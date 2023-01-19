@@ -1,5 +1,3 @@
-// ignore_for_file: avoid_print
-
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -7,62 +5,39 @@ import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:retry/retry.dart';
 
+// ignore_for_file: avoid_print, avoid_dynamic_calls
+
 const names = {
-  // 'aaaaa',
-  'avocado',
-  'banana',
-  'bonbon',
-  'bort',
-  'butter',
-  'cake',
-  'chocolate',
-  'cobalt',
-  'crepe',
-  'dash',
-  'density',
-  'dig',
-  'dust',
-  'fir',
-  'fos',
-  // 'gut',
-  'koalang',
-  'kom',
+  //
+  /* 'aaaaa', */ 'avocado',
+  'banana', 'bonbon', 'bort', 'butter',
+  'cake', 'chocolate', 'cobalt', 'crepe',
+  'dash', 'density', 'dig', 'dust',
+  'fir', 'fos',
+  /* 'gut', */
+  'koalang', 'kom',
   'lustrous',
-  'mandel',
-  'maracuja',
-  'moss',
-  'nuss',
-  'nut',
+  'mandel', 'maracuja', 'moss',
+  'nuss', 'nut',
   'oase',
-  'palm',
-  'party',
-  'pecan',
-  'phos',
-  'pistachio',
-  'plan',
-  'pretzl',
-  'sahara',
-  // 'sand',
-  'sick',
-  'sphene',
-  'stig',
-  'stuff',
-  // 'suricate',
-  'syrup',
+  'palm', 'party', 'pecan', 'phos', 'pistachio', 'plan', 'pretzl',
+  'sahara', /* 'sand', */ 'sick', 'sphene', 'stig', 'stuff',
+  /* 'suricate', */ 'syrup',
   'thing',
-  'walnut',
-  // 'whyyy',
-  'wit',
-  'wurzel',
+  'walnut', /* 'whyyy', */ 'wit', 'wurzel',
   'yam',
 };
 
 Future<void> main(List<String> args) async {
-  // final result = StringBuffer()
-  //   ..writeln('# Names for Candy')
-  //   ..writeln()
-  //   ..writeln('| Name | Domain | Domain `-lang` | GitHub | GitHub `-lang` |')
-  //   ..writeln('| :- | :-: | :-: | :-: | :-: |');
+  final resultFile = File('result.md');
+  if (!resultFile.existsSync()) {
+    await resultFile.writeAsString(
+      '# Names for Candy\n'
+      '\n'
+      '| Name | Domain | Domain `-lang` | GitHub | GitHub `-lang` |\n'
+      '| :- | :-: | :-: | :-: | :-: |\n',
+    );
+  }
 
   final names = <String>{};
   for (final name in _generateNames(200)) {
@@ -82,13 +57,11 @@ Future<void> main(List<String> args) async {
     final gitHubShort = results[2];
     final gitHubLong = results[3];
 
-    await File('result.md').writeAsString(
+    await resultFile.writeAsString(
       '| $name | $domainShort | $domainLong | $gitHubShort | $gitHubLong |\n',
       mode: FileMode.append,
     );
   }
-
-  // await File('result.md').writeAsString(result.toString());
 }
 
 Iterable<String> _generateNames(int count) sync* {
@@ -133,7 +106,7 @@ extension ListExtension<T> on List<T> {
 Future<String> isDomainAvailable(String name) async {
   final body = await retry(() async {
     final rawResponse = await http.post(
-      'https://domains.google.com/v1/Main/FeSearchService/Search?authuser=0',
+      Uri.https('domains.google.com', '/v1/Main/FeSearchService/Search'),
       headers: {
         'accept': 'application/json',
         'content-type': 'application/json',
@@ -177,7 +150,7 @@ Future<String> isDomainAvailable(String name) async {
 }
 
 Future<String> isGitHubOrganizationAvailable(String name) async {
-  final response = await http.head('https://github.com/$name');
+  final response = await http.head(Uri.https('github.com', '/$name'));
 
   switch (response.statusCode) {
     case HttpStatus.ok:

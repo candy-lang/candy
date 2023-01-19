@@ -1,14 +1,13 @@
 [ifElse, int] = use "...Core"
 
-fibRec = { fibRec n ->
+fibonacciRec = { fibonacciRec n ->
   ifElse (n | int.isLessThan 2) { n } {
-    fibRec fibRec (n | int.subtract 1)
-    | int.add (fibRec fibRec (n | int.subtract 2))
+    fibonacciRec fibonacciRec (n | int.subtract 1)
+    | int.add (fibonacciRec fibonacciRec (n | int.subtract 2))
   }
 }
-fib n =
+fibonacci n =
   needs (int.is n)
-  fibRec fibRec n
-twentyOne := fib 8
+  fibonacciRec fibonacciRec n
 
-main environment := Nothing
+main environment := fibonacci 15 # 610
