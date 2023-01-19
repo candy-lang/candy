@@ -214,8 +214,10 @@ jobs:
           gh-pages-branch: gh-pages
           gh-repository: github.com/candy-lang/benchmark-results
           benchmark-data-dir-path: ./
-          github-token: ${{ secrets.BENCHMARK_RESULTS_TOKEN }}
-          auto-push: true
+          # Only push results to the benchmark repository if we ran on a commit
+          # to the main branch.
+          auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          github-token: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.BENCHMARK_RESULTS_TOKEN || secrets.BENCHMARK_RESULTS_COMMENT_TOKEN }}
           comment-always: true
           comment-on-alert: true
           alert-threshold: 150%

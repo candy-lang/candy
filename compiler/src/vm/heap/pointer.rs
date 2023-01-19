@@ -16,6 +16,6 @@ impl Pointer {
 }
 impl Display for Pointer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:x}", self.0)
+        write!(f, "0x{:X}", self.0)
     }
 }
