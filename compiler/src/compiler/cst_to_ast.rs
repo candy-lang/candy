@@ -343,7 +343,8 @@ impl LoweringContext {
                 closing_parenthesis,
             } => {
                 match lowering_type {
-                    LoweringType::Expression => {
+                    LoweringType::Expression => {}
+                    LoweringType::Pattern | LoweringType::PatternLiteralPart => {
                         return self.create_ast(
                             cst.id,
                             AstKind::Error {
@@ -352,10 +353,8 @@ impl LoweringContext {
                                     self.create_error(cst, AstError::ParenthesizedInPattern)
                                 ],
                             },
-                        )
+                        );
                     }
-                    LoweringType::Pattern => {}
-                    LoweringType::PatternLiteralPart => {}
                 }
 
                 let mut ast = self.lower_cst(inner, LoweringType::Expression);
