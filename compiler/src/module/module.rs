@@ -127,7 +127,7 @@ impl Module {
         for path in paths {
             match path.try_exists() {
                 Ok(true) => return Some(path),
-                Ok(false) => warn!("Broken symbolic link: `{path:?}`."),
+                Ok(false) => {}
                 Err(error) if matches!(error.kind(), std::io::ErrorKind::NotFound) => {}
                 Err(_) => error!("Unexpected error when reading file {path:?}."),
             }

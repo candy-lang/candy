@@ -35,25 +35,48 @@ macro_rules! trace {
 
 #[derive(Clone)]
 pub struct Heap {
-    objects: HashMap<Pointer, Object>,
+    objects: Vec<Option<Object>>,
+    empty_addresses: Vec<Pointer>,
+    next_new_address: Pointer,
     channel_refcounts: HashMap<ChannelId, usize>,
-    next_address: Pointer,
 }
 
 impl std::fmt::Debug for Heap {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut objects = self.objects.iter().collect_vec();
-        objects.sort_by_key(|(address, _)| address.raw());
-
         writeln!(f, "{{")?;
-        for (address, object) in objects {
+        for (address, object) in self
+            .objects
+            .iter()
+            .enumerate()
+            .filter_map(|(address, object)| {
+                object
+                    .as_ref()
+                    .map(|object| (Pointer::from_raw(address), object))
+            })
+        {
             writeln!(
                 f,
-                "{address}: {} {}",
+                "{address} ({} {}): {}",
                 object.reference_count,
+                if object.reference_count == 1 {
+                    "ref"
+                } else {
+                    "refs"
+                },
                 address.format_debug(self),
             )?;
         }
+        if !self.empty_addresses.is_empty() {
+            writeln!(
+                f,
+                "empty_addresses: {}",
+                self.empty_addresses
+                    .iter()
+                    .map(|it| format!("{it}"))
+                    .join(", ")
+            )?;
+        }
+        writeln!(f, "next_new_address: {}", self.next_new_address)?;
         write!(f, "}}")
     }
 }
@@ -61,21 +84,24 @@ impl std::fmt::Debug for Heap {
 impl Default for Heap {
     fn default() -> Self {
         Self {
-            objects: HashMap::new(),
+            objects: vec![None],
+            empty_addresses: vec![],
+            next_new_address: Pointer::from_raw(1),
             channel_refcounts: HashMap::new(),
-            next_address: Pointer::from_raw(1),
         }
     }
 }
 impl Heap {
     pub fn get(&self, address: Pointer) -> &Object {
         self.objects
-            .get(&address)
+            .get(address.raw())
+            .and_then(|it| it.as_ref())
             .unwrap_or_else(|| panic!("Couldn't get object {address}."))
     }
     pub fn get_mut(&mut self, address: Pointer) -> &mut Object {
         self.objects
-            .get_mut(&address)
+            .get_mut(address.raw())
+            .and_then(|it| it.as_mut())
             .unwrap_or_else(|| panic!("Couldn't get object {address}."))
     }
     pub fn get_hir_id(&self, address: Pointer) -> Id {
@@ -140,16 +166,25 @@ impl Heap {
             data: object,
         };
         trace!("Creating object at {address}.");
-        self.objects.insert(address, object);
+        if address.raw() < self.objects.len() {
+            self.objects[address.raw()] = Some(object);
+        } else {
+            assert_eq!(address.raw(), self.objects.len());
+            self.objects.push(Some(object));
+        }
+
         address
     }
     fn reserve_address(&mut self) -> Pointer {
-        let address = self.next_address;
-        self.next_address = Pointer::from_raw(self.next_address.raw() + 1);
-        address
+        self.empty_addresses.pop().unwrap_or_else(|| {
+            let address = self.next_new_address;
+            self.next_new_address = Pointer::from_raw(self.next_new_address.raw() + 1);
+            address
+        })
     }
     fn free(&mut self, address: Pointer) {
-        let object = self.objects.remove(&address).unwrap();
+        let object = std::mem::take(&mut self.objects[address.raw()]).unwrap();
+        self.empty_addresses.push(address);
         trace!("Freeing object at {address}.");
         assert_eq!(object.reference_count, 0);
         for child in object.children() {
@@ -177,14 +212,31 @@ impl Heap {
         }
 
         for (address, refcount) in additional_refcounts {
-            other
-                .objects
-                .entry(address_map[&address])
-                .or_insert_with(|| Object {
-                    reference_count: 0,
+            let new_address = address_map[&address];
+            if new_address.raw() > other.objects.len() {
+                other
+                    .empty_addresses
+                    .extend((other.objects.len()..new_address.raw()).map(Pointer::from_raw));
+                other.objects.resize(new_address.raw(), None);
+            }
+
+            if new_address.raw() == other.objects.len() {
+                other.objects.push(Some(Object {
+                    reference_count: refcount,
                     data: Self::map_data(address_map, &self.get(address).data),
-                })
-                .reference_count += refcount;
+                }));
+            } else {
+                assert!(new_address.raw() < other.objects.len());
+                let object = &mut other.objects[new_address.raw()];
+                if let Some(object) = object {
+                    object.reference_count += refcount;
+                } else {
+                    *object = Some(Object {
+                        reference_count: refcount,
+                        data: Self::map_data(address_map, &self.get(address).data),
+                    });
+                }
+            }
         }
 
         addresses
