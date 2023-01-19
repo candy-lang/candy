@@ -62,8 +62,8 @@ use super::{
     tracing::TracingConfig,
 };
 use crate::{module::Module, utils::IdGenerator};
+use rustc_hash::FxHasher;
 use std::{
-    collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
     sync::Arc,
 };
@@ -142,7 +142,7 @@ impl Mir {
         }
     }
     fn do_hash(&self) -> u64 {
-        let mut hasher = DefaultHasher::new();
+        let mut hasher = FxHasher::default();
         self.hash(&mut hasher);
         hasher.finish()
     }
