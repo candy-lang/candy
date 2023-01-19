@@ -125,6 +125,7 @@ impl Deref for AstString {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum AstError {
+    ExpectedNameOrPatternInAssignment,
     ExpectedParameter,
     LambdaWithoutClosingCurlyBrace,
     ListItemWithoutComma,

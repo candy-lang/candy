@@ -67,6 +67,9 @@ impl Display for CompilerErrorPayload {
             }
             .to_string(),
             CompilerErrorPayload::Ast(error) => match error {
+                AstError::ExpectedNameOrPatternInAssignment => {
+                    "An assignment should have a name or pattern on the left side."
+                }
                 AstError::ExpectedParameter => "A parameter should come here.",
                 AstError::LambdaWithoutClosingCurlyBrace => {
                     "This lambda doesn't have a closing curly brace."

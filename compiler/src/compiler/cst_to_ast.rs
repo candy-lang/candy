@@ -727,7 +727,21 @@ impl LoweringContext {
                                 },
                             );
                         }
-                        _ => panic!("Expected an identifier, but found `{}`.", name_or_pattern),
+                        _ => {
+                            return self.create_ast(
+                                cst.id,
+                                AstKind::Error {
+                                    child: None,
+                                    errors: vec![CompilerError {
+                                        module: self.module.clone(),
+                                        span: name_or_pattern.span.clone(),
+                                        payload: CompilerErrorPayload::Ast(
+                                            AstError::ExpectedNameOrPatternInAssignment,
+                                        ),
+                                    }],
+                                },
+                            );
+                        }
                     };
 
                     let (parameters, errors) = self.lower_parameters(parameters);
