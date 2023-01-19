@@ -35,21 +35,22 @@
 //!
 //! [common subtree elimination]: super::common_subtree_elimination
 
+use rustc_hash::FxHashSet;
+
 use crate::{
     compiler::mir::{Body, Expression, Id, Mir},
     utils::IdGenerator,
 };
-use std::collections::HashSet;
 
 impl Mir {
     pub fn lift_constants(&mut self) {
         // Expressions in the top level should not be lifted as that would just
         // mean moving some constants and then creating references to them in
         // the original places.
-        let top_level_ids = self.body.iter().map(|(id, _)| id).collect::<HashSet<_>>();
+        let top_level_ids: FxHashSet<_> = self.body.iter().map(|(id, _)| id).collect();
 
         let mut constants = vec![];
-        let mut constant_ids = HashSet::new();
+        let mut constant_ids = FxHashSet::default();
 
         self.body.visit(&mut |id, expression, is_return_value| {
             if top_level_ids.contains(&id) {
@@ -87,7 +88,7 @@ impl Mir {
 
     fn remove_constants(
         body: &mut Body,
-        constant_ids: &HashSet<Id>,
+        constant_ids: &FxHashSet<Id>,
         id_generator: &mut IdGenerator<Id>,
     ) {
         let return_value = body.return_value();

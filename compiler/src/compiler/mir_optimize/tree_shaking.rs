@@ -16,15 +16,15 @@
 
 use crate::compiler::mir::{Body, Expression, Id, Mir};
 use itertools::Itertools;
-use std::collections::HashSet;
+use rustc_hash::FxHashSet;
 
 impl Mir {
     pub fn tree_shake(&mut self) {
-        self.body.tree_shake(&mut HashSet::new());
+        self.body.tree_shake(&mut FxHashSet::default());
     }
 }
 impl Body {
-    fn tree_shake(&mut self, keep: &mut HashSet<Id>) {
+    fn tree_shake(&mut self, keep: &mut FxHashSet<Id>) {
         let body = self.iter_mut().collect_vec();
         let mut ids_to_remove = vec![];
 

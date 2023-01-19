@@ -10,11 +10,13 @@
 //! ...            |  ...
 //! ```
 
+use rustc_hash::FxHashMap;
+
 use crate::{
     compiler::mir::{Body, Expression, Id, Mir},
     utils::IdGenerator,
 };
-use std::{collections::HashMap, mem};
+use std::mem;
 
 impl Mir {
     pub fn cleanup(&mut self) {
@@ -70,7 +72,7 @@ impl Mir {
 
     pub fn normalize_ids(&mut self) {
         let mut generator = IdGenerator::start_at(0);
-        let mapping: HashMap<Id, Id> = self
+        let mapping: FxHashMap<Id, Id> = self
             .body
             .defined_ids()
             .into_iter()

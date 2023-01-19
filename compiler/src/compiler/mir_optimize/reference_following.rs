@@ -16,12 +16,13 @@
 //!
 //! [constant folding]: super::constant_folding
 
-use crate::compiler::mir::{Expression, Id, Mir};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
+
+use crate::compiler::mir::{Expression, Mir};
 
 impl Mir {
     pub fn follow_references(&mut self) {
-        let mut replacements = HashMap::<Id, Id>::new();
+        let mut replacements = FxHashMap::default();
 
         self.body.visit(&mut |id, expression, _| {
             if let Expression::Reference(reference) = &expression {
