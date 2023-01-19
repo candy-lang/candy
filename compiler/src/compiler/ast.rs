@@ -135,6 +135,7 @@ pub enum AstError {
     ParenthesizedWithoutClosingParenthesis,
     PatternContainsInvalidExpression,
     PatternLiteralPartContainsInvalidExpression,
+    PipeInPattern,
     StructKeyWithoutColon,
     StructShorthandWithNotIdentifier,
     StructValueWithoutComma,

@@ -293,7 +293,18 @@ impl LoweringContext {
                 bar,
                 call,
             } => {
-                assert_eq!(lowering_type, LoweringType::Expression);
+                match lowering_type {
+                    LoweringType::Expression => {}
+                    LoweringType::Pattern | LoweringType::PatternLiteralPart => {
+                        return self.create_ast(
+                            cst.id,
+                            AstKind::Error {
+                                child: None,
+                                errors: vec![self.create_error(cst, AstError::PipeInPattern)],
+                            },
+                        )
+                    }
+                }
 
                 let ast = self.lower_cst(receiver, LoweringType::Expression);
 

@@ -89,6 +89,7 @@ impl Display for CompilerErrorPayload {
                 AstError::PatternLiteralPartContainsInvalidExpression => {
                     "This type of expression is not allowed in this part of a pattern."
                 }
+                AstError::PipeInPattern => "Pipes are not allowed in patterns.",
                 AstError::StructKeyWithoutColon => "This struct key should be followed by a colon.",
                 AstError::StructShorthandWithNotIdentifier => {
                     "Shorthand syntax in structs only supports identifiers."
