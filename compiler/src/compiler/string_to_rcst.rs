@@ -568,7 +568,7 @@ mod parse {
         );
         assert_eq!(
             whitespaces_and_newlines("\nfoo", 1, true),
-            ("\nfoo", vec![])
+            ("\nfoo", vec![]),
         );
         assert_eq!(
             whitespaces_and_newlines("\n  foo", 1, true),
