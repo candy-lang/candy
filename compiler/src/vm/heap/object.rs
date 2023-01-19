@@ -13,8 +13,8 @@ use crate::{
 };
 use itertools::Itertools;
 use num_bigint::BigInt;
+use rustc_hash::{FxHashMap, FxHasher};
 use std::{
-    collections::{hash_map::DefaultHasher, HashMap},
     hash::{Hash, Hasher},
     iter,
     ops::Deref,
@@ -90,7 +90,7 @@ impl List {
     }
 }
 impl Struct {
-    pub fn from_fields(heap: &Heap, fields: HashMap<Pointer, Pointer>) -> Self {
+    pub fn from_fields(heap: &Heap, fields: FxHashMap<Pointer, Pointer>) -> Self {
         let mut s = Self::default();
         for (key, value) in fields {
             s.insert(heap, key, value);
@@ -186,7 +186,7 @@ impl ReceivePort {
 
 impl Data {
     fn hash(&self, heap: &Heap) -> u64 {
-        let mut state = DefaultHasher::new();
+        let mut state = FxHasher::default();
         self.hash_with_state(heap, &mut state);
         state.finish()
     }

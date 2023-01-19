@@ -143,7 +143,6 @@ We already have a language server that provides some tooling.
 - pattern matching
 - add tests
 - add a more lightweight tracer that only tracks stack traces
-- optimize: inline functions
 - minimize inputs found through fuzzing
 - fuzz parser
 - remove builtinPrint

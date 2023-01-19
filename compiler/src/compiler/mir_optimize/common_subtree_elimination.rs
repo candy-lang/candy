@@ -18,15 +18,17 @@
 //! [constant lifting]: super::constant_lifting
 //! [module folding]: super::module_folding
 
+use rustc_hash::FxHashMap;
+
 use crate::{
     compiler::mir::{Expression, Id, Mir},
     utils::{CountableId, IdGenerator},
 };
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::hash_map::Entry;
 
 impl Mir {
     pub fn eliminate_common_subtrees(&mut self) {
-        let mut pure_expressions: HashMap<Expression, Id> = HashMap::new();
+        let mut pure_expressions = FxHashMap::default();
 
         self.body
             .visit_with_visible(&mut |id, expression, visible, _| {
@@ -64,7 +66,7 @@ impl Expression {
                 .map(|id| id.to_usize() + 1)
                 .unwrap_or(0),
         );
-        let mapping: HashMap<Id, Id> = self
+        let mapping: FxHashMap<Id, Id> = self
             .defined_ids()
             .into_iter()
             .map(|id| (id, generator.generate()))

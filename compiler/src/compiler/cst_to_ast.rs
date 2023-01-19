@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use rustc_hash::FxHashMap;
 
 use super::{
     ast::{
@@ -17,7 +18,7 @@ use crate::{
     },
     module::Module,
 };
-use std::{collections::HashMap, ops::Range, sync::Arc};
+use std::{ops::Range, sync::Arc};
 use tracing::warn;
 
 #[salsa::query_group(CstToAstStorage)]
@@ -31,7 +32,7 @@ pub trait CstToAst: CstDb + RcstToCst {
     fn ast(&self, module: Module) -> Option<AstResult>;
 }
 
-type AstResult = (Arc<Vec<Ast>>, Arc<HashMap<ast::Id, cst::Id>>);
+type AstResult = (Arc<Vec<Ast>>, Arc<FxHashMap<ast::Id, cst::Id>>);
 
 fn ast_to_cst_id(db: &dyn CstToAst, id: ast::Id) -> Option<cst::Id> {
     let (_, ast_to_cst_id_mapping) = db.ast(id.module.clone()).unwrap();
@@ -98,14 +99,14 @@ enum LoweringType {
 struct LoweringContext {
     module: Module,
     next_id: usize,
-    id_mapping: HashMap<ast::Id, cst::Id>,
+    id_mapping: FxHashMap<ast::Id, cst::Id>,
 }
 impl LoweringContext {
     fn new(module: Module) -> LoweringContext {
         LoweringContext {
             module,
             next_id: 0,
-            id_mapping: HashMap::new(),
+            id_mapping: FxHashMap::default(),
         }
     }
     fn lower_csts(&mut self, csts: &[Cst]) -> Vec<Ast> {

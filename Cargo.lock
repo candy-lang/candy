@@ -150,6 +150,7 @@ dependencies = [
  "proptest",
  "rand",
  "regex",
+ "rustc-hash",
  "salsa",
  "serde",
  "serde_json",

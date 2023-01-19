@@ -1,3 +1,5 @@
+use rustc_hash::FxHashMap;
+
 use crate::{
     compiler::hir::Id,
     vm::{
@@ -5,13 +7,12 @@ use crate::{
         FiberId, Heap, Pointer,
     },
 };
-use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct FuzzablesFinder {
-    pub fuzzables: HashMap<Id, Pointer>,
+    pub fuzzables: FxHashMap<Id, Pointer>,
     pub heap: Heap,
-    transferred_objects: HashMap<FiberId, HashMap<Pointer, Pointer>>,
+    transferred_objects: FxHashMap<FiberId, FxHashMap<Pointer, Pointer>>,
 }
 impl Tracer for FuzzablesFinder {
     fn add(&mut self, event: VmEvent) {
@@ -22,7 +23,7 @@ impl Tracer for FuzzablesFinder {
         let address_map = self
             .transferred_objects
             .entry(fiber)
-            .or_insert_with(HashMap::new);
+            .or_insert_with(FxHashMap::default);
         let closure = heap.clone_single_to_other_heap_with_existing_mapping(
             &mut self.heap,
             closure,
