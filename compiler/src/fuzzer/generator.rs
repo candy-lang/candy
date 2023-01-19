@@ -1,11 +1,10 @@
-use std::collections::HashMap;
-
 use crate::{
     builtin_functions,
     vm::{Heap, Packet, Pointer},
 };
 use num_bigint::RandBigInt;
 use rand::{prelude::ThreadRng, Rng};
+use rustc_hash::FxHashMap;
 
 pub fn generate_n_values(n: usize) -> Vec<Packet> {
     let mut values = vec![];
@@ -34,7 +33,7 @@ fn generate_value_with_complexity(
         3 => heap.create_symbol("Test".to_string()),
         4 => {
             complexity -= 1.0;
-            let mut fields = HashMap::new();
+            let mut fields = FxHashMap::default();
             while complexity > 20.0 {
                 let key = generate_value_with_complexity(heap, rng, 10.0);
                 let value = generate_value_with_complexity(heap, rng, 10.0);

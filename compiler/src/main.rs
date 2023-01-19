@@ -41,8 +41,8 @@ use compiler::{
 use itertools::Itertools;
 use language_server::CandyLanguageServer;
 use notify::{watcher, RecursiveMode, Watcher};
+use rustc_hash::FxHashMap;
 use std::{
-    collections::HashMap,
     convert::TryInto,
     env::current_dir,
     io::{self, BufRead, Write},
@@ -327,7 +327,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         let stdout_port = heap.create_send_port(stdout.channel);
         let stdin_symbol = heap.create_symbol("Stdin".to_string());
         let stdin_port = heap.create_send_port(stdin.channel);
-        heap.create_struct(HashMap::from([
+        heap.create_struct(FxHashMap::from_iter([
             (stdout_symbol, stdout_port),
             (stdin_symbol, stdin_port),
         ]))

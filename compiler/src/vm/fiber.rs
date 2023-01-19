@@ -13,7 +13,7 @@ use crate::{
     module::Module,
 };
 use itertools::Itertools;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use tracing::trace;
 
 const TRACE: bool = false;
@@ -159,10 +159,11 @@ impl Fiber {
         let receive_port_symbol = self.heap.create_symbol("ReceivePort".to_string());
         let send_port = self.heap.create_send_port(channel);
         let receive_port = self.heap.create_receive_port(channel);
-        self.data_stack.push(self.heap.create_struct(HashMap::from([
-            (send_port_symbol, send_port),
-            (receive_port_symbol, receive_port),
-        ])));
+        self.data_stack
+            .push(self.heap.create_struct(FxHashMap::from_iter([
+                (send_port_symbol, send_port),
+                (receive_port_symbol, receive_port),
+            ])));
         self.status = Status::Running;
     }
     pub fn complete_send(&mut self) {
@@ -311,7 +312,7 @@ impl Fiber {
                 for _ in 0..(2 * num_fields) {
                     key_value_addresses.push(self.data_stack.pop().unwrap());
                 }
-                let mut entries = HashMap::new();
+                let mut entries = FxHashMap::default();
                 for mut key_and_value in &key_value_addresses.into_iter().rev().chunks(2) {
                     let key = key_and_value.next().unwrap();
                     let value = key_and_value.next().unwrap();

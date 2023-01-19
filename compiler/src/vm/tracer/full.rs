@@ -1,14 +1,15 @@
 use super::{FiberEvent, Tracer, VmEvent};
 use crate::vm::{ChannelId, FiberId, Heap, Pointer};
 use itertools::Itertools;
-use std::{collections::HashMap, fmt, time::Instant};
+use rustc_hash::FxHashMap;
+use std::{fmt, time::Instant};
 
 /// A full tracer that saves all events that occur with timestamps.
 #[derive(Clone, Default)]
 pub struct FullTracer {
     pub events: Vec<TimedEvent>,
     pub heap: Heap,
-    transferred_objects: HashMap<FiberId, HashMap<Pointer, Pointer>>,
+    transferred_objects: FxHashMap<FiberId, FxHashMap<Pointer, Pointer>>,
 }
 #[derive(Clone)]
 pub struct TimedEvent {
@@ -86,7 +87,7 @@ impl FullTracer {
             let map = self
                 .transferred_objects
                 .entry(fiber)
-                .or_insert_with(HashMap::new);
+                .or_insert_with(FxHashMap::default);
             heap.clone_single_to_other_heap_with_existing_mapping(&mut self.heap, address, map)
         } else {
             heap.clone_single_to_other_heap(&mut self.heap, address)

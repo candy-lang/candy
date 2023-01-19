@@ -11,7 +11,8 @@ use super::ids::ChannelId;
 use crate::{builtin_functions::BuiltinFunction, compiler::hir::Id};
 use itertools::Itertools;
 use num_bigint::BigInt;
-use std::{cmp::Ordering, collections::HashMap};
+use rustc_hash::FxHashMap;
+use std::cmp::Ordering;
 
 const TRACE: bool = false;
 
@@ -38,7 +39,7 @@ pub struct Heap {
     objects: Vec<Option<Object>>,
     empty_addresses: Vec<Pointer>,
     next_new_address: Pointer,
-    channel_refcounts: HashMap<ChannelId, usize>,
+    channel_refcounts: FxHashMap<ChannelId, usize>,
 }
 
 impl std::fmt::Debug for Heap {
@@ -87,7 +88,7 @@ impl Default for Heap {
             objects: vec![None],
             empty_addresses: vec![],
             next_new_address: Pointer::from_raw(1),
-            channel_refcounts: HashMap::new(),
+            channel_refcounts: FxHashMap::default(),
         }
     }
 }
@@ -198,9 +199,9 @@ impl Heap {
         &self,
         other: &mut Heap,
         addresses: &[Pointer],
-        address_map: &mut HashMap<Pointer, Pointer>,
+        address_map: &mut FxHashMap<Pointer, Pointer>,
     ) -> Vec<Pointer> {
-        let mut additional_refcounts = HashMap::new();
+        let mut additional_refcounts = FxHashMap::default();
         for address in addresses {
             self.prepare_object_cloning(address_map, &mut additional_refcounts, other, *address);
         }
@@ -246,8 +247,8 @@ impl Heap {
     }
     fn prepare_object_cloning(
         &self,
-        address_map: &mut HashMap<Pointer, Pointer>,
-        additional_refcounts: &mut HashMap<Pointer, usize>,
+        address_map: &mut FxHashMap<Pointer, Pointer>,
+        additional_refcounts: &mut FxHashMap<Pointer, usize>,
         other: &mut Heap,
         address: Pointer,
     ) {
@@ -261,7 +262,7 @@ impl Heap {
             }
         }
     }
-    fn map_data(address_map: &HashMap<Pointer, Pointer>, data: &Data) -> Data {
+    fn map_data(address_map: &FxHashMap<Pointer, Pointer>, data: &Data) -> Data {
         match data {
             Data::Int(int) => Data::Int(int.clone()),
             Data::Text(text) => Data::Text(text.clone()),
@@ -295,14 +296,18 @@ impl Heap {
         &self,
         other: &mut Heap,
         address: Pointer,
-        address_map: &mut HashMap<Pointer, Pointer>,
+        address_map: &mut FxHashMap<Pointer, Pointer>,
     ) -> Pointer {
         self.clone_multiple_to_other_heap_with_existing_mapping(other, &[address], address_map)
             .pop()
             .unwrap()
     }
     pub fn clone_single_to_other_heap(&self, other: &mut Heap, address: Pointer) -> Pointer {
-        self.clone_single_to_other_heap_with_existing_mapping(other, address, &mut HashMap::new())
+        self.clone_single_to_other_heap_with_existing_mapping(
+            other,
+            address,
+            &mut FxHashMap::default(),
+        )
     }
 
     pub fn known_channels(&self) -> impl IntoIterator<Item = ChannelId> + '_ {
@@ -318,7 +323,7 @@ impl Heap {
     pub fn create_symbol(&mut self, symbol: String) -> Pointer {
         self.create(Data::Symbol(Symbol { value: symbol }))
     }
-    pub fn create_struct(&mut self, fields: HashMap<Pointer, Pointer>) -> Pointer {
+    pub fn create_struct(&mut self, fields: FxHashMap<Pointer, Pointer>) -> Pointer {
         self.create(Data::Struct(Struct::from_fields(self, fields)))
     }
     pub fn create_hir_id(&mut self, id: Id) -> Pointer {
@@ -358,7 +363,7 @@ impl Heap {
             Ok(it) => ("Ok".to_string(), it),
             Err(it) => ("Error".to_string(), it),
         };
-        let fields = HashMap::from([
+        let fields = FxHashMap::from_iter([
             (
                 self.create_symbol("Type".to_string()),
                 self.create_symbol(type_),
