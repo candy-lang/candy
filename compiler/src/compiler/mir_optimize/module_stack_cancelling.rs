@@ -38,4 +38,24 @@ impl Mir {
             }
         });
     }
+
+    pub fn remove_all_module_expressions_if_no_use_exists(&mut self) {
+        let mut contains_use = false;
+        self.body.visit(&mut |_, expression, _| {
+            if matches!(expression, Expression::UseModule { .. }) {
+                contains_use = true;
+            }
+        });
+
+        if !contains_use {
+            self.body.visit(&mut |_, expression, _| {
+                if matches!(
+                    expression,
+                    Expression::ModuleStarts { .. } | Expression::ModuleEnds
+                ) {
+                    *expression = Expression::nothing();
+                }
+            });
+        }
+    }
 }
