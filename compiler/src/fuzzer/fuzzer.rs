@@ -1,4 +1,4 @@
-use tracing::{debug, trace};
+use tracing::trace;
 
 use super::{
     input_pool::{InputPool, Score},
@@ -118,7 +118,7 @@ impl Fuzzer {
                 .unwrap_or_else(|| "{…}".to_string()),
             runner.input,
         );
-        debug!("{}", result.to_string(&call_string));
+        trace!("{}", result.to_string(&call_string));
         match result {
             RunResult::Timeout => self.create_new_fuzzing_case(pool),
             RunResult::Done { .. } | RunResult::NeedsUnfulfilled { .. } => {
