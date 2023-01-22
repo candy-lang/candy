@@ -1,79 +1,65 @@
-use super::generator::generate_n_values;
+use tracing::{debug, trace};
+
+use super::{
+    input_pool::{InputPool, Score},
+    runner::{RunResult, Runner},
+    utils::Input,
+    values::complexity_of_input,
+};
 use crate::{
-    compiler::hir::{self, Id},
+    compiler::hir::Id,
     vm::{
-        self,
         context::{ExecutionController, UseProvider},
         tracer::full::FullTracer,
-        Closure, Heap, Packet, Pointer, Vm,
+        Closure, Data, Heap, Pointer,
     },
 };
-use itertools::Itertools;
 use std::mem;
 
 pub struct Fuzzer {
     pub closure_heap: Heap,
     pub closure: Pointer,
-    pub closure_id: hir::Id,
+    pub closure_id: Id,
     status: Option<Status>, // only `None` during transitions
 }
 pub enum Status {
-    // TODO: Have some sort of timeout or track how long we've been running. If
-    // a function either goes into an infinite loop or does some error-prone
-    // stuff, we'll never find the errors if we accidentally first choose an
-    // input that triggers the loop.
     StillFuzzing {
-        vm: Vm,
-        arguments: Vec<Packet>,
-        tracer: FullTracer,
+        pool: InputPool,
+        runner: Runner,
+        max_coverage: usize,
     },
-    // TODO: In the future, also add a state for trying to simplify the
-    // arguments.
-    PanickedForArguments {
-        arguments: Vec<Packet>,
+    // TODO: In the future, also add a state for trying to simplify the input.
+    FoundPanic {
+        input: Input,
         reason: String,
-        responsible: hir::Id,
+        responsible: Id,
         tracer: FullTracer,
     },
 }
 
-impl Status {
-    fn new_fuzzing_attempt(closure_heap: &Heap, closure: Pointer) -> Status {
-        let num_args = {
-            let closure: Closure = closure_heap.get(closure).data.clone().try_into().unwrap();
-            closure.num_args
-        };
-
-        let mut vm_heap = Heap::default();
-        let closure = closure_heap.clone_single_to_other_heap(&mut vm_heap, closure);
-        let arguments = generate_n_values(num_args);
-        let argument_addresses = arguments
-            .iter()
-            .map(|arg| arg.clone_to_other_heap(&mut vm_heap))
-            .collect_vec();
-
-        let mut vm = Vm::default();
-        vm.set_up_for_running_closure(vm_heap, closure, argument_addresses, Id::fuzzer());
-
-        Status::StillFuzzing {
-            vm,
-            arguments,
-            tracer: FullTracer::default(),
-        }
-    }
-}
 impl Fuzzer {
-    pub fn new(closure_heap: &Heap, closure: Pointer, closure_id: hir::Id) -> Self {
+    pub fn new(closure_heap: &Heap, closure: Pointer, closure_id: Id) -> Self {
+        assert!(matches!(closure_heap.get(closure).data, Data::Closure(_)));
+
         // The given `closure_heap` may contain other fuzzable closures.
         let mut heap = Heap::default();
         let closure = closure_heap.clone_single_to_other_heap(&mut heap, closure);
 
-        let status = Status::new_fuzzing_attempt(&heap, closure);
+        let pool = {
+            let closure: Closure = heap.get(closure).data.clone().try_into().unwrap();
+            InputPool::new(closure.num_args)
+        };
+        let runner = Runner::new(&heap, closure, pool.generate_new_input());
+
         Self {
             closure_heap: heap,
             closure,
             closure_id,
-            status: Some(status),
+            status: Some(Status::StillFuzzing {
+                pool,
+                runner,
+                max_coverage: 0,
+            }),
         }
     }
 
@@ -90,53 +76,106 @@ impl Fuzzer {
         execution_controller: &mut E,
     ) {
         let mut status = mem::replace(&mut self.status, None).unwrap();
-        while matches!(status, Status::StillFuzzing { .. })
+        while !matches!(status, Status::FoundPanic { .. })
             && execution_controller.should_continue_running()
         {
-            status = self.map_status(status, use_provider, execution_controller);
+            status = match status {
+                Status::StillFuzzing {
+                    pool,
+                    runner,
+                    max_coverage,
+                } => self.continue_fuzzing(
+                    use_provider,
+                    execution_controller,
+                    pool,
+                    runner,
+                    max_coverage,
+                ),
+                // We already found some arguments that caused the closure to panic,
+                // so there's nothing more to do.
+                Status::FoundPanic {
+                    input,
+                    reason,
+                    responsible,
+                    tracer,
+                } => Status::FoundPanic {
+                    input,
+                    reason,
+                    responsible,
+                    tracer,
+                },
+            };
         }
         self.status = Some(status);
     }
-    fn map_status<U: UseProvider, E: ExecutionController>(
+
+    fn continue_fuzzing<U: UseProvider, E: ExecutionController>(
         &self,
-        status: Status,
-        use_provider: &U,
+        use_provider: &mut U,
         execution_controller: &mut E,
+        mut pool: InputPool,
+        mut runner: Runner,
+        mut max_coverage: usize,
     ) -> Status {
-        match status {
-            Status::StillFuzzing { mut vm, arguments, mut tracer } => match vm.status() {
-                vm::Status::CanRun => {
-                    vm.run(use_provider, execution_controller, &mut tracer);
-                    Status::StillFuzzing { vm, arguments, tracer }
-                }
-                vm::Status::WaitingForOperations => panic!("Fuzzing should not have to wait on channel operations because arguments were not channels."),
-                vm::Status::Done => Status::new_fuzzing_attempt(&self.closure_heap, self.closure),
-                vm::Status::Panicked { reason, responsible } => {
-                    if responsible == Id::fuzzer() {
-                        Status::new_fuzzing_attempt(&self.closure_heap, self.closure)
-                    } else {
-                        Status::PanickedForArguments {
-                            arguments,
-                            reason,
-                            responsible,
-                            tracer,
-                        }
-                    }
-                }
-            },
-            // We already found some arguments that caused the closure to panic,
-            // so there's nothing more to do.
-            Status::PanickedForArguments {
-                arguments,
+        runner.run(use_provider, execution_controller);
+        let Some(result) = runner.result else {
+            return Status::StillFuzzing { pool, runner, max_coverage };
+        };
+
+        let call_string = format!(
+            "`{} {}`",
+            self.closure_id
+                .keys
+                .last()
+                .map(|closure_name| closure_name.to_string())
+                .unwrap_or_else(|| "{…}".to_string()),
+            runner.input,
+        );
+        debug!("{}", result.to_string(&call_string));
+        match result {
+            RunResult::Timeout => self.create_new_fuzzing_case(pool, max_coverage),
+            RunResult::Done { .. } | RunResult::NeedsUnfulfilled { .. } => {
+                // TODO: For now, our "coverage" is just the number of executed
+                // instructions. In the future, we should instead actually look
+                // at what parts of the code ran. This way, we can boost inputs
+                // that achieve big coverage with few instructions.
+                let coverage = runner.num_instructions;
+
+                // We favor small inputs with good code coverage.
+                let score = {
+                    let coverage = coverage as Score;
+                    let complexity = complexity_of_input(&runner.input) as Score;
+                    let score: Score = 0.1 * coverage - 0.4 * complexity;
+                    score.clamp(0.1, Score::MAX)
+                };
+                // if coverage > max_coverage {
+                //     max_coverage = coverage;
+                // trace!(
+                //     "{} instructions: {}",
+                //     coverage,
+                //     result.to_string(&call_string),
+                // );
+                // }
+                pool.add(runner.input, score);
+                self.create_new_fuzzing_case(pool, max_coverage)
+            }
+            RunResult::Panicked {
                 reason,
                 responsible,
-                tracer,
-            } => Status::PanickedForArguments {
-                arguments,
+            } => Status::FoundPanic {
+                input: runner.input,
                 reason,
                 responsible,
-                tracer,
+                tracer: runner.tracer,
             },
+        }
+    }
+    fn create_new_fuzzing_case(&self, pool: InputPool, max_coverage: usize) -> Status {
+        let runner = Runner::new(&self.closure_heap, self.closure, pool.generate_new_input());
+        Status::StillFuzzing {
+            pool,
+            runner,
+            max_coverage,
         }
     }
 }

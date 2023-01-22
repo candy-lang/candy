@@ -1,12 +1,32 @@
+use std::fmt;
+
+use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
 use crate::{
     compiler::hir::Id,
     vm::{
         tracer::{FiberEvent, Tracer, VmEvent},
-        FiberId, Heap, Pointer,
+        Data, FiberId, Heap, Packet, Pointer,
     },
 };
+
+#[derive(Clone)]
+pub struct Input {
+    pub arguments: Vec<Packet>,
+}
+impl fmt::Display for Input {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.arguments
+                .iter()
+                .map(|arg| format!("{arg:?}"))
+                .join(" ")
+        )
+    }
+}
 
 #[derive(Default)]
 pub struct FuzzablesFinder {
@@ -18,6 +38,7 @@ impl Tracer for FuzzablesFinder {
     fn add(&mut self, event: VmEvent) {
         let VmEvent::InFiber { fiber, event } = event else { return; };
         let FiberEvent::FoundFuzzableClosure { definition, closure, heap } = event else { return; };
+        assert!(matches!(heap.get(closure).data, Data::Closure(_)));
 
         let definition = heap.get_hir_id(definition);
         let address_map = self
@@ -29,6 +50,7 @@ impl Tracer for FuzzablesFinder {
             closure,
             address_map,
         );
+        assert!(matches!(self.heap.get(closure).data, Data::Closure(_)));
         self.fuzzables.insert(definition, closure);
     }
 }

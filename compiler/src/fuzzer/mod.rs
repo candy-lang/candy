@@ -1,7 +1,10 @@
 mod fuzzer;
-mod generator;
+mod input_pool;
+mod runner;
 mod utils;
+mod values;
 
+use self::utils::Input;
 pub use self::{
     fuzzer::{Fuzzer, Status},
     utils::FuzzablesFinder,
@@ -13,10 +16,9 @@ use crate::{
     vm::{
         context::{DbUseProvider, RunForever, RunLimitedNumberOfInstructions},
         tracer::full::FullTracer,
-        Closure, Heap, Packet, Pointer, Vm,
+        Closure, Heap, Pointer, Vm,
     },
 };
-use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use tracing::{error, info};
 
@@ -64,8 +66,8 @@ pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
         );
         match fuzzer.into_status() {
             Status::StillFuzzing { .. } => {}
-            Status::PanickedForArguments {
-                arguments,
+            Status::FoundPanic {
+                input,
                 reason,
                 responsible,
                 tracer,
@@ -73,7 +75,7 @@ pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
                 error!("The fuzzer discovered an input that crashes {id}:");
                 let case = FailingFuzzCase {
                     closure: id,
-                    arguments,
+                    input,
                     reason,
                     responsible,
                     tracer,
@@ -89,7 +91,7 @@ pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
 
 pub struct FailingFuzzCase {
     closure: Id,
-    arguments: Vec<Packet>,
+    input: Input,
     reason: String,
     responsible: Id,
     tracer: FullTracer,
@@ -99,12 +101,7 @@ impl FailingFuzzCase {
     pub fn dump(&self, db: &Database) {
         error!(
             "Calling `{} {}` panics: {}",
-            self.closure,
-            self.arguments
-                .iter()
-                .map(|arg| format!("{arg:?}"))
-                .join(" "),
-            self.reason,
+            self.closure, self.input, self.reason,
         );
         error!("{} is responsible.", self.responsible,);
         error!(
