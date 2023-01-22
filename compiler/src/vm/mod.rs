@@ -10,7 +10,7 @@ mod use_module;
 pub use self::{
     channel::Packet,
     fiber::{ExecutionResult, Fiber},
-    heap::{Closure, Data, Heap, Int, List, Object, Pointer, SendPort, Struct, Text},
+    heap::{Closure, Data, Heap, Int, List, Object, Pointer, SendPort, Struct, Symbol, Text},
     ids::{ChannelId, FiberId, OperationId},
     tracer::{full::FullTracer, Tracer},
 };
