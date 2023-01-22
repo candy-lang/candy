@@ -1,5 +1,3 @@
-use std::mem;
-
 use itertools::Itertools;
 
 use crate::{
@@ -10,7 +8,7 @@ use crate::{
             CombiningExecutionController, CountingExecutionController, ExecutionController,
             UseProvider,
         },
-        ExecutionResult, FullTracer, Heap, Packet, Pointer, Vm,
+        FullTracer, Heap, Pointer, Vm,
     },
 };
 
@@ -31,7 +29,7 @@ pub enum RunResult {
     Timeout,
 
     /// The execution finished successfully with a value.
-    Done { return_value: Packet },
+    Done,
 
     /// The execution panicked and the caller of the closure (aka the fuzzer) is
     /// at fault.
@@ -45,7 +43,7 @@ impl RunResult {
     pub fn to_string(&self, call: &str) -> String {
         match self {
             RunResult::Timeout => format!("{call} timed out."),
-            RunResult::Done { return_value } => format!("{call} returned `{return_value:?}`."),
+            RunResult::Done => format!("{call} returned."),
             RunResult::NeedsUnfulfilled { reason } => {
                 format!("{call} panicked and it's our fault: {reason}")
             }
@@ -118,11 +116,7 @@ impl Runner {
             // it's of course valid to have a function that never returns. Thus,
             // this should be treated just like a regular timeout.
             vm::Status::WaitingForOperations => Some(RunResult::Timeout),
-            vm::Status::Done => {
-                let vm = mem::take(&mut self.vm).unwrap();
-                let ExecutionResult::Finished(return_value) = vm.tear_down() else { unreachable!() };
-                Some(RunResult::Done { return_value })
-            }
+            vm::Status::Done => Some(RunResult::Done),
             vm::Status::Panicked {
                 reason,
                 responsible,

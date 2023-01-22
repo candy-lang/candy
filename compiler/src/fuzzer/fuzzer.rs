@@ -1,4 +1,4 @@
-use tracing::{debug, trace};
+use tracing::trace;
 
 use super::{
     input_pool::{InputPool, Score},
@@ -26,7 +26,6 @@ pub enum Status {
     StillFuzzing {
         pool: InputPool,
         runner: Runner,
-        max_coverage: usize,
     },
     // TODO: In the future, also add a state for trying to simplify the input.
     FoundPanic {
@@ -55,11 +54,7 @@ impl Fuzzer {
             closure_heap: heap,
             closure,
             closure_id,
-            status: Some(Status::StillFuzzing {
-                pool,
-                runner,
-                max_coverage: 0,
-            }),
+            status: Some(Status::StillFuzzing { pool, runner }),
         }
     }
 
@@ -80,17 +75,9 @@ impl Fuzzer {
             && execution_controller.should_continue_running()
         {
             status = match status {
-                Status::StillFuzzing {
-                    pool,
-                    runner,
-                    max_coverage,
-                } => self.continue_fuzzing(
-                    use_provider,
-                    execution_controller,
-                    pool,
-                    runner,
-                    max_coverage,
-                ),
+                Status::StillFuzzing { pool, runner } => {
+                    self.continue_fuzzing(use_provider, execution_controller, pool, runner)
+                }
                 // We already found some arguments that caused the closure to panic,
                 // so there's nothing more to do.
                 Status::FoundPanic {
@@ -115,11 +102,10 @@ impl Fuzzer {
         execution_controller: &mut E,
         mut pool: InputPool,
         mut runner: Runner,
-        mut max_coverage: usize,
     ) -> Status {
         runner.run(use_provider, execution_controller);
         let Some(result) = runner.result else {
-            return Status::StillFuzzing { pool, runner, max_coverage };
+            return Status::StillFuzzing { pool, runner };
         };
 
         let call_string = format!(
@@ -131,9 +117,9 @@ impl Fuzzer {
                 .unwrap_or_else(|| "{…}".to_string()),
             runner.input,
         );
-        debug!("{}", result.to_string(&call_string));
+        trace!("{}", result.to_string(&call_string));
         match result {
-            RunResult::Timeout => self.create_new_fuzzing_case(pool, max_coverage),
+            RunResult::Timeout => self.create_new_fuzzing_case(pool),
             RunResult::Done { .. } | RunResult::NeedsUnfulfilled { .. } => {
                 // TODO: For now, our "coverage" is just the number of executed
                 // instructions. In the future, we should instead actually look
@@ -148,16 +134,8 @@ impl Fuzzer {
                     let score: Score = 0.1 * coverage - 0.4 * complexity;
                     score.clamp(0.1, Score::MAX)
                 };
-                // if coverage > max_coverage {
-                //     max_coverage = coverage;
-                // trace!(
-                //     "{} instructions: {}",
-                //     coverage,
-                //     result.to_string(&call_string),
-                // );
-                // }
                 pool.add(runner.input, score);
-                self.create_new_fuzzing_case(pool, max_coverage)
+                self.create_new_fuzzing_case(pool)
             }
             RunResult::Panicked {
                 reason,
@@ -170,12 +148,8 @@ impl Fuzzer {
             },
         }
     }
-    fn create_new_fuzzing_case(&self, pool: InputPool, max_coverage: usize) -> Status {
+    fn create_new_fuzzing_case(&self, pool: InputPool) -> Status {
         let runner = Runner::new(&self.closure_heap, self.closure, pool.generate_new_input());
-        Status::StillFuzzing {
-            pool,
-            runner,
-            max_coverage,
-        }
+        Status::StillFuzzing { pool, runner }
     }
 }
