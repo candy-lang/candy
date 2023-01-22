@@ -25,10 +25,10 @@ recursive initialArg body :=
 ## TODO: Support looping with a state.
 loop body :=
   needs (function.is0 body)
-  recursive Nothing { rec arg ->
+  recursive Nothing { recurse arg ->
     result = function.run body
     needs
       ((result | equals Continue) | bool.or (result | equals Break))
       "The `body` has to return `Continue` or `Break`."
-    if (result | equals Continue) { rec Nothing }
+    if (result | equals Continue) { recurse Nothing }
   }
