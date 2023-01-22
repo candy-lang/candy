@@ -9,13 +9,15 @@ pub type Score = f64;
 
 pub struct InputPool {
     num_args: usize,
+    symbols: Vec<String>,
     inputs_and_scores: Vec<(Input, Score)>,
 }
 
 impl InputPool {
-    pub fn new(num_args: usize) -> Self {
+    pub fn new(num_args: usize, symbols_in_heap: Vec<String>) -> Self {
         Self {
             num_args,
+            symbols: symbols_in_heap,
             inputs_and_scores: vec![],
         }
     }
@@ -24,7 +26,7 @@ impl InputPool {
         let mut rng = ThreadRng::default();
 
         if rng.gen_bool(0.1) || self.inputs_and_scores.len() < 20 {
-            return generate_input(self.num_args);
+            return generate_input(self.num_args, &self.symbols);
         }
 
         let (input, _) = self
@@ -32,7 +34,7 @@ impl InputPool {
             .choose_weighted(&mut rng, |(_, score)| *score)
             .unwrap();
         let mut input = input.clone();
-        mutate_input(&mut rng, &mut input);
+        mutate_input(&mut rng, &mut input, &self.symbols);
         return input;
     }
 

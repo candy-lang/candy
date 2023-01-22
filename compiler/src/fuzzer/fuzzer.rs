@@ -1,4 +1,4 @@
-use tracing::trace;
+use tracing::{debug, trace};
 
 use super::{
     input_pool::{InputPool, Score},
@@ -8,6 +8,7 @@ use super::{
 };
 use crate::{
     compiler::hir::Id,
+    fuzzer::utils::collect_symbols_in_heap,
     vm::{
         context::{ExecutionController, UseProvider},
         tracer::full::FullTracer,
@@ -46,7 +47,7 @@ impl Fuzzer {
 
         let pool = {
             let closure: Closure = heap.get(closure).data.clone().try_into().unwrap();
-            InputPool::new(closure.num_args)
+            InputPool::new(closure.num_args, collect_symbols_in_heap(&heap))
         };
         let runner = Runner::new(&heap, closure, pool.generate_new_input());
 
@@ -117,7 +118,7 @@ impl Fuzzer {
                 .unwrap_or_else(|| "{…}".to_string()),
             runner.input,
         );
-        trace!("{}", result.to_string(&call_string));
+        debug!("{}", result.to_string(&call_string));
         match result {
             RunResult::Timeout => self.create_new_fuzzing_case(pool),
             RunResult::Done { .. } | RunResult::NeedsUnfulfilled { .. } => {

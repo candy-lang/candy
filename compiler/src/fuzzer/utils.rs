@@ -28,6 +28,18 @@ impl fmt::Display for Input {
     }
 }
 
+pub fn collect_symbols_in_heap(heap: &Heap) -> Vec<String> {
+    heap.all_objects()
+        .filter_map(|object| {
+            if let Data::Symbol(symbol) = &object.data {
+                Some(symbol.value.to_string())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 #[derive(Default)]
 pub struct FuzzablesFinder {
     pub fuzzables: FxHashMap<Id, Pointer>,

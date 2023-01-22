@@ -15,33 +15,40 @@ use rustc_hash::FxHashMap;
 
 use super::utils::Input;
 
-pub fn generate_input(num_args: usize) -> Input {
+pub fn generate_input(num_args: usize, symbols: &[String]) -> Input {
     let mut arguments = vec![];
     for _ in 0..num_args {
-        arguments.push(generate_value());
+        arguments.push(generate_value(symbols));
     }
     Input { arguments }
 }
 
-fn generate_value() -> Packet {
+fn generate_value(symbols: &[String]) -> Packet {
     let mut heap = Heap::default();
-    let address = generate_value_with_complexity(&mut heap, &mut rand::thread_rng(), 100.0);
+    let address =
+        generate_value_with_complexity(&mut heap, &mut rand::thread_rng(), 100.0, symbols);
     Packet { heap, address }
 }
 fn generate_value_with_complexity(
     heap: &mut Heap,
     rng: &mut ThreadRng,
     mut complexity: f32,
+    symbols: &[String],
 ) -> Pointer {
     match rng.gen_range(1..=5) {
         1 => heap.create_int(rng.gen_bigint(10)),
         2 => heap.create_text("test".to_string()),
-        3 => heap.create_symbol("Test".to_string()),
+        3 => heap.create_symbol(
+            symbols
+                .choose(rng)
+                .map(|symbol| symbol.to_string())
+                .unwrap_or_else(|| "Nothing".to_string()),
+        ),
         4 => {
             complexity -= 1.0;
             let mut items = vec![];
             while complexity > 10.0 {
-                let item = generate_value_with_complexity(heap, rng, 10.0);
+                let item = generate_value_with_complexity(heap, rng, 10.0, symbols);
                 items.push(item);
                 complexity -= 10.0;
             }
@@ -51,8 +58,8 @@ fn generate_value_with_complexity(
             complexity -= 1.0;
             let mut fields = FxHashMap::default();
             while complexity > 20.0 {
-                let key = generate_value_with_complexity(heap, rng, 10.0);
-                let value = generate_value_with_complexity(heap, rng, 10.0);
+                let key = generate_value_with_complexity(heap, rng, 10.0, symbols);
+                let value = generate_value_with_complexity(heap, rng, 10.0, symbols);
                 fields.insert(key, value);
                 complexity -= 20.0;
             }
@@ -65,15 +72,20 @@ fn generate_value_with_complexity(
     }
 }
 
-pub fn mutate_input(rng: &mut ThreadRng, input: &mut Input) {
+pub fn mutate_input(rng: &mut ThreadRng, input: &mut Input, symbols: &[String]) {
     let num_args = input.arguments.len();
     let packet = input.arguments.get_mut(rng.gen_range(0..num_args)).unwrap();
-    packet.address = mutate_value(rng, &mut packet.heap, packet.address);
+    packet.address = mutate_value(rng, &mut packet.heap, packet.address, symbols);
 }
-fn mutate_value(rng: &mut ThreadRng, heap: &mut Heap, address: Pointer) -> Pointer {
+fn mutate_value(
+    rng: &mut ThreadRng,
+    heap: &mut Heap,
+    address: Pointer,
+    symbols: &[String],
+) -> Pointer {
     if rng.gen_bool(0.1) {
         heap.drop(address);
-        return generate_value_with_complexity(heap, rng, 100.0);
+        return generate_value_with_complexity(heap, rng, 100.0, symbols);
     }
 
     // We know that there are no cycles in the values because otherwise, objects
@@ -82,7 +94,7 @@ fn mutate_value(rng: &mut ThreadRng, heap: &mut Heap, address: Pointer) -> Point
     let mut data = mem::replace(
         &mut heap.get_mut(address).data,
         Data::Symbol(Symbol {
-            value: "nothing".to_string(),
+            value: "Nothing".to_string(),
         }),
     );
 
@@ -94,20 +106,20 @@ fn mutate_value(rng: &mut ThreadRng, heap: &mut Heap, address: Pointer) -> Point
             mutate_string(rng, &mut text.value);
         }
         Data::Symbol(symbol) => {
-            let first_letter = symbol.value.remove(0);
-            mutate_string(rng, &mut symbol.value);
-            symbol.value.insert(0, first_letter);
+            if !symbols.is_empty() {
+                symbol.value = symbols.choose(rng).unwrap().to_string();
+            }
         }
         Data::List(List { items }) => {
             if rng.gen_bool(0.9) && !items.is_empty() {
                 let index = rng.gen_range(0..items.len());
-                items[index] = mutate_value(rng, heap, items[index]);
+                items[index] = mutate_value(rng, heap, items[index], symbols);
             } else if rng.gen_bool(0.5) && !items.is_empty() {
                 items.remove(rng.gen_range(0..items.len()));
             } else {
                 items.insert(
                     rng.gen_range(0..=items.len()),
-                    generate_value_with_complexity(heap, rng, 100.0),
+                    generate_value_with_complexity(heap, rng, 100.0, symbols),
                 );
             }
         }
@@ -115,14 +127,14 @@ fn mutate_value(rng: &mut ThreadRng, heap: &mut Heap, address: Pointer) -> Point
             if rng.gen_bool(0.9) && !struct_.fields.is_empty() {
                 let index = rng.gen_range(0..struct_.fields.len());
                 let (_, _, value) = struct_.fields[index];
-                struct_.fields[index].2 = mutate_value(rng, heap, value);
+                struct_.fields[index].2 = mutate_value(rng, heap, value, symbols);
             } else if rng.gen_bool(0.5) && !struct_.fields.is_empty() {
                 struct_
                     .fields
                     .remove(rng.gen_range(0..struct_.fields.len()));
             } else {
-                let key = generate_value_with_complexity(heap, rng, 10.0);
-                let value = generate_value_with_complexity(heap, rng, 100.0);
+                let key = generate_value_with_complexity(heap, rng, 10.0, symbols);
+                let value = generate_value_with_complexity(heap, rng, 100.0, symbols);
                 struct_.insert(heap, key, value);
             }
         }
