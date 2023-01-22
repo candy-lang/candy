@@ -13,19 +13,19 @@ if condition then :=
   needs (function.is0 then)
   ifElse condition then {}
 
-recurse initialArg body :=
-  needs (function.is2 body) "The `body` should take the recurse function and the argument."
-  fullRec = { fullRec arg ->
-    rec = { arg -> fullRec fullRec arg }
+recursive initialArg body :=
+  needs (function.is2 body) "The `body` should take the recursive function and the argument."
+  recurse = { recurse arg ->
+    rec = { arg -> recurse recurse arg }
     body rec arg
   }
-  fullRec fullRec initialArg
+  recurse recurse initialArg
 
 ## TODO: Support breaking with a value as soon as tags are supported.
 ## TODO: Support looping with a state.
 loop body :=
   needs (function.is0 body)
-  recurse Nothing { rec arg ->
+  recursive Nothing { rec arg ->
     result = function.run body
     needs
       ((result | equals Continue) | bool.or (result | equals Break))
