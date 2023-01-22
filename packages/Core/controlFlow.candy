@@ -13,8 +13,8 @@ if condition then :=
   needs (function.is0 then)
   ifElse condition then {}
 
-recursive initialArg body :=
-  needs (function.is2 body) "The `body` should take the recursive function and the argument."
+recurse initialArg body :=
+  needs (function.is2 body) "The `body` should take the recurse function and the argument."
   fullRec = { fullRec arg ->
     rec = { arg -> fullRec fullRec arg }
     body rec arg
@@ -25,7 +25,7 @@ recursive initialArg body :=
 ## TODO: Support looping with a state.
 loop body :=
   needs (function.is0 body)
-  recursive Nothing { rec arg ->
+  recurse Nothing { rec arg ->
     result = function.run body
     needs
       ((result | equals Continue) | bool.or (result | equals Break))

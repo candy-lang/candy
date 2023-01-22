@@ -1,8 +1,8 @@
-[ifElse, int, recursive] = use "...Core"
+[ifElse, int, recurse] = use "...Core"
 
 fibonacci n =
   needs (int.is n)
-  recursive n { rec n ->
+  recurse n { rec n ->
     ifElse (n | int.isLessThan 2) { n } {
       rec (n | int.subtract 1)
       | int.add (rec (n | int.subtract 2))
