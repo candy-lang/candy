@@ -7,13 +7,14 @@ use crate::{
     compiler::hir::Id,
     vm::{
         tracer::{FiberEvent, Tracer, VmEvent},
-        Data, FiberId, Heap, Packet, Pointer,
+        Data, FiberId, Heap, Pointer,
     },
 };
 
 #[derive(Clone)]
 pub struct Input {
-    pub arguments: Vec<Packet>,
+    pub heap: Heap,
+    pub arguments: Vec<Pointer>,
 }
 impl fmt::Display for Input {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -22,9 +23,19 @@ impl fmt::Display for Input {
             "{}",
             self.arguments
                 .iter()
-                .map(|arg| format!("{arg:?}"))
+                .map(|arg| arg.format(&self.heap))
                 .join(" "),
         )
+    }
+}
+impl Input {
+    pub fn clone_to_other_heap(&self, other: &mut Heap) -> Vec<Pointer> {
+        self.heap
+            .clone_multiple_to_other_heap_with_existing_mapping(
+                other,
+                &self.arguments,
+                &mut FxHashMap::default(),
+            )
     }
 }
 

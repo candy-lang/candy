@@ -1,5 +1,3 @@
-use itertools::Itertools;
-
 use crate::{
     compiler::hir::Id,
     vm::{
@@ -60,11 +58,7 @@ impl Runner {
         ));
         let mut vm_heap = Heap::default();
         let closure = closure_heap.clone_single_to_other_heap(&mut vm_heap, closure);
-        let argument_addresses = input
-            .arguments
-            .iter()
-            .map(|arg| arg.clone_to_other_heap(&mut vm_heap))
-            .collect_vec();
+        let argument_addresses = input.clone_to_other_heap(&mut vm_heap);
 
         let mut vm = Vm::default();
         vm.set_up_for_running_closure(vm_heap, closure, argument_addresses, Id::fuzzer());

@@ -35,7 +35,7 @@ impl InputPool {
             .unwrap();
         let mut input = input.clone();
         mutate_input(&mut rng, &mut input, &self.symbols);
-        return input;
+        input
     }
 
     pub fn add(&mut self, input: Input, score: Score) {

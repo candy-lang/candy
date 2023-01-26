@@ -2,7 +2,7 @@ use std::mem;
 
 use crate::{
     builtin_functions,
-    vm::{Data, Heap, List, Packet, Pointer, Symbol},
+    vm::{Data, Heap, List, Pointer, Symbol},
 };
 use itertools::Itertools;
 use num_bigint::RandBigInt;
@@ -16,19 +16,16 @@ use rustc_hash::FxHashMap;
 use super::utils::Input;
 
 pub fn generate_input(num_args: usize, symbols: &[String]) -> Input {
+    let mut heap = Heap::default();
     let mut arguments = vec![];
     for _ in 0..num_args {
-        arguments.push(generate_value(symbols));
+        let address =
+            generate_value_with_complexity(&mut heap, &mut rand::thread_rng(), 100.0, symbols);
+        arguments.push(address);
     }
-    Input { arguments }
+    Input { heap, arguments }
 }
 
-fn generate_value(symbols: &[String]) -> Packet {
-    let mut heap = Heap::default();
-    let address =
-        generate_value_with_complexity(&mut heap, &mut rand::thread_rng(), 100.0, symbols);
-    Packet { heap, address }
-}
 fn generate_value_with_complexity(
     heap: &mut Heap,
     rng: &mut ThreadRng,
@@ -74,8 +71,8 @@ fn generate_value_with_complexity(
 
 pub fn mutate_input(rng: &mut ThreadRng, input: &mut Input, symbols: &[String]) {
     let num_args = input.arguments.len();
-    let packet = input.arguments.get_mut(rng.gen_range(0..num_args)).unwrap();
-    packet.address = mutate_value(rng, &mut packet.heap, packet.address, symbols);
+    let argument = input.arguments.get_mut(rng.gen_range(0..num_args)).unwrap();
+    *argument = mutate_value(rng, &mut input.heap, *argument, symbols);
 }
 fn mutate_value(
     rng: &mut ThreadRng,
@@ -172,7 +169,7 @@ pub fn complexity_of_input(input: &Input) -> usize {
     input
         .arguments
         .iter()
-        .map(|packet| complexity_of_value(&packet.heap, packet.address))
+        .map(|argument| complexity_of_value(&input.heap, *argument))
         .sum()
 }
 fn complexity_of_value(heap: &Heap, address: Pointer) -> usize {
