@@ -177,7 +177,7 @@ pub fn complexity_of_input(input: &Input) -> usize {
 }
 fn complexity_of_value(heap: &Heap, address: Pointer) -> usize {
     match &heap.get(address).data {
-        Data::Int(int) => int.value.magnitude().bits() as usize,
+        Data::Int(int) => int.value.bits() as usize,
         Data::Text(text) => text.value.len() + 1,
         Data::Symbol(symbol) => symbol.value.len(),
         Data::List(list) => {
