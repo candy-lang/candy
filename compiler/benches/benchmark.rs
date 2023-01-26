@@ -9,7 +9,7 @@ mod utils;
 
 // `Core` is available via `use "..Core"`.
 
-fn benchmark_compiler(c: &mut Criterion, prefix: &str) {
+fn benchmark_compiler<M: Measurement>(c: &mut Criterion<M>, prefix: &str) {
     let mut group = c.benchmark_group(format!("{prefix}: Compiler"));
 
     group.sample_size(100);
@@ -23,7 +23,7 @@ fn benchmark_compiler(c: &mut Criterion, prefix: &str) {
 
     group.finish();
 }
-fn benchmark_vm_runtime(c: &mut Criterion, prefix: &str) {
+fn benchmark_vm_runtime<M: Measurement>(c: &mut Criterion<M>, prefix: &str) {
     let mut group = c.benchmark_group(format!("{prefix}: VM Runtime"));
 
     group.sample_size(100);
@@ -80,7 +80,7 @@ impl<'a, M: Measurement> BencherExtension for Bencher<'a, M> {
     }
 }
 
-fn run_benchmarks(c: &mut Criterion<CyclesPerByte>, prefix: &str) {
+fn run_benchmarks<M: Measurement>(c: &mut Criterion<M>, prefix: &str) {
     benchmark_compiler(c, prefix);
     benchmark_vm_runtime(c, prefix);
 }
@@ -88,7 +88,11 @@ fn run_benchmarks(c: &mut Criterion<CyclesPerByte>, prefix: &str) {
 fn run_cycle_benchmarks(c: &mut Criterion<CyclesPerByte>) {
     run_benchmarks(c, &"Cycles");
 }
-criterion_group!(cycle_benchmarks, run_cycle_benchmarks);
+criterion_group!(
+    name = cycle_benchmarks;
+    config = Criterion::default().with_measurement(CyclesPerByte);
+    targets = run_cycle_benchmarks,
+);
 
 fn run_time_benchmarks(c: &mut Criterion) {
     run_benchmarks(c, &"Time");
