@@ -23,7 +23,7 @@ impl fmt::Display for Input {
             self.arguments
                 .iter()
                 .map(|arg| format!("{arg:?}"))
-                .join(" ")
+                .join(" "),
         )
     }
 }

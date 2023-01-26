@@ -51,7 +51,7 @@ impl Mir {
             self.body.visit(&mut |_, expression, _| {
                 if matches!(
                     expression,
-                    Expression::ModuleStarts { .. } | Expression::ModuleEnds
+                    Expression::ModuleStarts { .. } | Expression::ModuleEnds,
                 ) {
                     *expression = Expression::nothing();
                 }

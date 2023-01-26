@@ -189,9 +189,8 @@ fn complexity_of_value(heap: &Heap, address: Pointer) -> usize {
         }
         Data::Struct(struct_) => {
             struct_
-                .fields
                 .iter()
-                .map(|(_, key, value)| {
+                .map(|(key, value)| {
                     complexity_of_value(heap, *key) + complexity_of_value(heap, *value)
                 })
                 .sum::<usize>()

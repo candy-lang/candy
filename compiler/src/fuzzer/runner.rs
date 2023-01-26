@@ -56,7 +56,7 @@ impl Runner {
     pub fn new(closure_heap: &Heap, closure: Pointer, input: Input) -> Self {
         assert!(matches!(
             closure_heap.get(closure).data,
-            vm::Data::Closure(_)
+            vm::Data::Closure(_),
         ));
         let mut vm_heap = Heap::default();
         let closure = closure_heap.clone_single_to_other_heap(&mut vm_heap, closure);
