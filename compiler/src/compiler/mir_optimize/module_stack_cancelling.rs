@@ -13,7 +13,7 @@
 //! # after:
 //! ```
 
-use crate::compiler::mir::{Expression, Mir};
+use crate::compiler::mir::{Expression, Mir, VisitorResult};
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
@@ -44,6 +44,9 @@ impl Mir {
         self.body.visit(&mut |_, expression, _| {
             if matches!(expression, Expression::UseModule { .. }) {
                 contains_use = true;
+                VisitorResult::Abort
+            } else {
+                VisitorResult::Continue
             }
         });
 
@@ -55,6 +58,7 @@ impl Mir {
                 ) {
                     *expression = Expression::nothing();
                 }
+                VisitorResult::Continue
             });
         }
     }
