@@ -1,7 +1,7 @@
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 
 use super::{
-    utils::Input,
+    input::Input,
     values::{generate_input, mutate_input},
 };
 

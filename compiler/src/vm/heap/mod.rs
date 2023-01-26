@@ -293,7 +293,7 @@ impl Heap {
     }
 
     pub fn all_objects(&self) -> impl Iterator<Item = &Object> {
-        self.objects.iter().filter_map(|it| it.as_ref().clone())
+        self.objects.iter().filter_map(|it| it.as_ref())
     }
 
     pub fn known_channels(&self) -> impl IntoIterator<Item = ChannelId> + '_ {

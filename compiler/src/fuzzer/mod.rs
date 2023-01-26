@@ -1,10 +1,11 @@
 mod fuzzer;
+mod input;
 mod input_pool;
 mod runner;
 mod utils;
 mod values;
 
-use self::utils::Input;
+use self::input::Input;
 pub use self::{
     fuzzer::{Fuzzer, Status},
     utils::FuzzablesFinder,

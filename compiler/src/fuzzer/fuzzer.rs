@@ -1,9 +1,9 @@
 use tracing::trace;
 
 use super::{
+    input::Input,
     input_pool::{InputPool, Score},
     runner::{RunResult, Runner},
-    utils::Input,
     values::complexity_of_input,
 };
 use crate::{

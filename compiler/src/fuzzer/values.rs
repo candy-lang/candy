@@ -13,7 +13,7 @@ use rand::{
 };
 use rustc_hash::FxHashMap;
 
-use super::utils::Input;
+use super::input::Input;
 
 pub fn generate_input(num_args: usize, symbols: &[String]) -> Input {
     let mut heap = Heap::default();

@@ -10,7 +10,7 @@ use crate::{
     },
 };
 
-use super::utils::Input;
+use super::input::Input;
 
 const MAX_INSTRUCTIONS: usize = 10000;
 
