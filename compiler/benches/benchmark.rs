@@ -2,14 +2,15 @@ use criterion::{
     criterion_group, criterion_main, measurement::Measurement, BatchSize, Bencher, BenchmarkId,
     Criterion,
 };
+use criterion_cycles_per_byte::CyclesPerByte;
 use utils::{compile, run, setup, setup_and_compile};
 
 mod utils;
 
 // `Core` is available via `use "..Core"`.
 
-fn benchmark_compiler(c: &mut Criterion) {
-    let mut group = c.benchmark_group("Compiler");
+fn benchmark_compiler(c: &mut Criterion, prefix: &str) {
+    let mut group = c.benchmark_group(format!("{prefix}: Compiler"));
 
     group.sample_size(100);
     group.bench_function("hello_world", |b| {
@@ -22,8 +23,8 @@ fn benchmark_compiler(c: &mut Criterion) {
 
     group.finish();
 }
-fn benchmark_vm_runtime(c: &mut Criterion) {
-    let mut group = c.benchmark_group("VM Runtime");
+fn benchmark_vm_runtime(c: &mut Criterion, prefix: &str) {
+    let mut group = c.benchmark_group(format!("{prefix}: VM Runtime"));
 
     group.sample_size(100);
     group.bench_function("hello_world", |b| {
@@ -79,5 +80,19 @@ impl<'a, M: Measurement> BencherExtension for Bencher<'a, M> {
     }
 }
 
-criterion_group!(benches, benchmark_compiler, benchmark_vm_runtime);
-criterion_main!(benches);
+fn run_benchmarks(c: &mut Criterion<CyclesPerByte>, prefix: &str) {
+    benchmark_compiler(c, prefix);
+    benchmark_vm_runtime(c, prefix);
+}
+
+fn run_cycle_benchmarks(c: &mut Criterion<CyclesPerByte>) {
+    run_benchmarks(c, &"Cycles");
+}
+criterion_group!(cycle_benchmarks, run_cycle_benchmarks);
+
+fn run_time_benchmarks(c: &mut Criterion) {
+    run_benchmarks(c, &"Time");
+}
+criterion_group!(time_benchmarks, run_time_benchmarks);
+
+criterion_main!(cycle_benchmarks, time_benchmarks);

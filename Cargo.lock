@@ -136,6 +136,7 @@ dependencies = [
  "chrono",
  "colored",
  "criterion",
+ "criterion-cycles-per-byte",
  "im",
  "itertools",
  "lazy_static",
@@ -332,6 +333,15 @@ dependencies = [
  "serde_json",
  "tinytemplate",
  "walkdir",
+]
+
+[[package]]
+name = "criterion-cycles-per-byte"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2bc54a252c6611c249fb826e73b85ac675466370112d0aa35be3d3c1246322c5"
+dependencies = [
+ "criterion",
 ]
 
 [[package]]
