@@ -1,4 +1,8 @@
-use std::mem;
+use std::{
+    cell::{Ref, RefCell, RefMut},
+    mem,
+    rc::Rc,
+};
 
 use crate::{
     builtin_functions,
@@ -15,12 +19,15 @@ use rustc_hash::FxHashMap;
 
 use super::input::Input;
 
-pub fn generate_input(num_args: usize, symbols: &[String]) -> Input {
-    let mut heap = Heap::default();
+pub fn generate_input(heap: Rc<RefCell<Heap>>, num_args: usize, symbols: &[Pointer]) -> Input {
     let mut arguments = vec![];
     for _ in 0..num_args {
-        let address =
-            generate_value_with_complexity(&mut heap, &mut rand::thread_rng(), 100.0, symbols);
+        let address = generate_value_with_complexity(
+            &mut heap.borrow_mut(),
+            &mut rand::thread_rng(),
+            100.0,
+            symbols,
+        );
         arguments.push(address);
     }
     Input { heap, arguments }
@@ -30,17 +37,12 @@ fn generate_value_with_complexity(
     heap: &mut Heap,
     rng: &mut ThreadRng,
     mut complexity: f32,
-    symbols: &[String],
+    symbols: &[Pointer],
 ) -> Pointer {
     match rng.gen_range(1..=5) {
         1 => heap.create_int(rng.gen_bigint(10)),
         2 => heap.create_text("test".to_string()),
-        3 => heap.create_symbol(
-            symbols
-                .choose(rng)
-                .map(|symbol| symbol.to_string())
-                .unwrap_or_else(|| "Nothing".to_string()),
-        ),
+        3 => *symbols.choose(rng).unwrap(),
         4 => {
             complexity -= 1.0;
             let mut items = vec![];
@@ -69,16 +71,17 @@ fn generate_value_with_complexity(
     }
 }
 
-pub fn mutate_input(rng: &mut ThreadRng, input: &mut Input, symbols: &[String]) {
+pub fn mutate_input(rng: &mut ThreadRng, input: &mut Input, symbols: &[Pointer]) {
+    let mut heap = input.heap.borrow_mut();
     let num_args = input.arguments.len();
     let argument = input.arguments.get_mut(rng.gen_range(0..num_args)).unwrap();
-    *argument = mutate_value(rng, &mut input.heap, *argument, symbols);
+    *argument = mutate_value(rng, &mut heap, *argument, symbols);
 }
 fn mutate_value(
     rng: &mut ThreadRng,
-    heap: &mut Heap,
+    heap: &mut RefMut<Heap>,
     address: Pointer,
-    symbols: &[String],
+    symbols: &[Pointer],
 ) -> Pointer {
     if rng.gen_bool(0.1) {
         heap.drop(address);
@@ -166,13 +169,14 @@ fn mutate_string(rng: &mut ThreadRng, string: &mut String) {
 }
 
 pub fn complexity_of_input(input: &Input) -> usize {
+    let heap = input.heap.borrow();
     input
         .arguments
         .iter()
-        .map(|argument| complexity_of_value(&input.heap, *argument))
+        .map(|argument| complexity_of_value(&heap, *argument))
         .sum()
 }
-fn complexity_of_value(heap: &Heap, address: Pointer) -> usize {
+fn complexity_of_value(heap: &Ref<Heap>, address: Pointer) -> usize {
     match &heap.get(address).data {
         Data::Int(int) => int.value.bits() as usize,
         Data::Text(text) => text.value.len() + 1,
