@@ -3,7 +3,7 @@ use super::{
     cst::CstDb,
     error::CompilerError,
     hir,
-    mir::{Body, Expression, Id, Mir, MirBodyBuilder},
+    mir::{BodyBuilder, Expression, Id, LambdaBodyBuilder, Mir},
     tracing::TracingConfig,
 };
 use crate::{
@@ -47,46 +47,36 @@ fn compile_module(
     hir: &hir::Body,
     tracing: &TracingConfig,
 ) -> Mir {
-    let mut id_generator = IdGenerator::start_at(0);
-    let mut body = Body::default();
-    let mut mapping = FxHashMap::default();
+    Mir::build(|body| {
+        let mut mapping = FxHashMap::default();
 
-    body.push_with_new_id(
-        &mut id_generator,
-        Expression::ModuleStarts {
+        body.push(Expression::ModuleStarts {
             module: module.clone(),
-        },
-    );
+        });
 
-    let needs_function = generate_needs_function(&mut id_generator);
-    let needs_function = body.push_with_new_id(&mut id_generator, needs_function);
+        let needs_function = generate_needs_function(body);
 
-    let module_hir_id = body.push_with_new_id(
-        &mut id_generator,
-        Expression::HirId(hir::Id::new(module, vec![])),
-    );
-    let mut pattern_identifier_ids = FxHashMap::default();
-    for (id, expression) in &hir.expressions {
-        compile_expression(
-            db,
-            &mut id_generator,
-            &mut body,
-            &mut mapping,
-            &mut pattern_identifier_ids,
-            needs_function,
-            module_hir_id,
-            id,
-            expression,
-            tracing,
-        );
-    }
-    assert!(pattern_identifier_ids.is_empty());
+        let module_hir_id = body.push(Expression::HirId(hir::Id::new(module, vec![])));
+        let mut pattern_identifier_ids = FxHashMap::default();
+        for (id, expression) in &hir.expressions {
+            compile_expression(
+                db,
+                body,
+                &mut mapping,
+                &mut pattern_identifier_ids,
+                needs_function,
+                module_hir_id,
+                id,
+                expression,
+                tracing,
+            );
+        }
+        assert!(pattern_identifier_ids.is_empty());
 
-    let return_value = body.return_value();
-    body.push_with_new_id(&mut id_generator, Expression::ModuleEnds);
-    body.push_with_new_id(&mut id_generator, Expression::Reference(return_value));
-
-    Mir { id_generator, body }
+        let return_value = body.current_return_value();
+        body.push(Expression::ModuleEnds);
+        body.push(Expression::Reference(return_value));
+    })
 }
 
 /// In the MIR, there's no longer the concept of needs. Instead, HIR IDs are
@@ -115,8 +105,8 @@ fn compile_module(
 ///   builtinIfElse condition { Nothing } { panic reason responsibleForCondition }
 /// }
 /// ```
-fn generate_needs_function(id_generator: &mut IdGenerator<Id>) -> Expression {
-    Expression::build_lambda(id_generator, |body, responsible_for_call| {
+fn generate_needs_function(body: &mut BodyBuilder) -> Id {
+    body.push_lambda(|body, responsible_for_call| {
         let condition = body.new_parameter();
         let reason = body.new_parameter();
         let responsible_for_condition = body.new_parameter();
@@ -232,8 +222,7 @@ fn generate_needs_function(id_generator: &mut IdGenerator<Id>) -> Expression {
 #[allow(clippy::too_many_arguments)]
 fn compile_expression(
     db: &dyn HirToMir,
-    id_generator: &mut IdGenerator<Id>,
-    body: &mut Body,
+    body: &mut BodyBuilder,
     mapping: &mut FxHashMap<hir::Id, Id>,
     pattern_identifier_ids: &mut FxHashMap<hir::Id, FxHashMap<hir::PatternIdentifierId, Id>>,
     needs_function: Id,
@@ -261,13 +250,11 @@ fn compile_expression(
             expression,
             pattern,
         } => {
-            let responsible =
-                body.push_with_new_id(id_generator, Expression::HirId(hir_id.clone()));
+            let responsible = body.push(Expression::HirId(hir_id.clone()));
             let expression = mapping[expression];
             let mut identifier_ids = FxHashMap::default();
             compile_destructure(
                 db,
-                id_generator,
                 body,
                 &mut identifier_ids,
                 responsible,
@@ -302,98 +289,72 @@ fn compile_expression(
             body: original_body,
             fuzzable,
         }) => {
-            let mut parameters = vec![];
-            let responsible_parameter: Id = id_generator.generate();
-            let mut lambda_body = Body::default();
+            let lambda = body.push_lambda(|lambda, responsible_parameter| {
+                for original_parameter in original_parameters {
+                    let parameter = lambda.new_parameter();
+                    mapping.insert(original_parameter.clone(), parameter);
+                }
 
-            for original_parameter in original_parameters {
-                let parameter = id_generator.generate();
-                parameters.push(parameter);
-                mapping.insert(original_parameter.clone(), parameter);
-            }
+                let responsible = if *fuzzable {
+                    responsible_parameter
+                } else {
+                    // This is a lambda with curly braces, so whoever is responsible
+                    // for `needs` in the current scope is also responsible for
+                    // `needs` in the lambda.
+                    responsible_for_needs
+                };
 
-            let responsible = if *fuzzable {
-                responsible_parameter
-            } else {
-                // This is a lambda with curly braces, so whoever is responsible
-                // for `needs` in the current scope is also responsible for
-                // `needs` in the lambda.
-                responsible_for_needs
-            };
+                for (id, expression) in &original_body.expressions {
+                    compile_expression(
+                        db,
+                        lambda,
+                        mapping,
+                        pattern_identifier_ids,
+                        needs_function,
+                        responsible,
+                        id,
+                        expression,
+                        tracing,
+                    );
+                }
+            });
 
-            for (id, expression) in &original_body.expressions {
-                compile_expression(
-                    db,
-                    id_generator,
-                    &mut lambda_body,
-                    mapping,
-                    pattern_identifier_ids,
-                    needs_function,
-                    responsible,
-                    id,
-                    expression,
-                    tracing,
-                );
-            }
-
-            let lambda = body.push_with_new_id(
-                id_generator,
-                Expression::Lambda {
-                    parameters,
-                    responsible_parameter,
-                    body: lambda_body,
-                },
-            );
             if tracing.register_fuzzables.is_enabled() && *fuzzable {
-                let hir_definition =
-                    body.push_with_new_id(id_generator, Expression::HirId(hir_id.clone()));
-                body.push_with_new_id(
-                    id_generator,
-                    Expression::TraceFoundFuzzableClosure {
-                        hir_definition,
-                        closure: lambda,
-                    },
-                );
+                let hir_definition = body.push(Expression::HirId(hir_id.clone()));
+                body.push(Expression::TraceFoundFuzzableClosure {
+                    hir_definition,
+                    closure: lambda,
+                });
             }
+
             Expression::Reference(lambda)
         }
         hir::Expression::Call {
             function,
             arguments,
         } => {
-            let responsible =
-                body.push_with_new_id(id_generator, Expression::HirId(hir_id.clone()));
+            let responsible = body.push(Expression::HirId(hir_id.clone()));
             let arguments = arguments
                 .iter()
                 .map(|argument| mapping[argument])
                 .collect_vec();
 
             if tracing.calls.is_enabled() {
-                let hir_call =
-                    body.push_with_new_id(id_generator, Expression::HirId(hir_id.clone()));
-                body.push_with_new_id(
-                    id_generator,
-                    Expression::TraceCallStarts {
-                        hir_call,
-                        function: mapping[function],
-                        arguments: arguments.clone(),
-                        responsible,
-                    },
-                );
-            }
-            let call = body.push_with_new_id(
-                id_generator,
-                Expression::Call {
+                let hir_call = body.push(Expression::HirId(hir_id.clone()));
+                body.push(Expression::TraceCallStarts {
+                    hir_call,
                     function: mapping[function],
-                    arguments,
+                    arguments: arguments.clone(),
                     responsible,
-                },
-            );
+                });
+            }
+            let call = body.push(Expression::Call {
+                function: mapping[function],
+                arguments,
+                responsible,
+            });
             if tracing.calls.is_enabled() {
-                body.push_with_new_id(
-                    id_generator,
-                    Expression::TraceCallEnds { return_value: call },
-                );
+                body.push(Expression::TraceCallEnds { return_value: call });
             }
             Expression::Reference(call)
         }
@@ -410,8 +371,7 @@ fn compile_expression(
             responsible: responsible_for_needs,
         },
         hir::Expression::Needs { condition, reason } => {
-            let responsible =
-                body.push_with_new_id(id_generator, Expression::HirId(hir_id.clone()));
+            let responsible = body.push(Expression::HirId(hir_id.clone()));
             Expression::Call {
                 function: needs_function,
                 arguments: vec![mapping[condition], mapping[reason], responsible_for_needs],
@@ -419,33 +379,28 @@ fn compile_expression(
             }
         }
         hir::Expression::Error { errors, .. } => {
-            let responsible =
-                body.push_with_new_id(id_generator, Expression::HirId(hir_id.clone()));
-            compile_errors(db, id_generator, body, responsible, errors)
+            let responsible = body.push(Expression::HirId(hir_id.clone()));
+            compile_errors(db, body, responsible, errors)
         }
     };
 
-    let id = body.push_with_new_id(id_generator, expression);
+    let id = body.push(expression);
     mapping.insert(hir_id.clone(), id);
 
     if tracing.evaluated_expressions.is_enabled() {
-        let hir_expression = body.push_with_new_id(id_generator, Expression::HirId(hir_id.clone()));
-        body.push_with_new_id(
-            id_generator,
-            Expression::TraceExpressionEvaluated {
-                hir_expression,
-                value: id,
-            },
-        );
-        body.push_with_new_id(id_generator, Expression::Reference(id));
+        let hir_expression = body.push(Expression::HirId(hir_id.clone()));
+        body.push(Expression::TraceExpressionEvaluated {
+            hir_expression,
+            value: id,
+        });
+        body.push(Expression::Reference(id));
     }
 }
 
 // Destructuring
 fn compile_destructure(
     db: &dyn HirToMir,
-    id_generator: &mut IdGenerator<Id>,
-    body: &mut Body,
+    body: &mut BodyBuilder,
     identifier_ids: &mut FxHashMap<hir::PatternIdentifierId, Id>,
     responsible: Id,
     expression: Id,
@@ -457,21 +412,18 @@ fn compile_destructure(
             assert!(existing_entry.is_none());
         }
         hir::Pattern::Int(int) => compile_destructure_exact_value(
-            id_generator,
             body,
             responsible,
             expression,
             Expression::Int(int.to_owned().into()),
         ),
         hir::Pattern::Text(text) => compile_destructure_exact_value(
-            id_generator,
             body,
             responsible,
             expression,
             Expression::Text(text.to_owned()),
         ),
         hir::Pattern::Symbol(symbol) => compile_destructure_exact_value(
-            id_generator,
             body,
             responsible,
             expression,
@@ -479,29 +431,16 @@ fn compile_destructure(
         ),
         hir::Pattern::List(list) => {
             // Check that it's a list.
-            compile_destructure_verify_type(
-                id_generator,
-                body,
-                responsible,
-                expression,
-                "List".to_string(),
-            );
+            compile_destructure_verify_type(body, responsible, expression, "List".to_string());
 
             // Check that the length is correct.
-            let builtin_list_length = body.push_with_new_id(
-                id_generator,
-                Expression::Builtin(BuiltinFunction::ListLength),
-            );
-            let actual_length = body.push_with_new_id(
-                id_generator,
-                Expression::Call {
-                    function: builtin_list_length,
-                    arguments: vec![expression],
-                    responsible,
-                },
-            );
+            let builtin_list_length = body.push(Expression::Builtin(BuiltinFunction::ListLength));
+            let actual_length = body.push(Expression::Call {
+                function: builtin_list_length,
+                arguments: vec![expression],
+                responsible,
+            });
             push_equals_or_panic(
-                id_generator,
                 body,
                 responsible,
                 Expression::Int(list.len().into()),
@@ -520,97 +459,49 @@ fn compile_destructure(
             );
 
             // Destructure the elements.
-            let builtin_list_get =
-                body.push_with_new_id(id_generator, Expression::Builtin(BuiltinFunction::ListGet));
+            let builtin_list_get = body.push(Expression::Builtin(BuiltinFunction::ListGet));
             for (index, pattern) in list.iter().enumerate() {
-                let index = body.push_with_new_id(id_generator, Expression::Int(index.into()));
-                let item = body.push_with_new_id(
-                    id_generator,
-                    Expression::Call {
-                        function: builtin_list_get,
-                        arguments: vec![expression, index],
-                        responsible,
-                    },
-                );
-                compile_destructure(
-                    db,
-                    id_generator,
-                    body,
-                    identifier_ids,
+                let index = body.push(Expression::Int(index.into()));
+                let item = body.push(Expression::Call {
+                    function: builtin_list_get,
+                    arguments: vec![expression, index],
                     responsible,
-                    item,
-                    pattern,
-                );
+                });
+                compile_destructure(db, body, identifier_ids, responsible, item, pattern);
             }
         }
         hir::Pattern::Struct(struct_) => {
             // Check that it's a struct.
-            compile_destructure_verify_type(
-                id_generator,
-                body,
-                responsible,
-                expression,
-                "Struct".to_string(),
-            );
+            compile_destructure_verify_type(body, responsible, expression, "Struct".to_string());
 
             // Destructure the elements.
-            let builtin_struct_get = body.push_with_new_id(
-                id_generator,
-                Expression::Builtin(BuiltinFunction::StructGet),
-            );
+            let builtin_struct_get = body.push(Expression::Builtin(BuiltinFunction::StructGet));
             for (key_pattern, value_pattern) in struct_ {
-                let key = compile_pattern_to_key_expression(
-                    db,
-                    id_generator,
-                    body,
+                let key = compile_pattern_to_key_expression(db, body, responsible, key_pattern);
+                let item = body.push(Expression::Call {
+                    function: builtin_struct_get,
+                    arguments: vec![expression, key],
                     responsible,
-                    key_pattern,
-                );
-                let item = body.push_with_new_id(
-                    id_generator,
-                    Expression::Call {
-                        function: builtin_struct_get,
-                        arguments: vec![expression, key],
-                        responsible,
-                    },
-                );
-                compile_destructure(
-                    db,
-                    id_generator,
-                    body,
-                    identifier_ids,
-                    responsible,
-                    item,
-                    value_pattern,
-                );
+                });
+                compile_destructure(db, body, identifier_ids, responsible, item, value_pattern);
             }
         }
         hir::Pattern::Error { child, errors } => {
-            compile_errors(db, id_generator, body, responsible, errors);
+            compile_errors(db, body, responsible, errors);
             if let Some(child) = child {
                 // We still have to populate `identifier_ids`.
-                compile_destructure(
-                    db,
-                    id_generator,
-                    body,
-                    identifier_ids,
-                    responsible,
-                    expression,
-                    child,
-                );
+                compile_destructure(db, body, identifier_ids, responsible, expression, child);
             }
         }
     }
 }
 fn compile_destructure_exact_value(
-    id_generator: &mut IdGenerator<Id>,
-    body: &mut Body,
+    body: &mut BodyBuilder,
     responsible: Id,
     expression: Id,
     expected_value: Expression,
 ) {
     push_equals_or_panic(
-        id_generator,
         body,
         responsible,
         expected_value,
@@ -627,25 +518,19 @@ fn compile_destructure_exact_value(
     );
 }
 fn compile_destructure_verify_type(
-    id_generator: &mut IdGenerator<Id>,
-    body: &mut Body,
+    body: &mut BodyBuilder,
     responsible: Id,
     expression: Id,
     expected_type: String,
 ) {
-    let builtin_type_of =
-        body.push_with_new_id(id_generator, Expression::Builtin(BuiltinFunction::TypeOf));
-    let type_ = body.push_with_new_id(
-        id_generator,
-        Expression::Call {
-            function: builtin_type_of,
-            arguments: vec![expression],
-            responsible,
-        },
-    );
+    let builtin_type_of = body.push(Expression::Builtin(BuiltinFunction::TypeOf));
+    let type_ = body.push(Expression::Call {
+        function: builtin_type_of,
+        arguments: vec![expression],
+        responsible,
+    });
 
     push_equals_or_panic(
-        id_generator,
         body,
         responsible,
         Expression::Symbol(expected_type),
@@ -662,31 +547,26 @@ fn compile_destructure_verify_type(
     );
 }
 fn push_equals_or_panic<R>(
-    id_generator: &mut IdGenerator<Id>,
-    body: &mut Body,
+    body: &mut BodyBuilder,
     responsible: Id,
     expected_value: Expression,
     actual_value: Id,
     reason_factory: R,
 ) -> Id
 where
-    R: Fn(&mut MirBodyBuilder, Id, Id) -> Vec<Id>,
+    R: Fn(&mut LambdaBodyBuilder, Id, Id) -> Vec<Id>,
 {
-    let builtin_equals =
-        body.push_with_new_id(id_generator, Expression::Builtin(BuiltinFunction::Equals));
-    let expected_value = body.push_with_new_id(id_generator, expected_value);
-    let equals = body.push_with_new_id(
-        id_generator,
-        Expression::Call {
-            function: builtin_equals,
-            arguments: vec![expected_value, actual_value],
-            responsible,
-        },
-    );
+    let builtin_equals = body.push(Expression::Builtin(BuiltinFunction::Equals));
+    let expected_value = body.push(expected_value);
+    let equals = body.push(Expression::Call {
+        function: builtin_equals,
+        arguments: vec![expected_value, actual_value],
+        responsible,
+    });
 
-    let empty_lambda = push_empty_lambda(id_generator, body);
+    let empty_lambda = push_empty_lambda(body);
 
-    let on_wrong_value = Expression::build_lambda(id_generator, |body, _| {
+    let on_wrong_value = body.push_lambda(|body, _| {
         let to_debug_text = body.push(Expression::Builtin(BuiltinFunction::ToDebugText));
 
         let expected_as_text = body.push(Expression::Call {
@@ -720,30 +600,23 @@ where
             responsible,
         });
     });
-    let on_wrong_value = body.push_with_new_id(id_generator, on_wrong_value);
 
-    let builtin_if_else =
-        body.push_with_new_id(id_generator, Expression::Builtin(BuiltinFunction::IfElse));
-    body.push_with_new_id(
-        id_generator,
-        Expression::Call {
-            function: builtin_if_else,
-            arguments: vec![equals, empty_lambda, on_wrong_value],
-            responsible,
-        },
-    )
+    let builtin_if_else = body.push(Expression::Builtin(BuiltinFunction::IfElse));
+    body.push(Expression::Call {
+        function: builtin_if_else,
+        arguments: vec![equals, empty_lambda, on_wrong_value],
+        responsible,
+    })
 }
-fn push_empty_lambda(id_generator: &mut IdGenerator<Id>, body: &mut Body) -> Id {
-    let nothing = body.push_with_new_id(id_generator, Expression::nothing());
-    let lambda = Expression::build_lambda(id_generator, |body, _| {
+fn push_empty_lambda(body: &mut BodyBuilder) -> Id {
+    let nothing = body.push(Expression::nothing());
+    body.push_lambda(|body, _| {
         body.push(Expression::Reference(nothing));
-    });
-    body.push_with_new_id(id_generator, lambda)
+    })
 }
 fn compile_pattern_to_key_expression(
     db: &dyn HirToMir,
-    id_generator: &mut IdGenerator<Id>,
-    body: &mut Body,
+    body: &mut BodyBuilder,
     responsible: Id,
     pattern: &hir::Pattern,
 ) -> Id {
@@ -756,39 +629,34 @@ fn compile_pattern_to_key_expression(
         hir::Pattern::Symbol(symbol) => Expression::Symbol(symbol.to_owned()),
         hir::Pattern::List(_) => panic!("Lists can't be used in this part of a pattern."),
         hir::Pattern::Struct(_) => panic!("Structs can't be used in this part of a pattern."),
-        hir::Pattern::Error { errors, .. } => {
-            compile_errors(db, id_generator, body, responsible, errors)
-        }
+        hir::Pattern::Error { errors, .. } => compile_errors(db, body, responsible, errors),
     };
-    body.push_with_new_id(id_generator, expression)
+    body.push(expression)
 }
 
 // Errors
 
+// TODO: must_use
 fn compile_errors(
     db: &dyn HirToMir,
-    id_generator: &mut IdGenerator<Id>,
-    body: &mut Body,
+    body: &mut BodyBuilder,
     responsible: Id,
     errors: &Vec<CompilerError>,
 ) -> Expression {
-    let reason = body.push_with_new_id(
-        id_generator,
-        Expression::Text(if errors.len() == 1 {
-            format!(
-                "The code still contains an error: {}",
-                errors.iter().next().unwrap().format_nicely(db)
-            )
-        } else {
-            format!(
-                "The code still contains errors:\n{}",
-                errors
-                    .iter()
-                    .map(|error| format!("- {}", error.format_nicely(db)))
-                    .join("\n"),
-            )
-        }),
-    );
+    let reason = body.push(Expression::Text(if errors.len() == 1 {
+        format!(
+            "The code still contains an error: {}",
+            errors.iter().next().unwrap().format_nicely(db)
+        )
+    } else {
+        format!(
+            "The code still contains errors:\n{}",
+            errors
+                .iter()
+                .map(|error| format!("- {}", error.format_nicely(db)))
+                .join("\n"),
+        )
+    }));
     Expression::Panic {
         reason,
         responsible,
