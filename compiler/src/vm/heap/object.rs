@@ -283,7 +283,7 @@ impl Deref for Object {
 }
 
 impl Pointer {
-    fn hash(&self, heap: &Heap) -> u64 {
+    pub fn hash(&self, heap: &Heap) -> u64 {
         heap.get(*self).hash(heap)
     }
     fn hash_with_state<H: Hasher>(&self, heap: &Heap, state: &mut H) {
