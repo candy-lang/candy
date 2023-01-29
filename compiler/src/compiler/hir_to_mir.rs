@@ -252,15 +252,11 @@ fn compile_expression(
         } => {
             let responsible = body.push(Expression::HirId(hir_id.clone()));
             let expression = mapping[expression];
-            let mut identifier_ids = FxHashMap::default();
-            compile_destructure(
-                db,
-                body,
-                &mut identifier_ids,
-                responsible,
-                expression,
-                pattern,
-            );
+
+            let (pattern_result, identifier_ids) =
+                PatternLoweringContext::compile_pattern(db, body, responsible, expression, pattern);
+
+            // TODO: use pattern_result
 
             let existing_entry = pattern_identifier_ids.insert(hir_id.to_owned(), identifier_ids);
             assert!(existing_entry.is_none());
@@ -283,6 +279,9 @@ fn compile_expression(
                 pattern_identifier_ids.remove(destructuring).unwrap();
             }
             Expression::Reference(id)
+        }
+        hir::Expression::Match { expression, cases } => {
+            let expression = mapping[expression];
         }
         hir::Expression::Lambda(hir::Lambda {
             parameters: original_parameters,
@@ -397,116 +396,111 @@ fn compile_expression(
     }
 }
 
-// Destructuring
-fn compile_destructure(
-    db: &dyn HirToMir,
-    body: &mut BodyBuilder,
-    identifier_ids: &mut FxHashMap<hir::PatternIdentifierId, Id>,
+struct PatternLoweringContext<'a> {
+    db: &'a dyn HirToMir,
+    body: &'a mut BodyBuilder,
     responsible: Id,
-    expression: Id,
-    pattern: &hir::Pattern,
-) {
-    match pattern {
-        hir::Pattern::NewIdentifier(identifier_id) => {
-            let existing_entry = identifier_ids.insert(identifier_id.to_owned(), expression);
-            assert!(existing_entry.is_none());
-        }
-        hir::Pattern::Int(int) => compile_destructure_exact_value(
+}
+impl<'a> PatternLoweringContext<'a> {
+    fn compile_pattern(
+        db: &'a dyn HirToMir,
+        body: &'a mut BodyBuilder,
+        responsible: Id,
+        expression: Id,
+        pattern: &hir::Pattern,
+    ) -> Id {
+        let mut context = PatternLoweringContext {
+            db,
             body,
             responsible,
-            expression,
-            Expression::Int(int.to_owned().into()),
-        ),
-        hir::Pattern::Text(text) => compile_destructure_exact_value(
-            body,
-            responsible,
-            expression,
-            Expression::Text(text.to_owned()),
-        ),
-        hir::Pattern::Symbol(symbol) => compile_destructure_exact_value(
-            body,
-            responsible,
-            expression,
-            Expression::Symbol(symbol.to_owned()),
-        ),
-        hir::Pattern::List(list) => {
-            // Check that it's a list.
-            compile_destructure_verify_type(body, responsible, expression, "List".to_string());
+        };
+        context.compile(expression, pattern)
+    }
 
-            // Check that the length is correct.
-            let builtin_list_length = body.push(Expression::Builtin(BuiltinFunction::ListLength));
-            let actual_length = body.push(Expression::Call {
-                function: builtin_list_length,
-                arguments: vec![expression],
-                responsible,
-            });
-            push_equals_or_panic(
-                body,
-                responsible,
-                Expression::Int(list.len().into()),
-                actual_length,
-                |body, _expected, actual| {
-                    vec![
-                        body.push(Expression::Text(format!(
-                            "Expected {} {}, got ",
-                            list.len(),
-                            if list.len() == 1 { "item" } else { "items" },
-                        ))),
-                        actual,
-                        body.push(Expression::Text(".".to_string())),
-                    ]
-                },
-            );
-
-            // Destructure the elements.
-            let builtin_list_get = body.push(Expression::Builtin(BuiltinFunction::ListGet));
-            for (index, pattern) in list.iter().enumerate() {
-                let index = body.push(Expression::Int(index.into()));
-                let item = body.push(Expression::Call {
-                    function: builtin_list_get,
-                    arguments: vec![expression, index],
-                    responsible,
-                });
-                compile_destructure(db, body, identifier_ids, responsible, item, pattern);
+    fn compile(&mut self, expression: Id, pattern: &hir::Pattern) -> Id {
+        match pattern {
+            hir::Pattern::NewIdentifier(identifier_id) => self.push_match(vec![expression]),
+            hir::Pattern::Int(int) => {
+                self.compile_exact_value(expression, Expression::Int(int.to_owned().into()))
             }
-        }
-        hir::Pattern::Struct(struct_) => {
-            // Check that it's a struct.
-            compile_destructure_verify_type(body, responsible, expression, "Struct".to_string());
-
-            // Destructure the elements.
-            let builtin_struct_get = body.push(Expression::Builtin(BuiltinFunction::StructGet));
-            for (key_pattern, value_pattern) in struct_ {
-                let key = compile_pattern_to_key_expression(db, body, responsible, key_pattern);
-                let item = body.push(Expression::Call {
-                    function: builtin_struct_get,
-                    arguments: vec![expression, key],
-                    responsible,
-                });
-                compile_destructure(db, body, identifier_ids, responsible, item, value_pattern);
+            hir::Pattern::Text(text) => {
+                self.compile_exact_value(expression, Expression::Text(text.to_owned()))
             }
-        }
-        hir::Pattern::Error { child, errors } => {
-            compile_errors(db, body, responsible, errors);
-            if let Some(child) = child {
-                // We still have to populate `identifier_ids`.
-                compile_destructure(db, body, identifier_ids, responsible, expression, child);
+            hir::Pattern::Symbol(symbol) => {
+                self.compile_exact_value(expression, Expression::Symbol(symbol.to_owned()))
+            }
+            hir::Pattern::List(list) => {
+                // Check that it's a list.
+                self.compile_verify_type(expression, "List".to_string());
+
+                // Check that the length is correct.
+                let builtin_list_length = self
+                    .body
+                    .push(Expression::Builtin(BuiltinFunction::ListLength));
+                let actual_length = self.body.push(Expression::Call {
+                    function: builtin_list_length,
+                    arguments: vec![expression],
+                    responsible: self.responsible,
+                });
+                self.compile_equals(
+                    Expression::Int(list.len().into()),
+                    actual_length,
+                    |body, _expected, actual| {
+                        vec![
+                            body.push(Expression::Text(format!(
+                                "Expected {} {}, got ",
+                                list.len(),
+                                if list.len() == 1 { "item" } else { "items" },
+                            ))),
+                            actual,
+                            body.push(Expression::Text(".".to_string())),
+                        ]
+                    },
+                );
+
+                // Destructure the elements.
+                let builtin_list_get = self
+                    .body
+                    .push(Expression::Builtin(BuiltinFunction::ListGet));
+                for (index, pattern) in list.iter().enumerate() {
+                    let index = self.body.push(Expression::Int(index.into()));
+                    let item = self.body.push(Expression::Call {
+                        function: builtin_list_get,
+                        arguments: vec![expression, index],
+                        responsible: self.responsible,
+                    });
+                    self.compile_destructure(item, pattern);
+                }
+            }
+            hir::Pattern::Struct(struct_) => {
+                // Check that it's a struct.
+                self.compile_verify_type(expression, "Struct".to_string());
+
+                // Destructure the elements.
+                let builtin_struct_get = self
+                    .body
+                    .push(Expression::Builtin(BuiltinFunction::StructGet));
+                for (key_pattern, value_pattern) in struct_ {
+                    let key = self.compile_pattern_to_key_expression(key_pattern);
+                    let item = self.body.push(Expression::Call {
+                        function: builtin_struct_get,
+                        arguments: vec![expression, key],
+                        responsible: self.responsible,
+                    });
+                    self.compile_destructure(item, value_pattern);
+                }
+            }
+            hir::Pattern::Error { child, errors } => {
+                compile_errors(self.db, self.body, self.responsible, errors);
+                if let Some(child) = child {
+                    // We still have to populate `identifier_ids`.
+                    self.compile_destructure(expression, child);
+                }
             }
         }
     }
-}
-fn compile_destructure_exact_value(
-    body: &mut BodyBuilder,
-    responsible: Id,
-    expression: Id,
-    expected_value: Expression,
-) {
-    push_equals_or_panic(
-        body,
-        responsible,
-        expected_value,
-        expression,
-        |body, expected, actual| {
+    fn compile_exact_value(&mut self, expression: Id, expected_value: Expression) -> Id {
+        self.compile_equals(expected_value, expression, |body, expected, actual| {
             vec![
                 body.push(Expression::Text("Expected `".to_string())),
                 expected,
@@ -514,129 +508,124 @@ fn compile_destructure_exact_value(
                 actual,
                 body.push(Expression::Text("`.".to_string())),
             ]
-        },
-    );
-}
-fn compile_destructure_verify_type(
-    body: &mut BodyBuilder,
-    responsible: Id,
-    expression: Id,
-    expected_type: String,
-) {
-    let builtin_type_of = body.push(Expression::Builtin(BuiltinFunction::TypeOf));
-    let type_ = body.push(Expression::Call {
-        function: builtin_type_of,
-        arguments: vec![expression],
-        responsible,
-    });
-
-    push_equals_or_panic(
-        body,
-        responsible,
-        Expression::Symbol(expected_type),
-        type_,
-        |body, expected, actual| {
-            vec![
-                body.push(Expression::Text("Expected a ".to_string())),
-                expected,
-                body.push(Expression::Text(", got `".to_string())),
-                actual,
-                body.push(Expression::Text("`.".to_string())),
-            ]
-        },
-    );
-}
-fn push_equals_or_panic<R>(
-    body: &mut BodyBuilder,
-    responsible: Id,
-    expected_value: Expression,
-    actual_value: Id,
-    reason_factory: R,
-) -> Id
-where
-    R: Fn(&mut LambdaBodyBuilder, Id, Id) -> Vec<Id>,
-{
-    let builtin_equals = body.push(Expression::Builtin(BuiltinFunction::Equals));
-    let expected_value = body.push(expected_value);
-    let equals = body.push(Expression::Call {
-        function: builtin_equals,
-        arguments: vec![expected_value, actual_value],
-        responsible,
-    });
-
-    let empty_lambda = push_empty_lambda(body);
-
-    let on_wrong_value = body.push_lambda(|body, _| {
-        let to_debug_text = body.push(Expression::Builtin(BuiltinFunction::ToDebugText));
-
-        let expected_as_text = body.push(Expression::Call {
-            function: to_debug_text,
-            arguments: vec![expected_value],
-            responsible,
+        })
+    }
+    fn compile_verify_type(&mut self, expression: Id, expected_type: String) -> Id {
+        let builtin_type_of = self.body.push(Expression::Builtin(BuiltinFunction::TypeOf));
+        let type_ = self.body.push(Expression::Call {
+            function: builtin_type_of,
+            arguments: vec![expression],
+            responsible: self.responsible,
         });
 
-        let actual_as_text = body.push(Expression::Call {
-            function: to_debug_text,
-            arguments: vec![actual_value],
-            responsible,
+        self.compile_equals(
+            Expression::Symbol(expected_type),
+            type_,
+            |body, expected, actual| {
+                vec![
+                    body.push(Expression::Text("Expected a ".to_string())),
+                    expected,
+                    body.push(Expression::Text(", got `".to_string())),
+                    actual,
+                    body.push(Expression::Text("`.".to_string())),
+                ]
+            },
+        )
+    }
+    fn compile_equals<R>(
+        &mut self,
+        expected_value: Expression,
+        actual_value: Id,
+        reason_factory: R,
+    ) -> Id
+    where
+        R: FnOnce(&mut BodyBuilder, Id, Id) -> Vec<Id>,
+    {
+        let builtin_equals = self.body.push(Expression::Builtin(BuiltinFunction::Equals));
+        let expected_value = self.body.push(expected_value);
+        let equals = self.body.push(Expression::Call {
+            function: builtin_equals,
+            arguments: vec![expected_value, actual_value],
+            responsible: self.responsible,
         });
 
-        let builtin_text_concatenate =
-            body.push(Expression::Builtin(BuiltinFunction::TextConcatenate));
-        let reason_parts = reason_factory(body, expected_as_text, actual_as_text);
-        let reason = reason_parts
-            .into_iter()
-            .reduce(|left, right| {
-                body.push(Expression::Call {
-                    function: builtin_text_concatenate,
-                    arguments: vec![left, right],
-                    responsible,
+        let on_match = self.body.push_lambda(|body, _| {
+            self.push_match(vec![]);
+        });
+
+        let on_no_match = self.body.push_lambda(|body, _| {
+            let to_debug_text = body.push(Expression::Builtin(BuiltinFunction::ToDebugText));
+
+            let expected_as_text = body.push(Expression::Call {
+                function: to_debug_text,
+                arguments: vec![expected_value],
+                responsible: self.responsible,
+            });
+
+            let actual_as_text = body.push(Expression::Call {
+                function: to_debug_text,
+                arguments: vec![actual_value],
+                responsible: self.responsible,
+            });
+
+            let builtin_text_concatenate =
+                body.push(Expression::Builtin(BuiltinFunction::TextConcatenate));
+            let reason_parts = reason_factory(body, expected_as_text, actual_as_text);
+            let reason = reason_parts
+                .into_iter()
+                .reduce(|left, right| {
+                    body.push(Expression::Call {
+                        function: builtin_text_concatenate,
+                        arguments: vec![left, right],
+                        responsible: self.responsible,
+                    })
                 })
-            })
-            .unwrap();
+                .unwrap();
 
-        body.push(Expression::Panic {
-            reason,
-            responsible,
+            self.push_no_match(reason);
         });
-    });
 
-    let builtin_if_else = body.push(Expression::Builtin(BuiltinFunction::IfElse));
-    body.push(Expression::Call {
-        function: builtin_if_else,
-        arguments: vec![equals, empty_lambda, on_wrong_value],
-        responsible,
-    })
-}
-fn push_empty_lambda(body: &mut BodyBuilder) -> Id {
-    let nothing = body.push(Expression::nothing());
-    body.push_lambda(|body, _| {
-        body.push(Expression::Reference(nothing));
-    })
-}
-fn compile_pattern_to_key_expression(
-    db: &dyn HirToMir,
-    body: &mut BodyBuilder,
-    responsible: Id,
-    pattern: &hir::Pattern,
-) -> Id {
-    let expression = match pattern {
-        hir::Pattern::NewIdentifier(_) => {
-            panic!("New identifiers can't be used in this part of a pattern.")
-        }
-        hir::Pattern::Int(int) => Expression::Int(int.to_owned().into()),
-        hir::Pattern::Text(text) => Expression::Text(text.to_owned()),
-        hir::Pattern::Symbol(symbol) => Expression::Symbol(symbol.to_owned()),
-        hir::Pattern::List(_) => panic!("Lists can't be used in this part of a pattern."),
-        hir::Pattern::Struct(_) => panic!("Structs can't be used in this part of a pattern."),
-        hir::Pattern::Error { errors, .. } => compile_errors(db, body, responsible, errors),
-    };
-    body.push(expression)
+        let builtin_if_else = self.body.push(Expression::Builtin(BuiltinFunction::IfElse));
+        self.body.push(Expression::Call {
+            function: builtin_if_else,
+            arguments: vec![equals, on_match, on_no_match],
+            responsible: self.responsible,
+        })
+    }
+    fn compile_pattern_to_key_expression(&mut self, pattern: &hir::Pattern) -> Id {
+        let expression = match pattern {
+            hir::Pattern::NewIdentifier(_) => {
+                panic!("New identifiers can't be used in this part of a pattern.")
+            }
+            hir::Pattern::Int(int) => Expression::Int(int.to_owned().into()),
+            hir::Pattern::Text(text) => Expression::Text(text.to_owned()),
+            hir::Pattern::Symbol(symbol) => Expression::Symbol(symbol.to_owned()),
+            hir::Pattern::List(_) => panic!("Lists can't be used in this part of a pattern."),
+            hir::Pattern::Struct(_) => panic!("Structs can't be used in this part of a pattern."),
+            hir::Pattern::Error { errors, .. } => {
+                compile_errors(self.db, &mut self.body, self.responsible, errors)
+            }
+        };
+        self.body.push(expression)
+    }
+
+    fn push_match(&mut self, mut captured_identifiers: Vec<Id>) -> Id {
+        // TODO: Return `Match (…)` instead of `(Match, …)` when we have tags.
+        let match_ = self.body.push(Expression::Symbol("Match".to_string()));
+        captured_identifiers.insert(0, match_);
+        self.body.push(Expression::List(captured_identifiers))
+    }
+    fn push_no_match(&mut self, reason_text: Id) -> Id {
+        // TODO: Return `NoMatch reasonAsText` instead of `(NoMatch, reasonAsText)` when we have tags.
+        let no_match = self.body.push(Expression::Symbol("NoMatch".to_string()));
+        self.body
+            .push(Expression::List(vec![no_match, reason_text]))
+    }
 }
 
 // Errors
 
-// TODO: must_use
+#[must_use]
 fn compile_errors(
     db: &dyn HirToMir,
     body: &mut BodyBuilder,
@@ -646,7 +635,7 @@ fn compile_errors(
     let reason = body.push(Expression::Text(if errors.len() == 1 {
         format!(
             "The code still contains an error: {}",
-            errors.iter().next().unwrap().format_nicely(db)
+            errors.iter().next().unwrap().format_nicely(db),
         )
     } else {
         format!(
