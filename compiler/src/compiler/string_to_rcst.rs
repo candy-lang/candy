@@ -160,6 +160,10 @@ mod parse {
         literal(input, "\"").map(|it| (it, Rcst::DoubleQuote))
     }
     #[instrument(level = "trace")]
+    fn percent(input: &str) -> Option<(&str, Rcst)> {
+        literal(input, "%").map(|it| (it, Rcst::DoubleQuote))
+    }
+    #[instrument(level = "trace")]
     fn octothorpe(input: &str) -> Option<(&str, Rcst)> {
         literal(input, "#").map(|it| (it, Rcst::Octothorpe))
     }
@@ -1312,6 +1316,20 @@ mod parse {
                     };
                     did_make_progress = true;
                 }
+                'match_: {
+                    let (new_input, whitespace_after_receiver) =
+                        whitespaces_and_newlines(input, indentation, true);
+
+                    let Some((new_input, percent, cases)) = match_suffix(new_input, indentation) else { break 'match_; };
+
+                    input = new_input;
+                    result = Rcst::Match {
+                        expression: Box::new(result.wrap_in_whitespace(whitespace_after_receiver)),
+                        percent: Box::new(percent),
+                        cases: cases,
+                    };
+                    did_make_progress = true;
+                }
             }
 
             if !did_make_progress {
@@ -2375,6 +2393,98 @@ mod parse {
             }
         }
         (input, expressions)
+    }
+
+    #[instrument(level = "trace")]
+    fn match_suffix(input: &str, indentation: usize) -> Option<(&str, Rcst, Vec<Rcst>)> {
+        let (input, percent) = percent(input)?;
+        let (mut input, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
+        if !whitespace.is_multiline() {
+            return None;
+        }
+        let percent = percent.wrap_in_whitespace(whitespace);
+
+        let mut cases = vec![];
+        loop {
+            let Some((new_input, case)) = match_case(input, indentation + 1) else { break; };
+            let (new_input, whitespace) =
+                whitespaces_and_newlines(new_input, indentation + 1, true);
+            if !whitespace.is_multiline() {
+                break;
+            }
+            let case = case.wrap_in_whitespace(whitespace);
+            input = new_input;
+            cases.push(case);
+        }
+        if cases.is_empty() {
+            cases.push(Rcst::Error {
+                unparsable_input: input.to_string(),
+                error: RcstError::MatchMissesCases,
+            });
+        }
+
+        Some((input, percent, cases))
+    }
+    #[test]
+    fn test_match_suffix() {
+        assert_eq!(match_suffix("%", 0), None);
+        // %
+        //   1 -> 2
+        // Foo
+        assert_eq!(
+            match_suffix("%\n  1 -> 2\nFoo", 0),
+            Some((
+                "",
+                Rcst::TrailingWhitespace {
+                    child: Box::new(Rcst::Percent),
+                    whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                },
+                vec![Rcst::MatchCase {
+                    pattern: Box::new(Rcst::Int {
+                        value: 1u8.into(),
+                        string: "1".to_string(),
+                    }),
+                    arrow: Box::new(Rcst::Arrow),
+                    body: vec![Rcst::Int {
+                        value: 2u8.into(),
+                        string: "2".to_string(),
+                    }],
+                }],
+            )),
+        );
+    }
+
+    #[instrument(level = "trace")]
+    fn match_case(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
+        let (input, pattern) = pattern(input, indentation)?;
+        let (input, whitespace) = whitespaces_and_newlines(input, indentation, true);
+        let pattern = pattern.wrap_in_whitespace(whitespace);
+
+        let (input, arrow) = if let Some((input, arrow)) = arrow(input) {
+            let (input, whitespace) = whitespaces_and_newlines(input, indentation, true);
+            (input, arrow.wrap_in_whitespace(whitespace))
+        } else {
+            let error = Rcst::Error {
+                unparsable_input: "".to_string(),
+                error: RcstError::MatchCaseMissesArrow,
+            };
+            (input, error)
+        };
+
+        let (input, mut body) = body(input, indentation + 1);
+        if body.is_empty() {
+            body.push(Rcst::Error {
+                unparsable_input: "".to_string(),
+                error: RcstError::MatchCaseMissesBody,
+            });
+        }
+
+        let case = Rcst::MatchCase {
+            pattern: Box::new(pattern),
+            arrow: Box::new(arrow),
+            body,
+        };
+        Some((input, case))
     }
 
     #[instrument(level = "trace")]

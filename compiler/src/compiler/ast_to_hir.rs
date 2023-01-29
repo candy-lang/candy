@@ -1,6 +1,6 @@
 use super::{
     ast::{
-        self, Assignment, Ast, AstKind, AstString, Call, Identifier, Int, List, Struct,
+        self, Assignment, Ast, AstKind, AstString, Call, Identifier, Int, List, MatchCase, Struct,
         StructAccess, Symbol, Text, TextPart,
     },
     cst::{self, CstDb},
@@ -297,6 +297,41 @@ impl<'a> Context<'a> {
                     }
                 }
                 body
+            }
+            AstKind::Match(ast::Match { expression, cases }) => {
+                let expression = self.compile_single(expression);
+
+                let cases = cases.iter().for_each(|case| match case.kind {
+                    AstKind::MatchCase(MatchCase { box pattern, body }) => {
+                        let (pattern, pattern_identifiers) = PatternContext::compile(&pattern);
+
+                        let reset_state = self.start_scope();
+                        for (name, (ast_id, identifier_id)) in pattern_identifiers {
+                            self.push(
+                                Some(ast_id),
+                                Expression::PatternIdentifierReference {
+                                    destructuring: expression.clone(),
+                                    identifier_id,
+                                },
+                                Some(name.to_owned()),
+                            );
+                        }
+                        let body = self.compile(body.as_ref());
+                        self.end_scope(reset_state);
+                    }
+                    AstKind::Error { errors, .. } => (
+                        Pattern::Error {
+                            child: None,
+                            errors,
+                        },
+                        Body::default(),
+                    ),
+                    _ => unreachable!("Expected match case in match cases, got {value:?}."),
+                });
+                let hir_cases = vec![];
+            }
+            AstKind::MatchCase(_) => {
+                unreachable!("Match cases should be handled in match directly.")
             }
             AstKind::Error { child, errors } => {
                 let child = child.as_ref().map(|child| self.compile_single(child));
@@ -648,9 +683,7 @@ impl PatternContext {
                     })
                     .join(""),
             ),
-            AstKind::TextPart(_) => {
-                unreachable!("TextPart should not occur in AST patterns.")
-            }
+            AstKind::TextPart(_) => unreachable!("TextPart should not occur in AST patterns."),
             AstKind::Identifier(Identifier(name)) => {
                 let (_, pattern_id) = self
                     .identifier_ids
@@ -696,9 +729,11 @@ impl PatternContext {
             AstKind::StructAccess(_)
             | AstKind::Lambda(_)
             | AstKind::Call(_)
-            | AstKind::Assignment(_) => {
+            | AstKind::Assignment(_)
+            | AstKind::Match(_)
+            | AstKind::MatchCase(_) => {
                 unreachable!(
-                    "AST pattern can't contain struct access, lambda, call, or assignment."
+                    "AST pattern can't contain struct access, lambda, call, assignment, match, or match case."
                 )
             }
             AstKind::Error { child, errors, .. } => {

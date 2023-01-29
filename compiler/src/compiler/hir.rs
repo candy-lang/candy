@@ -75,6 +75,12 @@ impl Expression {
             Expression::PatternIdentifierReference { destructuring, .. } => {
                 ids.push(destructuring.to_owned())
             }
+            Expression::Match { expression, cases } => {
+                ids.push(expression.to_owned());
+                for (pattern, body) in cases {
+                    body.collect_all_ids(ids);
+                }
+            }
             Expression::Lambda(Lambda {
                 parameters, body, ..
             }) => {
@@ -202,6 +208,13 @@ pub enum Expression {
     PatternIdentifierReference {
         destructuring: Id,
         identifier_id: PatternIdentifierId,
+    },
+    Match {
+        expression: Id,
+        /// Each case consists of the pattern to match against, and the body
+        /// which starts with [PatternIdentifierReference]s for all identifiers
+        /// in the pattern.
+        cases: Vec<(Pattern, Body)>,
     },
     Lambda(Lambda),
     Builtin(BuiltinFunction),
@@ -346,8 +359,25 @@ impl fmt::Display for Expression {
             } => write!(
                 f,
                 "get destructured p${} from {destructuring}",
-                identifier_id.0
+                identifier_id.0,
             ),
+            Expression::Match { expression, cases } => {
+                write!(
+                    f,
+                    "match {expression) with these cases:\n{}",
+                    cases
+                        .iter()
+                        .map(|(pattern, body)| format!("{pattern} -> {body}")
+                            .lines()
+                            .enumerate()
+                            .map(|(i, line)| format!(
+                                "{}{line}",
+                                if i == 0 { "  " } else { "    " }
+                            ))
+                            .join("\n"))
+                        .join("\n"),
+                )
+            }
             Expression::Lambda(lambda) => {
                 write!(
                     f,
@@ -379,7 +409,7 @@ impl fmt::Display for Expression {
                     arguments
                         .iter()
                         .map(|argument| format!("  {argument}"))
-                        .join("\n")
+                        .join("\n"),
                 )
             }
             Expression::UseModule {
@@ -388,7 +418,7 @@ impl fmt::Display for Expression {
             } => write!(
                 f,
                 "use module {} relative to {}",
-                relative_path, current_module
+                relative_path, current_module,
             ),
             Expression::Needs { condition, reason } => {
                 write!(f, "needs {condition} with reason {reason}")
@@ -481,6 +511,7 @@ impl Expression {
             Expression::Struct(_) => None,
             Expression::Destructure { .. } => None,
             Expression::PatternIdentifierReference { .. } => None,
+            Expression::Match { cases, .. } => cases.iter().find_map(|(_, body)| body.find(id)),
             Expression::Lambda(Lambda { body, .. }) => body.find(id),
             Expression::Builtin(_) => None,
             Expression::Call { .. } => None,
@@ -517,8 +548,13 @@ impl CollectErrors for Expression {
             | Expression::Symbol(_)
             | Expression::List(_)
             | Expression::Struct(_)
-            | Expression::PatternIdentifierReference { .. }
-            | Expression::Builtin(_)
+            | Expression::PatternIdentifierReference { .. } => {}
+            Expression::Match { cases, .. } => {
+                for (_, body) in cases {
+                    body.collect_errors(errors);
+                }
+            }
+            Expression::Builtin(_)
             | Expression::Call { .. }
             | Expression::UseModule { .. }
             | Expression::Needs { .. } => {}
