@@ -364,7 +364,7 @@ impl fmt::Display for Expression {
             Expression::Match { expression, cases } => {
                 write!(
                     f,
-                    "match {expression) with these cases:\n{}",
+                    "match {expression} with these cases:\n{}",
                     cases
                         .iter()
                         .map(|(pattern, body)| format!("{pattern} -> {body}")

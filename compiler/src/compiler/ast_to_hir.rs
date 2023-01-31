@@ -116,6 +116,7 @@ impl<'a> Context<'a> {
 struct NonTopLevelResetState(bool);
 
 impl<'a> Context<'a> {
+    #[must_use]
     fn start_scope(&mut self) -> ScopeResetState {
         ScopeResetState {
             body: mem::take(&mut self.body),
@@ -124,6 +125,7 @@ impl<'a> Context<'a> {
             non_top_level_reset_state: self.start_non_top_level(),
         }
     }
+    #[must_use]
     fn end_scope(&mut self, reset_state: ScopeResetState) -> Body {
         let inner_body = mem::replace(&mut self.body, reset_state.body);
         self.prefix_keys = reset_state.prefix_keys;
@@ -301,34 +303,48 @@ impl<'a> Context<'a> {
             AstKind::Match(ast::Match { expression, cases }) => {
                 let expression = self.compile_single(expression);
 
-                let cases = cases.iter().for_each(|case| match case.kind {
-                    AstKind::MatchCase(MatchCase { box pattern, body }) => {
-                        let (pattern, pattern_identifiers) = PatternContext::compile(&pattern);
+                let cases = cases
+                    .iter()
+                    .map(|case| match case.kind {
+                        AstKind::MatchCase(MatchCase { box pattern, body }) => {
+                            let (pattern, pattern_identifiers) = PatternContext::compile(&pattern);
 
-                        let reset_state = self.start_scope();
-                        for (name, (ast_id, identifier_id)) in pattern_identifiers {
-                            self.push(
-                                Some(ast_id),
-                                Expression::PatternIdentifierReference {
-                                    destructuring: expression.clone(),
-                                    identifier_id,
-                                },
-                                Some(name.to_owned()),
-                            );
+                            let reset_state = self.start_scope();
+                            for (name, (ast_id, identifier_id)) in pattern_identifiers {
+                                self.push(
+                                    Some(ast_id),
+                                    Expression::PatternIdentifierReference {
+                                        destructuring: expression.clone(),
+                                        identifier_id,
+                                    },
+                                    Some(name.to_owned()),
+                                );
+                            }
+                            self.compile(body.as_ref());
+                            let body = self.end_scope(reset_state);
+
+                            (pattern, body)
                         }
-                        let body = self.compile(body.as_ref());
-                        self.end_scope(reset_state);
-                    }
-                    AstKind::Error { errors, .. } => (
-                        Pattern::Error {
-                            child: None,
-                            errors,
-                        },
-                        Body::default(),
-                    ),
-                    _ => unreachable!("Expected match case in match cases, got {value:?}."),
-                });
-                let hir_cases = vec![];
+                        AstKind::Error { errors, .. } => {
+                            let pattern = Pattern::Error {
+                                child: None,
+                                errors,
+                            };
+
+                            let reset_state = self.start_scope();
+                            self.compile(&[]);
+                            let body = self.end_scope(reset_state);
+
+                            (pattern, body)
+                        }
+                        _ => unreachable!("Expected match case in match cases, got {case:?}."),
+                    })
+                    .collect_vec();
+                self.push(
+                    Some(ast.id.clone()),
+                    Expression::Match { expression, cases },
+                    None,
+                )
             }
             AstKind::MatchCase(_) => {
                 unreachable!("Match cases should be handled in match directly.")

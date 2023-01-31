@@ -469,7 +469,7 @@ impl<'a> PatternLoweringContext<'a> {
                         arguments: vec![expression, index],
                         responsible: self.responsible,
                     });
-                    self.compile_destructure(item, pattern);
+                    self.compile(item, pattern);
                 }
             }
             hir::Pattern::Struct(struct_) => {
@@ -487,18 +487,19 @@ impl<'a> PatternLoweringContext<'a> {
                         arguments: vec![expression, key],
                         responsible: self.responsible,
                     });
-                    self.compile_destructure(item, value_pattern);
+                    self.compile(item, value_pattern);
                 }
             }
             hir::Pattern::Error { child, errors } => {
                 compile_errors(self.db, self.body, self.responsible, errors);
                 if let Some(child) = child {
                     // We still have to populate `identifier_ids`.
-                    self.compile_destructure(expression, child);
+                    self.compile(expression, child);
                 }
             }
         }
     }
+    #[must_use]
     fn compile_exact_value(&mut self, expression: Id, expected_value: Expression) -> Id {
         self.compile_equals(expected_value, expression, |body, expected, actual| {
             vec![
@@ -510,6 +511,7 @@ impl<'a> PatternLoweringContext<'a> {
             ]
         })
     }
+    #[must_use]
     fn compile_verify_type(&mut self, expression: Id, expected_type: String) -> Id {
         let builtin_type_of = self.body.push(Expression::Builtin(BuiltinFunction::TypeOf));
         let type_ = self.body.push(Expression::Call {
@@ -532,6 +534,7 @@ impl<'a> PatternLoweringContext<'a> {
             },
         )
     }
+    #[must_use]
     fn compile_equals<R>(
         &mut self,
         expected_value: Expression,
