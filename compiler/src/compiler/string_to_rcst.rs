@@ -1326,7 +1326,7 @@ mod parse {
                     result = Rcst::Match {
                         expression: Box::new(result.wrap_in_whitespace(whitespace_after_receiver)),
                         percent: Box::new(percent),
-                        cases: cases,
+                        cases,
                     };
                     did_make_progress = true;
                 }

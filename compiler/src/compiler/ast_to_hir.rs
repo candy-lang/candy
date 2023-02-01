@@ -305,9 +305,9 @@ impl<'a> Context<'a> {
 
                 let cases = cases
                     .iter()
-                    .map(|case| match case.kind {
+                    .map(|case| match &case.kind {
                         AstKind::MatchCase(MatchCase { box pattern, body }) => {
-                            let (pattern, pattern_identifiers) = PatternContext::compile(&pattern);
+                            let (pattern, pattern_identifiers) = PatternContext::compile(pattern);
 
                             let reset_state = self.start_scope();
                             for (name, (ast_id, identifier_id)) in pattern_identifiers {
@@ -328,7 +328,7 @@ impl<'a> Context<'a> {
                         AstKind::Error { errors, .. } => {
                             let pattern = Pattern::Error {
                                 child: None,
-                                errors,
+                                errors: errors.to_owned(),
                             };
 
                             let reset_state = self.start_scope();
@@ -398,7 +398,7 @@ impl<'a> Context<'a> {
         lambda: &ast::Lambda,
         identifier: Option<String>,
     ) -> hir::Id {
-        let assignment_reset_state = self.start_scope();
+        let reset_state = self.start_scope();
         let lambda_id = self.create_next_id(Some(id), identifier);
 
         for parameter in lambda.parameters.iter() {
@@ -410,14 +410,12 @@ impl<'a> Context<'a> {
             self.identifiers.insert(name, id);
         }
 
-        let lambda_reset_state = self.start_scope();
         self.prefix_keys
             .push(lambda_id.keys.last().unwrap().clone());
 
         self.compile(&lambda.body);
 
-        let inner_body = self.end_scope(lambda_reset_state);
-        self.end_scope(assignment_reset_state);
+        let inner_body = self.end_scope(reset_state);
 
         self.push_with_existing_id(
             lambda_id.clone(),

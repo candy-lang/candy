@@ -402,7 +402,7 @@ impl Display for Ast {
                     format!("\n  {}", match_case.body.iter().join("\n"))
                 }
                 .lines()
-                .map(|line| format!("{line}"))
+                .map(|line| line.to_string())
                 .join("  \n"),
             ),
             AstKind::Error { child, errors } => {

@@ -256,7 +256,7 @@ impl LoweringContext {
                         _ => panic!("Text contains non-TextPart. Whitespaces should have been removed already."),
                     }
                 }
-                let mut text = self.create_ast(cst.id, AstKind::Text(Text(lowered_parts)));
+                let text = self.create_ast(cst.id, AstKind::Text(Text(lowered_parts)));
 
                 if !matches!(
                     &closing.kind,
@@ -617,7 +617,7 @@ impl LoweringContext {
             }
             CstKind::MatchCase {
                 pattern,
-                arrow,
+                arrow: _,
                 body,
             } => {
                 let mut errors = vec![];

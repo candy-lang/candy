@@ -71,13 +71,16 @@ impl Expression {
                     ids.push(value_id.to_owned());
                 }
             }
-            Expression::Destructure { expression, .. } => ids.push(expression.to_owned()),
+            Expression::Destructure {
+                expression,
+                pattern: _,
+            } => ids.push(expression.to_owned()),
             Expression::PatternIdentifierReference { destructuring, .. } => {
                 ids.push(destructuring.to_owned())
             }
             Expression::Match { expression, cases } => {
                 ids.push(expression.to_owned());
-                for (pattern, body) in cases {
+                for (_, body) in cases {
                     body.collect_all_ids(ids);
                 }
             }
