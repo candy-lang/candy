@@ -60,7 +60,7 @@ impl Mir {
                     return; // TODO: Replace with a panic.
                 };
 
-                let mir = db.mir_with_obvious_optimized(
+                let mir = db.obviously_optimized_mir(
                     module_to_import.clone(),
                     tracing.for_child_module(),
                 );

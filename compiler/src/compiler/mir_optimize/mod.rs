@@ -55,6 +55,8 @@ mod reference_following;
 mod tree_shaking;
 mod utils;
 
+use self::complexity::Complexity;
+
 use super::{
     hir,
     hir_to_mir::HirToMir,
@@ -72,14 +74,22 @@ use tracing::debug;
 #[salsa::query_group(OptimizeMirStorage)]
 pub trait OptimizeMir: HirToMir {
     #[salsa::cycle(recover_from_cycle)]
-    fn mir_with_obvious_optimized(
-        &self,
-        module: Module,
-        tracing: TracingConfig,
-    ) -> Option<Arc<Mir>>;
+    fn optimized_mir(&self, module: Module, tracing: TracingConfig) -> Option<Arc<Mir>>;
+
+    #[salsa::cycle(recover_from_cycle)]
+    fn obviously_optimized_mir(&self, module: Module, tracing: TracingConfig) -> Option<Arc<Mir>>;
 }
 
-fn mir_with_obvious_optimized(
+fn optimized_mir(db: &dyn OptimizeMir, module: Module, tracing: TracingConfig) -> Option<Arc<Mir>> {
+    debug!("{module}: Optimizing thoroughly.");
+    let mir = db.obviously_optimized_mir(module.clone(), tracing.clone())?;
+    let mut mir = (*mir).clone();
+    mir.optimize(db, &tracing);
+    debug!("{module}: Optimized thoroughly.");
+    Some(Arc::new(mir))
+}
+
+fn obviously_optimized_mir(
     db: &dyn OptimizeMir,
     module: Module,
     tracing: TracingConfig,
@@ -97,6 +107,24 @@ fn mir_with_obvious_optimized(
 }
 
 impl Mir {
+    pub fn optimize(&mut self, db: &dyn OptimizeMir, tracing: &TracingConfig) {
+        loop {
+            let hashcode_before = self.do_hash();
+
+            self.optimize_obvious(db, tracing);
+            self.inline_functions_of_maximum_complexity(Complexity {
+                is_self_contained: true,
+                expressions: 1000000,
+            });
+
+            if self.do_hash() == hashcode_before {
+                break;
+            }
+        }
+        self.optimize_obvious(db, tracing);
+        self.cleanup();
+    }
+
     /// Performs optimizations that (usually) improve both performance and code
     /// size.
     pub fn optimize_obvious(&mut self, db: &dyn OptimizeMir, tracing: &TracingConfig) {

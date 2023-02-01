@@ -233,9 +233,17 @@ fn raw_build(
         module.dump_associated_debug_file("mir", &format!("{mir}"));
     }
 
-    let optimized_mir = db
-        .mir_with_obvious_optimized(module.clone(), tracing.clone())
+    let obviously_optimized_mir = db
+        .obviously_optimized_mir(module.clone(), tracing.clone())
         .unwrap();
+    if debug {
+        module.dump_associated_debug_file(
+            "obviously_optimized_mir",
+            &format!("{obviously_optimized_mir}"),
+        );
+    }
+
+    let optimized_mir = db.optimized_mir(module.clone(), tracing.clone()).unwrap();
     if debug {
         module.dump_associated_debug_file("optimized_mir", &format!("{optimized_mir}"));
     }

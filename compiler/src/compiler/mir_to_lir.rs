@@ -15,7 +15,7 @@ pub trait MirToLir: CstDb + OptimizeMir {
 }
 
 fn lir(db: &dyn MirToLir, module: Module, tracing: TracingConfig) -> Option<Arc<Lir>> {
-    let mir = db.mir_with_obvious_optimized(module, tracing)?;
+    let mir = db.obviously_optimized_mir(module, tracing)?;
     let instructions = compile_lambda(&[], &[], Id::from_usize(0), &mir.body);
     Some(Arc::new(Lir { instructions }))
 }
