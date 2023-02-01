@@ -325,7 +325,7 @@ impl Display for Ast {
                         .join("\n")
                 )
             }
-            AstKind::TextPart(TextPart(text)) => write!(f, "textPart \"{}\"", text),
+            AstKind::TextPart(TextPart(text)) => write!(f, "textPart {}", text),
             AstKind::Identifier(Identifier(identifier)) => write!(f, "identifier {}", identifier),
             AstKind::Symbol(Symbol(symbol)) => write!(f, "symbol {}", symbol),
             AstKind::List(List(items)) => {
