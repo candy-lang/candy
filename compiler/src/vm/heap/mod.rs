@@ -38,7 +38,6 @@ macro_rules! trace {
 pub struct Heap {
     objects: Vec<Option<Object>>,
     empty_addresses: Vec<Pointer>,
-    next_new_address: Pointer,
     channel_refcounts: FxHashMap<ChannelId, usize>,
 }
 
@@ -77,7 +76,6 @@ impl std::fmt::Debug for Heap {
                     .join(", ")
             )?;
         }
-        writeln!(f, "next_new_address: {}", self.next_new_address)?;
         write!(f, "}}")
     }
 }
@@ -87,7 +85,6 @@ impl Default for Heap {
         Self {
             objects: vec![None],
             empty_addresses: vec![],
-            next_new_address: Pointer::from_raw(1),
             channel_refcounts: FxHashMap::default(),
         }
     }
@@ -178,8 +175,8 @@ impl Heap {
     }
     fn reserve_address(&mut self) -> Pointer {
         self.empty_addresses.pop().unwrap_or_else(|| {
-            let address = self.next_new_address;
-            self.next_new_address = Pointer::from_raw(self.next_new_address.raw() + 1);
+            let address = Pointer::from_raw(self.objects.len());
+            self.objects.push(None);
             address
         })
     }
@@ -214,29 +211,14 @@ impl Heap {
 
         for (address, refcount) in additional_refcounts {
             let new_address = address_map[&address];
-            if new_address.raw() > other.objects.len() {
-                other
-                    .empty_addresses
-                    .extend((other.objects.len()..new_address.raw()).map(Pointer::from_raw));
-                other.objects.resize(new_address.raw(), None);
-            }
-
-            if new_address.raw() == other.objects.len() {
-                other.objects.push(Some(Object {
+            let object = &mut other.objects[new_address.raw()];
+            if let Some(object) = object {
+                object.reference_count += refcount;
+            } else {
+                *object = Some(Object {
                     reference_count: refcount,
                     data: Self::map_data(address_map, &self.get(address).data),
-                }));
-            } else {
-                assert!(new_address.raw() < other.objects.len());
-                let object = &mut other.objects[new_address.raw()];
-                if let Some(object) = object {
-                    object.reference_count += refcount;
-                } else {
-                    *object = Some(Object {
-                        reference_count: refcount,
-                        data: Self::map_data(address_map, &self.get(address).data),
-                    });
-                }
+                });
             }
         }
 
@@ -308,6 +290,10 @@ impl Heap {
             address,
             &mut FxHashMap::default(),
         )
+    }
+
+    pub fn all_objects(&self) -> impl Iterator<Item = &Object> {
+        self.objects.iter().filter_map(|it| it.as_ref())
     }
 
     pub fn known_channels(&self) -> impl IntoIterator<Item = ChannelId> + '_ {

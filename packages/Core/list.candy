@@ -39,6 +39,7 @@ isValidIndex list index :=
 
 get list index :=
   needs (is list)
+  needs (int.is index)
   needs (list | isValidIndex index)
   list | ✨.listGet index
 
@@ -46,7 +47,7 @@ get list index :=
 last list :=
   needs (is list)
   list | lastIndex
-  | result.mapError "Can't get the last item of an empty list."
+  | result.mapError { _ -> "Can't get the last item of an empty list." }
   | result.map { index -> list | get index }
 
 insert list index item :=
@@ -67,11 +68,13 @@ append list item :=
 
 replace list index newValue :=
   needs (is list)
-  needs (isValidIndex index)
+  needs (int.is index)
+  needs (list | isValidIndex index)
   list | ✨.listReplace index newValue
 update list index updater :=
   needs (is list)
-  needs (isValidIndex index)
+  needs (int.is index)
+  needs (list | isValidIndex index)
   needs (function.is1 updater)
   oldValue = list | get index
   newValue = updater oldValue
@@ -79,5 +82,6 @@ update list index updater :=
 
 removeAt list index :=
   needs (is list)
-  needs (isValidIndex index)
+  needs (int.is index)
+  needs (list | isValidIndex index)
   list | ✨.listRemoveAt index

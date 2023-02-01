@@ -116,7 +116,7 @@ impl Struct {
         }
         Err(index_of_first_hash_occurrence)
     }
-    fn insert(&mut self, heap: &Heap, key: Pointer, value: Pointer) {
+    pub fn insert(&mut self, heap: &Heap, key: Pointer, value: Pointer) {
         let hash = key.hash(heap);
         let field = (hash, key, value);
         match self.index_of_key(heap, key, hash) {
@@ -283,7 +283,7 @@ impl Deref for Object {
 }
 
 impl Pointer {
-    fn hash(&self, heap: &Heap) -> u64 {
+    pub fn hash(&self, heap: &Heap) -> u64 {
         heap.get(*self).hash(heap)
     }
     fn hash_with_state<H: Hasher>(&self, heap: &Heap, state: &mut H) {

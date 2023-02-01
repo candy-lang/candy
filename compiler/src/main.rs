@@ -4,6 +4,7 @@
 #![feature(entry_insert)]
 #![feature(let_chains)]
 #![feature(never_type)]
+#![feature(round_char_boundary)]
 #![feature(try_trait_v2)]
 #![allow(clippy::module_inception)]
 

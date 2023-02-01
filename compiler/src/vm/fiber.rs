@@ -175,9 +175,7 @@ impl Fiber {
     pub fn complete_receive(&mut self, packet: Packet) {
         assert!(matches!(self.status, Status::Receiving { .. }));
 
-        let address = packet
-            .heap
-            .clone_single_to_other_heap(&mut self.heap, packet.address);
+        let address = packet.clone_to_other_heap(&mut self.heap);
         self.data_stack.push(address);
         self.status = Status::Running;
     }

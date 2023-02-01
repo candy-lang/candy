@@ -60,7 +60,7 @@ impl FuzzerManager {
 
         match &fuzzer.status() {
             Status::StillFuzzing { .. } => None,
-            Status::PanickedForArguments { .. } => Some(fuzzer.closure_id.module.clone()),
+            Status::FoundPanic { .. } => Some(fuzzer.closure_id.module.clone()),
         }
     }
 
@@ -70,8 +70,8 @@ impl FuzzerManager {
         debug!("There are {} fuzzers.", self.fuzzers.len());
 
         for fuzzer in self.fuzzers[module].values() {
-            let Status::PanickedForArguments {
-                arguments,
+            let Status::FoundPanic {
+                input,
                 reason,
                 responsible,
                 ..
@@ -96,7 +96,7 @@ impl FuzzerManager {
                         "If this is called with {},",
                         parameter_names
                             .iter()
-                            .zip(arguments.iter())
+                            .zip(input.arguments.iter())
                             .map(|(name, argument)| format!("`{name} = {argument:?}`"))
                             .collect_vec()
                             .join_with_commas_and_and(),

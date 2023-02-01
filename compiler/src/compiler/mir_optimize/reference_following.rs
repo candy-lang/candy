@@ -18,7 +18,7 @@
 
 use rustc_hash::FxHashMap;
 
-use crate::compiler::mir::{Expression, Mir};
+use crate::compiler::mir::{Expression, Mir, VisitorResult};
 
 impl Mir {
     pub fn follow_references(&mut self) {
@@ -29,6 +29,7 @@ impl Mir {
                 let replacement = *replacements.get(reference).unwrap_or(reference);
                 replacements.insert(id, replacement);
             }
+            VisitorResult::Continue
         });
         self.body.visit(&mut |_, expression, _| {
             expression.replace_id_references(&mut |id| {
@@ -36,6 +37,7 @@ impl Mir {
                     *id = replacement;
                 }
             });
+            VisitorResult::Continue
         });
     }
 

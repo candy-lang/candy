@@ -56,6 +56,8 @@ impl Notification for HintsNotification {
     type Params = Self;
 }
 
+#[tokio::main(worker_threads = 1)]
+#[allow(unused_must_use)]
 pub async fn run_server(
     mut incoming_events: Receiver<Event>,
     outgoing_hints: Sender<(Module, Vec<Hint>)>,

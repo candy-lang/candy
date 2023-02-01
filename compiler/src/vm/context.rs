@@ -69,6 +69,20 @@ impl ExecutionController for RunLimitedNumberOfInstructions {
     }
 }
 
+#[derive(Default)]
+pub struct CountingExecutionController {
+    pub num_instructions: usize,
+}
+impl ExecutionController for CountingExecutionController {
+    fn should_continue_running(&self) -> bool {
+        true
+    }
+
+    fn instruction_executed(&mut self) {
+        self.num_instructions += 1;
+    }
+}
+
 pub struct CombiningExecutionController<'a, 'b, A: ExecutionController, B: ExecutionController> {
     a: &'a mut A,
     b: &'b mut B,
