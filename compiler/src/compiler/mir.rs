@@ -139,6 +139,14 @@ impl TryInto<bool> for &Expression {
         }
     }
 }
+impl TryInto<BigInt> for &Expression {
+    type Error = ();
+
+    fn try_into(self) -> Result<BigInt, ()> {
+        let Expression::Int(int) = self else { return Err(()); };
+        Ok(int.clone())
+    }
+}
 
 impl Body {
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = (Id, &Expression)> {
