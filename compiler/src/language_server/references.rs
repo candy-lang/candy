@@ -191,7 +191,8 @@ impl<'a> Context<'a> {
             Expression::List(_) => { }
             Expression::Struct(_) => { }
             Expression::Destructure { .. } => {},
-            Expression::PatternIdentifierReference { .. } => {}
+            Expression::PatternIdentifierReference { .. } => {}, // TODO
+            Expression::Match {..} => {},
             Expression::Lambda(Lambda { body, .. }) => {
                 // We don't need to visit the parameters: They can only be the
                 // declaration of an identifier and don't reference it any other

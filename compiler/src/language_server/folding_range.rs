@@ -56,6 +56,7 @@ impl<'a> Context<'a> {
             | CstKind::Arrow
             | CstKind::SingleQuote
             | CstKind::DoubleQuote
+            | CstKind::Percent
             | CstKind::Octothorpe
             | CstKind::Whitespace(_)
             | CstKind::Newline(_) => {}
@@ -110,6 +111,24 @@ impl<'a> Context<'a> {
                 self.visit_cst(struct_);
                 self.visit_cst(dot);
                 self.visit_cst(key);
+            }
+            CstKind::Match {
+                expression,
+                percent,
+                cases,
+            } => {
+                self.visit_cst(expression);
+                self.visit_cst(percent);
+                self.visit_csts(cases);
+            }
+            CstKind::MatchCase {
+                pattern,
+                arrow,
+                body,
+            } => {
+                self.visit_cst(pattern);
+                self.visit_cst(arrow);
+                self.visit_csts(body);
             }
             CstKind::Lambda {
                 opening_curly_brace,
