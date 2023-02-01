@@ -65,7 +65,7 @@ trait BencherExtension {
 impl<'a, M: Measurement> BencherExtension for Bencher<'a, M> {
     fn compile(&mut self, source_code: &str) {
         self.iter_batched(
-            || setup(),
+            setup,
             |mut db| compile(&mut db, source_code),
             BatchSize::SmallInput,
         )
