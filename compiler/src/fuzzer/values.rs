@@ -86,9 +86,6 @@ fn generate_mutated_value(
         return generate_value_with_complexity(heap, rng, 100.0, symbols);
     }
 
-    // We know that there are no cycles in the values because otherwise, objects
-    // would have an infinite size. Rust's type system doesn't know that, so we
-    // just temporarily replace the object's data with dummy data.
     let mut data = heap.get(address).data.clone();
     match &mut data {
         Data::Int(int) => {
