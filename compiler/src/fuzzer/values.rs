@@ -1,12 +1,11 @@
 use std::{
     cell::{Ref, RefCell, RefMut},
-    mem,
     rc::Rc,
 };
 
 use crate::{
     builtin_functions,
-    vm::{Data, Heap, List, Pointer, Symbol},
+    vm::{Data, Heap, List, Pointer},
 };
 use itertools::Itertools;
 use num_bigint::RandBigInt;
@@ -71,33 +70,26 @@ fn generate_value_with_complexity(
     }
 }
 
-pub fn mutate_input(rng: &mut ThreadRng, input: &mut Input, symbols: &[Pointer]) {
+pub fn generate_mutated_input(rng: &mut ThreadRng, input: &mut Input, symbols: &[Pointer]) {
     let mut heap = input.heap.borrow_mut();
     let num_args = input.arguments.len();
     let argument = input.arguments.get_mut(rng.gen_range(0..num_args)).unwrap();
-    *argument = mutate_value(rng, &mut heap, *argument, symbols);
+    *argument = generate_mutated_value(rng, &mut heap, *argument, symbols);
 }
-fn mutate_value(
+fn generate_mutated_value(
     rng: &mut ThreadRng,
     heap: &mut RefMut<Heap>,
     address: Pointer,
     symbols: &[Pointer],
 ) -> Pointer {
     if rng.gen_bool(0.1) {
-        heap.drop(address);
         return generate_value_with_complexity(heap, rng, 100.0, symbols);
     }
 
     // We know that there are no cycles in the values because otherwise, objects
     // would have an infinite size. Rust's type system doesn't know that, so we
     // just temporarily replace the object's data with dummy data.
-    let mut data = mem::replace(
-        &mut heap.get_mut(address).data,
-        Data::Symbol(Symbol {
-            value: "Nothing".to_string(),
-        }),
-    );
-
+    let mut data = heap.get(address).data.clone();
     match &mut data {
         Data::Int(int) => {
             int.value += rng.gen_range(-10..10);
@@ -113,7 +105,7 @@ fn mutate_value(
         Data::List(List { items }) => {
             if rng.gen_bool(0.9) && !items.is_empty() {
                 let index = rng.gen_range(0..items.len());
-                items[index] = mutate_value(rng, heap, items[index], symbols);
+                items[index] = generate_mutated_value(rng, heap, items[index], symbols);
             } else if rng.gen_bool(0.5) && !items.is_empty() {
                 items.remove(rng.gen_range(0..items.len()));
             } else {
@@ -127,7 +119,7 @@ fn mutate_value(
             if rng.gen_bool(0.9) && !struct_.fields.is_empty() {
                 let index = rng.gen_range(0..struct_.fields.len());
                 let (_, _, value) = struct_.fields[index];
-                struct_.fields[index].2 = mutate_value(rng, heap, value, symbols);
+                struct_.fields[index].2 = generate_mutated_value(rng, heap, value, symbols);
             } else if rng.gen_bool(0.5) && !struct_.fields.is_empty() {
                 struct_
                     .fields
@@ -146,8 +138,7 @@ fn mutate_value(
         }
     }
 
-    heap.get_mut(address).data = data;
-    address
+    heap.create(data)
 }
 fn mutate_string(rng: &mut ThreadRng, string: &mut String) {
     if rng.gen_bool(0.5) && !string.is_empty() {

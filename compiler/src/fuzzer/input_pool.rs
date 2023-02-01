@@ -8,7 +8,7 @@ use crate::vm::{Heap, Pointer};
 
 use super::{
     input::Input,
-    values::{generate_input, mutate_input},
+    values::{generate_input, generate_mutated_input},
 };
 
 pub type Score = f64;
@@ -60,7 +60,7 @@ impl InputPool {
             .choose_weighted(&mut rng, |(_, score)| *score)
             .unwrap();
         let mut input = (**input).clone();
-        mutate_input(&mut rng, &mut input, &self.symbols);
+        generate_mutated_input(&mut rng, &mut input, &self.symbols);
         input
     }
 
