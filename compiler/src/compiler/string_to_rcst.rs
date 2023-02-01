@@ -161,7 +161,7 @@ mod parse {
     }
     #[instrument(level = "trace")]
     fn percent(input: &str) -> Option<(&str, Rcst)> {
-        literal(input, "%").map(|it| (it, Rcst::DoubleQuote))
+        literal(input, "%").map(|it| (it, Rcst::Percent))
     }
     #[instrument(level = "trace")]
     fn octothorpe(input: &str) -> Option<(&str, Rcst)> {
@@ -2409,12 +2409,13 @@ mod parse {
             let Some((new_input, case)) = match_case(input, indentation + 1) else { break; };
             let (new_input, whitespace) =
                 whitespaces_and_newlines(new_input, indentation + 1, true);
-            if !whitespace.is_multiline() {
+            input = new_input;
+            let is_whitespace_multiline = whitespace.is_multiline();
+            let case = case.wrap_in_whitespace(whitespace);
+            cases.push(case);
+            if !is_whitespace_multiline {
                 break;
             }
-            let case = case.wrap_in_whitespace(whitespace);
-            input = new_input;
-            cases.push(case);
         }
         if cases.is_empty() {
             cases.push(Rcst::Error {
@@ -2434,17 +2435,26 @@ mod parse {
         assert_eq!(
             match_suffix("%\n  1 -> 2\nFoo", 0),
             Some((
-                "",
+                "\nFoo",
                 Rcst::TrailingWhitespace {
                     child: Box::new(Rcst::Percent),
-                    whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    whitespace: vec![
+                        Rcst::Newline("\n".to_string()),
+                        Rcst::Whitespace("  ".to_string()),
+                    ],
                 },
                 vec![Rcst::MatchCase {
-                    pattern: Box::new(Rcst::Int {
-                        value: 1u8.into(),
-                        string: "1".to_string(),
+                    pattern: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Int {
+                            value: 1u8.into(),
+                            string: "1".to_string(),
+                        }),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
-                    arrow: Box::new(Rcst::Arrow),
+                    arrow: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Arrow),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
                     body: vec![Rcst::Int {
                         value: 2u8.into(),
                         string: "2".to_string(),
