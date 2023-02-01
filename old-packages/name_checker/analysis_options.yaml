@@ -34,7 +34,6 @@ linter:
     directives_ordering: true
     discarded_futures: true
     flutter_style_todos: true
-    invariant_booleans: true
     join_return_with_assignment: true
     no_adjacent_strings_in_list: true
     omit_local_variable_types: true
