@@ -35,6 +35,7 @@ impl PartialEq for Input {
     /// heap. This assumption should hold because all inputs generated during a
     /// fuzzing run are saved in the same heap.
     fn eq(&self, other: &Self) -> bool {
+        assert!(Rc::ptr_eq(&self.heap, &other.heap));
         if self.arguments.len() != other.arguments.len() {
             return false;
         }

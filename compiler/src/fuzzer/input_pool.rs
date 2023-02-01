@@ -29,7 +29,7 @@ impl InputPool {
             .map(|symbol| heap.create_symbol(symbol))
             .collect_vec();
         if symbols.is_empty() {
-            symbols.push(heap.create_symbol("Nothing".to_string()));
+            symbols.push(heap.create_nothing());
         }
 
         Self {
