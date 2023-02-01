@@ -41,6 +41,14 @@ impl InputPool {
     }
 
     pub fn generate_new_input(&self) -> Input {
+        loop {
+            let input = self.generate_input();
+            if !self.input_scores.contains_key(&input) {
+                return input;
+            }
+        }
+    }
+    pub fn generate_input(&self) -> Input {
         let mut rng = ThreadRng::default();
 
         if rng.gen_bool(0.1) || self.input_scores.len() < 20 {
