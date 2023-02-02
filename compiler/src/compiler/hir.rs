@@ -279,7 +279,7 @@ pub enum Pattern {
     Symbol(String),
     List(Vec<Pattern>),
     // Keys may not contain `NewIdentifier`.
-    Struct(FxHashMap<Pattern, Pattern>),
+    Struct(Vec<(Pattern, Pattern)>),
     Error {
         child: Option<Box<Pattern>>,
         errors: Vec<CompilerError>,
@@ -289,6 +289,27 @@ pub enum Pattern {
 impl hash::Hash for Pattern {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
+    }
+}
+impl Pattern {
+    pub fn captured_identifier_count(&self) -> usize {
+        match self {
+            Pattern::NewIdentifier(_) => 1,
+            Pattern::Int(_) | Pattern::Text(_) | Pattern::Symbol(_) => 0,
+            Pattern::List(list) => list.iter().map(|it| it.captured_identifier_count()).sum(),
+            Pattern::Struct(struct_) => struct_
+                .iter()
+                .map(|(key, value)| {
+                    key.captured_identifier_count() + value.captured_identifier_count()
+                })
+                .sum(),
+            Pattern::Error { .. } => {
+                // Since generated code panics in this case, it doesn't matter
+                // whether the child captured any identifiers since they can't
+                // be accessed anyway.
+                0
+            }
+        }
     }
 }
 

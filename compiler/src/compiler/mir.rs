@@ -531,6 +531,51 @@ impl BodyBuilder {
         self.body
             .push_with_new_id(&mut self.id_generator, expression)
     }
+    #[cfg(test)]
+    pub fn push_multiple<F>(&mut self, function: F) -> Id
+    where
+        F: FnOnce(&mut BodyBuilder),
+    {
+        let mut body = BodyBuilder::new(mem::take(&mut self.id_generator));
+        function(&mut body);
+        let (id_generator, body) = body.finish();
+        self.id_generator = id_generator;
+        self.push(Expression::Multiple(body))
+    }
+
+    pub fn push_int(&mut self, value: BigInt) -> Id {
+        self.push(Expression::Int(value))
+    }
+    pub fn push_text(&mut self, value: String) -> Id {
+        self.push(Expression::Text(value))
+    }
+
+    pub fn push_symbol(&mut self, value: String) -> Id {
+        self.push(Expression::Symbol(value))
+    }
+    pub fn push_nothing(&mut self) -> Id {
+        self.push(Expression::nothing())
+    }
+    pub fn push_bool(&mut self, value: bool) -> Id {
+        self.push(value.into())
+    }
+
+    pub fn push_builtin(&mut self, function: BuiltinFunction) -> Id {
+        self.push(Expression::Builtin(function))
+    }
+    pub fn push_list(&mut self, list: Vec<Id>) -> Id {
+        self.push(Expression::List(list))
+    }
+    pub fn push_struct(&mut self, struct_: Vec<(Id, Id)>) -> Id {
+        self.push(Expression::Struct(struct_))
+    }
+    pub fn push_reference(&mut self, reference: Id) -> Id {
+        self.push(Expression::Reference(reference))
+    }
+    pub fn push_hir_id(&mut self, id: hir::Id) -> Id {
+        self.push(Expression::HirId(id))
+    }
+
     /// The builder function takes the builder and the responsible parameter.
     pub fn push_lambda<F>(&mut self, function: F) -> Id
     where
@@ -543,16 +588,40 @@ impl BodyBuilder {
         self.id_generator = id_generator;
         self.push(lambda)
     }
-    #[cfg(test)]
-    pub fn push_multiple<F>(&mut self, function: F) -> Id
+
+    pub fn push_call(&mut self, function: Id, arguments: Vec<Id>, responsible: Id) -> Id {
+        self.push(Expression::Call {
+            function,
+            arguments,
+            responsible,
+        })
+    }
+    pub fn push_if_else<T, E>(
+        &mut self,
+        condition: Id,
+        then_builder: T,
+        else_builder: E,
+        responsible: Id,
+    ) -> Id
     where
-        F: FnOnce(&mut BodyBuilder),
+        T: FnOnce(&mut Self),
+        E: FnOnce(&mut Self),
     {
-        let mut body = BodyBuilder::new(mem::take(&mut self.id_generator));
-        function(&mut body);
-        let (id_generator, body) = body.finish();
-        self.id_generator = id_generator;
-        self.push(Expression::Multiple(body))
+        let builtin_if = self.push_builtin(BuiltinFunction::IfElse);
+        let then_lambda = self.push_lambda(|body, _| then_builder(body));
+        let else_lambda = self.push_lambda(|body, _| else_builder(body));
+        self.push_call(
+            builtin_if,
+            vec![condition, then_lambda, else_lambda],
+            responsible,
+        )
+    }
+
+    pub fn push_panic(&mut self, reason: Id, responsible: Id) -> Id {
+        self.push(Expression::Panic {
+            reason,
+            responsible,
+        })
     }
 
     pub fn current_return_value(&mut self) -> Id {
