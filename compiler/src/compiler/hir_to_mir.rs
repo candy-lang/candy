@@ -155,7 +155,9 @@ struct LoweringContext<'a> {
     mapping: &'a mut FxHashMap<hir::Id, Id>,
     needs_function: Id,
     tracing: &'a TracingConfig,
-    last_pattern_result: Option<Id>,
+    /// The result of the last pattern match and whether it was trivial
+    /// (i.e., `foo = …`).
+    last_pattern_result: Option<(Id, bool)>,
 }
 
 impl<'a> LoweringContext<'a> {
@@ -230,54 +232,63 @@ impl<'a> LoweringContext<'a> {
                 let responsible = body.push_hir_id(hir_id.clone());
                 let expression = self.mapping[expression];
 
-                let pattern_result = PatternLoweringContext::compile_pattern(
-                    self.db,
-                    body,
-                    responsible,
-                    expression,
-                    pattern,
-                );
-
-                let nothing = body.push_nothing();
-                let is_match = body.push_is_match(pattern_result, responsible);
-                body.push_if_else(
-                    is_match,
-                    |body| {
-                        body.push_reference(nothing);
-                    },
-                    |body| {
-                        let list_get_function = body.push_builtin(BuiltinFunction::ListGet);
-                        let one = body.push_int(1.into());
-                        let reason = body.push_call(
-                            list_get_function,
-                            vec![pattern_result, one],
-                            responsible,
-                        );
-
-                        body.push_panic(reason, responsible);
-                    },
-                    responsible,
-                );
-
-                if pattern.captured_identifier_count() == 0 {
-                    body.push_reference(nothing)
+                if let hir::Pattern::NewIdentifier(_) = pattern {
+                    // The trivial case: `foo = …`.
+                    let result = body.push_reference(expression);
+                    self.last_pattern_result = Some((result, true));
+                    result
                 } else {
-                    // The generated expression will be followed by at least one
-                    // identifier reference, so we don't have to generate a
-                    // reference to the result in here.
-                    self.last_pattern_result = Some(pattern_result);
-                    pattern_result
+                    let pattern_result = PatternLoweringContext::compile_pattern(
+                        self.db,
+                        body,
+                        responsible,
+                        expression,
+                        pattern,
+                    );
+
+                    let nothing = body.push_nothing();
+                    let is_match = body.push_is_match(pattern_result, responsible);
+                    body.push_if_else(
+                        is_match,
+                        |body| {
+                            body.push_reference(nothing);
+                        },
+                        |body| {
+                            let list_get_function = body.push_builtin(BuiltinFunction::ListGet);
+                            let one = body.push_int(1.into());
+                            let reason = body.push_call(
+                                list_get_function,
+                                vec![pattern_result, one],
+                                responsible,
+                            );
+
+                            body.push_panic(reason, responsible);
+                        },
+                        responsible,
+                    );
+
+                    if pattern.captured_identifier_count() == 0 {
+                        body.push_reference(nothing)
+                    } else {
+                        // The generated expression will be followed by at least one
+                        // identifier reference, so we don't have to generate a
+                        // reference to the result in here.
+                        self.last_pattern_result = Some((pattern_result, false));
+                        pattern_result
+                    }
                 }
             }
             hir::Expression::PatternIdentifierReference(identifier_id) => {
-                let list_get = body.push_builtin(BuiltinFunction::ListGet);
-                let index = body.push_int((identifier_id.0 + 1).into());
-                let responsible = body.push_hir_id(hir_id.clone());
-                body.push_call(
-                    list_get,
-                    vec![self.last_pattern_result.unwrap(), index],
-                    responsible,
-                )
+                let (pattern_result, is_trivial) = self.last_pattern_result.unwrap();
+
+                if is_trivial {
+                    body.push_reference(pattern_result)
+                } else {
+                    let list_get = body.push_builtin(BuiltinFunction::ListGet);
+                    let index = body.push_int((identifier_id.0 + 1).into());
+                    let responsible = body.push_hir_id(hir_id.clone());
+                    body.push_call(list_get, vec![pattern_result, index], responsible)
+                }
             }
             hir::Expression::Match { expression, cases } => {
                 assert!(!cases.is_empty());
@@ -424,7 +435,7 @@ impl<'a> LoweringContext<'a> {
 
                 let builtin_if_else = body.push_builtin(BuiltinFunction::IfElse);
                 let then_lambda = body.push_lambda(|body, _| {
-                    self.last_pattern_result = Some(pattern_result);
+                    self.last_pattern_result = Some((pattern_result, false));
                     self.compile_expressions(body, responsible, &case_body.expressions);
                 });
                 let else_lambda = body.push_lambda(|body, _| {
