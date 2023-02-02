@@ -558,6 +558,7 @@ impl Expression {
             Expression::Struct(_) => None,
             Expression::Destructure { .. } => None,
             Expression::PatternIdentifierReference { .. } => None,
+            // TODO: use binary search
             Expression::Match { cases, .. } => cases.iter().find_map(|(_, body)| body.find(id)),
             Expression::Lambda(Lambda { body, .. }) => body.find(id),
             Expression::Builtin(_) => None,
