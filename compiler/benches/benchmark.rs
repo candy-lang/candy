@@ -86,7 +86,7 @@ fn run_benchmarks<M: Measurement>(c: &mut Criterion<M>, prefix: &str) {
 }
 
 fn run_cycle_benchmarks(c: &mut Criterion<CyclesPerByte>) {
-    run_benchmarks(c, &"Cycles");
+    run_benchmarks(c, "Cycles");
 }
 criterion_group!(
     name = cycle_benchmarks;
@@ -95,7 +95,7 @@ criterion_group!(
 );
 
 fn run_time_benchmarks(c: &mut Criterion) {
-    run_benchmarks(c, &"Time");
+    run_benchmarks(c, "Time");
 }
 criterion_group!(time_benchmarks, run_time_benchmarks);
 
