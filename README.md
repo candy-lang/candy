@@ -140,7 +140,6 @@ We already have a language server that provides some tooling.
 - new name?
 - add caching while compile-time evaluating code
 - tags
-- pattern matching
 - add tests
 - add a more lightweight tracer that only tracks stack traces
 - minimize inputs found through fuzzing
