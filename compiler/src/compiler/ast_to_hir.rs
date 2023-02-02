@@ -300,6 +300,10 @@ impl<'a> Context<'a> {
             AstKind::Match(ast::Match { expression, cases }) => {
                 let expression = self.compile_single(expression);
 
+                let reset_state = self.start_scope();
+                let match_id = self.create_next_id(Some(ast.id.clone()), None);
+                self.prefix_keys = match_id.keys.clone();
+
                 let cases = cases
                     .iter()
                     .map(|case| match &case.kind {
@@ -334,11 +338,12 @@ impl<'a> Context<'a> {
                         _ => unreachable!("Expected match case in match cases, got {case:?}."),
                     })
                     .collect_vec();
-                self.push(
-                    Some(ast.id.clone()),
-                    Expression::Match { expression, cases },
-                    None,
-                )
+
+                // The scope is only for hierarchical IDs. The actual bodies are
+                // inside the cases.
+                let _ = self.end_scope(reset_state);
+
+                self.push_with_existing_id(match_id, Expression::Match { expression, cases }, None)
             }
             AstKind::MatchCase(_) => {
                 unreachable!("Match cases should be handled in match directly.")
@@ -401,10 +406,12 @@ impl<'a> Context<'a> {
                 );
 
                 let reset_state = self.start_scope();
+                let then_lambda_id = self.create_next_id(None, None);
+                self.prefix_keys = then_lambda_id.keys.clone();
                 self.push(None, Expression::Reference(hir.clone()), None);
                 let then_body = self.end_scope(reset_state);
-                let then_lambda = self.push(
-                    None,
+                let then_lambda = self.push_with_existing_id(
+                    then_lambda_id,
                     Expression::Lambda(Lambda {
                         parameters: vec![],
                         body: then_body,
@@ -414,6 +421,8 @@ impl<'a> Context<'a> {
                 );
 
                 let reset_state = self.start_scope();
+                let else_lambda_id = self.create_next_id(None, None);
+                self.prefix_keys = else_lambda_id.keys.clone();
                 self.push(
                     None,
                     Expression::Call {
@@ -423,8 +432,8 @@ impl<'a> Context<'a> {
                     None,
                 );
                 let else_body = self.end_scope(reset_state);
-                let else_lambda = self.push(
-                    None,
+                let else_lambda = self.push_with_existing_id(
+                    else_lambda_id,
                     Expression::Lambda(Lambda {
                         parameters: vec![],
                         body: else_body,
@@ -467,18 +476,14 @@ impl<'a> Context<'a> {
     ) -> hir::Id {
         let reset_state = self.start_scope();
         let lambda_id = self.create_next_id(Some(id), identifier);
+        self.prefix_keys = lambda_id.keys.clone();
 
         for parameter in lambda.parameters.iter() {
             let name = parameter.value.to_string();
-            let id = hir::Id::new(self.module.clone(), add_keys(&lambda_id.keys, name.clone()));
-            self.id_mapping
-                .insert(id.clone(), Some(parameter.id.clone()));
+            let id = self.create_next_id(Some(parameter.id.clone()), Some(name.clone()));
             self.body.identifiers.insert(id.clone(), name.clone());
             self.identifiers.insert(name, id);
         }
-
-        self.prefix_keys
-            .push(lambda_id.keys.last().unwrap().clone());
 
         self.compile(&lambda.body);
 
@@ -680,7 +685,8 @@ impl<'a> Context<'a> {
         //  }
 
         let reset_state = self.start_scope();
-        self.prefix_keys.push("use".to_string());
+        let use_id = self.create_next_id(None, Some("use".to_string()));
+        self.prefix_keys = use_id.keys.clone();
         let relative_path = hir::Id::new(
             self.module.clone(),
             add_keys(&self.prefix_keys[..], "relativePath".to_string()),
@@ -697,8 +703,8 @@ impl<'a> Context<'a> {
 
         let inner_body = self.end_scope(reset_state);
 
-        self.push(
-            None,
+        self.push_with_existing_id(
+            use_id,
             Expression::Lambda(Lambda {
                 parameters: vec![relative_path],
                 body: inner_body,

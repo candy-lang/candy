@@ -32,11 +32,19 @@ fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
 }
 fn containing_body_of(db: &dyn HirDb, id: Id) -> Arc<Body> {
     match id.parent() {
-        Some(lambda_id) => {
-            if lambda_id.is_root() {
+        Some(parent_id) => {
+            if parent_id.is_root() {
                 db.hir(id.module).unwrap().0
             } else {
-                match db.find_expression(lambda_id).unwrap() {
+                match db.find_expression(parent_id).unwrap() {
+                    Expression::Match { cases, .. } => {
+                        let body = cases
+                            .into_iter()
+                            .map(|(_, body)| body)
+                            .find(|body| body.expressions.contains_key(&id))
+                            .unwrap();
+                        Arc::new(body)
+                    }
                     Expression::Lambda(lambda) => Arc::new(lambda.body),
                     _ => panic!("Parent of an expression must be a lambda (or root scope)."),
                 }
@@ -550,6 +558,7 @@ impl Expression {
             Expression::Struct(_) => None,
             Expression::Destructure { .. } => None,
             Expression::PatternIdentifierReference { .. } => None,
+            // TODO: use binary search
             Expression::Match { cases, .. } => cases.iter().find_map(|(_, body)| body.find(id)),
             Expression::Lambda(Lambda { body, .. }) => body.find(id),
             Expression::Builtin(_) => None,
@@ -589,7 +598,8 @@ impl CollectErrors for Expression {
             | Expression::Struct(_)
             | Expression::PatternIdentifierReference { .. } => {}
             Expression::Match { cases, .. } => {
-                for (_, body) in cases {
+                for (pattern, body) in cases {
+                    pattern.collect_errors(errors);
                     body.collect_errors(errors);
                 }
             }
@@ -610,12 +620,19 @@ impl CollectErrors for Expression {
 impl CollectErrors for Pattern {
     fn collect_errors(&self, errors: &mut Vec<CompilerError>) {
         match self {
-            Pattern::NewIdentifier(_)
-            | Pattern::Int(_)
-            | Pattern::Text(_)
-            | Pattern::Symbol(_)
-            | Pattern::List(_)
-            | Pattern::Struct(_) => {}
+            Pattern::NewIdentifier(_) | Pattern::Int(_) | Pattern::Text(_) | Pattern::Symbol(_) => {
+            }
+            Pattern::List(patterns) => {
+                for pattern in patterns {
+                    pattern.collect_errors(errors);
+                }
+            }
+            Pattern::Struct(struct_) => {
+                for (key_pattern, value_pattern) in struct_ {
+                    key_pattern.collect_errors(errors);
+                    value_pattern.collect_errors(errors);
+                }
+            }
             Pattern::Error {
                 errors: the_errors, ..
             } => {
