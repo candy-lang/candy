@@ -86,7 +86,7 @@ mod parse {
     use itertools::Itertools;
     use tracing::instrument;
 
-    static MEANINGFUL_PUNCTUATION: &str = "()[]:,{}->=.|";
+    static MEANINGFUL_PUNCTUATION: &str = r#"=,.:|()[]{}->'"%"#;
     static SUPPORTED_WHITESPACE: &str = " \r\n\t";
 
     #[instrument(level = "trace")]
@@ -1431,6 +1431,44 @@ mod parse {
                         }),
                         arguments: vec![Rcst::Identifier("baz".to_owned())],
                     }),
+                },
+            )),
+        );
+        // foo %
+        //   123 -> 123
+        assert_eq!(
+            expression("foo %\n  123 -> 123", 0, true, true, true),
+            Some((
+                "",
+                Rcst::Match {
+                    expression: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    percent: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Percent),
+                        whitespace: vec![
+                            Rcst::Newline("\n".to_string()),
+                            Rcst::Whitespace("  ".to_string()),
+                        ],
+                    }),
+                    cases: vec![Rcst::MatchCase {
+                        pattern: Box::new(Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::Int {
+                                value: 123u8.into(),
+                                string: "123".to_string(),
+                            }),
+                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                        }),
+                        arrow: Box::new(Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::Arrow),
+                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                        }),
+                        body: vec![Rcst::Int {
+                            value: 123u8.into(),
+                            string: "123".to_string(),
+                        }],
+                    }],
                 },
             )),
         );
