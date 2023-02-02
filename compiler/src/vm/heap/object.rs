@@ -313,14 +313,20 @@ impl Pointer {
                 if items.is_empty() {
                     ",".to_owned()
                 } else {
-                    items.iter().map(|item| item.format(heap)).join(", ")
+                    items
+                        .iter()
+                        .map(|item| item.format_helper(heap, is_debug))
+                        .join(", ")
                 },
             ),
             Data::Struct(struct_) => format!(
                 "[{}]",
                 struct_
                     .iter()
-                    .map(|(key, value)| (key.format(heap), value.format(heap)))
+                    .map(|(key, value)| (
+                        key.format_helper(heap, is_debug),
+                        value.format_helper(heap, is_debug)
+                    ))
                     .sorted_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b))
                     .map(|(key, value)| format!("{}: {}", key, value))
                     .join(", ")
