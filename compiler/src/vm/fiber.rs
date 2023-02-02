@@ -235,6 +235,11 @@ impl Fiber {
         while matches!(self.status, Status::Running)
             && execution_controller.should_continue_running()
         {
+            if self.next_instruction == InstructionPointer::null_pointer() {
+                self.status = Status::Done;
+                break;
+            }
+
             let current_closure = self.heap.get(self.next_instruction.closure);
             let current_body = if let Data::Closure(Closure { body, .. }) = &current_closure.data {
                 body
@@ -249,10 +254,6 @@ impl Fiber {
             self.next_instruction.instruction += 1;
             self.run_instruction(use_provider, tracer, instruction);
             execution_controller.instruction_executed();
-
-            if self.next_instruction == InstructionPointer::null_pointer() {
-                self.status = Status::Done;
-            }
         }
     }
     pub fn run_instruction(
