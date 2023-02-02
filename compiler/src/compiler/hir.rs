@@ -32,11 +32,19 @@ fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
 }
 fn containing_body_of(db: &dyn HirDb, id: Id) -> Arc<Body> {
     match id.parent() {
-        Some(lambda_id) => {
-            if lambda_id.is_root() {
+        Some(parent_id) => {
+            if parent_id.is_root() {
                 db.hir(id.module).unwrap().0
             } else {
-                match db.find_expression(lambda_id).unwrap() {
+                match db.find_expression(parent_id).unwrap() {
+                    Expression::Match { cases, .. } => {
+                        let body = cases
+                            .into_iter()
+                            .map(|(_, body)| body)
+                            .find(|body| body.expressions.contains_key(&id))
+                            .unwrap();
+                        Arc::new(body)
+                    }
                     Expression::Lambda(lambda) => Arc::new(lambda.body),
                     _ => panic!("Parent of an expression must be a lambda (or root scope)."),
                 }
