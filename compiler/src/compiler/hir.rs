@@ -597,7 +597,8 @@ impl CollectErrors for Expression {
             | Expression::Struct(_)
             | Expression::PatternIdentifierReference { .. } => {}
             Expression::Match { cases, .. } => {
-                for (_, body) in cases {
+                for (pattern, body) in cases {
+                    pattern.collect_errors(errors);
                     body.collect_errors(errors);
                 }
             }
@@ -618,12 +619,19 @@ impl CollectErrors for Expression {
 impl CollectErrors for Pattern {
     fn collect_errors(&self, errors: &mut Vec<CompilerError>) {
         match self {
-            Pattern::NewIdentifier(_)
-            | Pattern::Int(_)
-            | Pattern::Text(_)
-            | Pattern::Symbol(_)
-            | Pattern::List(_)
-            | Pattern::Struct(_) => {}
+            Pattern::NewIdentifier(_) | Pattern::Int(_) | Pattern::Text(_) | Pattern::Symbol(_) => {
+            }
+            Pattern::List(patterns) => {
+                for pattern in patterns {
+                    pattern.collect_errors(errors);
+                }
+            }
+            Pattern::Struct(struct_) => {
+                for (key_pattern, value_pattern) in struct_ {
+                    key_pattern.collect_errors(errors);
+                    value_pattern.collect_errors(errors);
+                }
+            }
             Pattern::Error {
                 errors: the_errors, ..
             } => {
