@@ -607,11 +607,11 @@ impl BodyBuilder {
         T: FnOnce(&mut Self),
         E: FnOnce(&mut Self),
     {
-        let builtin_if = self.push_builtin(BuiltinFunction::IfElse);
+        let builtin_if_else = self.push_builtin(BuiltinFunction::IfElse);
         let then_lambda = self.push_lambda(|body, _| then_builder(body));
         let else_lambda = self.push_lambda(|body, _| else_builder(body));
         self.push_call(
-            builtin_if,
+            builtin_if_else,
             vec![condition, then_lambda, else_lambda],
             responsible,
         )

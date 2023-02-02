@@ -262,10 +262,7 @@ impl<'a> Context<'a> {
                             .map(|(name, (ast_id, identifier_id))| {
                                 let id = self.push(
                                     Some(ast_id),
-                                    Expression::PatternIdentifierReference {
-                                        destructuring: body.clone(),
-                                        identifier_id,
-                                    },
+                                    Expression::PatternIdentifierReference(identifier_id),
                                     Some(name.to_owned()),
                                 );
                                 (name, id)
@@ -313,10 +310,7 @@ impl<'a> Context<'a> {
                             for (name, (ast_id, identifier_id)) in pattern_identifiers {
                                 self.push(
                                     Some(ast_id),
-                                    Expression::PatternIdentifierReference {
-                                        destructuring: expression.clone(),
-                                        identifier_id,
-                                    },
+                                    Expression::PatternIdentifierReference(identifier_id),
                                     Some(name.to_owned()),
                                 );
                             }

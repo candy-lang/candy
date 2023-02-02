@@ -75,9 +75,7 @@ impl Expression {
                 expression,
                 pattern: _,
             } => ids.push(expression.to_owned()),
-            Expression::PatternIdentifierReference { destructuring, .. } => {
-                ids.push(destructuring.to_owned())
-            }
+            Expression::PatternIdentifierReference(_) => {}
             Expression::Match { expression, cases } => {
                 ids.push(expression.to_owned());
                 for (_, body) in cases {
@@ -208,10 +206,7 @@ pub enum Expression {
         expression: Id,
         pattern: Pattern,
     },
-    PatternIdentifierReference {
-        destructuring: Id,
-        identifier_id: PatternIdentifierId,
-    },
+    PatternIdentifierReference(PatternIdentifierId),
     Match {
         expression: Id,
         /// Each case consists of the pattern to match against, and the body
@@ -377,21 +372,16 @@ impl fmt::Display for Expression {
                 expression,
                 pattern,
             } => write!(f, "destructure {expression} into {pattern}"),
-            Expression::PatternIdentifierReference {
-                destructuring,
-                identifier_id,
-            } => write!(
-                f,
-                "get destructured p${} from {destructuring}",
-                identifier_id.0,
-            ),
+            Expression::PatternIdentifierReference(identifier_id) => {
+                write!(f, "get destructured {identifier_id}")
+            }
             Expression::Match { expression, cases } => {
                 write!(
                     f,
                     "match {expression} with these cases:\n{}",
                     cases
                         .iter()
-                        .map(|(pattern, body)| format!("{pattern} -> {body}")
+                        .map(|(pattern, body)| format!("{pattern} ->\n{body}")
                             .lines()
                             .enumerate()
                             .map(|(i, line)| format!(

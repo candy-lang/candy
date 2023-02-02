@@ -12,6 +12,7 @@ use crate::{
     module::{Module, ModuleKind, Package},
 };
 use itertools::Itertools;
+use linked_hash_map::LinkedHashMap;
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
@@ -24,7 +25,7 @@ fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> Option<Arc<
     let mir = match module.kind {
         ModuleKind::Code => {
             let (hir, _) = db.hir(module.clone())?;
-            compile_module(db, module, &hir, &tracing)
+            LoweringContext::compile_module(db, module, &hir, &tracing)
         }
         ModuleKind::Asset => {
             let bytes = db.get_module_content(module)?;
@@ -38,41 +39,6 @@ fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> Option<Arc<
         }
     };
     Some(Arc::new(mir))
-}
-
-fn compile_module(
-    db: &dyn HirToMir,
-    module: Module,
-    hir: &hir::Body,
-    tracing: &TracingConfig,
-) -> Mir {
-    Mir::build(|body| {
-        let mut mapping = FxHashMap::default();
-
-        body.push(Expression::ModuleStarts {
-            module: module.clone(),
-        });
-
-        let needs_function = generate_needs_function(body);
-
-        let module_hir_id = body.push_hir_id(hir::Id::new(module, vec![]));
-        for (id, expression) in &hir.expressions {
-            compile_expression(
-                db,
-                body,
-                &mut mapping,
-                needs_function,
-                module_hir_id,
-                id,
-                expression,
-                tracing,
-            );
-        }
-
-        let return_value = body.current_return_value();
-        body.push(Expression::ModuleEnds);
-        body.push_reference(return_value);
-    })
 }
 
 /// In the MIR, there's no longer the concept of needs. Instead, HIR IDs are
@@ -184,191 +150,299 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
     })
 }
 
-// Nothing to see here.
-#[allow(clippy::too_many_arguments)]
-fn compile_expression(
-    db: &dyn HirToMir,
-    body: &mut BodyBuilder,
-    mapping: &mut FxHashMap<hir::Id, Id>,
+struct LoweringContext<'a> {
+    db: &'a dyn HirToMir,
+    mapping: &'a mut FxHashMap<hir::Id, Id>,
     needs_function: Id,
-    responsible_for_needs: Id,
-    hir_id: &hir::Id,
-    expression: &hir::Expression,
-    tracing: &TracingConfig,
-) {
-    let id = match expression {
-        hir::Expression::Int(int) => body.push_int(int.clone().into()),
-        hir::Expression::Text(text) => body.push_text(text.clone()),
-        hir::Expression::Reference(reference) => body.push_reference(mapping[reference]),
-        hir::Expression::Symbol(symbol) => body.push_symbol(symbol.clone()),
-        hir::Expression::Builtin(builtin) => body.push_builtin(*builtin),
-        hir::Expression::List(items) => {
-            body.push_list(items.iter().map(|item| mapping[item]).collect())
-        }
-        hir::Expression::Struct(fields) => {
-            let fields = fields
-                .iter()
-                .map(|(key, value)| (mapping[key], mapping[value]))
-                .collect();
-            body.push_struct(fields)
-        }
-        hir::Expression::Destructure {
-            expression,
-            pattern,
-        } => {
-            let responsible = body.push_hir_id(hir_id.clone());
-            let expression = mapping[expression];
+    tracing: &'a TracingConfig,
+    last_pattern_result: Option<Id>,
+}
 
-            let pattern_result =
-                PatternLoweringContext::compile_pattern(db, body, responsible, expression, pattern);
+impl<'a> LoweringContext<'a> {
+    fn compile_module(
+        db: &dyn HirToMir,
+        module: Module,
+        hir: &hir::Body,
+        tracing: &TracingConfig,
+    ) -> Mir {
+        Mir::build(|body| {
+            let mut mapping = FxHashMap::default();
 
-            let nothing = body.push_nothing();
-            let is_match = body.push_is_match(pattern_result, responsible);
-            body.push_if_else(
-                is_match,
-                |body| {
-                    body.push_reference(nothing);
-                },
-                |body| {
+            body.push(Expression::ModuleStarts {
+                module: module.clone(),
+            });
+
+            let needs_function = generate_needs_function(body);
+
+            let module_hir_id = body.push_hir_id(hir::Id::new(module, vec![]));
+            let mut context = LoweringContext {
+                db,
+                mapping: &mut mapping,
+                needs_function,
+                tracing,
+                last_pattern_result: None,
+            };
+            context.compile_expressions(body, module_hir_id, &hir.expressions);
+
+            let return_value = body.current_return_value();
+            body.push(Expression::ModuleEnds);
+            body.push_reference(return_value);
+        })
+    }
+
+    fn compile_expressions(
+        &mut self,
+        body: &mut BodyBuilder,
+        responsible_for_needs: Id,
+        expressions: &LinkedHashMap<hir::Id, hir::Expression>,
+    ) {
+        for (id, expression) in expressions {
+            self.compile_expression(body, responsible_for_needs, id, expression);
+        }
+    }
+    fn compile_expression(
+        &mut self,
+        body: &mut BodyBuilder,
+        responsible_for_needs: Id,
+        hir_id: &hir::Id,
+        expression: &hir::Expression,
+    ) {
+        let id = match expression {
+            hir::Expression::Int(int) => body.push_int(int.clone().into()),
+            hir::Expression::Text(text) => body.push_text(text.clone()),
+            hir::Expression::Reference(reference) => body.push_reference(self.mapping[reference]),
+            hir::Expression::Symbol(symbol) => body.push_symbol(symbol.clone()),
+            hir::Expression::Builtin(builtin) => body.push_builtin(*builtin),
+            hir::Expression::List(items) => {
+                body.push_list(items.iter().map(|item| self.mapping[item]).collect())
+            }
+            hir::Expression::Struct(fields) => {
+                let fields = fields
+                    .iter()
+                    .map(|(key, value)| (self.mapping[key], self.mapping[value]))
+                    .collect();
+                body.push_struct(fields)
+            }
+            hir::Expression::Destructure {
+                expression,
+                pattern,
+            } => {
+                let responsible = body.push_hir_id(hir_id.clone());
+                let expression = self.mapping[expression];
+
+                let pattern_result = PatternLoweringContext::compile_pattern(
+                    self.db,
+                    body,
+                    responsible,
+                    expression,
+                    pattern,
+                );
+
+                let nothing = body.push_nothing();
+                let is_match = body.push_is_match(pattern_result, responsible);
+                body.push_if_else(
+                    is_match,
+                    |body| {
+                        body.push_reference(nothing);
+                    },
+                    |body| {
+                        let list_get_function = body.push_builtin(BuiltinFunction::ListGet);
+                        let one = body.push_int(1.into());
+                        let reason = body.push_call(
+                            list_get_function,
+                            vec![pattern_result, one],
+                            responsible,
+                        );
+
+                        body.push_panic(reason, responsible);
+                    },
+                    responsible,
+                );
+
+                if pattern.captured_identifier_count() == 0 {
+                    body.push_reference(nothing)
+                } else {
+                    // The generated expression will be followed by at least one
+                    // identifier reference, so we don't have to generate a
+                    // reference to the result in here.
+                    self.last_pattern_result = Some(pattern_result);
+                    pattern_result
+                }
+            }
+            hir::Expression::PatternIdentifierReference(identifier_id) => {
+                let list_get = body.push_builtin(BuiltinFunction::ListGet);
+                let index = body.push_int((identifier_id.0 + 1).into());
+                let responsible = body.push_hir_id(hir_id.clone());
+                body.push_call(
+                    list_get,
+                    vec![self.last_pattern_result.unwrap(), index],
+                    responsible,
+                )
+            }
+            hir::Expression::Match { expression, cases } => {
+                assert!(!cases.is_empty());
+
+                let responsible = body.push_hir_id(hir_id.clone());
+                let expression = self.mapping[expression];
+                self.compile_match(body, expression, cases, responsible)
+            }
+            hir::Expression::Lambda(hir::Lambda {
+                parameters: original_parameters,
+                body: original_body,
+                fuzzable,
+            }) => {
+                let lambda = body.push_lambda(|lambda, responsible_parameter| {
+                    for original_parameter in original_parameters {
+                        let parameter = lambda.new_parameter();
+                        self.mapping.insert(original_parameter.clone(), parameter);
+                    }
+
+                    let responsible = if *fuzzable {
+                        responsible_parameter
+                    } else {
+                        // This is a lambda with curly braces, so whoever is responsible
+                        // for `needs` in the current scope is also responsible for
+                        // `needs` in the lambda.
+                        responsible_for_needs
+                    };
+
+                    self.compile_expressions(lambda, responsible, &original_body.expressions);
+                });
+
+                if self.tracing.register_fuzzables.is_enabled() && *fuzzable {
+                    let hir_definition = body.push(Expression::HirId(hir_id.clone()));
+                    body.push(Expression::TraceFoundFuzzableClosure {
+                        hir_definition,
+                        closure: lambda,
+                    });
+                    body.push_reference(lambda)
+                } else {
+                    lambda
+                }
+            }
+            hir::Expression::Call {
+                function,
+                arguments,
+            } => {
+                let responsible = body.push_hir_id(hir_id.clone());
+                let arguments = arguments
+                    .iter()
+                    .map(|argument| self.mapping[argument])
+                    .collect_vec();
+
+                if self.tracing.calls.is_enabled() {
+                    let hir_call = body.push_hir_id(hir_id.clone());
+                    body.push(Expression::TraceCallStarts {
+                        hir_call,
+                        function: self.mapping[function],
+                        arguments: arguments.clone(),
+                        responsible,
+                    });
+                }
+                let call = body.push_call(self.mapping[function], arguments, responsible);
+                if self.tracing.calls.is_enabled() {
+                    body.push(Expression::TraceCallEnds { return_value: call });
+                    body.push_reference(call)
+                } else {
+                    call
+                }
+            }
+            hir::Expression::UseModule {
+                current_module,
+                relative_path,
+            } => body.push(Expression::UseModule {
+                current_module: current_module.clone(),
+                relative_path: self.mapping[relative_path],
+                // The `UseModule` expression only exists in the generated `use`
+                // function. If a use fails, that's also the fault of the caller.
+                // Essentially, the `UseModule` expression works exactly like a
+                // `needs`.
+                responsible: responsible_for_needs,
+            }),
+            hir::Expression::Needs { condition, reason } => {
+                let responsible = body.push_hir_id(hir_id.clone());
+                body.push_call(
+                    self.needs_function,
+                    vec![
+                        self.mapping[condition],
+                        self.mapping[reason],
+                        responsible_for_needs,
+                    ],
+                    responsible,
+                )
+            }
+            hir::Expression::Error { errors, .. } => {
+                let responsible = body.push_hir_id(hir_id.clone());
+                body.compile_errors(self.db, responsible, errors)
+            }
+        };
+        self.mapping.insert(hir_id.clone(), id);
+
+        if self.tracing.evaluated_expressions.is_enabled() {
+            let hir_expression = body.push_hir_id(hir_id.clone());
+            body.push(Expression::TraceExpressionEvaluated {
+                hir_expression,
+                value: id,
+            });
+            body.push_reference(id);
+        }
+    }
+
+    fn compile_match(
+        &mut self,
+        body: &mut BodyBuilder,
+        expression: Id,
+        cases: &[(hir::Pattern, hir::Body)],
+        responsible: Id,
+    ) -> Id {
+        self.compile_match_rec(body, expression, cases, responsible, vec![])
+    }
+    fn compile_match_rec(
+        &mut self,
+        body: &mut BodyBuilder,
+        expression: Id,
+        cases: &[(hir::Pattern, hir::Body)],
+        responsible: Id,
+        mut no_match_reasons: Vec<Id>,
+    ) -> Id {
+        match cases {
+            [] => {
+                let reason = body.push_text("No case matched the given expression.".to_string());
+                // TODO: concat reasons
+                body.push_panic(reason, responsible)
+            }
+            [(case_pattern, case_body), rest @ ..] => {
+                let pattern_result = PatternLoweringContext::compile_pattern(
+                    self.db,
+                    body,
+                    responsible,
+                    expression,
+                    case_pattern,
+                );
+
+                let is_match = body.push_is_match(pattern_result, responsible);
+
+                let builtin_if_else = body.push_builtin(BuiltinFunction::IfElse);
+                let then_lambda = body.push_lambda(|body, _| {
+                    self.last_pattern_result = Some(pattern_result);
+                    self.compile_expressions(body, responsible, &case_body.expressions);
+                });
+                let else_lambda = body.push_lambda(|body, _| {
                     let list_get_function = body.push_builtin(BuiltinFunction::ListGet);
                     let one = body.push_int(1.into());
                     let reason =
                         body.push_call(list_get_function, vec![pattern_result, one], responsible);
+                    no_match_reasons.push(reason);
 
-                    body.push_panic(reason, responsible);
-                },
-                responsible,
-            );
-
-            if pattern.captured_identifier_count() == 0 {
-                body.push_reference(nothing)
-            } else {
-                // The generated expression will be followed by at least one
-                // identifier reference, so we don't have to generate a
-                // reference to the result in here.
-                pattern_result
-            }
-        }
-        hir::Expression::PatternIdentifierReference {
-            destructuring,
-            identifier_id,
-        } => {
-            let list_get = body.push_builtin(BuiltinFunction::ListGet);
-            let index = body.push_int((identifier_id.0 + 1).into());
-            let responsible = body.push_hir_id(hir_id.clone());
-            body.push_call(list_get, vec![mapping[destructuring], index], responsible)
-        }
-        hir::Expression::Match { expression, cases } => {
-            let expression = mapping[expression];
-
-            body.push_nothing()
-        }
-        hir::Expression::Lambda(hir::Lambda {
-            parameters: original_parameters,
-            body: original_body,
-            fuzzable,
-        }) => {
-            let lambda = body.push_lambda(|lambda, responsible_parameter| {
-                for original_parameter in original_parameters {
-                    let parameter = lambda.new_parameter();
-                    mapping.insert(original_parameter.clone(), parameter);
-                }
-
-                let responsible = if *fuzzable {
-                    responsible_parameter
-                } else {
-                    // This is a lambda with curly braces, so whoever is responsible
-                    // for `needs` in the current scope is also responsible for
-                    // `needs` in the lambda.
-                    responsible_for_needs
-                };
-
-                for (id, expression) in &original_body.expressions {
-                    compile_expression(
-                        db,
-                        lambda,
-                        mapping,
-                        needs_function,
-                        responsible,
-                        id,
-                        expression,
-                        tracing,
-                    );
-                }
-            });
-
-            if tracing.register_fuzzables.is_enabled() && *fuzzable {
-                let hir_definition = body.push(Expression::HirId(hir_id.clone()));
-                body.push(Expression::TraceFoundFuzzableClosure {
-                    hir_definition,
-                    closure: lambda,
+                    self.compile_match_rec(body, expression, rest, responsible, no_match_reasons);
                 });
-                body.push_reference(lambda)
-            } else {
-                lambda
-            }
-        }
-        hir::Expression::Call {
-            function,
-            arguments,
-        } => {
-            let responsible = body.push_hir_id(hir_id.clone());
-            let arguments = arguments
-                .iter()
-                .map(|argument| mapping[argument])
-                .collect_vec();
-
-            if tracing.calls.is_enabled() {
-                let hir_call = body.push_hir_id(hir_id.clone());
-                body.push(Expression::TraceCallStarts {
-                    hir_call,
-                    function: mapping[function],
-                    arguments: arguments.clone(),
+                body.push_call(
+                    builtin_if_else,
+                    vec![is_match, then_lambda, else_lambda],
                     responsible,
-                });
-            }
-            let call = body.push_call(mapping[function], arguments, responsible);
-            if tracing.calls.is_enabled() {
-                body.push(Expression::TraceCallEnds { return_value: call });
-                body.push_reference(call)
-            } else {
-                call
+                )
             }
         }
-        hir::Expression::UseModule {
-            current_module,
-            relative_path,
-        } => body.push(Expression::UseModule {
-            current_module: current_module.clone(),
-            relative_path: mapping[relative_path],
-            // The `UseModule` expression only exists in the generated `use`
-            // function. If a use fails, that's also the fault of the caller.
-            // Essentially, the `UseModule` expression works exactly like a
-            // `needs`.
-            responsible: responsible_for_needs,
-        }),
-        hir::Expression::Needs { condition, reason } => {
-            let responsible = body.push_hir_id(hir_id.clone());
-            body.push_call(
-                needs_function,
-                vec![mapping[condition], mapping[reason], responsible_for_needs],
-                responsible,
-            )
-        }
-        hir::Expression::Error { errors, .. } => {
-            let responsible = body.push_hir_id(hir_id.clone());
-            body.compile_errors(db, responsible, errors)
-        }
-    };
-    mapping.insert(hir_id.clone(), id);
-
-    if tracing.evaluated_expressions.is_enabled() {
-        let hir_expression = body.push_hir_id(hir_id.clone());
-        body.push(Expression::TraceExpressionEvaluated {
-            hir_expression,
-            value: id,
-        });
-        body.push_reference(id);
     }
 }
 
@@ -445,7 +519,7 @@ impl<'a> PatternLoweringContext<'a> {
                                     }
                                 })
                                 .collect_vec();
-                            self.compile_match_chain(body, condition_builders);
+                            self.compile_match_conjunction(body, condition_builders);
                         },
                         |body, _expected, actual| {
                             vec![
@@ -523,7 +597,7 @@ impl<'a> PatternLoweringContext<'a> {
                             }
                         })
                         .collect_vec();
-                    self.compile_match_chain(body, condition_builders);
+                    self.compile_match_conjunction(body, condition_builders);
                 })
             }
             hir::Pattern::Error { child, errors } => {
@@ -641,13 +715,13 @@ impl<'a> PatternLoweringContext<'a> {
         }
     }
 
-    fn compile_match_chain<F>(&self, body: &mut BodyBuilder, condition_builders: Vec<F>) -> Id
+    fn compile_match_conjunction<F>(&self, body: &mut BodyBuilder, condition_builders: Vec<F>) -> Id
     where
         F: FnMut(&mut BodyBuilder) -> (Id, usize),
     {
-        self.compile_match_chain_rec(body, condition_builders, vec![])
+        self.compile_match_conjunction_rec(body, condition_builders, vec![])
     }
-    fn compile_match_chain_rec<F>(
+    fn compile_match_conjunction_rec<F>(
         &self,
         body: &mut BodyBuilder,
         mut condition_builders: Vec<F>,
@@ -678,7 +752,7 @@ impl<'a> PatternLoweringContext<'a> {
                     );
                     captured_identifiers.push(captured_identifier);
                 }
-                self.compile_match_chain_rec(body, condition_builders, captured_identifiers);
+                self.compile_match_conjunction_rec(body, condition_builders, captured_identifiers);
             },
             |body| {
                 body.push_reference(return_value);
