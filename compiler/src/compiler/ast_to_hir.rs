@@ -1,6 +1,6 @@
 use super::{
     ast::{
-        self, Assignment, Ast, AstKind, AstString, Call, Identifier, Int, List, Struct,
+        self, Assignment, Ast, AstKind, AstString, Call, Identifier, Int, List, MatchCase, Struct,
         StructAccess, Symbol, Text, TextPart,
     },
     cst::{self, CstDb},
@@ -116,6 +116,7 @@ impl<'a> Context<'a> {
 struct NonTopLevelResetState(bool);
 
 impl<'a> Context<'a> {
+    #[must_use]
     fn start_scope(&mut self) -> ScopeResetState {
         ScopeResetState {
             body: mem::take(&mut self.body),
@@ -124,6 +125,7 @@ impl<'a> Context<'a> {
             non_top_level_reset_state: self.start_non_top_level(),
         }
     }
+    #[must_use]
     fn end_scope(&mut self, reset_state: ScopeResetState) -> Body {
         let inner_body = mem::replace(&mut self.body, reset_state.body);
         self.prefix_keys = reset_state.prefix_keys;
@@ -260,10 +262,7 @@ impl<'a> Context<'a> {
                             .map(|(name, (ast_id, identifier_id))| {
                                 let id = self.push(
                                     Some(ast_id),
-                                    Expression::PatternIdentifierReference {
-                                        destructuring: body.clone(),
-                                        identifier_id,
-                                    },
+                                    Expression::PatternIdentifierReference(identifier_id),
                                     Some(name.to_owned()),
                                 );
                                 (name, id)
@@ -298,6 +297,57 @@ impl<'a> Context<'a> {
                 }
                 body
             }
+            AstKind::Match(ast::Match { expression, cases }) => {
+                let expression = self.compile_single(expression);
+
+                let reset_state = self.start_scope();
+                let match_id = self.create_next_id(Some(ast.id.clone()), None);
+                self.prefix_keys = match_id.keys.clone();
+
+                let cases = cases
+                    .iter()
+                    .map(|case| match &case.kind {
+                        AstKind::MatchCase(MatchCase { box pattern, body }) => {
+                            let (pattern, pattern_identifiers) = PatternContext::compile(pattern);
+
+                            let reset_state = self.start_scope();
+                            for (name, (ast_id, identifier_id)) in pattern_identifiers {
+                                self.push(
+                                    Some(ast_id),
+                                    Expression::PatternIdentifierReference(identifier_id),
+                                    Some(name.to_owned()),
+                                );
+                            }
+                            self.compile(body.as_ref());
+                            let body = self.end_scope(reset_state);
+
+                            (pattern, body)
+                        }
+                        AstKind::Error { errors, .. } => {
+                            let pattern = Pattern::Error {
+                                child: None,
+                                errors: errors.to_owned(),
+                            };
+
+                            let reset_state = self.start_scope();
+                            self.compile(&[]);
+                            let body = self.end_scope(reset_state);
+
+                            (pattern, body)
+                        }
+                        _ => unreachable!("Expected match case in match cases, got {case:?}."),
+                    })
+                    .collect_vec();
+
+                // The scope is only for hierarchical IDs. The actual bodies are
+                // inside the cases.
+                let _ = self.end_scope(reset_state);
+
+                self.push_with_existing_id(match_id, Expression::Match { expression, cases }, None)
+            }
+            AstKind::MatchCase(_) => {
+                unreachable!("Match cases should be handled in match directly.")
+            }
             AstKind::Error { child, errors } => {
                 let child = child.as_ref().map(|child| self.compile_single(child));
                 self.push(
@@ -313,17 +363,94 @@ impl<'a> Context<'a> {
     }
 
     fn lower_text(&mut self, id: Option<ast::Id>, text: &Text) -> hir::Id {
-        // TODO: Convert parts to text
-        let builtin_text_concatenate = self.push(
+        let text_concatenate_function = self.push(
             None,
             Expression::Builtin(BuiltinFunction::TextConcatenate),
+            None,
+        );
+        let type_of_function = self.push(None, Expression::Builtin(BuiltinFunction::TypeOf), None);
+        let text_symbol = self.push(None, Expression::Symbol("Text".to_string()), None);
+        let equals_function = self.push(None, Expression::Builtin(BuiltinFunction::Equals), None);
+        let if_else_function = self.push(None, Expression::Builtin(BuiltinFunction::IfElse), None);
+        let to_debug_text_function = self.push(
+            None,
+            Expression::Builtin(BuiltinFunction::ToDebugText),
             None,
         );
 
         let compiled_parts = text
             .0
             .iter()
-            .map(|part| self.compile_single(part))
+            .map(|part| {
+                let hir = self.compile_single(part);
+                if matches!(part.kind, AstKind::TextPart { .. }) {
+                    return hir;
+                }
+
+                // Convert the part to text if it is not already a text.
+                let type_of = self.push(
+                    None,
+                    Expression::Call {
+                        function: type_of_function.clone(),
+                        arguments: vec![hir.clone()],
+                    },
+                    None,
+                );
+                let is_text = self.push(
+                    None,
+                    Expression::Call {
+                        function: equals_function.clone(),
+                        arguments: vec![type_of, text_symbol.clone()],
+                    },
+                    None,
+                );
+
+                let reset_state = self.start_scope();
+                let then_lambda_id = self.create_next_id(None, None);
+                self.prefix_keys = then_lambda_id.keys.clone();
+                self.push(None, Expression::Reference(hir.clone()), None);
+                let then_body = self.end_scope(reset_state);
+                let then_lambda = self.push_with_existing_id(
+                    then_lambda_id,
+                    Expression::Lambda(Lambda {
+                        parameters: vec![],
+                        body: then_body,
+                        fuzzable: false,
+                    }),
+                    None,
+                );
+
+                let reset_state = self.start_scope();
+                let else_lambda_id = self.create_next_id(None, None);
+                self.prefix_keys = else_lambda_id.keys.clone();
+                self.push(
+                    None,
+                    Expression::Call {
+                        function: to_debug_text_function.clone(),
+                        arguments: vec![hir],
+                    },
+                    None,
+                );
+                let else_body = self.end_scope(reset_state);
+                let else_lambda = self.push_with_existing_id(
+                    else_lambda_id,
+                    Expression::Lambda(Lambda {
+                        parameters: vec![],
+                        body: else_body,
+                        fuzzable: false,
+                    }),
+                    None,
+                );
+
+                self.push(
+                    None,
+                    Expression::Call {
+                        function: if_else_function.clone(),
+                        arguments: vec![is_text, then_lambda, else_lambda],
+                    },
+                    None,
+                )
+            })
             .collect_vec();
 
         compiled_parts
@@ -332,7 +459,7 @@ impl<'a> Context<'a> {
                 self.push(
                     None,
                     Expression::Call {
-                        function: builtin_text_concatenate.clone(),
+                        function: text_concatenate_function.clone(),
                         arguments: vec![left, right],
                     },
                     None,
@@ -347,26 +474,20 @@ impl<'a> Context<'a> {
         lambda: &ast::Lambda,
         identifier: Option<String>,
     ) -> hir::Id {
-        let assignment_reset_state = self.start_scope();
+        let reset_state = self.start_scope();
         let lambda_id = self.create_next_id(Some(id), identifier);
+        self.prefix_keys = lambda_id.keys.clone();
 
         for parameter in lambda.parameters.iter() {
             let name = parameter.value.to_string();
-            let id = hir::Id::new(self.module.clone(), add_keys(&lambda_id.keys, name.clone()));
-            self.id_mapping
-                .insert(id.clone(), Some(parameter.id.clone()));
+            let id = self.create_next_id(Some(parameter.id.clone()), Some(name.clone()));
             self.body.identifiers.insert(id.clone(), name.clone());
             self.identifiers.insert(name, id);
         }
 
-        let lambda_reset_state = self.start_scope();
-        self.prefix_keys
-            .push(lambda_id.keys.last().unwrap().clone());
-
         self.compile(&lambda.body);
 
-        let inner_body = self.end_scope(lambda_reset_state);
-        self.end_scope(assignment_reset_state);
+        let inner_body = self.end_scope(reset_state);
 
         self.push_with_existing_id(
             lambda_id.clone(),
@@ -564,7 +685,8 @@ impl<'a> Context<'a> {
         //  }
 
         let reset_state = self.start_scope();
-        self.prefix_keys.push("use".to_string());
+        let use_id = self.create_next_id(None, Some("use".to_string()));
+        self.prefix_keys = use_id.keys.clone();
         let relative_path = hir::Id::new(
             self.module.clone(),
             add_keys(&self.prefix_keys[..], "relativePath".to_string()),
@@ -581,8 +703,8 @@ impl<'a> Context<'a> {
 
         let inner_body = self.end_scope(reset_state);
 
-        self.push(
-            None,
+        self.push_with_existing_id(
+            use_id,
             Expression::Lambda(Lambda {
                 parameters: vec![relative_path],
                 body: inner_body,
@@ -648,9 +770,7 @@ impl PatternContext {
                     })
                     .join(""),
             ),
-            AstKind::TextPart(_) => {
-                unreachable!("TextPart should not occur in AST patterns.")
-            }
+            AstKind::TextPart(_) => unreachable!("TextPart should not occur in AST patterns."),
             AstKind::Identifier(Identifier(name)) => {
                 let (_, pattern_id) = self
                     .identifier_ids
@@ -696,9 +816,11 @@ impl PatternContext {
             AstKind::StructAccess(_)
             | AstKind::Lambda(_)
             | AstKind::Call(_)
-            | AstKind::Assignment(_) => {
+            | AstKind::Assignment(_)
+            | AstKind::Match(_)
+            | AstKind::MatchCase(_) => {
                 unreachable!(
-                    "AST pattern can't contain struct access, lambda, call, or assignment."
+                    "AST pattern can't contain struct access, lambda, call, assignment, match, or match case."
                 )
             }
             AstKind::Error { child, errors, .. } => {

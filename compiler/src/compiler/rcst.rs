@@ -19,6 +19,7 @@ pub enum Rcst {
     Arrow,              // ->
     SingleQuote,        // '
     DoubleQuote,        // "
+    Percent,            // %
     Octothorpe,         // #
     Whitespace(String), // contains only non-multiline whitespace
     Newline(String), // the associated `String` because some systems (such as Windows) have weird newlines
@@ -93,6 +94,16 @@ pub enum Rcst {
         dot: Box<Rcst>,
         key: Box<Rcst>,
     },
+    Match {
+        expression: Box<Rcst>,
+        percent: Box<Rcst>,
+        cases: Vec<Rcst>,
+    },
+    MatchCase {
+        pattern: Box<Rcst>,
+        arrow: Box<Rcst>,
+        body: Vec<Rcst>,
+    },
     Lambda {
         opening_curly_brace: Box<Rcst>,
         parameters_and_arrow: Option<(Vec<Rcst>, Box<Rcst>)>,
@@ -119,6 +130,9 @@ pub enum RcstError {
     IntContainsNonDigits,
     ListItemMissesValue,
     ListNotClosed,
+    MatchMissesCases,
+    MatchCaseMissesArrow,
+    MatchCaseMissesBody,
     OpeningParenthesisWithoutExpression,
     ParenthesisNotClosed,
     PipeMissesCall,
@@ -156,6 +170,7 @@ impl Display for Rcst {
             Rcst::Arrow => "->".fmt(f),
             Rcst::SingleQuote => "'".fmt(f),
             Rcst::DoubleQuote => '"'.fmt(f),
+            Rcst::Percent => '%'.fmt(f),
             Rcst::Octothorpe => "#".fmt(f),
             Rcst::Whitespace(whitespace) => whitespace.fmt(f),
             Rcst::Newline(newline) => newline.fmt(f),
@@ -298,6 +313,30 @@ impl Display for Rcst {
                 dot.fmt(f)?;
                 key.fmt(f)
             }
+            Rcst::Match {
+                expression,
+                percent,
+                cases,
+            } => {
+                expression.fmt(f)?;
+                percent.fmt(f)?;
+                for case in cases {
+                    case.fmt(f)?;
+                }
+                Ok(())
+            }
+            Rcst::MatchCase {
+                pattern,
+                arrow,
+                body,
+            } => {
+                pattern.fmt(f)?;
+                arrow.fmt(f)?;
+                for expression in body {
+                    expression.fmt(f)?;
+                }
+                Ok(())
+            }
             Rcst::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -361,6 +400,7 @@ impl IsMultiline for Rcst {
             Rcst::Arrow => false,
             Rcst::SingleQuote => false,
             Rcst::DoubleQuote => false,
+            Rcst::Percent => false,
             Rcst::Octothorpe => false,
             Rcst::Whitespace(_) => false,
             Rcst::Newline(_) => true,
@@ -441,6 +481,16 @@ impl IsMultiline for Rcst {
             Rcst::StructAccess { struct_, dot, key } => {
                 struct_.is_multiline() || dot.is_multiline() || key.is_multiline()
             }
+            Rcst::Match {
+                expression,
+                percent,
+                cases,
+            } => expression.is_multiline() || percent.is_multiline() || cases.is_multiline(),
+            Rcst::MatchCase {
+                pattern,
+                arrow,
+                body,
+            } => pattern.is_multiline() || arrow.is_multiline() || body.is_multiline(),
             Rcst::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,

@@ -39,6 +39,9 @@ impl Display for CompilerErrorPayload {
                 }
                 RcstError::ListItemMissesValue => "This list item is missing a value.",
                 RcstError::ListNotClosed => "The list is not closed.",
+                RcstError::MatchMissesCases => "This match misses cases to match against.",
+                RcstError::MatchCaseMissesArrow => "This match case misses an arrow.",
+                RcstError::MatchCaseMissesBody => "This match case misses a body to run.",
                 RcstError::OpeningParenthesisWithoutExpression => {
                     "Here's an opening parenthesis without an expression after it."
                 }

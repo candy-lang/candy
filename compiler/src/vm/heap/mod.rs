@@ -56,7 +56,7 @@ impl std::fmt::Debug for Heap {
         {
             writeln!(
                 f,
-                "{address} ({} {}): {}",
+                "  {address} ({} {}): {}",
                 object.reference_count,
                 if object.reference_count == 1 {
                     "ref"
@@ -69,7 +69,7 @@ impl std::fmt::Debug for Heap {
         if !self.empty_addresses.is_empty() {
             writeln!(
                 f,
-                "empty_addresses: {}",
+                "  empty_addresses: {}",
                 self.empty_addresses
                     .iter()
                     .map(|it| format!("{it}"))

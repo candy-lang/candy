@@ -86,7 +86,7 @@ mod parse {
     use itertools::Itertools;
     use tracing::instrument;
 
-    static MEANINGFUL_PUNCTUATION: &str = "()[]:,{}->=.|";
+    static MEANINGFUL_PUNCTUATION: &str = r#"=,.:|()[]{}->'"%"#;
     static SUPPORTED_WHITESPACE: &str = " \r\n\t";
 
     #[instrument(level = "trace")]
@@ -158,6 +158,10 @@ mod parse {
     #[instrument(level = "trace")]
     fn double_quote(input: &str) -> Option<(&str, Rcst)> {
         literal(input, "\"").map(|it| (it, Rcst::DoubleQuote))
+    }
+    #[instrument(level = "trace")]
+    fn percent(input: &str) -> Option<(&str, Rcst)> {
+        literal(input, "%").map(|it| (it, Rcst::Percent))
     }
     #[instrument(level = "trace")]
     fn octothorpe(input: &str) -> Option<(&str, Rcst)> {
@@ -1316,6 +1320,20 @@ mod parse {
                     };
                     did_make_progress = true;
                 }
+                'match_: {
+                    let (new_input, whitespace_after_receiver) =
+                        whitespaces_and_newlines(input, indentation, true);
+
+                    let Some((new_input, percent, cases)) = match_suffix(new_input, indentation) else { break 'match_; };
+
+                    input = new_input;
+                    result = Rcst::Match {
+                        expression: Box::new(result.wrap_in_whitespace(whitespace_after_receiver)),
+                        percent: Box::new(percent),
+                        cases,
+                    };
+                    did_make_progress = true;
+                }
             }
 
             if !did_make_progress {
@@ -1413,6 +1431,44 @@ mod parse {
                         }),
                         arguments: vec![Rcst::Identifier("baz".to_owned())],
                     }),
+                },
+            )),
+        );
+        // foo %
+        //   123 -> 123
+        assert_eq!(
+            expression("foo %\n  123 -> 123", 0, true, true, true),
+            Some((
+                "",
+                Rcst::Match {
+                    expression: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    percent: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Percent),
+                        whitespace: vec![
+                            Rcst::Newline("\n".to_string()),
+                            Rcst::Whitespace("  ".to_string()),
+                        ],
+                    }),
+                    cases: vec![Rcst::MatchCase {
+                        pattern: Box::new(Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::Int {
+                                value: 123u8.into(),
+                                string: "123".to_string(),
+                            }),
+                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                        }),
+                        arrow: Box::new(Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::Arrow),
+                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                        }),
+                        body: vec![Rcst::Int {
+                            value: 123u8.into(),
+                            string: "123".to_string(),
+                        }],
+                    }],
                 },
             )),
         );
@@ -2379,6 +2435,126 @@ mod parse {
             }
         }
         (input, expressions)
+    }
+
+    #[instrument(level = "trace")]
+    fn match_suffix(input: &str, indentation: usize) -> Option<(&str, Rcst, Vec<Rcst>)> {
+        let (input, percent) = percent(input)?;
+        let (mut input, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
+        let percent = percent.wrap_in_whitespace(whitespace);
+
+        let mut cases = vec![];
+        loop {
+            let Some((new_input, case)) = match_case(input, indentation + 1) else { break; };
+            let (new_input, whitespace) =
+                whitespaces_and_newlines(new_input, indentation + 1, true);
+            input = new_input;
+            let is_whitespace_multiline = whitespace.is_multiline();
+            let case = case.wrap_in_whitespace(whitespace);
+            cases.push(case);
+            if !is_whitespace_multiline {
+                break;
+            }
+        }
+        if cases.is_empty() {
+            cases.push(Rcst::Error {
+                unparsable_input: "".to_string(),
+                error: RcstError::MatchMissesCases,
+            });
+        }
+
+        Some((input, percent, cases))
+    }
+    #[test]
+    fn test_match_suffix() {
+        assert_eq!(
+            match_suffix("%", 0),
+            Some((
+                "",
+                Rcst::Percent,
+                vec![Rcst::Error {
+                    unparsable_input: "".to_string(),
+                    error: RcstError::MatchMissesCases,
+                }],
+            )),
+        );
+        assert_eq!(
+            match_suffix("%\n", 0),
+            Some((
+                "\n",
+                Rcst::Percent,
+                vec![Rcst::Error {
+                    unparsable_input: "".to_string(),
+                    error: RcstError::MatchMissesCases,
+                }],
+            )),
+        );
+        // %
+        //   1 -> 2
+        // Foo
+        assert_eq!(
+            match_suffix("%\n  1 -> 2\nFoo", 0),
+            Some((
+                "\nFoo",
+                Rcst::TrailingWhitespace {
+                    child: Box::new(Rcst::Percent),
+                    whitespace: vec![
+                        Rcst::Newline("\n".to_string()),
+                        Rcst::Whitespace("  ".to_string()),
+                    ],
+                },
+                vec![Rcst::MatchCase {
+                    pattern: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Int {
+                            value: 1u8.into(),
+                            string: "1".to_string(),
+                        }),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    arrow: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Arrow),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    body: vec![Rcst::Int {
+                        value: 2u8.into(),
+                        string: "2".to_string(),
+                    }],
+                }],
+            )),
+        );
+    }
+
+    #[instrument(level = "trace")]
+    fn match_case(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
+        let (input, pattern) = pattern(input, indentation)?;
+        let (input, whitespace) = whitespaces_and_newlines(input, indentation, true);
+        let pattern = pattern.wrap_in_whitespace(whitespace);
+
+        let (input, arrow) = if let Some((input, arrow)) = arrow(input) {
+            let (input, whitespace) = whitespaces_and_newlines(input, indentation, true);
+            (input, arrow.wrap_in_whitespace(whitespace))
+        } else {
+            let error = Rcst::Error {
+                unparsable_input: "".to_string(),
+                error: RcstError::MatchCaseMissesArrow,
+            };
+            (input, error)
+        };
+
+        let (input, mut body) = body(input, indentation + 1);
+        if body.is_empty() {
+            body.push(Rcst::Error {
+                unparsable_input: "".to_string(),
+                error: RcstError::MatchCaseMissesBody,
+            });
+        }
+
+        let case = Rcst::MatchCase {
+            pattern: Box::new(pattern),
+            arrow: Box::new(arrow),
+            body,
+        };
+        Some((input, case))
     }
 
     #[instrument(level = "trace")]

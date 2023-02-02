@@ -56,6 +56,7 @@ pub enum CstKind {
     Arrow,              // ->
     SingleQuote,        // '
     DoubleQuote,        // "
+    Percent,            // %
     Octothorpe,         // #
     Whitespace(String),
     Newline(String),
@@ -130,6 +131,16 @@ pub enum CstKind {
         dot: Box<Cst>,
         key: Box<Cst>,
     },
+    Match {
+        expression: Box<Cst>,
+        percent: Box<Cst>,
+        cases: Vec<Cst>,
+    },
+    MatchCase {
+        pattern: Box<Cst>,
+        arrow: Box<Cst>,
+        body: Vec<Cst>,
+    },
     Lambda {
         opening_curly_brace: Box<Cst>,
         parameters_and_arrow: Option<(Vec<Cst>, Box<Cst>)>,
@@ -166,6 +177,7 @@ impl Display for Cst {
             CstKind::Arrow => "->".fmt(f),
             CstKind::SingleQuote => "'".fmt(f),
             CstKind::DoubleQuote => '"'.fmt(f),
+            CstKind::Percent => '%'.fmt(f),
             CstKind::Octothorpe => '#'.fmt(f),
             CstKind::Whitespace(whitespace) => whitespace.fmt(f),
             CstKind::Newline(newline) => newline.fmt(f),
@@ -300,6 +312,30 @@ impl Display for Cst {
                 dot.fmt(f)?;
                 key.fmt(f)
             }
+            CstKind::Match {
+                expression,
+                percent,
+                cases,
+            } => {
+                expression.fmt(f)?;
+                percent.fmt(f)?;
+                for case in cases {
+                    case.fmt(f)?;
+                }
+                Ok(())
+            }
+            CstKind::MatchCase {
+                pattern,
+                arrow,
+                body,
+            } => {
+                pattern.fmt(f)?;
+                arrow.fmt(f)?;
+                for expression in body {
+                    expression.fmt(f)?;
+                }
+                Ok(())
+            }
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -387,6 +423,7 @@ impl UnwrapWhitespaceAndComment for Cst {
             | CstKind::Arrow
             | CstKind::SingleQuote
             | CstKind::DoubleQuote
+            | CstKind::Percent
             | CstKind::Octothorpe
             | CstKind::Whitespace(_)
             | CstKind::Newline(_)
@@ -504,6 +541,24 @@ impl UnwrapWhitespaceAndComment for Cst {
                 dot: Box::new(dot.unwrap_whitespace_and_comment()),
                 key: Box::new(key.unwrap_whitespace_and_comment()),
             },
+            CstKind::Match {
+                expression,
+                percent,
+                cases,
+            } => CstKind::Match {
+                expression: Box::new(expression.unwrap_whitespace_and_comment()),
+                percent: Box::new(percent.unwrap_whitespace_and_comment()),
+                cases: cases.unwrap_whitespace_and_comment(),
+            },
+            CstKind::MatchCase {
+                pattern,
+                arrow,
+                body,
+            } => CstKind::MatchCase {
+                pattern: Box::new(pattern.unwrap_whitespace_and_comment()),
+                arrow: Box::new(arrow.unwrap_whitespace_and_comment()),
+                body: body.unwrap_whitespace_and_comment(),
+            },
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -581,6 +636,7 @@ impl TreeWithIds for Cst {
             | CstKind::Arrow
             | CstKind::SingleQuote
             | CstKind::DoubleQuote
+            | CstKind::Percent
             | CstKind::Octothorpe
             | CstKind::Whitespace(_)
             | CstKind::Newline(_) => None,
@@ -670,6 +726,22 @@ impl TreeWithIds for Cst {
                 .find(id)
                 .or_else(|| dot.find(id))
                 .or_else(|| key.find(id)),
+            CstKind::Match {
+                expression,
+                percent,
+                cases,
+            } => expression
+                .find(id)
+                .or_else(|| percent.find(id))
+                .or_else(|| cases.find(id)),
+            CstKind::MatchCase {
+                pattern,
+                arrow,
+                body,
+            } => pattern
+                .find(id)
+                .or_else(|| arrow.find(id))
+                .or_else(|| body.find(id)),
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -720,6 +792,7 @@ impl TreeWithIds for Cst {
             | CstKind::Arrow
             | CstKind::SingleQuote
             | CstKind::DoubleQuote
+            | CstKind::Percent
             | CstKind::Octothorpe
             | CstKind::Whitespace(_)
             | CstKind::Newline(_) => (None, false),
@@ -797,6 +870,28 @@ impl TreeWithIds for Cst {
                     .find_by_offset(offset)
                     .or_else(|| dot.find_by_offset(offset))
                     .or_else(|| key.find_by_offset(offset)),
+                false,
+            ),
+            CstKind::Match {
+                expression,
+                percent,
+                cases,
+            } => (
+                expression
+                    .find_by_offset(offset)
+                    .or_else(|| percent.find_by_offset(offset))
+                    .or_else(|| cases.find_by_offset(offset)),
+                false,
+            ),
+            CstKind::MatchCase {
+                pattern,
+                arrow,
+                body,
+            } => (
+                pattern
+                    .find_by_offset(offset)
+                    .or_else(|| arrow.find_by_offset(offset))
+                    .or_else(|| body.find_by_offset(offset)),
                 false,
             ),
             CstKind::Lambda { body, .. } => (body.find_by_offset(offset), false),

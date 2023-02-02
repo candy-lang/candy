@@ -107,6 +107,10 @@ impl RcstToCstExt for Rcst {
                 state.offset += 1;
                 CstKind::DoubleQuote
             }
+            Rcst::Percent => {
+                state.offset += 1;
+                CstKind::Percent
+            }
             Rcst::Octothorpe => {
                 state.offset += 1;
                 CstKind::Octothorpe
@@ -225,6 +229,24 @@ impl RcstToCstExt for Rcst {
                 struct_: Box::new(struct_.to_cst(state)),
                 dot: Box::new(dot.to_cst(state)),
                 key: Box::new(key.to_cst(state)),
+            },
+            Rcst::Match {
+                expression,
+                percent,
+                cases,
+            } => CstKind::Match {
+                expression: Box::new(expression.to_cst(state)),
+                percent: Box::new(percent.to_cst(state)),
+                cases: cases.to_csts(state),
+            },
+            Rcst::MatchCase {
+                pattern,
+                arrow,
+                body,
+            } => CstKind::MatchCase {
+                pattern: Box::new(pattern.to_cst(state)),
+                arrow: Box::new(arrow.to_cst(state)),
+                body: body.to_csts(state),
             },
             Rcst::Pipe {
                 receiver,

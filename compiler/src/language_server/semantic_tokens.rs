@@ -159,7 +159,8 @@ impl<'a> Context<'a> {
             CstKind::Arrow => self.add_token(cst.span.clone(), SemanticTokenType::Operator),
             CstKind::SingleQuote => {} // handled by parent
             CstKind::DoubleQuote => {} // handled by parent
-            CstKind::Octothorpe => {}  // handled by parent
+            CstKind::Percent => self.add_token(cst.span.clone(), SemanticTokenType::Operator),
+            CstKind::Octothorpe => {} // handled by parent
             CstKind::Whitespace(_) | CstKind::Newline(_) => {}
             CstKind::Comment { octothorpe, .. } => {
                 self.visit_cst(octothorpe, None);
@@ -288,6 +289,24 @@ impl<'a> Context<'a> {
                     key,
                     Some(token_type_for_identifier.unwrap_or(SemanticTokenType::Symbol)),
                 );
+            }
+            CstKind::Match {
+                expression,
+                percent,
+                cases,
+            } => {
+                self.visit_cst(expression, None);
+                self.visit_cst(percent, None);
+                self.visit_csts(cases, None);
+            }
+            CstKind::MatchCase {
+                pattern,
+                arrow,
+                body,
+            } => {
+                self.visit_cst(pattern, None);
+                self.visit_cst(arrow, None);
+                self.visit_csts(body, None);
             }
             CstKind::Lambda {
                 opening_curly_brace,

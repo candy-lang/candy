@@ -10,6 +10,7 @@ use crate::{
     },
     database::Database,
     language_server::utils::LspPositionConversion,
+    module::Package,
 };
 use itertools::Itertools;
 use pad::PadStr;
@@ -67,7 +68,12 @@ impl FullTracer {
         {
             let hir_id = self.heap.get_hir_id(*call_site);
             let module = hir_id.module.clone();
-            let cst_id = db.hir_to_cst_id(hir_id.clone());
+            let is_tooling = matches!(module.package, Package::Tooling(_));
+            let cst_id = if is_tooling {
+                None
+            } else {
+                db.hir_to_cst_id(hir_id.clone())
+            };
             let cst = cst_id.map(|id| db.find_cst(module.clone(), id));
             let span = cst.map(|cst| {
                 (
@@ -78,8 +84,8 @@ impl FullTracer {
             let caller_location_string = format!(
                 "{hir_id} {}",
                 span.map(|((start_line, start_col), (end_line, end_col))| format!(
-                    "{}:{} – {}:{}",
-                    start_line, start_col, end_line, end_col
+                    "{}:{} – {}:{}",
+                    start_line, start_col, end_line, end_col,
                 ))
                 .unwrap_or_else(|| "<no location>".to_string())
             );

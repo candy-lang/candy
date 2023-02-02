@@ -32,11 +32,19 @@ fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
 }
 fn containing_body_of(db: &dyn HirDb, id: Id) -> Arc<Body> {
     match id.parent() {
-        Some(lambda_id) => {
-            if lambda_id.is_root() {
+        Some(parent_id) => {
+            if parent_id.is_root() {
                 db.hir(id.module).unwrap().0
             } else {
-                match db.find_expression(lambda_id).unwrap() {
+                match db.find_expression(parent_id).unwrap() {
+                    Expression::Match { cases, .. } => {
+                        let body = cases
+                            .into_iter()
+                            .map(|(_, body)| body)
+                            .find(|body| body.expressions.contains_key(&id))
+                            .unwrap();
+                        Arc::new(body)
+                    }
                     Expression::Lambda(lambda) => Arc::new(lambda.body),
                     _ => panic!("Parent of an expression must be a lambda (or root scope)."),
                 }
@@ -71,9 +79,16 @@ impl Expression {
                     ids.push(value_id.to_owned());
                 }
             }
-            Expression::Destructure { expression, .. } => ids.push(expression.to_owned()),
-            Expression::PatternIdentifierReference { destructuring, .. } => {
-                ids.push(destructuring.to_owned())
+            Expression::Destructure {
+                expression,
+                pattern: _,
+            } => ids.push(expression.to_owned()),
+            Expression::PatternIdentifierReference(_) => {}
+            Expression::Match { expression, cases } => {
+                ids.push(expression.to_owned());
+                for (_, body) in cases {
+                    body.collect_all_ids(ids);
+                }
             }
             Expression::Lambda(Lambda {
                 parameters, body, ..
@@ -203,9 +218,13 @@ pub enum Expression {
         expression: Id,
         pattern: Pattern,
     },
-    PatternIdentifierReference {
-        destructuring: Id,
-        identifier_id: PatternIdentifierId,
+    PatternIdentifierReference(PatternIdentifierId),
+    Match {
+        expression: Id,
+        /// Each case consists of the pattern to match against, and the body
+        /// which starts with [PatternIdentifierReference]s for all identifiers
+        /// in the pattern.
+        cases: Vec<(Pattern, Body)>,
     },
     Lambda(Lambda),
     Builtin(BuiltinFunction),
@@ -267,7 +286,7 @@ pub enum Pattern {
     Symbol(String),
     List(Vec<Pattern>),
     // Keys may not contain `NewIdentifier`.
-    Struct(FxHashMap<Pattern, Pattern>),
+    Struct(Vec<(Pattern, Pattern)>),
     Error {
         child: Option<Box<Pattern>>,
         errors: Vec<CompilerError>,
@@ -277,6 +296,27 @@ pub enum Pattern {
 impl hash::Hash for Pattern {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
+    }
+}
+impl Pattern {
+    pub fn captured_identifier_count(&self) -> usize {
+        match self {
+            Pattern::NewIdentifier(_) => 1,
+            Pattern::Int(_) | Pattern::Text(_) | Pattern::Symbol(_) => 0,
+            Pattern::List(list) => list.iter().map(|it| it.captured_identifier_count()).sum(),
+            Pattern::Struct(struct_) => struct_
+                .iter()
+                .map(|(key, value)| {
+                    key.captured_identifier_count() + value.captured_identifier_count()
+                })
+                .sum(),
+            Pattern::Error { .. } => {
+                // Since generated code panics in this case, it doesn't matter
+                // whether the child captured any identifiers since they can't
+                // be accessed anyway.
+                0
+            }
+        }
     }
 }
 
@@ -357,15 +397,27 @@ impl fmt::Display for Expression {
                 "destructure {} into {pattern}",
                 expression.to_short_debug_string(),
             ),
-            Expression::PatternIdentifierReference {
-                destructuring,
-                identifier_id,
-            } => write!(
-                f,
-                "get destructured p${} from {}",
-                identifier_id.0,
-                destructuring.to_short_debug_string(),
-            ),
+            Expression::PatternIdentifierReference(identifier_id) => {
+                write!(f, "get destructured {identifier_id}")
+            }
+            Expression::Match { expression, cases } => {
+                write!(
+                    f,
+                    "match {} with these cases:\n{}",
+                    expression.to_short_debug_string(),
+                    cases
+                        .iter()
+                        .map(|(pattern, body)| format!("{pattern} ->\n{body}")
+                            .lines()
+                            .enumerate()
+                            .map(|(i, line)| format!(
+                                "{}{line}",
+                                if i == 0 { "  " } else { "    " }
+                            ))
+                            .join("\n"))
+                        .join("\n"),
+                )
+            }
             Expression::Lambda(lambda) => {
                 write!(
                     f,
@@ -506,6 +558,8 @@ impl Expression {
             Expression::Struct(_) => None,
             Expression::Destructure { .. } => None,
             Expression::PatternIdentifierReference { .. } => None,
+            // TODO: use binary search
+            Expression::Match { cases, .. } => cases.iter().find_map(|(_, body)| body.find(id)),
             Expression::Lambda(Lambda { body, .. }) => body.find(id),
             Expression::Builtin(_) => None,
             Expression::Call { .. } => None,
@@ -542,8 +596,14 @@ impl CollectErrors for Expression {
             | Expression::Symbol(_)
             | Expression::List(_)
             | Expression::Struct(_)
-            | Expression::PatternIdentifierReference { .. }
-            | Expression::Builtin(_)
+            | Expression::PatternIdentifierReference { .. } => {}
+            Expression::Match { cases, .. } => {
+                for (pattern, body) in cases {
+                    pattern.collect_errors(errors);
+                    body.collect_errors(errors);
+                }
+            }
+            Expression::Builtin(_)
             | Expression::Call { .. }
             | Expression::UseModule { .. }
             | Expression::Needs { .. } => {}
@@ -560,12 +620,19 @@ impl CollectErrors for Expression {
 impl CollectErrors for Pattern {
     fn collect_errors(&self, errors: &mut Vec<CompilerError>) {
         match self {
-            Pattern::NewIdentifier(_)
-            | Pattern::Int(_)
-            | Pattern::Text(_)
-            | Pattern::Symbol(_)
-            | Pattern::List(_)
-            | Pattern::Struct(_) => {}
+            Pattern::NewIdentifier(_) | Pattern::Int(_) | Pattern::Text(_) | Pattern::Symbol(_) => {
+            }
+            Pattern::List(patterns) => {
+                for pattern in patterns {
+                    pattern.collect_errors(errors);
+                }
+            }
+            Pattern::Struct(struct_) => {
+                for (key_pattern, value_pattern) in struct_ {
+                    key_pattern.collect_errors(errors);
+                    value_pattern.collect_errors(errors);
+                }
+            }
             Pattern::Error {
                 errors: the_errors, ..
             } => {

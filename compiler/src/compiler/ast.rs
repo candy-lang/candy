@@ -54,6 +54,8 @@ pub enum AstKind {
     Lambda(Lambda),
     Call(Call),
     Assignment(Assignment),
+    Match(Match),
+    MatchCase(MatchCase),
     Error {
         /// The child may be set if it still makes sense to continue working
         /// with the error-containing subtree.
@@ -115,6 +117,17 @@ pub enum AssignmentBody {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct Match {
+    pub expression: Box<Ast>,
+    pub cases: Vec<Ast>,
+}
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct MatchCase {
+    pub pattern: Box<Ast>,
+    pub body: Vec<Ast>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct AstString {
     pub id: Id,
     pub value: String,
@@ -171,6 +184,8 @@ impl FindAst for Ast {
             AstKind::Lambda(lambda) => lambda.find(id),
             AstKind::Call(call) => call.find(id),
             AstKind::Assignment(assignment) => assignment.find(id),
+            AstKind::Match(match_) => match_.find(id),
+            AstKind::MatchCase(match_case) => match_case.find(id),
             AstKind::Error { child, .. } => child.as_ref().and_then(|child| child.find(id)),
         }
     }
@@ -217,6 +232,16 @@ impl FindAst for AssignmentBody {
         }
     }
 }
+impl FindAst for Match {
+    fn find(&self, id: &Id) -> Option<&Ast> {
+        self.expression.find(id).or_else(|| self.cases.find(id))
+    }
+}
+impl FindAst for MatchCase {
+    fn find(&self, id: &Id) -> Option<&Ast> {
+        self.pattern.find(id).or_else(|| self.body.find(id))
+    }
+}
 impl FindAst for Vec<Ast> {
     fn find(&self, id: &Id) -> Option<&Ast> {
         self.iter().find_map(|ast| ast.find(id))
@@ -261,6 +286,14 @@ impl CollectErrors for Ast {
                     }
                 }
             },
+            AstKind::Match(match_) => {
+                match_.expression.collect_errors(errors);
+                match_.cases.collect_errors(errors);
+            }
+            AstKind::MatchCase(match_case) => {
+                match_case.pattern.collect_errors(errors);
+                match_case.body.collect_errors(errors);
+            }
             AstKind::Error {
                 child,
                 errors: mut recovered_errors,
@@ -299,7 +332,7 @@ impl Display for Ast {
                         .join("\n")
                 )
             }
-            AstKind::TextPart(TextPart(text)) => write!(f, "textPart \"{}\"", text),
+            AstKind::TextPart(TextPart(text)) => write!(f, "textPart {}", text),
             AstKind::Identifier(Identifier(identifier)) => write!(f, "identifier {}", identifier),
             AstKind::Symbol(Symbol(symbol)) => write!(f, "symbol {}", symbol),
             AstKind::List(List(items)) => {
@@ -354,6 +387,31 @@ impl Display for Ast {
                     .join("\n"),
                 )
             }
+            AstKind::Match(match_) => write!(
+                f,
+                "match: {} %\n{}",
+                match_.expression,
+                match_
+                    .cases
+                    .iter()
+                    .join("\n")
+                    .lines()
+                    .map(|line| format!("  {line}"))
+                    .join("\n"),
+            ),
+            AstKind::MatchCase(match_case) => write!(
+                f,
+                "{} -> {}",
+                match_case.pattern,
+                if match_case.body.len() == 1 {
+                    format!("{}", match_case.body[0])
+                } else {
+                    format!("\n  {}", match_case.body.iter().join("\n"))
+                }
+                .lines()
+                .map(|line| line.to_string())
+                .join("  \n"),
+            ),
             AstKind::Error { child, errors } => {
                 write!(
                     f,

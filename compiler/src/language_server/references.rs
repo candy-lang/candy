@@ -13,6 +13,7 @@ use lsp_types::{
     TextDocumentPositionParams,
 };
 use std::{collections::HashSet, path::PathBuf};
+use tracing::{debug, info};
 
 pub fn find_references(
     db: &Database,
@@ -67,7 +68,8 @@ fn find(
 
 fn query_for_offset(db: &Database, module: Module, offset: usize) -> Option<ReferenceQuery> {
     let origin_cst = db.find_cst_by_offset(module.clone(), offset);
-    match origin_cst.kind {
+    info!("Finding references for {origin_cst:?}");
+    let query = match origin_cst.kind {
         CstKind::Identifier(identifier) if identifier == "needs" => {
             Some(ReferenceQuery::Needs(module))
         }
@@ -79,7 +81,7 @@ fn query_for_offset(db: &Database, module: Module, offset: usize) -> Option<Refe
                     // A local variable was declared. Find references to that variable.
                     hir_id
                 } else {
-                    // An intermediate reference. Find references to it's target.
+                    // An intermediate reference. Find references to its target.
                     match hir_expr {
                         Expression::Reference(target_id) => target_id,
                         Expression::Symbol(_) => {
@@ -87,7 +89,7 @@ fn query_for_offset(db: &Database, module: Module, offset: usize) -> Option<Refe
                             return None;
                         }
                         Expression::Error { .. } => return None,
-                        _ => panic!("Expected a reference, got {:?}", hir_expr),
+                        _ => panic!("Expected a reference, got {hir_expr}."),
                     }
                 }
             } else {
@@ -98,7 +100,9 @@ fn query_for_offset(db: &Database, module: Module, offset: usize) -> Option<Refe
         }
         CstKind::Symbol(symbol) => Some(ReferenceQuery::Symbol(module, symbol)),
         _ => None,
-    }
+    };
+    debug!("Reference query: {query:?}");
+    query
 }
 
 #[salsa::query_group(ReferencesDbStorage)]
@@ -176,8 +180,7 @@ impl<'a> Context<'a> {
     }
     fn visit_expression(&mut self, id: hir::Id, expression: &Expression) {
         match expression {
-            Expression::Int(_) => {}
-            Expression::Text(_) => {}
+            Expression::Int(_) | Expression::Text(_) => {}
             Expression::Reference(target) => {
                 if let ReferenceQuery::Id(target_id) = &self.query && target == target_id {
                     self.add_reference(id, DocumentHighlightKind::READ);
@@ -188,10 +191,15 @@ impl<'a> Context<'a> {
                     self.add_reference(id, DocumentHighlightKind::READ);
                 }
             }
-            Expression::List(_) => { }
-            Expression::Struct(_) => { }
-            Expression::Destructure { .. } => {},
-            Expression::PatternIdentifierReference { .. } => {}
+            Expression::List(_)
+            | Expression::Struct(_)
+            | Expression::Destructure { .. }
+            | Expression::PatternIdentifierReference (_) => {},
+            Expression::Match { cases, .. } => {
+                for (_, body) in cases {
+                    self.visit_body(body);
+                }
+            },
             Expression::Lambda(Lambda { body, .. }) => {
                 // We don't need to visit the parameters: They can only be the
                 // declaration of an identifier and don't reference it any other

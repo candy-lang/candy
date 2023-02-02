@@ -41,7 +41,7 @@ fn compile_lambda(
 
     if matches!(
         context.instructions.last().unwrap(),
-        Instruction::Call { .. }
+        Instruction::Call { .. },
     ) {
         let Instruction::Call { num_args } = context.instructions.pop().unwrap() else { unreachable!() };
         context.instructions.push(Instruction::TailCall {

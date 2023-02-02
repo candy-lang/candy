@@ -56,6 +56,7 @@ impl<'a> Context<'a> {
             | CstKind::Arrow
             | CstKind::SingleQuote
             | CstKind::DoubleQuote
+            | CstKind::Percent
             | CstKind::Octothorpe
             | CstKind::Whitespace(_)
             | CstKind::Newline(_) => {}
@@ -110,6 +111,42 @@ impl<'a> Context<'a> {
                 self.visit_cst(struct_);
                 self.visit_cst(dot);
                 self.visit_cst(key);
+            }
+            CstKind::Match {
+                expression,
+                percent,
+                cases,
+            } => {
+                self.visit_cst(expression);
+
+                let percent = percent.unwrap_whitespace_and_comment();
+                let cases_end = cases
+                    .unwrap_whitespace_and_comment()
+                    .last()
+                    .unwrap()
+                    .span
+                    .end;
+                self.push(percent.span.end, cases_end, FoldingRangeKind::Region);
+
+                self.visit_csts(cases);
+            }
+            CstKind::MatchCase {
+                pattern,
+                arrow,
+                body,
+            } => {
+                self.visit_cst(pattern);
+
+                let arrow = arrow.unwrap_whitespace_and_comment();
+                let body_end = body
+                    .unwrap_whitespace_and_comment()
+                    .last()
+                    .unwrap()
+                    .span
+                    .end;
+                self.push(arrow.span.end, body_end, FoldingRangeKind::Region);
+
+                self.visit_csts(body);
             }
             CstKind::Lambda {
                 opening_curly_brace,

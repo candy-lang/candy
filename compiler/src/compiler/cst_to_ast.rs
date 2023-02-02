@@ -3,7 +3,8 @@ use rustc_hash::FxHashMap;
 
 use super::{
     ast::{
-        self, Ast, AstError, AstKind, AstString, Identifier, Int, Lambda, Symbol, Text, TextPart,
+        self, Ast, AstError, AstKind, AstString, Identifier, Int, Lambda, MatchCase, Symbol, Text,
+        TextPart,
     },
     cst::{self, Cst, CstDb, CstKind},
     error::{CompilerError, CompilerErrorPayload},
@@ -13,7 +14,7 @@ use super::{
 };
 use crate::{
     compiler::{
-        ast::{AssignmentBody, List, Struct},
+        ast::{AssignmentBody, List, Match, Struct},
         cst::UnwrapWhitespaceAndComment,
     },
     module::Module,
@@ -131,6 +132,7 @@ impl LoweringContext {
             | CstKind::Arrow
             | CstKind::SingleQuote
             | CstKind::DoubleQuote
+            | CstKind::Percent
             | CstKind::Octothorpe => self.create_ast(
                 cst.id,
                 AstKind::Error {
@@ -253,7 +255,7 @@ impl LoweringContext {
                         _ => panic!("Text contains non-TextPart. Whitespaces should have been removed already."),
                     }
                 }
-                let mut text = self.create_ast(cst.id, AstKind::Text(Text(lowered_parts)));
+                let text = self.create_ast(cst.id, AstKind::Text(Text(lowered_parts)));
 
                 if !matches!(
                     &closing.kind,
@@ -272,16 +274,7 @@ impl LoweringContext {
                     errors.push(self.create_error(closing, AstError::TextWithoutClosingQuote));
                 }
 
-                if !errors.is_empty() {
-                    text = self.create_ast(
-                        cst.id,
-                        AstKind::Error {
-                            child: Some(Box::new(text)),
-                            errors,
-                        },
-                    );
-                }
-                text
+                self.wrap_in_errors(cst.id, text, errors)
             }
             CstKind::OpeningText { .. } => panic!("OpeningText should only occur in Text."),
             CstKind::ClosingText { .. } => panic!("ClosingText should only occur in Text."),
@@ -493,17 +486,8 @@ impl LoweringContext {
                     ));
                 }
 
-                let mut ast = self.create_ast(cst.id, AstKind::List(List(ast_items)));
-                if !errors.is_empty() {
-                    ast = self.create_ast(
-                        cst.id,
-                        AstKind::Error {
-                            child: Some(Box::new(ast)),
-                            errors,
-                        },
-                    );
-                }
-                ast
+                let ast = self.create_ast(cst.id, AstKind::List(List(ast_items)));
+                self.wrap_in_errors(cst.id, ast, errors)
             }
             CstKind::ListItem { .. } => panic!("ListItem should only appear in List."),
             CstKind::Struct {
@@ -621,17 +605,8 @@ impl LoweringContext {
                     );
                 }
 
-                let mut ast = self.create_ast(cst.id, AstKind::Struct(Struct { fields }));
-                if !errors.is_empty() {
-                    ast = self.create_ast(
-                        cst.id,
-                        AstKind::Error {
-                            child: Some(Box::new(ast)),
-                            errors,
-                        },
-                    );
-                }
-                ast
+                let ast = self.create_ast(cst.id, AstKind::Struct(Struct { fields }));
+                self.wrap_in_errors(cst.id, ast, errors)
             }
             CstKind::StructField { .. } => panic!("StructField should only appear in Struct."),
             CstKind::StructAccess { struct_, dot, key } => {
@@ -641,17 +616,64 @@ impl LoweringContext {
                     errors.push(self.create_error(cst, AstError::PatternContainsInvalidExpression));
                 };
 
-                let mut ast = self.lower_struct_access(cst.id, struct_, dot, key);
-                if !errors.is_empty() {
-                    ast = self.create_ast(
-                        cst.id,
-                        AstKind::Error {
-                            child: Some(Box::new(ast)),
-                            errors,
-                        },
-                    );
-                }
-                ast
+                let ast = self.lower_struct_access(cst.id, struct_, dot, key);
+                self.wrap_in_errors(cst.id, ast, errors)
+            }
+            CstKind::Match {
+                expression,
+                percent,
+                cases,
+            } => {
+                let mut errors = vec![];
+
+                if lowering_type != LoweringType::Expression {
+                    errors.push(self.create_error(cst, AstError::PatternContainsInvalidExpression));
+                };
+
+                let expression = self.lower_cst(expression, LoweringType::Expression);
+
+                assert!(
+                    matches!(percent.kind, CstKind::Percent),
+                    "Expected a percent sign after the expression to match over, but found {}.",
+                    percent,
+                );
+
+                let cases = self.lower_csts(cases);
+
+                let ast = self.create_ast(
+                    cst.id,
+                    AstKind::Match(Match {
+                        expression: Box::new(expression),
+                        cases,
+                    }),
+                );
+                self.wrap_in_errors(cst.id, ast, errors)
+            }
+            CstKind::MatchCase {
+                pattern,
+                arrow: _,
+                body,
+            } => {
+                let mut errors = vec![];
+
+                if lowering_type != LoweringType::Expression {
+                    errors.push(self.create_error(cst, AstError::PatternContainsInvalidExpression));
+                };
+
+                let pattern = self.lower_cst(pattern, LoweringType::Pattern);
+
+                // TODO: handle error in arrow
+
+                let body = self.lower_csts(body);
+
+                let ast = self.create_ast(
+                    cst.id,
+                    AstKind::MatchCase(MatchCase {
+                        pattern: Box::new(pattern),
+                        body,
+                    }),
+                );
+                self.wrap_in_errors(cst.id, ast, errors)
             }
             CstKind::Lambda {
                 opening_curly_brace,
@@ -693,7 +715,7 @@ impl LoweringContext {
                     ));
                 }
 
-                let mut ast = self.create_ast(
+                let ast = self.create_ast(
                     cst.id,
                     AstKind::Lambda(Lambda {
                         parameters,
@@ -701,16 +723,7 @@ impl LoweringContext {
                         fuzzable: false,
                     }),
                 );
-                if !errors.is_empty() {
-                    ast = self.create_ast(
-                        cst.id,
-                        AstKind::Error {
-                            child: None,
-                            errors,
-                        },
-                    );
-                }
-                ast
+                self.wrap_in_errors(cst.id, ast, errors)
             }
             CstKind::Assignment {
                 name_or_pattern,
@@ -778,23 +791,14 @@ impl LoweringContext {
                     (body, errors)
                 };
 
-                let mut ast = self.create_ast(
+                let ast = self.create_ast(
                     cst.id,
                     AstKind::Assignment(ast::Assignment {
                         is_public: matches!(assignment_sign.kind, CstKind::ColonEqualsSign),
                         body,
                     }),
                 );
-                if !errors.is_empty() {
-                    ast = self.create_ast(
-                        cst.id,
-                        AstKind::Error {
-                            child: None,
-                            errors,
-                        },
-                    );
-                }
-                ast
+                self.wrap_in_errors(cst.id, ast, errors)
             }
             CstKind::Error { error, .. } => self.create_ast(
                 cst.id,
@@ -891,6 +895,19 @@ impl LoweringContext {
         id
     }
 
+    fn wrap_in_errors(&mut self, cst_id: cst::Id, ast: Ast, errors: Vec<CompilerError>) -> Ast {
+        if errors.is_empty() {
+            return ast;
+        }
+
+        self.create_ast(
+            cst_id,
+            AstKind::Error {
+                child: Some(Box::new(ast)),
+                errors,
+            },
+        )
+    }
     fn create_error(&self, cst: &Cst, error: AstError) -> CompilerError {
         CompilerError {
             module: self.module.clone(),
