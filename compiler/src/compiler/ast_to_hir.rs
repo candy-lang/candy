@@ -358,17 +358,90 @@ impl<'a> Context<'a> {
     }
 
     fn lower_text(&mut self, id: Option<ast::Id>, text: &Text) -> hir::Id {
-        // TODO: Convert parts to text
-        let builtin_text_concatenate = self.push(
+        let text_concatenate_function = self.push(
             None,
             Expression::Builtin(BuiltinFunction::TextConcatenate),
+            None,
+        );
+        let type_of_function = self.push(None, Expression::Builtin(BuiltinFunction::TypeOf), None);
+        let text_symbol = self.push(None, Expression::Symbol("Text".to_string()), None);
+        let equals_function = self.push(None, Expression::Builtin(BuiltinFunction::Equals), None);
+        let if_else_function = self.push(None, Expression::Builtin(BuiltinFunction::IfElse), None);
+        let to_debug_text_function = self.push(
+            None,
+            Expression::Builtin(BuiltinFunction::ToDebugText),
             None,
         );
 
         let compiled_parts = text
             .0
             .iter()
-            .map(|part| self.compile_single(part))
+            .map(|part| {
+                let hir = self.compile_single(part);
+                if matches!(part.kind, AstKind::TextPart { .. }) {
+                    return hir;
+                }
+
+                // Convert the part to text if it is not already a text.
+                let type_of = self.push(
+                    None,
+                    Expression::Call {
+                        function: type_of_function.clone(),
+                        arguments: vec![hir.clone()],
+                    },
+                    None,
+                );
+                let is_text = self.push(
+                    None,
+                    Expression::Call {
+                        function: equals_function.clone(),
+                        arguments: vec![type_of, text_symbol.clone()],
+                    },
+                    None,
+                );
+
+                let reset_state = self.start_scope();
+                self.push(None, Expression::Reference(hir.clone()), None);
+                let then_body = self.end_scope(reset_state);
+                let then_lambda = self.push(
+                    None,
+                    Expression::Lambda(Lambda {
+                        parameters: vec![],
+                        body: then_body,
+                        fuzzable: false,
+                    }),
+                    None,
+                );
+
+                let reset_state = self.start_scope();
+                self.push(
+                    None,
+                    Expression::Call {
+                        function: to_debug_text_function.clone(),
+                        arguments: vec![hir],
+                    },
+                    None,
+                );
+                let else_body = self.end_scope(reset_state);
+                let else_lambda = self.push(
+                    None,
+                    Expression::Lambda(Lambda {
+                        parameters: vec![],
+                        body: else_body,
+                        fuzzable: false,
+                    }),
+                    None,
+                );
+
+                self.push(
+                    None,
+                    Expression::Call {
+                        function: if_else_function.clone(),
+                        arguments: vec![is_text, then_lambda, else_lambda],
+                    },
+                    None,
+                )
+            })
             .collect_vec();
 
         compiled_parts
@@ -377,7 +450,7 @@ impl<'a> Context<'a> {
                 self.push(
                     None,
                     Expression::Call {
-                        function: builtin_text_concatenate.clone(),
+                        function: text_concatenate_function.clone(),
                         arguments: vec![left, right],
                     },
                     None,
