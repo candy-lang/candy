@@ -30,7 +30,7 @@ use lsp_types::{
     TextDocumentChangeRegistrationOptions, TextDocumentContentChangeEvent,
     TextDocumentRegistrationOptions, Url, WorkDoneProgressOptions,
 };
-use std::{path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc, thread};
 use tokio::sync::{mpsc::Sender, Mutex, RwLock};
 use tower_lsp::{jsonrpc, Client, LanguageServer};
 use tracing::{debug, span, Level};
@@ -87,7 +87,9 @@ impl LanguageServer for CandyLanguageServer {
 
         let (events_sender, events_receiver) = tokio::sync::mpsc::channel(1024);
         let (hints_sender, mut hints_receiver) = tokio::sync::mpsc::channel(1024);
-        tokio::spawn(hints::run_server(events_receiver, hints_sender));
+        thread::spawn(|| {
+            hints::run_server(events_receiver, hints_sender);
+        });
         *self.hints_server_sink.lock().await = Some(events_sender);
         let client = self.client.clone();
         let hint_reporter = async move || {

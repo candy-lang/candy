@@ -135,6 +135,7 @@ impl Mir {
             self.checked_optimization(|mir| mir.eliminate_common_subtrees());
             self.checked_optimization(|mir| mir.flatten_multiples());
             self.checked_optimization(|mir| mir.cancel_out_module_expressions());
+            self.checked_optimization(|mir| mir.remove_all_module_expressions_if_no_use_exists());
 
             if self.do_hash() == hashcode_before {
                 return;

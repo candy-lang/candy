@@ -4,9 +4,21 @@ use crate::{
     compiler::hir::Id,
     vm::{
         tracer::{FiberEvent, Tracer, VmEvent},
-        FiberId, Heap, Pointer,
+        Data, FiberId, Heap, Pointer,
     },
 };
+
+pub fn collect_symbols_in_heap(heap: &Heap) -> Vec<String> {
+    heap.all_objects()
+        .filter_map(|object| {
+            if let Data::Symbol(symbol) = &object.data {
+                Some(symbol.value.to_string())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
 
 #[derive(Default)]
 pub struct FuzzablesFinder {
@@ -18,6 +30,7 @@ impl Tracer for FuzzablesFinder {
     fn add(&mut self, event: VmEvent) {
         let VmEvent::InFiber { fiber, event } = event else { return; };
         let FiberEvent::FoundFuzzableClosure { definition, closure, heap } = event else { return; };
+        assert!(matches!(heap.get(closure).data, Data::Closure(_)));
 
         let definition = heap.get_hir_id(definition);
         let address_map = self
@@ -29,6 +42,7 @@ impl Tracer for FuzzablesFinder {
             closure,
             address_map,
         );
+        assert!(matches!(self.heap.get(closure).data, Data::Closure(_)));
         self.fuzzables.insert(definition, closure);
     }
 }

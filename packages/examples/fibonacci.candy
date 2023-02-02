@@ -1,13 +1,12 @@
-[ifElse, int] = use "...Core"
+[ifElse, int, recursive] = use "...Core"
 
-fibonacciRec = { fibonacciRec n ->
-  ifElse (n | int.isLessThan 2) { n } {
-    fibonacciRec fibonacciRec (n | int.subtract 1)
-    | int.add (fibonacciRec fibonacciRec (n | int.subtract 2))
-  }
-}
 fibonacci n =
   needs (int.is n)
-  fibonacciRec fibonacciRec n
+  recursive n { recurse n ->
+    ifElse (n | int.isLessThan 2) { n } {
+      recurse (n | int.subtract 1)
+      | int.add (recurse (n | int.subtract 2))
+    }
+  }
 
 main environment := fibonacci 15 # 610

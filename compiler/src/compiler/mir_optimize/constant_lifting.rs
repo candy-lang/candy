@@ -38,7 +38,7 @@
 use rustc_hash::FxHashSet;
 
 use crate::{
-    compiler::mir::{Body, Expression, Id, Mir},
+    compiler::mir::{Body, Expression, Id, Mir, VisitorResult},
     utils::IdGenerator,
 };
 
@@ -54,7 +54,7 @@ impl Mir {
 
         self.body.visit(&mut |id, expression, is_return_value| {
             if top_level_ids.contains(&id) {
-                return;
+                return VisitorResult::Continue;
             }
             let is_constant = expression.is_pure()
                 && expression
@@ -62,15 +62,16 @@ impl Mir {
                     .iter()
                     .all(|captured| constant_ids.contains(captured));
             if !is_constant {
-                return;
+                return VisitorResult::Continue;
             }
             if is_return_value && let Expression::Reference(_) = expression {
                 // Returned references shouldn't be lifted. If we would lift
                 // one, we'd have to add a reference anyway.
-                return;
+                return VisitorResult::Continue;
             }
             constants.push((id, expression.clone()));
             constant_ids.insert(id);
+            VisitorResult::Continue
         });
 
         self.body.visit_bodies(&mut |body| {

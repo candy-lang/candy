@@ -2,6 +2,7 @@
 
 members = [
     "compiler",
+    "compiler/fuzz",
 ]
 
 [profile.release]

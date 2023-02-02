@@ -224,23 +224,33 @@ impl Body {
         }
     }
 
-    pub fn visit(&mut self, visitor: &mut dyn FnMut(Id, &mut Expression, bool)) {
+    pub fn visit(
+        &mut self,
+        visitor: &mut dyn FnMut(Id, &mut Expression, bool) -> VisitorResult,
+    ) -> VisitorResult {
         let length = self.expressions.len();
         for i in 0..length {
             let (id, expression) = self.expressions.get_mut(i).unwrap();
-            Self::visit_expression(*id, expression, i == length - 1, visitor);
+            match Self::visit_expression(*id, expression, i == length - 1, visitor) {
+                VisitorResult::Continue => {}
+                VisitorResult::Abort => return VisitorResult::Abort,
+            }
         }
+        VisitorResult::Continue
     }
     fn visit_expression(
         id: Id,
         expression: &mut Expression,
         is_returned: bool,
-        visitor: &mut dyn FnMut(Id, &mut Expression, bool),
-    ) {
+        visitor: &mut dyn FnMut(Id, &mut Expression, bool) -> VisitorResult,
+    ) -> VisitorResult {
         if let Expression::Lambda { body, .. } | Expression::Multiple(body) = expression {
-            body.visit(visitor);
+            match body.visit(visitor) {
+                VisitorResult::Continue => {}
+                VisitorResult::Abort => return VisitorResult::Abort,
+            }
         }
-        visitor(id, expression, is_returned);
+        visitor(id, expression, is_returned)
     }
 
     /// Calls the visitor for each contained expression, even expressions in
@@ -330,6 +340,10 @@ impl Expression {
             _ => {}
         }
     }
+}
+pub enum VisitorResult {
+    Continue,
+    Abort,
 }
 
 #[derive(Clone)]

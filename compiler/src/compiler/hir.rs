@@ -163,6 +163,10 @@ impl Id {
         Self::tooling("complicated-responsibility".to_string())
     }
 
+    pub fn to_short_debug_string(&self) -> String {
+        format!("${}", self.keys.iter().join(":"))
+    }
+
     pub fn is_root(&self) -> bool {
         self.keys.is_empty()
     }
@@ -349,13 +353,18 @@ impl fmt::Display for Expression {
         match self {
             Expression::Int(int) => write!(f, "int {int}"),
             Expression::Text(text) => write!(f, "text {text:?}"),
-            Expression::Reference(reference) => write!(f, "reference {reference}"),
+            Expression::Reference(reference) => {
+                write!(f, "reference {}", reference.to_short_debug_string())
+            }
             Expression::Symbol(symbol) => write!(f, "symbol {symbol}"),
             Expression::List(items) => {
                 write!(
                     f,
                     "list (\n{}\n)",
-                    items.iter().map(|item| format!("  {item},")).join("\n"),
+                    items
+                        .iter()
+                        .map(|item| format!("  {},", item.to_short_debug_string()))
+                        .join("\n"),
                 )
             }
             Expression::Struct(entries) => {
@@ -364,21 +373,30 @@ impl fmt::Display for Expression {
                     "struct [\n{}\n]",
                     entries
                         .iter()
-                        .map(|(key, value)| format!("  {key}: {value},"))
+                        .map(|(key, value)| format!(
+                            "  {}: {},",
+                            key.to_short_debug_string(),
+                            value.to_short_debug_string(),
+                        ))
                         .join("\n"),
                 )
             }
             Expression::Destructure {
                 expression,
                 pattern,
-            } => write!(f, "destructure {expression} into {pattern}"),
+            } => write!(
+                f,
+                "destructure {} into {pattern}",
+                expression.to_short_debug_string(),
+            ),
             Expression::PatternIdentifierReference(identifier_id) => {
                 write!(f, "get destructured {identifier_id}")
             }
             Expression::Match { expression, cases } => {
                 write!(
                     f,
-                    "match {expression} with these cases:\n{}",
+                    "match {} with these cases:\n{}",
+                    expression.to_short_debug_string(),
                     cases
                         .iter()
                         .map(|(pattern, body)| format!("{pattern} ->\n{body}")
@@ -419,10 +437,11 @@ impl fmt::Display for Expression {
                 assert!(!arguments.is_empty(), "A call needs to have arguments.");
                 write!(
                     f,
-                    "call {function} with these arguments:\n{}",
+                    "call {} with these arguments:\n{}",
+                    function.to_short_debug_string(),
                     arguments
                         .iter()
-                        .map(|argument| format!("  {argument}"))
+                        .map(|argument| format!("  {}", argument.to_short_debug_string()))
                         .join("\n"),
                 )
             }
@@ -432,10 +451,16 @@ impl fmt::Display for Expression {
             } => write!(
                 f,
                 "use module {} relative to {}",
-                relative_path, current_module,
+                relative_path.to_short_debug_string(),
+                current_module,
             ),
             Expression::Needs { condition, reason } => {
-                write!(f, "needs {condition} with reason {reason}")
+                write!(
+                    f,
+                    "needs {} with reason {}",
+                    condition.to_short_debug_string(),
+                    reason.to_short_debug_string(),
+                )
             }
             Expression::Error { child, errors } => {
                 write!(f, "{}", if errors.len() == 1 { "error" } else { "errors" })?;
@@ -498,7 +523,7 @@ impl fmt::Display for Lambda {
             "{} ->",
             self.parameters
                 .iter()
-                .map(|parameter| format!("{parameter}"))
+                .map(|parameter| parameter.to_short_debug_string())
                 .join(" "),
         )?;
         write!(f, "{}", self.body)?;
@@ -508,7 +533,7 @@ impl fmt::Display for Lambda {
 impl fmt::Display for Body {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (id, expression) in &self.expressions {
-            writeln!(f, "{id} = {expression}")?;
+            writeln!(f, "{} = {expression}", id.to_short_debug_string())?;
         }
         Ok(())
     }

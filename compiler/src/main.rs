@@ -4,6 +4,7 @@
 #![feature(entry_insert)]
 #![feature(let_chains)]
 #![feature(never_type)]
+#![feature(round_char_boundary)]
 #![feature(try_trait_v2)]
 #![allow(clippy::module_inception)]
 
@@ -185,7 +186,13 @@ fn raw_build(
             &ast_cst_id_map
                 .keys()
                 .sorted_by_key(|it| it.local)
-                .map(|key| format!("{key} -> {}\n", ast_cst_id_map[key].0))
+                .map(|key| {
+                    format!(
+                        "{} -> {}\n",
+                        key.to_short_debug_string(),
+                        ast_cst_id_map[key].0,
+                    )
+                })
                 .join(""),
         );
     }
@@ -197,7 +204,13 @@ fn raw_build(
             "hir_to_ast_ids",
             &hir_ast_id_map
                 .keys()
-                .map(|key| format!("{key} -> {}\n", hir_ast_id_map[key]))
+                .map(|key| {
+                    format!(
+                        "{} -> {}\n",
+                        key.to_short_debug_string(),
+                        hir_ast_id_map[key].to_short_debug_string(),
+                    )
+                })
                 .join(""),
         );
     }

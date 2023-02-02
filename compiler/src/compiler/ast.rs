@@ -25,6 +25,9 @@ impl Id {
     pub fn new(module: Module, local: usize) -> Self {
         Self { module, local }
     }
+    pub fn to_short_debug_string(&self) -> String {
+        format!("${}", self.local)
+    }
 }
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -138,14 +141,18 @@ impl Deref for AstString {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum AstError {
+    CallInPattern,
+    ExpectedNameOrPatternInAssignment,
     ExpectedParameter,
     LambdaWithoutClosingCurlyBrace,
     ListItemWithoutComma,
     ListWithNonListItem,
     ListWithoutClosingParenthesis,
+    ParenthesizedInPattern,
     ParenthesizedWithoutClosingParenthesis,
     PatternContainsInvalidExpression,
     PatternLiteralPartContainsInvalidExpression,
+    PipeInPattern,
     StructKeyWithoutColon,
     StructShorthandWithNotIdentifier,
     StructValueWithoutComma,
@@ -309,7 +316,7 @@ impl CollectErrors for Vec<Ast> {
 
 impl Display for Ast {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: ", self.id)?;
+        write!(f, "{}: ", self.id.to_short_debug_string())?;
         match &self.kind {
             AstKind::Int(Int(int)) => write!(f, "int {}", int),
             AstKind::Text(Text(parts)) => {
@@ -429,7 +436,14 @@ impl Display for Lambda {
             } else {
                 "non-fuzzable"
             },
-            self.parameters.iter().map(|it| format!("{it}")).join(" "),
+            if self.parameters.is_empty() {
+                "".to_string()
+            } else {
+                format!(
+                    "{} ->",
+                    self.parameters.iter().map(|it| format!("{it}")).join(" "),
+                )
+            },
             self.body
                 .iter()
                 .map(|it| format!("{it}"))
@@ -458,13 +472,16 @@ impl Display for Call {
             self.receiver,
             self.arguments
                 .iter()
-                .map(|argument| format!("  {argument}"))
+                .map(|argument| format!("{argument}"))
+                .join("\n")
+                .lines()
+                .map(|line| format!("  {line}"))
                 .join("\n")
         )
     }
 }
 impl Display for AstString {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}@\"{}\"", self.id, self.value)
+        write!(f, r#"{}@"{}""#, self.id.to_short_debug_string(), self.value)
     }
 }
