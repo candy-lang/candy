@@ -2441,9 +2441,6 @@ mod parse {
     fn match_suffix(input: &str, indentation: usize) -> Option<(&str, Rcst, Vec<Rcst>)> {
         let (input, percent) = percent(input)?;
         let (mut input, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
-        if !whitespace.is_multiline() {
-            return None;
-        }
         let percent = percent.wrap_in_whitespace(whitespace);
 
         let mut cases = vec![];
@@ -2461,7 +2458,7 @@ mod parse {
         }
         if cases.is_empty() {
             cases.push(Rcst::Error {
-                unparsable_input: input.to_string(),
+                unparsable_input: "".to_string(),
                 error: RcstError::MatchMissesCases,
             });
         }
@@ -2470,7 +2467,28 @@ mod parse {
     }
     #[test]
     fn test_match_suffix() {
-        assert_eq!(match_suffix("%", 0), None);
+        assert_eq!(
+            match_suffix("%", 0),
+            Some((
+                "",
+                Rcst::Percent,
+                vec![Rcst::Error {
+                    unparsable_input: "".to_string(),
+                    error: RcstError::MatchMissesCases,
+                }],
+            )),
+        );
+        assert_eq!(
+            match_suffix("%\n", 0),
+            Some((
+                "\n",
+                Rcst::Percent,
+                vec![Rcst::Error {
+                    unparsable_input: "".to_string(),
+                    error: RcstError::MatchMissesCases,
+                }],
+            )),
+        );
         // %
         //   1 -> 2
         // Foo
