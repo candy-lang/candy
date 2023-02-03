@@ -5,8 +5,24 @@
       "path": "."
     },
     {
-      "name": "Compiler",
-      "path": "compiler"
+      "name": "Compiler: Frontend",
+      "path": "compiler/frontend"
+    },
+    {
+      "name": "Compiler: VM",
+      "path": "compiler/vm"
+    },
+    {
+      "name": "Compiler: Fuzzer",
+      "path": "compiler/fuzzer"
+    },
+    {
+      "name": "Compiler: Language Server",
+      "path": "compiler/language_server"
+    },
+    {
+      "name": "Compiler: CLI",
+      "path": "compiler/cli"
     },
     {
       "name": "VS Code Extension",
