@@ -630,27 +630,22 @@ impl<'a> PatternLoweringContext<'a> {
                             let captured_identifiers = pattern.captured_identifiers();
                             if captured_identifiers == captured_identifiers_order {
                                 body.push_reference(result);
-                            } else {
-                                let captured_identifiers = captured_identifiers_order
-                                    .iter()
-                                    .map(|identifier_id| {
-                                        captured_identifiers
-                                            .iter()
-                                            .position(|it| it == identifier_id)
-                                            .map(|index| {
-                                                let index = body.push_int((1 + index).into());
-                                                body.push_symbol("Blub".to_string());
-                                                body.push_call(
-                                                    list_get_function,
-                                                    vec![result, index],
-                                                    self.responsible,
-                                                )
-                                            })
-                                            .unwrap_or_else(|| body.push_reference(nothing))
-                                    })
-                                    .collect();
-                                self.push_match(body, captured_identifiers);
+                                return;
                             }
+
+                            let captured_identifiers = captured_identifiers_order
+                                .iter()
+                                .map(|identifier_id| {
+                                    let index = captured_identifiers
+                                        .iter()
+                                        .position(|it| it == identifier_id);
+                                    let Some(index) = index else { return body.push_reference(nothing); };
+
+                                    let index = body.push_int((1 + index).into());
+                                    body.push_call(list_get_function, vec![result, index], self.responsible)
+                                })
+                                .collect();
+                            self.push_match(body, captured_identifiers);
                         },
                         |body| {
                             self.compile(body, expression, pattern);
