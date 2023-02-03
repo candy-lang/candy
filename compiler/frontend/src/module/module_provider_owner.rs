@@ -20,8 +20,11 @@ pub trait MutableModuleProviderOwner: ModuleProviderOwner {
         self.get_in_memory_module_provider().remove(module);
         self.invalidate_module(module);
     }
-    fn get_open_modules(&mut self) -> impl Iterator<Item = &Module> {
-        self.get_in_memory_module_provider().get_all_modules()
+    fn get_open_modules(&mut self) -> Vec<Module> {
+        self.get_in_memory_module_provider()
+            .get_all_modules()
+            .cloned()
+            .collect()
     }
 }
 

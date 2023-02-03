@@ -1,7 +1,6 @@
 #![feature(box_patterns)]
 #![feature(entry_insert)]
 #![feature(let_chains)]
-#![feature(return_position_impl_trait_in_trait)]
 
 pub mod ast;
 pub mod ast_to_hir;
