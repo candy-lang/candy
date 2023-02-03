@@ -1,0 +1,22 @@
+[package]
+name = "candy_frontend"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.56"
+
+[lib]
+
+[dependencies]
+im = "15.1.0"
+itertools = { version = "0.10.0" }
+lazy_static = "1.4.0"
+linked-hash-map = "0.5.4"
+num-bigint = { version = "0.4.3", features = ["rand"] }
+num-traits = { version = "0.2.15", features = ["i128"] }
+rustc-hash = "1.1.0"
+salsa = "0.16.1"
+strum = "0.24.0"
+strum_macros = "0.24"
+tracing = { version = "0.1", features = ["release_max_level_debug"] }
+unicode-segmentation = "1.9.0"
+url = "2.2.2"

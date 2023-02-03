@@ -1,16 +1,36 @@
 version: 2
 updates:
-  - package-ecosystem: 'github-actions'
-    directory: '/'
+  - package-ecosystem: github-actions
+    directory: /
     schedule:
-      interval: 'weekly'
+      interval: weekly
 
-  - package-ecosystem: 'cargo'
-    directory: '/new-new-packages/compiler'
+  - package-ecosystem: cargo
+    directory: /compiler/cli
     schedule:
-      interval: 'weekly'
+      interval: weekly
+  - package-ecosystem: cargo
+    directory: /compiler/compiler_fuzzer
+    schedule:
+      interval: weekly
+  - package-ecosystem: cargo
+    directory: /compiler/frontend
+    schedule:
+      interval: weekly
+  - package-ecosystem: cargo
+    directory: /compiler/fuzzer
+    schedule:
+      interval: weekly
+  - package-ecosystem: cargo
+    directory: /compiler/language_server
+    schedule:
+      interval: weekly
+  - package-ecosystem: cargo
+    directory: /compiler/vm
+    schedule:
+      interval: weekly
 
-  - package-ecosystem: 'npm'
-    directory: '/new-new-packages/vscode_extension'
+  - package-ecosystem: npm
+    directory: /vscode_extension
     schedule:
-      interval: 'weekly'
+      interval: weekly
