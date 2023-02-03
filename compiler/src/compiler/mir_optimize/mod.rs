@@ -47,6 +47,7 @@ mod common_subtree_elimination;
 mod complexity;
 mod constant_folding;
 mod constant_lifting;
+mod data_flow;
 mod inlining;
 mod module_folding;
 mod module_stack_cancelling;
@@ -84,7 +85,8 @@ fn optimized_mir(db: &dyn OptimizeMir, module: Module, tracing: TracingConfig) -
     debug!("{module}: Optimizing thoroughly.");
     let mir = db.obviously_optimized_mir(module.clone(), tracing.clone())?;
     let mut mir = (*mir).clone();
-    mir.optimize(db, &tracing);
+    // mir.optimize(db, &tracing);
+    mir.gather_data_flow_insights();
     debug!("{module}: Optimized thoroughly.");
     Some(Arc::new(mir))
 }
