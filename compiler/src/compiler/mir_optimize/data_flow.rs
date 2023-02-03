@@ -74,7 +74,6 @@ impl Timeline {
         self.values.insert(id, value);
     }
 
-    // TODO: own self
     fn run(&self, id: Id, expression: &Expression) -> Vec<Timeline> {
         let values = match expression {
             Expression::Int(_) => vec![FlowValue::Int],
@@ -86,7 +85,7 @@ impl Timeline {
             Expression::Reference(reference) => vec![self.values[reference].clone()],
             Expression::HirId(_) => vec![FlowValue::Any],
             Expression::Lambda { body, .. } => {
-                // TODO: if any of the body values may panic, add a panic as well
+                // TODO: Properly handle panics inside of the body.
                 vec![FlowValue::Lambda {
                     return_value: Box::new(self.values[&body.return_value()].clone()),
                 }]
@@ -100,6 +99,8 @@ impl Timeline {
                 if let FlowValue::Builtin(builtin) = self.values[function] {
                     let arguments = arguments.iter().map(|arg| &self.values[arg]).collect_vec();
                     Self::run_builtin(builtin, arguments)
+                } else if let FlowValue::Lambda { return_value } = &self.values[function] {
+                    vec![*return_value.clone()]
                 } else {
                     vec![FlowValue::Any, FlowValue::Never]
                 }
@@ -111,7 +112,7 @@ impl Timeline {
             }
             Expression::Panic { .. } => vec![FlowValue::Never],
             Expression::Multiple(multiple) => {
-                // TODO: if any of the body values may panic, add a panic as well
+                // TODO: Properly handle panics inside the body.
                 vec![self.values[&multiple.return_value()].clone()]
             }
             // These expressions are lowered to instructions that don't actually
@@ -270,83 +271,59 @@ impl Timeline {
 
 struct Multiverse {
     timelines: Vec<Timeline>,
-    insights: FxHashMap<Id, FxHashSet<FlowValue>>,
 }
 impl Multiverse {
     fn big_bang() -> Self {
         Self {
             timelines: vec![Timeline::default()],
-            insights: FxHashMap::default(),
         }
     }
 
-    fn visit_expression(
-        &mut self,
-        id: Id,
-        expression: &Expression,
-        last_usages: &FxHashMap<Id, Vec<Id>>,
-    ) {
-        match expression {
-            Expression::Lambda {
-                parameters,
-                responsible_parameter,
-                body,
-            } => {
-                for timeline in self.timelines.iter_mut() {
-                    for parameter in parameters {
-                        timeline.set(*parameter, FlowValue::Any);
-                        self.insights
-                            .insert(*parameter, vec![FlowValue::Any].into_iter().collect());
-                    }
-                    timeline.set(*responsible_parameter, FlowValue::Any);
-                    self.insights.insert(
-                        *responsible_parameter,
-                        vec![FlowValue::Any].into_iter().collect(),
-                    );
-                }
-                self.visit_body(body, last_usages);
-            }
-            Expression::Multiple(multiple) => self.visit_body(multiple, last_usages),
-            _ => {}
-        }
-
-        let mut new_timelines = FxHashSet::default();
+    fn run(&mut self, id: Id, expression: &Expression) {
+        let mut new_timelines = vec![];
         for timeline in &self.timelines {
-            for mut new_timeline in timeline.run(id, expression) {
-                self.insights
-                    .entry(id)
-                    .or_default()
-                    .insert(new_timeline.values[&id].clone());
-                for no_longer_accessed_id in last_usages.get(&id).unwrap_or(&vec![]) {
-                    new_timeline.values.remove(no_longer_accessed_id);
-                }
-                new_timelines.insert(new_timeline);
-            }
+            new_timelines.extend(timeline.run(id, expression));
         }
-        let possible_values = &self.insights[&id];
-        self.timelines = new_timelines.into_iter().collect();
-        println!(
-            "Expression {id}: There are {} timelines. Possible values: {}",
-            self.timelines.len(),
-            possible_values
-                .iter()
-                .map(|value| format!("{value:?}"))
-                .join(" | ")
-        );
+        self.timelines = new_timelines;
     }
 
-    fn visit_body(&mut self, body: &Body, last_usages: &FxHashMap<Id, Vec<Id>>) {
-        for (id, expression) in body.iter() {
-            self.visit_expression(id, expression, last_usages);
+    fn possible_values_for(&self, id: Id) -> FxHashSet<FlowValue> {
+        self.timelines
+            .iter()
+            .fold(FxHashSet::default(), |mut set, timeline| {
+                set.insert(timeline.values[&id].clone());
+                set
+            })
+    }
+
+    fn purge(&mut self, ids_to_purge: &[Id]) {
+        for timeline in &mut self.timelines {
+            for purged in ids_to_purge {
+                timeline.values.remove(purged);
+            }
         }
+
+        let new_timelines = self
+            .timelines
+            .drain(..)
+            .collect::<FxHashSet<_>>()
+            .into_iter()
+            .collect();
+        self.timelines = new_timelines;
     }
 }
 
 impl Mir {
     pub fn gather_data_flow_insights(&self) {
         println!("Gathering data flow insights");
+
         let mut id_to_its_last_usage = FxHashMap::default();
-        self.body.collect_last_id_usage(&mut id_to_its_last_usage);
+        self.body.visit_in_analysis_order(&mut |id, expression| {
+            id_to_its_last_usage.insert(id, id);
+            for referenced in expression.ids_used_for_analysis() {
+                id_to_its_last_usage.insert(referenced, id);
+            }
+        });
 
         let mut id_to_last_usages_it_does: FxHashMap<Id, Vec<Id>> = FxHashMap::default();
         for (used_id, usage) in id_to_its_last_usage {
@@ -356,39 +333,49 @@ impl Mir {
                 .push(used_id);
         }
 
+        let mut insights: FxHashMap<Id, FxHashSet<FlowValue>> = FxHashMap::default();
         let mut multiverse = Multiverse::big_bang();
-        multiverse.visit_body(&self.body, &id_to_last_usages_it_does);
+        self.body.visit_in_analysis_order(&mut |id, expression| {
+            multiverse.run(id, expression);
+            insights.insert(id, multiverse.possible_values_for(id));
+            multiverse.purge(id_to_last_usages_it_does.get(&id).unwrap_or(&vec![]));
 
-        let ids = self.body.all_ids().into_iter().sorted().collect_vec();
-        let no_info = FxHashSet::default();
-        for id in ids {
-            let possible_values = &multiverse.insights.get(&id).unwrap_or(&no_info);
-            println!(
-                "  {id:?}: {}",
-                possible_values
+            info!(
+                "{id:?}: {:30}  ({} timelines)",
+                insights[&id]
                     .iter()
                     .map(|value| format!("{value:?}"))
                     .join(" | "),
+                multiverse.timelines.len(),
             );
-        }
+        });
+
+        // TODO: Do something with the insights.
     }
 }
+
 impl Body {
-    fn collect_last_id_usage(&self, last_usages: &mut FxHashMap<Id, Id>) {
+    fn visit_in_analysis_order(&self, visitor: &mut dyn FnMut(Id, &Expression)) {
         for (id, expression) in self.iter() {
-            expression.collect_last_id_usage(id, last_usages);
+            expression.visit_in_analysis_order(id, visitor);
         }
     }
 }
 impl Expression {
-    fn collect_last_id_usage(&self, my_id: Id, last_usages: &mut FxHashMap<Id, Id>) {
-        last_usages.insert(my_id, my_id);
-        for id in self.referenced_ids() {
-            last_usages.insert(id, my_id);
-        }
+    fn visit_in_analysis_order(&self, id: Id, visitor: &mut dyn FnMut(Id, &Expression)) {
         match self {
-            Expression::Lambda { body, .. } => body.collect_last_id_usage(last_usages),
-            Expression::Multiple(multiple) => multiple.collect_last_id_usage(last_usages),
+            Expression::Lambda {
+                parameters,
+                responsible_parameter,
+                body,
+            } => {
+                for parameter in parameters {
+                    visitor(*parameter, &Expression::Parameter);
+                }
+                visitor(*responsible_parameter, &Expression::Parameter);
+                body.visit_in_analysis_order(visitor)
+            }
+            Expression::Multiple(multiple) => multiple.visit_in_analysis_order(visitor),
             Expression::Int(_)
             | Expression::Text(_)
             | Expression::Symbol(_)
@@ -406,7 +393,38 @@ impl Expression {
             | Expression::TraceCallStarts { .. }
             | Expression::TraceCallEnds { .. }
             | Expression::TraceExpressionEvaluated { .. }
-            | Expression::TraceFoundFuzzableClosure { .. } => {} // _ => {}
+            | Expression::TraceFoundFuzzableClosure { .. } => {}
+        }
+        visitor(id, self);
+    }
+}
+
+impl Expression {
+    fn ids_used_for_analysis(&self) -> Vec<Id> {
+        match self {
+            Expression::Lambda { body, .. } | Expression::Multiple(body) => {
+                vec![body.return_value()]
+            }
+            Expression::Int(_)
+            | Expression::Text(_)
+            | Expression::Symbol(_)
+            | Expression::Builtin(_)
+            | Expression::List(_)
+            | Expression::Struct(_)
+            | Expression::Reference(_)
+            | Expression::HirId(_)
+            | Expression::Parameter
+            | Expression::Call { .. }
+            | Expression::UseModule { .. }
+            | Expression::Panic { .. }
+            | Expression::ModuleStarts { .. }
+            | Expression::ModuleEnds
+            | Expression::TraceCallStarts { .. }
+            | Expression::TraceCallEnds { .. }
+            | Expression::TraceExpressionEvaluated { .. }
+            | Expression::TraceFoundFuzzableClosure { .. } => {
+                self.referenced_ids().into_iter().collect()
+            }
         }
     }
 }
