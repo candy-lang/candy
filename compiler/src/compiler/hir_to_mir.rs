@@ -267,7 +267,7 @@ impl<'a> LoweringContext<'a> {
                         responsible,
                     );
 
-                    if pattern.captured_identifier_count() == 0 {
+                    if !pattern.contains_captured_identifiers() {
                         body.push_reference(nothing)
                     } else {
                         // The generated expression will be followed by at least one
@@ -617,12 +617,44 @@ impl<'a> PatternLoweringContext<'a> {
                 };
 
                 let mut result = self.compile(body, expression, first_pattern);
+
+                let captured_identifiers_order = first_pattern.captured_identifiers();
+                let list_get_function = body.push_builtin(BuiltinFunction::ListGet);
+                let nothing = body.push_nothing();
+                dbg!(&captured_identifiers_order);
+
                 for pattern in rest_patterns {
                     let is_match = body.push_is_match(result, self.responsible);
                     result = body.push_if_else(
                         is_match,
                         |body| {
-                            body.push_reference(result);
+                            let captured_identifiers = pattern.captured_identifiers();
+                            dbg!(&captured_identifiers);
+                            if captured_identifiers == captured_identifiers_order {
+                                body.push_reference(result);
+                            } else {
+                                let captured_identifiers = captured_identifiers_order
+                                    .iter()
+                                    .map(|identifier_id| {
+                                        dbg!(identifier_id);
+                                        captured_identifiers
+                                            .iter()
+                                            .position(|it| it == identifier_id)
+                                            .map(|index| {
+                                                dbg!(index);
+                                                let index = body.push_int((1 + index).into());
+                                                body.push_symbol("Blub".to_string());
+                                                body.push_call(
+                                                    list_get_function,
+                                                    vec![result, index],
+                                                    self.responsible,
+                                                )
+                                            })
+                                            .unwrap_or_else(|| body.push_reference(nothing))
+                                    })
+                                    .collect();
+                                self.push_match(body, captured_identifiers);
+                            }
                         },
                         |body| {
                             self.compile(body, expression, pattern);
@@ -770,7 +802,6 @@ impl<'a> PatternLoweringContext<'a> {
         let mut condition_builder = condition_builders.remove(0);
         let (return_value, captured_identifier_count) = condition_builder(body);
 
-        // let responsible = self.responsible;
         let is_match = body.push_is_match(return_value, self.responsible);
         body.push_if_else(
             is_match,

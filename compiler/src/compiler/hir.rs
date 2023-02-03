@@ -257,7 +257,7 @@ impl hash::Hash for Expression {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PatternIdentifierId(pub usize);
 impl CountableId for PatternIdentifierId {
     fn from_usize(id: usize) -> Self {
@@ -300,6 +300,18 @@ impl hash::Hash for Pattern {
     }
 }
 impl Pattern {
+    pub fn contains_captured_identifiers(&self) -> bool {
+        match self {
+            Pattern::NewIdentifier(_) => true,
+            Pattern::Int(_) | Pattern::Text(_) | Pattern::Symbol(_) => false,
+            Pattern::List(list) => list.iter().any(|it| it.contains_captured_identifiers()),
+            Pattern::Struct(struct_) => struct_
+                .iter()
+                .any(|(_, value_pattern)| value_pattern.contains_captured_identifiers()),
+            Pattern::Or(patterns) => patterns.first().unwrap().contains_captured_identifiers(),
+            Pattern::Error { .. } => false,
+        }
+    }
     pub fn captured_identifier_count(&self) -> usize {
         match self {
             Pattern::NewIdentifier(_) => 1,
@@ -319,6 +331,40 @@ impl Pattern {
                 // whether the child captured any identifiers since they can't
                 // be accessed anyway.
                 0
+            }
+        }
+    }
+
+    /// Returns a mapping from `PatternIdentifierId` to the position of the
+    /// corresponding identifier in the `(Match, …)` result (zero-based,
+    /// ignoring the `Match` symbol).
+    pub fn captured_identifiers(&self) -> Vec<PatternIdentifierId> {
+        let mut ids = vec![];
+        self.collect_captured_identifiers(&mut ids);
+        ids
+    }
+    fn collect_captured_identifiers(&self, ids: &mut Vec<PatternIdentifierId>) {
+        match self {
+            Pattern::NewIdentifier(identifier_id) => ids.push(*identifier_id),
+            Pattern::Int(_) | Pattern::Text(_) | Pattern::Symbol(_) => {}
+            Pattern::List(list) => {
+                for pattern in list {
+                    pattern.collect_captured_identifiers(ids);
+                }
+            }
+            Pattern::Struct(struct_) => {
+                for (_, value_pattern) in struct_ {
+                    // Keys can't capture identifiers.
+                    value_pattern.collect_captured_identifiers(ids);
+                }
+            }
+            // If the number or captured identifiers isn't the same in both
+            // sides, the pattern is invalid and the generated code will panic.
+            Pattern::Or(patterns) => patterns.first().unwrap().collect_captured_identifiers(ids),
+            Pattern::Error { .. } => {
+                // Since generated code panics in this case, it doesn't matter
+                // whether the child captured any identifiers since they can't
+                // be accessed anyway.
             }
         }
     }
