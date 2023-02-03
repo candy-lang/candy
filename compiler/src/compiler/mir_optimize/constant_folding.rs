@@ -241,6 +241,7 @@ impl Mir {
                         BuiltinFunction::IntDivideTruncating => "Int",
                         BuiltinFunction::IntModulo => "Int",
                         BuiltinFunction::IntMultiply => "Int",
+                        BuiltinFunction::IntParse => "Struct",
                         BuiltinFunction::IntRemainder => "Int",
                         BuiltinFunction::IntShiftLeft => "Int",
                         BuiltinFunction::IntShiftRight => "Int",

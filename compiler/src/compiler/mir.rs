@@ -169,7 +169,7 @@ impl IntoIterator for Body {
     }
 }
 impl Body {
-    pub fn return_value(&mut self) -> Id {
+    pub fn return_value(&self) -> Id {
         let (id, _) = self.expressions.last().unwrap();
         *id
     }
