@@ -2375,7 +2375,7 @@ mod parse {
             let (new_input, whitespace_after_left) =
                 whitespaces_and_newlines(input, indentation, true);
 
-            let Some((new_input, bar)) = bar(new_input) else { break  };
+            let Some((new_input, bar)) = bar(new_input) else { break };
             let (new_input, whitespace_after_bar) =
                 whitespaces_and_newlines(new_input, indentation + 1, true);
             let bar = bar.wrap_in_whitespace(whitespace_after_bar);
