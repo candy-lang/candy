@@ -91,8 +91,8 @@ pub fn setup() -> Database {
     db
 }
 fn load_core(module_provider: &mut InMemoryModuleProvider) {
-    let packages_directory: PathBuf = "../packages".into();
-    let core_directory: PathBuf = "../packages/Core".into();
+    let packages_directory: PathBuf = "../../packages".into();
+    let core_directory: PathBuf = "../../packages/Core".into();
     for file in WalkDir::new(&core_directory)
         .into_iter()
         .map(|it| it.unwrap())
