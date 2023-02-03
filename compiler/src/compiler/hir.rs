@@ -623,12 +623,12 @@ impl CollectErrors for Pattern {
             Pattern::NewIdentifier(_) | Pattern::Int(_) | Pattern::Text(_) | Pattern::Symbol(_) => {
             }
             Pattern::List(patterns) => {
-                for pattern in patterns {
-                    pattern.collect_errors(errors);
+                for item_pattern in patterns {
+                    item_pattern.collect_errors(errors);
                 }
             }
-            Pattern::Struct(struct_) => {
-                for (key_pattern, value_pattern) in struct_ {
+            Pattern::Struct(patterns) => {
+                for (key_pattern, value_pattern) in patterns {
                     key_pattern.collect_errors(errors);
                     value_pattern.collect_errors(errors);
                 }
@@ -643,8 +643,8 @@ impl CollectErrors for Pattern {
 }
 impl CollectErrors for Body {
     fn collect_errors(&self, errors: &mut Vec<CompilerError>) {
-        for (_id, ast) in &self.expressions {
-            ast.collect_errors(errors);
+        for (_id, expression) in &self.expressions {
+            expression.collect_errors(errors);
         }
     }
 }

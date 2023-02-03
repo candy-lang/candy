@@ -657,9 +657,7 @@ impl<'a> Context<'a> {
         }
         unreachable!()
     }
-}
 
-impl<'a> Context<'a> {
     fn generate_sparkles(&mut self) {
         let mut sparkles_map = FxHashMap::default();
 

@@ -41,6 +41,14 @@ pub struct Ast {
     pub kind: AstKind,
 }
 
+impl Deref for Ast {
+    type Target = AstKind;
+
+    fn deref(&self) -> &Self::Target {
+        &self.kind
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum AstKind {
     Int(Int),
@@ -272,8 +280,8 @@ impl CollectErrors for Ast {
                     value.collect_errors(errors);
                 }
             }
-            AstKind::StructAccess(struct_access) => {
-                struct_access.struct_.collect_errors(errors);
+            AstKind::StructAccess(StructAccess { struct_, key: _ }) => {
+                struct_.collect_errors(errors);
             }
             AstKind::Lambda(lambda) => lambda.body.collect_errors(errors),
             AstKind::Call(call) => call.arguments.collect_errors(errors),
@@ -286,13 +294,13 @@ impl CollectErrors for Ast {
                     }
                 }
             },
-            AstKind::Match(match_) => {
-                match_.expression.collect_errors(errors);
-                match_.cases.collect_errors(errors);
+            AstKind::Match(Match { expression, cases }) => {
+                expression.collect_errors(errors);
+                cases.collect_errors(errors);
             }
-            AstKind::MatchCase(match_case) => {
-                match_case.pattern.collect_errors(errors);
-                match_case.body.collect_errors(errors);
+            AstKind::MatchCase(MatchCase { pattern, body }) => {
+                pattern.collect_errors(errors);
+                body.collect_errors(errors);
             }
             AstKind::Error {
                 child,

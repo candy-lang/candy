@@ -103,7 +103,7 @@ struct LoweringContext {
     id_mapping: FxHashMap<ast::Id, cst::Id>,
 }
 impl LoweringContext {
-    fn new(module: Module) -> LoweringContext {
+    fn new(module: Module) -> Self {
         LoweringContext {
             module,
             next_id: 0,
