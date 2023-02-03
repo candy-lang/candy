@@ -227,14 +227,15 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Run benchmark
-        run: cargo bench -- --output-format bencher | tee output.txt
+        working-directory: compiler/vm/
+        run: cargo bench -- --output-format bencher | tee benchmark_output.txt
 
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
         with:
           name: Compiler
           tool: cargo
-          output-file-path: output.txt
+          output-file-path: compiler/vm/benchmark_output.txt
           gh-pages-branch: gh-pages
           gh-repository: github.com/candy-lang/benchmark-results
           benchmark-data-dir-path: ./
