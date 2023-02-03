@@ -2440,10 +2440,7 @@ mod parse {
                                     comma: None,
                                 },
                             ],
-                            closing_parenthesis: Box::new(Rcst::TrailingWhitespace {
-                                child: Box::new(Rcst::OpeningParenthesis),
-                                whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                            }),
+                            closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
                         }),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
@@ -2470,10 +2467,7 @@ mod parse {
                                     comma: None,
                                 },
                             ],
-                            closing_parenthesis: Box::new(Rcst::TrailingWhitespace {
-                                child: Box::new(Rcst::OpeningParenthesis),
-                                whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                            }),
+                            closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
                         },
                     )],
                 },
