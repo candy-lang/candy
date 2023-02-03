@@ -12,5 +12,5 @@ These are the compiler stages:
 - MIR ("Mid-Level Intermediate Representation"): A representation with desugaring and explicit tracking of responsibilities. Tailored for applying optimizations.
 
 Note that if an error occurs in a compilation stage, we don't immediately abort but rather just try to contain the error in a subtree of the code and emit an error node.
-This means that even if you have a syntax error (missing parentheses, etc.), the tooling in other parts of the source still works – including auto-completion, edit-time evaluation, formatting, etc.
-You can even _run_ the code – it will simply panic during runtime if it encounters the part with the syntax error.
+This means that even if you have a syntax error (missing parentheses, etc.), the tooling in other parts of the source still works – including auto-completion, edit-time evaluation, formatting, etc.
+You can even _run_ the code – it will simply panic during runtime if it encounters the part with the syntax error.
