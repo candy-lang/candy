@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::{
     ast::{
@@ -14,7 +14,7 @@ use super::{
 };
 use crate::{
     compiler::{
-        ast::{AssignmentBody, List, Match, Struct},
+        ast::{AssignmentBody, List, Match, OrPattern, Struct},
         cst::UnwrapWhitespaceAndComment,
     },
     module::Module,
@@ -675,6 +675,66 @@ impl LoweringContext {
                 );
                 self.wrap_in_errors(cst.id, ast, errors)
             }
+            CstKind::OrPattern { left, right } => {
+                assert_eq!(lowering_type, LoweringType::Pattern);
+                assert!(!right.is_empty());
+
+                let left_ast = self.lower_cst(left, LoweringType::Pattern);
+                let mut patterns = vec![left_ast];
+
+                let right = right.iter().map(|(bar, right)| {
+                    assert!(
+                        matches!(bar.kind, CstKind::Bar),
+                        "Expected a bar after the left side of an or pattern, but found {}.",
+                        bar,
+                    );
+
+                    self.lower_cst(right, LoweringType::Pattern)
+                });
+                patterns.extend(right);
+
+                let mut errors = vec![];
+
+                let captured_identifiers = patterns
+                    .iter()
+                    .map(|it| it.captured_identifiers())
+                    .collect_vec();
+                let all_identifiers =
+                    captured_identifiers
+                        .iter()
+                        .fold(FxHashSet::default(), |mut acc, it| {
+                            acc.extend(it.keys());
+                            acc
+                        });
+                for identifier in all_identifiers {
+                    let number_of_missing_captures = captured_identifiers
+                        .iter()
+                        .filter(|it| !it.contains_key(identifier))
+                        .count();
+                    if number_of_missing_captures == 0 {
+                        continue;
+                    }
+
+                    let empty_vec = vec![];
+                    let all_captures = captured_identifiers
+                        .iter()
+                        .flat_map(|it| it.get(identifier).unwrap_or(&empty_vec))
+                        .filter_map(|it| self.id_mapping.get(it).cloned())
+                        .collect_vec();
+                    errors.push(self.create_error(
+                        left,
+                        AstError::OrPatternIsMissingIdentifiers {
+                            identifier: identifier.to_owned(),
+                            number_of_missing_captures:
+                                number_of_missing_captures.try_into().unwrap(),
+                            all_captures,
+                        },
+                    ))
+                }
+
+                let ast = self.create_ast(cst.id, AstKind::OrPattern(OrPattern(patterns)));
+                self.wrap_in_errors(cst.id, ast, errors)
+            }
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -850,7 +910,7 @@ impl LoweringContext {
             .enumerate()
             .map(|(index, it)| match self.lower_parameter(it) {
                 Ok(parameter) => parameter,
-                Err(error) => {
+                Err(box error) => {
                     errors.push(error);
                     self.create_string(it.id, format!("<invalid#{index}>"))
                 }
@@ -858,11 +918,13 @@ impl LoweringContext {
             .collect();
         (parameters, errors)
     }
-    fn lower_parameter(&mut self, cst: &Cst) -> Result<AstString, CompilerError> {
+    fn lower_parameter(&mut self, cst: &Cst) -> Result<AstString, Box<CompilerError>> {
         if let CstKind::Identifier(identifier) = &cst.kind {
             Ok(self.create_string(cst.id.to_owned(), identifier.clone()))
         } else {
-            Err(self.create_error(cst, AstError::ExpectedParameter))
+            Err(Box::new(
+                self.create_error(cst, AstError::ExpectedParameter),
+            ))
         }
     }
 

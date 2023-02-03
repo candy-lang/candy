@@ -248,6 +248,13 @@ impl RcstToCstExt for Rcst {
                 arrow: Box::new(arrow.to_cst(state)),
                 body: body.to_csts(state),
             },
+            Rcst::OrPattern { left, right } => CstKind::OrPattern {
+                left: Box::new(left.to_cst(state)),
+                right: right
+                    .into_iter()
+                    .map(|(bar, right)| (bar.to_cst(state), right.to_cst(state)))
+                    .collect(),
+            },
             Rcst::Pipe {
                 receiver,
                 bar,

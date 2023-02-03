@@ -287,6 +287,7 @@ pub enum Pattern {
     List(Vec<Pattern>),
     // Keys may not contain `NewIdentifier`.
     Struct(Vec<(Pattern, Pattern)>),
+    Or(Vec<Pattern>),
     Error {
         child: Option<Box<Pattern>>,
         errors: Vec<CompilerError>,
@@ -310,6 +311,9 @@ impl Pattern {
                     key.captured_identifier_count() + value.captured_identifier_count()
                 })
                 .sum(),
+            // If the number or captured identifiers isn't the same in both
+            // sides, the pattern is invalid and the generated code will panic.
+            Pattern::Or(patterns) => patterns.first().unwrap().captured_identifier_count(),
             Pattern::Error { .. } => {
                 // Since generated code panics in this case, it doesn't matter
                 // whether the child captured any identifiers since they can't
@@ -511,6 +515,11 @@ impl fmt::Display for Pattern {
                         .join(", "),
                 )
             }
+            Pattern::Or(patterns) => write!(
+                f,
+                "{}",
+                patterns.iter().map(|it| it.to_string()).join(" | "),
+            ),
             Pattern::Error { child, errors } => {
                 write!(f, "{}", if errors.len() == 1 { "error" } else { "errors" })?;
                 for error in errors {
@@ -631,6 +640,11 @@ impl CollectErrors for Pattern {
                 for (key_pattern, value_pattern) in patterns {
                     key_pattern.collect_errors(errors);
                     value_pattern.collect_errors(errors);
+                }
+            }
+            Pattern::Or(patterns) => {
+                for pattern in patterns {
+                    pattern.collect_errors(errors);
                 }
             }
             Pattern::Error {

@@ -1,4 +1,4 @@
-use super::{ast::AstError, hir::HirError, rcst::RcstError};
+use super::{ast::AstError, cst, hir::HirError, rcst::RcstError};
 use crate::module::Module;
 use std::{fmt::Display, ops::Range};
 
@@ -45,6 +45,7 @@ impl Display for CompilerErrorPayload {
                 RcstError::OpeningParenthesisWithoutExpression => {
                     "Here's an opening parenthesis without an expression after it."
                 }
+                RcstError::OrPatternMissesRight => "This or-pattern misses a right-hand side.",
                 RcstError::ParenthesisNotClosed => "This parenthesis isn't closed.",
                 RcstError::PipeMissesCall => "There should be a call after this pipe.",
                 RcstError::StructFieldMissesColon => "This struct field misses a colon.",
@@ -70,48 +71,66 @@ impl Display for CompilerErrorPayload {
             }
             .to_string(),
             CompilerErrorPayload::Ast(error) => match error {
-                AstError::CallInPattern => "Calls in patterns are not allowed.",
+                AstError::CallInPattern => "Calls in patterns are not allowed.".to_string(),
                 AstError::ExpectedNameOrPatternInAssignment => {
-                    "An assignment should have a name or pattern on the left side."
+                    "An assignment should have a name or pattern on the left side.".to_string()
                 }
-                AstError::ExpectedParameter => "A parameter should come here.",
+                AstError::ExpectedParameter => "A parameter should come here.".to_string(),
                 AstError::LambdaWithoutClosingCurlyBrace => {
-                    "This lambda doesn't have a closing curly brace."
+                    "This lambda doesn't have a closing curly brace.".to_string()
                 }
-                AstError::ListItemWithoutComma => "This list item should be followed by a comma.",
-                AstError::ListWithNonListItem => "This is not a list item.",
+                AstError::ListItemWithoutComma => {
+                    "This list item should be followed by a comma.".to_string()
+                }
+                AstError::ListWithNonListItem => "This is not a list item.".to_string(),
                 AstError::ListWithoutClosingParenthesis => {
-                    "This list doesn't have a closing parenthesis."
+                    "This list doesn't have a closing parenthesis.".to_string()
                 }
-                AstError::ParenthesizedInPattern => "Parentheses are not allowed in patterns.",
+                AstError::OrPatternIsMissingIdentifiers {
+                    identifier,
+                    number_of_missing_captures,
+                    ..
+                } => {
+                    format!(
+                        "`{identifier}` is missing in {number_of_missing_captures} {} of this or-pattern.",
+                        if number_of_missing_captures.get() == 1 { "sub-pattern" } else { "sub-patterns" },
+                    )
+                }
+                AstError::ParenthesizedInPattern => {
+                    "Parentheses are not allowed in patterns.".to_string()
+                }
                 AstError::ParenthesizedWithoutClosingParenthesis => {
                     "This expression is parenthesized, but the closing parenthesis is missing."
+                        .to_string()
                 }
                 AstError::PatternContainsInvalidExpression => {
-                    "This type of expression is not allowed in patterns."
+                    "This type of expression is not allowed in patterns.".to_string()
                 }
                 AstError::PatternLiteralPartContainsInvalidExpression => {
-                    "This type of expression is not allowed in this part of a pattern."
+                    "This type of expression is not allowed in this part of a pattern.".to_string()
                 }
-                AstError::PipeInPattern => "Pipes are not allowed in patterns.",
-                AstError::StructKeyWithoutColon => "This struct key should be followed by a colon.",
+                AstError::PipeInPattern => "Pipes are not allowed in patterns.".to_string(),
+                AstError::StructKeyWithoutColon => {
+                    "This struct key should be followed by a colon.".to_string()
+                }
                 AstError::StructShorthandWithNotIdentifier => {
-                    "Shorthand syntax in structs only supports identifiers."
+                    "Shorthand syntax in structs only supports identifiers.".to_string()
                 }
                 AstError::StructValueWithoutComma => {
-                    "This struct value should be followed by a comma."
+                    "This struct value should be followed by a comma.".to_string()
                 }
-                AstError::StructWithNonStructField => "Structs should only contain struct key.",
+                AstError::StructWithNonStructField => {
+                    "Structs should only contain struct key.".to_string()
+                }
                 AstError::StructWithoutClosingBrace => {
-                    "This struct doesn't have a closing bracket."
+                    "This struct doesn't have a closing bracket.".to_string()
                 }
-                AstError::TextWithoutClosingQuote => "This text never ends.",
+                AstError::TextWithoutClosingQuote => "This text never ends.".to_string(),
                 AstError::TextInterpolationWithoutClosingCurlyBraces => {
-                    "This text interpolation never ends."
+                    "This text interpolation never ends.".to_string()
                 }
-                AstError::UnexpectedPunctuation => "This punctuation was unexpected.",
-            }
-            .to_string(),
+                AstError::UnexpectedPunctuation => "This punctuation was unexpected.".to_string(),
+            },
             CompilerErrorPayload::Hir(error) => match error {
                 HirError::NeedsWithWrongNumberOfArguments { num_args } => {
                     format!("`needs` accepts one or two arguments, but was called with {num_args} arguments. Its parameters are the `condition` and an optional `message`.")
@@ -126,5 +145,25 @@ impl Display for CompilerErrorPayload {
             },
         };
         write!(f, "{message}")
+    }
+}
+impl CompilerError {
+    pub fn to_related_information(&self) -> Vec<(Module, cst::Id, String)> {
+        match &self.payload {
+            CompilerErrorPayload::Ast(AstError::OrPatternIsMissingIdentifiers {
+                all_captures,
+                ..
+            }) => all_captures
+                .iter()
+                .map(|capture| {
+                    (
+                        self.module.clone(),
+                        capture.to_owned(),
+                        "The identifier is bound here.".to_string(),
+                    )
+                })
+                .collect(),
+            _ => vec![],
+        }
     }
 }

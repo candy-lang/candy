@@ -1,7 +1,7 @@
 use super::{
     ast::{
-        self, Assignment, Ast, AstKind, AstString, Call, Identifier, Int, List, MatchCase, Struct,
-        StructAccess, Symbol, Text, TextPart,
+        self, Assignment, Ast, AstKind, AstString, Call, Identifier, Int, List, MatchCase,
+        OrPattern, Struct, StructAccess, Symbol, Text, TextPart,
     },
     cst::{self, CstDb},
     cst_to_ast::CstToAst,
@@ -347,6 +347,9 @@ impl<'a> Context<'a> {
             }
             AstKind::MatchCase(_) => {
                 unreachable!("Match cases should be handled in match directly.")
+            }
+            AstKind::OrPattern(_) => {
+                unreachable!("Or patterns should be handled in `PatternContext`.")
             }
             AstKind::Error { child, errors } => {
                 let child = child.as_ref().map(|child| self.compile_single(child));
@@ -820,6 +823,13 @@ impl PatternContext {
                 unreachable!(
                     "AST pattern can't contain struct access, lambda, call, assignment, match, or match case."
                 )
+            }
+            AstKind::OrPattern(OrPattern(patterns)) => {
+                let patterns = patterns
+                    .iter()
+                    .map(|pattern| self.compile_pattern(pattern))
+                    .collect();
+                Pattern::Or(patterns)
             }
             AstKind::Error { child, errors, .. } => {
                 let child = child

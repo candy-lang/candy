@@ -611,6 +611,27 @@ impl<'a> PatternLoweringContext<'a> {
                     self.compile_match_conjunction(body, condition_builders);
                 })
             }
+            hir::Pattern::Or(patterns) => {
+                let [first_pattern, rest_patterns @ ..] = patterns.as_slice() else {
+                    panic!("Or pattern must contain at least two patterns.");
+                };
+
+                let mut result = self.compile(body, expression, first_pattern);
+                for pattern in rest_patterns {
+                    let is_match = body.push_is_match(result, self.responsible);
+                    result = body.push_if_else(
+                        is_match,
+                        |body| {
+                            body.push_reference(result);
+                        },
+                        |body| {
+                            self.compile(body, expression, pattern);
+                        },
+                        self.responsible,
+                    );
+                }
+                result
+            }
             hir::Pattern::Error { child, errors } => {
                 let result = body.compile_errors(self.db, self.responsible, errors);
                 if let Some(child) = child {
@@ -720,6 +741,7 @@ impl<'a> PatternLoweringContext<'a> {
             hir::Pattern::Symbol(symbol) => body.push_symbol(symbol.to_owned()),
             hir::Pattern::List(_) => panic!("Lists can't be used in this part of a pattern."),
             hir::Pattern::Struct(_) => panic!("Structs can't be used in this part of a pattern."),
+            hir::Pattern::Or(_) => panic!("Or-patterns can't be used in this part of a pattern."),
             hir::Pattern::Error { errors, .. } => {
                 body.compile_errors(self.db, self.responsible, errors)
             }
