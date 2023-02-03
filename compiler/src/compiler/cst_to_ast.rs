@@ -147,7 +147,7 @@ impl LoweringContext {
                 panic!("Whitespace should have been removed before lowering to AST.")
             }
             CstKind::Identifier(identifier) => {
-                let string = self.create_string_without_id_mapping(identifier.to_string());
+                let string = self.create_string(cst.id, identifier.to_string());
                 let mut kind = AstKind::Identifier(Identifier(string));
                 if lowering_type == LoweringType::PatternLiteralPart {
                     kind = AstKind::Error {
@@ -161,7 +161,7 @@ impl LoweringContext {
                 self.create_ast(cst.id, kind)
             }
             CstKind::Symbol(symbol) => {
-                let string = self.create_string_without_id_mapping(symbol.to_string());
+                let string = self.create_string(cst.id, symbol.to_string());
                 self.create_ast(cst.id, AstKind::Symbol(Symbol(string)))
             }
             CstKind::Int { value, .. } => self.create_ast(cst.id, AstKind::Int(Int(value.clone()))),
@@ -191,7 +191,7 @@ impl LoweringContext {
                 for part in parts {
                     match &part.kind {
                         CstKind::TextPart(text) => {
-                            let string = self.create_string_without_id_mapping(text.clone());
+                            let string = self.create_string(part.id, text.clone());
                             let text_part =
                                 self.create_ast(part.id, AstKind::TextPart(TextPart(string)));
                             lowered_parts.push(text_part);
@@ -875,12 +875,6 @@ impl LoweringContext {
     fn create_string(&mut self, cst_id: cst::Id, value: String) -> AstString {
         AstString {
             id: self.create_next_id(cst_id),
-            value,
-        }
-    }
-    fn create_string_without_id_mapping(&mut self, value: String) -> AstString {
-        AstString {
-            id: self.create_next_id_without_mapping(),
             value,
         }
     }
