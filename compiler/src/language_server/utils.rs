@@ -125,7 +125,12 @@ pub fn offset_from_lsp_raw(text: &str, line_start_offsets: &[usize], position: P
 }
 
 fn offset_to_lsp(db: &dyn LspPositionConversion, module: Module, mut offset: usize) -> (u32, u32) {
-    let text = db.get_module_content_as_string(module.clone()).unwrap();
+    let Some(text) = db.get_module_content_as_string(module.clone()) else {
+        // If the parsing failed, the parser only emitted an RCST error node
+        // saying that the file contains invalid UTF-8. In that case, we can
+        // just display this error at the beginning of the file.
+        return (0, 0);
+    };
     if offset > text.len() {
         offset = text.len();
     }
