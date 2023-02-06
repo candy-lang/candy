@@ -9,6 +9,7 @@ use crate::{
     cst::{self, Cst, CstDb, CstKind, UnwrapWhitespaceAndComment},
     error::{CompilerError, CompilerErrorPayload},
     module::Module,
+    position::Offset,
     rcst_to_cst::RcstToCst,
     string_to_rcst::InvalidModuleError,
     utils::AdjustCasingOfFirstLetter,
@@ -19,8 +20,8 @@ use tracing::warn;
 #[salsa::query_group(CstToAstStorage)]
 pub trait CstToAst: CstDb + RcstToCst {
     fn ast_to_cst_id(&self, id: ast::Id) -> Option<cst::Id>;
-    fn ast_id_to_span(&self, id: ast::Id) -> Option<Range<usize>>;
-    fn ast_id_to_display_span(&self, id: ast::Id) -> Option<Range<usize>>;
+    fn ast_id_to_span(&self, id: ast::Id) -> Option<Range<Offset>>;
+    fn ast_id_to_display_span(&self, id: ast::Id) -> Option<Range<Offset>>;
 
     fn cst_to_ast_id(&self, module: Module, id: cst::Id) -> Option<ast::Id>;
 
@@ -33,11 +34,11 @@ fn ast_to_cst_id(db: &dyn CstToAst, id: ast::Id) -> Option<cst::Id> {
     let (_, ast_to_cst_id_mapping) = db.ast(id.module.clone()).unwrap();
     ast_to_cst_id_mapping.get(&id).cloned()
 }
-fn ast_id_to_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<usize>> {
+fn ast_id_to_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<Offset>> {
     let cst_id = db.ast_to_cst_id(id.clone())?;
     Some(db.find_cst(id.module, cst_id).span)
 }
-fn ast_id_to_display_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<usize>> {
+fn ast_id_to_display_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<Offset>> {
     let cst_id = db.ast_to_cst_id(id.clone())?;
     Some(db.find_cst(id.module, cst_id).display_span())
 }
@@ -73,7 +74,7 @@ fn ast(db: &dyn CstToAst, module: Module) -> Option<AstResult> {
                     child: None,
                     errors: vec![CompilerError {
                         module,
-                        span: 0..0,
+                        span: Offset(0)..Offset(0),
                         payload: CompilerErrorPayload::InvalidUtf8,
                     }],
                 },

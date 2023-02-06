@@ -1,7 +1,7 @@
 use num_bigint::BigUint;
 
 use super::{rcst::RcstError, rcst_to_cst::RcstToCst};
-use crate::module::Module;
+use crate::{module::Module, position::Offset};
 use std::{
     fmt::{self, Display, Formatter},
     ops::{Deref, Range},
@@ -10,16 +10,16 @@ use std::{
 #[salsa::query_group(CstDbStorage)]
 pub trait CstDb: RcstToCst {
     fn find_cst(&self, module: Module, id: Id) -> Cst;
-    fn find_cst_by_offset(&self, module: Module, offset: usize) -> Cst;
+    fn find_cst_by_offset(&self, module: Module, offset: Offset) -> Cst;
 }
 
 fn find_cst(db: &dyn CstDb, module: Module, id: Id) -> Cst {
     db.cst(module).unwrap().find(&id).unwrap().to_owned()
 }
-fn find_cst_by_offset(db: &dyn CstDb, module: Module, offset: usize) -> Cst {
+fn find_cst_by_offset(db: &dyn CstDb, module: Module, offset: Offset) -> Cst {
     db.cst(module)
         .unwrap()
-        .find_by_offset(&offset)
+        .find_by_offset(offset)
         .unwrap()
         .to_owned()
 }
@@ -35,7 +35,7 @@ impl Display for Id {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Cst {
     pub id: Id,
-    pub span: Range<usize>,
+    pub span: Range<Offset>,
     pub kind: CstKind,
 }
 
@@ -402,7 +402,7 @@ impl Cst {
     ///
     /// For example, if a call contains errors, we want to only underline the
     /// name of the called function itself, not everything including arguments.
-    pub fn display_span(&self) -> Range<usize> {
+    pub fn display_span(&self) -> Range<Offset> {
         match &self.kind {
             CstKind::TrailingWhitespace { child, .. } => child.display_span(),
             CstKind::Call { receiver, .. } => receiver.display_span(),
@@ -640,8 +640,8 @@ trait TreeWithIds {
     fn first_id(&self) -> Option<Id>;
     fn find(&self, id: &Id) -> Option<&Cst>;
 
-    fn first_offset(&self) -> Option<usize>;
-    fn find_by_offset(&self, offset: &usize) -> Option<&Cst>;
+    fn first_offset(&self) -> Option<Offset>;
+    fn find_by_offset(&self, offset: Offset) -> Option<&Cst>;
 }
 impl TreeWithIds for Cst {
     fn first_id(&self) -> Option<Id> {
@@ -810,10 +810,10 @@ impl TreeWithIds for Cst {
         }
     }
 
-    fn first_offset(&self) -> Option<usize> {
+    fn first_offset(&self) -> Option<Offset> {
         Some(self.span.start)
     }
-    fn find_by_offset(&self, offset: &usize) -> Option<&Cst> {
+    fn find_by_offset(&self, offset: Offset) -> Option<&Cst> {
         let (inner, is_end_inclusive) = match &self.kind {
             CstKind::EqualsSign
             | CstKind::Comma
@@ -960,7 +960,7 @@ impl TreeWithIds for Cst {
         };
 
         inner.or_else(|| {
-            if self.span.contains(offset) || (is_end_inclusive && &self.span.end == offset) {
+            if self.span.contains(&offset) || (is_end_inclusive && self.span.end == offset) {
                 Some(self)
             } else {
                 None
@@ -976,10 +976,10 @@ impl<T: TreeWithIds> TreeWithIds for Option<T> {
         self.as_ref().and_then(|it| it.find(id))
     }
 
-    fn first_offset(&self) -> Option<usize> {
+    fn first_offset(&self) -> Option<Offset> {
         self.as_ref().and_then(|it| it.first_offset())
     }
-    fn find_by_offset(&self, offset: &usize) -> Option<&Cst> {
+    fn find_by_offset(&self, offset: Offset) -> Option<&Cst> {
         self.as_ref().and_then(|it| it.find_by_offset(offset))
     }
 }
@@ -991,10 +991,10 @@ impl<T: TreeWithIds> TreeWithIds for Box<T> {
         self.as_ref().find(id)
     }
 
-    fn first_offset(&self) -> Option<usize> {
+    fn first_offset(&self) -> Option<Offset> {
         self.as_ref().first_offset()
     }
-    fn find_by_offset(&self, offset: &usize) -> Option<&Cst> {
+    fn find_by_offset(&self, offset: Offset) -> Option<&Cst> {
         self.as_ref().find_by_offset(offset)
     }
 }
@@ -1014,16 +1014,16 @@ impl<T: TreeWithIds> TreeWithIds for [T] {
         self[child_index].find(id)
     }
 
-    fn first_offset(&self) -> Option<usize> {
+    fn first_offset(&self) -> Option<Offset> {
         self.iter()
             .map(|it| it.first_offset())
             .filter_map(Some)
             .next()
             .flatten()
     }
-    fn find_by_offset(&self, offset: &usize) -> Option<&Cst> {
+    fn find_by_offset(&self, offset: Offset) -> Option<&Cst> {
         let child_index = self
-            .binary_search_by_key(offset, |it| it.first_offset().unwrap())
+            .binary_search_by_key(&offset, |it| it.first_offset().unwrap())
             .or_else(|err| if err == 0 { Err(()) } else { Ok(err - 1) })
             .ok()?;
         self[child_index].find_by_offset(offset)

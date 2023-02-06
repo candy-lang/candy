@@ -2,7 +2,7 @@ use candy_frontend::{
     cst::CstDb,
     error::CompilerError,
     module::{Module, ModuleDb, ModuleKind, Package},
-    position::{line_start_offsets_raw, PositionConversionDb},
+    position::{line_start_offsets_raw, Offset, PositionConversionDb},
 };
 use itertools::Itertools;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Url};
@@ -84,7 +84,7 @@ pub fn module_to_url(module: Module) -> Option<Url> {
 
 // UTF-8 Byte Offset ↔ LSP Position/Range
 
-pub fn lsp_range_to_range_raw(text: &str, range: lsp_types::Range) -> Range<usize> {
+pub fn lsp_range_to_range_raw(text: &str, range: lsp_types::Range) -> Range<Offset> {
     let line_start_offsets = line_start_offsets_raw(text);
     let start = lsp_position_to_offset_raw(text, &line_start_offsets, range.start);
     let end = lsp_position_to_offset_raw(text, &line_start_offsets, range.end);
@@ -92,17 +92,17 @@ pub fn lsp_range_to_range_raw(text: &str, range: lsp_types::Range) -> Range<usiz
 }
 fn lsp_position_to_offset_raw(
     text: &str,
-    line_start_offsets: &[usize],
+    line_start_offsets: &[Offset],
     position: Position,
-) -> usize {
+) -> Offset {
     let line_offset = line_start_offsets[position.line as usize];
     let line_length = if position.line as usize == line_start_offsets.len() - 1 {
-        text.len() - line_offset
+        text.len() - *line_offset
     } else {
-        line_start_offsets[(position.line + 1) as usize] - line_offset
+        *line_start_offsets[(position.line + 1) as usize] - *line_offset
     };
 
-    let line = &text[line_offset..line_offset + line_length];
+    let line = &text[*line_offset..*line_offset + line_length];
 
     let words = line.encode_utf16().collect::<Vec<_>>();
     let char_offset = if position.character as usize >= words.len() {
@@ -113,31 +113,31 @@ fn lsp_position_to_offset_raw(
             .len()
     };
 
-    line_offset + char_offset
+    Offset(*line_offset + char_offset)
 }
 pub trait LspPositionConversion {
-    fn lsp_position_to_offset(&self, module: Module, position: Position) -> usize;
+    fn lsp_position_to_offset(&self, module: Module, position: Position) -> Offset;
 
-    fn range_to_lsp_range(&self, module: Module, range: Range<usize>) -> lsp_types::Range;
-    fn offset_to_lsp_position(&self, module: Module, offset: usize) -> Position;
+    fn range_to_lsp_range(&self, module: Module, range: Range<Offset>) -> lsp_types::Range;
+    fn offset_to_lsp_position(&self, module: Module, offset: Offset) -> Position;
 }
 impl<DB: ModuleDb + PositionConversionDb + ?Sized> LspPositionConversion for DB {
-    fn lsp_position_to_offset(&self, module: Module, position: Position) -> usize {
+    fn lsp_position_to_offset(&self, module: Module, position: Position) -> Offset {
         let text = self.get_module_content_as_string(module.clone()).unwrap();
         let line_start_offsets = self.line_start_offsets(module);
         lsp_position_to_offset_raw(&text, &line_start_offsets, position)
     }
 
-    fn range_to_lsp_range(&self, module: Module, range: Range<usize>) -> lsp_types::Range {
+    fn range_to_lsp_range(&self, module: Module, range: Range<Offset>) -> lsp_types::Range {
         lsp_types::Range {
             start: self.offset_to_lsp_position(module.clone(), range.start),
             end: self.offset_to_lsp_position(module, range.end),
         }
     }
-    fn offset_to_lsp_position(&self, module: Module, mut offset: usize) -> Position {
+    fn offset_to_lsp_position(&self, module: Module, mut offset: Offset) -> Position {
         let text = self.get_module_content_as_string(module.clone()).unwrap();
-        if offset > text.len() {
-            offset = text.len();
+        if *offset > text.len() {
+            *offset = text.len();
         }
         let line_start_offsets = self.line_start_offsets(module);
 
@@ -146,7 +146,7 @@ impl<DB: ModuleDb + PositionConversionDb + ?Sized> LspPositionConversion for DB 
             .unwrap_or_else(|i| i - 1);
 
         let line_start = line_start_offsets[line];
-        let character_utf16_offset = text[line_start..offset.to_owned()].encode_utf16().count();
+        let character_utf16_offset = text[*line_start..*offset].encode_utf16().count();
         Position {
             line: line as u32,
             character: character_utf16_offset as u32,

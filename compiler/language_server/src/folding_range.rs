@@ -3,7 +3,7 @@ use std::ops::Range;
 use candy_frontend::{
     cst::{Cst, CstKind, UnwrapWhitespaceAndComment},
     module::{Module, ModuleDb},
-    position::PositionConversionDb,
+    position::{Offset, PositionConversionDb},
     rcst_to_cst::RcstToCst,
 };
 use lsp_types::{FoldingRange, FoldingRangeKind};
@@ -206,7 +206,7 @@ where
         }
     }
 
-    fn push(&mut self, range: Range<usize>, kind: FoldingRangeKind) {
+    fn push(&mut self, range: Range<Offset>, kind: FoldingRangeKind) {
         let range = self.db.range_to_lsp_range(self.module.clone(), range);
         self.ranges.push(FoldingRange {
             start_line: range.start.line,

@@ -10,6 +10,7 @@ use crate::{
     hir::{self, Body, Expression, HirError, Lambda, Pattern, PatternIdentifierId},
     id::IdGenerator,
     module::Module,
+    position::Offset,
     utils::AdjustCasingOfFirstLetter,
 };
 use itertools::Itertools;
@@ -20,8 +21,8 @@ use std::{mem, ops::Range, sync::Arc};
 pub trait AstToHir: CstDb + CstToAst {
     fn hir_to_ast_id(&self, id: hir::Id) -> Option<ast::Id>;
     fn hir_to_cst_id(&self, id: hir::Id) -> Option<cst::Id>;
-    fn hir_id_to_span(&self, id: hir::Id) -> Option<Range<usize>>;
-    fn hir_id_to_display_span(&self, id: hir::Id) -> Option<Range<usize>>;
+    fn hir_id_to_span(&self, id: hir::Id) -> Option<Range<Offset>>;
+    fn hir_id_to_display_span(&self, id: hir::Id) -> Option<Range<Offset>>;
 
     fn ast_to_hir_id(&self, id: ast::Id) -> Option<hir::Id>;
     fn cst_to_hir_id(&self, module: Module, id: cst::Id) -> Option<hir::Id>;
@@ -37,10 +38,10 @@ fn hir_to_ast_id(db: &dyn AstToHir, id: hir::Id) -> Option<ast::Id> {
 fn hir_to_cst_id(db: &dyn AstToHir, id: hir::Id) -> Option<cst::Id> {
     db.ast_to_cst_id(db.hir_to_ast_id(id)?)
 }
-fn hir_id_to_span(db: &dyn AstToHir, id: hir::Id) -> Option<Range<usize>> {
+fn hir_id_to_span(db: &dyn AstToHir, id: hir::Id) -> Option<Range<Offset>> {
     db.ast_id_to_span(db.hir_to_ast_id(id)?)
 }
-fn hir_id_to_display_span(db: &dyn AstToHir, id: hir::Id) -> Option<Range<usize>> {
+fn hir_id_to_display_span(db: &dyn AstToHir, id: hir::Id) -> Option<Range<Offset>> {
     let cst_id = db.hir_to_cst_id(id.clone())?;
     Some(db.find_cst(id.module, cst_id).display_span())
 }
@@ -556,7 +557,8 @@ impl<'a> Context<'a> {
                                             .get_module_content_as_string(
                                                 call.arguments[0].id.module.clone()
                                             )
-                                            .unwrap()[span],
+                                            .unwrap()
+                                            [*span.start..*span.end],
                                     ),
                                     None => "the needs of a function were not met".to_string(),
                                 },
@@ -622,7 +624,7 @@ impl<'a> Context<'a> {
         &mut self,
         ast_id: Option<ast::Id>,
         module: Module,
-        span: Range<usize>,
+        span: Range<Offset>,
         error: HirError,
     ) -> hir::Id {
         self.push(

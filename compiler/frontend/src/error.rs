@@ -1,11 +1,11 @@
 use super::{ast::AstError, cst, hir::HirError, rcst::RcstError};
-use crate::module::Module;
+use crate::{module::Module, position::Offset};
 use std::{fmt::Display, ops::Range};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct CompilerError {
     pub module: Module,
-    pub span: Range<usize>,
+    pub span: Range<Offset>,
     pub payload: CompilerErrorPayload,
 }
 impl Display for CompilerError {
@@ -13,7 +13,7 @@ impl Display for CompilerError {
         write!(
             f,
             "{} span({} – {}): {}",
-            self.module, self.span.start, self.span.end, self.payload,
+            self.module, *self.span.start, *self.span.end, self.payload,
         )
     }
 }

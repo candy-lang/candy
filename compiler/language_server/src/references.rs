@@ -2,7 +2,7 @@ use candy_frontend::{
     cst::{CstDb, CstKind},
     hir::{self, Body, Expression, HirDb, Lambda},
     module::{Module, ModuleDb, ModuleKind},
-    position::PositionConversionDb,
+    position::{Offset, PositionConversionDb},
 };
 use lsp_types::{
     DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams, Location, ReferenceParams,
@@ -73,7 +73,7 @@ where
     Some(db.references(query, include_declaration))
 }
 
-fn query_for_offset<DB: CstDb>(db: &DB, module: Module, offset: usize) -> Option<ReferenceQuery>
+fn query_for_offset<DB: CstDb>(db: &DB, module: Module, offset: Offset) -> Option<ReferenceQuery>
 where
     DB: HirDb,
 {

@@ -3,7 +3,7 @@ use super::{
     rcst::Rcst,
     string_to_rcst::{InvalidModuleError, StringToRcst},
 };
-use crate::module::Module;
+use crate::{module::Module, position::Offset};
 use std::sync::Arc;
 
 #[salsa::query_group(RcstToCstStorage)]
@@ -15,7 +15,7 @@ fn cst(db: &dyn RcstToCst, module: Module) -> Result<Arc<Vec<Cst>>, InvalidModul
     let rcsts = db.rcst(module)?;
 
     let mut state = State {
-        offset: 0,
+        offset: Offset(0),
         next_id: 0,
     };
     let csts = (*rcsts).clone().to_csts(&mut state);
@@ -24,7 +24,7 @@ fn cst(db: &dyn RcstToCst, module: Module) -> Result<Arc<Vec<Cst>>, InvalidModul
 }
 
 struct State {
-    offset: usize,
+    offset: Offset,
     next_id: usize,
 }
 
@@ -48,79 +48,79 @@ impl RcstToCstExt for Rcst {
     fn to_cst_kind(self, state: &mut State) -> CstKind {
         match self {
             Rcst::EqualsSign => {
-                state.offset += 1;
+                *state.offset += 1;
                 CstKind::EqualsSign
             }
             Rcst::Comma => {
-                state.offset += 1;
+                *state.offset += 1;
                 CstKind::Comma
             }
             Rcst::Dot => {
-                state.offset += 1;
+                *state.offset += 1;
                 CstKind::Dot
             }
             Rcst::Colon => {
-                state.offset += 1;
+                *state.offset += 1;
                 CstKind::Colon
             }
             Rcst::ColonEqualsSign => {
-                state.offset += 2;
+                *state.offset += 2;
                 CstKind::ColonEqualsSign
             }
             Rcst::Bar => {
-                state.offset += 1;
+                *state.offset += 1;
                 CstKind::Bar
             }
             Rcst::OpeningParenthesis => {
-                state.offset += 1;
+                *state.offset += 1;
                 CstKind::OpeningParenthesis
             }
             Rcst::ClosingParenthesis => {
-                state.offset += 1;
+                *state.offset += 1;
                 CstKind::ClosingParenthesis
             }
             Rcst::OpeningBracket => {
-                state.offset += 1;
+                *state.offset += 1;
                 CstKind::OpeningBracket
             }
             Rcst::ClosingBracket => {
-                state.offset += 1;
+                *state.offset += 1;
                 CstKind::ClosingBracket
             }
             Rcst::OpeningCurlyBrace => {
-                state.offset += 1;
+                *state.offset += 1;
                 CstKind::OpeningCurlyBrace
             }
             Rcst::ClosingCurlyBrace => {
-                state.offset += 1;
+                *state.offset += 1;
                 CstKind::ClosingCurlyBrace
             }
             Rcst::Arrow => {
-                state.offset += 2;
+                *state.offset += 2;
                 CstKind::Arrow
             }
             Rcst::SingleQuote => {
-                state.offset += 1;
+                *state.offset += 1;
                 CstKind::SingleQuote
             }
             Rcst::DoubleQuote => {
-                state.offset += 1;
+                *state.offset += 1;
                 CstKind::DoubleQuote
             }
             Rcst::Percent => {
-                state.offset += 1;
+                *state.offset += 1;
                 CstKind::Percent
             }
             Rcst::Octothorpe => {
-                state.offset += 1;
+                *state.offset += 1;
                 CstKind::Octothorpe
             }
             Rcst::Whitespace(whitespace) => {
-                state.offset += whitespace.len();
+                *state.offset += whitespace.len();
                 CstKind::Whitespace(whitespace)
             }
             Rcst::Newline(newline) => {
-                state.offset += newline.len();
+                *state.offset += newline.len();
                 CstKind::Newline(newline)
             }
             Rcst::Comment {
@@ -128,7 +128,7 @@ impl RcstToCstExt for Rcst {
                 comment,
             } => {
                 let octothorpe = octothorpe.to_cst(state);
-                state.offset += comment.len();
+                *state.offset += comment.len();
                 CstKind::Comment {
                     octothorpe: Box::new(octothorpe),
                     comment,
@@ -139,15 +139,15 @@ impl RcstToCstExt for Rcst {
                 whitespace: whitespace.to_csts(state),
             },
             Rcst::Identifier(identifier) => {
-                state.offset += identifier.len();
+                *state.offset += identifier.len();
                 CstKind::Identifier(identifier)
             }
             Rcst::Symbol(symbol) => {
-                state.offset += symbol.len();
+                *state.offset += symbol.len();
                 CstKind::Symbol(symbol)
             }
             Rcst::Int { value, string } => {
-                state.offset += string.len();
+                *state.offset += string.len();
                 CstKind::Int { value, string }
             }
             Rcst::OpeningText {
@@ -174,7 +174,7 @@ impl RcstToCstExt for Rcst {
                 closing: Box::new(closing.to_cst(state)),
             },
             Rcst::TextPart(text) => {
-                state.offset += text.len();
+                *state.offset += text.len();
                 CstKind::TextPart(text)
             }
             Rcst::TextInterpolation {
@@ -301,7 +301,7 @@ impl RcstToCstExt for Rcst {
                 unparsable_input,
                 error,
             } => {
-                state.offset += unparsable_input.len();
+                *state.offset += unparsable_input.len();
                 CstKind::Error {
                     unparsable_input,
                     error,

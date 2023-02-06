@@ -359,9 +359,9 @@ fn apply_text_changes(
                 let range = lsp_range_to_range_raw(&text, range);
                 text = format!(
                     "{}{}{}",
-                    &text[..range.start],
+                    &text[..*range.start],
                     &change.text,
-                    &text[range.end..],
+                    &text[*range.end..],
                 );
             }
             None => text = change.text,

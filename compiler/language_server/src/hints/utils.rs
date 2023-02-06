@@ -19,8 +19,8 @@ where
         let last_characer_of_line = if line as usize == line_start_offsets.len() - 1 {
             self.get_module_content(id.module.clone()).unwrap().len()
         } else {
-            line_start_offsets[(line + 1) as usize] - 1
+            *line_start_offsets[(line + 1) as usize] - 1
         };
-        Some(self.offset_to_lsp_position(id.module, last_characer_of_line))
+        Some(self.offset_to_lsp_position(id.module, last_characer_of_line.into()))
     }
 }

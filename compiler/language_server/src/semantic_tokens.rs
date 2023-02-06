@@ -1,7 +1,7 @@
 use candy_frontend::{
     cst::{Cst, CstKind},
     module::{Module, ModuleDb},
-    position::PositionConversionDb,
+    position::{Offset, PositionConversionDb},
     rcst_to_cst::RcstToCst,
 };
 use lazy_static::lazy_static;
@@ -85,7 +85,7 @@ where
             cursor: Position::new(0, 0),
         }
     }
-    fn add_token(&mut self, range: Range<usize>, type_: SemanticTokenType) {
+    fn add_token(&mut self, range: Range<Offset>, type_: SemanticTokenType) {
         // Reduce the token to multiple single-line tokens.
 
         let mut range = self.db.range_to_lsp_range(self.module.clone(), range);
@@ -95,8 +95,8 @@ where
             while range.start.line != range.end.line {
                 assert!(range.start.line < range.end.line);
 
-                let line_length = line_start_offsets[(range.start.line as usize) + 1]
-                    - line_start_offsets[range.start.line as usize]
+                let line_length = *line_start_offsets[(range.start.line as usize) + 1]
+                    - *line_start_offsets[range.start.line as usize]
                     - 1;
                 self.add_single_line_token(range.start, line_length as u32, type_);
                 range.start = Position {
