@@ -119,17 +119,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "candy_compiler_fuzzer"
-version = "0.0.0"
-dependencies = [
- "candy_frontend",
- "candy_vm",
- "lazy_static",
- "libfuzzer-sys",
- "salsa",
-]
-
-[[package]]
 name = "candy_frontend"
 version = "0.1.0"
 dependencies = [
@@ -202,6 +191,17 @@ dependencies = [
  "tracing",
  "unicode-segmentation",
  "walkdir",
+]
+
+[[package]]
+name = "candy_vm_fuzzer"
+version = "0.0.0"
+dependencies = [
+ "candy_frontend",
+ "candy_vm",
+ "lazy_static",
+ "libfuzzer-sys",
+ "salsa",
 ]
 
 [[package]]

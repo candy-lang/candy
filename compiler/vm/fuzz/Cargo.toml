@@ -1,5 +1,5 @@
 [package]
-name = "candy_compiler_fuzzer"
+name = "candy_vm_fuzzer"
 version = "0.0.0"
 publish = false
 edition = "2021"
