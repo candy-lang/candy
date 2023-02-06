@@ -1215,7 +1215,7 @@ mod parse {
         fn parse(self, input: &str, indentation: usize) -> Option<(&str, Rcst)> {
             match self {
                 ParseType::Expression => expression(input, indentation, false, true, true),
-                ParseType::Pattern => pattern(input, indentation),
+                ParseType::Pattern => pattern(input, indentation, true),
             }
         }
     }
@@ -2363,19 +2363,115 @@ mod parse {
     }
 
     #[instrument(level = "trace")]
-    fn pattern(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
-        int(input)
+    fn pattern(input: &str, indentation: usize, allow_or: bool) -> Option<(&str, Rcst)> {
+        let (mut input, mut result) = int(input)
             .or_else(|| text(input, indentation))
             .or_else(|| symbol(input))
             .or_else(|| list(input, indentation, ParseType::Pattern))
             .or_else(|| struct_(input, indentation, ParseType::Pattern))
-            .or_else(|| identifier(input))
+            .or_else(|| identifier(input))?;
+
+        loop {
+            let (new_input, whitespace_after_left) =
+                whitespaces_and_newlines(input, indentation, true);
+
+            let Some((new_input, bar)) = bar(new_input) else { break };
+            let (new_input, whitespace_after_bar) =
+                whitespaces_and_newlines(new_input, indentation + 1, true);
+            let bar = bar.wrap_in_whitespace(whitespace_after_bar);
+
+            let indentation = if bar.is_multiline() {
+                indentation + 1
+            } else {
+                indentation
+            };
+            let (new_input, new_right) =
+                pattern(new_input, indentation, false).unwrap_or_else(|| {
+                    let error = Rcst::Error {
+                        unparsable_input: "".to_string(),
+                        error: RcstError::OrPatternMissesRight,
+                    };
+                    (new_input, error)
+                });
+
+            input = new_input;
+            if let Rcst::OrPattern { right, .. } = &mut result {
+                let (previous_bar, previous_right) = right.pop().unwrap();
+                let previous_right = previous_right.wrap_in_whitespace(whitespace_after_left);
+                right.push((previous_bar, previous_right));
+
+                right.push((bar, new_right))
+            } else {
+                result = Rcst::OrPattern {
+                    left: Box::new(result.wrap_in_whitespace(whitespace_after_left)),
+                    right: vec![(bar, new_right)],
+                };
+            }
+        }
+        Some((input, result))
     }
     #[test]
     fn test_pattern() {
         assert_eq!(
-            pattern("foo", 0),
+            pattern("foo", 0, true),
             Some(("", Rcst::Identifier("foo".to_string())))
+        );
+        assert_eq!(
+            pattern("(0, foo) | (foo, 0)", 0, true),
+            Some((
+                "",
+                Rcst::OrPattern {
+                    left: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::List {
+                            opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
+                            items: vec![
+                                Rcst::TrailingWhitespace {
+                                    child: Box::new(Rcst::ListItem {
+                                        value: Box::new(Rcst::Int {
+                                            value: 0u8.into(),
+                                            string: "0".to_string(),
+                                        }),
+                                        comma: Some(Box::new(Rcst::Comma)),
+                                    }),
+                                    whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                                },
+                                Rcst::ListItem {
+                                    value: Box::new(Rcst::Identifier("foo".to_string())),
+                                    comma: None,
+                                },
+                            ],
+                            closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
+                        }),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    right: vec![(
+                        Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::Bar),
+                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                        },
+                        Rcst::List {
+                            opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
+                            items: vec![
+                                Rcst::TrailingWhitespace {
+                                    child: Box::new(Rcst::ListItem {
+                                        value: Box::new(Rcst::Identifier("foo".to_string())),
+                                        comma: Some(Box::new(Rcst::Comma)),
+                                    }),
+                                    whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                                },
+                                Rcst::ListItem {
+                                    value: Box::new(Rcst::Int {
+                                        value: 0u8.into(),
+                                        string: "0".to_string(),
+                                    }),
+                                    comma: None,
+                                },
+                            ],
+                            closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
+                        },
+                    )],
+                },
+            )),
         );
     }
 
@@ -2526,7 +2622,7 @@ mod parse {
 
     #[instrument(level = "trace")]
     fn match_case(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
-        let (input, pattern) = pattern(input, indentation)?;
+        let (input, pattern) = pattern(input, indentation, true)?;
         let (input, whitespace) = whitespaces_and_newlines(input, indentation, true);
         let pattern = pattern.wrap_in_whitespace(whitespace);
 
@@ -2784,7 +2880,7 @@ mod parse {
     #[instrument(level = "trace")]
     fn assignment(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
         let (input, mut signature) = run_of_expressions(input, indentation).or_else(|| {
-            pattern(input, indentation).map(|(input, pattern)| (input, vec![pattern]))
+            pattern(input, indentation, true).map(|(input, pattern)| (input, vec![pattern]))
         })?;
 
         let (input, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);

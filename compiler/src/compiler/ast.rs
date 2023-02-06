@@ -1,9 +1,11 @@
-use super::{cst_to_ast::CstToAst, error::CompilerError, utils::AdjustCasingOfFirstLetter};
+use super::{cst, cst_to_ast::CstToAst, error::CompilerError, utils::AdjustCasingOfFirstLetter};
 use crate::module::Module;
 use itertools::Itertools;
 use num_bigint::BigUint;
+use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Display, Formatter},
+    num::NonZeroUsize,
     ops::Deref,
 };
 
@@ -41,6 +43,14 @@ pub struct Ast {
     pub kind: AstKind,
 }
 
+impl Deref for Ast {
+    type Target = AstKind;
+
+    fn deref(&self) -> &Self::Target {
+        &self.kind
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum AstKind {
     Int(Int),
@@ -56,6 +66,7 @@ pub enum AstKind {
     Assignment(Assignment),
     Match(Match),
     MatchCase(MatchCase),
+    OrPattern(OrPattern),
     Error {
         /// The child may be set if it still makes sense to continue working
         /// with the error-containing subtree.
@@ -126,6 +137,8 @@ pub struct MatchCase {
     pub pattern: Box<Ast>,
     pub body: Vec<Ast>,
 }
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct OrPattern(pub Vec<Ast>);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct AstString {
@@ -148,6 +161,11 @@ pub enum AstError {
     ListItemWithoutComma,
     ListWithNonListItem,
     ListWithoutClosingParenthesis,
+    OrPatternIsMissingIdentifiers {
+        identifier: String,
+        number_of_missing_captures: NonZeroUsize,
+        all_captures: Vec<cst::Id>,
+    },
     ParenthesizedInPattern,
     ParenthesizedWithoutClosingParenthesis,
     PatternContainsInvalidExpression,
@@ -186,6 +204,7 @@ impl FindAst for Ast {
             AstKind::Assignment(assignment) => assignment.find(id),
             AstKind::Match(match_) => match_.find(id),
             AstKind::MatchCase(match_case) => match_case.find(id),
+            AstKind::OrPattern(or_pattern) => or_pattern.find(id),
             AstKind::Error { child, .. } => child.as_ref().and_then(|child| child.find(id)),
         }
     }
@@ -242,9 +261,63 @@ impl FindAst for MatchCase {
         self.pattern.find(id).or_else(|| self.body.find(id))
     }
 }
+impl FindAst for OrPattern {
+    fn find(&self, id: &Id) -> Option<&Ast> {
+        self.0.find(id)
+    }
+}
 impl FindAst for Vec<Ast> {
     fn find(&self, id: &Id) -> Option<&Ast> {
         self.iter().find_map(|ast| ast.find(id))
+    }
+}
+
+impl AstKind {
+    pub fn captured_identifiers(&self) -> FxHashMap<String, Vec<Id>> {
+        let mut captured_identifiers = FxHashMap::default();
+        self.captured_identifiers_helper(&mut captured_identifiers);
+        captured_identifiers
+    }
+    fn captured_identifiers_helper(&self, captured_identifiers: &mut FxHashMap<String, Vec<Id>>) {
+        match self {
+            AstKind::Int(_) | AstKind::Text(_) | AstKind::TextPart(_) => {}
+            AstKind::Identifier(Identifier(identifier)) => {
+                let entry = captured_identifiers
+                    .entry(identifier.value.clone())
+                    .or_insert_with(Vec::new);
+                entry.push(identifier.id.to_owned())
+            }
+            AstKind::Symbol(_) => {}
+            AstKind::List(List(list)) => {
+                for item in list {
+                    item.captured_identifiers_helper(captured_identifiers)
+                }
+            }
+            AstKind::Struct(Struct { fields }) => {
+                for (key, value) in fields {
+                    if let Some(key) = key {
+                        key.captured_identifiers_helper(captured_identifiers)
+                    }
+                    value.captured_identifiers_helper(captured_identifiers)
+                }
+            }
+            AstKind::StructAccess(_)
+            | AstKind::Lambda(_)
+            | AstKind::Call(_)
+            | AstKind::Assignment(_)
+            | AstKind::Match(_)
+            | AstKind::MatchCase(_) => {}
+            AstKind::OrPattern(OrPattern(patterns)) => {
+                for pattern in patterns {
+                    pattern.captured_identifiers_helper(captured_identifiers);
+                }
+            }
+            AstKind::Error { child, .. } => {
+                if let Some(child) = child {
+                    child.captured_identifiers_helper(captured_identifiers)
+                }
+            }
+        }
     }
 }
 
@@ -272,8 +345,8 @@ impl CollectErrors for Ast {
                     value.collect_errors(errors);
                 }
             }
-            AstKind::StructAccess(struct_access) => {
-                struct_access.struct_.collect_errors(errors);
+            AstKind::StructAccess(StructAccess { struct_, key: _ }) => {
+                struct_.collect_errors(errors);
             }
             AstKind::Lambda(lambda) => lambda.body.collect_errors(errors),
             AstKind::Call(call) => call.arguments.collect_errors(errors),
@@ -286,13 +359,18 @@ impl CollectErrors for Ast {
                     }
                 }
             },
-            AstKind::Match(match_) => {
-                match_.expression.collect_errors(errors);
-                match_.cases.collect_errors(errors);
+            AstKind::Match(Match { expression, cases }) => {
+                expression.collect_errors(errors);
+                cases.collect_errors(errors);
             }
-            AstKind::MatchCase(match_case) => {
-                match_case.pattern.collect_errors(errors);
-                match_case.body.collect_errors(errors);
+            AstKind::MatchCase(MatchCase { pattern, body }) => {
+                pattern.collect_errors(errors);
+                body.collect_errors(errors);
+            }
+            AstKind::OrPattern(OrPattern(patterns)) => {
+                for pattern in patterns {
+                    pattern.collect_errors(errors);
+                }
             }
             AstKind::Error {
                 child,
@@ -412,6 +490,13 @@ impl Display for Ast {
                 .map(|line| line.to_string())
                 .join("  \n"),
             ),
+            AstKind::OrPattern(OrPattern(patterns)) => {
+                write!(
+                    f,
+                    "{}",
+                    patterns.iter().map(|it| it.to_string()).join(" | "),
+                )
+            }
             AstKind::Error { child, errors } => {
                 write!(
                     f,

@@ -267,7 +267,7 @@ impl<'a> LoweringContext<'a> {
                         responsible,
                     );
 
-                    if pattern.captured_identifier_count() == 0 {
+                    if !pattern.contains_captured_identifiers() {
                         body.push_reference(nothing)
                     } else {
                         // The generated expression will be followed by at least one
@@ -611,6 +611,50 @@ impl<'a> PatternLoweringContext<'a> {
                     self.compile_match_conjunction(body, condition_builders);
                 })
             }
+            hir::Pattern::Or(patterns) => {
+                let [first_pattern, rest_patterns @ ..] = patterns.as_slice() else {
+                    panic!("Or pattern must contain at least two patterns.");
+                };
+
+                let mut result = self.compile(body, expression, first_pattern);
+
+                let captured_identifiers_order = first_pattern.captured_identifiers();
+                let list_get_function = body.push_builtin(BuiltinFunction::ListGet);
+                let nothing = body.push_nothing();
+
+                for pattern in rest_patterns {
+                    let is_match = body.push_is_match(result, self.responsible);
+                    result = body.push_if_else(
+                        is_match,
+                        |body| {
+                            let captured_identifiers = pattern.captured_identifiers();
+                            if captured_identifiers == captured_identifiers_order {
+                                body.push_reference(result);
+                                return;
+                            }
+
+                            let captured_identifiers = captured_identifiers_order
+                                .iter()
+                                .map(|identifier_id| {
+                                    let index = captured_identifiers
+                                        .iter()
+                                        .position(|it| it == identifier_id);
+                                    let Some(index) = index else { return body.push_reference(nothing); };
+
+                                    let index = body.push_int((1 + index).into());
+                                    body.push_call(list_get_function, vec![result, index], self.responsible)
+                                })
+                                .collect();
+                            self.push_match(body, captured_identifiers);
+                        },
+                        |body| {
+                            self.compile(body, expression, pattern);
+                        },
+                        self.responsible,
+                    );
+                }
+                result
+            }
             hir::Pattern::Error { child, errors } => {
                 let result = body.compile_errors(self.db, self.responsible, errors);
                 if let Some(child) = child {
@@ -720,6 +764,7 @@ impl<'a> PatternLoweringContext<'a> {
             hir::Pattern::Symbol(symbol) => body.push_symbol(symbol.to_owned()),
             hir::Pattern::List(_) => panic!("Lists can't be used in this part of a pattern."),
             hir::Pattern::Struct(_) => panic!("Structs can't be used in this part of a pattern."),
+            hir::Pattern::Or(_) => panic!("Or-patterns can't be used in this part of a pattern."),
             hir::Pattern::Error { errors, .. } => {
                 body.compile_errors(self.db, self.responsible, errors)
             }
@@ -748,7 +793,6 @@ impl<'a> PatternLoweringContext<'a> {
         let mut condition_builder = condition_builders.remove(0);
         let (return_value, captured_identifier_count) = condition_builder(body);
 
-        // let responsible = self.responsible;
         let is_match = body.push_is_match(return_value, self.responsible);
         body.push_if_else(
             is_match,

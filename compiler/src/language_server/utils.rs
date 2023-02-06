@@ -1,5 +1,5 @@
 use crate::{
-    compiler::error::CompilerError,
+    compiler::{cst::CstDb, error::CompilerError},
     database::Database,
     module::{Module, ModuleDb, Package},
 };
@@ -9,19 +9,30 @@ use std::{ops::Range, sync::Arc};
 
 impl CompilerError {
     pub fn into_diagnostic(self, db: &Database, module: Module) -> Diagnostic {
+        let related_information = self
+            .to_related_information()
+            .into_iter()
+            .filter_map(|(module, cst_id, message)| {
+                let uri: Option<Url> = module.clone().into();
+                let uri = uri?;
+
+                let span = db.find_cst(module.clone(), cst_id).display_span();
+                let range = db.range_to_lsp(module, span);
+
+                Some(lsp_types::DiagnosticRelatedInformation {
+                    location: lsp_types::Location { uri, range },
+                    message,
+                })
+            })
+            .collect();
         Diagnostic {
-            range: lsp_types::Range {
-                start: db
-                    .offset_to_lsp(module.clone(), self.span.start)
-                    .to_position(),
-                end: db.offset_to_lsp(module, self.span.end).to_position(),
-            },
+            range: db.range_to_lsp(module, self.span),
             severity: Some(DiagnosticSeverity::ERROR),
             code: None,
             code_description: None,
             source: Some("🍭 Candy".to_owned()),
             message: self.payload.to_string(),
-            related_information: None,
+            related_information: Some(related_information),
             tags: None,
             data: None,
         }

@@ -141,6 +141,10 @@ pub enum CstKind {
         arrow: Box<Cst>,
         body: Vec<Cst>,
     },
+    OrPattern {
+        left: Box<Cst>,
+        right: Vec<(Cst, Cst)>,
+    },
     Lambda {
         opening_curly_brace: Box<Cst>,
         parameters_and_arrow: Option<(Vec<Cst>, Box<Cst>)>,
@@ -333,6 +337,14 @@ impl Display for Cst {
                 arrow.fmt(f)?;
                 for expression in body {
                     expression.fmt(f)?;
+                }
+                Ok(())
+            }
+            CstKind::OrPattern { left, right } => {
+                left.fmt(f)?;
+                for (bar, right) in right {
+                    bar.fmt(f)?;
+                    right.fmt(f)?;
                 }
                 Ok(())
             }
@@ -559,6 +571,18 @@ impl UnwrapWhitespaceAndComment for Cst {
                 arrow: Box::new(arrow.unwrap_whitespace_and_comment()),
                 body: body.unwrap_whitespace_and_comment(),
             },
+            CstKind::OrPattern { left, right } => CstKind::OrPattern {
+                left: Box::new(left.unwrap_whitespace_and_comment()),
+                right: right
+                    .iter()
+                    .map(|(bar, right)| {
+                        (
+                            bar.unwrap_whitespace_and_comment(),
+                            right.unwrap_whitespace_and_comment(),
+                        )
+                    })
+                    .collect(),
+            },
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -742,6 +766,12 @@ impl TreeWithIds for Cst {
                 .find(id)
                 .or_else(|| arrow.find(id))
                 .or_else(|| body.find(id)),
+            CstKind::OrPattern { left, right } => left.find(id).or_else(|| {
+                // TODO: use binary search
+                right
+                    .iter()
+                    .find_map(|(bar, right)| bar.find(id).or_else(|| right.find(id)))
+            }),
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -892,6 +922,16 @@ impl TreeWithIds for Cst {
                     .find_by_offset(offset)
                     .or_else(|| arrow.find_by_offset(offset))
                     .or_else(|| body.find_by_offset(offset)),
+                false,
+            ),
+            CstKind::OrPattern { left, right } => (
+                left.find_by_offset(offset).or_else(|| {
+                    // TODO: use binary search
+                    right.iter().find_map(|(bar, right)| {
+                        bar.find_by_offset(offset)
+                            .or_else(|| right.find_by_offset(offset))
+                    })
+                }),
                 false,
             ),
             CstKind::Lambda { body, .. } => (body.find_by_offset(offset), false),

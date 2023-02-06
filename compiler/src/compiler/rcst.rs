@@ -104,6 +104,10 @@ pub enum Rcst {
         arrow: Box<Rcst>,
         body: Vec<Rcst>,
     },
+    OrPattern {
+        left: Box<Rcst>,
+        right: Vec<(Rcst, Rcst)>,
+    },
     Lambda {
         opening_curly_brace: Box<Rcst>,
         parameters_and_arrow: Option<(Vec<Rcst>, Box<Rcst>)>,
@@ -134,6 +138,7 @@ pub enum RcstError {
     MatchCaseMissesArrow,
     MatchCaseMissesBody,
     OpeningParenthesisWithoutExpression,
+    OrPatternMissesRight,
     ParenthesisNotClosed,
     PipeMissesCall,
     StructFieldMissesColon,
@@ -337,6 +342,14 @@ impl Display for Rcst {
                 }
                 Ok(())
             }
+            Rcst::OrPattern { left, right } => {
+                left.fmt(f)?;
+                for (bar, right) in right {
+                    bar.fmt(f)?;
+                    right.fmt(f)?;
+                }
+                Ok(())
+            }
             Rcst::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -491,6 +504,12 @@ impl IsMultiline for Rcst {
                 arrow,
                 body,
             } => pattern.is_multiline() || arrow.is_multiline() || body.is_multiline(),
+            Rcst::OrPattern { left, right } => {
+                left.is_multiline()
+                    || right
+                        .iter()
+                        .any(|(bar, right)| bar.is_multiline() || right.is_multiline())
+            }
             Rcst::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,

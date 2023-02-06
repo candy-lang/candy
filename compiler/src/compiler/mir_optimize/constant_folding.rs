@@ -28,6 +28,8 @@
 //!
 //! [tree shaking]: super::tree_shaking
 
+use num_traits::ToPrimitive;
+
 use crate::{
     builtin_functions::BuiltinFunction,
     compiler::mir::{Body, Expression, Id, Mir, VisibleExpressions},
@@ -121,6 +123,41 @@ impl Mir {
                     arguments: vec![],
                     responsible,
                 }
+            }
+            BuiltinFunction::ListGet => {
+                let [list_id, index_id] = arguments else {
+                    return Some(Err("wrong number of arguments".to_string()));
+                };
+
+                // TODO: Also catch this being called on a non-list and
+                // statically panic in that case.
+                let Expression::List(list) = visible.get(*list_id) else {
+                    return None;
+                };
+
+                // TODO: Also catch this being called on a non-int and
+                // statically panic in that case.
+                let Expression::Int(index) = visible.get(*index_id) else {
+                    return None;
+                };
+
+                let Some(value) = index.to_usize().and_then(|index| list.get(index)) else {
+                    return Some(Err(format!("List access will panic because index {} is out of bounds.", index)));
+                };
+                Expression::Reference(*value)
+            }
+            BuiltinFunction::ListLength => {
+                let [list_id] = arguments else {
+                    return Some(Err("wrong number of arguments".to_string()));
+                };
+
+                // TODO: Also catch this being called on a non-list and
+                // statically panic in that case.
+                let Expression::List(list) = visible.get(*list_id) else {
+                    return None;
+                };
+
+                Expression::Int(list.len().into())
             }
             BuiltinFunction::StructGet => {
                 if arguments.len() != 2 {

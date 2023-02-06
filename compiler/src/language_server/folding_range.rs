@@ -148,6 +148,13 @@ impl<'a> Context<'a> {
 
                 self.visit_csts(body);
             }
+            CstKind::OrPattern { left, right } => {
+                self.visit_cst(left);
+                for (bar, right) in right {
+                    self.visit_cst(bar);
+                    self.visit_cst(right);
+                }
+            }
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,

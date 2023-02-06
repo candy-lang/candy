@@ -257,7 +257,7 @@ impl hash::Hash for Expression {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PatternIdentifierId(pub usize);
 impl CountableId for PatternIdentifierId {
     fn from_usize(id: usize) -> Self {
@@ -287,6 +287,7 @@ pub enum Pattern {
     List(Vec<Pattern>),
     // Keys may not contain `NewIdentifier`.
     Struct(Vec<(Pattern, Pattern)>),
+    Or(Vec<Pattern>),
     Error {
         child: Option<Box<Pattern>>,
         errors: Vec<CompilerError>,
@@ -299,6 +300,18 @@ impl hash::Hash for Pattern {
     }
 }
 impl Pattern {
+    pub fn contains_captured_identifiers(&self) -> bool {
+        match self {
+            Pattern::NewIdentifier(_) => true,
+            Pattern::Int(_) | Pattern::Text(_) | Pattern::Symbol(_) => false,
+            Pattern::List(list) => list.iter().any(|it| it.contains_captured_identifiers()),
+            Pattern::Struct(struct_) => struct_
+                .iter()
+                .any(|(_, value_pattern)| value_pattern.contains_captured_identifiers()),
+            Pattern::Or(patterns) => patterns.first().unwrap().contains_captured_identifiers(),
+            Pattern::Error { .. } => false,
+        }
+    }
     pub fn captured_identifier_count(&self) -> usize {
         match self {
             Pattern::NewIdentifier(_) => 1,
@@ -310,11 +323,48 @@ impl Pattern {
                     key.captured_identifier_count() + value.captured_identifier_count()
                 })
                 .sum(),
+            // If the number or captured identifiers isn't the same in both
+            // sides, the pattern is invalid and the generated code will panic.
+            Pattern::Or(patterns) => patterns.first().unwrap().captured_identifier_count(),
             Pattern::Error { .. } => {
                 // Since generated code panics in this case, it doesn't matter
                 // whether the child captured any identifiers since they can't
                 // be accessed anyway.
                 0
+            }
+        }
+    }
+
+    /// Returns a mapping from `PatternIdentifierId` to the position of the
+    /// corresponding identifier in the `(Match, …)` result (zero-based,
+    /// ignoring the `Match` symbol).
+    pub fn captured_identifiers(&self) -> Vec<PatternIdentifierId> {
+        let mut ids = vec![];
+        self.collect_captured_identifiers(&mut ids);
+        ids
+    }
+    fn collect_captured_identifiers(&self, ids: &mut Vec<PatternIdentifierId>) {
+        match self {
+            Pattern::NewIdentifier(identifier_id) => ids.push(*identifier_id),
+            Pattern::Int(_) | Pattern::Text(_) | Pattern::Symbol(_) => {}
+            Pattern::List(list) => {
+                for pattern in list {
+                    pattern.collect_captured_identifiers(ids);
+                }
+            }
+            Pattern::Struct(struct_) => {
+                for (_, value_pattern) in struct_ {
+                    // Keys can't capture identifiers.
+                    value_pattern.collect_captured_identifiers(ids);
+                }
+            }
+            // If the number or captured identifiers isn't the same in both
+            // sides, the pattern is invalid and the generated code will panic.
+            Pattern::Or(patterns) => patterns.first().unwrap().collect_captured_identifiers(ids),
+            Pattern::Error { .. } => {
+                // Since generated code panics in this case, it doesn't matter
+                // whether the child captured any identifiers since they can't
+                // be accessed anyway.
             }
         }
     }
@@ -511,6 +561,11 @@ impl fmt::Display for Pattern {
                         .join(", "),
                 )
             }
+            Pattern::Or(patterns) => write!(
+                f,
+                "{}",
+                patterns.iter().map(|it| it.to_string()).join(" | "),
+            ),
             Pattern::Error { child, errors } => {
                 write!(f, "{}", if errors.len() == 1 { "error" } else { "errors" })?;
                 for error in errors {
@@ -623,14 +678,19 @@ impl CollectErrors for Pattern {
             Pattern::NewIdentifier(_) | Pattern::Int(_) | Pattern::Text(_) | Pattern::Symbol(_) => {
             }
             Pattern::List(patterns) => {
-                for pattern in patterns {
-                    pattern.collect_errors(errors);
+                for item_pattern in patterns {
+                    item_pattern.collect_errors(errors);
                 }
             }
-            Pattern::Struct(struct_) => {
-                for (key_pattern, value_pattern) in struct_ {
+            Pattern::Struct(patterns) => {
+                for (key_pattern, value_pattern) in patterns {
                     key_pattern.collect_errors(errors);
                     value_pattern.collect_errors(errors);
+                }
+            }
+            Pattern::Or(patterns) => {
+                for pattern in patterns {
+                    pattern.collect_errors(errors);
                 }
             }
             Pattern::Error {
@@ -643,8 +703,8 @@ impl CollectErrors for Pattern {
 }
 impl CollectErrors for Body {
     fn collect_errors(&self, errors: &mut Vec<CompilerError>) {
-        for (_id, ast) in &self.expressions {
-            ast.collect_errors(errors);
+        for (_id, expression) in &self.expressions {
+            expression.collect_errors(errors);
         }
     }
 }
