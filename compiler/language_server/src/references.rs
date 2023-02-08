@@ -202,7 +202,7 @@ where
                     self.add_reference(id, DocumentHighlightKind::READ);
                 }
             },
-             Expression::Text(_) => {},
+            Expression::Text(_) => {},
             Expression::Reference(target) => {
                 if let ReferenceQuery::Id(target_id) = &self.query && target == target_id {
                     self.add_reference(id, DocumentHighlightKind::READ);
