@@ -5,7 +5,6 @@ use crate::{
     heap::{Heap, Pointer},
 };
 use itertools::Itertools;
-use rustc_hash::FxHashMap;
 use std::{fmt, time::Instant};
 
 /// A full tracer that saves all events that occur with timestamps.
@@ -103,11 +102,11 @@ impl FullTracer {
             VmEvent::ChannelCreated { channel } => StoredVmEvent::ChannelCreated { channel },
             VmEvent::InFiber { fiber, event } => StoredVmEvent::InFiber {
                 fiber,
-                event: self.map_fiber_event(event, fiber),
+                event: self.map_fiber_event(event),
             },
         }
     }
-    fn map_fiber_event(&mut self, event: FiberEvent, fiber: FiberId) -> StoredFiberEvent {
+    fn map_fiber_event(&mut self, event: FiberEvent) -> StoredFiberEvent {
         match event {
             FiberEvent::ValueEvaluated {
                 expression,
