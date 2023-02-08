@@ -14,7 +14,7 @@ candy_fuzzer = { path = "../fuzzer" }
 candy_language_server = { path = "../language_server" }
 candy_vm = { path = "../vm" }
 itertools = { version = "0.10.0" }
-notify = "4.0.17"
+notify = "5.1.0"
 rustc-hash = "1.1.0"
 salsa = "0.16.1"
 structopt = "0.3.25"
