@@ -5,7 +5,6 @@ use crate::{
     heap::{Heap, Pointer},
 };
 use itertools::Itertools;
-use rustc_hash::FxHashMap;
 use std::{fmt, time::Instant};
 
 /// A full tracer that saves all events that occur with timestamps.
@@ -13,7 +12,6 @@ use std::{fmt, time::Instant};
 pub struct FullTracer {
     pub events: Vec<TimedEvent>,
     pub heap: Heap,
-    transferred_objects: FxHashMap<FiberId, FxHashMap<Pointer, Pointer>>,
 }
 #[derive(Clone)]
 pub struct TimedEvent {
@@ -81,21 +79,8 @@ impl Tracer for FullTracer {
     }
 }
 impl FullTracer {
-    fn import_from_heap(
-        &mut self,
-        address: Pointer,
-        heap: &Heap,
-        fiber: Option<FiberId>,
-    ) -> Pointer {
-        if let Some(fiber) = fiber {
-            let map = self
-                .transferred_objects
-                .entry(fiber)
-                .or_insert_with(FxHashMap::default);
-            heap.clone_single_to_other_heap_with_existing_mapping(&mut self.heap, address, map)
-        } else {
-            heap.clone_single_to_other_heap(&mut self.heap, address)
-        }
+    fn import_from_heap(&mut self, address: Pointer, heap: &Heap) -> Pointer {
+        heap.clone_single_to_other_heap(&mut self.heap, address)
     }
 
     fn map_vm_event(&mut self, event: VmEvent) -> StoredVmEvent {
@@ -117,19 +102,19 @@ impl FullTracer {
             VmEvent::ChannelCreated { channel } => StoredVmEvent::ChannelCreated { channel },
             VmEvent::InFiber { fiber, event } => StoredVmEvent::InFiber {
                 fiber,
-                event: self.map_fiber_event(event, fiber),
+                event: self.map_fiber_event(event),
             },
         }
     }
-    fn map_fiber_event(&mut self, event: FiberEvent, fiber: FiberId) -> StoredFiberEvent {
+    fn map_fiber_event(&mut self, event: FiberEvent) -> StoredFiberEvent {
         match event {
             FiberEvent::ValueEvaluated {
                 expression,
                 value,
                 heap,
             } => {
-                let expression = self.import_from_heap(expression, heap, Some(fiber));
-                let value = self.import_from_heap(value, heap, Some(fiber));
+                let expression = self.import_from_heap(expression, heap);
+                let value = self.import_from_heap(value, heap);
                 StoredFiberEvent::ValueEvaluated { expression, value }
             }
             FiberEvent::FoundFuzzableClosure {
@@ -137,8 +122,8 @@ impl FullTracer {
                 closure,
                 heap,
             } => {
-                let definition = self.import_from_heap(definition, heap, Some(fiber));
-                let closure = self.import_from_heap(closure, heap, Some(fiber));
+                let definition = self.import_from_heap(definition, heap);
+                let closure = self.import_from_heap(closure, heap);
                 StoredFiberEvent::FoundFuzzableClosure {
                     definition,
                     closure,
@@ -151,13 +136,13 @@ impl FullTracer {
                 responsible,
                 heap,
             } => {
-                let call_site = self.import_from_heap(call_site, heap, Some(fiber));
-                let callee = self.import_from_heap(callee, heap, Some(fiber));
+                let call_site = self.import_from_heap(call_site, heap);
+                let callee = self.import_from_heap(callee, heap);
                 let arguments = arguments
                     .into_iter()
-                    .map(|arg| self.import_from_heap(arg, heap, Some(fiber)))
+                    .map(|arg| self.import_from_heap(arg, heap))
                     .collect();
-                let responsible = self.import_from_heap(responsible, heap, Some(fiber));
+                let responsible = self.import_from_heap(responsible, heap);
                 StoredFiberEvent::CallStarted {
                     call_site,
                     callee,
@@ -166,7 +151,7 @@ impl FullTracer {
                 }
             }
             FiberEvent::CallEnded { return_value, heap } => {
-                let return_value = self.import_from_heap(return_value, heap, Some(fiber));
+                let return_value = self.import_from_heap(return_value, heap);
                 StoredFiberEvent::CallEnded { return_value }
             }
         }

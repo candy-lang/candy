@@ -152,6 +152,7 @@ dependencies = [
  "itertools",
  "lazy_static",
  "lsp-types",
+ "num-bigint",
  "rand",
  "salsa",
  "serde",

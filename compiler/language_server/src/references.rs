@@ -8,6 +8,7 @@ use lsp_types::{
     DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams, Location, ReferenceParams,
     TextDocumentPositionParams,
 };
+use num_bigint::BigUint;
 use std::{collections::HashSet, path::PathBuf};
 use tracing::{debug, info};
 
@@ -109,6 +110,7 @@ where
             Some(ReferenceQuery::Id(target_id))
         }
         CstKind::Symbol(symbol) => Some(ReferenceQuery::Symbol(module, symbol)),
+        CstKind::Int { value, .. } => Some(ReferenceQuery::Int(module, value)),
         _ => None,
     };
     debug!("Reference query: {query:?}");
@@ -132,6 +134,7 @@ fn references(
     // TODO: search all files
     let module = match &query {
         ReferenceQuery::Id(id) => id.module.clone(),
+        ReferenceQuery::Int(module, _) => module.to_owned(),
         ReferenceQuery::Symbol(module, _) => module.to_owned(),
         ReferenceQuery::Needs(module) => module.to_owned(),
     };
@@ -152,6 +155,7 @@ struct Context<'a, DB: PositionConversionDb + ReferencesDb + ?Sized> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ReferenceQuery {
     Id(hir::Id),
+    Int(Module, BigUint),
     Symbol(Module, String),
     Needs(Module),
 }
@@ -193,7 +197,12 @@ where
     }
     fn visit_expression(&mut self, id: hir::Id, expression: &Expression) {
         match expression {
-            Expression::Int(_) | Expression::Text(_) => {}
+            Expression::Int(int) =>{
+                if let ReferenceQuery::Int(_, target) = &self.query && int == target {
+                    self.add_reference(id, DocumentHighlightKind::READ);
+                }
+            },
+            Expression::Text(_) => {},
             Expression::Reference(target) => {
                 if let ReferenceQuery::Id(target_id) = &self.query && target == target_id {
                     self.add_reference(id, DocumentHighlightKind::READ);
