@@ -19,6 +19,7 @@ jobs:
           profile: minimal
           toolchain: ${{ env.RUST_VERSION }}
           override: true
+          components: clippy, rustfmt
 
       - name: Cache Rust dependencies and build
         uses: actions/cache@v3
@@ -32,124 +33,147 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
-      - uses: actions-rs/cargo@v1
+      # We run all these commands as sequential steps instead of using matrix
+      # jobs for better caching.
+
+      # frontend
+      - name: 'compiler/frontend: check'
+        uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --manifest-path compiler/Cargo.toml
-
-  test:
-    name: Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ env.RUST_VERSION }}
-          override: true
-
-      - name: Cache Rust dependencies and build
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/git/db/
-            ~/.cargo/registry/cache/
-            ~/.cargo/registry/index/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
-
-      - uses: actions-rs/cargo@v1
+          args: --manifest-path compiler/frontend/Cargo.toml
+      - name: 'compiler/frontend: test'
+        uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --manifest-path compiler/Cargo.toml
-
-  format:
-    name: Format
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ env.RUST_VERSION }}
-          override: true
-          components: rustfmt
-
-      - name: Cache Rust dependencies and build
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/git/db/
-            ~/.cargo/registry/cache/
-            ~/.cargo/registry/index/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
-
-      - uses: actions-rs/cargo@v1
+          args: --manifest-path compiler/frontend/Cargo.toml
+      - name: 'compiler/frontend: fmt'
+        uses: actions-rs/cargo@v1
         with:
           command: fmt
-          args: --manifest-path compiler/Cargo.toml --all -- --check
-
-  clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ env.RUST_VERSION }}
-          override: true
-          components: clippy
-
-      - name: Cache Rust dependencies and build
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/git/db/
-            ~/.cargo/registry/cache/
-            ~/.cargo/registry/index/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
-
-      - uses: actions-rs/cargo@v1
+          args: --manifest-path compiler/frontend/Cargo.toml --all -- --check
+      - name: 'compiler/frontend: clippy'
+        uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --manifest-path compiler/Cargo.toml -- -D warnings
+          args: --manifest-path compiler/frontend/Cargo.toml -- -D warnings
 
-  core:
-    name: Core
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
+      # vm
+      - name: 'compiler/vm: check'
+        uses: actions-rs/cargo@v1
         with:
-          profile: minimal
-          toolchain: ${{ env.RUST_VERSION }}
-          override: true
-
-      - name: Cache Rust dependencies and build
-        uses: actions/cache@v3
+          command: check
+          args: --manifest-path compiler/vm/Cargo.toml
+      - name: 'compiler/vm: test'
+        uses: actions-rs/cargo@v1
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/git/db/
-            ~/.cargo/registry/cache/
-            ~/.cargo/registry/index/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+          command: test
+          args: --manifest-path compiler/vm/Cargo.toml
+      - name: 'compiler/vm: fmt'
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --manifest-path compiler/vm/Cargo.toml --all -- --check
+      - name: 'compiler/vm: clippy'
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --manifest-path compiler/vm/Cargo.toml -- -D warnings
 
-      - uses: actions-rs/cargo@v1
+      # vm/fuzz
+      - name: 'compiler/vm/fuzz: check'
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path compiler/vm/fuzz/Cargo.toml
+      - name: 'compiler/vm/fuzz: test'
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --manifest-path compiler/vm/fuzz/Cargo.toml
+      - name: 'compiler/vm/fuzz: fmt'
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --manifest-path compiler/vm/fuzz/Cargo.toml --all -- --check
+      - name: 'compiler/vm/fuzz: clippy'
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --manifest-path compiler/vm/fuzz/Cargo.toml -- -D warnings
+
+      # fuzzer
+      - name: 'compiler/fuzzer: check'
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path compiler/fuzzer/Cargo.toml
+      - name: 'compiler/fuzzer: test'
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --manifest-path compiler/fuzzer/Cargo.toml
+      - name: 'compiler/fuzzer: fmt'
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --manifest-path compiler/fuzzer/Cargo.toml --all -- --check
+      - name: 'compiler/fuzzer: clippy'
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --manifest-path compiler/fuzzer/Cargo.toml -- -D warnings
+
+      # language_server
+      - name: 'compiler/language_server: check'
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path compiler/language_server/Cargo.toml
+      - name: 'compiler/language_server: test'
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --manifest-path compiler/language_server/Cargo.toml
+      - name: 'compiler/language_server: fmt'
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --manifest-path compiler/language_server/Cargo.toml --all -- --check
+      - name: 'compiler/language_server: clippy'
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --manifest-path compiler/language_server/Cargo.toml -- -D warnings
+
+      # cli
+      - name: 'compiler/cli: check'
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path compiler/cli/Cargo.toml
+      - name: 'compiler/cli: test'
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --manifest-path compiler/cli/Cargo.toml
+      - name: 'compiler/cli: fmt'
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --manifest-path compiler/cli/Cargo.toml --all -- --check
+      - name: 'compiler/cli: clippy'
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --manifest-path compiler/cli/Cargo.toml -- -D warnings
+
+      # Core
+      - name: 'Core: run'
+        uses: actions-rs/cargo@v1
         with:
           command: run
-          args: --release --manifest-path=compiler/Cargo.toml -- build --debug packages/Core/_.candy
+          args: --release --manifest-path=compiler/cli/Cargo.toml -- build --debug packages/Core/_.candy
 
   # fuzzing:
   #   name: Fuzzing
@@ -203,14 +227,15 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Run benchmark
-        run: cargo bench -- --output-format bencher | tee output.txt
+        working-directory: compiler/vm/
+        run: cargo bench -- --output-format bencher | tee benchmark_output.txt
 
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
         with:
           name: Compiler
           tool: cargo
-          output-file-path: output.txt
+          output-file-path: compiler/vm/benchmark_output.txt
           gh-pages-branch: gh-pages
           gh-repository: github.com/candy-lang/benchmark-results
           benchmark-data-dir-path: ./
@@ -218,7 +243,10 @@ jobs:
           # to the main branch.
           auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           github-token: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.BENCHMARK_RESULTS_TOKEN || secrets.BENCHMARK_RESULTS_COMMENT_TOKEN }}
-          comment-always: true
-          comment-on-alert: true
+          # Forks don't have access to secrets, so we can't create a commit
+          # comment. This step can still fail to notify us and the output shows
+          # results.
+          comment-always: ${{ github.secret_source == 'Actions' || github.secret_source == 'Dependabot' }}
+          comment-on-alert: ${{ github.secret_source == 'Actions' || github.secret_source == 'Dependabot' }}
           alert-threshold: 150%
           fail-on-alert: true

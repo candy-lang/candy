@@ -1,5 +1,13 @@
-'P: Compiler':
-  - compiler/**/*
+'P: Compiler: CLI':
+  - compiler/cli/**/*
+'P: Compiler: Frontend':
+  - compiler/frontend/**/*
+'P: Compiler: Fuzzer':
+  - compiler/fuzzer/**/*
+'P: Compiler: Language Server':
+  - compiler/language_server/**/*
+'P: Compiler: VM':
+  - compiler/vm/**/*
 'P: Core':
   - packages/Core/**/*
 'P: VS Code Extension':
