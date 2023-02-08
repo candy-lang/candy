@@ -26,7 +26,8 @@ use candy_vm::{
 };
 use database::Database;
 use itertools::Itertools;
-use notify::{watcher, RecursiveMode, Watcher};
+use notify::RecursiveMode;
+use notify_debouncer_mini::new_debouncer;
 use rustc_hash::FxHashMap;
 use std::{
     convert::TryInto,
@@ -127,8 +128,9 @@ fn build(options: CandyBuildOptions) -> ProgramResult {
         result.ok_or(Exit::FileNotFound).map(|_| ())
     } else {
         let (tx, rx) = channel();
-        let mut watcher = watcher(tx, Duration::from_secs(1)).unwrap();
-        watcher
+        let mut debouncer = new_debouncer(Duration::from_secs(1), None, tx).unwrap();
+        debouncer
+            .watcher()
             .watch(&options.file, RecursiveMode::Recursive)
             .unwrap();
         loop {
