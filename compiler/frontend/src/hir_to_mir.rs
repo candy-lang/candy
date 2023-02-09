@@ -160,7 +160,6 @@ struct LoweringContext<'a> {
 #[derive(Clone)]
 struct OngoingDestructuring {
     result: Id,
-    captured_identifier_count: usize,
 
     /// Assignments such as `foo = …` are considered trivial.
     is_trivial: bool,
@@ -243,7 +242,6 @@ impl<'a> LoweringContext<'a> {
                     let result = body.push_reference(expression);
                     self.ongoing_destructuring = Some(OngoingDestructuring {
                         result,
-                        captured_identifier_count: 1,
                         is_trivial: true,
                     });
                     result
@@ -280,31 +278,23 @@ impl<'a> LoweringContext<'a> {
                     let pattern_result = body.push_reference(pattern_result);
                     self.ongoing_destructuring = Some(OngoingDestructuring {
                         result: pattern_result,
-                        captured_identifier_count: pattern.captured_identifier_count(),
                         is_trivial: false,
                     });
                     pattern_result
                 }
             }
             hir::Expression::PatternIdentifierReference(identifier_id) => {
-                let OngoingDestructuring {
-                    result,
-                    captured_identifier_count,
-                    is_trivial,
-                } = self.ongoing_destructuring.clone().unwrap();
+                let OngoingDestructuring { result, is_trivial } =
+                    self.ongoing_destructuring.clone().unwrap();
 
-                let mut expression = if is_trivial {
+                if is_trivial {
                     body.push_reference(result)
                 } else {
                     let list_get = body.push_builtin(BuiltinFunction::ListGet);
                     let index = body.push_int((identifier_id.0 + 1).into());
                     let responsible = body.push_hir_id(hir_id.clone());
                     body.push_call(list_get, vec![result, index], responsible)
-                };
-                if identifier_id.0 == captured_identifier_count - 1 {
-                    expression = body.push_nothing();
                 }
-                expression
             }
             hir::Expression::Match { expression, cases } => {
                 assert!(!cases.is_empty());
@@ -453,7 +443,6 @@ impl<'a> LoweringContext<'a> {
                 let then_lambda = body.push_lambda(|body, _| {
                     self.ongoing_destructuring = Some(OngoingDestructuring {
                         result: pattern_result,
-                        captured_identifier_count: case_pattern.captured_identifier_count(),
                         is_trivial: false,
                     });
                     self.compile_expressions(body, responsible, &case_body.expressions);
