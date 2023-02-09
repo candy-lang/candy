@@ -33,10 +33,10 @@ doNotRun body :=
   #
   # These are some of the benefits over commenting code out:
   #
-  # * Refactorings, like renaming of functions, also affect the code.
-  # * Candy doesn't report linter warnings for fields and functions in the outer scope that are
+  # - Refactorings, like renaming of functions, also affect the code.
+  # - Candy doesn't report linter warnings for fields and functions in the outer scope that are
   #   only used in the code.
-  # * Making the code invalid (for example, by deleting needed functions) results in compiler
+  # - Making the code invalid (for example, by deleting needed functions) results in compiler
   #   errors.
   needs (is0 body)
   Nothing
