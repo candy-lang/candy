@@ -864,24 +864,34 @@ impl LoweringContext {
             dot
         );
 
-        let key = match key.kind.clone() {
+        match key.kind.clone() {
             CstKind::Identifier(identifier) => {
-                self.create_string(key.id.to_owned(), identifier.uppercase_first_letter())
+                let key =
+                    self.create_string(key.id.to_owned(), identifier.uppercase_first_letter());
+                self.create_ast(
+                    id,
+                    AstKind::StructAccess(ast::StructAccess {
+                        struct_: Box::new(struct_),
+                        key,
+                    }),
+                )
             }
-            // TODO: handle CstKind::Error
+            CstKind::Error { error, .. } => self.create_ast(
+                id.to_owned(),
+                AstKind::Error {
+                    child: None,
+                    errors: vec![CompilerError {
+                        module: self.module.clone(),
+                        span: key.span.clone(),
+                        payload: CompilerErrorPayload::Rcst(error),
+                    }],
+                },
+            ),
             _ => panic!(
                 "Expected an identifier after the dot in a struct access, but found `{}`.",
                 key
             ),
-        };
-
-        self.create_ast(
-            id,
-            AstKind::StructAccess(ast::StructAccess {
-                struct_: Box::new(struct_),
-                key,
-            }),
-        )
+        }
     }
 
     fn lower_parameters(&mut self, csts: &[Cst]) -> (Vec<AstString>, Vec<CompilerError>) {
