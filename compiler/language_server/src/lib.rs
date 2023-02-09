@@ -23,6 +23,7 @@ use candy_frontend::{
     ast_to_hir::AstToHir,
     hir::CollectErrors,
     module::{Module, ModuleDb, ModuleKind, MutableModuleProviderOwner},
+    string_to_rcst::{InvalidModuleError, StringToRcst},
 };
 use database::Database;
 use itertools::Itertools;
@@ -37,9 +38,10 @@ use lsp_types::{
     TextDocumentChangeRegistrationOptions, TextDocumentContentChangeEvent,
     TextDocumentRegistrationOptions, Url, WorkDoneProgressOptions,
 };
+use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, sync::Arc, thread};
 use tokio::sync::{mpsc::Sender, Mutex, RwLock};
-use tower_lsp::{jsonrpc, Client, LanguageServer};
+use tower_lsp::{jsonrpc, Client, ClientSocket, LanguageServer, LspService};
 use tracing::{debug, span, Level};
 use utils::{lsp_range_to_range_raw, module_from_package_root_and_url};
 
@@ -50,13 +52,15 @@ pub struct CandyLanguageServer {
     project_directory: RwLock<Option<PathBuf>>,
 }
 impl CandyLanguageServer {
-    pub fn from_client(client: Client) -> Self {
-        Self {
+    pub fn create() -> (LspService<Self>, ClientSocket) {
+        LspService::build(|client| Self {
             client,
             db: Default::default(),
             hints_server_sink: Default::default(),
             project_directory: Default::default(),
-        }
+        })
+        .custom_method("candy/viewRcst", CandyLanguageServer::candy_view_rcst)
+        .finish()
     }
 
     async fn send_to_hints_server(&self, event: hints::Event) {
@@ -312,6 +316,11 @@ impl LanguageServer for CandyLanguageServer {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ViewRcstParams {
+    pub uri: Url,
+}
 impl CandyLanguageServer {
     async fn analyze_modules(&self, modules: Vec<Module>) {
         debug!(
@@ -340,6 +349,20 @@ impl CandyLanguageServer {
                 .publish_diagnostics(module_to_url(module.clone()).unwrap(), diagnostics, None)
                 .await;
         }
+    }
+
+    async fn candy_view_rcst(&self, params: ViewRcstParams) -> jsonrpc::Result<String> {
+        let module = self.code_module_from_url(params.uri).await;
+        let db = self.db.lock().await;
+        let rcst = db
+            .rcst(module)
+            .map(|rcst| format!("{:#?}", rcst))
+            .unwrap_or_else(|error| match error {
+                InvalidModuleError::DoesNotExist => "# Module does not exist".to_string(),
+                InvalidModuleError::InvalidUtf8 => "# Invalid UTF-8".to_string(),
+                InvalidModuleError::IsToolingModule => "# Is a tooling module".to_string(),
+            });
+        Ok(rcst)
     }
 }
 

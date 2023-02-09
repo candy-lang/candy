@@ -38,7 +38,7 @@ use std::{
     time::Duration,
 };
 use structopt::StructOpt;
-use tower_lsp::{LspService, Server};
+use tower_lsp::Server;
 use tracing::{debug, error, info, warn, Level, Metadata};
 use tracing_subscriber::{
     filter,
@@ -497,7 +497,7 @@ fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
 async fn lsp() -> ProgramResult {
     init_logger(false);
     info!("Starting language server…");
-    let (service, socket) = LspService::new(CandyLanguageServer::from_client);
+    let (service, socket) = CandyLanguageServer::create();
     Server::new(tokio::io::stdin(), tokio::io::stdout(), socket)
         .serve(service)
         .await;

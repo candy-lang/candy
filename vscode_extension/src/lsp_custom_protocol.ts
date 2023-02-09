@@ -1,5 +1,19 @@
-import { NotificationType, Position } from 'vscode-languageclient';
+import {
+  DocumentUri,
+  NotificationType,
+  Position,
+  RequestType,
+} from 'vscode-languageclient';
 
+// Debug IRs
+export interface ViewRcstParams {
+  readonly uri: DocumentUri;
+}
+export const viewRcst = new RequestType<ViewRcstParams, string, void>(
+  'candy/viewRcst'
+);
+
+// Hints
 export class PublishHintsNotification {
   public static type = new NotificationType<HintsParams>(
     'candy/textDocument/publishHints'
