@@ -310,7 +310,10 @@ impl Pattern {
                 .iter()
                 .any(|(_, value_pattern)| value_pattern.contains_captured_identifiers()),
             Pattern::Or(patterns) => patterns.first().unwrap().contains_captured_identifiers(),
-            Pattern::Error { .. } => false,
+            Pattern::Error { child, .. } => child
+                .as_ref()
+                .map(|child| child.contains_captured_identifiers())
+                .unwrap_or_default(),
         }
     }
     pub fn captured_identifier_count(&self) -> usize {
@@ -327,11 +330,14 @@ impl Pattern {
             // If the number or captured identifiers isn't the same in both
             // sides, the pattern is invalid and the generated code will panic.
             Pattern::Or(patterns) => patterns.first().unwrap().captured_identifier_count(),
-            Pattern::Error { .. } => {
+            Pattern::Error { child, .. } => {
                 // Since generated code panics in this case, it doesn't matter
                 // whether the child captured any identifiers since they can't
                 // be accessed anyway.
-                0
+                child
+                    .as_ref()
+                    .map(|child| child.captured_identifier_count())
+                    .unwrap_or_default()
             }
         }
     }
