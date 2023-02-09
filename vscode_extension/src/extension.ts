@@ -16,7 +16,6 @@ export async function activate(context: vs.ExtensionContext) {
   let clientOptions: LanguageClientOptions = {
     outputChannelName: '🍭 Candy Language Server',
   };
-
   client = new LanguageClient(
     'candyLanguageServer',
     'Candy Language Server',
@@ -29,9 +28,8 @@ export async function activate(context: vs.ExtensionContext) {
 }
 
 export function deactivate(): Thenable<void> | undefined {
-  if (!client) {
-    return undefined;
-  }
+  if (!client) return undefined;
+
   return client.stop();
 }
 
