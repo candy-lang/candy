@@ -1211,7 +1211,7 @@ mod parse {
         indentation: usize,
         allow_assignment: bool,
         allow_call: bool,
-        allow_pipe: bool,
+        allow_bar: bool,
     ) -> Option<(&str, Rcst)> {
         // If we start the call list with `if … else …`, the formatting looks
         // weird. Hence, we start with a single `None`.
@@ -1273,7 +1273,7 @@ mod parse {
                 did_make_progress = true;
             }
 
-            if allow_pipe {
+            if allow_bar {
                 'pipe: {
                     let (new_input, whitespace_after_receiver) =
                         whitespaces_and_newlines(input, indentation, true);
