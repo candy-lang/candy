@@ -218,14 +218,10 @@ where
                     self.visit_cst(closing_curly_brace, None);
                 }
             }
-            CstKind::Pipe {
-                receiver,
-                bar,
-                call,
-            } => {
-                self.visit_cst(receiver, None);
+            CstKind::BinaryBar { left, bar, right } => {
+                self.visit_cst(left, None);
                 self.visit_cst(bar, None);
-                self.visit_cst(call, None);
+                self.visit_cst(right, None);
             }
             CstKind::Parenthesized {
                 opening_parenthesis,
@@ -306,13 +302,6 @@ where
                 self.visit_cst(pattern, None);
                 self.visit_cst(arrow, None);
                 self.visit_csts(body, None);
-            }
-            CstKind::OrPattern { left, right } => {
-                self.visit_cst(left, None);
-                for (bar, pattern) in right {
-                    self.visit_cst(bar, None);
-                    self.visit_cst(pattern, None);
-                }
             }
             CstKind::Lambda {
                 opening_curly_brace,

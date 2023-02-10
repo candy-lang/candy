@@ -272,54 +272,105 @@ impl LoweringContext {
             CstKind::TextInterpolation { .. } => {
                 panic!("TextInterpolation should only occur in Text.")
             }
-            CstKind::Pipe {
-                receiver,
-                bar,
-                call,
-            } => {
+            CstKind::BinaryBar { left, bar, right } => {
                 match lowering_type {
-                    LoweringType::Expression => {}
-                    LoweringType::Pattern | LoweringType::PatternLiteralPart => {
-                        return self.create_ast(
-                            cst.id,
-                            AstKind::Error {
-                                child: None,
-                                errors: vec![self.create_error(cst, AstError::PipeInPattern)],
+                    // In an expression context, a bar introduces a call.
+                    LoweringType::Expression => {
+                        let left = self.lower_cst(left, LoweringType::Expression);
+
+                        assert!(
+                            matches!(bar.kind, CstKind::Bar),
+                            "Pipe must contain a bar, but instead contained a {}.",
+                            bar,
+                        );
+
+                        let call = self.lower_cst(right, LoweringType::Expression);
+                        let call = match call {
+                            Ast {
+                                kind:
+                                    AstKind::Call(ast::Call {
+                                        receiver,
+                                        mut arguments,
+                                    }),
+                                ..
+                            } => {
+                                arguments.insert(0, left);
+                                ast::Call {
+                                    receiver,
+                                    arguments,
+                                }
+                            }
+                            call => ast::Call {
+                                receiver: Box::new(call),
+                                arguments: vec![left],
                             },
-                        )
+                        };
+                        self.create_ast(cst.id, AstKind::Call(call))
+                    }
+                    // In a pattern context, a bar represents an or pattern.
+                    LoweringType::Pattern | LoweringType::PatternLiteralPart => {
+                        let mut patterns = vec![];
+
+                        let mut cst = cst;
+                        while let Cst {
+                            kind: CstKind::BinaryBar { left, bar, right },
+                            ..
+                        } = cst
+                        {
+                            patterns.push(self.lower_cst(right, LoweringType::Pattern));
+                            assert!(
+                                matches!(bar.kind, CstKind::Bar),
+                                "Expected a bar after the left side of an or pattern, but found {}.",
+                                bar,
+                            );
+                            cst = left;
+                        }
+                        patterns.push(self.lower_cst(left, LoweringType::Pattern));
+                        patterns.reverse();
+
+                        let mut errors = vec![];
+
+                        let captured_identifiers = patterns
+                            .iter()
+                            .map(|it| it.captured_identifiers())
+                            .collect_vec();
+                        let all_identifiers = captured_identifiers.iter().fold(
+                            FxHashSet::default(),
+                            |mut acc, it| {
+                                acc.extend(it.keys());
+                                acc
+                            },
+                        );
+                        for identifier in all_identifiers {
+                            let number_of_missing_captures = captured_identifiers
+                                .iter()
+                                .filter(|it| !it.contains_key(identifier))
+                                .count();
+                            if number_of_missing_captures == 0 {
+                                continue;
+                            }
+
+                            let empty_vec = vec![];
+                            let all_captures = captured_identifiers
+                                .iter()
+                                .flat_map(|it| it.get(identifier).unwrap_or(&empty_vec))
+                                .filter_map(|it| self.id_mapping.get(it).cloned())
+                                .collect_vec();
+                            errors.push(self.create_error(
+                                left,
+                                AstError::OrPatternIsMissingIdentifiers {
+                                    identifier: identifier.to_owned(),
+                                    number_of_missing_captures:
+                                        number_of_missing_captures.try_into().unwrap(),
+                                    all_captures,
+                                },
+                            ))
+                        }
+
+                        let ast = self.create_ast(cst.id, AstKind::OrPattern(OrPattern(patterns)));
+                        self.wrap_in_errors(cst.id, ast, errors)
                     }
                 }
-
-                let ast = self.lower_cst(receiver, LoweringType::Expression);
-
-                assert!(
-                    matches!(bar.kind, CstKind::Bar),
-                    "Pipe must contain a bar, but instead contained a {}.",
-                    bar,
-                );
-
-                let call = self.lower_cst(call, LoweringType::Expression);
-                let call = match call {
-                    Ast {
-                        kind:
-                            AstKind::Call(ast::Call {
-                                receiver,
-                                mut arguments,
-                            }),
-                        ..
-                    } => {
-                        arguments.insert(0, ast);
-                        ast::Call {
-                            receiver,
-                            arguments,
-                        }
-                    }
-                    call => ast::Call {
-                        receiver: Box::new(call),
-                        arguments: vec![ast],
-                    },
-                };
-                self.create_ast(cst.id, AstKind::Call(call))
             }
             CstKind::Parenthesized {
                 opening_parenthesis,
@@ -655,66 +706,6 @@ impl LoweringContext {
                         body,
                     }),
                 )
-            }
-            CstKind::OrPattern { left, right } => {
-                assert_eq!(lowering_type, LoweringType::Pattern);
-                assert!(!right.is_empty());
-
-                let left_ast = self.lower_cst(left, LoweringType::Pattern);
-                let mut patterns = vec![left_ast];
-
-                let right = right.iter().map(|(bar, right)| {
-                    assert!(
-                        matches!(bar.kind, CstKind::Bar),
-                        "Expected a bar after the left side of an or pattern, but found {}.",
-                        bar,
-                    );
-
-                    self.lower_cst(right, LoweringType::Pattern)
-                });
-                patterns.extend(right);
-
-                let mut errors = vec![];
-
-                let captured_identifiers = patterns
-                    .iter()
-                    .map(|it| it.captured_identifiers())
-                    .collect_vec();
-                let all_identifiers =
-                    captured_identifiers
-                        .iter()
-                        .fold(FxHashSet::default(), |mut acc, it| {
-                            acc.extend(it.keys());
-                            acc
-                        });
-                for identifier in all_identifiers {
-                    let number_of_missing_captures = captured_identifiers
-                        .iter()
-                        .filter(|it| !it.contains_key(identifier))
-                        .count();
-                    if number_of_missing_captures == 0 {
-                        continue;
-                    }
-
-                    let empty_vec = vec![];
-                    let all_captures = captured_identifiers
-                        .iter()
-                        .flat_map(|it| it.get(identifier).unwrap_or(&empty_vec))
-                        .filter_map(|it| self.id_mapping.get(it).cloned())
-                        .collect_vec();
-                    errors.push(self.create_error(
-                        left,
-                        AstError::OrPatternIsMissingIdentifiers {
-                            identifier: identifier.to_owned(),
-                            number_of_missing_captures:
-                                number_of_missing_captures.try_into().unwrap(),
-                            all_captures,
-                        },
-                    ))
-                }
-
-                let ast = self.create_ast(cst.id, AstKind::OrPattern(OrPattern(patterns)));
-                self.wrap_in_errors(cst.id, ast, errors)
             }
             CstKind::Lambda {
                 opening_curly_brace,

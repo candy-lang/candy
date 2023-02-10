@@ -75,9 +75,10 @@ where
             | CstKind::Text { .. }
             | CstKind::TextPart(_)
             | CstKind::TextInterpolation { .. } => {}
-            CstKind::Pipe { receiver, call, .. } => {
-                self.visit_cst(receiver);
-                self.visit_cst(call);
+            CstKind::BinaryBar { left, bar, right } => {
+                self.visit_cst(left);
+                self.visit_cst(bar);
+                self.visit_cst(right);
             }
             CstKind::Parenthesized { inner, .. } => self.visit_cst(inner),
             CstKind::Call {
@@ -151,13 +152,6 @@ where
                 self.push(arrow.span.end..body_end, FoldingRangeKind::Region);
 
                 self.visit_csts(body);
-            }
-            CstKind::OrPattern { left, right } => {
-                self.visit_cst(left);
-                for (bar, right) in right {
-                    self.visit_cst(bar);
-                    self.visit_cst(right);
-                }
             }
             CstKind::Lambda {
                 opening_curly_brace,
