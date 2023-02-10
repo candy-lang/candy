@@ -167,7 +167,14 @@ takeWhile iterable tester = generateWithState iterable { iterable ->
 takeUntil iterable tester = iterable | takeWhile { item -> tester item | bool.not }
 
 skipHelper = { skipHelper iterable n ->
-  ifElse (equals n 0) { iterable } { skipHelper iterable (n | int.subtract 1) }
+  ifElse (equals n 0) {
+    iterable
+  } {
+    remaining = iterable | next
+    | result.map { it -> it.rest }
+    | result.unwrapOr {}
+    skipHelper skipHelper remaining (n | int.subtract 1)
+  }
 }
 skip iterable n :=
   needs (is iterable)
