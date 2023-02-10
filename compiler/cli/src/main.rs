@@ -24,6 +24,7 @@ use candy_vm::{
     tracer::{full::FullTracer, DummyTracer, Tracer},
     vm::{CompletedOperation, OperationId, Status, Vm},
 };
+use clap::{Parser, ValueHint};
 use database::Database;
 use itertools::Itertools;
 use notify::RecursiveMode;
@@ -37,7 +38,6 @@ use std::{
     sync::{mpsc::channel, Arc},
     time::Duration,
 };
-use structopt::StructOpt;
 use tower_lsp::{LspService, Server};
 use tracing::{debug, error, info, warn, Level, Metadata};
 use tracing_subscriber::{
@@ -46,8 +46,8 @@ use tracing_subscriber::{
     prelude::*,
 };
 
-#[derive(StructOpt, Debug)]
-#[structopt(name = "candy", about = "The 🍭 Candy CLI.")]
+#[derive(Parser, Debug)]
+#[command(name = "candy", about = "The 🍭 Candy CLI.")]
 enum CandyOptions {
     Build(CandyBuildOptions),
     Run(CandyRunOptions),
@@ -55,45 +55,45 @@ enum CandyOptions {
     Lsp,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct CandyBuildOptions {
-    #[structopt(long)]
+    #[arg(long)]
     debug: bool,
 
-    #[structopt(long)]
+    #[arg(long)]
     watch: bool,
 
-    #[structopt(long)]
+    #[arg(long)]
     tracing: bool,
 
-    #[structopt(parse(from_os_str))]
+    #[arg(value_hint = ValueHint::FilePath)]
     file: PathBuf,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct CandyRunOptions {
-    #[structopt(long)]
+    #[arg(long)]
     debug: bool,
 
-    #[structopt(long)]
+    #[arg(long)]
     tracing: bool,
 
-    #[structopt(parse(from_os_str))]
+    #[arg(value_hint = ValueHint::FilePath)]
     file: PathBuf,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct CandyFuzzOptions {
-    #[structopt(long)]
+    #[arg(long)]
     debug: bool,
 
-    #[structopt(parse(from_os_str))]
+    #[arg(value_hint = ValueHint::FilePath)]
     file: PathBuf,
 }
 
 #[tokio::main]
 async fn main() -> ProgramResult {
-    match CandyOptions::from_args() {
+    match CandyOptions::parse() {
         CandyOptions::Build(options) => build(options),
         CandyOptions::Run(options) => run(options),
         CandyOptions::Fuzz(options) => fuzz(options),
