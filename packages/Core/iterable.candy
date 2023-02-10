@@ -233,3 +233,34 @@ fromList l :=
 toList iterable :=
   needs (is iterable)
   iterable | foldLeft (,) { result item -> result | list.append item }
+
+## Partitioning
+
+windowed iterable size step allowPartialWindows :=
+  needs (is iterable)
+  needs (int.is size)
+  needs (int.isPositive size)
+  needs (int.is step)
+  needs (int.isPositive step)
+  needs (bool.is allowPartialWindows)
+
+  generateWithState iterable { iterable ->
+    items = iterable | take size | toList
+    length = items | list.length
+    isLongEnough = ifElse allowPartialWindows {
+      length | int.isPositive
+    } {
+      length | int.equals size
+    }
+    ifElse isLongEnough {
+      result.ok [Item: items, State: iterable | skip step]
+    } {
+      result.error Empty
+    }
+  }
+chunked iterable size :=
+  needs (is iterable)
+  needs (int.is size)
+  needs (int.isPositive size)
+
+  iterable | windowed size size True
