@@ -5,12 +5,6 @@ use ...LinkedList
 use ..
 
 impl[Item] Array[Item] {
-  public static fun filled(length: Int /* UInt */, item: Item): Array[Item] {
-    # Creates a new `Array` of the given `length`, where every slot is filled with the same `item`.
-
-    This.generate(length, { item })
-  }
-
   public static builtin fun generate(length: Int, generator: (Int) -> Item): Array[Item]
   # Creates a new `Array` of the given `length` where the `generator` is invoked with indices to
   # generate items to fill the slots.

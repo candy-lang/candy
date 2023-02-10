@@ -1,8 +1,0 @@
-use ..Hash
-use ..Int
-use ..Maybe
-use ..Operators
-
-impl Bool: Hash {
-  fun hash[H: Hasher](): H { H.primitive(this.match[Int](true = { 1 }, false = { 0 })) }
-}
