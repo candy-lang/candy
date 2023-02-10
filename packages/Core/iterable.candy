@@ -166,6 +166,19 @@ takeWhile iterable tester = generateWithState iterable { iterable ->
 
 takeUntil iterable tester = iterable | takeWhile { item -> tester item | bool.not }
 
+take iterable n := 
+  needs (is iterable)
+  needs (int.is n)
+  needs (int.isNonNegative n)
+
+  iterable
+  | withIndex
+  | takeWhile { it ->
+    [item, index] = it
+    index | int.isLessThan n
+  }
+  | map { it -> it.item }
+
 skipHelper = { skipHelper iterable n ->
   ifElse (equals n 0) {
     iterable
