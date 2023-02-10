@@ -5,6 +5,7 @@ function = use "..function"
 int = use "..int"
 result = use "..result"
 list = use "..list"
+text = use "..text"
 
 # An iterable is a `() -> Result[[Item, Rest: Iterable[Item]], Any]`.
 # isWithItemType value checkItem :=
@@ -133,6 +134,14 @@ any iterable tester :=
     result | bool.or itemResult
   }
   # TODO: stop after the first `True`
+
+joinToText iterable :=
+  needs (is iterable)
+
+  iterable | foldLeft "" { result item ->
+    needs (text.is item)
+    result | text.concatenate item
+  }
 
 ## Filtering
 
