@@ -1457,6 +1457,61 @@ mod parse {
                 },
             )),
         );
+        assert_eq!(
+            expression("(0, foo) | (foo, 0)", 0, false, true, true),
+            Some((
+                "",
+                Rcst::BinaryBar {
+                    left: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::List {
+                            opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
+                            items: vec![
+                                Rcst::TrailingWhitespace {
+                                    child: Box::new(Rcst::ListItem {
+                                        value: Box::new(Rcst::Int {
+                                            value: 0u8.into(),
+                                            string: "0".to_string(),
+                                        }),
+                                        comma: Some(Box::new(Rcst::Comma)),
+                                    }),
+                                    whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                                },
+                                Rcst::ListItem {
+                                    value: Box::new(Rcst::Identifier("foo".to_string())),
+                                    comma: None,
+                                },
+                            ],
+                            closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
+                        }),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    bar: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Bar),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    right: Box::new(Rcst::List {
+                        opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
+                        items: vec![
+                            Rcst::TrailingWhitespace {
+                                child: Box::new(Rcst::ListItem {
+                                    value: Box::new(Rcst::Identifier("foo".to_string())),
+                                    comma: Some(Box::new(Rcst::Comma)),
+                                }),
+                                whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                            },
+                            Rcst::ListItem {
+                                value: Box::new(Rcst::Int {
+                                    value: 0u8.into(),
+                                    string: "0".to_string(),
+                                }),
+                                comma: None,
+                            },
+                        ],
+                        closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
+                    }),
+                },
+            )),
+        );
     }
 
     /// Multiple expressions that are occurring one after another.
@@ -2348,110 +2403,6 @@ mod parse {
             ))
         );
     }
-
-    // #[instrument(level = "trace")]
-    // fn pattern(input: &str, indentation: usize, allow_or: bool) -> Option<(&str, Rcst)> {
-    //     let (mut input, mut result) = int(input)
-    //         .or_else(|| text(input, indentation))
-    //         .or_else(|| symbol(input))
-    //         .or_else(|| list(input, indentation))
-    //         .or_else(|| struct_(input, indentation))
-    //         .or_else(|| identifier(input))?;
-
-    //     loop {
-    //         let (new_input, whitespace_after_left) =
-    //             whitespaces_and_newlines(input, indentation, true);
-
-    //         let Some((new_input, bar)) = bar(new_input) else { break };
-    //         let (new_input, whitespace_after_bar) =
-    //             whitespaces_and_newlines(new_input, indentation + 1, true);
-    //         let bar = bar.wrap_in_whitespace(whitespace_after_bar);
-
-    //         let indentation = if bar.is_multiline() {
-    //             indentation + 1
-    //         } else {
-    //             indentation
-    //         };
-    //         let (new_input, new_right) =
-    //             pattern(new_input, indentation, false).unwrap_or_else(|| {
-    //                 let error = Rcst::Error {
-    //                     unparsable_input: "".to_string(),
-    //                     error: RcstError::OrPatternMissesRight,
-    //                 };
-    //                 (new_input, error)
-    //             });
-
-    //         input = new_input;
-    //         result = Rcst::BinaryBar {
-    //             left: Box::new(result.wrap_in_whitespace(whitespace_after_left)),
-    //             bar: Box::new(bar),
-    //             right: Box::new(new_right),
-    //         };
-    //     }
-    //     Some((input, result))
-    // }
-    // #[test]
-    // fn test_pattern() {
-    //     assert_eq!(
-    //         expression("foo", 0, false, true, true),
-    //         Some(("", Rcst::Identifier("foo".to_string())))
-    //     );
-    //     assert_eq!(
-    //         expression("(0, foo) | (foo, 0)", 0, false, true, true),
-    //         Some((
-    //             "",
-    //             Rcst::BinaryBar {
-    //                 left: Box::new(Rcst::TrailingWhitespace {
-    //                     child: Box::new(Rcst::List {
-    //                         opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
-    //                         items: vec![
-    //                             Rcst::TrailingWhitespace {
-    //                                 child: Box::new(Rcst::ListItem {
-    //                                     value: Box::new(Rcst::Int {
-    //                                         value: 0u8.into(),
-    //                                         string: "0".to_string(),
-    //                                     }),
-    //                                     comma: Some(Box::new(Rcst::Comma)),
-    //                                 }),
-    //                                 whitespace: vec![Rcst::Whitespace(" ".to_string())],
-    //                             },
-    //                             Rcst::ListItem {
-    //                                 value: Box::new(Rcst::Identifier("foo".to_string())),
-    //                                 comma: None,
-    //                             },
-    //                         ],
-    //                         closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
-    //                     }),
-    //                     whitespace: vec![Rcst::Whitespace(" ".to_string())],
-    //                 }),
-    //                 bar: Box::new(Rcst::TrailingWhitespace {
-    //                     child: Box::new(Rcst::Bar),
-    //                     whitespace: vec![Rcst::Whitespace(" ".to_string())],
-    //                 }),
-    //                 right: Box::new(Rcst::List {
-    //                     opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
-    //                     items: vec![
-    //                         Rcst::TrailingWhitespace {
-    //                             child: Box::new(Rcst::ListItem {
-    //                                 value: Box::new(Rcst::Identifier("foo".to_string())),
-    //                                 comma: Some(Box::new(Rcst::Comma)),
-    //                             }),
-    //                             whitespace: vec![Rcst::Whitespace(" ".to_string())],
-    //                         },
-    //                         Rcst::ListItem {
-    //                             value: Box::new(Rcst::Int {
-    //                                 value: 0u8.into(),
-    //                                 string: "0".to_string(),
-    //                             }),
-    //                             comma: None,
-    //                         },
-    //                     ],
-    //                     closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
-    //                 }),
-    //             },
-    //         )),
-    //     );
-    // }
 
     #[instrument(level = "trace")]
     pub fn body(mut input: &str, indentation: usize) -> (&str, Vec<Rcst>) {
