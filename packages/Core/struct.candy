@@ -1,3 +1,4 @@
+[ifElse] = use "..controlFlow"
 type = use "..type"
 
 is value := type.is value Struct
@@ -6,10 +7,13 @@ hasKey struct key :=
   needs (is struct)
   struct | ✨.structHasKey key
 
-getUnwrap struct key :=
+get struct key :=
   needs (is struct)
-  needs (hasKey struct key)
-  struct | ✨.structGet key
+  ifElse (struct | hasKey key) {
+    [Type: Ok, Value: struct | ✨.structGet key]
+  } {
+    [Type: Error, Value: "Key {key} not found in struct"]
+  }
 
 getKeys struct :=
   needs (is struct)
