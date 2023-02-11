@@ -1,5 +1,5 @@
 bool = use "..bool"
-[ifElse] = use "..controlFlow"
+[ifElse, recursive] = use "..controlFlow"
 [equals] = use "..equality"
 function = use "..function"
 int = use "..int"
@@ -29,17 +29,6 @@ isEmpty iterable :=
   needs (is iterable)
   iterable | next | result.isOk
 
-generateWithStateHelper = { generateWithStateHelper state mapper ->
-  {
-    mapper state | result.map { result ->
-      [item, state] = result
-      [
-        item,
-        Rest: generateWithStateHelper generateWithStateHelper state mapper,
-      ]
-    }
-  }
-}
 generateWithState initialState mapper :=
   # Creates a new iterator from a state and mapper. The `mapper` receives the
   # current state and returns either one of these:
@@ -48,7 +37,14 @@ generateWithState initialState mapper :=
   #   new state (`NewState`)
   # - a `result.err`, indicating that the iterator is done
   needs (function.is1 mapper)
-  generateWithStateHelper generateWithStateHelper initialState mapper
+  recursive initialState { recurse state ->
+    {
+      mapper state | result.map { result ->
+        [item, state] = result
+        [item, Rest: recurse state]
+      }
+    }
+  }
 
 ## Mapping Transformation
 ##
