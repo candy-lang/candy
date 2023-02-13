@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use candy_frontend::position::Offset;
 use lazy_static::lazy_static;
-use lsp_types::{Position, SemanticToken};
+use lsp_types::{Position, SemanticToken, SemanticTokensLegend};
 use rustc_hash::FxHashMap;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -40,6 +40,16 @@ impl SemanticTokenType {
             SemanticTokenType::Operator => lsp_types::SemanticTokenType::OPERATOR,
         }
     }
+}
+
+lazy_static! {
+    pub static ref LEGEND: SemanticTokensLegend = SemanticTokensLegend {
+        token_types: SemanticTokenType::iter().map(|it| it.as_lsp()).collect(),
+        token_modifiers: vec![
+            lsp_types::SemanticTokenModifier::DEFINITION,
+            lsp_types::SemanticTokenModifier::READONLY,
+        ],
+    };
 }
 
 pub struct SemanticTokensBuilder<'a> {

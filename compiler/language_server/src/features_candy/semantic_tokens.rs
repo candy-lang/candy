@@ -4,9 +4,7 @@ use candy_frontend::{
     position::PositionConversionDb,
     rcst_to_cst::RcstToCst,
 };
-use lazy_static::lazy_static;
-use lsp_types::{self, SemanticToken, SemanticTokensLegend};
-use strum::IntoEnumIterator;
+use lsp_types::{self, SemanticToken};
 
 use crate::semantic_tokens::{SemanticTokenType, SemanticTokensBuilder};
 
@@ -20,16 +18,6 @@ pub fn semantic_tokens<DB: ModuleDb + PositionConversionDb + RcstToCst>(
     let cst = db.cst(module).unwrap();
     visit_csts(&mut builder, &cst, None);
     builder.finish()
-}
-
-lazy_static! {
-    pub static ref LEGEND: SemanticTokensLegend = SemanticTokensLegend {
-        token_types: SemanticTokenType::iter().map(|it| it.as_lsp()).collect(),
-        token_modifiers: vec![
-            lsp_types::SemanticTokenModifier::DEFINITION,
-            lsp_types::SemanticTokenModifier::READONLY,
-        ],
-    };
 }
 
 fn visit_csts(

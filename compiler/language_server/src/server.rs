@@ -22,8 +22,9 @@ use tracing::{debug, span, Level};
 use crate::{
     database::Database,
     features::LanguageFeatures,
-    features_candy::{hints::HintsNotification, semantic_tokens, CandyFeatures},
+    features_candy::{hints::HintsNotification, CandyFeatures},
     features_ir::{Ir, IrFeatures},
+    semantic_tokens,
     utils::{module_from_package_root_and_url, module_to_url, LspPositionConversion},
 };
 
