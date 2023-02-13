@@ -182,14 +182,14 @@ impl LanguageFeatures for CandyFeatures {
     fn supports_semantic_tokens(&self) -> bool {
         true
     }
-    fn semantic_tokens<'life0, 'life1, 'async_trait>(
-        &'life0 self,
-        db: &'life1 Database,
+    fn semantic_tokens<'self, 'db, 'async_trait>(
+        &'self self,
+        db: &'db Database,
         module: Module,
     ) -> Pin<Box<dyn Future<Output = Vec<SemanticToken>> + Send + 'async_trait>>
     where
-        'life0: 'async_trait,
-        'life1: 'async_trait,
+        'self: 'async_trait,
+        'db: 'async_trait,
         Self: 'async_trait,
     {
         // [Database] is not [Send], so we can't use it in the async block.
