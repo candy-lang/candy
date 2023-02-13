@@ -1,6 +1,9 @@
-use super::{cst, cst_to_ast::CstToAst, error::CompilerError, utils::AdjustCasingOfFirstLetter};
-use crate::module::Module;
-use itertools::Itertools;
+use super::{cst, cst_to_ast::CstToAst, error::CompilerError};
+use crate::{
+    module::Module,
+    rich_ir::{RichIrBuilder, ToRichIr, TokenType},
+};
+use enumset::EnumSet;
 use num_bigint::BigUint;
 use rustc_hash::FxHashMap;
 use std::{
@@ -392,181 +395,173 @@ impl CollectErrors for Vec<Ast> {
     }
 }
 
-impl Display for Ast {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: ", self.id.to_short_debug_string())?;
+impl ToRichIr for Ast {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         match &self.kind {
-            AstKind::Int(Int(int)) => write!(f, "int {}", int),
-            AstKind::Text(Text(parts)) => {
-                write!(
-                    f,
-                    "text (\n{}\n)",
-                    parts
-                        .iter()
-                        .map(|part| format!("{part},"))
-                        .join("\n")
-                        .lines()
-                        .map(|line| format!("  {line}"))
-                        .join("\n")
-                )
-            }
-            AstKind::TextPart(TextPart(text)) => write!(f, "textPart {}", text),
-            AstKind::Identifier(Identifier(identifier)) => write!(f, "identifier {}", identifier),
-            AstKind::Symbol(Symbol(symbol)) => write!(f, "symbol {}", symbol),
-            AstKind::List(List(items)) => {
-                write!(
-                    f,
-                    "list (\n{}\n)",
-                    items
-                        .iter()
-                        .map(|value| format!("{value},"))
-                        .join("\n")
-                        .lines()
-                        .map(|line| format!("  {line}"))
-                        .join("\n")
-                )
-            }
-            AstKind::Struct(Struct { fields }) => {
-                write!(
-                    f,
-                    "struct [\n{}\n]",
-                    fields
-                        .iter()
-                        .map(|(key, value)| if let Some(key) = key {
-                            format!("{key}: {value},")
-                        } else {
-                            format!("{value},")
-                        })
-                        .join("\n")
-                        .lines()
-                        .map(|line| format!("  {line}"))
-                        .join("\n")
-                )
-            }
-            AstKind::StructAccess(struct_access) => write!(f, "{struct_access}"),
-            AstKind::Lambda(lambda) => write!(f, "{}", lambda),
-            AstKind::Call(call) => write!(f, "{}", call),
-            AstKind::Assignment(assignment) => {
-                write!(
-                    f,
-                    "assignment: {} {}=\n{}",
-                    match &assignment.body {
-                        AssignmentBody::Lambda { name, .. } => name.value.to_owned(),
-                        AssignmentBody::Body { pattern, .. } => format!("{}", pattern),
-                    },
-                    if assignment.is_public { ":" } else { "" },
-                    match &assignment.body {
-                        AssignmentBody::Lambda { lambda, .. } => format!("{}", lambda),
-                        AssignmentBody::Body { body, .. } =>
-                            body.iter().map(|it| format!("{it}")).join("\n"),
-                    }
-                    .lines()
-                    .map(|line| format!("  {line}"))
-                    .join("\n"),
-                )
-            }
-            AstKind::Match(match_) => write!(
-                f,
-                "match: {} %\n{}",
-                match_.expression,
-                match_
-                    .cases
-                    .iter()
-                    .join("\n")
-                    .lines()
-                    .map(|line| format!("  {line}"))
-                    .join("\n"),
-            ),
-            AstKind::MatchCase(match_case) => write!(
-                f,
-                "{} -> {}",
-                match_case.pattern,
-                if match_case.body.len() == 1 {
-                    format!("{}", match_case.body[0])
-                } else {
-                    format!("\n  {}", match_case.body.iter().join("\n"))
-                }
-                .lines()
-                .map(|line| line.to_string())
-                .join("  \n"),
-            ),
-            AstKind::OrPattern(OrPattern(patterns)) => {
-                write!(
-                    f,
-                    "{}",
-                    patterns.iter().map(|it| it.to_string()).join(" | "),
-                )
-            }
+            AstKind::Int(int) => int.build_rich_ir(builder),
+            AstKind::Text(text) => text.build_rich_ir(builder),
+            AstKind::TextPart(part) => part.build_rich_ir(builder),
+            AstKind::Identifier(identifier) => identifier.build_rich_ir(builder),
+            AstKind::Symbol(symbol) => symbol.build_rich_ir(builder),
+            AstKind::List(list) => list.build_rich_ir(builder),
+            AstKind::Struct(struct_) => struct_.build_rich_ir(builder),
+            AstKind::StructAccess(struct_access) => struct_access.build_rich_ir(builder),
+            AstKind::Lambda(lambda) => lambda.build_rich_ir(builder),
+            AstKind::Call(call) => call.build_rich_ir(builder),
+            AstKind::Assignment(assignment) => assignment.build_rich_ir(builder),
+            AstKind::Match(match_) => match_.build_rich_ir(builder),
+            AstKind::MatchCase(match_case) => match_case.build_rich_ir(builder),
+            AstKind::OrPattern(or_pattern) => or_pattern.build_rich_ir(builder),
             AstKind::Error { child, errors } => {
-                write!(
-                    f,
-                    "error:\n{}",
-                    errors.iter().map(|error| format!("  {error}")).join("\n"),
-                )?;
+                builder.push("error:", None, EnumSet::empty());
+                builder.push_children(errors);
                 if let Some(child) = child {
-                    write!(f, "\n  fallback: {child}")?;
+                    builder.push("fallback:", None, EnumSet::empty());
+                    child.build_rich_ir(builder);
                 }
-                Ok(())
             }
         }
     }
 }
-impl Display for Lambda {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "lambda ({}) {{ {} ->\n{}\n}}",
-            if self.fuzzable {
-                "fuzzable"
-            } else {
-                "non-fuzzable"
-            },
-            if self.parameters.is_empty() {
-                "".to_string()
-            } else {
-                format!(
-                    "{} ->",
-                    self.parameters.iter().map(|it| format!("{it}")).join(" "),
-                )
-            },
-            self.body
-                .iter()
-                .map(|it| format!("{it}"))
-                .join("\n")
-                .lines()
-                .map(|line| format!("  {line}"))
-                .join("\n")
+impl ToRichIr for Int {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push(
+            format!(" int {}", self.0),
+            Some(TokenType::Int),
+            EnumSet::empty(),
         )
     }
 }
-impl Display for StructAccess {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "struct access {}.{}",
-            self.struct_,
-            self.key.lowercase_first_letter()
-        )
+impl ToRichIr for Text {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push("text", None, EnumSet::empty());
+        builder.push_children(&self.0);
     }
 }
-impl Display for Call {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "call {} with these arguments:\n{}",
-            self.receiver,
-            self.arguments
-                .iter()
-                .map(|argument| format!("{argument}"))
-                .join("\n")
-                .lines()
-                .map(|line| format!("  {line}"))
-                .join("\n")
-        )
+impl ToRichIr for TextPart {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push("textPart ", None, EnumSet::empty());
+        self.0.build_rich_ir(builder);
     }
 }
-impl Display for AstString {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, r#"{}@"{}""#, self.id.to_short_debug_string(), self.value)
+impl ToRichIr for Identifier {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push("identifier ", None, EnumSet::empty());
+        self.0.build_rich_ir(builder);
+    }
+}
+impl ToRichIr for Symbol {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push("symbol ", None, EnumSet::empty());
+        self.0.build_rich_ir(builder);
+    }
+}
+impl ToRichIr for List {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push("list", None, EnumSet::empty());
+        builder.push_children(&self.0);
+    }
+}
+impl ToRichIr for Struct {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push("struct", None, EnumSet::empty());
+        builder.push_children_custom(&self.fields, |builder, (key, value)| {
+            if let Some(key) = key {
+                key.build_rich_ir(builder);
+                builder.push(": ", None, EnumSet::empty());
+            }
+
+            value.build_rich_ir(builder);
+        });
+    }
+}
+impl ToRichIr for StructAccess {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push("struct access ", None, EnumSet::empty());
+        self.struct_.build_rich_ir(builder);
+        builder.push(".", None, EnumSet::empty());
+        self.key.build_rich_ir(builder); // TODO: `lowercase_first_letter()`?
+    }
+}
+impl ToRichIr for Lambda {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push(
+            format!(
+                "lambda ({}) {{",
+                if self.fuzzable {
+                    "fuzzable"
+                } else {
+                    "non-fuzzable"
+                },
+            ),
+            None,
+            EnumSet::empty(),
+        );
+        for parameter in &self.parameters {
+            parameter.build_rich_ir(builder);
+            builder.push(" ", None, EnumSet::empty());
+        }
+        builder.push("->", None, EnumSet::empty());
+        builder.push_children(&self.body);
+        builder.push("}", None, EnumSet::empty());
+    }
+}
+impl ToRichIr for Call {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push("call ", None, EnumSet::empty());
+        self.receiver.build_rich_ir(builder);
+        builder.push(" with these arguments:", None, EnumSet::empty());
+        builder.push_children(&self.arguments);
+    }
+}
+impl ToRichIr for Assignment {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push("assignment: ", None, EnumSet::empty());
+        match &self.body {
+            AssignmentBody::Lambda { name, .. } => name.build_rich_ir(builder),
+            AssignmentBody::Body { pattern, .. } => pattern.build_rich_ir(builder),
+        }
+        builder.push(
+            if self.is_public { ":=" } else { "=" },
+            None,
+            EnumSet::empty(),
+        );
+        match &self.body {
+            AssignmentBody::Lambda { lambda, .. } => lambda.build_rich_ir(builder),
+            AssignmentBody::Body { body, .. } => builder.push_children(body),
+        }
+    }
+}
+impl ToRichIr for Match {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push("match ", None, EnumSet::empty());
+        self.expression.build_rich_ir(builder);
+        builder.push(" %", None, EnumSet::empty());
+        builder.push_children(&self.cases);
+    }
+}
+impl ToRichIr for MatchCase {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        self.pattern.build_rich_ir(builder);
+        builder.push(" -> ", None, EnumSet::empty());
+        builder.push_children(&self.body);
+    }
+}
+impl ToRichIr for OrPattern {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        self.0.first().unwrap().build_rich_ir(builder);
+        for pattern in self.0.iter().skip(1) {
+            builder.push(" | ", None, EnumSet::empty());
+            pattern.build_rich_ir(builder);
+        }
+    }
+}
+impl ToRichIr for AstString {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push(
+            format!(r#"{}@"{}""#, self.id.to_short_debug_string(), self.value),
+            Some(TokenType::Text),
+            EnumSet::empty(),
+        );
     }
 }

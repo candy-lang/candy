@@ -6,11 +6,14 @@ import {
 } from 'vscode-languageclient';
 
 // Debug IRs
-export interface ViewRcstParams {
+export interface ViewIrParams {
   readonly uri: DocumentUri;
 }
-export const viewRcst = new RequestType<ViewRcstParams, string, void>(
+export const viewRcst = new RequestType<ViewIrParams, string, void>(
   'candy/viewRcst'
+);
+export const viewAst = new RequestType<ViewIrParams, string, void>(
+  'candy/viewAst'
 );
 
 // Hints

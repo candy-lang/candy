@@ -16,7 +16,7 @@ where
         .to_related_information()
         .into_iter()
         .filter_map(|(module, cst_id, message)| {
-            let uri = module_to_url(module.clone())?;
+            let uri = module_to_url(&module)?;
 
             let span = db.find_cst(module.clone(), cst_id).display_span();
             let range = db.range_to_lsp_range(module, span);
@@ -64,8 +64,8 @@ pub fn module_from_package_root_and_url(
     }
 }
 
-pub fn module_to_url(module: Module) -> Option<Url> {
-    match module.package {
+pub fn module_to_url(module: &Module) -> Option<Url> {
+    match &module.package {
         Package::User(_) | Package::External(_) => Some(
             Url::from_file_path(
                 module
@@ -155,18 +155,19 @@ impl<DB: ModuleDb + PositionConversionDb + ?Sized> LspPositionConversion for DB 
 }
 
 pub trait JoinWithCommasAndAnd {
-    fn join_with_commas_and_and(self) -> String;
+    fn join_with_commas_and_and(&self) -> String;
 }
-impl JoinWithCommasAndAnd for Vec<String> {
-    fn join_with_commas_and_and(mut self) -> String {
-        match &self[..] {
+impl<S: AsRef<str>> JoinWithCommasAndAnd for [S] {
+    fn join_with_commas_and_and(&self) -> String {
+        match self {
             [] => panic!("Joining no parts."),
-            [part] => part.to_string(),
-            [first, second] => format!("{first} and {second}"),
-            _ => {
-                let last = self.pop().unwrap();
-                format!("{}, and {last}", self.into_iter().join(", "))
-            }
+            [part] => part.as_ref().to_string(),
+            [first, second] => format!("{} and {}", first.as_ref(), second.as_ref()),
+            [rest @ .., last] => format!(
+                "{}, and {}",
+                rest.iter().map(|it| it.as_ref()).join(", "),
+                last.as_ref(),
+            ),
         }
     }
 }

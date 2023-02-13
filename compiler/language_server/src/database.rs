@@ -17,18 +17,12 @@ use candy_frontend::{
 };
 use candy_vm::mir_to_lir::MirToLirStorage;
 
-use crate::{
-    folding_range::FoldingRangeDbStorage, references::ReferencesDbStorage,
-    semantic_tokens::SemanticTokenDbStorage,
-};
-
 #[derive()]
 #[salsa::database(
     AstDbStorage,
     AstToHirStorage,
     CstDbStorage,
     CstToAstStorage,
-    FoldingRangeDbStorage,
     HirDbStorage,
     HirToMirStorage,
     MirToLirStorage,
@@ -36,8 +30,6 @@ use crate::{
     OptimizeMirStorage,
     PositionConversionStorage,
     RcstToCstStorage,
-    ReferencesDbStorage,
-    SemanticTokenDbStorage,
     StringToRcstStorage
 )]
 pub struct Database {

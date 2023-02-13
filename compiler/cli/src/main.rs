@@ -10,10 +10,11 @@ use candy_frontend::{
     module::{Module, ModuleKind},
     position::PositionConversionDb,
     rcst_to_cst::RcstToCst,
+    rich_ir::ToRichIr,
     string_to_rcst::StringToRcst,
     TracingConfig, TracingMode,
 };
-use candy_language_server::CandyLanguageServer;
+use candy_language_server::server::Server;
 use candy_vm::{
     channel::{ChannelId, Packet},
     context::{DbUseProvider, RunForever},
@@ -38,7 +39,6 @@ use std::{
     time::Duration,
 };
 use structopt::StructOpt;
-use tower_lsp::Server;
 use tracing::{debug, error, info, warn, Level, Metadata};
 use tracing_subscriber::{
     filter,
@@ -163,10 +163,7 @@ fn raw_build(
 
     let (asts, ast_cst_id_map) = db.ast(module.clone()).unwrap();
     if debug {
-        module.dump_associated_debug_file(
-            "ast",
-            &format!("{}\n", asts.iter().map(|ast| format!("{}", ast)).join("\n")),
-        );
+        module.dump_associated_debug_file("ast", &format!("{}\n", asts.to_rich_ir().text));
         module.dump_associated_debug_file(
             "ast_to_cst_ids",
             &ast_cst_id_map
@@ -497,8 +494,8 @@ fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
 async fn lsp() -> ProgramResult {
     init_logger(false);
     info!("Starting language server…");
-    let (service, socket) = CandyLanguageServer::create();
-    Server::new(tokio::io::stdin(), tokio::io::stdout(), socket)
+    let (service, socket) = Server::create();
+    tower_lsp::Server::new(tokio::io::stdin(), tokio::io::stdout(), socket)
         .serve(service)
         .await;
     Ok(())

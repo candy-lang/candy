@@ -12,12 +12,10 @@ use strum_macros::EnumIter;
 
 use crate::utils::LspPositionConversion;
 
-#[salsa::query_group(SemanticTokenDbStorage)]
-pub trait SemanticTokenDb: ModuleDb + PositionConversionDb + RcstToCst {
-    fn semantic_tokens(&self, module: Module) -> Vec<SemanticToken>;
-}
-
-fn semantic_tokens(db: &dyn SemanticTokenDb, module: Module) -> Vec<SemanticToken> {
+pub fn semantic_tokens<DB: ModuleDb + PositionConversionDb + RcstToCst>(
+    db: &DB,
+    module: Module,
+) -> Vec<SemanticToken> {
     let mut context = Context::new(db, module.clone());
     let cst = db.cst(module).unwrap();
     context.visit_csts(&cst, None);
@@ -67,7 +65,7 @@ impl SemanticTokenType {
     }
 }
 
-struct Context<'a, DB: ModuleDb + PositionConversionDb + SemanticTokenDb + ?Sized> {
+struct Context<'a, DB: ModuleDb + PositionConversionDb + ?Sized> {
     db: &'a DB,
     module: Module,
     tokens: Vec<SemanticToken>,
@@ -75,7 +73,7 @@ struct Context<'a, DB: ModuleDb + PositionConversionDb + SemanticTokenDb + ?Size
 }
 impl<'a, DB> Context<'a, DB>
 where
-    DB: ModuleDb + PositionConversionDb + SemanticTokenDb + ?Sized,
+    DB: ModuleDb + PositionConversionDb + ?Sized,
 {
     fn new(db: &'a DB, module: Module) -> Self {
         Context {

@@ -19,7 +19,7 @@ use self::{constant_evaluator::ConstantEvaluator, fuzzer::FuzzerManager};
 use candy_frontend::module::{Module, MutableModuleProviderOwner};
 use candy_vm::heap::Heap;
 use itertools::Itertools;
-use lsp_types::{notification::Notification, Position};
+use lsp_types::{notification::Notification, Position, Url};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, time::Duration, vec};
 use tokio::{
@@ -50,7 +50,7 @@ pub enum HintKind {
 
 #[derive(Serialize, Deserialize)]
 pub struct HintsNotification {
-    pub uri: String,
+    pub uri: Url,
     pub hints: Vec<Hint>,
 }
 impl Notification for HintsNotification {

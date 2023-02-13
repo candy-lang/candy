@@ -56,6 +56,11 @@
         "command": "candy.debug.viewRcst",
         "category": "Candy Compiler Debugging",
         "title": "View RCST"
+      },
+      {
+        "command": "candy.debug.viewAst",
+        "category": "Candy Compiler Debugging",
+        "title": "View AST"
       }
     ],
     "configuration": {
