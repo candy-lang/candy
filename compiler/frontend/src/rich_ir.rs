@@ -23,8 +23,7 @@ pub enum TokenType {
     Text,
 }
 #[derive(Debug, EnumSetType)]
-pub enum TokenModifier {
-}
+pub enum TokenModifier {}
 
 pub trait ToRichIr {
     fn to_rich_ir(&self) -> RichIr {
