@@ -99,10 +99,10 @@ pub impl<DB: ModuleDb + PositionConversionDb + ?Sized> LspPositionConversion for
             end: self.offset_to_lsp_position(module, range.end),
         }
     }
-    fn offset_to_lsp_position(&self, module: Module, mut offset: Offset) -> Position {
+    fn offset_to_lsp_position(&self, module: Module, offset: Offset) -> Position {
         let text = self.get_module_content_as_string(module.clone()).unwrap();
         let line_start_offsets = self.line_start_offsets(module);
-        offset_to_lsp_position_raw(*text, *line_start_offsets, offset)
+        offset_to_lsp_position_raw(&*text, &*line_start_offsets, offset)
     }
 }
 
@@ -147,6 +147,8 @@ where
     S: AsRef<str>,
     L: AsRef<[Offset]>,
 {
+    let text = text.as_ref();
+    let line_start_offsets = line_start_offsets.as_ref();
     lsp_types::Range {
         start: offset_to_lsp_position_raw(text, line_start_offsets, range.start),
         end: offset_to_lsp_position_raw(text, line_start_offsets, range.end),

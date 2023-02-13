@@ -1,19 +1,27 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use candy_frontend::{
     cst_to_ast::CstToAst,
     module::Module,
-    rich_ir::{RichIr, ToRichIr},
+    position::line_start_offsets_raw,
+    rich_ir::{RichIr, ToRichIr, TokenType},
     string_to_rcst::{InvalidModuleError, StringToRcst},
 };
-use lsp_types::Url;
+use extension_trait::extension_trait;
+use lsp_types::{SemanticToken, Url};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 use tokio::sync::RwLock;
 use tower_lsp::jsonrpc;
 
-use crate::{database::Database, features::LanguageFeatures, server::Server};
+use crate::{
+    database::Database,
+    features::LanguageFeatures,
+    semantic_tokens::{SemanticTokenType, SemanticTokensBuilder},
+    server::Server,
+};
 
 #[derive(Debug, EnumIter, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum Ir {
@@ -84,6 +92,7 @@ impl IrFeatures {
         }
     }
 }
+#[async_trait]
 impl LanguageFeatures for IrFeatures {
     fn language_id(&self) -> Option<String> {
         None
@@ -92,10 +101,36 @@ impl LanguageFeatures for IrFeatures {
         vec![self.url_scheme.to_string()]
     }
 
-    // fn supports_semantic_tokens(&self) -> bool {
-    //     true
-    // }
-    // fn semantic_tokens(&self, _db: &Database, _module: Module) -> Vec<SemanticToken> {
-    //     vec![]
-    // }
+    fn supports_semantic_tokens(&self) -> bool {
+        true
+    }
+    async fn semantic_tokens(&self, _db: &Database, module: Module) -> Vec<SemanticToken> {
+        let open_irs = self.open_irs.read().await;
+        let ir = open_irs.get(&module).unwrap();
+        ir.to_semantic_tokens()
+    }
+}
+
+#[extension_trait]
+impl RichIrExtension for RichIr {
+    fn to_semantic_tokens(&self) -> Vec<SemanticToken> {
+        let line_start_offsets = line_start_offsets_raw(&self.text);
+        let mut builder = SemanticTokensBuilder::new(&self.text, &line_start_offsets);
+        for annotation in &self.annotations {
+            let Some(token_type) = annotation.token_type else { continue; };
+            builder.add(annotation.range.clone(), token_type.to_semantic());
+        }
+        builder.finish()
+    }
+}
+
+#[extension_trait]
+impl TokenTypeToSemantic for TokenType {
+    fn to_semantic(&self) -> SemanticTokenType {
+        match self {
+            TokenType::Int => SemanticTokenType::Int,
+            TokenType::Symbol => SemanticTokenType::Symbol,
+            TokenType::Text => SemanticTokenType::Text,
+        }
+    }
 }

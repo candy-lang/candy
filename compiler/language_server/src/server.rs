@@ -58,6 +58,7 @@ impl ServerState {
         }
     }
 }
+
 pub struct ServerFeatures {
     pub candy: CandyFeatures,
     pub ir: FxHashMap<Ir, IrFeatures>,
@@ -171,7 +172,8 @@ impl Server {
         };
 
         let original_url = if ir.is_some() {
-            let (_, original_scheme) = url.query_pairs().find(|(key, _)| key == "scheme").unwrap();
+            let original_scheme = url.query().unwrap().strip_prefix("scheme%3D").unwrap();
+            let original_scheme = urlencoding::decode(original_scheme).unwrap();
             Url::parse(&format!("{}://{}", original_scheme, url.path())).unwrap()
         } else {
             url
@@ -188,8 +190,6 @@ impl Server {
         let features = RwLockReadGuard::map(self.state.read().await, |state| {
             let features = state.require_features();
             ir.map(|ir| features.ir.get(&ir).unwrap() as &dyn LanguageFeatures)
-                // .map::<Box<&dyn LanguageFeatures>, _>(|it| Box::new(it))
-                // .unwrap_or_else(|| Box::new(&features.candy))
                 .unwrap_or_else(|| &features.candy)
         });
         (features, module)
@@ -434,6 +434,7 @@ impl LanguageServer for Server {
             .await;
         let db = self.db.lock().await;
         let tokens = features.semantic_tokens(&db, module);
+        let tokens = tokens.await;
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
             result_id: None,
             data: tokens,

@@ -16,12 +16,13 @@ pub struct RichIrAnnotation {
     pub token_modifiers: EnumSet<TokenModifier>,
 }
 
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum TokenType {
     Int,
     Symbol,
     Text,
 }
-#[derive(EnumSetType)]
+#[derive(Debug, EnumSetType)]
 pub enum TokenModifier {
 }
 

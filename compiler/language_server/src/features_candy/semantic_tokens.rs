@@ -14,10 +14,9 @@ pub fn semantic_tokens<DB: ModuleDb + PositionConversionDb + RcstToCst>(
     db: &DB,
     module: Module,
 ) -> Vec<SemanticToken> {
-    let mut builder = SemanticTokensBuilder::new(
-        *db.get_module_content_as_string(module.clone()).unwrap(),
-        *db.line_start_offsets(module.clone()),
-    );
+    let text = db.get_module_content_as_string(module.clone()).unwrap();
+    let line_start_offsets = db.line_start_offsets(module.clone());
+    let mut builder = SemanticTokensBuilder::new(&*text, &*line_start_offsets);
     let cst = db.cst(module).unwrap();
     visit_csts(&mut builder, &cst, None);
     builder.finish()
@@ -33,8 +32,8 @@ lazy_static! {
     };
 }
 
-fn visit_csts<'a>(
-    builder: &mut SemanticTokensBuilder<'a>,
+fn visit_csts(
+    builder: &mut SemanticTokensBuilder<'_>,
     csts: &[Cst],
     token_type_for_identifier: Option<SemanticTokenType>,
 ) {
@@ -42,8 +41,8 @@ fn visit_csts<'a>(
         visit_cst(builder, cst, token_type_for_identifier)
     }
 }
-fn visit_cst<'a>(
-    builder: &mut SemanticTokensBuilder<'a>,
+fn visit_cst(
+    builder: &mut SemanticTokensBuilder<'_>,
     cst: &Cst,
     token_type_for_identifier: Option<SemanticTokenType>,
 ) {
@@ -79,23 +78,23 @@ fn visit_cst<'a>(
             token_type_for_identifier.unwrap_or(SemanticTokenType::Variable),
         ),
         CstKind::Symbol { .. } => builder.add(cst.span.clone(), SemanticTokenType::Symbol),
-        CstKind::Int { .. } => builder.add(cst.span.clone(), SemanticTokenType::Number),
+        CstKind::Int { .. } => builder.add(cst.span.clone(), SemanticTokenType::Int),
         CstKind::OpeningText {
             opening_single_quotes,
             opening_double_quote,
         } => {
             for opening_single_quote in opening_single_quotes {
-                builder.add(opening_single_quote.span.clone(), SemanticTokenType::String);
+                builder.add(opening_single_quote.span.clone(), SemanticTokenType::Text);
             }
-            builder.add(opening_double_quote.span.clone(), SemanticTokenType::String);
+            builder.add(opening_double_quote.span.clone(), SemanticTokenType::Text);
         }
         CstKind::ClosingText {
             closing_double_quote,
             closing_single_quotes,
         } => {
-            builder.add(closing_double_quote.span.clone(), SemanticTokenType::String);
+            builder.add(closing_double_quote.span.clone(), SemanticTokenType::Text);
             for closing_single_quote in closing_single_quotes {
-                builder.add(closing_single_quote.span.clone(), SemanticTokenType::String);
+                builder.add(closing_single_quote.span.clone(), SemanticTokenType::Text);
             }
         }
         CstKind::Text {
@@ -109,7 +108,7 @@ fn visit_cst<'a>(
             }
             visit_cst(builder, closing, None);
         }
-        CstKind::TextPart(_) => builder.add(cst.span.clone(), SemanticTokenType::String),
+        CstKind::TextPart(_) => builder.add(cst.span.clone(), SemanticTokenType::Text),
         CstKind::TextInterpolation {
             opening_curly_braces,
             expression,

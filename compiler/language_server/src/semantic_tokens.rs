@@ -16,8 +16,8 @@ pub enum SemanticTokenType {
     Symbol,
     Function,
     Comment,
-    String,
-    Number,
+    Text,
+    Int,
     Operator,
 }
 lazy_static! {
@@ -35,8 +35,8 @@ impl SemanticTokenType {
             SemanticTokenType::Symbol => lsp_types::SemanticTokenType::ENUM_MEMBER,
             SemanticTokenType::Function => lsp_types::SemanticTokenType::FUNCTION,
             SemanticTokenType::Comment => lsp_types::SemanticTokenType::COMMENT,
-            SemanticTokenType::String => lsp_types::SemanticTokenType::STRING,
-            SemanticTokenType::Number => lsp_types::SemanticTokenType::NUMBER,
+            SemanticTokenType::Text => lsp_types::SemanticTokenType::STRING,
+            SemanticTokenType::Int => lsp_types::SemanticTokenType::NUMBER,
             SemanticTokenType::Operator => lsp_types::SemanticTokenType::OPERATOR,
         }
     }
@@ -49,7 +49,7 @@ pub struct SemanticTokensBuilder<'a> {
     cursor: Position,
 }
 impl<'a> SemanticTokensBuilder<'a> {
-    pub fn new<S, L>(text: S, line_start_offsets: L) -> Self
+    pub fn new<S, L>(text: &'a S, line_start_offsets: &'a L) -> Self
     where
         S: AsRef<str>,
         L: AsRef<[Offset]>,

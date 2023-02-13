@@ -64,12 +64,13 @@ fn offset_to_position(
 
 fn line_start_offsets(db: &dyn PositionConversionDb, module: Module) -> Arc<Vec<Offset>> {
     let text = db.get_module_content_as_string(module).unwrap();
-    Arc::new(line_start_offsets_raw(&text))
+    Arc::new(line_start_offsets_raw(&*text))
 }
-pub fn line_start_offsets_raw(text: &str) -> Vec<Offset> {
+pub fn line_start_offsets_raw<S: AsRef<str>>(text: S) -> Vec<Offset> {
     let mut offsets = vec![Offset(0)];
     offsets.extend(
-        text.bytes()
+        text.as_ref()
+            .bytes()
             .enumerate()
             .filter(|(_, it)| it == &b'\n')
             .map(|(index, _)| Offset(index + 1)),

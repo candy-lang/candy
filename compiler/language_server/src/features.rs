@@ -75,7 +75,7 @@ pub trait LanguageFeatures: Send + Sync {
     fn supports_semantic_tokens(&self) -> bool {
         false
     }
-    fn semantic_tokens(&self, _db: &Database, _module: Module) -> Vec<SemanticToken> {
+    async fn semantic_tokens(&self, _db: &Database, _module: Module) -> Vec<SemanticToken> {
         unimplemented!()
     }
 }

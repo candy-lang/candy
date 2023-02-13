@@ -1,4 +1,4 @@
-use std::thread;
+use std::{future::Future, pin::Pin, thread};
 
 use async_trait::async_trait;
 use candy_frontend::{
@@ -183,8 +183,21 @@ impl LanguageFeatures for CandyFeatures {
     fn supports_semantic_tokens(&self) -> bool {
         true
     }
-    fn semantic_tokens(&self, db: &Database, module: Module) -> Vec<SemanticToken> {
-        semantic_tokens(db, module)
+    fn semantic_tokens<'life0, 'life1, 'async_trait>(
+        &'life0 self,
+        db: &'life1 Database,
+        module: Module,
+    ) -> Pin<Box<dyn Future<Output = Vec<SemanticToken>> + Send + 'async_trait>>
+    where
+        'life0: 'async_trait,
+        'life1: 'async_trait,
+        Self: 'async_trait,
+    {
+        // [Database] is not [Send], so we can't use it in the async block.
+        // Since we don't need it after any async break, we avoid the `async`
+        // keyword for this function and use the database synchronously.
+        let tokens = semantic_tokens(db, module);
+        Box::pin(async move { tokens })
     }
 }
 
