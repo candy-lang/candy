@@ -1,7 +1,5 @@
-use std::{
-    ops::{Deref, DerefMut, Range},
-    sync::Arc,
-};
+use derive_more::{Deref, DerefMut, From};
+use std::{ops::Range, sync::Arc};
 
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -9,26 +7,9 @@ use crate::module::{Module, ModuleDb};
 
 /// The offset of a character in a string as the number of bytes preceding it in
 /// UTF-8 encoding.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, DerefMut, From)]
+#[from(forward)]
 pub struct Offset(pub usize);
-
-impl From<usize> for Offset {
-    fn from(offset: usize) -> Self {
-        Offset(offset)
-    }
-}
-impl Deref for Offset {
-    type Target = usize;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl DerefMut for Offset {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Position {
