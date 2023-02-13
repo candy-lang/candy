@@ -11,6 +11,7 @@ async-trait = "0.1.64"
 candy_frontend = { path = "../frontend" }
 candy_fuzzer = { path = "../fuzzer" }
 candy_vm = { path = "../vm" }
+extension-trait = "1.0.1"
 itertools = { version = "0.10.0" }
 lazy_static = "1.4.0"
 lsp-types = "0.93.0"
