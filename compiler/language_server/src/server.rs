@@ -111,10 +111,6 @@ impl Server {
             let candy_features = CandyFeatures::new(diagnostics_sender, hints_sender);
             let ir_features = Ir::iter().map(|ir| (ir, IrFeatures::new(ir))).collect();
 
-            // let (mut diagnostics_receiver, mut hints_receiver) = {
-            //     let mut receivers = self.diagnostics_and_hints_receiver.lock().await;
-            //     mem::take(&mut *receivers).unwrap()
-            // };
             let client_for_closure = client.clone();
             let diagnostics_reporter = async move || {
                 while let Some((module, diagnostics)) = diagnostics_receiver.recv().await {

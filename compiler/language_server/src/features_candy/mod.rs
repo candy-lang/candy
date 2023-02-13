@@ -42,7 +42,6 @@ impl CandyFeatures {
         hints_sender: Sender<(Module, Vec<Hint>)>,
     ) -> Self {
         let (hints_events_sender, hints_events_receiver) = tokio::sync::mpsc::channel(1024);
-        // let (hints_sender, mut hints_receiver) = tokio::sync::mpsc::channel(1024);
         thread::spawn(|| {
             hints::run_server(hints_events_receiver, hints_sender);
         });
