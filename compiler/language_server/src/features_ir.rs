@@ -2,10 +2,11 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use candy_frontend::{
+    ast_to_hir::AstToHir,
     cst_to_ast::CstToAst,
     module::Module,
     position::line_start_offsets_raw,
-    rich_ir::{RichIr, ToRichIr, TokenType},
+    rich_ir::{RichIr, ToRichIr, TokenModifier, TokenType},
     string_to_rcst::{InvalidModuleError, StringToRcst},
 };
 use extension_trait::extension_trait;
@@ -19,7 +20,7 @@ use tower_lsp::jsonrpc;
 use crate::{
     database::Database,
     features::LanguageFeatures,
-    semantic_tokens::{SemanticTokenType, SemanticTokensBuilder},
+    semantic_tokens::{SemanticTokenModifier, SemanticTokenType, SemanticTokensBuilder},
     server::Server,
 };
 
@@ -27,6 +28,7 @@ use crate::{
 pub enum Ir {
     Rcst,
     Ast,
+    Hir,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
@@ -48,6 +50,12 @@ impl Server {
     pub async fn candy_view_ast(&self, params: ViewIrParams) -> jsonrpc::Result<String> {
         self.candy_view_ir(params, Ir::Ast, |db, module| {
             db.ast(module).map(|(asts, _)| asts.to_rich_ir())
+        })
+        .await
+    }
+    pub async fn candy_view_hir(&self, params: ViewIrParams) -> jsonrpc::Result<String> {
+        self.candy_view_ir(params, Ir::Hir, |db, module| {
+            db.hir(module).map(|(body, _)| body.to_rich_ir())
         })
         .await
     }
@@ -85,6 +93,7 @@ impl IrFeatures {
         let url_scheme = match ir {
             Ir::Rcst => "candy-rcst",
             Ir::Ast => "candy-ast",
+            Ir::Hir => "candy-hir",
         };
         Self {
             url_scheme,
@@ -118,7 +127,15 @@ impl RichIrExtension for RichIr {
         let mut builder = SemanticTokensBuilder::new(&self.text, &line_start_offsets);
         for annotation in &self.annotations {
             let Some(token_type) = annotation.token_type else { continue; };
-            builder.add(annotation.range.clone(), token_type.to_semantic());
+            builder.add(
+                annotation.range.clone(),
+                token_type.to_semantic(),
+                annotation
+                    .token_modifiers
+                    .iter()
+                    .map(|it| it.to_semantic())
+                    .collect(),
+            );
         }
         builder.finish()
     }
@@ -128,9 +145,21 @@ impl RichIrExtension for RichIr {
 impl TokenTypeToSemantic for TokenType {
     fn to_semantic(&self) -> SemanticTokenType {
         match self {
-            TokenType::Int => SemanticTokenType::Int,
+            TokenType::Parameter => SemanticTokenType::Parameter,
+            TokenType::Variable => SemanticTokenType::Variable,
+            TokenType::Function => SemanticTokenType::Function,
             TokenType::Symbol => SemanticTokenType::Symbol,
             TokenType::Text => SemanticTokenType::Text,
+            TokenType::Int => SemanticTokenType::Int,
+        }
+    }
+}
+
+#[extension_trait]
+impl TokenModifierToSemantic for TokenModifier {
+    fn to_semantic(&self) -> SemanticTokenModifier {
+        match self {
+            TokenModifier::Builtin => SemanticTokenModifier::Builtin,
         }
     }
 }

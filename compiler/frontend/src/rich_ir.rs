@@ -18,12 +18,17 @@ pub struct RichIrAnnotation {
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum TokenType {
-    Int,
+    Parameter,
+    Variable,
     Symbol,
+    Function,
     Text,
+    Int,
 }
 #[derive(Debug, EnumSetType)]
-pub enum TokenModifier {}
+pub enum TokenModifier {
+    Builtin,
+}
 
 pub trait ToRichIr {
     fn to_rich_ir(&self) -> RichIr {
@@ -66,28 +71,69 @@ pub struct RichIrBuilder {
     indentation: usize,
 }
 impl RichIrBuilder {
+    pub fn indent(&mut self) {
+        self.indentation += 1;
+    }
+    pub fn dedent(&mut self) {
+        self.indentation -= 1;
+    }
     pub fn push_newline(&mut self) {
         self.push("\n", None, EnumSet::empty());
         self.push("  ".repeat(self.indentation), None, EnumSet::empty());
     }
-    pub fn push_children<CS: AsRef<[C]>, C: ToRichIr>(&mut self, children: CS) {
-        self.push_children_custom(children, |builder, child| child.build_rich_ir(builder))
-    }
-    pub fn push_children_custom<CS: AsRef<[C]>, C, F>(&mut self, children: CS, mut push_child: F)
+    pub fn push_children_multiline<'c, CS, C>(&mut self, children: CS)
     where
+        CS: IntoIterator<Item = &'c C>,
+        C: ToRichIr + 'c,
+    {
+        self.push_children_custom_multiline(children, |builder, child| child.build_rich_ir(builder))
+    }
+    pub fn push_children_custom_multiline<CS, C, F>(&mut self, children: CS, mut push_child: F)
+    where
+        CS: IntoIterator<Item = C>,
         F: FnMut(&mut Self, &C),
     {
-        let children = children.as_ref();
-        if children.is_empty() {
-            return;
-        }
-
-        self.indentation += 1;
+        self.indent();
         for child in children {
             self.push_newline();
-            push_child(self, child);
+            push_child(self, &child);
         }
-        self.indentation -= 1;
+        self.dedent();
+    }
+
+    pub fn push_children<CS, C, S>(&mut self, children: CS, separator: S)
+    where
+        CS: AsRef<[C]>,
+        C: ToRichIr,
+        S: AsRef<str>,
+    {
+        self.push_children_custom(
+            children,
+            |builder, child| child.build_rich_ir(builder),
+            separator,
+        )
+    }
+    pub fn push_children_custom<CS, C, F, S>(
+        &mut self,
+        children: CS,
+        mut push_child: F,
+        separator: S,
+    ) where
+        CS: AsRef<[C]>,
+        F: FnMut(&mut Self, &C),
+        S: AsRef<str>,
+    {
+        match children.as_ref() {
+            [] => {}
+            [child] => push_child(self, child),
+            [first, rest @ ..] => {
+                push_child(self, first);
+                for child in rest {
+                    self.push(separator.as_ref(), None, EnumSet::empty());
+                    push_child(self, child);
+                }
+            }
+        }
     }
 
     pub fn push<S: AsRef<str>>(
@@ -96,6 +142,10 @@ impl RichIrBuilder {
         token_type: Option<TokenType>,
         token_modifiers: EnumSet<TokenModifier>,
     ) {
+        assert!(
+            token_modifiers.is_empty() || token_type.is_some(),
+            "`token_modifiers` can only be specified if a `token_type` is specified.",
+        );
         let start = self.ir.text.len().into();
         self.ir.text.push_str(text.as_ref());
         let end = self.ir.text.len().into();

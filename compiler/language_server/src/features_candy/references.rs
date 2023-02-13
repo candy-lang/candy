@@ -4,6 +4,7 @@ use candy_frontend::{
     hir::{self, Body, Expression, HirDb, Lambda},
     module::{Module, ModuleDb},
     position::{Offset, PositionConversionDb},
+    rich_ir::ToRichIr,
 };
 use lsp_types::{DocumentHighlight, DocumentHighlightKind};
 use num_bigint::BigUint;
@@ -51,7 +52,7 @@ where
                             return None;
                         }
                         Expression::Error { .. } => return None,
-                        _ => panic!("Expected a reference, got {hir_expr}."),
+                        _ => panic!("Expected a reference, got {}.", hir_expr.to_rich_ir().text),
                     }
                 }
             } else {

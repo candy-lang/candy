@@ -150,6 +150,7 @@ impl Server {
         })
         .custom_method("candy/viewRcst", Server::candy_view_rcst)
         .custom_method("candy/viewAst", Server::candy_view_ast)
+        .custom_method("candy/viewHir", Server::candy_view_hir)
         .finish();
 
         (service, client)
@@ -169,6 +170,7 @@ impl Server {
         let ir = match url.scheme() {
             "candy-rcst" => Some(Ir::Rcst),
             "candy-ast" => Some(Ir::Ast),
+            "candy-hir" => Some(Ir::Hir),
             _ => None,
         };
 

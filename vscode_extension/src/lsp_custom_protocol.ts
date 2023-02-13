@@ -15,6 +15,9 @@ export const viewRcst = new RequestType<ViewIrParams, string, void>(
 export const viewAst = new RequestType<ViewIrParams, string, void>(
   'candy/viewAst'
 );
+export const viewHir = new RequestType<ViewIrParams, string, void>(
+  'candy/viewHir'
+);
 
 // Hints
 export class PublishHintsNotification {

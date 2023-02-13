@@ -1,6 +1,11 @@
 import * as vscode from 'vscode';
 import { LanguageClient, RequestType } from 'vscode-languageclient/node';
-import { viewAst, ViewIrParams, viewRcst } from './lsp_custom_protocol';
+import {
+  viewAst,
+  viewHir,
+  ViewIrParams,
+  viewRcst,
+} from './lsp_custom_protocol';
 
 export function registerDebugIrCommands(client: LanguageClient) {
   registerDebugIrCommand(
@@ -16,6 +21,13 @@ export function registerDebugIrCommands(client: LanguageClient) {
     'candy-ast',
     'candy.debug.viewAst',
     viewAst
+  );
+  registerDebugIrCommand(
+    client,
+    'HIR',
+    'candy-hir',
+    'candy.debug.viewHir',
+    viewHir
   );
 }
 

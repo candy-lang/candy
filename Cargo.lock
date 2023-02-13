@@ -143,6 +143,7 @@ dependencies = [
  "candy_frontend",
  "candy_fuzzer",
  "candy_vm",
+ "enumset",
  "extension-trait",
  "itertools",
  "lazy_static",

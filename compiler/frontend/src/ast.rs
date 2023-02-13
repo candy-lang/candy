@@ -402,7 +402,7 @@ impl ToRichIr for Ast {
             AstKind::OrPattern(or_pattern) => or_pattern.build_rich_ir(builder),
             AstKind::Error { child, errors } => {
                 builder.push("error:", None, EnumSet::empty());
-                builder.push_children(errors);
+                builder.push_children_multiline(errors);
                 if let Some(child) = child {
                     builder.push("fallback:", None, EnumSet::empty());
                     child.build_rich_ir(builder);
@@ -414,7 +414,7 @@ impl ToRichIr for Ast {
 impl ToRichIr for Int {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         builder.push(
-            format!(" int {}", self.0),
+            format!("int {}", self.0),
             Some(TokenType::Int),
             EnumSet::empty(),
         )
@@ -423,7 +423,7 @@ impl ToRichIr for Int {
 impl ToRichIr for Text {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         builder.push("text", None, EnumSet::empty());
-        builder.push_children(&self.0);
+        builder.push_children_multiline(&self.0);
     }
 }
 impl ToRichIr for TextPart {
@@ -447,13 +447,13 @@ impl ToRichIr for Symbol {
 impl ToRichIr for List {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         builder.push("list", None, EnumSet::empty());
-        builder.push_children(&self.0);
+        builder.push_children_multiline(&self.0);
     }
 }
 impl ToRichIr for Struct {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         builder.push("struct", None, EnumSet::empty());
-        builder.push_children_custom(&self.fields, |builder, (key, value)| {
+        builder.push_children_custom_multiline(&self.fields, |builder, (key, value)| {
             if let Some(key) = key {
                 key.build_rich_ir(builder);
                 builder.push(": ", None, EnumSet::empty());
@@ -490,7 +490,7 @@ impl ToRichIr for Lambda {
             builder.push(" ", None, EnumSet::empty());
         }
         builder.push("->", None, EnumSet::empty());
-        builder.push_children(&self.body);
+        builder.push_children_multiline(&self.body);
         builder.push_newline();
         builder.push("}", None, EnumSet::empty());
     }
@@ -500,7 +500,7 @@ impl ToRichIr for Call {
         builder.push("call ", None, EnumSet::empty());
         self.receiver.build_rich_ir(builder);
         builder.push(" with these arguments:", None, EnumSet::empty());
-        builder.push_children(&self.arguments);
+        builder.push_children_multiline(&self.arguments);
     }
 }
 impl ToRichIr for Assignment {
@@ -517,7 +517,7 @@ impl ToRichIr for Assignment {
         );
         match &self.body {
             AssignmentBody::Lambda { lambda, .. } => lambda.build_rich_ir(builder),
-            AssignmentBody::Body { body, .. } => builder.push_children(body),
+            AssignmentBody::Body { body, .. } => builder.push_children_multiline(body),
         }
     }
 }
@@ -526,14 +526,14 @@ impl ToRichIr for Match {
         builder.push("match ", None, EnumSet::empty());
         self.expression.build_rich_ir(builder);
         builder.push(" %", None, EnumSet::empty());
-        builder.push_children(&self.cases);
+        builder.push_children_multiline(&self.cases);
     }
 }
 impl ToRichIr for MatchCase {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         self.pattern.build_rich_ir(builder);
         builder.push(" -> ", None, EnumSet::empty());
-        builder.push_children(&self.body);
+        builder.push_children_multiline(&self.body);
     }
 }
 impl ToRichIr for OrPattern {

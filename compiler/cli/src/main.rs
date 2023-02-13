@@ -182,7 +182,7 @@ fn raw_build(
 
     let (hir, hir_ast_id_map) = db.hir(module.clone()).unwrap();
     if debug {
-        module.dump_associated_debug_file("hir", &format!("{}", hir));
+        module.dump_associated_debug_file("hir", &format!("{}\n", hir.to_rich_ir().text));
         module.dump_associated_debug_file(
             "hir_to_ast_ids",
             &hir_ast_id_map

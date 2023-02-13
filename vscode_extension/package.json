@@ -53,14 +53,19 @@
     ],
     "commands": [
       {
-        "command": "candy.debug.viewRcst",
         "category": "Candy Compiler Debugging",
+        "command": "candy.debug.viewRcst",
         "title": "View RCST"
       },
       {
-        "command": "candy.debug.viewAst",
         "category": "Candy Compiler Debugging",
+        "command": "candy.debug.viewAst",
         "title": "View AST"
+      },
+      {
+        "category": "Candy Compiler Debugging",
+        "command": "candy.debug.viewHir",
+        "title": "View HIR"
       }
     ],
     "configuration": {

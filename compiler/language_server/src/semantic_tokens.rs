@@ -1,6 +1,7 @@
 use std::ops::Range;
 
 use candy_frontend::position::Offset;
+use enumset::{EnumSet, EnumSetType};
 use lazy_static::lazy_static;
 use lsp_types::{Position, SemanticToken, SemanticTokensLegend};
 use rustc_hash::FxHashMap;
@@ -42,14 +43,29 @@ impl SemanticTokenType {
     }
 }
 
+#[derive(Debug, EnumIter, EnumSetType)]
+#[enumset(repr = "u32")]
+pub enum SemanticTokenModifier {
+    Definition,
+    Readonly,
+    Builtin,
+}
 lazy_static! {
     pub static ref LEGEND: SemanticTokensLegend = SemanticTokensLegend {
         token_types: SemanticTokenType::iter().map(|it| it.as_lsp()).collect(),
-        token_modifiers: vec![
-            lsp_types::SemanticTokenModifier::DEFINITION,
-            lsp_types::SemanticTokenModifier::READONLY,
-        ],
+        token_modifiers: SemanticTokenModifier::iter()
+            .map(|it| it.as_lsp())
+            .collect(),
     };
+}
+impl SemanticTokenModifier {
+    pub fn as_lsp(&self) -> lsp_types::SemanticTokenModifier {
+        match self {
+            SemanticTokenModifier::Definition => lsp_types::SemanticTokenModifier::DEFINITION,
+            SemanticTokenModifier::Readonly => lsp_types::SemanticTokenModifier::READONLY,
+            SemanticTokenModifier::Builtin => lsp_types::SemanticTokenModifier::DEFAULT_LIBRARY,
+        }
+    }
 }
 
 pub struct SemanticTokensBuilder<'a> {
@@ -72,7 +88,12 @@ impl<'a> SemanticTokensBuilder<'a> {
         }
     }
 
-    pub fn add(&mut self, range: Range<Offset>, type_: SemanticTokenType) {
+    pub fn add(
+        &mut self,
+        range: Range<Offset>,
+        type_: SemanticTokenType,
+        modifiers: EnumSet<SemanticTokenModifier>,
+    ) {
         // Reduce the token to multiple single-line tokens.
         let mut range = range_to_lsp_range_raw(self.text, self.line_start_offsets, range);
 
@@ -83,7 +104,7 @@ impl<'a> SemanticTokensBuilder<'a> {
                 let line_length = *self.line_start_offsets[(range.start.line as usize) + 1]
                     - *self.line_start_offsets[range.start.line as usize]
                     - 1;
-                self.add_single_line(range.start, line_length as u32, type_);
+                self.add_single_line(range.start, line_length as u32, type_, modifiers);
                 range.start = Position {
                     line: range.start.line + 1,
                     character: 0,
@@ -96,17 +117,27 @@ impl<'a> SemanticTokensBuilder<'a> {
             range.start,
             range.end.character - range.start.character,
             type_,
+            modifiers,
         );
     }
-    fn add_single_line(&mut self, start: Position, length: u32, type_: SemanticTokenType) {
+    fn add_single_line(
+        &mut self,
+        start: Position,
+        length: u32,
+        type_: SemanticTokenType,
+        mut modifiers: EnumSet<SemanticTokenModifier>,
+    ) {
         assert!(
             start >= self.cursor,
             "Tokens must be added with increasing positions. The cursor was as {:?}, but the new token starts at {start:?}.",
             self.cursor,
         );
 
-        let definition_modifier = (type_ == SemanticTokenType::Variable) as u32;
-        let readonly_modifier = 0b10;
+        if type_ == SemanticTokenType::Variable {
+            modifiers.insert(SemanticTokenModifier::Definition);
+        }
+        modifiers.insert(SemanticTokenModifier::Readonly);
+
         self.tokens.push(SemanticToken {
             delta_line: start.line - self.cursor.line,
             delta_start: if start.line == self.cursor.line {
@@ -116,7 +147,7 @@ impl<'a> SemanticTokensBuilder<'a> {
             },
             length,
             token_type: TOKEN_TYPE_MAPPING[&type_],
-            token_modifiers_bitset: definition_modifier | readonly_modifier,
+            token_modifiers_bitset: modifiers.as_repr(),
         });
         self.cursor.line = start.line;
         self.cursor.character = start.character;

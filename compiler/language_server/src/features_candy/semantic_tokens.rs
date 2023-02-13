@@ -4,6 +4,7 @@ use candy_frontend::{
     position::PositionConversionDb,
     rcst_to_cst::RcstToCst,
 };
+use enumset::EnumSet;
 use lsp_types::{self, SemanticToken};
 
 use crate::semantic_tokens::{SemanticTokenType, SemanticTokensBuilder};
@@ -35,7 +36,11 @@ fn visit_cst(
     token_type_for_identifier: Option<SemanticTokenType>,
 ) {
     match &cst.kind {
-        CstKind::EqualsSign => builder.add(cst.span.clone(), SemanticTokenType::Operator),
+        CstKind::EqualsSign => builder.add(
+            cst.span.clone(),
+            SemanticTokenType::Operator,
+            EnumSet::empty(),
+        ),
         CstKind::Comma
         | CstKind::Dot
         | CstKind::Colon
@@ -47,15 +52,27 @@ fn visit_cst(
         | CstKind::ClosingBracket
         | CstKind::OpeningCurlyBrace
         | CstKind::ClosingCurlyBrace => {}
-        CstKind::Arrow => builder.add(cst.span.clone(), SemanticTokenType::Operator),
+        CstKind::Arrow => builder.add(
+            cst.span.clone(),
+            SemanticTokenType::Operator,
+            EnumSet::empty(),
+        ),
         CstKind::SingleQuote => {} // handled by parent
         CstKind::DoubleQuote => {} // handled by parent
-        CstKind::Percent => builder.add(cst.span.clone(), SemanticTokenType::Operator),
+        CstKind::Percent => builder.add(
+            cst.span.clone(),
+            SemanticTokenType::Operator,
+            EnumSet::empty(),
+        ),
         CstKind::Octothorpe => {} // handled by parent
         CstKind::Whitespace(_) | CstKind::Newline(_) => {}
         CstKind::Comment { octothorpe, .. } => {
             visit_cst(builder, octothorpe, None);
-            builder.add(cst.span.clone(), SemanticTokenType::Comment);
+            builder.add(
+                cst.span.clone(),
+                SemanticTokenType::Comment,
+                EnumSet::empty(),
+            );
         }
         CstKind::TrailingWhitespace { child, whitespace } => {
             visit_cst(builder, child, token_type_for_identifier);
@@ -64,25 +81,48 @@ fn visit_cst(
         CstKind::Identifier { .. } => builder.add(
             cst.span.clone(),
             token_type_for_identifier.unwrap_or(SemanticTokenType::Variable),
+            EnumSet::empty(),
         ),
-        CstKind::Symbol { .. } => builder.add(cst.span.clone(), SemanticTokenType::Symbol),
-        CstKind::Int { .. } => builder.add(cst.span.clone(), SemanticTokenType::Int),
+        CstKind::Symbol { .. } => builder.add(
+            cst.span.clone(),
+            SemanticTokenType::Symbol,
+            EnumSet::empty(),
+        ),
+        CstKind::Int { .. } => {
+            builder.add(cst.span.clone(), SemanticTokenType::Int, EnumSet::empty())
+        }
         CstKind::OpeningText {
             opening_single_quotes,
             opening_double_quote,
         } => {
             for opening_single_quote in opening_single_quotes {
-                builder.add(opening_single_quote.span.clone(), SemanticTokenType::Text);
+                builder.add(
+                    opening_single_quote.span.clone(),
+                    SemanticTokenType::Text,
+                    EnumSet::empty(),
+                );
             }
-            builder.add(opening_double_quote.span.clone(), SemanticTokenType::Text);
+            builder.add(
+                opening_double_quote.span.clone(),
+                SemanticTokenType::Text,
+                EnumSet::empty(),
+            );
         }
         CstKind::ClosingText {
             closing_double_quote,
             closing_single_quotes,
         } => {
-            builder.add(closing_double_quote.span.clone(), SemanticTokenType::Text);
+            builder.add(
+                closing_double_quote.span.clone(),
+                SemanticTokenType::Text,
+                EnumSet::empty(),
+            );
             for closing_single_quote in closing_single_quotes {
-                builder.add(closing_single_quote.span.clone(), SemanticTokenType::Text);
+                builder.add(
+                    closing_single_quote.span.clone(),
+                    SemanticTokenType::Text,
+                    EnumSet::empty(),
+                );
             }
         }
         CstKind::Text {
@@ -96,7 +136,9 @@ fn visit_cst(
             }
             visit_cst(builder, closing, None);
         }
-        CstKind::TextPart(_) => builder.add(cst.span.clone(), SemanticTokenType::Text),
+        CstKind::TextPart(_) => {
+            builder.add(cst.span.clone(), SemanticTokenType::Text, EnumSet::empty())
+        }
         CstKind::TextInterpolation {
             opening_curly_braces,
             expression,
