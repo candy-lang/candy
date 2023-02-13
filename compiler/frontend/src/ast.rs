@@ -487,7 +487,7 @@ impl ToRichIr for Lambda {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         builder.push(
             format!(
-                "lambda ({}) {{",
+                "lambda ({}) {{ ",
                 if self.fuzzable {
                     "fuzzable"
                 } else {
@@ -503,6 +503,7 @@ impl ToRichIr for Lambda {
         }
         builder.push("->", None, EnumSet::empty());
         builder.push_children(&self.body);
+        builder.push_newline();
         builder.push("}", None, EnumSet::empty());
     }
 }
