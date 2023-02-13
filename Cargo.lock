@@ -169,6 +169,7 @@ dependencies = [
  "candy_frontend",
  "criterion",
  "criterion-cycles-per-byte",
+ "derive_more",
  "itertools",
  "lazy_static",
  "num-bigint",

@@ -3,13 +3,13 @@ use crate::{
     module::Module,
     rich_ir::{RichIrBuilder, ToRichIr, TokenType},
 };
+use derive_more::Deref;
 use enumset::EnumSet;
 use num_bigint::BigUint;
 use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Display, Formatter},
     num::NonZeroUsize,
-    ops::Deref,
 };
 
 #[salsa::query_group(AstDbStorage)]
@@ -40,18 +40,11 @@ impl Display for Id {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Deref)]
 pub struct Ast {
     pub id: Id,
+    #[deref]
     pub kind: AstKind,
-}
-
-impl Deref for Ast {
-    type Target = AstKind;
-
-    fn deref(&self) -> &Self::Target {
-        &self.kind
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -143,16 +136,11 @@ pub struct MatchCase {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct OrPattern(pub Vec<Ast>);
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Deref)]
 pub struct AstString {
     pub id: Id,
+    #[deref]
     pub value: String,
-}
-impl Deref for AstString {
-    type Target = String;
-    fn deref(&self) -> &Self::Target {
-        &self.value
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
