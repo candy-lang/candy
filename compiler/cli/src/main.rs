@@ -520,26 +520,21 @@ fn init_logger(use_stdout: bool) {
                     .starts_with("candy")
         }))
         .with_filter(filter::filter_fn(level_for(
-            "candy::compiler::optimize",
+            "candy_frontend::mir_optimize",
             Level::DEBUG,
         )))
         .with_filter(filter::filter_fn(level_for(
-            "candy::compiler::string_to_rcst",
+            "candy_frontend::string_to_rcst",
             Level::WARN,
         )))
+        .with_filter(filter::filter_fn(level_for("candy_frontend", Level::DEBUG)))
+        .with_filter(filter::filter_fn(level_for("candy_fuzzer", Level::DEBUG)))
         .with_filter(filter::filter_fn(level_for(
-            "candy::compiler",
-            Level::DEBUG,
-        )))
-        .with_filter(filter::filter_fn(level_for(
-            "candy::language_server",
+            "candy_language_server",
             Level::TRACE,
         )))
-        .with_filter(filter::filter_fn(level_for("candy::vm", Level::DEBUG)))
-        .with_filter(filter::filter_fn(level_for(
-            "candy::vm::heap",
-            Level::DEBUG,
-        )));
+        .with_filter(filter::filter_fn(level_for("candy_vm", Level::DEBUG)))
+        .with_filter(filter::filter_fn(level_for("candy_vm::heap", Level::DEBUG)));
     tracing_subscriber::registry().with(console_log).init();
 }
 fn level_for(module: &'static str, level: Level) -> impl Fn(&Metadata) -> bool {
