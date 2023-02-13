@@ -290,6 +290,16 @@ impl Display for PatternIdentifierId {
         write!(f, "p${}", self.0)
     }
 }
+impl ToRichIr for PatternIdentifierId {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        // TODO: convert to actual reference
+        builder.push(
+            self.to_string(),
+            Some(TokenType::Variable),
+            EnumSet::empty(),
+        )
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Pattern {
@@ -422,27 +432,22 @@ impl Body {
 impl ToRichIr for Expression {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         match self {
-            Expression::Int(int) => builder.push(
-                format!("int {}", int),
-                Some(TokenType::Int),
-                EnumSet::empty(),
-            ),
+            Expression::Int(int) => {
+                builder.push(int.to_string(), Some(TokenType::Int), EnumSet::empty())
+            }
             Expression::Text(text) => builder.push(
-                format!(r#"text "{}""#, text),
+                format!(r#""{}""#, text),
                 Some(TokenType::Text),
                 EnumSet::empty(),
             ),
             Expression::Reference(reference) => {
-                builder.push("reference ", None, EnumSet::empty());
                 reference.build_rich_ir(builder);
             }
-            Expression::Symbol(symbol) => builder.push(
-                format!("symbol {}", symbol),
-                Some(TokenType::Symbol),
-                EnumSet::empty(),
-            ),
+            Expression::Symbol(symbol) => {
+                builder.push(symbol, Some(TokenType::Symbol), EnumSet::empty())
+            }
             Expression::List(items) => {
-                builder.push("list (", None, EnumSet::empty());
+                builder.push("(", None, EnumSet::empty());
                 builder.push_children_custom_multiline(items, |builder, item| {
                     item.build_rich_ir(builder);
                     builder.push(",", None, EnumSet::empty());
@@ -450,7 +455,7 @@ impl ToRichIr for Expression {
                 builder.push(")", None, EnumSet::empty());
             }
             Expression::Struct(entries) => {
-                builder.push("struct [", None, EnumSet::empty());
+                builder.push("[", None, EnumSet::empty());
                 builder.push_children_custom_multiline(entries, |builder, (key, value)| {
                     key.build_rich_ir(builder);
                     builder.push(": ", None, EnumSet::empty());
@@ -472,16 +477,11 @@ impl ToRichIr for Expression {
                 pattern.build_rich_ir(builder);
             }
             Expression::PatternIdentifierReference(identifier_id) => {
-                builder.push(
-                    format!("get destructured {identifier_id}"),
-                    None,
-                    EnumSet::empty(),
-                );
+                identifier_id.build_rich_ir(builder)
             }
             Expression::Match { expression, cases } => {
-                builder.push("match ", None, EnumSet::empty());
                 expression.build_rich_ir(builder);
-                builder.push(" with these cases:", None, EnumSet::empty());
+                builder.push(" %", None, EnumSet::empty());
                 builder.push_children_custom_multiline(cases, |builder, (pattern, body)| {
                     pattern.build_rich_ir(builder);
                     builder.push(" ->", None, EnumSet::empty());
@@ -493,7 +493,7 @@ impl ToRichIr for Expression {
             Expression::Lambda(lambda) => {
                 builder.push(
                     format!(
-                        "lambda ({}) {{ ",
+                        "{{ ({}) ",
                         if lambda.fuzzable {
                             "fuzzable"
                         } else {
@@ -570,10 +570,7 @@ impl ToRichIr for Pattern {
                 Some(TokenType::Text),
                 EnumSet::empty(),
             ),
-            Pattern::NewIdentifier(reference) => {
-                // TODO: convert to actual reference
-                builder.push(format!("{reference}"), None, EnumSet::empty())
-            }
+            Pattern::NewIdentifier(reference) => reference.build_rich_ir(builder),
             Pattern::Symbol(symbol) => {
                 builder.push(symbol, Some(TokenType::Symbol), EnumSet::empty())
             }
