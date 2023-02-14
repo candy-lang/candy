@@ -208,14 +208,14 @@ impl Display for Id {
         write!(f, "{self:?}")
     }
 }
-impl ToRichIr for Id {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        // TODO: convert to actual reference
-        builder.push(
+impl ToRichIr<HirReferenceKey> for Id {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
+        let range = builder.push(
             self.to_short_debug_string(),
             Some(TokenType::Variable),
             EnumSet::empty(),
-        )
+        );
+        builder.push_reference(HirReferenceKey::Id(self.to_owned()), range);
     }
 }
 
@@ -290,14 +290,14 @@ impl Display for PatternIdentifierId {
         write!(f, "p${}", self.0)
     }
 }
-impl ToRichIr for PatternIdentifierId {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl ToRichIr<HirReferenceKey> for PatternIdentifierId {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
         // TODO: convert to actual reference
         builder.push(
             self.to_string(),
             Some(TokenType::Variable),
             EnumSet::empty(),
-        )
+        );
     }
 }
 
@@ -429,22 +429,28 @@ impl Body {
     }
 }
 
-impl ToRichIr for Expression {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum HirReferenceKey {
+    Id(Id),
+}
+impl ToRichIr<HirReferenceKey> for Expression {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
         match self {
             Expression::Int(int) => {
-                builder.push(int.to_string(), Some(TokenType::Int), EnumSet::empty())
+                builder.push(int.to_string(), Some(TokenType::Int), EnumSet::empty());
             }
-            Expression::Text(text) => builder.push(
-                format!(r#""{}""#, text),
-                Some(TokenType::Text),
-                EnumSet::empty(),
-            ),
+            Expression::Text(text) => {
+                builder.push(
+                    format!(r#""{}""#, text),
+                    Some(TokenType::Text),
+                    EnumSet::empty(),
+                );
+            }
             Expression::Reference(reference) => {
                 reference.build_rich_ir(builder);
             }
             Expression::Symbol(symbol) => {
-                builder.push(symbol, Some(TokenType::Symbol), EnumSet::empty())
+                builder.push(symbol, Some(TokenType::Symbol), EnumSet::empty());
             }
             Expression::List(items) => {
                 builder.push("(", None, EnumSet::empty());
@@ -526,15 +532,17 @@ impl ToRichIr for Expression {
             Expression::UseModule {
                 current_module,
                 relative_path,
-            } => builder.push(
-                format!(
-                    "use module {} relative to {}",
-                    relative_path.to_short_debug_string(),
-                    current_module,
-                ),
-                None,
-                EnumSet::empty(),
-            ),
+            } => {
+                builder.push(
+                    format!(
+                        "use module {} relative to {}",
+                        relative_path.to_short_debug_string(),
+                        current_module,
+                    ),
+                    None,
+                    EnumSet::empty(),
+                );
+            }
             Expression::Needs { condition, reason } => {
                 builder.push("needs ", None, EnumSet::empty());
                 condition.build_rich_ir(builder);
@@ -559,20 +567,22 @@ impl ToRichIr for Expression {
         }
     }
 }
-impl ToRichIr for Pattern {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl ToRichIr<HirReferenceKey> for Pattern {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
         match self {
             Pattern::Int(int) => {
-                builder.push(format!("{int}"), Some(TokenType::Int), EnumSet::empty())
+                builder.push(format!("{int}"), Some(TokenType::Int), EnumSet::empty());
             }
-            Pattern::Text(text) => builder.push(
-                format!(r#""{text:?}\""#),
-                Some(TokenType::Text),
-                EnumSet::empty(),
-            ),
+            Pattern::Text(text) => {
+                builder.push(
+                    format!(r#""{text:?}\""#),
+                    Some(TokenType::Text),
+                    EnumSet::empty(),
+                );
+            }
             Pattern::NewIdentifier(reference) => reference.build_rich_ir(builder),
             Pattern::Symbol(symbol) => {
-                builder.push(symbol, Some(TokenType::Symbol), EnumSet::empty())
+                builder.push(symbol, Some(TokenType::Symbol), EnumSet::empty());
             }
             Pattern::List(items) => {
                 builder.push("(", None, EnumSet::empty());
@@ -614,8 +624,8 @@ impl ToRichIr for Pattern {
         }
     }
 }
-impl ToRichIr for Lambda {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl ToRichIr<HirReferenceKey> for Lambda {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
         for parameter in &self.parameters {
             builder.push(
                 parameter.to_short_debug_string(),
@@ -632,10 +642,16 @@ impl ToRichIr for Lambda {
         builder.push_newline();
     }
 }
-impl ToRichIr for Body {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        fn push(builder: &mut RichIrBuilder, id: &Id, expression: &Expression) {
-            id.build_rich_ir(builder);
+impl ToRichIr<HirReferenceKey> for Body {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
+        fn push(builder: &mut RichIrBuilder<HirReferenceKey>, id: &Id, expression: &Expression) {
+            let range = builder.push(
+                id.to_short_debug_string(),
+                Some(TokenType::Variable),
+                EnumSet::empty(),
+            );
+            builder.push_definition(HirReferenceKey::Id(id.to_owned()), range);
+
             builder.push(" = ", None, EnumSet::empty());
             expression.build_rich_ir(builder);
         }

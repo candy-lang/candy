@@ -1,24 +1,22 @@
-use std::{future::Future, pin::Pin, thread};
-
 use async_trait::async_trait;
 use candy_frontend::{
     ast_to_hir::AstToHir,
     hir::CollectErrors,
     module::{Module, ModuleDb, MutableModuleProviderOwner},
-    position::Offset,
 };
 use itertools::Itertools;
 use lsp_types::{
-    Diagnostic, DocumentHighlight, FoldingRange, LocationLink, SemanticToken,
+    self, Diagnostic, DocumentHighlight, FoldingRange, LocationLink, SemanticToken,
     TextDocumentContentChangeEvent,
 };
+use std::thread;
 use tokio::sync::{mpsc::Sender, Mutex};
 use tracing::debug;
 
 use crate::{
     database::Database,
     features::LanguageFeatures,
-    utils::{error_into_diagnostic, lsp_range_to_range_raw},
+    utils::{error_into_diagnostic, lsp_range_to_range_raw, LspPositionConversion},
 };
 
 use self::{
@@ -32,6 +30,7 @@ pub mod hints;
 pub mod references;
 pub mod semantic_tokens;
 
+#[derive(Debug)]
 pub struct CandyFeatures {
     diagnostics_sender: Sender<(Module, Vec<Diagnostic>)>,
     hints_events_sender: Sender<hints::Event>,
@@ -150,53 +149,46 @@ impl LanguageFeatures for CandyFeatures {
     fn supports_folding_ranges(&self) -> bool {
         true
     }
-    fn folding_ranges(&self, db: &Database, module: Module) -> Vec<FoldingRange> {
-        folding_ranges(db, module)
+    async fn folding_ranges(&self, db: &Mutex<Database>, module: Module) -> Vec<FoldingRange> {
+        let db = db.lock().await;
+        folding_ranges(&*db, module)
     }
 
     fn supports_find_definition(&self) -> bool {
         true
     }
-    fn find_definition(
+    async fn find_definition(
         &self,
-        db: &Database,
+        db: &Mutex<Database>,
         module: Module,
-        offset: Offset,
+        position: lsp_types::Position,
     ) -> Option<LocationLink> {
-        find_definition(db, module, offset)
+        let db = db.lock().await;
+        let offset = db.lsp_position_to_offset(module.clone(), position);
+        find_definition(&*db, module, offset)
     }
 
     fn supports_references(&self) -> bool {
         true
     }
-    fn references(
+    async fn references(
         &self,
-        db: &Database,
+        db: &Mutex<Database>,
         module: Module,
-        offset: Offset,
+        position: lsp_types::Position,
         include_declaration: bool,
     ) -> Option<Vec<DocumentHighlight>> {
-        references(db, module, offset, include_declaration)
+        let db = db.lock().await;
+        let offset = db.lsp_position_to_offset(module.clone(), position);
+        references(&*db, module, offset, include_declaration)
     }
 
     fn supports_semantic_tokens(&self) -> bool {
         true
     }
-    fn semantic_tokens<'life0, 'life1, 'async_trait>(
-        &'life0 self,
-        db: &'life1 Database,
-        module: Module,
-    ) -> Pin<Box<dyn Future<Output = Vec<SemanticToken>> + Send + 'async_trait>>
-    where
-        'life0: 'async_trait,
-        'life1: 'async_trait,
-        Self: 'async_trait,
-    {
-        // [Database] is not [Send], so we can't use it in the async block.
-        // Since we don't need it after any async break, we avoid the `async`
-        // keyword for this function and use the database synchronously.
-        let tokens = semantic_tokens(db, module);
-        Box::pin(async move { tokens })
+    async fn semantic_tokens(&self, db: &Mutex<Database>, module: Module) -> Vec<SemanticToken> {
+        let db = db.lock().await;
+        semantic_tokens(&*db, module)
     }
 }
 

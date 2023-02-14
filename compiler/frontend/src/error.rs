@@ -6,7 +6,7 @@ use crate::{
     position::Offset,
     rich_ir::{RichIrBuilder, ToRichIr},
 };
-use std::{fmt::Display, ops::Range};
+use std::{fmt::Display, hash::Hash, ops::Range};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct CompilerError {
@@ -174,8 +174,8 @@ impl CompilerError {
     }
 }
 
-impl ToRichIr for CompilerError {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl<RK: Eq + Hash> ToRichIr<RK> for CompilerError {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<RK>) {
         // TODO: include more rich information
         builder.push(self.to_string(), None, EnumSet::empty());
     }

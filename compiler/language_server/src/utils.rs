@@ -112,7 +112,7 @@ pub fn lsp_range_to_range_raw(text: &str, range: lsp_types::Range) -> Range<Offs
     let end = lsp_position_to_offset_raw(text, &line_start_offsets, range.end);
     start..end
 }
-fn lsp_position_to_offset_raw(
+pub fn lsp_position_to_offset_raw(
     text: &str,
     line_start_offsets: &[Offset],
     position: Position,
@@ -141,7 +141,7 @@ fn lsp_position_to_offset_raw(
 pub fn range_to_lsp_range_raw<S, L>(
     text: S,
     line_start_offsets: L,
-    range: Range<Offset>,
+    range: &Range<Offset>,
 ) -> lsp_types::Range
 where
     S: AsRef<str>,

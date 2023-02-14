@@ -383,8 +383,8 @@ impl CollectErrors for Vec<Ast> {
     }
 }
 
-impl ToRichIr for Ast {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl ToRichIr<()> for Ast {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         match &self.kind {
             AstKind::Int(int) => int.build_rich_ir(builder),
             AstKind::Text(text) => text.build_rich_ir(builder),
@@ -411,47 +411,47 @@ impl ToRichIr for Ast {
         }
     }
 }
-impl ToRichIr for Int {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl ToRichIr<()> for Int {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         builder.push(
             format!("int {}", self.0),
             Some(TokenType::Int),
             EnumSet::empty(),
-        )
+        );
     }
 }
-impl ToRichIr for Text {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl ToRichIr<()> for Text {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         builder.push("text", None, EnumSet::empty());
         builder.push_children_multiline(&self.0);
     }
 }
-impl ToRichIr for TextPart {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl ToRichIr<()> for TextPart {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         builder.push("textPart ", None, EnumSet::empty());
         self.0.build_rich_ir(builder);
     }
 }
-impl ToRichIr for Identifier {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl ToRichIr<()> for Identifier {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         builder.push("identifier ", None, EnumSet::empty());
         self.0.build_rich_ir(builder);
     }
 }
-impl ToRichIr for Symbol {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl ToRichIr<()> for Symbol {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         builder.push("symbol ", None, EnumSet::empty());
         self.0.build_rich_ir(builder);
     }
 }
-impl ToRichIr for List {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl ToRichIr<()> for List {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         builder.push("list", None, EnumSet::empty());
         builder.push_children_multiline(&self.0);
     }
 }
-impl ToRichIr for Struct {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl ToRichIr<()> for Struct {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         builder.push("struct", None, EnumSet::empty());
         builder.push_children_custom_multiline(&self.fields, |builder, (key, value)| {
             if let Some(key) = key {
@@ -463,16 +463,16 @@ impl ToRichIr for Struct {
         });
     }
 }
-impl ToRichIr for StructAccess {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl ToRichIr<()> for StructAccess {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         builder.push("struct access ", None, EnumSet::empty());
         self.struct_.build_rich_ir(builder);
         builder.push(".", None, EnumSet::empty());
         self.key.build_rich_ir(builder); // TODO: `lowercase_first_letter()`?
     }
 }
-impl ToRichIr for Lambda {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl ToRichIr<()> for Lambda {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         builder.push(
             format!(
                 "lambda ({}) {{ ",
@@ -495,16 +495,16 @@ impl ToRichIr for Lambda {
         builder.push("}", None, EnumSet::empty());
     }
 }
-impl ToRichIr for Call {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl ToRichIr<()> for Call {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         builder.push("call ", None, EnumSet::empty());
         self.receiver.build_rich_ir(builder);
         builder.push(" with these arguments:", None, EnumSet::empty());
         builder.push_children_multiline(&self.arguments);
     }
 }
-impl ToRichIr for Assignment {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl ToRichIr<()> for Assignment {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         builder.push("assignment: ", None, EnumSet::empty());
         match &self.body {
             AssignmentBody::Lambda { name, .. } => name.build_rich_ir(builder),
@@ -521,23 +521,23 @@ impl ToRichIr for Assignment {
         }
     }
 }
-impl ToRichIr for Match {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl ToRichIr<()> for Match {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         builder.push("match ", None, EnumSet::empty());
         self.expression.build_rich_ir(builder);
         builder.push(" %", None, EnumSet::empty());
         builder.push_children_multiline(&self.cases);
     }
 }
-impl ToRichIr for MatchCase {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl ToRichIr<()> for MatchCase {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         self.pattern.build_rich_ir(builder);
         builder.push(" -> ", None, EnumSet::empty());
         builder.push_children_multiline(&self.body);
     }
 }
-impl ToRichIr for OrPattern {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl ToRichIr<()> for OrPattern {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         self.0.first().unwrap().build_rich_ir(builder);
         for pattern in self.0.iter().skip(1) {
             builder.push(" | ", None, EnumSet::empty());
@@ -545,8 +545,8 @@ impl ToRichIr for OrPattern {
         }
     }
 }
-impl ToRichIr for AstString {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl ToRichIr<()> for AstString {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         builder.push(
             format!(r#"{}@"{}""#, self.id.to_short_debug_string(), self.value),
             Some(TokenType::Text),

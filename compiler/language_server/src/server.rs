@@ -1,5 +1,8 @@
 use async_trait::async_trait;
-use candy_frontend::module::{Module, ModuleKind};
+use candy_frontend::{
+    hir::HirReferenceKey,
+    module::{Module, ModuleKind},
+};
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentFilter, DocumentHighlight, DocumentHighlightParams, FoldingRange, FoldingRangeParams,
@@ -11,10 +14,8 @@ use lsp_types::{
     TextDocumentChangeRegistrationOptions, TextDocumentRegistrationOptions, Url,
     WorkDoneProgressOptions,
 };
-use rustc_hash::FxHashMap;
 use serde::Serialize;
 use std::{mem, path::PathBuf};
-use strum::IntoEnumIterator;
 use tokio::sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tower_lsp::{jsonrpc, Client, ClientSocket, LanguageServer, LspService};
 use tracing::{debug, span, Level};
@@ -25,7 +26,7 @@ use crate::{
     features_candy::{hints::HintsNotification, CandyFeatures},
     features_ir::{Ir, IrFeatures},
     semantic_tokens,
-    utils::{module_from_package_root_and_url, module_to_url, LspPositionConversion},
+    utils::{module_from_package_root_and_url, module_to_url},
 };
 
 pub struct Server {
@@ -33,6 +34,7 @@ pub struct Server {
     pub db: Mutex<Database>,
     pub state: RwLock<ServerState>,
 }
+#[derive(Debug)]
 pub enum ServerState {
     Initial {
         features: ServerFeatures,
@@ -51,20 +53,20 @@ impl ServerState {
             ServerState::Shutdown => panic!("Server is shut down"),
         }
     }
-    pub fn require_features_mut(&mut self) -> &mut ServerFeatures {
-        match self {
-            ServerState::Initial { features } => features,
-            ServerState::Running { features, .. } => features,
-            ServerState::Shutdown => panic!("Server is shut down"),
-        }
-    }
 }
 
+#[derive(Debug)]
 pub struct ServerFeatures {
     pub candy: CandyFeatures,
-    pub ir: FxHashMap<Ir, IrFeatures>,
+    pub rcst: IrFeatures<()>,
+    pub ast: IrFeatures<()>,
+    pub hir: IrFeatures<HirReferenceKey>,
 }
 impl ServerFeatures {
+    fn all_features(&self) -> Vec<&dyn LanguageFeatures> {
+        vec![&self.candy, &self.rcst, &self.ast, &self.hir]
+    }
+
     fn selectors_where<F>(&self, mut filter: F) -> Vec<DocumentFilter>
     where
         F: FnMut(&dyn LanguageFeatures) -> bool,
@@ -86,8 +88,7 @@ impl ServerFeatures {
                 pattern: None,
             }))
         };
-        add_selectors_for(&mut selectors, &self.candy);
-        for features in self.ir.values() {
+        for features in self.all_features() {
             add_selectors_for(&mut selectors, features);
         }
         selectors
@@ -108,8 +109,12 @@ impl Server {
         let (hints_sender, mut hints_receiver) = tokio::sync::mpsc::channel(1024);
 
         let (service, client) = LspService::build(|client| {
-            let candy_features = CandyFeatures::new(diagnostics_sender, hints_sender);
-            let ir_features = Ir::iter().map(|ir| (ir, IrFeatures::new(ir))).collect();
+            let features = ServerFeatures {
+                candy: CandyFeatures::new(diagnostics_sender.clone(), hints_sender.clone()),
+                rcst: IrFeatures::new_rcst(),
+                ast: IrFeatures::new_ast(),
+                hir: IrFeatures::new_hir(),
+            };
 
             let client_for_closure = client.clone();
             let diagnostics_reporter = async move || {
@@ -136,12 +141,7 @@ impl Server {
             Self {
                 client,
                 db: Default::default(),
-                state: RwLock::new(ServerState::Initial {
-                    features: ServerFeatures {
-                        candy: candy_features,
-                        ir: ir_features,
-                    },
-                }),
+                state: RwLock::new(ServerState::Initial { features }),
             }
         })
         .custom_method("candy/viewRcst", Server::candy_view_rcst)
@@ -188,8 +188,12 @@ impl Server {
         let (ir, module) = self.ir_and_module_from_url(url).await;
         let features = RwLockReadGuard::map(self.state.read().await, |state| {
             let features = state.require_features();
-            ir.map(|ir| features.ir.get(&ir).unwrap() as &dyn LanguageFeatures)
-                .unwrap_or_else(|| &features.candy)
+            match ir {
+                Some(Ir::Rcst) => &features.rcst as &dyn LanguageFeatures,
+                Some(Ir::Ast) => &features.ast,
+                Some(Ir::Hir) => &features.hir,
+                None => &features.candy,
+            }
         });
         (features, module)
     }
@@ -217,10 +221,8 @@ impl LanguageServer for Server {
 
         {
             let state = self.state.read().await;
-            let features = state.require_features();
-            features.candy.initialize().await;
-            for feature in features.ir.values() {
-                feature.initialize().await;
+            for features in state.require_features().all_features() {
+                features.initialize().await;
             }
         }
 
@@ -322,14 +324,12 @@ impl LanguageServer for Server {
     }
 
     async fn shutdown(&self) -> jsonrpc::Result<()> {
-        let mut owned_state = {
+        let state = {
             let mut state = self.state.write().await;
             mem::replace(&mut *state, ServerState::Shutdown)
         };
-        let features = owned_state.require_features_mut();
-        features.candy.shutdown().await;
-        for (_, feature) in features.ir.drain() {
-            feature.shutdown().await;
+        for features in state.require_features().all_features() {
+            features.shutdown().await;
         }
         Ok(())
     }
@@ -367,13 +367,13 @@ impl LanguageServer for Server {
             .features_and_module_from_url(params.text_document_position_params.text_document.uri)
             .await;
         assert!(features.supports_find_definition());
-        let db = self.db.lock().await;
-        let offset = db.lsp_position_to_offset(
-            module.clone(),
-            params.text_document_position_params.position,
-        );
         let response = features
-            .find_definition(&db, module, offset)
+            .find_definition(
+                &self.db,
+                module,
+                params.text_document_position_params.position,
+            )
+            .await
             .map(|link| GotoDefinitionResponse::Link(vec![link]));
         Ok(response)
     }
@@ -420,8 +420,7 @@ impl LanguageServer for Server {
             .features_and_module_from_url(params.text_document.uri)
             .await;
         assert!(features.supports_folding_ranges());
-        let db = self.db.lock().await;
-        Ok(Some(features.folding_ranges(&db, module)))
+        Ok(Some(features.folding_ranges(&self.db, module).await))
     }
 
     async fn semantic_tokens_full(
@@ -431,8 +430,7 @@ impl LanguageServer for Server {
         let (features, module) = self
             .features_and_module_from_url(params.text_document.uri)
             .await;
-        let db = self.db.lock().await;
-        let tokens = features.semantic_tokens(&db, module);
+        let tokens = features.semantic_tokens(&self.db, module);
         let tokens = tokens.await;
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
             result_id: None,
@@ -449,8 +447,8 @@ impl Server {
     ) -> Option<Vec<DocumentHighlight>> {
         let (features, module) = self.features_and_module_from_url(uri).await;
         assert!(features.supports_references());
-        let db = self.db.lock().await;
-        let offset = db.lsp_position_to_offset(module.clone(), position);
-        features.references(&db, module, offset, include_declaration)
+        features
+            .references(&self.db, module, position, include_declaration)
+            .await
     }
 }

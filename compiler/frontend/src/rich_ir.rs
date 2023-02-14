@@ -1,15 +1,33 @@
-use std::ops::Range;
+use std::{hash::Hash, ops::Range};
 
 use enumset::{EnumSet, EnumSetType};
+use rustc_hash::FxHashMap;
 
 use crate::position::Offset;
 
-#[derive(Default)]
-pub struct RichIr {
+#[derive(Debug)]
+pub struct RichIr<RK: Eq + Hash> {
     pub text: String,
     pub annotations: Vec<RichIrAnnotation>,
+    pub references: FxHashMap<RK, Reference>,
+}
+impl<RK: Eq + Hash> Default for RichIr<RK> {
+    fn default() -> Self {
+        Self {
+            text: String::new(),
+            annotations: Vec::new(),
+            references: FxHashMap::default(),
+        }
+    }
 }
 
+#[derive(Debug, Default)]
+pub struct Reference {
+    pub definition: Option<Range<Offset>>,
+    pub references: Vec<Range<Offset>>,
+}
+
+#[derive(Debug)]
 pub struct RichIrAnnotation {
     pub range: Range<Offset>,
     pub token_type: Option<TokenType>,
@@ -30,28 +48,28 @@ pub enum TokenModifier {
     Builtin,
 }
 
-pub trait ToRichIr {
-    fn to_rich_ir(&self) -> RichIr {
+pub trait ToRichIr<RK: Eq + Hash> {
+    fn to_rich_ir(&self) -> RichIr<RK> {
         let mut builder = RichIrBuilder::default();
         self.build_rich_ir(&mut builder);
         builder.finish()
     }
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder);
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<RK>);
 }
-impl ToRichIr for str {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl<RK: Eq + Hash> ToRichIr<RK> for str {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<RK>) {
         builder.push(self, None, EnumSet::empty());
     }
 }
-impl<T: ToRichIr> ToRichIr for Option<T> {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl<T: ToRichIr<RK>, RK: Eq + Hash> ToRichIr<RK> for Option<T> {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<RK>) {
         if let Some(value) = self {
             value.build_rich_ir(builder);
         }
     }
 }
-impl<T: ToRichIr> ToRichIr for [T] {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl<T: ToRichIr<RK>, RK: Eq + Hash> ToRichIr<RK> for [T] {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<RK>) {
         match self {
             [] => {}
             [first, rest @ ..] => {
@@ -65,12 +83,19 @@ impl<T: ToRichIr> ToRichIr for [T] {
     }
 }
 
-#[derive(Default)]
-pub struct RichIrBuilder {
-    ir: RichIr,
+pub struct RichIrBuilder<RK: Eq + Hash> {
+    ir: RichIr<RK>,
     indentation: usize,
 }
-impl RichIrBuilder {
+impl<RK: Eq + Hash> Default for RichIrBuilder<RK> {
+    fn default() -> Self {
+        Self {
+            ir: RichIr::default(),
+            indentation: 0,
+        }
+    }
+}
+impl<RK: Eq + Hash> RichIrBuilder<RK> {
     pub fn indent(&mut self) {
         self.indentation += 1;
     }
@@ -84,7 +109,7 @@ impl RichIrBuilder {
     pub fn push_children_multiline<'c, CS, C>(&mut self, children: CS)
     where
         CS: IntoIterator<Item = &'c C>,
-        C: ToRichIr + 'c,
+        C: ToRichIr<RK> + 'c,
     {
         self.push_children_custom_multiline(children, |builder, child| child.build_rich_ir(builder))
     }
@@ -104,7 +129,7 @@ impl RichIrBuilder {
     pub fn push_children<CS, C, S>(&mut self, children: CS, separator: S)
     where
         CS: AsRef<[C]>,
-        C: ToRichIr,
+        C: ToRichIr<RK>,
         S: AsRef<str>,
     {
         self.push_children_custom(
@@ -141,7 +166,7 @@ impl RichIrBuilder {
         text: S,
         token_type: Option<TokenType>,
         token_modifiers: EnumSet<TokenModifier>,
-    ) {
+    ) -> Range<Offset> {
         assert!(
             token_modifiers.is_empty() || token_type.is_some(),
             "`token_modifiers` can only be specified if a `token_type` is specified.",
@@ -149,16 +174,34 @@ impl RichIrBuilder {
         let start = self.ir.text.len().into();
         self.ir.text.push_str(text.as_ref());
         let end = self.ir.text.len().into();
+        let range = start..end;
         if token_type.is_some() || !token_modifiers.is_empty() {
             self.ir.annotations.push(RichIrAnnotation {
-                range: start..end,
+                range: range.clone(),
                 token_type,
                 token_modifiers,
             });
         }
+        range
     }
 
-    pub fn finish(self) -> RichIr {
+    pub fn push_definition<CRK: Into<RK>>(&mut self, key: CRK, range: Range<Offset>) {
+        self.ir
+            .references
+            .entry(key.into())
+            .or_insert_with(Reference::default)
+            .definition = Some(range);
+    }
+    pub fn push_reference<CRK: Into<RK>>(&mut self, key: CRK, range: Range<Offset>) {
+        self.ir
+            .references
+            .entry(key.into())
+            .or_insert_with(Reference::default)
+            .references
+            .push(range);
+    }
+
+    pub fn finish(self) -> RichIr<RK> {
         self.ir
     }
 }

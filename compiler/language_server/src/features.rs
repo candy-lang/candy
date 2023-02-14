@@ -1,7 +1,8 @@
 use async_trait::async_trait;
-use candy_frontend::{module::Module, position::Offset};
+use candy_frontend::module::Module;
 use lsp_types::{
-    DocumentHighlight, FoldingRange, LocationLink, SemanticToken, TextDocumentContentChangeEvent,
+    self, DocumentHighlight, FoldingRange, LocationLink, SemanticToken,
+    TextDocumentContentChangeEvent,
 };
 use tokio::sync::Mutex;
 
@@ -42,18 +43,18 @@ pub trait LanguageFeatures: Send + Sync {
     fn supports_folding_ranges(&self) -> bool {
         false
     }
-    fn folding_ranges(&self, _db: &Database, _module: Module) -> Vec<FoldingRange> {
+    async fn folding_ranges(&self, _db: &Mutex<Database>, _module: Module) -> Vec<FoldingRange> {
         unimplemented!()
     }
 
     fn supports_find_definition(&self) -> bool {
         false
     }
-    fn find_definition(
+    async fn find_definition(
         &self,
-        _db: &Database,
+        _db: &Mutex<Database>,
         _module: Module,
-        _offset: Offset,
+        _position: lsp_types::Position,
     ) -> Option<LocationLink> {
         unimplemented!()
     }
@@ -62,11 +63,11 @@ pub trait LanguageFeatures: Send + Sync {
         false
     }
     /// Used for highlighting and finding references.
-    fn references(
+    async fn references(
         &self,
-        _db: &Database,
+        _db: &Mutex<Database>,
         _module: Module,
-        _offset: Offset,
+        _position: lsp_types::Position,
         _include_declaration: bool,
     ) -> Option<Vec<DocumentHighlight>> {
         unimplemented!()
@@ -75,7 +76,7 @@ pub trait LanguageFeatures: Send + Sync {
     fn supports_semantic_tokens(&self) -> bool {
         false
     }
-    async fn semantic_tokens(&self, _db: &Database, _module: Module) -> Vec<SemanticToken> {
+    async fn semantic_tokens(&self, _db: &Mutex<Database>, _module: Module) -> Vec<SemanticToken> {
         unimplemented!()
     }
 }
