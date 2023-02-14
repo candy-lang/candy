@@ -423,7 +423,7 @@ impl ToRichIr<()> for Int {
 impl ToRichIr<()> for Text {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         builder.push("text", None, EnumSet::empty());
-        builder.push_children_multiline(&self.0);
+        builder.push_foldable(|builder| builder.push_children_multiline(&self.0));
     }
 }
 impl ToRichIr<()> for TextPart {
@@ -447,19 +447,21 @@ impl ToRichIr<()> for Symbol {
 impl ToRichIr<()> for List {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         builder.push("list", None, EnumSet::empty());
-        builder.push_children_multiline(&self.0);
+        builder.push_foldable(|builder| builder.push_children_multiline(&self.0));
     }
 }
 impl ToRichIr<()> for Struct {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         builder.push("struct", None, EnumSet::empty());
-        builder.push_children_custom_multiline(&self.fields, |builder, (key, value)| {
-            if let Some(key) = key {
-                key.build_rich_ir(builder);
-                builder.push(": ", None, EnumSet::empty());
-            }
+        builder.push_foldable(|builder| {
+            builder.push_children_custom_multiline(&self.fields, |builder, (key, value)| {
+                if let Some(key) = key {
+                    key.build_rich_ir(builder);
+                    builder.push(": ", None, EnumSet::empty());
+                }
 
-            value.build_rich_ir(builder);
+                value.build_rich_ir(builder);
+            });
         });
     }
 }
@@ -475,7 +477,7 @@ impl ToRichIr<()> for Lambda {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         builder.push(
             format!(
-                "lambda ({}) {{ ",
+                "lambda ({}) {{",
                 if self.fuzzable {
                     "fuzzable"
                 } else {
@@ -486,12 +488,16 @@ impl ToRichIr<()> for Lambda {
             EnumSet::empty(),
         );
         for parameter in &self.parameters {
-            parameter.build_rich_ir(builder);
             builder.push(" ", None, EnumSet::empty());
+            parameter.build_rich_ir(builder);
         }
-        builder.push("->", None, EnumSet::empty());
-        builder.push_children_multiline(&self.body);
-        builder.push_newline();
+        if !self.parameters.is_empty() {
+            builder.push(" ->", None, EnumSet::empty());
+        }
+        builder.push_foldable(|builder| {
+            builder.push_children_multiline(&self.body);
+            builder.push_newline();
+        });
         builder.push("}", None, EnumSet::empty());
     }
 }
@@ -500,7 +506,7 @@ impl ToRichIr<()> for Call {
         builder.push("call ", None, EnumSet::empty());
         self.receiver.build_rich_ir(builder);
         builder.push(" with these arguments:", None, EnumSet::empty());
-        builder.push_children_multiline(&self.arguments);
+        builder.push_foldable(|builder| builder.push_children_multiline(&self.arguments));
     }
 }
 impl ToRichIr<()> for Assignment {
@@ -517,7 +523,9 @@ impl ToRichIr<()> for Assignment {
         );
         match &self.body {
             AssignmentBody::Lambda { lambda, .. } => lambda.build_rich_ir(builder),
-            AssignmentBody::Body { body, .. } => builder.push_children_multiline(body),
+            AssignmentBody::Body { body, .. } => {
+                builder.push_foldable(|builder| builder.push_children_multiline(body))
+            }
         }
     }
 }
@@ -526,14 +534,14 @@ impl ToRichIr<()> for Match {
         builder.push("match ", None, EnumSet::empty());
         self.expression.build_rich_ir(builder);
         builder.push(" %", None, EnumSet::empty());
-        builder.push_children_multiline(&self.cases);
+        builder.push_foldable(|builder| builder.push_children_multiline(&self.cases));
     }
 }
 impl ToRichIr<()> for MatchCase {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         self.pattern.build_rich_ir(builder);
         builder.push(" -> ", None, EnumSet::empty());
-        builder.push_children_multiline(&self.body);
+        builder.push_foldable(|builder| builder.push_children_multiline(&self.body));
     }
 }
 impl ToRichIr<()> for OrPattern {

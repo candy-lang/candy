@@ -9,8 +9,8 @@ use candy_frontend::{
 };
 use extension_trait::extension_trait;
 use lsp_types::{
-    self, notification::Notification, DocumentHighlight, DocumentHighlightKind, LocationLink,
-    SemanticToken, Url,
+    self, notification::Notification, DocumentHighlight, DocumentHighlightKind, FoldingRange,
+    FoldingRangeKind, LocationLink, SemanticToken, Url,
 };
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -196,6 +196,15 @@ impl<RK: Eq + Hash + Send + Sync + Debug> LanguageFeatures for IrFeatures<RK> {
         open_ir.find_definition(position)
     }
 
+    fn supports_folding_ranges(&self) -> bool {
+        true
+    }
+    async fn folding_ranges(&self, _db: &Mutex<Database>, module: Module) -> Vec<FoldingRange> {
+        let open_irs = self.open_irs.read().await;
+        let open_ir = open_irs.get(&module).unwrap();
+        open_ir.folding_ranges()
+    }
+
     fn supports_references(&self) -> bool {
         true
     }
@@ -240,6 +249,24 @@ impl<RK: Eq + Hash> OpenIr<RK> {
             target_selection_range: target_range,
         })
     }
+
+    fn folding_ranges(&self) -> Vec<FoldingRange> {
+        self.ir
+            .folding_ranges
+            .iter()
+            .map(|range| {
+                let range = self.range_to_lsp_range(range);
+                FoldingRange {
+                    start_line: range.start.line,
+                    start_character: Some(range.start.character),
+                    end_line: range.end.line,
+                    end_character: Some(range.end.character),
+                    kind: Some(FoldingRangeKind::Region),
+                }
+            })
+            .collect()
+    }
+
     fn references(
         &self,
         position: lsp_types::Position,

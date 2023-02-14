@@ -463,23 +463,30 @@ impl ToRichIr<HirReferenceKey> for Expression {
             }
             Expression::List(items) => {
                 builder.push("(", None, EnumSet::empty());
-                builder.push_children_custom_multiline(items, |builder, item| {
-                    item.build_rich_ir(builder);
-                    builder.push(",", None, EnumSet::empty());
+                builder.push_foldable(|builder| {
+                    builder.push_children_custom_multiline(items, |builder, item| {
+                        item.build_rich_ir(builder);
+                        builder.push(",", None, EnumSet::empty());
+                    });
+                    if !items.is_empty() {
+                        builder.push_newline();
+                    }
                 });
                 builder.push(")", None, EnumSet::empty());
             }
             Expression::Struct(entries) => {
                 builder.push("[", None, EnumSet::empty());
-                builder.push_children_custom_multiline(entries, |builder, (key, value)| {
-                    key.build_rich_ir(builder);
-                    builder.push(": ", None, EnumSet::empty());
-                    value.build_rich_ir(builder);
-                    builder.push(",", None, EnumSet::empty());
+                builder.push_foldable(|builder| {
+                    builder.push_children_custom_multiline(entries, |builder, (key, value)| {
+                        key.build_rich_ir(builder);
+                        builder.push(": ", None, EnumSet::empty());
+                        value.build_rich_ir(builder);
+                        builder.push(",", None, EnumSet::empty());
+                    });
+                    if !entries.is_empty() {
+                        builder.push_newline();
+                    }
                 });
-                if !entries.is_empty() {
-                    builder.push_newline();
-                }
                 builder.push("]", None, EnumSet::empty());
             }
             Expression::Destructure {
@@ -501,7 +508,12 @@ impl ToRichIr<HirReferenceKey> for Expression {
                     pattern.build_rich_ir(builder);
                     builder.push(" ->", None, EnumSet::empty());
                     builder.indent();
-                    body.build_rich_ir(builder);
+                    builder.push_foldable(|builder| {
+                        if !body.expressions.is_empty() {
+                            builder.push_newline();
+                        }
+                        body.build_rich_ir(builder);
+                    });
                     builder.dedent();
                 });
             }
@@ -560,19 +572,7 @@ impl ToRichIr<HirReferenceKey> for Expression {
                 reason.build_rich_ir(builder);
             }
             Expression::Error { child, errors } => {
-                builder.push(
-                    if errors.len() == 1 { "error" } else { "errors" },
-                    None,
-                    EnumSet::empty(),
-                );
-                builder.push_children_multiline(errors);
-                if let Some(child) = child {
-                    builder.indent();
-                    builder.push_newline();
-                    builder.push("fallback: ", None, EnumSet::empty());
-                    child.build_rich_ir(builder);
-                    builder.dedent();
-                }
+                build_errors_rich_ir(builder, errors, child);
             }
         }
     }
@@ -617,22 +617,31 @@ impl ToRichIr<HirReferenceKey> for Pattern {
             }
             Pattern::Or(patterns) => builder.push_children(patterns, " | "),
             Pattern::Error { child, errors } => {
-                builder.push(
-                    if errors.len() == 1 { "error" } else { "errors" },
-                    None,
-                    EnumSet::empty(),
-                );
-                builder.push_children_multiline(errors);
-                if let Some(child) = child {
-                    builder.indent();
-                    builder.push_newline();
-                    builder.push("fallback: ", None, EnumSet::empty());
-                    child.build_rich_ir(builder);
-                    builder.dedent();
-                }
+                build_errors_rich_ir(builder, errors, child);
             }
         }
     }
+}
+fn build_errors_rich_ir<C: ToRichIr<HirReferenceKey>>(
+    builder: &mut RichIrBuilder<HirReferenceKey>,
+    errors: &[CompilerError],
+    child: &Option<C>,
+) {
+    builder.push(
+        if errors.len() == 1 { "error" } else { "errors" },
+        None,
+        EnumSet::empty(),
+    );
+    builder.push_foldable(|builder| {
+        builder.push_children_multiline(errors);
+        if let Some(child) = child {
+            builder.indent();
+            builder.push_newline();
+            builder.push("fallback: ", None, EnumSet::empty());
+            child.build_rich_ir(builder);
+            builder.dedent();
+        }
+    });
 }
 impl ToRichIr<HirReferenceKey> for Lambda {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
@@ -645,11 +654,13 @@ impl ToRichIr<HirReferenceKey> for Lambda {
             builder.push(" ", None, EnumSet::empty());
         }
         builder.push("->", None, EnumSet::empty());
-        builder.indent();
-        builder.push_newline();
-        self.body.build_rich_ir(builder);
-        builder.dedent();
-        builder.push_newline();
+        builder.push_foldable(|builder| {
+            builder.indent();
+            builder.push_newline();
+            self.body.build_rich_ir(builder);
+            builder.dedent();
+            builder.push_newline();
+        });
     }
 }
 impl ToRichIr<HirReferenceKey> for Body {

@@ -10,6 +10,7 @@ pub struct RichIr<RK: Eq + Hash> {
     pub text: String,
     pub annotations: Vec<RichIrAnnotation>,
     pub references: FxHashMap<RK, Reference>,
+    pub folding_ranges: Vec<Range<Offset>>,
 }
 impl<RK: Eq + Hash> Default for RichIr<RK> {
     fn default() -> Self {
@@ -17,6 +18,7 @@ impl<RK: Eq + Hash> Default for RichIr<RK> {
             text: String::new(),
             annotations: Vec::new(),
             references: FxHashMap::default(),
+            folding_ranges: Vec::new(),
         }
     }
 }
@@ -68,6 +70,11 @@ impl<T: ToRichIr<RK>, RK: Eq + Hash> ToRichIr<RK> for Option<T> {
         }
     }
 }
+impl<T: ToRichIr<RK>, RK: Eq + Hash> ToRichIr<RK> for Box<T> {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<RK>) {
+        self.as_ref().build_rich_ir(builder);
+    }
+}
 impl<T: ToRichIr<RK>, RK: Eq + Hash> ToRichIr<RK> for [T] {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder<RK>) {
         match self {
@@ -96,6 +103,16 @@ impl<RK: Eq + Hash> Default for RichIrBuilder<RK> {
     }
 }
 impl<RK: Eq + Hash> RichIrBuilder<RK> {
+    pub fn push_foldable<F>(&mut self, build_children: F)
+    where
+        F: FnOnce(&mut Self),
+    {
+        let start = self.ir.text.len().into();
+        build_children(self);
+        let end = self.ir.text.len().into();
+        self.ir.folding_ranges.push(start..end);
+    }
+
     pub fn indent(&mut self) {
         self.indentation += 1;
     }
