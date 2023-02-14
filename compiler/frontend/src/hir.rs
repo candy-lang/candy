@@ -7,6 +7,7 @@ use crate::{
     rich_ir::{RichIrBuilder, ToRichIr, TokenModifier, TokenType},
 };
 
+use derive_more::From;
 use enumset::EnumSet;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
@@ -215,7 +216,7 @@ impl ToRichIr<HirReferenceKey> for Id {
             Some(TokenType::Variable),
             EnumSet::empty(),
         );
-        builder.push_reference(HirReferenceKey::Id(self.to_owned()), range);
+        builder.push_reference(self.to_owned(), range);
     }
 }
 
@@ -429,28 +430,36 @@ impl Body {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, From)]
 pub enum HirReferenceKey {
     Id(Id),
+    Int(BigUint),
+    Text(String),
+    #[from(ignore)]
+    Symbol(String),
+    BuiltinFunction(BuiltinFunction),
 }
 impl ToRichIr<HirReferenceKey> for Expression {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
         match self {
             Expression::Int(int) => {
-                builder.push(int.to_string(), Some(TokenType::Int), EnumSet::empty());
+                let range = builder.push(int.to_string(), Some(TokenType::Int), EnumSet::empty());
+                builder.push_reference(int.to_owned(), range);
             }
             Expression::Text(text) => {
-                builder.push(
+                let range = builder.push(
                     format!(r#""{}""#, text),
                     Some(TokenType::Text),
                     EnumSet::empty(),
                 );
+                builder.push_reference(text.to_owned(), range);
             }
             Expression::Reference(reference) => {
                 reference.build_rich_ir(builder);
             }
             Expression::Symbol(symbol) => {
-                builder.push(symbol, Some(TokenType::Symbol), EnumSet::empty());
+                let range = builder.push(symbol, Some(TokenType::Symbol), EnumSet::empty());
+                builder.push_reference(HirReferenceKey::Symbol(symbol.to_owned()), range);
             }
             Expression::List(items) => {
                 builder.push("(", None, EnumSet::empty());
@@ -513,11 +522,12 @@ impl ToRichIr<HirReferenceKey> for Expression {
                 builder.push("}", None, EnumSet::empty());
             }
             Expression::Builtin(builtin) => {
-                builder.push(
+                let range = builder.push(
                     format!("builtin{builtin:?}"),
                     Some(TokenType::Function),
                     EnumSet::only(TokenModifier::Builtin),
                 );
+                builder.push_reference(*builtin, range);
             }
             Expression::Call {
                 function,
@@ -650,7 +660,7 @@ impl ToRichIr<HirReferenceKey> for Body {
                 Some(TokenType::Variable),
                 EnumSet::empty(),
             );
-            builder.push_definition(HirReferenceKey::Id(id.to_owned()), range);
+            builder.push_definition(id.to_owned(), range);
 
             builder.push(" = ", None, EnumSet::empty());
             expression.build_rich_ir(builder);
