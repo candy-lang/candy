@@ -40,27 +40,24 @@ export class HintsDecorations implements vs.Disposable {
     ],
   ]);
 
-  constructor(private readonly analyzer: LanguageClient) {
-    // tslint:disable-next-line: no-floating-promises
-    analyzer.onReady().then(() => {
-      this.analyzer.onNotification(
-        PublishHintsNotification.type,
-        (notification) => {
-          // We parse the URI so that it gets normalized.
-          const uri = vs.Uri.parse(notification.uri).toString();
+  constructor(private readonly client: LanguageClient) {
+    this.client.onNotification(
+      PublishHintsNotification.type,
+      (notification) => {
+        // We parse the URI so that it gets normalized.
+        const uri = vs.Uri.parse(notification.uri).toString();
 
-          this.hints.set(uri, notification.hints);
-          // Fire an update if it was for the active document.
-          if (
-            vs.window.activeTextEditor &&
-            vs.window.activeTextEditor.document &&
-            uri === vs.window.activeTextEditor.document.uri.toString()
-          ) {
-            this.update();
-          }
+        this.hints.set(uri, notification.hints);
+        // Fire an update if it was for the active document.
+        if (
+          vs.window.activeTextEditor &&
+          vs.window.activeTextEditor.document &&
+          uri === vs.window.activeTextEditor.document.uri.toString()
+        ) {
+          this.update();
         }
-      );
-    });
+      }
+    );
 
     this.subscriptions.push(
       vs.window.onDidChangeActiveTextEditor(() => this.update())
@@ -70,9 +67,7 @@ export class HintsDecorations implements vs.Disposable {
         this.hints.delete(document.uri.toString());
       })
     );
-    if (vs.window.activeTextEditor) {
-      this.update();
-    }
+    if (vs.window.activeTextEditor) this.update();
   }
 
   private update() {
@@ -92,7 +87,7 @@ export class HintsDecorations implements vs.Disposable {
       };
       const decorations = new Map<HintKind, Item[]>();
       for (const hint of hints) {
-        const position = this.analyzer.protocol2CodeConverter.asPosition(
+        const position = this.client.protocol2CodeConverter.asPosition(
           hint.position
         );
 

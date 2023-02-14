@@ -1,10 +1,11 @@
+use derive_more::Deref;
 use num_bigint::BigUint;
 
 use super::{rcst::RcstError, rcst_to_cst::RcstToCst};
 use crate::{module::Module, position::Offset};
 use std::{
     fmt::{self, Display, Formatter},
-    ops::{Deref, Range},
+    ops::Range,
 };
 
 #[salsa::query_group(CstDbStorage)]
@@ -32,19 +33,12 @@ impl Display for Id {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Deref)]
 pub struct Cst {
     pub id: Id,
     pub span: Range<Offset>,
+    #[deref]
     pub kind: CstKind,
-}
-
-impl Deref for Cst {
-    type Target = CstKind;
-
-    fn deref(&self) -> &Self::Target {
-        &self.kind
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

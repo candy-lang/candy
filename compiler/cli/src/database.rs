@@ -15,10 +15,6 @@ use candy_frontend::{
     rcst_to_cst::RcstToCstStorage,
     string_to_rcst::StringToRcstStorage,
 };
-use candy_language_server::{
-    folding_range::FoldingRangeDbStorage, references::ReferencesDbStorage,
-    semantic_tokens::SemanticTokenDbStorage,
-};
 use candy_vm::mir_to_lir::MirToLirStorage;
 
 #[salsa::database(
@@ -26,7 +22,6 @@ use candy_vm::mir_to_lir::MirToLirStorage;
     AstToHirStorage,
     CstDbStorage,
     CstToAstStorage,
-    FoldingRangeDbStorage,
     HirDbStorage,
     HirToMirStorage,
     MirToLirStorage,
@@ -34,8 +29,6 @@ use candy_vm::mir_to_lir::MirToLirStorage;
     OptimizeMirStorage,
     PositionConversionStorage,
     RcstToCstStorage,
-    ReferencesDbStorage,
-    SemanticTokenDbStorage,
     StringToRcstStorage
 )]
 pub struct Database {

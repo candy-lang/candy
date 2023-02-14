@@ -1,4 +1,3 @@
-use super::{super::utils::JoinWithCommasAndAnd, utils::IdToEndOfLine, Hint, HintKind};
 use candy_frontend::{
     ast_to_hir::AstToHir,
     hir::{Expression, HirDb, Id, Lambda},
@@ -16,6 +15,13 @@ use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
 use std::collections::HashMap;
 use tracing::{debug, error};
+
+use crate::{
+    features_candy::hints::{utils::IdToEndOfLine, HintKind},
+    utils::JoinWithCommasAndAnd,
+};
+
+use super::Hint;
 
 #[derive(Default)]
 pub struct FuzzerManager {

@@ -4,15 +4,11 @@ use crate::{
     id::{CountableId, IdGenerator},
     module::Module,
 };
+use derive_more::{Deref, DerefMut};
 use itertools::Itertools;
 use num_bigint::BigInt;
 use rustc_hash::FxHashMap;
-use std::{
-    cmp::Ordering,
-    fmt, hash, mem,
-    ops::{Deref, DerefMut},
-    vec,
-};
+use std::{cmp::Ordering, fmt, hash, mem, vec};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Mir {
@@ -485,7 +481,11 @@ impl Mir {
         Mir { id_generator, body }
     }
 }
+
+#[derive(Deref, DerefMut)]
 pub struct LambdaBodyBuilder {
+    #[deref]
+    #[deref_mut]
     body_builder: BodyBuilder,
     responsible_parameter: Id,
     parameters: Vec<Id>,
@@ -514,18 +514,6 @@ impl LambdaBodyBuilder {
             body,
         };
         (id_generator, lambda)
-    }
-}
-impl Deref for LambdaBodyBuilder {
-    type Target = BodyBuilder;
-
-    fn deref(&self) -> &Self::Target {
-        &self.body_builder
-    }
-}
-impl DerefMut for LambdaBodyBuilder {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.body_builder
     }
 }
 

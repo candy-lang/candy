@@ -1,7 +1,5 @@
-use std::{
-    ops::{Deref, DerefMut, Range},
-    sync::Arc,
-};
+use derive_more::{Deref, DerefMut, From};
+use std::{ops::Range, sync::Arc};
 
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -9,26 +7,9 @@ use crate::module::{Module, ModuleDb};
 
 /// The offset of a character in a string as the number of bytes preceding it in
 /// UTF-8 encoding.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, DerefMut, From)]
+#[from(forward)]
 pub struct Offset(pub usize);
-
-impl From<usize> for Offset {
-    fn from(offset: usize) -> Self {
-        Offset(offset)
-    }
-}
-impl Deref for Offset {
-    type Target = usize;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl DerefMut for Offset {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Position {
@@ -83,12 +64,13 @@ fn offset_to_position(
 
 fn line_start_offsets(db: &dyn PositionConversionDb, module: Module) -> Arc<Vec<Offset>> {
     let text = db.get_module_content_as_string(module).unwrap();
-    Arc::new(line_start_offsets_raw(&text))
+    Arc::new(line_start_offsets_raw(&*text))
 }
-pub fn line_start_offsets_raw(text: &str) -> Vec<Offset> {
+pub fn line_start_offsets_raw<S: AsRef<str>>(text: S) -> Vec<Offset> {
     let mut offsets = vec![Offset(0)];
     offsets.extend(
-        text.bytes()
+        text.as_ref()
+            .bytes()
             .enumerate()
             .filter(|(_, it)| it == &b'\n')
             .map(|(index, _)| Offset(index + 1)),

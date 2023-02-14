@@ -1,5 +1,11 @@
+use enumset::EnumSet;
+
 use super::{ast::AstError, cst, hir::HirError, rcst::RcstError};
-use crate::{module::Module, position::Offset};
+use crate::{
+    module::Module,
+    position::Offset,
+    rich_ir::{RichIrBuilder, ToRichIr},
+};
 use std::{fmt::Display, ops::Range};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -165,5 +171,12 @@ impl CompilerError {
                 .collect(),
             _ => vec![],
         }
+    }
+}
+
+impl ToRichIr for CompilerError {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        // TODO: include more rich information
+        builder.push(self.to_string(), None, EnumSet::empty());
     }
 }
