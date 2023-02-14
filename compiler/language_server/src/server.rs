@@ -16,7 +16,7 @@ use lsp_types::{
 };
 use serde::Serialize;
 use std::{mem, path::PathBuf};
-use tokio::sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use tokio::sync::{mpsc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tower_lsp::{jsonrpc, Client, ClientSocket, LanguageServer, LspService};
 use tracing::{debug, span, Level};
 
@@ -24,7 +24,7 @@ use crate::{
     database::Database,
     features::LanguageFeatures,
     features_candy::{hints::HintsNotification, CandyFeatures},
-    features_ir::{Ir, IrFeatures},
+    features_ir::{Ir, IrFeatures, UpdateIrNotification},
     semantic_tokens,
     utils::{module_from_package_root_and_url, module_to_url},
 };
@@ -105,8 +105,8 @@ impl ServerFeatures {
 
 impl Server {
     pub fn create() -> (LspService<Self>, ClientSocket) {
-        let (diagnostics_sender, mut diagnostics_receiver) = tokio::sync::mpsc::channel(8);
-        let (hints_sender, mut hints_receiver) = tokio::sync::mpsc::channel(1024);
+        let (diagnostics_sender, mut diagnostics_receiver) = mpsc::channel(8);
+        let (hints_sender, mut hints_receiver) = mpsc::channel(1024);
 
         let (service, client) = LspService::build(|client| {
             let features = ServerFeatures {
@@ -144,9 +144,7 @@ impl Server {
                 state: RwLock::new(ServerState::Initial { features }),
             }
         })
-        .custom_method("candy/viewRcst", Server::candy_view_rcst)
-        .custom_method("candy/viewAst", Server::candy_view_ast)
-        .custom_method("candy/viewHir", Server::candy_view_hir)
+        .custom_method("candy/viewIr", Server::candy_view_ir)
         .finish();
 
         (service, client)
@@ -343,13 +341,40 @@ impl LanguageServer for Server {
         features.did_open(&self.db, module, content).await;
     }
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        let (features, module) = self
-            .features_and_module_from_url(params.text_document.uri)
-            .await;
-        assert!(features.supports_did_change());
-        features
-            .did_change(&self.db, module, params.content_changes)
-            .await;
+        let module = {
+            let (features, module) = self
+                .features_and_module_from_url(params.text_document.uri)
+                .await;
+            assert!(features.supports_did_change());
+            features
+                .did_change(&self.db, module.clone(), params.content_changes)
+                .await;
+            module
+        };
+
+        let notifications = {
+            let state = self.state.read().await;
+            let all_features = state.require_features();
+            [
+                all_features
+                    .rcst
+                    .maybe_generate_update_notification(&module)
+                    .await,
+                all_features
+                    .ast
+                    .maybe_generate_update_notification(&module)
+                    .await,
+                all_features
+                    .hir
+                    .maybe_generate_update_notification(&module)
+                    .await,
+            ]
+        };
+        for notification in notifications.into_iter().flatten() {
+            self.client
+                .send_notification::<UpdateIrNotification>(notification)
+                .await;
+        }
     }
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         let (features, module) = self

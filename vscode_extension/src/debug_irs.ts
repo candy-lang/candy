@@ -1,58 +1,53 @@
+import { assert } from 'console';
 import * as vscode from 'vscode';
-import { LanguageClient, RequestType } from 'vscode-languageclient/node';
+import { DocumentUri, LanguageClient } from 'vscode-languageclient/node';
 import {
-  viewAst,
-  viewHir,
+  Ir,
+  updateIrNotification,
+  viewIr,
   ViewIrParams,
-  viewRcst,
 } from './lsp_custom_protocol';
 
 export function registerDebugIrCommands(client: LanguageClient) {
-  registerDebugIrCommand(
-    client,
-    'RCST',
-    'candy-rcst',
-    'candy.debug.viewRcst',
-    viewRcst
-  );
-  registerDebugIrCommand(
-    client,
-    'AST',
-    'candy-ast',
-    'candy.debug.viewAst',
-    viewAst
-  );
-  registerDebugIrCommand(
-    client,
-    'HIR',
-    'candy-hir',
-    'candy.debug.viewHir',
-    viewHir
-  );
+  const updateIrEmitter = new vscode.EventEmitter<vscode.Uri>();
+  const onIrUpdate = updateIrEmitter.event;
+  client.onNotification(updateIrNotification, (notification) => {
+    console.log('updateIrNotification', notification);
+    updateIrEmitter.fire(vscode.Uri.parse(notification.uri));
+  });
+
+  registerDebugIrCommand(client, onIrUpdate, 'rcst', 'RCST', 'viewRcst');
+  registerDebugIrCommand(client, onIrUpdate, 'ast', 'AST', 'viewAst');
+  registerDebugIrCommand(client, onIrUpdate, 'hir', 'HIR', 'viewHir');
 }
 
 function registerDebugIrCommand(
   client: LanguageClient,
+  onIrUpdate: vscode.Event<vscode.Uri>,
+  ir: Ir,
   irName: string,
-  uriScheme: string,
-  command: string,
-  lspRequest: RequestType<ViewIrParams, string, void>
+  command: string
 ) {
+  const uriScheme = schemeForIr(ir);
+
+  const emitter = new vscode.EventEmitter<vscode.Uri>();
+  onIrUpdate((update) => {
+    if (update.scheme != uriScheme) return;
+    emitter.fire(update);
+  });
   const provider = new (class implements vscode.TextDocumentContentProvider {
-    onDidChange?: vscode.Event<vscode.Uri> | undefined;
+    onDidChange?: vscode.Event<vscode.Uri> | undefined = emitter.event;
     provideTextDocumentContent(
       uri: vscode.Uri,
       _token: vscode.CancellationToken
     ): vscode.ProviderResult<string> {
-      if (uri.scheme !== uriScheme) return null;
-
-      const scheme = decodeURIComponent(uri.query.substring('scheme='.length));
-      const params = { uri: `${scheme}://${uri.path}` };
-      return client.sendRequest(lspRequest, params);
+      const params: ViewIrParams = { uri: decodeUri(ir, uri), ir };
+      return client.sendRequest(viewIr, params);
     }
   })();
   vscode.workspace.registerTextDocumentContentProvider(uriScheme, provider);
-  vscode.commands.registerCommand(command, async () => {
+
+  vscode.commands.registerCommand(`candy.debug.${command}`, async () => {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
       vscode.window.showErrorMessage(
@@ -68,12 +63,25 @@ function registerDebugIrCommand(
       return;
     }
 
-    const uri = vscode.Uri.from({
-      scheme: uriScheme,
-      path: document.uri.path,
-      query: `scheme=${encodeURIComponent(document.uri.scheme)}`,
-    });
-    const irDocument = await vscode.workspace.openTextDocument(uri);
+    const encodedUri = encodeUri(ir, document.uri);
+    const irDocument = await vscode.workspace.openTextDocument(encodedUri);
     await vscode.window.showTextDocument(irDocument, vscode.ViewColumn.Beside);
   });
+}
+
+function encodeUri(ir: Ir, uri: vscode.Uri): vscode.Uri {
+  return vscode.Uri.from({
+    scheme: schemeForIr(ir),
+    path: uri.path,
+    query: `scheme=${encodeURIComponent(uri.scheme)}`,
+  });
+}
+function decodeUri(ir: Ir, uri: vscode.Uri): DocumentUri {
+  assert(uri.scheme === schemeForIr(ir));
+
+  const scheme = decodeURIComponent(uri.query.substring('scheme='.length));
+  return `${scheme}://${uri.path}`;
+}
+function schemeForIr(ir: Ir): string {
+  return `candy-${ir}`;
 }

@@ -8,8 +8,10 @@ use candy_frontend::{
     string_to_rcst::{InvalidModuleError, StringToRcst},
 };
 use extension_trait::extension_trait;
-use itertools::Itertools;
-use lsp_types::{self, DocumentHighlight, DocumentHighlightKind, LocationLink, SemanticToken, Url};
+use lsp_types::{
+    self, notification::Notification, DocumentHighlight, DocumentHighlightKind, LocationLink,
+    SemanticToken, Url,
+};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, hash::Hash, ops::Range, sync::Arc};
@@ -25,7 +27,8 @@ use crate::{
     utils::{lsp_position_to_offset_raw, range_to_lsp_range_raw},
 };
 
-#[derive(Debug, EnumIter, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, EnumIter, PartialEq, Eq, Clone, Copy, Hash, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum Ir {
     Rcst,
     Ast,
@@ -36,41 +39,48 @@ pub enum Ir {
 #[serde(rename_all = "camelCase")]
 pub struct ViewIrParams {
     pub uri: Url,
+    pub ir: Ir,
 }
 
 impl Server {
-    pub async fn candy_view_rcst(&self, params: ViewIrParams) -> jsonrpc::Result<String> {
-        self.candy_view_ir(
-            params,
-            |features| &features.rcst,
-            |db, module| match db.rcst(module) {
-                Ok(rcst) => Some(rcst.to_rich_ir()),
-                Err(InvalidModuleError::DoesNotExist) => None,
-                Err(InvalidModuleError::InvalidUtf8) => Some("# Invalid UTF-8".to_rich_ir()),
-                Err(InvalidModuleError::IsToolingModule) => {
-                    Some("# Is a tooling module".to_rich_ir())
-                }
-            },
-        )
-        .await
+    pub async fn candy_view_ir(&self, params: ViewIrParams) -> jsonrpc::Result<String> {
+        match params.ir {
+            Ir::Rcst => {
+                self.view_ir(
+                    params,
+                    |features| &features.rcst,
+                    |db, module| match db.rcst(module) {
+                        Ok(rcst) => Some(rcst.to_rich_ir()),
+                        Err(InvalidModuleError::DoesNotExist) => None,
+                        Err(InvalidModuleError::InvalidUtf8) => {
+                            Some("# Invalid UTF-8".to_rich_ir())
+                        }
+                        Err(InvalidModuleError::IsToolingModule) => {
+                            Some("# Is a tooling module".to_rich_ir())
+                        }
+                    },
+                )
+                .await
+            }
+            Ir::Ast => {
+                self.view_ir(
+                    params,
+                    |features| &features.ast,
+                    |db, module| db.ast(module).map(|(asts, _)| asts.to_rich_ir()),
+                )
+                .await
+            }
+            Ir::Hir => {
+                self.view_ir(
+                    params,
+                    |features| &features.hir,
+                    |db, module| db.hir(module).map(|(body, _)| body.to_rich_ir()),
+                )
+                .await
+            }
+        }
     }
-    pub async fn candy_view_ast(&self, params: ViewIrParams) -> jsonrpc::Result<String> {
-        self.candy_view_ir(
-            params,
-            |features| &features.ast,
-            |db, module| db.ast(module).map(|(asts, _)| asts.to_rich_ir()),
-        )
-        .await
-    }
-    pub async fn candy_view_hir(&self, params: ViewIrParams) -> jsonrpc::Result<String> {
-        self.candy_view_ir(
-            params,
-            |features| &features.hir,
-            |db, module| db.hir(module).map(|(body, _)| body.to_rich_ir()),
-        )
-        .await
-    }
-    async fn candy_view_ir<FF, IF, RK>(
+    async fn view_ir<FF, IF, RK>(
         &self,
         params: ViewIrParams,
         get_features: FF,
@@ -96,18 +106,20 @@ impl Server {
         .parse()
         .unwrap();
 
-        let mut open_irs = open_irs.write().await;
-        let db = self.db.lock().await;
-        let open_ir = open_irs.entry(module.clone()).or_insert_with(|| {
-            let ir = get_ir(&db, module).unwrap_or_else(|| "# Module does not exist".to_rich_ir());
-            let line_start_offsets = line_start_offsets_raw(&ir.text);
+        let ir = {
+            let db = self.db.lock().await;
+            get_ir(&db, module.clone()).unwrap_or_else(|| "# Module does not exist".to_rich_ir())
+        };
+        let text = ir.text.clone();
+        open_irs.write().await.insert(
+            module,
             OpenIr {
                 uri: ir_uri,
                 ir,
-                line_start_offsets,
-            }
-        });
-        Ok(open_ir.ir.text.clone())
+                line_start_offsets: line_start_offsets_raw(&text),
+            },
+        );
+        Ok(text)
     }
 }
 
@@ -138,7 +150,29 @@ impl<RK: Eq + Hash> IrFeatures<RK> {
             open_irs: Arc::default(),
         }
     }
+
+    pub async fn maybe_generate_update_notification(
+        &self,
+        module: &Module,
+    ) -> Option<UpdateIrNotification> {
+        let open_irs = self.open_irs.read().await;
+        let open_ir = open_irs.get(module)?;
+        Some(UpdateIrNotification {
+            uri: open_ir.uri.clone(),
+        })
+    }
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateIrNotification {
+    pub uri: Url,
+}
+impl Notification for UpdateIrNotification {
+    const METHOD: &'static str = "candy/updateIr";
+
+    type Params = Self;
+}
+
 #[async_trait]
 impl<RK: Eq + Hash + Send + Sync + Debug> LanguageFeatures for IrFeatures<RK> {
     fn language_id(&self) -> Option<String> {
@@ -182,8 +216,6 @@ impl<RK: Eq + Hash + Send + Sync + Debug> LanguageFeatures for IrFeatures<RK> {
     }
     async fn semantic_tokens(&self, _db: &Mutex<Database>, module: Module) -> Vec<SemanticToken> {
         let open_irs = self.open_irs.read().await;
-        dbg!(open_irs.keys().collect_vec());
-        dbg!(&module);
         let open_ir = open_irs.get(&module).unwrap();
         open_ir.semantic_tokens()
     }
