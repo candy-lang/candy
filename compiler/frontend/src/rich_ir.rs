@@ -5,22 +5,12 @@ use rustc_hash::FxHashMap;
 
 use crate::position::Offset;
 
-#[derive(Debug)]
-pub struct RichIr<RK: Eq + Hash> {
+#[derive(Debug, Default)]
+pub struct RichIr {
     pub text: String,
     pub annotations: Vec<RichIrAnnotation>,
-    pub references: FxHashMap<RK, Reference>,
+    pub references: Vec<Reference>,
     pub folding_ranges: Vec<Range<Offset>>,
-}
-impl<RK: Eq + Hash> Default for RichIr<RK> {
-    fn default() -> Self {
-        Self {
-            text: String::new(),
-            annotations: Vec::new(),
-            references: FxHashMap::default(),
-            folding_ranges: Vec::new(),
-        }
-    }
 }
 
 #[derive(Debug, Default)]
@@ -51,15 +41,15 @@ pub enum TokenModifier {
 }
 
 pub trait ToRichIr<RK: Eq + Hash> {
-    fn to_rich_ir(&self) -> RichIr<RK> {
+    fn to_rich_ir(&self) -> RichIr {
         let mut builder = RichIrBuilder::default();
         self.build_rich_ir(&mut builder);
         builder.finish()
     }
     fn build_rich_ir(&self, builder: &mut RichIrBuilder<RK>);
 }
-impl<RK: Eq + Hash> ToRichIr<RK> for str {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<RK>) {
+impl ToRichIr<()> for str {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
         builder.push(self, None, EnumSet::empty());
     }
 }
@@ -91,13 +81,15 @@ impl<T: ToRichIr<RK>, RK: Eq + Hash> ToRichIr<RK> for [T] {
 }
 
 pub struct RichIrBuilder<RK: Eq + Hash> {
-    ir: RichIr<RK>,
+    ir: RichIr,
+    references: FxHashMap<RK, Reference>,
     indentation: usize,
 }
 impl<RK: Eq + Hash> Default for RichIrBuilder<RK> {
     fn default() -> Self {
         Self {
             ir: RichIr::default(),
+            references: FxHashMap::default(),
             indentation: 0,
         }
     }
@@ -203,22 +195,21 @@ impl<RK: Eq + Hash> RichIrBuilder<RK> {
     }
 
     pub fn push_definition<CRK: Into<RK>>(&mut self, key: CRK, range: Range<Offset>) {
-        self.ir
-            .references
+        self.references
             .entry(key.into())
             .or_insert_with(Reference::default)
             .definition = Some(range);
     }
     pub fn push_reference<CRK: Into<RK>>(&mut self, key: CRK, range: Range<Offset>) {
-        self.ir
-            .references
+        self.references
             .entry(key.into())
             .or_insert_with(Reference::default)
             .references
             .push(range);
     }
 
-    pub fn finish(self) -> RichIr<RK> {
+    pub fn finish(mut self) -> RichIr {
+        self.ir.references = self.references.into_values().collect();
         self.ir
     }
 }

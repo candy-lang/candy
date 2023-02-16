@@ -1,8 +1,5 @@
 use async_trait::async_trait;
-use candy_frontend::{
-    hir::HirReferenceKey,
-    module::{Module, ModuleKind},
-};
+use candy_frontend::module::{Module, ModuleKind};
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentFilter, DocumentHighlight, DocumentHighlightParams, FoldingRange, FoldingRangeParams,
@@ -58,9 +55,9 @@ impl ServerState {
 #[derive(Debug)]
 pub struct ServerFeatures {
     pub candy: CandyFeatures,
-    pub rcst: IrFeatures<()>,
-    pub ast: IrFeatures<()>,
-    pub hir: IrFeatures<HirReferenceKey>,
+    pub rcst: IrFeatures,
+    pub ast: IrFeatures,
+    pub hir: IrFeatures,
 }
 impl ServerFeatures {
     fn all_features(&self) -> Vec<&dyn LanguageFeatures> {

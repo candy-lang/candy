@@ -80,16 +80,15 @@ impl Server {
             }
         }
     }
-    async fn view_ir<FF, IF, RK>(
+    async fn view_ir<FF, IF>(
         &self,
         params: ViewIrParams,
         get_features: FF,
         get_ir: IF,
     ) -> jsonrpc::Result<String>
     where
-        FF: FnOnce(&ServerFeatures) -> &IrFeatures<RK>,
-        IF: FnOnce(&Database, Module) -> Option<RichIr<RK>>,
-        RK: Eq + Hash,
+        FF: FnOnce(&ServerFeatures) -> &IrFeatures,
+        IF: FnOnce(&Database, Module) -> Option<RichIr>,
     {
         let module = self.code_module_from_url(params.uri.clone()).await;
 
@@ -124,17 +123,17 @@ impl Server {
 }
 
 #[derive(Debug)]
-pub struct IrFeatures<RK: Eq + Hash> {
+pub struct IrFeatures {
     url_scheme: &'static str,
-    open_irs: Arc<RwLock<FxHashMap<Module, OpenIr<RK>>>>,
+    open_irs: Arc<RwLock<FxHashMap<Module, OpenIr>>>,
 }
 #[derive(Debug)]
-struct OpenIr<RK: Eq + Hash> {
+struct OpenIr {
     uri: Url,
-    ir: RichIr<RK>,
+    ir: RichIr,
     line_start_offsets: Vec<Offset>,
 }
-impl<RK: Eq + Hash> IrFeatures<RK> {
+impl IrFeatures {
     pub fn new_rcst() -> Self {
         Self::new("candy-rcst")
     }
@@ -174,7 +173,7 @@ impl Notification for UpdateIrNotification {
 }
 
 #[async_trait]
-impl<RK: Eq + Hash + Send + Sync + Debug> LanguageFeatures for IrFeatures<RK> {
+impl LanguageFeatures for IrFeatures {
     fn language_id(&self) -> Option<String> {
         None
     }
@@ -230,7 +229,7 @@ impl<RK: Eq + Hash + Send + Sync + Debug> LanguageFeatures for IrFeatures<RK> {
     }
 }
 
-impl<RK: Eq + Hash> OpenIr<RK> {
+impl OpenIr {
     fn find_definition(&self, position: lsp_types::Position) -> Option<LocationLink> {
         let offset = self.lsp_position_to_offset(position);
         let result = self.references_entry(offset)?;
@@ -292,7 +291,7 @@ impl<RK: Eq + Hash> OpenIr<RK> {
         Some(highlights)
     }
     fn references_entry(&self, offset: Offset) -> Option<&Reference> {
-        self.ir.references.values().find(|value| {
+        self.ir.references.iter().find(|value| {
             value
                 .definition
                 .as_ref()
