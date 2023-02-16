@@ -267,7 +267,13 @@ impl ToRichIr<MirReferenceKey> for Expression {
                 );
                 responsible_parameter.build_rich_ir(builder);
                 builder.push(") ->", None, EnumSet::empty());
-                body.build_rich_ir(builder);
+                builder.push_foldable(|builder| {
+                    builder.indent();
+                    builder.push_newline();
+                    body.build_rich_ir(builder);
+                    builder.dedent();
+                    builder.push_newline();
+                });
                 builder.push("}", None, EnumSet::empty());
             }
             Expression::Parameter => {
