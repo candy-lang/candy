@@ -5,6 +5,7 @@ use candy_frontend::{
     mir::{Body, Expression, Id},
     mir_optimize::OptimizeMir,
     module::Module,
+    rich_ir::ToRichIr,
     tracing::TracingConfig,
 };
 use itertools::Itertools;
@@ -247,7 +248,13 @@ impl StackExt for Vec<Id> {
         self.iter()
             .rev()
             .position(|it| *it == id)
-            .unwrap_or_else(|| panic!("Id {} not found in stack: {}", id, self.iter().join(" ")))
+            .unwrap_or_else(|| {
+                panic!(
+                    "Id {} not found in stack: {}",
+                    id.to_rich_ir(),
+                    self.iter().map(|it| it.to_rich_ir()).join(" "),
+                )
+            })
     }
     fn replace_top_id(&mut self, id: Id) {
         self.pop().unwrap();

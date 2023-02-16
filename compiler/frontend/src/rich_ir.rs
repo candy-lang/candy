@@ -1,9 +1,11 @@
-use std::{hash::Hash, ops::Range};
-
+use crate::position::Offset;
 use enumset::{EnumSet, EnumSetType};
 use rustc_hash::FxHashMap;
-
-use crate::position::Offset;
+use std::{
+    fmt::{self, Display, Formatter},
+    hash::Hash,
+    ops::Range,
+};
 
 #[derive(Debug, Default)]
 pub struct RichIr {
@@ -11,6 +13,11 @@ pub struct RichIr {
     pub annotations: Vec<RichIrAnnotation>,
     pub references: Vec<Reference>,
     pub folding_ranges: Vec<Range<Offset>>,
+}
+impl Display for RichIr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.text)
+    }
 }
 
 #[derive(Debug, Default)]
@@ -28,6 +35,7 @@ pub struct RichIrAnnotation {
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum TokenType {
+    Module,
     Parameter,
     Variable,
     Symbol,

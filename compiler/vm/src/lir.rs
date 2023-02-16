@@ -1,4 +1,6 @@
-use candy_frontend::{builtin_functions::BuiltinFunction, hir, mir::Id, module::Module};
+use candy_frontend::{
+    builtin_functions::BuiltinFunction, hir, mir::Id, module::Module, rich_ir::ToRichIr,
+};
 use itertools::Itertools;
 use num_bigint::BigInt;
 use std::fmt::Display;
@@ -297,10 +299,18 @@ impl Display for Instruction {
             }
             Instruction::Return => write!(f, "return"),
             Instruction::UseModule { current_module } => {
-                write!(f, "useModule (currently in {})", current_module)
+                write!(
+                    f,
+                    "useModule (currently in {})",
+                    <Module as ToRichIr<Module>>::to_rich_ir(current_module),
+                )
             }
             Instruction::Panic => write!(f, "panic"),
-            Instruction::ModuleStarts { module } => write!(f, "moduleStarts {module}"),
+            Instruction::ModuleStarts { module } => write!(
+                f,
+                "moduleStarts {}",
+                <Module as ToRichIr<Module>>::to_rich_ir(module),
+            ),
             Instruction::ModuleEnds => write!(f, "moduleEnds"),
             Instruction::TraceCallStarts { num_args } => {
                 write!(f, "trace: callStarts ({num_args} args)")

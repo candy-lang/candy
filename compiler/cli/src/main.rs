@@ -149,11 +149,15 @@ fn raw_build(
     tracing: &TracingConfig,
     debug: bool,
 ) -> Option<Arc<Lir>> {
-    let rcst = db
-        .rcst(module.clone())
-        .unwrap_or_else(|err| panic!("Error parsing file `{}`: {:?}", module, err));
+    let rcst = db.rcst(module.clone()).unwrap_or_else(|err| {
+        panic!(
+            "Error parsing file `{}`: {:?}",
+            <Module as ToRichIr<Module>>::to_rich_ir(&module),
+            err,
+        )
+    });
     if debug {
-        module.dump_associated_debug_file("rcst", &format!("{:#?}\n", rcst));
+        module.dump_associated_debug_file("rcst", &format!("{}\n", rcst.to_rich_ir()));
     }
 
     let cst = db.cst(module.clone()).unwrap();
@@ -163,7 +167,7 @@ fn raw_build(
 
     let (asts, ast_cst_id_map) = db.ast(module.clone()).unwrap();
     if debug {
-        module.dump_associated_debug_file("ast", &format!("{}\n", asts.to_rich_ir().text));
+        module.dump_associated_debug_file("ast", &format!("{}\n", asts.to_rich_ir()));
         module.dump_associated_debug_file(
             "ast_to_cst_ids",
             &ast_cst_id_map
@@ -182,7 +186,7 @@ fn raw_build(
 
     let (hir, hir_ast_id_map) = db.hir(module.clone()).unwrap();
     if debug {
-        module.dump_associated_debug_file("hir", &format!("{}\n", hir.to_rich_ir().text));
+        module.dump_associated_debug_file("hir", &format!("{}\n", hir.to_rich_ir()));
         module.dump_associated_debug_file(
             "hir_to_ast_ids",
             &hir_ast_id_map
@@ -208,21 +212,28 @@ fn raw_build(
     {
         let range = db.range_to_positions(module.clone(), span);
         warn!(
-            "{module}:{}:{} – {}:{}: {payload}",
-            range.start.line, range.start.character, range.end.line, range.end.character,
+            "{}:{}:{} – {}:{}: {payload}",
+            <Module as ToRichIr<Module>>::to_rich_ir(&module),
+            range.start.line,
+            range.start.character,
+            range.end.line,
+            range.end.character,
         );
     }
 
     let mir = db.mir(module.clone(), tracing.clone()).unwrap();
     if debug {
-        module.dump_associated_debug_file("mir", &format!("{mir}"));
+        module.dump_associated_debug_file("mir", &format!("{}\n", mir.to_rich_ir()));
     }
 
     let optimized_mir = db
         .mir_with_obvious_optimized(module.clone(), tracing.clone())
         .unwrap();
     if debug {
-        module.dump_associated_debug_file("optimized_mir", &format!("{optimized_mir}"));
+        module.dump_associated_debug_file(
+            "optimized_mir",
+            &format!("{}\n", optimized_mir.to_rich_ir()),
+        );
     }
 
     let lir = db.lir(module.clone(), tracing.clone()).unwrap();
@@ -473,7 +484,10 @@ fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
         return Err(Exit::FileNotFound);
     }
 
-    debug!("Fuzzing `{module}`.");
+    debug!(
+        "Fuzzing `{}`.",
+        <Module as ToRichIr<Module>>::to_rich_ir(&module),
+    );
     let failing_cases = candy_fuzzer::fuzz(&db, module);
 
     if failing_cases.is_empty() {

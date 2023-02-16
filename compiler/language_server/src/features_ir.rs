@@ -2,10 +2,12 @@ use async_trait::async_trait;
 use candy_frontend::{
     ast_to_hir::AstToHir,
     cst_to_ast::CstToAst,
+    hir_to_mir::HirToMir,
     module::{Module, ModuleKind},
     position::{line_start_offsets_raw, Offset},
     rich_ir::{Reference, RichIr, ToRichIr, TokenModifier, TokenType},
     string_to_rcst::{InvalidModuleError, StringToRcst},
+    TracingConfig,
 };
 use extension_trait::extension_trait;
 use lsp_types::{
@@ -53,6 +55,9 @@ impl Server {
                 Ir::Hir => db
                     .hir(config.module.clone())
                     .map(|(body, _)| body.to_rich_ir()),
+                Ir::Mir => db
+                    .mir(config.module.clone(), TracingConfig::off()) // FIXME
+                    .map(|mir| mir.to_rich_ir()),
             }
         }
         .unwrap_or_else(|| "# Module does not exist".to_rich_ir());
@@ -81,6 +86,7 @@ impl Server {
             "rcst" => Ir::Rcst,
             "ast" => Ir::Ast,
             "hir" => Ir::Hir,
+            "mir" => Ir::Mir,
             _ => panic!("Unsupported IR: {ir}"),
         };
 
@@ -118,6 +124,7 @@ pub enum Ir {
     Rcst,
     Ast,
     Hir,
+    Mir,
 }
 impl IrFeatures {
     pub async fn generate_update_notifications(
@@ -313,6 +320,7 @@ impl OpenIr {
 impl TokenTypeToSemantic for TokenType {
     fn to_semantic(&self) -> SemanticTokenType {
         match self {
+            TokenType::Module => SemanticTokenType::Module,
             TokenType::Parameter => SemanticTokenType::Parameter,
             TokenType::Variable => SemanticTokenType::Variable,
             TokenType::Function => SemanticTokenType::Function,

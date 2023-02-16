@@ -10,13 +10,13 @@ export function registerDebugIrCommands(client: LanguageClient) {
   const updateIrEmitter = new vscode.EventEmitter<vscode.Uri>();
   registerDocumentProvider(client, updateIrEmitter.event);
   client.onNotification(updateIrNotification, (notification) => {
-    console.log('updateIrNotification', notification);
     updateIrEmitter.fire(vscode.Uri.parse(notification.uri));
   });
 
   registerDebugIrCommand('rcst', 'RCST', 'viewRcst');
   registerDebugIrCommand('ast', 'AST', 'viewAst');
   registerDebugIrCommand('hir', 'HIR', 'viewHir');
+  registerDebugIrCommand('mir', 'MIR', 'viewMir');
 }
 
 function registerDocumentProvider(
@@ -53,7 +53,6 @@ function registerDebugIrCommand(ir: string, irName: string, command: string) {
     }
 
     const encodedUri = encodeUri(document.uri, ir);
-    console.log('encodedUri', encodedUri, encodedUri.toString());
     const irDocument = await vscode.workspace.openTextDocument(encodedUri);
     await vscode.window.showTextDocument(irDocument, vscode.ViewColumn.Beside);
   });

@@ -201,7 +201,12 @@ impl Id {
 }
 impl Debug for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "HirId({}:{})", self.module, self.keys.iter().join(":"))
+        write!(
+            f,
+            "HirId({}:{})",
+            <Module as ToRichIr<Module>>::to_rich_ir(&self.module).text,
+            self.keys.iter().join(":"),
+        )
     }
 }
 impl Display for Id {
@@ -432,6 +437,7 @@ impl Body {
 
 #[derive(Debug, PartialEq, Eq, Hash, From)]
 pub enum HirReferenceKey {
+    Module(Module),
     Id(Id),
     Int(BigUint),
     Text(String),
@@ -463,30 +469,20 @@ impl ToRichIr<HirReferenceKey> for Expression {
             }
             Expression::List(items) => {
                 builder.push("(", None, EnumSet::empty());
-                builder.push_foldable(|builder| {
-                    builder.push_children_custom_multiline(items, |builder, item| {
-                        item.build_rich_ir(builder);
-                        builder.push(",", None, EnumSet::empty());
-                    });
-                    if !items.is_empty() {
-                        builder.push_newline();
-                    }
-                });
+                builder.push_children(items, ", ");
                 builder.push(")", None, EnumSet::empty());
             }
-            Expression::Struct(entries) => {
+            Expression::Struct(fields) => {
                 builder.push("[", None, EnumSet::empty());
-                builder.push_foldable(|builder| {
-                    builder.push_children_custom_multiline(entries, |builder, (key, value)| {
+                builder.push_children_custom(
+                    fields.iter().collect_vec(),
+                    |builder, (key, value)| {
                         key.build_rich_ir(builder);
                         builder.push(": ", None, EnumSet::empty());
                         value.build_rich_ir(builder);
-                        builder.push(",", None, EnumSet::empty());
-                    });
-                    if !entries.is_empty() {
-                        builder.push_newline();
-                    }
-                });
+                    },
+                    ", ",
+                );
                 builder.push("]", None, EnumSet::empty());
             }
             Expression::Destructure {
@@ -555,15 +551,10 @@ impl ToRichIr<HirReferenceKey> for Expression {
                 current_module,
                 relative_path,
             } => {
-                builder.push(
-                    format!(
-                        "use module {} relative to {}",
-                        relative_path.to_short_debug_string(),
-                        current_module,
-                    ),
-                    None,
-                    EnumSet::empty(),
-                );
+                builder.push("use module ", None, EnumSet::empty());
+                current_module.build_rich_ir(builder);
+                builder.push(" relative to", None, EnumSet::empty());
+                relative_path.build_rich_ir(builder);
             }
             Expression::Needs { condition, reason } => {
                 builder.push("needs ", None, EnumSet::empty());

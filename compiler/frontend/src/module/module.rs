@@ -1,13 +1,8 @@
-use itertools::Itertools;
-use std::{
-    fmt::{self, Display, Formatter},
-    fs,
-    hash::Hash,
-    path::PathBuf,
-};
-use tracing::{error, warn};
-
 use super::package::Package;
+use crate::rich_ir::{RichIrBuilder, ToRichIr, TokenType};
+use itertools::Itertools;
+use std::{fs, hash::Hash, path::PathBuf};
+use tracing::{error, warn};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
 pub struct Module {
@@ -101,7 +96,8 @@ impl Module {
     fn try_to_path(&self) -> Option<PathBuf> {
         let paths = self.to_possible_paths().unwrap_or_else(|| {
             panic!(
-                "Tried to get content of anonymous module {self} that is not cached by the language server."
+                "Tried to get content of anonymous module {} that is not cached by the language server.",
+                <Module as ToRichIr<Module>>::to_rich_ir(self).text,
             )
         });
         for path in paths {
@@ -126,17 +122,20 @@ impl Module {
         });
     }
 }
-
-impl Display for Module {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}:{}",
-            self.package,
-            self.path
-                .iter()
-                .map(|component| component.to_string())
-                .join("/")
-        )
+impl<RK: Eq + From<Module> + Hash> ToRichIr<RK> for Module {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<RK>) {
+        let range = builder.push(
+            format!(
+                "{}:{}",
+                self.package,
+                self.path
+                    .iter()
+                    .map(|component| component.to_string())
+                    .join("/")
+            ),
+            Some(TokenType::Module),
+            Default::default(),
+        );
+        builder.push_reference(self.to_owned(), range);
     }
 }
