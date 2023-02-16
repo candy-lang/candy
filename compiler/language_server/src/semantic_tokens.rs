@@ -95,7 +95,7 @@ impl<'a> SemanticTokensBuilder<'a> {
         modifiers: EnumSet<SemanticTokenModifier>,
     ) {
         // Reduce the token to multiple single-line tokens.
-        let mut range = range_to_lsp_range_raw(self.text, self.line_start_offsets, range);
+        let mut range = range_to_lsp_range_raw(self.text, self.line_start_offsets, &range);
 
         if range.start.line != range.end.line {
             while range.start.line != range.end.line {

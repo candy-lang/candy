@@ -9,15 +9,16 @@ import {
 export interface ViewIrParams {
   readonly uri: DocumentUri;
 }
-export const viewRcst = new RequestType<ViewIrParams, string, void>(
-  'candy/viewRcst'
+export const viewIr = new RequestType<ViewIrParams, string, void>(
+  'candy/viewIr'
 );
-export const viewAst = new RequestType<ViewIrParams, string, void>(
-  'candy/viewAst'
+
+export const updateIrNotification = new NotificationType<UpdateIrParams>(
+  'candy/updateIr'
 );
-export const viewHir = new RequestType<ViewIrParams, string, void>(
-  'candy/viewHir'
-);
+export interface UpdateIrParams {
+  readonly uri: DocumentUri;
+}
 
 // Hints
 export class PublishHintsNotification {

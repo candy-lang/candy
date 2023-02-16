@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use candy_frontend::module::{Module, ModuleKind};
+use candy_frontend::module::ModuleKind;
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentFilter, DocumentHighlight, DocumentHighlightParams, FoldingRange, FoldingRangeParams,
@@ -11,11 +11,9 @@ use lsp_types::{
     TextDocumentChangeRegistrationOptions, TextDocumentRegistrationOptions, Url,
     WorkDoneProgressOptions,
 };
-use rustc_hash::FxHashMap;
 use serde::Serialize;
 use std::{mem, path::PathBuf};
-use strum::IntoEnumIterator;
-use tokio::sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use tokio::sync::{mpsc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tower_lsp::{jsonrpc, Client, ClientSocket, LanguageServer, LspService};
 use tracing::{debug, span, Level};
 
@@ -23,9 +21,9 @@ use crate::{
     database::Database,
     features::LanguageFeatures,
     features_candy::{hints::HintsNotification, CandyFeatures},
-    features_ir::{Ir, IrFeatures},
+    features_ir::{IrFeatures, UpdateIrNotification},
     semantic_tokens,
-    utils::{module_from_package_root_and_url, module_to_url, LspPositionConversion},
+    utils::{module_from_package_root_and_url, module_to_url},
 };
 
 pub struct Server {
@@ -33,38 +31,46 @@ pub struct Server {
     pub db: Mutex<Database>,
     pub state: RwLock<ServerState>,
 }
+#[derive(Debug)]
 pub enum ServerState {
-    Initial {
-        features: ServerFeatures,
-    },
-    Running {
-        project_directory: PathBuf,
-        features: ServerFeatures,
-    },
+    Initial { features: ServerFeatures },
+    Running(RunningServerState),
     Shutdown,
+}
+#[derive(Debug)]
+pub struct RunningServerState {
+    pub project_directory: PathBuf,
+    pub features: ServerFeatures,
 }
 impl ServerState {
     pub fn require_features(&self) -> &ServerFeatures {
         match self {
             ServerState::Initial { features } => features,
-            ServerState::Running { features, .. } => features,
-            ServerState::Shutdown => panic!("Server is shut down"),
+            ServerState::Running(RunningServerState { features, .. }) => features,
+            ServerState::Shutdown => panic!("Server is shut down."),
         }
     }
-    pub fn require_features_mut(&mut self) -> &mut ServerFeatures {
+    pub fn require_running(&self) -> &RunningServerState {
         match self {
-            ServerState::Initial { features } => features,
-            ServerState::Running { features, .. } => features,
-            ServerState::Shutdown => panic!("Server is shut down"),
+            ServerState::Running(state) => state,
+            _ => panic!("Server is not running."),
         }
     }
 }
 
+#[derive(Debug)]
 pub struct ServerFeatures {
     pub candy: CandyFeatures,
-    pub ir: FxHashMap<Ir, IrFeatures>,
+    pub ir: IrFeatures,
 }
 impl ServerFeatures {
+    fn all_features<'this, 'a>(&'this self) -> [&'a dyn LanguageFeatures; 2]
+    where
+        'this: 'a,
+    {
+        [&self.candy, &self.ir]
+    }
+
     fn selectors_where<F>(&self, mut filter: F) -> Vec<DocumentFilter>
     where
         F: FnMut(&dyn LanguageFeatures) -> bool,
@@ -82,12 +88,11 @@ impl ServerFeatures {
 
             selectors.extend(schemes.into_iter().map(|scheme| DocumentFilter {
                 language: language_id.clone(),
-                scheme: Some(scheme),
+                scheme: Some(scheme.to_owned()),
                 pattern: None,
             }))
         };
-        add_selectors_for(&mut selectors, &self.candy);
-        for features in self.ir.values() {
+        for features in self.all_features() {
             add_selectors_for(&mut selectors, features);
         }
         selectors
@@ -104,12 +109,14 @@ impl ServerFeatures {
 
 impl Server {
     pub fn create() -> (LspService<Self>, ClientSocket) {
-        let (diagnostics_sender, mut diagnostics_receiver) = tokio::sync::mpsc::channel(8);
-        let (hints_sender, mut hints_receiver) = tokio::sync::mpsc::channel(1024);
+        let (diagnostics_sender, mut diagnostics_receiver) = mpsc::channel(8);
+        let (hints_sender, mut hints_receiver) = mpsc::channel(1024);
 
         let (service, client) = LspService::build(|client| {
-            let candy_features = CandyFeatures::new(diagnostics_sender, hints_sender);
-            let ir_features = Ir::iter().map(|ir| (ir, IrFeatures::new(ir))).collect();
+            let features = ServerFeatures {
+                candy: CandyFeatures::new(diagnostics_sender.clone(), hints_sender.clone()),
+                ir: IrFeatures::default(),
+            };
 
             let client_for_closure = client.clone();
             let diagnostics_reporter = async move || {
@@ -136,17 +143,10 @@ impl Server {
             Self {
                 client,
                 db: Default::default(),
-                state: RwLock::new(ServerState::Initial {
-                    features: ServerFeatures {
-                        candy: candy_features,
-                        ir: ir_features,
-                    },
-                }),
+                state: RwLock::new(ServerState::Initial { features }),
             }
         })
-        .custom_method("candy/viewRcst", Server::candy_view_rcst)
-        .custom_method("candy/viewAst", Server::candy_view_ast)
-        .custom_method("candy/viewHir", Server::candy_view_hir)
+        .custom_method("candy/viewIr", Server::candy_view_ir)
         .finish();
 
         (service, client)
@@ -156,42 +156,20 @@ impl Server {
         RwLockReadGuard::map(self.state.read().await, ServerState::require_features)
     }
 
-    pub async fn code_module_from_url(&self, url: Url) -> Module {
-        let ServerState::Running { ref project_directory, .. } = *self.state.read().await else {
-            panic!("Server not running");
-        };
-        module_from_package_root_and_url(project_directory.to_owned(), url, ModuleKind::Code)
+    pub async fn require_running_state(&self) -> RwLockReadGuard<RunningServerState> {
+        RwLockReadGuard::map(self.state.read().await, |state| state.require_running())
     }
-    pub async fn ir_and_module_from_url(&self, url: Url) -> (Option<Ir>, Module) {
-        let ir = match url.scheme() {
-            "candy-rcst" => Some(Ir::Rcst),
-            "candy-ast" => Some(Ir::Ast),
-            "candy-hir" => Some(Ir::Hir),
-            _ => None,
-        };
-
-        let original_url = if ir.is_some() {
-            let original_scheme = url.query().unwrap().strip_prefix("scheme%3D").unwrap();
-            let original_scheme = urlencoding::decode(original_scheme).unwrap();
-            Url::parse(&format!("{}://{}", original_scheme, url.path())).unwrap()
-        } else {
-            url
-        };
-        let module = self.code_module_from_url(original_url).await;
-
-        (ir, module)
-    }
-    pub async fn features_and_module_from_url(
+    pub async fn features_from_url<'a>(
         &self,
-        url: Url,
-    ) -> (RwLockReadGuard<dyn LanguageFeatures>, Module) {
-        let (ir, module) = self.ir_and_module_from_url(url).await;
-        let features = RwLockReadGuard::map(self.state.read().await, |state| {
-            let features = state.require_features();
-            ir.map(|ir| features.ir.get(&ir).unwrap() as &dyn LanguageFeatures)
-                .unwrap_or_else(|| &features.candy)
-        });
-        (features, module)
+        server_features: &'a ServerFeatures,
+        url: &Url,
+    ) -> &'a dyn LanguageFeatures {
+        let scheme = url.scheme();
+        server_features
+            .all_features()
+            .into_iter()
+            .find(|it| it.supported_url_schemes().contains(&scheme))
+            .unwrap()
     }
 }
 
@@ -217,10 +195,8 @@ impl LanguageServer for Server {
 
         {
             let state = self.state.read().await;
-            let features = state.require_features();
-            features.candy.initialize().await;
-            for feature in features.ir.values() {
-                feature.initialize().await;
+            for features in state.require_features().all_features() {
+                features.initialize().await;
             }
         }
 
@@ -228,10 +204,10 @@ impl LanguageServer for Server {
             RwLockWriteGuard::map(self.state.write().await, |state| {
                 let owned_state = mem::replace(state, ServerState::Shutdown);
                 let ServerState::Initial { features } = owned_state else { panic!("Already initialized"); };
-                *state = ServerState::Running {
+                *state = ServerState::Running(RunningServerState {
                     project_directory,
                     features,
-                };
+                });
                 state
             });
         }
@@ -322,58 +298,101 @@ impl LanguageServer for Server {
     }
 
     async fn shutdown(&self) -> jsonrpc::Result<()> {
-        let mut owned_state = {
+        let state = {
             let mut state = self.state.write().await;
             mem::replace(&mut *state, ServerState::Shutdown)
         };
-        let features = owned_state.require_features_mut();
-        features.candy.shutdown().await;
-        for (_, feature) in features.ir.drain() {
-            feature.shutdown().await;
+        for features in state.require_features().all_features() {
+            features.shutdown().await;
         }
         Ok(())
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        let (features, module) = self
-            .features_and_module_from_url(params.text_document.uri)
+        let state = self.require_running_state().await;
+        let features = self
+            .features_from_url(&state.features, &params.text_document.uri)
             .await;
         assert!(features.supports_did_open());
         let content = params.text_document.text.into_bytes();
-        features.did_open(&self.db, module, content).await;
+        features
+            .did_open(
+                &self.db,
+                &state.project_directory,
+                params.text_document.uri,
+                content,
+            )
+            .await;
     }
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        let (features, module) = self
-            .features_and_module_from_url(params.text_document.uri)
-            .await;
-        assert!(features.supports_did_change());
-        features
-            .did_change(&self.db, module, params.content_changes)
-            .await;
+        let state = self.require_running_state().await;
+        {
+            let features = self
+                .features_from_url(&state.features, &params.text_document.uri)
+                .await;
+            assert!(features.supports_did_change());
+            features
+                .did_change(
+                    &self.db,
+                    &state.project_directory,
+                    params.text_document.uri.clone(),
+                    params.content_changes,
+                )
+                .await;
+        };
+
+        let module_result = module_from_package_root_and_url(
+            state.project_directory.to_owned(),
+            &params.text_document.uri,
+            ModuleKind::Code, // FIXME
+        );
+        if let Ok(module) = module_result {
+            let notifications = {
+                let state = self.state.read().await;
+                state
+                    .require_features()
+                    .ir
+                    .generate_update_notifications(&module)
+                    .await
+            };
+            for notification in notifications {
+                self.client
+                    .send_notification::<UpdateIrNotification>(notification)
+                    .await;
+            }
+        }
     }
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
-        let (features, module) = self
-            .features_and_module_from_url(params.text_document.uri)
+        let state = self.require_running_state().await;
+        let features = self
+            .features_from_url(&state.features, &params.text_document.uri)
             .await;
         assert!(features.supports_did_close());
-        features.did_close(&self.db, module).await;
+        features
+            .did_close(&self.db, &state.project_directory, params.text_document.uri)
+            .await;
     }
 
     async fn goto_definition(
         &self,
         params: GotoDefinitionParams,
     ) -> jsonrpc::Result<Option<GotoDefinitionResponse>> {
-        let (features, module) = self
-            .features_and_module_from_url(params.text_document_position_params.text_document.uri)
+        let state = self.require_running_state().await;
+        let features = self
+            .features_from_url(
+                &state.features,
+                &params.text_document_position_params.text_document.uri,
+            )
             .await;
         assert!(features.supports_find_definition());
-        let db = self.db.lock().await;
-        let offset = db.lsp_position_to_offset(
-            module.clone(),
-            params.text_document_position_params.position,
-        );
         let response = features
-            .find_definition(&db, module, offset)
+            .find_definition(
+                &self.db,
+                &state.project_directory,
+                params.text_document_position_params.text_document.uri,
+                params.text_document_position_params.position,
+            )
+            .await
             .map(|link| GotoDefinitionResponse::Link(vec![link]));
         Ok(response)
     }
@@ -416,23 +435,28 @@ impl LanguageServer for Server {
         &self,
         params: FoldingRangeParams,
     ) -> jsonrpc::Result<Option<Vec<FoldingRange>>> {
-        let (features, module) = self
-            .features_and_module_from_url(params.text_document.uri)
+        let state = self.require_running_state().await;
+        let features = self
+            .features_from_url(&state.features, &params.text_document.uri)
             .await;
         assert!(features.supports_folding_ranges());
-        let db = self.db.lock().await;
-        Ok(Some(features.folding_ranges(&db, module)))
+        Ok(Some(
+            features
+                .folding_ranges(&self.db, &state.project_directory, params.text_document.uri)
+                .await,
+        ))
     }
 
     async fn semantic_tokens_full(
         &self,
         params: SemanticTokensParams,
     ) -> jsonrpc::Result<Option<SemanticTokensResult>> {
-        let (features, module) = self
-            .features_and_module_from_url(params.text_document.uri)
+        let state = self.require_running_state().await;
+        let features = self
+            .features_from_url(&state.features, &params.text_document.uri)
             .await;
-        let db = self.db.lock().await;
-        let tokens = features.semantic_tokens(&db, module);
+        let tokens =
+            features.semantic_tokens(&self.db, &state.project_directory, params.text_document.uri);
         let tokens = tokens.await;
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
             result_id: None,
@@ -447,10 +471,18 @@ impl Server {
         position: Position,
         include_declaration: bool,
     ) -> Option<Vec<DocumentHighlight>> {
-        let (features, module) = self.features_and_module_from_url(uri).await;
+        let state = self.state.read().await;
+        let state = state.require_running();
+        let features = self.features_from_url(&state.features, &uri).await;
         assert!(features.supports_references());
-        let db = self.db.lock().await;
-        let offset = db.lsp_position_to_offset(module.clone(), position);
-        features.references(&db, module, offset, include_declaration)
+        features
+            .references(
+                &self.db,
+                &state.project_directory,
+                uri,
+                position,
+                include_declaration,
+            )
+            .await
     }
 }

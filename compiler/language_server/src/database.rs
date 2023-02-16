@@ -17,7 +17,6 @@ use candy_frontend::{
 };
 use candy_vm::mir_to_lir::MirToLirStorage;
 
-#[derive()]
 #[salsa::database(
     AstDbStorage,
     AstToHirStorage,
