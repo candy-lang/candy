@@ -74,16 +74,15 @@ impl Server {
     }
     async fn decode_config(&self, uri: &Url) -> IrConfig {
         let (path, ir) = uri.path().rsplit_once('.').unwrap();
+        let original_scheme = uri.fragment().unwrap();
+        let original_uri = format!("{original_scheme}:{path}").parse().unwrap();
+
         let ir = match ir {
             "rcst" => Ir::Rcst,
             "ast" => Ir::Ast,
             "hir" => Ir::Hir,
             _ => panic!("Unsupported IR: {ir}"),
         };
-        dbg!(uri);
-        let original_scheme = uri.fragment().unwrap();
-        dbg!(&original_scheme);
-        let original_uri = format!("{original_scheme}:{path}").parse().unwrap();
 
         let state = self.state.read().await;
         IrConfig {
