@@ -517,7 +517,7 @@ impl ToRichIr<()> for Assignment {
             AssignmentBody::Body { pattern, .. } => pattern.build_rich_ir(builder),
         }
         builder.push(
-            if self.is_public { ":=" } else { "=" },
+            if self.is_public { " := " } else { " = " },
             None,
             EnumSet::empty(),
         );
