@@ -8,9 +8,7 @@ import {
 // Debug IRs
 export interface ViewIrParams {
   readonly uri: DocumentUri;
-  readonly ir: Ir;
 }
-export type Ir = 'rcst' | 'ast' | 'hir';
 export const viewIr = new RequestType<ViewIrParams, string, void>(
   'candy/viewIr'
 );

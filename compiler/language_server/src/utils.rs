@@ -43,10 +43,10 @@ where
 
 pub fn module_from_package_root_and_url(
     package_root: PathBuf,
-    url: Url,
+    url: &Url,
     kind: ModuleKind,
-) -> Module {
-    match url.scheme() {
+) -> Result<Module, String> {
+    let module = match url.scheme() {
         "file" => {
             Module::from_package_root_and_file(package_root, url.to_file_path().unwrap(), kind)
         }
@@ -61,8 +61,9 @@ pub fn module_from_package_root_and_url(
             path: vec![],
             kind,
         },
-        _ => panic!("Unsupported URI scheme: {}", url.scheme()),
-    }
+        _ => return Err(format!("Unsupported URI scheme: {}", url.scheme())),
+    };
+    Ok(module)
 }
 
 pub fn module_to_url(module: &Module) -> Option<Url> {

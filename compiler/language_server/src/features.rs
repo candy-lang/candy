@@ -1,8 +1,9 @@
+use std::path::Path;
+
 use async_trait::async_trait;
-use candy_frontend::module::Module;
 use lsp_types::{
     self, DocumentHighlight, FoldingRange, LocationLink, SemanticToken,
-    TextDocumentContentChangeEvent,
+    TextDocumentContentChangeEvent, Url,
 };
 use tokio::sync::Mutex;
 
@@ -11,7 +12,7 @@ use crate::database::Database;
 #[async_trait]
 pub trait LanguageFeatures: Send + Sync {
     fn language_id(&self) -> Option<String>;
-    fn supported_url_schemes(&self) -> Vec<String>;
+    fn supported_url_schemes(&self) -> Vec<&'static str>;
 
     async fn initialize(&self) {}
     async fn shutdown(&self) {}
@@ -19,7 +20,13 @@ pub trait LanguageFeatures: Send + Sync {
     fn supports_did_open(&self) -> bool {
         false
     }
-    async fn did_open(&self, _db: &Mutex<Database>, _module: Module, _content: Vec<u8>) {
+    async fn did_open(
+        &self,
+        _db: &Mutex<Database>,
+        _project_directory: &Path,
+        _uri: Url,
+        _content: Vec<u8>,
+    ) {
         unimplemented!()
     }
     fn supports_did_change(&self) -> bool {
@@ -28,7 +35,9 @@ pub trait LanguageFeatures: Send + Sync {
     async fn did_change(
         &self,
         _db: &Mutex<Database>,
-        _module: Module,
+
+        _project_directory: &Path,
+        _uri: Url,
         _changes: Vec<TextDocumentContentChangeEvent>,
     ) {
         unimplemented!()
@@ -36,14 +45,19 @@ pub trait LanguageFeatures: Send + Sync {
     fn supports_did_close(&self) -> bool {
         false
     }
-    async fn did_close(&self, _db: &Mutex<Database>, _module: Module) {
+    async fn did_close(&self, _db: &Mutex<Database>, _project_directory: &Path, _uri: Url) {
         unimplemented!()
     }
 
     fn supports_folding_ranges(&self) -> bool {
         false
     }
-    async fn folding_ranges(&self, _db: &Mutex<Database>, _module: Module) -> Vec<FoldingRange> {
+    async fn folding_ranges(
+        &self,
+        _db: &Mutex<Database>,
+        _project_directory: &Path,
+        _uri: Url,
+    ) -> Vec<FoldingRange> {
         unimplemented!()
     }
 
@@ -53,7 +67,8 @@ pub trait LanguageFeatures: Send + Sync {
     async fn find_definition(
         &self,
         _db: &Mutex<Database>,
-        _module: Module,
+        _project_directory: &Path,
+        _uri: Url,
         _position: lsp_types::Position,
     ) -> Option<LocationLink> {
         unimplemented!()
@@ -66,7 +81,8 @@ pub trait LanguageFeatures: Send + Sync {
     async fn references(
         &self,
         _db: &Mutex<Database>,
-        _module: Module,
+        _project_directory: &Path,
+        _uri: Url,
         _position: lsp_types::Position,
         _include_declaration: bool,
     ) -> Option<Vec<DocumentHighlight>> {
@@ -76,7 +92,12 @@ pub trait LanguageFeatures: Send + Sync {
     fn supports_semantic_tokens(&self) -> bool {
         false
     }
-    async fn semantic_tokens(&self, _db: &Mutex<Database>, _module: Module) -> Vec<SemanticToken> {
+    async fn semantic_tokens(
+        &self,
+        _db: &Mutex<Database>,
+        _project_directory: &Path,
+        _uri: Url,
+    ) -> Vec<SemanticToken> {
         unimplemented!()
     }
 }
