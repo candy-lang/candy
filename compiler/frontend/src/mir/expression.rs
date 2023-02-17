@@ -254,13 +254,13 @@ impl ToRichIr<MirReferenceKey> for Expression {
                 responsible_parameter,
                 body,
             } => {
-                builder.push("{{ ", None, EnumSet::empty());
+                builder.push("{ ", None, EnumSet::empty());
                 builder.push_children(parameters, " ");
                 builder.push(
                     if parameters.is_empty() {
                         "(responsible "
                     } else {
-                        "(+ responsible "
+                        " (+ responsible "
                     },
                     None,
                     EnumSet::empty(),
