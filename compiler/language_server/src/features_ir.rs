@@ -8,7 +8,7 @@ use candy_frontend::{
     position::{line_start_offsets_raw, Offset},
     rich_ir::{Reference, RichIr, ToRichIr, TokenModifier, TokenType},
     string_to_rcst::{InvalidModuleError, StringToRcst},
-    TracingConfig,
+    TracingConfig, TracingMode,
 };
 use extension_trait::extension_trait;
 use lsp_types::{
@@ -18,7 +18,6 @@ use lsp_types::{
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, hash::Hash, ops::Range, path::Path, sync::Arc};
-use strum_macros::EnumIter;
 use tokio::sync::{Mutex, RwLock};
 use tower_lsp::jsonrpc;
 
@@ -41,7 +40,7 @@ impl Server {
         let config = self.decode_config(&params.uri).await;
         let ir = {
             let db = self.db.lock().await;
-            match config.ir {
+            match &config.ir {
                 Ir::Rcst => match db.rcst(config.module.clone()) {
                     Ok(rcst) => Some(rcst.to_rich_ir()),
                     Err(InvalidModuleError::DoesNotExist) => None,
@@ -56,11 +55,11 @@ impl Server {
                 Ir::Hir => db
                     .hir(config.module.clone())
                     .map(|(body, _)| body.to_rich_ir()),
-                Ir::Mir => db
-                    .mir(config.module.clone(), TracingConfig::off()) // FIXME
+                Ir::Mir(tracing_config) => db
+                    .mir(config.module.clone(), tracing_config.to_owned())
                     .map(|mir| mir.to_rich_ir()),
-                Ir::OptimizedMir => db
-                    .mir_with_obvious_optimized(config.module.clone(), TracingConfig::off()) // FIXME
+                Ir::OptimizedMir(tracing_config) => db
+                    .mir_with_obvious_optimized(config.module.clone(), tracing_config.to_owned())
                     .map(|mir| mir.to_rich_ir()),
             }
         }
@@ -83,15 +82,35 @@ impl Server {
     }
     async fn decode_config(&self, uri: &Url) -> IrConfig {
         let (path, ir) = uri.path().rsplit_once('.').unwrap();
-        let original_scheme = uri.fragment().unwrap();
+        let details = urlencoding::decode(uri.fragment().unwrap()).unwrap();
+        let details: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_str(&details).unwrap();
+
+        let original_scheme = details.get("scheme").unwrap().as_str().unwrap();
         let original_uri = format!("{original_scheme}:{path}").parse().unwrap();
+
+        let tracing_config = details.get("tracingConfig").map(|json| {
+            let json = json.as_object().unwrap();
+            let parse_tracing_mode = |key: &str| match json.get(key).unwrap().as_str().unwrap() {
+                "off" => TracingMode::Off,
+                "onlyCurrent" => TracingMode::OnlyCurrent,
+                "all" => TracingMode::All,
+                _ => panic!("Unsupported tracing mode"),
+            };
+
+            TracingConfig {
+                register_fuzzables: parse_tracing_mode("registerFuzzables"),
+                calls: parse_tracing_mode("calls"),
+                evaluated_expressions: parse_tracing_mode("evaluatedExpressions"),
+            }
+        });
 
         let ir = match ir {
             "rcst" => Ir::Rcst,
             "ast" => Ir::Ast,
             "hir" => Ir::Hir,
-            "mir" => Ir::Mir,
-            "optimizedMir" => Ir::OptimizedMir,
+            "mir" => Ir::Mir(tracing_config.unwrap()),
+            "optimizedMir" => Ir::OptimizedMir(tracing_config.unwrap()),
             _ => panic!("Unsupported IR: {ir}"),
         };
 
@@ -124,13 +143,13 @@ struct IrConfig {
     module: Module,
     ir: Ir,
 }
-#[derive(Debug, EnumIter, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Ir {
     Rcst,
     Ast,
     Hir,
-    Mir,
-    OptimizedMir,
+    Mir(TracingConfig),
+    OptimizedMir(TracingConfig),
 }
 impl IrFeatures {
     pub async fn generate_update_notifications(
