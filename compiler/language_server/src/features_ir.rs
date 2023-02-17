@@ -8,7 +8,7 @@ use candy_frontend::{
     position::{line_start_offsets_raw, Offset},
     rich_ir::{Reference, RichIr, ToRichIr, TokenModifier, TokenType},
     string_to_rcst::{InvalidModuleError, StringToRcst},
-    TracingConfig, TracingMode,
+    TracingConfig,
 };
 use extension_trait::extension_trait;
 use lsp_types::{
@@ -83,27 +83,15 @@ impl Server {
     async fn decode_config(&self, uri: &Url) -> IrConfig {
         let (path, ir) = uri.path().rsplit_once('.').unwrap();
         let details = urlencoding::decode(uri.fragment().unwrap()).unwrap();
-        let details: serde_json::Map<String, serde_json::Value> =
+        let mut details: serde_json::Map<String, serde_json::Value> =
             serde_json::from_str(&details).unwrap();
 
         let original_scheme = details.get("scheme").unwrap().as_str().unwrap();
         let original_uri = format!("{original_scheme}:{path}").parse().unwrap();
 
-        let tracing_config = details.get("tracingConfig").map(|json| {
-            let json = json.as_object().unwrap();
-            let parse_tracing_mode = |key: &str| match json.get(key).unwrap().as_str().unwrap() {
-                "off" => TracingMode::Off,
-                "onlyCurrent" => TracingMode::OnlyCurrent,
-                "all" => TracingMode::All,
-                _ => panic!("Unsupported tracing mode"),
-            };
-
-            TracingConfig {
-                register_fuzzables: parse_tracing_mode("registerFuzzables"),
-                calls: parse_tracing_mode("calls"),
-                evaluated_expressions: parse_tracing_mode("evaluatedExpressions"),
-            }
-        });
+        let tracing_config = details
+            .remove("tracingConfig")
+            .map(|it| serde_json::from_value(it).unwrap());
 
         let ir = match ir {
             "rcst" => Ir::Rcst,
