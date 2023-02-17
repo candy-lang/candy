@@ -203,25 +203,22 @@ impl ToRichIr<MirReferenceKey> for Expression {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder<MirReferenceKey>) {
         match self {
             Expression::Int(int) => {
-                let range = builder.push(int.to_string(), Some(TokenType::Int), EnumSet::empty());
+                let range = builder.push(int.to_string(), TokenType::Int, EnumSet::empty());
                 builder.push_reference(int.to_owned(), range);
             }
             Expression::Text(text) => {
-                let range = builder.push(
-                    format!(r#""{}""#, text),
-                    Some(TokenType::Text),
-                    EnumSet::empty(),
-                );
+                let range =
+                    builder.push(format!(r#""{}""#, text), TokenType::Text, EnumSet::empty());
                 builder.push_reference(text.to_owned(), range);
             }
             Expression::Symbol(symbol) => {
-                let range = builder.push(symbol, Some(TokenType::Symbol), EnumSet::empty());
+                let range = builder.push(symbol, TokenType::Symbol, EnumSet::empty());
                 builder.push_reference(MirReferenceKey::Symbol(symbol.to_owned()), range);
             }
             Expression::Builtin(builtin) => {
                 let range = builder.push(
                     format!("builtin{builtin:?}"),
-                    Some(TokenType::Function),
+                    TokenType::Function,
                     EnumSet::only(TokenModifier::Builtin),
                 );
                 builder.push_reference(*builtin, range);
@@ -246,7 +243,7 @@ impl ToRichIr<MirReferenceKey> for Expression {
             }
             Expression::Reference(id) => id.build_rich_ir(builder),
             Expression::HirId(id) => {
-                let range = builder.push(id.to_string(), Some(TokenType::Symbol), EnumSet::empty());
+                let range = builder.push(id.to_string(), TokenType::Symbol, EnumSet::empty());
                 builder.push_reference(id.to_owned(), range);
             }
             Expression::Lambda {

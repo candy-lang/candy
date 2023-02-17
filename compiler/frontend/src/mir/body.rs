@@ -444,7 +444,7 @@ impl ToRichIr<MirReferenceKey> for Body {
         fn push(builder: &mut RichIrBuilder<MirReferenceKey>, id: &Id, expression: &Expression) {
             let range = builder.push(
                 id.to_short_debug_string(),
-                Some(TokenType::Variable),
+                TokenType::Variable,
                 EnumSet::empty(),
             );
             builder.push_definition(id.to_owned(), range);

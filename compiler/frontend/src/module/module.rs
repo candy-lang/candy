@@ -133,7 +133,7 @@ impl<RK: Eq + From<Module> + Hash> ToRichIr<RK> for Module {
                     .map(|component| component.to_string())
                     .join("/")
             ),
-            Some(TokenType::Module),
+            TokenType::Module,
             Default::default(),
         );
         builder.push_reference(self.to_owned(), range);

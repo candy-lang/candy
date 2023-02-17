@@ -35,7 +35,7 @@ impl ToRichIr<MirReferenceKey> for Id {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder<MirReferenceKey>) {
         let range = builder.push(
             self.to_short_debug_string(),
-            Some(TokenType::Variable),
+            TokenType::Variable,
             EnumSet::empty(),
         );
         builder.push_reference(*self, range);

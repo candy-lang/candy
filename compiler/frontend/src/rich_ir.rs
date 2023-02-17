@@ -178,12 +178,18 @@ impl<RK: Eq + Hash> RichIrBuilder<RK> {
         }
     }
 
-    pub fn push<S: AsRef<str>>(
+    pub fn push<S, TT>(
         &mut self,
         text: S,
-        token_type: Option<TokenType>,
+        token_type: TT,
         token_modifiers: EnumSet<TokenModifier>,
-    ) -> Range<Offset> {
+    ) -> Range<Offset>
+    where
+        S: AsRef<str>,
+        TT: Into<Option<TokenType>>,
+    {
+        let token_type = token_type.into();
+
         assert!(
             token_modifiers.is_empty() || token_type.is_some(),
             "`token_modifiers` can only be specified if a `token_type` is specified.",
