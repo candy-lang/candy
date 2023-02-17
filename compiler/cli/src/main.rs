@@ -535,7 +535,7 @@ fn init_logger(use_stdout: bool) {
         }))
         .with_filter(filter::filter_fn(level_for(
             "candy_frontend::mir_optimize",
-            Level::DEBUG,
+            Level::INFO,
         )))
         .with_filter(filter::filter_fn(level_for(
             "candy_frontend::string_to_rcst",
