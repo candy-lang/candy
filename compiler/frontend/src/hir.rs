@@ -626,11 +626,12 @@ fn build_errors_rich_ir<C: ToRichIr<HirReferenceKey>>(
 impl ToRichIr<HirReferenceKey> for Lambda {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
         for parameter in &self.parameters {
-            builder.push(
+            let range = builder.push(
                 parameter.to_short_debug_string(),
                 TokenType::Parameter,
                 EnumSet::empty(),
             );
+            builder.push_definition(parameter.to_owned(), range);
             builder.push(" ", None, EnumSet::empty());
         }
         builder.push("->", None, EnumSet::empty());

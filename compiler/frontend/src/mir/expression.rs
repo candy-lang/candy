@@ -252,7 +252,18 @@ impl ToRichIr<MirReferenceKey> for Expression {
                 body,
             } => {
                 builder.push("{ ", None, EnumSet::empty());
-                builder.push_children(parameters, " ");
+                builder.push_children_custom(
+                    parameters,
+                    |builder, parameter| {
+                        let range = builder.push(
+                            parameter.to_short_debug_string(),
+                            TokenType::Parameter,
+                            EnumSet::empty(),
+                        );
+                        builder.push_definition(*parameter, range);
+                    },
+                    " ",
+                );
                 builder.push(
                     if parameters.is_empty() {
                         "(responsible "
@@ -262,7 +273,12 @@ impl ToRichIr<MirReferenceKey> for Expression {
                     None,
                     EnumSet::empty(),
                 );
-                responsible_parameter.build_rich_ir(builder);
+                let range = builder.push(
+                    responsible_parameter.to_short_debug_string(),
+                    TokenType::Parameter,
+                    EnumSet::empty(),
+                );
+                builder.push_definition(*responsible_parameter, range);
                 builder.push(") ->", None, EnumSet::empty());
                 builder.push_foldable(|builder| {
                     builder.indent();
