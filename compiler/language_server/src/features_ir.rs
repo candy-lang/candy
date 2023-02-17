@@ -3,6 +3,7 @@ use candy_frontend::{
     ast_to_hir::AstToHir,
     cst_to_ast::CstToAst,
     hir_to_mir::HirToMir,
+    mir_optimize::OptimizeMir,
     module::{Module, ModuleKind},
     position::{line_start_offsets_raw, Offset},
     rich_ir::{Reference, RichIr, ToRichIr, TokenModifier, TokenType},
@@ -58,6 +59,9 @@ impl Server {
                 Ir::Mir => db
                     .mir(config.module.clone(), TracingConfig::off()) // FIXME
                     .map(|mir| mir.to_rich_ir()),
+                Ir::OptimizedMir => db
+                    .mir_with_obvious_optimized(config.module.clone(), TracingConfig::off()) // FIXME
+                    .map(|mir| mir.to_rich_ir()),
             }
         }
         .unwrap_or_else(|| "# Module does not exist".to_rich_ir());
@@ -87,6 +91,7 @@ impl Server {
             "ast" => Ir::Ast,
             "hir" => Ir::Hir,
             "mir" => Ir::Mir,
+            "optimizedMir" => Ir::OptimizedMir,
             _ => panic!("Unsupported IR: {ir}"),
         };
 
@@ -125,6 +130,7 @@ pub enum Ir {
     Ast,
     Hir,
     Mir,
+    OptimizedMir,
 }
 impl IrFeatures {
     pub async fn generate_update_notifications(

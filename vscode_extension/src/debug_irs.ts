@@ -3,8 +3,24 @@ import { LanguageClient } from 'vscode-languageclient/node';
 import {
   updateIrNotification,
   viewIr,
-  ViewIrParams,
+  ViewIrParams
 } from './lsp_custom_protocol';
+
+type Ir = 'rcst' | 'ast' | 'hir' | 'mir' | 'optimizedMir';
+function getIrTitle(ir: Ir): string {
+  switch (ir) {
+    case 'rcst':
+      return 'RCST';
+    case 'ast':
+      return 'AST';
+    case 'hir':
+      return 'HIR';
+    case 'mir':
+      return 'MIR';
+    case 'optimizedMir':
+      return 'Optimized MIR';
+  }
+}
 
 export function registerDebugIrCommands(client: LanguageClient) {
   const updateIrEmitter = new vscode.EventEmitter<vscode.Uri>();
@@ -13,10 +29,11 @@ export function registerDebugIrCommands(client: LanguageClient) {
     updateIrEmitter.fire(vscode.Uri.parse(notification.uri));
   });
 
-  registerDebugIrCommand('rcst', 'RCST', 'viewRcst');
-  registerDebugIrCommand('ast', 'AST', 'viewAst');
-  registerDebugIrCommand('hir', 'HIR', 'viewHir');
-  registerDebugIrCommand('mir', 'MIR', 'viewMir');
+  registerDebugIrCommand('rcst', 'viewRcst');
+  registerDebugIrCommand('ast', 'viewAst');
+  registerDebugIrCommand('hir', 'viewHir');
+  registerDebugIrCommand('mir', 'viewMir');
+  registerDebugIrCommand('optimizedMir', , 'viewOptimizedMir');
 }
 
 function registerDocumentProvider(
@@ -35,19 +52,19 @@ function registerDocumentProvider(
   })();
   vscode.workspace.registerTextDocumentContentProvider(irScheme, provider);
 }
-function registerDebugIrCommand(ir: string, irName: string, command: string) {
+function registerDebugIrCommand(ir: Ir, command: string) {
   vscode.commands.registerCommand(`candy.debug.${command}`, async () => {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
       vscode.window.showErrorMessage(
-        `Can't show the ${irName} without an active editor.`
+        `Can't show the ${getIrTitle(ir)} without an active editor.`
       );
       return;
     }
     const document = editor.document;
     if (document.languageId !== 'candy') {
       vscode.window.showErrorMessage(
-        `Can't show the ${irName} for a non-Candy file.`
+        `Can't show the ${getIrTitle(ir)} for a non-Candy file.`
       );
       return;
     }
