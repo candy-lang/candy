@@ -40,6 +40,7 @@ pub enum TokenType {
     Variable,
     Symbol,
     Function,
+    Comment,
     Text,
     Int,
 }
@@ -176,6 +177,17 @@ impl<RK: Eq + Hash> RichIrBuilder<RK> {
                 }
             }
         }
+    }
+
+    pub fn push_comment_line<S: AsRef<str>>(&mut self, text: S) {
+        let text = text.as_ref();
+        if text.is_empty() {
+            self.push("#", TokenType::Comment, EnumSet::empty());
+        } else {
+            self.push("# ", TokenType::Comment, EnumSet::empty());
+            self.push(text, TokenType::Comment, EnumSet::empty());
+        }
+        self.push_newline();
     }
 
     pub fn push<S, TT>(
