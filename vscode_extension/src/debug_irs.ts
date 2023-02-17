@@ -40,7 +40,9 @@ export function registerDebugIrCommands(client: LanguageClient) {
   registerDebugIrCommand('ast', 'viewAst', async () => ({ type: 'ast' }));
   registerDebugIrCommand('hir', 'viewHir', async () => ({ type: 'hir' }));
   registerDebugIrCommand('mir', 'viewMir', async () => {
-    const tracingConfig = await pickTracingConfig();
+    const tracingConfig = await pickTracingConfig({
+      canSelectOnlyCurrent: false,
+    });
     if (tracingConfig === undefined) return undefined;
 
     return { type: 'mir', tracingConfig };
@@ -122,34 +124,38 @@ interface TracingConfig {
 }
 type TracingMode = 'off' | 'onlyCurrent' | 'all';
 
-async function pickTracingConfig(): Promise<TracingConfig | undefined> {
+async function pickTracingConfig(
+  options: { canSelectOnlyCurrent: boolean } = { canSelectOnlyCurrent: true }
+): Promise<TracingConfig | undefined> {
   const registerFuzzables = await pickTracingMode(
-    'Include tracing of fuzzable closures?'
+    'Include tracing of fuzzable closures?',
+    options
   );
   if (registerFuzzables === undefined) return;
 
-  const calls = await pickTracingMode('Include tracing of calls?');
+  const calls = await pickTracingMode('Include tracing of calls?', options);
   if (calls === undefined) return;
 
   const evaluatedExpressions = await pickTracingMode(
-    'Include tracing of evaluated expressions?'
+    'Include tracing of evaluated expressions?',
+    options
   );
   if (evaluatedExpressions === undefined) return;
 
   return { registerFuzzables, calls, evaluatedExpressions };
 }
 async function pickTracingMode(
-  title: string
+  title: string,
+  options: { canSelectOnlyCurrent: boolean } = { canSelectOnlyCurrent: true }
 ): Promise<TracingMode | undefined> {
   type Item = vscode.QuickPickItem & { mode: TracingMode };
-  const result = await vscode.window.showQuickPick<Item>(
-    [
-      { label: 'Off', mode: 'off' },
-      { label: 'Only the current module', mode: 'onlyCurrent' },
-      { label: 'All', mode: 'all' },
-    ],
-    { title }
-  );
+  const items: Item[] = [{ label: 'No', mode: 'off' }];
+  if (options.canSelectOnlyCurrent) {
+    items.push({ label: 'Only for the current module', mode: 'onlyCurrent' });
+  }
+  items.push({ label: 'Yes', mode: 'all' });
+
+  const result = await vscode.window.showQuickPick<Item>(items, { title });
   return result?.mode;
 }
 
