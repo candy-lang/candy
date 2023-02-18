@@ -45,9 +45,9 @@ pub enum Expression {
         relative_path: Id,
         responsible: Id,
     },
-    /// This expression indicates that the code will panic. It's created if the
-    /// compiler can statically determine that some expression will always
-    /// panic.
+    /// This expression indicates that the code will panic. It's created in the
+    /// generated `needs` function or if the compiler can statically determine
+    /// that some expression will always panic.
     Panic {
         reason: Id,
         responsible: Id,
