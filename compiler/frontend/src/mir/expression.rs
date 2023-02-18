@@ -58,7 +58,7 @@ pub enum Expression {
     /// back into multiple expressions happens in the [multiple flattening]
     /// optimization.
     ///
-    /// [multiple flattening]: super::optimize::multiple_flattening
+    /// [multiple flattening]: crate::mir_optimize::multiple_flattening
     Multiple(Body),
 
     /// Indicates that a module started.
