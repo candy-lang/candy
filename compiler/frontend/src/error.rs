@@ -19,7 +19,10 @@ impl Display for CompilerError {
         write!(
             f,
             "{} span({} – {}): {}",
-            self.module, *self.span.start, *self.span.end, self.payload,
+            <Module as ToRichIr<Module>>::to_rich_ir(&self.module),
+            *self.span.start,
+            *self.span.end,
+            self.payload,
         )
     }
 }

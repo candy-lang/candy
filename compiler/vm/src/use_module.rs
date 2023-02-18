@@ -6,6 +6,7 @@ use super::{
 use candy_frontend::{
     hir::Id,
     module::{Module, UsePath},
+    rich_ir::ToRichIr,
 };
 
 impl Fiber {
@@ -25,9 +26,12 @@ impl Fiber {
         let target = UsePath::parse(path.value.as_str())?;
         let module = target.resolve_relative_to(current_module)?;
 
-        let lir = use_provider
-            .use_module(module.clone())
-            .ok_or_else(|| format!("`use` couldn't import the module `{}`.", module))?;
+        let lir = use_provider.use_module(module.clone()).ok_or_else(|| {
+            format!(
+                "`use` couldn't import the module `{}`.",
+                <Module as ToRichIr<Module>>::to_rich_ir(&module),
+            )
+        })?;
         let closure = self
             .heap
             .create_closure(Closure::of_module_lir(lir.as_ref().to_owned()));

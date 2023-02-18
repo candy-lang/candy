@@ -66,6 +66,16 @@
         "category": "Candy Compiler Debugging",
         "command": "candy.debug.viewHir",
         "title": "View HIR"
+      },
+      {
+        "category": "Candy Compiler Debugging",
+        "command": "candy.debug.viewMir",
+        "title": "View MIR"
+      },
+      {
+        "category": "Candy Compiler Debugging",
+        "command": "candy.debug.viewOptimizedMir",
+        "title": "View Optimized MIR"
       }
     ],
     "configuration": {

@@ -33,6 +33,7 @@ use num_traits::ToPrimitive;
 use crate::{
     builtin_functions::BuiltinFunction,
     mir::{Body, Expression, Id, Mir, VisibleExpressions},
+    rich_ir::ToRichIr,
 };
 
 impl Mir {
@@ -196,8 +197,8 @@ impl Mir {
                     Expression::Reference(value)
                 } else {
                     return Some(Err(format!(
-                        "Struct access will panic because key {:?} isn't in there.",
-                        visible.get(key_id),
+                        "Struct access will panic because key {} isn't in there.",
+                        visible.get(key_id).to_rich_ir().text,
                     )));
                 }
             }
