@@ -1,0 +1,51 @@
+bool = use "..bool"
+[ifElse, recursive] = use "..controlFlow"
+[equals] = use "..equality"
+int = use "..int"
+text = use "..text"
+[toDebugText] = use "..toDebugText"
+
+decimalsPow = 10000000
+
+is := int.is
+
+fromInt a :=
+  needs (is a)
+  int.multiply a decimalsPow
+
+toInt a :=
+  needs (is a)
+  int.divideTruncating a decimalsPow
+
+isNonNegative a :=
+  needs (is a)
+  int.isNonNegative a
+
+add a b :=
+  needs (is a)
+  needs (is b)
+  a | int.add b
+
+multiply a b :=
+  needs (is a)
+  needs (is b)
+  a | int.multiply b | int.divideTruncating decimalsPow
+
+divide a b :=
+  needs (is a)
+  needs (is b)
+  needs (b | equals 0 | bool.not)
+  a | int.multiply decimalsPow | int.divideTruncating b
+
+approxEquals a b delta :=
+  needs (is a)
+  needs (is b)
+  needs (int.is delta)
+  needs (int.isNonNegative delta)
+  a | int.subtract b | int.absolute | int.isLessThanOrEqualTo delta
+
+toText a :=
+  needs (is a)
+  beforeDot = a | toInt | toDebugText
+  afterDot = a | int.modulo decimalsPow | int.add decimalsPow | toDebugText | text.removePrefix "1"
+  "{beforeDot}.{afterDot}"
