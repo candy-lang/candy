@@ -1,0 +1,18 @@
+[equals, fixedDecimal, ifElse, recursive] = use "...Core"
+fixed = fixedDecimal
+
+sqrt x :=
+  needs (fixed.is x)
+  needs (fixed.isNonNegative x)
+
+  recursive (x | fixed.divide (2 | fixed.fromInt)) { recurse guess ->
+    refinedGuess = fixed.divide
+      (guess | fixed.add (x | fixed.divide guess))
+      (2 | fixed.fromInt)
+    ifElse (fixed.approxEquals guess refinedGuess 10) { guess } { recurse refinedGuess }
+  }
+
+main _ :=
+  input = 2
+  result = input | fixed.fromInt | sqrt
+  ✨.print "The root of {input} is {result | fixed.toText}"
