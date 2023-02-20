@@ -1,4 +1,7 @@
-use crate::mir::{Body, Expression, Id, Mir, VisibleExpressions};
+use crate::{
+    mir::{Body, Expression, Id, Mir, VisibleExpressions},
+    rich_ir::ToRichIr,
+};
 use std::{collections::HashSet, mem};
 use tracing::error;
 
@@ -378,14 +381,18 @@ impl Mir {
     ) {
         if body.iter().next().is_none() {
             error!("A body of a lambda is empty! Lambdas should have at least a return value.");
-            error!("This is the MIR:\n{self}");
+            error!("This is the MIR:\n{}", self.to_rich_ir());
             panic!("MIR is invalid!");
         }
         for (id, expression) in body.iter() {
             for captured in expression.captured_ids() {
                 if !visible.contains(&captured) {
-                    error!("MIR is invalid! {id} captures {captured}, but that's not visible.");
-                    error!("This is the MIR:\n{self}");
+                    error!(
+                        "MIR is invalid! {} captures {}, but that's not visible.",
+                        id.to_rich_ir().text,
+                        captured.to_rich_ir().text,
+                    );
+                    error!("This is the MIR:\n{}", self.to_rich_ir());
                     panic!("MIR is invalid!");
                 }
             }
@@ -405,8 +412,8 @@ impl Mir {
             }
 
             if defined_ids.contains(&id) {
-                error!("ID {id} exists twice.");
-                error!("This is the MIR:\n{self}");
+                error!("ID {} exists twice.", id.to_rich_ir().text);
+                error!("This is the MIR:\n{}", self.to_rich_ir());
                 panic!("MIR is invalid!");
             }
             defined_ids.insert(id);

@@ -3,6 +3,7 @@ use candy_frontend::{
     ast_to_hir::AstToHir,
     hir::CollectErrors,
     module::{Module, ModuleDb, ModuleKind, MutableModuleProviderOwner},
+    rich_ir::ToRichIr,
 };
 use itertools::Itertools;
 use lsp_types::{
@@ -62,7 +63,10 @@ impl CandyFeatures {
             } else {
                 "modules"
             },
-            modules.iter().join(", "),
+            modules
+                .iter()
+                .map(<Module as ToRichIr<Module>>::to_rich_ir)
+                .join(", "),
         );
 
         for module in modules {

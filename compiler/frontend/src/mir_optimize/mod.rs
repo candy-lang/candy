@@ -61,7 +61,7 @@ use super::{
     mir::{Body, Expression, Mir},
     tracing::TracingConfig,
 };
-use crate::{id::IdGenerator, module::Module};
+use crate::{id::IdGenerator, module::Module, rich_ir::ToRichIr};
 use rustc_hash::FxHasher;
 use std::{
     hash::{Hash, Hasher},
@@ -84,7 +84,10 @@ fn mir_with_obvious_optimized(
     module: Module,
     tracing: TracingConfig,
 ) -> Option<Arc<Mir>> {
-    debug!("{module}: Compiling.");
+    debug!(
+        "{}: Compiling.",
+        <Module as ToRichIr<Module>>::to_rich_ir(&module),
+    );
     let mir = db.mir(module.clone(), tracing.clone())?;
     let mut mir = (*mir).clone();
 
@@ -92,7 +95,10 @@ fn mir_with_obvious_optimized(
     mir.optimize_obvious(db, &tracing);
     let complexity_after = mir.complexity();
 
-    debug!("{module}: Done. Optimized from {complexity_before} to {complexity_after}");
+    debug!(
+        "{}: Done. Optimized from {complexity_before} to {complexity_after}",
+        <Module as ToRichIr<Module>>::to_rich_ir(&module),
+    );
     Some(Arc::new(mir))
 }
 

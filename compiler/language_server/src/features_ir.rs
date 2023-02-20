@@ -1,12 +1,19 @@
 use async_trait::async_trait;
 use candy_frontend::{
+    ast::Ast,
     ast_to_hir::AstToHir,
     cst_to_ast::CstToAst,
+    hir,
+    hir_to_mir::HirToMir,
+    mir::Mir,
+    mir_optimize::OptimizeMir,
     module::{Module, ModuleKind},
     position::{line_start_offsets_raw, Offset},
-    rich_ir::{Reference, RichIr, ToRichIr, TokenModifier, TokenType},
-    string_to_rcst::{InvalidModuleError, StringToRcst},
+    rich_ir::{Reference, RichIr, RichIrBuilder, ToRichIr, TokenModifier, TokenType},
+    string_to_rcst::{InvalidModuleError, RcstResult, StringToRcst},
+    TracingConfig, TracingMode,
 };
+use enumset::EnumSet;
 use extension_trait::extension_trait;
 use lsp_types::{
     self, notification::Notification, DocumentHighlight, DocumentHighlightKind, FoldingRange,
@@ -15,7 +22,6 @@ use lsp_types::{
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, hash::Hash, ops::Range, path::Path, sync::Arc};
-use strum_macros::EnumIter;
 use tokio::sync::{Mutex, RwLock};
 use tower_lsp::jsonrpc;
 
@@ -38,24 +44,36 @@ impl Server {
         let config = self.decode_config(&params.uri).await;
         let ir = {
             let db = self.db.lock().await;
-            match config.ir {
-                Ir::Rcst => match db.rcst(config.module.clone()) {
-                    Ok(rcst) => Some(rcst.to_rich_ir()),
-                    Err(InvalidModuleError::DoesNotExist) => None,
-                    Err(InvalidModuleError::InvalidUtf8) => Some("# Invalid UTF-8".to_rich_ir()),
-                    Err(InvalidModuleError::IsToolingModule) => {
-                        Some("# Is a tooling module".to_rich_ir())
-                    }
-                },
+            let rich_ir = match &config.ir {
+                Ir::Rcst => Self::rich_ir_for_rcst(&config.module, db.rcst(config.module.clone())),
                 Ir::Ast => db
                     .ast(config.module.clone())
-                    .map(|(asts, _)| asts.to_rich_ir()),
+                    .map(|(asts, _)| Self::rich_ir_for_ast(&config.module, asts)),
                 Ir::Hir => db
                     .hir(config.module.clone())
-                    .map(|(body, _)| body.to_rich_ir()),
-            }
-        }
-        .unwrap_or_else(|| "# Module does not exist".to_rich_ir());
+                    .map(|(body, _)| Self::rich_ir_for_hir(&config.module, body)),
+                Ir::Mir(tracing_config) => db
+                    .mir(config.module.clone(), tracing_config.to_owned())
+                    .map(|mir| Self::rich_ir_for_mir(&config.module, mir, tracing_config)),
+                Ir::OptimizedMir(tracing_config) => db
+                    .mir_with_obvious_optimized(config.module.clone(), tracing_config.to_owned())
+                    .map(|mir| {
+                        Self::rich_ir_for_optimized_mir(&config.module, mir, tracing_config)
+                    }),
+            };
+            rich_ir.unwrap_or_else(|| {
+                let mut builder = RichIrBuilder::<()>::default();
+                builder.push(
+                    format!(
+                        "# Module does not exist: {}",
+                        <Module as ToRichIr<Module>>::to_rich_ir(&config.module)
+                    ),
+                    TokenType::Comment,
+                    EnumSet::empty(),
+                );
+                builder.finish()
+            })
+        };
 
         let open_irs = {
             let state = self.state.read().await;
@@ -74,16 +92,25 @@ impl Server {
     }
     async fn decode_config(&self, uri: &Url) -> IrConfig {
         let (path, ir) = uri.path().rsplit_once('.').unwrap();
+        let details = urlencoding::decode(uri.fragment().unwrap()).unwrap();
+        let mut details: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_str(&details).unwrap();
+
+        let original_scheme = details.get("scheme").unwrap().as_str().unwrap();
+        let original_uri = format!("{original_scheme}:{path}").parse().unwrap();
+
+        let tracing_config = details
+            .remove("tracingConfig")
+            .map(|it| serde_json::from_value(it).unwrap());
+
         let ir = match ir {
             "rcst" => Ir::Rcst,
             "ast" => Ir::Ast,
             "hir" => Ir::Hir,
+            "mir" => Ir::Mir(tracing_config.unwrap()),
+            "optimizedMir" => Ir::OptimizedMir(tracing_config.unwrap()),
             _ => panic!("Unsupported IR: {ir}"),
         };
-        dbg!(uri);
-        let original_scheme = uri.fragment().unwrap();
-        dbg!(&original_scheme);
-        let original_uri = format!("{original_scheme}:{path}").parse().unwrap();
 
         let state = self.state.read().await;
         IrConfig {
@@ -96,29 +123,133 @@ impl Server {
             ir,
         }
     }
+
+    fn rich_ir_for_rcst(module: &Module, rcst: RcstResult) -> Option<RichIr> {
+        let mut builder = RichIrBuilder::default();
+        builder.push(
+            format!(
+                "# AST for module {}",
+                <Module as ToRichIr<Module>>::to_rich_ir(module)
+            ),
+            TokenType::Comment,
+            EnumSet::empty(),
+        );
+        builder.push_newline();
+        match rcst {
+            Ok(rcst) => rcst.build_rich_ir(&mut builder),
+            Err(InvalidModuleError::DoesNotExist) => return None,
+            Err(InvalidModuleError::InvalidUtf8) => {
+                builder.push("# Invalid UTF-8", TokenType::Comment, EnumSet::empty());
+            }
+            Err(InvalidModuleError::IsToolingModule) => {
+                builder.push(
+                    "# Is a tooling module",
+                    TokenType::Comment,
+                    EnumSet::empty(),
+                );
+            }
+        }
+        Some(builder.finish())
+    }
+    fn rich_ir_for_ast(module: &Module, asts: Arc<Vec<Ast>>) -> RichIr {
+        let mut builder = RichIrBuilder::default();
+        builder.push(
+            format!(
+                "# AST for module {}",
+                <Module as ToRichIr<Module>>::to_rich_ir(module)
+            ),
+            TokenType::Comment,
+            EnumSet::empty(),
+        );
+        builder.push_newline();
+        asts.build_rich_ir(&mut builder);
+        builder.finish()
+    }
+    fn rich_ir_for_hir(module: &Module, body: Arc<hir::Body>) -> RichIr {
+        let mut builder = RichIrBuilder::default();
+        builder.push(
+            format!(
+                "# HIR for module {}",
+                <Module as ToRichIr<Module>>::to_rich_ir(module)
+            ),
+            TokenType::Comment,
+            EnumSet::empty(),
+        );
+        builder.push_newline();
+        body.build_rich_ir(&mut builder);
+        builder.finish()
+    }
+    fn rich_ir_for_mir(module: &Module, mir: Arc<Mir>, tracing_config: &TracingConfig) -> RichIr {
+        let mut builder = RichIrBuilder::default();
+        builder.push(
+            format!(
+                "# MIR for module {}",
+                <Module as ToRichIr<Module>>::to_rich_ir(module)
+            ),
+            TokenType::Comment,
+            EnumSet::empty(),
+        );
+        builder.push_newline();
+        push_tracing_config(&mut builder, tracing_config);
+        builder.push_newline();
+        mir.build_rich_ir(&mut builder);
+        builder.finish()
+    }
+    fn rich_ir_for_optimized_mir(
+        module: &Module,
+        mir: Arc<Mir>,
+        tracing_config: &TracingConfig,
+    ) -> RichIr {
+        let mut builder = RichIrBuilder::default();
+        builder.push(
+            format!(
+                "# Optimized MIR for module {}",
+                <Module as ToRichIr<Module>>::to_rich_ir(module)
+            ),
+            TokenType::Comment,
+            EnumSet::empty(),
+        );
+        builder.push_newline();
+        push_tracing_config(&mut builder, tracing_config);
+        builder.push_newline();
+        mir.build_rich_ir(&mut builder);
+        builder.finish()
+    }
+}
+fn push_tracing_config<RK: Eq + Hash>(
+    builder: &mut RichIrBuilder<RK>,
+    tracing_config: &TracingConfig,
+) {
+    fn push_mode<RK: Eq + Hash>(builder: &mut RichIrBuilder<RK>, title: &str, mode: &TracingMode) {
+        builder.push_comment_line(format!(
+            "• {title} {}",
+            match mode {
+                TracingMode::Off => "No",
+                TracingMode::OnlyCurrent => "Only for the current module",
+                TracingMode::All => "Yes",
+            },
+        ));
+    }
+
+    builder.push_comment_line("");
+    builder.push_comment_line("Tracing Config:");
+    builder.push_comment_line("");
+    push_mode(
+        builder,
+        "Include tracing of fuzzable closures?",
+        &tracing_config.register_fuzzables,
+    );
+    push_mode(builder, "Include tracing of calls?", &tracing_config.calls);
+    push_mode(
+        builder,
+        "Include tracing of evaluated expressions?",
+        &tracing_config.evaluated_expressions,
+    );
 }
 
 #[derive(Debug, Default)]
 pub struct IrFeatures {
     open_irs: Arc<RwLock<FxHashMap<Url, OpenIr>>>,
-}
-
-#[derive(Debug)]
-struct OpenIr {
-    config: IrConfig,
-    ir: RichIr,
-    line_start_offsets: Vec<Offset>,
-}
-#[derive(Debug)]
-struct IrConfig {
-    module: Module,
-    ir: Ir,
-}
-#[derive(Debug, EnumIter, PartialEq, Eq, Clone, Copy, Hash)]
-pub enum Ir {
-    Rcst,
-    Ast,
-    Hir,
 }
 impl IrFeatures {
     pub async fn generate_update_notifications(
@@ -132,6 +263,27 @@ impl IrFeatures {
             .map(|(uri, _)| UpdateIrNotification { uri: uri.clone() })
             .collect()
     }
+}
+
+#[derive(Debug)]
+struct OpenIr {
+    config: IrConfig,
+    ir: RichIr,
+    line_start_offsets: Vec<Offset>,
+}
+#[derive(Debug)]
+struct IrConfig {
+    module: Module,
+    ir: Ir,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum Ir {
+    Rcst,
+    Ast,
+    Hir,
+    Mir(TracingConfig),
+    OptimizedMir(TracingConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -314,9 +466,11 @@ impl OpenIr {
 impl TokenTypeToSemantic for TokenType {
     fn to_semantic(&self) -> SemanticTokenType {
         match self {
+            TokenType::Module => SemanticTokenType::Module,
             TokenType::Parameter => SemanticTokenType::Parameter,
             TokenType::Variable => SemanticTokenType::Variable,
             TokenType::Function => SemanticTokenType::Function,
+            TokenType::Comment => SemanticTokenType::Comment,
             TokenType::Symbol => SemanticTokenType::Symbol,
             TokenType::Text => SemanticTokenType::Text,
             TokenType::Int => SemanticTokenType::Int,

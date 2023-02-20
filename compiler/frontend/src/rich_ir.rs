@@ -1,9 +1,11 @@
-use std::{hash::Hash, ops::Range};
-
+use crate::position::Offset;
 use enumset::{EnumSet, EnumSetType};
 use rustc_hash::FxHashMap;
-
-use crate::position::Offset;
+use std::{
+    fmt::{self, Display, Formatter},
+    hash::Hash,
+    ops::Range,
+};
 
 #[derive(Debug, Default)]
 pub struct RichIr {
@@ -11,6 +13,11 @@ pub struct RichIr {
     pub annotations: Vec<RichIrAnnotation>,
     pub references: Vec<Reference>,
     pub folding_ranges: Vec<Range<Offset>>,
+}
+impl Display for RichIr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.text)
+    }
 }
 
 #[derive(Debug, Default)]
@@ -28,10 +35,12 @@ pub struct RichIrAnnotation {
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum TokenType {
+    Module,
     Parameter,
     Variable,
     Symbol,
     Function,
+    Comment,
     Text,
     Int,
 }
@@ -170,12 +179,29 @@ impl<RK: Eq + Hash> RichIrBuilder<RK> {
         }
     }
 
-    pub fn push<S: AsRef<str>>(
+    pub fn push_comment_line<S: AsRef<str>>(&mut self, text: S) {
+        let text = text.as_ref();
+        if text.is_empty() {
+            self.push("#", TokenType::Comment, EnumSet::empty());
+        } else {
+            self.push("# ", TokenType::Comment, EnumSet::empty());
+            self.push(text, TokenType::Comment, EnumSet::empty());
+        }
+        self.push_newline();
+    }
+
+    pub fn push<S, TT>(
         &mut self,
         text: S,
-        token_type: Option<TokenType>,
+        token_type: TT,
         token_modifiers: EnumSet<TokenModifier>,
-    ) -> Range<Offset> {
+    ) -> Range<Offset>
+    where
+        S: AsRef<str>,
+        TT: Into<Option<TokenType>>,
+    {
+        let token_type = token_type.into();
+
         assert!(
             token_modifiers.is_empty() || token_type.is_some(),
             "`token_modifiers` can only be specified if a `token_type` is specified.",
