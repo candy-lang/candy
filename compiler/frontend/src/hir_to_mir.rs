@@ -275,12 +275,11 @@ impl<'a> LoweringContext<'a> {
                         responsible,
                     );
 
-                    let pattern_result = body.push_reference(pattern_result);
                     self.ongoing_destructuring = Some(OngoingDestructuring {
                         result: pattern_result,
                         is_trivial: false,
                     });
-                    pattern_result
+                    body.push_nothing()
                 }
             }
             hir::Expression::PatternIdentifierReference(identifier_id) => {
