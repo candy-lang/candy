@@ -11,6 +11,7 @@ use crate::{
     module::Module,
     position::Offset,
     rcst_to_cst::RcstToCst,
+    rich_ir::ToRichIr,
     string_to_rcst::InvalidModuleError,
     utils::AdjustCasingOfFirstLetter,
 };
@@ -60,11 +61,17 @@ fn ast(db: &dyn CstToAst, module: Module) -> Option<AstResult> {
             context.lower_csts(&cst)
         }
         Err(InvalidModuleError::DoesNotExist) => {
-            warn!("Tried to get AST of module that doesn't exist: {module}.");
+            warn!(
+                "Tried to get AST of module that doesn't exist: {}.",
+                <Module as ToRichIr<Module>>::to_rich_ir(&module),
+            );
             return None;
         }
         Err(InvalidModuleError::IsToolingModule) => {
-            warn!("Tried to get AST of tooling module: {module}.");
+            warn!(
+                "Tried to get AST of tooling module: {}.",
+                <Module as ToRichIr<Module>>::to_rich_ir(&module),
+            );
             return None;
         }
         Err(InvalidModuleError::InvalidUtf8) => {

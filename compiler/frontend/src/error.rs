@@ -1,6 +1,12 @@
+use enumset::EnumSet;
+
 use super::{ast::AstError, cst, hir::HirError, rcst::RcstError};
-use crate::{module::Module, position::Offset};
-use std::{fmt::Display, ops::Range};
+use crate::{
+    module::Module,
+    position::Offset,
+    rich_ir::{RichIrBuilder, ToRichIr},
+};
+use std::{fmt::Display, hash::Hash, ops::Range};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct CompilerError {
@@ -13,7 +19,10 @@ impl Display for CompilerError {
         write!(
             f,
             "{} span({} – {}): {}",
-            self.module, *self.span.start, *self.span.end, self.payload,
+            <Module as ToRichIr<Module>>::to_rich_ir(&self.module),
+            *self.span.start,
+            *self.span.end,
+            self.payload,
         )
     }
 }
@@ -165,5 +174,12 @@ impl CompilerError {
                 .collect(),
             _ => vec![],
         }
+    }
+}
+
+impl<RK: Eq + Hash> ToRichIr<RK> for CompilerError {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<RK>) {
+        // TODO: include more rich information
+        builder.push(self.to_string(), None, EnumSet::empty());
     }
 }

@@ -6,6 +6,7 @@ import {
   LanguageClientOptions,
   StreamInfo,
 } from 'vscode-languageclient/node';
+import { registerDebugIrCommands } from './debug_irs';
 import { HintsDecorations } from './hints';
 
 let client: LanguageClient;
@@ -16,7 +17,6 @@ export async function activate(context: vs.ExtensionContext) {
   let clientOptions: LanguageClientOptions = {
     outputChannelName: '🍭 Candy Language Server',
   };
-
   client = new LanguageClient(
     'candyLanguageServer',
     'Candy Language Server',
@@ -26,12 +26,12 @@ export async function activate(context: vs.ExtensionContext) {
   client.start();
 
   context.subscriptions.push(new HintsDecorations(client));
+  registerDebugIrCommands(client);
 }
 
 export function deactivate(): Thenable<void> | undefined {
-  if (!client) {
-    return undefined;
-  }
+  if (!client) return undefined;
+
   return client.stop();
 }
 

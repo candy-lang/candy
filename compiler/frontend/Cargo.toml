@@ -7,6 +7,8 @@ rust-version = "1.56"
 [lib]
 
 [dependencies]
+derive_more = "0.99.17"
+enumset = "1.0.12"
 im = "15.1.0"
 itertools = { version = "0.10.0" }
 lazy_static = "1.4.0"
@@ -15,6 +17,7 @@ num-bigint = { version = "0.4.3", features = ["rand"] }
 num-traits = { version = "0.2.15", features = ["i128"] }
 rustc-hash = "1.1.0"
 salsa = "0.16.1"
+serde = { version = "1.0.152", features = ["derive"] }
 strum = "0.24.0"
 strum_macros = "0.24"
 tracing = { version = "0.1", features = ["release_max_level_debug"] }

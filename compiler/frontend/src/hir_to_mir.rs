@@ -10,6 +10,7 @@ use crate::{
     builtin_functions::BuiltinFunction,
     module::{Module, ModuleKind, Package},
     position::PositionConversionDb,
+    rich_ir::ToRichIr,
 };
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
@@ -908,7 +909,7 @@ impl CompilerError {
         let range = db.range_to_positions(self.module.clone(), self.span.clone());
         format!(
             "{}:{}:{} – {}:{}: {}",
-            self.module,
+            <Module as ToRichIr<Module>>::to_rich_ir(&self.module),
             range.start.line,
             range.start.character,
             range.end.line,

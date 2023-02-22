@@ -9,17 +9,15 @@
 //! While doing all that, we can pause regularly between executing instructions
 //! so that we don't occupy a single CPU at 100 %.
 
-mod constant_evaluator;
-mod fuzzer;
-mod utils;
-
-use crate::database::Database;
-
 use self::{constant_evaluator::ConstantEvaluator, fuzzer::FuzzerManager};
-use candy_frontend::module::{Module, MutableModuleProviderOwner};
+use crate::database::Database;
+use candy_frontend::{
+    module::{Module, MutableModuleProviderOwner},
+    rich_ir::ToRichIr,
+};
 use candy_vm::heap::Heap;
 use itertools::Itertools;
-use lsp_types::{notification::Notification, Position};
+use lsp_types::{notification::Notification, Position, Url};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, time::Duration, vec};
 use tokio::{
@@ -27,6 +25,10 @@ use tokio::{
     time::sleep,
 };
 use tracing::debug;
+
+mod constant_evaluator;
+mod fuzzer;
+mod utils;
 
 pub enum Event {
     UpdateModule(Module, Vec<u8>),
@@ -50,7 +52,7 @@ pub enum HintKind {
 
 #[derive(Serialize, Deserialize)]
 pub struct HintsNotification {
-    pub uri: String,
+    pub uri: Url,
     pub hints: Vec<Hint>,
 }
 impl Notification for HintsNotification {
@@ -104,13 +106,19 @@ pub async fn run_server(
             if let Some(module) = constant_evaluator.run(&db) {
                 let (heap, closures) = constant_evaluator.get_fuzzable_closures(&module);
                 fuzzer.update_module(module.clone(), &heap, &closures);
-                debug!("The constant evaluator made progress in {module}.");
+                debug!(
+                    "The constant evaluator made progress in {}.",
+                    <Module as ToRichIr<Module>>::to_rich_ir(&module),
+                );
                 break 'new_insight Some(module);
             }
             // For fuzzing, we're a bit more resource-conscious.
             sleep(Duration::from_millis(200)).await;
             if let Some(module) = fuzzer.run(&db) {
-                debug!("The fuzzer made progress in {module}.");
+                debug!(
+                    "The fuzzer made progress in {}.",
+                    <Module as ToRichIr<Module>>::to_rich_ir(&module),
+                );
                 break 'new_insight Some(module);
             }
             None
@@ -156,7 +164,10 @@ impl OutgoingHints {
     }
 
     async fn report_hints(&mut self, module: Module, hints: Vec<Hint>) {
-        debug!("Reporting hints for {module}:\n{hints:?}");
+        debug!(
+            "Reporting hints for {}:\n{hints:?}",
+            <Module as ToRichIr<Module>>::to_rich_ir(&module),
+        );
         if self.last_sent.get(&module) != Some(&hints) {
             self.last_sent.insert(module.clone(), hints.clone());
             self.sender.send((module, hints)).await.unwrap();

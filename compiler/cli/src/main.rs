@@ -10,10 +10,11 @@ use candy_frontend::{
     module::{Module, ModuleKind},
     position::PositionConversionDb,
     rcst_to_cst::RcstToCst,
+    rich_ir::ToRichIr,
     string_to_rcst::StringToRcst,
     TracingConfig, TracingMode,
 };
-use candy_language_server::CandyLanguageServer;
+use candy_language_server::server::Server;
 use candy_vm::{
     channel::{ChannelId, Packet},
     context::{DbUseProvider, RunForever},
@@ -24,9 +25,11 @@ use candy_vm::{
     tracer::{full::FullTracer, DummyTracer, Tracer},
     vm::{CompletedOperation, OperationId, Status, Vm},
 };
+use clap::{Parser, ValueHint};
 use database::Database;
 use itertools::Itertools;
-use notify::{watcher, RecursiveMode, Watcher};
+use notify::RecursiveMode;
+use notify_debouncer_mini::new_debouncer;
 use rustc_hash::FxHashMap;
 use std::{
     convert::TryInto,
@@ -36,8 +39,6 @@ use std::{
     sync::{mpsc::channel, Arc},
     time::Duration,
 };
-use structopt::StructOpt;
-use tower_lsp::{LspService, Server};
 use tracing::{debug, error, info, warn, Level, Metadata};
 use tracing_subscriber::{
     filter,
@@ -45,8 +46,8 @@ use tracing_subscriber::{
     prelude::*,
 };
 
-#[derive(StructOpt, Debug)]
-#[structopt(name = "candy", about = "The 🍭 Candy CLI.")]
+#[derive(Parser, Debug)]
+#[command(name = "candy", about = "The 🍭 Candy CLI.")]
 enum CandyOptions {
     Build(CandyBuildOptions),
     Run(CandyRunOptions),
@@ -54,45 +55,45 @@ enum CandyOptions {
     Lsp,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct CandyBuildOptions {
-    #[structopt(long)]
+    #[arg(long)]
     debug: bool,
 
-    #[structopt(long)]
+    #[arg(long)]
     watch: bool,
 
-    #[structopt(long)]
+    #[arg(long)]
     tracing: bool,
 
-    #[structopt(parse(from_os_str))]
+    #[arg(value_hint = ValueHint::FilePath)]
     file: PathBuf,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct CandyRunOptions {
-    #[structopt(long)]
+    #[arg(long)]
     debug: bool,
 
-    #[structopt(long)]
+    #[arg(long)]
     tracing: bool,
 
-    #[structopt(parse(from_os_str))]
+    #[arg(value_hint = ValueHint::FilePath)]
     file: PathBuf,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct CandyFuzzOptions {
-    #[structopt(long)]
+    #[arg(long)]
     debug: bool,
 
-    #[structopt(parse(from_os_str))]
+    #[arg(value_hint = ValueHint::FilePath)]
     file: PathBuf,
 }
 
 #[tokio::main]
 async fn main() -> ProgramResult {
-    match CandyOptions::from_args() {
+    match CandyOptions::parse() {
         CandyOptions::Build(options) => build(options),
         CandyOptions::Run(options) => run(options),
         CandyOptions::Fuzz(options) => fuzz(options),
@@ -127,8 +128,9 @@ fn build(options: CandyBuildOptions) -> ProgramResult {
         result.ok_or(Exit::FileNotFound).map(|_| ())
     } else {
         let (tx, rx) = channel();
-        let mut watcher = watcher(tx, Duration::from_secs(1)).unwrap();
-        watcher
+        let mut debouncer = new_debouncer(Duration::from_secs(1), None, tx).unwrap();
+        debouncer
+            .watcher()
             .watch(&options.file, RecursiveMode::Recursive)
             .unwrap();
         loop {
@@ -147,11 +149,15 @@ fn raw_build(
     tracing: &TracingConfig,
     debug: bool,
 ) -> Option<Arc<Lir>> {
-    let rcst = db
-        .rcst(module.clone())
-        .unwrap_or_else(|err| panic!("Error parsing file `{}`: {:?}", module, err));
+    let rcst = db.rcst(module.clone()).unwrap_or_else(|err| {
+        panic!(
+            "Error parsing file `{}`: {:?}",
+            <Module as ToRichIr<Module>>::to_rich_ir(&module),
+            err,
+        )
+    });
     if debug {
-        module.dump_associated_debug_file("rcst", &format!("{:#?}\n", rcst));
+        module.dump_associated_debug_file("rcst", &format!("{}\n", rcst.to_rich_ir()));
     }
 
     let cst = db.cst(module.clone()).unwrap();
@@ -161,10 +167,7 @@ fn raw_build(
 
     let (asts, ast_cst_id_map) = db.ast(module.clone()).unwrap();
     if debug {
-        module.dump_associated_debug_file(
-            "ast",
-            &format!("{}\n", asts.iter().map(|ast| format!("{}", ast)).join("\n")),
-        );
+        module.dump_associated_debug_file("ast", &format!("{}\n", asts.to_rich_ir()));
         module.dump_associated_debug_file(
             "ast_to_cst_ids",
             &ast_cst_id_map
@@ -183,7 +186,7 @@ fn raw_build(
 
     let (hir, hir_ast_id_map) = db.hir(module.clone()).unwrap();
     if debug {
-        module.dump_associated_debug_file("hir", &format!("{}", hir));
+        module.dump_associated_debug_file("hir", &format!("{}\n", hir.to_rich_ir()));
         module.dump_associated_debug_file(
             "hir_to_ast_ids",
             &hir_ast_id_map
@@ -209,21 +212,28 @@ fn raw_build(
     {
         let range = db.range_to_positions(module.clone(), span);
         warn!(
-            "{module}:{}:{} – {}:{}: {payload}",
-            range.start.line, range.start.character, range.end.line, range.end.character,
+            "{}:{}:{} – {}:{}: {payload}",
+            <Module as ToRichIr<Module>>::to_rich_ir(&module),
+            range.start.line,
+            range.start.character,
+            range.end.line,
+            range.end.character,
         );
     }
 
     let mir = db.mir(module.clone(), tracing.clone()).unwrap();
     if debug {
-        module.dump_associated_debug_file("mir", &format!("{mir}"));
+        module.dump_associated_debug_file("mir", &format!("{}\n", mir.to_rich_ir()));
     }
 
     let optimized_mir = db
         .mir_with_obvious_optimized(module.clone(), tracing.clone())
         .unwrap();
     if debug {
-        module.dump_associated_debug_file("optimized_mir", &format!("{optimized_mir}"));
+        module.dump_associated_debug_file(
+            "optimized_mir",
+            &format!("{}\n", optimized_mir.to_rich_ir()),
+        );
     }
 
     let lir = db.lir(module.clone(), tracing.clone()).unwrap();
@@ -474,7 +484,10 @@ fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
         return Err(Exit::FileNotFound);
     }
 
-    debug!("Fuzzing `{module}`.");
+    debug!(
+        "Fuzzing `{}`.",
+        <Module as ToRichIr<Module>>::to_rich_ir(&module),
+    );
     let failing_cases = candy_fuzzer::fuzz(&db, module);
 
     if failing_cases.is_empty() {
@@ -495,8 +508,8 @@ fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
 async fn lsp() -> ProgramResult {
     init_logger(false);
     info!("Starting language server…");
-    let (service, socket) = LspService::new(CandyLanguageServer::from_client);
-    Server::new(tokio::io::stdin(), tokio::io::stdout(), socket)
+    let (service, socket) = Server::create();
+    tower_lsp::Server::new(tokio::io::stdin(), tokio::io::stdout(), socket)
         .serve(service)
         .await;
     Ok(())
@@ -521,26 +534,21 @@ fn init_logger(use_stdout: bool) {
                     .starts_with("candy")
         }))
         .with_filter(filter::filter_fn(level_for(
-            "candy::compiler::optimize",
-            Level::DEBUG,
+            "candy_frontend::mir_optimize",
+            Level::INFO,
         )))
         .with_filter(filter::filter_fn(level_for(
-            "candy::compiler::string_to_rcst",
+            "candy_frontend::string_to_rcst",
             Level::WARN,
         )))
+        .with_filter(filter::filter_fn(level_for("candy_frontend", Level::DEBUG)))
+        .with_filter(filter::filter_fn(level_for("candy_fuzzer", Level::DEBUG)))
         .with_filter(filter::filter_fn(level_for(
-            "candy::compiler",
-            Level::DEBUG,
-        )))
-        .with_filter(filter::filter_fn(level_for(
-            "candy::language_server",
+            "candy_language_server",
             Level::TRACE,
         )))
-        .with_filter(filter::filter_fn(level_for("candy::vm", Level::DEBUG)))
-        .with_filter(filter::filter_fn(level_for(
-            "candy::vm::heap",
-            Level::DEBUG,
-        )));
+        .with_filter(filter::filter_fn(level_for("candy_vm", Level::DEBUG)))
+        .with_filter(filter::filter_fn(level_for("candy_vm::heap", Level::DEBUG)));
     tracing_subscriber::registry().with(console_log).init();
 }
 fn level_for(module: &'static str, level: Level) -> impl Fn(&Metadata) -> bool {
