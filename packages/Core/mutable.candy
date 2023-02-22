@@ -18,18 +18,15 @@ inScope initialValue body :=
       body requests.sendPort
       requests.sendPort | channel.send Quit
     }
-    finalValue = nursery | async {
-      recursive initialValue { recurse value ->
-        requests.receivePort | channel.receive %
-          (Get, answerPort) ->
-            needs (channel.isSendPort answerPort)
-            answerPort | channel.send value
-            recurse value
-          (Set, newValue) -> recurse newValue
-          Quit -> value
-      }
+    recursive initialValue { recurse value ->
+      requests.receivePort | channel.receive %
+        (Get, answerPort) ->
+          needs (channel.isSendPort answerPort)
+          answerPort | channel.send value
+          recurse value
+        (Set, newValue) -> recurse newValue
+        Quit -> value
     }
-    await finalValue
   }
 
 set mutable newValue :=
