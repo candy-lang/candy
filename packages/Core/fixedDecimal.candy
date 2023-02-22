@@ -34,7 +34,7 @@ multiply a b :=
 divide a b :=
   needs (is a)
   needs (is b)
-  needs (b | equals 0 | bool.not)
+  needs (b | equals 0 | bool.not) "You can't divide by zero."
   a | int.multiply decimalsPow | int.divideTruncating b
 
 approxEquals a b delta :=
