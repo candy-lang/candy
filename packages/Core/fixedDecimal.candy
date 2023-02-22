@@ -1,3 +1,6 @@
+# As soon as tags or value hiding is supported, change fixed point numbers to
+# that. Currently, they're just normal ints.
+
 bool = use "..bool"
 [ifElse, recursive] = use "..controlFlow"
 [equals] = use "..equality"
@@ -6,6 +9,7 @@ text = use "..text"
 [toDebugText] = use "..toDebugText"
 
 decimalsPow = 10000000
+# TODO: Perhaps allow different levels of precision.
 
 is := int.is
 
@@ -13,7 +17,7 @@ fromInt a :=
   needs (is a)
   int.multiply a decimalsPow
 
-toInt a :=
+floorToInt a :=
   needs (is a)
   int.divideTruncating a decimalsPow
 
@@ -38,6 +42,9 @@ divide a b :=
   a | int.multiply decimalsPow | int.divideTruncating b
 
 approxEquals a b delta :=
+  # TODO: Instead of having to know the default precision and pass in an
+  # absolute delta, you should be able to specify how many digits of precision
+  # should be equal.
   needs (is a)
   needs (is b)
   needs (int.is delta)
@@ -46,6 +53,6 @@ approxEquals a b delta :=
 
 toText a :=
   needs (is a)
-  beforeDot = a | toInt | toDebugText
+  beforeDot = a | floorToInt | toDebugText
   afterDot = a | int.modulo decimalsPow | int.add decimalsPow | toDebugText | text.removePrefix "1"
   "{beforeDot}.{afterDot}"
