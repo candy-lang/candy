@@ -254,6 +254,10 @@ impl<'a> LoweringContext<'a> {
                         expression,
                         pattern,
                     );
+                    self.ongoing_destructuring = Some(OngoingDestructuring {
+                        result: pattern_result,
+                        is_trivial: false,
+                    });
 
                     let nothing = body.push_nothing();
                     let is_match = body.push_is_match(pattern_result, responsible);
@@ -274,13 +278,7 @@ impl<'a> LoweringContext<'a> {
                             body.push_panic(reason, responsible);
                         },
                         responsible,
-                    );
-
-                    self.ongoing_destructuring = Some(OngoingDestructuring {
-                        result: pattern_result,
-                        is_trivial: false,
-                    });
-                    body.push_nothing()
+                    )
                 }
             }
             hir::Expression::PatternIdentifierReference(identifier_id) => {
