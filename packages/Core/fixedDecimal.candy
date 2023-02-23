@@ -1,5 +1,5 @@
-# TODO: As soon as tags or value hiding is supported, change fixed point numbers to
-# that. Currently, they're just normal ints.
+# TODO: As soon as tags or value hiding is supported, change fixed point numbers
+# to that. Currently, they're just normal ints.
 
 bool = use "..bool"
 [ifElse, recursive] = use "..controlFlow"
