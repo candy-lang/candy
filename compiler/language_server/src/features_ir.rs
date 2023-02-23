@@ -266,7 +266,7 @@ struct OpenIr {
     ir: RichIr,
     line_start_offsets: Vec<Offset>,
 }
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct IrConfig {
     module: Module,
     ir: Ir,
@@ -350,6 +350,16 @@ pub enum Ir {
     OptimizedMir(TracingConfig),
     Lir(TracingConfig),
 }
+impl Ir {
+    fn tracing_config(&self) -> Option<&TracingConfig> {
+        match self {
+            Ir::Rcst | Ir::Ast | Ir::Hir => None,
+            Ir::Mir(tracing_config)
+            | Ir::OptimizedMir(tracing_config)
+            | Ir::Lir(tracing_config) => Some(tracing_config),
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateIrNotification {
@@ -380,7 +390,7 @@ impl LanguageFeatures for IrFeatures {
         uri: Url,
         position: lsp_types::Position,
     ) -> Option<LocationLink> {
-        let (origin_selection_range, key) = {
+        let (origin_selection_range, key, config) = {
             let open_irs = self.open_irs.read().await;
             let open_ir = open_irs.get(&uri).unwrap();
             let offset = open_ir.lsp_position_to_offset(position);
@@ -404,32 +414,64 @@ impl LanguageFeatures for IrFeatures {
                 });
             }
 
-            (origin_selection_range, key.to_owned())
+            (
+                origin_selection_range,
+                key.to_owned(),
+                open_ir.config.to_owned(),
+            )
         };
 
-        match &key {
+        let key_ref = &key;
+        let find_in_other_ir = async move |config: IrConfig| {
+            let uri = Url::from(&config);
+            self.ensure_is_open(db, config).await;
+
+            let rich_irs = self.open_irs.read().await;
+            let other_ir = rich_irs.get(&uri).unwrap();
+            let result = other_ir.ir.references.get(key_ref).unwrap();
+            let target_range = other_ir.range_to_lsp_range(result.definition.as_ref().unwrap());
+
+            (uri, target_range)
+        };
+
+        let (uri, target_range) = match &key {
+            ReferenceKey::Int(_)
+            | ReferenceKey::Text(_)
+            | ReferenceKey::Symbol(_)
+            | ReferenceKey::BuiltinFunction(_) => {
+                // These don't have a definition in Candy source code.
+                return None;
+            }
+            ReferenceKey::Module(module) => {
+                (module_to_url(module).unwrap(), lsp_types::Range::default())
+            }
             ReferenceKey::HirId(id) => {
                 let config = IrConfig {
                     module: id.module.to_owned(),
                     ir: Ir::Hir,
                 };
-                let uri = Url::from(&config);
-                self.ensure_is_open(db, config).await;
-
-                let rich_irs = self.open_irs.read().await;
-                let hir = rich_irs.get(&uri).unwrap();
-                let result = hir.ir.references.get(&key).unwrap();
-                let target_range = hir.range_to_lsp_range(result.definition.as_ref().unwrap());
-
-                Some(LocationLink {
-                    origin_selection_range: Some(origin_selection_range),
-                    target_uri: uri,
-                    target_range,
-                    target_selection_range: target_range,
-                })
+                find_in_other_ir(config).await
             }
-            _ => None,
-        }
+            ReferenceKey::MirId(_) => {
+                let config = IrConfig {
+                    module: config.module.to_owned(),
+                    ir: Ir::Mir(
+                        config
+                            .ir
+                            .tracing_config()
+                            .map(|it| it.to_owned())
+                            .unwrap_or_else(TracingConfig::off),
+                    ),
+                };
+                find_in_other_ir(config).await
+            }
+        };
+        Some(LocationLink {
+            origin_selection_range: Some(origin_selection_range),
+            target_uri: uri,
+            target_range,
+            target_selection_range: target_range,
+        })
     }
 
     fn supports_folding_ranges(&self) -> bool {
