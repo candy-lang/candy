@@ -14,18 +14,6 @@ pub struct CompilerError {
     pub span: Range<Offset>,
     pub payload: CompilerErrorPayload,
 }
-impl Display for CompilerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} span({} – {}): {}",
-            self.module.to_rich_ir(),
-            *self.span.start,
-            *self.span.end,
-            self.payload,
-        )
-    }
-}
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum CompilerErrorPayload {
@@ -179,7 +167,14 @@ impl CompilerError {
 
 impl ToRichIr for CompilerError {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        // TODO: include more rich information
-        builder.push(self.to_string(), None, EnumSet::empty());
+        self.module.build_rich_ir(builder);
+        builder.push(
+            format!(
+                " (span: {} – {}): {}",
+                *self.span.start, *self.span.end, self.payload,
+            ),
+            None,
+            EnumSet::empty(),
+        );
     }
 }
