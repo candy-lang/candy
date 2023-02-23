@@ -27,6 +27,7 @@ pub enum Expression {
     /// is fuzzable or not, this parameter may be used to dynamically determine
     /// who's at fault if some `needs` is not fulfilled.
     Lambda {
+        original_hirs: Vec<hir::Id>,
         parameters: Vec<Id>,
         responsible_parameter: Id,
         body: Body,
@@ -133,10 +134,12 @@ impl hash::Hash for Expression {
             Expression::Reference(id) => id.hash(state),
             Expression::HirId(id) => id.hash(state),
             Expression::Lambda {
+                original_hirs,
                 parameters,
                 responsible_parameter,
                 body,
             } => {
+                original_hirs.hash(state);
                 parameters.hash(state);
                 responsible_parameter.hash(state);
                 body.hash(state);
@@ -247,6 +250,7 @@ impl ToRichIr<MirReferenceKey> for Expression {
                 builder.push_reference(id.to_owned(), range);
             }
             Expression::Lambda {
+                original_hirs,
                 parameters,
                 responsible_parameter,
                 body,
@@ -279,7 +283,16 @@ impl ToRichIr<MirReferenceKey> for Expression {
                     EnumSet::empty(),
                 );
                 builder.push_definition(*responsible_parameter, range);
-                builder.push(") ->", None, EnumSet::empty());
+                builder.push(") ->  # ", None, EnumSet::empty());
+                builder.push_children_custom(
+                    original_hirs,
+                    |builder, id| {
+                        let range =
+                            builder.push(id.to_string(), TokenType::Symbol, EnumSet::empty());
+                        builder.push_reference(id.to_owned(), range);
+                    },
+                    ", ",
+                );
                 builder.push_foldable(|builder| {
                     builder.indent();
                     builder.push_newline();

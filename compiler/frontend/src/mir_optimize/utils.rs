@@ -254,6 +254,7 @@ impl Expression {
             }
             Expression::Reference(reference) => replacer(reference),
             Expression::Lambda {
+                original_hirs: _,
                 parameters,
                 responsible_parameter,
                 body,
@@ -341,6 +342,7 @@ impl Expression {
     pub fn replace_ids<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
         match self {
             Expression::Lambda {
+                original_hirs: _,
                 parameters,
                 responsible_parameter,
                 body,
@@ -397,6 +399,7 @@ impl Mir {
                 }
             }
             if let Expression::Lambda {
+                original_hirs: _,
                 parameters,
                 responsible_parameter,
                 body,

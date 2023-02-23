@@ -107,6 +107,7 @@ impl LoweringContext {
                 self.emit(id, Instruction::CreateHirId(hir_id.clone()));
             }
             Expression::Lambda {
+                original_hirs: _,
                 parameters,
                 responsible_parameter,
                 body,

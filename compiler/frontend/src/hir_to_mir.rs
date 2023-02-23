@@ -69,7 +69,7 @@ fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> Option<Arc<
 /// }
 /// ```
 fn generate_needs_function(body: &mut BodyBuilder) -> Id {
-    body.push_lambda(|body, responsible_for_call| {
+    body.push_lambda(hir::Id::dummy(), |body, responsible_for_call| {
         let condition = body.new_parameter();
         let reason = body.new_parameter();
         let responsible_for_condition = body.new_parameter();
@@ -306,7 +306,7 @@ impl<'a> LoweringContext<'a> {
                 body: original_body,
                 fuzzable,
             }) => {
-                let lambda = body.push_lambda(|lambda, responsible_parameter| {
+                let lambda = body.push_lambda(hir_id.clone(), |lambda, responsible_parameter| {
                     for original_parameter in original_parameters {
                         let parameter = lambda.new_parameter();
                         self.mapping.insert(original_parameter.clone(), parameter);
@@ -438,14 +438,14 @@ impl<'a> LoweringContext<'a> {
                 let is_match = body.push_is_match(pattern_result, responsible);
 
                 let builtin_if_else = body.push_builtin(BuiltinFunction::IfElse);
-                let then_lambda = body.push_lambda(|body, _| {
+                let then_lambda = body.push_lambda(hir::Id::dummy(), |body, _| {
                     self.ongoing_destructuring = Some(OngoingDestructuring {
                         result: pattern_result,
                         is_trivial: false,
                     });
                     self.compile_expressions(body, responsible, &case_body.expressions);
                 });
-                let else_lambda = body.push_lambda(|body, _| {
+                let else_lambda = body.push_lambda(hir::Id::dummy(), |body, _| {
                     let list_get_function = body.push_builtin(BuiltinFunction::ListGet);
                     let one = body.push_int(1.into());
                     let reason =
