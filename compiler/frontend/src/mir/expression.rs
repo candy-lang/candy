@@ -250,7 +250,9 @@ impl ToRichIr<MirReferenceKey> for Expression {
                 builder.push_reference(id.to_owned(), range);
             }
             Expression::Lambda {
-                original_hirs,
+                // IDs are displayed by the body before the entire expression
+                // assignment.
+                original_hirs: _,
                 parameters,
                 responsible_parameter,
                 body,
@@ -283,16 +285,7 @@ impl ToRichIr<MirReferenceKey> for Expression {
                     EnumSet::empty(),
                 );
                 builder.push_definition(*responsible_parameter, range);
-                builder.push(") ->  # ", None, EnumSet::empty());
-                builder.push_children_custom(
-                    original_hirs,
-                    |builder, id| {
-                        let range =
-                            builder.push(id.to_string(), TokenType::Symbol, EnumSet::empty());
-                        builder.push_reference(id.to_owned(), range);
-                    },
-                    ", ",
-                );
+                builder.push(") ->", None, EnumSet::empty());
                 builder.push_foldable(|builder| {
                     builder.indent();
                     builder.push_newline();

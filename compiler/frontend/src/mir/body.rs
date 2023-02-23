@@ -445,6 +445,20 @@ impl BodyBuilder {
 impl ToRichIr<MirReferenceKey> for Body {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder<MirReferenceKey>) {
         fn push(builder: &mut RichIrBuilder<MirReferenceKey>, id: &Id, expression: &Expression) {
+            if let Expression::Lambda { original_hirs, .. } = expression {
+                builder.push("# ", TokenType::Comment, EnumSet::empty());
+                builder.push_children_custom(
+                    original_hirs,
+                    |builder, id| {
+                        let range =
+                            builder.push(id.to_string(), TokenType::Comment, EnumSet::empty());
+                        builder.push_reference(id.to_owned(), range);
+                    },
+                    ", ",
+                );
+                builder.push_newline();
+            }
+
             let range = builder.push(
                 id.to_short_debug_string(),
                 TokenType::Variable,
