@@ -42,13 +42,10 @@ divide a b :=
   a | int.multiply decimalsPow | int.divideTruncating b
 
 approxEquals a b delta :=
-  # TODO: Instead of having to know the default precision and pass in an
-  # absolute delta, you should be able to specify how many digits of precision
-  # should be equal.
   needs (is a)
   needs (is b)
-  needs (int.is delta)
-  needs (int.isNonNegative delta)
+  needs (is delta)
+  needs (isNonNegative delta)
   a | int.subtract b | int.absolute | int.isLessThanOrEqualTo delta
 
 toText a :=
