@@ -312,11 +312,7 @@ impl ToRichIr<LirReferenceKey> for Instruction {
                 builder.push(
                     format!(
                         " with {num_args} {} capturing {}",
-                        if *num_args == 1 {
-                            "argument"
-                        } else {
-                            "arguments"
-                        },
+                        arguments_plural(*num_args),
                         if captured.is_empty() {
                             "nothing".to_string()
                         } else {
@@ -345,7 +341,7 @@ impl ToRichIr<LirReferenceKey> for Instruction {
             }
             Instruction::Call { num_args } => {
                 builder.push(
-                    format!(" with {num_args} arguments"),
+                    format!(" with {num_args} {}", arguments_plural(*num_args),),
                     None,
                     EnumSet::empty(),
                 );
@@ -355,7 +351,10 @@ impl ToRichIr<LirReferenceKey> for Instruction {
                 num_args,
             } => {
                 builder.push(
-                    format!(" with {num_locals_to_pop} locals and {num_args} arguments"),
+                    format!(
+                        " with {num_locals_to_pop} locals and {num_args} {}",
+                        arguments_plural(*num_args),
+                    ),
                     None,
                     EnumSet::empty(),
                 );
@@ -373,11 +372,23 @@ impl ToRichIr<LirReferenceKey> for Instruction {
             }
             Instruction::ModuleEnds => {}
             Instruction::TraceCallStarts { num_args } => {
-                builder.push(format!(" ({num_args} args)"), None, EnumSet::empty());
+                builder.push(
+                    format!(" ({num_args} {})", arguments_plural(*num_args),),
+                    None,
+                    EnumSet::empty(),
+                );
             }
             Instruction::TraceCallEnds => {}
             Instruction::TraceExpressionEvaluated => {}
             Instruction::TraceFoundFuzzableClosure => {}
         }
+    }
+}
+
+fn arguments_plural(num_args: usize) -> &'static str {
+    if num_args == 1 {
+        "argument"
+    } else {
+        "arguments"
     }
 }
