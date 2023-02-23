@@ -1,9 +1,15 @@
 use candy_frontend::{
-    builtin_functions::BuiltinFunction, hir, mir::Id, module::Module, rich_ir::ToRichIr,
+    builtin_functions::BuiltinFunction,
+    hir,
+    mir::Id,
+    module::Module,
+    rich_ir::{RichIrBuilder, ToRichIr, TokenType},
 };
+use derive_more::From;
+use enumset::EnumSet;
 use itertools::Itertools;
 use num_bigint::BigInt;
-use std::fmt::Display;
+use strum::{EnumDiscriminants, IntoStaticStr};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lir {
@@ -12,7 +18,8 @@ pub struct Lir {
 
 pub type StackOffset = usize; // 0 is the last item, 1 the one before that, etc.
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, EnumDiscriminants, Eq, Hash, PartialEq, IntoStaticStr)]
+#[strum_discriminants(derive(Hash, IntoStaticStr), strum(serialize_all = "camelCase"))]
 pub enum Instruction {
     /// Pushes an int.
     CreateInt(BigInt),
@@ -237,99 +244,140 @@ impl StackExt for Vec<Id> {
     }
 }
 
-impl Display for Instruction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+#[derive(Debug, PartialEq, Eq, Hash, From)]
+pub enum LirReferenceKey {
+    Module(Module),
+    Id(Id),
+    Int(BigInt),
+    Text(String),
+    #[from(ignore)]
+    Symbol(String),
+    BuiltinFunction(BuiltinFunction),
+    HirIr(hir::Id),
+    InstructionDiscriminant(InstructionDiscriminants),
+}
+impl ToRichIr<LirReferenceKey> for Lir {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<LirReferenceKey>) {
+        let mut iterator = self.instructions.iter();
+        if let Some(instruction) = iterator.next() {
+            instruction.build_rich_ir(builder);
+        }
+        for instruction in iterator {
+            builder.push_newline();
+            instruction.build_rich_ir(builder);
+        }
+    }
+}
+impl ToRichIr<LirReferenceKey> for Instruction {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<LirReferenceKey>) {
+        let discriminant: InstructionDiscriminants = self.into();
+        let range = builder.push::<&'static str, _>(discriminant.into(), None, EnumSet::empty());
+        builder.push_reference(discriminant, range);
+
         match self {
-            Instruction::CreateInt(int) => write!(f, "createInt {int}"),
-            Instruction::CreateText(text) => write!(f, "createText {text:?}"),
-            Instruction::CreateSymbol(symbol) => write!(f, "createSymbol {symbol}"),
+            Instruction::CreateInt(int) => {
+                builder.push(" ", None, EnumSet::empty());
+                let range = builder.push(int.to_string(), TokenType::Int, EnumSet::empty());
+                builder.push_reference(int.to_owned(), range);
+            }
+            Instruction::CreateText(text) => {
+                builder.push(" ", None, EnumSet::empty());
+                let range =
+                    builder.push(format!(r#""{}""#, text), TokenType::Text, EnumSet::empty());
+                builder.push_reference(text.to_owned(), range);
+            }
+            Instruction::CreateSymbol(symbol) => {
+                builder.push(" ", None, EnumSet::empty());
+                let range = builder.push(symbol, TokenType::Text, EnumSet::empty());
+                builder.push_reference(symbol.to_owned(), range);
+            }
             Instruction::CreateList { num_items } => {
-                write!(f, "createList {num_items}")
+                builder.push(" ", None, EnumSet::empty());
+                builder.push(num_items.to_string(), None, EnumSet::empty());
             }
             Instruction::CreateStruct { num_fields } => {
-                write!(f, "createStruct {num_fields}")
+                builder.push(" ", None, EnumSet::empty());
+                builder.push(num_fields.to_string(), None, EnumSet::empty());
             }
-            Instruction::CreateHirId(id) => write!(f, "createHirId {id}"),
+            Instruction::CreateHirId(id) => {
+                builder.push(" ", None, EnumSet::empty());
+                let range = builder.push(id.to_short_debug_string(), None, EnumSet::empty());
+                builder.push_reference(id.to_owned(), range);
+            }
             Instruction::CreateClosure {
                 captured,
                 num_args,
-                body: instructions,
+                body,
             } => {
-                write!(
-                    f,
-                    "createClosure with {num_args} {} capturing {}",
-                    if *num_args == 1 {
-                        "argument"
-                    } else {
-                        "arguments"
-                    },
-                    if captured.is_empty() {
-                        "nothing".to_string()
-                    } else {
-                        captured.iter().join(", ")
-                    },
-                )?;
-                for instruction in instructions {
-                    let indented = format!("{instruction}")
-                        .lines()
-                        .map(|line| format!("  {line}"))
-                        .join("\n");
-                    write!(f, "\n{indented}")?;
-                }
-                Ok(())
+                builder.push(
+                    format!(
+                        " with {num_args} {} capturing {}",
+                        if *num_args == 1 {
+                            "argument"
+                        } else {
+                            "arguments"
+                        },
+                        if captured.is_empty() {
+                            "nothing".to_string()
+                        } else {
+                            captured.iter().join(", ")
+                        },
+                    ),
+                    None,
+                    EnumSet::empty(),
+                );
+                builder.push_foldable(|builder| {
+                    builder.push_children_multiline(body);
+                });
             }
             Instruction::CreateBuiltin(builtin_function) => {
-                write!(f, "createBuiltin {builtin_function:?}")
+                builder.push(" ", None, EnumSet::empty());
+                let range = builder.push(format!("{:?}", builtin_function), None, EnumSet::empty());
+                builder.push_reference(*builtin_function, range);
             }
-            Instruction::PushFromStack(offset) => write!(f, "pushFromStack {offset}"),
+            Instruction::PushFromStack(offset) => {
+                builder.push(" ", None, EnumSet::empty());
+                builder.push(offset.to_string(), None, EnumSet::empty());
+            }
             Instruction::PopMultipleBelowTop(count) => {
-                write!(f, "popMultipleBelowTop {count}")
+                builder.push(" ", None, EnumSet::empty());
+                builder.push(count.to_string(), None, EnumSet::empty());
             }
             Instruction::Call { num_args } => {
-                write!(f, "call with {num_args} arguments")
+                builder.push(
+                    format!(" with {num_args} arguments"),
+                    None,
+                    EnumSet::empty(),
+                );
             }
             Instruction::TailCall {
                 num_locals_to_pop,
                 num_args,
             } => {
-                write!(
-                    f,
-                    "tail call with {num_locals_to_pop} locals and {num_args} arguments"
-                )
+                builder.push(
+                    format!(" with {num_locals_to_pop} locals and {num_args} arguments"),
+                    None,
+                    EnumSet::empty(),
+                );
             }
-            Instruction::Return => write!(f, "return"),
+            Instruction::Return => {}
             Instruction::UseModule { current_module } => {
-                write!(
-                    f,
-                    "useModule (currently in {})",
-                    <Module as ToRichIr<Module>>::to_rich_ir(current_module),
-                )
+                builder.push(" (currently in ", None, EnumSet::empty());
+                current_module.build_rich_ir(builder);
+                builder.push(")", None, EnumSet::empty());
             }
-            Instruction::Panic => write!(f, "panic"),
-            Instruction::ModuleStarts { module } => write!(
-                f,
-                "moduleStarts {}",
-                <Module as ToRichIr<Module>>::to_rich_ir(module),
-            ),
-            Instruction::ModuleEnds => write!(f, "moduleEnds"),
+            Instruction::Panic => {}
+            Instruction::ModuleStarts { module } => {
+                builder.push(" ", None, EnumSet::empty());
+                module.build_rich_ir(builder);
+            }
+            Instruction::ModuleEnds => {}
             Instruction::TraceCallStarts { num_args } => {
-                write!(f, "trace: callStarts ({num_args} args)")
+                builder.push(format!(" ({num_args} args)"), None, EnumSet::empty());
             }
-            Instruction::TraceCallEnds => write!(f, "trace: callEnds"),
-            Instruction::TraceExpressionEvaluated => {
-                write!(f, "trace: expressionEvaluated")
-            }
-            Instruction::TraceFoundFuzzableClosure => {
-                write!(f, "trace: foundFuzzableClosure")
-            }
+            Instruction::TraceCallEnds => {}
+            Instruction::TraceExpressionEvaluated => {}
+            Instruction::TraceFoundFuzzableClosure => {}
         }
-    }
-}
-impl Display for Lir {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for instruction in &self.instructions {
-            writeln!(f, "{instruction}")?;
-        }
-        Ok(())
     }
 }

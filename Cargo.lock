@@ -172,6 +172,7 @@ dependencies = [
  "criterion",
  "criterion-cycles-per-byte",
  "derive_more",
+ "enumset",
  "itertools",
  "lazy_static",
  "num-bigint",
@@ -182,6 +183,7 @@ dependencies = [
  "rand",
  "rustc-hash",
  "salsa",
+ "strum",
  "tracing",
  "unicode-segmentation",
  "walkdir",
@@ -1491,6 +1493,9 @@ name = "strum"
 version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
+dependencies = [
+ "strum_macros",
+]
 
 [[package]]
 name = "strum_macros"

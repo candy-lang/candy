@@ -13,6 +13,7 @@ use candy_frontend::{
     string_to_rcst::{InvalidModuleError, RcstResult, StringToRcst},
     TracingConfig, TracingMode,
 };
+use candy_vm::{lir::Lir, mir_to_lir::MirToLir};
 use enumset::EnumSet;
 use extension_trait::extension_trait;
 use lsp_types::{
@@ -60,6 +61,9 @@ impl Server {
                     .map(|mir| {
                         Self::rich_ir_for_optimized_mir(&config.module, mir, tracing_config)
                     }),
+                Ir::Lir(tracing_config) => db
+                    .lir(config.module.clone(), tracing_config.to_owned())
+                    .map(|mir| Self::rich_ir_for_lir(&config.module, mir, tracing_config)),
             };
             rich_ir.unwrap_or_else(|| {
                 let mut builder = RichIrBuilder::<()>::default();
@@ -109,6 +113,7 @@ impl Server {
             "hir" => Ir::Hir,
             "mir" => Ir::Mir(tracing_config.unwrap()),
             "optimizedMir" => Ir::OptimizedMir(tracing_config.unwrap()),
+            "lir" => Ir::Lir(tracing_config.unwrap()),
             _ => panic!("Unsupported IR: {ir}"),
         };
 
@@ -215,6 +220,22 @@ impl Server {
         mir.build_rich_ir(&mut builder);
         builder.finish()
     }
+    fn rich_ir_for_lir(module: &Module, lir: Arc<Lir>, tracing_config: &TracingConfig) -> RichIr {
+        let mut builder = RichIrBuilder::default();
+        builder.push(
+            format!(
+                "# LIR for module {}",
+                <Module as ToRichIr<Module>>::to_rich_ir(module)
+            ),
+            TokenType::Comment,
+            EnumSet::empty(),
+        );
+        builder.push_newline();
+        push_tracing_config(&mut builder, tracing_config);
+        builder.push_newline();
+        lir.build_rich_ir(&mut builder);
+        builder.finish()
+    }
 }
 fn push_tracing_config<RK: Eq + Hash>(
     builder: &mut RichIrBuilder<RK>,
@@ -284,6 +305,7 @@ pub enum Ir {
     Hir,
     Mir(TracingConfig),
     OptimizedMir(TracingConfig),
+    Lir(TracingConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
