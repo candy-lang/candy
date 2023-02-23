@@ -133,7 +133,7 @@ impl Server {
         let mut builder = RichIrBuilder::default();
         builder.push(
             format!(
-                "# AST for module {}",
+                "# RCST for module {}",
                 <Module as ToRichIr<Module>>::to_rich_ir(module)
             ),
             TokenType::Comment,
