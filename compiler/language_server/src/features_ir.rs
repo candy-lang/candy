@@ -25,7 +25,14 @@ use lsp_types::{
 };
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, hash::Hash, ops::Range, path::Path, sync::Arc};
+use std::{
+    fmt::Debug,
+    hash::Hash,
+    ops::Range,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
+use strum::{EnumDiscriminants, EnumString, IntoStaticStr};
 use tokio::sync::{Mutex, RwLock};
 use tower_lsp::jsonrpc;
 
@@ -34,7 +41,10 @@ use crate::{
     features::{LanguageFeatures, Reference},
     semantic_tokens::{SemanticTokenModifier, SemanticTokenType, SemanticTokensBuilder},
     server::Server,
-    utils::{lsp_position_to_offset_raw, module_from_package_root_and_url, range_to_lsp_range_raw},
+    utils::{
+        lsp_position_to_offset_raw, module_from_package_root_and_url, module_to_url,
+        range_to_lsp_range_raw,
+    },
 };
 
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
@@ -45,87 +55,117 @@ pub struct ViewIrParams {
 
 impl Server {
     pub async fn candy_view_ir(&self, params: ViewIrParams) -> jsonrpc::Result<String> {
-        let config = self.decode_config(&params.uri).await;
-        let ir = {
-            let db = self.db.lock().await;
-            let rich_ir = match &config.ir {
-                Ir::Rcst => Self::rich_ir_for_rcst(&config.module, db.rcst(config.module.clone())),
-                Ir::Ast => db
-                    .ast(config.module.clone())
-                    .map(|(asts, _)| Self::rich_ir_for_ast(&config.module, asts)),
-                Ir::Hir => db
-                    .hir(config.module.clone())
-                    .map(|(body, _)| Self::rich_ir_for_hir(&config.module, body)),
-                Ir::Mir(tracing_config) => db
-                    .mir(config.module.clone(), tracing_config.to_owned())
-                    .map(|mir| Self::rich_ir_for_mir(&config.module, mir, tracing_config)),
-                Ir::OptimizedMir(tracing_config) => db
-                    .mir_with_obvious_optimized(config.module.clone(), tracing_config.to_owned())
-                    .map(|mir| {
-                        Self::rich_ir_for_optimized_mir(&config.module, mir, tracing_config)
-                    }),
-                Ir::Lir(tracing_config) => db
-                    .lir(config.module.clone(), tracing_config.to_owned())
-                    .map(|mir| Self::rich_ir_for_lir(&config.module, mir, tracing_config)),
-            };
-            rich_ir.unwrap_or_else(|| {
-                let mut builder = RichIrBuilder::default();
-                builder.push(
-                    format!("# Module does not exist: {}", config.module.to_rich_ir()),
-                    TokenType::Comment,
-                    EnumSet::empty(),
-                );
-                builder.finish()
-            })
-        };
-
-        let open_irs = {
+        let project_directory = {
             let state = self.state.read().await;
-            state.require_features().ir.open_irs.clone()
+            state.require_running().project_directory.to_owned()
         };
-        let text = ir.text.clone();
-        open_irs.write().await.insert(
-            params.uri,
-            OpenIr {
-                config,
-                ir,
-                line_start_offsets: line_start_offsets_raw(&text),
-            },
-        );
-        Ok(text)
-    }
-    async fn decode_config(&self, uri: &Url) -> IrConfig {
-        let (path, ir) = uri.path().rsplit_once('.').unwrap();
-        let details = urlencoding::decode(uri.fragment().unwrap()).unwrap();
-        let mut details: serde_json::Map<String, serde_json::Value> =
-            serde_json::from_str(&details).unwrap();
-
-        let original_scheme = details.get("scheme").unwrap().as_str().unwrap();
-        let original_uri = format!("{original_scheme}:{path}").parse().unwrap();
-
-        let tracing_config = details
-            .remove("tracingConfig")
-            .map(|it| serde_json::from_value(it).unwrap());
-
-        let ir = match ir {
-            "rcst" => Ir::Rcst,
-            "ast" => Ir::Ast,
-            "hir" => Ir::Hir,
-            "mir" => Ir::Mir(tracing_config.unwrap()),
-            "optimizedMir" => Ir::OptimizedMir(tracing_config.unwrap()),
-            "lir" => Ir::Lir(tracing_config.unwrap()),
-            _ => panic!("Unsupported IR: {ir}"),
-        };
+        let config = IrConfig::decode(&params.uri, project_directory);
 
         let state = self.state.read().await;
-        IrConfig {
-            module: module_from_package_root_and_url(
-                state.require_running().project_directory.to_owned(),
-                &original_uri,
-                ModuleKind::Code, // FIXME
-            )
-            .unwrap(),
+        let features = state.require_features();
+
+        features.ir.open(&self.db, config, params.uri.clone()).await;
+
+        let open_irs = features.ir.open_irs.read().await;
+        Ok(open_irs.get(&params.uri).unwrap().ir.text.to_owned())
+    }
+}
+fn push_tracing_config(builder: &mut RichIrBuilder, tracing_config: &TracingConfig) {
+    fn push_mode(builder: &mut RichIrBuilder, title: &str, mode: &TracingMode) {
+        builder.push_comment_line(format!(
+            "• {title} {}",
+            match mode {
+                TracingMode::Off => "No",
+                TracingMode::OnlyCurrent => "Only for the current module",
+                TracingMode::All => "Yes",
+            },
+        ));
+    }
+
+    builder.push_comment_line("");
+    builder.push_comment_line("Tracing Config:");
+    builder.push_comment_line("");
+    push_mode(
+        builder,
+        "Include tracing of fuzzable closures?",
+        &tracing_config.register_fuzzables,
+    );
+    push_mode(builder, "Include tracing of calls?", &tracing_config.calls);
+    push_mode(
+        builder,
+        "Include tracing of evaluated expressions?",
+        &tracing_config.evaluated_expressions,
+    );
+}
+
+#[derive(Debug, Default)]
+pub struct IrFeatures {
+    open_irs: Arc<RwLock<FxHashMap<Url, OpenIr>>>,
+}
+impl IrFeatures {
+    pub async fn generate_update_notifications(
+        &self,
+        module: &Module,
+    ) -> Vec<UpdateIrNotification> {
+        let open_irs = self.open_irs.read().await;
+        open_irs
+            .iter()
+            .filter(|(_, open_ir)| &open_ir.config.module == module)
+            .map(|(uri, _)| UpdateIrNotification { uri: uri.clone() })
+            .collect()
+    }
+
+    async fn ensure_is_open(&self, db: &Mutex<Database>, config: IrConfig) {
+        let uri = Url::from(&config);
+        {
+            let open_irs = self.open_irs.read().await;
+            if open_irs.contains_key(&uri) {
+                return;
+            }
+        }
+
+        self.open(db, config, uri).await;
+    }
+    async fn open(&self, db: &Mutex<Database>, config: IrConfig, uri: Url) {
+        let db = db.lock().await;
+        let open_ir = self.create(&db, config);
+        let mut open_irs = self.open_irs.write().await;
+        open_irs.insert(uri, open_ir);
+    }
+    fn create(&self, db: &Database, config: IrConfig) -> OpenIr {
+        let ir = match &config.ir {
+            Ir::Rcst => Self::rich_ir_for_rcst(&config.module, db.rcst(config.module.clone())),
+            Ir::Ast => db
+                .ast(config.module.clone())
+                .map(|(asts, _)| Self::rich_ir_for_ast(&config.module, asts)),
+            Ir::Hir => db
+                .hir(config.module.clone())
+                .map(|(body, _)| Self::rich_ir_for_hir(&config.module, body)),
+            Ir::Mir(tracing_config) => db
+                .mir(config.module.clone(), tracing_config.to_owned())
+                .map(|mir| Self::rich_ir_for_mir(&config.module, mir, tracing_config)),
+            Ir::OptimizedMir(tracing_config) => db
+                .mir_with_obvious_optimized(config.module.clone(), tracing_config.to_owned())
+                .map(|mir| Self::rich_ir_for_optimized_mir(&config.module, mir, tracing_config)),
+            Ir::Lir(tracing_config) => db
+                .lir(config.module.clone(), tracing_config.to_owned())
+                .map(|mir| Self::rich_ir_for_lir(&config.module, mir, tracing_config)),
+        };
+        let ir = ir.unwrap_or_else(|| {
+            let mut builder = RichIrBuilder::default();
+            builder.push(
+                format!("# Module does not exist: {}", config.module.to_rich_ir()),
+                TokenType::Comment,
+                EnumSet::empty(),
+            );
+            builder.finish()
+        });
+
+        let line_start_offsets = line_start_offsets_raw(&ir.text);
+        OpenIr {
+            config,
             ir,
+            line_start_offsets,
         }
     }
 
@@ -219,51 +259,6 @@ impl Server {
         builder.finish()
     }
 }
-fn push_tracing_config(builder: &mut RichIrBuilder, tracing_config: &TracingConfig) {
-    fn push_mode(builder: &mut RichIrBuilder, title: &str, mode: &TracingMode) {
-        builder.push_comment_line(format!(
-            "• {title} {}",
-            match mode {
-                TracingMode::Off => "No",
-                TracingMode::OnlyCurrent => "Only for the current module",
-                TracingMode::All => "Yes",
-            },
-        ));
-    }
-
-    builder.push_comment_line("");
-    builder.push_comment_line("Tracing Config:");
-    builder.push_comment_line("");
-    push_mode(
-        builder,
-        "Include tracing of fuzzable closures?",
-        &tracing_config.register_fuzzables,
-    );
-    push_mode(builder, "Include tracing of calls?", &tracing_config.calls);
-    push_mode(
-        builder,
-        "Include tracing of evaluated expressions?",
-        &tracing_config.evaluated_expressions,
-    );
-}
-
-#[derive(Debug, Default)]
-pub struct IrFeatures {
-    open_irs: Arc<RwLock<FxHashMap<Url, OpenIr>>>,
-}
-impl IrFeatures {
-    pub async fn generate_update_notifications(
-        &self,
-        module: &Module,
-    ) -> Vec<UpdateIrNotification> {
-        let open_irs = self.open_irs.read().await;
-        open_irs
-            .iter()
-            .filter(|(_, open_ir)| &open_ir.config.module == module)
-            .map(|(uri, _)| UpdateIrNotification { uri: uri.clone() })
-            .collect()
-    }
-}
 
 #[derive(Debug)]
 struct OpenIr {
@@ -276,8 +271,77 @@ struct IrConfig {
     module: Module,
     ir: Ir,
 }
+impl IrConfig {
+    fn decode(uri: &Url, package_root: PathBuf) -> Self {
+        let (path, ir) = uri.path().rsplit_once('.').unwrap();
+        let details = urlencoding::decode(uri.fragment().unwrap()).unwrap();
+        let mut details: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_str(&details).unwrap();
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+        let original_scheme = details.get("scheme").unwrap().as_str().unwrap();
+        let original_uri = format!("{original_scheme}:{path}").parse().unwrap();
+
+        let tracing_config = details
+            .remove("tracingConfig")
+            .map(|it| serde_json::from_value(it).unwrap());
+
+        let ir = IrDiscriminants::try_from(ir).unwrap_or_else(|_| panic!("Unsupported IR: {ir}"));
+        let ir = match ir {
+            IrDiscriminants::Rcst => Ir::Rcst,
+            IrDiscriminants::Ast => Ir::Ast,
+            IrDiscriminants::Hir => Ir::Hir,
+            IrDiscriminants::Mir => Ir::Mir(tracing_config.unwrap()),
+            IrDiscriminants::OptimizedMir => Ir::OptimizedMir(tracing_config.unwrap()),
+            IrDiscriminants::Lir => Ir::Lir(tracing_config.unwrap()),
+        };
+
+        IrConfig {
+            module: module_from_package_root_and_url(
+                package_root,
+                &original_uri,
+                ModuleKind::Code, // FIXME
+            )
+            .unwrap(),
+            ir,
+        }
+    }
+}
+impl From<&IrConfig> for Url {
+    fn from(config: &IrConfig) -> Self {
+        let ir: &'static str = IrDiscriminants::from(&config.ir).into();
+        let original_url = module_to_url(&config.module).unwrap();
+
+        let mut details = serde_json::Map::new();
+        details.insert("scheme".to_string(), original_url.scheme().into());
+        match &config.ir {
+            Ir::Mir(tracing_config)
+            | Ir::OptimizedMir(tracing_config)
+            | Ir::Lir(tracing_config) => {
+                details.insert(
+                    "tracingConfig".to_string(),
+                    serde_json::to_value(tracing_config).unwrap(),
+                );
+            }
+            _ => {}
+        }
+
+        Url::parse(
+            format!(
+                "candy-ir:{}.{ir}#{}",
+                original_url.path(),
+                urlencoding::encode(serde_json::to_string(&details).unwrap().as_str()),
+            )
+            .as_str(),
+        )
+        .unwrap()
+    }
+}
+
+#[derive(Clone, Debug, EnumDiscriminants, Eq, Hash, PartialEq)]
+#[strum_discriminants(
+    derive(EnumString, Hash, IntoStaticStr),
+    strum(serialize_all = "camelCase")
+)]
 pub enum Ir {
     Rcst,
     Ast,
@@ -311,14 +375,61 @@ impl LanguageFeatures for IrFeatures {
     }
     async fn find_definition(
         &self,
-        _db: &Mutex<Database>,
+        db: &Mutex<Database>,
         _project_directory: &Path,
         uri: Url,
         position: lsp_types::Position,
     ) -> Option<LocationLink> {
-        let open_irs = self.open_irs.read().await;
-        let open_ir = open_irs.get(&uri).unwrap();
-        open_ir.find_definition(uri, position)
+        let (origin_selection_range, key) = {
+            let open_irs = self.open_irs.read().await;
+            let open_ir = open_irs.get(&uri).unwrap();
+            let offset = open_ir.lsp_position_to_offset(position);
+
+            let (key, result) = open_ir.find_references_entry(offset)?;
+
+            let origin_selection_range = result
+                .references
+                .iter()
+                .find(|it| it.contains(&offset))
+                .unwrap_or_else(|| result.definition.as_ref().unwrap());
+            let origin_selection_range = open_ir.range_to_lsp_range(origin_selection_range);
+
+            if let Some(definition) = &result.definition {
+                let target_range = open_ir.range_to_lsp_range(definition);
+                return Some(LocationLink {
+                    origin_selection_range: Some(origin_selection_range),
+                    target_uri: uri,
+                    target_range,
+                    target_selection_range: target_range,
+                });
+            }
+
+            (origin_selection_range, key.to_owned())
+        };
+
+        match &key {
+            ReferenceKey::HirId(id) => {
+                let config = IrConfig {
+                    module: id.module.to_owned(),
+                    ir: Ir::Hir,
+                };
+                let uri = Url::from(&config);
+                self.ensure_is_open(db, config).await;
+
+                let rich_irs = self.open_irs.read().await;
+                let hir = rich_irs.get(&uri).unwrap();
+                let result = hir.ir.references.get(&key).unwrap();
+                let target_range = hir.range_to_lsp_range(result.definition.as_ref().unwrap());
+
+                Some(LocationLink {
+                    origin_selection_range: Some(origin_selection_range),
+                    target_uri: uri,
+                    target_range,
+                    target_selection_range: target_range,
+                })
+            }
+            _ => None,
+        }
     }
 
     fn supports_folding_ranges(&self) -> bool {
@@ -387,25 +498,6 @@ impl LanguageFeatures for IrFeatures {
 }
 
 impl OpenIr {
-    fn find_definition(&self, uri: Url, position: lsp_types::Position) -> Option<LocationLink> {
-        let offset = self.lsp_position_to_offset(position);
-        let (_, result) = self.find_references_entry(offset)?;
-        let definition = result.definition.clone()?;
-
-        let origin_selection_range = result
-            .references
-            .iter()
-            .find(|it| it.contains(&offset))
-            .unwrap_or(&definition);
-        let target_range = self.range_to_lsp_range(&definition);
-        Some(LocationLink {
-            origin_selection_range: Some(self.range_to_lsp_range(origin_selection_range)),
-            target_uri: uri,
-            target_range,
-            target_selection_range: target_range,
-        })
-    }
-
     fn folding_ranges(&self) -> Vec<FoldingRange> {
         self.ir
             .folding_ranges

@@ -22,7 +22,7 @@ impl Display for RichIr {
     }
 }
 
-#[derive(Debug, Eq, From, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, From, Hash, PartialEq)]
 pub enum ReferenceKey {
     Int(BigInt),
     Text(String),
