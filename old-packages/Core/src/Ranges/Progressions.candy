@@ -39,11 +39,6 @@ impl BoundedIntProgression: Equals {
     this.start == other.start & this.end == other.end & this.step = other.step
   }
 }
-impl BoundedIntProgression: Hash {
-  fun hash[H: Hasher](): H {
-    H.combine(List[H].of(this.start.hash[H](), this.end.hash[H](), this.step.hash[H]()))
-  }
-}
 impl BoundedIntProgression: Iterate[Int] {
   fun iterate(): Maybe[(Int, Iterate[Int])] {
     (this.end > this.start).then[(Int, Iterate[Int])]({

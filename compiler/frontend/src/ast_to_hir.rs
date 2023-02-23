@@ -247,7 +247,7 @@ impl<'a> Context<'a> {
 
                         let (pattern, identifier_ids) = PatternContext::compile(pattern);
                         let body = self.push(
-                            Some(ast.id.clone()),
+                            None,
                             Expression::Destructure {
                                 expression: body,
                                 pattern,
@@ -267,6 +267,13 @@ impl<'a> Context<'a> {
                                 (name, id)
                             })
                             .collect_vec();
+
+                        self.push(
+                            Some(ast.id.clone()),
+                            Expression::Symbol("Nothing".to_string()),
+                            None,
+                        );
+
                         (names, body)
                     }
                 };

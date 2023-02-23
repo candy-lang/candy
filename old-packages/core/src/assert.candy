@@ -1,8 +1,0 @@
-use ..bool
-use ..string
-
-public builtin fun assert(condition: Bool, message: String = "Assert failed.")
-/// Throws an error if the `condition` is `false`.
-///
-/// This function is useful for ensuring that your mental model of the state of your program matches
-/// its actual state.

@@ -204,12 +204,7 @@ impl LoweringContext {
                             closing_curly_braces,
                         } => {
                             if lowering_type != LoweringType::Expression {
-                                errors.push(
-                                    self.create_error(
-                                        part,
-                                        AstError::PatternContainsInvalidExpression,
-                                    ),
-                                );
+                                return self.create_ast_for_invalid_expression_in_pattern(cst);
                             };
 
                             if opening_curly_braces.len() != (opening_single_quote_count + 1)
@@ -612,24 +607,19 @@ impl LoweringContext {
             }
             CstKind::StructField { .. } => panic!("StructField should only appear in Struct."),
             CstKind::StructAccess { struct_, dot, key } => {
-                let mut errors = vec![];
-
                 if lowering_type != LoweringType::Expression {
-                    errors.push(self.create_error(cst, AstError::PatternContainsInvalidExpression));
+                    return self.create_ast_for_invalid_expression_in_pattern(cst);
                 };
 
-                let ast = self.lower_struct_access(cst.id, struct_, dot, key);
-                self.wrap_in_errors(cst.id, ast, errors)
+                self.lower_struct_access(cst.id, struct_, dot, key)
             }
             CstKind::Match {
                 expression,
                 percent,
                 cases,
             } => {
-                let mut errors = vec![];
-
                 if lowering_type != LoweringType::Expression {
-                    errors.push(self.create_error(cst, AstError::PatternContainsInvalidExpression));
+                    return self.create_ast_for_invalid_expression_in_pattern(expression);
                 };
 
                 let expression = self.lower_cst(expression, LoweringType::Expression);
@@ -642,24 +632,21 @@ impl LoweringContext {
 
                 let cases = self.lower_csts(cases);
 
-                let ast = self.create_ast(
+                self.create_ast(
                     cst.id,
                     AstKind::Match(Match {
                         expression: Box::new(expression),
                         cases,
                     }),
-                );
-                self.wrap_in_errors(cst.id, ast, errors)
+                )
             }
             CstKind::MatchCase {
                 pattern,
                 arrow: _,
                 body,
             } => {
-                let mut errors = vec![];
-
                 if lowering_type != LoweringType::Expression {
-                    errors.push(self.create_error(cst, AstError::PatternContainsInvalidExpression));
+                    return self.create_ast_for_invalid_expression_in_pattern(pattern);
                 };
 
                 let pattern = self.lower_cst(pattern, LoweringType::Pattern);
@@ -668,14 +655,13 @@ impl LoweringContext {
 
                 let body = self.lower_csts(body);
 
-                let ast = self.create_ast(
+                self.create_ast(
                     cst.id,
                     AstKind::MatchCase(MatchCase {
                         pattern: Box::new(pattern),
                         body,
                     }),
-                );
-                self.wrap_in_errors(cst.id, ast, errors)
+                )
             }
             CstKind::OrPattern { left, right } => {
                 assert_eq!(lowering_type, LoweringType::Pattern);
@@ -746,8 +732,8 @@ impl LoweringContext {
                 let mut errors = vec![];
 
                 if lowering_type != LoweringType::Expression {
-                    errors.push(self.create_error(cst, AstError::PatternContainsInvalidExpression));
-                };
+                    return self.create_ast_for_invalid_expression_in_pattern(cst);
+                }
 
                 assert!(
                     matches!(opening_curly_brace.kind, CstKind::OpeningCurlyBrace),
@@ -885,24 +871,34 @@ impl LoweringContext {
             dot
         );
 
-        let key = match key.kind.clone() {
+        match key.kind.clone() {
             CstKind::Identifier(identifier) => {
-                self.create_string(key.id.to_owned(), identifier.uppercase_first_letter())
+                let key =
+                    self.create_string(key.id.to_owned(), identifier.uppercase_first_letter());
+                self.create_ast(
+                    id,
+                    AstKind::StructAccess(ast::StructAccess {
+                        struct_: Box::new(struct_),
+                        key,
+                    }),
+                )
             }
-            // TODO: handle CstKind::Error
+            CstKind::Error { error, .. } => self.create_ast(
+                id.to_owned(),
+                AstKind::Error {
+                    child: None,
+                    errors: vec![CompilerError {
+                        module: self.module.clone(),
+                        span: key.span.clone(),
+                        payload: CompilerErrorPayload::Rcst(error),
+                    }],
+                },
+            ),
             _ => panic!(
                 "Expected an identifier after the dot in a struct access, but found `{}`.",
                 key
             ),
-        };
-
-        self.create_ast(
-            id,
-            AstKind::StructAccess(ast::StructAccess {
-                struct_: Box::new(struct_),
-                key,
-            }),
-        )
+        }
     }
 
     fn lower_parameters(&mut self, csts: &[Cst]) -> (Vec<AstString>, Vec<CompilerError>) {
@@ -972,5 +968,14 @@ impl LoweringContext {
             span: cst.span.clone(),
             payload: CompilerErrorPayload::Ast(error),
         }
+    }
+    fn create_ast_for_invalid_expression_in_pattern(&mut self, cst: &Cst) -> Ast {
+        self.create_ast(
+            cst.id,
+            AstKind::Error {
+                child: None,
+                errors: vec![self.create_error(cst, AstError::PatternContainsInvalidExpression)],
+            },
+        )
     }
 }

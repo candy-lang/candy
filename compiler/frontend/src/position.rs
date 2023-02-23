@@ -46,7 +46,13 @@ fn offset_to_position(
     module: Module,
     mut offset: Offset,
 ) -> Position {
-    let text = db.get_module_content_as_string(module.clone()).unwrap();
+    let Some(text) = db.get_module_content_as_string(module.clone()) else {
+        assert_eq!(*offset, 0);
+        return Position {
+            line: 0,
+            character: 0,
+        };
+    };
     if *offset > text.len() {
         *offset = text.len();
     }

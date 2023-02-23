@@ -12,7 +12,8 @@ type Ir =
   | { type: 'ast' }
   | { type: 'hir' }
   | { type: 'mir'; tracingConfig: TracingConfig }
-  | { type: 'optimizedMir'; tracingConfig: TracingConfig };
+  | { type: 'optimizedMir'; tracingConfig: TracingConfig }
+  | { type: 'lir'; tracingConfig: TracingConfig };
 type IrType = Ir['type'];
 function getIrTitle(irType: IrType): string {
   switch (irType) {
@@ -26,6 +27,8 @@ function getIrTitle(irType: IrType): string {
       return 'MIR';
     case 'optimizedMir':
       return 'Optimized MIR';
+    case 'lir':
+      return 'LIR';
   }
 }
 
@@ -52,6 +55,12 @@ export function registerDebugIrCommands(client: LanguageClient) {
     if (tracingConfig === undefined) return undefined;
 
     return { type: 'optimizedMir', tracingConfig };
+  });
+  registerDebugIrCommand('lir', 'viewLir', async () => {
+    const tracingConfig = await pickTracingConfig();
+    if (tracingConfig === undefined) return undefined;
+
+    return { type: 'lir', tracingConfig };
   });
 }
 
