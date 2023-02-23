@@ -1,0 +1,131 @@
+# TODO: As soon as tags or value hiding is supported, change fixed point numbers
+# to that. Currently, they're just normal ints.
+
+bool = use "..bool"
+[ifElse, recursive] = use "..controlFlow"
+[equals] = use "..equality"
+[run] = use "..function"
+int = use "..int"
+text = use "..text"
+[toDebugText] = use "..toDebugText"
+
+decimalsPow = 10000000
+# TODO: Perhaps allow different levels of precision.
+
+is := int.is
+
+fromInt a :=
+  needs (int.is a)
+  a | int.multiply decimalsPow
+floorToInt a :=
+  needs (is a)
+  a | int.divideTruncating decimalsPow
+
+add summandA summandB :=
+  needs (is summandA)
+  needs (is summandB)
+  summandA | int.add summandB
+subtract minuend subtrahend :=
+  needs (is minuend)
+  needs (is subtrahend)
+  minuend | int.subtract subtrahend
+negate value :=
+  needs (is value)
+  value | int.negate
+multiply factorA factorB :=
+  needs (is factorA)
+  needs (is factorB)
+  factorA | int.multiply factorB | int.divideTruncating decimalsPow
+divide dividend divisor :=
+  needs (is dividend)
+  needs (is divisor)
+  needs (divisor | equals 0 | bool.not) "You can't divide by zero."
+  dividend | int.multiply decimalsPow | int.divideTruncating divisor
+
+compareTo valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  result = valueA | int.compare valueB
+  check (equals result Equal | bool.implies (equals valueA valueB))
+  result
+isLessThan valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  equals (compareTo valueA valueB) Less
+isGreaterThan valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  equals (compareTo valueA valueB) Greater
+isLessThanOrEqualTo valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  valueA | isGreaterThan valueB | bool.not
+isGreaterThanOrEqualTo valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  valueA | isLessThan valueB | bool.not
+
+isPositive value :=
+  needs (is value)
+  value | isGreaterThan 0
+isNonPositive value :=
+  needs (is value)
+  value | isPositive | bool.not
+isNegative value :=
+  needs (is value)
+  value | isLessThan 0
+isNonNegative value :=
+  needs (is value)
+  value | isNegative | bool.not
+absolute value :=
+  needs (is value)
+  ifElse (isNegative value) { negate value } { value }
+
+approxEquals a b delta :=
+  needs (is a)
+  needs (is b)
+  needs (is delta)
+  needs (isNonNegative delta)
+  a | int.subtract b | int.absolute | int.isLessThanOrEqualTo delta
+
+min valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  ifElse
+    (valueA | isLessThanOrEqualTo valueB)
+    { valueA }
+    { valueB }
+max valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  ifElse
+    (valueA | isGreaterThanOrEqualTo valueB)
+    { valueA }
+    { valueB }
+coerceAtLeast value minimum :=
+  needs (is value)
+  needs (is minimum)
+  max value minimum
+coerceAtMost value maximum :=
+  needs (is value)
+  needs (is maximum)
+  min value maximum
+coerceIn value minimum maximum :=
+  needs (is value)
+  needs (is minimum)
+  needs (is maximum)
+  needs (minimum | isLessThanOrEqualTo maximum)
+  value | coerceAtLeast minimum | coerceAtMost maximum
+
+toText a :=
+  needs (is a)
+  beforeDot = a | floorToInt | toDebugText
+  afterDot = run {
+    tmp = a | int.remainder decimalsPow
+    ifElse (isNonNegative tmp) {
+      tmp | int.add decimalsPow | toDebugText | text.removePrefix "1"
+    } {
+      tmp | int.subtract decimalsPow | toDebugText | text.removePrefix "-1"
+    }
+  }
+  "{beforeDot}.{afterDot}"

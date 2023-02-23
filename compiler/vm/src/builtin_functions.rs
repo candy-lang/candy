@@ -277,11 +277,17 @@ impl Heap {
     }
     fn int_divide_truncating(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |dividend: &Int, divisor: &Int| {
+            if divisor.data.value == 0.into() {
+                return Err("Can't divide by zero.".to_string());
+            }
             Return(self.create_int(&dividend.value / &divisor.value))
         })
     }
     fn int_modulo(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |dividend: &Int, divisor: &Int| {
+            if divisor.data.value == 0.into() {
+                return Err("Can't divide by zero.".to_string());
+            }
             Return(self.create_int(dividend.value.mod_floor(&divisor.value)))
         })
     }
@@ -301,6 +307,9 @@ impl Heap {
     }
     fn int_remainder(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |dividend: &Int, divisor: &Int| {
+            if divisor.data.value == 0.into() {
+                return Err("Can't divide by zero.".to_string());
+            }
             Return(self.create_int(&dividend.value % &divisor.value))
         })
     }

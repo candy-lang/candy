@@ -297,9 +297,15 @@ impl<'a> LoweringContext<'a> {
             hir::Expression::Match { expression, cases } => {
                 assert!(!cases.is_empty());
 
-                let responsible = body.push_hir_id(hir_id.clone());
+                let responsible_for_match = body.push_hir_id(hir_id.clone());
                 let expression = self.mapping[expression];
-                self.compile_match(body, expression, cases, responsible)
+                self.compile_match(
+                    body,
+                    expression,
+                    cases,
+                    responsible_for_needs,
+                    responsible_for_match,
+                )
             }
             hir::Expression::Lambda(hir::Lambda {
                 parameters: original_parameters,
@@ -408,34 +414,43 @@ impl<'a> LoweringContext<'a> {
         body: &mut BodyBuilder,
         expression: Id,
         cases: &[(hir::Pattern, hir::Body)],
-        responsible: Id,
+        responsible_for_needs: Id,
+        responsible_for_match: Id,
     ) -> Id {
-        self.compile_match_rec(body, expression, cases, responsible, vec![])
+        self.compile_match_rec(
+            body,
+            expression,
+            cases,
+            responsible_for_needs,
+            responsible_for_match,
+            vec![],
+        )
     }
     fn compile_match_rec(
         &mut self,
         body: &mut BodyBuilder,
         expression: Id,
         cases: &[(hir::Pattern, hir::Body)],
-        responsible: Id,
+        responsible_for_needs: Id,
+        responsible_for_match: Id,
         mut no_match_reasons: Vec<Id>,
     ) -> Id {
         match cases {
             [] => {
                 let reason = body.push_text("No case matched the given expression.".to_string());
                 // TODO: concat reasons
-                body.push_panic(reason, responsible)
+                body.push_panic(reason, responsible_for_match)
             }
             [(case_pattern, case_body), rest @ ..] => {
                 let pattern_result = PatternLoweringContext::compile_pattern(
                     self.db,
                     body,
-                    responsible,
+                    responsible_for_match,
                     expression,
                     case_pattern,
                 );
 
-                let is_match = body.push_is_match(pattern_result, responsible);
+                let is_match = body.push_is_match(pattern_result, responsible_for_match);
 
                 let builtin_if_else = body.push_builtin(BuiltinFunction::IfElse);
                 let then_lambda = body.push_lambda(|body, _| {
@@ -443,21 +458,31 @@ impl<'a> LoweringContext<'a> {
                         result: pattern_result,
                         is_trivial: false,
                     });
-                    self.compile_expressions(body, responsible, &case_body.expressions);
+                    self.compile_expressions(body, responsible_for_needs, &case_body.expressions);
                 });
                 let else_lambda = body.push_lambda(|body, _| {
                     let list_get_function = body.push_builtin(BuiltinFunction::ListGet);
                     let one = body.push_int(1.into());
-                    let reason =
-                        body.push_call(list_get_function, vec![pattern_result, one], responsible);
+                    let reason = body.push_call(
+                        list_get_function,
+                        vec![pattern_result, one],
+                        responsible_for_match,
+                    );
                     no_match_reasons.push(reason);
 
-                    self.compile_match_rec(body, expression, rest, responsible, no_match_reasons);
+                    self.compile_match_rec(
+                        body,
+                        expression,
+                        rest,
+                        responsible_for_needs,
+                        responsible_for_match,
+                        no_match_reasons,
+                    );
                 });
                 body.push_call(
                     builtin_if_else,
                     vec![is_match, then_lambda, else_lambda],
-                    responsible,
+                    responsible_for_match,
                 )
             }
         }
