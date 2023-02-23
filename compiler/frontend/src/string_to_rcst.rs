@@ -84,7 +84,7 @@ mod parse {
         whitespace_indentation_score,
     };
     use itertools::Itertools;
-    use tracing::{debug, info, instrument};
+    use tracing::instrument;
 
     static MEANINGFUL_PUNCTUATION: &str = r#"=,.:|()[]{}->'"%"#;
     static SUPPORTED_WHITESPACE: &str = " \r\n\t";
@@ -1265,70 +1265,51 @@ mod parse {
         loop {
             let mut did_make_progress = false;
 
-            debug!("Remaining input: {input:?}");
-            // let mut parse_suffix =
-            //     |parser: fn(&'a str, &Rcst, usize) -> Option<(&'a str, Rcst)>| {
-            //         if let Some((new_input, expression)) = parser(input, &result, indentation) {
-            //             input = new_input;
-            //             result = expression;
-            //             did_make_progress = true;
-            //             true
-            //         } else {
-            //             false
-            //         }
-            //     };
-
-            if let Some((new_input, expression)) =
-                expression_suffix_struct_access(input, &result, indentation)
-            {
-                input = new_input;
-                result = expression;
-                did_make_progress = true;
+            fn parse_suffix<'input>(
+                input: &mut &'input str,
+                indentation: usize,
+                result: &mut Rcst,
+                parser: fn(&'input str, &Rcst, usize) -> Option<(&'input str, Rcst)>,
+            ) -> bool {
+                if let Some((new_input, expression)) = parser(input, result, indentation) {
+                    *input = new_input;
+                    *result = expression;
+                    true
+                } else {
+                    false
+                }
             }
 
-            // parse_suffix(expression_suffix_struct_access);
-            // if allow_call {
-            //     parse_suffix(expression_suffix_call);
-            // }
-            // if allow_assignment {
-            //     parse_suffix(expression_suffix_assignment);
-            // }
-            // if allow_bar {
-            //     parse_suffix(expression_suffix_bar);
-            //     parse_suffix(expression_suffix_match);
-            // }
+            did_make_progress |= parse_suffix(
+                &mut input,
+                indentation,
+                &mut result,
+                expression_suffix_struct_access,
+            );
 
-            // if let Some((new_input, expression)) =
-            //     expression_suffix_struct_access(input, &result, indentation)
-            // {
-            //     input = new_input;
-            //     result = expression;
-            //     did_make_progress = true;
-            // }
+            if allow_call {
+                did_make_progress |=
+                    parse_suffix(&mut input, indentation, &mut result, expression_suffix_call);
+            }
+            if allow_bar {
+                did_make_progress |=
+                    parse_suffix(&mut input, indentation, &mut result, expression_suffix_bar);
+                did_make_progress |= parse_suffix(
+                    &mut input,
+                    indentation,
+                    &mut result,
+                    expression_suffix_match,
+                );
+            }
 
-            // if allow_call && let Some((new_input, expression)) = expression_suffix_call(input, &result, indentation) {
-            //     input = new_input;
-            //     result = expression;
-            //     did_make_progress = true;
-            // }
-
-            // if allow_bar && let Some((new_input, expression)) = expression_suffix_bar(input, &result, indentation) {
-            //     input = new_input;
-            //     result = expression;
-            //     did_make_progress = true;
-            // }
-
-            // if allow_bar && let Some((new_input, expression)) = expression_suffix_match(input, &result, indentation) {
-            //     input = new_input;
-            //     result = expression;
-            //     did_make_progress = true;
-            // }
-
-            // if allow_assignment && let Some((new_input, expression)) = expression_suffix_assignment(input, &result, indentation) {
-            //     input= new_input;
-            //     result = expression;
-            //     did_make_progress = true;
-            // }
+            if allow_assignment {
+                did_make_progress |= parse_suffix(
+                    &mut input,
+                    indentation,
+                    &mut result,
+                    expression_suffix_assignment,
+                );
+            }
 
             if !did_make_progress {
                 break;
