@@ -301,7 +301,7 @@ impl ToRichIr<LirReferenceKey> for Instruction {
             }
             Instruction::CreateHirId(id) => {
                 builder.push(" ", None, EnumSet::empty());
-                let range = builder.push(id.to_short_debug_string(), None, EnumSet::empty());
+                let range = builder.push(id.to_string(), None, EnumSet::empty());
                 builder.push_reference(id.to_owned(), range);
             }
             Instruction::CreateClosure {
