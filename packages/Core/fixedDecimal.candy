@@ -17,30 +17,69 @@ is := int.is
 fromInt a :=
   needs (int.is a)
   a | int.multiply decimalsPow
-
 floorToInt a :=
   needs (is a)
   a | int.divideTruncating decimalsPow
 
-isNonNegative a :=
-  needs (is a)
-  a | int.isNonNegative
+add summandA summandB :=
+  needs (is summandA)
+  needs (is summandB)
+  summandA | int.add summandB
+subtract minuend subtrahend :=
+  needs (is minuend)
+  needs (is subtrahend)
+  minuend | int.subtract subtrahend
+negate value :=
+  needs (is value)
+  value | int.negate
+multiply factorA factorB :=
+  needs (is factorA)
+  needs (is factorB)
+  factorA | int.multiply factorB | int.divideTruncating decimalsPow
+divide dividend divisor :=
+  needs (is dividend)
+  needs (is divisor)
+  needs (divisor | equals 0 | bool.not) "You can't divide by zero."
+  dividend | int.multiply decimalsPow | int.divideTruncating divisor
 
-add a b :=
-  needs (is a)
-  needs (is b)
-  a | int.add b
+compareTo valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  result = valueA | int.compare valueB
+  check (equals result Equal | bool.implies (equals valueA valueB))
+  result
+isLessThan valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  equals (compareTo valueA valueB) Less
+isGreaterThan valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  equals (compareTo valueA valueB) Greater
+isLessThanOrEqualTo valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  valueA | isGreaterThan valueB | bool.not
+isGreaterThanOrEqualTo valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  valueA | isLessThan valueB | bool.not
 
-multiply a b :=
-  needs (is a)
-  needs (is b)
-  a | int.multiply b | int.divideTruncating decimalsPow
-
-divide a b :=
-  needs (is a)
-  needs (is b)
-  needs (b | equals 0 | bool.not) "You can't divide by zero."
-  a | int.multiply decimalsPow | int.divideTruncating b
+isPositive value :=
+  needs (is value)
+  value | isGreaterThan 0
+isNonPositive value :=
+  needs (is value)
+  value | isPositive | bool.not
+isNegative value :=
+  needs (is value)
+  value | isLessThan 0
+isNonNegative value :=
+  needs (is value)
+  value | isNegative | bool.not
+absolute value :=
+  needs (is value)
+  ifElse (isNegative value) { negate value } { value }
 
 approxEquals a b delta :=
   needs (is a)
@@ -48,6 +87,35 @@ approxEquals a b delta :=
   needs (is delta)
   needs (isNonNegative delta)
   a | int.subtract b | int.absolute | int.isLessThanOrEqualTo delta
+
+min valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  ifElse
+    (valueA | isLessThanOrEqualTo valueB)
+    { valueA }
+    { valueB }
+max valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  ifElse
+    (valueA | isGreaterThanOrEqualTo valueB)
+    { valueA }
+    { valueB }
+coerceAtLeast value minimum :=
+  needs (is value)
+  needs (is minimum)
+  max value minimum
+coerceAtMost value maximum :=
+  needs (is value)
+  needs (is maximum)
+  min value maximum
+coerceIn value minimum maximum :=
+  needs (is value)
+  needs (is minimum)
+  needs (is maximum)
+  needs (minimum | isLessThanOrEqualTo maximum)
+  value | coerceAtLeast minimum | coerceAtMost maximum
 
 toText a :=
   needs (is a)
