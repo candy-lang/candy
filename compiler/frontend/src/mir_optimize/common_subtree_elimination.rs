@@ -21,14 +21,16 @@
 use rustc_hash::FxHashMap;
 
 use crate::{
+    hir,
     id::{CountableId, IdGenerator},
-    mir::{Expression, Id, Mir},
+    mir::{Expression, Id, Mir, VisitorResult},
 };
 use std::collections::hash_map::Entry;
 
 impl Mir {
     pub fn eliminate_common_subtrees(&mut self) {
         let mut pure_expressions = FxHashMap::default();
+        let mut additional_lambda_hirs: FxHashMap<Id, Vec<hir::Id>> = FxHashMap::default();
 
         self.body
             .visit_with_visible(&mut |id, expression, visible, _| {
@@ -45,12 +47,26 @@ impl Mir {
                         if visible.contains(*id_of_same_expression.get()) =>
                     {
                         *expression = Expression::Reference(*id_of_same_expression.get());
+
+                        if let Expression::Lambda { original_hirs, .. } = expression {
+                            additional_lambda_hirs
+                                .entry(*id_of_same_expression.get())
+                                .or_default()
+                                .append(original_hirs);
+                        }
                     }
                     _ => {
                         existing_entry.insert_entry(id);
                     }
                 }
             });
+
+        self.body.visit(&mut |id, expression, _| {
+            if let Expression::Lambda { original_hirs, .. } = expression && let Some(additional_hirs) = additional_lambda_hirs.remove(&id) {
+                original_hirs.extend(additional_hirs);
+            }
+            VisitorResult::Continue
+        });
     }
 }
 
@@ -76,6 +92,20 @@ impl Expression {
             if let Some(replacement) = mapping.get(id) {
                 *id = *replacement;
             }
-        })
+        });
+        self.strip_original_hirs();
+    }
+    fn strip_original_hirs(&mut self) {
+        if let Expression::Lambda {
+            original_hirs,
+            body,
+            ..
+        } = self
+        {
+            original_hirs.clear();
+            for (_, expression) in body.iter_mut() {
+                expression.strip_original_hirs();
+            }
+        }
     }
 }
