@@ -7,16 +7,17 @@ use candy_frontend::{
 };
 use itertools::Itertools;
 use lsp_types::{
-    self, Diagnostic, DocumentHighlight, FoldingRange, LocationLink, SemanticToken,
-    TextDocumentContentChangeEvent, Url,
+    self, Diagnostic, FoldingRange, LocationLink, SemanticToken, TextDocumentContentChangeEvent,
+    Url,
 };
+use rustc_hash::FxHashMap;
 use std::{path::Path, thread};
 use tokio::sync::{mpsc::Sender, Mutex};
 use tracing::debug;
 
 use crate::{
     database::Database,
-    features::LanguageFeatures,
+    features::{LanguageFeatures, Reference},
     utils::{
         error_into_diagnostic, lsp_range_to_range_raw, module_from_package_root_and_url,
         LspPositionConversion,
@@ -201,12 +202,20 @@ impl LanguageFeatures for CandyFeatures {
         project_directory: &Path,
         uri: Url,
         position: lsp_types::Position,
+        _only_in_same_document: bool,
         include_declaration: bool,
-    ) -> Option<Vec<DocumentHighlight>> {
+    ) -> FxHashMap<Url, Vec<Reference>> {
         let db = db.lock().await;
         let module = decode_module(project_directory, &uri);
         let offset = db.lsp_position_to_offset(module.clone(), position);
-        references(&*db, module, offset, include_declaration)
+
+        let mut all_references = FxHashMap::default();
+        let references = references(&*db, module, offset, include_declaration);
+        // TODO: Look for references in all modules
+        if !references.is_empty() {
+            all_references.insert(uri, references);
+        }
+        all_references
     }
 
     fn supports_semantic_tokens(&self) -> bool {

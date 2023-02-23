@@ -2,9 +2,9 @@ use std::path::Path;
 
 use async_trait::async_trait;
 use lsp_types::{
-    self, DocumentHighlight, FoldingRange, LocationLink, SemanticToken,
-    TextDocumentContentChangeEvent, Url,
+    self, FoldingRange, LocationLink, SemanticToken, TextDocumentContentChangeEvent, Url,
 };
+use rustc_hash::FxHashMap;
 use tokio::sync::Mutex;
 
 use crate::database::Database;
@@ -84,8 +84,9 @@ pub trait LanguageFeatures: Send + Sync {
         _project_directory: &Path,
         _uri: Url,
         _position: lsp_types::Position,
+        _only_in_same_document: bool,
         _include_declaration: bool,
-    ) -> Option<Vec<DocumentHighlight>> {
+    ) -> FxHashMap<Url, Vec<Reference>> {
         unimplemented!()
     }
 
@@ -100,4 +101,9 @@ pub trait LanguageFeatures: Send + Sync {
     ) -> Vec<SemanticToken> {
         unimplemented!()
     }
+}
+
+pub struct Reference {
+    pub range: lsp_types::Range,
+    pub is_write: bool,
 }

@@ -9,7 +9,10 @@ use candy_frontend::{
     mir_optimize::OptimizeMir,
     module::{Module, ModuleKind},
     position::{line_start_offsets_raw, Offset},
-    rich_ir::{Reference, RichIr, RichIrBuilder, ToRichIr, TokenModifier, TokenType},
+    rich_ir::{
+        ReferenceCollection, ReferenceKey, RichIr, RichIrBuilder, ToRichIr, TokenModifier,
+        TokenType,
+    },
     string_to_rcst::{InvalidModuleError, RcstResult, StringToRcst},
     TracingConfig, TracingMode,
 };
@@ -17,8 +20,8 @@ use candy_vm::{lir::Lir, mir_to_lir::MirToLir};
 use enumset::EnumSet;
 use extension_trait::extension_trait;
 use lsp_types::{
-    self, notification::Notification, DocumentHighlight, DocumentHighlightKind, FoldingRange,
-    FoldingRangeKind, LocationLink, SemanticToken, Url,
+    self, notification::Notification, FoldingRange, FoldingRangeKind, LocationLink, SemanticToken,
+    Url,
 };
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -28,7 +31,7 @@ use tower_lsp::jsonrpc;
 
 use crate::{
     database::Database,
-    features::LanguageFeatures,
+    features::{LanguageFeatures, Reference},
     semantic_tokens::{SemanticTokenModifier, SemanticTokenType, SemanticTokensBuilder},
     server::Server,
     utils::{lsp_position_to_offset_raw, module_from_package_root_and_url, range_to_lsp_range_raw},
@@ -341,11 +344,31 @@ impl LanguageFeatures for IrFeatures {
         _project_directory: &Path,
         uri: Url,
         position: lsp_types::Position,
+        only_in_same_document: bool,
         include_declaration: bool,
-    ) -> Option<Vec<DocumentHighlight>> {
+    ) -> FxHashMap<Url, Vec<Reference>> {
         let open_irs = self.open_irs.read().await;
         let open_ir = open_irs.get(&uri).unwrap();
-        open_ir.references(position, include_declaration)
+
+        let offset = open_ir.lsp_position_to_offset(position);
+        let Some((reference_key, _)) = open_ir.find_references_entry(offset) else { return FxHashMap::default(); };
+        if only_in_same_document {
+            FxHashMap::from_iter([(
+                uri,
+                open_ir.find_references(reference_key, include_declaration),
+            )])
+        } else {
+            open_irs
+                .iter()
+                .map(|(uri, ir)| {
+                    (
+                        uri.to_owned(),
+                        ir.find_references(reference_key, include_declaration),
+                    )
+                })
+                .filter(|(_, references)| !references.is_empty())
+                .collect()
+        }
     }
 
     fn supports_semantic_tokens(&self) -> bool {
@@ -366,7 +389,7 @@ impl LanguageFeatures for IrFeatures {
 impl OpenIr {
     fn find_definition(&self, uri: Url, position: lsp_types::Position) -> Option<LocationLink> {
         let offset = self.lsp_position_to_offset(position);
-        let result = self.references_entry(offset)?;
+        let (_, result) = self.find_references_entry(offset)?;
         let definition = result.definition.clone()?;
 
         let origin_selection_range = result
@@ -400,32 +423,33 @@ impl OpenIr {
             .collect()
     }
 
-    fn references(
+    fn find_references(
         &self,
-        position: lsp_types::Position,
+        reference_key: &ReferenceKey,
         include_declaration: bool,
-    ) -> Option<Vec<DocumentHighlight>> {
-        let offset = self.lsp_position_to_offset(position);
-        let result = self.references_entry(offset)?;
-        let mut highlights = Vec::with_capacity(
-            (include_declaration && result.definition.is_some()) as usize + result.references.len(),
-        );
+    ) -> Vec<Reference> {
+        let Some(result) = self.ir.references.get(reference_key) else { return vec![]; };
+
+        let mut references = vec![];
         if include_declaration && let Some(definition) = &result.definition {
-            highlights.push(DocumentHighlight {
+            references.push(Reference {
                 range: self.range_to_lsp_range(definition),
-                kind: Some(DocumentHighlightKind::WRITE),
+                is_write: true,
             })
         }
         for reference in &result.references {
-            highlights.push(DocumentHighlight {
+            references.push(Reference {
                 range: self.range_to_lsp_range(reference),
-                kind: Some(DocumentHighlightKind::READ),
+                is_write: true,
             })
         }
-        Some(highlights)
+        references
     }
-    fn references_entry(&self, offset: Offset) -> Option<&Reference> {
-        self.ir.references.iter().find(|value| {
+    fn find_references_entry(
+        &self,
+        offset: Offset,
+    ) -> Option<(&ReferenceKey, &ReferenceCollection)> {
+        self.ir.references.iter().find(|(_, value)| {
             value
                 .definition
                 .as_ref()

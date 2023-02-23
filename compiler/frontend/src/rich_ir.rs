@@ -13,7 +13,7 @@ use std::{
 pub struct RichIr {
     pub text: String,
     pub annotations: Vec<RichIrAnnotation>,
-    pub references: Vec<Reference>,
+    pub references: FxHashMap<ReferenceKey, ReferenceCollection>,
     pub folding_ranges: Vec<Range<Offset>>,
 }
 impl Display for RichIr {
@@ -22,8 +22,19 @@ impl Display for RichIr {
     }
 }
 
+#[derive(Debug, Eq, From, Hash, PartialEq)]
+pub enum ReferenceKey {
+    Int(BigInt),
+    Text(String),
+    #[from(ignore)]
+    Symbol(String),
+    BuiltinFunction(BuiltinFunction),
+    Module(Module),
+    HirId(hir::Id),
+    MirId(mir::Id),
+}
 #[derive(Debug, Default)]
-pub struct Reference {
+pub struct ReferenceCollection {
     pub definition: Option<Range<Offset>>,
     pub references: Vec<Range<Offset>>,
 }
@@ -94,19 +105,7 @@ impl<T: ToRichIr> ToRichIr for [T] {
 #[derive(Debug, Default)]
 pub struct RichIrBuilder {
     ir: RichIr,
-    references: FxHashMap<ReferenceKey, Reference>,
     indentation: usize,
-}
-#[derive(Debug, Eq, From, Hash, PartialEq)]
-pub enum ReferenceKey {
-    Int(BigInt),
-    Text(String),
-    #[from(ignore)]
-    Symbol(String),
-    BuiltinFunction(BuiltinFunction),
-    Module(Module),
-    HirId(hir::Id),
-    MirId(mir::Id),
 }
 impl RichIrBuilder {
     pub fn push_foldable<F>(&mut self, build_children: F)
@@ -226,21 +225,22 @@ impl RichIrBuilder {
     }
 
     pub fn push_definition<RK: Into<ReferenceKey>>(&mut self, key: RK, range: Range<Offset>) {
-        self.references
+        self.ir
+            .references
             .entry(key.into())
-            .or_insert_with(Reference::default)
+            .or_insert_with(ReferenceCollection::default)
             .definition = Some(range);
     }
     pub fn push_reference<RK: Into<ReferenceKey>>(&mut self, key: RK, range: Range<Offset>) {
-        self.references
+        self.ir
+            .references
             .entry(key.into())
-            .or_insert_with(Reference::default)
+            .or_insert_with(ReferenceCollection::default)
             .references
             .push(range);
     }
 
-    pub fn finish(mut self) -> RichIr {
-        self.ir.references = self.references.into_values().collect();
+    pub fn finish(self) -> RichIr {
         self.ir
     }
 }
