@@ -4,6 +4,7 @@
 bool = use "..bool"
 [ifElse, recursive] = use "..controlFlow"
 [equals] = use "..equality"
+[run] = use "..function"
 int = use "..int"
 text = use "..text"
 [toDebugText] = use "..toDebugText"
@@ -51,5 +52,12 @@ approxEquals a b delta :=
 toText a :=
   needs (is a)
   beforeDot = a | floorToInt | toDebugText
-  afterDot = a | int.modulo decimalsPow | int.add decimalsPow | toDebugText | text.removePrefix "1"
+  afterDot = run {
+    tmp = a | int.remainder decimalsPow
+    ifElse (isNonNegative tmp) {
+      tmp | int.add decimalsPow | toDebugText | text.removePrefix "1"
+    } {
+      tmp | int.subtract decimalsPow | toDebugText | text.removePrefix "-1"
+    }
+  }
   "{beforeDot}.{afterDot}"
