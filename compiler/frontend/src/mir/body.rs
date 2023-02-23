@@ -407,6 +407,7 @@ impl BodyBuilder {
     }
     pub fn push_if_else<T, E>(
         &mut self,
+        hir_id: hir::Id,
         condition: Id,
         then_builder: T,
         else_builder: E,
@@ -417,8 +418,8 @@ impl BodyBuilder {
         E: FnOnce(&mut Self),
     {
         let builtin_if_else = self.push_builtin(BuiltinFunction::IfElse);
-        let then_lambda = self.push_lambda(hir::Id::dummy(), |body, _| then_builder(body));
-        let else_lambda = self.push_lambda(hir::Id::dummy(), |body, _| else_builder(body));
+        let then_lambda = self.push_lambda(hir_id.child("then"), |body, _| then_builder(body));
+        let else_lambda = self.push_lambda(hir_id.child("else"), |body, _| else_builder(body));
         self.push_call(
             builtin_if_else,
             vec![condition, then_lambda, else_lambda],
