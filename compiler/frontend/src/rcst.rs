@@ -1,6 +1,9 @@
 use std::fmt::{self, Display, Formatter};
 
+use enumset::EnumSet;
 use num_bigint::BigUint;
+
+use crate::rich_ir::{RichIrBuilder, ToRichIr};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Rcst {
@@ -151,6 +154,12 @@ pub enum RcstError {
     UnparsedRest,
     WeirdWhitespace,
     WeirdWhitespaceInIndentation,
+}
+
+impl ToRichIr<()> for Rcst {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
+        builder.push(format!("{self:?}"), None, EnumSet::empty());
+    }
 }
 
 impl Display for Rcst {

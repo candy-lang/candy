@@ -10,26 +10,24 @@ use lsp_types::{FoldingRange, FoldingRangeKind};
 
 use crate::utils::LspPositionConversion;
 
-#[salsa::query_group(FoldingRangeDbStorage)]
-pub trait FoldingRangeDb: ModuleDb + PositionConversionDb + RcstToCst {
-    fn folding_ranges(&self, module: Module) -> Vec<FoldingRange>;
-}
-
-fn folding_ranges(db: &dyn FoldingRangeDb, module: Module) -> Vec<FoldingRange> {
+pub fn folding_ranges<DB: ModuleDb + PositionConversionDb + RcstToCst>(
+    db: &DB,
+    module: Module,
+) -> Vec<FoldingRange> {
     let mut context = Context::new(db, module.clone());
     let cst = db.cst(module).unwrap();
     context.visit_csts(&cst);
     context.ranges
 }
 
-struct Context<'a, DB: FoldingRangeDb + ModuleDb + PositionConversionDb + ?Sized> {
+struct Context<'a, DB: ModuleDb + PositionConversionDb + ?Sized> {
     db: &'a DB,
     module: Module,
     ranges: Vec<FoldingRange>,
 }
 impl<'a, DB> Context<'a, DB>
 where
-    DB: FoldingRangeDb + ModuleDb + PositionConversionDb + ?Sized,
+    DB: ModuleDb + PositionConversionDb + ?Sized,
 {
     fn new(db: &'a DB, module: Module) -> Self {
         Context {

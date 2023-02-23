@@ -5,18 +5,20 @@ use crate::{
     mir_to_lir::MirToLir,
 };
 use candy_frontend::{builtin_functions::BuiltinFunction, hir::Id, module::Module, TracingConfig};
+use derive_more::Deref;
 use itertools::Itertools;
 use num_bigint::BigInt;
 use rustc_hash::{FxHashMap, FxHasher};
 use std::{
     hash::{Hash, Hasher},
     iter,
-    ops::Deref,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Deref)]
 pub struct Object {
     pub reference_count: usize,
+
+    #[deref]
     pub data: Data,
 }
 #[derive(Clone)]
@@ -269,14 +271,6 @@ impl Data {
         } else {
             None
         }
-    }
-}
-
-impl Deref for Object {
-    type Target = Data;
-
-    fn deref(&self) -> &Self::Target {
-        &self.data
     }
 }
 

@@ -4,15 +4,18 @@ use crate::{
     error::CompilerError,
     id::CountableId,
     module::{Module, ModuleKind, Package},
+    rich_ir::{RichIrBuilder, ToRichIr, TokenModifier, TokenType},
 };
 
+use derive_more::From;
+use enumset::EnumSet;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
 use num_bigint::BigUint;
 use rustc_hash::FxHashMap;
 use std::{
-    fmt::{self, Display, Formatter},
-    hash,
+    fmt::{self, Debug, Display, Formatter},
+    hash::{Hash, Hasher},
     sync::Arc,
 };
 use tracing::info;
@@ -196,14 +199,29 @@ impl Id {
             && self.keys.iter().zip(&other.keys).all(|(a, b)| a == b)
     }
 }
-impl fmt::Debug for Id {
+impl Debug for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "HirId({}:{})", self.module, self.keys.iter().join(":"))
+        write!(
+            f,
+            "HirId({}:{})",
+            <Module as ToRichIr<Module>>::to_rich_ir(&self.module).text,
+            self.keys.iter().join(":"),
+        )
     }
 }
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{self:?}")
+    }
+}
+impl ToRichIr<HirReferenceKey> for Id {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
+        let range = builder.push(
+            self.to_short_debug_string(),
+            TokenType::Variable,
+            EnumSet::empty(),
+        );
+        builder.push_reference(self.to_owned(), range);
     }
 }
 
@@ -252,8 +270,8 @@ impl Expression {
     }
 }
 #[allow(clippy::derived_hash_with_manual_eq)]
-impl hash::Hash for Expression {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+impl Hash for Expression {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
     }
 }
@@ -268,14 +286,20 @@ impl CountableId for PatternIdentifierId {
         self.0
     }
 }
-impl fmt::Debug for PatternIdentifierId {
+impl Debug for PatternIdentifierId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "pattern_identifier_{:x}", self.0)
     }
 }
-impl fmt::Display for PatternIdentifierId {
+impl Display for PatternIdentifierId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "p${}", self.0)
+    }
+}
+impl ToRichIr<HirReferenceKey> for PatternIdentifierId {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
+        // TODO: convert to actual reference
+        builder.push(self.to_string(), TokenType::Variable, EnumSet::empty());
     }
 }
 
@@ -295,8 +319,8 @@ pub enum Pattern {
     },
 }
 #[allow(clippy::derived_hash_with_manual_eq)]
-impl hash::Hash for Pattern {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+impl Hash for Pattern {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
     }
 }
@@ -390,8 +414,8 @@ pub struct Body {
     pub identifiers: FxHashMap<Id, String>,
 }
 #[allow(clippy::derived_hash_with_manual_eq)]
-impl hash::Hash for Body {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+impl Hash for Body {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         self.expressions.hash(state);
     }
 }
@@ -413,199 +437,241 @@ impl Body {
     }
 }
 
-impl fmt::Display for Expression {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+#[derive(Debug, PartialEq, Eq, Hash, From)]
+pub enum HirReferenceKey {
+    Module(Module),
+    Id(Id),
+    Int(BigUint),
+    Text(String),
+    #[from(ignore)]
+    Symbol(String),
+    BuiltinFunction(BuiltinFunction),
+}
+impl ToRichIr<HirReferenceKey> for Expression {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
         match self {
-            Expression::Int(int) => write!(f, "int {int}"),
-            Expression::Text(text) => write!(f, "text {text:?}"),
+            Expression::Int(int) => {
+                let range = builder.push(int.to_string(), TokenType::Int, EnumSet::empty());
+                builder.push_reference(int.to_owned(), range);
+            }
+            Expression::Text(text) => {
+                let range =
+                    builder.push(format!(r#""{}""#, text), TokenType::Text, EnumSet::empty());
+                builder.push_reference(text.to_owned(), range);
+            }
             Expression::Reference(reference) => {
-                write!(f, "reference {}", reference.to_short_debug_string())
+                reference.build_rich_ir(builder);
             }
-            Expression::Symbol(symbol) => write!(f, "symbol {symbol}"),
+            Expression::Symbol(symbol) => {
+                let range = builder.push(symbol, TokenType::Symbol, EnumSet::empty());
+                builder.push_reference(HirReferenceKey::Symbol(symbol.to_owned()), range);
+            }
             Expression::List(items) => {
-                write!(
-                    f,
-                    "list (\n{}\n)",
-                    items
-                        .iter()
-                        .map(|item| format!("  {},", item.to_short_debug_string()))
-                        .join("\n"),
-                )
+                builder.push("(", None, EnumSet::empty());
+                builder.push_children(items, ", ");
+                builder.push(")", None, EnumSet::empty());
             }
-            Expression::Struct(entries) => {
-                write!(
-                    f,
-                    "struct [\n{}\n]",
-                    entries
-                        .iter()
-                        .map(|(key, value)| format!(
-                            "  {}: {},",
-                            key.to_short_debug_string(),
-                            value.to_short_debug_string(),
-                        ))
-                        .join("\n"),
-                )
+            Expression::Struct(fields) => {
+                builder.push("[", None, EnumSet::empty());
+                builder.push_children_custom(
+                    fields.iter().collect_vec(),
+                    |builder, (key, value)| {
+                        key.build_rich_ir(builder);
+                        builder.push(": ", None, EnumSet::empty());
+                        value.build_rich_ir(builder);
+                    },
+                    ", ",
+                );
+                builder.push("]", None, EnumSet::empty());
             }
             Expression::Destructure {
                 expression,
                 pattern,
-            } => write!(
-                f,
-                "destructure {} into {pattern}",
-                expression.to_short_debug_string(),
-            ),
+            } => {
+                builder.push("destructure ", None, EnumSet::empty());
+                expression.build_rich_ir(builder);
+                builder.push(" into ", None, EnumSet::empty());
+                pattern.build_rich_ir(builder);
+            }
             Expression::PatternIdentifierReference(identifier_id) => {
-                write!(f, "get destructured {identifier_id}")
+                identifier_id.build_rich_ir(builder)
             }
             Expression::Match { expression, cases } => {
-                write!(
-                    f,
-                    "match {} with these cases:\n{}",
-                    expression.to_short_debug_string(),
-                    cases
-                        .iter()
-                        .map(|(pattern, body)| format!("{pattern} ->\n{body}")
-                            .lines()
-                            .enumerate()
-                            .map(|(i, line)| format!(
-                                "{}{line}",
-                                if i == 0 { "  " } else { "    " }
-                            ))
-                            .join("\n"))
-                        .join("\n"),
-                )
+                expression.build_rich_ir(builder);
+                builder.push(" %", None, EnumSet::empty());
+                builder.push_children_custom_multiline(cases, |builder, (pattern, body)| {
+                    pattern.build_rich_ir(builder);
+                    builder.push(" ->", None, EnumSet::empty());
+                    builder.indent();
+                    builder.push_foldable(|builder| {
+                        if !body.expressions.is_empty() {
+                            builder.push_newline();
+                        }
+                        body.build_rich_ir(builder);
+                    });
+                    builder.dedent();
+                });
             }
             Expression::Lambda(lambda) => {
-                write!(
-                    f,
-                    "lambda ({}) {{ {}\n}}",
-                    if lambda.fuzzable {
-                        "fuzzable"
-                    } else {
-                        "non-fuzzable"
-                    },
-                    lambda
-                        .to_string()
-                        .lines()
-                        .enumerate()
-                        .map(|(i, line)| format!("{}{line}", if i == 0 { "" } else { "  " }))
-                        .join("\n"),
-                )
+                builder.push(
+                    format!(
+                        "{{ ({}) ",
+                        if lambda.fuzzable {
+                            "fuzzable"
+                        } else {
+                            "non-fuzzable"
+                        },
+                    ),
+                    None,
+                    EnumSet::empty(),
+                );
+                lambda.build_rich_ir(builder);
+                builder.push("}", None, EnumSet::empty());
             }
             Expression::Builtin(builtin) => {
-                write!(f, "builtin{builtin:?}")
+                let range = builder.push(
+                    format!("builtin{builtin:?}"),
+                    TokenType::Function,
+                    EnumSet::only(TokenModifier::Builtin),
+                );
+                builder.push_reference(*builtin, range);
             }
             Expression::Call {
                 function,
                 arguments,
             } => {
                 assert!(!arguments.is_empty(), "A call needs to have arguments.");
-                write!(
-                    f,
-                    "call {} with these arguments:\n{}",
-                    function.to_short_debug_string(),
-                    arguments
-                        .iter()
-                        .map(|argument| format!("  {}", argument.to_short_debug_string()))
-                        .join("\n"),
-                )
+                builder.push("call ", None, EnumSet::empty());
+                function.build_rich_ir(builder);
+                builder.push(" with ", None, EnumSet::empty());
+                builder.push_children(arguments, " ");
             }
             Expression::UseModule {
                 current_module,
                 relative_path,
-            } => write!(
-                f,
-                "use module {} relative to {}",
-                relative_path.to_short_debug_string(),
-                current_module,
-            ),
+            } => {
+                builder.push("use module ", None, EnumSet::empty());
+                current_module.build_rich_ir(builder);
+                builder.push(" relative to", None, EnumSet::empty());
+                relative_path.build_rich_ir(builder);
+            }
             Expression::Needs { condition, reason } => {
-                write!(
-                    f,
-                    "needs {} with reason {}",
-                    condition.to_short_debug_string(),
-                    reason.to_short_debug_string(),
-                )
+                builder.push("needs ", None, EnumSet::empty());
+                condition.build_rich_ir(builder);
+                builder.push(" with reason ", None, EnumSet::empty());
+                reason.build_rich_ir(builder);
             }
             Expression::Error { child, errors } => {
-                write!(f, "{}", if errors.len() == 1 { "error" } else { "errors" })?;
-                for error in errors {
-                    write!(f, "\n  {error:?}")?;
-                }
-                if let Some(child) = child {
-                    write!(f, "\n  fallback: {child}")?;
-                }
-                Ok(())
+                build_errors_rich_ir(builder, errors, child);
             }
         }
     }
 }
-impl fmt::Display for Pattern {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl ToRichIr<HirReferenceKey> for Pattern {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
         match self {
-            Pattern::Int(int) => write!(f, "{int}"),
-            Pattern::Text(text) => write!(f, "\"{text:?}\""),
-            Pattern::NewIdentifier(reference) => write!(f, "{reference}"),
-            Pattern::Symbol(symbol) => write!(f, "{symbol}"),
+            Pattern::Int(int) => {
+                builder.push(format!("{int}"), TokenType::Int, EnumSet::empty());
+            }
+            Pattern::Text(text) => {
+                builder.push(format!(r#""{text:?}\""#), TokenType::Text, EnumSet::empty());
+            }
+            Pattern::NewIdentifier(reference) => reference.build_rich_ir(builder),
+            Pattern::Symbol(symbol) => {
+                builder.push(symbol, TokenType::Symbol, EnumSet::empty());
+            }
             Pattern::List(items) => {
-                write!(
-                    f,
-                    "({})",
-                    match items.as_slice() {
-                        [] => ",".to_owned(),
-                        [item] => format!("{item},"),
-                        items => items.iter().map(|item| format!("{item}")).join(", "),
-                    },
-                )
+                builder.push("(", None, EnumSet::empty());
+                builder.push_children(items, ", ");
+                if items.len() <= 1 {
+                    builder.push(",", None, EnumSet::empty());
+                }
+                builder.push(")", None, EnumSet::empty());
             }
             Pattern::Struct(entries) => {
-                write!(
-                    f,
-                    "[{}]",
-                    entries
-                        .iter()
-                        .map(|(key, value)| format!("{key}: {value}"))
-                        .join(", "),
-                )
+                builder.push("[", None, EnumSet::empty());
+                builder.push_children_custom(
+                    entries,
+                    |builder, (key, value)| {
+                        key.build_rich_ir(builder);
+                        builder.push(": ", None, EnumSet::empty());
+                        value.build_rich_ir(builder);
+                    },
+                    ", ",
+                );
+                builder.push("]", None, EnumSet::empty());
             }
-            Pattern::Or(patterns) => write!(
-                f,
-                "{}",
-                patterns.iter().map(|it| it.to_string()).join(" | "),
-            ),
+            Pattern::Or(patterns) => builder.push_children(patterns, " | "),
             Pattern::Error { child, errors } => {
-                write!(f, "{}", if errors.len() == 1 { "error" } else { "errors" })?;
-                for error in errors {
-                    write!(f, "\n  {error}")?;
-                }
-                if let Some(child) = child {
-                    write!(f, "\n  fallback: {child}")?;
-                }
-                Ok(())
+                build_errors_rich_ir(builder, errors, child);
             }
         }
     }
 }
-impl fmt::Display for Lambda {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(
-            f,
-            "{} ->",
-            self.parameters
-                .iter()
-                .map(|parameter| parameter.to_short_debug_string())
-                .join(" "),
-        )?;
-        write!(f, "{}", self.body)?;
-        Ok(())
+fn build_errors_rich_ir<C: ToRichIr<HirReferenceKey>>(
+    builder: &mut RichIrBuilder<HirReferenceKey>,
+    errors: &[CompilerError],
+    child: &Option<C>,
+) {
+    builder.push(
+        if errors.len() == 1 { "error" } else { "errors" },
+        None,
+        EnumSet::empty(),
+    );
+    builder.push_foldable(|builder| {
+        builder.push_children_multiline(errors);
+        if let Some(child) = child {
+            builder.indent();
+            builder.push_newline();
+            builder.push("fallback: ", None, EnumSet::empty());
+            child.build_rich_ir(builder);
+            builder.dedent();
+        }
+    });
+}
+impl ToRichIr<HirReferenceKey> for Lambda {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
+        for parameter in &self.parameters {
+            let range = builder.push(
+                parameter.to_short_debug_string(),
+                TokenType::Parameter,
+                EnumSet::empty(),
+            );
+            builder.push_definition(parameter.to_owned(), range);
+            builder.push(" ", None, EnumSet::empty());
+        }
+        builder.push("->", None, EnumSet::empty());
+        builder.push_foldable(|builder| {
+            builder.indent();
+            builder.push_newline();
+            self.body.build_rich_ir(builder);
+            builder.dedent();
+            builder.push_newline();
+        });
     }
 }
-impl fmt::Display for Body {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (id, expression) in &self.expressions {
-            writeln!(f, "{} = {expression}", id.to_short_debug_string())?;
+impl ToRichIr<HirReferenceKey> for Body {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
+        fn push(builder: &mut RichIrBuilder<HirReferenceKey>, id: &Id, expression: &Expression) {
+            let range = builder.push(
+                id.to_short_debug_string(),
+                TokenType::Variable,
+                EnumSet::empty(),
+            );
+            builder.push_definition(id.to_owned(), range);
+
+            builder.push(" = ", None, EnumSet::empty());
+            expression.build_rich_ir(builder);
         }
-        Ok(())
+
+        let mut iterator = self.expressions.iter();
+        if let Some((id, expression)) = iterator.next() {
+            push(builder, id, expression);
+        }
+        for (id, expression) in iterator {
+            builder.push_newline();
+            push(builder, id, expression);
+        }
     }
 }
 

@@ -18,6 +18,7 @@ pub mod module;
 pub mod position;
 pub mod rcst;
 pub mod rcst_to_cst;
+pub mod rich_ir;
 pub mod string_to_rcst;
 pub mod tracing;
 mod utils;

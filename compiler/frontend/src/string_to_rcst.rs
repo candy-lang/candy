@@ -4,10 +4,12 @@ use std::sync::Arc;
 
 #[salsa::query_group(StringToRcstStorage)]
 pub trait StringToRcst: ModuleDb {
-    fn rcst(&self, module: Module) -> Result<Arc<Vec<Rcst>>, InvalidModuleError>;
+    fn rcst(&self, module: Module) -> RcstResult;
 }
 
-fn rcst(db: &dyn StringToRcst, module: Module) -> Result<Arc<Vec<Rcst>>, InvalidModuleError> {
+pub type RcstResult = Result<Arc<Vec<Rcst>>, InvalidModuleError>;
+
+fn rcst(db: &dyn StringToRcst, module: Module) -> RcstResult {
     if let Package::Tooling(_) = &module.package {
         return Err(InvalidModuleError::IsToolingModule);
     }

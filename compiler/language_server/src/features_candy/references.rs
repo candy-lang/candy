@@ -1,76 +1,29 @@
 use candy_frontend::{
+    ast_to_hir::AstToHir,
     cst::{CstDb, CstKind},
     hir::{self, Body, Expression, HirDb, Lambda},
-    module::{Module, ModuleDb, ModuleKind},
+    module::{Module, ModuleDb},
     position::{Offset, PositionConversionDb},
+    rich_ir::ToRichIr,
 };
-use lsp_types::{
-    DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams, Location, ReferenceParams,
-    TextDocumentPositionParams,
-};
-use std::{collections::HashSet, path::PathBuf};
+use lsp_types::{DocumentHighlight, DocumentHighlightKind};
+use num_bigint::BigUint;
+use std::collections::HashSet;
 use tracing::{debug, info};
 
-use crate::utils::{module_from_package_root_and_url, LspPositionConversion};
+use crate::utils::LspPositionConversion;
 
-pub fn find_references<DB>(
+pub fn references<DB>(
     db: &DB,
-    project_directory: PathBuf,
-    params: ReferenceParams,
-) -> Option<Vec<Location>>
-where
-    DB: HirDb + ModuleDb + PositionConversionDb + ReferencesDb,
-{
-    let position = params.text_document_position;
-    let references = find(
-        db,
-        project_directory,
-        position.clone(),
-        params.context.include_declaration,
-    )?
-    .into_iter()
-    .map(|it| Location {
-        uri: position.text_document.uri.clone(),
-        range: it.range,
-    })
-    .collect();
-    Some(references)
-}
-
-pub fn find_document_highlights<DB>(
-    db: &DB,
-    project_directory: PathBuf,
-    params: DocumentHighlightParams,
-) -> Option<Vec<DocumentHighlight>>
-where
-    DB: HirDb + ModuleDb + PositionConversionDb + ReferencesDb,
-{
-    find(
-        db,
-        project_directory,
-        params.text_document_position_params,
-        true,
-    )
-}
-
-fn find<DB>(
-    db: &DB,
-    project_directory: PathBuf,
-    params: TextDocumentPositionParams,
+    module: Module,
+    offset: Offset,
     include_declaration: bool,
 ) -> Option<Vec<DocumentHighlight>>
 where
-    DB: HirDb + ModuleDb + PositionConversionDb + ReferencesDb,
+    DB: HirDb + ModuleDb + PositionConversionDb,
 {
-    let module = module_from_package_root_and_url(
-        project_directory,
-        params.text_document.uri,
-        ModuleKind::Code,
-    );
-    let position = params.position;
-    let offset = db.lsp_position_to_offset(module.clone(), position);
     let query = query_for_offset(db, module, offset)?;
-    Some(db.references(query, include_declaration))
+    Some(find_references(db, query, include_declaration))
 }
 
 fn query_for_offset<DB: CstDb>(db: &DB, module: Module, offset: Offset) -> Option<ReferenceQuery>
@@ -99,7 +52,7 @@ where
                             return None;
                         }
                         Expression::Error { .. } => return None,
-                        _ => panic!("Expected a reference, got {hir_expr}."),
+                        _ => panic!("Expected a reference, got {}.", hir_expr.to_rich_ir().text),
                     }
                 }
             } else {
@@ -109,29 +62,22 @@ where
             Some(ReferenceQuery::Id(target_id))
         }
         CstKind::Symbol(symbol) => Some(ReferenceQuery::Symbol(module, symbol)),
+        CstKind::Int { value, .. } => Some(ReferenceQuery::Int(module, value)),
         _ => None,
     };
     debug!("Reference query: {query:?}");
     query
 }
 
-#[salsa::query_group(ReferencesDbStorage)]
-pub trait ReferencesDb: HirDb + ModuleDb + PositionConversionDb {
-    fn references(
-        &self,
-        query: ReferenceQuery,
-        include_declaration: bool,
-    ) -> Vec<DocumentHighlight>;
-}
-
-fn references(
-    db: &dyn ReferencesDb,
+fn find_references<DB: AstToHir + HirDb + PositionConversionDb>(
+    db: &DB,
     query: ReferenceQuery,
     include_declaration: bool,
 ) -> Vec<DocumentHighlight> {
     // TODO: search all files
     let module = match &query {
         ReferenceQuery::Id(id) => id.module.clone(),
+        ReferenceQuery::Int(module, _) => module.to_owned(),
         ReferenceQuery::Symbol(module, _) => module.to_owned(),
         ReferenceQuery::Needs(module) => module.to_owned(),
     };
@@ -142,7 +88,7 @@ fn references(
     context.references
 }
 
-struct Context<'a, DB: PositionConversionDb + ReferencesDb + ?Sized> {
+struct Context<'a, DB: PositionConversionDb + ?Sized> {
     db: &'a DB,
     query: ReferenceQuery,
     include_declaration: bool,
@@ -152,12 +98,13 @@ struct Context<'a, DB: PositionConversionDb + ReferencesDb + ?Sized> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ReferenceQuery {
     Id(hir::Id),
+    Int(Module, BigUint),
     Symbol(Module, String),
     Needs(Module),
 }
 impl<'a, DB> Context<'a, DB>
 where
-    DB: PositionConversionDb + ReferencesDb + ?Sized,
+    DB: PositionConversionDb + HirDb + ?Sized,
 {
     fn new(db: &'a DB, query: ReferenceQuery, include_declaration: bool) -> Self {
         Self {
@@ -193,7 +140,12 @@ where
     }
     fn visit_expression(&mut self, id: hir::Id, expression: &Expression) {
         match expression {
-            Expression::Int(_) | Expression::Text(_) => {}
+            Expression::Int(int) =>{
+                if let ReferenceQuery::Int(_, target) = &self.query && int == target {
+                    self.add_reference(id, DocumentHighlightKind::READ);
+                }
+            },
+            Expression::Text(_) => {},
             Expression::Reference(target) => {
                 if let ReferenceQuery::Id(target_id) = &self.query && target == target_id {
                     self.add_reference(id, DocumentHighlightKind::READ);

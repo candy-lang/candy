@@ -1,20 +1,12 @@
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+use serde::{Deserialize, Serialize};
+
+#[derive(PartialEq, Eq, Hash, Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TracingConfig {
     pub register_fuzzables: TracingMode,
     pub calls: TracingMode,
     pub evaluated_expressions: TracingMode,
 }
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
-pub enum TracingMode {
-    Off,
-
-    /// Traces the module that's the root of the compilation and no child
-    /// modules.
-    OnlyCurrent,
-
-    All,
-}
-
 impl TracingConfig {
     pub const fn off() -> Self {
         Self {
@@ -33,6 +25,17 @@ impl TracingConfig {
     }
 }
 
+#[derive(PartialEq, Eq, Hash, Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TracingMode {
+    Off,
+
+    /// Traces the module that's the root of the compilation and no child
+    /// modules.
+    OnlyCurrent,
+
+    All,
+}
 impl TracingMode {
     pub fn all_or_off(should_trace: bool) -> Self {
         if should_trace {

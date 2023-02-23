@@ -5,6 +5,7 @@ use candy_frontend::{
     hir::{Expression, HirDb, Id},
     module::{Module, ModuleDb},
     position::PositionConversionDb,
+    rich_ir::ToRichIr,
     TracingConfig, TracingMode,
 };
 use candy_vm::{
@@ -99,7 +100,8 @@ impl ConstantEvaluator {
     where
         DB: AstDb + AstToHir + HirDb + ModuleDb + PositionConversionDb,
     {
-        let span = span!(Level::DEBUG, "Calculating hints", %module);
+        let module_string = <Module as ToRichIr<Module>>::to_rich_ir(module).text;
+        let span = span!(Level::DEBUG, "Calculating hints", %module_string);
         let _enter = span.enter();
 
         let evaluator = &self.evaluators[module];

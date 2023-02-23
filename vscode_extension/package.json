@@ -51,6 +51,38 @@
         }
       }
     ],
+    "commands": [
+      {
+        "category": "Candy Compiler Debugging",
+        "command": "candy.debug.viewRcst",
+        "title": "View RCST"
+      },
+      {
+        "category": "Candy Compiler Debugging",
+        "command": "candy.debug.viewAst",
+        "title": "View AST"
+      },
+      {
+        "category": "Candy Compiler Debugging",
+        "command": "candy.debug.viewHir",
+        "title": "View HIR"
+      },
+      {
+        "category": "Candy Compiler Debugging",
+        "command": "candy.debug.viewMir",
+        "title": "View MIR"
+      },
+      {
+        "category": "Candy Compiler Debugging",
+        "command": "candy.debug.viewOptimizedMir",
+        "title": "View Optimized MIR"
+      },
+      {
+        "category": "Candy Compiler Debugging",
+        "command": "candy.debug.viewLir",
+        "title": "View LIR"
+      }
+    ],
     "configuration": {
       "title": "🍭 Candy",
       "properties": {
@@ -93,17 +125,17 @@
     "test": "node ./out/test/runTest.js"
   },
   "dependencies": {
-    "vscode-languageclient": "^8.0.2"
+    "vscode-languageclient": "^8.1.0"
   },
   "devDependencies": {
-    "@types/glob": "^7.1.3",
+    "@types/glob": "^8.0.1",
     "@types/mocha": "^10.0.1",
-    "@types/node": "^18.13.0",
-    "@types/vscode": "^1.66.0",
-    "@typescript-eslint/eslint-plugin": "^5.20.0",
-    "@typescript-eslint/parser": "^5.21.0",
-    "eslint": "^8.14.0",
-    "glob": "^8.0.1",
+    "@types/node": "^18.14.0",
+    "@types/vscode": "^1.75.1",
+    "@typescript-eslint/eslint-plugin": "^5.52.0",
+    "@typescript-eslint/parser": "^5.52.0",
+    "eslint": "^8.34.0",
+    "glob": "^8.1.0",
     "mocha": "^10.2.0",
     "typescript": "^4.9.5",
     "vscode-test": "^1.4.0"
