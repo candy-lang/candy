@@ -238,7 +238,7 @@ fn raw_build(
 
     let lir = db.lir(module.clone(), tracing.clone()).unwrap();
     if debug {
-        module.dump_associated_debug_file("lir", &format!("{lir}"));
+        module.dump_associated_debug_file("lir", &format!("{}\n", lir.to_rich_ir()));
     }
 
     Some(lir)
