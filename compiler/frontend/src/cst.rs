@@ -151,7 +151,6 @@ pub enum CstKind {
     },
     Assignment {
         name_or_pattern: Box<Cst>,
-        parameters: Vec<Cst>,
         assignment_sign: Box<Cst>,
         body: Vec<Cst>,
     },
@@ -354,14 +353,10 @@ impl Display for Cst {
             }
             CstKind::Assignment {
                 name_or_pattern,
-                parameters,
                 assignment_sign,
                 body,
             } => {
                 name_or_pattern.fmt(f)?;
-                for parameter in parameters {
-                    parameter.fmt(f)?;
-                }
                 assignment_sign.fmt(f)?;
                 for expression in body {
                     expression.fmt(f)?;
@@ -571,12 +566,10 @@ impl UnwrapWhitespaceAndComment for Cst {
             },
             CstKind::Assignment {
                 name_or_pattern,
-                parameters,
                 assignment_sign,
                 body,
             } => CstKind::Assignment {
                 name_or_pattern: Box::new(name_or_pattern.unwrap_whitespace_and_comment()),
-                parameters: parameters.unwrap_whitespace_and_comment(),
                 assignment_sign: Box::new(assignment_sign.unwrap_whitespace_and_comment()),
                 body: body.unwrap_whitespace_and_comment(),
             },
@@ -750,12 +743,10 @@ impl TreeWithIds for Cst {
                 .or_else(|| closing_curly_brace.find(id)),
             CstKind::Assignment {
                 name_or_pattern,
-                parameters,
                 assignment_sign,
                 body,
             } => name_or_pattern
                 .find(id)
-                .or_else(|| parameters.find(id))
                 .or_else(|| assignment_sign.find(id))
                 .or_else(|| body.find(id)),
             CstKind::Error { .. } => None,
@@ -887,13 +878,11 @@ impl TreeWithIds for Cst {
             CstKind::Lambda { body, .. } => (body.find_by_offset(offset), false),
             CstKind::Assignment {
                 name_or_pattern,
-                parameters,
                 assignment_sign,
                 body,
             } => (
                 name_or_pattern
                     .find_by_offset(offset)
-                    .or_else(|| parameters.find_by_offset(offset))
                     .or_else(|| assignment_sign.find_by_offset(offset))
                     .or_else(|| body.find_by_offset(offset)),
                 false,

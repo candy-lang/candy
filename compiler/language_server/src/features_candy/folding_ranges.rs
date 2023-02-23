@@ -177,7 +177,6 @@ where
             CstKind::Assignment {
                 name_or_pattern,
                 assignment_sign,
-                parameters,
                 body,
             } => {
                 if !body.is_empty() {
@@ -191,7 +190,6 @@ where
                 }
 
                 self.visit_cst(name_or_pattern);
-                self.visit_csts(parameters);
                 self.visit_csts(body);
             }
             CstKind::Error { .. } => {}

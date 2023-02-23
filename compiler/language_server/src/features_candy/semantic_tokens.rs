@@ -254,12 +254,10 @@ fn visit_cst(
         }
         CstKind::Assignment {
             name_or_pattern,
-            parameters,
             assignment_sign,
             body,
         } => {
             visit_cst(builder, name_or_pattern, Some(SemanticTokenType::Variable));
-            visit_csts(builder, &parameters[..], Some(SemanticTokenType::Parameter));
             visit_cst(builder, assignment_sign, None);
             visit_csts(builder, body, None);
         }

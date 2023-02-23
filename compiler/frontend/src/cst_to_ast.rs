@@ -766,7 +766,6 @@ impl LoweringContext {
             }
             CstKind::Assignment {
                 name_or_pattern,
-                parameters,
                 assignment_sign,
                 body,
             } => {
@@ -777,16 +776,14 @@ impl LoweringContext {
                 );
 
                 let body = self.lower_csts(body);
-                let (body, errors) = if parameters.is_empty() {
-                    let body = AssignmentBody::Body {
-                        pattern: Box::new(self.lower_cst(name_or_pattern, LoweringType::Pattern)),
-                        body,
-                    };
-                    (body, vec![])
-                } else {
-                    let name = match &name_or_pattern.kind {
+                let (body, errors) = if let CstKind::Call {
+                    receiver: name,
+                    arguments: parameters,
+                } = &name_or_pattern.kind
+                {
+                    let name = match &name.kind {
                         CstKind::Identifier(identifier) => {
-                            self.create_string(name_or_pattern.id.to_owned(), identifier.to_owned())
+                            self.create_string(name.id.to_owned(), identifier.to_owned())
                         }
                         CstKind::Error { error, .. } => {
                             return self.create_ast(
@@ -795,7 +792,7 @@ impl LoweringContext {
                                     child: None,
                                     errors: vec![CompilerError {
                                         module: self.module.clone(),
-                                        span: name_or_pattern.span.clone(),
+                                        span: name.span.clone(),
                                         payload: CompilerErrorPayload::Rcst(error.clone()),
                                     }],
                                 },
@@ -808,7 +805,7 @@ impl LoweringContext {
                                     child: None,
                                     errors: vec![CompilerError {
                                         module: self.module.clone(),
-                                        span: name_or_pattern.span.clone(),
+                                        span: name.span.clone(),
                                         payload: CompilerErrorPayload::Ast(
                                             AstError::ExpectedNameOrPatternInAssignment,
                                         ),
@@ -828,6 +825,12 @@ impl LoweringContext {
                         },
                     };
                     (body, errors)
+                } else {
+                    let body = AssignmentBody::Body {
+                        pattern: Box::new(self.lower_cst(name_or_pattern, LoweringType::Pattern)),
+                        body,
+                    };
+                    (body, vec![])
                 };
 
                 let ast = self.create_ast(

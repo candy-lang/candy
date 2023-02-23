@@ -277,12 +277,10 @@ impl RcstToCstExt for Rcst {
             },
             Rcst::Assignment {
                 name_or_pattern,
-                parameters,
                 assignment_sign,
                 body,
             } => CstKind::Assignment {
                 name_or_pattern: Box::new(name_or_pattern.to_cst(state)),
-                parameters: parameters.to_csts(state),
                 assignment_sign: Box::new(assignment_sign.to_cst(state)),
                 body: body.to_csts(state),
             },

@@ -115,7 +115,6 @@ pub enum Rcst {
     },
     Assignment {
         name_or_pattern: Box<Rcst>,
-        parameters: Vec<Rcst>,
         assignment_sign: Box<Rcst>,
         body: Vec<Rcst>,
     },
@@ -363,14 +362,10 @@ impl Display for Rcst {
             }
             Rcst::Assignment {
                 name_or_pattern,
-                parameters,
                 assignment_sign,
                 body,
             } => {
                 name_or_pattern.fmt(f)?;
-                for parameter in parameters {
-                    parameter.fmt(f)?;
-                }
                 assignment_sign.fmt(f)?;
                 for expression in body {
                     expression.fmt(f)?;
@@ -513,12 +508,10 @@ impl IsMultiline for Rcst {
             }
             Rcst::Assignment {
                 name_or_pattern,
-                parameters,
                 assignment_sign,
                 body,
             } => {
                 name_or_pattern.is_multiline()
-                    || parameters.is_multiline()
                     || assignment_sign.is_multiline()
                     || body.is_multiline()
             }

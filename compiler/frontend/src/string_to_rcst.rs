@@ -1528,7 +1528,6 @@ mod parse {
             input,
             Rcst::Assignment {
                 name_or_pattern: Box::new(name_or_pattern),
-                parameters,
                 assignment_sign: Box::new(assignment_sign),
                 body,
             }
@@ -1888,7 +1887,6 @@ mod parse {
                         child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
-                    parameters: vec![],
                     assignment_sign: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::EqualsSign),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
@@ -1910,13 +1908,15 @@ mod parse {
                 "\n2",
                 Rcst::Assignment {
                     name_or_pattern: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
+                        child: Box::new(Rcst::Call {
+                            receiver: Box::new(Rcst::Identifier("foo".to_string())),
+                            arguments: vec![Rcst::TrailingWhitespace {
+                                child: Box::new(Rcst::Identifier("bar".to_string())),
+                                whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                            }],
+                        }),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
-                    parameters: vec![Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("bar".to_string())),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }],
                     assignment_sign: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::EqualsSign),
                         whitespace: vec![
@@ -1940,19 +1940,24 @@ mod parse {
                 "",
                 Rcst::Assignment {
                     name_or_pattern: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![
-                            Rcst::Newline("\n".to_string()),
-                            Rcst::Whitespace("  ".to_string()),
-                        ],
+                        child: Box::new(Rcst::Call {
+                            receiver: Box::new(Rcst::TrailingWhitespace {
+                                child: Box::new(Rcst::Identifier("foo".to_string())),
+                                whitespace: vec![
+                                    Rcst::Newline("\n".to_string()),
+                                    Rcst::Whitespace("  ".to_string()),
+                                ],
+                            }),
+                            arguments: vec![Rcst::TrailingWhitespace {
+                                child: Box::new(Rcst::Identifier("bar".to_string())),
+                                whitespace: vec![
+                                    Rcst::Newline("\n".to_string()),
+                                    Rcst::Whitespace("  ".to_string()),
+                                ],
+                            }],
+                        }),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
-                    parameters: vec![Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("bar".to_string())),
-                        whitespace: vec![
-                            Rcst::Newline("\n".to_string()),
-                            Rcst::Whitespace("  ".to_string()),
-                        ],
-                    }],
                     assignment_sign: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::EqualsSign),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
@@ -1973,7 +1978,6 @@ mod parse {
                         child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
-                    parameters: vec![],
                     assignment_sign: Box::new(Rcst::EqualsSign),
                     body: vec![],
                 },
@@ -1988,7 +1992,6 @@ mod parse {
                         child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
-                    parameters: vec![],
                     assignment_sign: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::EqualsSign),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
@@ -2012,7 +2015,6 @@ mod parse {
                         child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
-                    parameters: vec![],
                     assignment_sign: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::EqualsSign),
                         whitespace: vec![
@@ -2040,7 +2042,6 @@ mod parse {
                         child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
-                    parameters: vec![],
                     assignment_sign: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::EqualsSign),
                         whitespace: vec![
@@ -2088,7 +2089,6 @@ mod parse {
                         }),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
-                    parameters: vec![],
                     assignment_sign: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::EqualsSign),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
@@ -2142,7 +2142,6 @@ mod parse {
                         }),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
-                    parameters: vec![],
                     assignment_sign: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::EqualsSign),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
