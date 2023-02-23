@@ -1,4 +1,4 @@
-# As soon as tags or value hiding is supported, change fixed point numbers to
+# TODO: As soon as tags or value hiding is supported, change fixed point numbers to
 # that. Currently, they're just normal ints.
 
 bool = use "..bool"
@@ -14,16 +14,16 @@ decimalsPow = 10000000
 is := int.is
 
 fromInt a :=
-  needs (is a)
-  int.multiply a decimalsPow
+  needs (int.is a)
+  a | int.multiply decimalsPow
 
 floorToInt a :=
   needs (is a)
-  int.divideTruncating a decimalsPow
+  a | int.divideTruncating decimalsPow
 
 isNonNegative a :=
   needs (is a)
-  int.isNonNegative a
+  a | int.isNonNegative
 
 add a b :=
   needs (is a)

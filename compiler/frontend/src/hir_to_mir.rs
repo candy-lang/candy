@@ -476,7 +476,7 @@ impl<'a> LoweringContext<'a> {
                 body.push_call(
                     builtin_if_else,
                     vec![is_match, then_lambda, else_lambda],
-                    responsible_for_needs,
+                    responsible_for_match,
                 )
             }
         }
