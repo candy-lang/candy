@@ -535,7 +535,7 @@ impl ToRichIr for Expression {
             } => {
                 builder.push("use module ", None, EnumSet::empty());
                 current_module.build_rich_ir(builder);
-                builder.push(" relative to", None, EnumSet::empty());
+                builder.push(" relative to ", None, EnumSet::empty());
                 relative_path.build_rich_ir(builder);
             }
             Expression::Needs { condition, reason } => {
