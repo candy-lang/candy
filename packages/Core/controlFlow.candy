@@ -1,6 +1,7 @@
 bool = use "..bool"
 [equals] = use "..equality"
 function = use "..function"
+[typeOf] = use "..type"
 
 ifElse condition then else :=
   needs (bool.is condition)
@@ -24,6 +25,7 @@ recursive initialArg body :=
 ## TODO: Support breaking with a value as soon as tags are supported.
 ## TODO: Support looping with a state.
 loop body :=
+  # Executes the body infinitely often.
   needs (function.is0 body)
   recursive Nothing { recurse arg ->
     result = function.run body
@@ -31,4 +33,15 @@ loop body :=
       ((result | equals Continue) | bool.or (result | equals Break))
       "The `body` has to return `Continue` or `Break`."
     if (result | equals Continue) { recurse Nothing }
+  }
+
+repeat times body :=
+  needs (typeOf times | equals Int)
+  needs (times | ✨.intCompareTo 0 | equals Less | bool.not)
+  needs (function.is0 body)
+  recursive times { recurse times ->
+    if (times | ✨.intCompareTo 0 | equals Greater) {
+      function.run body
+      recurse (✨.intSubtract times 1)
+    }
   }

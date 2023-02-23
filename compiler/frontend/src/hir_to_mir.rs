@@ -156,9 +156,14 @@ struct LoweringContext<'a> {
     mapping: &'a mut FxHashMap<hir::Id, Id>,
     needs_function: Id,
     tracing: &'a TracingConfig,
-    /// The result of the last pattern match and whether it was trivial
-    /// (i.e., `foo = …`).
-    last_pattern_result: Option<(Id, bool)>,
+    ongoing_destructuring: Option<OngoingDestructuring>,
+}
+#[derive(Clone)]
+struct OngoingDestructuring {
+    result: Id,
+
+    /// Assignments such as `foo = …` are considered trivial.
+    is_trivial: bool,
 }
 
 impl<'a> LoweringContext<'a> {
@@ -183,7 +188,7 @@ impl<'a> LoweringContext<'a> {
                 mapping: &mut mapping,
                 needs_function,
                 tracing,
-                last_pattern_result: None,
+                ongoing_destructuring: None,
             };
             context.compile_expressions(body, module_hir_id, &hir.expressions);
 
@@ -236,7 +241,10 @@ impl<'a> LoweringContext<'a> {
                 if let hir::Pattern::NewIdentifier(_) = pattern {
                     // The trivial case: `foo = …`.
                     let result = body.push_reference(expression);
-                    self.last_pattern_result = Some((result, true));
+                    self.ongoing_destructuring = Some(OngoingDestructuring {
+                        result,
+                        is_trivial: true,
+                    });
                     result
                 } else {
                     let pattern_result = PatternLoweringContext::compile_pattern(
@@ -246,6 +254,10 @@ impl<'a> LoweringContext<'a> {
                         expression,
                         pattern,
                     );
+                    self.ongoing_destructuring = Some(OngoingDestructuring {
+                        result: pattern_result,
+                        is_trivial: false,
+                    });
 
                     let nothing = body.push_nothing();
                     let is_match = body.push_is_match(pattern_result, responsible);
@@ -266,29 +278,20 @@ impl<'a> LoweringContext<'a> {
                             body.push_panic(reason, responsible);
                         },
                         responsible,
-                    );
-
-                    if !pattern.contains_captured_identifiers() {
-                        body.push_reference(nothing)
-                    } else {
-                        // The generated expression will be followed by at least one
-                        // identifier reference, so we don't have to generate a
-                        // reference to the result in here.
-                        self.last_pattern_result = Some((pattern_result, false));
-                        pattern_result
-                    }
+                    )
                 }
             }
             hir::Expression::PatternIdentifierReference(identifier_id) => {
-                let (pattern_result, is_trivial) = self.last_pattern_result.unwrap();
+                let OngoingDestructuring { result, is_trivial } =
+                    self.ongoing_destructuring.clone().unwrap();
 
                 if is_trivial {
-                    body.push_reference(pattern_result)
+                    body.push_reference(result)
                 } else {
                     let list_get = body.push_builtin(BuiltinFunction::ListGet);
                     let index = body.push_int((identifier_id.0 + 1).into());
                     let responsible = body.push_hir_id(hir_id.clone());
-                    body.push_call(list_get, vec![pattern_result, index], responsible)
+                    body.push_call(list_get, vec![result, index], responsible)
                 }
             }
             hir::Expression::Match { expression, cases } => {
@@ -436,7 +439,10 @@ impl<'a> LoweringContext<'a> {
 
                 let builtin_if_else = body.push_builtin(BuiltinFunction::IfElse);
                 let then_lambda = body.push_lambda(|body, _| {
-                    self.last_pattern_result = Some((pattern_result, false));
+                    self.ongoing_destructuring = Some(OngoingDestructuring {
+                        result: pattern_result,
+                        is_trivial: false,
+                    });
                     self.compile_expressions(body, responsible, &case_body.expressions);
                 });
                 let else_lambda = body.push_lambda(|body, _| {

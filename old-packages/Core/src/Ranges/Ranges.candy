@@ -26,30 +26,6 @@ public trait Range[T: Compare]: Equals {
 
 
 public type RangeBound[T: Compare] = Included T | Excluded T | Unbounded
-impl[T: Compare] RangeBound[T]: Equals {
-  fun equals(other: This): Bool {
-    this.match(
-      included = { value ->
-        other.match(included = { value == it }, excluded = { false() }, unbounded = { false() })
-      },
-      excluded = { value ->
-        other.match(included = { false() }, excluded = { value == it }, unbounded = { false() })
-      },
-      unbounded = {
-        other.match(included = { false() }, excluded = { false() }, unbounded = { true() })
-      },
-    )
-  }
-}
-impl[T: Compare & Hash] RangeBound[T]: Hash {
-  fun hash[H: Hasher](): H {
-    this.match(
-      included = { H.combine(List[H].of(0.hash[H](), it.hash[H]())) },
-      excluded = { H.combine(List[H].of(1.hash[H](), it.hash[H]())) },
-      unbounded = { 2.hash[H]() },
-    )
-  }
-}
 
 
 ## Inclusive start

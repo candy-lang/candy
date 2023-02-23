@@ -7,6 +7,7 @@ result = use "..result"
 type = use "..type"
 
 filled length item :=
+  # Creates a new list of the given length, where each slot is filled with the same item.
   needs (int.is length)
   needs (int.isNonNegative length)
   needs (int.fitsInRustU32 length)

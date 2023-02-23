@@ -4,5 +4,4 @@ todo message :=
   # Always panics with a todo message.
   needs (text.is message)
   ## There is no way to call `todo` correctly.
-  ## TODO: Use text interpolation when available.
-  needs False (text.concatenate "TODO: " message)
+  needs False "TODO: {message}"
