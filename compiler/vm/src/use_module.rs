@@ -29,7 +29,7 @@ impl Fiber {
         let lir = use_provider.use_module(module.clone()).ok_or_else(|| {
             format!(
                 "`use` couldn't import the module `{}`.",
-                <Module as ToRichIr<Module>>::to_rich_ir(&module),
+                module.to_rich_ir(),
             )
         })?;
         let closure = self

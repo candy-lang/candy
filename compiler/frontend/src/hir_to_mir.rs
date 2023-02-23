@@ -901,7 +901,7 @@ impl CompilerError {
         let range = db.range_to_positions(self.module.clone(), self.span.clone());
         format!(
             "{}:{}:{} – {}:{}: {}",
-            <Module as ToRichIr<Module>>::to_rich_ir(&self.module),
+            self.module.to_rich_ir(),
             range.start.line,
             range.start.character,
             range.end.line,

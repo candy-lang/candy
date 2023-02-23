@@ -19,7 +19,7 @@ impl Display for CompilerError {
         write!(
             f,
             "{} span({} – {}): {}",
-            <Module as ToRichIr<Module>>::to_rich_ir(&self.module),
+            self.module.to_rich_ir(),
             *self.span.start,
             *self.span.end,
             self.payload,
@@ -177,8 +177,8 @@ impl CompilerError {
     }
 }
 
-impl<RK: Eq + Hash> ToRichIr<RK> for CompilerError {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<RK>) {
+impl ToRichIr for CompilerError {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         // TODO: include more rich information
         builder.push(self.to_string(), None, EnumSet::empty());
     }

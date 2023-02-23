@@ -84,10 +84,7 @@ fn mir_with_obvious_optimized(
     module: Module,
     tracing: TracingConfig,
 ) -> Option<Arc<Mir>> {
-    debug!(
-        "{}: Compiling.",
-        <Module as ToRichIr<Module>>::to_rich_ir(&module),
-    );
+    debug!("{}: Compiling.", module.to_rich_ir());
     let mir = db.mir(module.clone(), tracing.clone())?;
     let mut mir = (*mir).clone();
 
@@ -97,7 +94,7 @@ fn mir_with_obvious_optimized(
 
     debug!(
         "{}: Done. Optimized from {complexity_before} to {complexity_after}",
-        <Module as ToRichIr<Module>>::to_rich_ir(&module),
+        module.to_rich_ir(),
     );
     Some(Arc::new(mir))
 }

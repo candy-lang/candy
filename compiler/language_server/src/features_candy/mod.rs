@@ -63,10 +63,7 @@ impl CandyFeatures {
             } else {
                 "modules"
             },
-            modules
-                .iter()
-                .map(<Module as ToRichIr<Module>>::to_rich_ir)
-                .join(", "),
+            modules.iter().map(Module::to_rich_ir).join(", "),
         );
 
         for module in modules {

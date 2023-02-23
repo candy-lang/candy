@@ -63,14 +63,14 @@ fn ast(db: &dyn CstToAst, module: Module) -> Option<AstResult> {
         Err(InvalidModuleError::DoesNotExist) => {
             warn!(
                 "Tried to get AST of module that doesn't exist: {}.",
-                <Module as ToRichIr<Module>>::to_rich_ir(&module),
+                module.to_rich_ir(),
             );
             return None;
         }
         Err(InvalidModuleError::IsToolingModule) => {
             warn!(
                 "Tried to get AST of tooling module: {}.",
-                <Module as ToRichIr<Module>>::to_rich_ir(&module),
+                module.to_rich_ir(),
             );
             return None;
         }

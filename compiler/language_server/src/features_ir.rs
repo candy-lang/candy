@@ -66,12 +66,9 @@ impl Server {
                     .map(|mir| Self::rich_ir_for_lir(&config.module, mir, tracing_config)),
             };
             rich_ir.unwrap_or_else(|| {
-                let mut builder = RichIrBuilder::<()>::default();
+                let mut builder = RichIrBuilder::default();
                 builder.push(
-                    format!(
-                        "# Module does not exist: {}",
-                        <Module as ToRichIr<Module>>::to_rich_ir(&config.module)
-                    ),
+                    format!("# Module does not exist: {}", config.module.to_rich_ir()),
                     TokenType::Comment,
                     EnumSet::empty(),
                 );
@@ -132,10 +129,7 @@ impl Server {
     fn rich_ir_for_rcst(module: &Module, rcst: RcstResult) -> Option<RichIr> {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!(
-                "# RCST for module {}",
-                <Module as ToRichIr<Module>>::to_rich_ir(module)
-            ),
+            format!("# RCST for module {}", module.to_rich_ir()),
             TokenType::Comment,
             EnumSet::empty(),
         );
@@ -159,10 +153,7 @@ impl Server {
     fn rich_ir_for_ast(module: &Module, asts: Arc<Vec<Ast>>) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!(
-                "# AST for module {}",
-                <Module as ToRichIr<Module>>::to_rich_ir(module)
-            ),
+            format!("# AST for module {}", module.to_rich_ir()),
             TokenType::Comment,
             EnumSet::empty(),
         );
@@ -173,10 +164,7 @@ impl Server {
     fn rich_ir_for_hir(module: &Module, body: Arc<hir::Body>) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!(
-                "# HIR for module {}",
-                <Module as ToRichIr<Module>>::to_rich_ir(module)
-            ),
+            format!("# HIR for module {}", module.to_rich_ir()),
             TokenType::Comment,
             EnumSet::empty(),
         );
@@ -187,10 +175,7 @@ impl Server {
     fn rich_ir_for_mir(module: &Module, mir: Arc<Mir>, tracing_config: &TracingConfig) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!(
-                "# MIR for module {}",
-                <Module as ToRichIr<Module>>::to_rich_ir(module)
-            ),
+            format!("# MIR for module {}", module.to_rich_ir()),
             TokenType::Comment,
             EnumSet::empty(),
         );
@@ -207,10 +192,7 @@ impl Server {
     ) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!(
-                "# Optimized MIR for module {}",
-                <Module as ToRichIr<Module>>::to_rich_ir(module)
-            ),
+            format!("# Optimized MIR for module {}", module.to_rich_ir()),
             TokenType::Comment,
             EnumSet::empty(),
         );
@@ -223,10 +205,7 @@ impl Server {
     fn rich_ir_for_lir(module: &Module, lir: Arc<Lir>, tracing_config: &TracingConfig) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!(
-                "# LIR for module {}",
-                <Module as ToRichIr<Module>>::to_rich_ir(module)
-            ),
+            format!("# LIR for module {}", module.to_rich_ir()),
             TokenType::Comment,
             EnumSet::empty(),
         );
@@ -237,11 +216,8 @@ impl Server {
         builder.finish()
     }
 }
-fn push_tracing_config<RK: Eq + Hash>(
-    builder: &mut RichIrBuilder<RK>,
-    tracing_config: &TracingConfig,
-) {
-    fn push_mode<RK: Eq + Hash>(builder: &mut RichIrBuilder<RK>, title: &str, mode: &TracingMode) {
+fn push_tracing_config(builder: &mut RichIrBuilder, tracing_config: &TracingConfig) {
+    fn push_mode(builder: &mut RichIrBuilder, title: &str, mode: &TracingMode) {
         builder.push_comment_line(format!(
             "• {title} {}",
             match mode {

@@ -1,4 +1,4 @@
-use super::{expression::Expression, id::Id, MirReferenceKey};
+use super::{expression::Expression, id::Id};
 use crate::{
     builtin_functions::BuiltinFunction,
     hir,
@@ -439,9 +439,9 @@ impl BodyBuilder {
     }
 }
 
-impl ToRichIr<MirReferenceKey> for Body {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<MirReferenceKey>) {
-        fn push(builder: &mut RichIrBuilder<MirReferenceKey>, id: &Id, expression: &Expression) {
+impl ToRichIr for Body {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        fn push(builder: &mut RichIrBuilder, id: &Id, expression: &Expression) {
             let range = builder.push(
                 id.to_short_debug_string(),
                 TokenType::Variable,

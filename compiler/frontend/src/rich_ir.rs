@@ -1,5 +1,7 @@
-use crate::position::Offset;
+use crate::{builtin_functions::BuiltinFunction, hir, mir, module::Module, position::Offset};
+use derive_more::From;
 use enumset::{EnumSet, EnumSetType};
+use num_bigint::BigInt;
 use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Display, Formatter},
@@ -49,33 +51,33 @@ pub enum TokenModifier {
     Builtin,
 }
 
-pub trait ToRichIr<RK: Eq + Hash> {
+pub trait ToRichIr {
     fn to_rich_ir(&self) -> RichIr {
         let mut builder = RichIrBuilder::default();
         self.build_rich_ir(&mut builder);
         builder.finish()
     }
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<RK>);
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder);
 }
-impl ToRichIr<()> for str {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
+impl ToRichIr for str {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         builder.push(self, None, EnumSet::empty());
     }
 }
-impl<T: ToRichIr<RK>, RK: Eq + Hash> ToRichIr<RK> for Option<T> {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<RK>) {
+impl<T: ToRichIr> ToRichIr for Option<T> {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         if let Some(value) = self {
             value.build_rich_ir(builder);
         }
     }
 }
-impl<T: ToRichIr<RK>, RK: Eq + Hash> ToRichIr<RK> for Box<T> {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<RK>) {
+impl<T: ToRichIr> ToRichIr for Box<T> {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         self.as_ref().build_rich_ir(builder);
     }
 }
-impl<T: ToRichIr<RK>, RK: Eq + Hash> ToRichIr<RK> for [T] {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<RK>) {
+impl<T: ToRichIr> ToRichIr for [T] {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         match self {
             [] => {}
             [first, rest @ ..] => {
@@ -89,21 +91,24 @@ impl<T: ToRichIr<RK>, RK: Eq + Hash> ToRichIr<RK> for [T] {
     }
 }
 
-pub struct RichIrBuilder<RK: Eq + Hash> {
+#[derive(Debug, Default)]
+pub struct RichIrBuilder {
     ir: RichIr,
-    references: FxHashMap<RK, Reference>,
+    references: FxHashMap<ReferenceKey, Reference>,
     indentation: usize,
 }
-impl<RK: Eq + Hash> Default for RichIrBuilder<RK> {
-    fn default() -> Self {
-        Self {
-            ir: RichIr::default(),
-            references: FxHashMap::default(),
-            indentation: 0,
-        }
-    }
+#[derive(Debug, Eq, From, Hash, PartialEq)]
+pub enum ReferenceKey {
+    Int(BigInt),
+    Text(String),
+    #[from(ignore)]
+    Symbol(String),
+    BuiltinFunction(BuiltinFunction),
+    Module(Module),
+    HirId(hir::Id),
+    MirId(mir::Id),
 }
-impl<RK: Eq + Hash> RichIrBuilder<RK> {
+impl RichIrBuilder {
     pub fn push_foldable<F>(&mut self, build_children: F)
     where
         F: FnOnce(&mut Self),
@@ -127,7 +132,7 @@ impl<RK: Eq + Hash> RichIrBuilder<RK> {
     pub fn push_children_multiline<'c, CS, C>(&mut self, children: CS)
     where
         CS: IntoIterator<Item = &'c C>,
-        C: ToRichIr<RK> + 'c,
+        C: ToRichIr + 'c,
     {
         self.push_children_custom_multiline(children, |builder, child| child.build_rich_ir(builder))
     }
@@ -147,7 +152,7 @@ impl<RK: Eq + Hash> RichIrBuilder<RK> {
     pub fn push_children<CS, C, S>(&mut self, children: CS, separator: S)
     where
         CS: AsRef<[C]>,
-        C: ToRichIr<RK>,
+        C: ToRichIr,
         S: AsRef<str>,
     {
         self.push_children_custom(
@@ -220,13 +225,13 @@ impl<RK: Eq + Hash> RichIrBuilder<RK> {
         range
     }
 
-    pub fn push_definition<CRK: Into<RK>>(&mut self, key: CRK, range: Range<Offset>) {
+    pub fn push_definition<RK: Into<ReferenceKey>>(&mut self, key: RK, range: Range<Offset>) {
         self.references
             .entry(key.into())
             .or_insert_with(Reference::default)
             .definition = Some(range);
     }
-    pub fn push_reference<CRK: Into<RK>>(&mut self, key: CRK, range: Range<Offset>) {
+    pub fn push_reference<RK: Into<ReferenceKey>>(&mut self, key: RK, range: Range<Offset>) {
         self.references
             .entry(key.into())
             .or_insert_with(Reference::default)
