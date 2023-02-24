@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Tracer</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: black;
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <noscript>This tracer uses WebAssembly and JavaScript. Please enable JavaScript in your browser.</noscript>
+    <canvas id = "canvas" width="150" height="150" />
+    <script type="module">
+      import init, { render } from "./pkg/candy_tracer.js";
+      await init();
+      render();
+    </script>
+  </body>
+</html>
