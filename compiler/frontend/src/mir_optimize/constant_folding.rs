@@ -97,8 +97,7 @@ fn run_builtin(
         | BuiltinFunction::ChannelReceive => return None,
         BuiltinFunction::Equals => {
             let [a, b] = arguments else { unreachable!() };
-            let are_equal = a.semantically_equals(*b, visible)?;
-            Expression::Symbol(if are_equal { "True" } else { "False" }.to_string())
+            a.semantically_equals(*b, visible)?.into()
         }
         BuiltinFunction::FunctionRun => {
             let [lambda] = arguments else { unreachable!() };
@@ -328,8 +327,7 @@ fn run_builtin(
                     BuiltinFunction::TextConcatenate => "Text",
                     BuiltinFunction::TextContains => "Symbol",
                     BuiltinFunction::TextEndsWith => "Symbol",
-                    // TODO before merge
-                    BuiltinFunction::TextFromUtf8 => return None,
+                    BuiltinFunction::TextFromUtf8 => "Struct",
                     BuiltinFunction::TextGetRange => "Text",
                     BuiltinFunction::TextIsEmpty => "Symbol",
                     BuiltinFunction::TextLength => "Int",
@@ -337,8 +335,7 @@ fn run_builtin(
                     BuiltinFunction::TextTrimEnd => "Text",
                     BuiltinFunction::TextTrimStart => "Text",
                     BuiltinFunction::ToDebugText => "Text",
-                    // TODO before merge
-                    BuiltinFunction::Try => return None,
+                    BuiltinFunction::Try => "Struct",
                     BuiltinFunction::TypeOf => "Symbol",
                 };
                 Expression::Symbol(return_type.to_string())
