@@ -103,14 +103,14 @@ fn run_builtin(
         BuiltinFunction::FunctionRun => {
             let [lambda] = arguments else { unreachable!() };
             Expression::Call {
-                function: arguments[0],
+                function: *lambda,
                 arguments: vec![],
                 responsible,
             }
         }
         BuiltinFunction::GetArgumentCount => {
             let [lambda] = arguments else { unreachable!() };
-            let Expression::Lambda { parameters, .. } = visible.get(arguments[0]) else { return None; };
+            let Expression::Lambda { parameters, .. } = visible.get(*lambda) else { return None; };
             Expression::Int(parameters.len().into())
         }
         BuiltinFunction::IfElse => {
@@ -221,7 +221,33 @@ fn run_builtin(
             }
         }
         BuiltinFunction::StructGetKeys => return None,
-        BuiltinFunction::StructHasKey => return None,
+        BuiltinFunction::StructHasKey => {
+            let [struct_, key] = arguments else { unreachable!() };
+
+            // TODO: Also catch this being called on a non-struct and
+            // statically panic in that case.
+            let Expression::Struct(fields) = visible.get(*struct_) else {
+                return None;
+            };
+
+            let mut is_contained = Some(false);
+            for (k, _) in fields.iter() {
+                match k.semantically_equals(*key, visible) {
+                    Some(is_equal) => {
+                        if is_equal {
+                            is_contained = Some(true);
+                        }
+                    }
+                    None => {
+                        if is_contained == Some(false) {
+                            is_contained = None;
+                        }
+                    }
+                }
+            }
+
+            is_contained?.into()
+        }
         BuiltinFunction::TextCharacters => return None,
         BuiltinFunction::TextConcatenate => {
             let [a, b] = arguments else { unreachable!() };
