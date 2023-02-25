@@ -349,7 +349,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         platform,
         &heap,
     );
-    vm.set_up_for_running_closure(heap, main, vec![environment], hir::Id::platform());
+    vm.set_up_for_running_closure(heap, main, vec![environment], platform);
     loop {
         match vm.status() {
             Status::CanRun => {

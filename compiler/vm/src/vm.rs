@@ -160,7 +160,7 @@ impl Vm {
         heap: Heap,
         closure: Pointer,
         arguments: Vec<Pointer>,
-        responsible: Id,
+        responsible: Pointer,
     ) {
         self.set_up_with_fiber(Fiber::new_for_running_closure(
             heap,
@@ -343,6 +343,7 @@ impl Vm {
                     let mut heap = Heap::default();
                     let body = fiber.heap.clone_single_to_other_heap(&mut heap, body);
                     let nursery_send_port = heap.create_send_port(nursery_id);
+                    let responsible = heap.create_hir_id(Id::complicated_responsibility());
                     let id = self.fiber_id_generator.generate();
                     self.fibers.insert(
                         id,
@@ -351,7 +352,7 @@ impl Vm {
                                 heap,
                                 body,
                                 vec![nursery_send_port],
-                                Id::complicated_responsibility(),
+                                responsible,
                             ),
                             parent: Some(fiber_id),
                         }),
@@ -375,16 +376,12 @@ impl Vm {
                 let child_id = {
                     let mut heap = Heap::default();
                     let body = fiber.heap.clone_single_to_other_heap(&mut heap, body);
+                    let responsible = heap.create_hir_id(Id::complicated_responsibility());
                     let id = self.fiber_id_generator.generate();
                     self.fibers.insert(
                         id,
                         FiberTree::Single(Single {
-                            fiber: Fiber::new_for_running_closure(
-                                heap,
-                                body,
-                                vec![],
-                                Id::complicated_responsibility(),
-                            ),
+                            fiber: Fiber::new_for_running_closure(heap, body, vec![], responsible),
                             parent: Some(fiber_id),
                         }),
                     );
@@ -590,7 +587,8 @@ impl Vm {
                 let parent_id = *parent_id;
 
                 match Self::parse_spawn_packet(packet) {
-                    Some((heap, closure_to_spawn, return_channel)) => {
+                    Some((mut heap, closure_to_spawn, return_channel)) => {
+                        let responsible = heap.create_hir_id(Id::complicated_responsibility());
                         let child_id = self.fiber_id_generator.generate();
                         self.fibers.insert(
                             child_id,
@@ -599,7 +597,7 @@ impl Vm {
                                     heap,
                                     closure_to_spawn,
                                     vec![],
-                                    Id::complicated_responsibility(),
+                                    responsible,
                                 ),
                                 parent: Some(parent_id),
                             }),

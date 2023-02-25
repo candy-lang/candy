@@ -117,12 +117,11 @@ impl Fiber {
         heap: Heap,
         closure: Pointer,
         arguments: Vec<Pointer>,
-        responsible: hir::Id,
+        responsible: Pointer,
     ) -> Self {
         assert!(matches!(heap.get(closure).data, Data::Closure(_)));
 
         let mut fiber = Self::new_with_heap(heap);
-        let responsible = fiber.heap.create(Data::HirId(responsible));
         fiber.status = Status::Running;
         fiber.call(closure, arguments, responsible);
 
@@ -138,9 +137,9 @@ impl Fiber {
             closure.num_args, 0,
             "Closure is not a module closure (it has arguments)."
         );
-        let module_id = Id::new(module, vec![]);
         let mut heap = Heap::default();
         let closure = heap.create_closure(closure);
+        let module_id = heap.create_hir_id(Id::new(module, vec![]));
         Self::new_for_running_closure(heap, closure, vec![], module_id)
     }
 

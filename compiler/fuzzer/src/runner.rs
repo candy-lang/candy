@@ -55,9 +55,10 @@ impl Runner {
         let mut vm_heap = Heap::default();
         let closure = closure_heap.clone_single_to_other_heap(&mut vm_heap, closure);
         let argument_addresses = input.clone_to_other_heap(&mut vm_heap);
+        let responsible = vm_heap.create_hir_id(Id::fuzzer());
 
         let mut vm = Vm::default();
-        vm.set_up_for_running_closure(vm_heap, closure, argument_addresses, Id::fuzzer());
+        vm.set_up_for_running_closure(vm_heap, closure, argument_addresses, responsible);
 
         Runner {
             vm: Some(vm),
