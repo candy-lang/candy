@@ -52,6 +52,7 @@ enum CandyOptions {
     Build(CandyBuildOptions),
     Run(CandyRunOptions),
     Fuzz(CandyFuzzOptions),
+    Trace(CandyTraceOptions),
     Lsp,
 }
 
@@ -87,6 +88,12 @@ struct CandyFuzzOptions {
     #[arg(long)]
     debug: bool,
 
+    #[arg(value_hint = ValueHint::FilePath)]
+    file: PathBuf,
+}
+
+#[derive(Parser, Debug)]
+struct CandyTraceOptions {
     #[arg(value_hint = ValueHint::FilePath)]
     file: PathBuf,
 }
@@ -503,6 +510,34 @@ fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
         }
         Err(Exit::FuzzingFoundFailingCases)
     }
+}
+
+fn trace(options: CandyTraceOptions) -> ProgramResult {
+    init_logger(true);
+
+    let db = Database::default();
+    let module = Module::from_package_root_and_file(
+        current_dir().unwrap(),
+        options.file.clone(),
+        ModuleKind::Code,
+    );
+    let path_string = options.file.to_string_lossy();
+
+    let tracing = TracingConfig {
+        register_fuzzables: TracingMode::Off,
+        calls: TracingMode::All,
+        evaluated_expressions: TracingMode::All,
+    };
+
+    debug!("Compiling `{path_string}`.");
+    let Some(module_closure) = Closure::of_module(&db, module.clone(), tracing.clone()) else {
+        warn!("File not found.");
+        return Err(Exit::FileNotFound);
+    };
+
+    debug!("Running tracing server for `{path_string}`.");
+    candy_trace_server::run(&DbUseProvider { db: &db, tracing }, module, module_closure);
+    Ok(())
 }
 
 async fn lsp() -> ProgramResult {

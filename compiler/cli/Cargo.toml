@@ -12,6 +12,7 @@ path = "src/main.rs"
 candy_frontend = { path = "../frontend" }
 candy_fuzzer = { path = "../fuzzer" }
 candy_language_server = { path = "../language_server" }
+candy_trace_server = { path = "../trace_server" }
 candy_vm = { path = "../vm" }
 clap = { version = "4.1.4", features = ["derive"] }
 itertools = { version = "0.10.0" }
