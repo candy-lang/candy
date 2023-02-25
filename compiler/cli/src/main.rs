@@ -76,9 +76,6 @@ struct CandyRunOptions {
     #[arg(long)]
     debug: bool,
 
-    #[arg(long)]
-    tracing: bool,
-
     #[arg(value_hint = ValueHint::FilePath)]
     file: PathBuf,
 }
@@ -104,6 +101,7 @@ async fn main() -> ProgramResult {
         CandyOptions::Build(options) => build(options),
         CandyOptions::Run(options) => run(options),
         CandyOptions::Fuzz(options) => fuzz(options),
+        CandyOptions::Trace(options) => trace(options),
         CandyOptions::Lsp => lsp().await,
     }
 }
@@ -253,26 +251,27 @@ fn raw_build(
 
 fn run(options: CandyRunOptions) -> ProgramResult {
     init_logger(true);
+
     let db = Database::default();
     let module = Module::from_package_root_and_file(
         current_dir().unwrap(),
         options.file.clone(),
         ModuleKind::Code,
     );
+    let path_string = options.file.to_string_lossy();
 
+    debug!("Compiling `{path_string}`.");
     let tracing = TracingConfig {
         register_fuzzables: TracingMode::Off,
-        calls: TracingMode::all_or_off(options.tracing),
-        evaluated_expressions: TracingMode::only_current_or_off(options.tracing),
+        calls: TracingMode::Off,
+        evaluated_expressions: TracingMode::Off,
     };
     if raw_build(&db, module.clone(), &tracing, options.debug).is_none() {
         warn!("File not found.");
         return Err(Exit::FileNotFound);
     };
 
-    let path_string = options.file.to_string_lossy();
     debug!("Running `{path_string}`.");
-
     let module_closure = Closure::of_module(&db, module.clone(), tracing.clone()).unwrap();
     let mut tracer = FullTracer::default();
 
@@ -291,10 +290,6 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         // TODO: Show stack traces of all fibers?
     }
     let result = vm.tear_down();
-
-    if options.debug {
-        module.dump_associated_debug_file("trace", &format!("{tracer:?}"));
-    }
 
     let (mut heap, exported_definitions): (_, Struct) = match result {
         ExecutionResult::Finished(return_value) => {
