@@ -88,6 +88,7 @@ dependencies = [
  "candy_frontend",
  "candy_fuzzer",
  "candy_language_server",
+ "candy_trace_server",
  "candy_vm",
  "clap 4.1.4",
  "itertools",
@@ -162,6 +163,18 @@ dependencies = [
  "tracing",
  "url",
  "urlencoding",
+]
+
+[[package]]
+name = "candy_trace_server"
+version = "0.1.0"
+dependencies = [
+ "candy_frontend",
+ "candy_vm",
+ "itertools",
+ "rustc-hash",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

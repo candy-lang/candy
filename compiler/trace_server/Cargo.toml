@@ -1,0 +1,13 @@
+[package]
+name = "candy_trace_server"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.56"
+
+[dependencies]
+candy_frontend = { path = "../frontend" }
+candy_vm = { path = "../vm" }
+itertools = { version = "0.10.0" }
+rustc-hash = "1.1.0"
+tokio = { version = "1.24.2", features = ["full"] }
+tracing = { version = "0.1", features = ["release_max_level_debug"] }

@@ -5,6 +5,7 @@ members = [
     "compiler/frontend",
     "compiler/fuzzer",
     "compiler/language_server",
+    "compiler/trace_server",
     "compiler/tracer",
     "compiler/vm",
     "compiler/vm/fuzz",

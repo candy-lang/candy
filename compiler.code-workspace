@@ -21,6 +21,10 @@
       "path": "compiler/language_server"
     },
     {
+      "name": "Compiler: Trace Server",
+      "path": "compiler/trace_server"
+    },
+    {
       "name": "Compiler: CLI",
       "path": "compiler/cli"
     },
