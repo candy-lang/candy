@@ -214,7 +214,7 @@ fn run_builtin(
                 Expression::Reference(value)
             } else {
                 return Some(Err(format!(
-                    "Struct access will panic because key {:?} isn't in there.",
+                    "Struct access will panic because key {} isn't in there.",
                     visible.get(*key).to_rich_ir(),
                 )));
             }
@@ -235,6 +235,7 @@ fn run_builtin(
                     Some(is_equal) => {
                         if is_equal {
                             is_contained = Some(true);
+                            break;
                         }
                     }
                     None => {
