@@ -1,89 +1,125 @@
 use std::fmt::Debug;
 
+use candy_frontend::id::CountableId;
 use candy_vm::heap::{Heap, Pointer};
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
-#[derive(Clone)]
-pub struct Trace {
-    pub heap: Heap,
-    pub root: CallSpan,
-}
+use crate::{storage::TraceStorage, time::Time};
+
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
+pub struct TraceId(usize);
 
 #[derive(Clone)]
-pub struct CallSpan {
-    pub call_site: Pointer,
-    pub callee: Pointer,
-    pub arguments: Vec<Pointer>,
-    pub children: Option<Vec<CallSpan>>,
-    pub end: End,
+pub enum Trace {
+    CallSpan {
+        call_site: Pointer,
+        callee: Pointer,
+        arguments: Vec<Pointer>,
+        children: Option<Vec<TraceId>>,
+        start: Time,
+        end: Option<CallEnd>,
+    },
+    ValueEvaluated {
+        expression: Pointer,
+        value: Pointer,
+    },
 }
 #[derive(Clone, Copy)]
-pub enum End {
-    NotYet,
+pub struct CallEnd {
+    pub when: Time,
+    pub result: CallResult,
+}
+#[derive(Clone, Copy)]
+pub enum CallResult {
     Canceled,
     Panicked,
-    Returns(Pointer),
+    Returned(Pointer),
 }
 
-impl Debug for Trace {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{}", self.root.format(&self.heap))
+impl CountableId for TraceId {
+    fn from_usize(id: usize) -> Self {
+        TraceId(id)
+    }
+
+    fn to_usize(&self) -> usize {
+        self.0
     }
 }
-impl CallSpan {
-    fn format(&self, heap: &Heap) -> String {
-        format!(
-            "{} {} -> {}{}",
-            self.callee.format(heap),
-            self.arguments
-                .iter()
-                .map(|argument| argument.format(heap))
-                .join(" "),
-            match self.end {
-                End::NotYet => "?".to_string(),
-                End::Canceled => "canceled".to_string(),
-                End::Panicked => "panicked".to_string(),
-                End::Returns(value) => value.format(heap),
-            },
-            match &self.children {
-                Some(children) => {
-                    children
+
+impl Trace {
+    pub fn format(&self, storage: &TraceStorage) -> String {
+        match self {
+            Trace::CallSpan {
+                call_site,
+                callee,
+                arguments,
+                children,
+                start,
+                end,
+            } => {
+                format!(
+                    "{} {} -> {}{}",
+                    callee.format(&storage.heap),
+                    arguments
                         .iter()
-                        .map(|child| format!("\n{}", child.format(heap)))
-                        .join("")
-                        .lines()
-                        .map(|line| format!("  {line}"))
-                        .join("\n")
-                }
-                None => "\n  (can be lazily re-computed)".to_string(),
+                        .map(|argument| argument.format(&storage.heap))
+                        .join(" "),
+                    match end {
+                        None => "?".to_string(),
+                        Some(CallEnd { when, result }) => match result {
+                            CallResult::Canceled => "canceled".to_string(),
+                            CallResult::Panicked => "panicked".to_string(),
+                            CallResult::Returned(value) => value.format(&storage.heap),
+                        },
+                    },
+                    match &children {
+                        Some(children) => {
+                            children
+                                .iter()
+                                .map(|child| format!("\n{}", storage.get(*child).format(storage)))
+                                .join("")
+                                .lines()
+                                .map(|line| format!("  {line}"))
+                                .join("\n")
+                        }
+                        None => "\n  (can be lazily re-computed)".to_string(),
+                    }
+                )
             }
-        )
+            Trace::ValueEvaluated { expression, value } => todo!(),
+        }
     }
 }
 
-impl CallSpan {
+impl Trace {
     pub fn change_pointers(&mut self, pointer_map: &FxHashMap<Pointer, Pointer>) {
-        let CallSpan {
-            call_site,
-            callee,
-            arguments,
-            children,
-            end,
-        } = self;
-
-        *call_site = pointer_map.get(call_site).copied().unwrap_or(*call_site);
-        *callee = pointer_map.get(callee).copied().unwrap_or(*callee);
-        for argument in arguments {
-            *argument = pointer_map.get(argument).copied().unwrap_or(*argument);
-        }
-        if let Some(children) = children {
-            for child in children {
-                child.change_pointers(pointer_map);
+        match self {
+            Trace::CallSpan {
+                call_site,
+                callee,
+                arguments,
+                children: _,
+                start,
+                end,
+            } => {
+                *call_site = pointer_map.get(call_site).copied().unwrap_or(*call_site);
+                *callee = pointer_map.get(callee).copied().unwrap_or(*callee);
+                for argument in arguments {
+                    *argument = pointer_map.get(argument).copied().unwrap_or(*argument);
+                }
+                if let Some(CallEnd {
+                    result: CallResult::Returned(value),
+                    ..
+                }) = end
+                {
+                    *value = pointer_map.get(value).copied().unwrap_or(*value);
+                }
             }
-        }
-        if let End::Returns(value) = end {
-            *value = pointer_map.get(value).copied().unwrap_or(*value);
+            Trace::ValueEvaluated { expression, value } => {
+                *expression = pointer_map.get(expression).copied().unwrap_or(*expression);
+                *value = pointer_map.get(value).copied().unwrap_or(*value);
+            }
         }
     }
 }

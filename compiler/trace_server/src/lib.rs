@@ -1,6 +1,9 @@
 mod trace;
 mod tracer;
+mod storage;
+mod time;
 
+use actix_web::HttpServer;
 use candy_frontend::{hir, module::Module, TracingConfig, TracingMode};
 use candy_vm::{
     context::{PanickingUseProvider, RunForever, UseProvider},
@@ -12,7 +15,7 @@ use candy_vm::{
 use rustc_hash::FxHashMap;
 use tracing::{debug, error, warn};
 
-use crate::{trace::Trace, tracer::trace_call};
+use crate::{storage::TraceStorage, trace::Trace, tracer::trace_call};
 
 pub fn run<U: UseProvider>(use_provider: &U, module: Module, module_closure: Closure) {
     let tracing = TracingConfig {
@@ -64,11 +67,11 @@ pub fn run<U: UseProvider>(use_provider: &U, module: Module, module_closure: Clo
     };
 
     debug!("Running main function.");
+    let mut storage = TraceStorage::new(heap);
     let mut vm = Vm::default();
-    let environment = heap.create_struct(FxHashMap::default());
-    let platform = heap.create_hir_id(hir::Id::platform());
-    let root = trace_call(&mut heap, platform, main, vec![environment], platform);
-    let trace = Trace { heap, root };
+    let environment = storage.heap.create_struct(FxHashMap::default());
+    let platform = storage.heap.create_hir_id(hir::Id::platform());
+    let root = trace_call(&mut storage, platform, main, vec![environment], platform);
 
-    debug!("Trace:\n{trace:?}");
+    debug!("Trace:\n{storage:?}");
 }

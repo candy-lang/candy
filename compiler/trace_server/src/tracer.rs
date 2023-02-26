@@ -1,4 +1,8 @@
-use crate::trace::{CallSpan, End, Trace};
+use crate::{
+    storage::TraceStorage,
+    time::Timer,
+    trace::{CallEnd, CallResult, Trace, TraceId},
+};
 use candy_frontend::hir;
 use candy_frontend::id::CountableId;
 use candy_vm::{
@@ -14,23 +18,31 @@ use std::{cmp::max, fmt};
 use tracing::{debug, error};
 
 pub fn trace_call(
-    tracer_heap: &mut Heap,
+    storage: &mut TraceStorage,
     call_site: Pointer,
     callee: Pointer,
     arguments: Vec<Pointer>,
     responsible: Pointer,
-) -> CallSpan {
+) -> TraceId {
     let mut vm_heap = Heap::default();
-    let call_site = tracer_heap.clone_single_to_other_heap(&mut vm_heap, call_site);
-    let callee = tracer_heap.clone_single_to_other_heap(&mut vm_heap, callee);
-    let arguments = tracer_heap.clone_multiple_to_other_heap_with_existing_mapping(
-        &mut vm_heap,
-        &arguments,
-        &mut FxHashMap::default(),
-    );
-    let responsible = tracer_heap.clone_single_to_other_heap(&mut vm_heap, responsible);
+    let call_site = storage
+        .heap
+        .clone_single_to_other_heap(&mut vm_heap, call_site);
+    let callee = storage
+        .heap
+        .clone_single_to_other_heap(&mut vm_heap, callee);
+    let arguments = storage
+        .heap
+        .clone_multiple_to_other_heap_with_existing_mapping(
+            &mut vm_heap,
+            &arguments,
+            &mut FxHashMap::default(),
+        );
+    let responsible = storage
+        .heap
+        .clone_single_to_other_heap(&mut vm_heap, responsible);
 
-    let mut tracer = LogicalTracer::new(tracer_heap);
+    let mut tracer = LogicalTracer::new(storage);
     tracer.for_fiber(FiberId::root()).call_started(
         call_site,
         callee,
@@ -71,43 +83,40 @@ pub fn trace_call(
     tracer.stack.pop().unwrap()
 }
 
-pub struct LogicalTracer<'heap> {
-    pub heap: &'heap mut Heap,
-    pub when_to_deduplicate: usize,
-    pub stack: Vec<CallSpan>,
+pub struct LogicalTracer<'s> {
+    pub timer: Timer,
+    pub storage: &'s mut TraceStorage,
+    pub stack: Vec<TraceId>,
 }
 
-impl<'heap> LogicalTracer<'heap> {
-    fn new(heap: &'heap mut Heap) -> Self {
-        let heap_size = heap.number_of_objects();
+impl<'s> LogicalTracer<'s> {
+    fn new(storage: &'s mut TraceStorage) -> Self {
         Self {
-            heap,
-            when_to_deduplicate: max(3 * heap_size, 100),
+            timer: Timer::start(),
+            storage,
             stack: vec![],
         }
     }
 
-    fn import_from_heap(&mut self, address: Pointer, heap: &Heap) -> Pointer {
-        heap.clone_single_to_other_heap(&mut self.heap, address)
+    fn end_current_and_merge(&mut self, result: CallResult) {
+        let current = self.stack.pop().unwrap();
+        let Trace::CallSpan { end, .. } = self.storage.get_mut(current) else { unreachable!() };
+        *end = Some(CallEnd {
+            when: self.timer.get_time(),
+            result,
+        });
+
+        let before = *self.stack.last().unwrap();
+        let Trace::CallSpan { children, .. } = self.storage.get_mut(before) else { unreachable!() };
+        children.as_mut().unwrap().push(current);
     }
-    fn end_current_and_merge(&mut self, end: End) {
-        let mut current = self.stack.pop().unwrap();
-        current.end = end;
-        self.stack
-            .last_mut()
-            .unwrap()
-            .children
-            .as_mut()
-            .unwrap()
-            .push(current);
-    }
-    fn end_all(&mut self, returns: End) {
+    fn end_all(&mut self, result: CallResult) {
         while self.stack.len() > 1 {
-            self.end_current_and_merge(returns);
+            self.end_current_and_merge(result);
         }
     }
 }
-impl<'heap> Tracer for LogicalTracer<'heap> {
+impl<'s> Tracer for LogicalTracer<'s> {
     fn add(&mut self, event: VmEvent) {
         match event {
             VmEvent::FiberCreated { fiber } => {}
@@ -117,12 +126,12 @@ impl<'heap> Tracer for LogicalTracer<'heap> {
                 panicked_child,
             } => {
                 if fiber == FiberId::root() {
-                    self.end_all(End::Panicked);
+                    self.end_all(CallResult::Panicked);
                 }
             }
             VmEvent::FiberCanceled { fiber } => {
                 if fiber == FiberId::root() {
-                    self.end_all(End::Canceled);
+                    self.end_all(CallResult::Canceled);
                 }
             }
             VmEvent::FiberExecutionStarted { .. } => {}
@@ -139,42 +148,38 @@ impl<'heap> Tracer for LogicalTracer<'heap> {
                     responsible: _,
                     heap,
                 } => {
-                    let call_site = self.import_from_heap(call_site, heap);
-                    let callee = self.import_from_heap(callee, heap);
+                    let call_site = self.storage.import_from_heap(heap, call_site);
+                    let callee = self.storage.import_from_heap(heap, callee);
                     let arguments = arguments
                         .into_iter()
-                        .map(|arg| self.import_from_heap(arg, heap))
+                        .map(|arg| self.storage.import_from_heap(heap, arg))
                         .collect_vec();
                     debug!(
                         "{}{} {}",
                         "  ".repeat(self.stack.len()),
-                        callee.format(self.heap),
+                        callee.format(&self.storage.heap),
                         arguments
                             .iter()
-                            .map(|argument| argument.format(self.heap))
+                            .map(|argument| argument.format(&self.storage.heap))
                             .join(" "),
                     );
-                    self.stack.push(CallSpan {
+                    let id = self.storage.create(Trace::CallSpan {
                         call_site,
                         callee,
                         arguments,
                         children: Some(vec![]),
-                        end: End::NotYet,
+                        start: self.timer.get_time(),
+                        end: None,
                     });
+                    self.stack.push(id);
                 }
                 FiberEvent::CallEnded { return_value, heap } => {
-                    let return_value = self.import_from_heap(return_value, heap);
-                    self.end_current_and_merge(End::Returns(return_value));
+                    let return_value = self.storage.import_from_heap(heap, return_value);
+                    self.end_current_and_merge(CallResult::Returned(return_value));
                 }
             },
         }
 
-        if self.heap.number_of_objects() > self.when_to_deduplicate {
-            let pointer_map = self.heap.deduplicate();
-            for entry in self.stack.iter_mut() {
-                entry.change_pointers(&pointer_map);
-            }
-            self.when_to_deduplicate = (self.when_to_deduplicate as f64 * 1.1) as usize;
-        }
+        self.storage.maybe_deduplicate();
     }
 }
