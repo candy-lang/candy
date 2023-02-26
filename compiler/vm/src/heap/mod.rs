@@ -266,8 +266,58 @@ impl Heap {
         )
     }
 
+    pub fn number_of_objects(&self) -> usize {
+        self.objects.len() - self.empty_addresses.len()
+    }
     pub fn all_objects(&self) -> impl Iterator<Item = &Object> {
-        self.objects.iter().filter_map(|it| it.as_ref())
+        self.all_pointers_and_objects().map(|(_, object)| object)
+    }
+    pub fn all_objects_mut(&mut self) -> impl Iterator<Item = &mut Object> {
+        self.objects.iter_mut().filter_map(|it| it.as_mut())
+    }
+    pub fn all_pointers_and_objects(&self) -> impl Iterator<Item = (Pointer, &Object)> {
+        self.objects
+            .iter()
+            .enumerate()
+            .filter_map(|(index, object)| {
+                object.as_ref().map(|obj| (Pointer::from_raw(index), obj))
+            })
+    }
+
+    pub fn deduplicate(&mut self) -> FxHashMap<Pointer, Pointer> {
+        let mut hash_cache = FxHashMap::default();
+        let mut hashes_to_pointers: FxHashMap<u64, Vec<Pointer>> = FxHashMap::default();
+        for (pointer, _) in self.all_pointers_and_objects() {
+            // debug!("Hashing {pointer}");
+            let hash = pointer.hash_with_cache(self, &mut hash_cache);
+            hashes_to_pointers.entry(hash).or_default().push(pointer);
+        }
+
+        // Maps deduplicated objects to their new canonical representative.
+        let mut deduplicated = FxHashMap::default();
+
+        for bucket in hashes_to_pointers.values_mut() {
+            let mut unique = vec![];
+            'walk_the_bucket: for pointer in bucket.drain(..) {
+                for canonical in &unique {
+                    if pointer.equals(self, *canonical) {
+                        deduplicated.insert(pointer, *canonical);
+                        continue 'walk_the_bucket;
+                    }
+                }
+                unique.push(pointer);
+            }
+        }
+
+        for address in deduplicated.keys().copied() {
+            let object = std::mem::take(&mut self.objects[address.raw()]).unwrap();
+            self.empty_addresses.push(address);
+        }
+        for object in self.all_objects_mut() {
+            object.data.change_pointers(&deduplicated);
+        }
+
+        deduplicated
     }
 
     pub fn known_channels(&self) -> impl IntoIterator<Item = ChannelId> + '_ {
