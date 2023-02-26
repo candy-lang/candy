@@ -11,6 +11,7 @@ use itertools::Itertools;
 use num_bigint::BigInt;
 use rustc_hash::FxHashMap;
 use std::cmp::Ordering;
+use tracing::debug;
 
 mod object;
 mod pointer;
@@ -197,35 +198,37 @@ impl Heap {
         &self,
         other: &mut Heap,
         addresses: &[Pointer],
-        address_map: &mut FxHashMap<Pointer, Pointer>,
+        pointer_map: &mut FxHashMap<Pointer, Pointer>,
     ) -> Vec<Pointer> {
         let mut additional_refcounts = FxHashMap::default();
         for address in addresses {
-            self.prepare_object_cloning(address_map, &mut additional_refcounts, other, *address);
+            self.prepare_object_cloning(pointer_map, &mut additional_refcounts, other, *address);
         }
 
         for object in additional_refcounts.keys() {
-            address_map
+            pointer_map
                 .entry(*object)
                 .or_insert_with(|| other.reserve_address());
         }
 
-        for (address, refcount) in additional_refcounts {
-            let new_address = address_map[&address];
+        for (address, reference_count) in additional_refcounts {
+            let new_address = pointer_map[&address];
             let object = &mut other.objects[new_address.raw()];
             if let Some(object) = object {
-                object.reference_count += refcount;
+                object.reference_count += reference_count;
             } else {
+                let mut data = self.get(address).data.clone();
+                data.change_pointers(pointer_map);
                 *object = Some(Object {
-                    reference_count: refcount,
-                    data: Self::map_data(address_map, &self.get(address).data),
+                    reference_count,
+                    data,
                 });
             }
         }
 
         addresses
             .iter()
-            .map(|address| address_map[address])
+            .map(|address| pointer_map[address])
             .collect()
     }
     fn prepare_object_cloning(
@@ -243,36 +246,6 @@ impl Heap {
             for child in self.get(address).children() {
                 self.prepare_object_cloning(address_map, additional_refcounts, other, child);
             }
-        }
-    }
-    fn map_data(address_map: &FxHashMap<Pointer, Pointer>, data: &Data) -> Data {
-        match data {
-            Data::Int(int) => Data::Int(int.clone()),
-            Data::Text(text) => Data::Text(text.clone()),
-            Data::Symbol(symbol) => Data::Symbol(symbol.clone()),
-            Data::List(List { items }) => Data::List(List {
-                items: items.iter().map(|item| address_map[item]).collect(),
-            }),
-            Data::Struct(struct_) => Data::Struct(Struct {
-                fields: struct_
-                    .fields
-                    .iter()
-                    .map(|(hash, key, value)| (*hash, address_map[key], address_map[value]))
-                    .collect(),
-            }),
-            Data::HirId(id) => Data::HirId(id.clone()),
-            Data::Closure(closure) => Data::Closure(Closure {
-                captured: closure
-                    .captured
-                    .iter()
-                    .map(|address| address_map[address])
-                    .collect(),
-                num_args: closure.num_args,
-                body: closure.body.clone(),
-            }),
-            Data::Builtin(builtin) => Data::Builtin(builtin.clone()),
-            Data::SendPort(port) => Data::SendPort(SendPort::new(port.channel)),
-            Data::ReceivePort(port) => Data::ReceivePort(ReceivePort::new(port.channel)),
         }
     }
     pub fn clone_single_to_other_heap_with_existing_mapping(

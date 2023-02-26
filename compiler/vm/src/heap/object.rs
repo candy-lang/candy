@@ -10,6 +10,7 @@ use itertools::Itertools;
 use num_bigint::BigInt;
 use rustc_hash::{FxHashMap, FxHasher};
 use std::{
+    collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
     iter,
 };
@@ -185,23 +186,20 @@ impl ReceivePort {
 }
 
 impl Data {
-    fn hash(&self, heap: &Heap) -> u64 {
-        let mut state = FxHasher::default();
-        self.hash_with_state(heap, &mut state);
-        state.finish()
+    pub fn hash(&self, heap: &Heap) -> u64 {
+        let mut cache = FxHashMap::default();
+        self.hash_with_cache(heap, &mut cache)
     }
-
-    fn hash_with_state<H: Hasher>(&self, heap: &Heap, state: &mut H) {
+    pub fn hash_with_cache(&self, heap: &Heap, cache: &mut FxHashMap<Pointer, u64>) -> u64 {
+        let mut state = DefaultHasher::default();
         match self {
-            Data::Int(int) => int.value.hash(state),
-            Data::Text(text) => text.value.hash(state),
-            Data::Symbol(symbol) => symbol.value.hash(state),
+            Data::Int(int) => int.value.hash(&mut state),
+            Data::Text(text) => text.value.hash(&mut state),
+            Data::Symbol(symbol) => symbol.value.hash(&mut state),
             Data::List(List { items }) => {
-                let mut s = 0;
                 for item in items {
-                    s ^= item.hash(heap);
+                    item.hash_with_cache(heap, cache).hash(&mut state);
                 }
-                s.hash(state)
             }
             Data::Struct(struct_) => {
                 let mut s = 0;
@@ -209,20 +207,23 @@ impl Data {
                     s ^= key.hash(heap);
                     s ^= value.hash(heap);
                 }
-                s.hash(state)
+                s.hash(&mut state);
             }
-            Data::HirId(id) => id.hash(state),
+            Data::HirId(id) => {
+                id.hash(&mut state);
+            }
             Data::Closure(closure) => {
                 for captured in &closure.captured {
-                    captured.hash_with_state(heap, state);
+                    captured.hash_with_cache(heap, cache).hash(&mut state);
                 }
-                closure.num_args.hash(state);
-                closure.body.hash(state);
+                closure.num_args.hash(&mut state);
+                closure.body.hash(&mut state);
             }
-            Data::Builtin(builtin) => builtin.function.hash(state),
-            Data::SendPort(port) => port.channel.hash(state),
-            Data::ReceivePort(port) => port.channel.hash(state),
+            Data::Builtin(builtin) => builtin.function.hash(&mut state),
+            Data::SendPort(port) => port.channel.hash(&mut state),
+            Data::ReceivePort(port) => port.channel.hash(&mut state),
         }
+        state.finish()
     }
 
     pub fn equals(&self, heap: &Heap, other: &Self) -> bool {
@@ -256,6 +257,34 @@ impl Data {
         }
     }
 
+    pub fn change_pointers(&mut self, pointer_map: &FxHashMap<Pointer, Pointer>) {
+        match self {
+            Data::Int(_)
+            | Data::Text(_)
+            | Data::Symbol(_)
+            | Data::HirId(_)
+            | Data::Builtin(_)
+            | Data::SendPort(_)
+            | Data::ReceivePort(_) => {}
+            Data::List(List { items }) => {
+                for item in items {
+                    *item = pointer_map.get(item).copied().unwrap_or(*item);
+                }
+            }
+            Data::Struct(Struct { fields }) => {
+                for (_, key, value) in fields {
+                    *key = pointer_map.get(key).copied().unwrap_or(*key);
+                    *value = pointer_map.get(value).copied().unwrap_or(*value);
+                }
+            }
+            Data::Closure(Closure { captured, .. }) => {
+                for captured in captured {
+                    *captured = pointer_map.get(captured).copied().unwrap_or(*captured);
+                }
+            }
+        }
+    }
+
     pub fn closure(&self) -> Option<&Closure> {
         if let Data::Closure(closure) = self {
             Some(closure)
@@ -278,8 +307,13 @@ impl Pointer {
     pub fn hash(&self, heap: &Heap) -> u64 {
         heap.get(*self).hash(heap)
     }
-    fn hash_with_state<H: Hasher>(&self, heap: &Heap, state: &mut H) {
-        heap.get(*self).hash_with_state(heap, state)
+    pub fn hash_with_cache(&self, heap: &Heap, cache: &mut FxHashMap<Pointer, u64>) -> u64 {
+        if let Some(hash) = cache.get(self) {
+            return *hash;
+        }
+        let hash = heap.get(*self).hash_with_cache(heap, cache);
+        cache.insert(*self, hash);
+        hash
     }
 
     pub fn equals(&self, heap: &Heap, other: Self) -> bool {
