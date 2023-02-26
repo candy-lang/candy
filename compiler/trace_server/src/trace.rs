@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use candy_vm::heap::{Heap, Pointer};
 use itertools::Itertools;
+use rustc_hash::FxHashMap;
 
 #[derive(Clone)]
 pub struct Trace {
@@ -62,24 +63,27 @@ impl CallSpan {
 }
 
 impl CallSpan {
-    fn map_pointers(&mut self, pointer_map: &FxHashMap<Pointer, Pointer>) {
+    pub fn change_pointers(&mut self, pointer_map: &FxHashMap<Pointer, Pointer>) {
         let CallSpan {
             call_site,
             callee,
             arguments,
             children,
             end,
-        } = &mut self;
+        } = self;
 
-        *call_site = pointer_map.get(call_site);
-        *callee = pointer_map.get(callee);
+        *call_site = pointer_map.get(call_site).copied().unwrap_or(*call_site);
+        *callee = pointer_map.get(callee).copied().unwrap_or(*callee);
         for argument in arguments {
-            *argument = pointer_map.get(argument);
+            *argument = pointer_map.get(argument).copied().unwrap_or(*argument);
         }
         if let Some(children) = children {
             for child in children {
-                child.map_pointers(pointer_map);
+                child.change_pointers(pointer_map);
             }
+        }
+        if let End::Returns(value) = end {
+            *value = pointer_map.get(value).copied().unwrap_or(*value);
         }
     }
 }

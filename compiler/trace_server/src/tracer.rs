@@ -1,17 +1,16 @@
 use crate::trace::{CallSpan, End, Trace};
 use candy_frontend::hir;
 use candy_frontend::id::CountableId;
-use candy_vm::context::{PanickingUseProvider, RunForever};
-use candy_vm::fiber::ExecutionResult;
-use candy_vm::tracer::{FiberEvent, Tracer, VmEvent};
-use candy_vm::vm::{Status, Vm};
 use candy_vm::{
-    fiber::FiberId,
+    context::{PanickingUseProvider, RunForever},
+    fiber::{ExecutionResult, FiberId},
     heap::{Heap, Pointer},
+    tracer::{FiberEvent, Tracer, VmEvent},
+    vm::{Status, Vm},
 };
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
-use std::fmt;
+use std::{cmp::max, fmt};
 use tracing::{debug, error};
 
 pub fn trace_call(
@@ -74,15 +73,16 @@ pub fn trace_call(
 
 pub struct LogicalTracer<'heap> {
     pub heap: &'heap mut Heap,
-    pub when_to_compact: usize,
+    pub when_to_deduplicate: usize,
     pub stack: Vec<CallSpan>,
 }
 
 impl<'heap> LogicalTracer<'heap> {
     fn new(heap: &'heap mut Heap) -> Self {
+        let heap_size = heap.number_of_objects();
         Self {
             heap,
-            when_to_compact: 3 * heap.number_of_objects(),
+            when_to_deduplicate: max(3 * heap_size, 100),
             stack: vec![],
         }
     }
@@ -169,11 +169,12 @@ impl<'heap> Tracer for LogicalTracer<'heap> {
             },
         }
 
-        if self.heap.number_of_objects() > self.when_to_compact {
-            let pointer_map = self.heap.compact_and_deduplicate();
-            for entry in stack {
-                entry.map_pointers(pointer_map);
+        if self.heap.number_of_objects() > self.when_to_deduplicate {
+            let pointer_map = self.heap.deduplicate();
+            for entry in self.stack.iter_mut() {
+                entry.change_pointers(&pointer_map);
             }
+            self.when_to_deduplicate = (self.when_to_deduplicate as f64 * 1.1) as usize;
         }
     }
 }

@@ -6,7 +6,7 @@ use candy_vm::{
     context::{PanickingUseProvider, RunForever, UseProvider},
     fiber::{ExecutionResult, FiberId},
     heap::{Closure, Struct},
-    tracer::logical::LogicalTracer,
+    tracer::DummyTracer,
     vm::{Status, Vm},
 };
 use rustc_hash::FxHashMap;
@@ -22,10 +22,9 @@ pub fn run<U: UseProvider>(use_provider: &U, module: Module, module_closure: Clo
     };
 
     debug!("Running module.");
-    let mut tracer = LogicalTracer::default();
     let mut vm = Vm::default();
     vm.set_up_for_running_module_closure(module.clone(), module_closure);
-    vm.run(use_provider, &mut RunForever, &mut tracer);
+    vm.run(use_provider, &mut RunForever, &mut DummyTracer::default());
     if let Status::WaitingForOperations = vm.status() {
         error!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");
         // TODO: Show stack traces of all fibers?
