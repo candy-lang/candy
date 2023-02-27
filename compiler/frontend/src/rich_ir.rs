@@ -30,6 +30,8 @@ pub enum ReferenceKey {
     Symbol(String),
     BuiltinFunction(BuiltinFunction),
     Module(Module),
+    #[from(ignore)]
+    ModuleWithSpan(Module, Range<Offset>),
     HirId(hir::Id),
     MirId(mir::Id),
 }

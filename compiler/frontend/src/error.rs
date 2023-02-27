@@ -4,7 +4,7 @@ use super::{ast::AstError, cst, hir::HirError, rcst::RcstError};
 use crate::{
     module::Module,
     position::Offset,
-    rich_ir::{RichIrBuilder, ToRichIr},
+    rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr},
 };
 use std::{fmt::Display, hash::Hash, ops::Range};
 
@@ -167,14 +167,20 @@ impl CompilerError {
 
 impl ToRichIr for CompilerError {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        self.module.build_rich_ir(builder);
-        builder.push(
+        let range = builder.push(
             format!(
-                " (span: {} – {}): {}",
-                *self.span.start, *self.span.end, self.payload,
+                "{} (span: {} – {})",
+                self.module.to_rich_ir(),
+                *self.span.start,
+                *self.span.end,
             ),
             None,
             EnumSet::empty(),
         );
+        builder.push_reference(
+            ReferenceKey::ModuleWithSpan(self.module.clone(), self.span.to_owned()),
+            range,
+        );
+        builder.push(format!(": {}", self.payload), None, EnumSet::empty());
     }
 }

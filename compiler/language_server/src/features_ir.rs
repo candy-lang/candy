@@ -43,7 +43,7 @@ use crate::{
     server::Server,
     utils::{
         lsp_position_to_offset_raw, module_from_package_root_and_url, module_to_url,
-        range_to_lsp_range_raw,
+        range_to_lsp_range_raw, LspPositionConversion,
     },
 };
 
@@ -421,14 +421,13 @@ impl LanguageFeatures for IrFeatures {
             )
         };
 
-        let key_ref = &key;
-        let find_in_other_ir = async move |config: IrConfig| {
+        let find_in_other_ir = async move |config: IrConfig, key: &ReferenceKey| {
             let uri = Url::from(&config);
             self.ensure_is_open(db, config).await;
 
             let rich_irs = self.open_irs.read().await;
             let other_ir = rich_irs.get(&uri).unwrap();
-            let result = other_ir.ir.references.get(key_ref).unwrap();
+            let result = other_ir.ir.references.get(key).unwrap();
             let target_range = other_ir.range_to_lsp_range(result.definition.as_ref().unwrap());
 
             (uri, target_range)
@@ -445,12 +444,17 @@ impl LanguageFeatures for IrFeatures {
             ReferenceKey::Module(module) => {
                 (module_to_url(module).unwrap(), lsp_types::Range::default())
             }
+            ReferenceKey::ModuleWithSpan(module, span) => {
+                let db = db.lock().await;
+                let range = db.range_to_lsp_range(module.to_owned(), span.to_owned());
+                (module_to_url(module).unwrap(), range)
+            }
             ReferenceKey::HirId(id) => {
                 let config = IrConfig {
                     module: id.module.to_owned(),
                     ir: Ir::Hir,
                 };
-                find_in_other_ir(config).await
+                find_in_other_ir(config, &key).await
             }
             ReferenceKey::MirId(_) => {
                 let config = IrConfig {
@@ -463,7 +467,7 @@ impl LanguageFeatures for IrFeatures {
                             .unwrap_or_else(TracingConfig::off),
                     ),
                 };
-                find_in_other_ir(config).await
+                find_in_other_ir(config, &key).await
             }
         };
         Some(LocationLink {
