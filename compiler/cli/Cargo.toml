@@ -13,7 +13,7 @@ candy_frontend = { path = "../frontend" }
 candy_fuzzer = { path = "../fuzzer" }
 candy_language_server = { path = "../language_server" }
 candy_vm = { path = "../vm" }
-clap = { version = "4.1.4", features = ["derive"] }
+clap = { version = "4.1.7", features = ["derive"] }
 itertools = { version = "0.10.0" }
 notify = "5.1.0"
 notify-debouncer-mini = { version = "0.2.1", default-features = false }
