@@ -1373,11 +1373,11 @@ mod parse {
                         .or_else(|| closing_curly_brace(i))
                         .or_else(|| arrow(i));
                     if let Some((i, cst)) = fallback && has_multiline_whitespace {
-                                    (i, cst)
-                                } else {
-                                    input = i;
-                                    break;
-                                }
+                        (i, cst)
+                    } else {
+                        input = i;
+                        break;
+                    }
                 }
             };
 
@@ -1390,8 +1390,8 @@ mod parse {
         }
 
         let (whitespace, mut expressions) = expressions.split_outer_trailing_whitespace();
-        let arguments = expressions.split_off(1);
-        let receiver = expressions.into_iter().next().unwrap();
+        let receiver = expressions.remove(0);
+        let arguments = expressions;
 
         Some((
             input,
@@ -1488,46 +1488,30 @@ mod parse {
     #[instrument(level = "trace")]
     fn expression_suffix_assignment<'a>(
         input: &'a str,
-        signature: &Rcst,
+        left: &Rcst,
         indentation: usize,
     ) -> Option<(&'a str, Rcst)> {
-        let mut signature = match signature {
-            Rcst::Call {
-                receiver,
-                arguments,
-            } => {
-                let mut signature = vec![*receiver.clone()];
-                signature.extend(&mut arguments.iter().cloned());
-                signature
-            }
-            signature => vec![signature.clone()],
-        };
-
-        let (input, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
-        let last = signature.pop().unwrap();
-        signature.push(last.wrap_in_whitespace(whitespace.clone()));
-
-        let parameters = signature.split_off(1);
-        let left = signature.into_iter().next().unwrap();
-
+        let (input, whitespace_after_left) = whitespaces_and_newlines(input, indentation, true);
         let (input, mut assignment_sign) =
             colon_equals_sign(input).or_else(|| equals_sign(input))?;
-        let original_assignment_sign = assignment_sign.clone();
+
+        // By now, it's clear that we are in an assignment, so we can do more
+        // expensive operations. We also save some state in case the assignment
+        // is invalid (so we can stop parsing right after the assignment sign).
+        let left = left.clone().wrap_in_whitespace(whitespace_after_left);
+        let just_the_assignment_sign = assignment_sign.clone();
         let input_after_assignment_sign = input;
 
         let (input, more_whitespace) = whitespaces_and_newlines(input, indentation + 1, false);
         assignment_sign = assignment_sign.wrap_in_whitespace(more_whitespace.clone());
 
-        let is_multiline = left.is_multiline()
-            || parameters.is_multiline()
-            || whitespace.is_multiline()
-            || more_whitespace.is_multiline();
+        let is_multiline = left.is_multiline() || assignment_sign.is_multiline();
         let (input, assignment_sign, body) = if is_multiline {
             let (input, body) = body(input, indentation + 1);
             if body.is_empty() {
                 (
                     input_after_assignment_sign,
-                    original_assignment_sign,
+                    just_the_assignment_sign,
                     vec![],
                 )
             } else {
@@ -1538,7 +1522,7 @@ mod parse {
                 Some((input, expression)) => (input, assignment_sign, vec![expression]),
                 None => (
                     input_after_assignment_sign,
-                    original_assignment_sign,
+                    just_the_assignment_sign,
                     vec![],
                 ),
             }
