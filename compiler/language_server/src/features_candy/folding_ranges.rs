@@ -175,7 +175,7 @@ where
                 self.visit_csts(body);
             }
             CstKind::Assignment {
-                name_or_pattern,
+                left,
                 assignment_sign,
                 body,
             } => {
@@ -189,7 +189,7 @@ where
                     );
                 }
 
-                self.visit_cst(name_or_pattern);
+                self.visit_cst(left);
                 self.visit_csts(body);
             }
             CstKind::Error { .. } => {}

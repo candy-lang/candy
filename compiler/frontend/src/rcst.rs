@@ -114,7 +114,7 @@ pub enum Rcst {
         closing_curly_brace: Box<Rcst>,
     },
     Assignment {
-        name_or_pattern: Box<Rcst>,
+        left: Box<Rcst>,
         assignment_sign: Box<Rcst>,
         body: Vec<Rcst>,
     },
@@ -361,11 +361,11 @@ impl Display for Rcst {
                 closing_curly_brace.fmt(f)
             }
             Rcst::Assignment {
-                name_or_pattern,
+                left,
                 assignment_sign,
                 body,
             } => {
-                name_or_pattern.fmt(f)?;
+                left.fmt(f)?;
                 assignment_sign.fmt(f)?;
                 for expression in body {
                     expression.fmt(f)?;
@@ -507,14 +507,10 @@ impl IsMultiline for Rcst {
                     || closing_curly_brace.is_multiline()
             }
             Rcst::Assignment {
-                name_or_pattern,
+                left,
                 assignment_sign,
                 body,
-            } => {
-                name_or_pattern.is_multiline()
-                    || assignment_sign.is_multiline()
-                    || body.is_multiline()
-            }
+            } => left.is_multiline() || assignment_sign.is_multiline() || body.is_multiline(),
             Rcst::Error {
                 unparsable_input, ..
             } => unparsable_input.is_multiline(),

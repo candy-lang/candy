@@ -150,7 +150,7 @@ pub enum CstKind {
         closing_curly_brace: Box<Cst>,
     },
     Assignment {
-        name_or_pattern: Box<Cst>,
+        left: Box<Cst>,
         assignment_sign: Box<Cst>,
         body: Vec<Cst>,
     },
@@ -352,11 +352,11 @@ impl Display for Cst {
                 closing_curly_brace.fmt(f)
             }
             CstKind::Assignment {
-                name_or_pattern,
+                left,
                 assignment_sign,
                 body,
             } => {
-                name_or_pattern.fmt(f)?;
+                left.fmt(f)?;
                 assignment_sign.fmt(f)?;
                 for expression in body {
                     expression.fmt(f)?;
@@ -379,9 +379,7 @@ impl Cst {
         match &self.kind {
             CstKind::TrailingWhitespace { child, .. } => child.display_span(),
             CstKind::Call { receiver, .. } => receiver.display_span(),
-            CstKind::Assignment {
-                name_or_pattern, ..
-            } => name_or_pattern.display_span(),
+            CstKind::Assignment { left, .. } => left.display_span(),
             _ => self.span.clone(),
         }
     }
@@ -565,11 +563,11 @@ impl UnwrapWhitespaceAndComment for Cst {
                 closing_curly_brace: Box::new(closing_curly_brace.unwrap_whitespace_and_comment()),
             },
             CstKind::Assignment {
-                name_or_pattern,
+                left,
                 assignment_sign,
                 body,
             } => CstKind::Assignment {
-                name_or_pattern: Box::new(name_or_pattern.unwrap_whitespace_and_comment()),
+                left: Box::new(left.unwrap_whitespace_and_comment()),
                 assignment_sign: Box::new(assignment_sign.unwrap_whitespace_and_comment()),
                 body: body.unwrap_whitespace_and_comment(),
             },
@@ -742,10 +740,10 @@ impl TreeWithIds for Cst {
                 .or_else(|| body.find(id))
                 .or_else(|| closing_curly_brace.find(id)),
             CstKind::Assignment {
-                name_or_pattern,
+                left,
                 assignment_sign,
                 body,
-            } => name_or_pattern
+            } => left
                 .find(id)
                 .or_else(|| assignment_sign.find(id))
                 .or_else(|| body.find(id)),
@@ -877,11 +875,11 @@ impl TreeWithIds for Cst {
             ),
             CstKind::Lambda { body, .. } => (body.find_by_offset(offset), false),
             CstKind::Assignment {
-                name_or_pattern,
+                left,
                 assignment_sign,
                 body,
             } => (
-                name_or_pattern
+                left
                     .find_by_offset(offset)
                     .or_else(|| assignment_sign.find_by_offset(offset))
                     .or_else(|| body.find_by_offset(offset)),

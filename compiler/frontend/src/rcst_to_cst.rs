@@ -276,11 +276,11 @@ impl RcstToCstExt for Rcst {
                 closing_curly_brace: Box::new(closing_curly_brace.to_cst(state)),
             },
             Rcst::Assignment {
-                name_or_pattern,
+                left,
                 assignment_sign,
                 body,
             } => CstKind::Assignment {
-                name_or_pattern: Box::new(name_or_pattern.to_cst(state)),
+                left: Box::new(left.to_cst(state)),
                 assignment_sign: Box::new(assignment_sign.to_cst(state)),
                 body: body.to_csts(state),
             },

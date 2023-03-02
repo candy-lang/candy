@@ -765,7 +765,7 @@ impl LoweringContext {
                 self.wrap_in_errors(cst.id, ast, errors)
             }
             CstKind::Assignment {
-                name_or_pattern,
+                left,
                 assignment_sign,
                 body,
             } => {
@@ -779,7 +779,7 @@ impl LoweringContext {
                 let (body, errors) = if let CstKind::Call {
                     receiver: name,
                     arguments: parameters,
-                } = &name_or_pattern.kind
+                } = &left.kind
                 {
                     let name = match &name.kind {
                         CstKind::Identifier(identifier) => {
@@ -827,7 +827,7 @@ impl LoweringContext {
                     (body, errors)
                 } else {
                     let body = AssignmentBody::Body {
-                        pattern: Box::new(self.lower_cst(name_or_pattern, LoweringType::Pattern)),
+                        pattern: Box::new(self.lower_cst(left, LoweringType::Pattern)),
                         body,
                     };
                     (body, vec![])

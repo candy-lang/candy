@@ -1486,7 +1486,7 @@ mod parse {
         signature.push(last.wrap_in_whitespace(whitespace.clone()));
 
         let parameters = signature.split_off(1);
-        let name_or_pattern = signature.into_iter().next().unwrap();
+        let left = signature.into_iter().next().unwrap();
 
         let (input, mut assignment_sign) =
             colon_equals_sign(input).or_else(|| equals_sign(input))?;
@@ -1496,7 +1496,7 @@ mod parse {
         let (input, more_whitespace) = whitespaces_and_newlines(input, indentation + 1, false);
         assignment_sign = assignment_sign.wrap_in_whitespace(more_whitespace.clone());
 
-        let is_multiline = name_or_pattern.is_multiline()
+        let is_multiline = left.is_multiline()
             || parameters.is_multiline()
             || whitespace.is_multiline()
             || more_whitespace.is_multiline();
@@ -1527,7 +1527,7 @@ mod parse {
         Some((
             input,
             Rcst::Assignment {
-                name_or_pattern: Box::new(name_or_pattern),
+                left: Box::new(left),
                 assignment_sign: Box::new(assignment_sign),
                 body,
             }
@@ -1883,7 +1883,7 @@ mod parse {
             Some((
                 "",
                 Rcst::Assignment {
-                    name_or_pattern: Box::new(Rcst::TrailingWhitespace {
+                    left: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
@@ -1922,7 +1922,7 @@ mod parse {
             Some((
                 "\n2",
                 Rcst::Assignment {
-                    name_or_pattern: Box::new(Rcst::TrailingWhitespace {
+                    left: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Call {
                             receiver: Box::new(Rcst::TrailingWhitespace {
                                 child: Box::new(Rcst::Identifier("foo".to_string())),
@@ -1954,7 +1954,7 @@ mod parse {
             Some((
                 "",
                 Rcst::Assignment {
-                    name_or_pattern: Box::new(Rcst::TrailingWhitespace {
+                    left: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Call {
                             receiver: Box::new(Rcst::TrailingWhitespace {
                                 child: Box::new(Rcst::Identifier("foo".to_string())),
@@ -1986,7 +1986,7 @@ mod parse {
             Some((
                 "\n  ",
                 Rcst::Assignment {
-                    name_or_pattern: Box::new(Rcst::TrailingWhitespace {
+                    left: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
@@ -2000,7 +2000,7 @@ mod parse {
             Some((
                 "\n",
                 Rcst::Assignment {
-                    name_or_pattern: Box::new(Rcst::TrailingWhitespace {
+                    left: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
@@ -2023,7 +2023,7 @@ mod parse {
             Some((
                 "\n3",
                 Rcst::Assignment {
-                    name_or_pattern: Box::new(Rcst::TrailingWhitespace {
+                    left: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
@@ -2050,7 +2050,7 @@ mod parse {
             Some((
                 "\n3",
                 Rcst::Assignment {
-                    name_or_pattern: Box::new(Rcst::TrailingWhitespace {
+                    left: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
@@ -2081,7 +2081,7 @@ mod parse {
             Some((
                 "",
                 Rcst::Assignment {
-                    name_or_pattern: Box::new(Rcst::TrailingWhitespace {
+                    left: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::List {
                             opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
                             items: vec![
@@ -2136,7 +2136,7 @@ mod parse {
             Some((
                 "",
                 Rcst::Assignment {
-                    name_or_pattern: Box::new(Rcst::TrailingWhitespace {
+                    left: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Struct {
                             opening_bracket: Box::new(Rcst::OpeningBracket),
                             fields: vec![Rcst::StructField {

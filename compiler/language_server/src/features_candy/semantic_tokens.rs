@@ -253,11 +253,11 @@ fn visit_cst(
             visit_cst(builder, closing_curly_brace, None);
         }
         CstKind::Assignment {
-            name_or_pattern,
+            left,
             assignment_sign,
             body,
         } => {
-            visit_cst(builder, name_or_pattern, Some(SemanticTokenType::Variable));
+            visit_cst(builder, left, Some(SemanticTokenType::Variable));
             visit_cst(builder, assignment_sign, None);
             visit_csts(builder, body, None);
         }
