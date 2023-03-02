@@ -59,10 +59,10 @@ pub enum Rcst {
         expression: Box<Rcst>,
         closing_curly_braces: Vec<Rcst>,
     },
-    Pipe {
-        receiver: Box<Rcst>,
+    BinaryBar {
+        left: Box<Rcst>,
         bar: Box<Rcst>,
-        call: Box<Rcst>,
+        right: Box<Rcst>,
     },
     Parenthesized {
         opening_parenthesis: Box<Rcst>,
@@ -107,10 +107,6 @@ pub enum Rcst {
         arrow: Box<Rcst>,
         body: Vec<Rcst>,
     },
-    OrPattern {
-        left: Box<Rcst>,
-        right: Vec<(Rcst, Rcst)>,
-    },
     Lambda {
         opening_curly_brace: Box<Rcst>,
         parameters_and_arrow: Option<(Vec<Rcst>, Box<Rcst>)>,
@@ -118,8 +114,7 @@ pub enum Rcst {
         closing_curly_brace: Box<Rcst>,
     },
     Assignment {
-        name_or_pattern: Box<Rcst>,
-        parameters: Vec<Rcst>,
+        left: Box<Rcst>,
         assignment_sign: Box<Rcst>,
         body: Vec<Rcst>,
     },
@@ -250,14 +245,10 @@ impl Display for Rcst {
                 }
                 Ok(())
             }
-            Rcst::Pipe {
-                receiver,
-                bar,
-                call,
-            } => {
-                receiver.fmt(f)?;
+            Rcst::BinaryBar { left, bar, right } => {
+                left.fmt(f)?;
                 bar.fmt(f)?;
-                call.fmt(f)
+                right.fmt(f)
             }
             Rcst::Parenthesized {
                 opening_parenthesis,
@@ -351,14 +342,6 @@ impl Display for Rcst {
                 }
                 Ok(())
             }
-            Rcst::OrPattern { left, right } => {
-                left.fmt(f)?;
-                for (bar, right) in right {
-                    bar.fmt(f)?;
-                    right.fmt(f)?;
-                }
-                Ok(())
-            }
             Rcst::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -378,15 +361,11 @@ impl Display for Rcst {
                 closing_curly_brace.fmt(f)
             }
             Rcst::Assignment {
-                name_or_pattern,
-                parameters,
+                left,
                 assignment_sign,
                 body,
             } => {
-                name_or_pattern.fmt(f)?;
-                for parameter in parameters {
-                    parameter.fmt(f)?;
-                }
+                left.fmt(f)?;
                 assignment_sign.fmt(f)?;
                 for expression in body {
                     expression.fmt(f)?;
@@ -442,11 +421,9 @@ impl IsMultiline for Rcst {
             } => opening.is_multiline() || parts.is_multiline() || closing.is_multiline(),
             Rcst::TextPart(_) => false,
             Rcst::TextInterpolation { .. } => false,
-            Rcst::Pipe {
-                receiver,
-                bar,
-                call,
-            } => receiver.is_multiline() || bar.is_multiline() || call.is_multiline(),
+            Rcst::BinaryBar { left, bar, right } => {
+                left.is_multiline() || bar.is_multiline() || right.is_multiline()
+            }
             Rcst::Parenthesized {
                 opening_parenthesis,
                 inner,
@@ -513,12 +490,6 @@ impl IsMultiline for Rcst {
                 arrow,
                 body,
             } => pattern.is_multiline() || arrow.is_multiline() || body.is_multiline(),
-            Rcst::OrPattern { left, right } => {
-                left.is_multiline()
-                    || right
-                        .iter()
-                        .any(|(bar, right)| bar.is_multiline() || right.is_multiline())
-            }
             Rcst::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -536,16 +507,10 @@ impl IsMultiline for Rcst {
                     || closing_curly_brace.is_multiline()
             }
             Rcst::Assignment {
-                name_or_pattern,
-                parameters,
+                left,
                 assignment_sign,
                 body,
-            } => {
-                name_or_pattern.is_multiline()
-                    || parameters.is_multiline()
-                    || assignment_sign.is_multiline()
-                    || body.is_multiline()
-            }
+            } => left.is_multiline() || assignment_sign.is_multiline() || body.is_multiline(),
             Rcst::Error {
                 unparsable_input, ..
             } => unparsable_input.is_multiline(),

@@ -152,14 +152,10 @@ fn visit_cst(
                 visit_cst(builder, closing_curly_brace, None);
             }
         }
-        CstKind::Pipe {
-            receiver,
-            bar,
-            call,
-        } => {
-            visit_cst(builder, receiver, None);
+        CstKind::BinaryBar { left, bar, right } => {
+            visit_cst(builder, left, None);
             visit_cst(builder, bar, None);
-            visit_cst(builder, call, None);
+            visit_cst(builder, right, None);
         }
         CstKind::Parenthesized {
             opening_parenthesis,
@@ -242,13 +238,6 @@ fn visit_cst(
             visit_cst(builder, arrow, None);
             visit_csts(builder, body, None);
         }
-        CstKind::OrPattern { left, right } => {
-            visit_cst(builder, left, None);
-            for (bar, pattern) in right {
-                visit_cst(builder, bar, None);
-                visit_cst(builder, pattern, None);
-            }
-        }
         CstKind::Lambda {
             opening_curly_brace,
             parameters_and_arrow,
@@ -264,13 +253,20 @@ fn visit_cst(
             visit_cst(builder, closing_curly_brace, None);
         }
         CstKind::Assignment {
-            name_or_pattern,
-            parameters,
+            left,
             assignment_sign,
             body,
         } => {
-            visit_cst(builder, name_or_pattern, Some(SemanticTokenType::Variable));
-            visit_csts(builder, &parameters[..], Some(SemanticTokenType::Parameter));
+            if let CstKind::Call {
+                receiver,
+                arguments,
+            } = &left.kind
+            {
+                visit_cst(builder, receiver, Some(SemanticTokenType::Function));
+                visit_csts(builder, arguments, Some(SemanticTokenType::Parameter));
+            } else {
+                visit_cst(builder, left, Some(SemanticTokenType::Variable));
+            }
             visit_cst(builder, assignment_sign, None);
             visit_csts(builder, body, None);
         }

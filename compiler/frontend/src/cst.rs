@@ -95,10 +95,10 @@ pub enum CstKind {
         expression: Box<Cst>,
         closing_curly_braces: Vec<Cst>,
     },
-    Pipe {
-        receiver: Box<Cst>,
+    BinaryBar {
+        left: Box<Cst>,
         bar: Box<Cst>,
-        call: Box<Cst>,
+        right: Box<Cst>,
     },
     Parenthesized {
         opening_parenthesis: Box<Cst>,
@@ -143,10 +143,6 @@ pub enum CstKind {
         arrow: Box<Cst>,
         body: Vec<Cst>,
     },
-    OrPattern {
-        left: Box<Cst>,
-        right: Vec<(Cst, Cst)>,
-    },
     Lambda {
         opening_curly_brace: Box<Cst>,
         parameters_and_arrow: Option<(Vec<Cst>, Box<Cst>)>,
@@ -154,8 +150,7 @@ pub enum CstKind {
         closing_curly_brace: Box<Cst>,
     },
     Assignment {
-        name_or_pattern: Box<Cst>,
-        parameters: Vec<Cst>,
+        left: Box<Cst>,
         assignment_sign: Box<Cst>,
         body: Vec<Cst>,
     },
@@ -249,11 +244,7 @@ impl Display for Cst {
                 }
                 Ok(())
             }
-            CstKind::Pipe {
-                receiver,
-                bar,
-                call,
-            } => write!(f, "{}{}{}", receiver, bar, call),
+            CstKind::BinaryBar { left, bar, right } => write!(f, "{}{}{}", left, bar, right),
             CstKind::Parenthesized {
                 opening_parenthesis,
                 inner,
@@ -342,14 +333,6 @@ impl Display for Cst {
                 }
                 Ok(())
             }
-            CstKind::OrPattern { left, right } => {
-                left.fmt(f)?;
-                for (bar, right) in right {
-                    bar.fmt(f)?;
-                    right.fmt(f)?;
-                }
-                Ok(())
-            }
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -369,15 +352,11 @@ impl Display for Cst {
                 closing_curly_brace.fmt(f)
             }
             CstKind::Assignment {
-                name_or_pattern,
-                parameters,
+                left,
                 assignment_sign,
                 body,
             } => {
-                name_or_pattern.fmt(f)?;
-                for parameter in parameters {
-                    parameter.fmt(f)?;
-                }
+                left.fmt(f)?;
                 assignment_sign.fmt(f)?;
                 for expression in body {
                     expression.fmt(f)?;
@@ -400,9 +379,7 @@ impl Cst {
         match &self.kind {
             CstKind::TrailingWhitespace { child, .. } => child.display_span(),
             CstKind::Call { receiver, .. } => receiver.display_span(),
-            CstKind::Assignment {
-                name_or_pattern, ..
-            } => name_or_pattern.display_span(),
+            CstKind::Assignment { left, .. } => left.display_span(),
             _ => self.span.clone(),
         }
     }
@@ -485,14 +462,10 @@ impl UnwrapWhitespaceAndComment for Cst {
                 expression: Box::new(expression.unwrap_whitespace_and_comment()),
                 closing_curly_braces: closing_curly_braces.unwrap_whitespace_and_comment(),
             },
-            CstKind::Pipe {
-                receiver,
-                bar,
-                call,
-            } => CstKind::Pipe {
-                receiver: Box::new(receiver.unwrap_whitespace_and_comment()),
+            CstKind::BinaryBar { left, bar, right } => CstKind::BinaryBar {
+                left: Box::new(left.unwrap_whitespace_and_comment()),
                 bar: Box::new(bar.unwrap_whitespace_and_comment()),
-                call: Box::new(call.unwrap_whitespace_and_comment()),
+                right: Box::new(right.unwrap_whitespace_and_comment()),
             },
             CstKind::Parenthesized {
                 opening_parenthesis,
@@ -573,18 +546,6 @@ impl UnwrapWhitespaceAndComment for Cst {
                 arrow: Box::new(arrow.unwrap_whitespace_and_comment()),
                 body: body.unwrap_whitespace_and_comment(),
             },
-            CstKind::OrPattern { left, right } => CstKind::OrPattern {
-                left: Box::new(left.unwrap_whitespace_and_comment()),
-                right: right
-                    .iter()
-                    .map(|(bar, right)| {
-                        (
-                            bar.unwrap_whitespace_and_comment(),
-                            right.unwrap_whitespace_and_comment(),
-                        )
-                    })
-                    .collect(),
-            },
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -602,13 +563,11 @@ impl UnwrapWhitespaceAndComment for Cst {
                 closing_curly_brace: Box::new(closing_curly_brace.unwrap_whitespace_and_comment()),
             },
             CstKind::Assignment {
-                name_or_pattern,
-                parameters,
+                left,
                 assignment_sign,
                 body,
             } => CstKind::Assignment {
-                name_or_pattern: Box::new(name_or_pattern.unwrap_whitespace_and_comment()),
-                parameters: parameters.unwrap_whitespace_and_comment(),
+                left: Box::new(left.unwrap_whitespace_and_comment()),
                 assignment_sign: Box::new(assignment_sign.unwrap_whitespace_and_comment()),
                 body: body.unwrap_whitespace_and_comment(),
             },
@@ -700,14 +659,10 @@ impl TreeWithIds for Cst {
                 .find(id)
                 .or_else(|| expression.find(id))
                 .or_else(|| closing_curly_braces.find(id)),
-            CstKind::Pipe {
-                receiver,
-                bar,
-                call,
-            } => receiver
+            CstKind::BinaryBar { left, bar, right } => left
                 .find(id)
                 .or_else(|| bar.find(id))
-                .or_else(|| call.find(id)),
+                .or_else(|| right.find(id)),
             CstKind::Parenthesized {
                 opening_parenthesis,
                 inner,
@@ -768,12 +723,6 @@ impl TreeWithIds for Cst {
                 .find(id)
                 .or_else(|| arrow.find(id))
                 .or_else(|| body.find(id)),
-            CstKind::OrPattern { left, right } => left.find(id).or_else(|| {
-                // TODO: use binary search
-                right
-                    .iter()
-                    .find_map(|(bar, right)| bar.find(id).or_else(|| right.find(id)))
-            }),
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -791,13 +740,11 @@ impl TreeWithIds for Cst {
                 .or_else(|| body.find(id))
                 .or_else(|| closing_curly_brace.find(id)),
             CstKind::Assignment {
-                name_or_pattern,
-                parameters,
+                left,
                 assignment_sign,
                 body,
-            } => name_or_pattern
+            } => left
                 .find(id)
-                .or_else(|| parameters.find(id))
                 .or_else(|| assignment_sign.find(id))
                 .or_else(|| body.find(id)),
             CstKind::Error { .. } => None,
@@ -838,10 +785,10 @@ impl TreeWithIds for Cst {
             | CstKind::ClosingText { .. }
             | CstKind::TextPart(_)
             | CstKind::TextInterpolation { .. } => (None, false),
-            CstKind::Pipe { receiver, call, .. } => (
-                receiver
-                    .find_by_offset(offset)
-                    .or_else(|| call.find_by_offset(offset)),
+            CstKind::BinaryBar { left, bar, right } => (
+                left.find_by_offset(offset)
+                    .or_else(|| bar.find_by_offset(offset))
+                    .or_else(|| right.find_by_offset(offset)),
                 false,
             ),
             CstKind::Parenthesized { inner, .. } => (inner.find_by_offset(offset), false),
@@ -926,26 +873,13 @@ impl TreeWithIds for Cst {
                     .or_else(|| body.find_by_offset(offset)),
                 false,
             ),
-            CstKind::OrPattern { left, right } => (
-                left.find_by_offset(offset).or_else(|| {
-                    // TODO: use binary search
-                    right.iter().find_map(|(bar, right)| {
-                        bar.find_by_offset(offset)
-                            .or_else(|| right.find_by_offset(offset))
-                    })
-                }),
-                false,
-            ),
             CstKind::Lambda { body, .. } => (body.find_by_offset(offset), false),
             CstKind::Assignment {
-                name_or_pattern,
-                parameters,
+                left,
                 assignment_sign,
                 body,
             } => (
-                name_or_pattern
-                    .find_by_offset(offset)
-                    .or_else(|| parameters.find_by_offset(offset))
+                left.find_by_offset(offset)
                     .or_else(|| assignment_sign.find_by_offset(offset))
                     .or_else(|| body.find_by_offset(offset)),
                 false,

@@ -73,9 +73,10 @@ where
             | CstKind::Text { .. }
             | CstKind::TextPart(_)
             | CstKind::TextInterpolation { .. } => {}
-            CstKind::Pipe { receiver, call, .. } => {
-                self.visit_cst(receiver);
-                self.visit_cst(call);
+            CstKind::BinaryBar { left, bar, right } => {
+                self.visit_cst(left);
+                self.visit_cst(bar);
+                self.visit_cst(right);
             }
             CstKind::Parenthesized { inner, .. } => self.visit_cst(inner),
             CstKind::Call {
@@ -150,13 +151,6 @@ where
 
                 self.visit_csts(body);
             }
-            CstKind::OrPattern { left, right } => {
-                self.visit_cst(left);
-                for (bar, right) in right {
-                    self.visit_cst(bar);
-                    self.visit_cst(right);
-                }
-            }
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -181,9 +175,8 @@ where
                 self.visit_csts(body);
             }
             CstKind::Assignment {
-                name_or_pattern,
+                left,
                 assignment_sign,
-                parameters,
                 body,
             } => {
                 if !body.is_empty() {
@@ -196,8 +189,7 @@ where
                     );
                 }
 
-                self.visit_cst(name_or_pattern);
-                self.visit_csts(parameters);
+                self.visit_cst(left);
                 self.visit_csts(body);
             }
             CstKind::Error { .. } => {}
