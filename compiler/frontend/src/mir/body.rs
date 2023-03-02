@@ -449,7 +449,7 @@ impl ToRichIr for Body {
             if let Expression::Lambda { original_hirs, .. } = expression {
                 builder.push("# ", TokenType::Comment, EnumSet::empty());
                 builder.push_children_custom(
-                    original_hirs.iter().collect_vec(),
+                    original_hirs.iter().sorted().collect_vec(),
                     |builder, id| {
                         let range =
                             builder.push(id.to_string(), TokenType::Comment, EnumSet::empty());
