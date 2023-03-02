@@ -18,7 +18,7 @@
 //! [constant lifting]: super::constant_lifting
 //! [module folding]: super::module_folding
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
     hir,
@@ -31,7 +31,7 @@ impl Mir {
     pub fn eliminate_common_subtrees(&mut self) {
         let mut pure_expressions = FxHashMap::default();
         let mut inner_lambdas: FxHashMap<Id, Vec<Id>> = FxHashMap::default();
-        let mut additional_lambda_hirs: FxHashMap<Id, Vec<hir::Id>> = FxHashMap::default();
+        let mut additional_lambda_hirs: FxHashMap<Id, FxHashSet<hir::Id>> = FxHashMap::default();
 
         self.body
             .visit_with_visible(&mut |id, expression, visible, _| {
@@ -43,10 +43,10 @@ impl Mir {
                 normalized.normalize();
 
                 if let Expression::Lambda { body, .. } = expression {
-                    inner_lambdas
-                        .entry(id)
-                        .or_default()
-                        .extend(body.all_lambdas().into_iter().map(|(id, _)| id));
+                    inner_lambdas.insert(
+                        id,
+                        body.all_lambdas().into_iter().map(|(id, _)| id).collect(),
+                    );
                 }
 
                 let existing_entry = pure_expressions.entry(normalized);
@@ -65,7 +65,7 @@ impl Mir {
                             additional_lambda_hirs
                                 .entry(*id_of_canonical_expression.get())
                                 .or_default()
-                                .append(original_hirs);
+                                .extend(&mut original_hirs.clone().into_iter());
 
                             let canonical_child_lambdas =
                                 inner_lambdas.get(id_of_canonical_expression.get()).unwrap();
@@ -135,7 +135,7 @@ impl Expression {
 }
 
 impl Body {
-    fn all_lambdas(&mut self) -> Vec<(Id, Vec<hir::Id>)> {
+    fn all_lambdas(&mut self) -> Vec<(Id, FxHashSet<hir::Id>)> {
         let mut ids_and_expressions = vec![];
         self.visit(&mut |id, expression, _| {
             if let Expression::Lambda { original_hirs, .. } = expression {

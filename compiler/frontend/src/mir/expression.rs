@@ -7,7 +7,11 @@ use crate::{
 use enumset::EnumSet;
 use itertools::Itertools;
 use num_bigint::BigInt;
-use std::hash;
+use rustc_hash::FxHashSet;
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{self, Hasher},
+};
 
 use super::{body::Body, id::Id};
 
@@ -27,7 +31,7 @@ pub enum Expression {
     /// is fuzzable or not, this parameter may be used to dynamically determine
     /// who's at fault if some `needs` is not fulfilled.
     Lambda {
-        original_hirs: Vec<hir::Id>,
+        original_hirs: FxHashSet<hir::Id>,
         parameters: Vec<Id>,
         responsible_parameter: Id,
         body: Body,
@@ -147,7 +151,15 @@ impl hash::Hash for Expression {
                 responsible_parameter,
                 body,
             } => {
-                original_hirs.hash(state);
+                {
+                    let mut hash = 0;
+                    for id in original_hirs {
+                        let mut state = DefaultHasher::new();
+                        id.hash(&mut state);
+                        hash ^= state.finish();
+                    }
+                    hash.hash(state);
+                }
                 parameters.hash(state);
                 responsible_parameter.hash(state);
                 body.hash(state);
