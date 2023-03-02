@@ -879,8 +879,7 @@ impl TreeWithIds for Cst {
                 assignment_sign,
                 body,
             } => (
-                left
-                    .find_by_offset(offset)
+                left.find_by_offset(offset)
                     .or_else(|| assignment_sign.find_by_offset(offset))
                     .or_else(|| body.find_by_offset(offset)),
                 false,
