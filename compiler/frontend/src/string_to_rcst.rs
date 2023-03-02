@@ -1503,7 +1503,7 @@ mod parse {
         let input_after_assignment_sign = input;
 
         let (input, more_whitespace) = whitespaces_and_newlines(input, indentation + 1, false);
-        assignment_sign = assignment_sign.wrap_in_whitespace(more_whitespace.clone());
+        assignment_sign = assignment_sign.wrap_in_whitespace(more_whitespace);
 
         let is_multiline = left.is_multiline() || assignment_sign.is_multiline();
         let (input, assignment_sign, body) = if is_multiline {
