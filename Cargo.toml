@@ -4,6 +4,7 @@ members = [
     "compiler/cli",
     "compiler/frontend",
     "compiler/fuzzer",
+    "compiler/formatter",
     "compiler/language_server",
     "compiler/vm",
     "compiler/vm/fuzz",

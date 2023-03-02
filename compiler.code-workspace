@@ -17,6 +17,10 @@
       "path": "compiler/fuzzer"
     },
     {
+      "name": "Compiler: Formatter",
+      "path": "compiler/formatter"
+    },
+    {
       "name": "Compiler: Language Server",
       "path": "compiler/language_server"
     },
