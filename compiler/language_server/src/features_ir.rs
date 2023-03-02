@@ -419,6 +419,8 @@ impl OpenIr {
                     end_line: range.end.line,
                     end_character: Some(range.end.character),
                     kind: Some(FoldingRangeKind::Region),
+                    // TODO: Customize collapsed text
+                    collapsed_text: None,
                 }
             })
             .collect()
