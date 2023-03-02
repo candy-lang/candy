@@ -57,6 +57,7 @@ impl Expression {
             return Err("Tried to inline, but the expression is not a call.");
         };
         let Expression::Lambda {
+            original_hirs: _,
             parameters,
             responsible_parameter,
             body,

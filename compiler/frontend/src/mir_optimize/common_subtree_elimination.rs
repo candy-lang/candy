@@ -18,17 +18,20 @@
 //! [constant lifting]: super::constant_lifting
 //! [module folding]: super::module_folding
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
+    hir,
     id::{CountableId, IdGenerator},
-    mir::{Expression, Id, Mir},
+    mir::{Body, Expression, Id, Mir, VisitorResult},
 };
 use std::collections::hash_map::Entry;
 
 impl Mir {
     pub fn eliminate_common_subtrees(&mut self) {
         let mut pure_expressions = FxHashMap::default();
+        let mut inner_lambdas: FxHashMap<Id, Vec<Id>> = FxHashMap::default();
+        let mut additional_lambda_hirs: FxHashMap<Id, FxHashSet<hir::Id>> = FxHashMap::default();
 
         self.body
             .visit_with_visible(&mut |id, expression, visible, _| {
@@ -39,18 +42,55 @@ impl Mir {
                 let mut normalized = expression.clone();
                 normalized.normalize();
 
+                if let Expression::Lambda { body, .. } = expression {
+                    inner_lambdas.insert(
+                        id,
+                        body.all_lambdas().into_iter().map(|(id, _)| id).collect(),
+                    );
+                }
+
                 let existing_entry = pure_expressions.entry(normalized);
                 match existing_entry {
-                    Entry::Occupied(id_of_same_expression)
-                        if visible.contains(*id_of_same_expression.get()) =>
+                    Entry::Occupied(id_of_canonical_expression)
+                        if visible.contains(*id_of_canonical_expression.get()) =>
                     {
-                        *expression = Expression::Reference(*id_of_same_expression.get());
+                        *expression = Expression::Reference(*id_of_canonical_expression.get());
+
+                        if let Expression::Lambda {
+                            body,
+                            original_hirs,
+                            ..
+                        } = expression
+                        {
+                            additional_lambda_hirs
+                                .entry(*id_of_canonical_expression.get())
+                                .or_default()
+                                .extend(&mut original_hirs.clone().into_iter());
+
+                            let canonical_child_lambdas =
+                                inner_lambdas.get(id_of_canonical_expression.get()).unwrap();
+                            for ((_, child_hirs), canonical_child_id) in
+                                body.all_lambdas().iter().zip(canonical_child_lambdas)
+                            {
+                                additional_lambda_hirs
+                                    .entry(*canonical_child_id)
+                                    .or_default()
+                                    .extend(child_hirs.clone());
+                            }
+                        }
                     }
                     _ => {
                         existing_entry.insert_entry(id);
                     }
                 }
             });
+
+        self.body.visit(&mut |id, expression, _| {
+            if let Expression::Lambda { original_hirs, .. } = expression && let Some(additional_hirs) = additional_lambda_hirs.remove(&id) {
+                original_hirs.extend(additional_hirs);
+            }
+            VisitorResult::Continue
+        });
     }
 }
 
@@ -76,6 +116,33 @@ impl Expression {
             if let Some(replacement) = mapping.get(id) {
                 *id = *replacement;
             }
-        })
+        });
+        self.strip_original_hirs();
+    }
+    fn strip_original_hirs(&mut self) {
+        if let Expression::Lambda {
+            original_hirs,
+            body,
+            ..
+        } = self
+        {
+            original_hirs.clear();
+            for (_, expression) in body.iter_mut() {
+                expression.strip_original_hirs();
+            }
+        }
+    }
+}
+
+impl Body {
+    fn all_lambdas(&mut self) -> Vec<(Id, FxHashSet<hir::Id>)> {
+        let mut ids_and_expressions = vec![];
+        self.visit(&mut |id, expression, _| {
+            if let Expression::Lambda { original_hirs, .. } = expression {
+                ids_and_expressions.push((id, original_hirs.clone()));
+            }
+            VisitorResult::Continue
+        });
+        ids_and_expressions
     }
 }

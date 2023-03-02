@@ -69,22 +69,23 @@ fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> Option<Arc<
 /// }
 /// ```
 fn generate_needs_function(body: &mut BodyBuilder) -> Id {
-    body.push_lambda(|body, responsible_for_call| {
+    let needs_id = hir::Id::new(
+        Module {
+            package: Package::Anonymous {
+                url: "$generated".to_string(),
+            },
+            path: vec![],
+            kind: ModuleKind::Code,
+        },
+        vec!["needs".to_string()],
+    );
+    body.push_lambda(needs_id.clone(), |body, responsible_for_call| {
         let condition = body.new_parameter();
         let reason = body.new_parameter();
         let responsible_for_condition = body.new_parameter();
 
         // Common stuff.
-        let needs_code = body.push_hir_id(hir::Id::new(
-            Module {
-                package: Package::Anonymous {
-                    url: "$generated".to_string(),
-                },
-                path: vec![],
-                kind: ModuleKind::Code,
-            },
-            vec!["needs".to_string()],
-        ));
+        let needs_code = body.push_hir_id(needs_id.clone());
         let builtin_equals = body.push_builtin(BuiltinFunction::Equals);
         let nothing_symbol = body.push_nothing();
 
@@ -94,6 +95,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
         let is_condition_true =
             body.push_call(builtin_equals, vec![condition, true_symbol], needs_code);
         let is_condition_bool = body.push_if_else(
+            needs_id.child("isConditionTrue"),
             is_condition_true,
             |body| {
                 body.push_reference(true_symbol);
@@ -104,6 +106,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
             needs_code,
         );
         body.push_if_else(
+            needs_id.child("isConditionBool"),
             is_condition_bool,
             |body| {
                 body.push_reference(nothing_symbol);
@@ -126,6 +129,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
             responsible_for_call,
         );
         body.push_if_else(
+            needs_id.child("isReasonText"),
             is_reason_text,
             |body| {
                 body.push_reference(nothing_symbol);
@@ -139,6 +143,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
 
         // The core logic of the needs.
         body.push_if_else(
+            needs_id.child("condition"),
             condition,
             |body| {
                 body.push_reference(nothing_symbol);
@@ -250,6 +255,7 @@ impl<'a> LoweringContext<'a> {
                     let pattern_result = PatternLoweringContext::compile_pattern(
                         self.db,
                         body,
+                        hir_id.clone(),
                         responsible,
                         expression,
                         pattern,
@@ -262,6 +268,7 @@ impl<'a> LoweringContext<'a> {
                     let nothing = body.push_nothing();
                     let is_match = body.push_is_match(pattern_result, responsible);
                     body.push_if_else(
+                        hir_id.child("isMatch"),
                         is_match,
                         |body| {
                             body.push_reference(nothing);
@@ -300,6 +307,7 @@ impl<'a> LoweringContext<'a> {
                 let responsible_for_match = body.push_hir_id(hir_id.clone());
                 let expression = self.mapping[expression];
                 self.compile_match(
+                    hir_id.clone(),
                     body,
                     expression,
                     cases,
@@ -312,7 +320,7 @@ impl<'a> LoweringContext<'a> {
                 body: original_body,
                 fuzzable,
             }) => {
-                let lambda = body.push_lambda(|lambda, responsible_parameter| {
+                let lambda = body.push_lambda(hir_id.clone(), |lambda, responsible_parameter| {
                     for original_parameter in original_parameters {
                         let parameter = lambda.new_parameter();
                         self.mapping.insert(original_parameter.clone(), parameter);
@@ -411,6 +419,7 @@ impl<'a> LoweringContext<'a> {
 
     fn compile_match(
         &mut self,
+        hir_id: hir::Id,
         body: &mut BodyBuilder,
         expression: Id,
         cases: &[(hir::Pattern, hir::Body)],
@@ -418,22 +427,27 @@ impl<'a> LoweringContext<'a> {
         responsible_for_match: Id,
     ) -> Id {
         self.compile_match_rec(
+            hir_id,
             body,
             expression,
             cases,
             responsible_for_needs,
             responsible_for_match,
             vec![],
+            0,
         )
     }
+    #[allow(clippy::too_many_arguments)]
     fn compile_match_rec(
         &mut self,
+        hir_id: hir::Id,
         body: &mut BodyBuilder,
         expression: Id,
         cases: &[(hir::Pattern, hir::Body)],
         responsible_for_needs: Id,
         responsible_for_match: Id,
         mut no_match_reasons: Vec<Id>,
+        case_index: usize,
     ) -> Id {
         match cases {
             [] => {
@@ -445,6 +459,7 @@ impl<'a> LoweringContext<'a> {
                 let pattern_result = PatternLoweringContext::compile_pattern(
                     self.db,
                     body,
+                    hir_id.clone(),
                     responsible_for_match,
                     expression,
                     case_pattern,
@@ -452,15 +467,16 @@ impl<'a> LoweringContext<'a> {
 
                 let is_match = body.push_is_match(pattern_result, responsible_for_match);
 
+                let case_id = hir_id.child(&format!("case-{case_index}"));
                 let builtin_if_else = body.push_builtin(BuiltinFunction::IfElse);
-                let then_lambda = body.push_lambda(|body, _| {
+                let then_lambda = body.push_lambda(case_id.child("matched"), |body, _| {
                     self.ongoing_destructuring = Some(OngoingDestructuring {
                         result: pattern_result,
                         is_trivial: false,
                     });
                     self.compile_expressions(body, responsible_for_needs, &case_body.expressions);
                 });
-                let else_lambda = body.push_lambda(|body, _| {
+                let else_lambda = body.push_lambda(case_id.child("didNotMatch"), |body, _| {
                     let list_get_function = body.push_builtin(BuiltinFunction::ListGet);
                     let one = body.push_int(1.into());
                     let reason = body.push_call(
@@ -471,12 +487,14 @@ impl<'a> LoweringContext<'a> {
                     no_match_reasons.push(reason);
 
                     self.compile_match_rec(
+                        hir_id,
                         body,
                         expression,
                         rest,
                         responsible_for_needs,
                         responsible_for_match,
                         no_match_reasons,
+                        case_index + 1,
                     );
                 });
                 body.push_call(
@@ -491,6 +509,7 @@ impl<'a> LoweringContext<'a> {
 
 struct PatternLoweringContext<'a> {
     db: &'a dyn HirToMir,
+    hir_id: hir::Id,
     match_symbol: Id,
     no_match_symbol: Id,
     responsible: Id,
@@ -501,6 +520,7 @@ impl<'a> PatternLoweringContext<'a> {
     fn compile_pattern(
         db: &'a dyn HirToMir,
         body: &'a mut BodyBuilder,
+        hir_id: hir::Id,
         responsible: Id,
         expression: Id,
         pattern: &hir::Pattern,
@@ -509,6 +529,7 @@ impl<'a> PatternLoweringContext<'a> {
         let no_match_symbol = body.push_no_match_symbol();
         let context = PatternLoweringContext {
             db,
+            hir_id,
             match_symbol,
             no_match_symbol,
             responsible,
@@ -596,6 +617,7 @@ impl<'a> PatternLoweringContext<'a> {
                                 );
 
                                 let result = body.push_if_else(
+                                    self.hir_id.child("hasKey"),
                                     has_key,
                                     |body| {
                                         let value = body.push_call(
@@ -657,6 +679,7 @@ impl<'a> PatternLoweringContext<'a> {
                 for pattern in rest_patterns {
                     let is_match = body.push_is_match(result, self.responsible);
                     result = body.push_if_else(
+                        self.hir_id.child("isMatch"),
                         is_match,
                         |body| {
                             let captured_identifiers = pattern.captured_identifiers();
@@ -768,6 +791,7 @@ impl<'a> PatternLoweringContext<'a> {
         let equals = body.push_call(builtin_equals, vec![expected, actual], self.responsible);
 
         body.push_if_else(
+            self.hir_id.child("equals"),
             equals,
             then_builder,
             |body| {
@@ -827,6 +851,7 @@ impl<'a> PatternLoweringContext<'a> {
 
         let is_match = body.push_is_match(return_value, self.responsible);
         body.push_if_else(
+            self.hir_id.child("isMatch"),
             is_match,
             |body| {
                 let list_get_function = body.push_builtin(BuiltinFunction::ListGet);

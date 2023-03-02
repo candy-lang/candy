@@ -192,6 +192,15 @@ impl Id {
         }
     }
 
+    pub fn child(&self, key: &str) -> Self {
+        let mut keys = self.keys.clone();
+        keys.push(key.to_string());
+        Self {
+            module: self.module.clone(),
+            keys,
+        }
+    }
+
     pub fn is_same_module_and_any_parent_of(&self, other: &Self) -> bool {
         self.module == other.module
             && self.keys.len() < other.keys.len()

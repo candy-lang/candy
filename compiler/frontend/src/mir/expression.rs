@@ -7,7 +7,8 @@ use crate::{
 use enumset::EnumSet;
 use itertools::Itertools;
 use num_bigint::BigInt;
-use std::hash;
+use rustc_hash::{FxHashSet, FxHasher};
+use std::hash::{self, Hasher};
 
 use super::{body::Body, id::Id};
 
@@ -27,6 +28,7 @@ pub enum Expression {
     /// is fuzzable or not, this parameter may be used to dynamically determine
     /// who's at fault if some `needs` is not fulfilled.
     Lambda {
+        original_hirs: FxHashSet<hir::Id>,
         parameters: Vec<Id>,
         responsible_parameter: Id,
         body: Body,
@@ -141,10 +143,20 @@ impl hash::Hash for Expression {
             Expression::Reference(id) => id.hash(state),
             Expression::HirId(id) => id.hash(state),
             Expression::Lambda {
+                original_hirs,
                 parameters,
                 responsible_parameter,
                 body,
             } => {
+                {
+                    let mut hash = 0;
+                    for id in original_hirs {
+                        let mut state = FxHasher::default();
+                        id.hash(&mut state);
+                        hash ^= state.finish();
+                    }
+                    hash.hash(state);
+                }
                 parameters.hash(state);
                 responsible_parameter.hash(state);
                 body.hash(state);
@@ -255,6 +267,9 @@ impl ToRichIr for Expression {
                 builder.push_reference(id.to_owned(), range);
             }
             Expression::Lambda {
+                // IDs are displayed by the body before the entire expression
+                // assignment.
+                original_hirs: _,
                 parameters,
                 responsible_parameter,
                 body,

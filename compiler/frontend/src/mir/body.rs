@@ -288,6 +288,7 @@ impl Expression {
 
 #[derive(Deref, DerefMut)]
 pub struct LambdaBodyBuilder {
+    hir_id: hir::Id,
     #[deref]
     #[deref_mut]
     body_builder: BodyBuilder,
@@ -295,9 +296,10 @@ pub struct LambdaBodyBuilder {
     parameters: Vec<Id>,
 }
 impl LambdaBodyBuilder {
-    fn new(mut id_generator: IdGenerator<Id>) -> Self {
+    fn new(hir_id: hir::Id, mut id_generator: IdGenerator<Id>) -> Self {
         let responsible_parameter = id_generator.generate();
         LambdaBodyBuilder {
+            hir_id,
             body_builder: BodyBuilder::new(id_generator),
             parameters: vec![],
             responsible_parameter,
@@ -313,6 +315,7 @@ impl LambdaBodyBuilder {
     fn finish(self) -> (IdGenerator<Id>, Expression) {
         let (id_generator, body) = self.body_builder.finish();
         let lambda = Expression::Lambda {
+            original_hirs: vec![self.hir_id].into_iter().collect(),
             parameters: self.parameters,
             responsible_parameter: self.responsible_parameter,
             body,
@@ -383,11 +386,11 @@ impl BodyBuilder {
     }
 
     /// The builder function takes the builder and the responsible parameter.
-    pub fn push_lambda<F>(&mut self, function: F) -> Id
+    pub fn push_lambda<F>(&mut self, hir_id: hir::Id, function: F) -> Id
     where
         F: FnOnce(&mut LambdaBodyBuilder, Id),
     {
-        let mut builder = LambdaBodyBuilder::new(mem::take(&mut self.id_generator));
+        let mut builder = LambdaBodyBuilder::new(hir_id, mem::take(&mut self.id_generator));
         let responsible_parameter = builder.responsible_parameter;
         function(&mut builder, responsible_parameter);
         let (id_generator, lambda) = builder.finish();
@@ -404,6 +407,7 @@ impl BodyBuilder {
     }
     pub fn push_if_else<T, E>(
         &mut self,
+        hir_id: hir::Id,
         condition: Id,
         then_builder: T,
         else_builder: E,
@@ -414,8 +418,8 @@ impl BodyBuilder {
         E: FnOnce(&mut Self),
     {
         let builtin_if_else = self.push_builtin(BuiltinFunction::IfElse);
-        let then_lambda = self.push_lambda(|body, _| then_builder(body));
-        let else_lambda = self.push_lambda(|body, _| else_builder(body));
+        let then_lambda = self.push_lambda(hir_id.child("then"), |body, _| then_builder(body));
+        let else_lambda = self.push_lambda(hir_id.child("else"), |body, _| else_builder(body));
         self.push_call(
             builtin_if_else,
             vec![condition, then_lambda, else_lambda],
@@ -442,6 +446,20 @@ impl BodyBuilder {
 impl ToRichIr for Body {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         fn push(builder: &mut RichIrBuilder, id: &Id, expression: &Expression) {
+            if let Expression::Lambda { original_hirs, .. } = expression {
+                builder.push("# ", TokenType::Comment, EnumSet::empty());
+                builder.push_children_custom(
+                    original_hirs.iter().sorted().collect_vec(),
+                    |builder, id| {
+                        let range =
+                            builder.push(id.to_string(), TokenType::Comment, EnumSet::empty());
+                        builder.push_reference((*id).clone(), range);
+                    },
+                    ", ",
+                );
+                builder.push_newline();
+            }
+
             let range = builder.push(
                 id.to_short_debug_string(),
                 TokenType::Variable,
