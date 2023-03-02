@@ -118,6 +118,14 @@ impl TryInto<bool> for &Expression {
         }
     }
 }
+impl TryInto<BigInt> for &Expression {
+    type Error = ();
+
+    fn try_into(self) -> Result<BigInt, ()> {
+        let Expression::Int(int) = self else { return Err(()); };
+        Ok(int.clone())
+    }
+}
 
 #[allow(clippy::derived_hash_with_manual_eq)]
 impl hash::Hash for Expression {

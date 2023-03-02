@@ -2,4 +2,6 @@
 
 typeOf value := ✨.typeOf value
 
-is value type := equals (typeOf value) type
+is value type :=
+  needs (typeOf type | equals Symbol)
+  equals (typeOf value) type
