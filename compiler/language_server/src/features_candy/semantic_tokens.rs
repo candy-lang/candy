@@ -265,7 +265,7 @@ fn visit_cst(
                 visit_cst(builder, receiver, Some(SemanticTokenType::Function));
                 visit_csts(builder, arguments, Some(SemanticTokenType::Parameter));
             } else {
-                visit_cst(builder, left, None);
+                visit_cst(builder, left, Some(SemanticTokenType::Variable));
             }
             visit_cst(builder, assignment_sign, None);
             visit_csts(builder, body, None);
