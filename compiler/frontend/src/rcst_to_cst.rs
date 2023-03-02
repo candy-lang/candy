@@ -1,9 +1,9 @@
 use super::{
-    cst::{self, Cst, CstKind},
+    cst::{Cst, CstKind},
     rcst::Rcst,
     string_to_rcst::{InvalidModuleError, StringToRcst},
 };
-use crate::{module::Module, position::Offset};
+use crate::{cst::Id, id::IdGenerator, module::Module, position::Offset};
 use std::sync::Arc;
 
 #[salsa::query_group(RcstToCstStorage)]
@@ -14,18 +14,16 @@ pub trait RcstToCst: StringToRcst {
 fn cst(db: &dyn RcstToCst, module: Module) -> Result<Arc<Vec<Cst>>, InvalidModuleError> {
     let rcsts = db.rcst(module)?;
 
-    let mut state = State {
-        offset: Offset(0),
-        next_id: 0,
-    };
+    let mut state = State::default();
     let csts = (*rcsts).clone().to_csts(&mut state);
 
     Ok(Arc::new(csts))
 }
 
+#[derive(Default)]
 struct State {
     offset: Offset,
-    next_id: usize,
+    id_generator: IdGenerator<Id>,
 }
 
 trait RcstToCstExt {
@@ -34,13 +32,12 @@ trait RcstToCstExt {
 }
 impl RcstToCstExt for Rcst {
     fn to_cst(self, state: &mut State) -> Cst {
-        let id = state.next_id;
-        state.next_id += 1;
+        let id = state.id_generator.generate();
         let start_offset = state.offset;
         let kind = self.to_cst_kind(state);
         let end_offset = state.offset;
         Cst {
-            id: cst::Id(id),
+            id,
             span: start_offset..end_offset,
             kind,
         }

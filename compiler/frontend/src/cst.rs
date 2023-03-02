@@ -2,7 +2,7 @@ use derive_more::Deref;
 use num_bigint::BigUint;
 
 use super::{rcst::RcstError, rcst_to_cst::RcstToCst};
-use crate::{module::Module, position::Offset};
+use crate::{id::CountableId, module::Module, position::Offset};
 use std::{
     fmt::{self, Display, Formatter},
     ops::Range,
@@ -27,6 +27,15 @@ fn find_cst_by_offset(db: &dyn CstDb, module: Module, offset: Offset) -> Cst {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub struct Id(pub usize);
+impl CountableId for Id {
+    fn from_usize(id: usize) -> Self {
+        Self(id)
+    }
+
+    fn to_usize(&self) -> usize {
+        self.0
+    }
+}
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "CstId({})", self.0)
