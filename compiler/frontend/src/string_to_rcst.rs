@@ -1234,13 +1234,13 @@ mod parse {
     }
 
     #[instrument(level = "trace")]
-    fn expression<'a>(
-        input: &'a str,
+    fn expression(
+        input: &str,
         indentation: usize,
         allow_assignment: bool,
         allow_call: bool,
         allow_bar: bool,
-    ) -> Option<(&'a str, Rcst)> {
+    ) -> Option<(&str, Rcst)> {
         // If we start the call list with `if … else …`, the formatting looks
         // weird. Hence, we start with a single `None`.
         let (mut input, mut result) = None
@@ -1448,7 +1448,29 @@ mod parse {
         indentation: usize,
     ) -> Option<(&'a str, Rcst)> {
         let (input, whitespace_after_receiver) = whitespaces_and_newlines(input, indentation, true);
-        let (input, percent, cases) = match_suffix(input, indentation)?;
+        let (input, percent) = percent(input)?;
+        let (mut input, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
+        let percent = percent.wrap_in_whitespace(whitespace);
+
+        let mut cases = vec![];
+        loop {
+            let Some((new_input, case)) = match_case(input, indentation + 1) else { break; };
+            let (new_input, whitespace) =
+                whitespaces_and_newlines(new_input, indentation + 1, true);
+            input = new_input;
+            let is_whitespace_multiline = whitespace.is_multiline();
+            let case = case.wrap_in_whitespace(whitespace);
+            cases.push(case);
+            if !is_whitespace_multiline {
+                break;
+            }
+        }
+        if cases.is_empty() {
+            cases.push(Rcst::Error {
+                unparsable_input: "".to_string(),
+                error: RcstError::MatchMissesCases,
+            });
+        }
 
         Some((
             input,
@@ -1914,6 +1936,79 @@ mod parse {
                 },
             ))
         );
+        assert_eq!(
+            expression("foo %", 0, false, false, true),
+            Some((
+                "",
+                Rcst::Match {
+                    expression: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    percent: Box::new(Rcst::Percent),
+                    cases: vec![Rcst::Error {
+                        unparsable_input: "".to_string(),
+                        error: RcstError::MatchMissesCases,
+                    }],
+                },
+            )),
+        );
+        assert_eq!(
+            expression("foo %\n", 0, false, false, true),
+            Some((
+                "\n",
+                Rcst::Match {
+                    expression: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    percent: Box::new(Rcst::Percent),
+                    cases: vec![Rcst::Error {
+                        unparsable_input: "".to_string(),
+                        error: RcstError::MatchMissesCases,
+                    }],
+                },
+            )),
+        );
+        // foo %
+        //   1 -> 2
+        // Foo
+        assert_eq!(
+            expression("foo %\n  1 -> 2\nFoo", 0, false, false, true),
+            Some((
+                "\nFoo",
+                Rcst::Match {
+                    expression: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    percent: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Percent),
+                        whitespace: vec![
+                            Rcst::Newline("\n".to_string()),
+                            Rcst::Whitespace("  ".to_string()),
+                        ],
+                    }),
+                    cases: vec![Rcst::MatchCase {
+                        pattern: Box::new(Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::Int {
+                                value: 1u8.into(),
+                                string: "1".to_string(),
+                            }),
+                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                        }),
+                        arrow: Box::new(Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::Arrow),
+                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                        }),
+                        body: vec![Rcst::Int {
+                            value: 2u8.into(),
+                            string: "2".to_string(),
+                        }],
+                    }],
+                },
+            )),
+        );
         // foo bar =
         //   3
         // 2
@@ -2161,289 +2256,6 @@ mod parse {
                     body: vec![Rcst::Identifier("bar".to_string())],
                 },
             )),
-        );
-    }
-
-    /// Multiple expressions that are occurring one after another.
-    #[instrument(level = "trace")]
-    fn run_of_expressions(input: &str, indentation: usize) -> Option<(&str, Vec<Rcst>)> {
-        let mut expressions = vec![];
-        let (mut input, expr) = expression(input, indentation, false, false, false)?;
-        expressions.push(expr);
-
-        let mut has_multiline_whitespace = false;
-        loop {
-            let (i, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
-            has_multiline_whitespace |= whitespace.is_multiline();
-            let indentation = if has_multiline_whitespace {
-                indentation + 1
-            } else {
-                indentation
-            };
-            let last = expressions.pop().unwrap();
-            expressions.push(last.wrap_in_whitespace(whitespace));
-
-            let (i, expr) = match expression(i, indentation, false, has_multiline_whitespace, false)
-            {
-                Some(it) => it,
-                None => {
-                    let fallback = closing_parenthesis(i)
-                        .or_else(|| closing_bracket(i))
-                        .or_else(|| closing_curly_brace(i))
-                        .or_else(|| arrow(i));
-                    if let Some((i, cst)) = fallback && has_multiline_whitespace {
-                        (i, cst)
-                    } else {
-                        input = i;
-                        break;
-                    }
-                }
-            };
-
-            expressions.push(expr);
-            input = i;
-        }
-        Some((input, expressions))
-    }
-    #[test]
-    fn test_run_of_expressions() {
-        assert_eq!(
-            run_of_expressions("print", 0),
-            Some(("", vec![Rcst::Identifier("print".to_string())])),
-        );
-        // foo
-        //   bar
-        assert_eq!(
-            call("foo\n  bar", 0),
-            Some((
-                "",
-                Rcst::Call {
-                    receiver: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![
-                            Rcst::Newline("\n".to_string()),
-                            Rcst::Whitespace("  ".to_string()),
-                        ],
-                    }),
-                    arguments: vec![Rcst::Identifier("bar".to_string())],
-                },
-            )),
-        );
-        assert_eq!(
-            run_of_expressions("(foo Bar) Baz", 0),
-            Some((
-                "",
-                vec![
-                    Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Parenthesized {
-                            opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
-                            inner: Box::new(Rcst::Call {
-                                receiver: Box::new(Rcst::TrailingWhitespace {
-                                    child: Box::new(Rcst::Identifier("foo".to_string())),
-                                    whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                                }),
-                                arguments: vec![Rcst::Symbol("Bar".to_string())],
-                            }),
-                            closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
-                        }),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    },
-                    Rcst::Symbol("Baz".to_string()),
-                ],
-            )),
-        );
-        assert_eq!(
-            run_of_expressions("foo | bar", 0),
-            Some((
-                "| bar",
-                vec![Rcst::TrailingWhitespace {
-                    child: Box::new(Rcst::Identifier("foo".to_string())),
-                    whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                }],
-            )),
-        );
-    }
-
-    #[instrument(level = "trace")]
-    fn call(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
-        let (input, expressions) = run_of_expressions(input, indentation)?;
-        if expressions.len() < 2 {
-            return None;
-        }
-
-        let (whitespace, mut expressions) = expressions.split_outer_trailing_whitespace();
-        let arguments = expressions.split_off(1);
-        let receiver = expressions.into_iter().next().unwrap();
-        Some((
-            input,
-            Rcst::Call {
-                receiver: Box::new(receiver),
-                arguments,
-            }
-            .wrap_in_whitespace(whitespace),
-        ))
-    }
-    #[test]
-    fn test_call() {
-        assert_eq!(call("print", 0), None);
-        assert_eq!(
-            call("foo bar", 0),
-            Some((
-                "",
-                Rcst::Call {
-                    receiver: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    arguments: vec![Rcst::Identifier("bar".to_string())]
-                }
-            ))
-        );
-        assert_eq!(
-            call("Foo 4 bar", 0),
-            Some((
-                "",
-                Rcst::Call {
-                    receiver: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Symbol("Foo".to_string())),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    arguments: vec![
-                        Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Int {
-                                value: 4u8.into(),
-                                string: "4".to_string()
-                            }),
-                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                        },
-                        Rcst::Identifier("bar".to_string())
-                    ]
-                }
-            ))
-        );
-        // foo
-        //   bar
-        //   baz
-        // 2
-        assert_eq!(
-            call("foo\n  bar\n  baz\n2", 0),
-            Some((
-                "\n2",
-                Rcst::Call {
-                    receiver: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![
-                            Rcst::Newline("\n".to_string()),
-                            Rcst::Whitespace("  ".to_string())
-                        ],
-                    }),
-                    arguments: vec![
-                        Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Identifier("bar".to_string())),
-                            whitespace: vec![
-                                Rcst::Newline("\n".to_string()),
-                                Rcst::Whitespace("  ".to_string())
-                            ],
-                        },
-                        Rcst::Identifier("baz".to_string())
-                    ],
-                },
-            ))
-        );
-        // foo 1 2
-        //   3
-        //   4
-        // bar
-        assert_eq!(
-            call("foo 1 2\n  3\n  4\nbar", 0),
-            Some((
-                "\nbar",
-                Rcst::Call {
-                    receiver: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    arguments: vec![
-                        Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Int {
-                                value: 1u8.into(),
-                                string: "1".to_string()
-                            }),
-                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                        },
-                        Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Int {
-                                value: 2u8.into(),
-                                string: "2".to_string()
-                            }),
-                            whitespace: vec![
-                                Rcst::Newline("\n".to_string()),
-                                Rcst::Whitespace("  ".to_string())
-                            ],
-                        },
-                        Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Int {
-                                value: 3u8.into(),
-                                string: "3".to_string()
-                            }),
-                            whitespace: vec![
-                                Rcst::Newline("\n".to_string()),
-                                Rcst::Whitespace("  ".to_string())
-                            ],
-                        },
-                        Rcst::Int {
-                            value: 4u8.into(),
-                            string: "4".to_string()
-                        }
-                    ],
-                }
-            ))
-        );
-        assert_eq!(
-            call("(foo Bar) Baz\n", 0),
-            Some((
-                "\n",
-                Rcst::Call {
-                    receiver: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Parenthesized {
-                            opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
-                            inner: Box::new(Rcst::Call {
-                                receiver: Box::new(Rcst::TrailingWhitespace {
-                                    child: Box::new(Rcst::Identifier("foo".to_string())),
-                                    whitespace: vec![Rcst::Whitespace(" ".to_string())]
-                                }),
-                                arguments: vec![Rcst::Symbol("Bar".to_string())]
-                            }),
-                            closing_parenthesis: Box::new(Rcst::ClosingParenthesis)
-                        }),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())]
-                    }),
-                    arguments: vec![Rcst::Symbol("Baz".to_string())]
-                }
-            ))
-        );
-        // foo T
-        //
-        //
-        // bar = 5
-        assert_eq!(
-            call("foo T\n\n\nbar = 5", 0),
-            Some((
-                "\nbar = 5",
-                Rcst::TrailingWhitespace {
-                    child: Box::new(Rcst::Call {
-                        receiver: Box::new(Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Identifier("foo".to_string())),
-                            whitespace: vec![Rcst::Whitespace(" ".to_string())]
-                        }),
-                        arguments: vec![Rcst::Symbol("T".to_string())]
-                    }),
-                    whitespace: vec![
-                        Rcst::Newline("\n".to_string()),
-                        Rcst::Newline("\n".to_string())
-                    ],
-                }
-            ))
         );
     }
 
@@ -3110,93 +2922,6 @@ mod parse {
             }
         }
         (input, expressions)
-    }
-
-    #[instrument(level = "trace")]
-    fn match_suffix(input: &str, indentation: usize) -> Option<(&str, Rcst, Vec<Rcst>)> {
-        let (input, percent) = percent(input)?;
-        let (mut input, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
-        let percent = percent.wrap_in_whitespace(whitespace);
-
-        let mut cases = vec![];
-        loop {
-            let Some((new_input, case)) = match_case(input, indentation + 1) else { break; };
-            let (new_input, whitespace) =
-                whitespaces_and_newlines(new_input, indentation + 1, true);
-            input = new_input;
-            let is_whitespace_multiline = whitespace.is_multiline();
-            let case = case.wrap_in_whitespace(whitespace);
-            cases.push(case);
-            if !is_whitespace_multiline {
-                break;
-            }
-        }
-        if cases.is_empty() {
-            cases.push(Rcst::Error {
-                unparsable_input: "".to_string(),
-                error: RcstError::MatchMissesCases,
-            });
-        }
-
-        Some((input, percent, cases))
-    }
-    #[test]
-    fn test_match_suffix() {
-        assert_eq!(
-            match_suffix("%", 0),
-            Some((
-                "",
-                Rcst::Percent,
-                vec![Rcst::Error {
-                    unparsable_input: "".to_string(),
-                    error: RcstError::MatchMissesCases,
-                }],
-            )),
-        );
-        assert_eq!(
-            match_suffix("%\n", 0),
-            Some((
-                "\n",
-                Rcst::Percent,
-                vec![Rcst::Error {
-                    unparsable_input: "".to_string(),
-                    error: RcstError::MatchMissesCases,
-                }],
-            )),
-        );
-        // %
-        //   1 -> 2
-        // Foo
-        assert_eq!(
-            match_suffix("%\n  1 -> 2\nFoo", 0),
-            Some((
-                "\nFoo",
-                Rcst::TrailingWhitespace {
-                    child: Box::new(Rcst::Percent),
-                    whitespace: vec![
-                        Rcst::Newline("\n".to_string()),
-                        Rcst::Whitespace("  ".to_string()),
-                    ],
-                },
-                vec![Rcst::MatchCase {
-                    pattern: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Int {
-                            value: 1u8.into(),
-                            string: "1".to_string(),
-                        }),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    arrow: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Arrow),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    body: vec![Rcst::Int {
-                        value: 2u8.into(),
-                        string: "2".to_string(),
-                    }],
-                }],
-            )),
-        );
     }
 
     #[instrument(level = "trace")]
