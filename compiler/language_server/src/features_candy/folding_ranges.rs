@@ -204,6 +204,8 @@ where
             end_line: range.end.line,
             end_character: Some(range.end.character),
             kind: Some(kind),
+            // TODO: Customize collapsed text
+            collapsed_text: None,
         });
     }
 }
