@@ -420,6 +420,7 @@ impl<'a> LoweringContext<'a> {
     ) -> Id {
         self.compile_match_rec(hir_id, body, expression, cases, responsible, vec![], 0)
     }
+    #[allow(clippy::too_many_arguments)]
     fn compile_match_rec(
         &mut self,
         hir_id: hir::Id,

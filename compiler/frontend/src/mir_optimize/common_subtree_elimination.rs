@@ -23,13 +23,14 @@ use rustc_hash::FxHashMap;
 use crate::{
     hir,
     id::{CountableId, IdGenerator},
-    mir::{Expression, Id, Mir, VisitorResult},
+    mir::{Body, Expression, Id, Mir, VisitorResult},
 };
 use std::collections::hash_map::Entry;
 
 impl Mir {
     pub fn eliminate_common_subtrees(&mut self) {
         let mut pure_expressions = FxHashMap::default();
+        let mut inner_lambdas: FxHashMap<Id, Vec<Id>> = FxHashMap::default();
         let mut additional_lambda_hirs: FxHashMap<Id, Vec<hir::Id>> = FxHashMap::default();
 
         self.body
@@ -41,18 +42,41 @@ impl Mir {
                 let mut normalized = expression.clone();
                 normalized.normalize();
 
+                if let Expression::Lambda { body, .. } = expression {
+                    inner_lambdas
+                        .entry(id)
+                        .or_default()
+                        .extend(body.all_lambdas().into_iter().map(|(id, _)| id));
+                }
+
                 let existing_entry = pure_expressions.entry(normalized);
                 match existing_entry {
-                    Entry::Occupied(id_of_same_expression)
-                        if visible.contains(*id_of_same_expression.get()) =>
+                    Entry::Occupied(id_of_canonical_expression)
+                        if visible.contains(*id_of_canonical_expression.get()) =>
                     {
-                        *expression = Expression::Reference(*id_of_same_expression.get());
+                        *expression = Expression::Reference(*id_of_canonical_expression.get());
 
-                        if let Expression::Lambda { original_hirs, .. } = expression {
+                        if let Expression::Lambda {
+                            body,
+                            original_hirs,
+                            ..
+                        } = expression
+                        {
                             additional_lambda_hirs
-                                .entry(*id_of_same_expression.get())
+                                .entry(*id_of_canonical_expression.get())
                                 .or_default()
                                 .append(original_hirs);
+
+                            let canonical_child_lambdas =
+                                inner_lambdas.get(id_of_canonical_expression.get()).unwrap();
+                            for ((_, child_hirs), canonical_child_id) in
+                                body.all_lambdas().iter().zip(canonical_child_lambdas)
+                            {
+                                additional_lambda_hirs
+                                    .entry(*canonical_child_id)
+                                    .or_default()
+                                    .extend(child_hirs.clone());
+                            }
                         }
                     }
                     _ => {
@@ -107,5 +131,18 @@ impl Expression {
                 expression.strip_original_hirs();
             }
         }
+    }
+}
+
+impl Body {
+    fn all_lambdas(&mut self) -> Vec<(Id, Vec<hir::Id>)> {
+        let mut ids_and_expressions = vec![];
+        self.visit(&mut |id, expression, _| {
+            if let Expression::Lambda { original_hirs, .. } = expression {
+                ids_and_expressions.push((id, original_hirs.clone()));
+            }
+            VisitorResult::Continue
+        });
+        ids_and_expressions
     }
 }
