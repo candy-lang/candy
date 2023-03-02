@@ -287,7 +287,7 @@ impl LoweringContext {
 
                         assert!(
                             matches!(bar.kind, CstKind::Bar),
-                            "Pipe must contain a bar, but instead contained a {}.",
+                            "BinaryBar must contain a bar, but instead contained a {}.",
                             bar,
                         );
 
@@ -341,13 +341,10 @@ impl LoweringContext {
                             .iter()
                             .map(|it| it.captured_identifiers())
                             .collect_vec();
-                        let all_identifiers = captured_identifiers.iter().fold(
-                            FxHashSet::default(),
-                            |mut acc, it| {
-                                acc.extend(it.keys());
-                                acc
-                            },
-                        );
+                        let all_identifiers = captured_identifiers
+                            .iter()
+                            .flat_map(|it| it.keys())
+                            .collect::<FxHashSet<_>>();
                         for identifier in all_identifiers {
                             let number_of_missing_captures = captured_identifiers
                                 .iter()
