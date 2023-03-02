@@ -304,9 +304,16 @@ impl<'a> LoweringContext<'a> {
             hir::Expression::Match { expression, cases } => {
                 assert!(!cases.is_empty());
 
-                let responsible = body.push_hir_id(hir_id.clone());
+                let responsible_for_match = body.push_hir_id(hir_id.clone());
                 let expression = self.mapping[expression];
-                self.compile_match(hir_id.clone(), body, expression, cases, responsible)
+                self.compile_match(
+                    hir_id.clone(),
+                    body,
+                    expression,
+                    cases,
+                    responsible_for_needs,
+                    responsible_for_match,
+                )
             }
             hir::Expression::Lambda(hir::Lambda {
                 parameters: original_parameters,
@@ -416,9 +423,19 @@ impl<'a> LoweringContext<'a> {
         body: &mut BodyBuilder,
         expression: Id,
         cases: &[(hir::Pattern, hir::Body)],
-        responsible: Id,
+        responsible_for_needs: Id,
+        responsible_for_match: Id,
     ) -> Id {
-        self.compile_match_rec(hir_id, body, expression, cases, responsible, vec![], 0)
+        self.compile_match_rec(
+            hir_id,
+            body,
+            expression,
+            cases,
+            responsible_for_needs,
+            responsible_for_match,
+            vec![],
+            0,
+        )
     }
     #[allow(clippy::too_many_arguments)]
     fn compile_match_rec(
@@ -427,7 +444,8 @@ impl<'a> LoweringContext<'a> {
         body: &mut BodyBuilder,
         expression: Id,
         cases: &[(hir::Pattern, hir::Body)],
-        responsible: Id,
+        responsible_for_needs: Id,
+        responsible_for_match: Id,
         mut no_match_reasons: Vec<Id>,
         case_index: usize,
     ) -> Id {
@@ -435,19 +453,19 @@ impl<'a> LoweringContext<'a> {
             [] => {
                 let reason = body.push_text("No case matched the given expression.".to_string());
                 // TODO: concat reasons
-                body.push_panic(reason, responsible)
+                body.push_panic(reason, responsible_for_match)
             }
             [(case_pattern, case_body), rest @ ..] => {
                 let pattern_result = PatternLoweringContext::compile_pattern(
                     self.db,
                     body,
                     hir_id.clone(),
-                    responsible,
+                    responsible_for_match,
                     expression,
                     case_pattern,
                 );
 
-                let is_match = body.push_is_match(pattern_result, responsible);
+                let is_match = body.push_is_match(pattern_result, responsible_for_match);
 
                 let case_id = hir_id.child(&format!("case-{case_index}"));
                 let builtin_if_else = body.push_builtin(BuiltinFunction::IfElse);
@@ -456,13 +474,16 @@ impl<'a> LoweringContext<'a> {
                         result: pattern_result,
                         is_trivial: false,
                     });
-                    self.compile_expressions(body, responsible, &case_body.expressions);
+                    self.compile_expressions(body, responsible_for_needs, &case_body.expressions);
                 });
                 let else_lambda = body.push_lambda(case_id.child("didNotMatch"), |body, _| {
                     let list_get_function = body.push_builtin(BuiltinFunction::ListGet);
                     let one = body.push_int(1.into());
-                    let reason =
-                        body.push_call(list_get_function, vec![pattern_result, one], responsible);
+                    let reason = body.push_call(
+                        list_get_function,
+                        vec![pattern_result, one],
+                        responsible_for_match,
+                    );
                     no_match_reasons.push(reason);
 
                     self.compile_match_rec(
@@ -470,7 +491,8 @@ impl<'a> LoweringContext<'a> {
                         body,
                         expression,
                         rest,
-                        responsible,
+                        responsible_for_needs,
+                        responsible_for_match,
                         no_match_reasons,
                         case_index + 1,
                     );
@@ -478,7 +500,7 @@ impl<'a> LoweringContext<'a> {
                 body.push_call(
                     builtin_if_else,
                     vec![is_match, then_lambda, else_lambda],
-                    responsible,
+                    responsible_for_match,
                 )
             }
         }
@@ -935,7 +957,7 @@ impl CompilerError {
         let range = db.range_to_positions(self.module.clone(), self.span.clone());
         format!(
             "{}:{}:{} – {}:{}: {}",
-            <Module as ToRichIr<Module>>::to_rich_ir(&self.module),
+            self.module.to_rich_ir(),
             range.start.line,
             range.start.character,
             range.end.line,

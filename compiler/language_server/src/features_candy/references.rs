@@ -6,24 +6,23 @@ use candy_frontend::{
     position::{Offset, PositionConversionDb},
     rich_ir::ToRichIr,
 };
-use lsp_types::{DocumentHighlight, DocumentHighlightKind};
 use num_bigint::BigUint;
 use std::collections::HashSet;
 use tracing::{debug, info};
 
-use crate::utils::LspPositionConversion;
+use crate::{features::Reference, utils::LspPositionConversion};
 
 pub fn references<DB>(
     db: &DB,
     module: Module,
     offset: Offset,
     include_declaration: bool,
-) -> Option<Vec<DocumentHighlight>>
+) -> Vec<Reference>
 where
     DB: HirDb + ModuleDb + PositionConversionDb,
 {
-    let query = query_for_offset(db, module, offset)?;
-    Some(find_references(db, query, include_declaration))
+    let Some(query) = query_for_offset(db, module, offset) else { return vec![]; };
+    find_references(db, query, include_declaration)
 }
 
 fn query_for_offset<DB: CstDb>(db: &DB, module: Module, offset: Offset) -> Option<ReferenceQuery>
@@ -73,7 +72,7 @@ fn find_references<DB: AstToHir + HirDb + PositionConversionDb>(
     db: &DB,
     query: ReferenceQuery,
     include_declaration: bool,
-) -> Vec<DocumentHighlight> {
+) -> Vec<Reference> {
     // TODO: search all files
     let module = match &query {
         ReferenceQuery::Id(id) => id.module.clone(),
@@ -93,7 +92,7 @@ struct Context<'a, DB: PositionConversionDb + ?Sized> {
     query: ReferenceQuery,
     include_declaration: bool,
     discovered_references: HashSet<hir::Id>,
-    references: Vec<DocumentHighlight>,
+    references: Vec<Reference>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ReferenceQuery {
@@ -119,7 +118,7 @@ where
     fn visit_body(&mut self, body: &Body) {
         if let ReferenceQuery::Id(id) = &self.query.clone() {
             if body.identifiers.contains_key(id) {
-                self.add_reference(id.clone(), DocumentHighlightKind::WRITE);
+                self.add_reference(id.clone(), true);
             }
         }
         for (id, expression) in &body.expressions {
@@ -142,18 +141,18 @@ where
         match expression {
             Expression::Int(int) =>{
                 if let ReferenceQuery::Int(_, target) = &self.query && int == target {
-                    self.add_reference(id, DocumentHighlightKind::READ);
+                    self.add_reference(id, false);
                 }
             },
             Expression::Text(_) => {},
             Expression::Reference(target) => {
                 if let ReferenceQuery::Id(target_id) = &self.query && target == target_id {
-                    self.add_reference(id, DocumentHighlightKind::READ);
+                    self.add_reference(id, false);
                 }
             }
             Expression::Symbol(symbol) => {
                 if let ReferenceQuery::Symbol(_, target) = &self.query && symbol == target {
-                    self.add_reference(id, DocumentHighlightKind::READ);
+                    self.add_reference(id, false);
                 }
             }
             Expression::List(_)
@@ -177,14 +176,14 @@ where
                 arguments,
             } => {
                 if let ReferenceQuery::Id(target_id) = &self.query && function == target_id {
-                    self.add_reference(id, DocumentHighlightKind::READ);
+                    self.add_reference(id, false);
                 }
                 self.visit_ids(arguments);
             }
             Expression::UseModule { .. } => {} // only occurs in generated code
             Expression::Needs { .. } => {
                 if let ReferenceQuery::Needs(_) = &self.query {
-                    self.add_reference(id, DocumentHighlightKind::READ);
+                    self.add_reference(id, false);
                 }
             }
             Expression::Error { child, .. } => {
@@ -195,7 +194,7 @@ where
         }
     }
 
-    fn add_reference(&mut self, id: hir::Id, kind: DocumentHighlightKind) {
+    fn add_reference(&mut self, id: hir::Id, is_write: bool) {
         if let ReferenceQuery::Id(target_id) = &self.query {
             if &id == target_id && !self.include_declaration {
                 return;
@@ -208,9 +207,9 @@ where
         self.discovered_references.insert(id.clone());
 
         if let Some(span) = self.db.hir_id_to_span(id.clone()) {
-            self.references.push(DocumentHighlight {
+            self.references.push(Reference {
                 range: self.db.range_to_lsp_range(id.module, span),
-                kind: Some(kind),
+                is_write,
             });
         }
     }

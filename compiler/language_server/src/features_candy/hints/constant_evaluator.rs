@@ -100,7 +100,7 @@ impl ConstantEvaluator {
     where
         DB: AstDb + AstToHir + HirDb + ModuleDb + PositionConversionDb,
     {
-        let module_string = <Module as ToRichIr<Module>>::to_rich_ir(module).text;
+        let module_string = module.to_rich_ir().text;
         let span = span!(Level::DEBUG, "Calculating hints", %module_string);
         let _enter = span.enter();
 

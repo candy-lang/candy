@@ -1,4 +1,4 @@
-use super::{expression::Expression, id::Id, MirReferenceKey};
+use super::{expression::Expression, id::Id};
 use crate::{
     builtin_functions::BuiltinFunction,
     hir,
@@ -41,7 +41,7 @@ impl IntoIterator for Body {
     }
 }
 impl Body {
-    pub fn return_value(&mut self) -> Id {
+    pub fn return_value(&self) -> Id {
         let (id, _) = self.expressions.last().unwrap();
         *id
     }
@@ -315,7 +315,7 @@ impl LambdaBodyBuilder {
     fn finish(self) -> (IdGenerator<Id>, Expression) {
         let (id_generator, body) = self.body_builder.finish();
         let lambda = Expression::Lambda {
-            original_hirs: vec![self.hir_id],
+            original_hirs: vec![self.hir_id].into_iter().collect(),
             parameters: self.parameters,
             responsible_parameter: self.responsible_parameter,
             body,
@@ -434,7 +434,7 @@ impl BodyBuilder {
         })
     }
 
-    pub fn current_return_value(&mut self) -> Id {
+    pub fn current_return_value(&self) -> Id {
         self.body.return_value()
     }
 
@@ -443,17 +443,17 @@ impl BodyBuilder {
     }
 }
 
-impl ToRichIr<MirReferenceKey> for Body {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<MirReferenceKey>) {
-        fn push(builder: &mut RichIrBuilder<MirReferenceKey>, id: &Id, expression: &Expression) {
+impl ToRichIr for Body {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        fn push(builder: &mut RichIrBuilder, id: &Id, expression: &Expression) {
             if let Expression::Lambda { original_hirs, .. } = expression {
                 builder.push("# ", TokenType::Comment, EnumSet::empty());
                 builder.push_children_custom(
-                    original_hirs,
+                    original_hirs.iter().collect_vec(),
                     |builder, id| {
                         let range =
                             builder.push(id.to_string(), TokenType::Comment, EnumSet::empty());
-                        builder.push_reference(id.to_owned(), range);
+                        builder.push_reference((*id).clone(), range);
                     },
                     ", ",
                 );

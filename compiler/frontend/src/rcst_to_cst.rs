@@ -248,21 +248,10 @@ impl RcstToCstExt for Rcst {
                 arrow: Box::new(arrow.to_cst(state)),
                 body: body.to_csts(state),
             },
-            Rcst::OrPattern { left, right } => CstKind::OrPattern {
+            Rcst::BinaryBar { left, bar, right } => CstKind::BinaryBar {
                 left: Box::new(left.to_cst(state)),
-                right: right
-                    .into_iter()
-                    .map(|(bar, right)| (bar.to_cst(state), right.to_cst(state)))
-                    .collect(),
-            },
-            Rcst::Pipe {
-                receiver,
-                bar,
-                call,
-            } => CstKind::Pipe {
-                receiver: Box::new(receiver.to_cst(state)),
                 bar: Box::new(bar.to_cst(state)),
-                call: Box::new(call.to_cst(state)),
+                right: Box::new(right.to_cst(state)),
             },
             Rcst::Parenthesized {
                 opening_parenthesis,
@@ -287,13 +276,11 @@ impl RcstToCstExt for Rcst {
                 closing_curly_brace: Box::new(closing_curly_brace.to_cst(state)),
             },
             Rcst::Assignment {
-                name_or_pattern,
-                parameters,
+                left,
                 assignment_sign,
                 body,
             } => CstKind::Assignment {
-                name_or_pattern: Box::new(name_or_pattern.to_cst(state)),
-                parameters: parameters.to_csts(state),
+                left: Box::new(left.to_cst(state)),
                 assignment_sign: Box::new(assignment_sign.to_cst(state)),
                 body: body.to_csts(state),
             },

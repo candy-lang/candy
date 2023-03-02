@@ -24,14 +24,17 @@ multiply factorA factorB :=
 divideTruncating dividend divisor :=
   needs (is dividend)
   needs (is divisor)
+  needs (divisor | equals 0 | bool.not) "You can't divide by zero."
   dividend | ✨.intDivideTruncating divisor
 remainder dividend divisor :=
   needs (is dividend)
   needs (is divisor)
+  needs (divisor | equals 0 | bool.not) "You can't divide by zero."
   dividend | ✨.intRemainder divisor
 modulo dividend divisor :=
   needs (is dividend)
   needs (is divisor)
+  needs (divisor | equals 0 | bool.not) "You can't divide by zero."
   dividend | ✨.intModulo divisor
 
 compareTo valueA valueB :=

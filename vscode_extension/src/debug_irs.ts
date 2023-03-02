@@ -78,7 +78,7 @@ function registerDocumentProvider(
       const { ir, originalUri } = decodeUri(uri);
       return vscode.window.withProgress(
         {
-          location: vscode.ProgressLocation.Notification,
+          location: vscode.ProgressLocation.Window,
           title: `Loading ${getIrTitle(ir.type)} of ${originalUri}…`,
           cancellable: true,
         },

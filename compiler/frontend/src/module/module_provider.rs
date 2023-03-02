@@ -56,7 +56,7 @@ impl ModuleProvider for FileSystemModuleProvider {
         let paths = module.to_possible_paths().unwrap_or_else(|| {
             panic!(
                 "Tried to get content of anonymous module {} that is not cached by the language server.",
-                <Module as ToRichIr<Module>>::to_rich_ir(module),
+                module.to_rich_ir(),
             )
         });
         for path in paths {

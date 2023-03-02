@@ -97,7 +97,7 @@ impl Module {
         let paths = self.to_possible_paths().unwrap_or_else(|| {
             panic!(
                 "Tried to get content of anonymous module {} that is not cached by the language server.",
-                <Module as ToRichIr<Module>>::to_rich_ir(self).text,
+                self.to_rich_ir(),
             )
         });
         for path in paths {
@@ -122,8 +122,8 @@ impl Module {
         });
     }
 }
-impl<RK: Eq + From<Module> + Hash> ToRichIr<RK> for Module {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<RK>) {
+impl ToRichIr for Module {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         let range = builder.push(
             format!(
                 "{}:{}",

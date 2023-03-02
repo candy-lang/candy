@@ -149,13 +149,9 @@ fn raw_build(
     tracing: &TracingConfig,
     debug: bool,
 ) -> Option<Arc<Lir>> {
-    let rcst = db.rcst(module.clone()).unwrap_or_else(|err| {
-        panic!(
-            "Error parsing file `{}`: {:?}",
-            <Module as ToRichIr<Module>>::to_rich_ir(&module),
-            err,
-        )
-    });
+    let rcst = db
+        .rcst(module.clone())
+        .unwrap_or_else(|err| panic!("Error parsing file `{}`: {:?}", module.to_rich_ir(), err));
     if debug {
         module.dump_associated_debug_file("rcst", &format!("{}\n", rcst.to_rich_ir()));
     }
@@ -213,7 +209,7 @@ fn raw_build(
         let range = db.range_to_positions(module.clone(), span);
         warn!(
             "{}:{}:{} – {}:{}: {payload}",
-            <Module as ToRichIr<Module>>::to_rich_ir(&module),
+            module.to_rich_ir(),
             range.start.line,
             range.start.character,
             range.end.line,
@@ -484,10 +480,7 @@ fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
         return Err(Exit::FileNotFound);
     }
 
-    debug!(
-        "Fuzzing `{}`.",
-        <Module as ToRichIr<Module>>::to_rich_ir(&module),
-    );
+    debug!("Fuzzing `{}`.", module.to_rich_ir());
     let failing_cases = candy_fuzzer::fuzz(&db, module);
 
     if failing_cases.is_empty() {

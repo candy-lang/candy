@@ -2,14 +2,14 @@ use crate::{
     builtin_functions::BuiltinFunction,
     hir,
     module::Module,
-    rich_ir::{RichIrBuilder, ToRichIr, TokenModifier, TokenType},
+    rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr, TokenModifier, TokenType},
 };
 use enumset::EnumSet;
 use itertools::Itertools;
 use num_bigint::BigInt;
 use std::hash;
 
-use super::{body::Body, id::Id, MirReferenceKey};
+use super::{body::Body, id::Id};
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum Expression {
@@ -119,6 +119,14 @@ impl TryInto<bool> for &Expression {
         }
     }
 }
+impl TryInto<BigInt> for &Expression {
+    type Error = ();
+
+    fn try_into(self) -> Result<BigInt, ()> {
+        let Expression::Int(int) = self else { return Err(()); };
+        Ok(int.clone())
+    }
+}
 
 #[allow(clippy::derived_hash_with_manual_eq)]
 impl hash::Hash for Expression {
@@ -202,8 +210,8 @@ impl hash::Hash for Expression {
         }
     }
 }
-impl ToRichIr<MirReferenceKey> for Expression {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<MirReferenceKey>) {
+impl ToRichIr for Expression {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         match self {
             Expression::Int(int) => {
                 let range = builder.push(int.to_string(), TokenType::Int, EnumSet::empty());
@@ -216,7 +224,7 @@ impl ToRichIr<MirReferenceKey> for Expression {
             }
             Expression::Symbol(symbol) => {
                 let range = builder.push(symbol, TokenType::Symbol, EnumSet::empty());
-                builder.push_reference(MirReferenceKey::Symbol(symbol.to_owned()), range);
+                builder.push_reference(ReferenceKey::Symbol(symbol.to_owned()), range);
             }
             Expression::Builtin(builtin) => {
                 let range = builder.push(

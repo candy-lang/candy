@@ -1,13 +1,7 @@
 use std::fmt::{self, Debug, Formatter};
 
-use derive_more::From;
-use num_bigint::BigInt;
-
 use crate::{
-    builtin_functions::BuiltinFunction,
-    hir,
     id::IdGenerator,
-    module::Module,
     rich_ir::{RichIrBuilder, ToRichIr},
 };
 
@@ -38,20 +32,8 @@ impl Debug for Mir {
         write!(f, "{}", self.body.to_rich_ir())
     }
 }
-impl ToRichIr<MirReferenceKey> for Mir {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<MirReferenceKey>) {
+impl ToRichIr for Mir {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         self.body.build_rich_ir(builder);
     }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, From)]
-pub enum MirReferenceKey {
-    Module(Module),
-    Id(Id),
-    Int(BigInt),
-    Text(String),
-    #[from(ignore)]
-    Symbol(String),
-    BuiltinFunction(BuiltinFunction),
-    HirId(hir::Id),
 }

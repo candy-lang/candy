@@ -4,7 +4,7 @@ use super::{ast::AstError, cst, hir::HirError, rcst::RcstError};
 use crate::{
     module::Module,
     position::Offset,
-    rich_ir::{RichIrBuilder, ToRichIr},
+    rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr},
 };
 use std::{fmt::Display, hash::Hash, ops::Range};
 
@@ -13,18 +13,6 @@ pub struct CompilerError {
     pub module: Module,
     pub span: Range<Offset>,
     pub payload: CompilerErrorPayload,
-}
-impl Display for CompilerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} span({} – {}): {}",
-            <Module as ToRichIr<Module>>::to_rich_ir(&self.module),
-            *self.span.start,
-            *self.span.end,
-            self.payload,
-        )
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -177,9 +165,22 @@ impl CompilerError {
     }
 }
 
-impl<RK: Eq + Hash> ToRichIr<RK> for CompilerError {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<RK>) {
-        // TODO: include more rich information
-        builder.push(self.to_string(), None, EnumSet::empty());
+impl ToRichIr for CompilerError {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        let range = builder.push(
+            format!(
+                "{} (span: {} – {})",
+                self.module.to_rich_ir(),
+                *self.span.start,
+                *self.span.end,
+            ),
+            None,
+            EnumSet::empty(),
+        );
+        builder.push_reference(
+            ReferenceKey::ModuleWithSpan(self.module.clone(), self.span.to_owned()),
+            range,
+        );
+        builder.push(format!(": {}", self.payload), None, EnumSet::empty());
     }
 }

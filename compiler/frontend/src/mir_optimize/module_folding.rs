@@ -30,7 +30,7 @@
 use crate::{
     mir::{Expression, Id, Mir},
     mir_optimize::OptimizeMir,
-    module::{Module, UsePath},
+    module::UsePath,
     rich_ir::ToRichIr,
     tracing::TracingConfig,
 };
@@ -57,7 +57,7 @@ impl Mir {
                 let Ok(module_to_import) = path.resolve_relative_to(current_module.clone()) else {
                     warn!(
                         "`use` called with a path that doesn't refer to a module: `\"{path:?}\"` relative to {}.",
-                        <Module as ToRichIr<Module>>::to_rich_ir(current_module),
+                        current_module.to_rich_ir(),
                     );
                     return; // TODO: Replace with a panic.
                 };
@@ -69,7 +69,7 @@ impl Mir {
                 let Some(mir) = mir else {
                     warn!(
                         "Module {} not found.",
-                        <Module as ToRichIr<Module>>::to_rich_ir(&module_to_import),
+                        module_to_import.to_rich_ir(),
                     );
                     return; // TODO: Replace with a panic.
                 };
