@@ -5,7 +5,6 @@ use candy_frontend::{
     module::Module,
     rich_ir::{RichIrBuilder, ToRichIr, TokenType},
 };
-use derive_more::From;
 use enumset::EnumSet;
 use itertools::Itertools;
 use num_bigint::BigInt;
@@ -244,20 +243,8 @@ impl StackExt for Vec<Id> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, From)]
-pub enum LirReferenceKey {
-    Module(Module),
-    Id(Id),
-    Int(BigInt),
-    Text(String),
-    #[from(ignore)]
-    Symbol(String),
-    BuiltinFunction(BuiltinFunction),
-    HirIr(hir::Id),
-    InstructionDiscriminant(InstructionDiscriminants),
-}
-impl ToRichIr<LirReferenceKey> for Lir {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<LirReferenceKey>) {
+impl ToRichIr for Lir {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         let mut iterator = self.instructions.iter();
         if let Some(instruction) = iterator.next() {
             instruction.build_rich_ir(builder);
@@ -268,11 +255,10 @@ impl ToRichIr<LirReferenceKey> for Lir {
         }
     }
 }
-impl ToRichIr<LirReferenceKey> for Instruction {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<LirReferenceKey>) {
+impl ToRichIr for Instruction {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         let discriminant: InstructionDiscriminants = self.into();
-        let range = builder.push::<&'static str, _>(discriminant.into(), None, EnumSet::empty());
-        builder.push_reference(discriminant, range);
+        builder.push::<&'static str, _>(discriminant.into(), None, EnumSet::empty());
 
         match self {
             Instruction::CreateInt(int) => {

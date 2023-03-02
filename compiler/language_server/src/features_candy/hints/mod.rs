@@ -108,17 +108,14 @@ pub async fn run_server(
                 fuzzer.update_module(module.clone(), &heap, &closures);
                 debug!(
                     "The constant evaluator made progress in {}.",
-                    <Module as ToRichIr<Module>>::to_rich_ir(&module),
+                    module.to_rich_ir(),
                 );
                 break 'new_insight Some(module);
             }
             // For fuzzing, we're a bit more resource-conscious.
             sleep(Duration::from_millis(200)).await;
             if let Some(module) = fuzzer.run(&db) {
-                debug!(
-                    "The fuzzer made progress in {}.",
-                    <Module as ToRichIr<Module>>::to_rich_ir(&module),
-                );
+                debug!("The fuzzer made progress in {}.", module.to_rich_ir());
                 break 'new_insight Some(module);
             }
             None
@@ -164,10 +161,7 @@ impl OutgoingHints {
     }
 
     async fn report_hints(&mut self, module: Module, hints: Vec<Hint>) {
-        debug!(
-            "Reporting hints for {}:\n{hints:?}",
-            <Module as ToRichIr<Module>>::to_rich_ir(&module),
-        );
+        debug!("Reporting hints for {}:\n{hints:?}", module.to_rich_ir());
         if self.last_sent.get(&module) != Some(&hints) {
             self.last_sent.insert(module.clone(), hints.clone());
             self.sender.send((module, hints)).await.unwrap();

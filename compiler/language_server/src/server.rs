@@ -2,15 +2,16 @@ use async_trait::async_trait;
 use candy_frontend::module::ModuleKind;
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentFilter, DocumentHighlight, DocumentHighlightParams, FoldingRange, FoldingRangeParams,
-    GotoDefinitionParams, GotoDefinitionResponse, InitializeParams, InitializeResult,
-    InitializedParams, Location, MessageType, Position, ReferenceParams, Registration,
-    SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
-    SemanticTokensRegistrationOptions, SemanticTokensResult, SemanticTokensServerCapabilities,
-    ServerCapabilities, ServerInfo, StaticRegistrationOptions,
-    TextDocumentChangeRegistrationOptions, TextDocumentRegistrationOptions, Url,
-    WorkDoneProgressOptions,
+    DocumentFilter, DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams,
+    FoldingRange, FoldingRangeParams, GotoDefinitionParams, GotoDefinitionResponse,
+    InitializeParams, InitializeResult, InitializedParams, Location, MessageType, Position,
+    ReferenceParams, Registration, SemanticTokens, SemanticTokensFullOptions,
+    SemanticTokensOptions, SemanticTokensParams, SemanticTokensRegistrationOptions,
+    SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
+    StaticRegistrationOptions, TextDocumentChangeRegistrationOptions,
+    TextDocumentRegistrationOptions, Url, WorkDoneProgressOptions,
 };
+use rustc_hash::FxHashMap;
 use serde::Serialize;
 use std::{mem, path::PathBuf};
 use tokio::sync::{mpsc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -19,7 +20,7 @@ use tracing::{debug, span, Level};
 
 use crate::{
     database::Database,
-    features::LanguageFeatures,
+    features::{LanguageFeatures, Reference},
     features_candy::{hints::HintsNotification, CandyFeatures},
     features_ir::{IrFeatures, UpdateIrNotification},
     semantic_tokens,
@@ -403,32 +404,51 @@ impl LanguageServer for Server {
             .references_raw(
                 uri.clone(),
                 params.text_document_position.position,
+                false,
                 params.context.include_declaration,
             )
             .await;
-        let response = highlights.map(|highlights| {
-            highlights
-                .into_iter()
-                .map(|highlight| Location {
+        let response = highlights
+            .iter()
+            .flat_map(|(uri, references)| {
+                references.iter().map(|highlight| Location {
                     uri: uri.clone(),
                     range: highlight.range,
                 })
-                .collect()
-        });
-        Ok(response)
+            })
+            .collect();
+        Ok(Some(response))
     }
     async fn document_highlight(
         &self,
         params: DocumentHighlightParams,
     ) -> jsonrpc::Result<Option<Vec<DocumentHighlight>>> {
-        let response = self
+        let mut response = self
             .references_raw(
-                params.text_document_position_params.text_document.uri,
+                params
+                    .text_document_position_params
+                    .text_document
+                    .uri
+                    .clone(),
                 params.text_document_position_params.position,
+                true,
                 true,
             )
             .await;
-        Ok(response)
+        let highlights = response
+            .remove(&params.text_document_position_params.text_document.uri)
+            .unwrap_or_default()
+            .iter()
+            .map(|reference| DocumentHighlight {
+                range: reference.range,
+                kind: Some(if reference.is_write {
+                    DocumentHighlightKind::WRITE
+                } else {
+                    DocumentHighlightKind::READ
+                }),
+            })
+            .collect();
+        Ok(Some(highlights))
     }
 
     async fn folding_range(
@@ -469,8 +489,9 @@ impl Server {
         &self,
         uri: Url,
         position: Position,
+        only_in_same_document: bool,
         include_declaration: bool,
-    ) -> Option<Vec<DocumentHighlight>> {
+    ) -> FxHashMap<Url, Vec<Reference>> {
         let state = self.state.read().await;
         let state = state.require_running();
         let features = self.features_from_url(&state.features, &uri).await;
@@ -481,6 +502,7 @@ impl Server {
                 &state.project_directory,
                 uri,
                 position,
+                only_in_same_document,
                 include_declaration,
             )
             .await

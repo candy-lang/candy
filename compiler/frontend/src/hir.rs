@@ -4,10 +4,9 @@ use crate::{
     error::CompilerError,
     id::CountableId,
     module::{Module, ModuleKind, Package},
-    rich_ir::{RichIrBuilder, ToRichIr, TokenModifier, TokenType},
+    rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr, TokenModifier, TokenType},
 };
 
-use derive_more::From;
 use enumset::EnumSet;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
@@ -204,7 +203,7 @@ impl Debug for Id {
         write!(
             f,
             "HirId({}:{})",
-            <Module as ToRichIr<Module>>::to_rich_ir(&self.module).text,
+            self.module.to_rich_ir(),
             self.keys.iter().join(":"),
         )
     }
@@ -214,8 +213,8 @@ impl Display for Id {
         write!(f, "{self:?}")
     }
 }
-impl ToRichIr<HirReferenceKey> for Id {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
+impl ToRichIr for Id {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         let range = builder.push(
             self.to_short_debug_string(),
             TokenType::Variable,
@@ -296,8 +295,8 @@ impl Display for PatternIdentifierId {
         write!(f, "p${}", self.0)
     }
 }
-impl ToRichIr<HirReferenceKey> for PatternIdentifierId {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
+impl ToRichIr for PatternIdentifierId {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         // TODO: convert to actual reference
         builder.push(self.to_string(), TokenType::Variable, EnumSet::empty());
     }
@@ -437,22 +436,12 @@ impl Body {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, From)]
-pub enum HirReferenceKey {
-    Module(Module),
-    Id(Id),
-    Int(BigUint),
-    Text(String),
-    #[from(ignore)]
-    Symbol(String),
-    BuiltinFunction(BuiltinFunction),
-}
-impl ToRichIr<HirReferenceKey> for Expression {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
+impl ToRichIr for Expression {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         match self {
             Expression::Int(int) => {
                 let range = builder.push(int.to_string(), TokenType::Int, EnumSet::empty());
-                builder.push_reference(int.to_owned(), range);
+                builder.push_reference(ReferenceKey::Int(int.to_owned().into()), range);
             }
             Expression::Text(text) => {
                 let range =
@@ -464,7 +453,7 @@ impl ToRichIr<HirReferenceKey> for Expression {
             }
             Expression::Symbol(symbol) => {
                 let range = builder.push(symbol, TokenType::Symbol, EnumSet::empty());
-                builder.push_reference(HirReferenceKey::Symbol(symbol.to_owned()), range);
+                builder.push_reference(ReferenceKey::Symbol(symbol.to_owned()), range);
             }
             Expression::List(items) => {
                 builder.push("(", None, EnumSet::empty());
@@ -552,7 +541,7 @@ impl ToRichIr<HirReferenceKey> for Expression {
             } => {
                 builder.push("use module ", None, EnumSet::empty());
                 current_module.build_rich_ir(builder);
-                builder.push(" relative to", None, EnumSet::empty());
+                builder.push(" relative to ", None, EnumSet::empty());
                 relative_path.build_rich_ir(builder);
             }
             Expression::Needs { condition, reason } => {
@@ -567,8 +556,8 @@ impl ToRichIr<HirReferenceKey> for Expression {
         }
     }
 }
-impl ToRichIr<HirReferenceKey> for Pattern {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
+impl ToRichIr for Pattern {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         match self {
             Pattern::Int(int) => {
                 builder.push(format!("{int}"), TokenType::Int, EnumSet::empty());
@@ -608,8 +597,8 @@ impl ToRichIr<HirReferenceKey> for Pattern {
         }
     }
 }
-fn build_errors_rich_ir<C: ToRichIr<HirReferenceKey>>(
-    builder: &mut RichIrBuilder<HirReferenceKey>,
+fn build_errors_rich_ir<C: ToRichIr>(
+    builder: &mut RichIrBuilder,
     errors: &[CompilerError],
     child: &Option<C>,
 ) {
@@ -629,8 +618,8 @@ fn build_errors_rich_ir<C: ToRichIr<HirReferenceKey>>(
         }
     });
 }
-impl ToRichIr<HirReferenceKey> for Lambda {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
+impl ToRichIr for Lambda {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         for parameter in &self.parameters {
             let range = builder.push(
                 parameter.to_short_debug_string(),
@@ -650,9 +639,9 @@ impl ToRichIr<HirReferenceKey> for Lambda {
         });
     }
 }
-impl ToRichIr<HirReferenceKey> for Body {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<HirReferenceKey>) {
-        fn push(builder: &mut RichIrBuilder<HirReferenceKey>, id: &Id, expression: &Expression) {
+impl ToRichIr for Body {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        fn push(builder: &mut RichIrBuilder, id: &Id, expression: &Expression) {
             let range = builder.push(
                 id.to_short_debug_string(),
                 TokenType::Variable,

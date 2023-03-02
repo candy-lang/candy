@@ -160,8 +160,8 @@ pub enum RcstError {
     WeirdWhitespaceInIndentation,
 }
 
-impl ToRichIr<()> for Rcst {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<()>) {
+impl ToRichIr for Rcst {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         builder.push(format!("{self:?}"), None, EnumSet::empty());
     }
 }

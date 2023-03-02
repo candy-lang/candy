@@ -1,4 +1,3 @@
-use super::MirReferenceKey;
 use crate::{
     id::CountableId,
     rich_ir::{RichIrBuilder, ToRichIr, TokenType},
@@ -31,8 +30,8 @@ impl Debug for Id {
         write!(f, "{}", self.to_short_debug_string())
     }
 }
-impl ToRichIr<MirReferenceKey> for Id {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder<MirReferenceKey>) {
+impl ToRichIr for Id {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         let range = builder.push(
             self.to_short_debug_string(),
             TokenType::Variable,
