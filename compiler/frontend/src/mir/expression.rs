@@ -7,11 +7,8 @@ use crate::{
 use enumset::EnumSet;
 use itertools::Itertools;
 use num_bigint::BigInt;
-use rustc_hash::FxHashSet;
-use std::{
-    collections::hash_map::DefaultHasher,
-    hash::{self, Hasher},
-};
+use rustc_hash::{FxHashSet, FxHasher};
+use std::hash::{self, Hasher};
 
 use super::{body::Body, id::Id};
 
@@ -154,7 +151,7 @@ impl hash::Hash for Expression {
                 {
                     let mut hash = 0;
                     for id in original_hirs {
-                        let mut state = DefaultHasher::new();
+                        let mut state = FxHasher::default();
                         id.hash(&mut state);
                         hash ^= state.finish();
                     }
