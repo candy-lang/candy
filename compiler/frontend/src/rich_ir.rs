@@ -110,10 +110,7 @@ pub struct RichIrBuilder {
     indentation: usize,
 }
 impl RichIrBuilder {
-    pub fn push_foldable<F>(&mut self, build_children: F)
-    where
-        F: FnOnce(&mut Self),
-    {
+    pub fn push_foldable(&mut self, build_children: impl FnOnce(&mut Self)) {
         let start = self.ir.text.len().into();
         build_children(self);
         let end = self.ir.text.len().into();
@@ -130,18 +127,17 @@ impl RichIrBuilder {
         self.push("\n", None, EnumSet::empty());
         self.push("  ".repeat(self.indentation), None, EnumSet::empty());
     }
-    pub fn push_children_multiline<'c, CS, C>(&mut self, children: CS)
+    pub fn push_children_multiline<'c, C>(&mut self, children: impl IntoIterator<Item = &'c C>)
     where
-        CS: IntoIterator<Item = &'c C>,
         C: ToRichIr + 'c,
     {
         self.push_children_custom_multiline(children, |builder, child| child.build_rich_ir(builder))
     }
-    pub fn push_children_custom_multiline<CS, C, F>(&mut self, children: CS, mut push_child: F)
-    where
-        CS: IntoIterator<Item = C>,
-        F: FnMut(&mut Self, &C),
-    {
+    pub fn push_children_custom_multiline<C>(
+        &mut self,
+        children: impl IntoIterator<Item = C>,
+        mut push_child: impl FnMut(&mut Self, &C),
+    ) {
         self.indent();
         for child in children {
             self.push_newline();
@@ -150,28 +146,23 @@ impl RichIrBuilder {
         self.dedent();
     }
 
-    pub fn push_children<CS, C, S>(&mut self, children: CS, separator: S)
-    where
-        CS: AsRef<[C]>,
-        C: ToRichIr,
-        S: AsRef<str>,
-    {
+    pub fn push_children<C: ToRichIr>(
+        &mut self,
+        children: impl AsRef<[C]>,
+        separator: impl AsRef<str>,
+    ) {
         self.push_children_custom(
             children,
             |builder, child| child.build_rich_ir(builder),
             separator,
         )
     }
-    pub fn push_children_custom<CS, C, F, S>(
+    pub fn push_children_custom<C>(
         &mut self,
-        children: CS,
-        mut push_child: F,
-        separator: S,
-    ) where
-        CS: AsRef<[C]>,
-        F: FnMut(&mut Self, &C),
-        S: AsRef<str>,
-    {
+        children: impl AsRef<[C]>,
+        mut push_child: impl FnMut(&mut Self, &C),
+        separator: impl AsRef<str>,
+    ) {
         match children.as_ref() {
             [] => {}
             [child] => push_child(self, child),
@@ -185,7 +176,7 @@ impl RichIrBuilder {
         }
     }
 
-    pub fn push_comment_line<S: AsRef<str>>(&mut self, text: S) {
+    pub fn push_comment_line(&mut self, text: impl AsRef<str>) {
         let text = text.as_ref();
         if text.is_empty() {
             self.push("#", TokenType::Comment, EnumSet::empty());
@@ -196,16 +187,12 @@ impl RichIrBuilder {
         self.push_newline();
     }
 
-    pub fn push<S, TT>(
+    pub fn push(
         &mut self,
-        text: S,
-        token_type: TT,
+        text: impl AsRef<str>,
+        token_type: impl Into<Option<TokenType>>,
         token_modifiers: EnumSet<TokenModifier>,
-    ) -> Range<Offset>
-    where
-        S: AsRef<str>,
-        TT: Into<Option<TokenType>>,
-    {
+    ) -> Range<Offset> {
         let token_type = token_type.into();
 
         assert!(
@@ -226,14 +213,14 @@ impl RichIrBuilder {
         range
     }
 
-    pub fn push_definition<RK: Into<ReferenceKey>>(&mut self, key: RK, range: Range<Offset>) {
+    pub fn push_definition(&mut self, key: impl Into<ReferenceKey>, range: Range<Offset>) {
         self.ir
             .references
             .entry(key.into())
             .or_insert_with(ReferenceCollection::default)
             .definition = Some(range);
     }
-    pub fn push_reference<RK: Into<ReferenceKey>>(&mut self, key: RK, range: Range<Offset>) {
+    pub fn push_reference(&mut self, key: impl Into<ReferenceKey>, range: Range<Offset>) {
         self.ir
             .references
             .entry(key.into())
