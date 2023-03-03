@@ -36,7 +36,7 @@ where
             Some(ReferenceQuery::Needs(module))
         }
         CstKind::Identifier { .. } => {
-            let hir_id = db.cst_to_hir_id(module, origin_cst.id)?;
+            let hir_id = db.cst_to_hir_id(module, origin_cst.data.id)?;
             let target_id = if let Some(hir_expr) = db.find_expression(hir_id.clone()) {
                 let containing_body = db.containing_body_of(hir_id.clone());
                 if containing_body.identifiers.contains_key(&hir_id) {
