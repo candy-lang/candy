@@ -9,6 +9,7 @@ rust-version = "1.56"
 [dependencies]
 derive_more = "0.99.17"
 enumset = "1.0.12"
+extension-trait = "1.0.1"
 im = "15.1.0"
 itertools = { version = "0.10.0" }
 lazy_static = "1.4.0"

@@ -1,6 +1,6 @@
 use enumset::EnumSet;
 
-use super::{ast::AstError, cst, hir::HirError, rcst::RcstError};
+use super::{ast::AstError, cst, cst::CstError, hir::HirError};
 use crate::{
     module::Module,
     position::Offset,
@@ -18,7 +18,7 @@ pub struct CompilerError {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum CompilerErrorPayload {
     InvalidUtf8,
-    Rcst(RcstError),
+    Cst(CstError),
     Ast(AstError),
     Hir(HirError),
 }
@@ -26,43 +26,43 @@ impl Display for CompilerErrorPayload {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let message = match self {
             CompilerErrorPayload::InvalidUtf8 => "The module contains invalid UTF-8.".to_string(),
-            CompilerErrorPayload::Rcst(error) => match error {
-                RcstError::CurlyBraceNotClosed => "The curly brace is not closed.",
-                RcstError::IdentifierContainsNonAlphanumericAscii => {
+            CompilerErrorPayload::Cst(error) => match error {
+                CstError::CurlyBraceNotClosed => "The curly brace is not closed.",
+                CstError::IdentifierContainsNonAlphanumericAscii => {
                     "This identifier contains non-alphanumeric ASCII characters."
                 }
-                RcstError::IntContainsNonDigits => {
+                CstError::IntContainsNonDigits => {
                     "This integer contains characters that are not digits."
                 }
-                RcstError::ListItemMissesValue => "This list item is missing a value.",
-                RcstError::ListNotClosed => "The list is not closed.",
-                RcstError::MatchMissesCases => "This match misses cases to match against.",
-                RcstError::MatchCaseMissesArrow => "This match case misses an arrow.",
-                RcstError::MatchCaseMissesBody => "This match case misses a body to run.",
-                RcstError::OpeningParenthesisWithoutExpression => {
+                CstError::ListItemMissesValue => "This list item is missing a value.",
+                CstError::ListNotClosed => "The list is not closed.",
+                CstError::MatchMissesCases => "This match misses cases to match against.",
+                CstError::MatchCaseMissesArrow => "This match case misses an arrow.",
+                CstError::MatchCaseMissesBody => "This match case misses a body to run.",
+                CstError::OpeningParenthesisWithoutExpression => {
                     "Here's an opening parenthesis without an expression after it."
                 }
-                RcstError::OrPatternMissesRight => "This or-pattern misses a right-hand side.",
-                RcstError::ParenthesisNotClosed => "This parenthesis isn't closed.",
-                RcstError::PipeMissesCall => "There should be a call after this pipe.",
-                RcstError::StructFieldMissesColon => "This struct field misses a colon.",
-                RcstError::StructFieldMissesKey => "This struct field misses a key.",
-                RcstError::StructFieldMissesValue => "This struct field misses a value.",
-                RcstError::StructNotClosed => "This struct is not closed.",
-                RcstError::SymbolContainsNonAlphanumericAscii => {
+                CstError::OrPatternMissesRight => "This or-pattern misses a right-hand side.",
+                CstError::ParenthesisNotClosed => "This parenthesis isn't closed.",
+                CstError::PipeMissesCall => "There should be a call after this pipe.",
+                CstError::StructFieldMissesColon => "This struct field misses a colon.",
+                CstError::StructFieldMissesKey => "This struct field misses a key.",
+                CstError::StructFieldMissesValue => "This struct field misses a value.",
+                CstError::StructNotClosed => "This struct is not closed.",
+                CstError::SymbolContainsNonAlphanumericAscii => {
                     "This symbol contains non-alphanumeric ASCII characters."
                 }
-                RcstError::TextNotClosed => "This text isn't closed.",
-                RcstError::TextNotSufficientlyIndented => "This text isn't sufficiently indented.",
-                RcstError::TextInterpolationNotClosed => "This text interpolation isn't closed.",
-                RcstError::TextInterpolationWithoutExpression => {
+                CstError::TextNotClosed => "This text isn't closed.",
+                CstError::TextNotSufficientlyIndented => "This text isn't sufficiently indented.",
+                CstError::TextInterpolationNotClosed => "This text interpolation isn't closed.",
+                CstError::TextInterpolationWithoutExpression => {
                     "Here's a start of a text interpolation without an expression after it."
                 }
-                RcstError::TooMuchWhitespace => "There is too much whitespace here.",
-                RcstError::UnexpectedCharacters => "This is an unexpected character.",
-                RcstError::UnparsedRest => "The parser couldn't parse this rest.",
-                RcstError::WeirdWhitespace => "This is weird whitespace.",
-                RcstError::WeirdWhitespaceInIndentation => {
+                CstError::TooMuchWhitespace => "There is too much whitespace here.",
+                CstError::UnexpectedCharacters => "This is an unexpected character.",
+                CstError::UnparsedRest => "The parser couldn't parse this rest.",
+                CstError::WeirdWhitespace => "This is weird whitespace.",
+                CstError::WeirdWhitespaceInIndentation => {
                     "This is weird whitespace. Make sure to use indent using two spaces."
                 }
             }

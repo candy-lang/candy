@@ -1,5 +1,8 @@
-use super::rcst::{Rcst, RcstError};
-use crate::module::{Module, ModuleDb, Package};
+use crate::{
+    cst::{CstError, CstKind},
+    module::{Module, ModuleDb, Package},
+    rcst::Rcst,
+};
 use std::sync::Arc;
 
 #[salsa::query_group(StringToRcstStorage)]
@@ -24,10 +27,13 @@ fn rcst(db: &dyn StringToRcst, module: Module) -> RcstResult {
     };
     let (rest, mut rcsts) = parse::body(&source, 0);
     if !rest.is_empty() {
-        rcsts.push(Rcst::Error {
-            unparsable_input: rest.to_string(),
-            error: RcstError::UnparsedRest,
-        });
+        rcsts.push(
+            CstKind::Error {
+                unparsable_input: rest.to_string(),
+                error: CstError::UnparsedRest,
+            }
+            .into(),
+        );
     }
     Ok(Arc::new(rcsts))
 }
@@ -39,24 +45,30 @@ pub enum InvalidModuleError {
     IsToolingModule,
 }
 
+impl CstKind<()> {
+    fn wrap_in_whitespace(self, whitespace: Vec<Rcst>) -> Rcst {
+        Rcst::from(self).wrap_in_whitespace(whitespace)
+    }
+}
 impl Rcst {
-    fn wrap_in_whitespace(mut self, mut whitespace: Vec<Rcst>) -> Self {
+    fn wrap_in_whitespace(mut self, mut whitespace: Vec<Rcst>) -> Rcst {
         if whitespace.is_empty() {
             return self;
         }
 
-        if let Rcst::TrailingWhitespace {
+        if let CstKind::TrailingWhitespace {
             whitespace: self_whitespace,
             ..
-        } = &mut self
+        } = &mut self.kind
         {
             self_whitespace.append(&mut whitespace);
             self
         } else {
-            Rcst::TrailingWhitespace {
+            CstKind::TrailingWhitespace {
                 child: Box::new(self),
                 whitespace,
             }
+            .into()
         }
     }
 }
@@ -81,12 +93,14 @@ mod parse {
     // all the surrounding code still has a chance to be properly parsed – even
     // mid-writing after putting the opening bracket of a struct.
 
-    use super::{
-        super::rcst::{IsMultiline, Rcst, RcstError, SplitOuterTrailingWhitespace},
-        whitespace_indentation_score,
+    use crate::{
+        cst::{CstError, CstKind, IsMultiline},
+        rcst::{Rcst, SplitOuterTrailingWhitespace},
     };
     use itertools::Itertools;
     use tracing::instrument;
+
+    use super::whitespace_indentation_score;
 
     static MEANINGFUL_PUNCTUATION: &str = r#"=,.:|()[]{}->'"%"#;
     static SUPPORTED_WHITESPACE: &str = " \r\n\t";
@@ -103,78 +117,78 @@ mod parse {
 
     #[instrument(level = "trace")]
     fn equals_sign(input: &str) -> Option<(&str, Rcst)> {
-        literal(input, "=").map(|it| (it, Rcst::EqualsSign))
+        literal(input, "=").map(|it| (it, CstKind::EqualsSign.into()))
     }
     #[instrument(level = "trace")]
     fn comma(input: &str) -> Option<(&str, Rcst)> {
-        literal(input, ",").map(|it| (it, Rcst::Comma))
+        literal(input, ",").map(|it| (it, CstKind::Comma.into()))
     }
     #[instrument(level = "trace")]
     fn dot(input: &str) -> Option<(&str, Rcst)> {
-        literal(input, ".").map(|it| (it, Rcst::Dot))
+        literal(input, ".").map(|it| (it, CstKind::Dot.into()))
     }
     #[instrument(level = "trace")]
     fn colon(input: &str) -> Option<(&str, Rcst)> {
-        literal(input, ":").map(|it| (it, Rcst::Colon))
+        literal(input, ":").map(|it| (it, CstKind::Colon.into()))
     }
     #[instrument(level = "trace")]
     fn colon_equals_sign(input: &str) -> Option<(&str, Rcst)> {
-        literal(input, ":=").map(|it| (it, Rcst::ColonEqualsSign))
+        literal(input, ":=").map(|it| (it, CstKind::ColonEqualsSign.into()))
     }
     #[instrument(level = "trace")]
     fn bar(input: &str) -> Option<(&str, Rcst)> {
-        literal(input, "|").map(|it| (it, Rcst::Bar))
+        literal(input, "|").map(|it| (it, CstKind::Bar.into()))
     }
     #[instrument(level = "trace")]
     fn opening_bracket(input: &str) -> Option<(&str, Rcst)> {
-        literal(input, "[").map(|it| (it, Rcst::OpeningBracket))
+        literal(input, "[").map(|it| (it, CstKind::OpeningBracket.into()))
     }
     #[instrument(level = "trace")]
     fn closing_bracket(input: &str) -> Option<(&str, Rcst)> {
-        literal(input, "]").map(|it| (it, Rcst::ClosingBracket))
+        literal(input, "]").map(|it| (it, CstKind::ClosingBracket.into()))
     }
     #[instrument(level = "trace")]
     fn opening_parenthesis(input: &str) -> Option<(&str, Rcst)> {
-        literal(input, "(").map(|it| (it, Rcst::OpeningParenthesis))
+        literal(input, "(").map(|it| (it, CstKind::OpeningParenthesis.into()))
     }
     #[instrument(level = "trace")]
     fn closing_parenthesis(input: &str) -> Option<(&str, Rcst)> {
-        literal(input, ")").map(|it| (it, Rcst::ClosingParenthesis))
+        literal(input, ")").map(|it| (it, CstKind::ClosingParenthesis.into()))
     }
     #[instrument(level = "trace")]
     fn opening_curly_brace(input: &str) -> Option<(&str, Rcst)> {
-        literal(input, "{").map(|it| (it, Rcst::OpeningCurlyBrace))
+        literal(input, "{").map(|it| (it, CstKind::OpeningCurlyBrace.into()))
     }
     #[instrument(level = "trace")]
     fn closing_curly_brace(input: &str) -> Option<(&str, Rcst)> {
-        literal(input, "}").map(|it| (it, Rcst::ClosingCurlyBrace))
+        literal(input, "}").map(|it| (it, CstKind::ClosingCurlyBrace.into()))
     }
     #[instrument(level = "trace")]
     fn arrow(input: &str) -> Option<(&str, Rcst)> {
-        literal(input, "->").map(|it| (it, Rcst::Arrow))
+        literal(input, "->").map(|it| (it, CstKind::Arrow.into()))
     }
     #[instrument(level = "trace")]
     fn single_quote(input: &str) -> Option<(&str, Rcst)> {
-        literal(input, "'").map(|it| (it, Rcst::SingleQuote))
+        literal(input, "'").map(|it| (it, CstKind::SingleQuote.into()))
     }
     #[instrument(level = "trace")]
     fn double_quote(input: &str) -> Option<(&str, Rcst)> {
-        literal(input, "\"").map(|it| (it, Rcst::DoubleQuote))
+        literal(input, "\"").map(|it| (it, CstKind::DoubleQuote.into()))
     }
     #[instrument(level = "trace")]
     fn percent(input: &str) -> Option<(&str, Rcst)> {
-        literal(input, "%").map(|it| (it, Rcst::Percent))
+        literal(input, "%").map(|it| (it, CstKind::Percent.into()))
     }
     #[instrument(level = "trace")]
     fn octothorpe(input: &str) -> Option<(&str, Rcst)> {
-        literal(input, "#").map(|it| (it, Rcst::Octothorpe))
+        literal(input, "#").map(|it| (it, CstKind::Octothorpe.into()))
     }
     #[instrument(level = "trace")]
     fn newline(input: &str) -> Option<(&str, Rcst)> {
         let newlines = vec!["\n", "\r\n"];
         for newline in newlines {
             if let Some(input) = literal(input, newline) {
-                return Some((input, Rcst::Newline(newline.to_string())));
+                return Some((input, CstKind::Newline(newline.to_string()).into()));
             }
         }
         None
@@ -237,21 +251,22 @@ mod parse {
     fn identifier(input: &str) -> Option<(&str, Rcst)> {
         let (input, w) = word(input)?;
         if w == "✨" {
-            return Some((input, Rcst::Identifier(w)));
+            return Some((input, CstKind::Identifier(w).into()));
         }
         let next_character = w.chars().next().unwrap();
         if !next_character.is_lowercase() && next_character != '_' {
             return None;
         }
         if w.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-            Some((input, Rcst::Identifier(w)))
+            Some((input, CstKind::Identifier(w).into()))
         } else {
             Some((
                 input,
-                Rcst::Error {
+                CstKind::Error {
                     unparsable_input: w,
-                    error: RcstError::IdentifierContainsNonAlphanumericAscii,
-                },
+                    error: CstError::IdentifierContainsNonAlphanumericAscii,
+                }
+                .into(),
             ))
         }
     }
@@ -259,27 +274,22 @@ mod parse {
     fn test_identifier() {
         assert_eq!(
             identifier("foo bar"),
-            Some((" bar", Rcst::Identifier("foo".to_string())))
+            Some((" bar", build_identifier("foo")))
         );
-        assert_eq!(
-            identifier("_"),
-            Some(("", Rcst::Identifier("_".to_string()))),
-        );
-        assert_eq!(
-            identifier("_foo"),
-            Some(("", Rcst::Identifier("_foo".to_string()))),
-        );
+        assert_eq!(identifier("_"), Some(("", build_identifier("_"))));
+        assert_eq!(identifier("_foo"), Some(("", build_identifier("_foo"))));
         assert_eq!(identifier("Foo bar"), None);
         assert_eq!(identifier("012 bar"), None);
         assert_eq!(
             identifier("f12🔥 bar"),
             Some((
                 " bar",
-                Rcst::Error {
+                CstKind::Error {
                     unparsable_input: "f12🔥".to_string(),
-                    error: RcstError::IdentifierContainsNonAlphanumericAscii,
+                    error: CstError::IdentifierContainsNonAlphanumericAscii,
                 }
-            ))
+                .into(),
+            )),
         );
     }
 
@@ -290,38 +300,34 @@ mod parse {
             return None;
         }
         if w.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-            Some((input, Rcst::Symbol(w)))
+            Some((input, CstKind::Symbol(w).into()))
         } else {
             Some((
                 input,
-                Rcst::Error {
+                CstKind::Error {
                     unparsable_input: w,
-                    error: RcstError::SymbolContainsNonAlphanumericAscii,
-                },
+                    error: CstError::SymbolContainsNonAlphanumericAscii,
+                }
+                .into(),
             ))
         }
     }
     #[test]
     fn test_symbol() {
-        assert_eq!(
-            symbol("Foo b"),
-            Some((" b", Rcst::Symbol("Foo".to_string())))
-        );
-        assert_eq!(
-            symbol("Foo_Bar"),
-            Some(("", Rcst::Symbol("Foo_Bar".to_string())))
-        );
+        assert_eq!(symbol("Foo b"), Some((" b", build_symbol("Foo"))));
+        assert_eq!(symbol("Foo_Bar"), Some(("", build_symbol("Foo_Bar"))));
         assert_eq!(symbol("foo bar"), None);
         assert_eq!(symbol("012 bar"), None);
         assert_eq!(
             symbol("F12🔥 bar"),
             Some((
                 " bar",
-                Rcst::Error {
+                CstKind::Error {
                     unparsable_input: "F12🔥".to_string(),
-                    error: RcstError::SymbolContainsNonAlphanumericAscii,
+                    error: CstError::SymbolContainsNonAlphanumericAscii,
                 }
-            ))
+                .into()
+            )),
         );
     }
 
@@ -331,61 +337,47 @@ mod parse {
         if !w.chars().next().unwrap().is_ascii_digit() {
             return None;
         }
+
         if w.chars().all(|c| c.is_ascii_digit()) {
             let value = str::parse(&w).expect("Couldn't parse int.");
-            Some((input, Rcst::Int { value, string: w }))
+            Some((input, CstKind::Int { value, string: w }.into()))
         } else {
             Some((
                 input,
-                Rcst::Error {
+                CstKind::Error {
                     unparsable_input: w,
-                    error: RcstError::IntContainsNonDigits,
-                },
+                    error: CstError::IntContainsNonDigits,
+                }
+                .into(),
             ))
         }
     }
     #[test]
     fn test_int() {
-        assert_eq!(
-            int("42 "),
-            Some((
-                " ",
-                Rcst::Int {
-                    value: 42u8.into(),
-                    string: "42".to_string()
-                }
-            ))
-        );
+        assert_eq!(int("42 "), Some((" ", build_simple_int(42))));
         assert_eq!(
             int("012"),
             Some((
                 "",
-                Rcst::Int {
+                CstKind::Int {
                     value: 12u8.into(),
                     string: "012".to_string()
                 }
-            ))
+                .into(),
+            )),
         );
-        assert_eq!(
-            int("123 years"),
-            Some((
-                " years",
-                Rcst::Int {
-                    value: 123u8.into(),
-                    string: "123".to_string()
-                }
-            ))
-        );
+        assert_eq!(int("123 years"), Some((" years", build_simple_int(123))));
         assert_eq!(int("foo"), None);
         assert_eq!(
             int("3D"),
             Some((
                 "",
-                Rcst::Error {
+                CstKind::Error {
                     unparsable_input: "3D".to_string(),
-                    error: RcstError::IntContainsNonDigits,
+                    error: CstError::IntContainsNonDigits,
                 }
-            ))
+                .into(),
+            )),
         );
     }
 
@@ -409,13 +401,14 @@ mod parse {
         if has_error {
             Some((
                 input,
-                Rcst::Error {
+                CstKind::Error {
                     unparsable_input: whitespace,
-                    error: RcstError::WeirdWhitespace,
-                },
+                    error: CstError::WeirdWhitespace,
+                }
+                .into(),
             ))
         } else if !whitespace.is_empty() {
-            Some((input, Rcst::Whitespace(whitespace)))
+            Some((input, CstKind::Whitespace(whitespace).into()))
         } else {
             None
         }
@@ -424,7 +417,7 @@ mod parse {
     fn test_single_line_whitespace() {
         assert_eq!(
             single_line_whitespace("  \nfoo"),
-            Some(("\nfoo", Rcst::Whitespace("  ".to_string())))
+            Some(("\nfoo", CstKind::Whitespace("  ".to_string()).into())),
         );
     }
 
@@ -445,10 +438,11 @@ mod parse {
         }
         Some((
             input,
-            Rcst::Comment {
+            CstKind::Comment {
                 octothorpe: Box::new(octothorpe),
                 comment: comment.into_iter().join(""),
-            },
+            }
+            .into(),
         ))
     }
 
@@ -475,12 +469,13 @@ mod parse {
         Some((
             input,
             if has_weird_whitespace {
-                Rcst::Error {
+                CstKind::Error {
                     unparsable_input: whitespace,
-                    error: RcstError::WeirdWhitespaceInIndentation,
+                    error: CstError::WeirdWhitespaceInIndentation,
                 }
+                .into()
             } else {
-                Rcst::Whitespace(whitespace)
+                CstKind::Whitespace(whitespace).into()
             },
         ))
     }
@@ -488,11 +483,11 @@ mod parse {
     fn test_leading_indentation() {
         assert_eq!(
             leading_indentation("foo", 0),
-            Some(("foo", Rcst::Whitespace("".to_string())))
+            Some(("foo", CstKind::Whitespace("".to_string()).into())),
         );
         assert_eq!(
             leading_indentation("  foo", 1),
-            Some(("foo", Rcst::Whitespace("  ".to_string())))
+            Some(("foo", CstKind::Whitespace("  ".to_string()).into())),
         );
         assert_eq!(leading_indentation("  foo", 2), None);
     }
@@ -556,7 +551,7 @@ mod parse {
         let parts = parts
             .into_iter()
             .filter(|it| {
-                if let Rcst::Whitespace(ws) = it {
+                if let CstKind::Whitespace(ws) = &it.kind {
                     !ws.is_empty()
                 } else {
                     true
@@ -570,7 +565,7 @@ mod parse {
         assert_eq!(whitespaces_and_newlines("foo", 0, true), ("foo", vec![]));
         assert_eq!(
             whitespaces_and_newlines("\nfoo", 0, true),
-            ("foo", vec![Rcst::Newline("\n".to_string())])
+            ("foo", vec![CstKind::Newline("\n".to_string()).into()]),
         );
         assert_eq!(
             whitespaces_and_newlines("\nfoo", 1, true),
@@ -581,50 +576,48 @@ mod parse {
             (
                 "foo",
                 vec![
-                    Rcst::Newline("\n".to_string()),
-                    Rcst::Whitespace("  ".to_string())
-                ]
-            )
+                    CstKind::Newline("\n".to_string()).into(),
+                    CstKind::Whitespace("  ".to_string()).into(),
+                ],
+            ),
         );
         assert_eq!(
             whitespaces_and_newlines("\n  foo", 0, true),
-            ("  foo", vec![Rcst::Newline("\n".to_string())])
+            ("  foo", vec![CstKind::Newline("\n".to_string()).into()]),
         );
         assert_eq!(
             whitespaces_and_newlines(" \n  foo", 0, true),
             (
                 "  foo",
                 vec![
-                    Rcst::Whitespace(" ".to_string()),
-                    Rcst::Newline("\n".to_string())
-                ]
-            )
+                    CstKind::Whitespace(" ".to_string()).into(),
+                    CstKind::Newline("\n".to_string()).into(),
+                ],
+            ),
         );
         assert_eq!(
             whitespaces_and_newlines("\n  foo", 2, true),
-            ("\n  foo", vec![])
+            ("\n  foo", vec![]),
         );
         assert_eq!(
             whitespaces_and_newlines("\tfoo", 1, true),
             (
                 "foo",
-                vec![Rcst::Error {
+                vec![CstKind::Error {
                     unparsable_input: "\t".to_string(),
-                    error: RcstError::WeirdWhitespace
-                }]
-            )
+                    error: CstError::WeirdWhitespace,
+                }
+                .into()],
+            ),
         );
         assert_eq!(
             whitespaces_and_newlines("# hey\n  foo", 1, true),
             (
                 "foo",
                 vec![
-                    Rcst::Comment {
-                        octothorpe: Box::new(Rcst::Octothorpe),
-                        comment: " hey".to_string()
-                    },
-                    Rcst::Newline("\n".to_string()),
-                    Rcst::Whitespace("  ".to_string()),
+                    build_comment(" hey"),
+                    CstKind::Newline("\n".to_string()).into(),
+                    CstKind::Whitespace("  ".to_string()).into(),
                 ],
             )
         );
@@ -633,18 +626,12 @@ mod parse {
             (
                 "\n",
                 vec![
-                    Rcst::Comment {
-                        octothorpe: Box::new(Rcst::Octothorpe),
-                        comment: " foo".to_string()
-                    },
-                    Rcst::Newline("\n".to_string()),
-                    Rcst::Newline("\n".to_string()),
-                    Rcst::Whitespace("  ".to_string()),
-                    Rcst::Comment {
-                        octothorpe: Box::new(Rcst::Octothorpe),
-                        comment: "bar".to_string()
-                    }
-                ]
+                    build_comment(" foo"),
+                    CstKind::Newline("\n".to_string()).into(),
+                    CstKind::Newline("\n".to_string()).into(),
+                    CstKind::Whitespace("  ".to_string()).into(),
+                    build_comment("bar"),
+                ],
             ),
         );
     }
@@ -665,10 +652,11 @@ mod parse {
         let (input, mut expression) = expression(input, indentation + 1, false, true, true)
             .unwrap_or((
                 input,
-                Rcst::Error {
+                CstKind::Error {
                     unparsable_input: "".to_string(),
-                    error: RcstError::TextInterpolationWithoutExpression,
-                },
+                    error: CstError::TextInterpolationWithoutExpression,
+                }
+                .into(),
             ));
 
         let (input, whitespace) = whitespaces_and_newlines(input, indentation + 1, false);
@@ -678,20 +666,22 @@ mod parse {
             parse_multiple(input, closing_curly_brace, Some((curly_brace_count, false))).unwrap_or(
                 (
                     input,
-                    vec![Rcst::Error {
+                    vec![CstKind::Error {
                         unparsable_input: "".to_string(),
-                        error: RcstError::TextInterpolationNotClosed,
-                    }],
+                        error: CstError::TextInterpolationNotClosed,
+                    }
+                    .into()],
                 ),
             );
 
         Some((
             input,
-            Rcst::TextInterpolation {
+            CstKind::TextInterpolation {
                 opening_curly_braces,
                 expression: Box::new(expression),
                 closing_curly_braces,
-            },
+            }
+            .into(),
         ))
     }
 
@@ -704,7 +694,7 @@ mod parse {
         let push_line_to_parts = |line: &mut Vec<char>, parts: &mut Vec<Rcst>| {
             let joined_line = line.drain(..).join("");
             if !joined_line.is_empty() {
-                parts.push(Rcst::TextPart(joined_line));
+                parts.push(CstKind::TextPart(joined_line).into());
             }
         };
 
@@ -722,8 +712,8 @@ mod parse {
                         Some((input_after_single_quotes, closing_single_quotes)) => {
                             input = input_after_single_quotes;
                             push_line_to_parts(&mut line, &mut parts);
-                            break Rcst::ClosingText {
-                                closing_double_quote: Box::new(Rcst::DoubleQuote),
+                            break CstKind::ClosingText {
+                                closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
                                 closing_single_quotes,
                             };
                         }
@@ -745,9 +735,9 @@ mod parse {
                 }
                 None => {
                     push_line_to_parts(&mut line, &mut parts);
-                    break Rcst::Error {
+                    break CstKind::Error {
                         unparsable_input: "".to_string(),
-                        error: RcstError::TextNotClosed,
+                        error: CstError::TextNotClosed,
                     };
                 }
                 Some('\n') => {
@@ -757,9 +747,9 @@ mod parse {
                     input = i;
                     parts.append(&mut whitespace);
                     if let Some('\n') = input.chars().next() {
-                        break Rcst::Error {
+                        break CstKind::Error {
                             unparsable_input: "".to_string(),
-                            error: RcstError::TextNotSufficientlyIndented,
+                            error: CstError::TextNotSufficientlyIndented,
                         };
                     }
                 }
@@ -771,14 +761,18 @@ mod parse {
         };
         Some((
             input,
-            Rcst::Text {
-                opening: Box::new(Rcst::OpeningText {
-                    opening_single_quotes,
-                    opening_double_quote: Box::new(opening_double_quote),
-                }),
+            CstKind::Text {
+                opening: Box::new(
+                    CstKind::OpeningText {
+                        opening_single_quotes,
+                        opening_double_quote: Box::new(opening_double_quote),
+                    }
+                    .into(),
+                ),
                 parts,
-                closing: Box::new(closing),
-            },
+                closing: Box::new(closing.into()),
+            }
+            .into(),
         ))
     }
     #[test]
@@ -786,20 +780,7 @@ mod parse {
         assert_eq!(text("foo", 0), None);
         assert_eq!(
             text("\"foo\" bar", 0),
-            Some((
-                " bar",
-                Rcst::Text {
-                    opening: Box::new(Rcst::OpeningText {
-                        opening_single_quotes: vec![],
-                        opening_double_quote: Box::new(Rcst::DoubleQuote),
-                    }),
-                    parts: vec![Rcst::TextPart("foo".to_string())],
-                    closing: Box::new(Rcst::ClosingText {
-                        closing_double_quote: Box::new(Rcst::DoubleQuote),
-                        closing_single_quotes: vec![],
-                    }),
-                },
-            )),
+            Some((" bar", build_simple_text("foo"))),
         );
         // "foo
         //   bar"2
@@ -807,22 +788,29 @@ mod parse {
             text("\"foo\n  bar\"2", 0),
             Some((
                 "2",
-                Rcst::Text {
-                    opening: Box::new(Rcst::OpeningText {
-                        opening_single_quotes: vec![],
-                        opening_double_quote: Box::new(Rcst::DoubleQuote),
-                    }),
+                CstKind::Text {
+                    opening: Box::new(
+                        CstKind::OpeningText {
+                            opening_single_quotes: vec![],
+                            opening_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                        }
+                        .into(),
+                    ),
                     parts: vec![
-                        Rcst::TextPart("foo".to_string()),
-                        Rcst::Newline("\n".to_string()),
-                        Rcst::Whitespace("  ".to_string()),
-                        Rcst::TextPart("bar".to_string())
+                        CstKind::TextPart("foo".to_string()).into(),
+                        CstKind::Newline("\n".to_string()).into(),
+                        CstKind::Whitespace("  ".to_string()).into(),
+                        CstKind::TextPart("bar".to_string()).into(),
                     ],
-                    closing: Box::new(Rcst::ClosingText {
-                        closing_double_quote: Box::new(Rcst::DoubleQuote),
-                        closing_single_quotes: vec![]
-                    }),
-                },
+                    closing: Box::new(
+                        CstKind::ClosingText {
+                            closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                            closing_single_quotes: vec![]
+                        }
+                        .into(),
+                    ),
+                }
+                .into(),
             )),
         );
         //   "foo
@@ -831,144 +819,171 @@ mod parse {
             text("\"foo\n  bar\"2", 1),
             Some((
                 "\n  bar\"2",
-                Rcst::Text {
-                    opening: Box::new(Rcst::OpeningText {
-                        opening_single_quotes: vec![],
-                        opening_double_quote: Box::new(Rcst::DoubleQuote),
-                    }),
-                    parts: vec![Rcst::TextPart("foo".to_string()),],
-                    closing: Box::new(Rcst::Error {
-                        unparsable_input: "".to_string(),
-                        error: RcstError::TextNotSufficientlyIndented,
-                    }),
+                CstKind::Text {
+                    opening: Box::new(
+                        CstKind::OpeningText {
+                            opening_single_quotes: vec![],
+                            opening_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                        }
+                        .into(),
+                    ),
+                    parts: vec![CstKind::TextPart("foo".to_string()).into()],
+                    closing: Box::new(
+                        CstKind::Error {
+                            unparsable_input: "".to_string(),
+                            error: CstError::TextNotSufficientlyIndented,
+                        }
+                        .into(),
+                    ),
                 }
-            ))
+                .into(),
+            )),
         );
         assert_eq!(
             text("\"foo", 0),
             Some((
                 "",
-                Rcst::Text {
-                    opening: Box::new(Rcst::OpeningText {
-                        opening_single_quotes: vec![],
-                        opening_double_quote: Box::new(Rcst::DoubleQuote)
-                    }),
-                    parts: vec![Rcst::TextPart("foo".to_string()),],
-                    closing: Box::new(Rcst::Error {
-                        unparsable_input: "".to_string(),
-                        error: RcstError::TextNotClosed,
-                    }),
+                CstKind::Text {
+                    opening: Box::new(
+                        CstKind::OpeningText {
+                            opening_single_quotes: vec![],
+                            opening_double_quote: Box::new(CstKind::DoubleQuote.into())
+                        }
+                        .into(),
+                    ),
+                    parts: vec![CstKind::TextPart("foo".to_string()).into()],
+                    closing: Box::new(
+                        CstKind::Error {
+                            unparsable_input: "".to_string(),
+                            error: CstError::TextNotClosed,
+                        }
+                        .into(),
+                    ),
                 }
-            ))
+                .into(),
+            )),
         );
         assert_eq!(
             text("''\"foo\"'bar\"'' baz", 0),
             Some((
                 " baz",
-                Rcst::Text {
-                    opening: Box::new(Rcst::OpeningText {
-                        opening_single_quotes: vec![Rcst::SingleQuote, Rcst::SingleQuote],
-                        opening_double_quote: Box::new(Rcst::DoubleQuote),
-                    }),
-                    parts: vec![Rcst::TextPart("foo\"'bar".to_string())],
-                    closing: Box::new(Rcst::ClosingText {
-                        closing_double_quote: Box::new(Rcst::DoubleQuote),
-                        closing_single_quotes: vec![Rcst::SingleQuote, Rcst::SingleQuote],
-                    }),
-                },
+                CstKind::Text {
+                    opening: Box::new(
+                        CstKind::OpeningText {
+                            opening_single_quotes: vec![
+                                CstKind::SingleQuote.into(),
+                                CstKind::SingleQuote.into(),
+                            ],
+                            opening_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                        }
+                        .into(),
+                    ),
+                    parts: vec![CstKind::TextPart("foo\"'bar".to_string()).into()],
+                    closing: Box::new(
+                        CstKind::ClosingText {
+                            closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                            closing_single_quotes: vec![
+                                CstKind::SingleQuote.into(),
+                                CstKind::SingleQuote.into(),
+                            ],
+                        }
+                        .into(),
+                    ),
+                }
+                .into(),
             )),
         );
         assert_eq!(
             text("\"foo {\"bar\"} baz\"", 0),
             Some((
                 "",
-                Rcst::Text {
-                    opening: Box::new(Rcst::OpeningText {
-                        opening_single_quotes: vec![],
-                        opening_double_quote: Box::new(Rcst::DoubleQuote),
-                    }),
+                CstKind::Text {
+                    opening: Box::new(
+                        CstKind::OpeningText {
+                            opening_single_quotes: vec![],
+                            opening_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                        }
+                        .into(),
+                    ),
                     parts: vec![
-                        Rcst::TextPart("foo ".to_string()),
-                        Rcst::TextInterpolation {
-                            opening_curly_braces: vec![Rcst::OpeningCurlyBrace],
-                            expression: Box::new(Rcst::Text {
-                                opening: Box::new(Rcst::OpeningText {
-                                    opening_single_quotes: vec![],
-                                    opening_double_quote: Box::new(Rcst::DoubleQuote),
-                                }),
-                                parts: vec![Rcst::TextPart("bar".to_string())],
-                                closing: Box::new(Rcst::ClosingText {
-                                    closing_double_quote: Box::new(Rcst::DoubleQuote),
-                                    closing_single_quotes: vec![],
-                                }),
-                            }),
-                            closing_curly_braces: vec![Rcst::ClosingCurlyBrace],
-                        },
-                        Rcst::TextPart(" baz".to_string()),
+                        CstKind::TextPart("foo ".to_string()).into(),
+                        CstKind::TextInterpolation {
+                            opening_curly_braces: vec![CstKind::OpeningCurlyBrace.into()],
+                            expression: Box::new(build_simple_text("bar")),
+                            closing_curly_braces: vec![CstKind::ClosingCurlyBrace.into()],
+                        }
+                        .into(),
+                        CstKind::TextPart(" baz".to_string()).into(),
                     ],
-                    closing: Box::new(Rcst::ClosingText {
-                        closing_double_quote: Box::new(Rcst::DoubleQuote),
-                        closing_single_quotes: vec![],
-                    }),
-                },
+                    closing: Box::new(
+                        CstKind::ClosingText {
+                            closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                            closing_single_quotes: vec![],
+                        }
+                        .into(),
+                    ),
+                }
+                .into(),
             )),
         );
         assert_eq!(
             text("'\"foo {\"bar\"} baz\"'", 0),
             Some((
                 "",
-                Rcst::Text {
-                    opening: Box::new(Rcst::OpeningText {
-                        opening_single_quotes: vec![Rcst::SingleQuote],
-                        opening_double_quote: Box::new(Rcst::DoubleQuote),
-                    }),
-                    parts: vec![Rcst::TextPart("foo {\"bar\"} baz".to_string())],
-                    closing: Box::new(Rcst::ClosingText {
-                        closing_double_quote: Box::new(Rcst::DoubleQuote),
-                        closing_single_quotes: vec![Rcst::SingleQuote],
-                    }),
-                },
+                CstKind::Text {
+                    opening: Box::new(
+                        CstKind::OpeningText {
+                            opening_single_quotes: vec![CstKind::SingleQuote.into()],
+                            opening_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                        }
+                        .into(),
+                    ),
+                    parts: vec![CstKind::TextPart("foo {\"bar\"} baz".to_string()).into()],
+                    closing: Box::new(
+                        CstKind::ClosingText {
+                            closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                            closing_single_quotes: vec![CstKind::SingleQuote.into()],
+                        }
+                        .into(),
+                    ),
+                }
+                .into(),
             )),
         );
         assert_eq!(
             text("\"foo {  \"bar\" } baz\"", 0),
             Some((
                 "",
-                Rcst::Text {
-                    opening: Box::new(Rcst::OpeningText {
-                        opening_single_quotes: vec![],
-                        opening_double_quote: Box::new(Rcst::DoubleQuote)
-                    }),
+                CstKind::Text {
+                    opening: Box::new(
+                        CstKind::OpeningText {
+                            opening_single_quotes: vec![],
+                            opening_double_quote: Box::new(CstKind::DoubleQuote.into())
+                        }
+                        .into(),
+                    ),
                     parts: vec![
-                        Rcst::TextPart("foo ".to_string()),
-                        Rcst::TextInterpolation {
-                            opening_curly_braces: vec![Rcst::TrailingWhitespace {
-                                child: Box::new(Rcst::OpeningCurlyBrace),
-                                whitespace: vec![Rcst::Whitespace("  ".to_string())],
-                            }],
-                            expression: Box::new(Rcst::TrailingWhitespace {
-                                child: Box::new(Rcst::Text {
-                                    opening: Box::new(Rcst::OpeningText {
-                                        opening_single_quotes: vec![],
-                                        opening_double_quote: Box::new(Rcst::DoubleQuote),
-                                    }),
-                                    parts: vec![Rcst::TextPart("bar".to_string())],
-                                    closing: Box::new(Rcst::ClosingText {
-                                        closing_double_quote: Box::new(Rcst::DoubleQuote),
-                                        closing_single_quotes: vec![],
-                                    }),
-                                }),
-                                whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                            }),
-                            closing_curly_braces: vec![Rcst::ClosingCurlyBrace],
-                        },
-                        Rcst::TextPart(" baz".to_string()),
+                        CstKind::TextPart("foo ".to_string()).into(),
+                        CstKind::TextInterpolation {
+                            opening_curly_braces: vec![CstKind::OpeningCurlyBrace
+                                .with_trailing_whitespace(vec![CstKind::Whitespace(
+                                    "  ".to_string(),
+                                )])],
+                            expression: Box::new(build_simple_text("bar").with_trailing_space()),
+                            closing_curly_braces: vec![CstKind::ClosingCurlyBrace.into()],
+                        }
+                        .into(),
+                        CstKind::TextPart(" baz".to_string()).into(),
                     ],
-                    closing: Box::new(Rcst::ClosingText {
-                        closing_double_quote: Box::new(Rcst::DoubleQuote),
-                        closing_single_quotes: vec![],
-                    }),
-                },
+                    closing: Box::new(
+                        CstKind::ClosingText {
+                            closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                            closing_single_quotes: vec![],
+                        }
+                        .into(),
+                    ),
+                }
+                .into(),
             )),
         );
         assert_eq!(
@@ -978,257 +993,304 @@ mod parse {
             ),
             Some((
                 "",
-                Rcst::Text {
-                    opening: Box::new(Rcst::OpeningText {
-                        opening_single_quotes: vec![],
-                        opening_double_quote: Box::new(Rcst::DoubleQuote),
-                    }),
+                CstKind::Text {
+                    opening: Box::new(
+                        CstKind::OpeningText {
+                            opening_single_quotes: vec![],
+                            opening_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                        }
+                        .into(),
+                    ),
                     parts: vec![
-                        Rcst::TextPart("Some text with ".to_string()),
-                        Rcst::TextInterpolation {
-                            opening_curly_braces: vec![Rcst::OpeningCurlyBrace],
-                            expression: Box::new(Rcst::Text {
-                                opening: Box::new(Rcst::OpeningText {
-                                    opening_single_quotes: vec![Rcst::SingleQuote],
-                                    opening_double_quote: Box::new(Rcst::DoubleQuote),
-                                }),
-                                parts: vec![
-                                    Rcst::TextPart("an interpolation containing ".to_string()),
-                                    Rcst::TextInterpolation {
-                                        opening_curly_braces: vec![
-                                            Rcst::OpeningCurlyBrace,
-                                            Rcst::OpeningCurlyBrace,
-                                        ],
-                                        expression: Box::new(Rcst::Text {
-                                            opening: Box::new(Rcst::OpeningText {
-                                                opening_single_quotes: vec![],
-                                                opening_double_quote: Box::new(Rcst::DoubleQuote),
-                                            }),
-                                            parts: vec![Rcst::TextPart(
-                                                "an interpolation".to_string(),
-                                            )],
-                                            closing: Box::new(Rcst::ClosingText {
-                                                closing_double_quote: Box::new(Rcst::DoubleQuote),
-                                                closing_single_quotes: vec![],
-                                            }),
-                                        }),
-                                        closing_curly_braces: vec![
-                                            Rcst::ClosingCurlyBrace,
-                                            Rcst::ClosingCurlyBrace,
-                                        ],
-                                    },
-                                ],
-                                closing: Box::new(Rcst::ClosingText {
-                                    closing_double_quote: Box::new(Rcst::DoubleQuote),
-                                    closing_single_quotes: vec![Rcst::SingleQuote],
-                                })
-                            }),
-                            closing_curly_braces: vec![Rcst::ClosingCurlyBrace],
-                        },
+                        CstKind::TextPart("Some text with ".to_string()).into(),
+                        CstKind::TextInterpolation {
+                            opening_curly_braces: vec![CstKind::OpeningCurlyBrace.into()],
+                            expression: Box::new(
+                                CstKind::Text {
+                                    opening:
+                                        Box::new(
+                                            CstKind::OpeningText {
+                                                opening_single_quotes: vec![
+                                                    CstKind::SingleQuote.into()
+                                                ],
+                                                opening_double_quote: Box::new(
+                                                    CstKind::DoubleQuote.into()
+                                                ),
+                                            }
+                                            .into(),
+                                        ),
+                                    parts: vec![
+                                        CstKind::TextPart(
+                                            "an interpolation containing ".to_string(),
+                                        )
+                                        .into(),
+                                        CstKind::TextInterpolation {
+                                            opening_curly_braces: vec![
+                                                CstKind::OpeningCurlyBrace.into(),
+                                                CstKind::OpeningCurlyBrace.into(),
+                                            ],
+                                            expression: Box::new(build_simple_text(
+                                                "an interpolation"
+                                            )),
+                                            closing_curly_braces: vec![
+                                                CstKind::ClosingCurlyBrace.into(),
+                                                CstKind::ClosingCurlyBrace.into(),
+                                            ],
+                                        }
+                                        .into(),
+                                    ],
+                                    closing:
+                                        Box::new(
+                                            CstKind::ClosingText {
+                                                closing_double_quote: Box::new(
+                                                    CstKind::DoubleQuote.into()
+                                                ),
+                                                closing_single_quotes: vec![
+                                                    CstKind::SingleQuote.into()
+                                                ],
+                                            }
+                                            .into()
+                                        ),
+                                }
+                                .into(),
+                            ),
+                            closing_curly_braces: vec![CstKind::ClosingCurlyBrace.into()],
+                        }
+                        .into(),
                     ],
-                    closing: Box::new(Rcst::ClosingText {
-                        closing_double_quote: Box::new(Rcst::DoubleQuote),
-                        closing_single_quotes: vec![],
-                    }),
-                },
+                    closing: Box::new(
+                        CstKind::ClosingText {
+                            closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                            closing_single_quotes: vec![],
+                        }
+                        .into(),
+                    ),
+                }
+                .into(),
             )),
         );
         assert_eq!(
             text("\"{ {2} }\"", 0),
             Some((
                 "",
-                Rcst::Text {
-                    opening: Box::new(Rcst::OpeningText {
-                        opening_single_quotes: vec![],
-                        opening_double_quote: Box::new(Rcst::DoubleQuote),
-                    }),
-                    parts: vec![Rcst::TextInterpolation {
-                        opening_curly_braces: vec![Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::OpeningCurlyBrace),
-                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                        }],
-                        expression: Box::new(Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Lambda {
-                                opening_curly_brace: Box::new(Rcst::OpeningCurlyBrace),
-                                parameters_and_arrow: None,
-                                body: vec![Rcst::Int {
-                                    value: 2u8.into(),
-                                    string: "2".to_string(),
-                                }],
-                                closing_curly_brace: Box::new(Rcst::ClosingCurlyBrace),
-                            }),
-                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                        }),
-                        closing_curly_braces: vec![Rcst::ClosingCurlyBrace],
-                    }],
-                    closing: Box::new(Rcst::ClosingText {
-                        closing_double_quote: Box::new(Rcst::DoubleQuote),
-                        closing_single_quotes: vec![],
-                    }),
-                },
+                CstKind::Text {
+                    opening: Box::new(
+                        CstKind::OpeningText {
+                            opening_single_quotes: vec![],
+                            opening_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                        }
+                        .into(),
+                    ),
+                    parts: vec![
+                        CstKind::TextInterpolation {
+                            opening_curly_braces: vec![
+                                CstKind::OpeningCurlyBrace.with_trailing_space()
+                            ],
+                            expression: Box::new(
+                                CstKind::Lambda {
+                                    opening_curly_brace: Box::new(
+                                        CstKind::OpeningCurlyBrace.into()
+                                    ),
+                                    parameters_and_arrow: None,
+                                    body: vec![build_simple_int(2)],
+                                    closing_curly_brace: Box::new(
+                                        CstKind::ClosingCurlyBrace.into()
+                                    ),
+                                }
+                                .with_trailing_space(),
+                            ),
+                            closing_curly_braces: vec![CstKind::ClosingCurlyBrace.into()],
+                        }
+                        .into(),
+                    ],
+                    closing: Box::new(
+                        CstKind::ClosingText {
+                            closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                            closing_single_quotes: vec![],
+                        }
+                        .into(),
+                    ),
+                }
+                .into(),
             )),
         );
         assert_eq!(
             text("\"{{2}}\"", 0),
             Some((
                 "",
-                Rcst::Text {
-                    opening: Box::new(Rcst::OpeningText {
-                        opening_single_quotes: vec![],
-                        opening_double_quote: Box::new(Rcst::DoubleQuote),
-                    }),
+                CstKind::Text {
+                    opening: Box::new(
+                        CstKind::OpeningText {
+                            opening_single_quotes: vec![],
+                            opening_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                        }
+                        .into(),
+                    ),
                     parts: vec![
-                        Rcst::TextPart("{".to_string()),
-                        Rcst::TextInterpolation {
-                            opening_curly_braces: vec![Rcst::OpeningCurlyBrace],
-                            expression: Box::new(Rcst::Int {
-                                value: 2u8.into(),
-                                string: "2".to_string()
-                            }),
-                            closing_curly_braces: vec![Rcst::ClosingCurlyBrace],
-                        },
-                        Rcst::TextPart("}".to_string()),
+                        CstKind::TextPart("{".to_string()).into(),
+                        CstKind::TextInterpolation {
+                            opening_curly_braces: vec![CstKind::OpeningCurlyBrace.into()],
+                            expression: Box::new(build_simple_int(2)),
+                            closing_curly_braces: vec![CstKind::ClosingCurlyBrace.into()],
+                        }
+                        .into(),
+                        CstKind::TextPart("}".to_string()).into(),
                     ],
-                    closing: Box::new(Rcst::ClosingText {
-                        closing_double_quote: Box::new(Rcst::DoubleQuote),
-                        closing_single_quotes: vec![],
-                    }),
-                },
+                    closing: Box::new(
+                        CstKind::ClosingText {
+                            closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                            closing_single_quotes: vec![],
+                        }
+                        .into(),
+                    ),
+                }
+                .into(),
             )),
         );
         assert_eq!(
             text("\"foo {} baz\"", 0),
             Some((
                 "",
-                Rcst::Text {
-                    opening: Box::new(Rcst::OpeningText {
-                        opening_single_quotes: vec![],
-                        opening_double_quote: Box::new(Rcst::DoubleQuote),
-                    }),
+                CstKind::Text {
+                    opening: Box::new(
+                        CstKind::OpeningText {
+                            opening_single_quotes: vec![],
+                            opening_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                        }
+                        .into(),
+                    ),
                     parts: vec![
-                        Rcst::TextPart("foo ".to_string()),
-                        Rcst::TextInterpolation {
-                            opening_curly_braces: vec![Rcst::OpeningCurlyBrace],
-                            expression: Box::new(Rcst::Error {
-                                unparsable_input: "".to_string(),
-                                error: RcstError::TextInterpolationWithoutExpression,
-                            }),
-                            closing_curly_braces: vec![Rcst::ClosingCurlyBrace],
-                        },
-                        Rcst::TextPart(" baz".to_string()),
+                        CstKind::TextPart("foo ".to_string()).into(),
+                        CstKind::TextInterpolation {
+                            opening_curly_braces: vec![CstKind::OpeningCurlyBrace.into()],
+                            expression: Box::new(
+                                CstKind::Error {
+                                    unparsable_input: "".to_string(),
+                                    error: CstError::TextInterpolationWithoutExpression,
+                                }
+                                .into(),
+                            ),
+                            closing_curly_braces: vec![CstKind::ClosingCurlyBrace.into()],
+                        }
+                        .into(),
+                        CstKind::TextPart(" baz".to_string()).into(),
                     ],
-                    closing: Box::new(Rcst::ClosingText {
-                        closing_double_quote: Box::new(Rcst::DoubleQuote),
-                        closing_single_quotes: vec![],
-                    }),
-                },
+                    closing: Box::new(
+                        CstKind::ClosingText {
+                            closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                            closing_single_quotes: vec![],
+                        }
+                        .into(),
+                    ),
+                }
+                .into(),
             )),
         );
         assert_eq!(
             text("\"foo {\"bar\" baz\"", 0),
             Some((
                 "",
-                Rcst::Text {
-                    opening: Box::new(Rcst::OpeningText {
-                        opening_single_quotes: vec![],
-                        opening_double_quote: Box::new(Rcst::DoubleQuote),
-                    }),
+                CstKind::Text {
+                    opening: Box::new(
+                        CstKind::OpeningText {
+                            opening_single_quotes: vec![],
+                            opening_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                        }
+                        .into(),
+                    ),
                     parts: vec![
-                        Rcst::TextPart("foo ".to_string()),
-                        Rcst::TextInterpolation {
-                            opening_curly_braces: vec![Rcst::OpeningCurlyBrace],
-                            expression: Box::new(Rcst::Call {
-                                receiver: Box::new(Rcst::TrailingWhitespace {
-                                    child: Box::new(Rcst::Text {
-                                        opening: Box::new(Rcst::OpeningText {
-                                            opening_single_quotes: vec![],
-                                            opening_double_quote: Box::new(Rcst::DoubleQuote),
-                                        }),
-                                        parts: vec![Rcst::TextPart("bar".to_string())],
-                                        closing: Box::new(Rcst::ClosingText {
-                                            closing_double_quote: Box::new(Rcst::DoubleQuote),
-                                            closing_single_quotes: vec![],
-                                        }),
-                                    }),
-                                    whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                                }),
-                                arguments: vec![
-                                    Rcst::Identifier("baz".to_string()),
-                                    Rcst::Text {
-                                        opening: Box::new(Rcst::OpeningText {
-                                            opening_single_quotes: vec![],
-                                            opening_double_quote: Box::new(Rcst::DoubleQuote),
-                                        }),
-                                        parts: vec![],
-                                        closing: Box::new(Rcst::Error {
-                                            unparsable_input: "".to_string(),
-                                            error: RcstError::TextNotClosed,
-                                        })
-                                    }
-                                ],
-                            }),
-                            closing_curly_braces: vec![Rcst::Error {
+                        CstKind::TextPart("foo ".to_string()).into(),
+                        CstKind::TextInterpolation {
+                            opening_curly_braces: vec![CstKind::OpeningCurlyBrace.into()],
+                            expression: Box::new(
+                                CstKind::Call {
+                                    receiver: Box::new(
+                                        build_simple_text("bar").with_trailing_space(),
+                                    ),
+                                    arguments: vec![
+                                        build_identifier("baz"),
+                                        CstKind::Text {
+                                            opening: Box::new(
+                                                CstKind::OpeningText {
+                                                    opening_single_quotes: vec![],
+                                                    opening_double_quote: Box::new(
+                                                        CstKind::DoubleQuote.into()
+                                                    ),
+                                                }
+                                                .into(),
+                                            ),
+                                            parts: vec![],
+                                            closing: Box::new(
+                                                CstKind::Error {
+                                                    unparsable_input: "".to_string(),
+                                                    error: CstError::TextNotClosed,
+                                                }
+                                                .into()
+                                            )
+                                        }
+                                        .into()
+                                    ],
+                                }
+                                .into(),
+                            ),
+                            closing_curly_braces: vec![CstKind::Error {
                                 unparsable_input: "".to_string(),
-                                error: RcstError::TextInterpolationNotClosed,
-                            }],
-                        },
+                                error: CstError::TextInterpolationNotClosed,
+                            }
+                            .into()],
+                        }
+                        .into(),
                     ],
-                    closing: Box::new(Rcst::Error {
-                        unparsable_input: "".to_string(),
-                        error: RcstError::TextNotClosed,
-                    }),
-                },
+                    closing: Box::new(
+                        CstKind::Error {
+                            unparsable_input: "".to_string(),
+                            error: CstError::TextNotClosed,
+                        }
+                        .into(),
+                    ),
+                }
+                .into(),
             )),
         );
         assert_eq!(
             text("\"foo {\"bar\" \"a\"} baz\"", 0),
             Some((
                 "",
-                Rcst::Text {
-                    opening: Box::new(Rcst::OpeningText {
-                        opening_single_quotes: vec![],
-                        opening_double_quote: Box::new(Rcst::DoubleQuote),
-                    }),
+                CstKind::Text {
+                    opening: Box::new(
+                        CstKind::OpeningText {
+                            opening_single_quotes: vec![],
+                            opening_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                        }
+                        .into(),
+                    ),
                     parts: vec![
-                        Rcst::TextPart("foo ".to_string()),
-                        Rcst::TextInterpolation {
-                            opening_curly_braces: vec![Rcst::OpeningCurlyBrace],
-                            expression: Box::new(Rcst::Call {
-                                receiver: Box::new(Rcst::TrailingWhitespace {
-                                    child: Box::new(Rcst::Text {
-                                        opening: Box::new(Rcst::OpeningText {
-                                            opening_single_quotes: vec![],
-                                            opening_double_quote: Box::new(Rcst::DoubleQuote),
-                                        }),
-                                        parts: vec![Rcst::TextPart("bar".to_string())],
-                                        closing: Box::new(Rcst::ClosingText {
-                                            closing_double_quote: Box::new(Rcst::DoubleQuote),
-                                            closing_single_quotes: vec![],
-                                        })
-                                    }),
-                                    whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                                }),
-                                arguments: vec![Rcst::Text {
-                                    opening: Box::new(Rcst::OpeningText {
-                                        opening_single_quotes: vec![],
-                                        opening_double_quote: Box::new(Rcst::DoubleQuote),
-                                    }),
-                                    parts: vec![Rcst::TextPart("a".to_string())],
-                                    closing: Box::new(Rcst::ClosingText {
-                                        closing_double_quote: Box::new(Rcst::DoubleQuote),
-                                        closing_single_quotes: vec![],
-                                    })
-                                }],
-                            }),
-                            closing_curly_braces: vec![Rcst::ClosingCurlyBrace],
-                        },
-                        Rcst::TextPart(" baz".to_string()),
+                        CstKind::TextPart("foo ".to_string()).into(),
+                        CstKind::TextInterpolation {
+                            opening_curly_braces: vec![CstKind::OpeningCurlyBrace.into()],
+                            expression: Box::new(
+                                CstKind::Call {
+                                    receiver: Box::new(
+                                        build_simple_text("bar").with_trailing_space(),
+                                    ),
+                                    arguments: vec![build_simple_text("a")],
+                                }
+                                .into(),
+                            ),
+                            closing_curly_braces: vec![CstKind::ClosingCurlyBrace.into()],
+                        }
+                        .into(),
+                        CstKind::TextPart(" baz".to_string()).into(),
                     ],
-                    closing: Box::new(Rcst::ClosingText {
-                        closing_double_quote: Box::new(Rcst::DoubleQuote),
-                        closing_single_quotes: vec![],
-                    }),
-                },
+                    closing: Box::new(
+                        CstKind::ClosingText {
+                            closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                            closing_single_quotes: vec![],
+                        }
+                        .into(),
+                    ),
+                }
+                .into(),
             )),
         );
     }
@@ -1256,10 +1318,11 @@ mod parse {
                 word(input).map(|(input, word)| {
                     (
                         input,
-                        Rcst::Error {
+                        CstKind::Error {
                             unparsable_input: word,
-                            error: RcstError::UnexpectedCharacters,
-                        },
+                            error: CstError::UnexpectedCharacters,
+                        }
+                        .into(),
                     )
                 })
             })?;
@@ -1337,11 +1400,12 @@ mod parse {
 
         Some((
             input,
-            Rcst::StructAccess {
+            CstKind::StructAccess {
                 struct_: Box::new(current.clone().wrap_in_whitespace(whitespace_after_struct)),
                 dot: Box::new(dot),
                 key: Box::new(key),
-            },
+            }
+            .into(),
         ))
     }
     #[instrument(level = "trace")]
@@ -1395,7 +1459,7 @@ mod parse {
 
         Some((
             input,
-            Rcst::Call {
+            CstKind::Call {
                 receiver: Box::new(receiver),
                 arguments,
             }
@@ -1421,16 +1485,16 @@ mod parse {
         };
         let (input, call) =
             expression(input, indentation, false, true, false).unwrap_or_else(|| {
-                let error = Rcst::Error {
+                let error = CstKind::Error {
                     unparsable_input: "".to_string(),
-                    error: RcstError::PipeMissesCall,
+                    error: CstError::PipeMissesCall,
                 };
-                (input, error)
+                (input, error.into())
             });
 
         Some((
             input,
-            Rcst::BinaryBar {
+            CstKind::BinaryBar {
                 left: Box::new(
                     current
                         .clone()
@@ -1438,7 +1502,8 @@ mod parse {
                 ),
                 bar: Box::new(bar),
                 right: Box::new(call),
-            },
+            }
+            .into(),
         ))
     }
     #[instrument(level = "trace")]
@@ -1466,15 +1531,18 @@ mod parse {
             }
         }
         if cases.is_empty() {
-            cases.push(Rcst::Error {
-                unparsable_input: "".to_string(),
-                error: RcstError::MatchMissesCases,
-            });
+            cases.push(
+                CstKind::Error {
+                    unparsable_input: "".to_string(),
+                    error: CstError::MatchMissesCases,
+                }
+                .into(),
+            );
         }
 
         Some((
             input,
-            Rcst::Match {
+            CstKind::Match {
                 expression: Box::new(
                     current
                         .clone()
@@ -1482,7 +1550,8 @@ mod parse {
                 ),
                 percent: Box::new(percent),
                 cases,
-            },
+            }
+            .into(),
         ))
     }
     #[instrument(level = "trace")]
@@ -1532,7 +1601,7 @@ mod parse {
             (assignment_sign, body).split_outer_trailing_whitespace();
         Some((
             input,
-            Rcst::Assignment {
+            CstKind::Assignment {
                 left: Box::new(left),
                 assignment_sign: Box::new(assignment_sign),
                 body,
@@ -1544,24 +1613,25 @@ mod parse {
     fn test_expression() {
         assert_eq!(
             expression("foo", 0, true, true, true),
-            Some(("", Rcst::Identifier("foo".to_string())))
+            Some(("", build_identifier("foo")))
         );
         assert_eq!(
             expression("(foo Bar)", 0, false, false, true),
             Some((
                 "",
-                Rcst::Parenthesized {
-                    opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
-                    inner: Box::new(Rcst::Call {
-                        receiver: Box::new(Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Identifier("foo".to_string())),
-                            whitespace: vec![Rcst::Whitespace(" ".to_string())]
-                        }),
-                        arguments: vec![Rcst::Symbol("Bar".to_string())]
-                    }),
-                    closing_parenthesis: Box::new(Rcst::ClosingParenthesis)
+                CstKind::Parenthesized {
+                    opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
+                    inner: Box::new(
+                        CstKind::Call {
+                            receiver: Box::new(build_identifier("foo").with_trailing_space()),
+                            arguments: vec![build_symbol("Bar")],
+                        }
+                        .into()
+                    ),
+                    closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into())
                 }
-            ))
+                .into(),
+            )),
         );
         // foo
         //   .bar
@@ -1569,24 +1639,22 @@ mod parse {
             expression("foo\n  .bar", 0, true, true, true),
             Some((
                 "",
-                Rcst::StructAccess {
-                    struct_: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![
-                            Rcst::Newline("\n".to_string()),
-                            Rcst::Whitespace("  ".to_string()),
-                        ],
-                    }),
-                    dot: Box::new(Rcst::Dot),
-                    key: Box::new(Rcst::Identifier("bar".to_owned())),
-                },
+                CstKind::StructAccess {
+                    struct_: Box::new(build_identifier("foo").with_trailing_whitespace(vec![
+                        CstKind::Newline("\n".to_string()),
+                        CstKind::Whitespace("  ".to_string()),
+                    ])),
+                    dot: Box::new(CstKind::Dot.into()),
+                    key: Box::new(build_identifier("bar")),
+                }
+                .into(),
             )),
         );
         // foo
         // .bar
         assert_eq!(
             expression("foo\n.bar", 0, true, true, true),
-            Some(("\n.bar", Rcst::Identifier("foo".to_string()))),
+            Some(("\n.bar", build_identifier("foo"))),
         );
         // foo
         // | bar
@@ -1594,17 +1662,15 @@ mod parse {
             expression("foo\n| bar", 0, true, true, true),
             Some((
                 "",
-                Rcst::BinaryBar {
-                    left: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![Rcst::Newline("\n".to_string())],
-                    }),
-                    bar: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Bar),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    right: Box::new(Rcst::Identifier("bar".to_owned())),
-                },
+                CstKind::BinaryBar {
+                    left: Box::new(
+                        build_identifier("foo")
+                            .with_trailing_whitespace(vec![CstKind::Newline("\n".to_string())]),
+                    ),
+                    bar: Box::new(CstKind::Bar.with_trailing_space()),
+                    right: Box::new(build_identifier("bar")),
+                }
+                .into(),
             )),
         );
         // foo
@@ -1613,23 +1679,21 @@ mod parse {
             expression("foo\n| bar baz", 0, true, true, true),
             Some((
                 "",
-                Rcst::BinaryBar {
-                    left: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![Rcst::Newline("\n".to_string())],
-                    }),
-                    bar: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Bar),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    right: Box::new(Rcst::Call {
-                        receiver: Box::new(Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Identifier("bar".to_owned())),
-                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                        }),
-                        arguments: vec![Rcst::Identifier("baz".to_owned())],
-                    }),
-                },
+                CstKind::BinaryBar {
+                    left: Box::new(
+                        build_identifier("foo")
+                            .with_trailing_whitespace(vec![CstKind::Newline("\n".to_string())]),
+                    ),
+                    bar: Box::new(CstKind::Bar.with_trailing_space()),
+                    right: Box::new(
+                        CstKind::Call {
+                            receiver: Box::new(build_identifier("bar").with_trailing_space()),
+                            arguments: vec![build_identifier("baz")],
+                        }
+                        .into(),
+                    ),
+                }
+                .into(),
             )),
         );
         // foo %
@@ -1638,127 +1702,94 @@ mod parse {
             expression("foo %\n  123 -> 123", 0, true, true, true),
             Some((
                 "",
-                Rcst::Match {
-                    expression: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    percent: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Percent),
-                        whitespace: vec![
-                            Rcst::Newline("\n".to_string()),
-                            Rcst::Whitespace("  ".to_string()),
-                        ],
-                    }),
-                    cases: vec![Rcst::MatchCase {
-                        pattern: Box::new(Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Int {
-                                value: 123u8.into(),
-                                string: "123".to_string(),
-                            }),
-                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                        }),
-                        arrow: Box::new(Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Arrow),
-                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                        }),
-                        body: vec![Rcst::Int {
-                            value: 123u8.into(),
-                            string: "123".to_string(),
-                        }],
-                    }],
-                },
+                CstKind::Match {
+                    expression: Box::new(build_identifier("foo").with_trailing_space()),
+                    percent: Box::new(CstKind::Percent.with_trailing_whitespace(vec![
+                        CstKind::Newline("\n".to_string()),
+                        CstKind::Whitespace("  ".to_string()),
+                    ])),
+                    cases: vec![CstKind::MatchCase {
+                        pattern: Box::new(build_simple_int(123).with_trailing_space()),
+                        arrow: Box::new(CstKind::Arrow.with_trailing_space()),
+                        body: vec![build_simple_int(123)],
+                    }
+                    .into()],
+                }
+                .into(),
             )),
         );
         assert_eq!(
             expression("(0, foo) | (foo, 0)", 0, false, true, true),
             Some((
                 "",
-                Rcst::BinaryBar {
-                    left: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::List {
-                            opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
+                CstKind::BinaryBar {
+                    left: Box::new(
+                        CstKind::List {
+                            opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
                             items: vec![
-                                Rcst::TrailingWhitespace {
-                                    child: Box::new(Rcst::ListItem {
-                                        value: Box::new(Rcst::Int {
-                                            value: 0u8.into(),
-                                            string: "0".to_string(),
-                                        }),
-                                        comma: Some(Box::new(Rcst::Comma)),
-                                    }),
-                                    whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                                },
-                                Rcst::ListItem {
-                                    value: Box::new(Rcst::Identifier("foo".to_string())),
+                                CstKind::ListItem {
+                                    value: Box::new(build_simple_int(0)),
+                                    comma: Some(Box::new(CstKind::Comma.into())),
+                                }
+                                .with_trailing_space(),
+                                CstKind::ListItem {
+                                    value: Box::new(build_identifier("foo")),
                                     comma: None,
-                                },
+                                }
+                                .into(),
                             ],
-                            closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
-                        }),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    bar: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Bar),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    right: Box::new(Rcst::List {
-                        opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
-                        items: vec![
-                            Rcst::TrailingWhitespace {
-                                child: Box::new(Rcst::ListItem {
-                                    value: Box::new(Rcst::Identifier("foo".to_string())),
-                                    comma: Some(Box::new(Rcst::Comma)),
-                                }),
-                                whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                            },
-                            Rcst::ListItem {
-                                value: Box::new(Rcst::Int {
-                                    value: 0u8.into(),
-                                    string: "0".to_string(),
-                                }),
-                                comma: None,
-                            },
-                        ],
-                        closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
-                    }),
-                },
+                            closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
+                        }
+                        .with_trailing_space(),
+                    ),
+                    bar: Box::new(CstKind::Bar.with_trailing_space()),
+                    right: Box::new(
+                        CstKind::List {
+                            opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
+                            items: vec![
+                                CstKind::ListItem {
+                                    value: Box::new(build_identifier("foo")),
+                                    comma: Some(Box::new(CstKind::Comma.into())),
+                                }
+                                .with_trailing_space(),
+                                CstKind::ListItem {
+                                    value: Box::new(build_simple_int(0)),
+                                    comma: None,
+                                }
+                                .into(),
+                            ],
+                            closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
+                        }
+                        .into(),
+                    ),
+                }
+                .into(),
             )),
         );
         assert_eq!(
             expression("foo bar", 0, false, true, true),
             Some((
                 "",
-                Rcst::Call {
-                    receiver: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    arguments: vec![Rcst::Identifier("bar".to_string())]
+                CstKind::Call {
+                    receiver: Box::new(build_identifier("foo").with_trailing_space()),
+                    arguments: vec![build_identifier("bar")],
                 }
+                .into(),
             ))
         );
         assert_eq!(
             expression("Foo 4 bar", 0, false, true, true),
             Some((
                 "",
-                Rcst::Call {
-                    receiver: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Symbol("Foo".to_string())),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
+                CstKind::Call {
+                    receiver: Box::new(build_symbol("Foo").with_trailing_space()),
                     arguments: vec![
-                        Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Int {
-                                value: 4u8.into(),
-                                string: "4".to_string()
-                            }),
-                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                        },
-                        Rcst::Identifier("bar".to_string())
-                    ]
+                        build_simple_int(4).with_trailing_space(),
+                        build_identifier("bar"),
+                    ],
                 }
-            ))
+                .into(),
+            )),
         );
         // foo
         //   bar
@@ -1768,26 +1799,21 @@ mod parse {
             expression("foo\n  bar\n  baz\n2", 0, false, true, true),
             Some((
                 "\n2",
-                Rcst::Call {
-                    receiver: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![
-                            Rcst::Newline("\n".to_string()),
-                            Rcst::Whitespace("  ".to_string())
-                        ],
-                    }),
+                CstKind::Call {
+                    receiver: Box::new(build_identifier("foo").with_trailing_whitespace(vec![
+                        CstKind::Newline("\n".to_string()),
+                        CstKind::Whitespace("  ".to_string()),
+                    ])),
                     arguments: vec![
-                        Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Identifier("bar".to_string())),
-                            whitespace: vec![
-                                Rcst::Newline("\n".to_string()),
-                                Rcst::Whitespace("  ".to_string())
-                            ],
-                        },
-                        Rcst::Identifier("baz".to_string())
+                        build_identifier("bar").with_trailing_whitespace(vec![
+                            CstKind::Newline("\n".to_string()),
+                            CstKind::Whitespace("  ".to_string()),
+                        ]),
+                        build_identifier("baz"),
                     ],
-                },
-            ))
+                }
+                .into(),
+            )),
         );
         // foo 1 2
         //   3
@@ -1797,69 +1823,49 @@ mod parse {
             expression("foo 1 2\n  3\n  4\nbar", 0, false, true, true),
             Some((
                 "\nbar",
-                Rcst::Call {
-                    receiver: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
+                CstKind::Call {
+                    receiver: Box::new(build_identifier("foo").with_trailing_space()),
                     arguments: vec![
-                        Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Int {
-                                value: 1u8.into(),
-                                string: "1".to_string()
-                            }),
-                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                        },
-                        Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Int {
-                                value: 2u8.into(),
-                                string: "2".to_string()
-                            }),
-                            whitespace: vec![
-                                Rcst::Newline("\n".to_string()),
-                                Rcst::Whitespace("  ".to_string())
-                            ],
-                        },
-                        Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Int {
-                                value: 3u8.into(),
-                                string: "3".to_string()
-                            }),
-                            whitespace: vec![
-                                Rcst::Newline("\n".to_string()),
-                                Rcst::Whitespace("  ".to_string())
-                            ],
-                        },
-                        Rcst::Int {
-                            value: 4u8.into(),
-                            string: "4".to_string()
-                        }
+                        build_simple_int(1).with_trailing_space(),
+                        build_simple_int(2).with_trailing_whitespace(vec![
+                            CstKind::Newline("\n".to_string()),
+                            CstKind::Whitespace("  ".to_string()),
+                        ]),
+                        build_simple_int(3).with_trailing_whitespace(vec![
+                            CstKind::Newline("\n".to_string()),
+                            CstKind::Whitespace("  ".to_string()),
+                        ]),
+                        build_simple_int(4),
                     ],
                 }
-            ))
+                .into(),
+            )),
         );
         assert_eq!(
             expression("(foo Bar) Baz\n", 0, false, true, true),
             Some((
                 "\n",
-                Rcst::Call {
-                    receiver: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Parenthesized {
-                            opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
-                            inner: Box::new(Rcst::Call {
-                                receiver: Box::new(Rcst::TrailingWhitespace {
-                                    child: Box::new(Rcst::Identifier("foo".to_string())),
-                                    whitespace: vec![Rcst::Whitespace(" ".to_string())]
-                                }),
-                                arguments: vec![Rcst::Symbol("Bar".to_string())]
-                            }),
-                            closing_parenthesis: Box::new(Rcst::ClosingParenthesis)
-                        }),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())]
-                    }),
-                    arguments: vec![Rcst::Symbol("Baz".to_string())]
+                CstKind::Call {
+                    receiver: Box::new(
+                        CstKind::Parenthesized {
+                            opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
+                            inner: Box::new(
+                                CstKind::Call {
+                                    receiver: Box::new(
+                                        build_identifier("foo").with_trailing_space(),
+                                    ),
+                                    arguments: vec![build_symbol("Bar")],
+                                }
+                                .into()
+                            ),
+                            closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
+                        }
+                        .with_trailing_space(),
+                    ),
+                    arguments: vec![build_symbol("Baz")]
                 }
-            ))
+                .into(),
+            )),
         );
         // foo T
         //
@@ -1869,89 +1875,69 @@ mod parse {
             expression("foo T\n\n\nbar = 5", 0, false, true, true),
             Some((
                 "\nbar = 5",
-                Rcst::TrailingWhitespace {
-                    child: Box::new(Rcst::Call {
-                        receiver: Box::new(Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Identifier("foo".to_string())),
-                            whitespace: vec![Rcst::Whitespace(" ".to_string())]
-                        }),
-                        arguments: vec![Rcst::Symbol("T".to_string())]
-                    }),
-                    whitespace: vec![
-                        Rcst::Newline("\n".to_string()),
-                        Rcst::Newline("\n".to_string())
-                    ],
+                CstKind::Call {
+                    receiver: Box::new(build_identifier("foo").with_trailing_space()),
+                    arguments: vec![build_symbol("T")],
                 }
-            ))
+                .with_trailing_whitespace(vec![
+                    CstKind::Newline("\n".to_string()),
+                    CstKind::Newline("\n".to_string()),
+                ]),
+            )),
         );
         assert_eq!(
             expression("foo = 42", 0, true, true, true),
             Some((
                 "",
-                Rcst::Assignment {
-                    left: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::EqualsSign),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    body: vec![Rcst::Int {
-                        value: 42u8.into(),
-                        string: "42".to_string(),
-                    }],
-                },
+                CstKind::Assignment {
+                    left: Box::new(build_identifier("foo").with_trailing_space()),
+                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_space()),
+                    body: vec![build_simple_int(42)],
+                }
+                .into(),
             )),
         );
         assert_eq!(
             expression("foo 42", 0, true, true, true),
             Some((
                 "",
-                Rcst::Call {
-                    receiver: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    arguments: vec![Rcst::Int {
-                        value: 42u8.into(),
-                        string: "42".to_string(),
-                    }],
-                },
-            ))
+                CstKind::Call {
+                    receiver: Box::new(build_identifier("foo").with_trailing_space()),
+                    arguments: vec![build_simple_int(42)],
+                }
+                .into(),
+            )),
         );
         assert_eq!(
             expression("foo %", 0, false, false, true),
             Some((
                 "",
-                Rcst::Match {
-                    expression: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    percent: Box::new(Rcst::Percent),
-                    cases: vec![Rcst::Error {
+                CstKind::Match {
+                    expression: Box::new(build_identifier("foo").with_trailing_space()),
+                    percent: Box::new(CstKind::Percent.into()),
+                    cases: vec![CstKind::Error {
                         unparsable_input: "".to_string(),
-                        error: RcstError::MatchMissesCases,
-                    }],
-                },
+                        error: CstError::MatchMissesCases,
+                    }
+                    .into()],
+                }
+                .into(),
             )),
         );
         assert_eq!(
             expression("foo %\n", 0, false, false, true),
             Some((
                 "\n",
-                Rcst::Match {
-                    expression: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    percent: Box::new(Rcst::Percent),
-                    cases: vec![Rcst::Error {
+                CstKind::Match {
+                    expression: Box::new(build_identifier("foo").with_trailing_space()),
+                    percent: Box::new(CstKind::Percent.into()),
+                    cases: vec![CstKind::Error {
                         unparsable_input: "".to_string(),
-                        error: RcstError::MatchMissesCases,
-                    }],
-                },
+                        error: CstError::MatchMissesCases,
+                    }
+                    .into()],
+                }
+                .into(),
             )),
         );
         // foo %
@@ -1961,36 +1947,20 @@ mod parse {
             expression("foo %\n  1 -> 2\nFoo", 0, false, false, true),
             Some((
                 "\nFoo",
-                Rcst::Match {
-                    expression: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    percent: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Percent),
-                        whitespace: vec![
-                            Rcst::Newline("\n".to_string()),
-                            Rcst::Whitespace("  ".to_string()),
-                        ],
-                    }),
-                    cases: vec![Rcst::MatchCase {
-                        pattern: Box::new(Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Int {
-                                value: 1u8.into(),
-                                string: "1".to_string(),
-                            }),
-                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                        }),
-                        arrow: Box::new(Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Arrow),
-                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                        }),
-                        body: vec![Rcst::Int {
-                            value: 2u8.into(),
-                            string: "2".to_string(),
-                        }],
-                    }],
-                },
+                CstKind::Match {
+                    expression: Box::new(build_identifier("foo").with_trailing_space()),
+                    percent: Box::new(CstKind::Percent.with_trailing_whitespace(vec![
+                        CstKind::Newline("\n".to_string()),
+                        CstKind::Whitespace("  ".to_string()),
+                    ])),
+                    cases: vec![CstKind::MatchCase {
+                        pattern: Box::new(build_simple_int(1).with_trailing_space()),
+                        arrow: Box::new(CstKind::Arrow.with_trailing_space()),
+                        body: vec![build_simple_int(2)],
+                    }
+                    .into()],
+                }
+                .into(),
             )),
         );
         // foo bar =
@@ -2000,29 +1970,21 @@ mod parse {
             expression("foo bar =\n  3\n2", 0, true, true, true),
             Some((
                 "\n2",
-                Rcst::Assignment {
-                    left: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Call {
-                            receiver: Box::new(Rcst::TrailingWhitespace {
-                                child: Box::new(Rcst::Identifier("foo".to_string())),
-                                whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                            }),
-                            arguments: vec![Rcst::Identifier("bar".to_string())],
-                        }),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::EqualsSign),
-                        whitespace: vec![
-                            Rcst::Newline("\n".to_string()),
-                            Rcst::Whitespace("  ".to_string())
-                        ],
-                    }),
-                    body: vec![Rcst::Int {
-                        value: 3u8.into(),
-                        string: "3".to_string(),
-                    }],
-                },
+                CstKind::Assignment {
+                    left: Box::new(
+                        CstKind::Call {
+                            receiver: Box::new(build_identifier("foo").with_trailing_space()),
+                            arguments: vec![build_identifier("bar")],
+                        }
+                        .with_trailing_space(),
+                    ),
+                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_whitespace(vec![
+                        CstKind::Newline("\n".to_string()),
+                        CstKind::Whitespace("  ".to_string())
+                    ])),
+                    body: vec![build_simple_int(3)],
+                }
+                .into(),
             )),
         );
         // foo
@@ -2032,67 +1994,51 @@ mod parse {
             expression("foo\n  bar\n  = 3", 0, true, true, true),
             Some((
                 "",
-                Rcst::Assignment {
-                    left: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Call {
-                            receiver: Box::new(Rcst::TrailingWhitespace {
-                                child: Box::new(Rcst::Identifier("foo".to_string())),
-                                whitespace: vec![
-                                    Rcst::Newline("\n".to_string()),
-                                    Rcst::Whitespace("  ".to_string()),
-                                ],
-                            }),
-                            arguments: vec![Rcst::Identifier("bar".to_string())],
-                        }),
-                        whitespace: vec![
-                            Rcst::Newline("\n".to_string()),
-                            Rcst::Whitespace("  ".to_string()),
-                        ],
-                    }),
-                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::EqualsSign),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    body: vec![Rcst::Int {
-                        value: 3u8.into(),
-                        string: "3".to_string(),
-                    }],
-                },
+                CstKind::Assignment {
+                    left: Box::new(
+                        CstKind::Call {
+                            receiver: Box::new(build_identifier("foo").with_trailing_whitespace(
+                                vec![
+                                    CstKind::Newline("\n".to_string()),
+                                    CstKind::Whitespace("  ".to_string()),
+                                ]
+                            )),
+                            arguments: vec![build_identifier("bar")],
+                        }
+                        .with_trailing_whitespace(vec![
+                            CstKind::Newline("\n".to_string()),
+                            CstKind::Whitespace("  ".to_string()),
+                        ])
+                    ),
+                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_space()),
+                    body: vec![build_simple_int(3)],
+                }
+                .into(),
             )),
         );
         assert_eq!(
             expression("foo =\n  ", 0, true, true, true),
             Some((
                 "\n  ",
-                Rcst::Assignment {
-                    left: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    assignment_sign: Box::new(Rcst::EqualsSign),
+                CstKind::Assignment {
+                    left: Box::new(build_identifier("foo").with_trailing_space()),
+                    assignment_sign: Box::new(CstKind::EqualsSign.into()),
                     body: vec![],
-                },
+                }
+                .into(),
             )),
         );
         assert_eq!(
             expression("foo = # comment\n", 0, true, true, true),
             Some((
                 "\n",
-                Rcst::Assignment {
-                    left: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::EqualsSign),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    body: vec![Rcst::Comment {
-                        octothorpe: Box::new(Rcst::Octothorpe),
-                        comment: " comment".to_string(),
-                    }],
+                CstKind::Assignment {
+                    left: Box::new(build_identifier("foo").with_trailing_space()),
+                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_space()),
+                    body: vec![build_comment(" comment")],
                 }
-            ))
+                .into(),
+            )),
         );
         // foo =
         //   # comment
@@ -2101,23 +2047,15 @@ mod parse {
             expression("foo =\n  # comment\n3", 0, true, true, true),
             Some((
                 "\n3",
-                Rcst::Assignment {
-                    left: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::EqualsSign),
-                        whitespace: vec![
-                            Rcst::Newline("\n".to_string()),
-                            Rcst::Whitespace("  ".to_string()),
-                        ],
-                    }),
-                    body: vec![Rcst::Comment {
-                        octothorpe: Box::new(Rcst::Octothorpe),
-                        comment: " comment".to_string(),
-                    }],
-                },
+                CstKind::Assignment {
+                    left: Box::new(build_identifier("foo").with_trailing_space()),
+                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_whitespace(vec![
+                        CstKind::Newline("\n".to_string()),
+                        CstKind::Whitespace("  ".to_string()),
+                    ])),
+                    body: vec![build_comment(" comment")],
+                }
+                .into(),
             )),
         );
         // foo =
@@ -2128,117 +2066,93 @@ mod parse {
             expression("foo =\n  # comment\n  5\n3", 0, true, true, true),
             Some((
                 "\n3",
-                Rcst::Assignment {
-                    left: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::EqualsSign),
-                        whitespace: vec![
-                            Rcst::Newline("\n".to_string()),
-                            Rcst::Whitespace("  ".to_string()),
-                        ],
-                    }),
+                CstKind::Assignment {
+                    left: Box::new(build_identifier("foo").with_trailing_space()),
+                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_whitespace(vec![
+                        CstKind::Newline("\n".to_string()),
+                        CstKind::Whitespace("  ".to_string()),
+                    ])),
                     body: vec![
-                        Rcst::Comment {
-                            octothorpe: Box::new(Rcst::Octothorpe),
-                            comment: " comment".to_string(),
-                        },
-                        Rcst::Newline("\n".to_string()),
-                        Rcst::Whitespace("  ".to_string()),
-                        Rcst::Int {
-                            value: 5u8.into(),
-                            string: "5".to_string(),
-                        },
+                        build_comment(" comment"),
+                        CstKind::Newline("\n".to_string()).into(),
+                        CstKind::Whitespace("  ".to_string()).into(),
+                        build_simple_int(5),
                     ],
-                },
+                }
+                .into(),
             )),
         );
         assert_eq!(
             expression("(foo, bar) = (1, 2)", 0, true, true, true),
             Some((
                 "",
-                Rcst::Assignment {
-                    left: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::List {
-                            opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
+                CstKind::Assignment {
+                    left: Box::new(
+                        CstKind::List {
+                            opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
                             items: vec![
-                                Rcst::TrailingWhitespace {
-                                    child: Box::new(Rcst::ListItem {
-                                        value: Box::new(Rcst::Identifier("foo".to_string())),
-                                        comma: Some(Box::new(Rcst::Comma)),
-                                    }),
-                                    whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                                },
-                                Rcst::ListItem {
-                                    value: Box::new(Rcst::Identifier("bar".to_string())),
+                                CstKind::ListItem {
+                                    value: Box::new(build_identifier("foo")),
+                                    comma: Some(Box::new(CstKind::Comma.into())),
+                                }
+                                .with_trailing_space(),
+                                CstKind::ListItem {
+                                    value: Box::new(build_identifier("bar")),
                                     comma: None,
-                                },
+                                }
+                                .into(),
                             ],
-                            closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
-                        }),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::EqualsSign),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    body: vec![Rcst::List {
-                        opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
+                            closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
+                        }
+                        .with_trailing_space()
+                    ),
+                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_space()),
+                    body: vec![CstKind::List {
+                        opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
                         items: vec![
-                            Rcst::TrailingWhitespace {
-                                child: Box::new(Rcst::ListItem {
-                                    value: Box::new(Rcst::Int {
-                                        value: 1u8.into(),
-                                        string: "1".to_string(),
-                                    }),
-                                    comma: Some(Box::new(Rcst::Comma)),
-                                }),
-                                whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                            },
-                            Rcst::ListItem {
-                                value: Box::new(Rcst::Int {
-                                    value: 2u8.into(),
-                                    string: "2".to_string(),
-                                }),
+                            CstKind::ListItem {
+                                value: Box::new(build_simple_int(1)),
+                                comma: Some(Box::new(CstKind::Comma.into())),
+                            }
+                            .with_trailing_space(),
+                            CstKind::ListItem {
+                                value: Box::new(build_simple_int(2)),
                                 comma: None,
-                            },
+                            }
+                            .into(),
                         ],
-                        closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
-                    }],
-                },
+                        closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
+                    }
+                    .into()],
+                }
+                .into(),
             )),
         );
         assert_eq!(
             expression("[Foo: foo] = bar", 0, true, true, true),
             Some((
                 "",
-                Rcst::Assignment {
-                    left: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Struct {
-                            opening_bracket: Box::new(Rcst::OpeningBracket),
-                            fields: vec![Rcst::StructField {
+                CstKind::Assignment {
+                    left: Box::new(
+                        CstKind::Struct {
+                            opening_bracket: Box::new(CstKind::OpeningBracket.into()),
+                            fields: vec![CstKind::StructField {
                                 key_and_colon: Some(Box::new((
-                                    Rcst::Symbol("Foo".to_string()),
-                                    Rcst::TrailingWhitespace {
-                                        child: Box::new(Rcst::Colon),
-                                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                                    },
+                                    build_symbol("Foo"),
+                                    CstKind::Colon.with_trailing_space(),
                                 ))),
-                                value: Box::new(Rcst::Identifier("foo".to_string())),
+                                value: Box::new(build_identifier("foo")),
                                 comma: None,
-                            }],
-                            closing_bracket: Box::new(Rcst::ClosingBracket),
-                        }),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::EqualsSign),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
-                    body: vec![Rcst::Identifier("bar".to_string())],
-                },
+                            }
+                            .into()],
+                            closing_bracket: Box::new(CstKind::ClosingBracket.into()),
+                        }
+                        .with_trailing_space(),
+                    ),
+                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_space()),
+                    body: vec![build_identifier("bar")],
+                }
+                .into(),
             )),
         );
     }
@@ -2271,11 +2185,12 @@ mod parse {
 
             return Some((
                 input,
-                Rcst::List {
+                CstKind::List {
                     opening_parenthesis: Box::new(opening_parenthesis),
                     items: vec![comma],
                     closing_parenthesis: Box::new(closing_parenthesis),
-                },
+                }
+                .into(),
             ));
         }
 
@@ -2304,10 +2219,11 @@ mod parse {
                     Some((new_input, value)) => (new_input, value, true),
                     None => (
                         new_input,
-                        Rcst::Error {
+                        CstKind::Error {
                             unparsable_input: "".to_string(),
-                            error: RcstError::ListItemMissesValue,
-                        },
+                            error: CstError::ListItemMissesValue,
+                        }
+                        .into(),
                         false,
                     ),
                 };
@@ -2332,10 +2248,13 @@ mod parse {
             has_at_least_one_comma |= comma.is_some();
 
             input = new_input;
-            items.push(Rcst::ListItem {
-                value: Box::new(value),
-                comma: comma.map(Box::new),
-            });
+            items.push(
+                CstKind::ListItem {
+                    value: Box::new(value),
+                    comma: comma.map(Box::new),
+                }
+                .into(),
+            );
         }
         if !has_at_least_one_comma {
             return None;
@@ -2355,20 +2274,22 @@ mod parse {
             }
             None => (
                 input,
-                Rcst::Error {
+                CstKind::Error {
                     unparsable_input: "".to_string(),
-                    error: RcstError::ListNotClosed,
-                },
+                    error: CstError::ListNotClosed,
+                }
+                .into(),
             ),
         };
 
         Some((
             input,
-            Rcst::List {
+            CstKind::List {
                 opening_parenthesis: Box::new(opening_parenthesis),
                 items,
                 closing_parenthesis: Box::new(closing_parenthesis),
-            },
+            }
+            .into(),
         ))
     }
     #[test]
@@ -2379,11 +2300,12 @@ mod parse {
             list("(,)", 0),
             Some((
                 "",
-                Rcst::List {
-                    opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
-                    items: vec![Rcst::Comma],
-                    closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
-                },
+                CstKind::List {
+                    opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
+                    items: vec![CstKind::Comma.into()],
+                    closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
+                }
+                .into(),
             )),
         );
         assert_eq!(list("(foo)", 0), None);
@@ -2391,34 +2313,39 @@ mod parse {
             list("(foo,)", 0),
             Some((
                 "",
-                Rcst::List {
-                    opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
-                    items: vec![Rcst::ListItem {
-                        value: Box::new(Rcst::Identifier("foo".to_string())),
-                        comma: Some(Box::new(Rcst::Comma)),
-                    }],
-                    closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
-                },
+                CstKind::List {
+                    opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
+                    items: vec![CstKind::ListItem {
+                        value: Box::new(build_identifier("foo")),
+                        comma: Some(Box::new(CstKind::Comma.into())),
+                    }
+                    .into()],
+                    closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
+                }
+                .into(),
             )),
         );
         assert_eq!(
             list("(foo,bar)", 0),
             Some((
                 "",
-                Rcst::List {
-                    opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
+                CstKind::List {
+                    opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
                     items: vec![
-                        Rcst::ListItem {
-                            value: Box::new(Rcst::Identifier("foo".to_string())),
-                            comma: Some(Box::new(Rcst::Comma)),
-                        },
-                        Rcst::ListItem {
-                            value: Box::new(Rcst::Identifier("bar".to_string())),
+                        CstKind::ListItem {
+                            value: Box::new(build_identifier("foo")),
+                            comma: Some(Box::new(CstKind::Comma.into())),
+                        }
+                        .into(),
+                        CstKind::ListItem {
+                            value: Box::new(build_identifier("bar")),
                             comma: None,
-                        },
+                        }
+                        .into(),
                     ],
-                    closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
-                },
+                    closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
+                }
+                .into(),
             )),
         );
         // (
@@ -2430,58 +2357,39 @@ mod parse {
             list("(\n  foo,\n  4,\n  \"Hi\",\n)", 0),
             Some((
                 "",
-                Rcst::List {
-                    opening_parenthesis: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::OpeningParenthesis),
-                        whitespace: vec![
-                            Rcst::Newline("\n".to_string()),
-                            Rcst::Whitespace("  ".to_string())
-                        ],
-                    }),
+                CstKind::List {
+                    opening_parenthesis: Box::new(
+                        CstKind::OpeningParenthesis.with_trailing_whitespace(vec![
+                            CstKind::Newline("\n".to_string()),
+                            CstKind::Whitespace("  ".to_string()),
+                        ]),
+                    ),
                     items: vec![
-                        Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::ListItem {
-                                value: Box::new(Rcst::Identifier("foo".to_string())),
-                                comma: Some(Box::new(Rcst::Comma)),
-                            }),
-                            whitespace: vec![
-                                Rcst::Newline("\n".to_string()),
-                                Rcst::Whitespace("  ".to_string())
-                            ],
-                        },
-                        Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::ListItem {
-                                value: Box::new(Rcst::Int {
-                                    value: 4u8.into(),
-                                    string: "4".to_string()
-                                }),
-                                comma: Some(Box::new(Rcst::Comma)),
-                            }),
-                            whitespace: vec![
-                                Rcst::Newline("\n".to_string()),
-                                Rcst::Whitespace("  ".to_string())
-                            ],
-                        },
-                        Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::ListItem {
-                                value: Box::new(Rcst::Text {
-                                    opening: Box::new(Rcst::OpeningText {
-                                        opening_single_quotes: vec![],
-                                        opening_double_quote: Box::new(Rcst::DoubleQuote),
-                                    }),
-                                    parts: vec![Rcst::TextPart("Hi".to_string())],
-                                    closing: Box::new(Rcst::ClosingText {
-                                        closing_double_quote: Box::new(Rcst::DoubleQuote),
-                                        closing_single_quotes: vec![],
-                                    }),
-                                }),
-                                comma: Some(Box::new(Rcst::Comma))
-                            }),
-                            whitespace: vec![Rcst::Newline("\n".to_string())]
+                        CstKind::ListItem {
+                            value: Box::new(build_identifier("foo")),
+                            comma: Some(Box::new(CstKind::Comma.into())),
                         }
+                        .with_trailing_whitespace(vec![
+                            CstKind::Newline("\n".to_string()),
+                            CstKind::Whitespace("  ".to_string())
+                        ]),
+                        CstKind::ListItem {
+                            value: Box::new(build_simple_int(4)),
+                            comma: Some(Box::new(CstKind::Comma.into())),
+                        }
+                        .with_trailing_whitespace(vec![
+                            CstKind::Newline("\n".to_string()),
+                            CstKind::Whitespace("  ".to_string())
+                        ]),
+                        CstKind::ListItem {
+                            value: Box::new(build_simple_text("Hi")),
+                            comma: Some(Box::new(CstKind::Comma.into()))
+                        }
+                        .with_trailing_whitespace(vec![CstKind::Newline("\n".to_string())]),
                     ],
-                    closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
-                },
+                    closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
+                }
+                .into(),
             )),
         );
     }
@@ -2528,10 +2436,11 @@ mod parse {
                 }
                 _ => (
                     input,
-                    Rcst::Error {
+                    CstKind::Error {
                         unparsable_input: "".to_string(),
-                        error: RcstError::StructFieldMissesColon,
-                    },
+                        error: CstError::StructFieldMissesColon,
+                    }
+                    .into(),
                     false,
                 ),
             };
@@ -2549,10 +2458,11 @@ mod parse {
                     Some((input, value)) => (input, value, true),
                     None => (
                         input,
-                        Rcst::Error {
+                        CstKind::Error {
                             unparsable_input: "".to_string(),
-                            error: RcstError::StructFieldMissesValue,
-                        },
+                            error: CstError::StructFieldMissesValue,
+                        }
+                        .into(),
                         false,
                     ),
                 };
@@ -2575,32 +2485,35 @@ mod parse {
             }
 
             let is_using_shorthand = key_or_value.is_some() && !has_colon && !has_value;
-            let key_or_value = key_or_value.unwrap_or_else(|| Rcst::Error {
-                unparsable_input: "".to_string(),
-                error: if is_using_shorthand {
-                    RcstError::StructFieldMissesValue
-                } else {
-                    RcstError::StructFieldMissesKey
-                },
+            let key_or_value = key_or_value.unwrap_or_else(|| {
+                CstKind::Error {
+                    unparsable_input: "".to_string(),
+                    error: if is_using_shorthand {
+                        CstError::StructFieldMissesValue
+                    } else {
+                        CstError::StructFieldMissesKey
+                    },
+                }
+                .into()
             });
             let key_or_value = key_or_value.wrap_in_whitespace(key_or_value_whitespace);
 
             outer_input = input;
             let comma = comma.map(Box::new);
             let field = if is_using_shorthand {
-                Rcst::StructField {
+                CstKind::StructField {
                     key_and_colon: None,
                     value: Box::new(key_or_value),
                     comma,
                 }
             } else {
-                Rcst::StructField {
+                CstKind::StructField {
                     key_and_colon: Some(Box::new((key_or_value, colon))),
                     value: Box::new(value),
                     comma,
                 }
             };
-            fields.push(field);
+            fields.push(field.into());
         }
         let input = outer_input;
 
@@ -2618,20 +2531,22 @@ mod parse {
             }
             None => (
                 input,
-                Rcst::Error {
+                CstKind::Error {
                     unparsable_input: "".to_string(),
-                    error: RcstError::StructNotClosed,
-                },
+                    error: CstError::StructNotClosed,
+                }
+                .into(),
             ),
         };
 
         Some((
             input,
-            Rcst::Struct {
+            CstKind::Struct {
                 opening_bracket: Box::new(opening_bracket),
                 fields,
                 closing_bracket: Box::new(closing_bracket),
-            },
+            }
+            .into(),
         ))
     }
     #[test]
@@ -2641,75 +2556,83 @@ mod parse {
             struct_("[]", 0),
             Some((
                 "",
-                Rcst::Struct {
-                    opening_bracket: Box::new(Rcst::OpeningBracket),
+                CstKind::Struct {
+                    opening_bracket: Box::new(CstKind::OpeningBracket.into()),
                     fields: vec![],
-                    closing_bracket: Box::new(Rcst::ClosingBracket),
-                },
+                    closing_bracket: Box::new(CstKind::ClosingBracket.into()),
+                }
+                .into(),
             )),
         );
         assert_eq!(
             struct_("[foo:bar]", 0),
             Some((
                 "",
-                Rcst::Struct {
-                    opening_bracket: Box::new(Rcst::OpeningBracket),
-                    fields: vec![Rcst::StructField {
+                CstKind::Struct {
+                    opening_bracket: Box::new(CstKind::OpeningBracket.into()),
+                    fields: vec![CstKind::StructField {
                         key_and_colon: Some(Box::new((
-                            Rcst::Identifier("foo".to_string()),
-                            Rcst::Colon,
+                            build_identifier("foo"),
+                            CstKind::Colon.into(),
                         ))),
-                        value: Box::new(Rcst::Identifier("bar".to_string())),
+                        value: Box::new(build_identifier("bar")),
                         comma: None,
-                    }],
-                    closing_bracket: Box::new(Rcst::ClosingBracket),
-                },
+                    }
+                    .into()],
+                    closing_bracket: Box::new(CstKind::ClosingBracket.into()),
+                }
+                .into(),
             )),
         );
         assert_eq!(
             struct_("[foo,bar:baz]", 0),
             Some((
                 "",
-                Rcst::Struct {
-                    opening_bracket: Box::new(Rcst::OpeningBracket),
+                CstKind::Struct {
+                    opening_bracket: Box::new(CstKind::OpeningBracket.into()),
                     fields: vec![
-                        Rcst::StructField {
+                        CstKind::StructField {
                             key_and_colon: None,
-                            value: Box::new(Rcst::Identifier("foo".to_string())),
-                            comma: Some(Box::new(Rcst::Comma)),
-                        },
-                        Rcst::StructField {
+                            value: Box::new(build_identifier("foo")),
+                            comma: Some(Box::new(CstKind::Comma.into())),
+                        }
+                        .into(),
+                        CstKind::StructField {
                             key_and_colon: Some(Box::new((
-                                Rcst::Identifier("bar".to_string()),
-                                Rcst::Colon,
+                                build_identifier("bar"),
+                                CstKind::Colon.into(),
                             ))),
-                            value: Box::new(Rcst::Identifier("baz".to_string())),
+                            value: Box::new(build_identifier("baz")),
                             comma: None,
-                        },
+                        }
+                        .into(),
                     ],
-                    closing_bracket: Box::new(Rcst::ClosingBracket),
-                },
+                    closing_bracket: Box::new(CstKind::ClosingBracket.into()),
+                }
+                .into(),
             )),
         );
         assert_eq!(
             struct_("[foo := [foo]", 0),
             Some((
                 ":= [foo]",
-                Rcst::Struct {
-                    opening_bracket: Box::new(Rcst::OpeningBracket),
-                    fields: vec![Rcst::StructField {
+                CstKind::Struct {
+                    opening_bracket: Box::new(CstKind::OpeningBracket.into()),
+                    fields: vec![CstKind::StructField {
                         key_and_colon: None,
-                        value: Box::new(Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Identifier("foo".to_string())),
-                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                        }),
+                        value: Box::new(build_identifier("foo").with_trailing_space()),
                         comma: None,
-                    }],
-                    closing_bracket: Box::new(Rcst::Error {
-                        unparsable_input: "".to_string(),
-                        error: RcstError::StructNotClosed,
-                    }),
-                },
+                    }
+                    .into()],
+                    closing_bracket: Box::new(
+                        CstKind::Error {
+                            unparsable_input: "".to_string(),
+                            error: CstError::StructNotClosed,
+                        }
+                        .into()
+                    ),
+                }
+                .into(),
             )),
         );
         // [
@@ -2720,62 +2643,39 @@ mod parse {
             struct_("[\n  foo: bar,\n  4: \"Hi\",\n]", 0),
             Some((
                 "",
-                Rcst::Struct {
-                    opening_bracket: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::OpeningBracket),
-                        whitespace: vec![
-                            Rcst::Newline("\n".to_string()),
-                            Rcst::Whitespace("  ".to_string()),
+                CstKind::Struct {
+                    opening_bracket: Box::new(CstKind::OpeningBracket.with_trailing_whitespace(
+                        vec![
+                            CstKind::Newline("\n".to_string()),
+                            CstKind::Whitespace("  ".to_string()),
                         ],
-                    }),
+                    )),
                     fields: vec![
-                        Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::StructField {
-                                key_and_colon: Some(Box::new((
-                                    Rcst::Identifier("foo".to_string()),
-                                    Rcst::TrailingWhitespace {
-                                        child: Box::new(Rcst::Colon),
-                                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                                    },
-                                ))),
-                                value: Box::new(Rcst::Identifier("bar".to_string())),
-                                comma: Some(Box::new(Rcst::Comma)),
-                            }),
-                            whitespace: vec![
-                                Rcst::Newline("\n".to_string()),
-                                Rcst::Whitespace("  ".to_string()),
-                            ],
-                        },
-                        Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::StructField {
-                                key_and_colon: Some(Box::new((
-                                    Rcst::Int {
-                                        value: 4u8.into(),
-                                        string: "4".to_string()
-                                    },
-                                    Rcst::TrailingWhitespace {
-                                        child: Box::new(Rcst::Colon),
-                                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                                    },
-                                ))),
-                                value: Box::new(Rcst::Text {
-                                    opening: Box::new(Rcst::OpeningText {
-                                        opening_single_quotes: vec![],
-                                        opening_double_quote: Box::new(Rcst::DoubleQuote),
-                                    }),
-                                    parts: vec![Rcst::TextPart("Hi".to_string())],
-                                    closing: Box::new(Rcst::ClosingText {
-                                        closing_double_quote: Box::new(Rcst::DoubleQuote),
-                                        closing_single_quotes: vec![],
-                                    }),
-                                }),
-                                comma: Some(Box::new(Rcst::Comma)),
-                            }),
-                            whitespace: vec![Rcst::Newline("\n".to_string())],
-                        },
+                        CstKind::StructField {
+                            key_and_colon: Some(Box::new((
+                                build_identifier("foo"),
+                                CstKind::Colon.with_trailing_space(),
+                            ))),
+                            value: Box::new(build_identifier("bar")),
+                            comma: Some(Box::new(CstKind::Comma.into())),
+                        }
+                        .with_trailing_whitespace(vec![
+                            CstKind::Newline("\n".to_string()),
+                            CstKind::Whitespace("  ".to_string()),
+                        ]),
+                        CstKind::StructField {
+                            key_and_colon: Some(Box::new((
+                                build_simple_int(4),
+                                CstKind::Colon.with_trailing_space(),
+                            ))),
+                            value: Box::new(build_simple_text("Hi")),
+                            comma: Some(Box::new(CstKind::Comma.into())),
+                        }
+                        .with_trailing_whitespace(vec![CstKind::Newline("\n".to_string())]),
                     ],
-                    closing_bracket: Box::new(Rcst::ClosingBracket),
-                },
+                    closing_bracket: Box::new(CstKind::ClosingBracket.into()),
+                }
+                .into(),
             )),
         );
     }
@@ -2794,10 +2694,11 @@ mod parse {
 
         let (input, inner) = expression(input, inner_indentation, false, true, true).unwrap_or((
             input,
-            Rcst::Error {
+            CstKind::Error {
                 unparsable_input: "".to_string(),
-                error: RcstError::OpeningParenthesisWithoutExpression,
-            },
+                error: CstError::OpeningParenthesisWithoutExpression,
+            }
+            .into(),
         ));
 
         let (input, whitespace) = whitespaces_and_newlines(input, indentation, true);
@@ -2805,19 +2706,21 @@ mod parse {
 
         let (input, closing_parenthesis) = closing_parenthesis(input).unwrap_or((
             input,
-            Rcst::Error {
+            CstKind::Error {
                 unparsable_input: "".to_string(),
-                error: RcstError::ParenthesisNotClosed,
-            },
+                error: CstError::ParenthesisNotClosed,
+            }
+            .into(),
         ));
 
         Some((
             input,
-            Rcst::Parenthesized {
+            CstKind::Parenthesized {
                 opening_parenthesis: Box::new(opening_parenthesis),
                 inner: Box::new(inner),
                 closing_parenthesis: Box::new(closing_parenthesis),
-            },
+            }
+            .into(),
         ))
     }
     #[test]
@@ -2826,27 +2729,32 @@ mod parse {
             parenthesized("(foo)", 0),
             Some((
                 "",
-                Rcst::Parenthesized {
-                    opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
-                    inner: Box::new(Rcst::Identifier("foo".to_string())),
-                    closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
+                CstKind::Parenthesized {
+                    opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
+                    inner: Box::new(build_identifier("foo")),
+                    closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
                 }
-            ))
+                .into(),
+            )),
         );
         assert_eq!(parenthesized("foo", 0), None);
         assert_eq!(
             parenthesized("(foo", 0),
             Some((
                 "",
-                Rcst::Parenthesized {
-                    opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
-                    inner: Box::new(Rcst::Identifier("foo".to_string())),
-                    closing_parenthesis: Box::new(Rcst::Error {
-                        unparsable_input: "".to_string(),
-                        error: RcstError::ParenthesisNotClosed
-                    }),
+                CstKind::Parenthesized {
+                    opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
+                    inner: Box::new(build_identifier("foo")),
+                    closing_parenthesis: Box::new(
+                        CstKind::Error {
+                            unparsable_input: "".to_string(),
+                            error: CstError::ParenthesisNotClosed
+                        }
+                        .into()
+                    ),
                 }
-            ))
+                .into(),
+            )),
         );
     }
 
@@ -2865,20 +2773,23 @@ mod parse {
             let mut indentation = indentation;
             if let Some((new_input, unexpected_whitespace)) = single_line_whitespace(input) {
                 input = new_input;
-                indentation += match &unexpected_whitespace {
-                    Rcst::Whitespace(whitespace)
-                    | Rcst::Error {
+                indentation += match &unexpected_whitespace.kind {
+                    CstKind::Whitespace(whitespace)
+                    | CstKind::Error {
                         unparsable_input: whitespace,
-                        error: RcstError::WeirdWhitespace,
+                        error: CstError::WeirdWhitespace,
                     } => whitespace_indentation_score(whitespace) / 2,
                     _ => panic!(
                         "single_line_whitespace returned something other than Whitespace or Error."
                     ),
                 };
-                expressions.push(Rcst::Error {
-                    unparsable_input: unexpected_whitespace.to_string(),
-                    error: RcstError::TooMuchWhitespace,
-                });
+                expressions.push(
+                    CstKind::Error {
+                        unparsable_input: unexpected_whitespace.to_string(),
+                        error: CstError::TooMuchWhitespace,
+                    }
+                    .into(),
+                );
             }
 
             match expression(input, indentation, true, true, true) {
@@ -2918,27 +2829,30 @@ mod parse {
             let (input, whitespace) = whitespaces_and_newlines(input, indentation, true);
             (input, arrow.wrap_in_whitespace(whitespace))
         } else {
-            let error = Rcst::Error {
+            let error = CstKind::Error {
                 unparsable_input: "".to_string(),
-                error: RcstError::MatchCaseMissesArrow,
+                error: CstError::MatchCaseMissesArrow,
             };
-            (input, error)
+            (input, error.into())
         };
 
         let (input, mut body) = body(input, indentation + 1);
         if body.is_empty() {
-            body.push(Rcst::Error {
-                unparsable_input: "".to_string(),
-                error: RcstError::MatchCaseMissesBody,
-            });
+            body.push(
+                CstKind::Error {
+                    unparsable_input: "".to_string(),
+                    error: CstError::MatchCaseMissesBody,
+                }
+                .into(),
+            );
         }
 
-        let case = Rcst::MatchCase {
+        let case = CstKind::MatchCase {
             pattern: Box::new(pattern),
             arrow: Box::new(arrow),
             body,
         };
-        Some((input, case))
+        Some((input, case.into()))
     }
 
     #[instrument(level = "trace")]
@@ -3008,10 +2922,11 @@ mod parse {
                     Some(it) => it,
                     None => (
                         i,
-                        Rcst::Error {
+                        CstKind::Error {
                             unparsable_input: "".to_string(),
-                            error: RcstError::CurlyBraceNotClosed,
-                        },
+                            error: CstError::CurlyBraceNotClosed,
+                        }
+                        .into(),
                     ),
                 };
                 (i, body, whitespace, curly_brace)
@@ -3034,13 +2949,14 @@ mod parse {
 
         Some((
             input,
-            Rcst::Lambda {
+            CstKind::Lambda {
                 opening_curly_brace: Box::new(opening_curly_brace),
                 parameters_and_arrow: parameters_and_arrow
                     .map(|(parameters, arrow)| (parameters, Box::new(arrow))),
                 body,
                 closing_curly_brace: Box::new(closing_curly_brace),
-            },
+            }
+            .into(),
         ))
     }
     #[test]
@@ -3050,22 +2966,14 @@ mod parse {
             lambda("{ 2 }", 0),
             Some((
                 "",
-                Rcst::Lambda {
-                    opening_curly_brace: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::OpeningCurlyBrace),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
+                CstKind::Lambda {
+                    opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.with_trailing_space()),
                     parameters_and_arrow: None,
-                    body: vec![Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Int {
-                            value: 2u8.into(),
-                            string: "2".to_string()
-                        }),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }],
-                    closing_curly_brace: Box::new(Rcst::ClosingCurlyBrace),
+                    body: vec![build_simple_int(2).with_trailing_space()],
+                    closing_curly_brace: Box::new(CstKind::ClosingCurlyBrace.into()),
                 }
-            ))
+                .into(),
+            )),
         );
         // { a ->
         //   foo
@@ -3074,31 +2982,21 @@ mod parse {
             lambda("{ a ->\n  foo\n}", 0),
             Some((
                 "",
-                Rcst::Lambda {
-                    opening_curly_brace: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::OpeningCurlyBrace),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
+                CstKind::Lambda {
+                    opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.with_trailing_space()),
                     parameters_and_arrow: Some((
-                        vec![Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Identifier("a".to_string())),
-                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                        },],
-                        Box::new(Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Arrow),
-                            whitespace: vec![
-                                Rcst::Newline("\n".to_string()),
-                                Rcst::Whitespace("  ".to_string())
-                            ],
-                        }),
+                        vec![build_identifier("a").with_trailing_space()],
+                        Box::new(CstKind::Arrow.with_trailing_whitespace(vec![
+                            CstKind::Newline("\n".to_string()),
+                            CstKind::Whitespace("  ".to_string())
+                        ])),
                     )),
-                    body: vec![Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
-                        whitespace: vec![Rcst::Newline("\n".to_string())],
-                    }],
-                    closing_curly_brace: Box::new(Rcst::ClosingCurlyBrace),
+                    body: vec![build_identifier("foo")
+                        .with_trailing_whitespace(vec![CstKind::Newline("\n".to_string())])],
+                    closing_curly_brace: Box::new(CstKind::ClosingCurlyBrace.into()),
                 }
-            ))
+                .into(),
+            )),
         );
         // {
         // foo
@@ -3106,19 +3004,23 @@ mod parse {
             lambda("{\nfoo", 0),
             Some((
                 "foo",
-                Rcst::Lambda {
-                    opening_curly_brace: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::OpeningCurlyBrace),
-                        whitespace: vec![Rcst::Newline("\n".to_string())],
-                    }),
+                CstKind::Lambda {
+                    opening_curly_brace: Box::new(
+                        CstKind::OpeningCurlyBrace
+                            .with_trailing_whitespace(vec![CstKind::Newline("\n".to_string())])
+                    ),
                     parameters_and_arrow: None,
                     body: vec![],
-                    closing_curly_brace: Box::new(Rcst::Error {
-                        unparsable_input: "".to_string(),
-                        error: RcstError::CurlyBraceNotClosed
-                    }),
+                    closing_curly_brace: Box::new(
+                        CstKind::Error {
+                            unparsable_input: "".to_string(),
+                            error: CstError::CurlyBraceNotClosed
+                        }
+                        .into()
+                    ),
                 }
-            ))
+                .into(),
+            )),
         );
         // {->
         // }
@@ -3126,16 +3028,20 @@ mod parse {
             lambda("{->\n}", 1),
             Some((
                 "\n}",
-                Rcst::Lambda {
-                    opening_curly_brace: Box::new(Rcst::OpeningCurlyBrace),
-                    parameters_and_arrow: Some((vec![], Box::new(Rcst::Arrow))),
+                CstKind::Lambda {
+                    opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.into()),
+                    parameters_and_arrow: Some((vec![], Box::new(CstKind::Arrow.into()))),
                     body: vec![],
-                    closing_curly_brace: Box::new(Rcst::Error {
-                        unparsable_input: "".to_string(),
-                        error: RcstError::CurlyBraceNotClosed
-                    }),
+                    closing_curly_brace: Box::new(
+                        CstKind::Error {
+                            unparsable_input: "".to_string(),
+                            error: CstError::CurlyBraceNotClosed
+                        }
+                        .into()
+                    ),
                 }
-            ))
+                .into(),
+            )),
         );
         // { foo
         //   bar
@@ -3144,24 +3050,92 @@ mod parse {
             lambda("{ foo\n  bar\n}", 0),
             Some((
                 "",
-                Rcst::Lambda {
-                    opening_curly_brace: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::OpeningCurlyBrace),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                    }),
+                CstKind::Lambda {
+                    opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.with_trailing_space()),
                     parameters_and_arrow: None,
                     body: vec![
-                        Rcst::Identifier("foo".to_string()),
-                        Rcst::Newline("\n".to_string()),
-                        Rcst::Whitespace("  ".to_string()),
-                        Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Identifier("bar".to_string())),
-                            whitespace: vec![Rcst::Newline("\n".to_string())],
-                        }
+                        build_identifier("foo"),
+                        CstKind::Newline("\n".to_string()).into(),
+                        CstKind::Whitespace("  ".to_string()).into(),
+                        build_identifier("bar")
+                            .with_trailing_whitespace(vec![CstKind::Newline("\n".to_string())]),
                     ],
-                    closing_curly_brace: Box::new(Rcst::ClosingCurlyBrace)
+                    closing_curly_brace: Box::new(CstKind::ClosingCurlyBrace.into())
                 }
-            ))
+                .into(),
+            )),
         );
+    }
+
+    #[cfg(test)]
+    fn build_comment(value: impl AsRef<str>) -> Rcst {
+        CstKind::Comment {
+            octothorpe: Box::new(CstKind::Octothorpe.into()),
+            comment: value.as_ref().to_string(),
+        }
+        .into()
+    }
+    #[cfg(test)]
+    fn build_identifier(value: impl AsRef<str>) -> Rcst {
+        CstKind::Identifier(value.as_ref().to_string()).into()
+    }
+    #[cfg(test)]
+    fn build_symbol(value: impl AsRef<str>) -> Rcst {
+        CstKind::Symbol(value.as_ref().to_string()).into()
+    }
+    #[cfg(test)]
+    fn build_simple_int(value: usize) -> Rcst {
+        CstKind::Int {
+            value: value.into(),
+            string: value.to_string(),
+        }
+        .into()
+    }
+    #[cfg(test)]
+    fn build_simple_text(value: impl AsRef<str>) -> Rcst {
+        CstKind::Text {
+            opening: Box::new(
+                CstKind::OpeningText {
+                    opening_single_quotes: vec![],
+                    opening_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                }
+                .into(),
+            ),
+            parts: vec![CstKind::TextPart(value.as_ref().to_string()).into()],
+            closing: Box::new(
+                CstKind::ClosingText {
+                    closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                    closing_single_quotes: vec![],
+                }
+                .into(),
+            ),
+        }
+        .into()
+    }
+
+    #[cfg(test)]
+    impl Rcst {
+        fn with_trailing_space(self) -> Rcst {
+            self.with_trailing_whitespace(vec![CstKind::Whitespace(" ".to_string())])
+        }
+        fn with_trailing_whitespace(self, trailing_whitespace: Vec<CstKind<()>>) -> Rcst {
+            CstKind::TrailingWhitespace {
+                child: Box::new(self),
+                whitespace: trailing_whitespace
+                    .into_iter()
+                    .map(|it| it.into())
+                    .collect(),
+            }
+            .into()
+        }
+    }
+    #[cfg(test)]
+    impl CstKind<()> {
+        fn with_trailing_space(self) -> Rcst {
+            Rcst::from(self).with_trailing_space()
+        }
+        fn with_trailing_whitespace(self, trailing_whitespace: Vec<CstKind<()>>) -> Rcst {
+            Rcst::from(self).with_trailing_whitespace(trailing_whitespace)
+        }
     }
 }

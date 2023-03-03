@@ -12,6 +12,7 @@ impl Id {
         format!("${}", self.0)
     }
 }
+
 impl CountableId for Id {
     fn from_usize(id: usize) -> Self {
         Self(id)
@@ -20,6 +21,7 @@ impl CountableId for Id {
         self.0
     }
 }
+
 impl ToString for Id {
     fn to_string(&self) -> String {
         self.to_short_debug_string()

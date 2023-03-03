@@ -7,11 +7,13 @@ use crate::module::{Module, ModuleDb};
 
 /// The offset of a character in a string as the number of bytes preceding it in
 /// UTF-8 encoding.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, DerefMut, From)]
+#[derive(
+    Clone, Copy, Debug, Default, Deref, DerefMut, Eq, From, Hash, Ord, PartialEq, PartialOrd,
+)]
 #[from(forward)]
 pub struct Offset(pub usize);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Position {
     /// Zero-based line index (`\n`-separated)
     pub line: usize,

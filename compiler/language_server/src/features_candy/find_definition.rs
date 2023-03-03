@@ -20,7 +20,7 @@ where
         _ => return None,
     }
 
-    let origin_hir_id = db.cst_to_hir_id(module.clone(), origin_cst.id)?;
+    let origin_hir_id = db.cst_to_hir_id(module.clone(), origin_cst.data.id)?;
     let origin_expression = db.find_expression(origin_hir_id)?;
     let target_hir_id = match origin_expression {
         Expression::Reference(id) => id,
@@ -30,9 +30,9 @@ where
     let target_cst = db.find_cst(module.clone(), target_cst_id);
 
     Some(LocationLink {
-        origin_selection_range: Some(db.range_to_lsp_range(module.clone(), origin_cst.span)),
+        origin_selection_range: Some(db.range_to_lsp_range(module.clone(), origin_cst.data.span)),
         target_uri: module_to_url(&module).unwrap(),
-        target_range: db.range_to_lsp_range(module.clone(), target_cst.span.clone()),
+        target_range: db.range_to_lsp_range(module.clone(), target_cst.data.span.clone()),
         target_selection_range: db.range_to_lsp_range(module, target_cst.display_span()),
     })
 }
