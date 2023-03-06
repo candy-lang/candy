@@ -300,7 +300,9 @@ impl TreeWithIds for Cst {
         };
 
         inner.or_else(|| {
-            if self.data.span.contains(&offset) || (is_end_inclusive && self.data.span.end == offset) {
+            if self.data.span.contains(&offset)
+                || (is_end_inclusive && self.data.span.end == offset)
+            {
                 Some(self)
             } else {
                 None
