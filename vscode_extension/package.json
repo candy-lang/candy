@@ -135,7 +135,7 @@
     "@typescript-eslint/eslint-plugin": "^5.54.0",
     "@typescript-eslint/parser": "^5.54.0",
     "eslint": "^8.35.0",
-    "glob": "^8.1.0",
+    "glob": "^9.2.1",
     "mocha": "^10.2.0",
     "typescript": "^4.9.5",
     "vscode-test": "^1.4.0"
