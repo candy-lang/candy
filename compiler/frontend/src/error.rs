@@ -27,6 +27,7 @@ impl Display for CompilerErrorPayload {
         let message = match self {
             CompilerErrorPayload::InvalidUtf8 => "The module contains invalid UTF-8.".to_string(),
             CompilerErrorPayload::Cst(error) => match error {
+                CstError::BinaryBarMissesRight => "There should be a right side after this bar.",
                 CstError::CurlyBraceNotClosed => "The curly brace is not closed.",
                 CstError::IdentifierContainsNonAlphanumericAscii => {
                     "This identifier contains non-alphanumeric ASCII characters."
@@ -44,7 +45,6 @@ impl Display for CompilerErrorPayload {
                 }
                 CstError::OrPatternMissesRight => "This or-pattern misses a right-hand side.",
                 CstError::ParenthesisNotClosed => "This parenthesis isn't closed.",
-                CstError::PipeMissesCall => "There should be a call after this pipe.",
                 CstError::StructFieldMissesColon => "This struct field misses a colon.",
                 CstError::StructFieldMissesKey => "This struct field misses a key.",
                 CstError::StructFieldMissesValue => "This struct field misses a value.",

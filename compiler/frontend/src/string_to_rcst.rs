@@ -1487,7 +1487,7 @@ mod parse {
             expression(input, indentation, false, true, false).unwrap_or_else(|| {
                 let error = CstKind::Error {
                     unparsable_input: "".to_string(),
-                    error: CstError::PipeMissesCall,
+                    error: CstError::BinaryBarMissesRight,
                 };
                 (input, error.into())
             });

@@ -1,5 +1,6 @@
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum CstError {
+    BinaryBarMissesRight,
     CurlyBraceNotClosed,
     IdentifierContainsNonAlphanumericAscii,
     IntContainsNonDigits,
@@ -11,7 +12,6 @@ pub enum CstError {
     OpeningParenthesisWithoutExpression,
     OrPatternMissesRight,
     ParenthesisNotClosed,
-    PipeMissesCall,
     StructFieldMissesColon,
     StructFieldMissesKey,
     StructFieldMissesValue,
