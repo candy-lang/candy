@@ -238,7 +238,7 @@ impl LoweringContext {
                                             module: self.module.clone(),
                                             span: part.data.span.clone(),
                                             payload: CompilerErrorPayload::Ast(
-                                                AstError::TextInterpolationWithoutClosingCurlyBraces,
+                                                AstError::TextInterpolationMissesClosingCurlyBraces,
                                             ),
                                         }],
                                     },
@@ -270,7 +270,7 @@ impl LoweringContext {
                             matches!(single_quote.kind, CstKind::SingleQuote)
                         }) && opening_single_quote_count == closing_single_quotes.len()
                 ) {
-                    errors.push(self.create_error(closing, AstError::TextWithoutClosingQuote));
+                    errors.push(self.create_error(closing, AstError::TextMissesClosingQuote));
                 }
 
                 self.wrap_in_errors(cst.data.id, text, errors)
@@ -413,7 +413,7 @@ impl LoweringContext {
                             child: Some(Box::new(ast)),
                             errors: vec![self.create_error(
                                 closing_parenthesis,
-                                AstError::ParenthesizedWithoutClosingParenthesis,
+                                AstError::ParenthesizedMissesClosingParenthesis,
                             )],
                         },
                     );
@@ -517,7 +517,7 @@ impl LoweringContext {
                                     comma.data.id,
                                     AstKind::Error {
                                         child: Some(Box::new(value)),
-                                        errors: vec![self.create_error(comma, AstError::ListItemWithoutComma)],
+                                        errors: vec![self.create_error(comma, AstError::ListItemMissesComma)],
                                     },
                                 );
                             }
@@ -528,10 +528,12 @@ impl LoweringContext {
                 }
 
                 if !matches!(closing_parenthesis.kind, CstKind::ClosingParenthesis) {
-                    errors.push(self.create_error(
-                        closing_parenthesis,
-                        AstError::ListWithoutClosingParenthesis,
-                    ));
+                    errors.push(
+                        self.create_error(
+                            closing_parenthesis,
+                            AstError::ListMissesClosingParenthesis,
+                        ),
+                    );
                 }
 
                 let ast = self.create_ast(cst.data.id, AstKind::List(List(ast_items)));
@@ -589,7 +591,7 @@ impl LoweringContext {
                                     AstKind::Error {
                                         child: Some(Box::new(key)),
                                         errors: vec![self
-                                            .create_error(colon, AstError::StructKeyWithoutColon)],
+                                            .create_error(colon, AstError::StructKeyMissesColon)],
                                     },
                                 )
                             }
@@ -604,7 +606,7 @@ impl LoweringContext {
                                             child: Some(Box::new(value)),
                                             errors: vec![self.create_error(
                                                 comma,
-                                                AstError::StructValueWithoutComma,
+                                                AstError::StructValueMissesComma,
                                             )],
                                         },
                                     )
@@ -636,7 +638,7 @@ impl LoweringContext {
                                             child: Some(Box::new(ast)),
                                             errors: vec![self.create_error(
                                                 comma,
-                                                AstError::StructValueWithoutComma,
+                                                AstError::StructValueMissesComma,
                                             )],
                                         },
                                     )
@@ -649,7 +651,7 @@ impl LoweringContext {
 
                 if !matches!(closing_bracket.kind, CstKind::ClosingBracket) {
                     errors.push(
-                        self.create_error(closing_bracket, AstError::StructWithoutClosingBrace),
+                        self.create_error(closing_bracket, AstError::StructMissesClosingBrace),
                     );
                 }
 
@@ -750,7 +752,7 @@ impl LoweringContext {
                 if !matches!(closing_curly_brace.kind, CstKind::ClosingCurlyBrace) {
                     errors.push(self.create_error(
                         closing_curly_brace,
-                        AstError::LambdaWithoutClosingCurlyBrace,
+                        AstError::LambdaMissesClosingCurlyBrace,
                     ));
                 }
 

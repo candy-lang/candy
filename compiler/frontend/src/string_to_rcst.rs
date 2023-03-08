@@ -654,7 +654,7 @@ mod parse {
                 input,
                 CstKind::Error {
                     unparsable_input: "".to_string(),
-                    error: CstError::TextInterpolationWithoutExpression,
+                    error: CstError::TextInterpolationMissesExpression,
                 }
                 .into(),
             ));
@@ -1166,7 +1166,7 @@ mod parse {
                             expression: Box::new(
                                 CstKind::Error {
                                     unparsable_input: "".to_string(),
-                                    error: CstError::TextInterpolationWithoutExpression,
+                                    error: CstError::TextInterpolationMissesExpression,
                                 }
                                 .into(),
                             ),
@@ -2696,7 +2696,7 @@ mod parse {
             input,
             CstKind::Error {
                 unparsable_input: "".to_string(),
-                error: CstError::OpeningParenthesisWithoutExpression,
+                error: CstError::OpeningParenthesisMissesExpression,
             }
             .into(),
         ));

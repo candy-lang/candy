@@ -40,7 +40,7 @@ impl Display for CompilerErrorPayload {
                 CstError::MatchMissesCases => "This match misses cases to match against.",
                 CstError::MatchCaseMissesArrow => "This match case misses an arrow.",
                 CstError::MatchCaseMissesBody => "This match case misses a body to run.",
-                CstError::OpeningParenthesisWithoutExpression => {
+                CstError::OpeningParenthesisMissesExpression => {
                     "Here's an opening parenthesis without an expression after it."
                 }
                 CstError::OrPatternMissesRight => "This or-pattern misses a right-hand side.",
@@ -55,7 +55,7 @@ impl Display for CompilerErrorPayload {
                 CstError::TextNotClosed => "This text isn't closed.",
                 CstError::TextNotSufficientlyIndented => "This text isn't sufficiently indented.",
                 CstError::TextInterpolationNotClosed => "This text interpolation isn't closed.",
-                CstError::TextInterpolationWithoutExpression => {
+                CstError::TextInterpolationMissesExpression => {
                     "Here's a start of a text interpolation without an expression after it."
                 }
                 CstError::TooMuchWhitespace => "There is too much whitespace here.",
@@ -73,16 +73,16 @@ impl Display for CompilerErrorPayload {
                     "An assignment should have a name or pattern on the left side.".to_string()
                 }
                 AstError::ExpectedParameter => "A parameter should come here.".to_string(),
-                AstError::LambdaWithoutClosingCurlyBrace => {
+                AstError::LambdaMissesClosingCurlyBrace => {
                     "This lambda doesn't have a closing curly brace.".to_string()
                 }
-                AstError::ListItemWithoutComma => {
+                AstError::ListItemMissesComma => {
                     "This list item should be followed by a comma.".to_string()
                 }
-                AstError::ListWithNonListItem => "This is not a list item.".to_string(),
-                AstError::ListWithoutClosingParenthesis => {
+                AstError::ListMissesClosingParenthesis => {
                     "This list doesn't have a closing parenthesis.".to_string()
                 }
+                AstError::ListWithNonListItem => "This is not a list item.".to_string(),
                 AstError::OrPatternIsMissingIdentifiers {
                     identifier,
                     number_of_missing_captures,
@@ -96,7 +96,7 @@ impl Display for CompilerErrorPayload {
                 AstError::ParenthesizedInPattern => {
                     "Parentheses are not allowed in patterns.".to_string()
                 }
-                AstError::ParenthesizedWithoutClosingParenthesis => {
+                AstError::ParenthesizedMissesClosingParenthesis => {
                     "This expression is parenthesized, but the closing parenthesis is missing."
                         .to_string()
                 }
@@ -107,25 +107,25 @@ impl Display for CompilerErrorPayload {
                     "This type of expression is not allowed in this part of a pattern.".to_string()
                 }
                 AstError::PipeInPattern => "Pipes are not allowed in patterns.".to_string(),
-                AstError::StructKeyWithoutColon => {
+                AstError::StructKeyMissesColon => {
                     "This struct key should be followed by a colon.".to_string()
+                }
+                AstError::StructMissesClosingBrace => {
+                    "This struct doesn't have a closing bracket.".to_string()
                 }
                 AstError::StructShorthandWithNotIdentifier => {
                     "Shorthand syntax in structs only supports identifiers.".to_string()
                 }
-                AstError::StructValueWithoutComma => {
+                AstError::StructValueMissesComma => {
                     "This struct value should be followed by a comma.".to_string()
                 }
                 AstError::StructWithNonStructField => {
                     "Structs should only contain struct key.".to_string()
                 }
-                AstError::StructWithoutClosingBrace => {
-                    "This struct doesn't have a closing bracket.".to_string()
-                }
-                AstError::TextWithoutClosingQuote => "This text never ends.".to_string(),
-                AstError::TextInterpolationWithoutClosingCurlyBraces => {
+                AstError::TextInterpolationMissesClosingCurlyBraces => {
                     "This text interpolation never ends.".to_string()
                 }
+                AstError::TextMissesClosingQuote => "This text never ends.".to_string(),
                 AstError::UnexpectedPunctuation => "This punctuation was unexpected.".to_string(),
             },
             CompilerErrorPayload::Hir(error) => match error {
