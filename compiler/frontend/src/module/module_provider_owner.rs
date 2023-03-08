@@ -36,14 +36,13 @@ mod test {
     use crate::{
         ast::AstDbStorage,
         ast_to_hir::AstToHirStorage,
-        cst::CstDbStorage,
+        cst::{CstDbStorage, CstKind},
         cst_to_ast::CstToAstStorage,
         hir::HirDbStorage,
         hir_to_mir::HirToMirStorage,
         mir_optimize::OptimizeMirStorage,
         module::{GetModuleContentQuery, ModuleDb, ModuleDbStorage, ModuleKind, Package},
         position::PositionConversionStorage,
-        rcst::Rcst,
         rcst_to_cst::RcstToCstStorage,
         string_to_rcst::{StringToRcst, StringToRcstStorage},
     };
@@ -99,10 +98,11 @@ mod test {
         );
         assert_eq!(
             db.rcst(module.clone()).unwrap().as_ref().to_owned(),
-            vec![Rcst::Int {
+            vec![CstKind::Int {
                 value: 123u8.into(),
                 string: "123".to_string(),
-            }],
+            }
+            .into()],
         );
 
         db.did_change_module(&module, "456".to_string().into_bytes());
@@ -115,10 +115,11 @@ mod test {
         );
         assert_eq!(
             db.rcst(module.clone()).unwrap().as_ref().to_owned(),
-            vec![Rcst::Int {
+            vec![CstKind::Int {
                 value: 456u16.into(),
                 string: "456".to_string(),
-            }],
+            }
+            .into()],
         );
 
         db.did_close_module(&module);

@@ -37,7 +37,7 @@ fn ast_to_cst_id(db: &dyn CstToAst, id: ast::Id) -> Option<cst::Id> {
 }
 fn ast_id_to_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<Offset>> {
     let cst_id = db.ast_to_cst_id(id.clone())?;
-    Some(db.find_cst(id.module, cst_id).span)
+    Some(db.find_cst(id.module, cst_id).data.span)
 }
 fn ast_id_to_display_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<Offset>> {
     let cst_id = db.ast_to_cst_id(id.clone())?;
@@ -136,7 +136,7 @@ impl LoweringContext {
             | CstKind::DoubleQuote
             | CstKind::Percent
             | CstKind::Octothorpe => self.create_ast(
-                cst.id,
+                cst.data.id,
                 AstKind::Error {
                     child: None,
                     errors: vec![self.create_error(cst, AstError::UnexpectedPunctuation)],
@@ -149,7 +149,7 @@ impl LoweringContext {
                 panic!("Whitespace should have been removed before lowering to AST.")
             }
             CstKind::Identifier(identifier) => {
-                let string = self.create_string(cst.id, identifier.to_string());
+                let string = self.create_string(cst.data.id, identifier.to_string());
                 let mut kind = AstKind::Identifier(Identifier(string));
                 if lowering_type == LoweringType::PatternLiteralPart {
                     kind = AstKind::Error {
@@ -160,13 +160,15 @@ impl LoweringContext {
                         )],
                     };
                 };
-                self.create_ast(cst.id, kind)
+                self.create_ast(cst.data.id, kind)
             }
             CstKind::Symbol(symbol) => {
-                let string = self.create_string(cst.id, symbol.to_string());
-                self.create_ast(cst.id, AstKind::Symbol(Symbol(string)))
+                let string = self.create_string(cst.data.id, symbol.to_string());
+                self.create_ast(cst.data.id, AstKind::Symbol(Symbol(string)))
             }
-            CstKind::Int { value, .. } => self.create_ast(cst.id, AstKind::Int(Int(value.clone()))),
+            CstKind::Int { value, .. } => {
+                self.create_ast(cst.data.id, AstKind::Int(Int(value.clone())))
+            }
             CstKind::Text {
                 opening,
                 parts,
@@ -193,9 +195,9 @@ impl LoweringContext {
                 for part in parts {
                     match &part.kind {
                         CstKind::TextPart(text) => {
-                            let string = self.create_string(part.id, text.clone());
+                            let string = self.create_string(part.data.id, text.clone());
                             let text_part =
-                                self.create_ast(part.id, AstKind::TextPart(TextPart(string)));
+                                self.create_ast(part.data.id, AstKind::TextPart(TextPart(string)));
                             lowered_parts.push(text_part);
                         },
                         CstKind::TextInterpolation {
@@ -229,14 +231,14 @@ impl LoweringContext {
                                 lowered_parts.push(ast);
                             } else {
                                 let error = self.create_ast(
-                                    part.id,
+                                    part.data.id,
                                     AstKind::Error {
                                         child: Some(Box::new(ast)),
                                         errors: vec![CompilerError {
                                             module: self.module.clone(),
-                                            span: part.span.clone(),
+                                            span: part.data.span.clone(),
                                             payload: CompilerErrorPayload::Ast(
-                                                AstError::TextInterpolationWithoutClosingCurlyBraces,
+                                                AstError::TextInterpolationMissesClosingCurlyBraces,
                                             ),
                                         }],
                                     },
@@ -246,13 +248,13 @@ impl LoweringContext {
                         },
                         CstKind::Error { error, .. } => errors.push(CompilerError {
                             module: self.module.clone(),
-                            span: part.span.clone(),
-                            payload: CompilerErrorPayload::Rcst(error.clone()),
+                            span: part.data.span.clone(),
+                            payload: CompilerErrorPayload::Cst(error.clone()),
                         }),
                         _ => panic!("Text contains non-TextPart. Whitespaces should have been removed already."),
                     }
                 }
-                let text = self.create_ast(cst.id, AstKind::Text(Text(lowered_parts)));
+                let text = self.create_ast(cst.data.id, AstKind::Text(Text(lowered_parts)));
 
                 if !matches!(
                     &closing.kind,
@@ -268,10 +270,10 @@ impl LoweringContext {
                             matches!(single_quote.kind, CstKind::SingleQuote)
                         }) && opening_single_quote_count == closing_single_quotes.len()
                 ) {
-                    errors.push(self.create_error(closing, AstError::TextWithoutClosingQuote));
+                    errors.push(self.create_error(closing, AstError::TextMissesClosingQuote));
                 }
 
-                self.wrap_in_errors(cst.id, text, errors)
+                self.wrap_in_errors(cst.data.id, text, errors)
             }
             CstKind::OpeningText { .. } => panic!("OpeningText should only occur in Text."),
             CstKind::ClosingText { .. } => panic!("ClosingText should only occur in Text."),
@@ -312,7 +314,7 @@ impl LoweringContext {
                                 arguments: vec![left],
                             },
                         };
-                        self.create_ast(cst.id, AstKind::Call(call))
+                        self.create_ast(cst.data.id, AstKind::Call(call))
                     }
                     // In a pattern context, a bar represents an or pattern.
                     LoweringType::Pattern | LoweringType::PatternLiteralPart => {
@@ -371,8 +373,9 @@ impl LoweringContext {
                             ))
                         }
 
-                        let ast = self.create_ast(cst.id, AstKind::OrPattern(OrPattern(patterns)));
-                        self.wrap_in_errors(cst.id, ast, errors)
+                        let ast =
+                            self.create_ast(cst.data.id, AstKind::OrPattern(OrPattern(patterns)));
+                        self.wrap_in_errors(cst.data.id, ast, errors)
                     }
                 }
             }
@@ -385,7 +388,7 @@ impl LoweringContext {
                     LoweringType::Expression => {}
                     LoweringType::Pattern | LoweringType::PatternLiteralPart => {
                         return self.create_ast(
-                            cst.id,
+                            cst.data.id,
                             AstKind::Error {
                                 child: None,
                                 errors: vec![
@@ -405,12 +408,12 @@ impl LoweringContext {
                 );
                 if !matches!(closing_parenthesis.kind, CstKind::ClosingParenthesis) {
                     ast = self.create_ast(
-                        closing_parenthesis.id,
+                        closing_parenthesis.data.id,
                         AstKind::Error {
                             child: Some(Box::new(ast)),
                             errors: vec![self.create_error(
                                 closing_parenthesis,
-                                AstError::ParenthesizedWithoutClosingParenthesis,
+                                AstError::ParenthesizedMissesClosingParenthesis,
                             )],
                         },
                     );
@@ -426,7 +429,7 @@ impl LoweringContext {
                     LoweringType::Expression => {}
                     LoweringType::Pattern | LoweringType::PatternLiteralPart => {
                         return self.create_ast(
-                            cst.id,
+                            cst.data.id,
                             AstKind::Error {
                                 child: None,
                                 errors: vec![self.create_error(cst, AstError::CallInPattern)],
@@ -464,7 +467,7 @@ impl LoweringContext {
                 let arguments = self.lower_csts(arguments);
 
                 self.create_ast(
-                    cst.id,
+                    cst.data.id,
                     AstKind::Call(ast::Call {
                         receiver: receiver.into(),
                         arguments,
@@ -511,10 +514,10 @@ impl LoweringContext {
                         if let Some(comma) = comma {
                             if !matches!(comma.kind, CstKind::Comma) {
                                 value = self.create_ast(
-                                    comma.id,
+                                    comma.data.id,
                                     AstKind::Error {
                                         child: Some(Box::new(value)),
-                                        errors: vec![self.create_error(comma, AstError::ListItemWithoutComma)],
+                                        errors: vec![self.create_error(comma, AstError::ListItemMissesComma)],
                                     },
                                 );
                             }
@@ -525,14 +528,16 @@ impl LoweringContext {
                 }
 
                 if !matches!(closing_parenthesis.kind, CstKind::ClosingParenthesis) {
-                    errors.push(self.create_error(
-                        closing_parenthesis,
-                        AstError::ListWithoutClosingParenthesis,
-                    ));
+                    errors.push(
+                        self.create_error(
+                            closing_parenthesis,
+                            AstError::ListMissesClosingParenthesis,
+                        ),
+                    );
                 }
 
-                let ast = self.create_ast(cst.id, AstKind::List(List(ast_items)));
-                self.wrap_in_errors(cst.id, ast, errors)
+                let ast = self.create_ast(cst.data.id, AstKind::List(List(ast_items)));
+                self.wrap_in_errors(cst.data.id, ast, errors)
             }
             CstKind::ListItem { .. } => panic!("ListItem should only appear in List."),
             CstKind::Struct {
@@ -582,11 +587,11 @@ impl LoweringContext {
 
                             if !matches!(colon.kind, CstKind::Colon) {
                                 key = self.create_ast(
-                                    colon.id,
+                                    colon.data.id,
                                     AstKind::Error {
                                         child: Some(Box::new(key)),
                                         errors: vec![self
-                                            .create_error(colon, AstError::StructKeyWithoutColon)],
+                                            .create_error(colon, AstError::StructKeyMissesColon)],
                                     },
                                 )
                             }
@@ -596,12 +601,12 @@ impl LoweringContext {
                             if let Some(comma) = comma {
                                 if !matches!(comma.kind, CstKind::Comma) {
                                     value = self.create_ast(
-                                        comma.id,
+                                        comma.data.id,
                                         AstKind::Error {
                                             child: Some(Box::new(value)),
                                             errors: vec![self.create_error(
                                                 comma,
-                                                AstError::StructValueWithoutComma,
+                                                AstError::StructValueMissesComma,
                                             )],
                                         },
                                     )
@@ -614,7 +619,7 @@ impl LoweringContext {
 
                             if !matches!(ast.kind, AstKind::Identifier(_)) {
                                 ast = self.create_ast(
-                                    value.id,
+                                    value.data.id,
                                     AstKind::Error {
                                         child: Some(Box::new(ast)),
                                         errors: vec![self.create_error(
@@ -628,12 +633,12 @@ impl LoweringContext {
                             if let Some(comma) = comma {
                                 if !matches!(comma.kind, CstKind::Comma) {
                                     ast = self.create_ast(
-                                        comma.id,
+                                        comma.data.id,
                                         AstKind::Error {
                                             child: Some(Box::new(ast)),
                                             errors: vec![self.create_error(
                                                 comma,
-                                                AstError::StructValueWithoutComma,
+                                                AstError::StructValueMissesComma,
                                             )],
                                         },
                                     )
@@ -646,12 +651,12 @@ impl LoweringContext {
 
                 if !matches!(closing_bracket.kind, CstKind::ClosingBracket) {
                     errors.push(
-                        self.create_error(closing_bracket, AstError::StructWithoutClosingBrace),
+                        self.create_error(closing_bracket, AstError::StructMissesClosingBrace),
                     );
                 }
 
-                let ast = self.create_ast(cst.id, AstKind::Struct(Struct { fields }));
-                self.wrap_in_errors(cst.id, ast, errors)
+                let ast = self.create_ast(cst.data.id, AstKind::Struct(Struct { fields }));
+                self.wrap_in_errors(cst.data.id, ast, errors)
             }
             CstKind::StructField { .. } => panic!("StructField should only appear in Struct."),
             CstKind::StructAccess { struct_, dot, key } => {
@@ -659,7 +664,7 @@ impl LoweringContext {
                     return self.create_ast_for_invalid_expression_in_pattern(cst);
                 };
 
-                self.lower_struct_access(cst.id, struct_, dot, key)
+                self.lower_struct_access(cst.data.id, struct_, dot, key)
             }
             CstKind::Match {
                 expression,
@@ -681,7 +686,7 @@ impl LoweringContext {
                 let cases = self.lower_csts(cases);
 
                 self.create_ast(
-                    cst.id,
+                    cst.data.id,
                     AstKind::Match(Match {
                         expression: Box::new(expression),
                         cases,
@@ -704,7 +709,7 @@ impl LoweringContext {
                 let body = self.lower_csts(body);
 
                 self.create_ast(
-                    cst.id,
+                    cst.data.id,
                     AstKind::MatchCase(MatchCase {
                         pattern: Box::new(pattern),
                         body,
@@ -747,19 +752,19 @@ impl LoweringContext {
                 if !matches!(closing_curly_brace.kind, CstKind::ClosingCurlyBrace) {
                     errors.push(self.create_error(
                         closing_curly_brace,
-                        AstError::LambdaWithoutClosingCurlyBrace,
+                        AstError::LambdaMissesClosingCurlyBrace,
                     ));
                 }
 
                 let ast = self.create_ast(
-                    cst.id,
+                    cst.data.id,
                     AstKind::Lambda(Lambda {
                         parameters,
                         body,
                         fuzzable: false,
                     }),
                 );
-                self.wrap_in_errors(cst.id, ast, errors)
+                self.wrap_in_errors(cst.data.id, ast, errors)
             }
             CstKind::Assignment {
                 left,
@@ -780,29 +785,29 @@ impl LoweringContext {
                 {
                     let name = match &name.kind {
                         CstKind::Identifier(identifier) => {
-                            self.create_string(name.id.to_owned(), identifier.to_owned())
+                            self.create_string(name.data.id.to_owned(), identifier.to_owned())
                         }
                         CstKind::Error { error, .. } => {
                             return self.create_ast(
-                                cst.id,
+                                cst.data.id,
                                 AstKind::Error {
                                     child: None,
                                     errors: vec![CompilerError {
                                         module: self.module.clone(),
-                                        span: name.span.clone(),
-                                        payload: CompilerErrorPayload::Rcst(error.clone()),
+                                        span: name.data.span.clone(),
+                                        payload: CompilerErrorPayload::Cst(error.clone()),
                                     }],
                                 },
                             );
                         }
                         _ => {
                             return self.create_ast(
-                                cst.id,
+                                cst.data.id,
                                 AstKind::Error {
                                     child: None,
                                     errors: vec![CompilerError {
                                         module: self.module.clone(),
-                                        span: name.span.clone(),
+                                        span: name.data.span.clone(),
                                         payload: CompilerErrorPayload::Ast(
                                             AstError::ExpectedNameOrPatternInAssignment,
                                         ),
@@ -831,22 +836,22 @@ impl LoweringContext {
                 };
 
                 let ast = self.create_ast(
-                    cst.id,
+                    cst.data.id,
                     AstKind::Assignment(ast::Assignment {
                         is_public: matches!(assignment_sign.kind, CstKind::ColonEqualsSign),
                         body,
                     }),
                 );
-                self.wrap_in_errors(cst.id, ast, errors)
+                self.wrap_in_errors(cst.data.id, ast, errors)
             }
             CstKind::Error { error, .. } => self.create_ast(
-                cst.id,
+                cst.data.id,
                 AstKind::Error {
                     child: None,
                     errors: vec![CompilerError {
                         module: self.module.clone(),
-                        span: cst.span.clone(),
-                        payload: CompilerErrorPayload::Rcst(error.clone()),
+                        span: cst.data.span.clone(),
+                        payload: CompilerErrorPayload::Cst(error.clone()),
                     }],
                 },
             ),
@@ -865,7 +870,7 @@ impl LoweringContext {
         match key.kind.clone() {
             CstKind::Identifier(identifier) => {
                 let key =
-                    self.create_string(key.id.to_owned(), identifier.uppercase_first_letter());
+                    self.create_string(key.data.id.to_owned(), identifier.uppercase_first_letter());
                 self.create_ast(
                     id,
                     AstKind::StructAccess(ast::StructAccess {
@@ -880,8 +885,8 @@ impl LoweringContext {
                     child: None,
                     errors: vec![CompilerError {
                         module: self.module.clone(),
-                        span: key.span.clone(),
-                        payload: CompilerErrorPayload::Rcst(error),
+                        span: key.data.span.clone(),
+                        payload: CompilerErrorPayload::Cst(error),
                     }],
                 },
             ),
@@ -901,7 +906,7 @@ impl LoweringContext {
                 Ok(parameter) => parameter,
                 Err(box error) => {
                     errors.push(error);
-                    self.create_string(it.id, format!("<invalid#{index}>"))
+                    self.create_string(it.data.id, format!("<invalid#{index}>"))
                 }
             })
             .collect();
@@ -909,7 +914,7 @@ impl LoweringContext {
     }
     fn lower_parameter(&mut self, cst: &Cst) -> Result<AstString, Box<CompilerError>> {
         if let CstKind::Identifier(identifier) = &cst.kind {
-            Ok(self.create_string(cst.id.to_owned(), identifier.clone()))
+            Ok(self.create_string(cst.data.id.to_owned(), identifier.clone()))
         } else {
             Err(Box::new(
                 self.create_error(cst, AstError::ExpectedParameter),
@@ -956,13 +961,13 @@ impl LoweringContext {
     fn create_error(&self, cst: &Cst, error: AstError) -> CompilerError {
         CompilerError {
             module: self.module.clone(),
-            span: cst.span.clone(),
+            span: cst.data.span.clone(),
             payload: CompilerErrorPayload::Ast(error),
         }
     }
     fn create_ast_for_invalid_expression_in_pattern(&mut self, cst: &Cst) -> Ast {
         self.create_ast(
-            cst.id,
+            cst.data.id,
             AstKind::Error {
                 child: None,
                 errors: vec![self.create_error(cst, AstError::PatternContainsInvalidExpression)],

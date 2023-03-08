@@ -71,7 +71,7 @@ pub enum RcstListItemMarker {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum RcstError {
-    EscapeWithoutChar,
+    EscapeMissesChar,
     EscapeWithInvalidChar,
     UrlInvalid,
     WeirdWhitespace,

@@ -102,11 +102,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "candy_formatter"
+version = "0.1.0"
+dependencies = [
+ "candy_frontend",
+]
+
+[[package]]
 name = "candy_frontend"
 version = "0.1.0"
 dependencies = [
  "derive_more",
  "enumset",
+ "extension-trait",
  "im",
  "itertools",
  "lazy_static",

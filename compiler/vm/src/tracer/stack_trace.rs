@@ -72,7 +72,7 @@ impl FullTracer {
                 db.hir_to_cst_id(hir_id.clone())
             };
             let cst = cst_id.map(|id| db.find_cst(module.clone(), id));
-            let span = cst.map(|cst| db.range_to_positions(module.clone(), cst.span));
+            let span = cst.map(|cst| db.range_to_positions(module.clone(), cst.data.span));
             let caller_location_string = format!(
                 "{hir_id} {}",
                 span.map(|it| format!(

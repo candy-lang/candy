@@ -87,7 +87,7 @@ where
                     let receiver = receiver.unwrap_whitespace_and_comment();
                     let last_argument = arguments.last().unwrap().unwrap_whitespace_and_comment();
                     self.push(
-                        receiver.span.end..last_argument.span.end,
+                        receiver.data.span.end..last_argument.data.span.end,
                         FoldingRangeKind::Region,
                     );
                 }
@@ -127,9 +127,10 @@ where
                     .unwrap_whitespace_and_comment()
                     .last()
                     .unwrap()
+                    .data
                     .span
                     .end;
-                self.push(percent.span.end..cases_end, FoldingRangeKind::Region);
+                self.push(percent.data.span.end..cases_end, FoldingRangeKind::Region);
 
                 self.visit_csts(cases);
             }
@@ -145,9 +146,10 @@ where
                     .unwrap_whitespace_and_comment()
                     .last()
                     .unwrap()
+                    .data
                     .span
                     .end;
-                self.push(arrow.span.end..body_end, FoldingRangeKind::Region);
+                self.push(arrow.data.span.end..body_end, FoldingRangeKind::Region);
 
                 self.visit_csts(body);
             }
@@ -166,7 +168,7 @@ where
                 let closing_curly_brace = closing_curly_brace.unwrap_whitespace_and_comment();
 
                 self.push(
-                    opening_curly_brace.span.end..closing_curly_brace.span.start,
+                    opening_curly_brace.data.span.end..closing_curly_brace.data.span.start,
                     FoldingRangeKind::Region,
                 );
                 if let Some((parameters, _)) = parameters_and_arrow {
@@ -184,7 +186,7 @@ where
                     let last_expression = body.last().unwrap().unwrap_whitespace_and_comment();
 
                     self.push(
-                        assignment_sign.span.end..last_expression.span.end,
+                        assignment_sign.data.span.end..last_expression.data.span.end,
                         FoldingRangeKind::Region,
                     );
                 }

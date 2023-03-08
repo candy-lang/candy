@@ -258,7 +258,11 @@ impl ToRichIr for Lir {
 impl ToRichIr for Instruction {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         let discriminant: InstructionDiscriminants = self.into();
-        builder.push::<&'static str, _>(discriminant.into(), None, EnumSet::empty());
+        builder.push(
+            Into::<&'static str>::into(discriminant),
+            None,
+            EnumSet::empty(),
+        );
 
         match self {
             Instruction::CreateInt(int) => {

@@ -323,7 +323,7 @@ mod parse {
             },
             None => Rcst::Error {
                 child: None,
-                error: RcstError::EscapeWithoutChar,
+                error: RcstError::EscapeMissesChar,
             },
         }
     }
@@ -341,7 +341,7 @@ mod parse {
             escaped(None),
             Rcst::Error {
                 child: None,
-                error: RcstError::EscapeWithoutChar,
+                error: RcstError::EscapeMissesChar,
             }
         );
     }

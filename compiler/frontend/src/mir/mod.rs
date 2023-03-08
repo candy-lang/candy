@@ -1,11 +1,9 @@
-use std::fmt::{self, Debug, Formatter};
-
+pub use self::{body::*, expression::*, id::*};
 use crate::{
     id::IdGenerator,
     rich_ir::{RichIrBuilder, ToRichIr},
 };
-
-pub use self::{body::*, expression::*, id::*};
+use std::fmt::{self, Debug, Formatter};
 
 mod body;
 mod expression;
