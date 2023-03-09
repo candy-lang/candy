@@ -16,6 +16,7 @@ use candy_frontend::{
     rich_ir::ToRichIr,
 };
 use candy_vm::heap::Heap;
+use extension_trait::extension_trait;
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position, Url};
 use serde::{Deserialize, Serialize};
@@ -179,9 +180,7 @@ fn quasi_spaces(n: usize) -> String {
     format!(" {}", " ".repeat(n))
 }
 
-trait AlignHints {
-    fn align_hint_columns(&mut self);
-}
+#[extension_trait]
 impl AlignHints for Vec<Hint> {
     fn align_hint_columns(&mut self) {
         assert!(!self.is_empty());
