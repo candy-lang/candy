@@ -302,7 +302,11 @@ impl IrConfig {
             module: module_from_package_root_and_url(
                 package_root,
                 &original_uri,
-                ModuleKind::Code, // FIXME
+                if path.ends_with(".candy") {
+                    ModuleKind::Code
+                } else {
+                    ModuleKind::Asset
+                },
             )
             .unwrap(),
             ir,

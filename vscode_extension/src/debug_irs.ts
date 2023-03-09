@@ -107,18 +107,10 @@ async function registerDebugIrCommand(
       return;
     }
 
-    const document = editor.document;
-    if (document.languageId !== 'candy') {
-      vscode.window.showErrorMessage(
-        `Can't show the ${getIrTitle(irType)} for a non-Candy file.`
-      );
-      return;
-    }
-
     const ir = await createIrConfig();
     if (ir === undefined) return;
 
-    const encodedUri = encodeUri(document.uri, ir);
+    const encodedUri = encodeUri(editor.document.uri, ir);
     const irDocument = await vscode.workspace.openTextDocument(encodedUri);
     await vscode.window.showTextDocument(irDocument, vscode.ViewColumn.Beside);
   });

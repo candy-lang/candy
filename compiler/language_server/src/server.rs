@@ -345,7 +345,11 @@ impl LanguageServer for Server {
         let module_result = module_from_package_root_and_url(
             state.project_directory.to_owned(),
             &params.text_document.uri,
-            ModuleKind::Code, // FIXME
+            if params.text_document.uri.path().ends_with(".candy") {
+                ModuleKind::Code
+            } else {
+                ModuleKind::Asset
+            },
         );
         if let Ok(module) = module_result {
             let notifications = {
