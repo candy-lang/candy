@@ -67,13 +67,6 @@ fn ast(db: &dyn CstToAst, module: Module) -> Option<AstResult> {
             );
             return None;
         }
-        Err(InvalidModuleError::IsToolingModule) => {
-            warn!(
-                "Tried to get AST of tooling module: {}.",
-                module.to_rich_ir(),
-            );
-            return None;
-        }
         Err(InvalidModuleError::InvalidUtf8) => {
             vec![Ast {
                 id: context.create_next_id_without_mapping(),
@@ -86,6 +79,20 @@ fn ast(db: &dyn CstToAst, module: Module) -> Option<AstResult> {
                     }],
                 },
             }]
+        }
+        Err(InvalidModuleError::IsNotCandy) => {
+            warn!(
+                "Tried to get AST of a module that's not Candy code: {}.",
+                module.to_rich_ir(),
+            );
+            return None;
+        }
+        Err(InvalidModuleError::IsToolingModule) => {
+            warn!(
+                "Tried to get AST of tooling module: {}.",
+                module.to_rich_ir(),
+            );
+            return None;
         }
     };
 

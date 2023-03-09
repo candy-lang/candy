@@ -1,6 +1,6 @@
 use crate::{
     cst::{CstError, CstKind},
-    module::{Module, ModuleDb, Package},
+    module::{Module, ModuleDb, ModuleKind, Package},
     rcst::Rcst,
 };
 use std::sync::Arc;
@@ -13,6 +13,10 @@ pub trait StringToRcst: ModuleDb {
 pub type RcstResult = Result<Arc<Vec<Rcst>>, InvalidModuleError>;
 
 fn rcst(db: &dyn StringToRcst, module: Module) -> RcstResult {
+    if module.kind != ModuleKind::Code {
+        return Err(InvalidModuleError::IsNotCandy);
+    }
+
     if let Package::Tooling(_) = &module.package {
         return Err(InvalidModuleError::IsToolingModule);
     }
@@ -42,6 +46,7 @@ fn rcst(db: &dyn StringToRcst, module: Module) -> RcstResult {
 pub enum InvalidModuleError {
     DoesNotExist,
     InvalidUtf8,
+    IsNotCandy,
     IsToolingModule,
 }
 

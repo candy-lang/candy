@@ -183,6 +183,9 @@ impl IrFeatures {
             Err(InvalidModuleError::InvalidUtf8) => {
                 builder.push("# Invalid UTF-8", TokenType::Comment, EnumSet::empty());
             }
+            Err(InvalidModuleError::IsNotCandy) => {
+                builder.push("# Is not Candy code", TokenType::Comment, EnumSet::empty());
+            }
             Err(InvalidModuleError::IsToolingModule) => {
                 builder.push(
                     "# Is a tooling module",
