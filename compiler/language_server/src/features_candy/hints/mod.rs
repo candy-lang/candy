@@ -131,7 +131,8 @@ pub async fn run_server(
                 // Make hints look like comments.
                 .map(|mut hint_group| {
                     for hint in &mut hint_group {
-                        hint.text = format!("{}# {}", quasi_spaces(2), hint.text);
+                        hint.text =
+                            format!("{}# {}", quasi_spaces(2), hint.text.replace('\n', r#"\n"#));
                     }
                     hint_group
                 })
