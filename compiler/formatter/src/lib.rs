@@ -400,17 +400,17 @@ mod test {
     }
     #[test]
     fn test_int() {
-        test("1", "1");
-        test("123", "123");
+        test("1", "1\n");
+        test("123", "123\n");
     }
     #[test]
     fn test_call() {
-        test("foo bar Baz", "foo bar Baz");
-        test("foo   bar Baz ", "foo bar Baz");
-        test("foo   bar Baz ", "foo bar Baz");
+        test("foo bar Baz", "foo bar Baz\n");
+        test("foo   bar Baz ", "foo bar Baz\n");
+        test("foo   bar Baz ", "foo bar Baz\n");
         test(
-"foo firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument",
-            "foo\n  firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n  secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument",
+            "foo firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument",
+            "foo\n  firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n  secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n",
         );
     }
 
