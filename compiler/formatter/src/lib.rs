@@ -145,6 +145,7 @@ impl FormatterState {
             saw_non_whitespace = true;
             empty_line_count = 0;
 
+            let mut trailing_whitespace_id = None;
             loop {
                 let Some(next) = csts.get(index) else { break; };
 
@@ -156,8 +157,23 @@ impl FormatterState {
                     } => {
                         // Remove whitespace after an expression or comment.
                         index += 1;
+                        trailing_whitespace_id = Some(next.data.id);
                     }
                     CstKind::Newline(_) => break,
+                    CstKind::Comment { .. } => {
+                        // A comment in the same line.
+                        result.push(Cst {
+                            data: CstData {
+                                id: trailing_whitespace_id
+                                    .unwrap_or_else(|| self.id_generator.generate()),
+                                span: Range::default(),
+                            },
+                            kind: CstKind::Whitespace(" ".to_string()),
+                        });
+
+                        result.push(self.format_cst(next, indentation_level));
+                        index += 1;
+                    }
                     _ => {
                         // Another expression without a newline in between.
                         result.push(Cst {
@@ -395,6 +411,13 @@ mod test {
         test("foo \n  ", "foo\n");
         test("foo\n\n", "foo\n");
         test("foo\n \n ", "foo\n");
+
+        // Comments
+        test("# abc\nfoo", "# abc\nfoo\n");
+        test("foo# abc", "foo # abc\n");
+        test("foo # abc", "foo # abc\n");
+        test("foo\n# abc", "foo\n# abc\n");
+        test("foo\n # abc", "foo\n# abc\n");
     }
     #[test]
     fn test_int() {
