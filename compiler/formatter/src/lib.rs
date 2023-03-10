@@ -328,7 +328,37 @@ impl FormatterState {
                 value,
                 comma,
             } => todo!(),
-            CstKind::StructAccess { struct_, dot, key } => todo!(),
+            CstKind::StructAccess { struct_, dot, key } => {
+                let (struct_, struct_whitespace) = struct_.split_trailing_whitespace();
+                let struct_ = self.format_cst(struct_, indentation_level);
+
+                let (dot, dot_whitespace) = dot.split_trailing_whitespace();
+                let dot = self.format_cst(dot, indentation_level + 1);
+                assert!(dot.is_singleline());
+                let struct_whitespace = dot_whitespace.merge_into(struct_whitespace);
+
+                let key = self.format_cst(key, indentation_level + 1);
+                assert!(key.is_singleline());
+
+                let is_access_singleline = !struct_whitespace.has_comments()
+                    && struct_.last_line_width() + dot.last_line_width() + key.last_line_width()
+                        <= MAX_LINE_LENGTH;
+                let struct_ = if is_access_singleline {
+                    struct_
+                } else {
+                    struct_whitespace.into_trailing_with_indentation(
+                        &mut self.id_generator,
+                        struct_,
+                        indentation_level + 1,
+                    )
+                };
+
+                CstKind::StructAccess {
+                    struct_: Box::new(struct_),
+                    dot: Box::new(dot),
+                    key: Box::new(key),
+                }
+            }
             CstKind::Match {
                 expression,
                 percent,
@@ -420,6 +450,29 @@ mod test {
 
         test("foo # abc\n  bar\n  Baz", "foo # abc\n  bar\n  Baz\n");
         test("foo\n  bar # abc\n  Baz", "foo\n  bar # abc\n  Baz\n");
+    }
+    #[test]
+    fn test_struct_access() {
+        test("foo.bar", "foo.bar\n");
+        test("foo.bar.baz", "foo.bar.baz\n");
+        test("foo . bar. baz .blub ", "foo.bar.baz.blub\n");
+        test(
+            "foo.firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument.secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument",
+            "foo.firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n  .secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n",
+        );
+        test(
+            "foo.firstVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgument.secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument",
+            "foo\n  .firstVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n  .secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n",
+        );
+
+        // Comments
+        test("foo# abc\n  .bar", "foo # abc\n  .bar\n");
+        test("foo # abc\n  .bar", "foo # abc\n  .bar\n");
+        test("foo  # abc\n  .bar", "foo # abc\n  .bar\n");
+        test("foo .# abc\n  bar", "foo # abc\n  .bar\n");
+        test("foo . # abc\n  bar", "foo # abc\n  .bar\n");
+        test("foo .bar# abc", "foo.bar # abc\n");
+        test("foo .bar # abc", "foo.bar # abc\n");
     }
 
     fn test(source: &str, expected: &str) {
