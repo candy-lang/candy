@@ -110,7 +110,7 @@ mod parse {
 
     use super::whitespace_indentation_score;
 
-    static MEANINGFUL_PUNCTUATION: &str = r#"=,.:|()[]{}->'"%"#;
+    static MEANINGFUL_PUNCTUATION: &str = r#"=,.:|()[]{}->'"%#"#;
     static SUPPORTED_WHITESPACE: &str = " \r\n\t";
 
     #[instrument(level = "trace")]
@@ -253,6 +253,7 @@ mod parse {
         );
         assert_eq!(word("012🔥hi"), Some(("", "012🔥hi".to_string())));
         assert_eq!(word("foo(blub)"), Some(("(blub)", "foo".to_string())));
+        assert_eq!(word("foo#abc"), Some(("#abc", "foo".to_string())));
     }
 
     #[instrument(level = "trace")]
