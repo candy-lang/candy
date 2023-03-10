@@ -5,6 +5,10 @@ use candy_frontend::{
 use itertools::Itertools;
 use std::ops::Range;
 
+pub fn indentation<D>(indentation_level: usize) -> CstKind<D> {
+    CstKind::Whitespace("  ".repeat(indentation_level))
+}
+
 pub enum ExistingWhitespace<'a> {
     None,
     Some {
@@ -76,7 +80,7 @@ impl ExistingWhitespace<'_> {
         let split_index = last_comment_index.map(|it| it + 1).unwrap_or_default();
         let (comments, final_whitespace) = trailing_whitespace.split_at(split_index);
         // TODO: format comments
-        let mut whitespace = comments.into_iter().cloned().collect_vec();
+        let mut whitespace = comments.iter().cloned().collect_vec();
 
         let existing_newline_index = final_whitespace
             .iter()
@@ -104,7 +108,7 @@ impl ExistingWhitespace<'_> {
                     id: indentation_id,
                     span: Range::default(),
                 },
-                kind: CstKind::Whitespace("  ".repeat(indentation_level)),
+                kind: indentation(indentation_level),
             });
         }
 

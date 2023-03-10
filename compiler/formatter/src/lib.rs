@@ -1,5 +1,7 @@
+#![feature(anonymous_lifetime_in_impl_trait)]
+
 use candy_frontend::{
-    cst::{Cst, CstData, CstKind, Id, IsMultiline},
+    cst::{Cst, CstData, CstError, CstKind, Id, IsMultiline},
     id::{CountableId, IdGenerator},
     position::Offset,
 };
@@ -22,7 +24,7 @@ pub struct TextEdit {
 pub const MAX_LINE_LENGTH: usize = 100;
 
 #[extension_trait]
-pub impl Formatter for &[Cst] {
+pub impl<C: AsRef<[Cst]>> Formatter for C {
     fn format_to_string(&self) -> String {
         self.format().iter().join("")
     }
@@ -30,9 +32,9 @@ pub impl Formatter for &[Cst] {
         todo!()
     }
     fn format(&self) -> Vec<Cst> {
-        let mut id_generator = IdGenerator::start_at(largest_id(self).to_usize() + 1);
-
-        self.format_helper(&mut id_generator, 0)
+        let id_generator = IdGenerator::start_at(largest_id(self.as_ref()).to_usize() + 1);
+        let mut state = FormatterState { id_generator };
+        state.format_csts(self.as_ref().iter(), 0)
         // TODO: fix spans
     }
 }
@@ -49,40 +51,109 @@ fn largest_id(csts: &[Cst]) -> Id {
         .unwrap()
 }
 
-#[extension_trait]
-impl FormatCsts for [Cst] {
-    fn format_helper(
-        &self,
-        id_generator: &mut IdGenerator<Id>,
-        indentation_level: usize,
-    ) -> Vec<Cst> {
-        let mut is_after_expression = false;
+struct FormatterState {
+    id_generator: IdGenerator<Id>,
+}
+impl FormatterState {
+    fn format_csts(&mut self, csts: impl AsRef<[Cst]>, indentation_level: usize) -> Vec<Cst> {
         let mut result = vec![];
-        for cst in self {
-            match &cst.kind {
-                CstKind::Whitespace(_) => {
-                    if !is_after_expression {
-                        continue;
+
+        let csts = csts.as_ref();
+        let mut index = 0;
+        'outer: while index < csts.len() {
+            let cst = &csts[index];
+
+            if let CstKind::Newline(_) = cst.kind {
+                result.push(cst.to_owned());
+                index += 1;
+                continue;
+            }
+
+            // Indentation
+            let (mut cst, indentation_id) = if let CstKind::Whitespace(_)
+            | CstKind::Error {
+                error: CstError::TooMuchWhitespace,
+                ..
+            } = &cst.kind
+            {
+                index += 1;
+                (csts.get(index), Some(cst.data.id))
+            } else {
+                (Some(cst), None)
+            };
+
+            // Remove more whitespaces before an actual expression or comment.
+            let not_whitespace = loop {
+                let Some(next) = cst else {
+                    // Remove whitespace at the end of the file.
+                    break 'outer;
+                };
+
+                match next.kind {
+                    CstKind::Whitespace(_)
+                    | CstKind::Error {
+                        error: CstError::TooMuchWhitespace,
+                        ..
+                    } => {
+                        // Remove multiple sequential whitespaces.
+                        index += 1;
+                        cst = csts.get(index);
                     }
-                    // TOOD: indentation
+                    CstKind::Newline(_) => {
+                        // Remove indentation when it is followed by a newline.
+                        continue 'outer;
+                    }
+                    _ => break next,
                 }
-                CstKind::Newline(_) => {
-                    is_after_expression = false;
-                    continue;
-                }
-                _ => {
-                    result.push(cst.format(id_generator, indentation_level));
-                    is_after_expression = true;
+            };
+
+            if indentation_level > 0 {
+                result.push(Cst {
+                    data: CstData {
+                        id: indentation_id.unwrap_or_else(|| self.id_generator.generate()),
+                        span: Range::default(),
+                    },
+                    kind: CstKind::Whitespace("  ".repeat(indentation_level)),
+                });
+            }
+
+            result.push(self.format_cst(not_whitespace, indentation_level));
+            index += 1;
+
+            loop {
+                let Some(next) = csts.get(index) else { break; };
+
+                match next.kind {
+                    CstKind::Whitespace(_)
+                    | CstKind::Error {
+                        error: CstError::TooMuchWhitespace,
+                        ..
+                    } => {
+                        // Remove whitespace after an expression or comment.
+                        index += 1;
+                    }
+                    CstKind::Newline(_) => break,
+                    _ => {
+                        // Another expression without a newline in between.
+                        result.push(Cst {
+                            data: CstData {
+                                id: self.id_generator.generate(),
+                                span: Range::default(),
+                            },
+                            kind: CstKind::Newline("\n".to_string()),
+                        });
+
+                        result.push(self.format_cst(next, indentation_level));
+                        index += 1;
+                    }
                 }
             }
         }
         result
     }
-}
-#[extension_trait]
-impl FormatCst for Cst {
-    fn format(&self, id_generator: &mut IdGenerator<Id>, indentation_level: usize) -> Cst {
-        let new_kind = match &self.kind {
+
+    fn format_cst(&mut self, cst: &Cst, indentation_level: usize) -> Cst {
+        let new_kind = match &cst.kind {
             CstKind::EqualsSign
             | CstKind::Comma
             | CstKind::Dot
@@ -101,14 +172,11 @@ impl FormatCst for Cst {
             | CstKind::Percent
             | CstKind::Octothorpe
             | CstKind::Whitespace(_)
-            | CstKind::Newline(_) => return self.to_owned(),
-            CstKind::Comment {
-                octothorpe,
-                comment,
-            } => todo!(),
+            | CstKind::Newline(_)
+            | CstKind::Comment { .. } => return cst.to_owned(),
             CstKind::TrailingWhitespace { child, whitespace } => todo!(),
-            CstKind::Identifier(_) | CstKind::Symbol(_) => return self.to_owned(),
-            CstKind::Int { value, string } => return self.to_owned(), // TODO
+            CstKind::Identifier(_) | CstKind::Symbol(_) => return cst.to_owned(),
+            CstKind::Int { value, string } => return cst.to_owned(), // TODO
             CstKind::OpeningText {
                 opening_single_quotes,
                 opening_double_quote,
@@ -139,13 +207,13 @@ impl FormatCst for Cst {
                 arguments,
             } => {
                 let (receiver, receiver_whitespace) = receiver.split_trailing_whitespace();
-                let receiver = receiver.format(id_generator, indentation_level);
+                let receiver = self.format_cst(receiver, indentation_level);
 
                 let mut arguments = arguments
                     .iter()
                     .map(|argument| {
                         let (argument, argument_whitespace) = argument.split_trailing_whitespace();
-                        let argument = argument.format(id_generator, indentation_level + 1);
+                        let argument = self.format_cst(argument, indentation_level + 1);
                         (argument, argument_whitespace)
                     })
                     .collect_vec();
@@ -163,14 +231,21 @@ impl FormatCst for Cst {
                     Some(indentation_level + 1)
                 };
 
-                let receiver =
-                    receiver_whitespace.into_trailing(id_generator, receiver, indentation_level);
+                let receiver = receiver_whitespace.into_trailing(
+                    &mut self.id_generator,
+                    receiver,
+                    indentation_level,
+                );
 
                 let last_argument = arguments.pop().unwrap().0;
                 let mut arguments = arguments
                     .into_iter()
                     .map(|(argument, argument_whitespace)| {
-                        argument_whitespace.into_trailing(id_generator, argument, indentation_level)
+                        argument_whitespace.into_trailing(
+                            &mut self.id_generator,
+                            argument,
+                            indentation_level,
+                        )
                     })
                     .collect_vec();
                 arguments.push(last_argument);
@@ -218,17 +293,17 @@ impl FormatCst for Cst {
                 assignment_sign,
                 body,
             } => todo!(),
-            CstKind::Error {
-                unparsable_input,
-                error,
-            } => todo!(),
+            CstKind::Error { .. } => return cst.to_owned(),
         };
         Cst {
-            data: self.data.clone(),
+            data: cst.data.clone(),
             kind: new_kind,
         }
     }
+}
 
+#[extension_trait]
+impl FormatCstExtension for Cst {
     fn split_trailing_whitespace(&self) -> (&Cst, ExistingWhitespace) {
         match &self.kind {
             CstKind::TrailingWhitespace { child, whitespace } => (
@@ -250,6 +325,21 @@ mod test {
     use itertools::Itertools;
 
     #[test]
+    fn test_csts() {
+        test("foo", "foo");
+
+        test("foo\nbar", "foo\nbar");
+        test("foo\n\nbar", "foo\n\nbar");
+        test("foo\n\n\nbar", "foo\n\n\nbar");
+
+        test("foo\nbar\nbaz", "foo\nbar\nbaz");
+        test("foo\n bar", "foo\nbar");
+        test("foo\n \nbar", "foo\n\nbar");
+        test("foo ", "foo");
+        test(" ", "");
+        test(" \nfoo", "\nfoo");
+    }
+    #[test]
     fn test_int() {
         test("1", "1");
         test("123", "123");
@@ -268,8 +358,6 @@ mod test {
     fn test(source: &str, expected: &str) {
         let csts = parse_rcst(source).to_csts();
         assert_eq!(source, csts.iter().join(""));
-
-        dbg!(&csts);
 
         let formatted = csts.as_slice().format_to_string();
         assert_eq!(formatted, expected);
