@@ -58,13 +58,17 @@ impl FormatterState {
     fn format_csts(&mut self, csts: impl AsRef<[Cst]>, indentation_level: usize) -> Vec<Cst> {
         let mut result = vec![];
 
+        let mut saw_non_whitespace = false;
         let csts = csts.as_ref();
         let mut index = 0;
         'outer: while index < csts.len() {
             let cst = &csts[index];
 
             if let CstKind::Newline(_) = cst.kind {
-                result.push(cst.to_owned());
+                if saw_non_whitespace {
+                    // Remove leading newlines.
+                    result.push(cst.to_owned());
+                }
                 index += 1;
                 continue;
             }
@@ -119,6 +123,7 @@ impl FormatterState {
 
             result.push(self.format_cst(not_whitespace, indentation_level));
             index += 1;
+            saw_non_whitespace = true;
 
             loop {
                 let Some(next) = csts.get(index) else { break; };
@@ -331,13 +336,17 @@ mod test {
         test("foo\nbar", "foo\nbar");
         test("foo\n\nbar", "foo\n\nbar");
         test("foo\n\n\nbar", "foo\n\n\nbar");
+        // test("foo\n\n\n\nbar", "foo\n\n\nbar"); // TODO
 
         test("foo\nbar\nbaz", "foo\nbar\nbaz");
         test("foo\n bar", "foo\nbar");
         test("foo\n \nbar", "foo\n\nbar");
         test("foo ", "foo");
+
         test(" ", "");
-        test(" \nfoo", "\nfoo");
+        test(" \nfoo", "foo");
+        test("  \nfoo", "foo");
+        test(" \n  \n foo", "foo");
     }
     #[test]
     fn test_int() {
