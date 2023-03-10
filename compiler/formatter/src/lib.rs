@@ -218,16 +218,11 @@ impl FormatterState {
             | CstKind::Newline(_)
             | CstKind::Comment { .. } => return cst.to_owned(),
             CstKind::TrailingWhitespace { child, whitespace } => todo!(),
-            CstKind::Identifier(_) | CstKind::Symbol(_) => return cst.to_owned(),
-            CstKind::Int { value, string } => return cst.to_owned(), // TODO
-            CstKind::OpeningText {
-                opening_single_quotes,
-                opening_double_quote,
-            } => todo!(),
-            CstKind::ClosingText {
-                closing_double_quote,
-                closing_single_quotes,
-            } => todo!(),
+            CstKind::Identifier(_)
+            | CstKind::Symbol(_)
+            | CstKind::Int { .. }
+            | CstKind::OpeningText { .. }
+            | CstKind::ClosingText { .. } => return cst.to_owned(),
             CstKind::Text {
                 opening,
                 parts,
