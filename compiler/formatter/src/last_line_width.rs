@@ -10,6 +10,7 @@ pub impl<D> LastLineWidth for Cst<D> {
     }
 }
 
+#[derive(Debug)]
 struct LastLineWidthInfo {
     is_multiline: bool,
     last_line_width: usize,
@@ -36,11 +37,7 @@ impl LastLineWidthInfo {
         let other = get_other();
         Self {
             is_multiline: other.is_multiline,
-            last_line_width: if other.is_multiline {
-                other.last_line_width
-            } else {
-                self.last_line_width + other.last_line_width
-            },
+            last_line_width: self.last_line_width + other.last_line_width,
         }
     }
 }
