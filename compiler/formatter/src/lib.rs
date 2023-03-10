@@ -261,14 +261,17 @@ impl FormatterState {
                     })
                     .collect_vec();
 
-                let indentation_level = if arguments.iter().all(|(it, _)| it.is_singleline())
+                let are_arguments_singleline = !receiver_whitespace.has_comments()
+                    && arguments.iter().all(|(argument, argument_whitespace)| {
+                        argument.is_singleline() && !argument_whitespace.has_comments()
+                    })
                     && arguments
                         .iter()
                         .map(|(it, _)| 1 + it.last_line_width())
                         .sum::<usize>()
                         + receiver.last_line_width()
-                        <= MAX_LINE_LENGTH
-                {
+                        <= MAX_LINE_LENGTH;
+                let indentation_level = if are_arguments_singleline {
                     None
                 } else {
                     Some(indentation_level + 1)
@@ -412,6 +415,9 @@ mod test {
             "foo firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument",
             "foo\n  firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n  secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n",
         );
+
+        test("foo # abc\n  bar\n  Baz", "foo # abc\n  bar\n  Baz\n");
+        test("foo\n  bar # abc\n  Baz", "foo\n  bar # abc\n  Baz\n");
     }
 
     fn test(source: &str, expected: &str) {
