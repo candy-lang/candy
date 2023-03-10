@@ -3,7 +3,7 @@ use crate::{
     module::{Module, ModuleDb, ModuleKind, Package},
     rcst::Rcst,
 };
-use std::sync::Arc;
+use std::{str, sync::Arc};
 
 #[salsa::query_group(StringToRcstStorage)]
 pub trait StringToRcst: ModuleDb {
@@ -23,13 +23,16 @@ fn rcst(db: &dyn StringToRcst, module: Module) -> RcstResult {
     let source = db
         .get_module_content(module)
         .ok_or(InvalidModuleError::DoesNotExist)?;
-    let source = match String::from_utf8((*source).clone()) {
+    let source = match str::from_utf8(source.as_slice()) {
         Ok(source) => source,
         Err(_) => {
             return Err(InvalidModuleError::InvalidUtf8);
         }
     };
-    let (rest, mut rcsts) = parse::body(&source, 0);
+    Ok(Arc::new(parse_rcst(source)))
+}
+pub fn parse_rcst(source: &str) -> Vec<Rcst> {
+    let (rest, mut rcsts) = parse::body(source, 0);
     if !rest.is_empty() {
         rcsts.push(
             CstKind::Error {
@@ -39,7 +42,7 @@ fn rcst(db: &dyn StringToRcst, module: Module) -> RcstResult {
             .into(),
         );
     }
-    Ok(Arc::new(rcsts))
+    rcsts
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
