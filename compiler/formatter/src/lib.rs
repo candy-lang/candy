@@ -1,4 +1,5 @@
 #![feature(anonymous_lifetime_in_impl_trait)]
+#![feature(let_chains)]
 
 use candy_frontend::{
     cst::{Cst, CstData, CstError, CstKind, Id, IsMultiline},
@@ -170,6 +171,24 @@ impl FormatterState {
                 }
             }
         }
+
+        // Add trailing newline.
+        if let Some(last) = result.last() && !matches!(
+            last,
+            Cst {
+                kind: CstKind::Newline(_),
+                ..
+            },
+        ) {
+            result.push(Cst {
+                data: CstData {
+                    id: self.id_generator.generate(),
+                    span: Range::default(),
+                },
+                kind: CstKind::Newline("\n".to_string()),
+            });
+        }
+
         result
     }
 
@@ -347,24 +366,24 @@ mod test {
 
     #[test]
     fn test_csts() {
-        test("foo", "foo");
+        test(" ", "");
+        test("foo", "foo\n");
+        test("foo\n", "foo\n");
 
-        test("foo\nbar", "foo\nbar");
-        test("foo\n\nbar", "foo\n\nbar");
-        test("foo\n\n\nbar", "foo\n\n\nbar");
+        test("foo\nbar", "foo\nbar\n");
+        test("foo\n\nbar", "foo\n\nbar\n");
+        test("foo\n\n\nbar", "foo\n\n\nbar\n");
         // test("foo\n\n\n\nbar", "foo\n\n\nbar"); // TODO
 
-        test("foo\nbar\nbaz", "foo\nbar\nbaz");
-        test("foo\n bar", "foo\nbar");
-        test("foo\n \nbar", "foo\n\nbar");
-        test("foo ", "foo");
-
-        test(" ", "");
+        test("foo\nbar\nbaz", "foo\nbar\nbaz\n");
+        test("foo\n bar", "foo\nbar\n");
+        test("foo\n \nbar", "foo\n\nbar\n");
+        test("foo ", "foo\n");
 
         // Leading newlines
-        test(" \nfoo", "foo");
-        test("  \nfoo", "foo");
-        test(" \n  \n foo", "foo");
+        test(" \nfoo", "foo\n");
+        test("  \nfoo", "foo\n");
+        test(" \n  \n foo", "foo\n");
 
         // Trailing newlines
         test("foo\n ", "foo\n");
