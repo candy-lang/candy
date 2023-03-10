@@ -60,15 +60,17 @@ impl FormatterState {
         let mut result = vec![];
 
         let mut saw_non_whitespace = false;
+        let mut empty_line_count = 0;
         let csts = csts.as_ref();
         let mut index = 0;
         'outer: while index < csts.len() {
             let cst = &csts[index];
 
             if let CstKind::Newline(_) = cst.kind {
-                if saw_non_whitespace {
-                    // Remove leading newlines.
+                // Remove leading newlines and limit to at most two empty lines.
+                if saw_non_whitespace && empty_line_count <= 2 {
                     result.push(cst.to_owned());
+                    empty_line_count += 1;
                 }
                 index += 1;
 
@@ -141,6 +143,7 @@ impl FormatterState {
             result.push(self.format_cst(not_whitespace, indentation_level));
             index += 1;
             saw_non_whitespace = true;
+            empty_line_count = 0;
 
             loop {
                 let Some(next) = csts.get(index) else { break; };
@@ -370,11 +373,14 @@ mod test {
         test("foo", "foo\n");
         test("foo\n", "foo\n");
 
+        // Consecutive newlines
         test("foo\nbar", "foo\nbar\n");
         test("foo\n\nbar", "foo\n\nbar\n");
         test("foo\n\n\nbar", "foo\n\n\nbar\n");
-        // test("foo\n\n\n\nbar", "foo\n\n\nbar"); // TODO
+        test("foo\n\n\n\nbar", "foo\n\n\nbar\n");
+        test("foo\n\n\n\n\nbar", "foo\n\n\nbar\n");
 
+        // Consecutive expressions
         test("foo\nbar\nbaz", "foo\nbar\nbaz\n");
         test("foo\n bar", "foo\nbar\n");
         test("foo\n \nbar", "foo\n\nbar\n");
