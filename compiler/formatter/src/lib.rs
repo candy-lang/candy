@@ -6,7 +6,7 @@ use candy_frontend::{
     id::{CountableId, IdGenerator},
     position::Offset,
 };
-use existing_whitespace::ExistingWhitespace;
+use existing_whitespace::SplitTrailingWhitespace;
 use extension_trait::extension_trait;
 use itertools::Itertools;
 use last_line_width::LastLineWidth;
@@ -355,22 +355,6 @@ impl FormatterState {
         Cst {
             data: cst.data.clone(),
             kind: new_kind,
-        }
-    }
-}
-
-#[extension_trait]
-impl FormatCstExtension for Cst {
-    fn split_trailing_whitespace(&self) -> (&Cst, ExistingWhitespace) {
-        match &self.kind {
-            CstKind::TrailingWhitespace { child, whitespace } => (
-                child,
-                ExistingWhitespace::Some {
-                    id: self.data.id,
-                    trailing_whitespace: whitespace,
-                },
-            ),
-            _ => (self, ExistingWhitespace::None),
         }
     }
 }

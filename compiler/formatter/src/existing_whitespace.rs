@@ -2,18 +2,35 @@ use candy_frontend::{
     cst::{Cst, CstData, CstKind, Id},
     id::IdGenerator,
 };
+use extension_trait::extension_trait;
 use itertools::Itertools;
-use std::ops::Range;
+use std::{borrow::Cow, ops::Range};
 
 pub fn indentation<D>(indentation_level: usize) -> CstKind<D> {
     CstKind::Whitespace("  ".repeat(indentation_level))
+}
+
+#[extension_trait]
+pub impl SplitTrailingWhitespace for Cst {
+    fn split_trailing_whitespace(&self) -> (&Cst, ExistingWhitespace) {
+        match &self.kind {
+            CstKind::TrailingWhitespace { child, whitespace } => (
+                child,
+                ExistingWhitespace::Some {
+                    id: self.data.id,
+                    trailing_whitespace: Cow::Borrowed(whitespace),
+                },
+            ),
+            _ => (self, ExistingWhitespace::None),
+        }
+    }
 }
 
 pub enum ExistingWhitespace<'a> {
     None,
     Some {
         id: Id,
-        trailing_whitespace: &'a [Cst],
+        trailing_whitespace: Cow<'a, [Cst]>,
     },
 }
 impl ExistingWhitespace<'_> {
@@ -33,6 +50,30 @@ impl ExistingWhitespace<'_> {
                     .any(|it| matches!(it.kind, CstKind::Comment { .. }))
             })
             .unwrap_or_default()
+    }
+
+    pub fn merge_into(self, other: Self) -> Self {
+        match (self, other) {
+            (this, ExistingWhitespace::None) => this,
+            (ExistingWhitespace::None, other) => other,
+            (
+                ExistingWhitespace::Some {
+                    trailing_whitespace: self_trailing_whitespace,
+                    ..
+                },
+                ExistingWhitespace::Some {
+                    id,
+                    trailing_whitespace: other_trailing_whitespace,
+                },
+            ) => {
+                let mut trailing_whitespace = self_trailing_whitespace.to_vec();
+                trailing_whitespace.extend(other_trailing_whitespace.iter().cloned());
+                ExistingWhitespace::Some {
+                    id,
+                    trailing_whitespace: Cow::Owned(trailing_whitespace),
+                }
+            }
+        }
     }
 
     pub fn into_trailing(
