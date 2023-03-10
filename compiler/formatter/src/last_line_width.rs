@@ -28,17 +28,6 @@ impl LastLineWidthInfo {
         }
     }
 
-    #[deprecated]
-    fn combine_with(&self, other: &Self) -> Self {
-        Self {
-            is_multiline: self.is_multiline || other.is_multiline,
-            last_line_width: if other.is_multiline {
-                other.last_line_width
-            } else {
-                self.last_line_width + other.last_line_width
-            },
-        }
-    }
     fn preceded_by(self, get_other: impl FnOnce() -> LastLineWidthInfo) -> Self {
         if self.is_multiline {
             return self;
