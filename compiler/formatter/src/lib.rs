@@ -70,6 +70,22 @@ impl FormatterState {
                     result.push(cst.to_owned());
                 }
                 index += 1;
+
+                if csts[index..].iter().all(|it| {
+                    matches!(
+                        it.kind,
+                        CstKind::Whitespace(_)
+                            | CstKind::Error {
+                                error: CstError::TooMuchWhitespace,
+                                ..
+                            }
+                            | CstKind::Newline(_),
+                    )
+                }) {
+                    // Remove trailing newlines and whitespace.
+                    break 'outer;
+                }
+
                 continue;
             }
 
@@ -344,9 +360,18 @@ mod test {
         test("foo ", "foo");
 
         test(" ", "");
+
+        // Leading newlines
         test(" \nfoo", "foo");
         test("  \nfoo", "foo");
         test(" \n  \n foo", "foo");
+
+        // Trailing newlines
+        test("foo\n ", "foo\n");
+        test("foo\n  ", "foo\n");
+        test("foo \n  ", "foo\n");
+        test("foo\n\n", "foo\n");
+        test("foo\n \n ", "foo\n");
     }
     #[test]
     fn test_int() {
