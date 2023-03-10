@@ -1,5 +1,5 @@
 use candy_frontend::{
-    cst::{Cst, CstData, CstKind, Id},
+    cst::{Cst, CstData, CstError, CstKind, Id},
     id::IdGenerator,
 };
 use extension_trait::extension_trait;
@@ -119,9 +119,13 @@ impl ExistingWhitespace<'_> {
             .iter()
             .rposition(|it| matches!(it.kind, CstKind::Comment { .. }));
         let split_index = last_comment_index.map(|it| it + 1).unwrap_or_default();
-        let (comments, final_whitespace) = trailing_whitespace.split_at(split_index);
-        // TODO: format comments
-        let mut whitespace = comments.iter().cloned().collect_vec();
+        let (comments_and_whitespace, final_whitespace) = trailing_whitespace.split_at(split_index);
+
+        let mut whitespace = Self::format_trailing_comments(
+            comments_and_whitespace,
+            id_generator,
+            indentation_level,
+        );
 
         let existing_newline_index = final_whitespace
             .iter()
@@ -155,6 +159,64 @@ impl ExistingWhitespace<'_> {
 
         self.into_trailing_helper(id_generator, child, whitespace)
     }
+    fn format_trailing_comments(
+        comments_and_whitespace: &[Cst],
+        id_generator: &mut IdGenerator<Id>,
+        indentation_level: usize,
+    ) -> Vec<Cst> {
+        let mut whitespace = vec![];
+        let mut is_comment_on_same_line = true;
+        let mut last_newline_id = None;
+        let mut last_whitespace_id = None;
+        for item in comments_and_whitespace {
+            match &item.kind {
+                CstKind::Whitespace(_)
+                | CstKind::Error {
+                    error: CstError::TooMuchWhitespace,
+                    ..
+                } => {
+                    last_whitespace_id = Some(item.data.id);
+                }
+                CstKind::Newline(_) => {
+                    is_comment_on_same_line = false;
+                    last_newline_id = Some(item.data.id);
+                    last_whitespace_id = None;
+                }
+                CstKind::Comment { .. } => {
+                    if is_comment_on_same_line {
+                        assert_eq!(last_newline_id, None);
+                        whitespace.push(Cst {
+                            data: CstData {
+                                id: last_whitespace_id.unwrap_or(id_generator.generate()),
+                                span: Range::default(),
+                            },
+                            kind: CstKind::Whitespace(" ".to_owned()),
+                        });
+                    } else {
+                        whitespace.push(Cst {
+                            data: CstData {
+                                id: last_newline_id.unwrap_or(id_generator.generate()),
+                                span: Range::default(),
+                            },
+                            kind: CstKind::Newline("\n".to_owned()),
+                        });
+                        whitespace.push(Cst {
+                            data: CstData {
+                                id: last_whitespace_id.unwrap_or(id_generator.generate()),
+                                span: Range::default(),
+                            },
+                            kind: indentation(indentation_level),
+                        });
+                    }
+                    whitespace.push(item.clone());
+                    last_newline_id = None;
+                    last_whitespace_id = None;
+                }
+                _ => unreachable!(),
+            }
+        }
+        whitespace
+    }
     fn into_trailing_helper(
         self,
         id_generator: &mut IdGenerator<Id>,
@@ -174,5 +236,51 @@ impl ExistingWhitespace<'_> {
                 whitespace,
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::existing_whitespace::SplitTrailingWhitespace;
+    use candy_frontend::{
+        cst::CstKind, id::IdGenerator, rcst_to_cst::RcstsToCstsExt, string_to_rcst::parse_rcst,
+    };
+
+    #[test]
+    fn test_trailing_with_space() {
+        test("foo End", None, "foo ");
+        test("foo  End", None, "foo ");
+    }
+
+    #[test]
+    fn test_trailing_with_indentation() {
+        test("foo\n  End", Some(1), "foo\n  ");
+        test("foo \n  End", Some(1), "foo\n  ");
+        test("foo End", Some(2), "foo\n    ");
+        test("foo \n  End", Some(2), "foo\n    ");
+
+        // Comments
+        test("foo# abc\n  End", Some(1), "foo # abc\n  ");
+        test("foo # abc\n  End", Some(1), "foo # abc\n  ");
+        test("foo  # abc\n  End", Some(1), "foo # abc\n  ");
+        test("foo\n  # abc\n  End", Some(1), "foo\n  # abc\n  ");
+    }
+
+    fn test(source: &str, indentation_level: Option<usize>, expected: &str) {
+        let mut csts = parse_rcst(source).to_csts();
+        assert_eq!(csts.len(), 1);
+
+        let cst = match csts.pop().unwrap().kind {
+            CstKind::Call { receiver, .. } => receiver,
+            _ => panic!("Expected a call"),
+        };
+
+        let (cst, trailing_whitespace) = cst.split_trailing_whitespace();
+
+        let mut id_generator = IdGenerator::default();
+        let formatted = trailing_whitespace
+            .into_trailing(&mut id_generator, cst.to_owned(), indentation_level)
+            .to_string();
+        assert_eq!(formatted, expected);
     }
 }
