@@ -35,7 +35,7 @@ pub impl<C: AsRef<[Cst]>> Formatter for C {
     fn format(&self) -> Vec<Cst> {
         let id_generator = IdGenerator::start_at(largest_id(self.as_ref()).to_usize() + 1);
         let mut state = FormatterState { id_generator };
-        state.format_csts(self.as_ref().iter(), 0)
+        state.format_csts(self.as_ref().iter(), &FormatterInfo::default())
         // TODO: fix spans
     }
 }
@@ -51,12 +51,39 @@ fn largest_id(csts: &[Cst]) -> Id {
         .max()
         .unwrap()
 }
+#[derive(Default)]
+struct FormatterInfo {
+    indentation_level: usize,
+    trailing_comma_condition: Option<TrailingCommaCondition>,
+}
+#[derive(Clone, Copy)]
+enum TrailingCommaCondition {
+    Always,
+
+    /// Add a trailing comma if the element fits in a single line and is at most
+    /// this wide.
+    IfFitsIn(usize),
+}
+impl FormatterInfo {
+    fn with_indent(&self) -> Self {
+        Self {
+            indentation_level: self.indentation_level + 1,
+            trailing_comma_condition: self.trailing_comma_condition,
+        }
+    }
+    fn with_trailing_comma_condition(&self, condition: TrailingCommaCondition) -> Self {
+        Self {
+            indentation_level: self.indentation_level,
+            trailing_comma_condition: Some(condition),
+        }
+    }
+}
 
 struct FormatterState {
     id_generator: IdGenerator<Id>,
 }
 impl FormatterState {
-    fn format_csts(&mut self, csts: impl AsRef<[Cst]>, indentation_level: usize) -> Vec<Cst> {
+    fn format_csts(&mut self, csts: impl AsRef<[Cst]>, info: &FormatterInfo) -> Vec<Cst> {
         let mut result = vec![];
 
         let mut saw_non_whitespace = false;
@@ -130,17 +157,17 @@ impl FormatterState {
                 }
             };
 
-            if indentation_level > 0 {
+            if info.indentation_level > 0 {
                 result.push(Cst {
                     data: CstData {
                         id: indentation_id.unwrap_or_else(|| self.id_generator.generate()),
                         span: Range::default(),
                     },
-                    kind: CstKind::Whitespace("  ".repeat(indentation_level)),
+                    kind: CstKind::Whitespace("  ".repeat(info.indentation_level)),
                 });
             }
 
-            result.push(self.format_cst(not_whitespace, indentation_level));
+            result.push(self.format_cst(not_whitespace, info));
             index += 1;
             saw_non_whitespace = true;
             empty_line_count = 0;
@@ -171,7 +198,7 @@ impl FormatterState {
                             kind: CstKind::Whitespace(" ".to_string()),
                         });
 
-                        result.push(self.format_cst(next, indentation_level));
+                        result.push(self.format_cst(next, info));
                         index += 1;
                     }
                     _ => {
@@ -184,7 +211,7 @@ impl FormatterState {
                             kind: CstKind::Newline("\n".to_string()),
                         });
 
-                        result.push(self.format_cst(next, indentation_level));
+                        result.push(self.format_cst(next, info));
                         index += 1;
                     }
                 }
@@ -211,7 +238,7 @@ impl FormatterState {
         result
     }
 
-    fn format_cst(&mut self, cst: &Cst, indentation_level: usize) -> Cst {
+    fn format_cst(&mut self, cst: &Cst, info: &FormatterInfo) -> Cst {
         let new_kind = match &cst.kind {
             CstKind::EqualsSign
             | CstKind::Comma
@@ -261,13 +288,13 @@ impl FormatterState {
                 arguments,
             } => {
                 let (receiver, receiver_whitespace) = receiver.split_trailing_whitespace();
-                let receiver = self.format_cst(receiver, indentation_level);
+                let receiver = self.format_cst(receiver, info);
 
                 let mut arguments = arguments
                     .iter()
                     .map(|argument| {
                         let (argument, argument_whitespace) = argument.split_trailing_whitespace();
-                        let argument = self.format_cst(argument, indentation_level + 1);
+                        let argument = self.format_cst(argument, &info.with_indent());
                         (argument, argument_whitespace)
                     })
                     .collect_vec();
@@ -285,7 +312,7 @@ impl FormatterState {
                 let indentation_level = if are_arguments_singleline {
                     None
                 } else {
-                    Some(indentation_level + 1)
+                    Some(info.indentation_level + 1)
                 };
 
                 let receiver = receiver_whitespace.into_trailing(
@@ -330,14 +357,14 @@ impl FormatterState {
             } => todo!(),
             CstKind::StructAccess { struct_, dot, key } => {
                 let (struct_, struct_whitespace) = struct_.split_trailing_whitespace();
-                let struct_ = self.format_cst(struct_, indentation_level);
+                let struct_ = self.format_cst(struct_, info);
 
                 let (dot, dot_whitespace) = dot.split_trailing_whitespace();
-                let dot = self.format_cst(dot, indentation_level + 1);
+                let dot = self.format_cst(dot, &info.with_indent());
                 assert!(dot.is_singleline());
                 let struct_whitespace = dot_whitespace.merge_into(struct_whitespace);
 
-                let key = self.format_cst(key, indentation_level + 1);
+                let key = self.format_cst(key, &info.with_indent());
                 assert!(key.is_singleline());
 
                 let is_access_singleline = !struct_whitespace.has_comments()
@@ -349,7 +376,7 @@ impl FormatterState {
                     struct_whitespace.into_trailing_with_indentation(
                         &mut self.id_generator,
                         struct_,
-                        indentation_level + 1,
+                        info.indentation_level + 1,
                     )
                 };
 
