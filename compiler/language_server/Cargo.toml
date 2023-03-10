@@ -13,7 +13,7 @@ candy_fuzzer = { path = "../fuzzer" }
 candy_vm = { path = "../vm" }
 enumset = "1.0.12"
 extension-trait = "1.0.1"
-itertools = { version = "0.10.0" }
+itertools = "0.10.0"
 lazy_static = "1.4.0"
 lsp-types = "0.94.0"
 num-bigint = { version = "0.4.3", features = ["rand"] }
