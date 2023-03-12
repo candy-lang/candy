@@ -22,7 +22,7 @@ pub struct TextEdit {
     pub new_text: String,
 }
 
-pub const MAX_LINE_LENGTH: usize = 100;
+pub const MAX_WIDTH: usize = 100;
 
 #[extension_trait]
 pub impl<C: AsRef<[Cst]>> Formatter for C {
@@ -325,7 +325,7 @@ impl FormatterState {
                         + opening_parenthesis.last_line_width()
                         + inner.last_line_width()
                         + closing_parenthesis.last_line_width()
-                        <= MAX_LINE_LENGTH;
+                        <= MAX_WIDTH;
                 let (opening_parenthesis_trailing, inner_trailing) = if is_singleline {
                     (TrailingWhitespace::None, TrailingWhitespace::None)
                 } else {
@@ -372,7 +372,7 @@ impl FormatterState {
                             .iter()
                             .map(|(it, _)| 1 + it.last_line_width())
                             .sum::<usize>()
-                        <= MAX_LINE_LENGTH;
+                        <= MAX_WIDTH;
                 let trailing = if are_arguments_singleline {
                     TrailingWhitespace::Space
                 } else {
@@ -439,7 +439,7 @@ impl FormatterState {
 
                         let info = if is_last_item && !is_single_item && let Some(width) = width {
                             // We're looking at the last item and everything might fit in one line.
-                            let max_width = MAX_LINE_LENGTH - width;
+                            let max_width = MAX_WIDTH - width;
                             assert!(max_width > 0);
 
                             item_info.with_trailing_comma_condition(
@@ -455,14 +455,14 @@ impl FormatterState {
                                 width = None;
                             } else {
                                 let (new_width, max_width) = if is_single_item || is_last_item {
-                                    (old_width + item.last_line_width(), MAX_LINE_LENGTH)
+                                    (old_width + item.last_line_width(), MAX_WIDTH)
                                 } else {
                                     // We need an additional column for the trailing space after the
                                     // comma.
                                     let new_width = old_width + item.last_line_width() + 1;
 
                                     // The last item needs at least one column of space.
-                                    let max_width = MAX_LINE_LENGTH - 1;
+                                    let max_width = MAX_WIDTH - 1;
 
                                     (new_width, max_width)
                                 };
@@ -478,7 +478,7 @@ impl FormatterState {
                     })
                     .collect_vec();
                 if let Some(width) = width {
-                    assert!(width <= MAX_LINE_LENGTH);
+                    assert!(width <= MAX_WIDTH);
                 }
 
                 let (opening_parenthesis_trailing, item_trailing, last_item_trailing) =
@@ -581,7 +581,7 @@ impl FormatterState {
                         + struct_.last_line_width()
                         + dot.last_line_width()
                         + key.last_line_width()
-                        <= MAX_LINE_LENGTH;
+                        <= MAX_WIDTH;
                 let struct_ = if is_access_singleline {
                     struct_
                 } else {
@@ -641,7 +641,7 @@ impl FormatterState {
                         + assignment_sign.last_line_width()
                         + 1
                         + body.last_line_width()
-                        <= MAX_LINE_LENGTH;
+                        <= MAX_WIDTH;
                 let assignment_sign_trailing = if is_body_in_same_line {
                     TrailingWhitespace::Space
                 } else {
