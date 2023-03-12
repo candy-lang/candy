@@ -321,7 +321,8 @@ impl FormatterState {
                     && inner.is_singleline()
                     && !inner_whitespace.has_comments()
                     && !closing_parenthesis_whitespace.has_comments()
-                    && opening_parenthesis.last_line_width()
+                    && info.indentation.width()
+                        + opening_parenthesis.last_line_width()
                         + inner.last_line_width()
                         + closing_parenthesis.last_line_width()
                         <= MAX_LINE_LENGTH;
@@ -365,11 +366,12 @@ impl FormatterState {
                     && arguments.iter().all(|(argument, argument_whitespace)| {
                         argument.is_singleline() && !argument_whitespace.has_comments()
                     })
-                    && arguments
-                        .iter()
-                        .map(|(it, _)| 1 + it.last_line_width())
-                        .sum::<usize>()
+                    && info.indentation.width()
                         + receiver.last_line_width()
+                        + arguments
+                            .iter()
+                            .map(|(it, _)| 1 + it.last_line_width())
+                            .sum::<usize>()
                         <= MAX_LINE_LENGTH;
                 let trailing = if are_arguments_singleline {
                     TrailingWhitespace::Space
@@ -575,7 +577,10 @@ impl FormatterState {
                 assert!(key.is_singleline());
 
                 let is_access_singleline = !struct_whitespace.has_comments()
-                    && struct_.last_line_width() + dot.last_line_width() + key.last_line_width()
+                    && info.indentation.width()
+                        + struct_.last_line_width()
+                        + dot.last_line_width()
+                        + key.last_line_width()
                         <= MAX_LINE_LENGTH;
                 let struct_ = if is_access_singleline {
                     struct_
@@ -699,6 +704,10 @@ mod test {
         test(
             "(\n  veryVeryVeryVeryVeryVeryVeryVeryLongReceiver veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgumentt)",
             "(veryVeryVeryVeryVeryVeryVeryVeryLongReceiver veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgumentt)\n",
+        );
+        test(
+            "(veryVeryVeryVeryVeryVeryVeryVeryLongReceiver veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgumenttt)",
+            "(\n  veryVeryVeryVeryVeryVeryVeryVeryLongReceiver\n    veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgumenttt\n)\n",
         );
 
         // Comments
