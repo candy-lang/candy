@@ -2221,6 +2221,7 @@ mod parse {
                 let last = items.pop().unwrap();
                 items.push(last.wrap_in_whitespace(whitespace));
             }
+            input = new_input;
 
             // Value.
             let (new_input, value, has_value) =
@@ -2329,6 +2330,22 @@ mod parse {
                         comma: Some(Box::new(CstKind::Comma.into())),
                     }
                     .into()],
+                    closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
+                }
+                .into(),
+            )),
+        );
+        assert_eq!(
+            list("(foo, )", 0),
+            Some((
+                "",
+                CstKind::List {
+                    opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
+                    items: vec![CstKind::ListItem {
+                        value: Box::new(build_identifier("foo")),
+                        comma: Some(Box::new(CstKind::Comma.into())),
+                    }
+                    .with_trailing_space()],
                     closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
                 }
                 .into(),
