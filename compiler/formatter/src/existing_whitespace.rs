@@ -3,7 +3,6 @@ use candy_frontend::{
     id::IdGenerator,
 };
 use extension_trait::extension_trait;
-use itertools::Itertools;
 use std::{borrow::Cow, ops::Range};
 
 pub fn indentation<D>(indentation_level: usize) -> CstKind<D> {
@@ -32,6 +31,12 @@ pub enum ExistingWhitespace<'a> {
         id: Id,
         trailing_whitespace: Cow<'a, [Cst]>,
     },
+}
+#[derive(Clone)]
+pub enum TrailingWhitespace {
+    None,
+    Space,
+    Indentation(usize),
 }
 impl ExistingWhitespace<'_> {
     fn trailing_whitespace(&self) -> Option<&[Cst]> {
@@ -80,14 +85,20 @@ impl ExistingWhitespace<'_> {
         self,
         id_generator: &mut IdGenerator<Id>,
         child: Cst,
-        indentation_level: Option<usize>,
+        trailing: TrailingWhitespace,
     ) -> Cst {
-        match indentation_level {
-            Some(indentation_level) => {
+        match trailing {
+            TrailingWhitespace::None => self.into_empty_trailing(child),
+            TrailingWhitespace::Space => self.into_trailing_with_space(id_generator, child),
+            TrailingWhitespace::Indentation(indentation_level) => {
                 self.into_trailing_with_indentation(id_generator, child, indentation_level)
             }
-            None => self.into_trailing_with_space(id_generator, child),
         }
+    }
+    pub fn into_empty_trailing(self, child: Cst) -> Cst {
+        assert!(!self.has_comments());
+
+        child
     }
     pub fn into_trailing_with_space(self, id_generator: &mut IdGenerator<Id>, child: Cst) -> Cst {
         assert!(!self.has_comments());
@@ -246,27 +257,35 @@ mod test {
         cst::CstKind, id::IdGenerator, rcst_to_cst::RcstsToCstsExt, string_to_rcst::parse_rcst,
     };
 
+    use super::TrailingWhitespace::{self, *};
+
+    #[test]
+    fn test_empty_trailing() {
+        test("foo End", None, "foo");
+        test("foo  End", None, "foo");
+    }
+
     #[test]
     fn test_trailing_with_space() {
-        test("foo End", None, "foo ");
-        test("foo  End", None, "foo ");
+        test("foo End", Space, "foo ");
+        test("foo  End", Space, "foo ");
     }
 
     #[test]
     fn test_trailing_with_indentation() {
-        test("foo\n  End", Some(1), "foo\n  ");
-        test("foo \n  End", Some(1), "foo\n  ");
-        test("foo End", Some(2), "foo\n    ");
-        test("foo \n  End", Some(2), "foo\n    ");
+        test("foo\n  End", Indentation(1), "foo\n  ");
+        test("foo \n  End", Indentation(1), "foo\n  ");
+        test("foo End", Indentation(2), "foo\n    ");
+        test("foo \n  End", Indentation(2), "foo\n    ");
 
         // Comments
-        test("foo# abc\n  End", Some(1), "foo # abc\n  ");
-        test("foo # abc\n  End", Some(1), "foo # abc\n  ");
-        test("foo  # abc\n  End", Some(1), "foo # abc\n  ");
-        test("foo\n  # abc\n  End", Some(1), "foo\n  # abc\n  ");
+        test("foo# abc\n  End", Indentation(1), "foo # abc\n  ");
+        test("foo # abc\n  End", Indentation(1), "foo # abc\n  ");
+        test("foo  # abc\n  End", Indentation(1), "foo # abc\n  ");
+        test("foo\n  # abc\n  End", Indentation(1), "foo\n  # abc\n  ");
     }
 
-    fn test(source: &str, indentation_level: Option<usize>, expected: &str) {
+    fn test(source: &str, trailing: TrailingWhitespace, expected: &str) {
         let mut csts = parse_rcst(source).to_csts();
         assert_eq!(csts.len(), 1);
 
@@ -279,7 +298,7 @@ mod test {
 
         let mut id_generator = IdGenerator::default();
         let formatted = trailing_whitespace
-            .into_trailing(&mut id_generator, cst.to_owned(), indentation_level)
+            .into_trailing(&mut id_generator, cst.into_owned(), trailing)
             .to_string();
         assert_eq!(formatted, expected);
     }

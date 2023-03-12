@@ -6,7 +6,7 @@ use candy_frontend::{
     id::{CountableId, IdGenerator},
     position::Offset,
 };
-use existing_whitespace::{ExistingWhitespace, SplitTrailingWhitespace};
+use existing_whitespace::{ExistingWhitespace, SplitTrailingWhitespace, TrailingWhitespace};
 use extension_trait::extension_trait;
 use itertools::Itertools;
 use last_line_width::LastLineWidth;
@@ -304,16 +304,16 @@ impl FormatterState {
                         .sum::<usize>()
                         + receiver.last_line_width()
                         <= MAX_LINE_LENGTH;
-                let indentation_level = if are_arguments_singleline {
-                    None
+                let trailing = if are_arguments_singleline {
+                    TrailingWhitespace::Space
                 } else {
-                    Some(info.indentation_level + 1)
+                    TrailingWhitespace::Indentation(info.indentation_level + 1)
                 };
 
                 let receiver = receiver_whitespace.into_trailing(
                     &mut self.id_generator,
                     receiver,
-                    indentation_level,
+                    trailing.clone(),
                 );
 
                 let last_argument = arguments.pop().unwrap().0;
@@ -323,7 +323,7 @@ impl FormatterState {
                         argument_whitespace.into_trailing(
                             &mut self.id_generator,
                             argument,
-                            indentation_level,
+                            trailing.clone(),
                         )
                     })
                     .collect_vec();
