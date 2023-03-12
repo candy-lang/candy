@@ -283,7 +283,50 @@ impl FormatterState {
                 opening_parenthesis,
                 inner,
                 closing_parenthesis,
-            } => todo!(),
+            } => {
+                let (opening_parenthesis, opening_parenthesis_whitespace) =
+                    self.format_child(opening_parenthesis, info);
+                assert!(opening_parenthesis.is_singleline());
+
+                let (inner, inner_whitespace) = self.format_child(inner, &info.with_indent());
+
+                let (closing_parenthesis, closing_parenthesis_whitespace) =
+                    self.format_child(closing_parenthesis, info);
+                assert!(closing_parenthesis.is_singleline());
+
+                let is_singleline = !opening_parenthesis_whitespace.has_comments()
+                    && inner.is_singleline()
+                    && !inner_whitespace.has_comments()
+                    && !closing_parenthesis_whitespace.has_comments()
+                    && opening_parenthesis.last_line_width()
+                        + inner.last_line_width()
+                        + closing_parenthesis.last_line_width()
+                        <= MAX_LINE_LENGTH;
+                let (opening_parenthesis_trailing, inner_trailing) = if is_singleline {
+                    (TrailingWhitespace::None, TrailingWhitespace::None)
+                } else {
+                    (
+                        TrailingWhitespace::Indentation(info.indentation_level + 1),
+                        TrailingWhitespace::Indentation(info.indentation_level),
+                    )
+                };
+
+                CstKind::Parenthesized {
+                    opening_parenthesis: Box::new(opening_parenthesis_whitespace.into_trailing(
+                        &mut self.id_generator,
+                        opening_parenthesis,
+                        opening_parenthesis_trailing,
+                    )),
+                    inner: Box::new(inner_whitespace.into_trailing(
+                        &mut self.id_generator,
+                        inner,
+                        inner_trailing,
+                    )),
+                    closing_parenthesis: Box::new(
+                        closing_parenthesis_whitespace.into_empty_trailing(closing_parenthesis),
+                    ),
+                }
+            }
             CstKind::Call {
                 receiver,
                 arguments,
@@ -617,6 +660,32 @@ mod test {
         test("123", "123\n");
     }
     #[test]
+    fn test_parenthesized() {
+        test("(foo)", "(foo)\n");
+        test(" ( foo ) ", "(foo)\n");
+        test("(\n  foo)", "(foo)\n");
+        test("(\n  foo\n)", "(foo)\n");
+        test(
+            "(veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryItemmm)",
+            "(veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryItemmm)\n",
+        );
+        test(
+            "(veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryItemmmm)",
+            "(\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryItemmmm\n)\n",
+        );
+        test(
+            "(\n  veryVeryVeryVeryVeryVeryVeryVeryLongReceiver veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgumentt)",
+            "(veryVeryVeryVeryVeryVeryVeryVeryLongReceiver veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgumentt)\n",
+        );
+
+        // Comments
+        test("(foo) # abc", "(foo) # abc\n");
+        test("(foo)# abc", "(foo) # abc\n");
+        test("(foo# abc\n)", "(\n  foo # abc\n)\n");
+        test("(foo # abc\n)", "(\n  foo # abc\n)\n");
+        test("(# abc\n  foo)", "( # abc\n  foo\n)\n");
+    }
+    #[test]
     fn test_call() {
         test("foo bar Baz", "foo bar Baz\n");
         test("foo   bar Baz ", "foo bar Baz\n");
@@ -648,12 +717,12 @@ mod test {
         test("(\n  foo,\n)\n", "(foo,)\n");
         test(" ( foo , ) \n", "(foo,)\n");
         test(
-            "(veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryItemm,)",
-            "(veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryItemm,)\n",
+            "(veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItemm,)",
+            "(veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItemm,)\n",
         );
         test(
-            "(veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryItemmm,)",
-            "(\n  veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryItemmm,\n)\n",
+            "(veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItemmm,)",
+            "(\n  veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItemmm,\n)\n",
         );
 
         // Multiple items
