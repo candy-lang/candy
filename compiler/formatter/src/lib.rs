@@ -1,6 +1,7 @@
 #![feature(anonymous_lifetime_in_impl_trait)]
 #![feature(let_chains)]
 
+use crate::last_line_width::HasLastLineWidthInfo;
 use candy_frontend::{
     cst::{Cst, CstData, CstError, CstKind, Id, IsMultiline},
     id::{CountableId, IdGenerator},
@@ -9,7 +10,6 @@ use candy_frontend::{
 use existing_whitespace::{ExistingWhitespace, SplitTrailingWhitespace, TrailingWhitespace};
 use extension_trait::extension_trait;
 use itertools::Itertools;
-use last_line_width::LastLineWidth;
 use std::ops::Range;
 use traversal::dft_pre;
 
@@ -109,18 +109,18 @@ struct FormatterState {
 impl FormatterState {
     fn format_csts(&mut self, csts: impl AsRef<[Cst]>, info: &FormatterInfo) -> Vec<Cst> {
         let mut result = vec![];
-
         let mut saw_non_whitespace = false;
         let mut empty_line_count = 0;
         let csts = csts.as_ref();
         let mut index = 0;
+        let mut pending_newlines = vec![];
         'outer: while index < csts.len() {
             let cst = &csts[index];
 
             if let CstKind::Newline(_) = cst.kind {
                 // Remove leading newlines and limit to at most two empty lines.
                 if saw_non_whitespace && empty_line_count <= 2 {
-                    result.push(cst.to_owned());
+                    pending_newlines.push(cst.to_owned());
                     empty_line_count += 1;
                 }
                 index += 1;
@@ -181,7 +181,10 @@ impl FormatterState {
                 }
             };
 
-            if info.indentation.is_indented() {
+            result.append(&mut pending_newlines);
+
+            // In indented bodies, the indentation of the first line is taken care of by the caller.
+            if saw_non_whitespace && info.indentation.is_indented() {
                 result.push(Cst {
                     data: CstData {
                         id: indentation_id.unwrap_or_else(|| self.id_generator.generate()),
@@ -242,21 +245,16 @@ impl FormatterState {
             }
         }
 
-        // Add trailing newline.
-        if let Some(last) = result.last() && !matches!(
-            last,
-            Cst {
-                kind: CstKind::Newline(_),
-                ..
-            },
-        ) {
-            result.push(Cst {
+        // Add trailing newline (only for top-level bodies).
+        if !info.indentation.is_indented() && !result.is_empty() {
+            let trailing_newline = pending_newlines.pop().unwrap_or_else(|| Cst {
                 data: CstData {
                     id: self.id_generator.generate(),
                     span: Range::default(),
                 },
                 kind: CstKind::Newline("\n".to_string()),
             });
+            result.push(trailing_newline);
         }
 
         result
@@ -618,7 +616,47 @@ impl FormatterState {
                 left,
                 assignment_sign,
                 body,
-            } => todo!(),
+            } => {
+                let (left, left_whitespace) = self.format_child(left, info);
+                let left_trailing = if left_whitespace.has_comments() {
+                    TrailingWhitespace::Indentation(info.indentation.with_indent())
+                } else {
+                    TrailingWhitespace::Space
+                };
+                let left =
+                    left_whitespace.into_trailing(&mut self.id_generator, left, left_trailing);
+
+                let (assignment_sign, assignment_sign_whitespace) =
+                    self.format_child(assignment_sign, &info.with_indent());
+                assert!(assignment_sign.is_singleline());
+
+                let body = self.format_csts(body, &info.with_indent());
+
+                let is_body_in_same_line = !assignment_sign_whitespace.has_comments()
+                    && body.is_singleline()
+                    && info.indentation.width()
+                        + left.last_line_width()
+                        + assignment_sign.last_line_width()
+                        + 1
+                        + body.last_line_width()
+                        <= MAX_LINE_LENGTH;
+                let assignment_sign_trailing = if is_body_in_same_line {
+                    TrailingWhitespace::Space
+                } else {
+                    TrailingWhitespace::Indentation(info.indentation.with_indent())
+                };
+                let assignment_sign = assignment_sign_whitespace.into_trailing(
+                    &mut self.id_generator,
+                    assignment_sign,
+                    assignment_sign_trailing,
+                );
+
+                CstKind::Assignment {
+                    left: Box::new(left),
+                    assignment_sign: Box::new(assignment_sign),
+                    body,
+                }
+            }
             CstKind::Error { .. } => return cst.to_owned(),
         };
         Cst {
@@ -799,6 +837,45 @@ mod test {
         test("foo . # abc\n  bar", "foo # abc\n  .bar\n");
         test("foo .bar# abc", "foo.bar # abc\n");
         test("foo .bar # abc", "foo.bar # abc\n");
+    }
+
+    #[test]
+    fn test_assignment() {
+        // Simple assignment
+        test("foo = bar", "foo = bar\n");
+        test("foo=bar", "foo = bar\n");
+        test("foo = bar", "foo = bar\n");
+        test("foo =\n  bar ", "foo = bar\n");
+        test("foo := bar", "foo := bar\n");
+        test(
+            "foo = veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression",
+            "foo = veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression\n",
+        );
+        test(
+            "foo = veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression",
+            "foo =\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression\n",
+        );
+
+        // Function definition
+        test("foo bar=baz ", "foo bar = baz\n");
+        test("foo\n  bar=baz ", "foo bar = baz\n");
+        test("foo\n  bar\n  =\n  baz ", "foo bar = baz\n");
+        test(
+            "foo firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument = bar",
+            "foo\n  firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n  secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument = bar\n",
+        );
+        test(
+            "foo firstVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgument = bar",
+            "foo\n  firstVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgument =\n  bar\n",
+        );
+        test(
+            "foo argument = veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression\n",
+            "foo argument =\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression\n",
+        );
+
+        // Comments
+        test("foo = bar # abc\n", "foo = bar # abc\n");
+        test("foo=bar# abc\n", "foo = bar # abc\n");
     }
 
     fn test(source: &str, expected: &str) {

@@ -3,15 +3,8 @@ use extension_trait::extension_trait;
 use itertools::{FoldWhile, Itertools};
 use unicode_width::UnicodeWidthStr;
 
-#[extension_trait]
-pub impl<D> LastLineWidth for Cst<D> {
-    fn last_line_width(&self) -> usize {
-        self.last_line_width_info().last_line_width
-    }
-}
-
 #[derive(Debug)]
-struct LastLineWidthInfo {
+pub struct LastLineWidthInfo {
     is_multiline: bool,
     last_line_width: usize,
 }
@@ -47,7 +40,10 @@ impl Default for LastLineWidthInfo {
     }
 }
 
-trait HasLastLineWidthInfo {
+pub trait HasLastLineWidthInfo {
+    fn last_line_width(&self) -> usize {
+        self.last_line_width_info().last_line_width
+    }
     fn last_line_width_info(&self) -> LastLineWidthInfo;
 }
 impl HasLastLineWidthInfo for String {
