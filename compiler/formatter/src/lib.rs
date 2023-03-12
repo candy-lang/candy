@@ -6,7 +6,7 @@ use candy_frontend::{
     id::{CountableId, IdGenerator},
     position::Offset,
 };
-use existing_whitespace::SplitTrailingWhitespace;
+use existing_whitespace::{ExistingWhitespace, SplitTrailingWhitespace};
 use extension_trait::extension_trait;
 use itertools::Itertools;
 use last_line_width::LastLineWidth;
@@ -287,16 +287,11 @@ impl FormatterState {
                 receiver,
                 arguments,
             } => {
-                let (receiver, receiver_whitespace) = receiver.split_trailing_whitespace();
-                let receiver = self.format_cst(receiver, info);
+                let (receiver, receiver_whitespace) = self.format_child(receiver, info);
 
                 let mut arguments = arguments
                     .iter()
-                    .map(|argument| {
-                        let (argument, argument_whitespace) = argument.split_trailing_whitespace();
-                        let argument = self.format_cst(argument, &info.with_indent());
-                        (argument, argument_whitespace)
-                    })
+                    .map(|argument| self.format_child(argument, &info.with_indent()))
                     .collect_vec();
 
                 let are_arguments_singleline = !receiver_whitespace.has_comments()
@@ -356,11 +351,9 @@ impl FormatterState {
                 comma,
             } => todo!(),
             CstKind::StructAccess { struct_, dot, key } => {
-                let (struct_, struct_whitespace) = struct_.split_trailing_whitespace();
-                let struct_ = self.format_cst(struct_, info);
+                let (struct_, struct_whitespace) = self.format_child(struct_, info);
 
-                let (dot, dot_whitespace) = dot.split_trailing_whitespace();
-                let dot = self.format_cst(dot, &info.with_indent());
+                let (dot, dot_whitespace) = self.format_child(dot, &info.with_indent());
                 assert!(dot.is_singleline());
                 let struct_whitespace = dot_whitespace.merge_into(struct_whitespace);
 
@@ -413,6 +406,16 @@ impl FormatterState {
             data: cst.data.clone(),
             kind: new_kind,
         }
+    }
+
+    fn format_child<'a>(
+        &mut self,
+        child: &'a Cst,
+        info: &FormatterInfo,
+    ) -> (Cst, ExistingWhitespace<'a>) {
+        let (child, child_whitespace) = child.split_trailing_whitespace();
+        let child = self.format_cst(child, info);
+        (child, child_whitespace)
     }
 }
 
