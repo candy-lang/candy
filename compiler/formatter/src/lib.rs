@@ -79,14 +79,6 @@ struct FormatterInfo {
     indentation: Indentation,
     trailing_comma_condition: Option<TrailingCommaCondition>,
 }
-#[derive(Clone, Copy)]
-enum TrailingCommaCondition {
-    Always,
-
-    /// Add a trailing comma if the element fits in a single line and is at most
-    /// this wide.
-    UnlessFitsIn(usize),
-}
 impl FormatterInfo {
     fn with_indent(&self) -> Self {
         Self {
@@ -101,6 +93,15 @@ impl FormatterInfo {
             trailing_comma_condition: Some(condition),
         }
     }
+}
+
+#[derive(Clone)]
+enum TrailingCommaCondition {
+    Always,
+
+    /// Add a trailing comma if the element fits in a single line and is at most
+    /// this wide.
+    UnlessFitsIn(usize),
 }
 
 struct FormatterState {
@@ -526,34 +527,16 @@ impl FormatterState {
             CstKind::ListItem { value, comma } => {
                 let (value, value_whitespace) = self.format_child(value, info);
 
-                let should_have_comma = match info.trailing_comma_condition {
-                    Some(TrailingCommaCondition::Always) => true,
-                    Some(TrailingCommaCondition::UnlessFitsIn(max_width)) => {
+                let comma =
+                    self.apply_trailing_comma_condition(comma.as_deref(), info, |max_width| {
                         value.is_multiline()
                             || value_whitespace.has_comments()
                             || value.last_line_width() > max_width
-                    }
-                    None => comma.is_some(),
-                };
-                let comma = if should_have_comma {
-                    let comma = comma
-                        .as_ref()
-                        .map(|it| self.format_cst(it, info))
-                        .unwrap_or_else(|| Cst {
-                            data: CstData {
-                                id: self.id_generator.generate(),
-                                span: Range::default(),
-                            },
-                            kind: CstKind::Comma,
-                        });
-                    Some(Box::new(comma))
-                } else {
-                    None
-                };
+                    });
 
                 CstKind::ListItem {
                     value: Box::new(value),
-                    comma,
+                    comma: comma.map(Box::new),
                 }
             }
             CstKind::Struct {
@@ -675,6 +658,34 @@ impl FormatterState {
         let (child, child_whitespace) = child.split_trailing_whitespace();
         let child = self.format_cst(child.as_ref(), info);
         (child, child_whitespace)
+    }
+
+    fn apply_trailing_comma_condition(
+        &mut self,
+        comma: Option<&Cst>,
+        info: &FormatterInfo,
+        fits_in_width: impl FnOnce(usize) -> bool,
+    ) -> Option<Cst> {
+        let should_have_comma = match info.trailing_comma_condition {
+            Some(TrailingCommaCondition::Always) => true,
+            Some(TrailingCommaCondition::UnlessFitsIn(max_width)) => fits_in_width(max_width),
+            None => comma.is_some(),
+        };
+        if should_have_comma {
+            let comma = comma
+                .as_ref()
+                .map(|it| self.format_cst(it, info))
+                .unwrap_or_else(|| Cst {
+                    data: CstData {
+                        id: self.id_generator.generate(),
+                        span: Range::default(),
+                    },
+                    kind: CstKind::Comma,
+                });
+            Some(comma)
+        } else {
+            None
+        }
     }
 }
 
@@ -840,7 +851,6 @@ mod test {
         test("foo .bar# abc", "foo.bar # abc\n");
         test("foo .bar # abc", "foo.bar # abc\n");
     }
-
     #[test]
     fn test_assignment() {
         // Simple assignment
