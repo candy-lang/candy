@@ -51,9 +51,32 @@ fn largest_id(csts: &[Cst]) -> Id {
         .max()
         .unwrap()
 }
+
+#[derive(Clone, Copy, Default)]
+pub struct Indentation(usize);
+impl Indentation {
+    pub fn level(self) -> usize {
+        self.0
+    }
+    pub fn width(self) -> usize {
+        self.0 * 2
+    }
+    pub fn is_indented(self) -> bool {
+        self.0 > 0
+    }
+
+    pub fn with_indent(self) -> Self {
+        Self(self.0 + 1)
+    }
+
+    pub fn to_cst_kind<D>(self) -> CstKind<D> {
+        CstKind::Whitespace(" ".repeat(self.width()))
+    }
+}
+
 #[derive(Clone, Default)]
 struct FormatterInfo {
-    indentation_level: usize,
+    indentation: Indentation,
     trailing_comma_condition: Option<TrailingCommaCondition>,
 }
 #[derive(Clone, Copy)]
@@ -67,14 +90,14 @@ enum TrailingCommaCondition {
 impl FormatterInfo {
     fn with_indent(&self) -> Self {
         Self {
-            indentation_level: self.indentation_level + 1,
+            indentation: self.indentation.with_indent(),
             // Only applies for direct descendants.
             trailing_comma_condition: None,
         }
     }
     fn with_trailing_comma_condition(&self, condition: TrailingCommaCondition) -> Self {
         Self {
-            indentation_level: self.indentation_level,
+            indentation: self.indentation,
             trailing_comma_condition: Some(condition),
         }
     }
@@ -158,13 +181,13 @@ impl FormatterState {
                 }
             };
 
-            if info.indentation_level > 0 {
+            if info.indentation.is_indented() {
                 result.push(Cst {
                     data: CstData {
                         id: indentation_id.unwrap_or_else(|| self.id_generator.generate()),
                         span: Range::default(),
                     },
-                    kind: CstKind::Whitespace("  ".repeat(info.indentation_level)),
+                    kind: info.indentation.to_cst_kind(),
                 });
             }
 
@@ -306,8 +329,8 @@ impl FormatterState {
                     (TrailingWhitespace::None, TrailingWhitespace::None)
                 } else {
                     (
-                        TrailingWhitespace::Indentation(info.indentation_level + 1),
-                        TrailingWhitespace::Indentation(info.indentation_level),
+                        TrailingWhitespace::Indentation(info.indentation.with_indent()),
+                        TrailingWhitespace::Indentation(info.indentation),
                     )
                 };
 
@@ -351,7 +374,7 @@ impl FormatterState {
                 let trailing = if are_arguments_singleline {
                     TrailingWhitespace::Space
                 } else {
-                    TrailingWhitespace::Indentation(info.indentation_level + 1)
+                    TrailingWhitespace::Indentation(info.indentation.with_indent())
                 };
 
                 let receiver = receiver_whitespace.into_trailing(
@@ -397,7 +420,7 @@ impl FormatterState {
                     None
                 } else {
                     Some(
-                        info.indentation_level * 2
+                        info.indentation.width()
                             + opening_parenthesis.last_line_width()
                             + closing_parenthesis.last_line_width(),
                     )
@@ -465,9 +488,9 @@ impl FormatterState {
                         )
                     } else {
                         (
-                            TrailingWhitespace::Indentation(info.indentation_level + 1),
-                            TrailingWhitespace::Indentation(info.indentation_level + 1),
-                            TrailingWhitespace::Indentation(info.indentation_level),
+                            TrailingWhitespace::Indentation(info.indentation.with_indent()),
+                            TrailingWhitespace::Indentation(info.indentation.with_indent()),
+                            TrailingWhitespace::Indentation(info.indentation),
                         )
                     };
 
@@ -560,7 +583,7 @@ impl FormatterState {
                     struct_whitespace.into_trailing_with_indentation(
                         &mut self.id_generator,
                         struct_,
-                        info.indentation_level + 1,
+                        info.indentation.with_indent(),
                     )
                 };
 

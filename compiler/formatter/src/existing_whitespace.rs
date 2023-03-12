@@ -2,12 +2,11 @@ use candy_frontend::{
     cst::{Cst, CstData, CstError, CstKind, Id},
     id::IdGenerator,
 };
+use derive_more::From;
 use extension_trait::extension_trait;
 use std::{borrow::Cow, ops::Range};
 
-pub fn indentation<D>(indentation_level: usize) -> CstKind<D> {
-    CstKind::Whitespace("  ".repeat(indentation_level))
-}
+use crate::Indentation;
 
 #[extension_trait]
 pub impl SplitTrailingWhitespace for Cst {
@@ -45,11 +44,11 @@ pub enum ExistingWhitespace<'a> {
         trailing_whitespace: Cow<'a, [Cst]>,
     },
 }
-#[derive(Clone)]
+#[derive(Clone, From)]
 pub enum TrailingWhitespace {
     None,
     Space,
-    Indentation(usize),
+    Indentation(Indentation),
 }
 impl ExistingWhitespace<'_> {
     fn trailing_whitespace(&self) -> Option<&[Cst]> {
@@ -98,13 +97,13 @@ impl ExistingWhitespace<'_> {
         self,
         id_generator: &mut IdGenerator<Id>,
         child: Cst,
-        trailing: TrailingWhitespace,
+        trailing: impl Into<TrailingWhitespace>,
     ) -> Cst {
-        match trailing {
+        match trailing.into() {
             TrailingWhitespace::None => self.into_empty_trailing(child),
             TrailingWhitespace::Space => self.into_trailing_with_space(id_generator, child),
-            TrailingWhitespace::Indentation(indentation_level) => {
-                self.into_trailing_with_indentation(id_generator, child, indentation_level)
+            TrailingWhitespace::Indentation(indentation) => {
+                self.into_trailing_with_indentation(id_generator, child, indentation)
             }
         }
     }
@@ -136,7 +135,7 @@ impl ExistingWhitespace<'_> {
         self,
         id_generator: &mut IdGenerator<Id>,
         child: Cst,
-        indentation_level: usize,
+        indentation: Indentation,
     ) -> Cst {
         let trailing_whitespace = self.trailing_whitespace().unwrap_or_default();
         let last_comment_index = trailing_whitespace
@@ -145,11 +144,8 @@ impl ExistingWhitespace<'_> {
         let split_index = last_comment_index.map(|it| it + 1).unwrap_or_default();
         let (comments_and_whitespace, final_whitespace) = trailing_whitespace.split_at(split_index);
 
-        let mut whitespace = Self::format_trailing_comments(
-            comments_and_whitespace,
-            id_generator,
-            indentation_level,
-        );
+        let mut whitespace =
+            Self::format_trailing_comments(comments_and_whitespace, id_generator, indentation);
 
         let existing_newline_index = final_whitespace
             .iter()
@@ -165,7 +161,7 @@ impl ExistingWhitespace<'_> {
             kind: CstKind::Newline("\n".to_owned()),
         });
 
-        if indentation_level > 0 {
+        if indentation.is_indented() {
             let search_start_index = existing_newline_index.map(|it| it + 1).unwrap_or_default();
             let indentation_id = final_whitespace[search_start_index..]
                 .iter()
@@ -177,7 +173,7 @@ impl ExistingWhitespace<'_> {
                     id: indentation_id,
                     span: Range::default(),
                 },
-                kind: indentation(indentation_level),
+                kind: indentation.to_cst_kind(),
             });
         }
 
@@ -186,7 +182,7 @@ impl ExistingWhitespace<'_> {
     fn format_trailing_comments(
         comments_and_whitespace: &[Cst],
         id_generator: &mut IdGenerator<Id>,
-        indentation_level: usize,
+        indentation: Indentation,
     ) -> Vec<Cst> {
         let mut whitespace = vec![];
         let mut is_comment_on_same_line = true;
@@ -229,7 +225,7 @@ impl ExistingWhitespace<'_> {
                                 id: last_whitespace_id.unwrap_or(id_generator.generate()),
                                 span: Range::default(),
                             },
-                            kind: indentation(indentation_level),
+                            kind: indentation.to_cst_kind(),
                         });
                     }
                     whitespace.push(item.clone());
@@ -265,23 +261,23 @@ impl ExistingWhitespace<'_> {
 
 #[cfg(test)]
 mod test {
-    use crate::existing_whitespace::SplitTrailingWhitespace;
+    use crate::{existing_whitespace::SplitTrailingWhitespace, Indentation};
     use candy_frontend::{
         cst::CstKind, id::IdGenerator, rcst_to_cst::RcstsToCstsExt, string_to_rcst::parse_rcst,
     };
 
-    use super::TrailingWhitespace::{self, *};
+    use super::TrailingWhitespace;
 
     #[test]
     fn test_empty_trailing() {
-        test("foo End", None, "foo");
-        test("foo  End", None, "foo");
+        test("foo End", TrailingWhitespace::None, "foo");
+        test("foo  End", TrailingWhitespace::None, "foo");
     }
 
     #[test]
     fn test_trailing_with_space() {
-        test("foo End", Space, "foo ");
-        test("foo  End", Space, "foo ");
+        test("foo End", TrailingWhitespace::Space, "foo ");
+        test("foo  End", TrailingWhitespace::Space, "foo ");
     }
 
     #[test]
@@ -298,7 +294,7 @@ mod test {
         test("foo\n  # abc\n  End", Indentation(1), "foo\n  # abc\n  ");
     }
 
-    fn test(source: &str, trailing: TrailingWhitespace, expected: &str) {
+    fn test(source: &str, trailing: impl Into<TrailingWhitespace>, expected: &str) {
         let mut csts = parse_rcst(source).to_csts();
         assert_eq!(csts.len(), 1);
 

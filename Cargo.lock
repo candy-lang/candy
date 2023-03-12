@@ -106,6 +106,7 @@ name = "candy_formatter"
 version = "0.1.0"
 dependencies = [
  "candy_frontend",
+ "derive_more",
  "extension-trait",
  "itertools",
  "traversal",

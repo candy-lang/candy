@@ -8,6 +8,7 @@ rust-version = "1.56"
 
 [dependencies]
 candy_frontend = { path = "../frontend" }
+derive_more = "0.99.17"
 extension-trait = "1.0.1"
 itertools = "0.10.0"
 traversal = "0.1.2"
