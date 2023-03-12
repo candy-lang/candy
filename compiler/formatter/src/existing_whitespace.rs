@@ -11,16 +11,29 @@ pub fn indentation<D>(indentation_level: usize) -> CstKind<D> {
 
 #[extension_trait]
 pub impl SplitTrailingWhitespace for Cst {
-    fn split_trailing_whitespace(&self) -> (&Cst, ExistingWhitespace) {
+    fn split_trailing_whitespace(&self) -> (Cow<Cst>, ExistingWhitespace) {
         match &self.kind {
-            CstKind::TrailingWhitespace { child, whitespace } => (
-                child,
-                ExistingWhitespace::Some {
+            CstKind::TrailingWhitespace { child, whitespace } => {
+                let (child, child_whitespace) = child.split_trailing_whitespace();
+                let whitespace = ExistingWhitespace::Some {
                     id: self.data.id,
                     trailing_whitespace: Cow::Borrowed(whitespace),
-                },
-            ),
-            _ => (self, ExistingWhitespace::None),
+                };
+                (child, child_whitespace.merge_into(whitespace))
+            }
+            CstKind::ListItem { value, comma } => {
+                // Move potential comments before the comma to the end of the list item.
+                let (value, value_whitespace) = value.split_trailing_whitespace();
+                let cst = Cst {
+                    data: self.data.clone(),
+                    kind: CstKind::ListItem {
+                        value: Box::new(value.into_owned()),
+                        comma: comma.to_owned(),
+                    },
+                };
+                (Cow::Owned(cst), value_whitespace)
+            }
+            _ => (Cow::Borrowed(self), ExistingWhitespace::None),
         }
     }
 }

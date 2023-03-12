@@ -51,7 +51,7 @@ fn largest_id(csts: &[Cst]) -> Id {
         .max()
         .unwrap()
 }
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct FormatterInfo {
     indentation_level: usize,
     trailing_comma_condition: Option<TrailingCommaCondition>,
@@ -62,13 +62,14 @@ enum TrailingCommaCondition {
 
     /// Add a trailing comma if the element fits in a single line and is at most
     /// this wide.
-    IfFitsIn(usize),
+    UnlessFitsIn(usize),
 }
 impl FormatterInfo {
     fn with_indent(&self) -> Self {
         Self {
             indentation_level: self.indentation_level + 1,
-            trailing_comma_condition: self.trailing_comma_condition,
+            // Only applies for direct descendants.
+            trailing_comma_condition: None,
         }
     }
     fn with_trailing_comma_condition(&self, condition: TrailingCommaCondition) -> Self {
@@ -338,8 +339,155 @@ impl FormatterState {
                 opening_parenthesis,
                 items,
                 closing_parenthesis,
-            } => todo!(),
-            CstKind::ListItem { value, comma } => todo!(),
+            } => {
+                let (opening_parenthesis, opening_parenthesis_whitespace) =
+                    self.format_child(opening_parenthesis, info);
+                assert!(opening_parenthesis.is_singleline());
+
+                let (closing_parenthesis, closing_parenthesis_whitespace) =
+                    self.format_child(closing_parenthesis, info);
+                assert!(closing_parenthesis.is_singleline());
+
+                // As soon as we find out that the list has to be multiline, we no longer track the
+                // exact width.
+                let mut width = if opening_parenthesis_whitespace.has_comments() {
+                    None
+                } else {
+                    Some(
+                        info.indentation_level * 2
+                            + opening_parenthesis.last_line_width()
+                            + closing_parenthesis.last_line_width(),
+                    )
+                };
+                let item_info = info
+                    .with_indent()
+                    .with_trailing_comma_condition(TrailingCommaCondition::Always);
+                let items = items
+                    .iter()
+                    .enumerate()
+                    .map(|(index, item)| {
+                        let is_single_item = items.len() == 1;
+                        let is_last_item = index == items.len() - 1;
+
+                        let info = if is_last_item && !is_single_item && let Some(width) = width {
+                            // We're looking at the last item and everything might fit in one line.
+                            let max_width = MAX_LINE_LENGTH - width;
+                            assert!(max_width > 0);
+
+                            item_info.with_trailing_comma_condition(
+                                TrailingCommaCondition::UnlessFitsIn(max_width),
+                            )
+                        } else {
+                            item_info.clone()
+                        };
+                        let (item, item_whitespace) = self.format_child(item, &info);
+
+                        if let Some(old_width) = width {
+                            if item.is_multiline() || item_whitespace.has_comments() {
+                                width = None;
+                            } else {
+                                let (new_width, max_width) = if is_single_item || is_last_item {
+                                    (old_width + item.last_line_width(), MAX_LINE_LENGTH)
+                                } else {
+                                    // We need an additional column for the trailing space after the
+                                    // comma.
+                                    let new_width = old_width + item.last_line_width() + 1;
+
+                                    // The last item needs at least one column of space.
+                                    let max_width = MAX_LINE_LENGTH - 1;
+
+                                    (new_width, max_width)
+                                };
+                                if new_width > max_width {
+                                    width = None;
+                                } else {
+                                    width = Some(new_width);
+                                }
+                            }
+                        }
+
+                        (item, item_whitespace)
+                    })
+                    .collect_vec();
+                if let Some(width) = width {
+                    assert!(width <= MAX_LINE_LENGTH);
+                }
+
+                let (opening_parenthesis_trailing, item_trailing, last_item_trailing) =
+                    if width.is_some() {
+                        (
+                            TrailingWhitespace::None,
+                            TrailingWhitespace::Space,
+                            TrailingWhitespace::None,
+                        )
+                    } else {
+                        (
+                            TrailingWhitespace::Indentation(info.indentation_level + 1),
+                            TrailingWhitespace::Indentation(info.indentation_level + 1),
+                            TrailingWhitespace::Indentation(info.indentation_level),
+                        )
+                    };
+
+                let last_item_index = items.len() - 1;
+                CstKind::List {
+                    opening_parenthesis: Box::new(opening_parenthesis_whitespace.into_trailing(
+                        &mut self.id_generator,
+                        opening_parenthesis,
+                        opening_parenthesis_trailing,
+                    )),
+                    items: items
+                        .into_iter()
+                        .enumerate()
+                        .map(|(index, (item, item_whitespace))| {
+                            item_whitespace.into_trailing(
+                                &mut self.id_generator,
+                                item,
+                                if index == last_item_index {
+                                    last_item_trailing.clone()
+                                } else {
+                                    item_trailing.clone()
+                                },
+                            )
+                        })
+                        .collect(),
+                    closing_parenthesis: Box::new(
+                        closing_parenthesis_whitespace.into_empty_trailing(closing_parenthesis),
+                    ),
+                }
+            }
+            CstKind::ListItem { value, comma } => {
+                let (value, value_whitespace) = self.format_child(value, info);
+
+                let should_have_comma = match info.trailing_comma_condition {
+                    Some(TrailingCommaCondition::Always) => true,
+                    Some(TrailingCommaCondition::UnlessFitsIn(max_width)) => {
+                        value.is_multiline()
+                            || value_whitespace.has_comments()
+                            || value.last_line_width() > max_width
+                    }
+                    None => comma.is_some(),
+                };
+                let comma = if should_have_comma {
+                    let comma = comma
+                        .as_ref()
+                        .map(|it| self.format_cst(it, info))
+                        .unwrap_or_else(|| Cst {
+                            data: CstData {
+                                id: self.id_generator.generate(),
+                                span: Range::default(),
+                            },
+                            kind: CstKind::Comma,
+                        });
+                    Some(Box::new(comma))
+                } else {
+                    None
+                };
+
+                CstKind::ListItem {
+                    value: Box::new(value),
+                    comma,
+                }
+            }
             CstKind::Struct {
                 opening_bracket,
                 fields,
@@ -414,7 +562,7 @@ impl FormatterState {
         info: &FormatterInfo,
     ) -> (Cst, ExistingWhitespace<'a>) {
         let (child, child_whitespace) = child.split_trailing_whitespace();
-        let child = self.format_cst(child, info);
+        let child = self.format_cst(child.as_ref(), info);
         (child, child_whitespace)
     }
 }
@@ -480,6 +628,53 @@ mod test {
 
         test("foo # abc\n  bar\n  Baz", "foo # abc\n  bar\n  Baz\n");
         test("foo\n  bar # abc\n  Baz", "foo\n  bar # abc\n  Baz\n");
+    }
+    #[test]
+    fn test_list() {
+        // Empty
+        test("(,)", "(,)\n");
+        test(" ( , ) ", "(,)\n");
+        test("(\n  , ) ", "(,)\n");
+        test("(\n  ,\n) ", "(,)\n");
+
+        // Single item
+        test("(foo,)", "(foo,)\n");
+        test("(foo,)\n", "(foo,)\n");
+        test("(foo, )\n", "(foo,)\n");
+        test("(foo ,)\n", "(foo,)\n");
+        test("( foo, )\n", "(foo,)\n");
+        test("(foo,)\n", "(foo,)\n");
+        test("(\n  foo,\n)\n", "(foo,)\n");
+        test("(\n  foo,\n)\n", "(foo,)\n");
+        test(" ( foo , ) \n", "(foo,)\n");
+        test(
+            "(veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryItemm,)",
+            "(veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryItemm,)\n",
+        );
+        test(
+            "(veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryItemmm,)",
+            "(\n  veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryItemmm,\n)\n",
+        );
+
+        // Multiple items
+        test("(foo, bar)", "(foo, bar)\n");
+        test("(foo, bar,)", "(foo, bar)\n");
+        test("(foo, bar, baz)", "(foo, bar, baz)\n");
+        test("(foo, bar, baz,)", "(foo, bar, baz)\n");
+        test("( foo ,bar ,baz , )", "(foo, bar, baz)\n");
+        test("(\n  foo,\n  bar,\n  baz,\n)", "(foo, bar, baz)\n");
+        test(
+            "(firstVeryVeryVeryVeryVeryVeryVeryVeryLongVeryItem, secondVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItem)",
+            "(\n  firstVeryVeryVeryVeryVeryVeryVeryVeryLongVeryItem,\n  secondVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItem,\n)\n",
+        );
+
+        // Comments
+        test("(foo,) # abc", "(foo,) # abc\n");
+        test("(foo,)# abc", "(foo,) # abc\n");
+        test("(foo,# abc\n)", "(\n  foo, # abc\n)\n");
+        test("(foo, # abc\n)", "(\n  foo, # abc\n)\n");
+        test("(# abc\n  foo,)", "( # abc\n  foo,\n)\n");
+        test("(foo# abc\n  , bar,)", "(\n  foo, # abc\n  bar,\n)\n");
     }
     #[test]
     fn test_struct_access() {
