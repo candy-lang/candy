@@ -282,7 +282,9 @@ impl FormatterState {
             | CstKind::Whitespace(_)
             | CstKind::Newline(_)
             | CstKind::Comment { .. } => return cst.to_owned(),
-            CstKind::TrailingWhitespace { child, whitespace } => todo!(),
+            CstKind::TrailingWhitespace { .. } => {
+                panic!("Trailing whitespace should be handled by the caller.")
+            }
             CstKind::Identifier(_)
             | CstKind::Symbol(_)
             | CstKind::Int { .. }
