@@ -1,4 +1,5 @@
 #![feature(anonymous_lifetime_in_impl_trait)]
+#![feature(box_patterns)]
 #![feature(let_chains)]
 
 use crate::last_line_width::HasLastLineWidthInfo;
@@ -409,119 +410,17 @@ impl FormatterState {
                 items,
                 closing_parenthesis,
             } => {
-                let (opening_parenthesis, opening_parenthesis_whitespace) =
-                    self.format_child(opening_parenthesis, info);
-                assert!(opening_parenthesis.is_singleline());
-
-                let (closing_parenthesis, closing_parenthesis_whitespace) =
-                    self.format_child(closing_parenthesis, info);
-                assert!(closing_parenthesis.is_singleline());
-
-                // As soon as we find out that the list has to be multiline, we no longer track the
-                // exact width.
-                let mut width = if opening_parenthesis_whitespace.has_comments() {
-                    None
-                } else {
-                    Some(
-                        info.indentation.width()
-                            + opening_parenthesis.last_line_width()
-                            + closing_parenthesis.last_line_width(),
-                    )
-                };
-                let item_info = info
-                    .with_indent()
-                    .with_trailing_comma_condition(TrailingCommaCondition::Always);
-                let items = items
-                    .iter()
-                    .enumerate()
-                    .map(|(index, item)| {
-                        let is_single_item = items.len() == 1;
-                        let is_last_item = index == items.len() - 1;
-
-                        let info = if is_last_item && !is_single_item && let Some(width) = width {
-                            // We're looking at the last item and everything might fit in one line.
-                            let max_width = MAX_WIDTH - width;
-                            assert!(max_width > 0);
-
-                            item_info.with_trailing_comma_condition(
-                                TrailingCommaCondition::UnlessFitsIn(max_width),
-                            )
-                        } else {
-                            item_info.clone()
-                        };
-                        let (item, item_whitespace) = self.format_child(item, &info);
-
-                        if let Some(old_width) = width {
-                            if item.is_multiline() || item_whitespace.has_comments() {
-                                width = None;
-                            } else {
-                                let (new_width, max_width) = if is_single_item || is_last_item {
-                                    (old_width + item.last_line_width(), MAX_WIDTH)
-                                } else {
-                                    // We need an additional column for the trailing space after the
-                                    // comma.
-                                    let new_width = old_width + item.last_line_width() + 1;
-
-                                    // The last item needs at least one column of space.
-                                    let max_width = MAX_WIDTH - 1;
-
-                                    (new_width, max_width)
-                                };
-                                if new_width > max_width {
-                                    width = None;
-                                } else {
-                                    width = Some(new_width);
-                                }
-                            }
-                        }
-
-                        (item, item_whitespace)
-                    })
-                    .collect_vec();
-                if let Some(width) = width {
-                    assert!(width <= MAX_WIDTH);
-                }
-
-                let (opening_parenthesis_trailing, item_trailing, last_item_trailing) =
-                    if width.is_some() {
-                        (
-                            TrailingWhitespace::None,
-                            TrailingWhitespace::Space,
-                            TrailingWhitespace::None,
-                        )
-                    } else {
-                        (
-                            TrailingWhitespace::Indentation(info.indentation.with_indent()),
-                            TrailingWhitespace::Indentation(info.indentation.with_indent()),
-                            TrailingWhitespace::Indentation(info.indentation),
-                        )
-                    };
-
-                let last_item_index = items.len() - 1;
+                let (opening_parenthesis, items, closing_parenthesis) = self.format_collection(
+                    opening_parenthesis,
+                    items,
+                    closing_parenthesis,
+                    true,
+                    info,
+                );
                 CstKind::List {
-                    opening_parenthesis: Box::new(opening_parenthesis_whitespace.into_trailing(
-                        &mut self.id_generator,
-                        opening_parenthesis,
-                        opening_parenthesis_trailing,
-                    )),
-                    items: items
-                        .into_iter()
-                        .enumerate()
-                        .map(|(index, (item, item_whitespace))| {
-                            item_whitespace.into_trailing(
-                                &mut self.id_generator,
-                                item,
-                                if index == last_item_index {
-                                    last_item_trailing.clone()
-                                } else {
-                                    item_trailing.clone()
-                                },
-                            )
-                        })
-                        .collect(),
-                    closing_parenthesis: Box::new(
-                        closing_parenthesis_whitespace.into_empty_trailing(closing_parenthesis),
-                    ),
+                    opening_parenthesis: Box::new(opening_parenthesis),
+                    items,
+                    closing_parenthesis: Box::new(closing_parenthesis),
                 }
             }
             CstKind::ListItem { value, comma } => {
@@ -529,9 +428,9 @@ impl FormatterState {
 
                 let comma =
                     self.apply_trailing_comma_condition(comma.as_deref(), info, |max_width| {
-                        value.is_multiline()
-                            || value_whitespace.has_comments()
-                            || value.last_line_width() > max_width
+                        value.is_singleline()
+                            && !value_whitespace.has_comments()
+                            && value.last_line_width() <= max_width
                     });
 
                 CstKind::ListItem {
@@ -543,12 +442,95 @@ impl FormatterState {
                 opening_bracket,
                 fields,
                 closing_bracket,
-            } => todo!(),
+            } => {
+                let (opening_bracket, fields, closing_bracket) =
+                    self.format_collection(opening_bracket, fields, closing_bracket, false, info);
+                CstKind::Struct {
+                    opening_bracket: Box::new(opening_bracket),
+                    fields,
+                    closing_bracket: Box::new(closing_bracket),
+                }
+            }
             CstKind::StructField {
                 key_and_colon,
                 value,
                 comma,
-            } => todo!(),
+            } => {
+                let key_and_colon_and_colon_whitespace =
+                    key_and_colon.as_ref().map(|box (key, colon)| {
+                        let (key, key_whitespace) = self.format_child(key, &info.with_indent());
+                        let key_trailing = if key_whitespace.has_comments() {
+                            // TODO: move comments behind the colon
+                            TrailingWhitespace::Indentation(info.indentation.with_indent())
+                        } else {
+                            TrailingWhitespace::None
+                        };
+                        let key =
+                            key_whitespace.into_trailing(&mut self.id_generator, key, key_trailing);
+
+                        let (colon, colon_whitespace) =
+                            self.format_child(colon, &info.with_indent());
+                        assert!(colon.is_singleline());
+
+                        (key, colon, colon_whitespace)
+                    });
+
+                let (value, value_whitespace) = self.format_child(value, &info.with_indent());
+                let value_trailing = if value_whitespace.has_comments() {
+                    // TODO: move comments behind the comma
+                    TrailingWhitespace::Indentation(info.indentation.with_indent())
+                } else {
+                    TrailingWhitespace::None
+                };
+                let value =
+                    value_whitespace.into_trailing(&mut self.id_generator, value, value_trailing);
+
+                let key_is_singleline = key_and_colon_and_colon_whitespace
+                    .as_ref()
+                    .map(|(key, _, _)| key.is_singleline())
+                    .unwrap_or(true);
+                let colon_has_comments = key_and_colon_and_colon_whitespace
+                    .as_ref()
+                    .map(|(_, _, colon_whitespace)| colon_whitespace.has_comments())
+                    .unwrap_or_default();
+                let key_and_colon_width = key_and_colon_and_colon_whitespace
+                    .as_ref()
+                    .map(|(key, colon, _)| key.last_line_width() + colon.last_line_width() + 1)
+                    .unwrap_or_default();
+                let can_value_be_on_same_line =
+                    key_is_singleline && !colon_has_comments && value.is_singleline();
+                let comma =
+                    self.apply_trailing_comma_condition(comma.as_deref(), info, |max_width| {
+                        can_value_be_on_same_line
+                            && key_and_colon_width + value.last_line_width() <= max_width
+                    });
+
+                let key_and_colon =
+                    key_and_colon_and_colon_whitespace.map(|(key, colon, colon_whitespace)| {
+                        let fits_width = key_and_colon_width
+                            + value.last_line_width()
+                            + comma.is_some() as usize
+                            <= MAX_WIDTH - info.indentation.width();
+                        let colon_trailing = if can_value_be_on_same_line && fits_width {
+                            TrailingWhitespace::Space
+                        } else {
+                            TrailingWhitespace::Indentation(info.indentation.with_indent())
+                        };
+                        let colon = colon_whitespace.into_trailing(
+                            &mut self.id_generator,
+                            colon,
+                            colon_trailing,
+                        );
+
+                        (key, colon)
+                    });
+
+                CstKind::StructField {
+                    key_and_colon: key_and_colon.map(Box::new),
+                    value: Box::new(value),
+                    comma: comma.map(Box::new),
+                }
+            }
             CstKind::StructAccess { struct_, dot, key } => {
                 let (struct_, struct_whitespace) = self.format_child(struct_, info);
 
@@ -660,6 +642,136 @@ impl FormatterState {
         (child, child_whitespace)
     }
 
+    fn format_collection(
+        &mut self,
+        opening_punctuation: &Cst,
+        items: &[Cst],
+        closing_punctuation: &Cst,
+        is_comma_required_for_single_item: bool,
+        info: &FormatterInfo,
+    ) -> (Cst, Vec<Cst>, Cst) {
+        let (opening_punctuation, opening_punctuation_whitespace) =
+            self.format_child(opening_punctuation, info);
+        assert!(opening_punctuation.is_singleline());
+
+        let (closing_punctuation, closing_punctuation_whitespace) =
+            self.format_child(closing_punctuation, info);
+        assert!(closing_punctuation.is_singleline());
+        assert!(!closing_punctuation_whitespace.has_comments());
+
+        // As soon as we find out that the collection has to be multiline, we no longer track the
+        // exact width.
+        let mut width = if opening_punctuation_whitespace.has_comments() {
+            None
+        } else {
+            Some(
+                info.indentation.width()
+                    + opening_punctuation.last_line_width()
+                    + closing_punctuation.last_line_width(),
+            )
+        };
+        let item_info = info
+            .with_indent()
+            .with_trailing_comma_condition(TrailingCommaCondition::Always);
+        let items = items
+            .iter()
+            .enumerate()
+            .map(|(index, item)| {
+                let is_single_item = items.len() == 1;
+                let is_last_item = index == items.len() - 1;
+
+                let (item, item_whitespace) = item.split_trailing_whitespace();
+
+                let is_comma_required_due_to_single_item =
+                    is_comma_required_for_single_item && is_single_item;
+                let is_comma_required = is_comma_required_due_to_single_item
+                    || !is_last_item
+                    || item_whitespace.has_comments();
+                let info = if !is_comma_required && let Some(width) = width {
+                    // We're looking at the last item and everything might fit in one line.
+                    let max_width = MAX_WIDTH - width;
+                    assert!(max_width > 0);
+
+                    item_info.with_trailing_comma_condition(
+                        TrailingCommaCondition::UnlessFitsIn(max_width),
+                    )
+                } else {
+                    item_info.clone()
+                };
+                let item = self.format_cst(item.as_ref(), &info);
+
+                if let Some(old_width) = width {
+                    if item.is_multiline() || item_whitespace.has_comments() {
+                        width = None;
+                    } else {
+                        let (new_width, max_width) = if is_last_item {
+                            (old_width + item.last_line_width(), MAX_WIDTH)
+                        } else {
+                            // We need an additional column for the trailing space after the comma.
+                            let new_width = old_width + item.last_line_width() + 1;
+
+                            // The last item needs at least one column of space.
+                            let max_width = MAX_WIDTH - 1;
+
+                            (new_width, max_width)
+                        };
+                        if new_width > max_width {
+                            width = None;
+                        } else {
+                            width = Some(new_width);
+                        }
+                    }
+                }
+
+                (item, item_whitespace)
+            })
+            .collect_vec();
+        if let Some(width) = width {
+            assert!(width <= MAX_WIDTH);
+        }
+
+        let (opening_punctuation_trailing, item_trailing, last_item_trailing) = if width.is_some() {
+            (
+                TrailingWhitespace::None,
+                TrailingWhitespace::Space,
+                TrailingWhitespace::None,
+            )
+        } else {
+            (
+                TrailingWhitespace::Indentation(info.indentation.with_indent()),
+                TrailingWhitespace::Indentation(info.indentation.with_indent()),
+                TrailingWhitespace::Indentation(info.indentation),
+            )
+        };
+
+        let opening_punctuation = opening_punctuation_whitespace.into_trailing(
+            &mut self.id_generator,
+            opening_punctuation,
+            opening_punctuation_trailing,
+        );
+        let closing_punctuation =
+            closing_punctuation_whitespace.into_empty_trailing(closing_punctuation);
+
+        let last_item_index = items.len().checked_sub(1);
+        let items = items
+            .into_iter()
+            .enumerate()
+            .map(|(index, (item, item_whitespace))| {
+                item_whitespace.into_trailing(
+                    &mut self.id_generator,
+                    item,
+                    if last_item_index == Some(index) {
+                        last_item_trailing.clone()
+                    } else {
+                        item_trailing.clone()
+                    },
+                )
+            })
+            .collect();
+
+        (opening_punctuation, items, closing_punctuation)
+    }
+
     fn apply_trailing_comma_condition(
         &mut self,
         comma: Option<&Cst>,
@@ -668,7 +780,7 @@ impl FormatterState {
     ) -> Option<Cst> {
         let should_have_comma = match info.trailing_comma_condition {
             Some(TrailingCommaCondition::Always) => true,
-            Some(TrailingCommaCondition::UnlessFitsIn(max_width)) => fits_in_width(max_width),
+            Some(TrailingCommaCondition::UnlessFitsIn(max_width)) => !fits_in_width(max_width),
             None => comma.is_some(),
         };
         if should_have_comma {
@@ -829,6 +941,60 @@ mod test {
         test("(foo# abc\n  , bar,)", "(\n  foo, # abc\n  bar,\n)\n");
     }
     #[test]
+    fn test_struct() {
+        // Empty
+        test("[]", "[]\n");
+        test("[ ]", "[]\n");
+        test("[\n]", "[]\n");
+
+        // Single item
+        test("[foo]", "[foo]\n");
+        test("[foo ]", "[foo]\n");
+        test("[\n  foo]", "[foo]\n");
+        test("[\n  foo\n]", "[foo]\n");
+        test("[foo: bar]", "[foo: bar]\n");
+        test("[ foo :bar ] ", "[foo: bar]\n");
+        test("[\n  foo:\n    bar,\n]", "[foo: bar]\n");
+        test(
+            "[veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItemmm]",
+            "[veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItemmm]\n",
+        );
+        test(
+            "[veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItemmmm]",
+            "[\n  veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItemmmm,\n]\n",
+        );
+        test(
+            "[\n  veryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongKey: value\n]",
+            "[veryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongKey: value]\n",
+        );
+        test(
+            "[veryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryLongKey: veryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryLongValue]",
+            "[\n  veryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryLongKey:\n    veryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryLongValue,\n]\n",
+        );
+
+        // Multiple items
+        test("[foo: bar, baz]", "[foo: bar, baz]\n");
+        test("[foo: bar, baz,]", "[foo: bar, baz]\n");
+        test("[foo: bar, baz: blub,]", "[foo: bar, baz: blub]\n");
+        test("[ foo :bar ,baz , ]", "[foo: bar, baz]\n");
+        test("[\n  foo :\n    bar ,\n  baz ,\n]", "[foo: bar, baz]\n");
+        test(
+            "[item1, veryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongKey: value]",
+            "[\n  item1,\n  veryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongKey: value,\n]\n",
+        );
+
+        // Comments
+        test("[foo] # abc", "[foo] # abc\n");
+        test("[foo: bar] # abc", "[foo: bar] # abc\n");
+        test("[foo: bar # abc\n]", "[\n  foo: bar, # abc\n]\n");
+        test("[foo: # abc\n  bar\n]", "[\n  foo: # abc\n    bar,\n]\n");
+        test("[# abc\n  foo: bar]", "[ # abc\n  foo: bar,\n]\n");
+        test(
+            "[foo: bar # abc\n  , baz]",
+            "[\n  foo: bar, # abc\n  baz,\n]\n",
+        );
+    }
+    #[test]
     fn test_struct_access() {
         test("foo.bar", "foo.bar\n");
         test("foo.bar.baz", "foo.bar.baz\n");
@@ -893,6 +1059,8 @@ mod test {
     fn test(source: &str, expected: &str) {
         let csts = parse_rcst(source).to_csts();
         assert_eq!(source, csts.iter().join(""));
+
+        // dbg!(&csts);
 
         let formatted = csts.as_slice().format_to_string();
         assert_eq!(formatted, expected);

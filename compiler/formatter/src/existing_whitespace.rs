@@ -20,11 +20,28 @@ pub impl SplitTrailingWhitespace for Cst {
                 (child, child_whitespace.merge_into(whitespace))
             }
             CstKind::ListItem { value, comma } => {
-                // Move potential comments before the comma to the end of the list item.
+                // Move potential comments before the comma to the end of the item.
                 let (value, value_whitespace) = value.split_trailing_whitespace();
                 let cst = Cst {
                     data: self.data.clone(),
                     kind: CstKind::ListItem {
+                        value: Box::new(value.into_owned()),
+                        comma: comma.to_owned(),
+                    },
+                };
+                (Cow::Owned(cst), value_whitespace)
+            }
+            CstKind::StructField {
+                key_and_colon,
+                value,
+                comma,
+            } => {
+                // Move potential comments before the comma to the end of the field.
+                let (value, value_whitespace) = value.split_trailing_whitespace();
+                let cst = Cst {
+                    data: self.data.clone(),
+                    kind: CstKind::StructField {
+                        key_and_colon: key_and_colon.to_owned(),
                         value: Box::new(value.into_owned()),
                         comma: comma.to_owned(),
                     },
