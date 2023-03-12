@@ -1,3 +1,4 @@
+use crate::Indentation;
 use candy_frontend::{
     cst::{Cst, CstData, CstError, CstKind, Id},
     id::IdGenerator,
@@ -5,8 +6,6 @@ use candy_frontend::{
 use derive_more::From;
 use extension_trait::extension_trait;
 use std::{borrow::Cow, ops::Range};
-
-use crate::Indentation;
 
 #[extension_trait]
 pub impl SplitTrailingWhitespace for Cst {
