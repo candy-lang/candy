@@ -2440,6 +2440,7 @@ mod parse {
                 let last = fields.pop().unwrap();
                 fields.push(last.wrap_in_whitespace(whitespace));
             }
+            outer_input = input;
 
             // The key if it's explicit or the value when using a shorthand.
             let (input, key_or_value) =
@@ -2584,6 +2585,18 @@ mod parse {
                 "",
                 CstKind::Struct {
                     opening_bracket: Box::new(CstKind::OpeningBracket.into()),
+                    fields: vec![],
+                    closing_bracket: Box::new(CstKind::ClosingBracket.into()),
+                }
+                .into(),
+            )),
+        );
+        assert_eq!(
+            struct_("[ ]", 0),
+            Some((
+                "",
+                CstKind::Struct {
+                    opening_bracket: Box::new(CstKind::OpeningBracket.with_trailing_space()),
                     fields: vec![],
                     closing_bracket: Box::new(CstKind::ClosingBracket.into()),
                 }
