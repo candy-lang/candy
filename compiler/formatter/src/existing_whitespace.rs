@@ -154,7 +154,7 @@ impl ExistingWhitespace<'_> {
             (None, _) => outer,
             (Some(inner_trailing_whitespace), Some(outer_trailing_whitespace)) => {
                 let mut trailing_whitespace = inner_trailing_whitespace.to_vec();
-                trailing_whitespace.extend(outer_trailing_whitespace.iter().cloned());
+                trailing_whitespace.extend_from_slice(outer_trailing_whitespace);
                 ExistingWhitespace {
                     child_end_offset: self.child_end_offset,
                     trailing_whitespace: Some(Cow::Owned(trailing_whitespace)),
