@@ -184,9 +184,7 @@ fn format_csts(edits: &mut TextEdits, csts: &[Cst], info: &FormatterInfo) -> Wid
         }
 
         let (not_whitespace_width, whitespace) = format_cst(edits, not_whitespace, info).split();
-        if let Some(whitespace) = whitespace.take() {
-            inject_whitespace(whitespace.into_owned(), &mut csts, index);
-        }
+        inject_whitespace(whitespace.take().into_owned(), &mut csts, index);
         if width.is_none() {
             width = Some(not_whitespace_width);
         } else {
@@ -233,9 +231,7 @@ fn format_csts(edits: &mut TextEdits, csts: &[Cst], info: &FormatterInfo) -> Wid
                     }
 
                     let (_, whitespace) = format_cst(edits, next, info).split();
-                    if let Some(whitespace) = whitespace.take() {
-                        inject_whitespace(whitespace.into_owned(), &mut csts, index);
-                    }
+                    inject_whitespace(whitespace.take().into_owned(), &mut csts, index);
                     index += 1;
                 }
                 _ => {
@@ -250,9 +246,7 @@ fn format_csts(edits: &mut TextEdits, csts: &[Cst], info: &FormatterInfo) -> Wid
                     edits.change(whitespace_span, info.indentation.to_string());
 
                     let (_, whitespace) = format_cst(edits, next, info).split();
-                    if let Some(whitespace) = whitespace.take() {
-                        inject_whitespace(whitespace.into_owned(), &mut csts, index);
-                    }
+                    inject_whitespace(whitespace.take().into_owned(), &mut csts, index);
 
                     index += 1;
                 }

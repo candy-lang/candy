@@ -10,9 +10,9 @@ use std::borrow::Cow;
 #[derive(Clone, Debug)]
 pub struct ExistingWhitespace<'a> {
     start_offset: Offset,
-    adopted_whitespace_before: Option<Cow<'a, [Cst]>>,
-    whitespace: Option<Cow<'a, [Cst]>>,
-    adopted_whitespace_after: Option<Cow<'a, [Cst]>>,
+    adopted_whitespace_before: Cow<'a, [Cst]>,
+    whitespace: Cow<'a, [Cst]>,
+    adopted_whitespace_after: Cow<'a, [Cst]>,
 }
 #[derive(Clone, Debug, From)]
 pub enum TrailingWhitespace {
@@ -28,9 +28,9 @@ impl<'a> ExistingWhitespace<'a> {
     pub fn empty(start_offset: Offset) -> Self {
         Self {
             start_offset,
-            adopted_whitespace_before: None,
-            whitespace: None,
-            adopted_whitespace_after: None,
+            adopted_whitespace_before: Cow::default(),
+            whitespace: Cow::default(),
+            adopted_whitespace_after: Cow::default(),
         }
     }
     pub fn new(start_offset: Offset, whitespace: impl Into<Cow<'a, [Cst]>>) -> Self {
@@ -41,26 +41,24 @@ impl<'a> ExistingWhitespace<'a> {
 
         Self {
             start_offset,
-            adopted_whitespace_before: None,
-            whitespace: Some(whitespace),
-            adopted_whitespace_after: None,
+            adopted_whitespace_before: Cow::default(),
+            whitespace,
+            adopted_whitespace_after: Cow::default(),
         }
     }
 
-    pub fn start_offset(&self) -> Offset {
-        self.start_offset
-    }
     pub fn end_offset(&self) -> Offset {
         self.whitespace
             .as_ref()
-            .map(|it| it.as_ref().last().unwrap().data.span.end)
+            .last()
+            .map(|it| it.data.span.end)
             .unwrap_or(self.start_offset)
     }
-    pub fn whitespace_ref(&self) -> Option<&[Cst]> {
-        self.whitespace.as_ref().map(|it| it.as_ref())
+    pub fn whitespace_ref(&self) -> &[Cst] {
+        self.whitespace.as_ref()
     }
 
-    pub fn take(self) -> Option<Cow<'a, [Cst]>> {
+    pub fn take(self) -> Cow<'a, [Cst]> {
         self.whitespace
     }
     pub fn empty_and_move_comments_to(
@@ -68,9 +66,9 @@ impl<'a> ExistingWhitespace<'a> {
         edits: &mut TextEdits,
         other: &mut ExistingWhitespace<'a>,
     ) {
-        if self.adopted_whitespace_before.is_none()
-            && self.whitespace.is_none()
-            && self.adopted_whitespace_after.is_none()
+        if self.adopted_whitespace_before.is_empty()
+            && self.whitespace.is_empty()
+            && self.adopted_whitespace_after.is_empty()
         {
             return;
         }
@@ -79,102 +77,66 @@ impl<'a> ExistingWhitespace<'a> {
         if self.start_offset <= other.start_offset {
             assert!(self_end_offset <= other.start_offset);
             if self_end_offset == other.start_offset
-                && self.adopted_whitespace_before.is_none()
-                && self.adopted_whitespace_after.is_none()
-                && other.adopted_whitespace_before.is_none()
+                && self.adopted_whitespace_before.is_empty()
+                && self.adopted_whitespace_after.is_empty()
+                && other.adopted_whitespace_before.is_empty()
             {
-                if let Some(self_whitespace) = self.whitespace {
-                    prepend(self_whitespace, &mut other.whitespace);
-                }
-                if let Some(self_adopted_whitespace_before) = self.adopted_whitespace_before {
-                    prepend(self_adopted_whitespace_before, &mut other.whitespace);
-                }
+                prepend(self.whitespace, &mut other.whitespace);
+                prepend(self.adopted_whitespace_before, &mut other.whitespace);
                 return;
             }
 
-            if let Some(other_adopted_whitespace_before) = &other.adopted_whitespace_before {
-                let other_adopted_start_offset = other_adopted_whitespace_before
-                    .as_ref()
-                    .first()
-                    .unwrap()
-                    .data
-                    .span
-                    .start;
+            if let Some(other_adopted_first) = &other.adopted_whitespace_before.first() {
+                let other_adopted_start_offset = other_adopted_first.data.span.start;
                 assert!(self_end_offset <= other_adopted_start_offset);
             }
-            if let Some(self_adopted_whitespace_after) = self.adopted_whitespace_after {
-                prepend(
-                    self_adopted_whitespace_after,
-                    &mut other.adopted_whitespace_before,
-                );
-            }
-            if let Some(self_whitespace) = self.whitespace {
-                prepend(self_whitespace, &mut other.adopted_whitespace_before);
-            }
-            if let Some(self_adopted_whitespace_before) = self.adopted_whitespace_before {
-                prepend(
-                    self_adopted_whitespace_before,
-                    &mut other.adopted_whitespace_before,
-                );
-            }
+            prepend(
+                self.adopted_whitespace_after,
+                &mut other.adopted_whitespace_before,
+            );
+            prepend(self.whitespace, &mut other.adopted_whitespace_before);
+            prepend(
+                self.adopted_whitespace_before,
+                &mut other.adopted_whitespace_before,
+            );
         } else {
             let other_end_offset = other
                 .whitespace
-                .as_ref()
-                .map(|it| it.as_ref().last().unwrap().data.span.end)
+                .last()
+                .map(|it| it.data.span.end)
                 .unwrap_or_else(|| other.start_offset);
             if self.start_offset == other_end_offset
-                && other.adopted_whitespace_after.is_none()
-                && self.adopted_whitespace_before.is_none()
-                && self.adopted_whitespace_after.is_none()
+                && other.adopted_whitespace_after.is_empty()
+                && self.adopted_whitespace_before.is_empty()
+                && self.adopted_whitespace_after.is_empty()
             {
-                if let Some(self_whitespace) = self.whitespace {
-                    append(self_whitespace, &mut other.whitespace);
-                }
-                if let Some(self_adopted_whitespace_after) = self.adopted_whitespace_after {
-                    append(self_adopted_whitespace_after, &mut other.whitespace);
-                }
+                append(self.whitespace, &mut other.whitespace);
+                append(self.adopted_whitespace_after, &mut other.whitespace);
                 return;
             }
 
-            if let Some(other_adopted_whitespace_after) = &other.adopted_whitespace_after {
-                let other_adopted_end_offset = other_adopted_whitespace_after
-                    .as_ref()
-                    .last()
-                    .unwrap()
-                    .data
-                    .span
-                    .end;
+            if let Some(other_adopted_last) = &other.adopted_whitespace_after.last() {
+                let other_adopted_end_offset = other_adopted_last.data.span.end;
                 assert!(other_adopted_end_offset <= self.start_offset);
             }
-            if let Some(self_adopted_whitespace_before) = self.adopted_whitespace_before {
-                append(
-                    self_adopted_whitespace_before,
-                    &mut other.adopted_whitespace_after,
-                );
-            }
-            if let Some(self_whitespace) = self.whitespace {
-                append(self_whitespace, &mut other.adopted_whitespace_after);
-            }
-            if let Some(self_adopted_whitespace_after) = self.adopted_whitespace_after {
-                append(
-                    self_adopted_whitespace_after,
-                    &mut other.adopted_whitespace_after,
-                );
-            }
+            append(
+                self.adopted_whitespace_before,
+                &mut other.adopted_whitespace_after,
+            );
+            append(self.whitespace, &mut other.adopted_whitespace_after);
+            append(
+                self.adopted_whitespace_after,
+                &mut other.adopted_whitespace_after,
+            );
         }
         edits.delete(self.start_offset..self_end_offset);
     }
 
     pub fn has_comments(&self) -> bool {
-        fn check(whitespace: &Option<Cow<[Cst]>>) -> bool {
+        fn check(whitespace: &[Cst]) -> bool {
             whitespace
-                .as_ref()
-                .map(|it| {
-                    it.iter()
-                        .any(|it| matches!(it.kind, CstKind::Comment { .. }))
-                })
-                .unwrap_or_default()
+                .iter()
+                .any(|it| matches!(it.kind, CstKind::Comment { .. }))
         }
 
         check(&self.adopted_whitespace_before)
@@ -205,35 +167,26 @@ impl<'a> ExistingWhitespace<'a> {
     pub fn into_empty_trailing(self, edits: &mut TextEdits) {
         assert!(!self.has_comments());
 
-        for whitespace in self.whitespace_ref().unwrap_or_default() {
+        for whitespace in self.whitespace_ref() {
             edits.delete(whitespace.data.span.to_owned());
         }
     }
     pub fn into_trailing_with_space(self, edits: &mut TextEdits) {
         assert!(!self.has_comments());
 
-        if let Some(whitespace) = self.whitespace_ref() {
-            edits.change(
-                whitespace.first().unwrap().data.span.start
-                    ..whitespace.last().unwrap().data.span.end,
-                SPACE,
-            );
+        if let Some((first, last)) = first_and_last(self.whitespace.as_ref()) {
+            edits.change(first.data.span.start..last.data.span.end, SPACE);
         } else {
             edits.insert(self.start_offset, SPACE);
         }
     }
     pub fn into_trailing_with_indentation(self, edits: &mut TextEdits, indentation: Indentation) {
-        fn iter_whitespace<'a>(
-            whitespace: &'a Option<Cow<'a, [Cst]>>,
+        fn iter_whitespace(
+            whitespace: &[Cst],
             offset_override: impl Into<Option<Offset>>,
-        ) -> impl Iterator<Item = (&'a Cst, Option<Offset>)> {
+        ) -> impl Iterator<Item = (&Cst, Option<Offset>)> {
             let offset_override = offset_override.into();
-            whitespace
-                .as_ref()
-                .map(|it| it.as_ref())
-                .unwrap_or_default()
-                .iter()
-                .map(move |it| (it, offset_override))
+            whitespace.iter().map(move |it| (it, offset_override))
         }
 
         // For adopted items, we need an offset override: The position where adopted comments will
@@ -334,30 +287,38 @@ impl<'a> ExistingWhitespace<'a> {
     }
 }
 
-fn append<'a>(source: Cow<'a, [Cst]>, mut target: &mut Option<Cow<'a, [Cst]>>) {
-    if let Some(target) = &mut target {
+fn append<'a>(source: Cow<'a, [Cst]>, target: &mut Cow<'a, [Cst]>) {
+    if source.is_empty() {
+        return;
+    }
+
+    if target.is_empty() {
+        *target = source;
+    } else {
         match source {
             Cow::Borrowed(source) => target.to_mut().extend_from_slice(source),
             Cow::Owned(mut source) => target.to_mut().append(&mut source),
         }
-    } else {
-        *target = Some(source);
     }
 }
-fn prepend<'a>(source: Cow<'a, [Cst]>, mut target: &mut Option<Cow<'a, [Cst]>>) {
-    if let Some(target) = &mut target {
+fn prepend<'a>(source: Cow<'a, [Cst]>, target: &mut Cow<'a, [Cst]>) {
+    if source.is_empty() {
+        return;
+    }
+
+    if target.is_empty() {
+        *target = source;
+    } else {
         target
             .to_mut()
             .splice(0..0, source.as_ref().iter().cloned());
-    } else {
-        *target = Some(source);
     }
 }
-fn first_and_last<I: Iterator>(
+fn first_and_last<I: IntoIterator>(
     iterator: I,
-) -> Option<(<I as Iterator>::Item, <I as Iterator>::Item)>
+) -> Option<(<I as IntoIterator>::Item, <I as IntoIterator>::Item)>
 where
-    <I as Iterator>::Item: Copy,
+    <I as IntoIterator>::Item: Copy,
 {
     let mut result = None;
     for item in iterator {
