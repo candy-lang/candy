@@ -1,5 +1,9 @@
 use extension_trait::extension_trait;
-use std::{iter::Sum, ops::Add};
+use std::{
+    fmt::{self, Display, Formatter},
+    iter::Sum,
+    ops::Add,
+};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Indentation(pub usize);
@@ -14,9 +18,13 @@ impl Indentation {
     pub fn with_indent(self) -> Self {
         Self(self.0 + 1)
     }
-
-    pub fn to_string(self) -> String {
-        " ".repeat(self.width())
+}
+impl Display for Indentation {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        for _ in 0..self.0 {
+            write!(f, "  ")?;
+        }
+        Ok(())
     }
 }
 

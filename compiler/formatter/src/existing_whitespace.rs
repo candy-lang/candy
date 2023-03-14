@@ -218,7 +218,7 @@ impl<'a> ExistingWhitespace<'a> {
             let offset = self.end_offset();
             offset..offset
         };
-        edits.change(range, format!("{NEWLINE}{}", indentation.to_string()));
+        edits.change(range, format!("{NEWLINE}{indentation}"));
     }
     fn format_trailing_comments(
         comments_and_whitespace: &[(&Cst, Option<Offset>)],
