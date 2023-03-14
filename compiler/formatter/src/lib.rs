@@ -314,13 +314,13 @@ pub(crate) fn format_cst<'a>(
             let child = format_cst(edits, child, info);
             let whitespace = if whitespace.is_empty() {
                 child.whitespace
-            } else if child.whitespace.trailing_whitespace_ref().is_none() {
-                ExistingWhitespace::new(child.whitespace.child_end_offset(), whitespace)
+            } else if child.whitespace.whitespace_ref().is_none() {
+                ExistingWhitespace::new(child.whitespace.start_offset(), whitespace)
             } else {
-                let child_end_offset = child.whitespace.child_end_offset();
+                let start_offset = child.whitespace.start_offset();
                 let mut new_whitespace = child.whitespace.take().unwrap().into_owned();
                 new_whitespace.extend_from_slice(whitespace);
-                ExistingWhitespace::new(child_end_offset, new_whitespace)
+                ExistingWhitespace::new(start_offset, new_whitespace)
             };
             return FormattedCst::new(child.min_width, whitespace);
         }
@@ -486,12 +486,15 @@ pub(crate) fn format_cst<'a>(
             );
         }
         CstKind::StructAccess { struct_, dot, key } => {
-            let struct_ = format_cst(edits, struct_, info);
-            let dot = format_cst(edits, dot, &info.with_indent());
-            // TODO: let struct_whitespace = dot_whitespace.merge_into(struct_whitespace);
+            // TODO: child_width vs min_width
+            let (struct_width, mut struct_whitespace) = format_cst(edits, struct_, info).split();
+
+            let (dot_width, dot_whitespace) = format_cst(edits, dot, &info.with_indent()).split();
+            dot_whitespace.empty_and_move_comments_to(edits, &mut struct_whitespace);
+
             let key = format_cst(edits, key, &info.with_indent());
 
-            let min_width = &struct_.min_width + &dot.min_width + &key.min_width;
+            let min_width = &struct_width + &dot_width + &key.min_width;
             let struct_trailing = if min_width.fits(info.indentation) {
                 TrailingWhitespace::None
             } else {
@@ -500,9 +503,7 @@ pub(crate) fn format_cst<'a>(
 
             let (key_width, whitespace) = key.split();
             return FormattedCst::new(
-                struct_.into_trailing(edits, struct_trailing)
-                    + dot.into_empty_trailing(edits)
-                    + key_width,
+                struct_whitespace.into_trailing(edits, struct_trailing) + dot_width + key_width,
                 whitespace,
             );
         }
@@ -965,8 +966,8 @@ mod test {
         test("foo# abc\n  .bar", "foo # abc\n  .bar\n");
         test("foo # abc\n  .bar", "foo # abc\n  .bar\n");
         test("foo  # abc\n  .bar", "foo # abc\n  .bar\n");
-        // test("foo .# abc\n  bar", "foo # abc\n  .bar\n"); // FIXME
-        // test("foo . # abc\n  bar", "foo # abc\n  .bar\n"); // FIXME
+        test("foo .# abc\n  bar", "foo # abc\n  .bar\n");
+        test("foo . # abc\n  bar", "foo # abc\n  .bar\n");
         test("foo .bar# abc", "foo.bar # abc\n");
         test("foo .bar # abc", "foo.bar # abc\n");
     }
