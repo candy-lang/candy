@@ -1,5 +1,4 @@
 use candy_frontend::cst::{Cst, CstKind};
-use extension_trait::extension_trait;
 use itertools::{FoldWhile, Itertools};
 use unicode_width::UnicodeWidthStr;
 

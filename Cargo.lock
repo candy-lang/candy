@@ -109,7 +109,6 @@ dependencies = [
  "derive_more",
  "extension-trait",
  "itertools",
- "traversal",
  "unicode-width",
 ]
 
@@ -1745,12 +1744,6 @@ dependencies = [
  "tracing-core",
  "tracing-log",
 ]
-
-[[package]]
-name = "traversal"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0ec9745d7517c8b8e8c0a65cba2d84e42f95fd348a01693c5e4da1bc6d00c99"
 
 [[package]]
 name = "typenum"

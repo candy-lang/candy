@@ -1,83 +1,138 @@
-use crate::Indentation;
+use crate::{text_edits::TextEdits, Indentation};
 use candy_frontend::{
-    cst::{Cst, CstData, CstError, CstKind, Id},
-    id::IdGenerator,
+    cst::{Cst, CstError, CstKind},
+    position::Offset,
 };
 use derive_more::From;
 use extension_trait::extension_trait;
-use std::{borrow::Cow, ops::Range};
+use std::borrow::Cow;
 
 #[extension_trait]
 pub impl SplitTrailingWhitespace for Cst {
     fn split_trailing_whitespace(&self) -> (Cow<Cst>, ExistingWhitespace) {
-        match &self.kind {
+        // TODO: improve
+        let (child, child_whitespace) = match &self.kind {
             CstKind::TrailingWhitespace { child, whitespace } => {
                 let (child, child_whitespace) = child.split_trailing_whitespace();
-                let whitespace = ExistingWhitespace::Some {
-                    id: self.data.id,
-                    trailing_whitespace: Cow::Borrowed(whitespace),
+                if whitespace.is_empty() {
+                    return (child, child_whitespace);
+                }
+
+                let whitespace = ExistingWhitespace {
+                    child_end_offset: child.data.span.end,
+                    trailing_whitespace: Some(Cow::Borrowed(whitespace)),
                 };
-                (child, child_whitespace.merge_into(whitespace))
+                (child, child_whitespace.merge_into_outer(whitespace))
             }
-            CstKind::ListItem { value, comma } => {
-                // Move potential comments before the comma to the end of the item.
-                let (value, value_whitespace) = value.split_trailing_whitespace();
-                let cst = Cst {
-                    data: self.data.clone(),
-                    kind: CstKind::ListItem {
-                        value: Box::new(value.into_owned()),
-                        comma: comma.to_owned(),
-                    },
-                };
-                (Cow::Owned(cst), value_whitespace)
-            }
-            CstKind::StructField {
-                key_and_colon,
-                value,
-                comma,
-            } => {
-                // Move potential comments before the comma to the end of the field.
-                let (value, value_whitespace) = value.split_trailing_whitespace();
-                let cst = Cst {
-                    data: self.data.clone(),
-                    kind: CstKind::StructField {
-                        key_and_colon: key_and_colon.to_owned(),
-                        value: Box::new(value.into_owned()),
-                        comma: comma.to_owned(),
-                    },
-                };
-                (Cow::Owned(cst), value_whitespace)
-            }
-            _ => (Cow::Borrowed(self), ExistingWhitespace::None),
+            // CstKind::Parenthesized {
+            //     opening_parenthesis,
+            //     inner,
+            //     closing_parenthesis,
+            // } => {
+            //     let (closing_parenthesis, closing_parenthesis_whitespace) =
+            //         closing_parenthesis.split_trailing_whitespace();
+            //     let cst = Cst {
+            //         data: self.data.clone(),
+            //         kind: CstKind::Parenthesized {
+            //             opening_parenthesis: opening_parenthesis.to_owned(),
+            //             inner: inner.to_owned(),
+            //             closing_parenthesis: Box::new(closing_parenthesis.into_owned()),
+            //         },
+            //     };
+            //     (Cow::Owned(cst), closing_parenthesis_whitespace)
+            // }
+            // CstKind::Call {
+            //     receiver,
+            //     arguments,
+            // } => {
+            //     let arguments = arguments.to_owned();
+            //     let last_argument = arguments.pop().unwrap();
+            //     let (last_argument, last_argument_whitespace) =
+            //         last_argument.split_trailing_whitespace();
+            //     arguments.push(last_argument.into_owned());
+            //     let cst = Cst {
+            //         data: self.data.clone(),
+            //         kind: CstKind::Call {
+            //             receiver: receiver.to_owned(),
+            //             arguments,
+            //         },
+            //     };
+            //     (Cow::Owned(cst), last_argument_whitespace)
+            // }
+            // CstKind::ListItem { value, comma } => {
+            //     // Move potential comments before the comma to the end of the item.
+            //     let (value, value_whitespace) = value.split_trailing_whitespace();
+            //     let cst = Cst {
+            //         data: self.data.clone(),
+            //         kind: CstKind::ListItem {
+            //             value: Box::new(value.into_owned()),
+            //             comma: comma.to_owned(),
+            //         },
+            //     };
+            //     (Cow::Owned(cst), value_whitespace)
+            // }
+            // CstKind::StructField {
+            //     key_and_colon,
+            //     value,
+            //     comma,
+            // } => {
+            //     // Move potential comments before the comma to the end of the field.
+            //     let (value, value_whitespace) = value.split_trailing_whitespace();
+            //     let cst = Cst {
+            //         data: self.data.clone(),
+            //         kind: CstKind::StructField {
+            //             key_and_colon: key_and_colon.to_owned(),
+            //             value: Box::new(value.into_owned()),
+            //             comma: comma.to_owned(),
+            //         },
+            //     };
+            //     (Cow::Owned(cst), value_whitespace)
+            // }
+            // TODO: struct access key
+            _ => (
+                Cow::Borrowed(self),
+                ExistingWhitespace {
+                    child_end_offset: self.data.span.end,
+                    trailing_whitespace: None,
+                },
+            ),
+        };
+
+        if child_whitespace.trailing_whitespace_ref().is_none() {
+            let child_whitespace = ExistingWhitespace {
+                child_end_offset: child.data.span.end,
+                trailing_whitespace: None,
+            };
+            return (child, child_whitespace);
         }
+
+        (child, child_whitespace)
     }
 }
 
-pub enum ExistingWhitespace<'a> {
-    None,
-    Some {
-        id: Id,
-        trailing_whitespace: Cow<'a, [Cst]>,
-    },
+#[derive(Clone, Debug)]
+pub struct ExistingWhitespace<'a> {
+    child_end_offset: Offset,
+    trailing_whitespace: Option<Cow<'a, [Cst]>>,
 }
-#[derive(Clone, From)]
+#[derive(Clone, Debug, From)]
 pub enum TrailingWhitespace {
     None,
     Space,
     Indentation(Indentation),
 }
+
+pub const SPACE: &str = " ";
+pub const NEWLINE: &str = "\n";
+
 impl ExistingWhitespace<'_> {
-    fn trailing_whitespace(&self) -> Option<&[Cst]> {
-        match self {
-            ExistingWhitespace::None => None,
-            ExistingWhitespace::Some {
-                trailing_whitespace,
-                ..
-            } => Some(trailing_whitespace),
-        }
+    pub fn trailing_whitespace_ref(&self) -> Option<&[Cst]> {
+        self.trailing_whitespace.as_ref().map(|it| it.as_ref())
     }
+
     pub fn has_comments(&self) -> bool {
-        self.trailing_whitespace()
+        self.trailing_whitespace
+            .as_ref()
             .map(|it| {
                 it.iter()
                     .any(|it| matches!(it.kind, CstKind::Comment { .. }))
@@ -85,125 +140,78 @@ impl ExistingWhitespace<'_> {
             .unwrap_or_default()
     }
 
-    pub fn merge_into(self, other: Self) -> Self {
-        match (self, other) {
-            (this, ExistingWhitespace::None) => this,
-            (ExistingWhitespace::None, other) => other,
-            (
-                ExistingWhitespace::Some {
-                    trailing_whitespace: self_trailing_whitespace,
-                    ..
-                },
-                ExistingWhitespace::Some {
-                    id,
-                    trailing_whitespace: other_trailing_whitespace,
-                },
-            ) => {
-                let mut trailing_whitespace = self_trailing_whitespace.to_vec();
-                trailing_whitespace.extend(other_trailing_whitespace.iter().cloned());
-                ExistingWhitespace::Some {
-                    id,
-                    trailing_whitespace: Cow::Owned(trailing_whitespace),
+    pub fn merge_into_outer(self, outer: Self) -> Self {
+        assert_eq!(
+            self.trailing_whitespace
+                .as_ref()
+                .map(|it| it.last().unwrap().data.span.end)
+                .unwrap_or_else(|| self.child_end_offset),
+            outer.child_end_offset,
+        );
+
+        match (&self.trailing_whitespace, &outer.trailing_whitespace) {
+            (_, None) => self,
+            (None, _) => outer,
+            (Some(inner_trailing_whitespace), Some(outer_trailing_whitespace)) => {
+                let mut trailing_whitespace = inner_trailing_whitespace.to_vec();
+                trailing_whitespace.extend(outer_trailing_whitespace.iter().cloned());
+                ExistingWhitespace {
+                    child_end_offset: self.child_end_offset,
+                    trailing_whitespace: Some(Cow::Owned(trailing_whitespace)),
                 }
             }
         }
     }
 
-    pub fn into_trailing(
-        self,
-        id_generator: &mut IdGenerator<Id>,
-        child: Cst,
-        trailing: impl Into<TrailingWhitespace>,
-    ) -> Cst {
-        match trailing.into() {
-            TrailingWhitespace::None => self.into_empty_trailing(child),
-            TrailingWhitespace::Space => self.into_trailing_with_space(id_generator, child),
-            TrailingWhitespace::Indentation(indentation) => {
-                self.into_trailing_with_indentation(id_generator, child, indentation)
-            }
+    pub fn into_empty_trailing(self, edits: &mut TextEdits) {
+        assert!(!self.has_comments());
+
+        for whitespace in self.trailing_whitespace_ref().unwrap_or_default() {
+            edits.delete(whitespace.data.span.to_owned());
         }
     }
-    pub fn into_empty_trailing(self, child: Cst) -> Cst {
+    pub fn into_trailing_with_space(self, edits: &mut TextEdits) {
         assert!(!self.has_comments());
 
-        child
+        if let Some(whitespace) = self.trailing_whitespace_ref() {
+            edits.change(
+                whitespace.first().unwrap().data.span.start
+                    ..whitespace.last().unwrap().data.span.end,
+                SPACE,
+            );
+        } else {
+            edits.insert(self.child_end_offset, SPACE);
+        }
     }
-    pub fn into_trailing_with_space(self, id_generator: &mut IdGenerator<Id>, child: Cst) -> Cst {
-        assert!(!self.has_comments());
-
-        let final_whitespace_id = self
-            .trailing_whitespace()
-            .unwrap_or_default()
-            .iter()
-            .find(|it| matches!(it.kind, CstKind::Whitespace(_)))
-            .map(|it| it.data.id)
-            .unwrap_or(id_generator.generate());
-        let whitespace = vec![Cst {
-            data: CstData {
-                id: final_whitespace_id,
-                span: Range::default(),
-            },
-            kind: CstKind::Whitespace(" ".to_owned()),
-        }];
-        self.into_trailing_helper(id_generator, child, whitespace)
-    }
-    pub fn into_trailing_with_indentation(
-        self,
-        id_generator: &mut IdGenerator<Id>,
-        child: Cst,
-        indentation: Indentation,
-    ) -> Cst {
-        let trailing_whitespace = self.trailing_whitespace().unwrap_or_default();
+    pub fn into_trailing_with_indentation(self, edits: &mut TextEdits, indentation: Indentation) {
+        let trailing_whitespace = self.trailing_whitespace_ref().unwrap_or_default();
         let last_comment_index = trailing_whitespace
             .iter()
             .rposition(|it| matches!(it.kind, CstKind::Comment { .. }));
         let split_index = last_comment_index.map(|it| it + 1).unwrap_or_default();
         let (comments_and_whitespace, final_whitespace) = trailing_whitespace.split_at(split_index);
 
-        let mut whitespace =
-            Self::format_trailing_comments(comments_and_whitespace, id_generator, indentation);
+        Self::format_trailing_comments(comments_and_whitespace, edits, indentation);
 
-        let existing_newline_index = final_whitespace
-            .iter()
-            .position(|it| matches!(it.kind, CstKind::Newline(_)));
-        let newline_id = existing_newline_index
-            .map(|it| final_whitespace[it].data.id)
-            .unwrap_or(id_generator.generate());
-        whitespace.push(Cst {
-            data: CstData {
-                id: newline_id,
-                span: Range::default(),
-            },
-            kind: CstKind::Newline("\n".to_owned()),
-        });
-
-        if indentation.is_indented() {
-            let search_start_index = existing_newline_index.map(|it| it + 1).unwrap_or_default();
-            let indentation_id = final_whitespace[search_start_index..]
-                .iter()
-                .find(|it| matches!(it.kind, CstKind::Whitespace(_)))
-                .map(|it| it.data.id)
-                .unwrap_or(id_generator.generate());
-            whitespace.push(Cst {
-                data: CstData {
-                    id: indentation_id,
-                    span: Range::default(),
-                },
-                kind: indentation.to_cst_kind(),
-            });
-        }
-
-        self.into_trailing_helper(id_generator, child, whitespace)
+        let range = if final_whitespace.is_empty() {
+            let offset = comments_and_whitespace
+                .last()
+                .map(|it| it.data.span.end)
+                .unwrap_or(self.child_end_offset);
+            offset..offset
+        } else {
+            final_whitespace.first().unwrap().data.span.start
+                ..final_whitespace.last().unwrap().data.span.end
+        };
+        edits.change(range, format!("{NEWLINE}{}", indentation.to_string()));
     }
     fn format_trailing_comments(
         comments_and_whitespace: &[Cst],
-        id_generator: &mut IdGenerator<Id>,
+        edits: &mut TextEdits,
         indentation: Indentation,
-    ) -> Vec<Cst> {
-        let mut whitespace = vec![];
+    ) {
         let mut is_comment_on_same_line = true;
-        let mut last_newline_id = None;
-        let mut last_whitespace_id = None;
+        let mut last_whitespace_range = None;
         for item in comments_and_whitespace {
             match &item.kind {
                 CstKind::Whitespace(_)
@@ -211,78 +219,55 @@ impl ExistingWhitespace<'_> {
                     error: CstError::TooMuchWhitespace,
                     ..
                 } => {
-                    last_whitespace_id = Some(item.data.id);
+                    if let Some(range) = last_whitespace_range {
+                        edits.delete(range);
+                    }
+                    last_whitespace_range = Some(item.data.span.to_owned());
                 }
                 CstKind::Newline(_) => {
-                    is_comment_on_same_line = false;
-                    last_newline_id = Some(item.data.id);
-                    last_whitespace_id = None;
+                    if is_comment_on_same_line {
+                        if let Some(range) = last_whitespace_range {
+                            // Delete trailing spaces in the previous line.
+                            edits.delete(range);
+                            last_whitespace_range = None;
+                        }
+
+                        is_comment_on_same_line = false;
+                        edits.change(item.data.span.to_owned(), NEWLINE);
+                    } else {
+                        // We already encountered and kept a newline, so we can delete this one.
+                        edits.delete(item.data.span.to_owned());
+                    }
                 }
                 CstKind::Comment { .. } => {
-                    if is_comment_on_same_line {
-                        assert_eq!(last_newline_id, None);
-                        whitespace.push(Cst {
-                            data: CstData {
-                                id: last_whitespace_id.unwrap_or(id_generator.generate()),
-                                span: Range::default(),
-                            },
-                            kind: CstKind::Whitespace(" ".to_owned()),
-                        });
+                    let space = if is_comment_on_same_line {
+                        Cow::Borrowed(SPACE)
                     } else {
-                        whitespace.push(Cst {
-                            data: CstData {
-                                id: last_newline_id.unwrap_or(id_generator.generate()),
-                                span: Range::default(),
-                            },
-                            kind: CstKind::Newline("\n".to_owned()),
-                        });
-                        whitespace.push(Cst {
-                            data: CstData {
-                                id: last_whitespace_id.unwrap_or(id_generator.generate()),
-                                span: Range::default(),
-                            },
-                            kind: indentation.to_cst_kind(),
-                        });
+                        Cow::Owned(indentation.to_string())
+                    };
+                    if let Some(range) = last_whitespace_range {
+                        edits.change(range, space);
+                    } else {
+                        edits.insert(item.data.span.start, space);
                     }
-                    whitespace.push(item.clone());
-                    last_newline_id = None;
-                    last_whitespace_id = None;
+
+                    is_comment_on_same_line = false;
+                    last_whitespace_range = None;
+                    // TODO: Handle multiple comments on the same line.
                 }
                 _ => unreachable!(),
             }
-        }
-        whitespace
-    }
-    fn into_trailing_helper(
-        self,
-        id_generator: &mut IdGenerator<Id>,
-        child: Cst,
-        whitespace: Vec<Cst>,
-    ) -> Cst {
-        Cst {
-            data: CstData {
-                id: match self {
-                    ExistingWhitespace::None => id_generator.generate(),
-                    ExistingWhitespace::Some { id, .. } => id,
-                },
-                span: Range::default(),
-            },
-            kind: CstKind::TrailingWhitespace {
-                child: Box::new(child),
-                whitespace,
-            },
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::{existing_whitespace::SplitTrailingWhitespace, Indentation};
-    use candy_frontend::{
-        cst::CstKind, id::IdGenerator, rcst_to_cst::RcstsToCstsExt, string_to_rcst::parse_rcst,
-    };
-
     use super::TrailingWhitespace;
+    use crate::{
+        existing_whitespace::SplitTrailingWhitespace, text_edits::TextEdits, width::Indentation,
+    };
+    use candy_frontend::{cst::CstKind, rcst_to_cst::RcstsToCstsExt, string_to_rcst::parse_rcst};
 
     #[test]
     fn test_empty_trailing() {
@@ -318,13 +303,18 @@ mod test {
             CstKind::Call { receiver, .. } => receiver,
             _ => panic!("Expected a call"),
         };
+        let reduced_source = cst.to_string();
 
-        let (cst, trailing_whitespace) = cst.split_trailing_whitespace();
+        let (_, trailing_whitespace) = cst.split_trailing_whitespace();
 
-        let mut id_generator = IdGenerator::default();
-        let formatted = trailing_whitespace
-            .into_trailing(&mut id_generator, cst.into_owned(), trailing)
-            .to_string();
-        assert_eq!(formatted, expected);
+        let mut edits = TextEdits::new(reduced_source);
+        match trailing.into() {
+            TrailingWhitespace::None => trailing_whitespace.into_empty_trailing(&mut edits),
+            TrailingWhitespace::Space => trailing_whitespace.into_trailing_with_space(&mut edits),
+            TrailingWhitespace::Indentation(indentation) => {
+                trailing_whitespace.into_trailing_with_indentation(&mut edits, indentation)
+            }
+        }
+        assert_eq!(edits.apply(), expected);
     }
 }
