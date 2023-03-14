@@ -7,13 +7,12 @@ use candy_frontend::{
     cst::{Cst, CstError, CstKind},
     position::Offset,
 };
-use existing_whitespace::{
-    ExistingWhitespace, SplitTrailingWhitespace, TrailingWhitespace, NEWLINE, SPACE,
-};
+use existing_whitespace::{ExistingWhitespace, TrailingWhitespace, NEWLINE, SPACE};
 use extension_trait::extension_trait;
 use itertools::Itertools;
-use std::ops::Range;
+use std::{borrow::Cow, ops::Range};
 use text_edits::TextEdits;
+use traversal::dft_post_rev;
 use width::{Indentation, Width};
 
 mod existing_whitespace;
@@ -31,7 +30,7 @@ pub impl<C: AsRef<[Cst]>> Formatter for C {
         // TOOD: Is there an elegant way to avoid stringifying the whole CST?
         let source = csts.iter().join("");
         let mut edits = TextEdits::new(source);
-        format_csts(&mut edits, csts.iter(), &FormatterInfo::default());
+        format_csts(&mut edits, csts, &FormatterInfo::default());
         edits
     }
 }
@@ -70,7 +69,7 @@ enum TrailingCommaCondition {
 /// consecutively.
 const MAX_CONSECUTIVE_EMPTY_LINES: usize = 2;
 
-fn format_csts(edits: &mut TextEdits, csts: impl AsRef<[Cst]>, info: &FormatterInfo) -> Width {
+fn format_csts(edits: &mut TextEdits, csts: &[Cst], info: &FormatterInfo) -> Width {
     // In the formatted output, is this the first line with actual content (i.e., an expression
     // or comment)?
     let mut is_first_content_line = true;
@@ -78,11 +77,16 @@ fn format_csts(edits: &mut TextEdits, csts: impl AsRef<[Cst]>, info: &FormatterI
     let mut width = None;
 
     let mut empty_line_count = 0;
-    let csts = csts.as_ref();
+    let mut csts = Cow::Borrowed(csts);
     let mut index = 0;
     let mut pending_newlines = vec![];
+
+    let inject_whitespace = move |whitespace: Vec<Cst>, csts: &mut Cow<'_, [Cst]>, index: usize| {
+        csts.to_mut().splice(index + 1..index + 1, whitespace);
+    };
+
     'outer: while index < csts.len() {
-        let cst = &csts[index];
+        let cst = &csts.as_ref()[index];
 
         if let CstKind::Newline(_) = cst.kind {
             // Remove leading newlines and limit the number of consecutive empty lines.
@@ -179,7 +183,10 @@ fn format_csts(edits: &mut TextEdits, csts: impl AsRef<[Cst]>, info: &FormatterI
             edits.delete(indentation_span);
         }
 
-        let not_whitespace_width = format_cst(edits, not_whitespace, info);
+        let (not_whitespace_width, whitespace) = format_cst(edits, not_whitespace, info).split();
+        if let Some(whitespace) = whitespace.take() {
+            inject_whitespace(whitespace.into_owned(), &mut csts, index);
+        }
         if width.is_none() {
             width = Some(not_whitespace_width);
         } else {
@@ -225,7 +232,10 @@ fn format_csts(edits: &mut TextEdits, csts: impl AsRef<[Cst]>, info: &FormatterI
                         edits.insert(next.data.span.start, SPACE);
                     }
 
-                    format_cst(edits, next, info);
+                    let (_, whitespace) = format_cst(edits, next, info).split();
+                    if let Some(whitespace) = whitespace.take() {
+                        inject_whitespace(whitespace.into_owned(), &mut csts, index);
+                    }
                     index += 1;
                 }
                 _ => {
@@ -239,7 +249,10 @@ fn format_csts(edits: &mut TextEdits, csts: impl AsRef<[Cst]>, info: &FormatterI
 
                     edits.change(whitespace_span, info.indentation.to_string());
 
-                    format_cst(edits, next, info);
+                    let (_, whitespace) = format_cst(edits, next, info).split();
+                    if let Some(whitespace) = whitespace.take() {
+                        inject_whitespace(whitespace.into_owned(), &mut csts, index);
+                    }
 
                     index += 1;
                 }
@@ -264,8 +277,12 @@ fn format_csts(edits: &mut TextEdits, csts: impl AsRef<[Cst]>, info: &FormatterI
     width.unwrap_or_default()
 }
 
-fn format_cst(edits: &mut TextEdits, cst: &Cst, info: &FormatterInfo) -> Width {
-    match &cst.kind {
+pub(crate) fn format_cst<'a>(
+    edits: &mut TextEdits,
+    cst: &'a Cst,
+    info: &FormatterInfo,
+) -> FormattedCst<'a> {
+    let width = match &cst.kind {
         CstKind::EqualsSign | CstKind::Comma | CstKind::Dot | CstKind::Colon => {
             Width::Singleline(1)
         }
@@ -288,13 +305,24 @@ fn format_cst(edits: &mut TextEdits, cst: &Cst, info: &FormatterInfo) -> Width {
             octothorpe,
             comment,
         } => {
-            let formatted_octothorpe = format_child(edits, octothorpe, info);
+            let formatted_octothorpe = format_cst(edits, octothorpe, info);
             assert!(formatted_octothorpe.min_width.is_singleline());
 
             formatted_octothorpe.into_empty_trailing(edits) + comment.width()
         }
-        CstKind::TrailingWhitespace { .. } => {
-            panic!("Trailing whitespace should be handled by the caller.")
+        CstKind::TrailingWhitespace { child, whitespace } => {
+            let child = format_cst(edits, child, info);
+            let whitespace = if whitespace.is_empty() {
+                child.whitespace
+            } else if child.whitespace.trailing_whitespace_ref().is_none() {
+                ExistingWhitespace::new(child.whitespace.child_end_offset(), whitespace)
+            } else {
+                let child_end_offset = child.whitespace.child_end_offset();
+                let mut new_whitespace = child.whitespace.take().unwrap().into_owned();
+                new_whitespace.extend_from_slice(whitespace);
+                ExistingWhitespace::new(child_end_offset, new_whitespace)
+            };
+            return FormattedCst::new(child.min_width, whitespace);
         }
         CstKind::Identifier(string) | CstKind::Symbol(string) | CstKind::Int { string, .. } => {
             string.width()
@@ -317,9 +345,9 @@ fn format_cst(edits: &mut TextEdits, cst: &Cst, info: &FormatterInfo) -> Width {
             inner,
             closing_parenthesis,
         } => {
-            let opening_parenthesis = format_child(edits, opening_parenthesis, info);
-            let inner = format_child(edits, inner, &info.with_indent());
-            let closing_parenthesis = format_child(edits, closing_parenthesis, info);
+            let opening_parenthesis = format_cst(edits, opening_parenthesis, info);
+            let inner = format_cst(edits, inner, &info.with_indent());
+            let closing_parenthesis = format_cst(edits, closing_parenthesis, info);
 
             let min_width =
                 &opening_parenthesis.min_width + &inner.min_width + &closing_parenthesis.min_width;
@@ -333,18 +361,22 @@ fn format_cst(edits: &mut TextEdits, cst: &Cst, info: &FormatterInfo) -> Width {
                 )
             };
 
-            opening_parenthesis.into_trailing(edits, opening_parenthesis_trailing)
-                + inner.into_trailing(edits, inner_trailing)
-                + closing_parenthesis.into_empty_trailing(edits)
+            let (closing_parenthesis_width, whitespace) = closing_parenthesis.split();
+            return FormattedCst::new(
+                opening_parenthesis.into_trailing(edits, opening_parenthesis_trailing)
+                    + inner.into_trailing(edits, inner_trailing)
+                    + closing_parenthesis_width,
+                whitespace,
+            );
         }
         CstKind::Call {
             receiver,
             arguments,
         } => {
-            let receiver = format_child(edits, receiver, info);
+            let receiver = format_cst(edits, receiver, info);
             let mut arguments = arguments
                 .iter()
-                .map(|argument| format_child(edits, argument, &info.with_indent()))
+                .map(|argument| format_cst(edits, argument, &info.with_indent()))
                 .collect_vec();
 
             let min_width = &receiver.min_width
@@ -358,32 +390,37 @@ fn format_cst(edits: &mut TextEdits, cst: &Cst, info: &FormatterInfo) -> Width {
                 TrailingWhitespace::Indentation(info.indentation.with_indent())
             };
 
-            let last_argument = arguments.pop().unwrap();
-            receiver.into_trailing(edits, trailing.clone())
-                + arguments
-                    .into_iter()
-                    .map(|it| it.into_trailing(edits, trailing.clone()))
-                    .sum::<Width>()
-                + last_argument.into_empty_trailing(edits)
+            let (last_argument_width, whitespace) = arguments.pop().unwrap().split();
+            return FormattedCst::new(
+                receiver.into_trailing(edits, trailing.clone())
+                    + arguments
+                        .into_iter()
+                        .map(|it| it.into_trailing(edits, trailing.clone()))
+                        .sum::<Width>()
+                    + last_argument_width,
+                whitespace,
+            );
         }
         CstKind::List {
             opening_parenthesis,
             items,
             closing_parenthesis,
-        } => format_collection(
-            edits,
-            opening_parenthesis,
-            items,
-            closing_parenthesis,
-            true,
-            info,
-        ),
+        } => {
+            return format_collection(
+                edits,
+                opening_parenthesis,
+                items,
+                closing_parenthesis,
+                true,
+                info,
+            );
+        }
         CstKind::ListItem { value, comma } => {
             let value_end = value.data.span.end;
-            let value = format_child(edits, value, info);
+            let value = format_cst(edits, value, info);
             let value_width = value.into_empty_trailing(edits);
 
-            let comma_width = apply_trailing_comma_condition(
+            let (comma_width, whitespace) = apply_trailing_comma_condition(
                 edits,
                 comma.as_deref(),
                 value_end,
@@ -391,37 +428,39 @@ fn format_cst(edits: &mut TextEdits, cst: &Cst, info: &FormatterInfo) -> Width {
                 &value_width,
             );
 
-            value_width + comma_width
+            return FormattedCst::new(value_width + comma_width, whitespace);
         }
         CstKind::Struct {
             opening_bracket,
             fields,
             closing_bracket,
-        } => format_collection(edits, opening_bracket, fields, closing_bracket, false, info),
+        } => {
+            return format_collection(edits, opening_bracket, fields, closing_bracket, false, info);
+        }
         CstKind::StructField {
             key_and_colon,
             value,
             comma,
         } => {
             let key_width_and_colon = key_and_colon.as_ref().map(|box (key, colon)| {
-                let key = format_child(edits, key, &info.with_indent());
+                let key = format_cst(edits, key, &info.with_indent());
                 let key_width = key.into_empty_trailing(edits);
 
-                let colon = format_child(edits, colon, &info.with_indent());
+                let colon = format_cst(edits, colon, &info.with_indent());
 
                 (key_width, colon)
             });
 
             let value_end = value.data.span.end;
             let value_width =
-                format_child(edits, value, &info.with_indent()).into_empty_trailing(edits);
+                format_cst(edits, value, &info.with_indent()).into_empty_trailing(edits);
 
             let key_and_colon_min_width = key_width_and_colon
                 .as_ref()
                 .map(|(key_width, colon)| key_width + &colon.min_width)
                 .unwrap_or_default();
             let min_width_before_comma = key_and_colon_min_width + &value_width;
-            let comma_width = apply_trailing_comma_condition(
+            let (comma_width, whitespace) = apply_trailing_comma_condition(
                 edits,
                 comma.as_deref(),
                 value_end,
@@ -430,24 +469,27 @@ fn format_cst(edits: &mut TextEdits, cst: &Cst, info: &FormatterInfo) -> Width {
             );
             let min_width = min_width_before_comma + &comma_width;
 
-            key_width_and_colon
-                .map(|(key_width, colon)| {
-                    let colon_trailing = if min_width.fits(info.indentation) {
-                        TrailingWhitespace::Space
-                    } else {
-                        TrailingWhitespace::Indentation(info.indentation.with_indent())
-                    };
-                    key_width + colon.into_trailing(edits, colon_trailing)
-                })
-                .unwrap_or_default()
-                + value_width
-                + comma_width
+            return FormattedCst::new(
+                key_width_and_colon
+                    .map(|(key_width, colon)| {
+                        let colon_trailing = if min_width.fits(info.indentation) {
+                            TrailingWhitespace::Space
+                        } else {
+                            TrailingWhitespace::Indentation(info.indentation.with_indent())
+                        };
+                        key_width + colon.into_trailing(edits, colon_trailing)
+                    })
+                    .unwrap_or_default()
+                    + value_width
+                    + comma_width,
+                whitespace,
+            );
         }
         CstKind::StructAccess { struct_, dot, key } => {
-            let struct_ = format_child(edits, struct_, info);
-            let dot = format_child(edits, dot, &info.with_indent());
-            // TODO! let struct_whitespace = dot_whitespace.merge_into(struct_whitespace);
-            let key = format_child(edits, key, &info.with_indent());
+            let struct_ = format_cst(edits, struct_, info);
+            let dot = format_cst(edits, dot, &info.with_indent());
+            // TODO: let struct_whitespace = dot_whitespace.merge_into(struct_whitespace);
+            let key = format_cst(edits, key, &info.with_indent());
 
             let min_width = &struct_.min_width + &dot.min_width + &key.min_width;
             let struct_trailing = if min_width.fits(info.indentation) {
@@ -456,9 +498,13 @@ fn format_cst(edits: &mut TextEdits, cst: &Cst, info: &FormatterInfo) -> Width {
                 TrailingWhitespace::Indentation(info.indentation.with_indent())
             };
 
-            struct_.into_trailing(edits, struct_trailing)
-                + dot.into_empty_trailing(edits)
-                + key.into_empty_trailing(edits)
+            let (key_width, whitespace) = key.split();
+            return FormattedCst::new(
+                struct_.into_trailing(edits, struct_trailing)
+                    + dot.into_empty_trailing(edits)
+                    + key_width,
+                whitespace,
+            );
         }
         CstKind::Match {
             expression,
@@ -481,10 +527,10 @@ fn format_cst(edits: &mut TextEdits, cst: &Cst, info: &FormatterInfo) -> Width {
             assignment_sign,
             body,
         } => {
-            let left = format_child(edits, left, info);
+            let left = format_cst(edits, left, info);
             let left_width = left.into_trailing_with_space(edits);
 
-            let assignment_sign = format_child(edits, assignment_sign, &info.with_indent());
+            let assignment_sign = format_cst(edits, assignment_sign, &info.with_indent());
 
             let body_width = format_csts(edits, body, &info.with_indent());
 
@@ -502,29 +548,20 @@ fn format_cst(edits: &mut TextEdits, cst: &Cst, info: &FormatterInfo) -> Width {
         CstKind::Error {
             unparsable_input, ..
         } => unparsable_input.width(),
-    }
+    };
+    FormattedCst::new(width, ExistingWhitespace::empty(cst.data.span.end))
 }
 
-fn format_child<'a>(
-    edits: &mut TextEdits,
-    child: &'a Cst,
-    info: &FormatterInfo,
-) -> FormattedCst<'a> {
-    let (child, child_whitespace) = child.split_trailing_whitespace();
-    let width = format_cst(edits, child.as_ref(), info);
-    FormattedCst::new(width, child_whitespace)
-}
-
-fn format_collection(
+fn format_collection<'a>(
     edits: &mut TextEdits,
     opening_punctuation: &Cst,
     items: &[Cst],
-    closing_punctuation: &Cst,
+    closing_punctuation: &'a Cst,
     is_comma_required_for_single_item: bool,
     info: &FormatterInfo,
-) -> Width {
-    let opening_punctuation = format_child(edits, opening_punctuation, info);
-    let closing_punctuation = format_child(edits, closing_punctuation, info);
+) -> FormattedCst<'a> {
+    let opening_punctuation = format_cst(edits, opening_punctuation, info);
+    let closing_punctuation = format_cst(edits, closing_punctuation, info);
 
     let mut min_width = Width::Singleline(info.indentation.width())
         + &opening_punctuation.min_width
@@ -539,13 +576,16 @@ fn format_collection(
             let is_single_item = items.len() == 1;
             let is_last_item = index == items.len() - 1;
 
-            let (item, item_whitespace) = item.split_trailing_whitespace();
+            let item_has_comments =
+                dft_post_rev(item, |it| it.children().into_iter()).any(|(_, it)| match it.kind {
+                    CstKind::Comment { .. } => true,
+                    _ => false,
+                });
 
             let is_comma_required_due_to_single_item =
                 is_single_item && is_comma_required_for_single_item;
-            let is_comma_required = is_comma_required_due_to_single_item
-                || !is_last_item
-                || item_whitespace.has_comments();
+            let is_comma_required =
+                is_comma_required_due_to_single_item || !is_last_item || item_has_comments;
             let info = if !is_comma_required && let Width::Singleline(min_width) = min_width {
                     // We're looking at the last item and everything might fit in one line.
                     let max_width = Width::MAX - min_width;
@@ -557,8 +597,7 @@ fn format_collection(
                 } else {
                     item_info.clone()
                 };
-            let item_width = format_cst(edits, item.as_ref(), &info);
-            let item = FormattedCst::new(item_width, item_whitespace);
+            let item = format_cst(edits, item, &info);
 
             if let Width::Singleline(old_min_width) = min_width
                     && let Width::Singleline(item_width) = item.min_width {
@@ -598,31 +637,35 @@ fn format_collection(
         };
 
     let last_item_index = items.len().checked_sub(1);
-    opening_punctuation.into_trailing(edits, opening_punctuation_trailing)
-        + items
-            .into_iter()
-            .enumerate()
-            .map(|(index, item)| {
-                item.into_trailing(
-                    edits,
-                    if last_item_index == Some(index) {
-                        last_item_trailing.clone()
-                    } else {
-                        item_trailing.clone()
-                    },
-                )
-            })
-            .sum::<Width>()
-        + closing_punctuation.into_empty_trailing(edits)
+    let (closing_punctuation_width, whitespace) = closing_punctuation.split();
+    FormattedCst::new(
+        opening_punctuation.into_trailing(edits, opening_punctuation_trailing)
+            + items
+                .into_iter()
+                .enumerate()
+                .map(|(index, item)| {
+                    item.into_trailing(
+                        edits,
+                        if last_item_index == Some(index) {
+                            last_item_trailing.clone()
+                        } else {
+                            item_trailing.clone()
+                        },
+                    )
+                })
+                .sum::<Width>()
+            + closing_punctuation_width,
+        whitespace,
+    )
 }
 
-fn apply_trailing_comma_condition(
+fn apply_trailing_comma_condition<'a>(
     edits: &mut TextEdits,
-    comma: Option<&Cst>,
+    comma: Option<&'a Cst>,
     fallback_offset: Offset,
     info: &FormatterInfo,
     min_width_before_comma: &Width,
-) -> Width {
+) -> (Width, ExistingWhitespace<'a>) {
     let should_have_comma = match info.trailing_comma_condition {
         Some(TrailingCommaCondition::Always) => true,
         Some(TrailingCommaCondition::UnlessFitsIn(max_width)) => {
@@ -630,21 +673,27 @@ fn apply_trailing_comma_condition(
         }
         None => comma.is_some(),
     };
-    if should_have_comma {
-        if let Some(comma) = comma {
-            let comma = format_child(edits, comma, info);
+    let (width, whitespace) = if should_have_comma {
+        let whitespace = if let Some(comma) = comma {
+            let comma = format_cst(edits, comma, info);
             assert_eq!(comma.min_width, Width::Singleline(1));
-            comma.whitespace.into_empty_trailing(edits);
+            Some(comma.whitespace)
         } else {
             edits.insert(fallback_offset, ",");
-        }
-        Width::Singleline(1)
+            None
+        };
+        (Width::Singleline(1), whitespace)
     } else {
         if let Some(comma) = comma {
+            // TODO: Keep comments
             edits.delete(comma.data.span.to_owned());
         }
-        Width::default()
-    }
+        (Width::default(), None)
+    };
+    (
+        width,
+        whitespace.unwrap_or_else(|| ExistingWhitespace::empty(fallback_offset)),
+    )
 }
 
 #[must_use]
@@ -667,6 +716,11 @@ impl<'a> FormattedCst<'a> {
             whitespace,
         }
     }
+
+    pub fn split(self) -> (Width, ExistingWhitespace<'a>) {
+        (self.min_width, self.whitespace)
+    }
+
     pub fn into_trailing(
         self,
         edits: &mut TextEdits,
@@ -680,6 +734,7 @@ impl<'a> FormattedCst<'a> {
             }
         }
     }
+    #[deprecated]
     pub fn into_empty_trailing(self, edits: &mut TextEdits) -> Width {
         self.whitespace.into_empty_trailing(edits);
         self.min_width

@@ -4,111 +4,7 @@ use candy_frontend::{
     position::Offset,
 };
 use derive_more::From;
-use extension_trait::extension_trait;
 use std::borrow::Cow;
-
-#[extension_trait]
-pub impl SplitTrailingWhitespace for Cst {
-    fn split_trailing_whitespace(&self) -> (Cow<Cst>, ExistingWhitespace) {
-        // TODO: improve
-        let (child, child_whitespace) = match &self.kind {
-            CstKind::TrailingWhitespace { child, whitespace } => {
-                let (child, child_whitespace) = child.split_trailing_whitespace();
-                if whitespace.is_empty() {
-                    return (child, child_whitespace);
-                }
-
-                let whitespace = ExistingWhitespace {
-                    child_end_offset: child.data.span.end,
-                    trailing_whitespace: Some(Cow::Borrowed(whitespace)),
-                };
-                (child, child_whitespace.merge_into_outer(whitespace))
-            }
-            // CstKind::Parenthesized {
-            //     opening_parenthesis,
-            //     inner,
-            //     closing_parenthesis,
-            // } => {
-            //     let (closing_parenthesis, closing_parenthesis_whitespace) =
-            //         closing_parenthesis.split_trailing_whitespace();
-            //     let cst = Cst {
-            //         data: self.data.clone(),
-            //         kind: CstKind::Parenthesized {
-            //             opening_parenthesis: opening_parenthesis.to_owned(),
-            //             inner: inner.to_owned(),
-            //             closing_parenthesis: Box::new(closing_parenthesis.into_owned()),
-            //         },
-            //     };
-            //     (Cow::Owned(cst), closing_parenthesis_whitespace)
-            // }
-            // CstKind::Call {
-            //     receiver,
-            //     arguments,
-            // } => {
-            //     let arguments = arguments.to_owned();
-            //     let last_argument = arguments.pop().unwrap();
-            //     let (last_argument, last_argument_whitespace) =
-            //         last_argument.split_trailing_whitespace();
-            //     arguments.push(last_argument.into_owned());
-            //     let cst = Cst {
-            //         data: self.data.clone(),
-            //         kind: CstKind::Call {
-            //             receiver: receiver.to_owned(),
-            //             arguments,
-            //         },
-            //     };
-            //     (Cow::Owned(cst), last_argument_whitespace)
-            // }
-            // CstKind::ListItem { value, comma } => {
-            //     // Move potential comments before the comma to the end of the item.
-            //     let (value, value_whitespace) = value.split_trailing_whitespace();
-            //     let cst = Cst {
-            //         data: self.data.clone(),
-            //         kind: CstKind::ListItem {
-            //             value: Box::new(value.into_owned()),
-            //             comma: comma.to_owned(),
-            //         },
-            //     };
-            //     (Cow::Owned(cst), value_whitespace)
-            // }
-            // CstKind::StructField {
-            //     key_and_colon,
-            //     value,
-            //     comma,
-            // } => {
-            //     // Move potential comments before the comma to the end of the field.
-            //     let (value, value_whitespace) = value.split_trailing_whitespace();
-            //     let cst = Cst {
-            //         data: self.data.clone(),
-            //         kind: CstKind::StructField {
-            //             key_and_colon: key_and_colon.to_owned(),
-            //             value: Box::new(value.into_owned()),
-            //             comma: comma.to_owned(),
-            //         },
-            //     };
-            //     (Cow::Owned(cst), value_whitespace)
-            // }
-            // TODO: struct access key
-            _ => (
-                Cow::Borrowed(self),
-                ExistingWhitespace {
-                    child_end_offset: self.data.span.end,
-                    trailing_whitespace: None,
-                },
-            ),
-        };
-
-        if child_whitespace.trailing_whitespace_ref().is_none() {
-            let child_whitespace = ExistingWhitespace {
-                child_end_offset: child.data.span.end,
-                trailing_whitespace: None,
-            };
-            return (child, child_whitespace);
-        }
-
-        (child, child_whitespace)
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct ExistingWhitespace<'a> {
@@ -125,9 +21,33 @@ pub enum TrailingWhitespace {
 pub const SPACE: &str = " ";
 pub const NEWLINE: &str = "\n";
 
-impl ExistingWhitespace<'_> {
+impl<'a> ExistingWhitespace<'a> {
+    pub fn empty(child_end_offset: Offset) -> Self {
+        Self {
+            child_end_offset,
+            trailing_whitespace: None,
+        }
+    }
+    pub fn new(child_end_offset: Offset, trailing_whitespace: impl Into<Cow<'a, [Cst]>>) -> Self {
+        let trailing_whitespace = trailing_whitespace.into();
+        if trailing_whitespace.is_empty() {
+            return Self::empty(child_end_offset);
+        }
+
+        Self {
+            child_end_offset,
+            trailing_whitespace: Some(trailing_whitespace),
+        }
+    }
+
+    pub fn child_end_offset(&self) -> Offset {
+        self.child_end_offset
+    }
     pub fn trailing_whitespace_ref(&self) -> Option<&[Cst]> {
         self.trailing_whitespace.as_ref().map(|it| it.as_ref())
+    }
+    pub fn take(self) -> Option<Cow<'a, [Cst]>> {
+        self.trailing_whitespace
     }
 
     pub fn has_comments(&self) -> bool {
@@ -138,29 +58,6 @@ impl ExistingWhitespace<'_> {
                     .any(|it| matches!(it.kind, CstKind::Comment { .. }))
             })
             .unwrap_or_default()
-    }
-
-    pub fn merge_into_outer(self, outer: Self) -> Self {
-        assert_eq!(
-            self.trailing_whitespace
-                .as_ref()
-                .map(|it| it.last().unwrap().data.span.end)
-                .unwrap_or_else(|| self.child_end_offset),
-            outer.child_end_offset,
-        );
-
-        match (&self.trailing_whitespace, &outer.trailing_whitespace) {
-            (_, None) => self,
-            (None, _) => outer,
-            (Some(inner_trailing_whitespace), Some(outer_trailing_whitespace)) => {
-                let mut trailing_whitespace = inner_trailing_whitespace.to_vec();
-                trailing_whitespace.extend_from_slice(outer_trailing_whitespace);
-                ExistingWhitespace {
-                    child_end_offset: self.child_end_offset,
-                    trailing_whitespace: Some(Cow::Owned(trailing_whitespace)),
-                }
-            }
-        }
     }
 
     pub fn into_empty_trailing(self, edits: &mut TextEdits) {
@@ -264,9 +161,7 @@ impl ExistingWhitespace<'_> {
 #[cfg(test)]
 mod test {
     use super::TrailingWhitespace;
-    use crate::{
-        existing_whitespace::SplitTrailingWhitespace, text_edits::TextEdits, width::Indentation,
-    };
+    use crate::{format_cst, text_edits::TextEdits, width::Indentation, FormatterInfo};
     use candy_frontend::{cst::CstKind, rcst_to_cst::RcstsToCstsExt, string_to_rcst::parse_rcst};
 
     #[test]
@@ -305,9 +200,9 @@ mod test {
         };
         let reduced_source = cst.to_string();
 
-        let (_, trailing_whitespace) = cst.split_trailing_whitespace();
-
         let mut edits = TextEdits::new(reduced_source);
+        let (_, trailing_whitespace) =
+            format_cst(&mut edits, &cst, &FormatterInfo::default()).split();
         match trailing.into() {
             TrailingWhitespace::None => trailing_whitespace.into_empty_trailing(&mut edits),
             TrailingWhitespace::Space => trailing_whitespace.into_trailing_with_space(&mut edits),
