@@ -409,16 +409,16 @@ pub(crate) fn format_cst<'a>(
         }
         CstKind::ListItem { value, comma } => {
             let value_end = value.data.span.end;
-            let value = format_cst(edits, value, info);
-            let value_width = value.into_empty_trailing(edits);
+            let (value_width, value_whitespace) = format_cst(edits, value, info).split();
 
-            let (comma_width, whitespace) = apply_trailing_comma_condition(
+            let (comma_width, mut whitespace) = apply_trailing_comma_condition(
                 edits,
                 comma.as_deref(),
                 value_end,
                 info,
                 &value_width,
             );
+            value_whitespace.empty_and_move_comments_to(edits, &mut whitespace);
 
             return FormattedCst::new(value_width + comma_width, whitespace);
         }
@@ -885,7 +885,7 @@ mod test {
         test("(foo,# abc\n)", "(\n  foo, # abc\n)\n");
         test("(foo, # abc\n)", "(\n  foo, # abc\n)\n");
         test("(# abc\n  foo,)", "( # abc\n  foo,\n)\n");
-        // test("(foo# abc\n  , bar,)", "(\n  foo, # abc\n  bar,\n)\n"); // FIXME
+        test("(foo# abc\n  , bar,)", "(\n  foo, # abc\n  bar,\n)\n");
     }
     #[test]
     fn test_struct() {
