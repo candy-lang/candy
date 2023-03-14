@@ -16,7 +16,6 @@ use traversal::dft_post_rev;
 use width::{Indentation, Width};
 
 mod existing_whitespace;
-mod last_line_width;
 mod text_edits;
 mod width;
 
