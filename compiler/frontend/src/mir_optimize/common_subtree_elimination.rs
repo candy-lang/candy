@@ -54,8 +54,10 @@ impl Mir {
                     Entry::Occupied(id_of_canonical_expression)
                         if visible.contains(*id_of_canonical_expression.get()) =>
                     {
-                        *expression = Expression::Reference(*id_of_canonical_expression.get());
-
+                        let old_expression = std::mem::replace(
+                            expression,
+                            Expression::Reference(*id_of_canonical_expression.get()),
+                        );
                         if let Expression::Lambda {
                             body,
                             original_hirs,
