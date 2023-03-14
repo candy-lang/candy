@@ -79,6 +79,6 @@ impl Mir {
             .map(|id| (id, generator.generate()))
             .collect();
 
-        self.body.replace_ids(&mut |id| *id = mapping[id])
+        self.body.replace_ids(&mut |id| *id = mapping[&*id])
     }
 }

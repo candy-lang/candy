@@ -82,7 +82,7 @@ impl Mir {
                     .map(|id| (id, self.id_generator.generate()))
                     .collect();
                 let mut body_to_insert = mir.body;
-                body_to_insert.replace_ids(&mut |id| *id = mapping[id]);
+                body_to_insert.replace_ids(&mut |id| *id = mapping[&*id]);
 
                 *expression = Expression::Multiple(body_to_insert);
             });
