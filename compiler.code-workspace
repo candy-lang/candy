@@ -55,7 +55,7 @@
       "*.candy": "${capture}.candy.*"
     },
     "git.branchProtection": ["main"],
-    "rust-analyzer.checkOnSave.command": "clippy",
+    "rust-analyzer.check.command": "clippy",
     "task.allowAutomaticTasks": "on"
   }
 }
