@@ -835,6 +835,7 @@ mod test {
         );
 
         test("foo # abc\n  bar\n  Baz", "foo # abc\n  bar\n  Baz\n");
+        test("foo\n  # abc\n  bar\n  Baz", "foo\n  # abc\n  bar\n  Baz\n");
         test("foo\n  bar # abc\n  Baz", "foo\n  bar # abc\n  Baz\n");
     }
     #[test]

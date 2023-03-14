@@ -79,17 +79,15 @@ impl<'a> ExistingWhitespace<'a> {
         if self.start_offset <= other.start_offset {
             assert!(self_end_offset <= other.start_offset);
             if self_end_offset == other.start_offset
+                && self.adopted_whitespace_before.is_none()
                 && self.adopted_whitespace_after.is_none()
                 && other.adopted_whitespace_before.is_none()
             {
                 if let Some(self_whitespace) = self.whitespace {
-                    prepend(self_whitespace, &mut other.adopted_whitespace_before);
+                    prepend(self_whitespace, &mut other.whitespace);
                 }
                 if let Some(self_adopted_whitespace_before) = self.adopted_whitespace_before {
-                    prepend(
-                        self_adopted_whitespace_before,
-                        &mut other.adopted_whitespace_before,
-                    );
+                    prepend(self_adopted_whitespace_before, &mut other.whitespace);
                 }
                 return;
             }
@@ -128,15 +126,13 @@ impl<'a> ExistingWhitespace<'a> {
             if self.start_offset == other_end_offset
                 && other.adopted_whitespace_after.is_none()
                 && self.adopted_whitespace_before.is_none()
+                && self.adopted_whitespace_after.is_none()
             {
                 if let Some(self_whitespace) = self.whitespace {
-                    append(self_whitespace, &mut other.adopted_whitespace_after);
+                    append(self_whitespace, &mut other.whitespace);
                 }
                 if let Some(self_adopted_whitespace_after) = self.adopted_whitespace_after {
-                    append(
-                        self_adopted_whitespace_after,
-                        &mut other.adopted_whitespace_after,
-                    );
+                    append(self_adopted_whitespace_after, &mut other.whitespace);
                 }
                 return;
             }
