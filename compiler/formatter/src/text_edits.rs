@@ -53,9 +53,14 @@ impl TextEdits {
         match index {
             Ok(index) => {
                 let existing = &mut self.edits[index];
-                assert!(existing.is_insert());
+                assert!(
+                    existing.is_insert() || range.is_empty(),
+                    "At least one of [existing, new] must be an insert.",
+                );
 
-                existing.range = range;
+                if existing.range.is_empty() {
+                    existing.range = range;
+                }
                 existing.new_text = format!("{}{}", existing.new_text, new_text);
             }
             Err(index) => {

@@ -311,18 +311,10 @@ pub(crate) fn format_cst<'a>(
             formatted_octothorpe.into_empty_trailing(edits) + comment.width()
         }
         CstKind::TrailingWhitespace { child, whitespace } => {
-            let child = format_cst(edits, child, info);
-            let whitespace = if whitespace.is_empty() {
-                child.whitespace
-            } else if child.whitespace.whitespace_ref().is_none() {
-                ExistingWhitespace::new(child.whitespace.start_offset(), whitespace)
-            } else {
-                let start_offset = child.whitespace.start_offset();
-                let mut new_whitespace = child.whitespace.take().unwrap().into_owned();
-                new_whitespace.extend_from_slice(whitespace);
-                ExistingWhitespace::new(start_offset, new_whitespace)
-            };
-            return FormattedCst::new(child.min_width, whitespace);
+            let (child_width, child_whitespace) = format_cst(edits, child, info).split();
+            let mut whitespace = ExistingWhitespace::new(child.data.span.end, whitespace);
+            child_whitespace.empty_and_move_comments_to(edits, &mut whitespace);
+            return FormattedCst::new(child_width, whitespace);
         }
         CstKind::Identifier(string) | CstKind::Symbol(string) | CstKind::Int { string, .. } => {
             string.width()
@@ -685,11 +677,12 @@ fn apply_trailing_comma_condition<'a>(
         };
         (Width::Singleline(1), whitespace)
     } else {
-        if let Some(comma) = comma {
+        let whitespace = comma.map(|comma| {
             // TODO: Keep comments
             edits.delete(comma.data.span.to_owned());
-        }
-        (Width::default(), None)
+            ExistingWhitespace::empty(comma.data.span.end)
+        });
+        (Width::default(), whitespace)
     };
     (
         width,

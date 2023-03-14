@@ -68,13 +68,29 @@ impl<'a> ExistingWhitespace<'a> {
         edits: &mut TextEdits,
         other: &mut ExistingWhitespace<'a>,
     ) {
-        let self_end_offset = self.end_offset();
-        let Some(self_whitespace) = self.whitespace else { return; };
+        if self.adopted_whitespace_before.is_none()
+            && self.whitespace.is_none()
+            && self.adopted_whitespace_after.is_none()
+        {
+            return;
+        }
 
+        let self_end_offset = self.end_offset();
         if self.start_offset <= other.start_offset {
             assert!(self_end_offset <= other.start_offset);
-            if self_end_offset == other.start_offset {
-                prepend(self_whitespace, &mut other.whitespace);
+            if self_end_offset == other.start_offset
+                && self.adopted_whitespace_after.is_none()
+                && other.adopted_whitespace_before.is_none()
+            {
+                if let Some(self_whitespace) = self.whitespace {
+                    prepend(self_whitespace, &mut other.adopted_whitespace_before);
+                }
+                if let Some(self_adopted_whitespace_before) = self.adopted_whitespace_before {
+                    prepend(
+                        self_adopted_whitespace_before,
+                        &mut other.adopted_whitespace_before,
+                    );
+                }
                 return;
             }
 
@@ -88,15 +104,40 @@ impl<'a> ExistingWhitespace<'a> {
                     .start;
                 assert!(self_end_offset <= other_adopted_start_offset);
             }
-            prepend(self_whitespace, &mut other.adopted_whitespace_before);
+            if let Some(self_adopted_whitespace_after) = self.adopted_whitespace_after {
+                prepend(
+                    self_adopted_whitespace_after,
+                    &mut other.adopted_whitespace_before,
+                );
+            }
+            if let Some(self_whitespace) = self.whitespace {
+                prepend(self_whitespace, &mut other.adopted_whitespace_before);
+            }
+            if let Some(self_adopted_whitespace_before) = self.adopted_whitespace_before {
+                prepend(
+                    self_adopted_whitespace_before,
+                    &mut other.adopted_whitespace_before,
+                );
+            }
         } else {
             let other_end_offset = other
                 .whitespace
                 .as_ref()
                 .map(|it| it.as_ref().last().unwrap().data.span.end)
                 .unwrap_or_else(|| other.start_offset);
-            if self.start_offset == other_end_offset {
-                prepend(self_whitespace, &mut other.whitespace);
+            if self.start_offset == other_end_offset
+                && other.adopted_whitespace_after.is_none()
+                && self.adopted_whitespace_before.is_none()
+            {
+                if let Some(self_whitespace) = self.whitespace {
+                    append(self_whitespace, &mut other.adopted_whitespace_after);
+                }
+                if let Some(self_adopted_whitespace_after) = self.adopted_whitespace_after {
+                    append(
+                        self_adopted_whitespace_after,
+                        &mut other.adopted_whitespace_after,
+                    );
+                }
                 return;
             }
 
@@ -110,7 +151,21 @@ impl<'a> ExistingWhitespace<'a> {
                     .end;
                 assert!(other_adopted_end_offset <= self.start_offset);
             }
-            append(self_whitespace, &mut other.adopted_whitespace_after);
+            if let Some(self_adopted_whitespace_before) = self.adopted_whitespace_before {
+                append(
+                    self_adopted_whitespace_before,
+                    &mut other.adopted_whitespace_after,
+                );
+            }
+            if let Some(self_whitespace) = self.whitespace {
+                append(self_whitespace, &mut other.adopted_whitespace_after);
+            }
+            if let Some(self_adopted_whitespace_after) = self.adopted_whitespace_after {
+                append(
+                    self_adopted_whitespace_after,
+                    &mut other.adopted_whitespace_after,
+                );
+            }
         }
         edits.delete(self.start_offset..self_end_offset);
     }
@@ -174,19 +229,19 @@ impl<'a> ExistingWhitespace<'a> {
     pub fn into_trailing_with_indentation(self, edits: &mut TextEdits, indentation: Indentation) {
         fn iter_whitespace<'a>(
             whitespace: &'a Option<Cow<'a, [Cst]>>,
-            fallback_offset: impl Into<Option<Offset>>,
+            offset_override: impl Into<Option<Offset>>,
         ) -> impl Iterator<Item = (&'a Cst, Option<Offset>)> {
-            let fallback_offset = fallback_offset.into();
+            let offset_override = offset_override.into();
             whitespace
                 .as_ref()
                 .map(|it| it.as_ref())
                 .unwrap_or_default()
                 .iter()
-                .map(move |it| (it, fallback_offset))
+                .map(move |it| (it, offset_override))
         }
 
-        // For adopted items, we need a fallback offset: The position where adopted comments will be
-        // inserted.
+        // For adopted items, we need an offset override: The position where adopted comments will
+        // be inserted.
         let whitespace = iter_whitespace(&self.adopted_whitespace_before, self.start_offset)
             .chain(iter_whitespace(&self.whitespace, None))
             .chain(iter_whitespace(
@@ -206,7 +261,7 @@ impl<'a> ExistingWhitespace<'a> {
 
         let owned_final_whitespace = final_whitespace
             .iter()
-            .filter(|(_, fallback_offset)| fallback_offset.is_none())
+            .filter(|(_, offset_override)| offset_override.is_none())
             .map(|(it, _)| it);
         let range = if let Some((first, last)) = first_and_last(owned_final_whitespace) {
             first.data.span.start..last.data.span.end
@@ -223,14 +278,15 @@ impl<'a> ExistingWhitespace<'a> {
     ) {
         let mut is_comment_on_same_line = true;
         let mut last_reusable_whitespace_range = None;
-        for (item, fallback_offset) in comments_and_whitespace {
+        for (item, offset_override) in comments_and_whitespace {
+            let is_adopted = offset_override.is_some();
             match &item.kind {
                 CstKind::Whitespace(_)
                 | CstKind::Error {
                     error: CstError::TooMuchWhitespace,
                     ..
                 } => {
-                    if fallback_offset.is_none() {
+                    if !is_adopted {
                         if let Some(range) = last_reusable_whitespace_range {
                             edits.delete(range);
                         }
@@ -261,11 +317,11 @@ impl<'a> ExistingWhitespace<'a> {
                     if let Some(range) = last_reusable_whitespace_range {
                         edits.change(range, space);
                     } else {
-                        edits.insert(item.data.span.start, space);
+                        edits.insert(offset_override.unwrap_or(item.data.span.start), space);
                     }
 
-                    if let Some(fallback_offset) = fallback_offset {
-                        edits.insert(*fallback_offset, format!("#{comment}"));
+                    if let Some(offset_override) = offset_override {
+                        edits.insert(*offset_override, format!("#{comment}"));
                     }
 
                     is_comment_on_same_line = false;
@@ -275,6 +331,10 @@ impl<'a> ExistingWhitespace<'a> {
                 _ => unreachable!(),
             }
         }
+        assert!(
+            last_reusable_whitespace_range.is_none(),
+            "The last CST should be a comment, so we should have consumed all whitespace.",
+        );
     }
 }
 
