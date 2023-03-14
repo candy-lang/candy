@@ -569,11 +569,8 @@ fn format_collection<'a>(
             let is_single_item = items.len() == 1;
             let is_last_item = index == items.len() - 1;
 
-            let item_has_comments =
-                dft_post_rev(item, |it| it.children().into_iter()).any(|(_, it)| match it.kind {
-                    CstKind::Comment { .. } => true,
-                    _ => false,
-                });
+            let item_has_comments = dft_post_rev(item, |it| it.children().into_iter())
+                .any(|(_, it)| matches!(it.kind, CstKind::Comment { .. }));
 
             let is_comma_required_due_to_single_item =
                 is_single_item && is_comma_required_for_single_item;
