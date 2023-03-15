@@ -315,9 +315,9 @@ pub(crate) fn format_cst<'a>(
             formatted_octothorpe.into_empty_trailing(edits) + comment.width()
         }
         CstKind::TrailingWhitespace { child, whitespace } => {
-            let (child_width, child_whitespace) = format_cst(edits, child, info).split();
             let mut whitespace = ExistingWhitespace::new(child.data.span.end, whitespace);
-            child_whitespace.into_empty_and_move_comments_to(edits, &mut whitespace);
+            let child_width = format_cst(edits, child, info)
+                .into_empty_and_move_comments_to(edits, &mut whitespace);
             return FormattedCst::new(child_width, whitespace);
         }
         CstKind::Identifier(string) | CstKind::Symbol(string) | CstKind::Int { string, .. } => {
@@ -414,18 +414,20 @@ pub(crate) fn format_cst<'a>(
         }
         CstKind::ListItem { value, comma } => {
             let value_end = value.data.span.end;
-            let (value_width, value_whitespace) = format_cst(edits, value, info).split();
+            let value = format_cst(edits, value, info);
 
             let (comma_width, mut whitespace) = apply_trailing_comma_condition(
                 edits,
                 comma.as_deref(),
                 value_end,
                 info,
-                &value_width + value_whitespace.min_width(),
+                value.min_width(),
             );
-            value_whitespace.into_empty_and_move_comments_to(edits, &mut whitespace);
 
-            return FormattedCst::new(value_width + comma_width, whitespace);
+            return FormattedCst::new(
+                value.into_empty_and_move_comments_to(edits, &mut whitespace) + comma_width,
+                whitespace,
+            );
         }
         CstKind::Struct {
             opening_bracket,
@@ -440,33 +442,30 @@ pub(crate) fn format_cst<'a>(
             comma,
         } => {
             let key_width_and_colon = key_and_colon.as_ref().map(|box (key, colon)| {
-                let (key_width, key_whitespace) =
-                    format_cst(edits, key, &info.with_indent()).split();
-
+                let key = format_cst(edits, key, &info.with_indent());
                 let mut colon = format_cst(edits, colon, &info.with_indent());
-                key_whitespace.into_empty_and_move_comments_to(edits, &mut colon.whitespace);
-
-                (key_width, colon)
+                (
+                    key.into_empty_and_move_comments_to(edits, &mut colon.whitespace),
+                    colon,
+                )
             });
 
             let value_end = value.data.span.end;
-            let (value_width, value_whitespace) =
-                format_cst(edits, value, &info.with_indent()).split();
+            let value = format_cst(edits, value, &info.with_indent());
 
             let key_and_colon_min_width = key_width_and_colon
                 .as_ref()
                 .map(|(key_width, colon)| key_width + &colon.min_width())
                 .unwrap_or_default();
-            let min_width_before_comma = key_and_colon_min_width + &value_width;
             let (comma_width, mut whitespace) = apply_trailing_comma_condition(
                 edits,
                 comma.as_deref(),
                 value_end,
                 info,
-                &min_width_before_comma + value_whitespace.min_width(),
+                &key_and_colon_min_width + value.min_width(),
             );
-            value_whitespace.into_empty_and_move_comments_to(edits, &mut whitespace);
-            let min_width = min_width_before_comma + &comma_width;
+            let value_width = value.into_empty_and_move_comments_to(edits, &mut whitespace);
+            let min_width = key_and_colon_min_width + &value_width + &comma_width;
 
             return FormattedCst::new(
                 key_width_and_colon
@@ -485,11 +484,10 @@ pub(crate) fn format_cst<'a>(
             );
         }
         CstKind::StructAccess { struct_, dot, key } => {
-            // TODO: child_width vs min_width
             let mut struct_ = format_cst(edits, struct_, info);
 
-            let (dot_width, dot_whitespace) = format_cst(edits, dot, &info.with_indent()).split();
-            dot_whitespace.into_empty_and_move_comments_to(edits, &mut struct_.whitespace);
+            let dot_width = format_cst(edits, dot, &info.with_indent())
+                .into_empty_and_move_comments_to(edits, &mut struct_.whitespace);
 
             let key = format_cst(edits, key, &info.with_indent());
 
@@ -776,6 +774,7 @@ impl<'a> FormattedCst<'a> {
         }
     }
 
+    #[must_use]
     pub fn min_width(&self) -> Width {
         if self.whitespace.has_comments() {
             Width::multiline()
@@ -784,6 +783,7 @@ impl<'a> FormattedCst<'a> {
         }
     }
 
+    #[must_use]
     pub fn split(self) -> (Width, ExistingWhitespace<'a>) {
         (self.child_width, self.whitespace)
     }
