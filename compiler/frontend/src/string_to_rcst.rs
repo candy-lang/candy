@@ -598,10 +598,7 @@ mod parse {
             whitespaces_and_newlines(" \n  foo", 0, true),
             (
                 "  foo",
-                vec![
-                    CstKind::Whitespace(" ".to_string()).into(),
-                    CstKind::Newline("\n".to_string()).into(),
-                ],
+                vec![build_space(), CstKind::Newline("\n".to_string()).into(),],
             ),
         );
         assert_eq!(
@@ -1583,27 +1580,15 @@ mod parse {
         let (input, more_whitespace) = whitespaces_and_newlines(input, indentation + 1, false);
         assignment_sign = assignment_sign.wrap_in_whitespace(more_whitespace);
 
-        let is_multiline = left.is_multiline() || assignment_sign.is_multiline();
-        let (input, assignment_sign, body) = if is_multiline {
-            let (input, body) = body(input, indentation + 1);
-            if body.is_empty() {
-                (
-                    input_after_assignment_sign,
-                    just_the_assignment_sign,
-                    vec![],
-                )
-            } else {
-                (input, assignment_sign, body)
-            }
+        let (input, body) = body(input, indentation + 1);
+        let (input, assignment_sign, body) = if body.is_empty() {
+            (
+                input_after_assignment_sign,
+                just_the_assignment_sign,
+                vec![],
+            )
         } else {
-            match comment(input).or_else(|| expression(input, indentation, false, true, true)) {
-                Some((input, expression)) => (input, assignment_sign, vec![expression]),
-                None => (
-                    input_after_assignment_sign,
-                    just_the_assignment_sign,
-                    vec![],
-                ),
-            }
+            (input, assignment_sign, body)
         };
 
         let (whitespace, (assignment_sign, body)) =
@@ -2045,6 +2030,22 @@ mod parse {
                     left: Box::new(build_identifier("foo").with_trailing_space()),
                     assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_space()),
                     body: vec![build_comment(" comment")],
+                }
+                .into(),
+            )),
+        );
+        assert_eq!(
+            expression("foo = bar # comment\n", 0, true, true, true),
+            Some((
+                "\n",
+                CstKind::Assignment {
+                    left: Box::new(build_identifier("foo").with_trailing_space()),
+                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_space()),
+                    body: vec![
+                        build_identifier("bar"),
+                        build_space(),
+                        build_comment(" comment"),
+                    ],
                 }
                 .into(),
             )),
@@ -3150,6 +3151,10 @@ mod parse {
             ),
         }
         .into()
+    }
+    #[cfg(test)]
+    fn build_space() -> Rcst {
+        CstKind::Whitespace(" ".to_string()).into()
     }
 
     #[cfg(test)]
