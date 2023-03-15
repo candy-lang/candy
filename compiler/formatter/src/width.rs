@@ -2,7 +2,7 @@ use extension_trait::extension_trait;
 use std::{
     fmt::{self, Display, Formatter},
     iter::Sum,
-    ops::Add,
+    ops::{Add, AddAssign},
 };
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -51,6 +51,13 @@ impl Width {
             Width::multiline()
         } else {
             Width::Singleline(width)
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Width::Singleline(width) => *width == 0,
+            Width::Multiline { .. } => false,
         }
     }
     pub fn is_singleline(&self) -> bool {
@@ -138,6 +145,12 @@ impl<'a, 'b> Add<&'b Width> for &'a Width {
                 }
             }
         }
+    }
+}
+
+impl AddAssign<Width> for Width {
+    fn add_assign(&mut self, rhs: Width) {
+        *self = &*self + &rhs;
     }
 }
 

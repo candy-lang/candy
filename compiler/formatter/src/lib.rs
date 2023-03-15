@@ -7,10 +7,9 @@ use candy_frontend::{
     cst::{Cst, CstError, CstKind},
     position::Offset,
 };
-use existing_whitespace::{ExistingWhitespace, TrailingWhitespace, NEWLINE, SPACE};
+use existing_whitespace::{ExistingWhitespace, TrailingNewlineCount, TrailingWhitespace};
 use extension_trait::extension_trait;
 use itertools::Itertools;
-use std::{borrow::Cow, ops::Range};
 use text_edits::TextEdits;
 use traversal::dft_post_rev;
 use width::{Indentation, Width};
@@ -29,7 +28,20 @@ pub impl<C: AsRef<[Cst]>> Formatter for C {
         // TOOD: Is there an elegant way to avoid stringifying the whole CST?
         let source = csts.iter().join("");
         let mut edits = TextEdits::new(source);
-        format_csts(&mut edits, csts, &FormatterInfo::default());
+
+        let formatted = format_csts(
+            &mut edits,
+            csts,
+            Offset::default(),
+            &FormatterInfo::default(),
+        );
+        let trailing = if formatted.child_width == Width::default() {
+            TrailingWhitespace::None
+        } else {
+            TrailingWhitespace::Indentation(Indentation::default())
+        };
+        _ = formatted.into_trailing(&mut edits, trailing);
+
         edits
     }
 }
@@ -64,221 +76,62 @@ enum TrailingCommaCondition {
     UnlessFitsIn(usize),
 }
 
-/// The maximum number of empty lines (i.e., containing no expression or comment) that may come
-/// consecutively.
-const MAX_CONSECUTIVE_EMPTY_LINES: usize = 2;
-
-fn format_csts(edits: &mut TextEdits, csts: &[Cst], info: &FormatterInfo) -> Width {
-    // In the formatted output, is this the first line with actual content (i.e., an expression
-    // or comment)?
-    let mut is_first_content_line = true;
-
-    let mut width = None;
-
-    let mut empty_line_count = 0;
-    let mut csts = Cow::Borrowed(csts);
-    let mut index = 0;
-    let mut pending_newlines = vec![];
-
-    let inject_whitespace = move |whitespace: Vec<Cst>, csts: &mut Cow<'_, [Cst]>, index: usize| {
-        csts.to_mut().splice(index + 1..index + 1, whitespace);
-    };
-
-    'outer: while index < csts.len() {
-        let cst = &csts.as_ref()[index];
-
-        if let CstKind::Newline(_) = cst.kind {
-            // Remove leading newlines and limit the number of consecutive empty lines.
-            if is_first_content_line || empty_line_count > MAX_CONSECUTIVE_EMPTY_LINES {
-                edits.delete(cst.data.span.to_owned());
-            } else {
-                pending_newlines.push(cst.data.span.to_owned());
-                empty_line_count += 1;
-            }
-            index += 1;
-
-            let remaining_csts = &csts[index..];
-            if remaining_csts.iter().all(|it| {
-                matches!(
-                    it.kind,
+fn format_csts<'a>(
+    edits: &mut TextEdits,
+    mut csts: &'a [Cst],
+    fallback_offset: Offset,
+    info: &FormatterInfo,
+) -> FormattedCst<'a> {
+    let mut offset = fallback_offset;
+    let mut width = Width::default();
+    let mut formatted =
+        FormattedCst::new(Width::default(), ExistingWhitespace::empty(fallback_offset));
+    loop {
+        {
+            // Whitespace
+            let first_expression_index = csts.iter().find_position(|cst| {
+                !matches!(
+                    cst.kind,
                     CstKind::Whitespace(_)
                         | CstKind::Error {
                             error: CstError::TooMuchWhitespace,
                             ..
                         }
-                        | CstKind::Newline(_),
+                        | CstKind::Newline(_)
+                        | CstKind::Comment { .. },
                 )
-            }) {
-                // Remove trailing newlines and whitespace.
-                for whitespace in remaining_csts {
-                    edits.delete(whitespace.data.span.to_owned());
-                }
-                break 'outer;
-            }
-
-            continue;
+            });
+            let (new_whitespace, rest) =
+                if let Some((first_expression_index, _)) = first_expression_index {
+                    csts.split_at(first_expression_index)
+                } else {
+                    (csts, [].as_slice())
+                };
+            csts = rest;
+            let new_whitespace = ExistingWhitespace::new(offset, new_whitespace);
+            new_whitespace.into_empty_and_move_comments_to(edits, &mut formatted.whitespace);
         }
 
-        // Indentation
-        let (mut cst, indentation_span) = if let CstKind::Whitespace(_)
-        | CstKind::Error {
-            error: CstError::TooMuchWhitespace,
-            ..
-        } = &cst.kind
-        {
-            index += 1;
-            (csts.get(index), Some(cst.data.span.to_owned()))
+        // Expression
+        let Some((expression, rest)) = csts.split_first() else { break; };
+        csts = rest;
+
+        let is_at_start = offset == fallback_offset;
+        width += if is_at_start && !formatted.whitespace.has_comments() {
+            formatted.into_empty_trailing(edits)
         } else {
-            (Some(cst), None)
+            formatted.into_trailing_with_indentation_detailed(
+                edits,
+                info.indentation,
+                TrailingNewlineCount::Keep,
+            )
         };
 
-        // Remove more whitespaces before an actual expression or comment.
-        let not_whitespace = loop {
-            let Some(next) = cst else {
-                // Remove whitespace at the end of the file.
-                if let Some(indentation_span) = indentation_span {
-                    edits.delete(indentation_span);
-                }
-                break 'outer;
-            };
-
-            match next.kind {
-                CstKind::Whitespace(_)
-                | CstKind::Error {
-                    error: CstError::TooMuchWhitespace,
-                    ..
-                } => {
-                    // Remove multiple sequential whitespaces.
-                    index += 1;
-                    cst = csts.get(index);
-                }
-                CstKind::Newline(_) => {
-                    // Remove indentation when it is followed by a newline.
-                    if let Some(indentation_span) = indentation_span {
-                        edits.delete(indentation_span);
-                    }
-                    continue 'outer;
-                }
-                _ => break next,
-            }
-        };
-
-        for newline in pending_newlines.drain(..) {
-            edits.change(newline, NEWLINE);
-        }
-
-        // In indented bodies, the indentation of the first line is taken care of by the caller.
-        //
-        // That's also why we don't have to keep track of its width: The exact width is only
-        // interesting for single-line bodies in which indentation won't occurr.
-        if !is_first_content_line && info.indentation.is_indented() {
-            let indentation = info.indentation.to_string();
-            if let Some(indentation_span) = indentation_span {
-                edits.change(indentation_span, indentation);
-            } else if let Some(cst) = cst {
-                edits.insert(cst.data.span.start, indentation);
-            }
-        } else if let Some(indentation_span) = indentation_span {
-            edits.delete(indentation_span);
-        }
-
-        let (not_whitespace_width, whitespace) = format_cst(edits, not_whitespace, info).split();
-        inject_whitespace(whitespace.take().into_owned(), &mut csts, index);
-        if width.is_none() {
-            width = Some(not_whitespace_width.clone());
-        } else {
-            width = Some(Width::multiline());
-        }
-        index += 1;
-        is_first_content_line = false;
-        empty_line_count = 0;
-
-        let mut trailing_whitespace_span: Option<Range<Offset>> = None;
-        loop {
-            let Some(next) = csts.get(index) else {
-                // Remove trailing whitespace at the end of the file.
-                if let Some(span) = trailing_whitespace_span {
-                    edits.delete(span);
-                }
-                break;
-            };
-
-            match next.kind {
-                CstKind::Whitespace(_)
-                | CstKind::Error {
-                    error: CstError::TooMuchWhitespace,
-                    ..
-                } => {
-                    // Remove whitespace after an expression or comment (unless we're between an expression and a
-                    // comment on the same line).
-                    index += 1;
-                    trailing_whitespace_span = Some(next.data.span.to_owned());
-                }
-                CstKind::Newline(_) => {
-                    if let Some(span) = trailing_whitespace_span {
-                        edits.delete(span);
-                    }
-                    break;
-                }
-                CstKind::Comment { .. } => {
-                    // A comment in the same line.
-                    // TODO: handle multiple comments in the same line.
-                    let comment_start = next.data.span.start;
-                    let (comment_width, whitespace) = format_cst(edits, next, info).split();
-                    inject_whitespace(whitespace.take().into_owned(), &mut csts, index);
-
-                    let new_whitspace = if (&not_whitespace_width + Width::SPACE + &comment_width)
-                        .fits(info.indentation)
-                    {
-                        Cow::Borrowed(SPACE)
-                    } else {
-                        Cow::Owned(format!("{NEWLINE}{}", info.indentation))
-                    };
-                    if let Some(span) = trailing_whitespace_span {
-                        edits.change(span, new_whitspace);
-                        trailing_whitespace_span = None;
-                    } else {
-                        edits.insert(comment_start, new_whitspace);
-                    }
-
-                    width = Some(width.unwrap() + Width::SPACE + comment_width);
-                    index += 1;
-                }
-                _ => {
-                    // Another expression without a newline in between.
-                    let whitespace_span =
-                        trailing_whitespace_span.unwrap_or_else(|| next.data.span.to_owned());
-                    trailing_whitespace_span = None;
-
-                    edits.insert(whitespace_span.start, NEWLINE);
-                    width = Some(Width::multiline());
-
-                    edits.change(whitespace_span, info.indentation.to_string());
-
-                    let (_, whitespace) = format_cst(edits, next, info).split();
-                    inject_whitespace(whitespace.take().into_owned(), &mut csts, index);
-
-                    index += 1;
-                }
-            }
-        }
+        formatted = format_cst(edits, expression, info);
+        offset = formatted.whitespace.end_offset();
     }
 
-    // Add trailing newline (only for a non-empty top-level body).
-    if !info.indentation.is_indented() && !is_first_content_line {
-        if let Some(newline) = pending_newlines.pop() {
-            edits.change(newline, NEWLINE);
-        } else {
-            let last_cst = csts.last().unwrap();
-            edits.insert(last_cst.data.span.end, NEWLINE);
-        }
-        width = Some(Width::multiline())
-    }
-    for newline in pending_newlines {
-        edits.delete(newline);
-    }
-
-    width.unwrap_or_default()
+    FormattedCst::new(width + formatted.child_width, formatted.whitespace)
 }
 
 pub(crate) fn format_cst<'a>(
@@ -625,7 +478,13 @@ pub(crate) fn format_cst<'a>(
             let pattern_width =
                 pattern.into_space_and_move_comments_to(edits, &mut arrow.whitespace);
 
-            let body_width = format_csts(edits, body, &info.with_indent());
+            let (body_width, whitespace) = format_csts(
+                edits,
+                body,
+                arrow.whitespace.end_offset(),
+                &info.with_indent(),
+            )
+            .split();
 
             let arrow_trailing = if pattern_width.last_line_fits(
                 info.indentation,
@@ -636,7 +495,10 @@ pub(crate) fn format_cst<'a>(
                 TrailingWhitespace::Indentation(info.indentation.with_indent())
             };
 
-            pattern_width + arrow.into_trailing(edits, arrow_trailing) + body_width
+            return FormattedCst::new(
+                pattern_width + arrow.into_trailing(edits, arrow_trailing) + body_width,
+                whitespace,
+            );
         }
         CstKind::Lambda {
             opening_curly_brace,
@@ -654,7 +516,17 @@ pub(crate) fn format_cst<'a>(
 
             let assignment_sign = format_cst(edits, assignment_sign, &info.with_indent());
 
-            let body_width = format_csts(edits, body, &info.with_indent());
+            let body = format_csts(
+                edits,
+                body,
+                assignment_sign.whitespace.end_offset(),
+                &info.with_indent(),
+            );
+            let body_width = body.into_trailing_with_indentation_detailed(
+                edits,
+                info.indentation.with_indent(),
+                TrailingNewlineCount::Zero,
+            );
 
             let is_body_in_same_line = left_width.last_line_fits(
                 info.indentation,
@@ -900,11 +772,23 @@ impl<'a> FormattedCst<'a> {
         edits: &mut TextEdits,
         indentation: Indentation,
     ) -> Width {
-        self.whitespace
-            .into_trailing_with_indentation(edits, indentation);
-        Width::Multiline {
-            last_line_width: Some(indentation.width()),
-        }
+        self.into_trailing_with_indentation_detailed(edits, indentation, TrailingNewlineCount::One)
+    }
+    #[must_use]
+    pub fn into_trailing_with_indentation_detailed(
+        self,
+        edits: &mut TextEdits,
+        indentation: Indentation,
+        trailing_newline_count: TrailingNewlineCount,
+    ) -> Width {
+        &self.child_width
+            + self.whitespace.into_trailing_with_indentation(
+                edits,
+                self.child_width.clone(),
+                indentation,
+                trailing_newline_count,
+                !self.child_width.is_empty(),
+            )
     }
 }
 
@@ -992,7 +876,6 @@ mod test {
         test("foo | # abc\n  bar", "foo # abc\n| bar\n");
         test("foo # abc\n| bar", "foo # abc\n| bar\n");
     }
-
     #[test]
     fn test_parenthesized() {
         test("(foo)", "(foo)\n");
