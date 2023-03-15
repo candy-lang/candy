@@ -31,7 +31,7 @@ impl Display for Indentation {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Width {
     Singleline(usize),
-    Multline,
+    Multiline,
 }
 impl Width {
     pub const MAX: usize = 100;
@@ -42,7 +42,7 @@ impl Width {
     }
     pub fn from_width_and_max(width: usize, max_width: usize) -> Self {
         if width > max_width {
-            Width::Multline
+            Width::Multiline
         } else {
             Width::Singleline(width)
         }
@@ -50,7 +50,7 @@ impl Width {
     pub fn is_singleline(&self) -> bool {
         match self {
             Width::Singleline(_) => true,
-            Width::Multline => false,
+            Width::Multiline => false,
         }
     }
     pub fn is_multiline(&self) -> bool {
@@ -63,7 +63,7 @@ impl Width {
     pub fn fits_in(&self, max_width: usize) -> bool {
         match self {
             Width::Singleline(width) => width <= &max_width,
-            Width::Multline => false,
+            Width::Multiline => false,
         }
     }
 }
@@ -104,7 +104,7 @@ impl Sum for Width {
 pub impl StringWidth for str {
     fn width(&self) -> Width {
         if self.contains('\n') {
-            Width::Multline
+            Width::Multiline
         } else {
             Width::Singleline(unicode_width::UnicodeWidthStr::width(self))
         }

@@ -187,7 +187,7 @@ fn format_csts(edits: &mut TextEdits, csts: &[Cst], info: &FormatterInfo) -> Wid
         if width.is_none() {
             width = Some(not_whitespace_width);
         } else {
-            width = Some(Width::Multline);
+            width = Some(Width::Multiline);
         }
         index += 1;
         is_first_content_line = false;
@@ -240,7 +240,7 @@ fn format_csts(edits: &mut TextEdits, csts: &[Cst], info: &FormatterInfo) -> Wid
                     trailing_whitespace_span = None;
 
                     edits.insert(whitespace_span.start, NEWLINE);
-                    width = Some(Width::Multline);
+                    width = Some(Width::Multiline);
 
                     edits.change(whitespace_span, info.indentation.to_string());
 
@@ -261,7 +261,7 @@ fn format_csts(edits: &mut TextEdits, csts: &[Cst], info: &FormatterInfo) -> Wid
             let last_cst = csts.last().unwrap();
             edits.insert(last_cst.data.span.end, NEWLINE);
         }
-        width = Some(Width::Multline)
+        width = Some(Width::Multiline)
     }
     for newline in pending_newlines {
         edits.delete(newline);
@@ -600,7 +600,7 @@ fn format_collection<'a>(
                 };
                 min_width = Width::from_width_and_max(old_min_width + item_min_width, max_width);
             } else {
-                min_width = Width::Multline;
+                min_width = Width::Multiline;
             }
 
             item
@@ -702,7 +702,7 @@ impl<'a> FormattedCst<'a> {
 
     pub fn min_width(&self) -> Width {
         if self.whitespace.has_comments() {
-            Width::Multline
+            Width::Multiline
         } else {
             self.child_width.clone()
         }
@@ -741,7 +741,7 @@ impl<'a> FormattedCst<'a> {
     ) -> Width {
         self.whitespace
             .into_trailing_with_indentation(edits, indentation);
-        Width::Multline
+        Width::Multiline
     }
 }
 
