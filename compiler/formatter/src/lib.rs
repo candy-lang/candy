@@ -135,12 +135,12 @@ fn format_csts(edits: &mut TextEdits, csts: &[Cst], info: &FormatterInfo) -> Wid
         // Remove more whitespaces before an actual expression or comment.
         let not_whitespace = loop {
             let Some(next) = cst else {
-                    // Remove whitespace at the end of the file.
-                    if let Some(indentation_span) = indentation_span {
-                        edits.delete(indentation_span);
-                    }
-                    break 'outer;
-                };
+                // Remove whitespace at the end of the file.
+                if let Some(indentation_span) = indentation_span {
+                    edits.delete(indentation_span);
+                }
+                break 'outer;
+            };
 
             match next.kind {
                 CstKind::Whitespace(_)
