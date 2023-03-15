@@ -323,18 +323,59 @@ pub(crate) fn format_cst<'a>(
         CstKind::Identifier(string) | CstKind::Symbol(string) | CstKind::Int { string, .. } => {
             string.width()
         }
-        CstKind::OpeningText { .. } | CstKind::ClosingText { .. } => todo!(),
+        CstKind::OpeningText {
+            opening_single_quotes,
+            opening_double_quote,
+        } => {
+            // TODO: Format text
+            opening_single_quotes
+                .iter()
+                .map(|it| format_cst(edits, it, info).min_width())
+                .sum::<Width>()
+                + format_cst(edits, opening_double_quote, info).min_width()
+        }
+        CstKind::ClosingText {
+            closing_double_quote,
+            closing_single_quotes,
+        } => {
+            // TODO: Format text
+            format_cst(edits, closing_double_quote, info).min_width()
+                + closing_single_quotes
+                    .iter()
+                    .map(|it| format_cst(edits, it, info).min_width())
+                    .sum::<Width>()
+        }
         CstKind::Text {
             opening,
             parts,
             closing,
-        } => todo!(),
-        CstKind::TextPart(_) => todo!(),
+        } => {
+            // TODO: Format text
+            format_cst(edits, opening, info).min_width()
+                + parts
+                    .iter()
+                    .map(|it| format_cst(edits, it, info).min_width())
+                    .sum::<Width>()
+                + format_cst(edits, closing, info).min_width()
+        }
+        CstKind::TextPart(text) => text.width(),
+
         CstKind::TextInterpolation {
             opening_curly_braces,
             expression,
             closing_curly_braces,
-        } => todo!(),
+        } => {
+            // TODO: Format text
+            opening_curly_braces
+                .iter()
+                .map(|it| format_cst(edits, it, info).min_width())
+                .sum::<Width>()
+                + format_cst(edits, expression, info).min_width()
+                + closing_curly_braces
+                    .iter()
+                    .map(|it| format_cst(edits, it, info).min_width())
+                    .sum::<Width>()
+        }
         CstKind::BinaryBar { left, bar, right } => {
             let mut left = format_cst(edits, left, info);
 
