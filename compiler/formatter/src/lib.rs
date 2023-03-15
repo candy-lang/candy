@@ -317,7 +317,7 @@ pub(crate) fn format_cst<'a>(
         CstKind::TrailingWhitespace { child, whitespace } => {
             let (child_width, child_whitespace) = format_cst(edits, child, info).split();
             let mut whitespace = ExistingWhitespace::new(child.data.span.end, whitespace);
-            child_whitespace.empty_and_move_comments_to(edits, &mut whitespace);
+            child_whitespace.into_empty_and_move_comments_to(edits, &mut whitespace);
             return FormattedCst::new(child_width, whitespace);
         }
         CstKind::Identifier(string) | CstKind::Symbol(string) | CstKind::Int { string, .. } => {
@@ -423,7 +423,7 @@ pub(crate) fn format_cst<'a>(
                 info,
                 &value_width + value_whitespace.min_width(),
             );
-            value_whitespace.empty_and_move_comments_to(edits, &mut whitespace);
+            value_whitespace.into_empty_and_move_comments_to(edits, &mut whitespace);
 
             return FormattedCst::new(value_width + comma_width, whitespace);
         }
@@ -444,7 +444,7 @@ pub(crate) fn format_cst<'a>(
                     format_cst(edits, key, &info.with_indent()).split();
 
                 let mut colon = format_cst(edits, colon, &info.with_indent());
-                key_whitespace.empty_and_move_comments_to(edits, &mut colon.whitespace);
+                key_whitespace.into_empty_and_move_comments_to(edits, &mut colon.whitespace);
 
                 (key_width, colon)
             });
@@ -465,7 +465,7 @@ pub(crate) fn format_cst<'a>(
                 info,
                 &min_width_before_comma + value_whitespace.min_width(),
             );
-            value_whitespace.empty_and_move_comments_to(edits, &mut whitespace);
+            value_whitespace.into_empty_and_move_comments_to(edits, &mut whitespace);
             let min_width = min_width_before_comma + &comma_width;
 
             return FormattedCst::new(
@@ -489,7 +489,7 @@ pub(crate) fn format_cst<'a>(
             let mut struct_ = format_cst(edits, struct_, info);
 
             let (dot_width, dot_whitespace) = format_cst(edits, dot, &info.with_indent()).split();
-            dot_whitespace.empty_and_move_comments_to(edits, &mut struct_.whitespace);
+            dot_whitespace.into_empty_and_move_comments_to(edits, &mut struct_.whitespace);
 
             let key = format_cst(edits, key, &info.with_indent());
 
@@ -510,12 +510,75 @@ pub(crate) fn format_cst<'a>(
             expression,
             percent,
             cases,
-        } => todo!(),
+        } => {
+            let (expression_width, expression_whitespace) =
+                format_cst(edits, expression, info).split();
+
+            let mut percent = format_cst(edits, percent, info);
+            expression_whitespace.into_space_and_move_comments_to(edits, &mut percent.whitespace);
+
+            let only_has_empty_error_case = matches!(
+                cases.as_slice(),
+                [Cst {
+                    kind: CstKind::Error {
+                        unparsable_input,
+                        error: CstError::MatchMissesCases,
+                    },
+                    ..
+                }] if unparsable_input.is_empty(),
+            );
+            let (cases, last_case) = if !only_has_empty_error_case && let [cases @ .., last_case] = cases.as_slice() {
+                (cases, last_case)
+            } else {
+                let (percent_width, whitespace) = percent.split();
+                return FormattedCst::new(expression_width + percent_width, whitespace);
+            };
+
+            let percent_width =
+                percent.into_trailing_with_indentation(edits, info.indentation.with_indent());
+
+            let (last_case_width, whitespace) =
+                format_cst(edits, last_case, &info.with_indent()).split();
+            return FormattedCst::new(
+                expression_width
+                    + percent_width
+                    + cases
+                        .iter()
+                        .map(|it| {
+                            format_cst(edits, it, &info.with_indent())
+                                .into_trailing_with_indentation(
+                                    edits,
+                                    info.indentation.with_indent(),
+                                )
+                        })
+                        .sum::<Width>()
+                    + last_case_width,
+                whitespace,
+            );
+        }
         CstKind::MatchCase {
             pattern,
             arrow,
             body,
-        } => todo!(),
+        } => {
+            let (pattern_width, pattern_whitespace) = format_cst(edits, pattern, info).split();
+
+            let mut arrow = format_cst(edits, arrow, info);
+            pattern_whitespace.into_space_and_move_comments_to(edits, &mut arrow.whitespace);
+
+            let body_width = format_csts(edits, body, &info.with_indent());
+
+            let arrow_trailing = if pattern_width.last_line_fits(
+                info.indentation,
+                arrow.min_width() + Width::SPACE + &body_width,
+            ) {
+                TrailingWhitespace::Space
+            } else {
+                TrailingWhitespace::Indentation(info.indentation.with_indent())
+            };
+
+            pattern_width + arrow.into_trailing(edits, arrow_trailing) + body_width
+        }
         CstKind::Lambda {
             opening_curly_brace,
             parameters_and_arrow,
@@ -975,6 +1038,25 @@ mod test {
         test("foo . # abc\n  bar", "foo # abc\n  .bar\n");
         test("foo .bar# abc", "foo.bar # abc\n");
         test("foo .bar # abc", "foo.bar # abc\n");
+    }
+    #[test]
+    fn test_match() {
+        test("foo % ", "foo %\n");
+        test(
+            "foo %\n  Foo -> Foo\n  Bar -> Bar",
+            "foo %\n  Foo -> Foo\n  Bar -> Bar\n",
+        );
+        test(
+            "foo%\n  Foo->Foo\n\n  Bar  ->  Bar",
+            "foo %\n  Foo -> Foo\n  Bar -> Bar\n",
+        );
+
+        // Comments
+        test("foo%# abc\n  Bar -> Baz", "foo % # abc\n  Bar -> Baz\n");
+        test(
+            "foo %\n  Bar # abc\n  -> Baz",
+            "foo %\n  Bar -> # abc\n    Baz\n",
+        );
     }
     #[test]
     fn test_assignment() {

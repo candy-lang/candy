@@ -61,7 +61,29 @@ impl<'a> ExistingWhitespace<'a> {
     pub fn take(self) -> Cow<'a, [Cst]> {
         self.whitespace
     }
-    pub fn empty_and_move_comments_to(
+    pub fn into_space_and_move_comments_to(
+        mut self,
+        edits: &mut TextEdits,
+        other: &mut ExistingWhitespace<'a>,
+    ) {
+        if let Some(whitespace) = self.whitespace.first() && matches!(whitespace.kind, CstKind::Whitespace(_)) {
+            let span = 
+            match &mut self.whitespace {
+                Cow::Borrowed(whitespace) => {
+                    let (first, remaining) = whitespace.split_first().unwrap();
+                    *whitespace = remaining;
+                    first.data.span.to_owned()
+                },
+                Cow::Owned(whitespace) => whitespace.remove(0).data.span,
+            };
+            self.start_offset = span.end;
+            edits.change(span, SPACE);
+        } else {
+            edits.insert(self.start_offset, SPACE);
+        }
+        self.into_empty_and_move_comments_to(edits, other);
+    }
+    pub fn into_empty_and_move_comments_to(
         self,
         edits: &mut TextEdits,
         other: &mut ExistingWhitespace<'a>,
@@ -83,6 +105,7 @@ impl<'a> ExistingWhitespace<'a> {
                 && !edits.has_edit_at(self_end_offset)
             {
                 // Simple case: The whitespace is adopted by directly following whitespace.
+                other.start_offset = self.start_offset;
                 prepend(self.whitespace, &mut other.whitespace);
                 prepend(self.adopted_whitespace_before, &mut other.whitespace);
                 return;
