@@ -782,7 +782,7 @@ mod parse {
     fn test_text() {
         assert_eq!(text("foo", 0), None);
         assert_eq!(
-            text("\"foo\" bar", 0),
+            text(r#""foo" bar"#, 0),
             Some((" bar", build_simple_text("foo"))),
         );
         // "foo
@@ -2854,6 +2854,13 @@ mod parse {
             }
         }
         (input, expressions)
+    }
+    #[test]
+    fn test_body() {
+        assert_eq!(
+            body("foo # comment", 0),
+            ("", vec![build_identifier("foo"), build_space(), build_comment(" comment")]),
+        );
     }
 
     #[instrument(level = "trace")]

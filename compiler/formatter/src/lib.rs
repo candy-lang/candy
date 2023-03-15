@@ -163,7 +163,9 @@ pub(crate) fn format_cst<'a>(
             comment,
         } => {
             let formatted_octothorpe = format_cst(edits, octothorpe, info);
-            assert!(formatted_octothorpe.min_width().is_singleline());
+            assert!(formatted_octothorpe
+                .min_width(info.indentation)
+                .is_singleline());
 
             formatted_octothorpe.into_empty_trailing(edits) + comment.width()
         }
@@ -183,19 +185,19 @@ pub(crate) fn format_cst<'a>(
             // TODO: Format text
             opening_single_quotes
                 .iter()
-                .map(|it| format_cst(edits, it, info).min_width())
+                .map(|it| format_cst(edits, it, info).min_width(info.indentation))
                 .sum::<Width>()
-                + format_cst(edits, opening_double_quote, info).min_width()
+                + format_cst(edits, opening_double_quote, info).min_width(info.indentation)
         }
         CstKind::ClosingText {
             closing_double_quote,
             closing_single_quotes,
         } => {
             // TODO: Format text
-            format_cst(edits, closing_double_quote, info).min_width()
+            format_cst(edits, closing_double_quote, info).min_width(info.indentation)
                 + closing_single_quotes
                     .iter()
-                    .map(|it| format_cst(edits, it, info).min_width())
+                    .map(|it| format_cst(edits, it, info).min_width(info.indentation))
                     .sum::<Width>()
         }
         CstKind::Text {
@@ -204,12 +206,12 @@ pub(crate) fn format_cst<'a>(
             closing,
         } => {
             // TODO: Format text
-            format_cst(edits, opening, info).min_width()
+            format_cst(edits, opening, info).min_width(info.indentation)
                 + parts
                     .iter()
-                    .map(|it| format_cst(edits, it, info).min_width())
+                    .map(|it| format_cst(edits, it, info).min_width(info.indentation))
                     .sum::<Width>()
-                + format_cst(edits, closing, info).min_width()
+                + format_cst(edits, closing, info).min_width(info.indentation)
         }
         CstKind::TextPart(text) => text.width(),
 
@@ -221,12 +223,12 @@ pub(crate) fn format_cst<'a>(
             // TODO: Format text
             opening_curly_braces
                 .iter()
-                .map(|it| format_cst(edits, it, info).min_width())
+                .map(|it| format_cst(edits, it, info).min_width(info.indentation))
                 .sum::<Width>()
-                + format_cst(edits, expression, info).min_width()
+                + format_cst(edits, expression, info).min_width(info.indentation)
                 + closing_curly_braces
                     .iter()
-                    .map(|it| format_cst(edits, it, info).min_width())
+                    .map(|it| format_cst(edits, it, info).min_width(info.indentation))
                     .sum::<Width>()
         }
         CstKind::BinaryBar { left, bar, right } => {
@@ -237,13 +239,14 @@ pub(crate) fn format_cst<'a>(
 
             let (right_width, whitespace) = format_cst(edits, right, info).split();
 
-            let left_trailing = if (left.min_width() + Width::SPACE + &bar_width + &right_width)
-                .fits(info.indentation)
-            {
-                TrailingWhitespace::Space
-            } else {
-                TrailingWhitespace::Indentation(info.indentation)
-            };
+            let left_trailing =
+                if (left.min_width(info.indentation) + Width::SPACE + &bar_width + &right_width)
+                    .fits(info.indentation)
+                {
+                    TrailingWhitespace::Space
+                } else {
+                    TrailingWhitespace::Indentation(info.indentation)
+                };
             return FormattedCst::new(
                 left.into_trailing(edits, left_trailing) + bar_width + right_width,
                 whitespace,
@@ -258,9 +261,9 @@ pub(crate) fn format_cst<'a>(
             let inner = format_cst(edits, inner, &info.with_indent());
             let closing_parenthesis = format_cst(edits, closing_parenthesis, info);
 
-            let min_width = &opening_parenthesis.min_width()
-                + &inner.min_width()
-                + &closing_parenthesis.min_width();
+            let min_width = &opening_parenthesis.min_width(info.indentation)
+                + &inner.min_width(info.indentation)
+                + &closing_parenthesis.min_width(info.indentation);
             let (opening_parenthesis_trailing, inner_trailing) = if min_width.fits(info.indentation)
             {
                 (TrailingWhitespace::None, TrailingWhitespace::None)
@@ -289,10 +292,10 @@ pub(crate) fn format_cst<'a>(
                 .map(|argument| format_cst(edits, argument, &info.with_indent()))
                 .collect_vec();
 
-            let min_width = &receiver.min_width()
+            let min_width = &receiver.min_width(info.indentation)
                 + arguments
                     .iter()
-                    .map(|it| Width::SPACE + &it.min_width())
+                    .map(|it| Width::SPACE + &it.min_width(info.indentation))
                     .sum::<Width>();
             let trailing = if min_width.fits(info.indentation) {
                 TrailingWhitespace::Space
@@ -334,7 +337,7 @@ pub(crate) fn format_cst<'a>(
                 comma.as_deref(),
                 value_end,
                 info,
-                value.min_width(),
+                value.min_width(info.indentation),
             );
 
             return FormattedCst::new(
@@ -368,14 +371,14 @@ pub(crate) fn format_cst<'a>(
 
             let key_and_colon_min_width = key_width_and_colon
                 .as_ref()
-                .map(|(key_width, colon)| key_width + &colon.min_width())
+                .map(|(key_width, colon)| key_width + &colon.min_width(info.indentation))
                 .unwrap_or_default();
             let (comma_width, mut whitespace) = apply_trailing_comma_condition(
                 edits,
                 comma.as_deref(),
                 value_end,
                 info,
-                &key_and_colon_min_width + value.min_width(),
+                &key_and_colon_min_width + value.min_width(info.indentation),
             );
             let value_width = value.into_empty_and_move_comments_to(edits, &mut whitespace);
             let min_width = key_and_colon_min_width + &value_width + &comma_width;
@@ -404,7 +407,8 @@ pub(crate) fn format_cst<'a>(
 
             let key = format_cst(edits, key, &info.with_indent());
 
-            let min_width = struct_.min_width() + &dot_width + key.min_width();
+            let min_width =
+                struct_.min_width(info.indentation) + &dot_width + key.min_width(info.indentation);
             let struct_trailing = if min_width.fits(info.indentation) {
                 TrailingWhitespace::None
             } else {
@@ -488,7 +492,7 @@ pub(crate) fn format_cst<'a>(
 
             let arrow_trailing = if pattern_width.last_line_fits(
                 info.indentation,
-                arrow.min_width() + Width::SPACE + &body_width,
+                arrow.min_width(info.indentation) + Width::SPACE + &body_width,
             ) {
                 TrailingWhitespace::Space
             } else {
@@ -505,7 +509,131 @@ pub(crate) fn format_cst<'a>(
             parameters_and_arrow,
             body,
             closing_curly_brace,
-        } => todo!(),
+        } => {
+            let opening_curly_brace = format_cst(edits, opening_curly_brace, info);
+
+            let parameters_width_and_arrow =
+                parameters_and_arrow.as_ref().map(|(parameters, arrow)| {
+                    let mut parameters = parameters
+                        .iter()
+                        .map(|it| format_cst(edits, it, &info.with_indent()))
+                        .collect_vec();
+                    let arrow = format_cst(edits, arrow, &info.with_indent());
+
+                    let parameters_trailing = if (opening_curly_brace.min_width(info.indentation)
+                        + Width::SPACE
+                        + parameters
+                            .iter()
+                            .map(|it| it.min_width(info.indentation) + Width::SPACE)
+                            .sum::<Width>()
+                        + arrow.min_width(info.indentation))
+                    .fits(info.indentation)
+                    {
+                        TrailingWhitespace::Space
+                    } else {
+                        TrailingWhitespace::Indentation(info.indentation.with_indent())
+                    };
+                    let last_parameter = parameters.pop();
+                    let parameters_width = parameters
+                        .into_iter()
+                        .map(|it| it.into_trailing(edits, parameters_trailing.clone()))
+                        .sum::<Width>();
+
+                    let last_parameter_width = last_parameter
+                        .map(|it| {
+                            let trailing = if parameters_width.last_line_fits(
+                                info.indentation,
+                                it.min_width(info.indentation)
+                                    + Width::SPACE
+                                    + arrow.min_width(info.indentation),
+                            ) {
+                                TrailingWhitespace::Space
+                            } else {
+                                TrailingWhitespace::Indentation(info.indentation.with_indent())
+                            };
+                            it.into_trailing(edits, trailing)
+                        })
+                        .unwrap_or_default();
+
+                    (parameters_width + last_parameter_width, arrow)
+                });
+
+            let body_fallback_offset = parameters_width_and_arrow
+                .as_ref()
+                .map(|(_, arrow)| arrow.whitespace.end_offset())
+                .unwrap_or_else(|| opening_curly_brace.whitespace.end_offset());
+            let body = format_csts(edits, body, body_fallback_offset, &info.with_indent());
+            let (closing_curly_brace_width, whitespace) =
+                format_cst(edits, closing_curly_brace, info).split();
+
+            let parameters_and_arrow_min_width = parameters_width_and_arrow
+                .as_ref()
+                .map(|(parameters_width, arrow)| {
+                    parameters_width + arrow.min_width(info.indentation)
+                })
+                .unwrap_or_default();
+            let space_if_parameters = if parameters_width_and_arrow.is_some() {
+                Width::SPACE
+            } else {
+                Width::default()
+            };
+            let body_min_width = body.min_width(info.indentation);
+            let body_and_space_width = if body_min_width.is_empty() {
+                Width::default()
+            } else {
+                &body_min_width + Width::SPACE
+            };
+            let width_until_arrow = opening_curly_brace.min_width(info.indentation)
+                + Width::SPACE
+                + &parameters_and_arrow_min_width;
+            let width_from_body = body_and_space_width + &closing_curly_brace_width;
+            let opening_curly_brace_trailing = if parameters_and_arrow.is_some()
+                && width_until_arrow.fits(info.indentation)
+                || parameters_and_arrow.is_none()
+                    && (&width_until_arrow
+                        + &body_min_width
+                        + Width::SPACE
+                        + &closing_curly_brace_width)
+                        .fits(info.indentation)
+            {
+                TrailingWhitespace::Space
+            } else if body_min_width.is_empty() {
+                TrailingWhitespace::Indentation(info.indentation)
+            } else {
+                TrailingWhitespace::Indentation(info.indentation.with_indent())
+            };
+            let body_trailing = if body.child_width.is_empty() {
+                TrailingWhitespace::None
+            } else if (&width_until_arrow + &space_if_parameters + &width_from_body)
+                .fits(info.indentation)
+            {
+                TrailingWhitespace::Space
+            } else {
+                TrailingWhitespace::Indentation(info.indentation)
+            };
+            // TODO
+            let opening_curly_brace_width =
+                opening_curly_brace.into_trailing(edits, opening_curly_brace_trailing);
+            let arrow_trailing = if width_until_arrow
+                .last_line_fits(info.indentation, space_if_parameters + width_from_body)
+            {
+                TrailingWhitespace::Space
+            } else {
+                TrailingWhitespace::Indentation(info.indentation.with_indent())
+            };
+
+            return FormattedCst::new(
+                opening_curly_brace_width
+                    + parameters_width_and_arrow
+                        .map(|(parameters_width, arrow)| {
+                            parameters_width + arrow.into_trailing(edits, arrow_trailing)
+                        })
+                        .unwrap_or_default()
+                    + body.into_trailing(edits, body_trailing)
+                    + closing_curly_brace_width,
+                whitespace,
+            );
+        }
         CstKind::Assignment {
             left,
             assignment_sign,
@@ -530,7 +658,7 @@ pub(crate) fn format_cst<'a>(
 
             let is_body_in_same_line = left_width.last_line_fits(
                 info.indentation,
-                &assignment_sign.min_width() + Width::SPACE + &body_width,
+                &assignment_sign.min_width(info.indentation) + Width::SPACE + &body_width,
             );
             let assignment_sign_trailing = if is_body_in_same_line {
                 TrailingWhitespace::Space
@@ -559,8 +687,8 @@ fn format_collection<'a>(
     let closing_punctuation = format_cst(edits, closing_punctuation, info);
 
     let mut min_width = Width::Singleline(info.indentation.width())
-        + &opening_punctuation.min_width()
-        + &closing_punctuation.min_width();
+        + &opening_punctuation.min_width(info.indentation)
+        + &closing_punctuation.min_width(info.indentation);
     let item_info = info
         .with_indent()
         .with_trailing_comma_condition(TrailingCommaCondition::Always);
@@ -592,7 +720,7 @@ fn format_collection<'a>(
             let item = format_cst(edits, item, &info);
 
             if let Width::Singleline(old_min_width) = min_width
-                    && let Width::Singleline(item_min_width) = item.min_width() {
+                    && let Width::Singleline(item_min_width) = item.min_width(info.indentation) {
                 let (item_min_width, max_width) = if is_last_item {
                     (item_min_width, Width::MAX)
                 } else {
@@ -707,9 +835,11 @@ impl<'a> FormattedCst<'a> {
     }
 
     #[must_use]
-    pub fn min_width(&self) -> Width {
+    pub fn min_width(&self, indentation: Indentation) -> Width {
         if self.whitespace.has_comments() {
-            Width::multiline()
+            Width::Multiline {
+                last_line_width: Some(indentation.width()),
+            }
         } else {
             self.child_width.clone()
         }
@@ -867,6 +997,10 @@ mod test {
             "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryLongFunction0 longArgument0 | veryVeryVeryVeryVeryVeryVeryVeryLongFunction1 longArgument1 longArgument2",
             "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver\n| veryVeryVeryVeryVeryVeryVeryVeryLongFunction0 longArgument0\n| veryVeryVeryVeryVeryVeryVeryVeryLongFunction1 longArgument1 longArgument2\n",
         );
+        // test(
+        //     "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryLongFunction longArgument0 longArgument1 longArgument2 longArgument3",
+        //     "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver\n| veryVeryVeryVeryVeryVeryVeryVeryLongFunction\n  longArgument0\n  longArgument1\n  longArgument2\n  longArgument3\n",
+        // ); // FIXME
         test(
             "foo | veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction0 veryVeryVeryVeryVeryVeryVeryLongArgument0 | function1",
             "foo\n| veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction0 veryVeryVeryVeryVeryVeryVeryLongArgument0\n| function1\n",
@@ -1061,6 +1195,57 @@ mod test {
         test(
             "foo %\n  Bar # abc\n  -> Baz",
             "foo %\n  Bar -> # abc\n    Baz\n",
+        );
+    }
+    #[test]
+    fn test_lambda() {
+        // No parameters
+        test("{}", "{ }\n");
+        test("{ }", "{ }\n");
+        test("{ foo }", "{ foo }\n");
+        test("{\n  foo\n}", "{ foo }\n");
+        test("{\n  foo\n  bar\n}", "{\n  foo\n  bar\n}\n");
+        test("{\n  foo\n \n  bar\n}", "{\n  foo\n\n  bar\n}\n");
+        test(
+            "{ veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongBodyy }",
+            "{\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongBodyy\n}\n",
+        );
+
+        test("{ foo -> }", "{ foo -> }\n");
+        test("{ foo -> bar }", "{ foo -> bar }\n");
+        test(
+            "{ parameter veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameter -> foo }",
+            "{\n  parameter veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameter ->\n  foo\n}\n",
+        );
+        test(
+            "{ parameter veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameterr -> foo }",
+            "{\n  parameter\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameterr -> foo\n}\n",
+        );
+        test(
+            "{ parameter veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameter -> foo }",
+            "{\n  parameter\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameter ->\n  foo\n}\n",
+        );
+        test(
+            "{ parameter veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameter -> foo }",
+            "{\n  parameter\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameter\n  -> foo\n}\n",
+        );
+        test(
+            "{ parameter -> veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongBody\n}\n",
+            "{ parameter ->\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongBody\n}\n",
+        );
+
+        // Comments
+        test("{ # abc\n}", "{ # abc\n}\n");
+        test("{ foo # abc\n}", "{\n  foo # abc\n}\n");
+        test("{ foo -> bar # abc\n}", "{ foo ->\n  bar # abc\n}\n");
+        test("{ foo -> # abc\n  bar\n}", "{ foo -> # abc\n  bar\n}\n");
+        test(
+            "{ foo# abc\n  ->\n  bar\n}",
+            "{\n  foo # abc\n  -> bar\n}\n",
+        );
+        test(
+            "{ # abc\n  foo ->\n  bar\n}",
+            "{\n  # abc\n  foo -> bar\n}\n",
         );
     }
     #[test]
