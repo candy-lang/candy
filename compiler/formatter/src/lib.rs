@@ -185,7 +185,7 @@ fn format_csts(edits: &mut TextEdits, csts: &[Cst], info: &FormatterInfo) -> Wid
         let (not_whitespace_width, whitespace) = format_cst(edits, not_whitespace, info).split();
         inject_whitespace(whitespace.take().into_owned(), &mut csts, index);
         if width.is_none() {
-            width = Some(not_whitespace_width);
+            width = Some(not_whitespace_width.clone());
         } else {
             width = Some(Width::multiline());
         }
@@ -222,15 +222,25 @@ fn format_csts(edits: &mut TextEdits, csts: &[Cst], info: &FormatterInfo) -> Wid
                 }
                 CstKind::Comment { .. } => {
                     // A comment in the same line.
-                    if let Some(span) = trailing_whitespace_span {
-                        edits.change(span, SPACE);
-                        trailing_whitespace_span = None;
-                    } else {
-                        edits.insert(next.data.span.start, SPACE);
-                    }
-
+                    // TODO: handle multiple comments in the same line.
+                    let comment_start = next.data.span.start;
                     let (comment_width, whitespace) = format_cst(edits, next, info).split();
                     inject_whitespace(whitespace.take().into_owned(), &mut csts, index);
+
+                    let new_whitspace = if (&not_whitespace_width + Width::SPACE + &comment_width)
+                        .fits(info.indentation)
+                    {
+                        Cow::Borrowed(SPACE)
+                    } else {
+                        Cow::Owned(format!("{NEWLINE}{}", info.indentation))
+                    };
+                    if let Some(span) = trailing_whitespace_span {
+                        edits.change(span, new_whitspace);
+                        trailing_whitespace_span = None;
+                    } else {
+                        edits.insert(comment_start, new_whitspace);
+                    }
+
                     width = Some(width.unwrap() + Width::SPACE + comment_width);
                     index += 1;
                 }
@@ -1006,6 +1016,10 @@ mod test {
         test(
             "foo = bar # veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongComment\n",
             "foo =\n  bar # veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongComment\n",
+        );
+        test(
+            "foo = bar # veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongComment\n",
+            "foo =\n  bar\n  # veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongComment\n",
         );
     }
 
