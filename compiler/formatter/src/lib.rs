@@ -335,7 +335,26 @@ pub(crate) fn format_cst<'a>(
             expression,
             closing_curly_braces,
         } => todo!(),
-        CstKind::BinaryBar { left, bar, right } => todo!(),
+        CstKind::BinaryBar { left, bar, right } => {
+            let mut left = format_cst(edits, left, info);
+
+            let bar_width = format_cst(edits, bar, info)
+                .into_space_and_move_comments_to(edits, &mut left.whitespace);
+
+            let (right_width, whitespace) = format_cst(edits, right, info).split();
+
+            let left_trailing = if (left.min_width() + Width::SPACE + &bar_width + &right_width)
+                .fits(info.indentation)
+            {
+                TrailingWhitespace::Space
+            } else {
+                TrailingWhitespace::Indentation(info.indentation)
+            };
+            return FormattedCst::new(
+                left.into_trailing(edits, left_trailing) + bar_width + right_width,
+                whitespace,
+            );
+        }
         CstKind::Parenthesized {
             opening_parenthesis,
             inner,
@@ -897,6 +916,42 @@ mod test {
         test("1", "1\n");
         test("123", "123\n");
     }
+    #[test]
+    fn test_binary_bar() {
+        test("foo | bar", "foo | bar\n");
+        test("foo|bar", "foo | bar\n");
+        test("foo  |  bar", "foo | bar\n");
+        test("foo\n\n|   bar", "foo | bar\n");
+        test(
+            "veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction",
+            "veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongReceiver\n| veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction\n",
+        );
+        test(
+            "foo | veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction0 veryVeryVeryVeryVeryVeryVeryLongArgument0",
+            "foo\n| veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction0 veryVeryVeryVeryVeryVeryVeryLongArgument0\n",
+        );
+        test(
+            "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryLongFunction longArgument",
+            "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver\n| veryVeryVeryVeryVeryVeryVeryVeryLongFunction longArgument\n",
+        );
+        test(
+            "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryLongFunction0 | veryVeryVeryVeryVeryVeryVeryVeryLongFunction1",
+            "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryLongFunction0\n| veryVeryVeryVeryVeryVeryVeryVeryLongFunction1\n",
+        );
+        test(
+            "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryLongFunction0 longArgument0 | veryVeryVeryVeryVeryVeryVeryVeryLongFunction1 longArgument1 longArgument2",
+            "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver\n| veryVeryVeryVeryVeryVeryVeryVeryLongFunction0 longArgument0\n| veryVeryVeryVeryVeryVeryVeryVeryLongFunction1 longArgument1 longArgument2\n",
+        );
+        test(
+            "foo | veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction0 veryVeryVeryVeryVeryVeryVeryLongArgument0 | function1",
+            "foo\n| veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction0 veryVeryVeryVeryVeryVeryVeryLongArgument0\n| function1\n",
+        );
+        // Comments
+        test("foo | bar # abc", "foo | bar # abc\n");
+        test("foo | # abc\n  bar", "foo # abc\n| bar\n");
+        test("foo # abc\n| bar", "foo # abc\n| bar\n");
+    }
+
     #[test]
     fn test_parenthesized() {
         test("(foo)", "(foo)\n");
