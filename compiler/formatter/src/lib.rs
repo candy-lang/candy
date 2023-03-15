@@ -229,8 +229,9 @@ fn format_csts(edits: &mut TextEdits, csts: &[Cst], info: &FormatterInfo) -> Wid
                         edits.insert(next.data.span.start, SPACE);
                     }
 
-                    let (_, whitespace) = format_cst(edits, next, info).split();
+                    let (comment_width, whitespace) = format_cst(edits, next, info).split();
                     inject_whitespace(whitespace.take().into_owned(), &mut csts, index);
+                    width = Some(width.unwrap() + Width::SPACE + comment_width);
                     index += 1;
                 }
                 _ => {
@@ -1002,6 +1003,10 @@ mod test {
         // Comments
         test("foo = bar # abc\n", "foo = bar # abc\n");
         test("foo=bar# abc\n", "foo = bar # abc\n");
+        test(
+            "foo = bar # veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongComment\n",
+            "foo =\n  bar # veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongComment\n",
+        );
     }
 
     fn test(source: &str, expected: &str) {
