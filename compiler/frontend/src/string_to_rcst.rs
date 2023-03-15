@@ -574,7 +574,7 @@ mod parse {
         assert_eq!(whitespaces_and_newlines("foo", 0, true), ("foo", vec![]));
         assert_eq!(
             whitespaces_and_newlines("\nfoo", 0, true),
-            ("foo", vec![CstKind::Newline("\n".to_string()).into()]),
+            ("foo", vec![build_newline()]),
         );
         assert_eq!(
             whitespaces_and_newlines("\nfoo", 1, true),
@@ -585,21 +585,18 @@ mod parse {
             (
                 "foo",
                 vec![
-                    CstKind::Newline("\n".to_string()).into(),
+                    build_newline(),
                     CstKind::Whitespace("  ".to_string()).into(),
                 ],
             ),
         );
         assert_eq!(
             whitespaces_and_newlines("\n  foo", 0, true),
-            ("  foo", vec![CstKind::Newline("\n".to_string()).into()]),
+            ("  foo", vec![build_newline()]),
         );
         assert_eq!(
             whitespaces_and_newlines(" \n  foo", 0, true),
-            (
-                "  foo",
-                vec![build_space(), CstKind::Newline("\n".to_string()).into(),],
-            ),
+            ("  foo", vec![build_space(), build_newline()]),
         );
         assert_eq!(
             whitespaces_and_newlines("\n  foo", 2, true),
@@ -622,7 +619,7 @@ mod parse {
                 "foo",
                 vec![
                     build_comment(" hey"),
-                    CstKind::Newline("\n".to_string()).into(),
+                    build_newline(),
                     CstKind::Whitespace("  ".to_string()).into(),
                 ],
             )
@@ -633,8 +630,8 @@ mod parse {
                 "\n",
                 vec![
                     build_comment(" foo"),
-                    CstKind::Newline("\n".to_string()).into(),
-                    CstKind::Newline("\n".to_string()).into(),
+                    build_newline(),
+                    build_newline(),
                     CstKind::Whitespace("  ".to_string()).into(),
                     build_comment("bar"),
                 ],
@@ -804,7 +801,7 @@ mod parse {
                     ),
                     parts: vec![
                         CstKind::TextPart("foo".to_string()).into(),
-                        CstKind::Newline("\n".to_string()).into(),
+                        build_newline(),
                         CstKind::Whitespace("  ".to_string()).into(),
                         CstKind::TextPart("bar".to_string()).into(),
                     ],
@@ -2084,7 +2081,7 @@ mod parse {
                     ])),
                     body: vec![
                         build_comment(" comment"),
-                        CstKind::Newline("\n".to_string()).into(),
+                        build_newline(),
                         CstKind::Whitespace("  ".to_string()).into(),
                         build_simple_int(5),
                     ],
@@ -3095,7 +3092,7 @@ mod parse {
                     parameters_and_arrow: None,
                     body: vec![
                         build_identifier("foo"),
-                        CstKind::Newline("\n".to_string()).into(),
+                        build_newline(),
                         CstKind::Whitespace("  ".to_string()).into(),
                         build_identifier("bar")
                             .with_trailing_whitespace(vec![CstKind::Newline("\n".to_string())]),
@@ -3155,6 +3152,10 @@ mod parse {
     #[cfg(test)]
     fn build_space() -> Rcst {
         CstKind::Whitespace(" ".to_string()).into()
+    }
+    #[cfg(test)]
+    fn build_newline() -> Rcst {
+        CstKind::Newline("\n".to_string()).into()
     }
 
     #[cfg(test)]
