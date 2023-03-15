@@ -187,7 +187,7 @@ fn format_csts(edits: &mut TextEdits, csts: &[Cst], info: &FormatterInfo) -> Wid
         if width.is_none() {
             width = Some(not_whitespace_width);
         } else {
-            width = Some(Width::Multiline);
+            width = Some(Width::multiline());
         }
         index += 1;
         is_first_content_line = false;
@@ -240,7 +240,7 @@ fn format_csts(edits: &mut TextEdits, csts: &[Cst], info: &FormatterInfo) -> Wid
                     trailing_whitespace_span = None;
 
                     edits.insert(whitespace_span.start, NEWLINE);
-                    width = Some(Width::Multiline);
+                    width = Some(Width::multiline());
 
                     edits.change(whitespace_span, info.indentation.to_string());
 
@@ -261,7 +261,7 @@ fn format_csts(edits: &mut TextEdits, csts: &[Cst], info: &FormatterInfo) -> Wid
             let last_cst = csts.last().unwrap();
             edits.insert(last_cst.data.span.end, NEWLINE);
         }
-        width = Some(Width::Multiline)
+        width = Some(Width::multiline())
     }
     for newline in pending_newlines {
         edits.delete(newline);
@@ -523,9 +523,10 @@ pub(crate) fn format_cst<'a>(
 
             let body_width = format_csts(edits, body, &info.with_indent());
 
-            let is_body_in_same_line =
-                (&left_width + &assignment_sign.min_width() + Width::SPACE + &body_width)
-                    .fits(info.indentation);
+            let is_body_in_same_line = left_width.last_line_fits(
+                info.indentation,
+                &assignment_sign.min_width() + Width::SPACE + &body_width,
+            );
             let assignment_sign_trailing = if is_body_in_same_line {
                 TrailingWhitespace::Space
             } else {
@@ -600,7 +601,7 @@ fn format_collection<'a>(
                 };
                 min_width = Width::from_width_and_max(old_min_width + item_min_width, max_width);
             } else {
-                min_width = Width::Multiline;
+                min_width = Width::multiline();
             }
 
             item
@@ -702,7 +703,7 @@ impl<'a> FormattedCst<'a> {
 
     pub fn min_width(&self) -> Width {
         if self.whitespace.has_comments() {
-            Width::Multiline
+            Width::multiline()
         } else {
             self.child_width.clone()
         }
@@ -741,7 +742,9 @@ impl<'a> FormattedCst<'a> {
     ) -> Width {
         self.whitespace
             .into_trailing_with_indentation(edits, indentation);
-        Width::Multiline
+        Width::Multiline {
+            last_line_width: Some(indentation.width()),
+        }
     }
 }
 
@@ -983,10 +986,10 @@ mod test {
         test("foo bar=baz ", "foo bar = baz\n");
         test("foo\n  bar=baz ", "foo bar = baz\n");
         test("foo\n  bar\n  =\n  baz ", "foo bar = baz\n");
-        // test(
-        //     "foo firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument = bar",
-        //     "foo\n  firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n  secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument = bar\n",
-        // ); // FIXME
+        test(
+            "foo firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument = bar",
+            "foo\n  firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n  secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument = bar\n",
+        );
         test(
             "foo firstVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgument = bar",
             "foo\n  firstVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgument =\n  bar\n",

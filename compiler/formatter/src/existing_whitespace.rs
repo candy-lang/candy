@@ -152,7 +152,7 @@ impl<'a> ExistingWhitespace<'a> {
     }
     pub fn min_width(&self) -> Width {
         if self.has_comments() {
-            Width::Multiline
+            Width::multiline()
         } else {
             Width::default()
         }
@@ -174,7 +174,7 @@ impl<'a> ExistingWhitespace<'a> {
             }
             TrailingWhitespace::Indentation(indentation) => {
                 self.into_trailing_with_indentation(edits, indentation);
-                Width::Multiline
+                Width::multiline()
             }
         }
     }
