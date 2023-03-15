@@ -299,7 +299,7 @@ pub(crate) fn format_cst<'a>(
             comment,
         } => {
             let formatted_octothorpe = format_cst(edits, octothorpe, info);
-            assert!(formatted_octothorpe.min_width.is_singleline());
+            assert!(formatted_octothorpe.min_width().is_singleline());
 
             formatted_octothorpe.into_empty_trailing(edits) + comment.width()
         }
@@ -334,8 +334,9 @@ pub(crate) fn format_cst<'a>(
             let inner = format_cst(edits, inner, &info.with_indent());
             let closing_parenthesis = format_cst(edits, closing_parenthesis, info);
 
-            let min_width =
-                &opening_parenthesis.min_width + &inner.min_width + &closing_parenthesis.min_width;
+            let min_width = &opening_parenthesis.min_width()
+                + &inner.min_width()
+                + &closing_parenthesis.min_width();
             let (opening_parenthesis_trailing, inner_trailing) = if min_width.fits(info.indentation)
             {
                 (TrailingWhitespace::None, TrailingWhitespace::None)
@@ -364,10 +365,10 @@ pub(crate) fn format_cst<'a>(
                 .map(|argument| format_cst(edits, argument, &info.with_indent()))
                 .collect_vec();
 
-            let min_width = &receiver.min_width
+            let min_width = &receiver.min_width()
                 + arguments
                     .iter()
-                    .map(|it| Width::SPACE + &it.min_width)
+                    .map(|it| Width::SPACE + &it.min_width())
                     .sum::<Width>();
             let trailing = if min_width.fits(info.indentation) {
                 TrailingWhitespace::Space
@@ -409,7 +410,7 @@ pub(crate) fn format_cst<'a>(
                 comma.as_deref(),
                 value_end,
                 info,
-                &value_width,
+                &value_width + value_whitespace.min_width(),
             );
             value_whitespace.empty_and_move_comments_to(edits, &mut whitespace);
 
@@ -428,30 +429,32 @@ pub(crate) fn format_cst<'a>(
             comma,
         } => {
             let key_width_and_colon = key_and_colon.as_ref().map(|box (key, colon)| {
-                let key = format_cst(edits, key, &info.with_indent());
-                let key_width = key.into_empty_trailing(edits);
+                let (key_width, key_whitespace) =
+                    format_cst(edits, key, &info.with_indent()).split();
 
-                let colon = format_cst(edits, colon, &info.with_indent());
+                let mut colon = format_cst(edits, colon, &info.with_indent());
+                key_whitespace.empty_and_move_comments_to(edits, &mut colon.whitespace);
 
                 (key_width, colon)
             });
 
             let value_end = value.data.span.end;
-            let value_width =
-                format_cst(edits, value, &info.with_indent()).into_empty_trailing(edits);
+            let (value_width, value_whitespace) =
+                format_cst(edits, value, &info.with_indent()).split();
 
             let key_and_colon_min_width = key_width_and_colon
                 .as_ref()
-                .map(|(key_width, colon)| key_width + &colon.min_width)
+                .map(|(key_width, colon)| key_width + &colon.min_width())
                 .unwrap_or_default();
             let min_width_before_comma = key_and_colon_min_width + &value_width;
-            let (comma_width, whitespace) = apply_trailing_comma_condition(
+            let (comma_width, mut whitespace) = apply_trailing_comma_condition(
                 edits,
                 comma.as_deref(),
                 value_end,
                 info,
-                &min_width_before_comma,
+                &min_width_before_comma + value_whitespace.min_width(),
             );
+            value_whitespace.empty_and_move_comments_to(edits, &mut whitespace);
             let min_width = min_width_before_comma + &comma_width;
 
             return FormattedCst::new(
@@ -472,14 +475,14 @@ pub(crate) fn format_cst<'a>(
         }
         CstKind::StructAccess { struct_, dot, key } => {
             // TODO: child_width vs min_width
-            let (struct_width, mut struct_whitespace) = format_cst(edits, struct_, info).split();
+            let mut struct_ = format_cst(edits, struct_, info);
 
             let (dot_width, dot_whitespace) = format_cst(edits, dot, &info.with_indent()).split();
-            dot_whitespace.empty_and_move_comments_to(edits, &mut struct_whitespace);
+            dot_whitespace.empty_and_move_comments_to(edits, &mut struct_.whitespace);
 
             let key = format_cst(edits, key, &info.with_indent());
 
-            let min_width = &struct_width + &dot_width + &key.min_width;
+            let min_width = struct_.min_width() + &dot_width + key.min_width();
             let struct_trailing = if min_width.fits(info.indentation) {
                 TrailingWhitespace::None
             } else {
@@ -488,7 +491,7 @@ pub(crate) fn format_cst<'a>(
 
             let (key_width, whitespace) = key.split();
             return FormattedCst::new(
-                struct_whitespace.into_trailing(edits, struct_trailing) + dot_width + key_width,
+                struct_.into_trailing(edits, struct_trailing) + dot_width + key_width,
                 whitespace,
             );
         }
@@ -521,7 +524,7 @@ pub(crate) fn format_cst<'a>(
             let body_width = format_csts(edits, body, &info.with_indent());
 
             let is_body_in_same_line =
-                (&left_width + &assignment_sign.min_width + Width::SPACE + &body_width)
+                (&left_width + &assignment_sign.min_width() + Width::SPACE + &body_width)
                     .fits(info.indentation);
             let assignment_sign_trailing = if is_body_in_same_line {
                 TrailingWhitespace::Space
@@ -550,8 +553,8 @@ fn format_collection<'a>(
     let closing_punctuation = format_cst(edits, closing_punctuation, info);
 
     let mut min_width = Width::Singleline(info.indentation.width())
-        + &opening_punctuation.min_width
-        + &closing_punctuation.min_width;
+        + &opening_punctuation.min_width()
+        + &closing_punctuation.min_width();
     let item_info = info
         .with_indent()
         .with_trailing_comma_condition(TrailingCommaCondition::Always);
@@ -583,19 +586,19 @@ fn format_collection<'a>(
             let item = format_cst(edits, item, &info);
 
             if let Width::Singleline(old_min_width) = min_width
-                    && let Width::Singleline(item_width) = item.min_width {
-                let (item_width, max_width) = if is_last_item {
-                    (item_width, Width::MAX)
+                    && let Width::Singleline(item_min_width) = item.min_width() {
+                let (item_min_width, max_width) = if is_last_item {
+                    (item_min_width, Width::MAX)
                 } else {
                     // We need an additional column for the trailing space after the comma.
-                    let item_width = item_width + 1;
+                    let item_min_width = item_min_width + 1;
 
                     // The last item needs at least one column of space.
                     let max_width = Width::MAX - 1;
 
-                    (item_width, max_width)
+                    (item_min_width, max_width)
                 };
-                min_width = Width::from_width_and_max(old_min_width + item_width, max_width);
+                min_width = Width::from_width_and_max(old_min_width + item_min_width, max_width);
             } else {
                 min_width = Width::Multline;
             }
@@ -647,19 +650,19 @@ fn apply_trailing_comma_condition<'a>(
     comma: Option<&'a Cst>,
     fallback_offset: Offset,
     info: &FormatterInfo,
-    min_width_before_comma: &Width,
+    min_width_except_comma: Width,
 ) -> (Width, ExistingWhitespace<'a>) {
     let should_have_comma = match info.trailing_comma_condition {
         Some(TrailingCommaCondition::Always) => true,
         Some(TrailingCommaCondition::UnlessFitsIn(max_width)) => {
-            !min_width_before_comma.fits_in(max_width)
+            !min_width_except_comma.fits_in(max_width)
         }
         None => comma.is_some(),
     };
     let (width, whitespace) = if should_have_comma {
         let whitespace = if let Some(comma) = comma {
             let comma = format_cst(edits, comma, info);
-            assert_eq!(comma.min_width, Width::Singleline(1));
+            assert_eq!(comma.child_width, Width::Singleline(1));
             Some(comma.whitespace)
         } else {
             edits.insert(fallback_offset, ",");
@@ -686,23 +689,27 @@ struct FormattedCst<'a> {
     ///
     /// If there are trailing comments, this is [Width::Multiline]. Otherwise, it's the child's own
     /// width.
-    min_width: Width,
+    child_width: Width,
     whitespace: ExistingWhitespace<'a>,
 }
 impl<'a> FormattedCst<'a> {
     pub fn new(child_width: Width, whitespace: ExistingWhitespace<'a>) -> Self {
         Self {
-            min_width: if whitespace.has_comments() {
-                Width::Multline
-            } else {
-                child_width
-            },
+            child_width,
             whitespace,
         }
     }
 
+    pub fn min_width(&self) -> Width {
+        if self.whitespace.has_comments() {
+            Width::Multline
+        } else {
+            self.child_width.clone()
+        }
+    }
+
     pub fn split(self) -> (Width, ExistingWhitespace<'a>) {
-        (self.min_width, self.whitespace)
+        (self.child_width, self.whitespace)
     }
 
     pub fn into_trailing(
@@ -721,11 +728,11 @@ impl<'a> FormattedCst<'a> {
     #[deprecated]
     pub fn into_empty_trailing(self, edits: &mut TextEdits) -> Width {
         self.whitespace.into_empty_trailing(edits);
-        self.min_width
+        self.child_width
     }
     pub fn into_trailing_with_space(self, edits: &mut TextEdits) -> Width {
         self.whitespace.into_trailing_with_space(edits);
-        self.min_width + Width::SPACE
+        self.child_width + Width::SPACE
     }
     pub fn into_trailing_with_indentation(
         self,
@@ -924,13 +931,13 @@ mod test {
         // Comments
         test("[foo] # abc", "[foo] # abc\n");
         test("[foo: bar] # abc", "[foo: bar] # abc\n");
-        // test("[foo: bar # abc\n]", "[\n  foo: bar, # abc\n]\n"); // FIXME
+        test("[foo: bar # abc\n]", "[\n  foo: bar, # abc\n]\n");
         test("[foo: # abc\n  bar\n]", "[\n  foo: # abc\n    bar,\n]\n");
         test("[# abc\n  foo: bar]", "[ # abc\n  foo: bar,\n]\n");
-        // test(
-        //     "[foo: bar # abc\n  , baz]",
-        //     "[\n  foo: bar, # abc\n  baz,\n]\n",
-        // ); // FIXME
+        test(
+            "[foo: bar # abc\n  , baz]",
+            "[\n  foo: bar, # abc\n  baz,\n]\n",
+        );
     }
     #[test]
     fn test_struct_access() {

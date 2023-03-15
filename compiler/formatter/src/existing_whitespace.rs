@@ -80,12 +80,16 @@ impl<'a> ExistingWhitespace<'a> {
                 && self.adopted_whitespace_before.is_empty()
                 && self.adopted_whitespace_after.is_empty()
                 && other.adopted_whitespace_before.is_empty()
+                && !edits.has_edit_at(self_end_offset)
             {
+                // Simple case: The whitespace is adopted by directly following whitespace.
                 prepend(self.whitespace, &mut other.whitespace);
                 prepend(self.adopted_whitespace_before, &mut other.whitespace);
                 return;
             }
 
+            // Default case: We have to delete the whitespace here and re-insert the relevant parts
+            // (comments) later.
             if let Some(other_adopted_first) = &other.adopted_whitespace_before.first() {
                 let other_adopted_start_offset = other_adopted_first.data.span.start;
                 assert!(self_end_offset <= other_adopted_start_offset);
@@ -109,12 +113,15 @@ impl<'a> ExistingWhitespace<'a> {
                 && other.adopted_whitespace_after.is_empty()
                 && self.adopted_whitespace_before.is_empty()
                 && self.adopted_whitespace_after.is_empty()
+                && !edits.has_edit_at(self.start_offset)
             {
+                // Simple case: The whitespace is adopted by directly precedinb whitespace.
                 append(self.whitespace, &mut other.whitespace);
                 append(self.adopted_whitespace_after, &mut other.whitespace);
                 return;
             }
 
+            // Default case (see above)
             if let Some(other_adopted_last) = &other.adopted_whitespace_after.last() {
                 let other_adopted_end_offset = other_adopted_last.data.span.end;
                 assert!(other_adopted_end_offset <= self.start_offset);
@@ -142,6 +149,13 @@ impl<'a> ExistingWhitespace<'a> {
         check(&self.adopted_whitespace_before)
             || check(&self.whitespace)
             || check(&self.adopted_whitespace_after)
+    }
+    pub fn min_width(&self) -> Width {
+        if self.has_comments() {
+            Width::Multline
+        } else {
+            Width::default()
+        }
     }
 
     pub fn into_trailing(

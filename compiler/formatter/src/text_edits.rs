@@ -35,6 +35,19 @@ impl TextEdits {
         }
     }
 
+    pub fn has_edit_at(&self, offset: Offset) -> bool {
+        self.edits
+            .binary_search_by_key(&offset, |it| it.range.start)
+            .map(|_| true) // An edit starts at this position.
+            .unwrap_or_else(|index| {
+                self.edits
+                    .get(index)
+                    // An edit contains this position.
+                    .map(|it| it.range.contains(&offset))
+                    .unwrap_or_default()
+            })
+    }
+
     pub fn insert(&mut self, offset: Offset, text: impl Into<Cow<str>>) {
         self.change(offset..offset, text);
     }
