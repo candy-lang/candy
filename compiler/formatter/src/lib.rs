@@ -511,11 +511,11 @@ pub(crate) fn format_cst<'a>(
             percent,
             cases,
         } => {
-            let (expression_width, expression_whitespace) =
-                format_cst(edits, expression, info).split();
+            let expression = format_cst(edits, expression, info);
 
             let mut percent = format_cst(edits, percent, info);
-            expression_whitespace.into_space_and_move_comments_to(edits, &mut percent.whitespace);
+            let expression_width =
+                expression.into_space_and_move_comments_to(edits, &mut percent.whitespace);
 
             let only_has_empty_error_case = matches!(
                 cases.as_slice(),
@@ -561,10 +561,11 @@ pub(crate) fn format_cst<'a>(
             arrow,
             body,
         } => {
-            let (pattern_width, pattern_whitespace) = format_cst(edits, pattern, info).split();
+            let pattern = format_cst(edits, pattern, info);
 
             let mut arrow = format_cst(edits, arrow, info);
-            pattern_whitespace.into_space_and_move_comments_to(edits, &mut arrow.whitespace);
+            let pattern_width =
+                pattern.into_space_and_move_comments_to(edits, &mut arrow.whitespace);
 
             let body_width = format_csts(edits, body, &info.with_indent());
 
@@ -787,6 +788,28 @@ impl<'a> FormattedCst<'a> {
         (self.child_width, self.whitespace)
     }
 
+    #[must_use]
+    pub fn into_space_and_move_comments_to(
+        self,
+        edits: &mut TextEdits,
+        other: &mut ExistingWhitespace<'a>,
+    ) -> Width {
+        self.whitespace
+            .into_space_and_move_comments_to(edits, other);
+        self.child_width + Width::SPACE
+    }
+    #[must_use]
+    pub fn into_empty_and_move_comments_to(
+        self,
+        edits: &mut TextEdits,
+        other: &mut ExistingWhitespace<'a>,
+    ) -> Width {
+        self.whitespace
+            .into_empty_and_move_comments_to(edits, other);
+        self.child_width
+    }
+
+    #[must_use]
     pub fn into_trailing(
         self,
         edits: &mut TextEdits,
@@ -801,14 +824,17 @@ impl<'a> FormattedCst<'a> {
         }
     }
     #[deprecated]
+    #[must_use]
     pub fn into_empty_trailing(self, edits: &mut TextEdits) -> Width {
         self.whitespace.into_empty_trailing(edits);
         self.child_width
     }
+    #[must_use]
     pub fn into_trailing_with_space(self, edits: &mut TextEdits) -> Width {
         self.whitespace.into_trailing_with_space(edits);
         self.child_width + Width::SPACE
     }
+    #[must_use]
     pub fn into_trailing_with_indentation(
         self,
         edits: &mut TextEdits,
