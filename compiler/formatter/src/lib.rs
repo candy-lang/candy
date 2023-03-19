@@ -278,7 +278,7 @@ pub(crate) fn format_cst<'a>(
                         {
                             (
                                 opening_parenthesis_whitespace.into_empty_trailing(edits),
-                                right.into_trailing_with_space(edits),
+                                right.into_empty_trailing(edits),
                             )
                         } else {
                             (
@@ -1330,6 +1330,8 @@ mod test {
         test("foo\n\n|   bar", "foo | bar\n");
         test("foo | (bar)", "foo | bar\n");
         test("foo | (\n  bar\n)", "foo | bar\n");
+        test("foo | (bar baz)", "foo | (bar baz)\n");
+        test("foo | (bar | baz)", "foo | (bar | baz)\n");
         test(
             "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | (veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction)",
             "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction\n",
