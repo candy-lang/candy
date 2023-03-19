@@ -998,6 +998,9 @@ fn format_collection<'a>(
 }
 
 type UnformattedCst<'a> = (&'a Cst, ExistingWhitespace<'a>);
+
+/// Reduces multiple pairs of parentheses around the inner expression to at most one pair that keeps
+/// all comments.
 fn split_parenthesized<'a>(
     edits: &mut TextEdits,
     mut cst: &'a Cst,
@@ -1125,6 +1128,11 @@ impl<D> CstHasCommentsAndPrecedence for Cst<D> {
             .any(|(_, it)| matches!(it.kind, CstKind::Comment { .. }))
     }
 
+    /// Used by the parent to determine whether parentheses are necessary around this expression.
+    ///
+    /// Returns `None` if the child isn't a full expression on its own (e.g., [CstKind::Dot]) or is
+    /// an error. In these cases, parenthesized expressions should be kept parenthesized and vice
+    /// versa.
     fn precedence(&self) -> Option<PrecedenceCategory> {
         match &self.kind {
             CstKind::EqualsSign
