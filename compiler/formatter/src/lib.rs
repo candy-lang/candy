@@ -84,8 +84,11 @@ fn format_csts<'a>(
 ) -> FormattedCst<'a> {
     let mut offset = fallback_offset;
     let mut width = Width::default();
-    let mut formatted =
-        FormattedCst::new(Width::default(), ExistingWhitespace::empty(fallback_offset));
+    let mut formatted = FormattedCst::new(
+        Width::default(),
+        ExistingWhitespace::empty(fallback_offset),
+        None,
+    );
     loop {
         {
             // Whitespace
@@ -131,7 +134,7 @@ fn format_csts<'a>(
         offset = formatted.whitespace.end_offset();
     }
 
-    FormattedCst::new(width + formatted.child_width, formatted.whitespace)
+    FormattedCst::new(width + formatted.child_width, formatted.whitespace, None)
 }
 
 pub(crate) fn format_cst<'a>(
@@ -171,9 +174,10 @@ pub(crate) fn format_cst<'a>(
         }
         CstKind::TrailingWhitespace { child, whitespace } => {
             let mut whitespace = ExistingWhitespace::new(child.data.span.end, whitespace);
-            let child_width = format_cst(edits, child, info)
-                .into_empty_and_move_comments_to(edits, &mut whitespace);
-            return FormattedCst::new(child_width, whitespace);
+            let child = format_cst(edits, child, info);
+            let child_precedence = child.precedence;
+            let child_width = child.into_empty_and_move_comments_to(edits, &mut whitespace);
+            return FormattedCst::new(child_width, whitespace, child_precedence);
         }
         CstKind::Identifier(string) | CstKind::Symbol(string) | CstKind::Int { string, .. } => {
             string.width()
@@ -237,7 +241,79 @@ pub(crate) fn format_cst<'a>(
             let bar_width = format_cst(edits, bar, info)
                 .into_space_and_move_comments_to(edits, &mut left.whitespace);
 
-            let (right_width, whitespace) = format_cst(edits, right, info).split();
+            let (right, right_parentheses) = split_parenthesized(edits, right);
+            // Depending on the precedence of `right` and whether there's an opening parenthesis
+            // with a comment, we might be able to remove the parentheses. However, we won't insert
+            // any by ourselves.
+            let right_needs_parentheses = match right.precedence() {
+                Some(PrecedenceCategory::High) => right_parentheses
+                    .as_ref()
+                    .map(|((_, opening_parenthesis_whitespace), _)| {
+                        opening_parenthesis_whitespace.has_comments()
+                    })
+                    .unwrap_or_default(),
+                Some(PrecedenceCategory::Low) | None => right_parentheses.is_some(),
+            };
+            let right_info = if right_needs_parentheses {
+                info.with_indent()
+            } else {
+                info.to_owned()
+            };
+            let right = format_cst(edits, right, &right_info);
+
+            let (right_width, whitespace) = if let Some((
+                (opening_parenthesis, opening_parenthesis_whitespace),
+                (closing_parenthesis, closing_parenthesis_whitespace),
+            )) = right_parentheses
+            {
+                if right_needs_parentheses {
+                    let opening_parenthesis_width =
+                        format_cst(edits, opening_parenthesis, info).into_empty_trailing(edits);
+                    let closing_parenthesis_width =
+                        format_cst(edits, closing_parenthesis, info).into_empty_trailing(edits);
+                    let (opening_parenthesis_trailing_width, right_width) =
+                        if !opening_parenthesis_whitespace.has_comments()
+                            && (left.min_width(info.indentation)
+                                + Width::SPACE
+                                + &bar_width
+                                + &opening_parenthesis_width
+                                + right.min_width(info.indentation.with_indent())
+                                + &closing_parenthesis_width)
+                                .fits(info.indentation)
+                        {
+                            (
+                                opening_parenthesis_whitespace.into_empty_trailing(edits),
+                                right.into_trailing_with_space(edits),
+                            )
+                        } else {
+                            (
+                                opening_parenthesis_whitespace.into_trailing_with_indentation(
+                                    edits,
+                                    Width::Singleline(1) + Width::SPACE + Width::Singleline(1),
+                                    info.indentation.with_indent(),
+                                    TrailingNewlineCount::One,
+                                    true,
+                                ),
+                                right.into_trailing_with_indentation(edits, info.indentation),
+                            )
+                        };
+                    (
+                        opening_parenthesis_width
+                            + opening_parenthesis_trailing_width
+                            + right_width
+                            + closing_parenthesis_width,
+                        closing_parenthesis_whitespace,
+                    )
+                } else {
+                    edits.delete(opening_parenthesis.data.span.to_owned());
+                    opening_parenthesis_whitespace.into_empty_trailing(edits);
+                    let right_width = right.into_empty_trailing(edits);
+                    edits.delete(closing_parenthesis.data.span.to_owned());
+                    (right_width, closing_parenthesis_whitespace)
+                }
+            } else {
+                right.split()
+            };
 
             let left_trailing =
                 if (left.min_width(info.indentation) + Width::SPACE + &bar_width + &right_width)
@@ -247,9 +323,11 @@ pub(crate) fn format_cst<'a>(
                 } else {
                     TrailingWhitespace::Indentation(info.indentation)
                 };
+
             return FormattedCst::new(
                 left.into_trailing(edits, left_trailing) + bar_width + right_width,
                 whitespace,
+                PrecedenceCategory::Low,
             );
         }
         CstKind::Parenthesized {
@@ -280,6 +358,7 @@ pub(crate) fn format_cst<'a>(
                     + inner.into_trailing(edits, inner_trailing)
                     + closing_parenthesis_width,
                 whitespace,
+                PrecedenceCategory::High,
             );
         }
         CstKind::Call {
@@ -312,6 +391,7 @@ pub(crate) fn format_cst<'a>(
                         .sum::<Width>()
                     + last_argument_width,
                 whitespace,
+                PrecedenceCategory::Low,
             );
         }
         CstKind::List {
@@ -343,6 +423,7 @@ pub(crate) fn format_cst<'a>(
             return FormattedCst::new(
                 value.into_empty_and_move_comments_to(edits, &mut whitespace) + comma_width,
                 whitespace,
+                None,
             );
         }
         CstKind::Struct {
@@ -397,6 +478,7 @@ pub(crate) fn format_cst<'a>(
                     + value_width
                     + comma_width,
                 whitespace,
+                None,
             );
         }
         CstKind::StructAccess { struct_, dot, key } => {
@@ -419,6 +501,7 @@ pub(crate) fn format_cst<'a>(
             return FormattedCst::new(
                 struct_.into_trailing(edits, struct_trailing) + dot_width + key_width,
                 whitespace,
+                PrecedenceCategory::High,
             );
         }
         CstKind::Match {
@@ -446,7 +529,7 @@ pub(crate) fn format_cst<'a>(
                 (cases, last_case)
             } else {
                 let (percent_width, whitespace) = percent.split();
-                return FormattedCst::new(expression_width + percent_width, whitespace);
+                return FormattedCst::new(expression_width + percent_width, whitespace, PrecedenceCategory::Low);
             };
 
             let percent_width =
@@ -469,6 +552,7 @@ pub(crate) fn format_cst<'a>(
                         .sum::<Width>()
                     + last_case_width,
                 whitespace,
+                PrecedenceCategory::Low,
             );
         }
         CstKind::MatchCase {
@@ -502,6 +586,7 @@ pub(crate) fn format_cst<'a>(
             return FormattedCst::new(
                 pattern_width + arrow.into_trailing(edits, arrow_trailing) + body_width,
                 whitespace,
+                None,
             );
         }
         CstKind::Lambda {
@@ -632,6 +717,7 @@ pub(crate) fn format_cst<'a>(
                     + body.into_trailing(edits, body_trailing)
                     + closing_curly_brace_width,
                 whitespace,
+                PrecedenceCategory::High,
             );
         }
         CstKind::Assignment {
@@ -672,7 +758,7 @@ pub(crate) fn format_cst<'a>(
             unparsable_input, ..
         } => unparsable_input.width(),
     };
-    FormattedCst::new(width, ExistingWhitespace::empty(cst.data.span.end))
+    FormattedCst::new(width, ExistingWhitespace::empty(cst.data.span.end), None)
 }
 
 fn format_collection<'a>(
@@ -699,13 +785,10 @@ fn format_collection<'a>(
             let is_single_item = items.len() == 1;
             let is_last_item = index == items.len() - 1;
 
-            let item_has_comments = dft_post_rev(item, |it| it.children().into_iter())
-                .any(|(_, it)| matches!(it.kind, CstKind::Comment { .. }));
-
             let is_comma_required_due_to_single_item =
                 is_single_item && is_comma_required_for_single_item;
             let is_comma_required =
-                is_comma_required_due_to_single_item || !is_last_item || item_has_comments;
+                is_comma_required_due_to_single_item || !is_last_item || item.has_comments();
             let info = if !is_comma_required && let Width::Singleline(min_width) = min_width {
                     // We're looking at the last item and everything might fit in one line.
                     let max_width = Width::MAX - min_width;
@@ -776,7 +859,70 @@ fn format_collection<'a>(
                 .sum::<Width>()
             + closing_punctuation_width,
         whitespace,
+        PrecedenceCategory::High,
     )
+}
+
+type UnformattedCst<'a> = (&'a Cst, ExistingWhitespace<'a>);
+fn split_parenthesized<'a>(
+    edits: &mut TextEdits,
+    mut cst: &'a Cst,
+) -> (&'a Cst, Option<(UnformattedCst<'a>, UnformattedCst<'a>)>) {
+    // BinaryBar: keep if inner is low precedence
+    // Call: maybe keep/add if inner is low precedence (if all is single line)
+    let mut parentheses: Option<(UnformattedCst, UnformattedCst)> = None;
+    while let CstKind::Parenthesized {
+        box opening_parenthesis,
+        inner,
+        box closing_parenthesis,
+    } = &cst.kind
+    {
+        cst = inner;
+
+        let (new_opening_parenthesis, new_opening_parenthesis_whitespace) =
+            split_whitespace(opening_parenthesis);
+        let (new_closing_parenthesis, new_closing_parenthesis_whitespace) =
+            split_whitespace(closing_parenthesis);
+        let new_parentheses = if let Some((
+            (old_opening_parenthesis, mut old_opening_parenthesis_whitespace),
+            (old_closing_parenthesis, mut old_closing_parenthesis_whitespace),
+        )) = parentheses
+        {
+            // TODO: helper function
+            let opening = if old_opening_parenthesis_whitespace.has_comments() {
+                edits.delete(new_opening_parenthesis.data.span.to_owned());
+                new_opening_parenthesis_whitespace.into_empty_and_move_comments_to(
+                    edits,
+                    &mut old_opening_parenthesis_whitespace,
+                );
+                (old_opening_parenthesis, old_opening_parenthesis_whitespace)
+            } else {
+                edits.delete(old_opening_parenthesis.data.span.to_owned());
+                old_opening_parenthesis_whitespace.into_empty_trailing(edits);
+                (new_opening_parenthesis, new_opening_parenthesis_whitespace)
+            };
+            let closing = if old_closing_parenthesis_whitespace.has_comments() {
+                edits.delete(new_closing_parenthesis.data.span.to_owned());
+                new_closing_parenthesis_whitespace.into_empty_and_move_comments_to(
+                    edits,
+                    &mut old_closing_parenthesis_whitespace,
+                );
+                (old_closing_parenthesis, old_closing_parenthesis_whitespace)
+            } else {
+                edits.delete(old_closing_parenthesis.data.span.to_owned());
+                old_closing_parenthesis_whitespace.into_empty_trailing(edits);
+                (new_closing_parenthesis, new_closing_parenthesis_whitespace)
+            };
+            (opening, closing)
+        } else {
+            (
+                (new_opening_parenthesis, new_opening_parenthesis_whitespace),
+                (new_closing_parenthesis, new_closing_parenthesis_whitespace),
+            )
+        };
+        parentheses = Some(new_parentheses);
+    }
+    (cst, parentheses)
 }
 
 fn apply_trailing_comma_condition<'a>(
@@ -793,28 +939,104 @@ fn apply_trailing_comma_condition<'a>(
         }
         None => comma.is_some(),
     };
-    let (width, whitespace) = if should_have_comma {
+    if should_have_comma {
         let whitespace = if let Some(comma) = comma {
             let comma = format_cst(edits, comma, info);
             assert_eq!(comma.child_width, Width::Singleline(1));
-            Some(comma.whitespace)
+            comma.whitespace
         } else {
             edits.insert(fallback_offset, ",");
-            None
+            ExistingWhitespace::empty(fallback_offset)
         };
         (Width::Singleline(1), whitespace)
-    } else {
-        let whitespace = comma.map(|comma| {
-            // TODO: Keep comments
+    } else if let Some(comma) = comma {
+        if comma.has_comments() {
+            // This last item can't fit on one line, so we do have to keep the comma.
+            format_cst(edits, comma, info).split()
+        } else {
             edits.delete(comma.data.span.to_owned());
-            ExistingWhitespace::empty(comma.data.span.end)
-        });
-        (Width::default(), whitespace)
-    };
-    (
-        width,
-        whitespace.unwrap_or_else(|| ExistingWhitespace::empty(fallback_offset)),
-    )
+            (
+                Width::default(),
+                ExistingWhitespace::empty(comma.data.span.end),
+            )
+        }
+    } else {
+        (Width::default(), ExistingWhitespace::empty(fallback_offset))
+    }
+}
+
+fn split_whitespace(cst: &Cst) -> (&Cst, ExistingWhitespace) {
+    if let CstKind::TrailingWhitespace {
+        box child,
+        whitespace,
+    } = &cst.kind
+    {
+        let mut whitespace = ExistingWhitespace::new(child.data.span.end, whitespace);
+        let (child, child_whitespace) = split_whitespace(child);
+        child_whitespace.move_to_outer(&mut whitespace);
+        (child, whitespace)
+    } else {
+        (cst, ExistingWhitespace::empty(cst.data.span.end))
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PrecedenceCategory {
+    High,
+    Low,
+}
+
+#[extension_trait]
+impl<D> CstHasCommentsAndPrecedence for Cst<D> {
+    fn has_comments(&self) -> bool {
+        dft_post_rev(self, |it| it.children().into_iter())
+            .any(|(_, it)| matches!(it.kind, CstKind::Comment { .. }))
+    }
+
+    fn precedence(&self) -> Option<PrecedenceCategory> {
+        match &self.kind {
+            CstKind::EqualsSign
+            | CstKind::Comma
+            | CstKind::Dot
+            | CstKind::Colon
+            | CstKind::ColonEqualsSign
+            | CstKind::Bar
+            | CstKind::OpeningParenthesis
+            | CstKind::ClosingParenthesis
+            | CstKind::OpeningBracket
+            | CstKind::ClosingBracket
+            | CstKind::OpeningCurlyBrace
+            | CstKind::ClosingCurlyBrace
+            | CstKind::Arrow
+            | CstKind::SingleQuote
+            | CstKind::DoubleQuote
+            | CstKind::Percent
+            | CstKind::Octothorpe
+            | CstKind::Whitespace(_)
+            | CstKind::Newline(_)
+            | CstKind::Comment { .. } => None,
+            CstKind::TrailingWhitespace { child, .. } => child.precedence(),
+            CstKind::Identifier(_) | CstKind::Symbol(_) | CstKind::Int { .. } => {
+                Some(PrecedenceCategory::High)
+            }
+            CstKind::OpeningText { .. } | CstKind::ClosingText { .. } => None,
+            CstKind::Text { .. } => Some(PrecedenceCategory::High),
+            CstKind::TextPart(_) => todo!(),
+            CstKind::TextInterpolation { .. } => None,
+            CstKind::BinaryBar { .. } => Some(PrecedenceCategory::Low),
+            CstKind::Parenthesized { .. } => Some(PrecedenceCategory::High),
+            CstKind::Call { .. } => Some(PrecedenceCategory::Low),
+            CstKind::List { .. } => Some(PrecedenceCategory::High),
+            CstKind::ListItem { .. } => None,
+            CstKind::Struct { .. } => Some(PrecedenceCategory::High),
+            CstKind::StructField { .. } => None,
+            CstKind::StructAccess { .. } => Some(PrecedenceCategory::High),
+            CstKind::Match { .. } => Some(PrecedenceCategory::Low),
+            CstKind::MatchCase { .. } => None,
+            CstKind::Lambda { .. } => Some(PrecedenceCategory::High),
+            CstKind::Assignment { .. } | CstKind::Error { .. } => None,
+        }
+    }
 }
 
 #[must_use]
@@ -825,12 +1047,18 @@ struct FormattedCst<'a> {
     /// width.
     child_width: Width,
     whitespace: ExistingWhitespace<'a>,
+    precedence: Option<PrecedenceCategory>, // TODO: remove
 }
 impl<'a> FormattedCst<'a> {
-    pub fn new(child_width: Width, whitespace: ExistingWhitespace<'a>) -> Self {
+    pub fn new(
+        child_width: Width,
+        whitespace: ExistingWhitespace<'a>,
+        precedence: impl Into<Option<PrecedenceCategory>>,
+    ) -> Self {
         Self {
             child_width,
             whitespace,
+            precedence: precedence.into(),
         }
     }
 
@@ -885,16 +1113,13 @@ impl<'a> FormattedCst<'a> {
             }
         }
     }
-    #[deprecated]
     #[must_use]
     pub fn into_empty_trailing(self, edits: &mut TextEdits) -> Width {
-        self.whitespace.into_empty_trailing(edits);
-        self.child_width
+        self.child_width + self.whitespace.into_empty_trailing(edits)
     }
     #[must_use]
     pub fn into_trailing_with_space(self, edits: &mut TextEdits) -> Width {
-        self.whitespace.into_trailing_with_space(edits);
-        self.child_width + Width::SPACE
+        self.child_width + self.whitespace.into_trailing_with_space(edits)
     }
     #[must_use]
     pub fn into_trailing_with_indentation(
@@ -977,6 +1202,12 @@ mod test {
         test("foo|bar", "foo | bar\n");
         test("foo  |  bar", "foo | bar\n");
         test("foo\n\n|   bar", "foo | bar\n");
+        test("foo | (bar)", "foo | bar\n");
+        test("foo | (\n  bar\n)", "foo | bar\n");
+        test(
+            "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | (veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction)",
+            "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction\n",
+        );
         test(
             "veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction",
             "veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongReceiver\n| veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction\n",

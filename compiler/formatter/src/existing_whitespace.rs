@@ -63,6 +63,16 @@ impl<'a> ExistingWhitespace<'a> {
         self.whitespace.as_ref()
     }
 
+    pub fn move_to_outer(self, outer: &mut ExistingWhitespace<'a>) {
+        assert!(self.adopted_whitespace_before.is_empty());
+        assert!(self.adopted_whitespace_after.is_empty());
+        assert!(outer.adopted_whitespace_before.is_empty());
+        assert!(outer.adopted_whitespace_after.is_empty());
+        assert_eq!(self.end_offset(), outer.start_offset);
+
+        outer.start_offset = self.start_offset;
+        prepend(self.whitespace, &mut outer.whitespace);
+    }
     pub fn into_space_and_move_comments_to(
         mut self,
         edits: &mut TextEdits,
@@ -175,14 +185,17 @@ impl<'a> ExistingWhitespace<'a> {
             || check(&self.adopted_whitespace_after)
     }
 
-    pub fn into_empty_trailing(self, edits: &mut TextEdits) {
+    pub fn into_empty_trailing(self, edits: &mut TextEdits) -> Width {
         assert!(!self.has_comments());
 
         for whitespace in self.whitespace_ref() {
             edits.delete(whitespace.data.span.to_owned());
         }
+
+        Width::default()
     }
-    pub fn into_trailing_with_space(self, edits: &mut TextEdits) {
+    #[must_use]
+    pub fn into_trailing_with_space(self, edits: &mut TextEdits) -> Width {
         assert!(!self.has_comments());
 
         if let Some((first, last)) = first_and_last(self.whitespace.as_ref()) {
@@ -190,8 +203,10 @@ impl<'a> ExistingWhitespace<'a> {
         } else {
             edits.insert(self.start_offset, SPACE);
         }
+        Width::SPACE
     }
 
+    #[must_use]
     pub fn into_trailing_with_indentation(
         self,
         edits: &mut TextEdits,
@@ -230,8 +245,8 @@ impl<'a> ExistingWhitespace<'a> {
             edits,
             comments_and_whitespace,
             child_width,
-            ensure_space_before_first_comment,
             indentation,
+            ensure_space_before_first_comment,
         );
 
         let owned_final_whitespace = final_whitespace
@@ -286,8 +301,8 @@ impl<'a> ExistingWhitespace<'a> {
         edits: &mut TextEdits,
         comments_and_whitespace: &[(&Cst, Option<Offset>)],
         child_width: Width,
-        ensure_space_before_first_comment: bool,
         indentation: Indentation,
+        ensure_space_before_first_comment: bool,
     ) {
         let mut is_comment_on_same_line = true;
         let mut last_reusable_whitespace_range = None;
@@ -450,7 +465,7 @@ mod test {
 
         let mut edits = TextEdits::new(reduced_source);
         let (child_width, whitespace) = format_cst(&mut edits, &cst, &FormatterInfo::default()).split();
-        match trailing.into() {
+         _ = match trailing.into() {
             TrailingWhitespace::None => whitespace.into_empty_trailing(&mut edits),
             TrailingWhitespace::Space => whitespace.into_trailing_with_space(&mut edits),
             TrailingWhitespace::Indentation(indentation) => {
@@ -460,9 +475,9 @@ mod test {
                     indentation,
                     TrailingNewlineCount::One,
                     true,
-                );
+                )
             }
-        }
+        };
         assert_eq!(edits.apply(), expected);
     }
 }
