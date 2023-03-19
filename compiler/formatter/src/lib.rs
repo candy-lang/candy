@@ -218,7 +218,6 @@ pub(crate) fn format_cst<'a>(
                 + format_cst(edits, closing, info).min_width(info.indentation)
         }
         CstKind::TextPart(text) => text.width(),
-
         CstKind::TextInterpolation {
             opening_curly_braces,
             expression,
@@ -330,32 +329,45 @@ pub(crate) fn format_cst<'a>(
                 PrecedenceCategory::Low,
             );
         }
-        CstKind::Parenthesized {
-            opening_parenthesis,
-            inner,
-            closing_parenthesis,
-        } => {
-            let opening_parenthesis = format_cst(edits, opening_parenthesis, info);
-            let inner = format_cst(edits, inner, &info.with_indent());
-            let closing_parenthesis = format_cst(edits, closing_parenthesis, info);
+        CstKind::Parenthesized { .. } => {
+            // Whenever parentheses are necessary, they are handled by the parent. Hence, we try to
+            // remove them here.
+            let (child, parentheses) = split_parenthesized(edits, cst);
+            let (
+                (opening_parenthesis, opening_parenthesis_whitespace),
+                (closing_parenthesis, mut whitespace),
+            ) = parentheses.unwrap();
 
-            let min_width = &opening_parenthesis.min_width(info.indentation)
-                + &inner.min_width(info.indentation)
-                + &closing_parenthesis.min_width(info.indentation);
-            let (opening_parenthesis_trailing, inner_trailing) = if min_width.fits(info.indentation)
-            {
-                (TrailingWhitespace::None, TrailingWhitespace::None)
-            } else {
-                (
-                    TrailingWhitespace::Indentation(info.indentation.with_indent()),
-                    TrailingWhitespace::Indentation(info.indentation),
-                )
-            };
+            if !opening_parenthesis_whitespace.has_comments() {
+                // We can remove the parentheses.
+                edits.delete(opening_parenthesis.data.span.to_owned());
+                opening_parenthesis_whitespace.into_empty_trailing(edits);
+                let child = format_cst(edits, child, info);
+                let child_precedence = child.precedence;
+                let (child_width, child_whitespace) = child.split();
+                child_whitespace.into_empty_and_move_comments_to(edits, &mut whitespace);
+                edits.delete(closing_parenthesis.data.span.to_owned());
+                return FormattedCst::new(child_width, whitespace, child_precedence);
+            }
 
-            let (closing_parenthesis_width, whitespace) = closing_parenthesis.split();
+            let opening_parenthesis_width =
+                format_cst(edits, opening_parenthesis, info).into_empty_trailing(edits);
+            let opening_parenthesis_trailing_width = opening_parenthesis_whitespace
+                .into_trailing_with_indentation(
+                    edits,
+                    Width::Singleline(1),
+                    info.indentation.with_indent(),
+                    TrailingNewlineCount::One,
+                    true,
+                );
+            let child_width = format_cst(edits, child, &info.with_indent())
+                .into_trailing_with_indentation(edits, info.indentation);
+            let closing_parenthesis_width =
+                format_cst(edits, closing_parenthesis, info).into_empty_trailing(edits);
             return FormattedCst::new(
-                opening_parenthesis.into_trailing(edits, opening_parenthesis_trailing)
-                    + inner.into_trailing(edits, inner_trailing)
+                opening_parenthesis_width
+                    + opening_parenthesis_trailing_width
+                    + child_width
                     + closing_parenthesis_width,
                 whitespace,
                 PrecedenceCategory::High,
@@ -1243,33 +1255,30 @@ mod test {
     }
     #[test]
     fn test_parenthesized() {
-        test("(foo)", "(foo)\n");
-        test(" ( foo ) ", "(foo)\n");
-        test("(\n  foo)", "(foo)\n");
-        test("(\n  foo\n)", "(foo)\n");
+        test("(foo)", "foo\n");
+        test(" ( foo ) ", "foo\n");
+        test("(\n  foo)", "foo\n");
+        test("(\n  foo\n)", "foo\n");
         test(
             "(veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryItemmm)",
-            "(veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryItemmm)\n",
-        );
-        test(
-            "(veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryItemmmm)",
-            "(\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryItemmmm\n)\n",
+            "veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryItemmm\n",
         );
         test(
             "(\n  veryVeryVeryVeryVeryVeryVeryVeryLongReceiver veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgumentt)",
-            "(veryVeryVeryVeryVeryVeryVeryVeryLongReceiver veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgumentt)\n",
+            "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgumentt\n",
         );
         test(
             "(veryVeryVeryVeryVeryVeryVeryVeryLongReceiver veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgumenttt)",
-            "(\n  veryVeryVeryVeryVeryVeryVeryVeryLongReceiver\n    veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgumenttt\n)\n",
+            "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgumenttt\n",
         );
 
         // Comments
-        test("(foo) # abc", "(foo) # abc\n");
-        test("(foo)# abc", "(foo) # abc\n");
-        test("(foo# abc\n)", "(\n  foo # abc\n)\n");
-        test("(foo # abc\n)", "(\n  foo # abc\n)\n");
+        test("(foo) # abc", "foo # abc\n");
+        test("(foo)# abc", "foo # abc\n");
+        test("(foo# abc\n)", "foo # abc\n");
+        test("(foo # abc\n)", "foo # abc\n");
         test("(# abc\n  foo)", "( # abc\n  foo\n)\n");
+        test("(((# abc\n  foo)))", "( # abc\n  foo\n)\n");
     }
     #[test]
     fn test_call() {
