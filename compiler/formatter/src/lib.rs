@@ -270,7 +270,7 @@ pub(crate) fn format_cst<'a>(
                         format_cst(edits, opening_parenthesis, info).into_empty_trailing(edits);
                     let closing_parenthesis_width =
                         format_cst(edits, closing_parenthesis, info).into_empty_trailing(edits);
-                    let (opening_parenthesis_trailing_width, right_width) =
+                    let (opening_parenthesis_whitespace_width, right_width) =
                         if !opening_parenthesis_whitespace.has_comments()
                             && (left.min_width(info.indentation)
                                 + Width::SPACE
@@ -288,7 +288,7 @@ pub(crate) fn format_cst<'a>(
                             (
                                 opening_parenthesis_whitespace.into_trailing_with_indentation(
                                     edits,
-                                    Width::Singleline(1) + Width::SPACE + Width::Singleline(1),
+                                    &(Width::Singleline(1) + Width::SPACE + Width::Singleline(1)),
                                     info.indentation.with_indent(),
                                     TrailingNewlineCount::One,
                                     true,
@@ -298,7 +298,7 @@ pub(crate) fn format_cst<'a>(
                         };
                     (
                         opening_parenthesis_width
-                            + opening_parenthesis_trailing_width
+                            + opening_parenthesis_whitespace_width
                             + right_width
                             + closing_parenthesis_width,
                         closing_parenthesis_whitespace,
@@ -352,10 +352,10 @@ pub(crate) fn format_cst<'a>(
 
             let opening_parenthesis_width =
                 format_cst(edits, opening_parenthesis, info).into_empty_trailing(edits);
-            let opening_parenthesis_trailing_width = opening_parenthesis_whitespace
+            let opening_parenthesis_whitespace_width = opening_parenthesis_whitespace
                 .into_trailing_with_indentation(
                     edits,
-                    Width::Singleline(1),
+                    &Width::Singleline(1),
                     info.indentation.with_indent(),
                     TrailingNewlineCount::One,
                     true,
@@ -366,7 +366,7 @@ pub(crate) fn format_cst<'a>(
                 format_cst(edits, closing_parenthesis, info).into_empty_trailing(edits);
             return FormattedCst::new(
                 opening_parenthesis_width
-                    + opening_parenthesis_trailing_width
+                    + opening_parenthesis_whitespace_width
                     + child_width
                     + closing_parenthesis_width,
                 whitespace,
@@ -378,30 +378,48 @@ pub(crate) fn format_cst<'a>(
             arguments,
         } => {
             let receiver = format_cst(edits, receiver, info);
+            if arguments.is_empty() {
+                return receiver;
+            }
+
             let mut arguments = arguments
                 .iter()
-                .map(|argument| format_cst(edits, argument, &info.with_indent()))
+                .map(|argument| Argument::new(edits, argument, info))
                 .collect_vec();
 
             let min_width = &receiver.min_width(info.indentation)
                 + arguments
                     .iter()
-                    .map(|it| Width::SPACE + &it.min_width(info.indentation))
+                    .map(|it| Width::SPACE + &it.min_singleline_width)
                     .sum::<Width>();
-            let trailing = if min_width.fits(info.indentation) {
-                TrailingWhitespace::Space
+            let (is_singleline, argument_info, trailing) = if min_width.fits(info.indentation) {
+                (true, info.to_owned(), TrailingWhitespace::Space)
             } else {
-                TrailingWhitespace::Indentation(info.indentation.with_indent())
+                (
+                    false,
+                    info.with_indent(),
+                    TrailingWhitespace::Indentation(info.indentation.with_indent()),
+                )
             };
 
-            let (last_argument_width, whitespace) = arguments.pop().unwrap().split();
+            let width = receiver.into_trailing(edits, trailing);
+
+            let last_argument = arguments.pop().unwrap();
+            let width = arguments.into_iter().fold(width, |old_width, argument| {
+                let argument = argument.format(edits, &argument_info, &old_width, is_singleline);
+                let width = if is_singleline {
+                    argument.into_trailing_with_space(edits)
+                } else {
+                    argument.into_trailing_with_indentation(edits, argument_info.indentation)
+                };
+                old_width + width
+            });
+            let (last_argument_width, whitespace) = last_argument
+                .format(edits, &argument_info, &width, is_singleline)
+                .split();
+
             return FormattedCst::new(
-                receiver.into_trailing(edits, trailing.clone())
-                    + arguments
-                        .into_iter()
-                        .map(|it| it.into_trailing(edits, trailing.clone()))
-                        .sum::<Width>()
-                    + last_argument_width,
+                width + last_argument_width,
                 whitespace,
                 PrecedenceCategory::Low,
             );
@@ -588,7 +606,7 @@ pub(crate) fn format_cst<'a>(
 
             let arrow_trailing = if pattern_width.last_line_fits(
                 info.indentation,
-                arrow.min_width(info.indentation) + Width::SPACE + &body_width,
+                &(arrow.min_width(info.indentation) + Width::SPACE + &body_width),
             ) {
                 TrailingWhitespace::Space
             } else {
@@ -640,9 +658,9 @@ pub(crate) fn format_cst<'a>(
                         .map(|it| {
                             let trailing = if parameters_width.last_line_fits(
                                 info.indentation,
-                                it.min_width(info.indentation)
+                                &(it.min_width(info.indentation)
                                     + Width::SPACE
-                                    + arrow.min_width(info.indentation),
+                                    + arrow.min_width(info.indentation)),
                             ) {
                                 TrailingWhitespace::Space
                             } else {
@@ -712,7 +730,7 @@ pub(crate) fn format_cst<'a>(
             let opening_curly_brace_width =
                 opening_curly_brace.into_trailing(edits, opening_curly_brace_trailing);
             let arrow_trailing = if width_until_arrow
-                .last_line_fits(info.indentation, space_if_parameters + width_from_body)
+                .last_line_fits(info.indentation, &(space_if_parameters + width_from_body))
             {
                 TrailingWhitespace::Space
             } else {
@@ -756,7 +774,7 @@ pub(crate) fn format_cst<'a>(
 
             let is_body_in_same_line = left_width.last_line_fits(
                 info.indentation,
-                &assignment_sign.min_width(info.indentation) + Width::SPACE + &body_width,
+                &(&assignment_sign.min_width(info.indentation) + Width::SPACE + &body_width),
             );
             let assignment_sign_trailing = if is_body_in_same_line {
                 TrailingWhitespace::Space
@@ -771,6 +789,129 @@ pub(crate) fn format_cst<'a>(
         } => unparsable_input.width(),
     };
     FormattedCst::new(width, ExistingWhitespace::empty(cst.data.span.end), None)
+}
+
+struct Argument<'a> {
+    argument_start_offset: Offset,
+    argument: FormattedCst<'a>,
+    precedence: Option<PrecedenceCategory>,
+    parentheses: Option<(UnformattedCst<'a>, UnformattedCst<'a>)>,
+    min_singleline_width: Width,
+}
+impl<'a> Argument<'a> {
+    fn new(edits: &mut TextEdits, cst: &'a Cst, info: &FormatterInfo) -> Self {
+        let (argument, parentheses) = split_parenthesized(edits, cst);
+        let argument_start_offset = argument.data.span.start;
+        let precedence = argument.precedence();
+
+        let (argument, min_singleline_width) = if let Some(((_, opening_parenthesis_whitespace), _)) = &parentheses && opening_parenthesis_whitespace.has_comments() {
+            let argument = format_cst(edits, argument, &info.with_indent().with_indent());
+            (argument, Width::multiline())
+        } else {
+            let argument = format_cst(edits, argument, info);
+            let mut min_width = argument.min_width(info.indentation.with_indent());
+            const PARENTHESES_WIDTH: Width = Width::Singleline(2);
+            match precedence {
+                Some(PrecedenceCategory::High) => {},
+                Some(PrecedenceCategory::Low) => min_width += PARENTHESES_WIDTH,
+                None if parentheses.is_some() => min_width += PARENTHESES_WIDTH,
+                None => {},
+            }
+            (argument, min_width)
+        };
+        Argument {
+            argument_start_offset,
+            argument,
+            precedence,
+            parentheses,
+            min_singleline_width,
+        }
+    }
+
+    fn format(
+        self,
+        edits: &mut TextEdits,
+        info: &FormatterInfo,
+        old_width: &Width,
+        is_singleline: bool,
+    ) -> FormattedCst<'a> {
+        if let Some((
+            (opening_parenthesis, opening_parenthesis_whitespace),
+            (closing_parenthesis, mut whitespace),
+        )) = self.parentheses
+        {
+            // We already have parentheses …
+            let argument_width = if is_singleline
+                && self.precedence != Some(PrecedenceCategory::High)
+                || opening_parenthesis_whitespace.has_comments()
+            {
+                // … and we actually need them.
+                let opening_parenthesis_width =
+                    format_cst(edits, opening_parenthesis, info).into_empty_trailing(edits);
+                let closing_parenthesis_width =
+                    format_cst(edits, closing_parenthesis, info).into_empty_trailing(edits);
+                if is_singleline
+                    && old_width.last_line_fits(info.indentation, &self.min_singleline_width)
+                    || !is_singleline
+                        && old_width.last_line_fits(
+                            info.indentation.with_indent(),
+                            &self.min_singleline_width,
+                        )
+                {
+                    // The argument fits in one line.
+                    assert!(is_singleline);
+                    let opening_parenthesis_whitespace_width =
+                        opening_parenthesis_whitespace.into_empty_trailing(edits);
+                    opening_parenthesis_width
+                        + opening_parenthesis_whitespace_width
+                        + self.argument.into_empty_trailing(edits)
+                        + closing_parenthesis_width
+                } else {
+                    // The argument goes over multiple lines.
+                    let opening_parenthesis_whitespace_width = opening_parenthesis_whitespace
+                        .into_trailing_with_indentation(
+                            edits,
+                            &(old_width + Width::Singleline(1)),
+                            info.indentation.with_indent(),
+                            TrailingNewlineCount::One,
+                            true,
+                        );
+                    opening_parenthesis_width
+                        + opening_parenthesis_whitespace_width
+                        + self
+                            .argument
+                            .into_trailing_with_indentation(edits, info.indentation)
+                        + closing_parenthesis_width
+                }
+            } else {
+                // … but we don't need them.
+                edits.delete(opening_parenthesis.data.span.to_owned());
+                opening_parenthesis_whitespace.into_empty_trailing(edits);
+                edits.delete(closing_parenthesis.data.span.to_owned());
+                let (argument_width, argument_whitespace) = self.argument.split();
+                argument_whitespace.into_empty_and_move_comments_to(edits, &mut whitespace);
+                argument_width
+            };
+            FormattedCst::new(argument_width, whitespace, self.precedence)
+        } else {
+            // We don't have parentheses …
+            if is_singleline && self.precedence == Some(PrecedenceCategory::Low) {
+                // … but we need them.
+                // This can only be the case if the whole call fits on one line.
+                edits.insert(self.argument_start_offset, "(");
+                edits.insert(self.argument.whitespace.start_offset(), ")");
+                let (argument_width, whitespace) = self.argument.split();
+                FormattedCst::new(
+                    Width::Singleline(1) + argument_width + Width::Singleline(1),
+                    whitespace,
+                    self.precedence,
+                )
+            } else {
+                // … and we don't need them.
+                self.argument
+            }
+        }
+    }
 }
 
 fn format_collection<'a>(
@@ -880,8 +1021,6 @@ fn split_parenthesized<'a>(
     edits: &mut TextEdits,
     mut cst: &'a Cst,
 ) -> (&'a Cst, Option<(UnformattedCst<'a>, UnformattedCst<'a>)>) {
-    // BinaryBar: keep if inner is low precedence
-    // Call: maybe keep/add if inner is low precedence (if all is single line)
     let mut parentheses: Option<(UnformattedCst, UnformattedCst)> = None;
     while let CstKind::Parenthesized {
         box opening_parenthesis,
@@ -1151,7 +1290,7 @@ impl<'a> FormattedCst<'a> {
         &self.child_width
             + self.whitespace.into_trailing_with_indentation(
                 edits,
-                self.child_width.clone(),
+                &self.child_width,
                 indentation,
                 trailing_newline_count,
                 !self.child_width.is_empty(),
@@ -1290,6 +1429,17 @@ mod test {
             "foo\n  firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n  secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n",
         );
 
+        // Parentheses
+        test("foo (bar)", "foo bar\n");
+        test("foo (bar baz)", "foo (bar baz)\n");
+        test("foo\n  bar baz", "foo (bar baz)\n");
+        test(
+            "foo (firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument secondVeryVeryVeryVeryVeryVeryVeryLongArgument)",
+            "foo\n  firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument secondVeryVeryVeryVeryVeryVeryVeryLongArgument\n",
+        );
+        test("foo (# abc\n  bar\n)", "foo\n  ( # abc\n    bar\n  )\n");
+
+        // Comments
         test("foo # abc\n  bar\n  Baz", "foo # abc\n  bar\n  Baz\n");
         test("foo\n  # abc\n  bar\n  Baz", "foo\n  # abc\n  bar\n  Baz\n");
         test("foo\n  bar # abc\n  Baz", "foo\n  bar # abc\n  Baz\n");

@@ -52,6 +52,9 @@ impl<'a> ExistingWhitespace<'a> {
         }
     }
 
+    pub fn start_offset(&self) -> Offset {
+        self.start_offset
+    }
     pub fn end_offset(&self) -> Offset {
         self.whitespace
             .as_ref()
@@ -210,7 +213,7 @@ impl<'a> ExistingWhitespace<'a> {
     pub fn into_trailing_with_indentation(
         self,
         edits: &mut TextEdits,
-        child_width: Width,
+        child_width: &Width,
         indentation: Indentation,
         trailing_newline_count: TrailingNewlineCount,
         ensure_space_before_first_comment: bool,
@@ -300,7 +303,7 @@ impl<'a> ExistingWhitespace<'a> {
     fn format_trailing_comments(
         edits: &mut TextEdits,
         comments_and_whitespace: &[(&Cst, Option<Offset>)],
-        child_width: Width,
+        child_width: &Width,
         indentation: Indentation,
         ensure_space_before_first_comment: bool,
     ) {
@@ -344,7 +347,7 @@ impl<'a> ExistingWhitespace<'a> {
                         } else {
                             Width::default()
                         };
-                        if (&child_width + space_width + Width::Singleline(1) + comment.width()).fits(indentation) {
+                        if child_width.last_line_fits(indentation, &(space_width + Width::Singleline(1) + comment.width())) {
                             if ensure_space_before_first_comment {
                                 Cow::Borrowed(SPACE)
                             } else {
@@ -471,7 +474,7 @@ mod test {
             TrailingWhitespace::Indentation(indentation) => {
                 whitespace.into_trailing_with_indentation(
                     &mut edits,
-                    child_width,
+                    &child_width,
                     indentation,
                     TrailingNewlineCount::One,
                     true,

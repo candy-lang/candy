@@ -79,7 +79,7 @@ impl Width {
             Width::Multiline { .. } => false,
         }
     }
-    pub fn last_line_fits(&self, indentation: Indentation, extra_width: Width) -> bool {
+    pub fn last_line_fits(&self, indentation: Indentation, extra_width: &Width) -> bool {
         let Width::Singleline(extra_width) = extra_width else { return false; };
         match self {
             Width::Singleline(self_width) => {
