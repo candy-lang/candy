@@ -84,11 +84,8 @@ fn format_csts<'a>(
 ) -> FormattedCst<'a> {
     let mut offset = fallback_offset;
     let mut width = Width::default();
-    let mut formatted = FormattedCst::new(
-        Width::default(),
-        ExistingWhitespace::empty(fallback_offset),
-        None,
-    );
+    let mut formatted =
+        FormattedCst::new(Width::default(), ExistingWhitespace::empty(fallback_offset));
     loop {
         {
             // Whitespace
@@ -134,7 +131,7 @@ fn format_csts<'a>(
         offset = formatted.whitespace.end_offset();
     }
 
-    FormattedCst::new(width + formatted.child_width, formatted.whitespace, None)
+    FormattedCst::new(width + formatted.child_width, formatted.whitespace)
 }
 
 pub(crate) fn format_cst<'a>(
@@ -175,9 +172,8 @@ pub(crate) fn format_cst<'a>(
         CstKind::TrailingWhitespace { child, whitespace } => {
             let mut whitespace = ExistingWhitespace::new(child.data.span.end, whitespace);
             let child = format_cst(edits, child, info);
-            let child_precedence = child.precedence;
             let child_width = child.into_empty_and_move_comments_to(edits, &mut whitespace);
-            return FormattedCst::new(child_width, whitespace, child_precedence);
+            return FormattedCst::new(child_width, whitespace);
         }
         CstKind::Identifier(string) | CstKind::Symbol(string) | CstKind::Int { string, .. } => {
             string.width()
@@ -326,7 +322,6 @@ pub(crate) fn format_cst<'a>(
             return FormattedCst::new(
                 left.into_trailing(edits, left_trailing) + bar_width + right_width,
                 whitespace,
-                PrecedenceCategory::Low,
             );
         }
         CstKind::Parenthesized { .. } => {
@@ -343,11 +338,10 @@ pub(crate) fn format_cst<'a>(
                 edits.delete(opening_parenthesis.data.span.to_owned());
                 opening_parenthesis_whitespace.into_empty_trailing(edits);
                 let child = format_cst(edits, child, info);
-                let child_precedence = child.precedence;
                 let (child_width, child_whitespace) = child.split();
                 child_whitespace.into_empty_and_move_comments_to(edits, &mut whitespace);
                 edits.delete(closing_parenthesis.data.span.to_owned());
-                return FormattedCst::new(child_width, whitespace, child_precedence);
+                return FormattedCst::new(child_width, whitespace);
             }
 
             let opening_parenthesis_width =
@@ -370,7 +364,6 @@ pub(crate) fn format_cst<'a>(
                     + child_width
                     + closing_parenthesis_width,
                 whitespace,
-                PrecedenceCategory::High,
             );
         }
         CstKind::Call {
@@ -418,11 +411,7 @@ pub(crate) fn format_cst<'a>(
                 .format(edits, &argument_info, &width, is_singleline)
                 .split();
 
-            return FormattedCst::new(
-                width + last_argument_width,
-                whitespace,
-                PrecedenceCategory::Low,
-            );
+            return FormattedCst::new(width + last_argument_width, whitespace);
         }
         CstKind::List {
             opening_parenthesis,
@@ -453,7 +442,6 @@ pub(crate) fn format_cst<'a>(
             return FormattedCst::new(
                 value.into_empty_and_move_comments_to(edits, &mut whitespace) + comma_width,
                 whitespace,
-                None,
             );
         }
         CstKind::Struct {
@@ -508,7 +496,6 @@ pub(crate) fn format_cst<'a>(
                     + value_width
                     + comma_width,
                 whitespace,
-                None,
             );
         }
         CstKind::StructAccess { struct_, dot, key } => {
@@ -531,7 +518,6 @@ pub(crate) fn format_cst<'a>(
             return FormattedCst::new(
                 struct_.into_trailing(edits, struct_trailing) + dot_width + key_width,
                 whitespace,
-                PrecedenceCategory::High,
             );
         }
         CstKind::Match {
@@ -559,7 +545,7 @@ pub(crate) fn format_cst<'a>(
                 (cases, last_case)
             } else {
                 let (percent_width, whitespace) = percent.split();
-                return FormattedCst::new(expression_width + percent_width, whitespace, PrecedenceCategory::Low);
+                return FormattedCst::new(expression_width + percent_width, whitespace, );
             };
 
             let percent_width =
@@ -582,7 +568,6 @@ pub(crate) fn format_cst<'a>(
                         .sum::<Width>()
                     + last_case_width,
                 whitespace,
-                PrecedenceCategory::Low,
             );
         }
         CstKind::MatchCase {
@@ -616,7 +601,6 @@ pub(crate) fn format_cst<'a>(
             return FormattedCst::new(
                 pattern_width + arrow.into_trailing(edits, arrow_trailing) + body_width,
                 whitespace,
-                None,
             );
         }
         CstKind::Lambda {
@@ -747,7 +731,6 @@ pub(crate) fn format_cst<'a>(
                     + body.into_trailing(edits, body_trailing)
                     + closing_curly_brace_width,
                 whitespace,
-                PrecedenceCategory::High,
             );
         }
         CstKind::Assignment {
@@ -788,7 +771,7 @@ pub(crate) fn format_cst<'a>(
             unparsable_input, ..
         } => unparsable_input.width(),
     };
-    FormattedCst::new(width, ExistingWhitespace::empty(cst.data.span.end), None)
+    FormattedCst::new(width, ExistingWhitespace::empty(cst.data.span.end))
 }
 
 struct Argument<'a> {
@@ -892,7 +875,7 @@ impl<'a> Argument<'a> {
                 argument_whitespace.into_empty_and_move_comments_to(edits, &mut whitespace);
                 argument_width
             };
-            FormattedCst::new(argument_width, whitespace, self.precedence)
+            FormattedCst::new(argument_width, whitespace)
         } else {
             // We don't have parentheses …
             if is_singleline && self.precedence == Some(PrecedenceCategory::Low) {
@@ -904,7 +887,6 @@ impl<'a> Argument<'a> {
                 FormattedCst::new(
                     Width::Singleline(1) + argument_width + Width::Singleline(1),
                     whitespace,
-                    self.precedence,
                 )
             } else {
                 // … and we don't need them.
@@ -1012,7 +994,6 @@ fn format_collection<'a>(
                 .sum::<Width>()
             + closing_punctuation_width,
         whitespace,
-        PrecedenceCategory::High,
     )
 }
 
@@ -1198,18 +1179,12 @@ struct FormattedCst<'a> {
     /// width.
     child_width: Width,
     whitespace: ExistingWhitespace<'a>,
-    precedence: Option<PrecedenceCategory>, // TODO: remove
 }
 impl<'a> FormattedCst<'a> {
-    pub fn new(
-        child_width: Width,
-        whitespace: ExistingWhitespace<'a>,
-        precedence: impl Into<Option<PrecedenceCategory>>,
-    ) -> Self {
+    pub fn new(child_width: Width, whitespace: ExistingWhitespace<'a>) -> Self {
         Self {
             child_width,
             whitespace,
-            precedence: precedence.into(),
         }
     }
 
