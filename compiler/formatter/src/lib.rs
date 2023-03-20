@@ -143,7 +143,8 @@ fn format_csts<'a>(
 /// 2. Tell each [ExistingWhitespace] (often through [FormattedCst]) whether it should be empty,
 ///    become a single space, or become a newline with indentation.
 ///
-/// [CstKind::StructAccess] is a simple example of this.
+/// See the case of [CstKind::StructAccess] for a simple example and [CstKind::Lambda] for the
+/// opposite.
 pub(crate) fn format_cst<'a>(
     edits: &mut TextEdits,
     previous_width: &Width,
@@ -273,7 +274,7 @@ pub(crate) fn format_cst<'a>(
         CstKind::BinaryBar { left, bar, right } => {
             let mut left = format_cst(edits, previous_width, left, info);
 
-            let width_for_right_side = Width::multiline(info.indentation.with_indent().width());
+            let width_for_right_side = Width::multiline(info.indentation.width());
             let bar_width = format_cst(edits, &width_for_right_side, bar, info)
                 .into_space_and_move_comments_to(edits, &mut left.whitespace);
 
@@ -462,15 +463,16 @@ pub(crate) fn format_cst<'a>(
                     .iter()
                     .map(|it| Width::SPACE + &it.min_singleline_width)
                     .sum::<Width>();
-            let (is_singleline, argument_info, trailing) = if min_width.fits(info.indentation) {
-                (true, info.to_owned(), TrailingWhitespace::Space)
-            } else {
-                (
-                    false,
-                    info.with_indent(),
-                    TrailingWhitespace::Indentation(info.indentation.with_indent()),
-                )
-            };
+            let (is_singleline, argument_info, trailing) =
+                if previous_width.last_line_fits(info.indentation, &min_width) {
+                    (true, info.to_owned(), TrailingWhitespace::Space)
+                } else {
+                    (
+                        false,
+                        info.with_indent(),
+                        TrailingWhitespace::Indentation(info.indentation.with_indent()),
+                    )
+                };
 
             let width = receiver.into_trailing(edits, trailing);
 
@@ -1279,10 +1281,10 @@ mod test {
             "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryLongFunction0 longArgument0 | veryVeryVeryVeryVeryVeryVeryVeryLongFunction1 longArgument1 longArgument2",
             "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver\n| veryVeryVeryVeryVeryVeryVeryVeryLongFunction0 longArgument0\n| veryVeryVeryVeryVeryVeryVeryVeryLongFunction1 longArgument1 longArgument2\n",
         );
-        // test(
-        //     "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryLongFunction longArgument0 longArgument1 longArgument2 longArgument3",
-        //     "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver\n| veryVeryVeryVeryVeryVeryVeryVeryLongFunction\n  longArgument0\n  longArgument1\n  longArgument2\n  longArgument3\n",
-        // ); // FIXME
+        test(
+            "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryLongFunction longArgument0 longArgument1 longArgument2 longArgument3",
+            "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver\n| veryVeryVeryVeryVeryVeryVeryVeryLongFunction\n  longArgument0\n  longArgument1\n  longArgument2\n  longArgument3\n",
+        );
         test(
             "foo | veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction0 veryVeryVeryVeryVeryVeryVeryLongArgument0 | function1",
             "foo\n| veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction0 veryVeryVeryVeryVeryVeryVeryLongArgument0\n| function1\n",
