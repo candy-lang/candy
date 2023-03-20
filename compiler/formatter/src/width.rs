@@ -37,9 +37,9 @@ impl Width {
     pub const MAX: usize = 100;
     pub const SPACE: Width = Width::Singleline(1);
 
-    pub fn multiline() -> Self {
+    pub fn multiline(last_line_width: impl Into<Option<usize>>) -> Self {
         Width::Multiline {
-            last_line_width: None,
+            last_line_width: last_line_width.into(),
         }
     }
 
@@ -48,7 +48,7 @@ impl Width {
     }
     pub fn from_width_and_max(width: usize, max_width: usize) -> Self {
         if width > max_width {
-            Width::multiline()
+            Width::multiline(None)
         } else {
             Width::Singleline(width)
         }
@@ -120,15 +120,13 @@ impl<'a, 'b> Add<&'b Width> for &'a Width {
     fn add(self, rhs: &'b Width) -> Self::Output {
         match (self, rhs) {
             (Width::Singleline(lhs), Width::Singleline(rhs)) => Width::from_width(lhs + rhs),
-            (_, Width::Multiline { last_line_width }) => Width::Multiline {
-                last_line_width: *last_line_width,
-            },
+            (_, Width::Multiline { last_line_width }) => Width::multiline(*last_line_width),
             (
                 Width::Multiline {
                     last_line_width: None,
                 },
                 Width::Singleline(_),
-            ) => Width::multiline(),
+            ) => Width::multiline(None),
             (
                 Width::Multiline {
                     last_line_width: Some(last_line_width),
@@ -136,13 +134,12 @@ impl<'a, 'b> Add<&'b Width> for &'a Width {
                 Width::Singleline(width),
             ) => {
                 let total_width = last_line_width + width;
-                Width::Multiline {
-                    last_line_width: if total_width <= Width::MAX {
-                        Some(total_width)
-                    } else {
-                        None
-                    },
-                }
+                let last_line_width = if total_width <= Width::MAX {
+                    Some(total_width)
+                } else {
+                    None
+                };
+                Width::multiline(last_line_width)
             }
         }
     }
@@ -150,7 +147,12 @@ impl<'a, 'b> Add<&'b Width> for &'a Width {
 
 impl AddAssign<Width> for Width {
     fn add_assign(&mut self, rhs: Width) {
-        *self = &*self + &rhs;
+        *self += &rhs;
+    }
+}
+impl AddAssign<&Width> for Width {
+    fn add_assign(&mut self, rhs: &Width) {
+        *self = &*self + rhs;
     }
 }
 
@@ -164,9 +166,7 @@ impl Sum for Width {
 pub impl StringWidth for str {
     fn width(&self) -> Width {
         if let Some(index) = self.rfind('\n') {
-            Width::Multiline {
-                last_line_width: Some(unicode_width::UnicodeWidthStr::width(&self[index + 1..])),
-            }
+            Width::multiline(unicode_width::UnicodeWidthStr::width(&self[index + 1..]))
         } else {
             Width::Singleline(unicode_width::UnicodeWidthStr::width(self))
         }

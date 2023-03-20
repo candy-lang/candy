@@ -282,7 +282,7 @@ impl<'a> ExistingWhitespace<'a> {
                         let comment_source = &edits.source()[*comment.data.span.start..*comment.data.span.end];
                         space_width + comment_source.width()
                     },
-                    _ => Width::multiline(),
+                    _ => Width::multiline(None),
                 };
             },
             TrailingNewlineCount::One => 1,
@@ -298,7 +298,7 @@ impl<'a> ExistingWhitespace<'a> {
             }
         };
         edits.change(trailing_range, format!("{}{indentation}", NEWLINE.repeat(trailing_newline_count)));
-        Width::Multiline { last_line_width: Some(indentation.width()) }
+        Width::multiline(indentation.width())
     }
     fn format_trailing_comments(
         edits: &mut TextEdits,
@@ -463,7 +463,7 @@ where
 #[cfg(test)]
 mod test {
     use super::TrailingWhitespace;
-    use crate::{format_cst, text_edits::TextEdits, width::Indentation, FormatterInfo, existing_whitespace::TrailingNewlineCount};
+    use crate::{format_cst, text_edits::TextEdits, width::{Indentation, Width}, FormatterInfo, existing_whitespace::TrailingNewlineCount};
     use candy_frontend::{cst::CstKind, rcst_to_cst::RcstsToCstsExt, string_to_rcst::parse_rcst};
 
     #[test]
@@ -503,7 +503,7 @@ mod test {
         let reduced_source = cst.to_string();
 
         let mut edits = TextEdits::new(reduced_source);
-        let (child_width, whitespace) = format_cst(&mut edits, &cst, &FormatterInfo::default()).split();
+        let (child_width, whitespace) = format_cst(&mut edits, &Width::default(), &cst, &FormatterInfo::default()).split();
          _ = match trailing.into() {
             TrailingWhitespace::None => whitespace.into_empty_trailing(&mut edits),
             TrailingWhitespace::Space => whitespace.into_trailing_with_space(&mut edits),
