@@ -1207,6 +1207,13 @@ mod test {
     use candy_frontend::{rcst_to_cst::RcstsToCstsExt, string_to_rcst::parse_rcst};
     use itertools::Itertools;
 
+    // Comments with code snippets display the formatted/expected version of the subsequent test,
+    // excluding a trailing newline.
+    //
+    // They're present for multiline expressions for better readability. When multiple source
+    // expressions have the same formatted version, there's only a comment in front of the first
+    // test case.
+
     #[test]
     fn test_csts() {
         test(" ", "");
@@ -1214,24 +1221,46 @@ mod test {
         test("foo\n", "foo\n");
 
         // Consecutive newlines
+
+        // foo
+        // bar
         test("foo\nbar", "foo\nbar\n");
+        // foo
+        //
+        // bar
         test("foo\n\nbar", "foo\n\nbar\n");
+        // foo
+        //
+        //
+        // bar
         test("foo\n\n\nbar", "foo\n\n\nbar\n");
         test("foo\n\n\n\nbar", "foo\n\n\nbar\n");
         test("foo\n\n\n\n\nbar", "foo\n\n\nbar\n");
 
         // Consecutive expressions
+
+        // foo
+        // bar
+        // baz
         test("foo\nbar\nbaz", "foo\nbar\nbaz\n");
+        // foo
+        // bar
         test("foo\n bar", "foo\nbar\n");
+        // foo
+        //
+        // bar
         test("foo\n \nbar", "foo\n\nbar\n");
+        // foo
         test("foo ", "foo\n");
 
         // Leading newlines
+
         test(" \nfoo", "foo\n");
         test("  \nfoo", "foo\n");
         test(" \n  \n foo", "foo\n");
 
         // Trailing newlines
+
         test("foo\n ", "foo\n");
         test("foo\n  ", "foo\n");
         test("foo \n  ", "foo\n");
@@ -1239,10 +1268,16 @@ mod test {
         test("foo\n \n ", "foo\n");
 
         // Comments
+
+        // # abc
+        // foo
         test("# abc\nfoo", "# abc\nfoo\n");
+        // foo # abc
         test("foo# abc", "foo # abc\n");
         test("foo # abc", "foo # abc\n");
         test("foo # abc ", "foo # abc\n");
+        // foo
+        // # abc
         test("foo\n# abc", "foo\n# abc\n");
         test("foo\n # abc", "foo\n# abc\n");
     }
@@ -1265,36 +1300,60 @@ mod test {
             "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | (veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction)",
             "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction\n",
         );
+        // veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongReceiver
+        // | veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction
         test(
             "veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction",
             "veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongReceiver\n| veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction\n",
         );
+        // foo
+        // | veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction0 veryVeryVeryVeryVeryVeryVeryLongArgument0
         test(
             "foo | veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction0 veryVeryVeryVeryVeryVeryVeryLongArgument0",
             "foo\n| veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction0 veryVeryVeryVeryVeryVeryVeryLongArgument0\n",
         );
+        // veryVeryVeryVeryVeryVeryVeryVeryLongReceiver
+        // | veryVeryVeryVeryVeryVeryVeryVeryLongFunction longArgument
         test(
             "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryLongFunction longArgument",
             "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver\n| veryVeryVeryVeryVeryVeryVeryVeryLongFunction longArgument\n",
         );
+        // veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryLongFunction0
+        // | veryVeryVeryVeryVeryVeryVeryVeryLongFunction1
         test(
             "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryLongFunction0 | veryVeryVeryVeryVeryVeryVeryVeryLongFunction1",
             "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryLongFunction0\n| veryVeryVeryVeryVeryVeryVeryVeryLongFunction1\n",
         );
+        // veryVeryVeryVeryVeryVeryVeryVeryLongReceiver
+        // | veryVeryVeryVeryVeryVeryVeryVeryLongFunction0 longArgument0
+        // | veryVeryVeryVeryVeryVeryVeryVeryLongFunction1 longArgument1 longArgument2
         test(
             "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryLongFunction0 longArgument0 | veryVeryVeryVeryVeryVeryVeryVeryLongFunction1 longArgument1 longArgument2",
             "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver\n| veryVeryVeryVeryVeryVeryVeryVeryLongFunction0 longArgument0\n| veryVeryVeryVeryVeryVeryVeryVeryLongFunction1 longArgument1 longArgument2\n",
         );
+        // veryVeryVeryVeryVeryVeryVeryVeryLongReceiver
+        // | veryVeryVeryVeryVeryVeryVeryVeryLongFunction
+        //   longArgument0
+        //   longArgument1
+        //   longArgument2
+        //   longArgument3
         test(
             "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver | veryVeryVeryVeryVeryVeryVeryVeryLongFunction longArgument0 longArgument1 longArgument2 longArgument3",
             "veryVeryVeryVeryVeryVeryVeryVeryLongReceiver\n| veryVeryVeryVeryVeryVeryVeryVeryLongFunction\n  longArgument0\n  longArgument1\n  longArgument2\n  longArgument3\n",
         );
+        // foo
+        // | veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction0 veryVeryVeryVeryVeryVeryVeryLongArgument0
+        // | function1
         test(
             "foo | veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction0 veryVeryVeryVeryVeryVeryVeryLongArgument0 | function1",
             "foo\n| veryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongFunction0 veryVeryVeryVeryVeryVeryVeryLongArgument0\n| function1\n",
         );
+
         // Comments
+
         test("foo | bar # abc", "foo | bar # abc\n");
+        // foo # abc
+        // | bar
         test("foo | # abc\n  bar", "foo # abc\n| bar\n");
         test("foo # abc\n| bar", "foo # abc\n| bar\n");
     }
@@ -1318,12 +1377,20 @@ mod test {
         );
 
         // Comments
+
         test("(foo) # abc", "foo # abc\n");
         test("(foo)# abc", "foo # abc\n");
         test("(foo# abc\n)", "foo # abc\n");
         test("(foo # abc\n)", "foo # abc\n");
+        // ( # abc
+        //   foo
+        // )
         test("(# abc\n  foo)", "( # abc\n  foo\n)\n");
         test("(((# abc\n  foo)))", "( # abc\n  foo\n)\n");
+        // ( # abc
+        //   # def
+        //   foo
+        // )
         test(
             "(# abc\n  (# def\n    foo))",
             "( # abc\n  # def\n  foo\n)\n",
@@ -1334,35 +1401,58 @@ mod test {
         test("foo bar Baz", "foo bar Baz\n");
         test("foo   bar Baz ", "foo bar Baz\n");
         test("foo   bar Baz ", "foo bar Baz\n");
+        // foo
+        //   firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument
+        //   secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument
         test(
             "foo firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument",
             "foo\n  firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n  secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n",
         );
 
         // Parentheses
+
         test("foo (bar)", "foo bar\n");
         test("foo (bar baz)", "foo (bar baz)\n");
         test("foo\n  bar baz", "foo (bar baz)\n");
+        // foo
+        //   firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument secondVeryVeryVeryVeryVeryVeryVeryLongArgument
         test(
             "foo (firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument secondVeryVeryVeryVeryVeryVeryVeryLongArgument)",
             "foo\n  firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument secondVeryVeryVeryVeryVeryVeryVeryLongArgument\n",
         );
+        // foo
+        //   ( # abc
+        //     bar
+        //   )
         test("foo (# abc\n  bar\n)", "foo\n  ( # abc\n    bar\n  )\n");
 
         // Comments
+
+        // foo # abc
+        //   bar
+        //   Baz
         test("foo # abc\n  bar\n  Baz", "foo # abc\n  bar\n  Baz\n");
+        // foo
+        //   # abc
+        //   bar
+        //   Baz
         test("foo\n  # abc\n  bar\n  Baz", "foo\n  # abc\n  bar\n  Baz\n");
+        // foo
+        //   bar # abc
+        //   Baz
         test("foo\n  bar # abc\n  Baz", "foo\n  bar # abc\n  Baz\n");
     }
     #[test]
     fn test_list() {
         // Empty
+
         test("(,)", "(,)\n");
         test(" ( , ) ", "(,)\n");
         test("(\n  , ) ", "(,)\n");
         test("(\n  ,\n) ", "(,)\n");
 
         // Single item
+
         test("(foo,)", "(foo,)\n");
         test("(foo,)\n", "(foo,)\n");
         test("(foo, )\n", "(foo,)\n");
@@ -1376,39 +1466,60 @@ mod test {
             "(veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItemm,)",
             "(veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItemm,)\n",
         );
+        // (
+        //   veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItemmm,
+        // )
         test(
             "(veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItemmm,)",
             "(\n  veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItemmm,\n)\n",
         );
 
         // Multiple items
+
         test("(foo, bar)", "(foo, bar)\n");
         test("(foo, bar,)", "(foo, bar)\n");
         test("(foo, bar, baz)", "(foo, bar, baz)\n");
         test("(foo, bar, baz,)", "(foo, bar, baz)\n");
         test("( foo ,bar ,baz , )", "(foo, bar, baz)\n");
         test("(\n  foo,\n  bar,\n  baz,\n)", "(foo, bar, baz)\n");
+        // (
+        //   firstVeryVeryVeryVeryVeryVeryVeryVeryLongVeryItem,
+        //   secondVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItem,
+        // )
         test(
             "(firstVeryVeryVeryVeryVeryVeryVeryVeryLongVeryItem, secondVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItem)",
             "(\n  firstVeryVeryVeryVeryVeryVeryVeryVeryLongVeryItem,\n  secondVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItem,\n)\n",
         );
 
         // Comments
+
         test("(foo,) # abc", "(foo,) # abc\n");
         test("(foo,)# abc", "(foo,) # abc\n");
+        // (
+        //   foo, # abc
+        // )
         test("(foo,# abc\n)", "(\n  foo, # abc\n)\n");
         test("(foo, # abc\n)", "(\n  foo, # abc\n)\n");
+        // ( # abc
+        //   foo,
+        // )
         test("(# abc\n  foo,)", "( # abc\n  foo,\n)\n");
+        // (
+        //   foo, # abc
+        //   bar,
+        // )
         test("(foo# abc\n  , bar,)", "(\n  foo, # abc\n  bar,\n)\n");
     }
     #[test]
     fn test_struct() {
         // Empty
+
         test("[]", "[]\n");
         test("[ ]", "[]\n");
         test("[\n]", "[]\n");
 
         // Single item
+
         test("[foo]", "[foo]\n");
         test("[foo ]", "[foo]\n");
         test("[\n  foo]", "[foo]\n");
@@ -1420,6 +1531,9 @@ mod test {
             "[veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItemmm]",
             "[veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItemmm]\n",
         );
+        // [
+        //   veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItemmmm,
+        // ]
         test(
             "[veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItemmmm]",
             "[\n  veryVeryVeryVeryVeryVeryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongItemmmm,\n]\n",
@@ -1428,12 +1542,17 @@ mod test {
             "[\n  veryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongKey: value\n]",
             "[veryVeryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongKey: value]\n",
         );
+        // [
+        //   veryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryLongKey:
+        //     veryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryLongValue,
+        // ]
         test(
             "[veryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryLongKey: veryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryLongValue]",
             "[\n  veryVeryLongVeryVeryVeryVeryVeryVeryVeryVeryLongKey:\n    veryLongVeryVeryVeryVeryVeryVeryVeryVeryVeryLongValue,\n]\n",
         );
 
         // Multiple items
+
         test("[foo: bar, baz]", "[foo: bar, baz]\n");
         test("[foo: bar, baz,]", "[foo: bar, baz]\n");
         test("[foo: bar, baz: blub,]", "[foo: bar, baz: blub]\n");
@@ -1445,11 +1564,26 @@ mod test {
         );
 
         // Comments
+
         test("[foo] # abc", "[foo] # abc\n");
         test("[foo: bar] # abc", "[foo: bar] # abc\n");
+        // [
+        //   foo: bar, # abc
+        // ]
         test("[foo: bar # abc\n]", "[\n  foo: bar, # abc\n]\n");
+        // [
+        //   foo: # abc
+        //     bar,
+        // ]
         test("[foo: # abc\n  bar\n]", "[\n  foo: # abc\n    bar,\n]\n");
+        // [ # abc
+        //   foo: bar,
+        // ]
         test("[# abc\n  foo: bar]", "[ # abc\n  foo: bar,\n]\n");
+        // [
+        //   foo: bar, # abc
+        //   baz,
+        // ]
         test(
             "[foo: bar # abc\n  , baz]",
             "[\n  foo: bar, # abc\n  baz,\n]\n",
@@ -1460,16 +1594,24 @@ mod test {
         test("foo.bar", "foo.bar\n");
         test("foo.bar.baz", "foo.bar.baz\n");
         test("foo . bar. baz .blub ", "foo.bar.baz.blub\n");
+        // foo.firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument
+        //   .secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument
         test(
             "foo.firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument.secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument",
             "foo.firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n  .secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n",
         );
+        // foo
+        //   .firstVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgument
+        //   .secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument
         test(
             "foo.firstVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgument.secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument",
             "foo\n  .firstVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n  .secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n",
         );
 
         // Comments
+
+        // foo # abc
+        //   .bar
         test("foo# abc\n  .bar", "foo # abc\n  .bar\n");
         test("foo # abc\n  .bar", "foo # abc\n  .bar\n");
         test("foo  # abc\n  .bar", "foo # abc\n  .bar\n");
@@ -1481,6 +1623,9 @@ mod test {
     #[test]
     fn test_match() {
         test("foo % ", "foo %\n");
+        // foo %
+        //   Foo -> Foo
+        //   Bar -> Bar
         test(
             "foo %\n  Foo -> Foo\n  Bar -> Bar",
             "foo %\n  Foo -> Foo\n  Bar -> Bar\n",
@@ -1491,7 +1636,12 @@ mod test {
         );
 
         // Comments
+        // foo % # abc
+        //   Bar -> Baz
         test("foo%# abc\n  Bar -> Baz", "foo % # abc\n  Bar -> Baz\n");
+        // foo %
+        //   Bar -> # abc
+        //     Baz
         test(
             "foo %\n  Bar # abc\n  -> Baz",
             "foo %\n  Bar -> # abc\n    Baz\n",
@@ -1500,54 +1650,108 @@ mod test {
     #[test]
     fn test_lambda() {
         // No parameters
+
         test("{}", "{ }\n");
         test("{ }", "{ }\n");
         test("{ foo }", "{ foo }\n");
         test("{\n  foo\n}", "{ foo }\n");
+        // {
+        //   foo
+        //   bar
+        // }
         test("{\n  foo\n  bar\n}", "{\n  foo\n  bar\n}\n");
+        // {
+        //   foo
+        //
+        //   bar
+        // }
         test("{\n  foo\n \n  bar\n}", "{\n  foo\n\n  bar\n}\n");
+        // {
+        //   veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongBodyy
+        // }
         test(
             "{ veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongBodyy }",
             "{\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongBodyy\n}\n",
         );
 
+        // Parameters
+
         test("{ foo -> }", "{ foo -> }\n");
         test("{ foo -> bar }", "{ foo -> bar }\n");
+        // { parameter veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameter ->
+        //   foo
+        // }
         test(
             "{ parameter veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameter -> foo }",
             "{ parameter veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameter ->\n  foo\n}\n",
         );
+        // {
+        //   parameter
+        //   veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameterr -> foo
+        // }
         test(
             "{ parameter veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameterr -> foo }",
             "{\n  parameter\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameterr -> foo\n}\n",
         );
+        // {
+        //   parameter
+        //   veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameter ->
+        //   foo
+        // }
         test(
             "{ parameter veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameter -> foo }",
             "{\n  parameter\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameter ->\n  foo\n}\n",
         );
+        // {
+        //   parameter
+        //   veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameter
+        //   -> foo
+        // }
         test(
             "{ parameter veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameter -> foo }",
             "{\n  parameter\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameter\n  -> foo\n}\n",
         );
+        // { parameter ->
+        //   veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongBody
+        // }
         test(
             "{ parameter -> veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongBody\n}\n",
             "{ parameter ->\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongBody\n}\n",
         );
 
         // Comments
+
         test("{ # abc\n}", "{ # abc\n}\n");
+        // {
+        //   foo # abc
+        // }
         test("{ foo # abc\n}", "{\n  foo # abc\n}\n");
+        // { foo ->
+        //   bar # abc
+        // }
         test("{ foo -> bar # abc\n}", "{ foo ->\n  bar # abc\n}\n");
+        // { foo -> # abc
+        //   bar
+        // }
         test("{ foo -> # abc\n  bar\n}", "{ foo -> # abc\n  bar\n}\n");
+        // {
+        //   foo # abc
+        //   -> bar
+        // }
         test(
             "{ foo# abc\n  ->\n  bar\n}",
             "{\n  foo # abc\n  -> bar\n}\n",
         );
+        // { # abc
+        //   foo ->
+        //   bar
+        // }
         test("{ # abc\n  foo ->\n  bar\n}", "{ # abc\n  foo -> bar\n}\n");
     }
     #[test]
     fn test_assignment() {
         // Simple assignment
+
         test("foo = bar", "foo = bar\n");
         test("foo=bar", "foo = bar\n");
         test("foo = bar", "foo = bar\n");
@@ -1557,35 +1761,52 @@ mod test {
             "foo = veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression",
             "foo = veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression\n",
         );
+        // foo =
+        //   veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression
         test(
             "foo = veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression",
             "foo =\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression\n",
         );
 
         // Function definition
+
         test("foo bar=baz ", "foo bar = baz\n");
         test("foo\n  bar=baz ", "foo bar = baz\n");
         test("foo\n  bar\n  =\n  baz ", "foo bar = baz\n");
+        // foo
+        //   firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument
+        //   secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument
         test(
             "foo firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument = bar",
             "foo\n  firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n  secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument = bar\n",
         );
+        // foo
+        //   firstVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgument =
+        //   bar
         test(
             "foo firstVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgument = bar",
             "foo\n  firstVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgument =\n  bar\n",
         );
+        // foo argument =
+        //   veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression
         test(
             "foo argument = veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression\n",
             "foo argument =\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression\n",
         );
 
         // Comments
+
         test("foo = bar # abc\n", "foo = bar # abc\n");
         test("foo=bar# abc\n", "foo = bar # abc\n");
+        // foo =
+        //   bar # veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongComment
         test(
             "foo = bar # veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongComment\n",
             "foo =\n  bar # veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongComment\n",
         );
+        // foo =
+        //   bar
+        //   # veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongComment
         test(
             "foo = bar # veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongComment\n",
             "foo =\n  bar\n  # veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongComment\n",
