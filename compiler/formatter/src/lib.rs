@@ -12,6 +12,7 @@ use extension_trait::extension_trait;
 use format_collection::{
     apply_trailing_comma_condition, format_collection, TrailingCommaCondition,
 };
+use formatted_cst::{FormattedCst, UnformattedCst};
 use itertools::Itertools;
 use text_edits::TextEdits;
 use traversal::dft_post_rev;
@@ -19,6 +20,7 @@ use width::{Indentation, Width};
 
 mod existing_whitespace;
 mod format_collection;
+mod formatted_cst;
 mod text_edits;
 mod width;
 
@@ -40,7 +42,7 @@ pub impl<C: AsRef<[Cst]>> Formatter for C {
             Offset::default(),
             &FormatterInfo::default(),
         );
-        let trailing = if formatted.child_width == Width::default() {
+        let trailing = if formatted.child_width() == &Width::default() {
             TrailingWhitespace::None
         } else {
             TrailingWhitespace::Indentation(Indentation::default())
@@ -128,7 +130,7 @@ fn format_csts<'a>(
         offset = formatted.whitespace.end_offset();
     }
 
-    FormattedCst::new(width + formatted.child_width, formatted.whitespace)
+    FormattedCst::new(width + formatted.child_width(), formatted.whitespace)
 }
 
 /// The non-trivial cases usually work in three steps, though these are often not clearly separated:
@@ -519,7 +521,7 @@ pub(crate) fn format_cst<'a>(
 
             let (comma_width, mut whitespace) = apply_trailing_comma_condition(
                 edits,
-                &(previous_width + &value.child_width),
+                &(previous_width + value.child_width()),
                 comma.as_deref(),
                 value_end,
                 info,
@@ -555,7 +557,7 @@ pub(crate) fn format_cst<'a>(
                 let key = format_cst(edits, previous_width, key, &info.with_indent());
                 let mut colon = format_cst(
                     edits,
-                    &(previous_width + &key.child_width),
+                    &(previous_width + key.child_width()),
                     colon,
                     &info.with_indent(),
                 );
@@ -579,7 +581,7 @@ pub(crate) fn format_cst<'a>(
                 .unwrap_or_default();
             let (comma_width, mut whitespace) = apply_trailing_comma_condition(
                 edits,
-                &(previous_width_for_value + &value.child_width),
+                &(previous_width_for_value + value.child_width()),
                 comma.as_deref(),
                 value_end,
                 info,
@@ -772,7 +774,7 @@ pub(crate) fn format_cst<'a>(
                                 info.indentation,
                                 &(it.min_width(info.indentation)
                                     + Width::SPACE
-                                    + &arrow.child_width),
+                                    + arrow.child_width()),
                             ) {
                                 TrailingWhitespace::Space
                             } else {
@@ -808,7 +810,7 @@ pub(crate) fn format_cst<'a>(
                 .as_ref()
                 .map(|(parameters_width, arrow)| {
                     (
-                        parameters_width + &arrow.child_width,
+                        parameters_width + arrow.child_width(),
                         arrow.whitespace.has_comments(),
                     )
                 })
@@ -846,7 +848,7 @@ pub(crate) fn format_cst<'a>(
             };
             let width_from_body =
                 body_min_width + space_if_body_not_empty + &closing_curly_brace_width;
-            let body_trailing = if body.child_width.is_empty() {
+            let body_trailing = if body.child_width().is_empty() {
                 TrailingWhitespace::None
             } else if !arrow_has_comments
                 && (&width_until_arrow + &space_if_parameters + &width_from_body)
@@ -1190,111 +1192,6 @@ impl<D> CstHasCommentsAndPrecedence for Cst<D> {
             CstKind::Lambda { .. } => Some(PrecedenceCategory::High),
             CstKind::Assignment { .. } | CstKind::Error { .. } => None,
         }
-    }
-}
-
-struct UnformattedCst<'a> {
-    child: &'a Cst,
-    whitespace: ExistingWhitespace<'a>,
-}
-
-#[must_use]
-pub struct FormattedCst<'a> {
-    /// The minimum width that this CST node could take after formatting.
-    ///
-    /// If there are trailing comments, this is [Width::Multiline]. Otherwise, it's the child's own
-    /// width.
-    child_width: Width,
-    whitespace: ExistingWhitespace<'a>,
-}
-impl<'a> FormattedCst<'a> {
-    pub fn new(child_width: Width, whitespace: ExistingWhitespace<'a>) -> Self {
-        Self {
-            child_width,
-            whitespace,
-        }
-    }
-
-    #[must_use]
-    pub fn min_width(&self, indentation: Indentation) -> Width {
-        if self.whitespace.has_comments() {
-            Width::multiline(indentation.width())
-        } else {
-            self.child_width.clone()
-        }
-    }
-
-    #[must_use]
-    pub fn split(self) -> (Width, ExistingWhitespace<'a>) {
-        (self.child_width, self.whitespace)
-    }
-
-    #[must_use]
-    pub fn into_space_and_move_comments_to(
-        self,
-        edits: &mut TextEdits,
-        other: &mut ExistingWhitespace<'a>,
-    ) -> Width {
-        self.whitespace
-            .into_space_and_move_comments_to(edits, other);
-        self.child_width + Width::SPACE
-    }
-    #[must_use]
-    pub fn into_empty_and_move_comments_to(
-        self,
-        edits: &mut TextEdits,
-        other: &mut ExistingWhitespace<'a>,
-    ) -> Width {
-        self.whitespace
-            .into_empty_and_move_comments_to(edits, other);
-        self.child_width
-    }
-
-    #[must_use]
-    pub fn into_trailing(
-        self,
-        edits: &mut TextEdits,
-        trailing: impl Into<TrailingWhitespace>,
-    ) -> Width {
-        match trailing.into() {
-            TrailingWhitespace::None => self.into_empty_trailing(edits),
-            TrailingWhitespace::Space => self.into_trailing_with_space(edits),
-            TrailingWhitespace::Indentation(indentation) => {
-                self.into_trailing_with_indentation(edits, indentation)
-            }
-        }
-    }
-    #[must_use]
-    pub fn into_empty_trailing(self, edits: &mut TextEdits) -> Width {
-        self.child_width + self.whitespace.into_empty_trailing(edits)
-    }
-    #[must_use]
-    pub fn into_trailing_with_space(self, edits: &mut TextEdits) -> Width {
-        self.child_width + self.whitespace.into_trailing_with_space(edits)
-    }
-    #[must_use]
-    pub fn into_trailing_with_indentation(
-        self,
-        edits: &mut TextEdits,
-        indentation: Indentation,
-    ) -> Width {
-        self.into_trailing_with_indentation_detailed(edits, indentation, TrailingNewlineCount::One)
-    }
-    #[must_use]
-    pub fn into_trailing_with_indentation_detailed(
-        self,
-        edits: &mut TextEdits,
-        indentation: Indentation,
-        trailing_newline_count: TrailingNewlineCount,
-    ) -> Width {
-        &self.child_width
-            + self.whitespace.into_trailing_with_indentation(
-                edits,
-                &self.child_width,
-                indentation,
-                trailing_newline_count,
-                !self.child_width.is_empty(),
-            )
     }
 }
 

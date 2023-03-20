@@ -1,9 +1,10 @@
 use crate::{
     existing_whitespace::{ExistingWhitespace, TrailingWhitespace},
     format_cst,
+    formatted_cst::FormattedCst,
     text_edits::TextEdits,
     width::Width,
-    CstHasCommentsAndPrecedence, FormattedCst, FormatterInfo,
+    CstHasCommentsAndPrecedence, FormatterInfo,
 };
 use candy_frontend::{cst::Cst, position::Offset};
 use itertools::Itertools;
@@ -143,7 +144,7 @@ pub fn apply_trailing_comma_condition<'a>(
     if should_have_comma {
         let whitespace = if let Some(comma) = comma {
             let comma = format_cst(edits, previous_width, comma, info);
-            assert_eq!(comma.child_width, Width::Singleline(1));
+            assert_eq!(comma.child_width(), &Width::Singleline(1));
             comma.whitespace
         } else {
             edits.insert(fallback_offset, ",");
