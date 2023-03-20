@@ -807,21 +807,12 @@ pub(crate) fn format_cst<'a>(
                     )
                 })
                 .unwrap_or_default();
-            let space_if_parameters = if parameters_width_and_arrow.is_some() {
-                Width::SPACE
-            } else {
-                Width::default()
-            };
             let body_min_width = body.min_width(info.indentation);
-            let body_and_space_width = if body_min_width.is_empty() {
-                Width::default()
-            } else {
-                &body_min_width + Width::SPACE
-            };
             let width_until_arrow = opening_curly_brace.min_width(info.indentation)
                 + Width::SPACE
                 + &parameters_and_arrow_min_width;
-            let width_from_body = body_and_space_width + &closing_curly_brace_width;
+
+            // Opening curly brace
             let width_for_first_line = if parameters_and_arrow.is_some() {
                 width_until_arrow.clone()
             } else {
@@ -835,6 +826,20 @@ pub(crate) fn format_cst<'a>(
                 } else {
                     TrailingWhitespace::Indentation(info.indentation.with_indent())
                 };
+
+            // Body
+            let space_if_parameters = if parameters_width_and_arrow.is_some() {
+                Width::SPACE
+            } else {
+                Width::default()
+            };
+            let space_if_body_not_empty = if body_min_width.is_empty() {
+                Width::default()
+            } else {
+                Width::SPACE
+            };
+            let width_from_body =
+                body_min_width + space_if_body_not_empty + &closing_curly_brace_width;
             let body_trailing = if body.child_width.is_empty() {
                 TrailingWhitespace::None
             } else if !arrow_has_comments
@@ -845,9 +850,8 @@ pub(crate) fn format_cst<'a>(
             } else {
                 TrailingWhitespace::Indentation(info.indentation)
             };
-            let opening_curly_brace_width =
-                opening_curly_brace.into_trailing(edits, opening_curly_brace_trailing);
 
+            // Parameters and arrow
             let parameters_and_arrow_width = parameters_width_and_arrow
                 .map(|(parameters_width, arrow)| {
                     let arrow_trailing = if !arrow.whitespace.has_comments()
@@ -864,7 +868,7 @@ pub(crate) fn format_cst<'a>(
                 .unwrap_or_default();
 
             return FormattedCst::new(
-                opening_curly_brace_width
+                opening_curly_brace.into_trailing(edits, opening_curly_brace_trailing)
                     + parameters_and_arrow_width
                     + body.into_trailing(edits, body_trailing)
                     + closing_curly_brace_width,
