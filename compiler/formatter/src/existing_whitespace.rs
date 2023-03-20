@@ -1,4 +1,4 @@
-use crate::{text_edits::TextEdits, width::{Width, StringWidth}, Indentation};
+use crate::{text_edits::TextEdits, width::{Width, StringWidth}, Indentation, FormatterInfo, format_cst};
 use candy_frontend::{
     cst::{Cst, CstError, CstKind},
     position::Offset,
@@ -62,6 +62,12 @@ impl<'a> ExistingWhitespace<'a> {
             .map(|it| it.data.span.end)
             .unwrap_or(self.start_offset)
     }
+    pub fn is_empty(&self) -> bool {
+
+        self.adopted_whitespace_before.is_empty()
+            && self.whitespace.is_empty()
+            && self.adopted_whitespace_after.is_empty()
+    }
     pub fn whitespace_ref(&self) -> &[Cst] {
         self.whitespace.as_ref()
     }
@@ -103,9 +109,7 @@ impl<'a> ExistingWhitespace<'a> {
         edits: &mut TextEdits,
         other: &mut ExistingWhitespace<'a>,
     ) {
-        if self.adopted_whitespace_before.is_empty()
-            && self.whitespace.is_empty()
-            && self.adopted_whitespace_after.is_empty()
+        if self.is_empty()
         {
             return;
         }
@@ -366,7 +370,14 @@ impl<'a> ExistingWhitespace<'a> {
                     }
                 }
                 CstKind::Comment { comment, .. } => {
-                    // TODO: format octothorpe
+                    let (comment_width, comment_whitespace) = format_cst(
+                        edits,
+                        child_width,
+                        item,&FormatterInfo {indentation, trailing_comma_condition: None},
+                    ).split();
+                    assert!(comment_whitespace.is_empty());
+                    _ = comment_whitespace;
+
                     let space = match comment_position {
                         CommentPosition::SameLine => {
                             let (space, space_width) = if ensure_space_before_first_comment {
@@ -374,7 +385,7 @@ impl<'a> ExistingWhitespace<'a> {
                             } else {
                                 (Cow::default(), Width::default())
                             };
-                            if child_width.last_line_fits(indentation, &(space_width + Width::Singleline(1) + comment.width())) {
+                            if child_width.last_line_fits(indentation, &(space_width + comment_width)) {
                                 space
                             } else {
                                 Cow::Owned(format!("{NEWLINE}{indentation}"))
@@ -490,6 +501,7 @@ mod test {
         test("foo # abc\n  End", Indentation(1), "foo # abc\n  ");
         test("foo  # abc\n  End", Indentation(1), "foo # abc\n  ");
         test("foo\n  # abc\n  End", Indentation(1), "foo\n  # abc\n  ");
+        test("foo # abc \n  End", Indentation(1), "foo # abc\n  ");
     }
 
     fn test(source: &str, trailing: impl Into<TrailingWhitespace>, expected: &str) {

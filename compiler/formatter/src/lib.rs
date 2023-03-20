@@ -181,7 +181,10 @@ pub(crate) fn format_cst<'a>(
                 .min_width(info.indentation)
                 .is_singleline());
 
-            formatted_octothorpe.into_empty_trailing(edits) + comment.width()
+            let trimmed_comment = comment.trim_end();
+            edits.change(octothorpe.data.span.end..cst.data.span.end, trimmed_comment);
+
+            formatted_octothorpe.into_empty_trailing(edits) + trimmed_comment.width()
         }
         CstKind::TrailingWhitespace { child, whitespace } => {
             let mut whitespace = ExistingWhitespace::new(child.data.span.end, whitespace);
@@ -1490,6 +1493,7 @@ mod test {
         test("# abc\nfoo", "# abc\nfoo\n");
         test("foo# abc", "foo # abc\n");
         test("foo # abc", "foo # abc\n");
+        test("foo # abc ", "foo # abc\n");
         test("foo\n# abc", "foo\n# abc\n");
         test("foo\n # abc", "foo\n# abc\n");
     }
