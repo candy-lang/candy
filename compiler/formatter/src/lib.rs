@@ -1403,6 +1403,10 @@ mod test {
         test("(foo # abc\n)", "foo # abc\n");
         test("(# abc\n  foo)", "( # abc\n  foo\n)\n");
         test("(((# abc\n  foo)))", "( # abc\n  foo\n)\n");
+        test(
+            "(# abc\n  (# def\n    foo))",
+            "( # abc\n  # def\n  foo\n)\n",
+        );
     }
     #[test]
     fn test_call() {

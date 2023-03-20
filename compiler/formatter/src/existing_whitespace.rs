@@ -307,7 +307,11 @@ impl<'a> ExistingWhitespace<'a> {
         indentation: Indentation,
         ensure_space_before_first_comment: bool,
     ) {
-        let mut is_comment_on_same_line = true;
+        enum CommentPosition {
+            SameLine,
+            NextLine { is_newline_adopted: bool },
+        }
+        let mut comment_position = CommentPosition::SameLine;
         let mut last_reusable_whitespace_range = None;
         for (item, offset_override) in comments_and_whitespace {
             let is_adopted = offset_override.is_some();
@@ -325,39 +329,71 @@ impl<'a> ExistingWhitespace<'a> {
                     }
                 }
                 CstKind::Newline(_) => {
-                    if is_comment_on_same_line {
-                        if let Some(range) = last_reusable_whitespace_range {
-                            // Delete trailing spaces in the previous line.
-                            edits.delete(range);
-                            last_reusable_whitespace_range = None;
-                        }
+                    match comment_position {
+                        CommentPosition::SameLine => {
+                            if let Some(range) = last_reusable_whitespace_range {
+                                // Delete trailing spaces in the previous line.
+                                edits.delete(range);
+                                last_reusable_whitespace_range = None;
+                            }
+                            
+                            comment_position = CommentPosition::NextLine { is_newline_adopted: is_adopted };
+                            if !is_adopted {
+                                edits.change(item.data.span.to_owned(), NEWLINE);
+                            }
+                        },
+                        CommentPosition::NextLine { is_newline_adopted } => {
+                            if is_adopted {
+                                // We already encountered a newline (owned or adopted) and the new
+                                // one is adopted. Hence, we can't reuse it and there's nothing to
+                                // do for us.
+                            } else if is_newline_adopted {
+                                // The old newline was adopted, but we now have one to reuse.
+                                if let Some(range) = last_reusable_whitespace_range {
+                                    // Delete old reusable whitespace since the new one has to come
+                                    // after this newline.
+                                    edits.delete(range);
+                                    last_reusable_whitespace_range = None;
+                                }
 
-                        is_comment_on_same_line = false;
-                        edits.change(item.data.span.to_owned(), NEWLINE);
-                    } else {
-                        // We already encountered and kept a newline, so we can delete this one.
-                        edits.delete(item.data.span.to_owned());
+                                comment_position = CommentPosition::NextLine { is_newline_adopted: false };
+                            } else {
+                                // We already encountered and kept a newline, so we can delete this
+                                // one.
+                                edits.delete(item.data.span.to_owned());
+                            }
+                        },
                     }
                 }
                 CstKind::Comment { comment, .. } => {
                     // TODO: format octothorpe
-                    let space = if is_comment_on_same_line {
-                        let space_width = if ensure_space_before_first_comment {
-                            Width::SPACE
-                        } else {
-                            Width::default()
-                        };
-                        if child_width.last_line_fits(indentation, &(space_width + Width::Singleline(1) + comment.width())) {
-                            if ensure_space_before_first_comment {
-                                Cow::Borrowed(SPACE)
+                    let space = match comment_position {
+                        CommentPosition::SameLine => {
+                            let (space, space_width) = if ensure_space_before_first_comment {
+                                (Cow::Borrowed(SPACE), Width::SPACE)
                             } else {
-                                Cow::default()
+                                (Cow::default(), Width::default())
+                            };
+                            if child_width.last_line_fits(indentation, &(space_width + Width::Singleline(1) + comment.width())) {
+                                space
+                            } else {
+                                Cow::Owned(format!("{NEWLINE}{indentation}"))
                             }
-                        } else {
-                            Cow::Owned(format!("{}{}", NEWLINE, indentation))
+                        },
+                        CommentPosition::NextLine { is_newline_adopted } => {
+                            if is_newline_adopted {
+                                edits.insert(
+                                    last_reusable_whitespace_range
+                                        .as_ref()
+                                        .map(|it| it.start)
+                                        .or(*offset_override)
+                                        .unwrap_or(item.data.span.start),
+                                    NEWLINE,
+                                );
+                            }
+
+                            Cow::Owned(indentation.to_string())
                         }
-                    } else {
-                        Cow::Owned(indentation.to_string())
                     };
                     if let Some(range) = last_reusable_whitespace_range {
                         edits.change(range, space);
@@ -369,7 +405,7 @@ impl<'a> ExistingWhitespace<'a> {
                         edits.insert(*offset_override, format!("#{comment}"));
                     }
 
-                    is_comment_on_same_line = false;
+                    comment_position = CommentPosition::SameLine;
                     last_reusable_whitespace_range = None;
                     // TODO: Handle multiple comments on the same line.
                 }
