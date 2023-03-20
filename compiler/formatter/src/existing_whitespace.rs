@@ -7,13 +7,6 @@ use derive_more::From;
 use itertools::Itertools;
 use std::borrow::Cow;
 
-#[derive(Clone, Debug)]
-pub struct ExistingWhitespace<'a> {
-    start_offset: Offset,
-    adopted_whitespace_before: Cow<'a, [Cst]>,
-    whitespace: Cow<'a, [Cst]>,
-    adopted_whitespace_after: Cow<'a, [Cst]>,
-}
 #[derive(Clone, Debug, From)]
 pub enum TrailingWhitespace {
     None,
@@ -29,6 +22,28 @@ pub enum TrailingNewlineCount {
 pub const SPACE: &str = " ";
 pub const NEWLINE: &str = "\n";
 
+/// Captures the existing trailing whitespace of CST nodes for later formatting.
+///
+/// The CST node ends at [start_offset], which is also where [whitespace] begins.
+///
+/// The three whitespace fields can contain singleline whitespace, linebreaks, and comments.
+///
+/// This struct also supports adoption: Whitespace can be “cut” from one place and “pasted” to
+/// another. There are two use-cases for this:
+///
+/// - Move comments from an inner CST node to the parent CST node, where the actual whitespace stays
+///   in the same place. E.g., the comma of a list item could contain trailing whitespace, which is
+///   moved up and merged with potential trailing whitespace around the list item as a whole.
+/// - Move comments to the other side of punctuation. E.g., a list item containing a comment between
+///   value and comma (forcing the comma to be on a separate line) would move the trailing
+///   whitespace of the value into trailing whitespace around the list item as a whole.
+#[derive(Clone, Debug)]
+pub struct ExistingWhitespace<'a> {
+    start_offset: Offset,
+    adopted_whitespace_before: Cow<'a, [Cst]>,
+    whitespace: Cow<'a, [Cst]>,
+    adopted_whitespace_after: Cow<'a, [Cst]>,
+}
 impl<'a> ExistingWhitespace<'a> {
     pub fn empty(start_offset: Offset) -> Self {
         Self {
@@ -63,7 +78,6 @@ impl<'a> ExistingWhitespace<'a> {
             .unwrap_or(self.start_offset)
     }
     pub fn is_empty(&self) -> bool {
-
         self.adopted_whitespace_before.is_empty()
             && self.whitespace.is_empty()
             && self.adopted_whitespace_after.is_empty()
