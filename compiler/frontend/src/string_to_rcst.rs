@@ -637,6 +637,10 @@ mod parse {
                 ],
             ),
         );
+        assert_eq!(
+            whitespaces_and_newlines(" # abc\n", 1, true),
+            ("\n", vec![build_space(), build_comment(" abc")]),
+        );
     }
 
     #[instrument(level = "trace")]
@@ -2859,7 +2863,14 @@ mod parse {
     fn test_body() {
         assert_eq!(
             body("foo # comment", 0),
-            ("", vec![build_identifier("foo"), build_space(), build_comment(" comment")]),
+            (
+                "",
+                vec![
+                    build_identifier("foo"),
+                    build_space(),
+                    build_comment(" comment")
+                ]
+            ),
         );
     }
 
@@ -2943,7 +2954,7 @@ mod parse {
             opening_curly_brace = opening_curly_brace.wrap_in_whitespace(whitespace);
         }
 
-        let (input, mut body, whitespace_before_closing_curly_brace, closing_curly_brace) = {
+        let (input, mut body, mut whitespace_before_closing_curly_brace, closing_curly_brace) = {
             let input_before_parsing_expression = i;
             let (i, body_expression) = match expression(i, indentation + 1, true, true, true) {
                 Some((i, expression)) => (i, vec![expression]),
@@ -2979,8 +2990,7 @@ mod parse {
 
         // Attach the `whitespace_before_closing_curly_brace`.
         if !body.is_empty() {
-            let last = body.pop().unwrap();
-            body.push(last.wrap_in_whitespace(whitespace_before_closing_curly_brace));
+            body.append(&mut whitespace_before_closing_curly_brace);
         } else if let Some((parameters, arrow)) = parameters_and_arrow {
             parameters_and_arrow = Some((
                 parameters,
@@ -3107,6 +3117,26 @@ mod parse {
                     closing_curly_brace: Box::new(CstKind::ClosingCurlyBrace.into())
                 }
                 .into(),
+            )),
+        );
+        // { foo # abc
+        // }
+        assert_eq!(
+            lambda("{ foo # abc\n}", 0),
+            Some((
+                "",
+                CstKind::Lambda {
+                    opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.with_trailing_space()),
+                    parameters_and_arrow: None,
+                    body: vec![
+                        build_identifier("foo"),
+                        build_space(),
+                        build_comment(" abc"),
+                        build_newline(),
+                    ],
+                    closing_curly_brace: Box::new(CstKind::ClosingCurlyBrace.into())
+                }
+                .into()
             )),
         );
     }
