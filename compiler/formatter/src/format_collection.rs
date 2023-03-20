@@ -1,10 +1,9 @@
 use crate::{
     existing_whitespace::{ExistingWhitespace, TrailingWhitespace},
-    format_cst,
+    format::{format_cst, CstHasCommentsAndPrecedence, FormatterInfo},
     formatted_cst::FormattedCst,
     text_edits::TextEdits,
     width::Width,
-    CstHasCommentsAndPrecedence, FormatterInfo,
 };
 use candy_frontend::{cst::Cst, position::Offset};
 use itertools::Itertools;

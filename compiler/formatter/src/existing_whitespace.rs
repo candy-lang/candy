@@ -1,4 +1,4 @@
-use crate::{text_edits::TextEdits, width::{Width, StringWidth}, Indentation, FormatterInfo, format_cst};
+use crate::{text_edits::TextEdits, width::{Width, StringWidth}, Indentation, format::{format_cst, FormatterInfo}};
 use candy_frontend::{
     cst::{Cst, CstError, CstKind},
     position::Offset,
@@ -373,7 +373,11 @@ impl<'a> ExistingWhitespace<'a> {
                     let (comment_width, comment_whitespace) = format_cst(
                         edits,
                         child_width,
-                        item,&FormatterInfo {indentation, trailing_comma_condition: None},
+                        item,
+                        &FormatterInfo {
+                            indentation,
+                            trailing_comma_condition: None,
+                        },
                     ).split();
                     assert!(comment_whitespace.is_empty());
                     _ = comment_whitespace;
@@ -474,7 +478,7 @@ where
 #[cfg(test)]
 mod test {
     use super::TrailingWhitespace;
-    use crate::{format_cst, text_edits::TextEdits, width::{Indentation, Width}, FormatterInfo, existing_whitespace::TrailingNewlineCount};
+    use crate::{text_edits::TextEdits, width::{Indentation, Width}, existing_whitespace::TrailingNewlineCount, format::{format_cst, FormatterInfo}};
     use candy_frontend::{cst::CstKind, rcst_to_cst::RcstsToCstsExt, string_to_rcst::parse_rcst};
 
     #[test]
