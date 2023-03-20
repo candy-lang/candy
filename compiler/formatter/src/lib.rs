@@ -145,6 +145,10 @@ fn format_csts<'a>(
 ///
 /// See the case of [CstKind::StructAccess] for a simple example and [CstKind::Lambda] for the
 /// opposite.
+///
+/// [previous_width] is relevant for the minimum width that is reserved on the first line: E.g.,
+/// when formatting the call within `foo | bar baz`, [previous_width] would indicate that a width of
+/// two is reserved in the first line (for the bar and the space that follows it).
 pub(crate) fn format_cst<'a>(
     edits: &mut TextEdits,
     previous_width: &Width,
