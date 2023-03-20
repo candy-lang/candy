@@ -761,11 +761,12 @@ pub(crate) fn format_cst<'a>(
 
                     let last_parameter_width = last_parameter
                         .map(|it| {
+                            // The arrow's comment can flow to the next line.
                             let trailing = if parameters_width.last_line_fits(
                                 info.indentation,
                                 &(it.min_width(info.indentation)
                                     + Width::SPACE
-                                    + arrow.min_width(info.indentation)),
+                                    + &arrow.child_width),
                             ) {
                                 TrailingWhitespace::Space
                             } else {
@@ -797,10 +798,13 @@ pub(crate) fn format_cst<'a>(
             )
             .split();
 
-            let parameters_and_arrow_min_width = parameters_width_and_arrow
+            let (parameters_and_arrow_min_width, arrow_has_comments) = parameters_width_and_arrow
                 .as_ref()
                 .map(|(parameters_width, arrow)| {
-                    parameters_width + arrow.min_width(info.indentation)
+                    (
+                        parameters_width + &arrow.child_width,
+                        arrow.whitespace.has_comments(),
+                    )
                 })
                 .unwrap_or_default();
             let space_if_parameters = if parameters_width_and_arrow.is_some() {
@@ -818,48 +822,50 @@ pub(crate) fn format_cst<'a>(
                 + Width::SPACE
                 + &parameters_and_arrow_min_width;
             let width_from_body = body_and_space_width + &closing_curly_brace_width;
-            let opening_curly_brace_trailing = if parameters_and_arrow.is_some()
-                && width_until_arrow.fits(info.indentation)
-                || parameters_and_arrow.is_none()
-                    && (&width_until_arrow
-                        + &body_min_width
-                        + Width::SPACE
-                        + &closing_curly_brace_width)
-                        .fits(info.indentation)
-            {
-                TrailingWhitespace::Space
-            } else if body_min_width.is_empty() {
-                TrailingWhitespace::Indentation(info.indentation)
+            let width_for_first_line = if parameters_and_arrow.is_some() {
+                width_until_arrow.clone()
             } else {
-                TrailingWhitespace::Indentation(info.indentation.with_indent())
+                &width_until_arrow + &body_min_width + Width::SPACE + &closing_curly_brace_width
             };
+            let opening_curly_brace_trailing =
+                if previous_width.last_line_fits(info.indentation, &width_for_first_line) {
+                    TrailingWhitespace::Space
+                } else if body_min_width.is_empty() {
+                    TrailingWhitespace::Indentation(info.indentation)
+                } else {
+                    TrailingWhitespace::Indentation(info.indentation.with_indent())
+                };
             let body_trailing = if body.child_width.is_empty() {
                 TrailingWhitespace::None
-            } else if (&width_until_arrow + &space_if_parameters + &width_from_body)
-                .fits(info.indentation)
+            } else if !arrow_has_comments
+                && (&width_until_arrow + &space_if_parameters + &width_from_body)
+                    .fits(info.indentation)
             {
                 TrailingWhitespace::Space
             } else {
                 TrailingWhitespace::Indentation(info.indentation)
             };
-            // TODO
             let opening_curly_brace_width =
                 opening_curly_brace.into_trailing(edits, opening_curly_brace_trailing);
-            let arrow_trailing = if width_until_arrow
-                .last_line_fits(info.indentation, &(space_if_parameters + width_from_body))
-            {
-                TrailingWhitespace::Space
-            } else {
-                TrailingWhitespace::Indentation(info.indentation.with_indent())
-            };
+
+            let parameters_and_arrow_width = parameters_width_and_arrow
+                .map(|(parameters_width, arrow)| {
+                    let arrow_trailing = if !arrow.whitespace.has_comments()
+                        && width_until_arrow.last_line_fits(
+                            info.indentation,
+                            &(space_if_parameters + width_from_body),
+                        ) {
+                        TrailingWhitespace::Space
+                    } else {
+                        TrailingWhitespace::Indentation(info.indentation.with_indent())
+                    };
+                    parameters_width + arrow.into_trailing(edits, arrow_trailing)
+                })
+                .unwrap_or_default();
 
             return FormattedCst::new(
                 opening_curly_brace_width
-                    + parameters_width_and_arrow
-                        .map(|(parameters_width, arrow)| {
-                            parameters_width + arrow.into_trailing(edits, arrow_trailing)
-                        })
-                        .unwrap_or_default()
+                    + parameters_and_arrow_width
                     + body.into_trailing(edits, body_trailing)
                     + closing_curly_brace_width,
                 whitespace,
@@ -1744,7 +1750,7 @@ mod test {
         test("{ foo -> bar }", "{ foo -> bar }\n");
         test(
             "{ parameter veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameter -> foo }",
-            "{\n  parameter veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameter ->\n  foo\n}\n",
+            "{ parameter veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameter ->\n  foo\n}\n",
         );
         test(
             "{ parameter veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongParameterr -> foo }",
@@ -1772,10 +1778,7 @@ mod test {
             "{ foo# abc\n  ->\n  bar\n}",
             "{\n  foo # abc\n  -> bar\n}\n",
         );
-        test(
-            "{ # abc\n  foo ->\n  bar\n}",
-            "{\n  # abc\n  foo -> bar\n}\n",
-        );
+        test("{ # abc\n  foo ->\n  bar\n}", "{ # abc\n  foo -> bar\n}\n");
     }
     #[test]
     fn test_assignment() {
