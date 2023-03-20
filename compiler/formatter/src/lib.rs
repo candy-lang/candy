@@ -5,7 +5,7 @@
 use candy_frontend::{cst::Cst, position::Offset};
 use existing_whitespace::TrailingWhitespace;
 use extension_trait::extension_trait;
-use format::{format_csts, FormatterInfo};
+use format::{format_csts, FormattingInfo};
 use itertools::Itertools;
 use text_edits::TextEdits;
 use width::{Indentation, Width};
@@ -33,7 +33,7 @@ pub impl<C: AsRef<[Cst]>> Formatter for C {
             &Width::default(),
             csts,
             Offset::default(),
-            &FormatterInfo::default(),
+            &FormattingInfo::default(),
         );
         let trailing = if formatted.child_width() == &Width::default() {
             TrailingWhitespace::None

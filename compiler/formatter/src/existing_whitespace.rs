@@ -1,4 +1,4 @@
-use crate::{text_edits::TextEdits, width::{Width, StringWidth}, Indentation, format::{format_cst, FormatterInfo}};
+use crate::{text_edits::TextEdits, width::{Width, StringWidth}, Indentation, format::{format_cst, FormattingInfo}};
 use candy_frontend::{
     cst::{Cst, CstError, CstKind},
     position::Offset,
@@ -374,7 +374,7 @@ impl<'a> ExistingWhitespace<'a> {
                         edits,
                         child_width,
                         item,
-                        &FormatterInfo {
+                        &FormattingInfo {
                             indentation,
                             trailing_comma_condition: None,
                         },
@@ -478,7 +478,7 @@ where
 #[cfg(test)]
 mod test {
     use super::TrailingWhitespace;
-    use crate::{text_edits::TextEdits, width::{Indentation, Width}, existing_whitespace::TrailingNewlineCount, format::{format_cst, FormatterInfo}};
+    use crate::{text_edits::TextEdits, width::{Indentation, Width}, existing_whitespace::TrailingNewlineCount, format::{format_cst, FormattingInfo}};
     use candy_frontend::{cst::CstKind, rcst_to_cst::RcstsToCstsExt, string_to_rcst::parse_rcst};
 
     #[test]
@@ -519,7 +519,7 @@ mod test {
         let reduced_source = cst.to_string();
 
         let mut edits = TextEdits::new(reduced_source);
-        let (child_width, whitespace) = format_cst(&mut edits, &Width::default(), &cst, &FormatterInfo::default()).split();
+        let (child_width, whitespace) = format_cst(&mut edits, &Width::default(), &cst, &FormattingInfo::default()).split();
          _ = match trailing.into() {
             TrailingWhitespace::None => whitespace.into_empty_trailing(&mut edits),
             TrailingWhitespace::Space => whitespace.into_trailing_with_space(&mut edits),

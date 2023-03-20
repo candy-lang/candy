@@ -16,11 +16,11 @@ use itertools::Itertools;
 use traversal::dft_post_rev;
 
 #[derive(Clone, Default)]
-pub struct FormatterInfo {
+pub struct FormattingInfo {
     pub indentation: Indentation,
     pub trailing_comma_condition: Option<TrailingCommaCondition>,
 }
-impl FormatterInfo {
+impl FormattingInfo {
     pub fn with_indent(&self) -> Self {
         Self {
             indentation: self.indentation.with_indent(),
@@ -41,7 +41,7 @@ pub fn format_csts<'a>(
     previous_width: &Width,
     mut csts: &'a [Cst],
     fallback_offset: Offset,
-    info: &FormatterInfo,
+    info: &FormattingInfo,
 ) -> FormattedCst<'a> {
     let mut offset = fallback_offset;
     let mut width = Width::default();
@@ -115,7 +115,7 @@ pub(crate) fn format_cst<'a>(
     edits: &mut TextEdits,
     previous_width: &Width,
     cst: &'a Cst,
-    info: &FormatterInfo,
+    info: &FormattingInfo,
 ) -> FormattedCst<'a> {
     let width = match &cst.kind {
         CstKind::EqualsSign | CstKind::Comma | CstKind::Dot | CstKind::Colon => {
@@ -911,7 +911,7 @@ impl<'a> Argument<'a> {
         edits: &mut TextEdits,
         previous_width: &Width,
         cst: &'a Cst,
-        info: &FormatterInfo,
+        info: &FormattingInfo,
     ) -> Self {
         let (argument, parentheses) = split_parenthesized(edits, cst);
         let argument_start_offset = argument.data.span.start;
@@ -945,7 +945,7 @@ impl<'a> Argument<'a> {
         self,
         edits: &mut TextEdits,
         previous_width: &Width,
-        info: &FormatterInfo,
+        info: &FormattingInfo,
         is_singleline: bool,
     ) -> FormattedCst<'a> {
         if let Some((

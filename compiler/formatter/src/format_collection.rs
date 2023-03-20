@@ -1,6 +1,6 @@
 use crate::{
     existing_whitespace::{ExistingWhitespace, TrailingWhitespace},
-    format::{format_cst, CstHasCommentsAndPrecedence, FormatterInfo},
+    format::{format_cst, CstHasCommentsAndPrecedence, FormattingInfo},
     formatted_cst::FormattedCst,
     text_edits::TextEdits,
     width::Width,
@@ -15,7 +15,7 @@ pub fn format_collection<'a>(
     items: &[Cst],
     closing_punctuation: &'a Cst,
     is_comma_required_for_single_item: bool,
-    info: &FormatterInfo,
+    info: &FormattingInfo,
 ) -> FormattedCst<'a> {
     let opening_punctuation = format_cst(edits, previous_width, opening_punctuation, info);
     let closing_punctuation = format_cst(
@@ -130,7 +130,7 @@ pub fn apply_trailing_comma_condition<'a>(
     previous_width: &Width,
     comma: Option<&'a Cst>,
     fallback_offset: Offset,
-    info: &FormatterInfo,
+    info: &FormattingInfo,
     min_width_except_comma: Width,
 ) -> (Width, ExistingWhitespace<'a>) {
     let should_have_comma = match info.trailing_comma_condition {
