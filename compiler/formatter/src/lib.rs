@@ -243,9 +243,7 @@ pub(crate) fn format_cst<'a>(
             let right_needs_parentheses = match right.precedence() {
                 Some(PrecedenceCategory::High) => right_parentheses
                     .as_ref()
-                    .map(|((_, opening_parenthesis_whitespace), _)| {
-                        opening_parenthesis_whitespace.has_comments()
-                    })
+                    .map(|(opening_parenthesis, _)| opening_parenthesis.whitespace.has_comments())
                     .unwrap_or_default(),
                 Some(PrecedenceCategory::Low) | None => right_parentheses.is_some(),
             };
@@ -257,8 +255,14 @@ pub(crate) fn format_cst<'a>(
             let right = format_cst(edits, right, &right_info);
 
             let (right_width, whitespace) = if let Some((
-                (opening_parenthesis, opening_parenthesis_whitespace),
-                (closing_parenthesis, closing_parenthesis_whitespace),
+                UnformattedCst {
+                    child: opening_parenthesis,
+                    whitespace: opening_parenthesis_whitespace,
+                },
+                UnformattedCst {
+                    child: closing_parenthesis,
+                    whitespace: closing_parenthesis_whitespace,
+                },
             )) = right_parentheses
             {
                 if right_needs_parentheses {
@@ -329,8 +333,14 @@ pub(crate) fn format_cst<'a>(
             // remove them here.
             let (child, parentheses) = split_parenthesized(edits, cst);
             let (
-                (opening_parenthesis, opening_parenthesis_whitespace),
-                (closing_parenthesis, mut whitespace),
+                UnformattedCst {
+                    child: opening_parenthesis,
+                    whitespace: opening_parenthesis_whitespace,
+                },
+                UnformattedCst {
+                    child: closing_parenthesis,
+                    mut whitespace,
+                },
             ) = parentheses.unwrap();
 
             if !opening_parenthesis_whitespace.has_comments() {
@@ -787,7 +797,7 @@ impl<'a> Argument<'a> {
         let argument_start_offset = argument.data.span.start;
         let precedence = argument.precedence();
 
-        let (argument, min_singleline_width) = if let Some(((_, opening_parenthesis_whitespace), _)) = &parentheses && opening_parenthesis_whitespace.has_comments() {
+        let (argument, min_singleline_width) = if let Some((opening_parenthesis, _)) = &parentheses && opening_parenthesis.whitespace.has_comments() {
             let argument = format_cst(edits, argument, &info.with_indent().with_indent());
             (argument, Width::multiline())
         } else {
@@ -819,8 +829,14 @@ impl<'a> Argument<'a> {
         is_singleline: bool,
     ) -> FormattedCst<'a> {
         if let Some((
-            (opening_parenthesis, opening_parenthesis_whitespace),
-            (closing_parenthesis, mut whitespace),
+            UnformattedCst {
+                child: opening_parenthesis,
+                whitespace: opening_parenthesis_whitespace,
+            },
+            UnformattedCst {
+                child: closing_parenthesis,
+                mut whitespace,
+            },
         )) = self.parentheses
         {
             // We already have parentheses …
@@ -997,8 +1013,6 @@ fn format_collection<'a>(
     )
 }
 
-type UnformattedCst<'a> = (&'a Cst, ExistingWhitespace<'a>);
-
 /// Reduces multiple pairs of parentheses around the inner expression to at most one pair that keeps
 /// all comments.
 fn split_parenthesized<'a>(
@@ -1014,46 +1028,33 @@ fn split_parenthesized<'a>(
     {
         cst = inner;
 
-        let (new_opening_parenthesis, new_opening_parenthesis_whitespace) =
-            split_whitespace(opening_parenthesis);
-        let (new_closing_parenthesis, new_closing_parenthesis_whitespace) =
-            split_whitespace(closing_parenthesis);
-        let new_parentheses = if let Some((
-            (old_opening_parenthesis, mut old_opening_parenthesis_whitespace),
-            (old_closing_parenthesis, mut old_closing_parenthesis_whitespace),
-        )) = parentheses
+        let new_opening_parenthesis = split_whitespace(opening_parenthesis);
+        let new_closing_parenthesis = split_whitespace(closing_parenthesis);
+        let new_parentheses = if let Some((old_opening_parenthesis, old_closing_parenthesis)) =
+            parentheses
         {
-            // TODO: helper function
-            let opening = if old_opening_parenthesis_whitespace.has_comments() {
-                edits.delete(new_opening_parenthesis.data.span.to_owned());
-                new_opening_parenthesis_whitespace.into_empty_and_move_comments_to(
-                    edits,
-                    &mut old_opening_parenthesis_whitespace,
-                );
-                (old_opening_parenthesis, old_opening_parenthesis_whitespace)
-            } else {
-                edits.delete(old_opening_parenthesis.data.span.to_owned());
-                old_opening_parenthesis_whitespace.into_empty_trailing(edits);
-                (new_opening_parenthesis, new_opening_parenthesis_whitespace)
-            };
-            let closing = if old_closing_parenthesis_whitespace.has_comments() {
-                edits.delete(new_closing_parenthesis.data.span.to_owned());
-                new_closing_parenthesis_whitespace.into_empty_and_move_comments_to(
-                    edits,
-                    &mut old_closing_parenthesis_whitespace,
-                );
-                (old_closing_parenthesis, old_closing_parenthesis_whitespace)
-            } else {
-                edits.delete(old_closing_parenthesis.data.span.to_owned());
-                old_closing_parenthesis_whitespace.into_empty_trailing(edits);
-                (new_closing_parenthesis, new_closing_parenthesis_whitespace)
-            };
+            fn merge<'a>(
+                edits: &mut TextEdits,
+                mut old_parenthesis: UnformattedCst<'a>,
+                new_parenthesis: UnformattedCst<'a>,
+            ) -> UnformattedCst<'a> {
+                if old_parenthesis.whitespace.has_comments() {
+                    edits.delete(new_parenthesis.child.data.span.to_owned());
+                    new_parenthesis
+                        .whitespace
+                        .into_empty_and_move_comments_to(edits, &mut old_parenthesis.whitespace);
+                    old_parenthesis
+                } else {
+                    edits.delete(old_parenthesis.child.data.span.to_owned());
+                    old_parenthesis.whitespace.into_empty_trailing(edits);
+                    new_parenthesis
+                }
+            }
+            let opening = merge(edits, old_opening_parenthesis, new_opening_parenthesis);
+            let closing = merge(edits, old_closing_parenthesis, new_closing_parenthesis);
             (opening, closing)
         } else {
-            (
-                (new_opening_parenthesis, new_opening_parenthesis_whitespace),
-                (new_closing_parenthesis, new_closing_parenthesis_whitespace),
-            )
+            (new_opening_parenthesis, new_closing_parenthesis)
         };
         parentheses = Some(new_parentheses);
     }
@@ -1100,18 +1101,24 @@ fn apply_trailing_comma_condition<'a>(
     }
 }
 
-fn split_whitespace(cst: &Cst) -> (&Cst, ExistingWhitespace) {
+fn split_whitespace(cst: &Cst) -> UnformattedCst {
     if let CstKind::TrailingWhitespace {
         box child,
         whitespace,
     } = &cst.kind
     {
         let mut whitespace = ExistingWhitespace::new(child.data.span.end, whitespace);
-        let (child, child_whitespace) = split_whitespace(child);
+        let UnformattedCst {
+            child,
+            whitespace: child_whitespace,
+        } = split_whitespace(child);
         child_whitespace.move_to_outer(&mut whitespace);
-        (child, whitespace)
+        UnformattedCst { child, whitespace }
     } else {
-        (cst, ExistingWhitespace::empty(cst.data.span.end))
+        UnformattedCst {
+            child: cst,
+            whitespace: ExistingWhitespace::empty(cst.data.span.end),
+        }
     }
 }
 
@@ -1177,6 +1184,11 @@ impl<D> CstHasCommentsAndPrecedence for Cst<D> {
             CstKind::Assignment { .. } | CstKind::Error { .. } => None,
         }
     }
+}
+
+struct UnformattedCst<'a> {
+    child: &'a Cst,
+    whitespace: ExistingWhitespace<'a>,
 }
 
 #[must_use]
