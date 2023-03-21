@@ -520,22 +520,25 @@ mod parse {
 
         let mut new_input = input;
         let mut new_parts = vec![];
+        let mut is_sufficiently_indented = true;
         loop {
             let new_input_from_iteration_start = new_input;
 
-            if also_comments {
-                if let Some((new_new_input, whitespace)) = comment(new_input) {
-                    new_input = new_new_input;
-                    new_parts.push(whitespace);
+            if also_comments
+                && is_sufficiently_indented
+                && let Some((new_new_input, whitespace)) = comment(new_input)
+            {
+                new_input = new_new_input;
+                new_parts.push(whitespace);
 
-                    input = new_input;
-                    parts.append(&mut new_parts);
-                }
+                input = new_input;
+                parts.append(&mut new_parts);
             }
 
             if let Some((new_new_input, newline)) = newline(new_input) {
                 new_input = new_new_input;
                 new_parts.push(newline);
+                is_sufficiently_indented = false;
             }
 
             if let Some((new_new_input, whitespace)) = leading_indentation(new_input, indentation) {
@@ -544,6 +547,7 @@ mod parse {
 
                 input = new_input;
                 parts.append(&mut new_parts);
+                is_sufficiently_indented = true;
             } else if let Some((new_new_input, whitespace)) = single_line_whitespace(new_input) {
                 new_input = new_new_input;
                 new_parts.push(whitespace);
@@ -637,6 +641,10 @@ mod parse {
         assert_eq!(
             whitespaces_and_newlines(" # abc\n", 1, true),
             ("\n", vec![build_space(), build_comment(" abc")]),
+        );
+        assert_eq!(
+            whitespaces_and_newlines("\n# abc\n", 1, true),
+            ("\n# abc\n", vec![]),
         );
     }
 
