@@ -1083,45 +1083,70 @@ fn split_parenthesized<'a>(
     edits: &mut TextEdits,
     mut cst: &'a Cst,
 ) -> (&'a Cst, Option<(UnformattedCst<'a>, UnformattedCst<'a>)>) {
+    let mut next_cst = cst;
+    let mut trailing_whitespace = vec![];
     let mut parentheses: Option<(UnformattedCst, UnformattedCst)> = None;
-    // TODO: Also handle [CstKind::TrailingWhitespace] if it contains another [CstKind::Parenthesized]
-    while let CstKind::Parenthesized {
-        box opening_parenthesis,
-        inner,
-        box closing_parenthesis,
-    } = &cst.kind
-    {
-        cst = inner;
-
-        let new_opening_parenthesis = split_whitespace(opening_parenthesis);
-        let new_closing_parenthesis = split_whitespace(closing_parenthesis);
-        let new_parentheses = if let Some((old_opening_parenthesis, old_closing_parenthesis)) =
-            parentheses
-        {
-            fn merge<'a>(
-                edits: &mut TextEdits,
-                mut old_parenthesis: UnformattedCst<'a>,
-                new_parenthesis: UnformattedCst<'a>,
-            ) -> UnformattedCst<'a> {
-                if old_parenthesis.whitespace.has_comments() {
-                    edits.delete(new_parenthesis.child.data.span.to_owned());
-                    new_parenthesis
-                        .whitespace
-                        .into_empty_and_move_comments_to(edits, &mut old_parenthesis.whitespace);
-                    old_parenthesis
-                } else {
-                    edits.delete(old_parenthesis.child.data.span.to_owned());
-                    old_parenthesis.whitespace.into_empty_trailing(edits);
-                    new_parenthesis
-                }
+    loop {
+        match &next_cst.kind {
+            CstKind::TrailingWhitespace { child, whitespace } => {
+                next_cst = child;
+                trailing_whitespace.push(ExistingWhitespace::new(child.data.span.end, whitespace));
             }
-            let opening = merge(edits, old_opening_parenthesis, new_opening_parenthesis);
-            let closing = merge(edits, old_closing_parenthesis, new_closing_parenthesis);
-            (opening, closing)
-        } else {
-            (new_opening_parenthesis, new_closing_parenthesis)
-        };
-        parentheses = Some(new_parentheses);
+            CstKind::Parenthesized {
+                box opening_parenthesis,
+                inner,
+                box closing_parenthesis,
+            } => {
+                next_cst = inner;
+                cst = inner;
+
+                let new_opening_parenthesis = split_whitespace(opening_parenthesis);
+                let new_closing_parenthesis = {
+                    let UnformattedCst { child, whitespace } =
+                        split_whitespace(closing_parenthesis);
+                    trailing_whitespace.push(whitespace);
+
+                    let mut whitespace = trailing_whitespace.remove(0);
+                    for trailing_whitespace in trailing_whitespace.drain(..) {
+                        trailing_whitespace.into_empty_and_move_comments_to(edits, &mut whitespace);
+                    }
+                    UnformattedCst { child, whitespace }
+                };
+
+                let new_parentheses =
+                    if let Some((old_opening_parenthesis, old_closing_parenthesis)) = parentheses {
+                        fn merge<'a>(
+                            edits: &mut TextEdits,
+                            mut left_parenthesis: UnformattedCst<'a>,
+                            right_parenthesis: UnformattedCst<'a>,
+                        ) -> UnformattedCst<'a> {
+                            if left_parenthesis.whitespace.has_comments() {
+                                edits.delete(right_parenthesis.child.data.span.to_owned());
+                                right_parenthesis
+                                    .whitespace
+                                    .into_empty_and_move_comments_to(
+                                        edits,
+                                        &mut left_parenthesis.whitespace,
+                                    );
+                                left_parenthesis
+                            } else {
+                                edits.delete(left_parenthesis.child.data.span.to_owned());
+                                left_parenthesis.whitespace.into_empty_trailing(edits);
+                                right_parenthesis
+                            }
+                        }
+                        let opening =
+                            merge(edits, old_opening_parenthesis, new_opening_parenthesis);
+                        let closing =
+                            merge(edits, new_closing_parenthesis, old_closing_parenthesis);
+                        (opening, closing)
+                    } else {
+                        (new_opening_parenthesis, new_closing_parenthesis)
+                    };
+                parentheses = Some(new_parentheses);
+            }
+            _ => break,
+        }
     }
     (cst, parentheses)
 }
@@ -1137,7 +1162,7 @@ fn split_whitespace(cst: &Cst) -> UnformattedCst {
             child,
             whitespace: child_whitespace,
         } = split_whitespace(child);
-        child_whitespace.move_to_outer(&mut whitespace);
+        child_whitespace.move_into_outer(&mut whitespace);
         UnformattedCst { child, whitespace }
     } else {
         UnformattedCst {
@@ -1373,6 +1398,7 @@ mod test {
         test(" ( foo ) ", "foo\n");
         test("(\n  foo)", "foo\n");
         test("(\n  foo\n)", "foo\n");
+        test("( ( foo ) ) ", "foo\n");
         test(
             "(veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryItemmm)",
             "veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryItemmm\n",
@@ -1435,6 +1461,7 @@ mod test {
         //     bar
         //   )
         test("foo (# abc\n  bar\n)", "foo\n  ( # abc\n    bar\n  )\n");
+        test("needs (is foo) \"message\"", "needs (is foo) \"message\"\n");
 
         // Trailing sandwich-like
 

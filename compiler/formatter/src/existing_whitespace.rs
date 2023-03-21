@@ -86,7 +86,7 @@ impl<'a> ExistingWhitespace<'a> {
         self.whitespace.as_ref()
     }
 
-    pub fn move_to_outer(self, outer: &mut ExistingWhitespace<'a>) {
+    pub fn move_into_outer(self, outer: &mut ExistingWhitespace<'a>) {
         assert!(self.adopted_whitespace_before.is_empty());
         assert!(self.adopted_whitespace_after.is_empty());
         assert!(outer.adopted_whitespace_before.is_empty());
