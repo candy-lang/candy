@@ -3023,7 +3023,7 @@ mod parse {
                 CstKind::Lambda {
                     opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.with_trailing_space()),
                     parameters_and_arrow: None,
-                    body: vec![build_simple_int(2).with_trailing_space()],
+                    body: vec![build_simple_int(2), build_space()],
                     closing_curly_brace: Box::new(CstKind::ClosingCurlyBrace.into()),
                 }
                 .into(),
@@ -3045,8 +3045,7 @@ mod parse {
                             CstKind::Whitespace("  ".to_string())
                         ])),
                     )),
-                    body: vec![build_identifier("foo")
-                        .with_trailing_whitespace(vec![CstKind::Newline("\n".to_string())])],
+                    body: vec![build_identifier("foo"), build_newline()],
                     closing_curly_brace: Box::new(CstKind::ClosingCurlyBrace.into()),
                 }
                 .into(),
@@ -3111,8 +3110,8 @@ mod parse {
                         build_identifier("foo"),
                         build_newline(),
                         CstKind::Whitespace("  ".to_string()).into(),
-                        build_identifier("bar")
-                            .with_trailing_whitespace(vec![CstKind::Newline("\n".to_string())]),
+                        build_identifier("bar"),
+                        build_newline(),
                     ],
                     closing_curly_brace: Box::new(CstKind::ClosingCurlyBrace.into())
                 }
