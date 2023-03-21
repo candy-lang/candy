@@ -1581,15 +1581,44 @@ mod parse {
         let (input, more_whitespace) = whitespaces_and_newlines(input, indentation + 1, false);
         assignment_sign = assignment_sign.wrap_in_whitespace(more_whitespace);
 
-        let (input, body) = body(input, indentation + 1);
-        let (input, assignment_sign, body) = if body.is_empty() {
-            (
-                input_after_assignment_sign,
-                just_the_assignment_sign,
-                vec![],
-            )
+        let is_multiline = left.is_multiline() || assignment_sign.is_multiline();
+        let (input, assignment_sign, body) = if is_multiline {
+            let (input, body) = body(input, indentation + 1);
+            if body.is_empty() {
+                (
+                    input_after_assignment_sign,
+                    just_the_assignment_sign,
+                    vec![],
+                )
+            } else {
+                (input, assignment_sign, body)
+            }
         } else {
-            (input, assignment_sign, body)
+            let mut body = vec![];
+            let mut input = input;
+            if let Some((new_input, expression)) = expression(input, indentation, false, true, true)
+            {
+                input = new_input;
+                body.push(expression);
+                if let Some((new_input, whitespace)) = single_line_whitespace(input) {
+                    input = new_input;
+                    body.push(whitespace);
+                }
+            }
+            if let Some((new_input, comment)) = comment(input) {
+                input = new_input;
+                body.push(comment);
+            }
+
+            if body.is_empty() {
+                (
+                    input_after_assignment_sign,
+                    just_the_assignment_sign,
+                    vec![],
+                )
+            } else {
+                (input, assignment_sign, body)
+            }
         };
 
         let (whitespace, (assignment_sign, body)) =
@@ -1978,6 +2007,35 @@ mod parse {
                         CstKind::Whitespace("  ".to_string())
                     ])),
                     body: vec![build_simple_int(3)],
+                }
+                .into(),
+            )),
+        );
+        // main := { environment ->
+        //   input
+        // }
+        assert_eq!(
+            expression("main := { environment ->\n  input\n}", 0, true, true, true),
+            Some((
+                "",
+                CstKind::Assignment {
+                    left: Box::new(build_identifier("main").with_trailing_space()),
+                    assignment_sign: Box::new(CstKind::ColonEqualsSign.with_trailing_space()),
+                    body: vec![CstKind::Lambda {
+                        opening_curly_brace: Box::new(
+                            CstKind::OpeningCurlyBrace.with_trailing_space()
+                        ),
+                        parameters_and_arrow: Some((
+                            vec![build_identifier("environment").with_trailing_space()],
+                            Box::new(CstKind::Arrow.with_trailing_whitespace(vec![
+                                CstKind::Newline("\n".to_string()),
+                                CstKind::Whitespace("  ".to_string()),
+                            ])),
+                        )),
+                        body: vec![build_identifier("input"), build_newline()],
+                        closing_curly_brace: Box::new(CstKind::ClosingCurlyBrace.into()),
+                    }
+                    .into()],
                 }
                 .into(),
             )),
