@@ -334,7 +334,7 @@ pub(crate) fn format_cst<'a>(
                         edits,
                         &previous_width_for_arguments,
                         argument,
-                        info,
+                        &info.with_indent(),
                         index == last_argument_index,
                     )
                 })
@@ -1224,6 +1224,16 @@ mod test {
         test(
             "foo firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument",
             "foo\n  firstVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n  secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n",
+        );
+        // foo
+        //   {
+        //     bar
+        //     baz
+        //   }
+        //   blub
+        test(
+            "foo { bar\n  baz\n} blub",
+            "foo\n  {\n    bar\n    baz\n  }\n  blub\n",
         );
 
         // Parentheses
