@@ -419,15 +419,25 @@ pub(crate) fn format_cst<'a>(
 
             let previous_width_for_arguments =
                 Width::multiline(info.indentation.with_indent().width());
+            let last_argument_index = arguments.len() - 1;
             let mut arguments = arguments
                 .iter()
-                .map(|argument| Argument::new(edits, &previous_width_for_arguments, argument, info))
+                .enumerate()
+                .map(|(index, argument)| {
+                    Argument::new(
+                        edits,
+                        &previous_width_for_arguments,
+                        argument,
+                        info,
+                        index == last_argument_index,
+                    )
+                })
                 .collect_vec();
 
             let min_width = &receiver.min_width(info.indentation)
                 + arguments
                     .iter()
-                    .map(|it| Width::SPACE + &it.min_singleline_width)
+                    .map(|it| Width::SPACE + it.min_singleline_width())
                     .sum::<Width>();
             let (is_singleline, argument_info, trailing) =
                 if previous_width.last_line_fits(info.indentation, &min_width) {
@@ -901,10 +911,9 @@ pub(crate) fn format_cst<'a>(
 
 struct Argument<'a> {
     argument_start_offset: Offset,
-    argument: FormattedCst<'a>,
+    argument: MaybeSandwichLikeArgument<'a>,
     precedence: Option<PrecedenceCategory>,
     parentheses: Option<(UnformattedCst<'a>, UnformattedCst<'a>)>,
-    min_singleline_width: Width,
 }
 impl<'a> Argument<'a> {
     fn new(
@@ -912,35 +921,51 @@ impl<'a> Argument<'a> {
         previous_width: &Width,
         cst: &'a Cst,
         info: &FormattingInfo,
+        is_last: bool,
     ) -> Self {
         let (argument, parentheses) = split_parenthesized(edits, cst);
         let argument_start_offset = argument.data.span.start;
         let precedence = argument.precedence();
 
-        let (argument, min_singleline_width) = if let Some((opening_parenthesis, _)) = &parentheses && opening_parenthesis.whitespace.has_comments() {
+        let argument = if let Some((opening_parenthesis, _)) = &parentheses && opening_parenthesis.whitespace.has_comments() {
             let argument = format_cst(edits, previous_width, argument, &info.with_indent().with_indent());
-            (argument, Width::multiline(None))
+            MaybeSandwichLikeArgument::Other {
+                argument,
+                min_singleline_width: Width::multiline(None),
+            }
+        } else if is_last && matches!(
+            argument.kind,
+            CstKind::List { .. } | CstKind::Struct { .. } | CstKind::Lambda { .. },
+        ) {
+            MaybeSandwichLikeArgument::SandwichLike(argument)
         } else {
             let argument = format_cst(edits, previous_width, argument, info);
-            let mut min_width = argument.min_width(info.indentation.with_indent());
+            let mut min_singleline_width = argument.min_width(info.indentation.with_indent());
             const PARENTHESES_WIDTH: Width = Width::Singleline(2);
             match precedence {
                 Some(PrecedenceCategory::High) => {},
-                Some(PrecedenceCategory::Low) => min_width += PARENTHESES_WIDTH,
-                None if parentheses.is_some() => min_width += PARENTHESES_WIDTH,
+                Some(PrecedenceCategory::Low) => min_singleline_width += PARENTHESES_WIDTH,
+                None if parentheses.is_some() => min_singleline_width += PARENTHESES_WIDTH,
                 None => {},
             }
-            (argument, min_width)
+            MaybeSandwichLikeArgument::Other { argument, min_singleline_width }
         };
         Argument {
             argument_start_offset,
             argument,
             precedence,
             parentheses,
-            min_singleline_width,
         }
     }
 
+    /// Width of the opening parenthesis / bracket / curly brace
+    const SANDWICH_LIKE_MIN_SINGLELINE_WIDTH: Width = Width::Singleline(1);
+    fn min_singleline_width(&self) -> &Width {
+        match &self.argument {
+            MaybeSandwichLikeArgument::SandwichLike(_) => &Self::SANDWICH_LIKE_MIN_SINGLELINE_WIDTH,
+            MaybeSandwichLikeArgument::Other { min_singleline_width, .. } => min_singleline_width,
+        }
+    }
     fn format(
         self,
         edits: &mut TextEdits,
@@ -948,6 +973,14 @@ impl<'a> Argument<'a> {
         info: &FormattingInfo,
         is_singleline: bool,
     ) -> FormattedCst<'a> {
+        let (argument, min_singleline_width) = match self.argument {
+            MaybeSandwichLikeArgument::SandwichLike(it) => (
+                format_cst(edits, previous_width, it, info),
+                Self::SANDWICH_LIKE_MIN_SINGLELINE_WIDTH,
+            ),
+            MaybeSandwichLikeArgument::Other { argument, min_singleline_width } => (argument, min_singleline_width),
+        };
+
         if let Some((
             UnformattedCst {
                 child: opening_parenthesis,
@@ -969,12 +1002,12 @@ impl<'a> Argument<'a> {
                     format_cst(edits, previous_width, opening_parenthesis, info)
                         .into_empty_trailing(edits);
                 let width_between_parentheses = if is_singleline
-                    && previous_width.last_line_fits(info.indentation, &self.min_singleline_width)
+                    && previous_width.last_line_fits(info.indentation, &min_singleline_width)
                 {
                     // The argument fits in one line.
                     let opening_parenthesis_whitespace_width =
                         opening_parenthesis_whitespace.into_empty_trailing(edits);
-                    opening_parenthesis_whitespace_width + self.argument.into_empty_trailing(edits)
+                    opening_parenthesis_whitespace_width + argument.into_empty_trailing(edits)
                 } else {
                     // The argument goes over multiple lines.
                     let opening_parenthesis_whitespace_width = opening_parenthesis_whitespace
@@ -986,9 +1019,7 @@ impl<'a> Argument<'a> {
                             true,
                         );
                     opening_parenthesis_whitespace_width
-                        + self
-                            .argument
-                            .into_trailing_with_indentation(edits, info.indentation)
+                        + argument.into_trailing_with_indentation(edits, info.indentation)
                 };
                 let width_before_closing_parenthesis =
                     opening_parenthesis_width + width_between_parentheses;
@@ -1005,7 +1036,7 @@ impl<'a> Argument<'a> {
                 edits.delete(opening_parenthesis.data.span.to_owned());
                 opening_parenthesis_whitespace.into_empty_trailing(edits);
                 edits.delete(closing_parenthesis.data.span.to_owned());
-                let (argument_width, argument_whitespace) = self.argument.split();
+                let (argument_width, argument_whitespace) = argument.split();
                 argument_whitespace.into_empty_and_move_comments_to(edits, &mut whitespace);
                 argument_width
             };
@@ -1016,18 +1047,25 @@ impl<'a> Argument<'a> {
                 // … but we need them.
                 // This can only be the case if the whole call fits on one line.
                 edits.insert(self.argument_start_offset, "(");
-                edits.insert(self.argument.whitespace.start_offset(), ")");
-                let (argument_width, whitespace) = self.argument.split();
+                edits.insert(argument.whitespace.start_offset(), ")");
+                let (argument_width, whitespace) = argument.split();
                 FormattedCst::new(
                     Width::Singleline(1) + argument_width + Width::Singleline(1),
                     whitespace,
                 )
             } else {
                 // … and we don't need them.
-                self.argument
+                argument
             }
         }
     }
+}
+enum MaybeSandwichLikeArgument<'a> {
+    SandwichLike(&'a Cst),
+    Other {
+        argument: FormattedCst<'a>,
+        min_singleline_width: Width,
+    },
 }
 
 /// Reduces multiple pairs of parentheses around the inner expression to at most one pair that keeps
@@ -1037,6 +1075,7 @@ fn split_parenthesized<'a>(
     mut cst: &'a Cst,
 ) -> (&'a Cst, Option<(UnformattedCst<'a>, UnformattedCst<'a>)>) {
     let mut parentheses: Option<(UnformattedCst, UnformattedCst)> = None;
+    // TODO: Also handle [CstKind::TrailingWhitespace] if it contains another [CstKind::Parenthesized]
     while let CstKind::Parenthesized {
         box opening_parenthesis,
         inner,
@@ -1387,6 +1426,48 @@ mod test {
         //     bar
         //   )
         test("foo (# abc\n  bar\n)", "foo\n  ( # abc\n    bar\n  )\n");
+
+        // Trailing sandwich-like
+
+        test("foo{bar}", "foo { bar }\n");
+        test("foo(bar,)", "foo (bar,)\n");
+        test("foo[bar]", "foo [bar]\n");
+        test("foo [\n  bar\n]", "foo [bar]\n");
+        // foo {
+        //   veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression
+        // }
+        test(
+            "foo { veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression }",
+            "foo {\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression\n}\n",
+        );
+        // foo { bar ->
+        //   veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression
+        // }
+        test(
+            "foo { bar -> veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression }",
+            "foo { bar ->\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression\n}\n",
+        );
+        // foo (
+        //   veryVeryVeryVeryVeryVeryLongItem0,
+        //   veryVeryVeryVeryVeryVeryLongItem1,
+        //   veryVeryVeryVeryVeryVeryLongItem2,
+        // )
+        test(
+            "foo (veryVeryVeryVeryVeryVeryLongItem0, veryVeryVeryVeryVeryVeryLongItem1, veryVeryVeryVeryVeryVeryLongItem2)",
+            "foo (\n  veryVeryVeryVeryVeryVeryLongItem0,\n  veryVeryVeryVeryVeryVeryLongItem1,\n  veryVeryVeryVeryVeryVeryLongItem2,\n)\n",
+        );
+        // foo ( # abc
+        //   item,
+        // )
+        test("foo (# abc\n  item,)", "foo ( # abc\n  item,\n)\n");
+        // foo (
+        //   # veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongComment
+        //   item,
+        // )
+        test(
+            "foo (# veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongComment\n  item,)",
+            "foo (\n  # veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongComment\n  item,\n)\n",
+        );
 
         // Comments
 
