@@ -51,15 +51,16 @@ pub fn format_csts<'a>(
         {
             // Whitespace
             let first_expression_index = csts.iter().find_position(|cst| {
+                #[allow(unused_parens)] // False positive
                 !matches!(
                     cst.kind,
-                    CstKind::Whitespace(_)
+                    (CstKind::Whitespace(_)
                         | CstKind::Error {
                             error: CstError::TooMuchWhitespace,
                             ..
                         }
                         | CstKind::Newline(_)
-                        | CstKind::Comment { .. },
+                        | CstKind::Comment { .. }),
                 )
             });
             let (new_whitespace, rest) =
@@ -800,6 +801,7 @@ pub(crate) fn format_cst<'a>(
 
             // Opening curly brace
             let width_for_first_line = if parameters_and_arrow.is_some() {
+                #[allow(clippy::redundant_clone)] // False positive
                 width_until_arrow.clone()
             } else {
                 &width_until_arrow + &body_min_width + Width::SPACE + &closing_curly_brace_width
@@ -916,6 +918,7 @@ struct Argument<'a> {
     parentheses: Option<(UnformattedCst<'a>, UnformattedCst<'a>)>,
 }
 impl<'a> Argument<'a> {
+    #[allow(unused_parens)] // False positive
     fn new(
         edits: &mut TextEdits,
         previous_width: &Width,
@@ -935,7 +938,7 @@ impl<'a> Argument<'a> {
             }
         } else if is_last && matches!(
             argument.kind,
-            CstKind::List { .. } | CstKind::Struct { .. } | CstKind::Lambda { .. },
+            (CstKind::List { .. } | CstKind::Struct { .. } | CstKind::Lambda { .. }),
         ) {
             MaybeSandwichLikeArgument::SandwichLike(argument)
         } else {
