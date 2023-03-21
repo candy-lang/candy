@@ -154,6 +154,7 @@ name = "candy_language_server"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "candy_formatter",
  "candy_frontend",
  "candy_fuzzer",
  "candy_vm",

@@ -2,7 +2,7 @@ use std::path::Path;
 
 use async_trait::async_trait;
 use lsp_types::{
-    self, FoldingRange, LocationLink, SemanticToken, TextDocumentContentChangeEvent, Url,
+    self, FoldingRange, LocationLink, SemanticToken, TextDocumentContentChangeEvent, TextEdit, Url,
 };
 use rustc_hash::FxHashMap;
 use tokio::sync::Mutex;
@@ -58,6 +58,18 @@ pub trait LanguageFeatures: Send + Sync {
         _project_directory: &Path,
         _uri: Url,
     ) -> Vec<FoldingRange> {
+        unimplemented!()
+    }
+
+    fn supports_format(&self) -> bool {
+        false
+    }
+    async fn format(
+        &self,
+        _db: &Mutex<Database>,
+        _project_directory: &Path,
+        _uri: Url,
+    ) -> Vec<TextEdit> {
         unimplemented!()
     }
 
