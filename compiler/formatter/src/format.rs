@@ -491,7 +491,29 @@ pub(crate) fn format_cst<'a>(
             );
         }
         CstKind::StructAccess { struct_, dot, key } => {
-            let mut struct_ = format_cst(edits, previous_width, struct_, info);
+            let (struct_, struct_parentheses) = ExistingParentheses::split_from(edits, struct_);
+            let struct_needs_parentheses = match struct_.precedence() {
+                Some(PrecedenceCategory::High) => struct_parentheses.are_required_due_to_comments(),
+                Some(PrecedenceCategory::Low) => true,
+                None => struct_parentheses.is_some(),
+            };
+            let (previous_width_for_struct, info_for_struct) = if struct_needs_parentheses {
+                let previous_width_for_struct = if struct_parentheses.are_required_due_to_comments()
+                {
+                    Width::multiline(info.indentation.with_indent().width())
+                } else {
+                    previous_width + Width::PARENTHESIS
+                };
+                (previous_width_for_struct, info.with_indent())
+            } else {
+                (previous_width.to_owned(), info.to_owned())
+            };
+            let struct_ = format_cst(edits, &previous_width_for_struct, struct_, &info_for_struct);
+            let mut struct_ = if struct_needs_parentheses {
+                struct_parentheses.into_some(edits, previous_width, struct_, info)
+            } else {
+                struct_parentheses.into_none(edits, struct_)
+            };
 
             let previous_width_for_dot = Width::multiline(info.indentation.with_indent().width());
             let dot_width = format_cst(edits, &previous_width_for_dot, dot, &info.with_indent())
@@ -1445,6 +1467,7 @@ mod test {
             "foo.firstVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgument.secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument",
             "foo\n  .firstVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n  .secondVeryVeryVeryVeryVeryVeryVeryVeryLongArgument\n",
         );
+        test("(use \"Foo\").bar", "(use \"Foo\").bar\n");
 
         // Comments
 

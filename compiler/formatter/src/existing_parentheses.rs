@@ -141,7 +141,6 @@ impl<'a> ExistingParentheses<'a> {
             }
         }
     }
-    const PARENTHESIS_WIDTH: Width = Width::Singleline(1);
     pub fn into_some(
         self,
         edits: &mut TextEdits,
@@ -152,9 +151,9 @@ impl<'a> ExistingParentheses<'a> {
         let fits_in_one_line = !self.are_required_due_to_comments()
             && previous_width.last_line_fits(
                 info.indentation,
-                &(&Self::PARENTHESIS_WIDTH
+                &(&Width::PARENTHESIS
                     + child.min_width(info.indentation.with_indent())
-                    + &Self::PARENTHESIS_WIDTH),
+                    + &Width::PARENTHESIS),
             );
         let child_trailing = if fits_in_one_line {
             TrailingWhitespace::None
@@ -164,7 +163,7 @@ impl<'a> ExistingParentheses<'a> {
         match self {
             ExistingParentheses::None { child_start_offset } => {
                 let (opening, opening_width) = if fits_in_one_line {
-                    (Cow::Borrowed("("), Self::PARENTHESIS_WIDTH.clone())
+                    (Cow::Borrowed("("), Width::PARENTHESIS.clone())
                 } else {
                     (
                         Cow::Owned(format!("(\n{}", info.indentation.with_indent())),
@@ -181,7 +180,7 @@ impl<'a> ExistingParentheses<'a> {
                 edits.insert(child_end_offset, ")");
 
                 FormattedCst::new(
-                    opening_width + child_width + &Self::PARENTHESIS_WIDTH,
+                    opening_width + child_width + &Width::PARENTHESIS,
                     ExistingWhitespace::empty(child_end_offset),
                 )
             }
@@ -194,7 +193,7 @@ impl<'a> ExistingParentheses<'a> {
                 } else {
                     opening.whitespace.into_trailing_with_indentation(
                         edits,
-                        &(previous_width + &Self::PARENTHESIS_WIDTH),
+                        &(previous_width + &Width::PARENTHESIS),
                         info.indentation.with_indent(),
                         TrailingNewlineCount::One,
                         true,
@@ -216,6 +215,10 @@ impl<'a> ExistingParentheses<'a> {
             }
         }
     }
+}
+
+impl Width {
+    pub const PARENTHESIS: Width = Width::Singleline(1);
 }
 
 fn split_whitespace(cst: &Cst) -> UnformattedCst {

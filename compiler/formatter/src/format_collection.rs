@@ -143,13 +143,13 @@ pub fn apply_trailing_comma_condition<'a>(
     if should_have_comma {
         let whitespace = if let Some(comma) = comma {
             let comma = format_cst(edits, previous_width, comma, info);
-            assert_eq!(comma.child_width(), &Width::Singleline(1));
+            assert_eq!(comma.child_width(), &Width::COMMA);
             comma.whitespace
         } else {
             edits.insert(fallback_offset, ",");
             ExistingWhitespace::empty(fallback_offset)
         };
-        (Width::Singleline(1), whitespace)
+        (Width::COMMA, whitespace)
     } else if let Some(comma) = comma {
         if comma.has_comments() {
             // This last item can't fit on one line, so we do have to keep the comma.
@@ -164,4 +164,8 @@ pub fn apply_trailing_comma_condition<'a>(
     } else {
         (Width::default(), ExistingWhitespace::empty(fallback_offset))
     }
+}
+
+impl Width {
+    const COMMA: Width = Width::Singleline(1);
 }
