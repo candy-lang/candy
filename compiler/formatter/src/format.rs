@@ -963,7 +963,10 @@ impl<'a> Argument<'a> {
     fn min_singleline_width(&self) -> &Width {
         match &self.argument {
             MaybeSandwichLikeArgument::SandwichLike(_) => &Self::SANDWICH_LIKE_MIN_SINGLELINE_WIDTH,
-            MaybeSandwichLikeArgument::Other { min_singleline_width, .. } => min_singleline_width,
+            MaybeSandwichLikeArgument::Other {
+                min_singleline_width,
+                ..
+            } => min_singleline_width,
         }
     }
     fn format(
@@ -978,7 +981,10 @@ impl<'a> Argument<'a> {
                 format_cst(edits, previous_width, it, info),
                 Self::SANDWICH_LIKE_MIN_SINGLELINE_WIDTH,
             ),
-            MaybeSandwichLikeArgument::Other { argument, min_singleline_width } => (argument, min_singleline_width),
+            MaybeSandwichLikeArgument::Other {
+                argument,
+                min_singleline_width,
+            } => (argument, min_singleline_width),
         };
 
         if let Some((
