@@ -534,9 +534,6 @@ mod parse {
             }
 
             if let Some((new_new_input, newline)) = newline(new_input) {
-                input = new_input;
-                parts.append(&mut new_parts);
-
                 new_input = new_new_input;
                 new_parts.push(newline);
             }
@@ -1917,6 +1914,21 @@ mod parse {
                     left: Box::new(build_identifier("foo").with_trailing_space()),
                     assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_space()),
                     body: vec![build_simple_int(42)],
+                }
+                .into(),
+            )),
+        );
+        assert_eq!(
+            expression("foo =\n  bar\n\nbaz", 0, true, true, true),
+            Some((
+                "\n\nbaz",
+                CstKind::Assignment {
+                    left: Box::new(build_identifier("foo").with_trailing_space()),
+                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_whitespace(vec![
+                        CstKind::Newline("\n".to_string()),
+                        CstKind::Whitespace("  ".to_string())
+                    ])),
+                    body: vec![build_identifier("bar")],
                 }
                 .into(),
             )),

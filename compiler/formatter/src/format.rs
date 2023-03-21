@@ -1052,6 +1052,10 @@ mod test {
         test("foo\n\n\nbar", "foo\n\n\nbar\n");
         test("foo\n\n\n\nbar", "foo\n\n\nbar\n");
         test("foo\n\n\n\n\nbar", "foo\n\n\nbar\n");
+        // foo = bar
+        //
+        // baz
+        test("foo =\n  bar\n\nbaz", "foo = bar\n\nbaz\n");
 
         // Consecutive expressions
 
