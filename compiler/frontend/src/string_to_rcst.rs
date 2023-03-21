@@ -2895,11 +2895,9 @@ mod parse {
                 Some((new_input, expression)) => {
                     input = new_input;
 
-                    let (whitespace, expression) = expression.split_outer_trailing_whitespace();
+                    let (mut whitespace, expression) = expression.split_outer_trailing_whitespace();
                     expressions.push(expression);
-                    for whitespace in whitespace {
-                        expressions.push(whitespace);
-                    }
+                    expressions.append(&mut whitespace);
                 }
                 None => {
                     let fallback = colon(new_input)
