@@ -10,6 +10,7 @@ use itertools::Itertools;
 use text_edits::TextEdits;
 use width::{Indentation, Width};
 
+mod existing_parentheses;
 mod existing_whitespace;
 mod format;
 mod format_collection;

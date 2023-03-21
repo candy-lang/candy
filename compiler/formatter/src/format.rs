@@ -1,9 +1,10 @@
 use crate::{
+    existing_parentheses::ExistingParentheses,
     existing_whitespace::{ExistingWhitespace, TrailingNewlineCount, TrailingWhitespace},
     format_collection::{
         apply_trailing_comma_condition, format_collection, TrailingCommaCondition,
     },
-    formatted_cst::{FormattedCst, UnformattedCst},
+    formatted_cst::FormattedCst,
     text_edits::TextEdits,
     width::{Indentation, StringWidth, Width},
 };
@@ -245,15 +246,12 @@ pub(crate) fn format_cst<'a>(
             let bar_width = format_cst(edits, &width_for_right_side, bar, info)
                 .into_space_and_move_comments_to(edits, &mut left.whitespace);
 
-            let (right, right_parentheses) = split_parenthesized(edits, right);
+            let (right, right_parentheses) = ExistingParentheses::split_from(edits, right);
             // Depending on the precedence of `right` and whether there's an opening parenthesis
             // with a comment, we might be able to remove the parentheses. However, we won't insert
             // any by ourselves.
             let right_needs_parentheses = match right.precedence() {
-                Some(PrecedenceCategory::High) => right_parentheses
-                    .as_ref()
-                    .map(|(opening_parenthesis, _)| opening_parenthesis.whitespace.has_comments())
-                    .unwrap_or_default(),
+                Some(PrecedenceCategory::High) => right_parentheses.are_required_due_to_comments(),
                 Some(PrecedenceCategory::Low) | None => right_parentheses.is_some(),
             };
             let (previous_width_for_right, info_for_right) = if right_needs_parentheses {
@@ -266,75 +264,22 @@ pub(crate) fn format_cst<'a>(
             };
             let right = format_cst(edits, &previous_width_for_right, right, &info_for_right);
 
-            let (right_width, whitespace) = if let Some((
-                UnformattedCst {
-                    child: opening_parenthesis,
-                    whitespace: opening_parenthesis_whitespace,
-                },
-                UnformattedCst {
-                    child: closing_parenthesis,
-                    whitespace: closing_parenthesis_whitespace,
-                },
-            )) = right_parentheses
-            {
-                if right_needs_parentheses {
-                    let opening_parenthesis_width = format_cst(
-                        edits,
-                        &(&width_for_right_side + &bar_width),
-                        opening_parenthesis,
-                        info,
-                    )
-                    .into_empty_trailing(edits);
-                    let closing_parenthesis_width = format_cst(
-                        edits,
-                        &Width::multiline(info.indentation.width()),
-                        closing_parenthesis,
-                        info,
-                    )
-                    .into_empty_trailing(edits);
-                    let (opening_parenthesis_whitespace_width, right_width) =
-                        if !opening_parenthesis_whitespace.has_comments()
-                            && (left.min_width(info.indentation)
-                                + Width::SPACE
-                                + &bar_width
-                                + &opening_parenthesis_width
-                                + right.min_width(info.indentation.with_indent())
-                                + &closing_parenthesis_width)
-                                .fits(info.indentation)
-                        {
-                            (
-                                opening_parenthesis_whitespace.into_empty_trailing(edits),
-                                right.into_empty_trailing(edits),
-                            )
-                        } else {
-                            (
-                                opening_parenthesis_whitespace.into_trailing_with_indentation(
-                                    edits,
-                                    &(Width::Singleline(1) + Width::SPACE + Width::Singleline(1)),
-                                    info.indentation.with_indent(),
-                                    TrailingNewlineCount::One,
-                                    true,
-                                ),
-                                right.into_trailing_with_indentation(edits, info.indentation),
-                            )
-                        };
-                    (
-                        opening_parenthesis_width
-                            + opening_parenthesis_whitespace_width
-                            + right_width
-                            + closing_parenthesis_width,
-                        closing_parenthesis_whitespace,
-                    )
-                } else {
-                    edits.delete(opening_parenthesis.data.span.to_owned());
-                    opening_parenthesis_whitespace.into_empty_trailing(edits);
-                    let right_width = right.into_empty_trailing(edits);
-                    edits.delete(closing_parenthesis.data.span.to_owned());
-                    (right_width, closing_parenthesis_whitespace)
-                }
+            let (right_width, whitespace) = if right_needs_parentheses {
+                assert!(right_parentheses.is_some());
+                right_parentheses.into_some(
+                    edits,
+                    &(previous_width
+                        + left.min_width(info.indentation)
+                        + Width::SPACE
+                        + &bar_width
+                        + Width::SPACE),
+                    right,
+                    info,
+                )
             } else {
-                right.split()
-            };
+                right_parentheses.into_none(edits, right)
+            }
+            .split();
 
             let left_trailing =
                 if (left.min_width(info.indentation) + Width::SPACE + &bar_width + &right_width)
@@ -353,61 +298,21 @@ pub(crate) fn format_cst<'a>(
         CstKind::Parenthesized { .. } => {
             // Whenever parentheses are necessary, they are handled by the parent. Hence, we try to
             // remove them here.
-            let (child, parentheses) = split_parenthesized(edits, cst);
-            let (
-                UnformattedCst {
-                    child: opening_parenthesis,
-                    whitespace: opening_parenthesis_whitespace,
-                },
-                UnformattedCst {
-                    child: closing_parenthesis,
-                    mut whitespace,
-                },
-            ) = parentheses.unwrap();
+            let (child, parentheses) = ExistingParentheses::split_from(edits, cst);
+            assert!(parentheses.is_some());
 
-            if !opening_parenthesis_whitespace.has_comments() {
-                // We can remove the parentheses.
-                edits.delete(opening_parenthesis.data.span.to_owned());
-                opening_parenthesis_whitespace.into_empty_trailing(edits);
-                let child = format_cst(edits, previous_width, child, info);
-                let (child_width, child_whitespace) = child.split();
-                child_whitespace.into_empty_and_move_comments_to(edits, &mut whitespace);
-                edits.delete(closing_parenthesis.data.span.to_owned());
-                return FormattedCst::new(child_width, whitespace);
-            }
-
-            let opening_parenthesis_width =
-                format_cst(edits, previous_width, opening_parenthesis, info)
-                    .into_empty_trailing(edits);
-            let opening_parenthesis_whitespace_width = opening_parenthesis_whitespace
-                .into_trailing_with_indentation(
+            return if parentheses.are_required_due_to_comments() {
+                let child = format_cst(
                     edits,
-                    &Width::Singleline(1),
-                    info.indentation.with_indent(),
-                    TrailingNewlineCount::One,
-                    true,
+                    &Width::multiline(info.indentation.with_indent().width()),
+                    child,
+                    &info.with_indent(),
                 );
-            let child_width = format_cst(
-                edits,
-                &Width::multiline(info.indentation.with_indent().width()),
-                child,
-                &info.with_indent(),
-            )
-            .into_trailing_with_indentation(edits, info.indentation);
-            let closing_parenthesis_width = format_cst(
-                edits,
-                &Width::multiline(info.indentation.width()),
-                closing_parenthesis,
-                info,
-            )
-            .into_empty_trailing(edits);
-            return FormattedCst::new(
-                opening_parenthesis_width
-                    + opening_parenthesis_whitespace_width
-                    + child_width
-                    + closing_parenthesis_width,
-                whitespace,
-            );
+                parentheses.into_some(edits, previous_width, child, info)
+            } else {
+                let child = format_cst(edits, previous_width, child, info);
+                parentheses.into_none(edits, child)
+            };
         }
         CstKind::Call {
             receiver,
@@ -912,10 +817,9 @@ pub(crate) fn format_cst<'a>(
 }
 
 struct Argument<'a> {
-    argument_start_offset: Offset,
     argument: MaybeSandwichLikeArgument<'a>,
     precedence: Option<PrecedenceCategory>,
-    parentheses: Option<(UnformattedCst<'a>, UnformattedCst<'a>)>,
+    parentheses: ExistingParentheses<'a>,
 }
 impl<'a> Argument<'a> {
     #[allow(unused_parens)] // False positive
@@ -926,35 +830,43 @@ impl<'a> Argument<'a> {
         info: &FormattingInfo,
         is_last: bool,
     ) -> Self {
-        let (argument, parentheses) = split_parenthesized(edits, cst);
-        let argument_start_offset = argument.data.span.start;
+        let (argument, parentheses) = ExistingParentheses::split_from(edits, cst);
         let precedence = argument.precedence();
 
-        let argument = if let Some((opening_parenthesis, _)) = &parentheses && opening_parenthesis.whitespace.has_comments() {
-            let argument = format_cst(edits, previous_width, argument, &info.with_indent().with_indent());
+        let argument = if parentheses.are_required_due_to_comments() {
+            let argument = format_cst(
+                edits,
+                previous_width,
+                argument,
+                &info.with_indent().with_indent(),
+            );
             MaybeSandwichLikeArgument::Other {
                 argument,
                 min_singleline_width: Width::multiline(None),
             }
-        } else if is_last && matches!(
-            argument.kind,
-            (CstKind::List { .. } | CstKind::Struct { .. } | CstKind::Lambda { .. }),
-        ) {
+        } else if is_last
+            && matches!(
+                argument.kind,
+                (CstKind::List { .. } | CstKind::Struct { .. } | CstKind::Lambda { .. }),
+            )
+        {
             MaybeSandwichLikeArgument::SandwichLike(argument)
         } else {
             let argument = format_cst(edits, previous_width, argument, info);
             let mut min_singleline_width = argument.min_width(info.indentation.with_indent());
             const PARENTHESES_WIDTH: Width = Width::Singleline(2);
             match precedence {
-                Some(PrecedenceCategory::High) => {},
+                Some(PrecedenceCategory::High) => {}
                 Some(PrecedenceCategory::Low) => min_singleline_width += PARENTHESES_WIDTH,
                 None if parentheses.is_some() => min_singleline_width += PARENTHESES_WIDTH,
-                None => {},
+                None => {}
             }
-            MaybeSandwichLikeArgument::Other { argument, min_singleline_width }
+            MaybeSandwichLikeArgument::Other {
+                argument,
+                min_singleline_width,
+            }
         };
         Argument {
-            argument_start_offset,
             argument,
             precedence,
             parentheses,
@@ -979,92 +891,34 @@ impl<'a> Argument<'a> {
         info: &FormattingInfo,
         is_singleline: bool,
     ) -> FormattedCst<'a> {
-        let (argument, min_singleline_width) = match self.argument {
-            MaybeSandwichLikeArgument::SandwichLike(it) => (
-                format_cst(edits, previous_width, it, info),
-                Self::SANDWICH_LIKE_MIN_SINGLELINE_WIDTH,
-            ),
-            MaybeSandwichLikeArgument::Other {
-                argument,
-                min_singleline_width,
-            } => (argument, min_singleline_width),
+        let argument = match self.argument {
+            MaybeSandwichLikeArgument::SandwichLike(it) => {
+                format_cst(edits, previous_width, it, info)
+            }
+            MaybeSandwichLikeArgument::Other { argument, .. } => argument,
         };
 
-        if let Some((
-            UnformattedCst {
-                child: opening_parenthesis,
-                whitespace: opening_parenthesis_whitespace,
-            },
-            UnformattedCst {
-                child: closing_parenthesis,
-                mut whitespace,
-            },
-        )) = self.parentheses
-        {
+        if self.parentheses.is_some() {
             // We already have parentheses …
-            let argument_width = if is_singleline
-                && self.precedence != Some(PrecedenceCategory::High)
-                || opening_parenthesis_whitespace.has_comments()
+            if is_singleline && self.precedence != Some(PrecedenceCategory::High)
+                || self.parentheses.are_required_due_to_comments()
             {
                 // … and we actually need them.
-                let opening_parenthesis_width =
-                    format_cst(edits, previous_width, opening_parenthesis, info)
-                        .into_empty_trailing(edits);
-                let width_between_parentheses = if is_singleline
-                    && previous_width.last_line_fits(info.indentation, &min_singleline_width)
-                {
-                    // The argument fits in one line.
-                    let opening_parenthesis_whitespace_width =
-                        opening_parenthesis_whitespace.into_empty_trailing(edits);
-                    opening_parenthesis_whitespace_width + argument.into_empty_trailing(edits)
-                } else {
-                    // The argument goes over multiple lines.
-                    let opening_parenthesis_whitespace_width = opening_parenthesis_whitespace
-                        .into_trailing_with_indentation(
-                            edits,
-                            &(previous_width + Width::Singleline(1)),
-                            info.indentation.with_indent(),
-                            TrailingNewlineCount::One,
-                            true,
-                        );
-                    opening_parenthesis_whitespace_width
-                        + argument.into_trailing_with_indentation(edits, info.indentation)
-                };
-                let width_before_closing_parenthesis =
-                    opening_parenthesis_width + width_between_parentheses;
-                let closing_parenthesis_width = format_cst(
-                    edits,
-                    &(previous_width + &width_before_closing_parenthesis),
-                    closing_parenthesis,
-                    info,
-                )
-                .into_empty_trailing(edits);
-                width_before_closing_parenthesis + closing_parenthesis_width
+                self.parentheses
+                    .into_some(edits, previous_width, argument, info)
             } else {
                 // … but we don't need them.
-                edits.delete(opening_parenthesis.data.span.to_owned());
-                opening_parenthesis_whitespace.into_empty_trailing(edits);
-                edits.delete(closing_parenthesis.data.span.to_owned());
-                let (argument_width, argument_whitespace) = argument.split();
-                argument_whitespace.into_empty_and_move_comments_to(edits, &mut whitespace);
-                argument_width
-            };
-            FormattedCst::new(argument_width, whitespace)
+                self.parentheses.into_none(edits, argument)
+            }
         } else {
             // We don't have parentheses …
             if is_singleline && self.precedence == Some(PrecedenceCategory::Low) {
                 // … but we need them.
-                // This can only be the case if the whole call fits on one line.
-                edits.insert(self.argument_start_offset, "(");
-                edits.insert(argument.whitespace.start_offset(), ")");
-                let (argument_width, whitespace) = argument.split();
-                FormattedCst::new(
-                    Width::Singleline(1) + argument_width + Width::Singleline(1),
-                    whitespace,
-                )
+                self.parentheses
+                    .into_some(edits, previous_width, argument, info)
             } else {
                 // … and we don't need them.
-                argument
+                self.parentheses.into_none(edits, argument)
             }
         }
     }
@@ -1075,101 +929,6 @@ enum MaybeSandwichLikeArgument<'a> {
         argument: FormattedCst<'a>,
         min_singleline_width: Width,
     },
-}
-
-/// Reduces multiple pairs of parentheses around the inner expression to at most one pair that keeps
-/// all comments.
-fn split_parenthesized<'a>(
-    edits: &mut TextEdits,
-    mut cst: &'a Cst,
-) -> (&'a Cst, Option<(UnformattedCst<'a>, UnformattedCst<'a>)>) {
-    let mut next_cst = cst;
-    let mut trailing_whitespace = vec![];
-    let mut parentheses: Option<(UnformattedCst, UnformattedCst)> = None;
-    loop {
-        match &next_cst.kind {
-            CstKind::TrailingWhitespace { child, whitespace } => {
-                next_cst = child;
-                trailing_whitespace.push(ExistingWhitespace::new(child.data.span.end, whitespace));
-            }
-            CstKind::Parenthesized {
-                box opening_parenthesis,
-                inner,
-                box closing_parenthesis,
-            } => {
-                next_cst = inner;
-                cst = inner;
-
-                let new_opening_parenthesis = split_whitespace(opening_parenthesis);
-                let new_closing_parenthesis = {
-                    let UnformattedCst { child, whitespace } =
-                        split_whitespace(closing_parenthesis);
-                    trailing_whitespace.push(whitespace);
-
-                    let mut whitespace = trailing_whitespace.remove(0);
-                    for trailing_whitespace in trailing_whitespace.drain(..) {
-                        trailing_whitespace.into_empty_and_move_comments_to(edits, &mut whitespace);
-                    }
-                    UnformattedCst { child, whitespace }
-                };
-
-                let new_parentheses =
-                    if let Some((old_opening_parenthesis, old_closing_parenthesis)) = parentheses {
-                        fn merge<'a>(
-                            edits: &mut TextEdits,
-                            mut left_parenthesis: UnformattedCst<'a>,
-                            right_parenthesis: UnformattedCst<'a>,
-                        ) -> UnformattedCst<'a> {
-                            if left_parenthesis.whitespace.has_comments() {
-                                edits.delete(right_parenthesis.child.data.span.to_owned());
-                                right_parenthesis
-                                    .whitespace
-                                    .into_empty_and_move_comments_to(
-                                        edits,
-                                        &mut left_parenthesis.whitespace,
-                                    );
-                                left_parenthesis
-                            } else {
-                                edits.delete(left_parenthesis.child.data.span.to_owned());
-                                left_parenthesis.whitespace.into_empty_trailing(edits);
-                                right_parenthesis
-                            }
-                        }
-                        let opening =
-                            merge(edits, old_opening_parenthesis, new_opening_parenthesis);
-                        let closing =
-                            merge(edits, new_closing_parenthesis, old_closing_parenthesis);
-                        (opening, closing)
-                    } else {
-                        (new_opening_parenthesis, new_closing_parenthesis)
-                    };
-                parentheses = Some(new_parentheses);
-            }
-            _ => break,
-        }
-    }
-    (cst, parentheses)
-}
-
-fn split_whitespace(cst: &Cst) -> UnformattedCst {
-    if let CstKind::TrailingWhitespace {
-        box child,
-        whitespace,
-    } = &cst.kind
-    {
-        let mut whitespace = ExistingWhitespace::new(child.data.span.end, whitespace);
-        let UnformattedCst {
-            child,
-            whitespace: child_whitespace,
-        } = split_whitespace(child);
-        child_whitespace.move_into_outer(&mut whitespace);
-        UnformattedCst { child, whitespace }
-    } else {
-        UnformattedCst {
-            child: cst,
-            whitespace: ExistingWhitespace::empty(cst.data.span.end),
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -67,9 +67,6 @@ impl<'a> ExistingWhitespace<'a> {
         }
     }
 
-    pub fn start_offset(&self) -> Offset {
-        self.start_offset
-    }
     pub fn end_offset(&self) -> Offset {
         self.whitespace
             .as_ref()
