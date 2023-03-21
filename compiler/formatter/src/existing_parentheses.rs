@@ -197,6 +197,7 @@ impl<'a> ExistingParentheses<'a> {
                         info.indentation.with_indent(),
                         TrailingNewlineCount::One,
                         true,
+                        false,
                     )
                 };
 

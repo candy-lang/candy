@@ -99,7 +99,12 @@ impl<'a> FormattedCst<'a> {
         edits: &mut TextEdits,
         indentation: Indentation,
     ) -> Width {
-        self.into_trailing_with_indentation_detailed(edits, indentation, TrailingNewlineCount::One)
+        self.into_trailing_with_indentation_detailed(
+            edits,
+            indentation,
+            TrailingNewlineCount::One,
+            false,
+        )
     }
     #[must_use]
     pub fn into_trailing_with_indentation_detailed(
@@ -107,6 +112,7 @@ impl<'a> FormattedCst<'a> {
         edits: &mut TextEdits,
         indentation: Indentation,
         trailing_newline_count: TrailingNewlineCount,
+        is_directly_inside_body: bool,
     ) -> Width {
         &self.child_width
             + self.whitespace.into_trailing_with_indentation(
@@ -115,6 +121,7 @@ impl<'a> FormattedCst<'a> {
                 indentation,
                 trailing_newline_count,
                 !self.child_width.is_empty(),
+                is_directly_inside_body,
             )
     }
 }

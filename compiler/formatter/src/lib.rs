@@ -3,7 +3,7 @@
 #![feature(let_chains)]
 
 use candy_frontend::{cst::Cst, position::Offset};
-use existing_whitespace::TrailingWhitespace;
+use existing_whitespace::TrailingNewlineCount;
 use extension_trait::extension_trait;
 use format::{format_csts, FormattingInfo};
 use itertools::Itertools;
@@ -36,12 +36,16 @@ pub impl<C: AsRef<[Cst]>> Formatter for C {
             Offset::default(),
             &FormattingInfo::default(),
         );
-        let trailing = if formatted.child_width() == &Width::default() {
-            TrailingWhitespace::None
+        if formatted.child_width() == &Width::default() {
+            _ = formatted.into_empty_trailing(&mut edits);
         } else {
-            TrailingWhitespace::Indentation(Indentation::default())
+            _ = formatted.into_trailing_with_indentation_detailed(
+                &mut edits,
+                Indentation::default(),
+                TrailingNewlineCount::One,
+                true,
+            );
         };
-        _ = formatted.into_trailing(&mut edits, trailing);
 
         edits
     }

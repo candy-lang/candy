@@ -87,6 +87,7 @@ pub fn format_csts<'a>(
                 edits,
                 info.indentation,
                 TrailingNewlineCount::Keep,
+                true,
             )
         };
 
@@ -817,6 +818,7 @@ pub(crate) fn format_cst<'a>(
                 edits,
                 info.indentation.with_indent(),
                 TrailingNewlineCount::Zero,
+                true,
             );
 
             let is_body_in_same_line = left_width.last_line_fits(
@@ -1056,6 +1058,10 @@ mod test {
         //
         // baz
         test("foo =\n  bar\n\nbaz", "foo = bar\n\nbaz\n");
+        // foo = bar
+        //
+        // # abc
+        test("foo =\n  bar\n\n# abc", "foo = bar\n\n# abc\n");
 
         // Consecutive expressions
 

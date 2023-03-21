@@ -13,10 +13,16 @@ pub enum TrailingWhitespace {
     Space,
     Indentation(Indentation),
 }
+#[derive(Clone, Copy, Debug)]
 pub enum TrailingNewlineCount {
     Zero,
     One,
     Keep,
+}
+impl TrailingNewlineCount {
+    /// The maximum number of empty lines (i.e., containing no expression or comment) that may come
+    /// consecutively.
+    const MAX_CONSECUTIVE_EMPTY_LINES: usize = 2;
 }
 
 pub const SPACE: &str = " ";
@@ -232,6 +238,7 @@ impl<'a> ExistingWhitespace<'a> {
         indentation: Indentation,
         trailing_newline_count: TrailingNewlineCount,
         ensure_space_before_first_comment: bool,
+        is_directly_inside_body: bool,
     ) -> Width {
         fn iter_whitespace(
             whitespace: &[Cst],
@@ -265,6 +272,7 @@ impl<'a> ExistingWhitespace<'a> {
             child_width,
             indentation,
             ensure_space_before_first_comment,
+            is_directly_inside_body,
         );
 
         let owned_final_whitespace = final_whitespace
@@ -302,14 +310,11 @@ impl<'a> ExistingWhitespace<'a> {
             },
             TrailingNewlineCount::One => 1,
             TrailingNewlineCount::Keep => {
-                /// The maximum number of empty lines (i.e., containing no expression or comment) that may come
-                /// consecutively.
-                const MAX_CONSECUTIVE_EMPTY_LINES: usize = 2;
                 final_whitespace
                     .iter()
                     .filter(|(it, _)| matches!(it.kind, CstKind::Newline(_)))
                     .count()
-                    .clamp(1, 1 + MAX_CONSECUTIVE_EMPTY_LINES)
+                    .clamp(1, 1 + TrailingNewlineCount::MAX_CONSECUTIVE_EMPTY_LINES)
             }
         };
         edits.change(trailing_range, format!("{}{indentation}", NEWLINE.repeat(trailing_newline_count)));
@@ -321,6 +326,7 @@ impl<'a> ExistingWhitespace<'a> {
         child_width: &Width,
         indentation: Indentation,
         ensure_space_before_first_comment: bool,
+        is_directly_inside_body: bool,
     ) {
         enum CommentPosition {
             SameLine,
@@ -328,6 +334,14 @@ impl<'a> ExistingWhitespace<'a> {
         }
         let mut comment_position = CommentPosition::SameLine;
         let mut last_reusable_whitespace_range = None;
+
+        let mut newline_count = 0;
+        let newline_limit = if is_directly_inside_body {
+            1
+        } else {
+            TrailingNewlineCount::MAX_CONSECUTIVE_EMPTY_LINES
+        };
+
         for (item, offset_override) in comments_and_whitespace {
             let is_adopted = offset_override.is_some();
             match &item.kind {
@@ -373,9 +387,13 @@ impl<'a> ExistingWhitespace<'a> {
 
                                 comment_position = CommentPosition::NextLine { is_newline_adopted: false };
                             } else {
-                                // We already encountered and kept a newline, so we can delete this
-                                // one.
-                                edits.delete(item.data.span.to_owned());
+                                // We already encountered and kept at least one newline.
+                                
+                                if newline_count >= newline_limit {
+                                    edits.delete(item.data.span.to_owned());
+                                } else {
+                                    newline_count += 1;
+                                }
                             }
                         },
                     }
@@ -541,6 +559,7 @@ mod test {
                     indentation,
                     TrailingNewlineCount::One,
                     true,
+                    false,
                 )
             }
         };
