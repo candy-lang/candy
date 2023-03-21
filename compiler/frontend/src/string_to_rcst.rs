@@ -1903,15 +1903,12 @@ mod parse {
         assert_eq!(
             expression("foo T\n\n\nbar = 5", 0, false, true, true),
             Some((
-                "\nbar = 5",
+                "\n\n\nbar = 5",
                 CstKind::Call {
                     receiver: Box::new(build_identifier("foo").with_trailing_space()),
                     arguments: vec![build_symbol("T")],
                 }
-                .with_trailing_whitespace(vec![
-                    CstKind::Newline("\n".to_string()),
-                    CstKind::Newline("\n".to_string()),
-                ]),
+                .into(),
             )),
         );
         assert_eq!(
