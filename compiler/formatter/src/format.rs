@@ -825,12 +825,24 @@ pub(crate) fn format_cst<'a>(
                 &info.with_indent(),
             );
 
+            let body_info = if let [expression] = body.as_slice()
+                && expression.is_sandwich_like()
+                && previous_width_for_inner.last_line_fits(
+                    info.indentation,
+                    &(Width::SPACE + Width::PARENTHESIS),
+                )
+            {
+                // Avoid double indentation for bodies/items/entries in trailing lambdas/lists/structs.
+                info.to_owned()
+            } else {
+                info.with_indent()
+            };
             let body = format_csts(
                 edits,
                 &previous_width_for_inner,
                 body,
                 assignment_sign.whitespace.end_offset(),
-                &info.with_indent(),
+                &body_info,
             );
             let body_width = body.into_trailing_with_indentation_detailed(
                 edits,
@@ -839,11 +851,10 @@ pub(crate) fn format_cst<'a>(
                 true,
             );
 
-            let is_body_in_same_line = left_width.last_line_fits(
+            let assignment_sign_trailing = if let Some(body_first_line_width) = body_width.first_line_width() && left_width.last_line_fits(
                 info.indentation,
-                &(&assignment_sign.min_width(info.indentation) + Width::SPACE + &body_width),
-            );
-            let assignment_sign_trailing = if is_body_in_same_line {
+                &(&assignment_sign.min_width(info.indentation) + Width::SPACE + body_first_line_width),
+            ) {
                 TrailingWhitespace::Space
             } else {
                 TrailingWhitespace::Indentation(info.indentation.with_indent())
@@ -864,7 +875,6 @@ struct Argument<'a> {
     parentheses: ExistingParentheses<'a>,
 }
 impl<'a> Argument<'a> {
-    #[allow(unused_parens)] // False positive
     fn new(
         edits: &mut TextEdits,
         previous_width: &Width,
@@ -886,12 +896,7 @@ impl<'a> Argument<'a> {
                 argument,
                 min_singleline_width: Width::multiline(None, None),
             }
-        } else if is_last
-            && matches!(
-                argument.kind,
-                (CstKind::List { .. } | CstKind::Struct { .. } | CstKind::Lambda { .. }),
-            )
-        {
+        } else if is_last && argument.is_sandwich_like() {
             MaybeSandwichLikeArgument::SandwichLike(argument)
         } else {
             let argument = format_cst(edits, previous_width, argument, info);
@@ -980,10 +985,18 @@ pub enum PrecedenceCategory {
 }
 
 #[extension_trait]
-pub impl<D> CstHasCommentsAndPrecedence for Cst<D> {
+pub impl<D> CstExtension for Cst<D> {
     fn has_comments(&self) -> bool {
         dft_post_rev(self, |it| it.children().into_iter())
             .any(|(_, it)| matches!(it.kind, CstKind::Comment { .. }))
+    }
+
+    #[allow(unused_parens)] // False positive
+    fn is_sandwich_like(&self) -> bool {
+        matches!(
+            &self.kind,
+            (CstKind::List { .. } | CstKind::Struct { .. } | CstKind::Lambda { .. }),
+        )
     }
 
     /// Used by the parent to determine whether parentheses are necessary around this expression.
@@ -1681,6 +1694,11 @@ mod test {
             "foo = veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression",
             "foo =\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression\n",
         );
+        // foo := {
+        //   bar
+        //   baz
+        // }
+        test("foo := {\n  bar\n  baz\n}", "foo := {\n  bar\n  baz\n}\n");
 
         // Function definition
 

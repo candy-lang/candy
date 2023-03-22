@@ -1,6 +1,6 @@
 use crate::{
     existing_whitespace::{ExistingWhitespace, TrailingWhitespace},
-    format::{format_cst, CstHasCommentsAndPrecedence, FormattingInfo},
+    format::{format_cst, CstExtension, FormattingInfo},
     formatted_cst::FormattedCst,
     text_edits::TextEdits,
     width::Width,
