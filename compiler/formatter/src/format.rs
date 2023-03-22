@@ -774,8 +774,10 @@ pub(crate) fn format_cst<'a>(
             let body_trailing = if body.child_width().is_empty() {
                 TrailingWhitespace::None
             } else if !arrow_has_comments
-                && (&width_until_arrow + &space_if_parameters + &width_from_body)
-                    .fits(info.indentation)
+                && previous_width.last_line_fits(
+                    info.indentation,
+                    &(&width_until_arrow + &space_if_parameters + &width_from_body),
+                )
             {
                 TrailingWhitespace::Space
             } else {
@@ -1300,6 +1302,13 @@ mod test {
         test(
             "foo { veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression }",
             "foo {\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression\n}\n",
+        );
+        // veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression {
+        //   foo
+        // }
+        test(
+            "veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression { foo }",
+            "veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression {\n  foo\n}\n",
         );
         // foo { bar ->
         //   veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression
