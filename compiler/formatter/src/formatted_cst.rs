@@ -39,7 +39,7 @@ impl<'a> FormattedCst<'a> {
     #[must_use]
     pub fn min_width(&self, indentation: Indentation) -> Width {
         if self.whitespace.has_comments() {
-            Width::multiline(indentation.width())
+            &self.child_width + Width::multiline(0, indentation.width())
         } else {
             self.child_width.clone()
         }

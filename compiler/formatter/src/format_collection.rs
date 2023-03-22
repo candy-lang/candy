@@ -20,7 +20,7 @@ pub fn format_collection<'a>(
     let opening_punctuation = format_cst(edits, previous_width, opening_punctuation, info);
     let closing_punctuation = format_cst(
         edits,
-        &Width::multiline(info.indentation.width()),
+        &Width::multiline(None, info.indentation.width()),
         closing_punctuation,
         info,
     );
@@ -28,7 +28,7 @@ pub fn format_collection<'a>(
     let mut min_width = Width::Singleline(info.indentation.width())
         + &opening_punctuation.min_width(info.indentation)
         + &closing_punctuation.min_width(info.indentation);
-    let previous_width_for_items = Width::multiline(info.indentation.with_indent().width());
+    let previous_width_for_items = Width::multiline(None, info.indentation.with_indent().width());
     let item_info = info
         .with_indent()
         .with_trailing_comma_condition(TrailingCommaCondition::Always);
@@ -71,7 +71,7 @@ pub fn format_collection<'a>(
                 };
                 min_width = Width::from_width_and_max(old_min_width + item_min_width, max_width);
             } else {
-                min_width = Width::multiline(None);
+                min_width = Width::multiline(None, None);
             }
 
             item

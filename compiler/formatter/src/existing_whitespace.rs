@@ -272,7 +272,7 @@ impl<'a> ExistingWhitespace<'a> {
             .iter()
             .filter(|(it, _)| matches!(it.kind, CstKind::Comment { .. }))
             .count();
-        Self::format_trailing_comments(
+        let first_line_width = Self::format_trailing_comments(
             edits,
             comments_and_whitespace,
             child_width,
@@ -312,7 +312,7 @@ impl<'a> ExistingWhitespace<'a> {
                             &edits.source()[*comment.data.span.start..*comment.data.span.end];
                         space_width + comment_source.width()
                     }
-                    _ => Width::multiline(None),
+                    _ => Width::multiline(first_line_width, None),
                 };
             }
             TrailingNewlineCount::One => 1,
@@ -326,7 +326,7 @@ impl<'a> ExistingWhitespace<'a> {
             trailing_range,
             format!("{}{indentation}", NEWLINE.repeat(trailing_newline_count)),
         );
-        Width::multiline(indentation.width())
+        Width::multiline(first_line_width, indentation.width())
     }
     fn format_trailing_comments(
         edits: &mut TextEdits,
@@ -335,7 +335,8 @@ impl<'a> ExistingWhitespace<'a> {
         indentation: Indentation,
         ensure_space_before_first_comment: bool,
         is_directly_inside_body: bool,
-    ) {
+    ) -> usize {
+        let mut first_line_width = 0;
         enum CommentPosition {
             SameLine,
             NextLine { is_newline_adopted: bool },
@@ -432,8 +433,10 @@ impl<'a> ExistingWhitespace<'a> {
                                 (Cow::default(), Width::default())
                             };
                             if child_width
-                                .last_line_fits(indentation, &(space_width + comment_width))
+                                .last_line_fits(indentation, &(&space_width + &comment_width))
                             {
+                                first_line_width = space_width.singleline_width().unwrap()
+                                    + comment_width.singleline_width().unwrap();
                                 space
                             } else {
                                 Cow::Owned(format!("{NEWLINE}{indentation}"))
@@ -475,6 +478,7 @@ impl<'a> ExistingWhitespace<'a> {
             last_reusable_whitespace_range.is_none(),
             "The last CST must be a comment, so we should have consumed all whitespace.",
         );
+        first_line_width
     }
 }
 
