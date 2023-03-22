@@ -1,5 +1,5 @@
 use crate::{
-    existing_whitespace::{ExistingWhitespace, TrailingNewlineCount, TrailingWhitespace},
+    existing_whitespace::{ExistingWhitespace, TrailingWhitespace, TrailingWithIndentationConfig},
     format::{format_cst, FormattingInfo},
     formatted_cst::{FormattedCst, UnformattedCst},
     text_edits::TextEdits,
@@ -193,11 +193,10 @@ impl<'a> ExistingParentheses<'a> {
                 } else {
                     opening.whitespace.into_trailing_with_indentation(
                         edits,
-                        &(previous_width + &Width::PARENTHESIS),
-                        info.indentation.with_indent(),
-                        TrailingNewlineCount::One,
-                        true,
-                        false,
+                        &TrailingWithIndentationConfig::Trailing {
+                            previous_width: previous_width + &Width::PARENTHESIS,
+                            indentation: info.indentation.with_indent(),
+                        },
                     )
                 };
 

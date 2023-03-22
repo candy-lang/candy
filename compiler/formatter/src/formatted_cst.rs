@@ -1,5 +1,5 @@
 use crate::{
-    existing_whitespace::{ExistingWhitespace, TrailingNewlineCount, TrailingWhitespace},
+    existing_whitespace::{ExistingWhitespace, TrailingWhitespace, TrailingWithIndentationConfig},
     text_edits::TextEdits,
     width::{Indentation, Width},
 };
@@ -45,7 +45,6 @@ impl<'a> FormattedCst<'a> {
         }
     }
 
-    #[must_use]
     pub fn split(self) -> (Width, ExistingWhitespace<'a>) {
         (self.child_width, self.whitespace)
     }
@@ -101,27 +100,38 @@ impl<'a> FormattedCst<'a> {
     ) -> Width {
         self.into_trailing_with_indentation_detailed(
             edits,
-            indentation,
-            TrailingNewlineCount::One,
-            false,
+            &TrailingWithIndentationConfig::Trailing {
+                // TODO: Pass actual previous width
+                previous_width: Width::default(),
+                indentation,
+            },
         )
     }
     #[must_use]
     pub fn into_trailing_with_indentation_detailed(
         self,
         edits: &mut TextEdits,
-        indentation: Indentation,
-        trailing_newline_count: TrailingNewlineCount,
-        is_directly_inside_body: bool,
+        config: &TrailingWithIndentationConfig,
     ) -> Width {
-        &self.child_width
-            + self.whitespace.into_trailing_with_indentation(
-                edits,
-                &self.child_width,
+        let config = match config {
+            TrailingWithIndentationConfig::Body {
+                position,
                 indentation,
-                trailing_newline_count,
-                !self.child_width.is_empty(),
-                is_directly_inside_body,
-            )
+            } => TrailingWithIndentationConfig::Body {
+                position: *position,
+                indentation: *indentation,
+            },
+            TrailingWithIndentationConfig::Trailing {
+                previous_width,
+                indentation,
+            } => TrailingWithIndentationConfig::Trailing {
+                previous_width: previous_width + &self.child_width,
+                indentation: *indentation,
+            },
+        };
+        let whitespace_width = self
+            .whitespace
+            .into_trailing_with_indentation(edits, &config);
+        self.child_width + whitespace_width
     }
 }

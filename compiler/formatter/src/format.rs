@@ -1,6 +1,9 @@
 use crate::{
     existing_parentheses::ExistingParentheses,
-    existing_whitespace::{ExistingWhitespace, TrailingNewlineCount, TrailingWhitespace},
+    existing_whitespace::{
+        ExistingWhitespace, TrailingWhitespace, TrailingWithIndentationConfig,
+        WhitespacePositionInBody,
+    },
     format_collection::{
         apply_trailing_comma_condition, format_collection, TrailingCommaCondition,
     },
@@ -48,54 +51,70 @@ pub fn format_csts<'a>(
     let mut width = Width::default();
     let mut formatted =
         FormattedCst::new(Width::default(), ExistingWhitespace::empty(fallback_offset));
+    let mut expression_count = 0;
     loop {
-        {
-            // Whitespace
-            let first_expression_index = csts.iter().find_position(|cst| {
-                #[allow(unused_parens)] // False positive
-                !matches!(
-                    cst.kind,
-                    (CstKind::Whitespace(_)
-                        | CstKind::Error {
-                            error: CstError::TooMuchWhitespace,
-                            ..
-                        }
-                        | CstKind::Newline(_)
-                        | CstKind::Comment { .. }),
-                )
-            });
-            let (new_whitespace, rest) =
-                if let Some((first_expression_index, _)) = first_expression_index {
-                    csts.split_at(first_expression_index)
-                } else {
-                    (csts, [].as_slice())
-                };
-            csts = rest;
-            let new_whitespace = ExistingWhitespace::new(offset, new_whitespace);
-            new_whitespace.into_empty_and_move_comments_to(edits, &mut formatted.whitespace);
-        }
+        let (new_whitespace, rest) = split_leading_whitespace(offset, csts);
+        csts = rest;
+        new_whitespace.into_empty_and_move_comments_to(edits, &mut formatted.whitespace);
 
         // Expression
         let Some((expression, rest)) = csts.split_first() else { break; };
         csts = rest;
 
         let is_at_start = offset == fallback_offset;
-        width += if is_at_start && !formatted.whitespace.has_comments() {
-            formatted.into_empty_trailing(edits)
+        width += if is_at_start {
+            formatted.into_trailing_with_indentation_detailed(
+                edits,
+                &TrailingWithIndentationConfig::Body {
+                    position: WhitespacePositionInBody::Start,
+                    indentation: info.indentation,
+                },
+            )
         } else {
             formatted.into_trailing_with_indentation_detailed(
                 edits,
-                info.indentation,
-                TrailingNewlineCount::Keep,
-                true,
+                &TrailingWithIndentationConfig::Body {
+                    position: WhitespacePositionInBody::Middle,
+                    indentation: info.indentation,
+                },
             )
         };
 
         formatted = format_cst(edits, &(previous_width + &width), expression, info);
         offset = formatted.whitespace.end_offset();
+        expression_count += 1;
     }
 
-    FormattedCst::new(width + formatted.child_width(), formatted.whitespace)
+    width += formatted.child_width();
+    if expression_count > 1 {
+        width = width.without_first_line_width();
+    }
+
+    FormattedCst::new(width, formatted.whitespace)
+}
+
+fn split_leading_whitespace(start_offset: Offset, csts: &[Cst]) -> (ExistingWhitespace, &[Cst]) {
+    let first_expression_index = csts.iter().find_position(|cst| {
+        #[allow(unused_parens)] // False positive
+        !matches!(
+            cst.kind,
+            (CstKind::Whitespace(_)
+                | CstKind::Error {
+                    error: CstError::TooMuchWhitespace,
+                    ..
+                }
+                | CstKind::Newline(_)
+                | CstKind::Comment { .. }),
+        )
+    });
+    let (leading_whitespace, rest) =
+        if let Some((first_expression_index, _)) = first_expression_index {
+            csts.split_at(first_expression_index)
+        } else {
+            (csts, [].as_slice())
+        };
+    let leading_whitespace = ExistingWhitespace::new(start_offset, leading_whitespace);
+    (leading_whitespace, rest)
 }
 
 /// The non-trivial cases usually work in three steps, though these are often not clearly separated:
@@ -813,54 +832,69 @@ pub(crate) fn format_cst<'a>(
             assignment_sign,
             body,
         } => {
-            let left = format_cst(edits, previous_width, left, info);
-            let left_width = left.into_trailing_with_space(edits);
+            let left_width =
+                format_cst(edits, previous_width, left, info).into_trailing_with_space(edits);
+            // TODO: move assignment sign to next line if it doesn't fit
 
-            let previous_width_for_inner =
-                Width::multiline(None, info.indentation.with_indent().width());
+            let previous_width_for_assignment_sign = previous_width + &left_width;
             let assignment_sign = format_cst(
                 edits,
-                &previous_width_for_inner,
+                &previous_width_for_assignment_sign,
                 assignment_sign,
                 &info.with_indent(),
             );
 
             let body_info = if let [expression] = body.as_slice()
                 && expression.is_sandwich_like()
-                && previous_width_for_inner.last_line_fits(
+                && previous_width_for_assignment_sign.last_line_fits(
                     info.indentation,
                     &(Width::SPACE + Width::PARENTHESIS),
-                )
-            {
-                // Avoid double indentation for bodies/items/entries in trailing lambdas/lists/structs.
+                ) {
+                // Avoid double indentation for bodies/items/entries in trailing lambdas/lists/
+                // structs.
                 info.to_owned()
             } else {
                 info.with_indent()
             };
-            let body = format_csts(
+            let (body_width, body_whitespace) = format_csts(
                 edits,
-                &previous_width_for_inner,
+                &(previous_width_for_assignment_sign
+                    + assignment_sign.min_width(info.indentation)
+                    + Width::SPACE),
                 body,
                 assignment_sign.whitespace.end_offset(),
                 &body_info,
-            );
-            let body_width = body.into_trailing_with_indentation_detailed(
+            )
+            .split();
+            let body_whitespace_has_comments = body_whitespace.has_comments();
+            let body_whitespace_width = body_whitespace.into_trailing_with_indentation(
                 edits,
-                info.indentation.with_indent(),
-                TrailingNewlineCount::Zero,
-                true,
+                &TrailingWithIndentationConfig::Body {
+                    position: WhitespacePositionInBody::End,
+                    indentation: info.indentation.with_indent(),
+                },
             );
 
-            let assignment_sign_trailing = if let Some(body_first_line_width) = body_width.first_line_width() && left_width.last_line_fits(
+            let assignment_sign_trailing = if left_width.last_line_fits(
                 info.indentation,
-                &(&assignment_sign.min_width(info.indentation) + Width::SPACE + body_first_line_width),
+                &(&assignment_sign.min_width(info.indentation) + Width::SPACE + &body_width + &body_whitespace_width),
+            ) {
+                TrailingWhitespace::Space
+            } else if !body_whitespace_has_comments
+                && let Some(body_first_line_width) = body_width.first_line_width()
+                && left_width.last_line_fits(
+                    info.indentation,
+                    &(&assignment_sign.min_width(info.indentation) + Width::SPACE + body_first_line_width),
             ) {
                 TrailingWhitespace::Space
             } else {
                 TrailingWhitespace::Indentation(info.indentation.with_indent())
             };
 
-            left_width + assignment_sign.into_trailing(edits, assignment_sign_trailing) + body_width
+            left_width
+                + assignment_sign.into_trailing(edits, assignment_sign_trailing)
+                + body_width
+                + &body_whitespace_width
         }
         CstKind::Error {
             unparsable_input, ..
@@ -1684,6 +1718,10 @@ mod test {
         test("foo = bar", "foo = bar\n");
         test("foo =\n  bar ", "foo = bar\n");
         test("foo := bar", "foo := bar\n");
+        // foo =
+        //   bar
+        //   baz
+        test("foo =\n  bar\n  baz", "foo =\n  bar\n  baz\n");
         test(
             "foo = veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression",
             "foo = veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression\n",
