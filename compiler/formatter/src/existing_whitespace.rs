@@ -1,4 +1,9 @@
-use crate::{text_edits::TextEdits, width::{Width, StringWidth}, Indentation, format::{format_cst, FormattingInfo}};
+use crate::{
+    format::{format_cst, FormattingInfo},
+    text_edits::TextEdits,
+    width::{StringWidth, Width},
+    Indentation,
+};
 use candy_frontend::{
     cst::{Cst, CstError, CstKind},
     position::Offset,
@@ -105,8 +110,7 @@ impl<'a> ExistingWhitespace<'a> {
         other: &mut ExistingWhitespace<'a>,
     ) {
         if let Some(whitespace) = self.whitespace.first() && matches!(whitespace.kind, CstKind::Whitespace(_)) {
-            let span = 
-            match &mut self.whitespace {
+            let span = match &mut self.whitespace {
                 Cow::Borrowed(whitespace) => {
                     let (first, remaining) = whitespace.split_first().unwrap();
                     *whitespace = remaining;
@@ -126,8 +130,7 @@ impl<'a> ExistingWhitespace<'a> {
         edits: &mut TextEdits,
         other: &mut ExistingWhitespace<'a>,
     ) {
-        if self.is_empty()
-        {
+        if self.is_empty() {
             return;
         }
 
@@ -264,8 +267,11 @@ impl<'a> ExistingWhitespace<'a> {
             .rposition(|(it, _)| matches!(it.kind, CstKind::Comment { .. }));
         let split_index = last_comment_index.map(|it| it + 1).unwrap_or_default();
         let (comments_and_whitespace, final_whitespace) = whitespace.split_at(split_index);
-        
-        let comment_count = comments_and_whitespace.iter().filter(|(it, _)| matches!(it.kind, CstKind::Comment { .. })).count();
+
+        let comment_count = comments_and_whitespace
+            .iter()
+            .filter(|(it, _)| matches!(it.kind, CstKind::Comment { .. }))
+            .count();
         Self::format_trailing_comments(
             edits,
             comments_and_whitespace,
@@ -302,22 +308,24 @@ impl<'a> ExistingWhitespace<'a> {
                             .unwrap()
                             .0;
                         // TOOD: Use width of the formatted comment
-                        let comment_source = &edits.source()[*comment.data.span.start..*comment.data.span.end];
+                        let comment_source =
+                            &edits.source()[*comment.data.span.start..*comment.data.span.end];
                         space_width + comment_source.width()
-                    },
+                    }
                     _ => Width::multiline(None),
                 };
-            },
-            TrailingNewlineCount::One => 1,
-            TrailingNewlineCount::Keep => {
-                final_whitespace
-                    .iter()
-                    .filter(|(it, _)| matches!(it.kind, CstKind::Newline(_)))
-                    .count()
-                    .clamp(1, 1 + TrailingNewlineCount::MAX_CONSECUTIVE_EMPTY_LINES)
             }
+            TrailingNewlineCount::One => 1,
+            TrailingNewlineCount::Keep => final_whitespace
+                .iter()
+                .filter(|(it, _)| matches!(it.kind, CstKind::Newline(_)))
+                .count()
+                .clamp(1, 1 + TrailingNewlineCount::MAX_CONSECUTIVE_EMPTY_LINES),
         };
-        edits.change(trailing_range, format!("{}{indentation}", NEWLINE.repeat(trailing_newline_count)));
+        edits.change(
+            trailing_range,
+            format!("{}{indentation}", NEWLINE.repeat(trailing_newline_count)),
+        );
         Width::multiline(indentation.width())
     }
     fn format_trailing_comments(
@@ -365,12 +373,14 @@ impl<'a> ExistingWhitespace<'a> {
                                 edits.delete(range);
                                 last_reusable_whitespace_range = None;
                             }
-                            
-                            comment_position = CommentPosition::NextLine { is_newline_adopted: is_adopted };
+
+                            comment_position = CommentPosition::NextLine {
+                                is_newline_adopted: is_adopted,
+                            };
                             if !is_adopted {
                                 edits.change(item.data.span.to_owned(), NEWLINE);
                             }
-                        },
+                        }
                         CommentPosition::NextLine { is_newline_adopted } => {
                             if is_adopted {
                                 // We already encountered a newline (owned or adopted) and the new
@@ -385,17 +395,19 @@ impl<'a> ExistingWhitespace<'a> {
                                     last_reusable_whitespace_range = None;
                                 }
 
-                                comment_position = CommentPosition::NextLine { is_newline_adopted: false };
+                                comment_position = CommentPosition::NextLine {
+                                    is_newline_adopted: false,
+                                };
                             } else {
                                 // We already encountered and kept at least one newline.
-                                
+
                                 if newline_count >= newline_limit {
                                     edits.delete(item.data.span.to_owned());
                                 } else {
                                     newline_count += 1;
                                 }
                             }
-                        },
+                        }
                     }
                 }
                 CstKind::Comment { comment, .. } => {
@@ -407,7 +419,8 @@ impl<'a> ExistingWhitespace<'a> {
                             indentation,
                             trailing_comma_condition: None,
                         },
-                    ).split();
+                    )
+                    .split();
                     assert!(comment_whitespace.is_empty());
                     _ = comment_whitespace;
 
@@ -418,12 +431,14 @@ impl<'a> ExistingWhitespace<'a> {
                             } else {
                                 (Cow::default(), Width::default())
                             };
-                            if child_width.last_line_fits(indentation, &(space_width + comment_width)) {
+                            if child_width
+                                .last_line_fits(indentation, &(space_width + comment_width))
+                            {
                                 space
                             } else {
                                 Cow::Owned(format!("{NEWLINE}{indentation}"))
                             }
-                        },
+                        }
                         CommentPosition::NextLine { is_newline_adopted } => {
                             if is_newline_adopted {
                                 edits.insert(
@@ -507,7 +522,12 @@ where
 #[cfg(test)]
 mod test {
     use super::TrailingWhitespace;
-    use crate::{text_edits::TextEdits, width::{Indentation, Width}, existing_whitespace::TrailingNewlineCount, format::{format_cst, FormattingInfo}};
+    use crate::{
+        existing_whitespace::TrailingNewlineCount,
+        format::{format_cst, FormattingInfo},
+        text_edits::TextEdits,
+        width::{Indentation, Width},
+    };
     use candy_frontend::{cst::CstKind, rcst_to_cst::RcstsToCstsExt, string_to_rcst::parse_rcst};
 
     #[test]
@@ -548,20 +568,25 @@ mod test {
         let reduced_source = cst.to_string();
 
         let mut edits = TextEdits::new(reduced_source);
-        let (child_width, whitespace) = format_cst(&mut edits, &Width::default(), &cst, &FormattingInfo::default()).split();
-         _ = match trailing.into() {
+        let (child_width, whitespace) = format_cst(
+            &mut edits,
+            &Width::default(),
+            &cst,
+            &FormattingInfo::default(),
+        )
+        .split();
+        _ = match trailing.into() {
             TrailingWhitespace::None => whitespace.into_empty_trailing(&mut edits),
             TrailingWhitespace::Space => whitespace.into_trailing_with_space(&mut edits),
-            TrailingWhitespace::Indentation(indentation) => {
-                whitespace.into_trailing_with_indentation(
+            TrailingWhitespace::Indentation(indentation) => whitespace
+                .into_trailing_with_indentation(
                     &mut edits,
                     &child_width,
                     indentation,
                     TrailingNewlineCount::One,
                     true,
                     false,
-                )
-            }
+                ),
         };
         assert_eq!(edits.apply(), expected);
     }
