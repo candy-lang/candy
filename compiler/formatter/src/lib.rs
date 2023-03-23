@@ -1,5 +1,9 @@
 #![feature(anonymous_lifetime_in_impl_trait)]
 #![feature(box_patterns)]
+#![feature(const_cmp)]
+#![feature(const_convert)]
+#![feature(const_default_impls)]
+#![feature(const_trait_impl)]
 #![feature(let_chains)]
 
 use candy_frontend::{cst::Cst, position::Offset};

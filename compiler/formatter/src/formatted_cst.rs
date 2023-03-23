@@ -1,7 +1,7 @@
 use crate::{
     existing_whitespace::{ExistingWhitespace, TrailingWhitespace, TrailingWithIndentationConfig},
     text_edits::TextEdits,
-    width::{Indentation, Width},
+    width::{Indentation, SinglelineWidth, Width},
 };
 use candy_frontend::cst::Cst;
 
@@ -39,7 +39,7 @@ impl<'a> FormattedCst<'a> {
     #[must_use]
     pub fn min_width(&self, indentation: Indentation) -> Width {
         if self.whitespace.has_comments() {
-            &self.child_width + Width::multiline(0, indentation.width())
+            &self.child_width + Width::multiline(SinglelineWidth::default(), indentation.width())
         } else {
             self.child_width.clone()
         }
@@ -57,7 +57,7 @@ impl<'a> FormattedCst<'a> {
     ) -> Width {
         self.whitespace
             .into_space_and_move_comments_to(edits, other);
-        self.child_width + Width::SPACE
+        self.child_width + SinglelineWidth::SPACE
     }
     #[must_use]
     pub fn into_empty_and_move_comments_to(

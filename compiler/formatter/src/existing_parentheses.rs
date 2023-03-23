@@ -3,7 +3,7 @@ use crate::{
     format::{format_cst, FormattingInfo},
     formatted_cst::{FormattedCst, UnformattedCst},
     text_edits::TextEdits,
-    width::Width,
+    width::{SinglelineWidth, Width},
 };
 use candy_frontend::{
     cst::{Cst, CstKind},
@@ -151,9 +151,9 @@ impl<'a> ExistingParentheses<'a> {
         let fits_in_one_line = !self.are_required_due_to_comments()
             && previous_width.last_line_fits(
                 info.indentation,
-                &(&Width::PARENTHESIS
+                &(&SinglelineWidth::PARENTHESIS.into()
                     + child.min_width(info.indentation.with_indent())
-                    + &Width::PARENTHESIS),
+                    + &SinglelineWidth::PARENTHESIS.into()),
             );
         let child_trailing = if fits_in_one_line {
             TrailingWhitespace::None
@@ -163,13 +163,13 @@ impl<'a> ExistingParentheses<'a> {
         match self {
             ExistingParentheses::None { child_start_offset } => {
                 let (opening, opening_width) = if fits_in_one_line {
-                    (Cow::Borrowed("("), Width::PARENTHESIS.clone())
+                    (Cow::Borrowed("("), SinglelineWidth::PARENTHESIS)
                 } else {
                     (
                         Cow::Owned(format!("(\n{}", info.indentation.with_indent())),
                         // We don't have to calculate the exact width here since the child's width
                         // includes a newline.
-                        Width::default(),
+                        SinglelineWidth::default(),
                     )
                 };
                 edits.insert(child_start_offset, opening);
@@ -180,7 +180,7 @@ impl<'a> ExistingParentheses<'a> {
                 edits.insert(child_end_offset, ")");
 
                 FormattedCst::new(
-                    opening_width + child_width + &Width::PARENTHESIS,
+                    &opening_width.into() + child_width + &SinglelineWidth::PARENTHESIS.into(),
                     ExistingWhitespace::empty(child_end_offset),
                 )
             }
@@ -189,12 +189,12 @@ impl<'a> ExistingParentheses<'a> {
                     .into_empty_trailing(edits);
 
                 let opening_whitespace_width = if fits_in_one_line {
-                    opening.whitespace.into_empty_trailing(edits)
+                    opening.whitespace.into_empty_trailing(edits).into()
                 } else {
                     opening.whitespace.into_trailing_with_indentation(
                         edits,
                         &TrailingWithIndentationConfig::Trailing {
-                            previous_width: previous_width + &Width::PARENTHESIS,
+                            previous_width: previous_width + SinglelineWidth::PARENTHESIS,
                             indentation: info.indentation.with_indent(),
                         },
                     )
@@ -217,8 +217,8 @@ impl<'a> ExistingParentheses<'a> {
     }
 }
 
-impl Width {
-    pub const PARENTHESIS: Width = Width::Singleline(1);
+impl SinglelineWidth {
+    pub const PARENTHESIS: SinglelineWidth = 1.into();
 }
 
 fn split_whitespace(cst: &Cst) -> UnformattedCst {

@@ -3,7 +3,7 @@ use crate::{
     format::{format_cst, CstExtension, FormattingInfo},
     formatted_cst::FormattedCst,
     text_edits::TextEdits,
-    width::Width,
+    width::{SinglelineWidth, Width},
 };
 use candy_frontend::{cst::Cst, position::Offset};
 use itertools::Itertools;
@@ -46,7 +46,7 @@ pub fn format_collection<'a>(
             let info = if !is_comma_required && let Width::Singleline(min_width) = min_width {
                     // We're looking at the last item and everything might fit in one line.
                     let max_width = Width::MAX - min_width;
-                    assert!(max_width > 0);
+                    assert!(!max_width.is_empty());
 
                     item_info.with_trailing_comma_condition(
                         TrailingCommaCondition::UnlessFitsIn(max_width),
@@ -62,10 +62,10 @@ pub fn format_collection<'a>(
                     (item_min_width, Width::MAX)
                 } else {
                     // We need an additional column for the trailing space after the comma.
-                    let item_min_width = item_min_width + 1;
+                    let item_min_width = item_min_width + SinglelineWidth::from(1);
 
                     // The last item needs at least one column of space.
-                    let max_width = Width::MAX - 1;
+                    let max_width = Width::MAX - SinglelineWidth::from(1);
 
                     (item_min_width, max_width)
                 };
@@ -122,7 +122,7 @@ pub enum TrailingCommaCondition {
 
     /// Add a trailing comma if the element fits in a single line and is at most
     /// this wide.
-    UnlessFitsIn(usize),
+    UnlessFitsIn(SinglelineWidth),
 }
 
 pub fn apply_trailing_comma_condition<'a>(
@@ -143,13 +143,13 @@ pub fn apply_trailing_comma_condition<'a>(
     if should_have_comma {
         let whitespace = if let Some(comma) = comma {
             let comma = format_cst(edits, previous_width, comma, info);
-            assert_eq!(comma.child_width(), &Width::COMMA);
+            assert_eq!(comma.child_width(), &SinglelineWidth::COMMA.into());
             comma.whitespace
         } else {
             edits.insert(fallback_offset, ",");
             ExistingWhitespace::empty(fallback_offset)
         };
-        (Width::COMMA, whitespace)
+        (SinglelineWidth::COMMA.into(), whitespace)
     } else if let Some(comma) = comma {
         if comma.has_comments() {
             // This last item can't fit on one line, so we do have to keep the comma.
@@ -166,6 +166,6 @@ pub fn apply_trailing_comma_condition<'a>(
     }
 }
 
-impl Width {
-    const COMMA: Width = Width::Singleline(1);
+impl SinglelineWidth {
+    const COMMA: SinglelineWidth = SinglelineWidth::from(1);
 }

@@ -1,7 +1,7 @@
 use crate::{
     format::{format_cst, FormattingInfo},
     text_edits::TextEdits,
-    width::Width,
+    width::{SinglelineWidth, Width},
     Indentation,
 };
 use candy_frontend::{
@@ -222,17 +222,17 @@ impl<'a> ExistingWhitespace<'a> {
             || check(&self.adopted_whitespace_after)
     }
 
-    pub fn into_empty_trailing(self, edits: &mut TextEdits) -> Width {
+    pub fn into_empty_trailing(self, edits: &mut TextEdits) -> SinglelineWidth {
         assert!(!self.has_comments());
 
         for whitespace in self.whitespace_ref() {
             edits.delete(whitespace.data.span.to_owned());
         }
 
-        Width::default()
+        SinglelineWidth::default()
     }
     #[must_use]
-    pub fn into_trailing_with_space(self, edits: &mut TextEdits) -> Width {
+    pub fn into_trailing_with_space(self, edits: &mut TextEdits) -> SinglelineWidth {
         assert!(!self.has_comments());
 
         if let Some((first, last)) = first_and_last(self.whitespace.as_ref()) {
@@ -240,7 +240,7 @@ impl<'a> ExistingWhitespace<'a> {
         } else {
             edits.insert(self.start_offset, SPACE);
         }
-        Width::SPACE
+        SinglelineWidth::SPACE
     }
 
     #[must_use]
@@ -319,7 +319,7 @@ impl<'a> ExistingWhitespace<'a> {
             trailing_range,
             format!("{}{indentation}", NEWLINE.repeat(trailing_newline_count)),
         );
-        comments_width + Width::multiline(0, indentation.width())
+        comments_width + Width::NEWLINE + indentation.width()
     }
     fn format_trailing_comments(
         edits: &mut TextEdits,
@@ -392,7 +392,7 @@ impl<'a> ExistingWhitespace<'a> {
                         };
 
                         comment_position = CommentPosition::NextLine(newline_count);
-                        width += Width::multiline(0, 0);
+                        width += Width::NEWLINE;
                     }
                     CommentPosition::NextLine(_) if is_adopted => {
                         // We already encountered a newline (owned or adopted) and the new
@@ -419,7 +419,7 @@ impl<'a> ExistingWhitespace<'a> {
                             edits.delete(item.data.span.to_owned());
                         } else {
                             *count = count.checked_add(1).unwrap();
-                            width += Width::multiline(0, 0);
+                            width += Width::NEWLINE;
                         }
                     }
                 },
@@ -440,17 +440,18 @@ impl<'a> ExistingWhitespace<'a> {
                     let space = match comment_position {
                         CommentPosition::FirstLine => {
                             let (space, space_width) = if ensure_space_before_first_comment {
-                                (Cow::Borrowed(SPACE), Width::SPACE)
+                                (Cow::Borrowed(SPACE), SinglelineWidth::SPACE)
                             } else {
-                                (Cow::default(), Width::default())
+                                (Cow::default(), SinglelineWidth::default())
                             };
-                            if previous_width
-                                .last_line_fits(indentation, &(&space_width + &comment_width))
-                            {
-                                width += space_width;
+                            if previous_width.last_line_fits(
+                                indentation,
+                                &(&space_width.into() + &comment_width),
+                            ) {
+                                width += &space_width.into();
                                 space
                             } else {
-                                width += Width::multiline(0, indentation.width());
+                                width += Width::NEWLINE + indentation.width();
                                 Cow::Owned(format!("{NEWLINE}{indentation}"))
                             }
                         }
@@ -465,11 +466,9 @@ impl<'a> ExistingWhitespace<'a> {
                                             .unwrap_or(item.data.span.start),
                                         NEWLINE,
                                     );
-                                    width += Width::multiline(0, indentation.width());
+                                    width += Width::NEWLINE + indentation.width();
                                 }
-                                NewlineCount::Owned(_) => {
-                                    width += Width::Singleline(indentation.width());
-                                }
+                                NewlineCount::Owned(_) => width += &indentation.width().into(),
                             }
                             Cow::Owned(indentation.to_string())
                         }
@@ -566,17 +565,21 @@ mod test {
 
     #[test]
     fn test_trailing_with_indentation() {
-        test("foo\n  End", Indentation(1), "foo\n  ");
-        test("foo \n  End", Indentation(1), "foo\n  ");
-        test("foo End", Indentation(2), "foo\n    ");
-        test("foo \n  End", Indentation(2), "foo\n    ");
+        test("foo\n  End", Indentation::from(1), "foo\n  ");
+        test("foo \n  End", Indentation::from(1), "foo\n  ");
+        test("foo End", Indentation::from(2), "foo\n    ");
+        test("foo \n  End", Indentation::from(2), "foo\n    ");
 
         // Comments
-        test("foo# abc\n  End", Indentation(1), "foo # abc\n  ");
-        test("foo # abc\n  End", Indentation(1), "foo # abc\n  ");
-        test("foo  # abc\n  End", Indentation(1), "foo # abc\n  ");
-        test("foo\n  # abc\n  End", Indentation(1), "foo\n  # abc\n  ");
-        test("foo # abc \n  End", Indentation(1), "foo # abc\n  ");
+        test("foo# abc\n  End", Indentation::from(1), "foo # abc\n  ");
+        test("foo # abc\n  End", Indentation::from(1), "foo # abc\n  ");
+        test("foo  # abc\n  End", Indentation::from(1), "foo # abc\n  ");
+        test(
+            "foo\n  # abc\n  End",
+            Indentation::from(1),
+            "foo\n  # abc\n  ",
+        );
+        test("foo # abc \n  End", Indentation::from(1), "foo # abc\n  ");
     }
 
     fn test(source: &str, trailing: impl Into<TrailingWhitespace>, expected: &str) {
@@ -597,17 +600,18 @@ mod test {
             &FormattingInfo::default(),
         )
         .split();
-        _ = match trailing.into() {
-            TrailingWhitespace::None => whitespace.into_empty_trailing(&mut edits),
-            TrailingWhitespace::Space => whitespace.into_trailing_with_space(&mut edits),
-            TrailingWhitespace::Indentation(indentation) => whitespace
-                .into_trailing_with_indentation(
+        match trailing.into() {
+            TrailingWhitespace::None => _ = whitespace.into_empty_trailing(&mut edits),
+            TrailingWhitespace::Space => _ = whitespace.into_trailing_with_space(&mut edits),
+            TrailingWhitespace::Indentation(indentation) => {
+                _ = whitespace.into_trailing_with_indentation(
                     &mut edits,
                     &TrailingWithIndentationConfig::Trailing {
                         previous_width: child_width,
                         indentation,
                     },
-                ),
+                )
+            }
         };
         assert_eq!(edits.apply(), expected);
     }
