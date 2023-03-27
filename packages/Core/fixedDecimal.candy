@@ -2,6 +2,7 @@
 # to that. Currently, they're just normal ints.
 
 bool = use "..bool"
+[check] = use "..check"
 [ifElse, recursive] = use "..controlFlow"
 [equals] = use "..equality"
 [run] = use "..function"
@@ -45,7 +46,7 @@ divide dividend divisor :=
 compareTo valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  result = valueA | int.compare valueB
+  result = valueA | int.compareTo valueB
   check (equals result Equal | bool.implies (equals valueA valueB))
   result
 isLessThan valueA valueB :=
