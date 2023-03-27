@@ -1091,8 +1091,7 @@ pub impl<D> CstExtension for Cst<D> {
             }
             CstKind::OpeningText { .. } | CstKind::ClosingText { .. } => None,
             CstKind::Text { .. } => Some(PrecedenceCategory::High),
-            CstKind::TextPart(_) => todo!(),
-            CstKind::TextInterpolation { .. } => None,
+            CstKind::TextPart(_) | CstKind::TextInterpolation { .. } => None,
             CstKind::BinaryBar { .. } => Some(PrecedenceCategory::Low),
             CstKind::Parenthesized { .. } => Some(PrecedenceCategory::High),
             CstKind::Call { .. } => Some(PrecedenceCategory::Low),
