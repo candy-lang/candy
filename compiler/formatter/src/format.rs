@@ -22,20 +22,31 @@ use traversal::dft_post_rev;
 #[derive(Clone, Default)]
 pub struct FormattingInfo {
     pub indentation: Indentation,
+
+    // The fields below apply only for direct descendants.
     pub trailing_comma_condition: Option<TrailingCommaCondition>,
+    pub is_single_expression_in_assignment_body: bool,
 }
 impl FormattingInfo {
     pub fn with_indent(&self) -> Self {
         Self {
             indentation: self.indentation.with_indent(),
-            // Only applies for direct descendants.
             trailing_comma_condition: None,
+            is_single_expression_in_assignment_body: false,
         }
     }
     pub fn with_trailing_comma_condition(&self, condition: TrailingCommaCondition) -> Self {
         Self {
             indentation: self.indentation,
             trailing_comma_condition: Some(condition),
+            is_single_expression_in_assignment_body: false,
+        }
+    }
+    pub fn for_single_expression_in_assignment_body(&self) -> Self {
+        Self {
+            indentation: self.indentation,
+            trailing_comma_condition: None,
+            is_single_expression_in_assignment_body: true,
         }
     }
 }
@@ -349,8 +360,17 @@ pub(crate) fn format_cst<'a>(
                 return receiver;
             }
 
+            let info_for_arguments = if info.is_single_expression_in_assignment_body
+                && previous_width
+                    .last_line_fits(info.indentation, &receiver.min_width(info.indentation))
+            {
+                info.to_owned()
+            } else {
+                info.with_indent()
+            };
+
             let previous_width_for_arguments =
-                Width::multiline(None, info.indentation.with_indent().width());
+                Width::multiline(None, info_for_arguments.indentation.width());
             let last_argument_index = arguments.len() - 1;
             let mut arguments = arguments
                 .iter()
@@ -360,7 +380,7 @@ pub(crate) fn format_cst<'a>(
                         edits,
                         &previous_width_for_arguments,
                         argument,
-                        &info.with_indent(),
+                        &info_for_arguments,
                         index == last_argument_index,
                     )
                 })
@@ -375,10 +395,11 @@ pub(crate) fn format_cst<'a>(
                 if previous_width.last_line_fits(info.indentation, &min_width) {
                     (true, info.to_owned(), TrailingWhitespace::Space)
                 } else {
+                    let indentation = info_for_arguments.indentation;
                     (
                         false,
-                        info.with_indent(),
-                        TrailingWhitespace::Indentation(info.indentation.with_indent()),
+                        info_for_arguments,
+                        TrailingWhitespace::Indentation(indentation),
                     )
                 };
 
@@ -850,15 +871,10 @@ pub(crate) fn format_cst<'a>(
                 &info.with_indent(),
             );
 
-            let body_info = if let [expression] = body.as_slice()
-                && expression.is_sandwich_like()
-                && previous_width_for_assignment_sign.last_line_fits(
-                    info.indentation,
-                    &(SinglelineWidth::SPACE + SinglelineWidth::PARENTHESIS).into(),
-                ) {
+            let body_info = if body.len() == 1 {
                 // Avoid double indentation for bodies/items/entries in trailing lambdas/lists/
                 // structs.
-                info.to_owned()
+                info.for_single_expression_in_assignment_body()
             } else {
                 info.with_indent()
             };
@@ -1720,37 +1736,36 @@ mod test {
     }
     #[test]
     fn test_assignment() {
-        // // Simple assignment
+        // Simple assignment
 
-        // test("foo = bar", "foo = bar\n");
-        // test("foo=bar", "foo = bar\n");
-        // test("foo = bar", "foo = bar\n");
-        // test("foo =\n  bar ", "foo = bar\n");
-        // test("foo := bar", "foo := bar\n");
-        // // foo =
-        // //   bar
-        // //   baz
-        // test("foo =\n  bar\n  baz", "foo =\n  bar\n  baz\n");
-        // test(
-        //     "foo = veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression",
-        //     "foo = veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression\n",
-        // );
-        // // foo =
-        // //   veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression
-        // test(
-        //     "foo = veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression",
-        //     "foo =\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression\n",
-        // );
-        // // foo := {
-        // //   bar
-        // //   baz
-        // // }
-        // test("foo := {\n  bar\n  baz\n}", "foo := {\n  bar\n  baz\n}\n");
-        // // foo = bar {
-        // //   baz
-        // //   blub
-        // //
-        // TODO: specialize assignment to detect a single call?
+        test("foo = bar", "foo = bar\n");
+        test("foo=bar", "foo = bar\n");
+        test("foo = bar", "foo = bar\n");
+        test("foo =\n  bar ", "foo = bar\n");
+        test("foo := bar", "foo := bar\n");
+        // foo =
+        //   bar
+        //   baz
+        test("foo =\n  bar\n  baz", "foo =\n  bar\n  baz\n");
+        test(
+            "foo = veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression",
+            "foo = veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression\n",
+        );
+        // foo =
+        //   veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression
+        test(
+            "foo = veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression",
+            "foo =\n  veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongExpression\n",
+        );
+        // foo := {
+        //   bar
+        //   baz
+        // }
+        test("foo := {\n  bar\n  baz\n}", "foo := {\n  bar\n  baz\n}\n");
+        // foo = bar {
+        //   baz
+        //   blub
+        //
         test(
             "foo = bar {\n  baz\n  blub\n}",
             "foo = bar {\n  baz\n  blub\n}\n",
