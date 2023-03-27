@@ -827,8 +827,8 @@ impl PatternContext {
             | AstKind::Assignment(_)
             | AstKind::Match(_)
             | AstKind::MatchCase(_) => {
-                unreachable!(
-                    "AST pattern can't contain struct access, lambda, call, assignment, match, or match case."
+                panic!(
+                    "AST pattern can't contain struct access, lambda, call, assignment, match, or match case, but found {ast:?}."
                 )
             }
             AstKind::OrPattern(OrPattern(patterns)) => {
