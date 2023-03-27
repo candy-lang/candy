@@ -302,7 +302,7 @@ impl<'a> ExistingWhitespace<'a> {
                 return comments_width;
             }
             TrailingWithIndentationConfig::Body {
-                position: WhitespacePositionInBody::Middle,
+                position: WhitespacePositionInBody::Start | WhitespacePositionInBody::Middle,
                 indentation,
             } => {
                 let trailing_newline_count = final_whitespace

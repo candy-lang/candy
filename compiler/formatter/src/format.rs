@@ -1186,6 +1186,10 @@ mod test {
         // Comments
 
         // # abc
+        //
+        // foo
+        test("# abc\n\nfoo", "# abc\n\nfoo\n");
+        // # abc
         // foo
         test("# abc\nfoo", "# abc\nfoo\n");
         // foo # abc
