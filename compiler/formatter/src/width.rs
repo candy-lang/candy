@@ -23,9 +23,7 @@ impl Indentation {
 }
 impl Display for Indentation {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        for _ in 0..self.0 {
-            write!(f, "  ")?;
-        }
+        write!(f, "{}", "  ".repeat(self.0))?;
         Ok(())
     }
 }
