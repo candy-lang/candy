@@ -186,7 +186,7 @@ impl<'a> ExistingWhitespace<'a> {
                 && self.adopted_whitespace_after.is_empty()
                 && !edits.has_edit_at(self.start_offset)
             {
-                // Simple case: The whitespace is adopted by directly precedinb whitespace.
+                // Simple case: The whitespace is adopted by directly preceding whitespace.
                 append(self.whitespace, &mut other.whitespace);
                 append(self.adopted_whitespace_after, &mut other.whitespace);
                 return;
