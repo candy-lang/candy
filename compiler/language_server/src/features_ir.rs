@@ -284,6 +284,12 @@ impl IrConfig {
         let original_scheme = details.get("scheme").unwrap().as_str().unwrap();
         let original_uri = format!("{original_scheme}:{path}").parse().unwrap();
 
+        let module_kind = match details.get("moduleKind").unwrap().as_str().unwrap() {
+            "code" => ModuleKind::Code,
+            "asset" => ModuleKind::Asset,
+            module_kind => panic!("Unknown module kind: `{module_kind}`"),
+        };
+
         let tracing_config = details
             .remove("tracingConfig")
             .map(|it| serde_json::from_value(it).unwrap());
@@ -299,16 +305,8 @@ impl IrConfig {
         };
 
         IrConfig {
-            module: module_from_package_root_and_url(
-                package_root,
-                &original_uri,
-                if path.ends_with(".candy") {
-                    ModuleKind::Code
-                } else {
-                    ModuleKind::Asset
-                },
-            )
-            .unwrap(),
+            module: module_from_package_root_and_url(package_root, &original_uri, module_kind)
+                .unwrap(),
             ir,
         }
     }
