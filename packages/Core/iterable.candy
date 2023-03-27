@@ -74,9 +74,7 @@ withIndex iterable :=
 
 # TODO: ensure this works with tail recursion
 foldLeftHelper = { foldLeftHelper iterable value combine ->
-  iterable
-  | next
-  | result.map { it ->
+  iterable | next | result.map { it ->
     [item, rest] = it
     newValue = combine value item
     foldLeftHelper foldLeftHelper rest newValue combine
@@ -92,9 +90,7 @@ foldLeft iterable initialValue combine :=
 reduceLeft iterable combine :=
   needs (is iterable)
   needs (function.is2 combine)
-  iterable
-  | next
-  | result.mapError { _ -> "Can't `reduceLeft` an empty iterable" }
+  iterable | next | result.mapError { _ -> "Can't `reduceLeft` an empty iterable" }
   | result.map { it ->
     [item, rest] = it
     rest | foldLeft item combine
@@ -143,9 +139,7 @@ joinToText iterable :=
 
 whereHelper = { whereHelper iterable tester ->
   generateWithState iterable { iterable ->
-    iterable
-    | next
-    | result.flatMap { itemAndRest ->
+    iterable | next | result.flatMap { itemAndRest ->
       [item, rest] = itemAndRest
       ifElse (tester item) { result.ok [item, State: rest] } { whereHelper rest tester | next }
     }
@@ -157,40 +151,28 @@ where iterable tester :=
   whereHelper whereHelper iterable tester
 
 takeWhile iterable tester = generateWithState iterable { iterable ->
-  iterable
-  | next
-  | result.flatMap { itemAndRest ->
+  iterable | next | result.flatMap { itemAndRest ->
     [item, rest] = itemAndRest
-    ifElse (tester item) {
-      result.ok [item, State: rest]
-    } {
-      result.error Empty
-    }
+    ifElse (tester item) { result.ok [item, State: rest] } { result.error Empty }
   }
 }
 
 takeUntil iterable tester = iterable | takeWhile { item -> tester item | bool.not }
 
-take iterable n := 
+take iterable n :=
   needs (is iterable)
   needs (int.is n)
   needs (int.isNonNegative n)
 
-  iterable
-  | withIndex
-  | takeWhile { it ->
+  iterable | withIndex | takeWhile { it ->
     [item, index] = it
     index | int.isLessThan n
   }
   | map { it -> it.item }
 
 skipHelper = { skipHelper iterable n ->
-  ifElse (equals n 0) {
-    iterable
-  } {
-    remaining = iterable | next
-    | result.map { it -> it.rest }
-    | result.unwrapOr {}
+  ifElse (equals n 0) { iterable } {
+    remaining = iterable | next | result.map { it -> it.rest } | result.unwrapOr { }
     skipHelper skipHelper remaining (n | int.subtract 1)
   }
 }
@@ -219,11 +201,10 @@ fromList l :=
   # The state contains the list and an index.
   generateWithState [l, Index: 0] { state ->
     [l, index] = state
-    ifElse (l | list.isValidIndex index) {
-      result.ok [Item: l | list.get index, State: [l, Index: index | int.add 1]]
-    } {
-      result.error Empty
-    }
+    ifElse
+      l | list.isValidIndex index
+      { result.ok [Item: l | list.get index, State: [l, Index: index | int.add 1]] }
+      { result.error Empty }
   }
 
 toList iterable :=
@@ -243,14 +224,10 @@ windowed iterable size step allowPartialWindows :=
   generateWithState iterable { iterable ->
     items = iterable | take size | toList
     length = items | list.length
-    isLongEnough = ifElse allowPartialWindows {
-      length | int.isPositive
-    } {
+    isLongEnough = ifElse allowPartialWindows { length | int.isPositive } {
       length | int.equals size
     }
-    ifElse isLongEnough {
-      result.ok [Item: items, State: iterable | skip step]
-    } {
+    ifElse isLongEnough { result.ok [Item: items, State: iterable | skip step] } {
       result.error Empty
     }
   }

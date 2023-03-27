@@ -12,10 +12,12 @@ ifElse condition then else :=
 if condition then :=
   needs (bool.is condition)
   needs (function.is0 then)
-  ifElse condition then {}
+  ifElse condition then { }
 
 recursive initialArg body :=
-  needs (function.is2 body) "The `body` should take the recursive function and the argument."
+  needs
+    function.is2 body
+    "The `body` should take the recursive function and the argument."
   recurse = { recurse arg ->
     rec = { arg -> recurse recurse arg }
     body rec arg
@@ -30,7 +32,7 @@ loop body :=
   recursive Nothing { recurse arg ->
     result = function.run body
     needs
-      ((result | equals Continue) | bool.or (result | equals Break))
+      result | equals Continue | bool.or (result | equals Break)
       "The `body` has to return `Continue` or `Break`."
     if (result | equals Continue) { recurse Nothing }
   }

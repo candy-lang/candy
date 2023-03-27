@@ -1,5 +1,3 @@
 input := (use "..inputs").day1simple
 
-main := { environment ->
-  input
-}
+main := { environment -> input }

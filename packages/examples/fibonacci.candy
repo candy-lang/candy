@@ -4,8 +4,7 @@ fibonacci n =
   needs (int.is n)
   recursive n { recurse n ->
     ifElse (n | int.isLessThan 2) { n } {
-      recurse (n | int.subtract 1)
-      | int.add (recurse (n | int.subtract 2))
+      recurse (n | int.subtract 1) | int.add (recurse (n | int.subtract 2))
     }
   }
 
