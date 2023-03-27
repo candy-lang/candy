@@ -1440,8 +1440,13 @@ mod parse {
             let last = expressions.pop().unwrap();
             expressions.push(last.wrap_in_whitespace(whitespace));
 
-            let (i, expr) = match expression(i, indentation, false, has_multiline_whitespace, false)
-            {
+            let (i, expr) = match expression(
+                i,
+                indentation,
+                false,
+                has_multiline_whitespace,
+                has_multiline_whitespace,
+            ) {
                 Some(it) => it,
                 None => {
                     let fallback = closing_parenthesis(i)
@@ -1866,6 +1871,27 @@ mod parse {
                         ]),
                         build_simple_int(4),
                     ],
+                }
+                .into(),
+            )),
+        );
+        // foo
+        //   bar | baz
+        assert_eq!(
+            expression("foo\n  bar | baz", 0, true, true, true),
+            Some((
+                "",
+                CstKind::Call {
+                    receiver: Box::new(build_identifier("foo").with_trailing_whitespace(vec![
+                        CstKind::Newline("\n".to_string()),
+                        CstKind::Whitespace("  ".to_string()),
+                    ])),
+                    arguments: vec![CstKind::BinaryBar {
+                        left: Box::new(build_identifier("bar").with_trailing_space()),
+                        bar: Box::new(CstKind::Bar.with_trailing_space()),
+                        right: Box::new(build_identifier("baz")),
+                    }
+                    .into()],
                 }
                 .into(),
             )),
