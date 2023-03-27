@@ -17,12 +17,14 @@ pub fn format_collection<'a>(
     is_comma_required_for_single_item: bool,
     info: &FormattingInfo,
 ) -> FormattedCst<'a> {
-    let opening_punctuation = format_cst(edits, previous_width, opening_punctuation, info);
+    let info = info.resolve_for_sandwich_like(previous_width);
+
+    let opening_punctuation = format_cst(edits, previous_width, opening_punctuation, &info);
     let closing_punctuation = format_cst(
         edits,
         &Width::multiline(None, info.indentation.width()),
         closing_punctuation,
-        info,
+        &info,
     );
 
     let mut min_width = Width::Singleline(info.indentation.width())

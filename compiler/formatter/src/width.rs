@@ -20,6 +20,9 @@ impl Indentation {
     pub fn with_indent(self) -> Self {
         Self(self.0 + 1)
     }
+    pub fn with_dedent(self) -> Self {
+        Self(self.0 - 1)
+    }
 }
 impl Display for Indentation {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

@@ -35,6 +35,13 @@ impl FormattingInfo {
             is_single_expression_in_assignment_body: false,
         }
     }
+    pub fn with_dedent(&self) -> Self {
+        Self {
+            indentation: self.indentation.with_dedent(),
+            trailing_comma_condition: None,
+            is_single_expression_in_assignment_body: false,
+        }
+    }
     pub fn with_trailing_comma_condition(&self, condition: TrailingCommaCondition) -> Self {
         Self {
             indentation: self.indentation,
@@ -44,9 +51,23 @@ impl FormattingInfo {
     }
     pub fn for_single_expression_in_assignment_body(&self) -> Self {
         Self {
-            indentation: self.indentation,
+            indentation: self.indentation.with_indent(),
             trailing_comma_condition: None,
             is_single_expression_in_assignment_body: true,
+        }
+    }
+    pub fn resolve_for_sandwich_like(&self, previous_width: &Width) -> Self {
+        Self {
+            indentation: if self.is_single_expression_in_assignment_body
+                && previous_width
+                    .last_line_fits(self.indentation, &SinglelineWidth::PARENTHESIS.into())
+            {
+                self.indentation.with_dedent()
+            } else {
+                self.indentation
+            },
+            trailing_comma_condition: None,
+            is_single_expression_in_assignment_body: false,
         }
     }
 }
@@ -360,17 +381,7 @@ pub(crate) fn format_cst<'a>(
                 return receiver;
             }
 
-            let info_for_arguments = if info.is_single_expression_in_assignment_body
-                && previous_width
-                    .last_line_fits(info.indentation, &receiver.min_width(info.indentation))
-            {
-                info.to_owned()
-            } else {
-                info.with_indent()
-            };
-
-            let previous_width_for_arguments =
-                Width::multiline(None, info_for_arguments.indentation.width());
+            let previous_width_for_arguments = Width::multiline(None, info.indentation.width());
             let last_argument_index = arguments.len() - 1;
             let mut arguments = arguments
                 .iter()
@@ -380,7 +391,7 @@ pub(crate) fn format_cst<'a>(
                         edits,
                         &previous_width_for_arguments,
                         argument,
-                        &info_for_arguments,
+                        &info.with_indent(),
                         index == last_argument_index,
                     )
                 })
@@ -395,11 +406,10 @@ pub(crate) fn format_cst<'a>(
                 if previous_width.last_line_fits(info.indentation, &min_width) {
                     (true, info.to_owned(), TrailingWhitespace::Space)
                 } else {
-                    let indentation = info_for_arguments.indentation;
                     (
                         false,
-                        info_for_arguments,
-                        TrailingWhitespace::Indentation(indentation),
+                        info.with_indent(),
+                        TrailingWhitespace::Indentation(info.indentation.with_indent()),
                     )
                 };
 
@@ -424,11 +434,17 @@ pub(crate) fn format_cst<'a>(
                 &last_argument.argument,
                 MaybeSandwichLikeArgument::SandwichLike(_)
             );
+            let info_for_last_argument =
+                if info.is_single_expression_in_assignment_body && is_singleline {
+                    argument_info.with_dedent()
+                } else {
+                    argument_info.clone()
+                };
             let (last_argument_width, whitespace) = last_argument
                 .format(
                     edits,
                     &(previous_width + &width),
-                    &argument_info,
+                    &info_for_last_argument,
                     is_singleline,
                 )
                 .split();
@@ -698,7 +714,9 @@ pub(crate) fn format_cst<'a>(
             body,
             closing_curly_brace,
         } => {
-            let opening_curly_brace = format_cst(edits, previous_width, opening_curly_brace, info);
+            let info = info.resolve_for_sandwich_like(previous_width);
+
+            let opening_curly_brace = format_cst(edits, previous_width, opening_curly_brace, &info);
 
             let previous_width_for_inner =
                 Width::multiline(None, info.indentation.with_indent().width());
@@ -767,7 +785,7 @@ pub(crate) fn format_cst<'a>(
                 edits,
                 &Width::multiline(None, info.indentation.width()),
                 closing_curly_brace,
-                info,
+                &info,
             )
             .split();
 
@@ -1772,6 +1790,13 @@ mod test {
         test(
             "foo = bar {\n  baz\n  blub\n}",
             "foo = bar {\n  baz\n  blub\n}\n",
+        );
+        // looooooooooooooooongIdentifier =
+        //   function
+        //     loooooooooooooooooooooooooooooooooooooooooooooooongArgument
+        test(
+            "looooooooooooooooongIdentifier = function loooooooooooooooooooooooooooooooooooooooooooooooongArgument",
+            "looooooooooooooooongIdentifier =\n  function\n    loooooooooooooooooooooooooooooooooooooooooooooooongArgument\n",
         );
 
         // Function definition
