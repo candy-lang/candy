@@ -582,6 +582,7 @@ mod test {
         test("foo # abc \n  End", Indentation::from(1), "foo # abc\n  ");
     }
 
+    #[track_caller]
     fn test(source: &str, trailing: impl Into<TrailingWhitespace>, expected: &str) {
         let mut csts = parse_rcst(source).to_csts();
         assert_eq!(csts.len(), 1);

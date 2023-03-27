@@ -1801,6 +1801,7 @@ mod test {
         );
     }
 
+    #[track_caller]
     fn test(source: &str, expected: &str) {
         let csts = parse_rcst(source).to_csts();
         assert_eq!(source, csts.iter().join(""));
