@@ -438,7 +438,7 @@ pub(crate) fn format_cst<'a>(
                 if info.is_single_expression_in_assignment_body && is_singleline {
                     argument_info.with_dedent()
                 } else {
-                    argument_info.clone()
+                    argument_info
                 };
             let (last_argument_width, whitespace) = last_argument
                 .format(
