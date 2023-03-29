@@ -2,6 +2,7 @@
 # to that. Currently, they're just normal ints.
 
 bool = use "..bool"
+[check] = use "..check"
 [ifElse, recursive] = use "..controlFlow"
 [equals] = use "..equality"
 [run] = use "..function"
@@ -45,7 +46,7 @@ divide dividend divisor :=
 compareTo valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  result = valueA | int.compare valueB
+  result = valueA | int.compareTo valueB
   check (equals result Equal | bool.implies (equals valueA valueB))
   result
 isLessThan valueA valueB :=
@@ -91,17 +92,11 @@ approxEquals a b delta :=
 min valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  ifElse
-    (valueA | isLessThanOrEqualTo valueB)
-    { valueA }
-    { valueB }
+  ifElse (valueA | isLessThanOrEqualTo valueB) { valueA } { valueB }
 max valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  ifElse
-    (valueA | isGreaterThanOrEqualTo valueB)
-    { valueA }
-    { valueB }
+  ifElse (valueA | isGreaterThanOrEqualTo valueB) { valueA } { valueB }
 coerceAtLeast value minimum :=
   needs (is value)
   needs (is minimum)
@@ -122,9 +117,7 @@ toText a :=
   beforeDot = a | floorToInt | toDebugText
   afterDot = run {
     tmp = a | int.remainder decimalsPow
-    ifElse (isNonNegative tmp) {
-      tmp | int.add decimalsPow | toDebugText | text.removePrefix "1"
-    } {
+    ifElse (isNonNegative tmp) { tmp | int.add decimalsPow | toDebugText | text.removePrefix "1" } {
       tmp | int.subtract decimalsPow | toDebugText | text.removePrefix "-1"
     }
   }

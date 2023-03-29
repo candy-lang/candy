@@ -8,7 +8,9 @@ isSendPort value := type.is value SendPort
 isReceivePort value := type.is value ReceivePort
 
 create capacity :=
-  needs (int.is capacity) "`capacity` is not an integer. Channels need a capacity because otherwise, there would be no backpressure among fibers, and memory leaks would go unnoticed."
+  needs
+    int.is capacity
+    "`capacity` is not an integer. Channels need a capacity because otherwise, there would be no backpressure among fibers, and memory leaks would go unnoticed."
   needs (int.isNonNegative capacity)
   needs (int.fitsInRustU32 capacity)
   # Technically, it needs to fit in a usize, the natural word length on systems.
@@ -17,11 +19,15 @@ create capacity :=
   ✨.channelCreate capacity
 
 send port packet :=
-  needs (bool.not (isReceivePort port)) "`port` should be a send port, not a receive port."
+  needs
+    bool.not (isReceivePort port)
+    "`port` should be a send port, not a receive port."
   needs (isSendPort port)
   port | ✨.channelSend packet
 
 receive port :=
-  needs (bool.not (isSendPort port)) "`port` should be a receive port, not a send port."
+  needs
+    bool.not (isSendPort port)
+    "`port` should be a receive port, not a send port."
   needs (isReceivePort port)
   port | ✨.channelReceive

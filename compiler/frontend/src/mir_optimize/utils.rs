@@ -2,7 +2,8 @@ use crate::{
     mir::{Body, Expression, Id, Mir, VisibleExpressions},
     rich_ir::ToRichIr,
 };
-use std::{collections::HashSet, mem};
+use rustc_hash::FxHashSet;
+use std::mem;
 use tracing::error;
 
 impl Expression {
@@ -50,12 +51,12 @@ impl Expression {
     /// also includes references to locally defined IDs. IDs are returned in the
     /// order that they are referenced, which means that the vector may contain
     /// the same ID multiple times.
-    pub fn referenced_ids(&self) -> HashSet<Id> {
-        let mut referenced = HashSet::new();
+    pub fn referenced_ids(&self) -> FxHashSet<Id> {
+        let mut referenced = FxHashSet::default();
         self.collect_referenced_ids(&mut referenced);
         referenced
     }
-    fn collect_referenced_ids(&self, referenced: &mut HashSet<Id>) {
+    fn collect_referenced_ids(&self, referenced: &mut FxHashSet<Id>) {
         match self {
             Expression::Int(_)
             | Expression::Text(_)
@@ -135,7 +136,7 @@ impl Expression {
     }
 }
 impl Body {
-    fn collect_referenced_ids(&self, referenced: &mut HashSet<Id>) {
+    fn collect_referenced_ids(&self, referenced: &mut FxHashSet<Id>) {
         for (_, expression) in self.iter() {
             expression.collect_referenced_ids(referenced);
         }
@@ -143,18 +144,18 @@ impl Body {
 }
 
 impl Expression {
-    pub fn captured_ids(&self) -> Vec<Id> {
-        let mut ids = self.referenced_ids().into_iter().collect::<HashSet<_>>();
+    pub fn captured_ids(&self) -> FxHashSet<Id> {
+        let mut ids = self.referenced_ids();
         for id in self.defined_ids() {
             ids.remove(&id);
         }
-        ids.into_iter().collect()
+        ids
     }
 }
 
 impl Body {
-    pub fn all_ids(&self) -> HashSet<Id> {
-        let mut ids = self.defined_ids().into_iter().collect::<HashSet<_>>();
+    pub fn all_ids(&self) -> FxHashSet<Id> {
+        let mut ids = self.defined_ids().into_iter().collect::<FxHashSet<_>>();
         self.collect_referenced_ids(&mut ids);
         ids
     }
@@ -373,12 +374,12 @@ impl Body {
 
 impl Mir {
     pub fn validate(&self) {
-        self.validate_body(&self.body, &mut HashSet::new(), im::HashSet::new());
+        self.validate_body(&self.body, &mut FxHashSet::default(), im::HashSet::new());
     }
     fn validate_body(
         &self,
         body: &Body,
-        defined_ids: &mut HashSet<Id>,
+        defined_ids: &mut FxHashSet<Id>,
         mut visible: im::HashSet<Id>,
     ) {
         if body.iter().next().is_none() {

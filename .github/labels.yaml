@@ -2,6 +2,8 @@
   - compiler/cli/**/*
 'P: Compiler: Frontend':
   - compiler/frontend/**/*
+'P: Compiler: Formatter':
+  - compiler/formatter/**/*
 'P: Compiler: Fuzzer':
   - compiler/fuzzer/**/*
 'P: Compiler: Language Server':

@@ -19,11 +19,7 @@ pub trait RcstToCst: StringToRcst {
 
 fn cst(db: &dyn RcstToCst, module: Module) -> Result<Arc<Vec<Cst>>, InvalidModuleError> {
     let rcsts = db.rcst(module)?;
-
-    let mut state = State::default();
-    let csts = (*rcsts).clone().to_csts(&mut state);
-
-    Ok(Arc::new(csts))
+    Ok(Arc::new(rcsts.to_csts()))
 }
 
 #[derive(Default)]
@@ -32,9 +28,8 @@ struct State {
     id_generator: IdGenerator<Id>,
 }
 
-#[extension_trait]
-impl RcstToCstExt for Rcst {
-    fn to_cst(self, state: &mut State) -> Cst {
+impl Rcst {
+    fn to_cst(&self, state: &mut State) -> Cst {
         let id = state.id_generator.generate();
         let start_offset = state.offset;
         let kind = self.to_cst_kind(state);
@@ -47,8 +42,8 @@ impl RcstToCstExt for Rcst {
             kind,
         }
     }
-    fn to_cst_kind(self, state: &mut State) -> CstKind<CstData> {
-        match self.kind {
+    fn to_cst_kind(&self, state: &mut State) -> CstKind<CstData> {
+        match &self.kind {
             CstKind::EqualsSign => {
                 *state.offset += 1;
                 CstKind::EqualsSign
@@ -119,11 +114,11 @@ impl RcstToCstExt for Rcst {
             }
             CstKind::Whitespace(whitespace) => {
                 *state.offset += whitespace.len();
-                CstKind::Whitespace(whitespace)
+                CstKind::Whitespace(whitespace.to_owned())
             }
             CstKind::Newline(newline) => {
                 *state.offset += newline.len();
-                CstKind::Newline(newline)
+                CstKind::Newline(newline.to_owned())
             }
             CstKind::Comment {
                 octothorpe,
@@ -133,30 +128,33 @@ impl RcstToCstExt for Rcst {
                 *state.offset += comment.len();
                 CstKind::Comment {
                     octothorpe: Box::new(octothorpe),
-                    comment,
+                    comment: comment.to_owned(),
                 }
             }
             CstKind::TrailingWhitespace { child, whitespace } => CstKind::TrailingWhitespace {
                 child: Box::new(child.to_cst(state)),
-                whitespace: whitespace.to_csts(state),
+                whitespace: whitespace.to_csts_helper(state),
             },
             CstKind::Identifier(identifier) => {
                 *state.offset += identifier.len();
-                CstKind::Identifier(identifier)
+                CstKind::Identifier(identifier.to_owned())
             }
             CstKind::Symbol(symbol) => {
                 *state.offset += symbol.len();
-                CstKind::Symbol(symbol)
+                CstKind::Symbol(symbol.to_owned())
             }
             CstKind::Int { value, string } => {
                 *state.offset += string.len();
-                CstKind::Int { value, string }
+                CstKind::Int {
+                    value: value.to_owned(),
+                    string: string.to_owned(),
+                }
             }
             CstKind::OpeningText {
                 opening_single_quotes,
                 opening_double_quote,
             } => CstKind::OpeningText {
-                opening_single_quotes: opening_single_quotes.to_csts(state),
+                opening_single_quotes: opening_single_quotes.to_csts_helper(state),
                 opening_double_quote: Box::new(opening_double_quote.to_cst(state)),
             },
             CstKind::ClosingText {
@@ -164,7 +162,7 @@ impl RcstToCstExt for Rcst {
                 closing_single_quotes,
             } => CstKind::ClosingText {
                 closing_double_quote: Box::new(closing_double_quote.to_cst(state)),
-                closing_single_quotes: closing_single_quotes.to_csts(state),
+                closing_single_quotes: closing_single_quotes.to_csts_helper(state),
             },
             CstKind::Text {
                 opening,
@@ -172,28 +170,28 @@ impl RcstToCstExt for Rcst {
                 closing,
             } => CstKind::Text {
                 opening: Box::new(opening.to_cst(state)),
-                parts: parts.to_csts(state),
+                parts: parts.to_csts_helper(state),
                 closing: Box::new(closing.to_cst(state)),
             },
             CstKind::TextPart(text) => {
                 *state.offset += text.len();
-                CstKind::TextPart(text)
+                CstKind::TextPart(text.to_owned())
             }
             CstKind::TextInterpolation {
                 opening_curly_braces,
                 expression,
                 closing_curly_braces,
             } => CstKind::TextInterpolation {
-                opening_curly_braces: opening_curly_braces.to_csts(state),
+                opening_curly_braces: opening_curly_braces.to_csts_helper(state),
                 expression: Box::new(expression.to_cst(state)),
-                closing_curly_braces: closing_curly_braces.to_csts(state),
+                closing_curly_braces: closing_curly_braces.to_csts_helper(state),
             },
             CstKind::Call {
                 receiver,
                 arguments,
             } => CstKind::Call {
                 receiver: Box::new(receiver.to_cst(state)),
-                arguments: arguments.to_csts(state),
+                arguments: arguments.to_csts_helper(state),
             },
             CstKind::List {
                 opening_parenthesis,
@@ -201,12 +199,12 @@ impl RcstToCstExt for Rcst {
                 closing_parenthesis,
             } => CstKind::List {
                 opening_parenthesis: Box::new(opening_parenthesis.to_cst(state)),
-                items: items.to_csts(state),
+                items: items.to_csts_helper(state),
                 closing_parenthesis: Box::new(closing_parenthesis.to_cst(state)),
             },
             CstKind::ListItem { value, comma } => CstKind::ListItem {
                 value: Box::new(value.to_cst(state)),
-                comma: comma.map(|comma| Box::new(comma.to_cst(state))),
+                comma: comma.as_ref().map(|comma| Box::new(comma.to_cst(state))),
             },
             CstKind::Struct {
                 opening_bracket,
@@ -214,7 +212,7 @@ impl RcstToCstExt for Rcst {
                 closing_bracket,
             } => CstKind::Struct {
                 opening_bracket: Box::new(opening_bracket.to_cst(state)),
-                fields: fields.to_csts(state),
+                fields: fields.to_csts_helper(state),
                 closing_bracket: Box::new(closing_bracket.to_cst(state)),
             },
             CstKind::StructField {
@@ -223,9 +221,10 @@ impl RcstToCstExt for Rcst {
                 comma,
             } => CstKind::StructField {
                 key_and_colon: key_and_colon
+                    .as_ref()
                     .map(|box (key, colon)| Box::new((key.to_cst(state), colon.to_cst(state)))),
                 value: Box::new(value.to_cst(state)),
-                comma: comma.map(|comma| Box::new(comma.to_cst(state))),
+                comma: comma.as_ref().map(|comma| Box::new(comma.to_cst(state))),
             },
             CstKind::StructAccess { struct_, dot, key } => CstKind::StructAccess {
                 struct_: Box::new(struct_.to_cst(state)),
@@ -239,7 +238,7 @@ impl RcstToCstExt for Rcst {
             } => CstKind::Match {
                 expression: Box::new(expression.to_cst(state)),
                 percent: Box::new(percent.to_cst(state)),
-                cases: cases.to_csts(state),
+                cases: cases.to_csts_helper(state),
             },
             CstKind::MatchCase {
                 pattern,
@@ -248,7 +247,7 @@ impl RcstToCstExt for Rcst {
             } => CstKind::MatchCase {
                 pattern: Box::new(pattern.to_cst(state)),
                 arrow: Box::new(arrow.to_cst(state)),
-                body: body.to_csts(state),
+                body: body.to_csts_helper(state),
             },
             CstKind::BinaryBar { left, bar, right } => CstKind::BinaryBar {
                 left: Box::new(left.to_cst(state)),
@@ -271,10 +270,13 @@ impl RcstToCstExt for Rcst {
                 closing_curly_brace,
             } => CstKind::Lambda {
                 opening_curly_brace: Box::new(opening_curly_brace.to_cst(state)),
-                parameters_and_arrow: parameters_and_arrow.map(|(parameters, arrow)| {
-                    (parameters.to_csts(state), Box::new(arrow.to_cst(state)))
+                parameters_and_arrow: parameters_and_arrow.as_ref().map(|(parameters, arrow)| {
+                    (
+                        parameters.to_csts_helper(state),
+                        Box::new(arrow.to_cst(state)),
+                    )
                 }),
-                body: body.to_csts(state),
+                body: body.to_csts_helper(state),
                 closing_curly_brace: Box::new(closing_curly_brace.to_cst(state)),
             },
             CstKind::Assignment {
@@ -284,7 +286,7 @@ impl RcstToCstExt for Rcst {
             } => CstKind::Assignment {
                 left: Box::new(left.to_cst(state)),
                 assignment_sign: Box::new(assignment_sign.to_cst(state)),
-                body: body.to_csts(state),
+                body: body.to_csts_helper(state),
             },
             CstKind::Error {
                 unparsable_input,
@@ -292,8 +294,8 @@ impl RcstToCstExt for Rcst {
             } => {
                 *state.offset += unparsable_input.len();
                 CstKind::Error {
-                    unparsable_input,
-                    error,
+                    unparsable_input: unparsable_input.to_owned(),
+                    error: error.to_owned(),
                 }
             }
         }
@@ -301,8 +303,15 @@ impl RcstToCstExt for Rcst {
 }
 
 #[extension_trait]
-impl RcstsToCstsExt for Vec<Rcst> {
-    fn to_csts(self, state: &mut State) -> Vec<Cst> {
+pub impl RcstsToCstsExt for Vec<Rcst> {
+    fn to_csts(&self) -> Vec<Cst> {
+        let mut state = State::default();
+        self.to_csts_helper(&mut state)
+    }
+}
+#[extension_trait]
+impl RcstsToCstsHelperExt for Vec<Rcst> {
+    fn to_csts_helper(&self, state: &mut State) -> Vec<Cst> {
         let mut csts = vec![];
         for rcst in self {
             csts.push(rcst.to_cst(state));

@@ -183,6 +183,9 @@ impl IrFeatures {
             Err(InvalidModuleError::InvalidUtf8) => {
                 builder.push("# Invalid UTF-8", TokenType::Comment, EnumSet::empty());
             }
+            Err(InvalidModuleError::IsNotCandy) => {
+                builder.push("# Is not Candy code", TokenType::Comment, EnumSet::empty());
+            }
             Err(InvalidModuleError::IsToolingModule) => {
                 builder.push(
                     "# Is a tooling module",
@@ -281,6 +284,12 @@ impl IrConfig {
         let original_scheme = details.get("scheme").unwrap().as_str().unwrap();
         let original_uri = format!("{original_scheme}:{path}").parse().unwrap();
 
+        let module_kind = match details.get("moduleKind").unwrap().as_str().unwrap() {
+            "code" => ModuleKind::Code,
+            "asset" => ModuleKind::Asset,
+            module_kind => panic!("Unknown module kind: `{module_kind}`"),
+        };
+
         let tracing_config = details
             .remove("tracingConfig")
             .map(|it| serde_json::from_value(it).unwrap());
@@ -296,12 +305,8 @@ impl IrConfig {
         };
 
         IrConfig {
-            module: module_from_package_root_and_url(
-                package_root,
-                &original_uri,
-                ModuleKind::Code, // FIXME
-            )
-            .unwrap(),
+            module: module_from_package_root_and_url(package_root, &original_uri, module_kind)
+                .unwrap(),
             ir,
         }
     }

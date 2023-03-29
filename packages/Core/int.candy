@@ -95,14 +95,18 @@ fitsInRustU128 value :=
 shiftLeft value amount :=
   needs (is value)
   needs (is amount)
-  needs (isNonNegative amount) "The shift `amount` is negative. You might want to call `shiftRight` instead."
+  needs
+    isNonNegative amount
+    "The shift `amount` is negative. You might want to call `shiftRight` instead."
   # TODO: Add the negated value in the error message as soon as we support string interpolation.
   needs (fitsInRustU128 amount) "Shifts by that much are not yet supported."
   value | ✨.intShiftLeft amount
 shiftRight value amount :=
   needs (is value)
   needs (is amount)
-  needs (isNonNegative amount) "The shift `amount` is negative. You might want to call `shiftLeft` instead."
+  needs
+    isNonNegative amount
+    "The shift `amount` is negative. You might want to call `shiftLeft` instead."
   # TODO: Add the negated value in the error message as soon as we support string interpolation.
   needs (fitsInRustU128 amount) "Shifts by that much are not yet supported."
   value | ✨.intShiftRight amount
@@ -138,17 +142,11 @@ isOdd value :=
 min valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  ifElse
-    (valueA | isLessThanOrEqualTo valueB)
-    { valueA }
-    { valueB }
+  ifElse (valueA | isLessThanOrEqualTo valueB) { valueA } { valueB }
 max valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  ifElse
-    (valueA | isGreaterThanOrEqualTo valueB)
-    { valueA }
-    { valueB }
+  ifElse (valueA | isGreaterThanOrEqualTo valueB) { valueA } { valueB }
 coerceAtLeast value minimum :=
   needs (is value)
   needs (is minimum)

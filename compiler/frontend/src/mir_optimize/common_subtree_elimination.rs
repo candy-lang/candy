@@ -54,28 +54,30 @@ impl Mir {
                     Entry::Occupied(id_of_canonical_expression)
                         if visible.contains(*id_of_canonical_expression.get()) =>
                     {
-                        *expression = Expression::Reference(*id_of_canonical_expression.get());
-
+                        let old_expression = std::mem::replace(
+                            expression,
+                            Expression::Reference(*id_of_canonical_expression.get()),
+                        );
                         if let Expression::Lambda {
-                            body,
+                            mut body,
                             original_hirs,
                             ..
-                        } = expression
+                        } = old_expression
                         {
                             additional_lambda_hirs
                                 .entry(*id_of_canonical_expression.get())
                                 .or_default()
-                                .extend(&mut original_hirs.clone().into_iter());
+                                .extend(original_hirs);
 
                             let canonical_child_lambdas =
                                 inner_lambdas.get(id_of_canonical_expression.get()).unwrap();
                             for ((_, child_hirs), canonical_child_id) in
-                                body.all_lambdas().iter().zip(canonical_child_lambdas)
+                                body.all_lambdas().into_iter().zip(canonical_child_lambdas)
                             {
                                 additional_lambda_hirs
                                     .entry(*canonical_child_id)
                                     .or_default()
-                                    .extend(child_hirs.clone());
+                                    .extend(child_hirs);
                             }
                         }
                     }

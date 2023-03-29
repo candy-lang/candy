@@ -74,10 +74,7 @@ contains text pattern :=
 removePrefix text prefix :=
   needs (is text)
   needs (is prefix)
-  ifElse
-    (text | startsWith prefix)
-    { text | getRange (prefix | length) (text | length) }
-    { text }
+  ifElse (text | startsWith prefix) { text | getRange (prefix | length) (text | length) } { text }
 removeSuffix text suffix :=
   needs (is text)
   needs (is suffix)

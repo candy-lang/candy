@@ -138,7 +138,7 @@ impl Display for CompilerErrorPayload {
                 HirError::PublicAssignmentWithSameName { name } => {
                     format!("There already exists a public assignment (:=) named `{name}`.")
                 }
-                HirError::UnknownReference { name } => format!("`{name}`is not in scope."),
+                HirError::UnknownReference { name } => format!("`{name}` is not in scope."),
             },
         };
         write!(f, "{message}")

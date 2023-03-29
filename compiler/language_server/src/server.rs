@@ -2,14 +2,15 @@ use async_trait::async_trait;
 use candy_frontend::module::ModuleKind;
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentFilter, DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams,
-    FoldingRange, FoldingRangeParams, GotoDefinitionParams, GotoDefinitionResponse,
-    InitializeParams, InitializeResult, InitializedParams, Location, MessageType, Position,
-    ReferenceParams, Registration, SemanticTokens, SemanticTokensFullOptions,
-    SemanticTokensOptions, SemanticTokensParams, SemanticTokensRegistrationOptions,
-    SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
-    StaticRegistrationOptions, TextDocumentChangeRegistrationOptions,
-    TextDocumentRegistrationOptions, Url, WorkDoneProgressOptions,
+    DocumentFilter, DocumentFormattingParams, DocumentHighlight, DocumentHighlightKind,
+    DocumentHighlightParams, FoldingRange, FoldingRangeParams, GotoDefinitionParams,
+    GotoDefinitionResponse, InitializeParams, InitializeResult, InitializedParams, Location,
+    MessageType, Position, ReferenceParams, Registration, SemanticTokens,
+    SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
+    SemanticTokensRegistrationOptions, SemanticTokensResult, SemanticTokensServerCapabilities,
+    ServerCapabilities, ServerInfo, StaticRegistrationOptions,
+    TextDocumentChangeRegistrationOptions, TextDocumentRegistrationOptions, TextEdit, Url,
+    WorkDoneProgressOptions,
 };
 use rustc_hash::FxHashMap;
 use serde::Serialize;
@@ -272,6 +273,10 @@ impl LanguageServer for Server {
                     features.registration_options_where(|it| it.supports_folding_ranges()),
                 ),
                 registration(
+                    "textDocument/formatting",
+                    features.registration_options_where(|it| it.supports_format()),
+                ),
+                registration(
                     "textDocument/semanticTokens",
                     SemanticTokensServerCapabilities::SemanticTokensRegistrationOptions(
                         SemanticTokensRegistrationOptions {
@@ -345,7 +350,11 @@ impl LanguageServer for Server {
         let module_result = module_from_package_root_and_url(
             state.project_directory.to_owned(),
             &params.text_document.uri,
-            ModuleKind::Code, // FIXME
+            if params.text_document.uri.path().ends_with(".candy") {
+                ModuleKind::Code
+            } else {
+                ModuleKind::Asset
+            },
         );
         if let Ok(module) = module_result {
             let notifications = {
@@ -463,6 +472,22 @@ impl LanguageServer for Server {
         Ok(Some(
             features
                 .folding_ranges(&self.db, &state.project_directory, params.text_document.uri)
+                .await,
+        ))
+    }
+
+    async fn formatting(
+        &self,
+        params: DocumentFormattingParams,
+    ) -> jsonrpc::Result<Option<Vec<TextEdit>>> {
+        let state = self.require_running_state().await;
+        let features = self
+            .features_from_url(&state.features, &params.text_document.uri)
+            .await;
+        assert!(features.supports_format());
+        Ok(Some(
+            features
+                .format(&self.db, &state.project_directory, params.text_document.uri)
                 .await,
         ))
     }

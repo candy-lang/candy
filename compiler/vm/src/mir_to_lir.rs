@@ -9,6 +9,7 @@ use candy_frontend::{
     tracing::TracingConfig,
 };
 use itertools::Itertools;
+use rustc_hash::FxHashSet;
 use std::sync::Arc;
 
 #[salsa::query_group(MirToLirStorage)]
@@ -18,12 +19,12 @@ pub trait MirToLir: CstDb + OptimizeMir {
 
 fn lir(db: &dyn MirToLir, module: Module, tracing: TracingConfig) -> Option<Arc<Lir>> {
     let mir = db.mir_with_obvious_optimized(module, tracing)?;
-    let instructions = compile_lambda(&[], &[], Id::from_usize(0), &mir.body);
+    let instructions = compile_lambda(&FxHashSet::default(), &[], Id::from_usize(0), &mir.body);
     Some(Arc::new(Lir { instructions }))
 }
 
 fn compile_lambda(
-    captured: &[Id],
+    captured: &FxHashSet<Id>,
     parameters: &[Id],
     responsible_parameter: Id,
     body: &Body,

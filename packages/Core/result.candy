@@ -4,16 +4,12 @@ bool = use "..bool"
 function = use "..function"
 struct = use "..struct"
 
-is value :=
-  struct.is value | bool.lazyAnd {
-    value
-    | struct.hasKey Type
-    | bool.and (value | struct.hasKey Value)
-    | bool.lazyAnd {
-      type = value.type
-      equals type Ok | bool.or (equals type Error)
-    }
+is value := struct.is value | bool.lazyAnd {
+  value | struct.hasKey Type | bool.and (value | struct.hasKey Value) | bool.lazyAnd {
+    type = value.type
+    equals type Ok | bool.or (equals type Error)
   }
+}
 
 ok value := [Type: Ok, Value: value]
 isOk result :=
@@ -47,10 +43,7 @@ mapOrElse result okMapper errorMapper :=
   needs (is result)
   needs (function.is1 okMapper)
   needs (function.is1 errorMapper)
-  ifElse
-    equals result.type Ok
-    { okMapper result.value }
-    { errorMapper result.value }
+  ifElse (equals result.type Ok) { okMapper result.value } { errorMapper result.value }
 mapOr result okMapper errorValue :=
   # Returns `okMapper result.value` if `isOk result` and `errorValue` if
   # `isError result`.

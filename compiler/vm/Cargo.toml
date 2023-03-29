@@ -11,7 +11,7 @@ bench = false
 candy_frontend = { path = "../frontend" }
 derive_more = "0.99.17"
 enumset = "1.0.12"
-itertools = { version = "0.10.0" }
+itertools = "0.10.0"
 num-bigint = { version = "0.4.3", features = ["rand"] }
 num-integer = { version = "0.1.45", features = ["i128"] }
 num-traits = { version = "0.2.15", features = ["i128"] }

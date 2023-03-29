@@ -1,9 +1,9 @@
 use crate::{
     cst::{CstError, CstKind},
-    module::{Module, ModuleDb, Package},
+    module::{Module, ModuleDb, ModuleKind, Package},
     rcst::Rcst,
 };
-use std::sync::Arc;
+use std::{str, sync::Arc};
 
 #[salsa::query_group(StringToRcstStorage)]
 pub trait StringToRcst: ModuleDb {
@@ -13,19 +13,26 @@ pub trait StringToRcst: ModuleDb {
 pub type RcstResult = Result<Arc<Vec<Rcst>>, InvalidModuleError>;
 
 fn rcst(db: &dyn StringToRcst, module: Module) -> RcstResult {
+    if module.kind != ModuleKind::Code {
+        return Err(InvalidModuleError::IsNotCandy);
+    }
+
     if let Package::Tooling(_) = &module.package {
         return Err(InvalidModuleError::IsToolingModule);
     }
     let source = db
         .get_module_content(module)
         .ok_or(InvalidModuleError::DoesNotExist)?;
-    let source = match String::from_utf8((*source).clone()) {
+    let source = match str::from_utf8(source.as_slice()) {
         Ok(source) => source,
         Err(_) => {
             return Err(InvalidModuleError::InvalidUtf8);
         }
     };
-    let (rest, mut rcsts) = parse::body(&source, 0);
+    Ok(Arc::new(parse_rcst(source)))
+}
+pub fn parse_rcst(source: &str) -> Vec<Rcst> {
+    let (rest, mut rcsts) = parse::body(source, 0);
     if !rest.is_empty() {
         rcsts.push(
             CstKind::Error {
@@ -35,13 +42,14 @@ fn rcst(db: &dyn StringToRcst, module: Module) -> RcstResult {
             .into(),
         );
     }
-    Ok(Arc::new(rcsts))
+    rcsts
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum InvalidModuleError {
     DoesNotExist,
     InvalidUtf8,
+    IsNotCandy,
     IsToolingModule,
 }
 
@@ -102,7 +110,7 @@ mod parse {
 
     use super::whitespace_indentation_score;
 
-    static MEANINGFUL_PUNCTUATION: &str = r#"=,.:|()[]{}->'"%"#;
+    static MEANINGFUL_PUNCTUATION: &str = r#"=,.:|()[]{}->'"%#"#;
     static SUPPORTED_WHITESPACE: &str = " \r\n\t";
 
     #[instrument(level = "trace")]
@@ -245,6 +253,7 @@ mod parse {
         );
         assert_eq!(word("012🔥hi"), Some(("", "012🔥hi".to_string())));
         assert_eq!(word("foo(blub)"), Some(("(blub)", "foo".to_string())));
+        assert_eq!(word("foo#abc"), Some(("#abc", "foo".to_string())));
     }
 
     #[instrument(level = "trace")]
@@ -511,25 +520,25 @@ mod parse {
 
         let mut new_input = input;
         let mut new_parts = vec![];
+        let mut is_sufficiently_indented = true;
         loop {
             let new_input_from_iteration_start = new_input;
 
-            if also_comments {
-                if let Some((new_new_input, whitespace)) = comment(new_input) {
-                    new_input = new_new_input;
-                    new_parts.push(whitespace);
+            if also_comments
+                && is_sufficiently_indented
+                && let Some((new_new_input, whitespace)) = comment(new_input)
+            {
+                new_input = new_new_input;
+                new_parts.push(whitespace);
 
-                    input = new_input;
-                    parts.append(&mut new_parts);
-                }
+                input = new_input;
+                parts.append(&mut new_parts);
             }
 
             if let Some((new_new_input, newline)) = newline(new_input) {
-                input = new_input;
-                parts.append(&mut new_parts);
-
                 new_input = new_new_input;
                 new_parts.push(newline);
+                is_sufficiently_indented = false;
             }
 
             if let Some((new_new_input, whitespace)) = leading_indentation(new_input, indentation) {
@@ -538,6 +547,7 @@ mod parse {
 
                 input = new_input;
                 parts.append(&mut new_parts);
+                is_sufficiently_indented = true;
             } else if let Some((new_new_input, whitespace)) = single_line_whitespace(new_input) {
                 new_input = new_new_input;
                 new_parts.push(whitespace);
@@ -565,7 +575,7 @@ mod parse {
         assert_eq!(whitespaces_and_newlines("foo", 0, true), ("foo", vec![]));
         assert_eq!(
             whitespaces_and_newlines("\nfoo", 0, true),
-            ("foo", vec![CstKind::Newline("\n".to_string()).into()]),
+            ("foo", vec![build_newline()]),
         );
         assert_eq!(
             whitespaces_and_newlines("\nfoo", 1, true),
@@ -576,24 +586,18 @@ mod parse {
             (
                 "foo",
                 vec![
-                    CstKind::Newline("\n".to_string()).into(),
+                    build_newline(),
                     CstKind::Whitespace("  ".to_string()).into(),
                 ],
             ),
         );
         assert_eq!(
             whitespaces_and_newlines("\n  foo", 0, true),
-            ("  foo", vec![CstKind::Newline("\n".to_string()).into()]),
+            ("  foo", vec![build_newline()]),
         );
         assert_eq!(
             whitespaces_and_newlines(" \n  foo", 0, true),
-            (
-                "  foo",
-                vec![
-                    CstKind::Whitespace(" ".to_string()).into(),
-                    CstKind::Newline("\n".to_string()).into(),
-                ],
-            ),
+            ("  foo", vec![build_space(), build_newline()]),
         );
         assert_eq!(
             whitespaces_and_newlines("\n  foo", 2, true),
@@ -616,7 +620,7 @@ mod parse {
                 "foo",
                 vec![
                     build_comment(" hey"),
-                    CstKind::Newline("\n".to_string()).into(),
+                    build_newline(),
                     CstKind::Whitespace("  ".to_string()).into(),
                 ],
             )
@@ -627,12 +631,20 @@ mod parse {
                 "\n",
                 vec![
                     build_comment(" foo"),
-                    CstKind::Newline("\n".to_string()).into(),
-                    CstKind::Newline("\n".to_string()).into(),
+                    build_newline(),
+                    build_newline(),
                     CstKind::Whitespace("  ".to_string()).into(),
                     build_comment("bar"),
                 ],
             ),
+        );
+        assert_eq!(
+            whitespaces_and_newlines(" # abc\n", 1, true),
+            ("\n", vec![build_space(), build_comment(" abc")]),
+        );
+        assert_eq!(
+            whitespaces_and_newlines("\n# abc\n", 1, true),
+            ("\n# abc\n", vec![]),
         );
     }
 
@@ -779,7 +791,7 @@ mod parse {
     fn test_text() {
         assert_eq!(text("foo", 0), None);
         assert_eq!(
-            text("\"foo\" bar", 0),
+            text(r#""foo" bar"#, 0),
             Some((" bar", build_simple_text("foo"))),
         );
         // "foo
@@ -798,7 +810,7 @@ mod parse {
                     ),
                     parts: vec![
                         CstKind::TextPart("foo".to_string()).into(),
-                        CstKind::Newline("\n".to_string()).into(),
+                        build_newline(),
                         CstKind::Whitespace("  ".to_string()).into(),
                         CstKind::TextPart("bar".to_string()).into(),
                     ],
@@ -1428,8 +1440,13 @@ mod parse {
             let last = expressions.pop().unwrap();
             expressions.push(last.wrap_in_whitespace(whitespace));
 
-            let (i, expr) = match expression(i, indentation, false, has_multiline_whitespace, false)
-            {
+            let (i, expr) = match expression(
+                i,
+                indentation,
+                false,
+                has_multiline_whitespace,
+                has_multiline_whitespace,
+            ) {
                 Some(it) => it,
                 None => {
                     let fallback = closing_parenthesis(i)
@@ -1587,13 +1604,30 @@ mod parse {
                 (input, assignment_sign, body)
             }
         } else {
-            match comment(input).or_else(|| expression(input, indentation, false, true, true)) {
-                Some((input, expression)) => (input, assignment_sign, vec![expression]),
-                None => (
+            let mut body = vec![];
+            let mut input = input;
+            if let Some((new_input, expression)) = expression(input, indentation, false, true, true)
+            {
+                input = new_input;
+                body.push(expression);
+                if let Some((new_input, whitespace)) = single_line_whitespace(input) {
+                    input = new_input;
+                    body.push(whitespace);
+                }
+            }
+            if let Some((new_input, comment)) = comment(input) {
+                input = new_input;
+                body.push(comment);
+            }
+
+            if body.is_empty() {
+                (
                     input_after_assignment_sign,
                     just_the_assignment_sign,
                     vec![],
-                ),
+                )
+            } else {
+                (input, assignment_sign, body)
             }
         };
 
@@ -1841,6 +1875,27 @@ mod parse {
                 .into(),
             )),
         );
+        // foo
+        //   bar | baz
+        assert_eq!(
+            expression("foo\n  bar | baz", 0, true, true, true),
+            Some((
+                "",
+                CstKind::Call {
+                    receiver: Box::new(build_identifier("foo").with_trailing_whitespace(vec![
+                        CstKind::Newline("\n".to_string()),
+                        CstKind::Whitespace("  ".to_string()),
+                    ])),
+                    arguments: vec![CstKind::BinaryBar {
+                        left: Box::new(build_identifier("bar").with_trailing_space()),
+                        bar: Box::new(CstKind::Bar.with_trailing_space()),
+                        right: Box::new(build_identifier("baz")),
+                    }
+                    .into()],
+                }
+                .into(),
+            )),
+        );
         assert_eq!(
             expression("(foo Bar) Baz\n", 0, false, true, true),
             Some((
@@ -1874,15 +1929,12 @@ mod parse {
         assert_eq!(
             expression("foo T\n\n\nbar = 5", 0, false, true, true),
             Some((
-                "\nbar = 5",
+                "\n\n\nbar = 5",
                 CstKind::Call {
                     receiver: Box::new(build_identifier("foo").with_trailing_space()),
                     arguments: vec![build_symbol("T")],
                 }
-                .with_trailing_whitespace(vec![
-                    CstKind::Newline("\n".to_string()),
-                    CstKind::Newline("\n".to_string()),
-                ]),
+                .into(),
             )),
         );
         assert_eq!(
@@ -1893,6 +1945,21 @@ mod parse {
                     left: Box::new(build_identifier("foo").with_trailing_space()),
                     assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_space()),
                     body: vec![build_simple_int(42)],
+                }
+                .into(),
+            )),
+        );
+        assert_eq!(
+            expression("foo =\n  bar\n\nbaz", 0, true, true, true),
+            Some((
+                "\n\nbaz",
+                CstKind::Assignment {
+                    left: Box::new(build_identifier("foo").with_trailing_space()),
+                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_whitespace(vec![
+                        CstKind::Newline("\n".to_string()),
+                        CstKind::Whitespace("  ".to_string())
+                    ])),
+                    body: vec![build_identifier("bar")],
                 }
                 .into(),
             )),
@@ -1987,6 +2054,35 @@ mod parse {
                 .into(),
             )),
         );
+        // main := { environment ->
+        //   input
+        // }
+        assert_eq!(
+            expression("main := { environment ->\n  input\n}", 0, true, true, true),
+            Some((
+                "",
+                CstKind::Assignment {
+                    left: Box::new(build_identifier("main").with_trailing_space()),
+                    assignment_sign: Box::new(CstKind::ColonEqualsSign.with_trailing_space()),
+                    body: vec![CstKind::Lambda {
+                        opening_curly_brace: Box::new(
+                            CstKind::OpeningCurlyBrace.with_trailing_space()
+                        ),
+                        parameters_and_arrow: Some((
+                            vec![build_identifier("environment").with_trailing_space()],
+                            Box::new(CstKind::Arrow.with_trailing_whitespace(vec![
+                                CstKind::Newline("\n".to_string()),
+                                CstKind::Whitespace("  ".to_string()),
+                            ])),
+                        )),
+                        body: vec![build_identifier("input"), build_newline()],
+                        closing_curly_brace: Box::new(CstKind::ClosingCurlyBrace.into()),
+                    }
+                    .into()],
+                }
+                .into(),
+            )),
+        );
         // foo
         //   bar
         //   = 3
@@ -2040,6 +2136,22 @@ mod parse {
                 .into(),
             )),
         );
+        assert_eq!(
+            expression("foo = bar # comment\n", 0, true, true, true),
+            Some((
+                "\n",
+                CstKind::Assignment {
+                    left: Box::new(build_identifier("foo").with_trailing_space()),
+                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_space()),
+                    body: vec![
+                        build_identifier("bar"),
+                        build_space(),
+                        build_comment(" comment"),
+                    ],
+                }
+                .into(),
+            )),
+        );
         // foo =
         //   # comment
         // 3
@@ -2074,7 +2186,7 @@ mod parse {
                     ])),
                     body: vec![
                         build_comment(" comment"),
-                        CstKind::Newline("\n".to_string()).into(),
+                        build_newline(),
                         CstKind::Whitespace("  ".to_string()).into(),
                         build_simple_int(5),
                     ],
@@ -2212,6 +2324,7 @@ mod parse {
                 let last = items.pop().unwrap();
                 items.push(last.wrap_in_whitespace(whitespace));
             }
+            input = new_input;
 
             // Value.
             let (new_input, value, has_value) =
@@ -2326,6 +2439,22 @@ mod parse {
             )),
         );
         assert_eq!(
+            list("(foo, )", 0),
+            Some((
+                "",
+                CstKind::List {
+                    opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
+                    items: vec![CstKind::ListItem {
+                        value: Box::new(build_identifier("foo")),
+                        comma: Some(Box::new(CstKind::Comma.into())),
+                    }
+                    .with_trailing_space()],
+                    closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
+                }
+                .into(),
+            )),
+        );
+        assert_eq!(
             list("(foo,bar)", 0),
             Some((
                 "",
@@ -2414,6 +2543,7 @@ mod parse {
                 let last = fields.pop().unwrap();
                 fields.push(last.wrap_in_whitespace(whitespace));
             }
+            outer_input = input;
 
             // The key if it's explicit or the value when using a shorthand.
             let (input, key_or_value) =
@@ -2558,6 +2688,18 @@ mod parse {
                 "",
                 CstKind::Struct {
                     opening_bracket: Box::new(CstKind::OpeningBracket.into()),
+                    fields: vec![],
+                    closing_bracket: Box::new(CstKind::ClosingBracket.into()),
+                }
+                .into(),
+            )),
+        );
+        assert_eq!(
+            struct_("[ ]", 0),
+            Some((
+                "",
+                CstKind::Struct {
+                    opening_bracket: Box::new(CstKind::OpeningBracket.with_trailing_space()),
                     fields: vec![],
                     closing_bracket: Box::new(CstKind::ClosingBracket.into()),
                 }
@@ -2796,11 +2938,9 @@ mod parse {
                 Some((new_input, expression)) => {
                     input = new_input;
 
-                    let (whitespace, expression) = expression.split_outer_trailing_whitespace();
+                    let (mut whitespace, expression) = expression.split_outer_trailing_whitespace();
                     expressions.push(expression);
-                    for whitespace in whitespace {
-                        expressions.push(whitespace);
-                    }
+                    expressions.append(&mut whitespace);
                 }
                 None => {
                     let fallback = colon(new_input)
@@ -2817,6 +2957,20 @@ mod parse {
             }
         }
         (input, expressions)
+    }
+    #[test]
+    fn test_body() {
+        assert_eq!(
+            body("foo # comment", 0),
+            (
+                "",
+                vec![
+                    build_identifier("foo"),
+                    build_space(),
+                    build_comment(" comment")
+                ]
+            ),
+        );
     }
 
     #[instrument(level = "trace")]
@@ -2899,7 +3053,7 @@ mod parse {
             opening_curly_brace = opening_curly_brace.wrap_in_whitespace(whitespace);
         }
 
-        let (input, mut body, whitespace_before_closing_curly_brace, closing_curly_brace) = {
+        let (input, mut body, mut whitespace_before_closing_curly_brace, closing_curly_brace) = {
             let input_before_parsing_expression = i;
             let (i, body_expression) = match expression(i, indentation + 1, true, true, true) {
                 Some((i, expression)) => (i, vec![expression]),
@@ -2935,8 +3089,7 @@ mod parse {
 
         // Attach the `whitespace_before_closing_curly_brace`.
         if !body.is_empty() {
-            let last = body.pop().unwrap();
-            body.push(last.wrap_in_whitespace(whitespace_before_closing_curly_brace));
+            body.append(&mut whitespace_before_closing_curly_brace);
         } else if let Some((parameters, arrow)) = parameters_and_arrow {
             parameters_and_arrow = Some((
                 parameters,
@@ -2969,7 +3122,7 @@ mod parse {
                 CstKind::Lambda {
                     opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.with_trailing_space()),
                     parameters_and_arrow: None,
-                    body: vec![build_simple_int(2).with_trailing_space()],
+                    body: vec![build_simple_int(2), build_space()],
                     closing_curly_brace: Box::new(CstKind::ClosingCurlyBrace.into()),
                 }
                 .into(),
@@ -2991,8 +3144,7 @@ mod parse {
                             CstKind::Whitespace("  ".to_string())
                         ])),
                     )),
-                    body: vec![build_identifier("foo")
-                        .with_trailing_whitespace(vec![CstKind::Newline("\n".to_string())])],
+                    body: vec![build_identifier("foo"), build_newline()],
                     closing_curly_brace: Box::new(CstKind::ClosingCurlyBrace.into()),
                 }
                 .into(),
@@ -3055,14 +3207,34 @@ mod parse {
                     parameters_and_arrow: None,
                     body: vec![
                         build_identifier("foo"),
-                        CstKind::Newline("\n".to_string()).into(),
+                        build_newline(),
                         CstKind::Whitespace("  ".to_string()).into(),
-                        build_identifier("bar")
-                            .with_trailing_whitespace(vec![CstKind::Newline("\n".to_string())]),
+                        build_identifier("bar"),
+                        build_newline(),
                     ],
                     closing_curly_brace: Box::new(CstKind::ClosingCurlyBrace.into())
                 }
                 .into(),
+            )),
+        );
+        // { foo # abc
+        // }
+        assert_eq!(
+            lambda("{ foo # abc\n}", 0),
+            Some((
+                "",
+                CstKind::Lambda {
+                    opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.with_trailing_space()),
+                    parameters_and_arrow: None,
+                    body: vec![
+                        build_identifier("foo"),
+                        build_space(),
+                        build_comment(" abc"),
+                        build_newline(),
+                    ],
+                    closing_curly_brace: Box::new(CstKind::ClosingCurlyBrace.into())
+                }
+                .into()
             )),
         );
     }
@@ -3111,6 +3283,14 @@ mod parse {
             ),
         }
         .into()
+    }
+    #[cfg(test)]
+    fn build_space() -> Rcst {
+        CstKind::Whitespace(" ".to_string()).into()
+    }
+    #[cfg(test)]
+    fn build_newline() -> Rcst {
+        CstKind::Newline("\n".to_string()).into()
     }
 
     #[cfg(test)]

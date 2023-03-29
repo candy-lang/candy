@@ -58,10 +58,10 @@ impl Body {
         self.push(id, expression);
         id
     }
-    pub fn insert_at_front(&mut self, expressions: Vec<(Id, Expression)>) {
-        let old_expressions = mem::take(&mut self.expressions);
-        self.expressions.extend(expressions);
-        self.expressions.extend(old_expressions);
+    pub fn insert_at_front(&mut self, mut expressions: Vec<(Id, Expression)>) {
+        let mut old_expressions = mem::take(&mut self.expressions);
+        self.expressions.append(&mut expressions);
+        self.expressions.append(&mut old_expressions);
     }
     pub fn remove_all<F>(&mut self, mut predicate: F)
     where

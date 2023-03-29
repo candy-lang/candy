@@ -32,6 +32,11 @@ function getIrTitle(irType: IrType): string {
   }
 }
 
+type ModuleKind = 'code' | 'asset';
+function getModuleKind(languageId: string): ModuleKind {
+  return languageId === 'candy' ? 'code' : 'asset';
+}
+
 export function registerDebugIrCommands(client: LanguageClient) {
   const updateIrEmitter = new vscode.EventEmitter<vscode.Uri>();
   registerDocumentProvider(client, updateIrEmitter.event);
@@ -107,18 +112,10 @@ async function registerDebugIrCommand(
       return;
     }
 
-    const document = editor.document;
-    if (document.languageId !== 'candy') {
-      vscode.window.showErrorMessage(
-        `Can't show the ${getIrTitle(irType)} for a non-Candy file.`
-      );
-      return;
-    }
-
     const ir = await createIrConfig();
     if (ir === undefined) return;
 
-    const encodedUri = encodeUri(document.uri, ir);
+    const encodedUri = encodeUri(editor.document, ir);
     const irDocument = await vscode.workspace.openTextDocument(encodedUri);
     await vscode.window.showTextDocument(irDocument, vscode.ViewColumn.Beside);
   });
@@ -171,13 +168,17 @@ async function pickTracingMode(
 // URI en-/decoding
 
 const irScheme = 'candy-ir';
-function encodeUri(uri: vscode.Uri, ir: Ir): vscode.Uri {
-  const details: { [key: string]: any } = { scheme: uri.scheme, ...ir };
+function encodeUri(document: vscode.TextDocument, ir: Ir): vscode.Uri {
+  const details: { [key: string]: any } = {
+    scheme: document.uri.scheme,
+    moduleKind: getModuleKind(document.languageId),
+    ...ir,
+  };
   delete details.type;
 
   return vscode.Uri.from({
     scheme: irScheme,
-    path: `${uri.path}.${ir.type}`,
+    path: `${document.uri.path}.${ir.type}`,
     // TODO: Encode this in the query part once VS Code doesn't encode it again.
     fragment: JSON.stringify(details),
   });

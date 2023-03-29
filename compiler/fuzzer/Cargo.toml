@@ -9,7 +9,7 @@ rust-version = "1.56"
 [dependencies]
 candy_frontend = { path = "../frontend" }
 candy_vm = { path = "../vm" }
-itertools = { version = "0.10.0" }
+itertools = "0.10.0"
 num-bigint = { version = "0.4.3", features = ["rand"] }
 rand = "0.8.5"
 rustc-hash = "1.1.0"

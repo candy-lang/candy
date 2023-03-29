@@ -3,12 +3,13 @@ use candy_frontend::{
     ast_to_hir::AstToHir,
     hir::CollectErrors,
     module::{Module, ModuleDb, ModuleKind, MutableModuleProviderOwner},
+    rcst_to_cst::RcstToCst,
     rich_ir::ToRichIr,
 };
 use itertools::Itertools;
 use lsp_types::{
     self, Diagnostic, FoldingRange, LocationLink, SemanticToken, TextDocumentContentChangeEvent,
-    Url,
+    TextEdit, Url,
 };
 use rustc_hash::FxHashMap;
 use std::{path::Path, thread};
@@ -28,6 +29,7 @@ use self::{
     find_definition::find_definition, folding_ranges::folding_ranges, hints::Hint,
     references::references, semantic_tokens::semantic_tokens,
 };
+use candy_formatter::Formatter;
 
 pub mod find_definition;
 pub mod folding_ranges;
@@ -175,6 +177,29 @@ impl LanguageFeatures for CandyFeatures {
         let db = db.lock().await;
         let module = decode_module(project_directory, &uri);
         folding_ranges(&*db, module)
+    }
+
+    fn supports_format(&self) -> bool {
+        true
+    }
+    async fn format(
+        &self,
+        db: &Mutex<Database>,
+        project_directory: &Path,
+        uri: Url,
+    ) -> Vec<TextEdit> {
+        let db = db.lock().await;
+        let module = decode_module(project_directory, &uri);
+        let Ok(cst) = db.cst(module.clone()) else { return vec![]; };
+
+        cst.format_to_edits()
+            .finish()
+            .into_iter()
+            .map(|it| TextEdit {
+                range: db.range_to_lsp_range(module.clone(), it.range),
+                new_text: it.new_text,
+            })
+            .collect()
     }
 
     fn supports_find_definition(&self) -> bool {

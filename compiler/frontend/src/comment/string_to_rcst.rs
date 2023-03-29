@@ -745,8 +745,8 @@ mod parse {
         let mut parts = vec![];
         let mut formatting_state = vec![];
         if let Some((line, remaining)) = input.split_first() {
-            let (new_parts, new_formatting_state) = inline(line, formatting_state.as_slice())?;
-            parts.extend(new_parts);
+            let (mut new_parts, new_formatting_state) = inline(line, formatting_state.as_slice())?;
+            parts.append(&mut new_parts);
             formatting_state = new_formatting_state;
             input = recombine("", remaining);
         }

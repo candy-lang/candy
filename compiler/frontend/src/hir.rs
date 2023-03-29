@@ -74,7 +74,7 @@ impl Expression {
             }
             Expression::Symbol(_) => {}
             Expression::List(items) => {
-                ids.extend(items.iter().cloned());
+                ids.extend_from_slice(items);
             }
             Expression::Struct(entries) => {
                 for (key_id, value_id) in entries.iter() {
@@ -106,7 +106,7 @@ impl Expression {
                 arguments,
             } => {
                 ids.push(function.clone());
-                ids.extend(arguments.iter().cloned());
+                ids.extend_from_slice(arguments);
             }
             Expression::UseModule { relative_path, .. } => {
                 ids.push(relative_path.clone());

@@ -1,6 +1,9 @@
 use super::{Cst, CstKind};
 
 pub trait IsMultiline {
+    fn is_singleline(&self) -> bool {
+        !self.is_multiline()
+    }
     fn is_multiline(&self) -> bool;
 }
 impl<D> IsMultiline for Cst<D> {

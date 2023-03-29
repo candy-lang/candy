@@ -4,7 +4,6 @@ use crate::{
     fiber::{Fiber, Status},
     heap::{Closure, Data, Heap, Int, List, Pointer, ReceivePort, SendPort, Struct, Text},
 };
-
 use candy_frontend::builtin_functions::BuiltinFunction;
 use itertools::Itertools;
 use num_bigint::BigInt;

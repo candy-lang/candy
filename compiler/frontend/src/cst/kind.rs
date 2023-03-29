@@ -129,6 +129,190 @@ impl<D> CstKind<D> {
             _ => false,
         }
     }
+
+    pub fn children(&self) -> Vec<&Cst<D>> {
+        match self {
+            CstKind::EqualsSign
+            | CstKind::Comma
+            | CstKind::Dot
+            | CstKind::Colon
+            | CstKind::ColonEqualsSign
+            | CstKind::Bar
+            | CstKind::OpeningParenthesis
+            | CstKind::ClosingParenthesis
+            | CstKind::OpeningBracket
+            | CstKind::ClosingBracket
+            | CstKind::OpeningCurlyBrace
+            | CstKind::ClosingCurlyBrace
+            | CstKind::Arrow
+            | CstKind::SingleQuote
+            | CstKind::DoubleQuote
+            | CstKind::Percent
+            | CstKind::Octothorpe
+            | CstKind::Whitespace(_)
+            | CstKind::Newline(_) => vec![],
+            CstKind::Comment { octothorpe, .. } => vec![octothorpe],
+            CstKind::TrailingWhitespace { child, whitespace } => {
+                let mut children = vec![child.as_ref()];
+                children.extend(whitespace);
+                children
+            }
+            CstKind::Identifier(_) | CstKind::Symbol(_) | CstKind::Int { .. } => vec![],
+            CstKind::OpeningText {
+                opening_single_quotes,
+                opening_double_quote,
+            } => {
+                let mut children = vec![];
+                children.extend(opening_single_quotes);
+                children.push(opening_double_quote);
+                children
+            }
+            CstKind::ClosingText {
+                closing_double_quote,
+                closing_single_quotes,
+            } => {
+                let mut children = vec![closing_double_quote.as_ref()];
+                children.extend(closing_single_quotes);
+                children
+            }
+            CstKind::Text {
+                opening,
+                parts,
+                closing,
+            } => {
+                let mut children = vec![opening.as_ref()];
+                children.extend(parts);
+                children.push(closing);
+                children
+            }
+            CstKind::TextPart(_) => vec![],
+            CstKind::TextInterpolation {
+                opening_curly_braces,
+                expression,
+                closing_curly_braces,
+            } => {
+                let mut children = vec![];
+                children.extend(opening_curly_braces);
+                children.push(expression);
+                children.extend(closing_curly_braces);
+                children
+            }
+            CstKind::BinaryBar { left, bar, right } => {
+                let mut children = vec![left.as_ref()];
+                children.push(bar);
+                children.push(right);
+                children
+            }
+            CstKind::Parenthesized {
+                opening_parenthesis,
+                inner,
+                closing_parenthesis,
+            } => {
+                let mut children = vec![opening_parenthesis.as_ref()];
+                children.push(inner);
+                children.push(closing_parenthesis);
+                children
+            }
+            CstKind::Call {
+                receiver,
+                arguments,
+            } => {
+                let mut children = vec![receiver.as_ref()];
+                children.extend(arguments);
+                children
+            }
+            CstKind::List {
+                opening_parenthesis,
+                items,
+                closing_parenthesis,
+            } => {
+                let mut children = vec![opening_parenthesis.as_ref()];
+                children.extend(items);
+                children.push(closing_parenthesis);
+                children
+            }
+            CstKind::ListItem { value, comma } => {
+                let mut children = vec![value.as_ref()];
+                if let Some(comma) = comma {
+                    children.push(comma);
+                }
+                children
+            }
+            CstKind::Struct {
+                opening_bracket,
+                fields,
+                closing_bracket,
+            } => {
+                let mut children = vec![opening_bracket.as_ref()];
+                children.extend(fields);
+                children.push(closing_bracket);
+                children
+            }
+            CstKind::StructField {
+                key_and_colon,
+                value,
+                comma,
+            } => {
+                let mut children = vec![];
+                if let Some(box (key, colon)) = key_and_colon {
+                    children.push(key);
+                    children.push(colon);
+                }
+                children.push(value);
+                if let Some(box comma) = comma {
+                    children.push(comma);
+                }
+                children
+            }
+            CstKind::StructAccess { struct_, dot, key } => {
+                vec![struct_.as_ref(), dot.as_ref(), key.as_ref()]
+            }
+            CstKind::Match {
+                expression,
+                percent,
+                cases,
+            } => {
+                let mut children = vec![expression.as_ref(), percent.as_ref()];
+                children.extend(cases);
+                children
+            }
+            CstKind::MatchCase {
+                pattern,
+                arrow,
+                body,
+            } => {
+                let mut children = vec![pattern.as_ref(), arrow.as_ref()];
+                children.extend(body);
+                children
+            }
+            CstKind::Lambda {
+                opening_curly_brace,
+                parameters_and_arrow,
+                body,
+                closing_curly_brace,
+            } => {
+                let mut children = vec![opening_curly_brace.as_ref()];
+                if let Some((parameters, arrow)) = parameters_and_arrow {
+                    children.extend(parameters);
+                    children.push(arrow);
+                }
+                children.extend(body);
+                children.push(closing_curly_brace);
+                children
+            }
+            CstKind::Assignment {
+                left,
+                assignment_sign,
+                body,
+            } => {
+                let mut children = vec![left.as_ref()];
+                children.push(assignment_sign);
+                children.extend(body);
+                children
+            }
+            CstKind::Error { .. } => vec![],
+        }
+    }
 }
 
 impl<D> Display for CstKind<D> {
