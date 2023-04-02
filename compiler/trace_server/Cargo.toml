@@ -5,6 +5,8 @@ edition = "2021"
 rust-version = "1.56"
 
 [dependencies]
+actix-web = { version = "4.0.0-beta.8", features = ["rustls"] }
+actix-service = "2.0.0"
 candy_frontend = { path = "../frontend" }
 candy_vm = { path = "../vm" }
 itertools = { version = "0.10.0" }

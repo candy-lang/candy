@@ -13,7 +13,7 @@ impl Timer {
             start: Instant::now(),
         }
     }
-    pub fn get_time(&self) -> Time {
+    pub fn now(&self) -> Time {
         let now = Instant::now();
         let elapsed = now - self.start;
         Time(elapsed.as_secs_f64())

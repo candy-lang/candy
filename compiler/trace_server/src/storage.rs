@@ -39,13 +39,14 @@ impl TraceStorage {
     }
 
     pub fn maybe_deduplicate(&mut self) {
-        if self.heap.number_of_objects() > self.when_to_deduplicate {
-            let pointer_map = self.heap.deduplicate();
-            for trace in self.traces.values_mut() {
-                trace.change_pointers(&pointer_map);
-            }
-            self.when_to_deduplicate = (self.when_to_deduplicate as f64 * 1.1) as usize;
+        if self.heap.number_of_objects() < self.when_to_deduplicate {
+            return;
         }
+        let pointer_map = self.heap.deduplicate();
+        for trace in self.traces.values_mut() {
+            trace.change_pointers(&pointer_map);
+        }
+        self.when_to_deduplicate = (self.when_to_deduplicate as f64 * 1.1) as usize;
     }
 }
 

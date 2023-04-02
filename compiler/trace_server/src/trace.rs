@@ -21,6 +21,7 @@ pub enum Trace {
         end: Option<CallEnd>,
     },
     ValueEvaluated {
+        when: Time,
         expression: Pointer,
         value: Pointer,
     },
@@ -33,7 +34,7 @@ pub struct CallEnd {
 #[derive(Clone, Copy)]
 pub enum CallResult {
     Canceled,
-    Panicked,
+    Panicked, // FIXME: reason
     Returned(Pointer),
 }
 
@@ -87,7 +88,11 @@ impl Trace {
                     }
                 )
             }
-            Trace::ValueEvaluated { expression, value } => todo!(),
+            Trace::ValueEvaluated {
+                when,
+                expression,
+                value,
+            } => todo!(),
         }
     }
 }
@@ -116,7 +121,11 @@ impl Trace {
                     *value = pointer_map.get(value).copied().unwrap_or(*value);
                 }
             }
-            Trace::ValueEvaluated { expression, value } => {
+            Trace::ValueEvaluated {
+                when: _,
+                expression,
+                value,
+            } => {
                 *expression = pointer_map.get(expression).copied().unwrap_or(*expression);
                 *value = pointer_map.get(value).copied().unwrap_or(*value);
             }

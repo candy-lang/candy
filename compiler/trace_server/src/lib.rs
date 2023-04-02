@@ -1,7 +1,10 @@
-mod trace;
-mod tracer;
 mod storage;
 mod time;
+mod trace;
+mod tracer;
+mod web_server;
+
+use std::sync::RwLock;
 
 use actix_web::HttpServer;
 use candy_frontend::{hir, module::Module, TracingConfig, TracingMode};
@@ -67,11 +70,14 @@ pub fn run<U: UseProvider>(use_provider: &U, module: Module, module_closure: Clo
     };
 
     debug!("Running main function.");
-    let mut storage = TraceStorage::new(heap);
+    let mut storage = Arc::new(RwLock::new(TraceStorage::new(heap)));
+    // std::thread::spawn(|| web_server::run(storage));
+
     let mut vm = Vm::default();
     let environment = storage.heap.create_struct(FxHashMap::default());
     let platform = storage.heap.create_hir_id(hir::Id::platform());
     let root = trace_call(&mut storage, platform, main, vec![environment], platform);
 
     debug!("Trace:\n{storage:?}");
+    // web_server::run(storage);
 }
