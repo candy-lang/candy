@@ -1,55 +1,29 @@
-use super::Tracer;
+use crate::{
+    channel::ChannelId,
+    fiber::FiberId,
+    heap::{Heap, Pointer},
+};
 
-/// A dummy version of the tracer that remembers nothing.
+use super::{FiberTracer, Tracer};
+
+/// A tracer that remembers nothing.
 #[derive(Default)]
 pub struct DummyTracer;
 impl Tracer for DummyTracer {
-    fn fiber_created(&mut self, fiber: crate::fiber::FiberId) {}
+    type ForFiber = DummyTracer;
 
-    fn fiber_done(&mut self, fiber: crate::fiber::FiberId) {}
-
-    fn fiber_panicked(
-        &mut self,
-        fiber: crate::fiber::FiberId,
-        panicked_child: Option<crate::fiber::FiberId>,
-    ) {
-    }
-
-    fn fiber_canceled(&mut self, fiber: crate::fiber::FiberId) {}
-
-    fn fiber_execution_started(&mut self, fiber: crate::fiber::FiberId) {}
-
-    fn fiber_execution_ended(&mut self, fiber: crate::fiber::FiberId) {}
-
-    fn channel_created(&mut self, channel: crate::channel::ChannelId) {}
-
-    fn value_evaluated(
-        &mut self,
-        fiber: crate::fiber::FiberId,
-        expression: crate::heap::Pointer,
-        value: crate::heap::Pointer,
-        heap: &mut crate::heap::Heap,
-    ) {
-    }
-
-    fn found_fuzzable_closure(
-        &mut self,
-        fiber: crate::fiber::FiberId,
-        definition: crate::heap::Pointer,
-        closure: crate::heap::Pointer,
-        heap: &crate::heap::Heap,
-    ) {
-    }
-
-    fn call_started(
-        &mut self,
-        call_site: crate::heap::Pointer,
-        callee: crate::heap::Pointer,
-        args: Vec<crate::heap::Pointer>,
-        responsible: crate::heap::Pointer,
-        heap: &crate::heap::Heap,
-    ) {
-    }
-
-    fn call_ended(&mut self, return_value: crate::heap::Pointer, heap: &crate::heap::Heap) {}
+    fn fiber_created(&mut self, _: FiberId) {}
+    fn fiber_done(&mut self, _: FiberId) {}
+    fn fiber_panicked(&mut self, _: FiberId, _: Option<FiberId>) {}
+    fn fiber_canceled(&mut self, _: FiberId) {}
+    fn fiber_execution_started(&mut self, _: FiberId) {}
+    fn fiber_execution_ended(&mut self, _: FiberId) {}
+    fn channel_created(&mut self, _: ChannelId) {}
+    fn tracer_for_fiber(&mut self, _: FiberId) -> DummyTracer {}
+}
+impl FiberTracer for DummyTracer {
+    fn value_evaluated(&mut self, _: Pointer, _: Pointer, _: &mut Heap) {}
+    fn found_fuzzable_closure(&mut self, _: Pointer, _: Pointer, _: &mut Heap) {}
+    fn call_started(&mut self, _: Pointer, _: Pointer, _: Vec<Pointer>, _: Pointer, _: &mut Heap) {}
+    fn call_ended(&mut self, _: Pointer, _: &mut Heap) {}
 }

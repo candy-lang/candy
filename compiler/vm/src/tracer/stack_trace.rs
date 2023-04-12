@@ -1,8 +1,8 @@
 use super::{
     full::{FullTracer, StoredFiberEvent, StoredVmEvent},
-    FiberId,
+    FiberId, FiberTracer, Tracer,
 };
-use crate::heap::Pointer;
+use crate::heap::{Heap, Pointer};
 use candy_frontend::{
     ast_to_hir::AstToHir, cst::CstKind, module::Package, position::PositionConversionDb,
 };
@@ -11,8 +11,13 @@ use pad::PadStr;
 use rustc_hash::FxHashMap;
 use tracing::debug;
 
-// Stack traces are a reduced view of the tracing state that represent the stack
-// trace at a given moment in time.
+// A tracer that makes it possible to display stack traces, including all the
+// arguments of called functions.
+pub struct StackTracer {}
+
+struct StackFiberTracer {
+    stack: Vec<Call>,
+}
 
 #[derive(Clone)]
 pub struct Call {
@@ -20,6 +25,90 @@ pub struct Call {
     pub callee: Pointer,
     pub arguments: Vec<Pointer>,
     pub responsible: Pointer,
+}
+
+impl Tracer for StackTracer {
+    type ForFiber;
+
+    fn fiber_created(&mut self, fiber: FiberId) {
+        todo!()
+    }
+
+    fn fiber_done(&mut self, fiber: FiberId) {
+        todo!()
+    }
+
+    fn fiber_panicked(&mut self, fiber: FiberId, panicked_child: Option<FiberId>) {
+        todo!()
+    }
+
+    fn fiber_canceled(&mut self, fiber: FiberId) {
+        todo!()
+    }
+
+    fn fiber_execution_started(&mut self, fiber: FiberId) {
+        todo!()
+    }
+
+    fn fiber_execution_ended(&mut self, fiber: FiberId) {
+        todo!()
+    }
+
+    fn channel_created(&mut self, channel: crate::channel::ChannelId) {
+        todo!()
+    }
+
+    fn tracer_for_fiber(&mut self, fiber: FiberId) -> FiberTracer {
+        todo!()
+    }
+
+    fn fiber_exited(&mut self, fiber_tracer: Self::ForFiber) {
+        todo!()
+    }
+}
+
+impl FiberTracer for StackFiberTracer {
+    fn value_evaluated(&mut self, _: Pointer, _: Pointer, _: &mut Heap) {}
+    fn found_fuzzable_closure(&mut self, _: Pointer, _: Pointer, _: &mut Heap) {}
+
+    fn call_started(
+        &mut self,
+        call_site: Pointer,
+        callee: Pointer,
+        arguments: Vec<Pointer>,
+        responsible: Pointer,
+        heap: &mut Heap,
+    ) {
+        heap.dup(call_site);
+        heap.dup(callee);
+        for argument in arguments {
+            heap.dup(argument);
+        }
+        heap.dup(responsible);
+
+        self.stack.push(Call {
+            call_site,
+            callee,
+            arguments,
+            responsible,
+        });
+    }
+
+    fn call_ended(&mut self, return_value: Pointer, heap: &mut Heap) {
+        let Call {
+            call_site,
+            callee,
+            arguments,
+            responsible,
+        } = self.stack.pop().unwrap();
+
+        heap.drop(call_site);
+        heap.drop(callee);
+        for argument in arguments {
+            heap.drop(argument);
+        }
+        heap.drop(responsible);
+    }
 }
 
 impl FullTracer {

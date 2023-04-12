@@ -39,13 +39,14 @@ impl Debug for FiberId {
 /// A fiber represents an execution thread of a program. It's a stack-based
 /// machine that runs instructions from a LIR. Fibers are owned by a `Vm`.
 #[derive(Clone)]
-pub struct Fiber {
+pub struct Fiber<T: FiberTracer> {
     pub status: Status,
     next_instruction: InstructionPointer,
     pub data_stack: Vec<Pointer>,
     pub call_stack: Vec<InstructionPointer>,
     pub import_stack: Vec<Module>,
     pub heap: Heap,
+    pub tracer: T,
 }
 
 #[derive(Clone, Debug)]
@@ -103,7 +104,7 @@ pub enum ExecutionResult {
 }
 
 impl Fiber {
-    fn new_with_heap(heap: Heap) -> Self {
+    fn new_with_heap(heap: Heap, tracer: Box<dyn FiberTracer>) -> Self {
         Self {
             status: Status::Done,
             next_instruction: InstructionPointer::null_pointer(),
@@ -111,6 +112,7 @@ impl Fiber {
             call_stack: vec![],
             import_stack: vec![],
             heap,
+            tracer,
         }
     }
     pub fn new_for_running_closure(
@@ -118,10 +120,11 @@ impl Fiber {
         closure: Pointer,
         arguments: Vec<Pointer>,
         responsible: Pointer,
+        tracer: Box<dyn FiberTracer>,
     ) -> Self {
         assert!(matches!(heap.get(closure).data, Data::Closure(_)));
 
-        let mut fiber = Self::new_with_heap(heap);
+        let mut fiber = Self::new_with_heap(heap, tracer);
         fiber.status = Status::Running;
         fiber.call(closure, arguments, responsible);
 
@@ -140,10 +143,10 @@ impl Fiber {
         let mut heap = Heap::default();
         let closure = heap.create_closure(closure);
         let module_id = heap.create_hir_id(Id::new(module, vec![]));
-        Self::new_for_running_closure(heap, closure, vec![], module_id)
+        Self::new_for_running_closure(heap, closure, vec![], module_id, tracer)
     }
 
-    pub fn tear_down(mut self) -> ExecutionResult {
+    pub fn into_execution_result(mut self) -> ExecutionResult {
         match self.status {
             Status::Done => ExecutionResult::Finished(Packet {
                 heap: self.heap,
@@ -466,18 +469,18 @@ impl Fiber {
                 let call_site = self.data_stack.pop().unwrap();
 
                 args.reverse();
-                tracer.call_started(call_site, callee_address, args, responsible, &self.heap);
+                tracer.call_started(call_site, callee_address, args, responsible, &mut self.heap);
             }
             Instruction::TraceCallEnds => {
                 let return_value = self.data_stack.pop().unwrap();
 
-                tracer.call_ended(return_value, &self.heap);
+                tracer.call_ended(return_value, &mut self.heap);
             }
             Instruction::TraceExpressionEvaluated => {
                 let value = self.data_stack.pop().unwrap();
                 let expression = self.data_stack.pop().unwrap();
 
-                tracer.value_evaluated(expression, value, &self.heap);
+                tracer.value_evaluated(expression, value, &mut self.heap);
             }
             Instruction::TraceFoundFuzzableClosure => {
                 let closure = self.data_stack.pop().unwrap();
@@ -488,7 +491,7 @@ impl Fiber {
                     "Instruction TraceFoundFuzzableClosure executed, but stack top is not a closure.",
                 );
 
-                tracer.found_fuzzable_closure(definition, closure, &self.heap);
+                tracer.found_fuzzable_closure(definition, closure, &mut self.heap);
             }
         }
     }

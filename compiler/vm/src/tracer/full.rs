@@ -1,4 +1,4 @@
-use super::{FiberEvent, Tracer, VmEvent};
+use super::{FiberEvent, FiberTracer, Tracer, VmEvent};
 use crate::{
     channel::ChannelId,
     fiber::FiberId,
@@ -69,6 +69,8 @@ pub enum StoredFiberEvent {
     },
 }
 
+struct FullFiberTracer {}
+
 impl Tracer for FullTracer {
     fn add(&mut self, event: VmEvent) {
         let event = TimedEvent {
@@ -77,7 +79,71 @@ impl Tracer for FullTracer {
         };
         self.events.push(event);
     }
+
+    type ForFiber;
+
+    fn fiber_created(&mut self, fiber: FiberId) {
+        todo!()
+    }
+
+    fn fiber_done(&mut self, fiber: FiberId) {
+        todo!()
+    }
+
+    fn fiber_panicked(&mut self, fiber: FiberId, panicked_child: Option<FiberId>) {
+        todo!()
+    }
+
+    fn fiber_canceled(&mut self, fiber: FiberId) {
+        todo!()
+    }
+
+    fn fiber_execution_started(&mut self, fiber: FiberId) {
+        todo!()
+    }
+
+    fn fiber_execution_ended(&mut self, fiber: FiberId) {
+        todo!()
+    }
+
+    fn channel_created(&mut self, channel: ChannelId) {
+        todo!()
+    }
+
+    fn tracer_for_fiber(&mut self, fiber: FiberId) -> super::FiberTracer {
+        todo!()
+    }
+
+    fn fiber_exited(&mut self, fiber_tracer: Self::ForFiber) {
+        todo!()
+    }
 }
+
+impl FiberTracer for FullFiberTracer {
+    fn value_evaluated(&mut self, expression: Pointer, value: Pointer, heap: &mut Heap) {
+        todo!()
+    }
+
+    fn found_fuzzable_closure(&mut self, definition: Pointer, closure: Pointer, heap: &mut Heap) {
+        todo!()
+    }
+
+    fn call_started(
+        &mut self,
+        call_site: Pointer,
+        callee: Pointer,
+        args: Vec<Pointer>,
+        responsible: Pointer,
+        heap: &mut Heap,
+    ) {
+        todo!()
+    }
+
+    fn call_ended(&mut self, return_value: Pointer, heap: &mut Heap) {
+        todo!()
+    }
+}
+
 impl FullTracer {
     fn import_from_heap(&mut self, address: Pointer, heap: &Heap) -> Pointer {
         heap.clone_single_to_other_heap(&mut self.heap, address)

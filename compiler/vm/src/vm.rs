@@ -18,7 +18,7 @@ use crate::{
         CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions,
         UseProvider,
     },
-    fiber::{self, ExecutionResult, Fiber, FiberId},
+    fiber::{self, Fiber, FiberId, FiberResult},
     heap::{Closure, Heap, Pointer, SendPort, Struct},
     tracer::Tracer,
 };
@@ -43,12 +43,14 @@ impl fmt::Debug for OperationId {
 /// VMs are first-class Rust structs, they enable other code to store "freezed"
 /// programs and to remain in control about when and for how long code runs.
 #[derive(Clone)]
-pub struct Vm {
-    fibers: HashMap<FiberId, FiberTree>,
+pub struct Vm<T: Tracer> {
+    fibers: HashMap<FiberId, FiberTree<T::ForFiber>>,
 
     channels: HashMap<ChannelId, ChannelLike>,
     pub completed_operations: HashMap<OperationId, CompletedOperation>,
     pub unreferenced_channels: HashSet<ChannelId>,
+
+    tracer: T,
 
     operation_id_generator: IdGenerator<OperationId>,
     fiber_id_generator: IdGenerator<FiberId>,
@@ -56,23 +58,23 @@ pub struct Vm {
 }
 
 #[derive(Clone)]
-enum FiberTree {
+enum FiberTree<T: FiberTracer> {
     /// This tree is currently focused on running a single fiber.
-    Single(Single),
+    Single(Single<T>),
 
     /// The fiber of this tree entered a `core.parallel` scope so that it's now
     /// paused and waits for the parallel scope to end. Instead of the main
     /// former single fiber, the tree now runs the closure passed to
     /// `core.parallel` as well as any other spawned children.
-    Parallel(Parallel),
+    Parallel(Parallel<T>),
 
-    Try(Try),
+    Try(Try<T>),
 }
 
 /// Single fibers are the leaves of the fiber tree.
 #[derive(Clone)]
-struct Single {
-    fiber: Fiber,
+struct Single<T: FiberTracer> {
+    fiber: Fiber<T>,
     parent: Option<FiberId>,
 }
 
@@ -84,8 +86,8 @@ struct Single {
 /// child, those children also have an explicit send port where the closure's
 /// result is sent to.
 #[derive(Clone)]
-struct Parallel {
-    paused_fiber: Single,
+struct Parallel<T: FiberTracer> {
+    paused_fiber: Single<T>,
     children: HashMap<FiberId, ChildKind>,
     return_value: Option<Packet>, // will later contain the body's return value
     nursery: ChannelId,
@@ -97,8 +99,8 @@ enum ChildKind {
 }
 
 #[derive(Clone)]
-struct Try {
-    paused_fiber: Single,
+struct Try<T: FiberTracer> {
+    paused_fiber: Single<T>,
     child: FiberId,
 }
 
@@ -128,20 +130,19 @@ impl FiberId {
     }
 }
 
-impl Default for Vm {
-    fn default() -> Self {
+impl Vm<T: Tracer> {
+    fn new(tracer: T) -> Self {
         Self {
             fibers: HashMap::new(),
             channels: HashMap::new(),
             completed_operations: Default::default(),
             unreferenced_channels: Default::default(),
+            tracer,
             operation_id_generator: Default::default(),
             channel_id_generator: Default::default(),
             fiber_id_generator: IdGenerator::start_at(FiberId::root().to_usize() + 1),
         }
     }
-}
-impl Vm {
     fn set_up_with_fiber(&mut self, fiber: Fiber) {
         assert!(
             !self.fibers.contains_key(&FiberId::root()),
@@ -167,16 +168,17 @@ impl Vm {
             closure,
             arguments,
             responsible,
+            self.tracer.for_fiber(FiberId::root()),
         ));
     }
     pub fn set_up_for_running_module_closure(&mut self, module: Module, closure: Closure) {
         self.set_up_with_fiber(Fiber::new_for_running_module_closure(module, closure))
     }
 
-    pub fn tear_down(mut self) -> ExecutionResult {
+    pub fn tear_down(mut self) -> FiberResult {
         let tree = self.fibers.remove(&FiberId::root()).unwrap();
         let single = tree.into_single().unwrap();
-        single.fiber.tear_down()
+        single.fiber.into_execution_result()
     }
 
     pub fn status(&self) -> Status {
@@ -353,6 +355,7 @@ impl Vm {
                                 body,
                                 vec![nursery_send_port],
                                 responsible,
+                                self.tracer.for_fiber(id),
                             ),
                             parent: Some(fiber_id),
                         }),
@@ -381,7 +384,13 @@ impl Vm {
                     self.fibers.insert(
                         id,
                         FiberTree::Single(Single {
-                            fiber: Fiber::new_for_running_closure(heap, body, vec![], responsible),
+                            fiber: Fiber::new_for_running_closure(
+                                heap,
+                                body,
+                                vec![],
+                                responsible,
+                                self.tracer.for_fiber(id),
+                            ),
                             parent: Some(fiber_id),
                         }),
                     );
@@ -415,7 +424,7 @@ impl Vm {
                 .unwrap()
                 .into_single()
                 .unwrap();
-            let result = single.fiber.tear_down();
+            let result = single.fiber.into_execution_result();
             let parent = single
                 .parent
                 .expect("we already checked we're not the root fiber");
@@ -426,7 +435,7 @@ impl Vm {
                     let child = parallel.children.remove(&fiber_id).unwrap();
 
                     match result {
-                        ExecutionResult::Finished(return_value) => {
+                        FiberResult::Finished(return_value) => {
                             let is_finished = parallel.children.is_empty();
                             match child {
                                 ChildKind::InitialChild => {
@@ -449,7 +458,7 @@ impl Vm {
                                 )
                             }
                         }
-                        ExecutionResult::Panicked {
+                        FiberResult::Panicked {
                             reason,
                             responsible,
                         } => self.finish_parallel(

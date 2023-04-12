@@ -18,7 +18,7 @@ use candy_language_server::server::Server;
 use candy_vm::{
     channel::{ChannelId, Packet},
     context::{DbUseProvider, RunForever},
-    fiber::{ExecutionResult, FiberId},
+    fiber::{FiberId, FiberResult},
     heap::{Closure, Data, Heap, SendPort, Struct},
     lir::Lir,
     mir_to_lir::MirToLir,
@@ -292,7 +292,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     let result = vm.tear_down();
 
     let (mut heap, exported_definitions): (_, Struct) = match result {
-        ExecutionResult::Finished(return_value) => {
+        FiberResult::Finished(return_value) => {
             debug!("The module exports these definitions: {return_value:?}",);
             let exported = return_value
                 .heap
@@ -303,7 +303,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
                 .unwrap();
             (return_value.heap, exported)
         }
-        ExecutionResult::Panicked {
+        FiberResult::Panicked {
             reason,
             responsible,
         } => {
@@ -375,14 +375,14 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         module.dump_associated_debug_file("trace", &format!("{tracer:?}"));
     }
     match vm.tear_down() {
-        ExecutionResult::Finished(return_value) => {
+        FiberResult::Finished(return_value) => {
             tracer
                 .for_fiber(FiberId::root())
                 .call_ended(return_value.address, &return_value.heap);
             debug!("The main function returned: {return_value:?}");
             Ok(())
         }
-        ExecutionResult::Panicked {
+        FiberResult::Panicked {
             reason,
             responsible,
         } => {
