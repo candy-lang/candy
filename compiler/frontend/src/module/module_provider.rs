@@ -63,7 +63,7 @@ impl ModuleProvider for FileSystemModuleProvider {
             match fs::read(path.clone()) {
                 Ok(content) => return Some(Arc::new(content)),
                 Err(error) if matches!(error.kind(), std::io::ErrorKind::NotFound) => {}
-                Err(_) => error!("Unexpected error when reading file {path:?}."),
+                Err(error) => error!("Unexpected error when reading file {path:?}: {error}."),
             }
         }
         None
