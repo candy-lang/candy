@@ -1,0 +1,16 @@
+type = use "..type"
+
+is value := type.is value Symbol
+
+tagGetSymbol tag :=
+  needs (is tag)
+  tag | ✨.tagGetSymbol
+
+tagHasValue tag :=
+  needs (is tag)
+  tag | ✨.tagHasValue
+
+tagGetValue tag :=
+  needs (is tag)
+  needs (tagHasValue tag)
+  tag | ✨.tagGetValue
