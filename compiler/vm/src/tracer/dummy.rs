@@ -19,7 +19,10 @@ impl Tracer for DummyTracer {
     fn fiber_execution_started(&mut self, _: FiberId) {}
     fn fiber_execution_ended(&mut self, _: FiberId) {}
     fn channel_created(&mut self, _: ChannelId) {}
-    fn tracer_for_fiber(&mut self, _: FiberId) -> DummyTracer {}
+    fn tracer_for_fiber(&mut self, _: FiberId) -> DummyTracer {
+        DummyTracer
+    }
+    fn integrate_fiber_tracer(&mut self, _: Self::ForFiber, _: &Heap, _: &mut Heap) {}
 }
 impl FiberTracer for DummyTracer {
     fn value_evaluated(&mut self, _: Pointer, _: Pointer, _: &mut Heap) {}

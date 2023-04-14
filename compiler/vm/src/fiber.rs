@@ -98,13 +98,18 @@ impl InstructionPointer {
     }
 }
 
+pub struct CompletedExecution<T> {
+    pub tracer: T,
+    pub heap: Heap,
+    pub result: ExecutionResult,
+}
 pub enum ExecutionResult {
-    Finished(Packet),
+    Finished { return_value: Pointer },
     Panicked { reason: String, responsible: Id },
 }
 
-impl Fiber {
-    fn new_with_heap(heap: Heap, tracer: Box<dyn FiberTracer>) -> Self {
+impl<T: FiberTracer> Fiber<T> {
+    fn new_with_heap(heap: Heap, tracer: T) -> Self {
         Self {
             status: Status::Done,
             next_instruction: InstructionPointer::null_pointer(),
@@ -120,7 +125,7 @@ impl Fiber {
         closure: Pointer,
         arguments: Vec<Pointer>,
         responsible: Pointer,
-        tracer: Box<dyn FiberTracer>,
+        tracer: T,
     ) -> Self {
         assert!(matches!(heap.get(closure).data, Data::Closure(_)));
 
@@ -130,7 +135,7 @@ impl Fiber {
 
         fiber
     }
-    pub fn new_for_running_module_closure(module: Module, closure: Closure) -> Self {
+    pub fn new_for_running_module_closure(module: Module, closure: Closure, tracer: T) -> Self {
         assert_eq!(
             closure.captured.len(),
             0,
@@ -146,20 +151,23 @@ impl Fiber {
         Self::new_for_running_closure(heap, closure, vec![], module_id, tracer)
     }
 
-    pub fn into_execution_result(mut self) -> ExecutionResult {
-        match self.status {
-            Status::Done => ExecutionResult::Finished(Packet {
-                heap: self.heap,
-                address: self.data_stack.pop().unwrap(),
-            }),
-            Status::Panicked {
-                reason,
-                responsible,
-            } => ExecutionResult::Panicked {
-                reason,
-                responsible,
+    pub fn tear_down(mut self) -> CompletedExecution<T> {
+        CompletedExecution {
+            tracer: self.tracer,
+            heap: self.heap,
+            result: match self.status {
+                Status::Done => ExecutionResult::Finished {
+                    return_value: self.data_stack.pop().unwrap(),
+                },
+                Status::Panicked {
+                    reason,
+                    responsible,
+                } => ExecutionResult::Panicked {
+                    reason,
+                    responsible,
+                },
+                _ => panic!("Called `tear_down` on a fiber that's still running."),
             },
-            _ => panic!("Called `tear_down` on a fiber that's still running."),
         }
     }
 
@@ -213,14 +221,13 @@ impl Fiber {
             Err((reason, responsible)) => self.panic(reason, responsible),
         }
     }
-    pub fn complete_try(&mut self, result: ExecutionResult) {
+    pub fn complete_try(&mut self, result: Result<Packet, String>) {
         assert!(matches!(self.status, Status::InTry { .. }));
         let result = match result {
-            ExecutionResult::Finished(Packet {
-                heap,
-                address: return_value,
-            }) => Ok(heap.clone_single_to_other_heap(&mut self.heap, return_value)),
-            ExecutionResult::Panicked { reason, .. } => Err(self.heap.create_text(reason)),
+            Ok(Packet { heap, address }) => {
+                Ok(heap.clone_single_to_other_heap(&mut self.heap, address))
+            }
+            Err(reason) => Err(self.heap.create_text(reason)),
         };
         self.data_stack.push(self.heap.create_result(result));
         self.status = Status::Running;
@@ -244,7 +251,6 @@ impl Fiber {
         &mut self,
         use_provider: &dyn UseProvider,
         execution_controller: &mut dyn ExecutionController,
-        tracer: &mut FiberTracer,
     ) {
         assert!(
             matches!(self.status, Status::Running),
@@ -270,16 +276,11 @@ impl Fiber {
                 .clone();
 
             self.next_instruction.instruction += 1;
-            self.run_instruction(use_provider, tracer, instruction);
+            self.run_instruction(use_provider, instruction);
             execution_controller.instruction_executed();
         }
     }
-    pub fn run_instruction(
-        &mut self,
-        use_provider: &dyn UseProvider,
-        tracer: &mut FiberTracer,
-        instruction: Instruction,
-    ) {
+    pub fn run_instruction(&mut self, use_provider: &dyn UseProvider, instruction: Instruction) {
         if TRACE {
             trace!(
                 "Instruction pointer: {}:{}",
@@ -469,18 +470,25 @@ impl Fiber {
                 let call_site = self.data_stack.pop().unwrap();
 
                 args.reverse();
-                tracer.call_started(call_site, callee_address, args, responsible, &mut self.heap);
+                self.tracer.call_started(
+                    call_site,
+                    callee_address,
+                    args,
+                    responsible,
+                    &mut self.heap,
+                );
             }
             Instruction::TraceCallEnds => {
                 let return_value = self.data_stack.pop().unwrap();
 
-                tracer.call_ended(return_value, &mut self.heap);
+                self.tracer.call_ended(return_value, &mut self.heap);
             }
             Instruction::TraceExpressionEvaluated => {
                 let value = self.data_stack.pop().unwrap();
                 let expression = self.data_stack.pop().unwrap();
 
-                tracer.value_evaluated(expression, value, &mut self.heap);
+                self.tracer
+                    .value_evaluated(expression, value, &mut self.heap);
             }
             Instruction::TraceFoundFuzzableClosure => {
                 let closure = self.data_stack.pop().unwrap();
@@ -491,7 +499,8 @@ impl Fiber {
                     "Instruction TraceFoundFuzzableClosure executed, but stack top is not a closure.",
                 );
 
-                tracer.found_fuzzable_closure(definition, closure, &mut self.heap);
+                self.tracer
+                    .found_fuzzable_closure(definition, closure, &mut self.heap);
             }
         }
     }

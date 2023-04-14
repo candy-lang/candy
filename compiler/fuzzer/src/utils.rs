@@ -4,7 +4,7 @@ use candy_frontend::hir::Id;
 use candy_vm::{
     fiber::FiberId,
     heap::{Data, Heap, Pointer},
-    tracer::{FiberEvent, Tracer, VmEvent},
+    tracer::{FiberTracer, Tracer},
 };
 
 pub fn collect_symbols_in_heap(heap: &Heap) -> Vec<String> {
@@ -22,26 +22,42 @@ pub fn collect_symbols_in_heap(heap: &Heap) -> Vec<String> {
 #[derive(Default)]
 pub struct FuzzablesFinder {
     pub fuzzables: FxHashMap<Id, Pointer>,
-    pub heap: Heap,
-    transferred_objects: FxHashMap<FiberId, FxHashMap<Pointer, Pointer>>,
 }
-impl Tracer for FuzzablesFinder {
-    fn add(&mut self, event: VmEvent) {
-        let VmEvent::InFiber { fiber, event } = event else { return; };
-        let FiberEvent::FoundFuzzableClosure { definition, closure, heap } = event else { return; };
-        assert!(matches!(heap.get(closure).data, Data::Closure(_)));
+#[derive(Default)]
+pub struct FiberFuzzablesFinder {
+    fuzzables: FxHashMap<Id, Pointer>,
+}
 
+impl Tracer for FuzzablesFinder {
+    type ForFiber = FiberFuzzablesFinder;
+
+    fn fiber_created(&mut self, _: FiberId) {}
+    fn fiber_done(&mut self, _: FiberId) {}
+    fn fiber_panicked(&mut self, _: FiberId, _: Option<FiberId>) {}
+    fn fiber_canceled(&mut self, _: FiberId) {}
+    fn fiber_execution_started(&mut self, _: FiberId) {}
+    fn fiber_execution_ended(&mut self, _: FiberId) {}
+    fn channel_created(&mut self, _: candy_vm::channel::ChannelId) {}
+
+    fn tracer_for_fiber(&mut self, _: FiberId) -> Self::ForFiber {
+        FiberFuzzablesFinder::default()
+    }
+    fn integrate_fiber_tracer(&mut self, tracer: Self::ForFiber, from: &Heap, to: &mut Heap) {
+        let mapping = from.clone_to_other_heap(to);
+        for (id, closure) in tracer.fuzzables {
+            self.fuzzables.insert(id, mapping[&closure]);
+        }
+    }
+}
+
+impl FiberTracer for FiberFuzzablesFinder {
+    fn value_evaluated(&mut self, _: Pointer, _: Pointer, _: &mut Heap) {}
+    fn call_started(&mut self, _: Pointer, _: Pointer, _: Vec<Pointer>, _: Pointer, _: &mut Heap) {}
+    fn call_ended(&mut self, _: Pointer, _: &mut Heap) {}
+
+    fn found_fuzzable_closure(&mut self, definition: Pointer, closure: Pointer, heap: &mut Heap) {
         let definition = heap.get_hir_id(definition);
-        let address_map = self
-            .transferred_objects
-            .entry(fiber)
-            .or_insert_with(FxHashMap::default);
-        let closure = heap.clone_single_to_other_heap_with_existing_mapping(
-            &mut self.heap,
-            closure,
-            address_map,
-        );
-        assert!(matches!(self.heap.get(closure).data, Data::Closure(_)));
+        heap.dup(closure);
         self.fuzzables.insert(definition, closure);
     }
 }

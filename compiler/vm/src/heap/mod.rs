@@ -265,6 +265,17 @@ impl Heap {
             &mut FxHashMap::default(),
         )
     }
+    pub fn clone_to_other_heap(&self, other: &mut Heap) -> FxHashMap<Pointer, Pointer> {
+        let mut mapping = FxHashMap::default();
+        self.clone_multiple_to_other_heap_with_existing_mapping(
+            other,
+            &self.all_pointers_and_objects()
+                .map(|(pointer, _)| pointer)
+                .collect_vec(),
+            &mut mapping,
+        );
+        mapping
+    }
 
     pub fn number_of_objects(&self) -> usize {
         self.objects.len() - self.empty_addresses.len()

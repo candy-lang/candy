@@ -1,0 +1,12 @@
+fibonacciRec rec n =
+  ✨.ifElse (n | ✨.intCompareTo 2 | ✨.equals Less) { n } {
+    ✨.intAdd (rec rec (n | ✨.intSubtract 1)) (rec rec (n | ✨.intSubtract 2))
+  }
+fibonacci n = fibonacciRec fibonacciRec n
+
+foo n =
+  ✨.intAdd n 1
+
+main environment :=
+  #✨.intAdd (foo 2) (foo 5)
+  fibonacci 5 # 610

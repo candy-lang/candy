@@ -3,6 +3,7 @@ use crate::{
     channel::{Capacity, Packet},
     fiber::{Fiber, Status},
     heap::{Closure, Data, Heap, Int, List, Pointer, ReceivePort, SendPort, Struct, Text},
+    tracer::FiberTracer,
 };
 
 use candy_frontend::builtin_functions::BuiltinFunction;
@@ -15,7 +16,7 @@ use std::{ops::Deref, str::FromStr};
 use tracing::{info, span, Level};
 use unicode_segmentation::UnicodeSegmentation;
 
-impl Fiber {
+impl<T: FiberTracer> Fiber<T> {
     pub(super) fn run_builtin_function(
         &mut self,
         builtin_function: &BuiltinFunction,

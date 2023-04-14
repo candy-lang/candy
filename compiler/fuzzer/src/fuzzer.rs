@@ -12,7 +12,7 @@ use candy_frontend::hir::Id;
 use candy_vm::{
     context::{ExecutionController, UseProvider},
     heap::{Closure, Data, Heap, Pointer},
-    tracer::full::FullTracer,
+    tracer::stack_trace::StackTracer,
 };
 use std::mem;
 
@@ -32,7 +32,8 @@ pub enum Status {
         input: Input,
         reason: String,
         responsible: Id,
-        tracer: FullTracer,
+        heap: Heap,
+        tracer: StackTracer,
     },
 }
 
@@ -84,11 +85,13 @@ impl Fuzzer {
                     input,
                     reason,
                     responsible,
+                    heap,
                     tracer,
                 } => Status::FoundPanic {
                     input,
                     reason,
                     responsible,
+                    heap,
                     tracer,
                 },
             };
@@ -140,12 +143,16 @@ impl Fuzzer {
             RunResult::Panicked {
                 reason,
                 responsible,
-            } => Status::FoundPanic {
-                input: runner.input,
-                reason,
-                responsible,
-                tracer: runner.tracer,
-            },
+            } => {
+                let result = runner.vm.unwrap().tear_down();
+                Status::FoundPanic {
+                    input: runner.input,
+                    reason,
+                    responsible,
+                    heap: result.heap,
+                    tracer: result.tracer,
+                }
+            }
         }
     }
     fn create_new_fuzzing_case(&self, pool: InputPool) -> Status {

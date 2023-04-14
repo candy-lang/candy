@@ -487,6 +487,7 @@ dependencies = [
  "criterion-cycles-per-byte",
  "derive_more",
  "enumset",
+ "extension-trait",
  "itertools",
  "lazy_static",
  "num-bigint",

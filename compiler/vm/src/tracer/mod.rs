@@ -13,14 +13,15 @@ pub trait Tracer {
     type ForFiber: FiberTracer;
 
     fn fiber_created(&mut self, id: FiberId);
-    fn fiber_done(&mut self, id: FiberId, fiber: Fiber);
-    fn fiber_panicked(&mut self, id: FiberId, fiber: Fiber, panicked_child: Option<FiberId>);
-    fn fiber_canceled(&mut self, id: FiberId, fiber: Fiber);
+    fn fiber_done(&mut self, id: FiberId);
+    fn fiber_panicked(&mut self, id: FiberId, panicked_child: Option<FiberId>);
+    fn fiber_canceled(&mut self, id: FiberId);
     fn fiber_execution_started(&mut self, id: FiberId);
     fn fiber_execution_ended(&mut self, id: FiberId);
     fn channel_created(&mut self, channel: ChannelId);
 
-    fn tracer_for_fiber(&mut self, id: FiberId) -> FiberTracer;
+    fn tracer_for_fiber(&mut self, id: FiberId) -> Self::ForFiber;
+    fn integrate_fiber_tracer(&mut self, tracer: Self::ForFiber, from: &Heap, to: &mut Heap);
 }
 
 pub trait FiberTracer {

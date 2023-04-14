@@ -22,7 +22,7 @@ use candy_vm::{
     context::{DbUseProvider, RunForever, RunLimitedNumberOfInstructions},
     heap::{Closure, Heap, Pointer},
     mir_to_lir::MirToLir,
-    tracer::full::FullTracer,
+    tracer::stack_trace::StackTracer,
     vm::Vm,
 };
 use rustc_hash::FxHashMap;
@@ -39,8 +39,7 @@ where
     };
 
     let (fuzzables_heap, fuzzables): (Heap, FxHashMap<Id, Pointer>) = {
-        let mut tracer = FuzzablesFinder::default();
-        let mut vm = Vm::default();
+        let mut vm = Vm::new(FuzzablesFinder::default());
         vm.set_up_for_running_module_closure(
             module.clone(),
             Closure::of_module(db, module, tracing.clone()).unwrap(),
@@ -51,9 +50,9 @@ where
                 tracing: tracing.clone(),
             },
             &mut RunForever,
-            &mut tracer,
         );
-        (tracer.heap, tracer.fuzzables)
+        let result = vm.tear_down();
+        (result.heap, result.tracer.fuzzables)
     };
 
     info!(
@@ -79,6 +78,7 @@ where
                 input,
                 reason,
                 responsible,
+                heap,
                 tracer,
             } => {
                 error!("The fuzzer discovered an input that crashes {id}:");
@@ -87,6 +87,7 @@ where
                     input,
                     reason,
                     responsible,
+                    heap,
                     tracer,
                 };
                 case.dump(db);
@@ -103,7 +104,8 @@ pub struct FailingFuzzCase {
     input: Input,
     reason: String,
     responsible: Id,
-    tracer: FullTracer,
+    heap: Heap,
+    tracer: StackTracer,
 }
 
 impl FailingFuzzCase {
@@ -118,7 +120,8 @@ impl FailingFuzzCase {
         error!("{} is responsible.", self.responsible,);
         error!(
             "This is the stack trace:\n{}",
-            self.tracer.format_panic_stack_trace_to_root_fiber(db)
+            self.tracer
+                .format_panic_stack_trace_to_root_fiber(db, &self.heap),
         );
     }
 }

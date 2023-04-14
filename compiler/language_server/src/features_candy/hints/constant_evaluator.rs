@@ -1,4 +1,4 @@
-use super::{utils::IdToEndOfLine, Hint, HintKind};
+use super::{constant_tracer::ConstantTracer, utils::IdToEndOfLine, Hint, HintKind};
 use candy_frontend::{
     ast::{Assignment, AssignmentBody, AstDb, AstKind},
     ast_to_hir::AstToHir,
@@ -13,10 +13,7 @@ use candy_vm::{
     fiber::FiberId,
     heap::{Closure, Heap, Pointer},
     mir_to_lir::MirToLir,
-    tracer::{
-        full::{FullTracer, StoredFiberEvent, StoredVmEvent, TimedEvent},
-        stack_trace::Call,
-    },
+    tracer::stack_trace::Call,
     vm::{self, Vm},
 };
 use itertools::Itertools;
@@ -29,8 +26,7 @@ pub struct ConstantEvaluator {
     evaluators: HashMap<Module, Evaluator>,
 }
 struct Evaluator {
-    tracer: FullTracer,
-    vm: Vm,
+    vm: Vm<ConstantTracer>,
 }
 
 impl ConstantEvaluator {
@@ -40,13 +36,12 @@ impl ConstantEvaluator {
             calls: TracingMode::Off,
             evaluated_expressions: TracingMode::OnlyCurrent,
         };
-        let tracer = FullTracer::default();
-        let mut vm = Vm::default();
+        let mut vm = Vm::new(ConstantTracer);
         vm.set_up_for_running_module_closure(
             module.clone(),
             Closure::of_module(db, module.clone(), tracing).unwrap(),
         );
-        self.evaluators.insert(module, Evaluator { tracer, vm });
+        self.evaluators.insert(module, Evaluator { vm });
     }
 
     pub fn remove_module(&mut self, module: Module) {
@@ -70,7 +65,6 @@ impl ConstantEvaluator {
                 tracing: TracingConfig::off(),
             },
             &mut RunLimitedNumberOfInstructions::new(500),
-            &mut evaluator.tracer,
         );
         Some(module.clone())
     }

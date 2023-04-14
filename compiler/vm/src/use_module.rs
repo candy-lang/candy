@@ -1,3 +1,5 @@
+use crate::tracer::FiberTracer;
+
 use super::{
     context::UseProvider,
     fiber::Fiber,
@@ -9,7 +11,7 @@ use candy_frontend::{
     rich_ir::ToRichIr,
 };
 
-impl Fiber {
+impl<T: FiberTracer> Fiber<T> {
     pub fn use_module(
         &mut self,
         use_provider: &dyn UseProvider,

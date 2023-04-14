@@ -1,8 +1,8 @@
-use super::{
-    full::{FullTracer, StoredFiberEvent, StoredVmEvent},
-    FiberId, FiberTracer, Tracer,
+use super::{FiberId, FiberTracer, Tracer};
+use crate::{
+    channel::ChannelId,
+    heap::{Heap, Pointer},
 };
-use crate::heap::{Heap, Pointer};
 use candy_frontend::{
     ast_to_hir::AstToHir, cst::CstKind, module::Package, position::PositionConversionDb,
 };
@@ -13,9 +13,14 @@ use tracing::debug;
 
 // A tracer that makes it possible to display stack traces, including all the
 // arguments of called functions.
-pub struct StackTracer {}
+#[derive(Default)]
+pub struct StackTracer {
+    stacks: FxHashMap<FiberId, Vec<Call>>,
+    children_responsible_for_panic: FxHashMap<FiberId, FiberId>,
+}
 
-struct StackFiberTracer {
+pub struct FiberStackTracer {
+    id: FiberId,
     stack: Vec<Call>,
 }
 
@@ -28,46 +33,50 @@ pub struct Call {
 }
 
 impl Tracer for StackTracer {
-    type ForFiber;
+    type ForFiber = FiberStackTracer;
 
-    fn fiber_created(&mut self, fiber: FiberId) {
-        todo!()
-    }
-
+    fn fiber_created(&mut self, _: FiberId) {}
     fn fiber_done(&mut self, fiber: FiberId) {
-        todo!()
+        self.stacks.remove(&fiber);
     }
-
-    fn fiber_panicked(&mut self, fiber: FiberId, panicked_child: Option<FiberId>) {
-        todo!()
+    fn fiber_panicked(&mut self, fiber: FiberId, responsible_child: Option<FiberId>) {
+        if let Some(child) = responsible_child {
+            self.children_responsible_for_panic.insert(fiber, child);
+        }
     }
-
     fn fiber_canceled(&mut self, fiber: FiberId) {
-        todo!()
+        self.stacks.remove(&fiber);
+    }
+    fn fiber_execution_started(&mut self, _: FiberId) {}
+    fn fiber_execution_ended(&mut self, _: FiberId) {}
+    fn channel_created(&mut self, _: ChannelId) {}
+
+    fn tracer_for_fiber(&mut self, fiber: FiberId) -> Self::ForFiber {
+        FiberStackTracer {
+            id: fiber,
+            stack: vec![],
+        }
     }
 
-    fn fiber_execution_started(&mut self, fiber: FiberId) {
-        todo!()
-    }
-
-    fn fiber_execution_ended(&mut self, fiber: FiberId) {
-        todo!()
-    }
-
-    fn channel_created(&mut self, channel: crate::channel::ChannelId) {
-        todo!()
-    }
-
-    fn tracer_for_fiber(&mut self, fiber: FiberId) -> FiberTracer {
-        todo!()
-    }
-
-    fn fiber_exited(&mut self, fiber_tracer: Self::ForFiber) {
-        todo!()
+    fn integrate_fiber_tracer(&mut self, tracer: Self::ForFiber, from: &Heap, to: &mut Heap) {
+        let mapping = from.clone_to_other_heap(to);
+        self.stacks.insert(
+            tracer.id,
+            tracer
+                .stack
+                .into_iter()
+                .map(|call| Call {
+                    call_site: mapping[&call.call_site],
+                    callee: mapping[&call.callee],
+                    arguments: call.arguments.iter().map(|arg| mapping[arg]).collect(),
+                    responsible: mapping[&call.responsible],
+                })
+                .collect_vec(),
+        );
     }
 }
 
-impl FiberTracer for StackFiberTracer {
+impl FiberTracer for FiberStackTracer {
     fn value_evaluated(&mut self, _: Pointer, _: Pointer, _: &mut Heap) {}
     fn found_fuzzable_closure(&mut self, _: Pointer, _: Pointer, _: &mut Heap) {}
 
@@ -81,8 +90,8 @@ impl FiberTracer for StackFiberTracer {
     ) {
         heap.dup(call_site);
         heap.dup(callee);
-        for argument in arguments {
-            heap.dup(argument);
+        for argument in &arguments {
+            heap.dup(*argument);
         }
         heap.dup(responsible);
 
@@ -111,35 +120,34 @@ impl FiberTracer for StackFiberTracer {
     }
 }
 
-impl FullTracer {
-    pub fn stack_traces(&self) -> FxHashMap<FiberId, Vec<Call>> {
-        let mut stacks: FxHashMap<FiberId, Vec<Call>> = FxHashMap::default();
-        for timed_event in &self.events {
-            let StoredVmEvent::InFiber { fiber, event } = &timed_event.event else { continue; };
-            let stack = stacks.entry(*fiber).or_default();
-            match event {
-                StoredFiberEvent::CallStarted {
-                    call_site,
-                    callee,
-                    arguments,
-                    responsible,
-                } => {
-                    stack.push(Call {
-                        call_site: *call_site,
-                        callee: *callee,
-                        arguments: arguments.clone(),
-                        responsible: *responsible,
-                    });
-                }
-                StoredFiberEvent::CallEnded { .. } => {
-                    stack.pop().unwrap();
-                }
-                _ => {}
-            }
+impl StackTracer {
+    /// When a VM panics, some child fiber might be responsible for that. This
+    /// function returns a formatted stack trace spanning all fibers in the
+    /// chain from the panicking root fiber until the concrete failing needs.
+    pub fn format_panic_stack_trace_to_root_fiber<DB>(&self, db: &DB, heap: &Heap) -> String
+    where
+        DB: AstToHir + PositionConversionDb,
+    {
+        let mut panicking_fiber_chain = vec![FiberId::root()];
+        while let Some(child) = self
+            .children_responsible_for_panic
+            .get(panicking_fiber_chain.last().unwrap())
+        {
+            panicking_fiber_chain.push(*child);
         }
-        stacks
+
+        // debug!("Stack traces: {:?}", stack_traces.keys().collect_vec());
+        panicking_fiber_chain
+            .into_iter()
+            .rev()
+            .map(|fiber| match self.stacks.get(&fiber) {
+                Some(stack_trace) => self.format_stack_trace(db, heap, stack_trace),
+                None => "(there's no stack trace for this fiber)".to_string(),
+            })
+            .join("\n(fiber boundary)\n")
     }
-    pub fn format_stack_trace<DB>(&self, db: &DB, stack: &[Call]) -> String
+
+    pub fn format_stack_trace<DB>(&self, db: &DB, heap: &Heap, stack: &[Call]) -> String
     where
         DB: AstToHir + PositionConversionDb,
     {
@@ -152,7 +160,7 @@ impl FullTracer {
             ..
         } in stack.iter().rev()
         {
-            let hir_id = self.heap.get_hir_id(*call_site);
+            let hir_id = heap.get_hir_id(*call_site);
             let module = hir_id.module.clone();
             let is_tooling = matches!(module.package, Package::Tooling(_));
             let cst_id = if is_tooling {
@@ -180,8 +188,8 @@ impl FullTracer {
                             _ => None,
                         }
                     })
-                    .unwrap_or_else(|| callee.format(&self.heap)),
-                arguments.iter().map(|arg| arg.format(&self.heap)).join(" "),
+                    .unwrap_or_else(|| callee.format(heap)),
+                arguments.iter().map(|arg| arg.format(heap)).join(" "),
             );
             caller_locations_and_calls.push((caller_location_string, call_string));
         }
@@ -196,40 +204,6 @@ impl FullTracer {
             .into_iter()
             .map(|(location, call)| format!("{} {}", location.pad_to_width(longest_location), call))
             .join("\n")
-    }
-    /// When a VM panics, some child fiber might be responsible for that. This
-    /// function returns a formatted stack trace spanning all fibers in the
-    /// chain from the panicking root fiber until the concrete failing needs.
-    pub fn format_panic_stack_trace_to_root_fiber<DB>(&self, db: &DB) -> String
-    where
-        DB: AstToHir + PositionConversionDb,
-    {
-        let mut panicking_fiber_chain = vec![FiberId::root()];
-        for timed_event in self.events.iter().rev() {
-            if let StoredVmEvent::FiberPanicked {
-                fiber,
-                panicked_child,
-            } = timed_event.event
-            {
-                if fiber == *panicking_fiber_chain.last().unwrap() {
-                    match panicked_child {
-                        Some(child) => panicking_fiber_chain.push(child),
-                        None => break,
-                    }
-                }
-            }
-        }
-
-        let stack_traces = self.stack_traces();
-        debug!("Stack traces: {:?}", stack_traces.keys().collect_vec());
-        panicking_fiber_chain
-            .into_iter()
-            .rev()
-            .map(|fiber| match stack_traces.get(&fiber) {
-                Some(stack_trace) => self.format_stack_trace(db, stack_trace),
-                None => "(there's no stack trace for this fiber)".to_string(),
-            })
-            .join("\n(fiber boundary)\n")
     }
 }
 

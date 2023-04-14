@@ -5,7 +5,7 @@ use candy_vm::{
         CombiningExecutionController, CountingExecutionController, ExecutionController, UseProvider,
     },
     heap::{Data, Heap, Pointer},
-    tracer::full::FullTracer,
+    tracer::stack_trace::StackTracer,
     vm::{self, Vm},
 };
 
@@ -14,9 +14,8 @@ use super::input::Input;
 const MAX_INSTRUCTIONS: usize = 10000;
 
 pub struct Runner {
-    pub vm: Option<Vm>, // Is consumed when the runner is finished.
+    pub vm: Option<Vm<StackTracer>>, // Is consumed when the runner is finished.
     pub input: Input,
-    pub tracer: FullTracer,
     pub num_instructions: usize,
     pub result: Option<RunResult>,
 }
@@ -57,13 +56,12 @@ impl Runner {
         let argument_addresses = input.clone_to_other_heap(&mut vm_heap);
         let responsible = vm_heap.create_hir_id(Id::fuzzer());
 
-        let mut vm = Vm::default();
+        let mut vm = Vm::new(StackTracer::default());
         vm.set_up_for_running_closure(vm_heap, closure, argument_addresses, responsible);
 
         Runner {
             vm: Some(vm),
             input,
-            tracer: FullTracer::default(),
             num_instructions: 0,
             result: None,
         }
@@ -84,11 +82,10 @@ impl Runner {
         while matches!(self.vm.as_ref().unwrap().status(), vm::Status::CanRun)
             && execution_controller.should_continue_running()
         {
-            self.vm.as_mut().unwrap().run(
-                use_provider,
-                &mut execution_controller,
-                &mut self.tracer,
-            );
+            self.vm
+                .as_mut()
+                .unwrap()
+                .run(use_provider, &mut execution_controller);
         }
 
         self.num_instructions += instruction_counter.num_instructions;
