@@ -173,8 +173,8 @@ impl Fiber {
     pub fn complete_channel_create(&mut self, channel: ChannelId) {
         assert!(matches!(self.status, Status::CreatingChannel { .. }));
 
-        let send_port_symbol = self.heap.create_symbol("SendPort".to_string());
-        let receive_port_symbol = self.heap.create_symbol("ReceivePort".to_string());
+        let send_port_symbol = self.heap.create_tag("SendPort".to_string(), None);
+        let receive_port_symbol = self.heap.create_tag("ReceivePort".to_string(), None);
         let send_port = self.heap.create_send_port(channel);
         let receive_port = self.heap.create_receive_port(channel);
         self.data_stack
@@ -311,8 +311,9 @@ impl Fiber {
                 let address = self.heap.create_text(text);
                 self.data_stack.push(address);
             }
+            // TODO: Support tags with values
             Instruction::CreateSymbol(symbol) => {
-                let address = self.heap.create_symbol(symbol);
+                let address = self.heap.create_tag(symbol, None);
                 self.data_stack.push(address);
             }
             Instruction::CreateList { num_items } => {

@@ -2,7 +2,7 @@ use crate::{
     channel::ChannelId,
     channel::{Capacity, Packet},
     fiber::{Fiber, Status},
-    heap::{Closure, Data, Heap, Int, List, Pointer, ReceivePort, SendPort, Struct, Symbol, Text},
+    heap::{Closure, Data, Heap, Int, List, Pointer, ReceivePort, SendPort, Struct, Tag, Text},
 };
 use candy_frontend::builtin_functions::BuiltinFunction;
 use itertools::Itertools;
@@ -434,22 +434,22 @@ impl Heap {
     }
 
     fn tag_get_symbol(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |symbol: &Symbol| {
-            let symbol = self.create_symbol(symbol.value.to_string());
-            // TODO: Strip tag value
-            Return(symbol)
+        unpack_and_later_drop!(self, args, |tag: &Tag| {
+            Return(self.create_tag(tag.symbol.to_string(), None))
         })
     }
     fn tag_has_value(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |symbol: &Symbol| {
-            // TODO: Check if tag has value
-            Return(self.create_bool(false))
+        unpack_and_later_drop!(self, args, |tag: &Tag| {
+            Return(self.create_bool(tag.value.is_some()))
         })
     }
     fn tag_get_value(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |symbol: &Symbol| {
-            // TODO: Check if tag has value
-            Err("The tag doesn't have a value.".to_string())
+        unpack_and_later_drop!(self, args, |tag: &Tag| {
+            tag.value
+                .map_or(Err("The tag doesn't have a value.".to_string()), |value| {
+                    self.dup(value);
+                    Ok(Return(value))
+                })
         })
     }
 
@@ -557,10 +557,11 @@ impl Heap {
 
     fn type_of(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Any| {
+            // FIXME: Change symbol to tag
             let symbol = match **value {
                 Data::Int(_) => "Int",
                 Data::Text(_) => "Text",
-                Data::Symbol(_) => "Symbol",
+                Data::Tag(_) => "Symbol",
                 Data::List(_) => "List",
                 Data::Struct(_) => "Struct",
                 Data::HirId(_) => unreachable!(),
@@ -569,7 +570,7 @@ impl Heap {
                 Data::SendPort(_) => "SendPort",
                 Data::ReceivePort(_) => "ReceivePort",
             };
-            Return(self.create_symbol(symbol.to_string()))
+            Return(self.create_tag(symbol.to_string(), None))
         })
     }
 }

@@ -152,7 +152,7 @@ pub fn run(db: &Database, lir: Lir) -> Packet {
     };
 
     // Run the `main` function.
-    let main = heap.create_symbol("Main".to_string());
+    let main = heap.create_tag("Main".to_string(), None);
     let main = match exported_definitions.get(&heap, main) {
         Some(main) => main,
         None => panic!("The module doesn't contain a main function."),
