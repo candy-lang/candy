@@ -248,6 +248,9 @@ fn run_builtin(
 
             is_contained?.into()
         }
+        BuiltinFunction::TagGetSymbol => return None,
+        BuiltinFunction::TagHasValue => return None,
+        BuiltinFunction::TagGetValue => return None,
         BuiltinFunction::TextCharacters => return None,
         BuiltinFunction::TextConcatenate => {
             let [a, b] = arguments else { unreachable!() };
@@ -324,6 +327,9 @@ fn run_builtin(
                     BuiltinFunction::StructGet => return None,
                     BuiltinFunction::StructGetKeys => "List",
                     BuiltinFunction::StructHasKey => "Symbol",
+                    BuiltinFunction::TagGetSymbol => "Symbol",
+                    BuiltinFunction::TagHasValue => "Symbol",
+                    BuiltinFunction::TagGetValue => return None,
                     BuiltinFunction::TextCharacters => "List",
                     BuiltinFunction::TextConcatenate => "Text",
                     BuiltinFunction::TextContains => "Symbol",

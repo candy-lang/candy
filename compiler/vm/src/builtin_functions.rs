@@ -2,7 +2,7 @@ use crate::{
     channel::ChannelId,
     channel::{Capacity, Packet},
     fiber::{Fiber, Status},
-    heap::{Closure, Data, Heap, Int, List, Pointer, ReceivePort, SendPort, Struct, Text},
+    heap::{Closure, Data, Heap, Int, List, Pointer, ReceivePort, SendPort, Struct, Symbol, Text},
 };
 use candy_frontend::builtin_functions::BuiltinFunction;
 use itertools::Itertools;
@@ -54,6 +54,9 @@ impl Fiber {
             BuiltinFunction::StructGet => self.heap.struct_get(args),
             BuiltinFunction::StructGetKeys => self.heap.struct_get_keys(args),
             BuiltinFunction::StructHasKey => self.heap.struct_has_key(args),
+            BuiltinFunction::TagGetSymbol => self.heap.tag_get_symbol(args),
+            BuiltinFunction::TagHasValue => self.heap.tag_has_value(args),
+            BuiltinFunction::TagGetValue => self.heap.tag_get_value(args),
             BuiltinFunction::TextCharacters => self.heap.text_characters(args),
             BuiltinFunction::TextConcatenate => self.heap.text_concatenate(args),
             BuiltinFunction::TextContains => self.heap.text_contains(args),
@@ -427,6 +430,26 @@ impl Heap {
         unpack_and_later_drop!(self, args, |struct_: &Struct, key: Any| {
             let has_key = struct_.get(self, key.address).is_some();
             Return(self.create_bool(has_key))
+        })
+    }
+
+    fn tag_get_symbol(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |symbol: &Symbol| {
+            let symbol = self.create_symbol(symbol.value.to_string());
+            // TODO: Strip tag value
+            Return(symbol)
+        })
+    }
+    fn tag_has_value(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |symbol: &Symbol| {
+            // TODO: Check if tag has value
+            Return(self.create_bool(false))
+        })
+    }
+    fn tag_get_value(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |symbol: &Symbol| {
+            // TODO: Check if tag has value
+            Err("The tag doesn't have a value.".to_string())
         })
     }
 
