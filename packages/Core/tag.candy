@@ -1,6 +1,6 @@
 type = use "..type"
 
-is value := type.is value Symbol
+is value := type.is value Tag
 
 tagGetSymbol tag :=
   needs (is tag)

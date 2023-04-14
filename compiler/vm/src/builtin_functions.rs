@@ -557,11 +557,10 @@ impl Heap {
 
     fn type_of(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Any| {
-            // FIXME: Change symbol to tag
-            let symbol = match **value {
+            let type_name = match **value {
                 Data::Int(_) => "Int",
                 Data::Text(_) => "Text",
-                Data::Tag(_) => "Symbol",
+                Data::Tag(_) => "Tag",
                 Data::List(_) => "List",
                 Data::Struct(_) => "Struct",
                 Data::HirId(_) => unreachable!(),
@@ -570,7 +569,7 @@ impl Heap {
                 Data::SendPort(_) => "SendPort",
                 Data::ReceivePort(_) => "ReceivePort",
             };
-            Return(self.create_tag(symbol.to_string(), None))
+            Return(self.create_tag(type_name.to_string(), None))
         })
     }
 }
