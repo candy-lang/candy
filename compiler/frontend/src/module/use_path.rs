@@ -22,7 +22,7 @@ impl UsePath {
         };
         let path = {
             if !path.chars().all(|c| c.is_ascii_alphanumeric() || c == '.') {
-                return Err("the target name can only contain letters and dots".to_string());
+                return Err("The target name can only contain letters and dots.".to_string());
             }
             path.to_string()
         };
@@ -42,7 +42,7 @@ impl UsePath {
         let mut path = current_module.path;
         for _ in 0..self.parent_navigations {
             if path.pop().is_none() {
-                return Err("too many parent navigations".to_string());
+                return Err("The path contains too many parent navigations. You can't navigate out of the current package.".to_string());
             }
         }
         path.push(self.path.to_string());
