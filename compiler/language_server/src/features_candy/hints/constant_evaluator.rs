@@ -22,7 +22,7 @@ use candy_vm::{
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
 use std::collections::HashMap;
-use tracing::{span, Level};
+use tracing::{span, warn, Level};
 
 #[derive(Default)]
 pub struct ConstantEvaluator {
@@ -109,6 +109,7 @@ impl ConstantEvaluator {
 
         // TODO: Think about how to highlight the responsible piece of code.
         if let vm::Status::Panicked { reason, .. } = evaluator.vm.status() {
+            warn!(reason);
             if let Some(hint) = panic_hint(db, module.clone(), evaluator, reason) {
                 hints.push(hint);
             }

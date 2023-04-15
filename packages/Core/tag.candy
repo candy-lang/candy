@@ -2,15 +2,15 @@ type = use "..type"
 
 is value := type.is value Tag
 
-tagGetSymbol tag :=
+getSymbol tag :=
   needs (is tag)
   tag | ✨.tagGetSymbol
 
-tagHasValue tag :=
+hasValue tag :=
   needs (is tag)
   tag | ✨.tagHasValue
 
-tagGetValue tag :=
+getValue tag :=
   needs (is tag)
-  needs (tagHasValue tag)
+  needs (hasValue tag)
   tag | ✨.tagGetValue
