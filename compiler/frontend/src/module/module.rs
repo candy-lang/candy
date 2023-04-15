@@ -54,7 +54,7 @@ impl Module {
             })
             .collect_vec();
 
-        if kind == ModuleKind::Code {
+        if kind == ModuleKind::Code && !path.is_empty() {
             let last = path.pop().unwrap();
             let last = last
                 .strip_suffix(".candy")
