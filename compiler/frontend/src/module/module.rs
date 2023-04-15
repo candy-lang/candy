@@ -1,4 +1,4 @@
-use super::package::Package;
+use super::package::{Package, SurroundingPackage};
 use crate::rich_ir::{RichIrBuilder, ToRichIr, TokenType};
 use itertools::Itertools;
 use std::{fs, hash::Hash, path::PathBuf};
@@ -17,28 +17,27 @@ pub enum ModuleKind {
 }
 
 impl Module {
-    pub fn from_package_root_and_file(
-        package_root: PathBuf,
+    pub fn from_file(file: PathBuf, kind: ModuleKind) -> Result<Self, String> {
+        assert!(file.is_file());
+        let package_root = file
+            .surrounding_candy_package()
+            .unwrap_or_else(|| Package::User(file.clone()));
+        Self::from_package_and_file(package_root, file, kind)
+    }
+    fn from_package_and_file(
+        package: Package,
         file: PathBuf,
         kind: ModuleKind,
-    ) -> Self {
-        let relative_path = fs::canonicalize(&file).unwrap_or_else(|err| {
-            panic!(
-                "File `{}` does not exist or its path is invalid: {err}.",
+    ) -> Result<Self, String> {
+        let Ok(canonicalized) = fs::canonicalize(&file) else {
+            return Err(format!(
+                "File `{}` does not exist or its path is invalid.",
                 file.to_string_lossy(),
-            )
-        });
-        let relative_path =
-            match relative_path.strip_prefix(fs::canonicalize(&package_root).unwrap()) {
-                Ok(path) => path,
-                Err(_) => {
-                    return Module {
-                        package: Package::External(file),
-                        path: vec![],
-                        kind,
-                    }
-                }
-            };
+            ))
+        };
+        let relative_path = canonicalized
+            .strip_prefix(fs::canonicalize(package.to_path().unwrap()).unwrap())
+            .expect("File is not located in the package.");
 
         let mut path = relative_path
             .components()
@@ -65,11 +64,11 @@ impl Module {
             }
         }
 
-        Module {
-            package: Package::User(package_root),
+        Ok(Module {
+            package,
             path,
             kind,
-        }
+        })
     }
 
     pub fn to_possible_paths(&self) -> Option<Vec<PathBuf>> {

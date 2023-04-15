@@ -1,5 +1,9 @@
+use extension_trait::extension_trait;
+use rustc_hash::FxHashSet;
 use std::{
+    ffi::OsString,
     fmt::{self, Display, Formatter},
+    fs,
     hash::Hash,
     path::PathBuf,
 };
@@ -51,6 +55,35 @@ impl Display for Package {
             Package::External(path) => write!(f, "extern:{path:?}"),
             Package::Anonymous { url } => write!(f, "anonymous:{url}"),
             Package::Tooling(tooling) => write!(f, "tooling:{tooling}"),
+        }
+    }
+}
+
+#[extension_trait]
+pub impl SurroundingPackage for PathBuf {
+    fn surrounding_candy_package(&self) -> Option<Package> {
+        let mut candidate_folder = if self.is_dir() {
+            self.clone()
+        } else {
+            self.parent().unwrap().to_path_buf()
+        };
+        loop {
+            let children = fs::read_dir(&candidate_folder)
+                .unwrap()
+                .map(|child| child.unwrap().file_name())
+                .collect::<FxHashSet<OsString>>();
+
+            if !children.contains(&OsString::from("_.candy".to_string())) {
+                return None;
+            }
+
+            if children.contains(&OsString::from("_package.candy".to_string())) {
+                return Some(Package::User(candidate_folder));
+            } else if let Some(parent) = candidate_folder.parent() {
+                candidate_folder = parent.to_path_buf();
+            } else {
+                return None;
+            }
         }
     }
 }

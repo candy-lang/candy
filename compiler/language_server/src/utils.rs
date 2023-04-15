@@ -7,7 +7,7 @@ use candy_frontend::{
 use extension_trait::extension_trait;
 use itertools::Itertools;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Url};
-use std::{ops::Range, path::PathBuf};
+use std::ops::Range;
 
 pub fn error_into_diagnostic<DB>(db: &DB, module: Module, error: CompilerError) -> Diagnostic
 where
@@ -41,16 +41,10 @@ where
     }
 }
 
-pub fn module_from_package_root_and_url(
-    package_root: PathBuf,
-    url: &Url,
-    kind: ModuleKind,
-) -> Result<Module, String> {
-    let module = match url.scheme() {
-        "file" => {
-            Module::from_package_root_and_file(package_root, url.to_file_path().unwrap(), kind)
-        }
-        "untitled" => Module {
+pub fn module_from_url(url: &Url, kind: ModuleKind) -> Result<Module, String> {
+    match url.scheme() {
+        "file" => Module::from_file(url.to_file_path().unwrap(), kind),
+        "untitled" => Ok(Module {
             package: Package::Anonymous {
                 url: url
                     .to_string()
@@ -60,10 +54,9 @@ pub fn module_from_package_root_and_url(
             },
             path: vec![],
             kind,
-        },
-        _ => return Err(format!("Unsupported URI scheme: {}", url.scheme())),
-    };
-    Ok(module)
+        }),
+        _ => Err(format!("Unsupported URI scheme: {}", url.scheme())),
+    }
 }
 
 pub fn module_to_url(module: &Module) -> Option<Url> {

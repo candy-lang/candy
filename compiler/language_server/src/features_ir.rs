@@ -25,13 +25,7 @@ use lsp_types::{
 };
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::{
-    fmt::Debug,
-    hash::Hash,
-    ops::Range,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{fmt::Debug, hash::Hash, ops::Range, sync::Arc};
 use strum::{EnumDiscriminants, EnumString, IntoStaticStr};
 use tokio::sync::{Mutex, RwLock};
 use tower_lsp::jsonrpc;
@@ -42,8 +36,8 @@ use crate::{
     semantic_tokens::{SemanticTokenModifier, SemanticTokenType, SemanticTokensBuilder},
     server::Server,
     utils::{
-        lsp_position_to_offset_raw, module_from_package_root_and_url, module_to_url,
-        range_to_lsp_range_raw, LspPositionConversion,
+        lsp_position_to_offset_raw, module_from_url, module_to_url, range_to_lsp_range_raw,
+        LspPositionConversion,
     },
 };
 
@@ -55,11 +49,7 @@ pub struct ViewIrParams {
 
 impl Server {
     pub async fn candy_view_ir(&self, params: ViewIrParams) -> jsonrpc::Result<String> {
-        let project_directory = {
-            let state = self.state.read().await;
-            state.require_running().project_directory.to_owned()
-        };
-        let config = IrConfig::decode(&params.uri, project_directory);
+        let config = IrConfig::decode(&params.uri);
 
         let state = self.state.read().await;
         let features = state.require_features();
@@ -275,7 +265,7 @@ struct IrConfig {
     ir: Ir,
 }
 impl IrConfig {
-    fn decode(uri: &Url, package_root: PathBuf) -> Self {
+    fn decode(uri: &Url) -> Self {
         let (path, ir) = uri.path().rsplit_once('.').unwrap();
         let details = urlencoding::decode(uri.fragment().unwrap()).unwrap();
         let mut details: serde_json::Map<String, serde_json::Value> =
@@ -305,8 +295,7 @@ impl IrConfig {
         };
 
         IrConfig {
-            module: module_from_package_root_and_url(package_root, &original_uri, module_kind)
-                .unwrap(),
+            module: module_from_url(&original_uri, module_kind).unwrap(),
             ir,
         }
     }
@@ -391,7 +380,6 @@ impl LanguageFeatures for IrFeatures {
     async fn find_definition(
         &self,
         db: &Mutex<Database>,
-        _project_directory: &Path,
         uri: Url,
         position: lsp_types::Position,
     ) -> Option<LocationLink> {
@@ -486,12 +474,7 @@ impl LanguageFeatures for IrFeatures {
     fn supports_folding_ranges(&self) -> bool {
         true
     }
-    async fn folding_ranges(
-        &self,
-        _db: &Mutex<Database>,
-        _project_directory: &Path,
-        uri: Url,
-    ) -> Vec<FoldingRange> {
+    async fn folding_ranges(&self, _db: &Mutex<Database>, uri: Url) -> Vec<FoldingRange> {
         let open_irs = self.open_irs.read().await;
         let open_ir = open_irs.get(&uri).unwrap();
         open_ir.folding_ranges()
@@ -503,7 +486,6 @@ impl LanguageFeatures for IrFeatures {
     async fn references(
         &self,
         _db: &Mutex<Database>,
-        _project_directory: &Path,
         uri: Url,
         position: lsp_types::Position,
         only_in_same_document: bool,
@@ -536,12 +518,7 @@ impl LanguageFeatures for IrFeatures {
     fn supports_semantic_tokens(&self) -> bool {
         true
     }
-    async fn semantic_tokens(
-        &self,
-        _db: &Mutex<Database>,
-        _project_directory: &Path,
-        uri: Url,
-    ) -> Vec<SemanticToken> {
+    async fn semantic_tokens(&self, _db: &Mutex<Database>, uri: Url) -> Vec<SemanticToken> {
         let open_irs = self.open_irs.read().await;
         let open_ir = open_irs.get(&uri).unwrap();
         open_ir.semantic_tokens()

@@ -12,7 +12,7 @@ use lsp_types::{
     TextEdit, Url,
 };
 use rustc_hash::FxHashMap;
-use std::{path::Path, thread};
+use std::thread;
 use tokio::sync::{mpsc::Sender, Mutex};
 use tracing::debug;
 
@@ -20,8 +20,7 @@ use crate::{
     database::Database,
     features::{LanguageFeatures, Reference},
     utils::{
-        error_into_diagnostic, lsp_range_to_range_raw, module_from_package_root_and_url,
-        LspPositionConversion,
+        error_into_diagnostic, lsp_range_to_range_raw, module_from_url, LspPositionConversion,
     },
 };
 
@@ -113,16 +112,10 @@ impl LanguageFeatures for CandyFeatures {
     fn supports_did_open(&self) -> bool {
         true
     }
-    async fn did_open(
-        &self,
-        db: &Mutex<Database>,
-        project_directory: &Path,
-        uri: Url,
-        content: Vec<u8>,
-    ) {
+    async fn did_open(&self, db: &Mutex<Database>, uri: Url, content: Vec<u8>) {
         let module = {
             let mut db = db.lock().await;
-            let module = decode_module(project_directory, &uri);
+            let module = decode_module(&uri);
             db.did_open_module(&module, content.clone());
             module
         };
@@ -136,13 +129,12 @@ impl LanguageFeatures for CandyFeatures {
     async fn did_change(
         &self,
         db: &Mutex<Database>,
-        project_directory: &Path,
         uri: Url,
         changes: Vec<TextDocumentContentChangeEvent>,
     ) {
         let (module, content, open_modules) = {
             let mut db = db.lock().await;
-            let module = decode_module(project_directory, &uri);
+            let module = decode_module(&uri);
             let content = apply_text_changes(&db, module.clone(), changes).into_bytes();
             db.did_change_module(&module, content.clone());
             (module, content, db.get_open_modules())
@@ -154,10 +146,10 @@ impl LanguageFeatures for CandyFeatures {
     fn supports_did_close(&self) -> bool {
         true
     }
-    async fn did_close(&self, db: &Mutex<Database>, project_directory: &Path, uri: Url) {
+    async fn did_close(&self, db: &Mutex<Database>, uri: Url) {
         let module = {
             let mut db = db.lock().await;
-            let module = decode_module(project_directory, &uri);
+            let module = decode_module(&uri);
             db.did_close_module(&module);
             module
         };
@@ -168,28 +160,18 @@ impl LanguageFeatures for CandyFeatures {
     fn supports_folding_ranges(&self) -> bool {
         true
     }
-    async fn folding_ranges(
-        &self,
-        db: &Mutex<Database>,
-        project_directory: &Path,
-        uri: Url,
-    ) -> Vec<FoldingRange> {
+    async fn folding_ranges(&self, db: &Mutex<Database>, uri: Url) -> Vec<FoldingRange> {
         let db = db.lock().await;
-        let module = decode_module(project_directory, &uri);
+        let module = decode_module(&uri);
         folding_ranges(&*db, module)
     }
 
     fn supports_format(&self) -> bool {
         true
     }
-    async fn format(
-        &self,
-        db: &Mutex<Database>,
-        project_directory: &Path,
-        uri: Url,
-    ) -> Vec<TextEdit> {
+    async fn format(&self, db: &Mutex<Database>, uri: Url) -> Vec<TextEdit> {
         let db = db.lock().await;
-        let module = decode_module(project_directory, &uri);
+        let module = decode_module(&uri);
         let Ok(cst) = db.cst(module.clone()) else { return vec![]; };
 
         cst.format_to_edits()
@@ -208,12 +190,11 @@ impl LanguageFeatures for CandyFeatures {
     async fn find_definition(
         &self,
         db: &Mutex<Database>,
-        project_directory: &Path,
         uri: Url,
         position: lsp_types::Position,
     ) -> Option<LocationLink> {
         let db = db.lock().await;
-        let module = decode_module(project_directory, &uri);
+        let module = decode_module(&uri);
         let offset = db.lsp_position_to_offset(module.clone(), position);
         find_definition(&*db, module, offset)
     }
@@ -224,14 +205,13 @@ impl LanguageFeatures for CandyFeatures {
     async fn references(
         &self,
         db: &Mutex<Database>,
-        project_directory: &Path,
         uri: Url,
         position: lsp_types::Position,
         _only_in_same_document: bool,
         include_declaration: bool,
     ) -> FxHashMap<Url, Vec<Reference>> {
         let db = db.lock().await;
-        let module = decode_module(project_directory, &uri);
+        let module = decode_module(&uri);
         let offset = db.lsp_position_to_offset(module.clone(), position);
 
         let mut all_references = FxHashMap::default();
@@ -246,21 +226,15 @@ impl LanguageFeatures for CandyFeatures {
     fn supports_semantic_tokens(&self) -> bool {
         true
     }
-    async fn semantic_tokens(
-        &self,
-        db: &Mutex<Database>,
-        project_directory: &Path,
-        uri: Url,
-    ) -> Vec<SemanticToken> {
+    async fn semantic_tokens(&self, db: &Mutex<Database>, uri: Url) -> Vec<SemanticToken> {
         let db = db.lock().await;
-        let module = decode_module(project_directory, &uri);
+        let module = decode_module(&uri);
         semantic_tokens(&*db, module)
     }
 }
 
-fn decode_module(project_directory: &Path, uri: &Url) -> Module {
-    module_from_package_root_and_url(project_directory.to_path_buf(), uri, ModuleKind::Code)
-        .unwrap()
+fn decode_module(uri: &Url) -> Module {
+    module_from_url(uri, ModuleKind::Code).unwrap()
 }
 fn apply_text_changes(
     db: &Database,

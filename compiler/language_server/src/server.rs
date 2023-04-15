@@ -14,7 +14,7 @@ use lsp_types::{
 };
 use rustc_hash::FxHashMap;
 use serde::Serialize;
-use std::{mem, path::PathBuf};
+use std::mem;
 use tokio::sync::{mpsc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tower_lsp::{jsonrpc, Client, ClientSocket, LanguageServer, LspService};
 use tracing::{debug, span, Level};
@@ -25,7 +25,7 @@ use crate::{
     features_candy::{hints::HintsNotification, CandyFeatures},
     features_ir::{IrFeatures, UpdateIrNotification},
     semantic_tokens,
-    utils::{module_from_package_root_and_url, module_to_url},
+    utils::{module_from_url, module_to_url},
 };
 
 pub struct Server {
@@ -41,7 +41,6 @@ pub enum ServerState {
 }
 #[derive(Debug)]
 pub struct RunningServerState {
-    pub project_directory: PathBuf,
     pub features: ServerFeatures,
 }
 impl ServerState {
@@ -177,23 +176,11 @@ impl Server {
 
 #[async_trait]
 impl LanguageServer for Server {
-    async fn initialize(&self, params: InitializeParams) -> jsonrpc::Result<InitializeResult> {
+    async fn initialize(&self, _params: InitializeParams) -> jsonrpc::Result<InitializeResult> {
         span!(Level::DEBUG, "LSP: initialize");
         self.client
             .log_message(MessageType::INFO, "Initializing!")
             .await;
-
-        let first_workspace_folder = params
-            .workspace_folders
-            .unwrap()
-            .first()
-            .unwrap()
-            .uri
-            .clone();
-        let project_directory = match first_workspace_folder.scheme() {
-            "file" => first_workspace_folder.to_file_path().unwrap(),
-            _ => panic!("Workspace folder must be a file URI."),
-        };
 
         {
             let state = self.state.read().await;
@@ -206,10 +193,7 @@ impl LanguageServer for Server {
             RwLockWriteGuard::map(self.state.write().await, |state| {
                 let owned_state = mem::replace(state, ServerState::Shutdown);
                 let ServerState::Initial { features } = owned_state else { panic!("Already initialized"); };
-                *state = ServerState::Running(RunningServerState {
-                    project_directory,
-                    features,
-                });
+                *state = ServerState::Running(RunningServerState { features });
                 state
             });
         }
@@ -322,12 +306,7 @@ impl LanguageServer for Server {
         assert!(features.supports_did_open());
         let content = params.text_document.text.into_bytes();
         features
-            .did_open(
-                &self.db,
-                &state.project_directory,
-                params.text_document.uri,
-                content,
-            )
+            .did_open(&self.db, params.text_document.uri, content)
             .await;
     }
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
@@ -340,15 +319,13 @@ impl LanguageServer for Server {
             features
                 .did_change(
                     &self.db,
-                    &state.project_directory,
                     params.text_document.uri.clone(),
                     params.content_changes,
                 )
                 .await;
         };
 
-        let module_result = module_from_package_root_and_url(
-            state.project_directory.to_owned(),
+        let module_result = module_from_url(
             &params.text_document.uri,
             if params.text_document.uri.path().ends_with(".candy") {
                 ModuleKind::Code
@@ -378,9 +355,7 @@ impl LanguageServer for Server {
             .features_from_url(&state.features, &params.text_document.uri)
             .await;
         assert!(features.supports_did_close());
-        features
-            .did_close(&self.db, &state.project_directory, params.text_document.uri)
-            .await;
+        features.did_close(&self.db, params.text_document.uri).await;
     }
 
     async fn goto_definition(
@@ -398,7 +373,6 @@ impl LanguageServer for Server {
         let response = features
             .find_definition(
                 &self.db,
-                &state.project_directory,
                 params.text_document_position_params.text_document.uri,
                 params.text_document_position_params.position,
             )
@@ -471,7 +445,7 @@ impl LanguageServer for Server {
         assert!(features.supports_folding_ranges());
         Ok(Some(
             features
-                .folding_ranges(&self.db, &state.project_directory, params.text_document.uri)
+                .folding_ranges(&self.db, params.text_document.uri)
                 .await,
         ))
     }
@@ -486,9 +460,7 @@ impl LanguageServer for Server {
             .await;
         assert!(features.supports_format());
         Ok(Some(
-            features
-                .format(&self.db, &state.project_directory, params.text_document.uri)
-                .await,
+            features.format(&self.db, params.text_document.uri).await,
         ))
     }
 
@@ -500,8 +472,7 @@ impl LanguageServer for Server {
         let features = self
             .features_from_url(&state.features, &params.text_document.uri)
             .await;
-        let tokens =
-            features.semantic_tokens(&self.db, &state.project_directory, params.text_document.uri);
+        let tokens = features.semantic_tokens(&self.db, params.text_document.uri);
         let tokens = tokens.await;
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
             result_id: None,
@@ -524,7 +495,6 @@ impl Server {
         features
             .references(
                 &self.db,
-                &state.project_directory,
                 uri,
                 position,
                 only_in_same_document,
