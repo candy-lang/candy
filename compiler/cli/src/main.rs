@@ -330,8 +330,9 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         } => {
             error!("The module panicked: {reason}");
             error!("{responsible} is responsible.");
-            let span = db.hir_id_to_span(responsible).unwrap();
-            error!("Responsible is at {span:?}.");
+            if let Some(span) = db.hir_id_to_span(responsible) {
+                error!("Responsible is at {span:?}.");
+            }
             error!(
                 "This is the stack trace:\n{}",
                 tracer.format_panic_stack_trace_to_root_fiber(&db)
