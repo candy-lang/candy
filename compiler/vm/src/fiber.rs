@@ -1,6 +1,6 @@
 use std::fmt::{self, Debug};
 
-use crate::channel::ChannelId;
+use crate::{channel::ChannelId, heap::Tag};
 
 use super::{
     channel::{Capacity, Packet},
@@ -527,6 +527,21 @@ impl Fiber {
                 let builtin = *builtin;
                 self.heap.drop(callee);
                 self.run_builtin_function(&builtin, &arguments, responsible);
+            }
+            Data::Tag(Tag { symbol, .. }) => {
+                if let [value] = arguments.as_slice() {
+                    let tag = self.heap.create_tag(symbol.to_string(), Some(*value));
+                    self.data_stack.push(tag);
+                    self.heap.dup(*value);
+                } else {
+                    self.panic(
+                        format!(
+                            "Assigning the value of a tag expects 1 parameter, but you provided {} arguments.",
+                            arguments.len(),
+                        ),
+                        self.heap.get_hir_id(responsible),
+                    );
+                }
             }
             _ => {
                 self.panic(
