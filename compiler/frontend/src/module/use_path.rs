@@ -1,4 +1,5 @@
 use super::module::{Module, ModuleKind};
+use std::fmt::Display;
 
 #[derive(Debug)]
 pub struct UsePath {
@@ -52,5 +53,10 @@ impl UsePath {
             path: path.clone(),
             kind,
         })
+    }
+}
+impl Display for UsePath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", ".".repeat(self.parent_navigations), self.path)
     }
 }
