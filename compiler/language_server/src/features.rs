@@ -27,7 +27,6 @@ pub trait LanguageFeatures: Send + Sync {
     async fn did_change(
         &self,
         _db: &Mutex<Database>,
-
         _uri: Url,
         _changes: Vec<TextDocumentContentChangeEvent>,
     ) {

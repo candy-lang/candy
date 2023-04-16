@@ -51,11 +51,10 @@ impl Display for Package {
 #[extension_trait]
 pub impl SurroundingPackage for Path {
     fn surrounding_candy_package(&self, packages_path: &Path) -> Option<Package> {
-        let mut candidate = if self.is_dir() {
-            self.to_path_buf()
-        } else {
-            self.parent().unwrap().to_path_buf()
-        };
+        let mut candidate = fs::canonicalize(self.to_path_buf()).unwrap();
+        if !candidate.is_dir() {
+            candidate = candidate.parent().unwrap().to_path_buf();
+        }
 
         loop {
             let children = fs::read_dir(&candidate)

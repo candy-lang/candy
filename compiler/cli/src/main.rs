@@ -33,8 +33,9 @@ use notify_debouncer_mini::new_debouncer;
 use rustc_hash::FxHashMap;
 use std::{
     convert::TryInto,
-    env::current_dir,
-    io::{self, BufRead, Write},
+    env::{current_dir, current_exe},
+    fs,
+    io::{self, BufRead, ErrorKind, Write},
     path::PathBuf,
     sync::{mpsc::channel, Arc},
     time::Duration,
@@ -69,7 +70,7 @@ struct CandyBuildOptions {
     tracing: bool,
 
     #[arg(value_hint = ValueHint::FilePath)]
-    file: Option<PathBuf>,
+    path: Option<PathBuf>,
 }
 
 /// Run a Candy program.
@@ -85,10 +86,10 @@ struct CandyRunOptions {
     #[arg(long)]
     tracing: bool,
 
-    /// The file to run. If non is provided, the package of your current working
-    /// directory will be run.
+    /// The file or package to run. If non is provided, the package of your
+    /// current working directory will be run.
     #[arg(value_hint = ValueHint::FilePath)]
-    file: Option<PathBuf>,
+    path: Option<PathBuf>,
 }
 
 /// Fuzz a Candy module.
@@ -104,7 +105,7 @@ struct CandyFuzzOptions {
     debug: bool,
 
     #[arg(value_hint = ValueHint::FilePath)]
-    file: Option<PathBuf>,
+    path: Option<PathBuf>,
 }
 
 #[tokio::main]
@@ -126,11 +127,27 @@ enum Exit {
     NotInCandyPackage,
 }
 
-fn module_for_file(file: Option<PathBuf>) -> Result<Module, Exit> {
-    match file {
-        Some(file) => Ok(Module::from_file(file, ModuleKind::Code).unwrap()),
+fn packages_path() -> PathBuf {
+    // We assume the candy executable lives inside the Candy Git repository at
+    // its usual location, `$candy/target/[release or debug]/candy`.
+    let candy_exe = current_exe().unwrap();
+    let target_dir = candy_exe.parent().unwrap().parent().unwrap();
+    let candy_repo = target_dir.parent().unwrap();
+    candy_repo.join("packages")
+}
+fn module_for_path(path: Option<PathBuf>) -> Result<Module, Exit> {
+    let packages_path = packages_path();
+    match path {
+        Some(file) => match fs::canonicalize(file) {
+            Ok(path) => Ok(Module::from_path(&packages_path, &path, ModuleKind::Code).unwrap()),
+            Err(error) if error.kind() == ErrorKind::NotFound => {
+                error!("The given file doesn't exist.");
+                return Err(Exit::FileNotFound);
+            }
+            Err(_) => unreachable!(),
+        },
         None => {
-            let Some(package) = current_dir().unwrap().surrounding_candy_package() else {
+            let Some(package) = current_dir().unwrap().surrounding_candy_package(&packages_path) else {
                 error!("You are not in a Candy package. Either navigate into a package or specify a Candy file.");
                 error!("Candy packages are folders that contain a `_package.candy` file. This file marks the root folder of a package. Relative imports can only happen within the package.");
                 return Err(Exit::NotInCandyPackage)
@@ -147,7 +164,7 @@ fn module_for_file(file: Option<PathBuf>) -> Result<Module, Exit> {
 fn build(options: CandyBuildOptions) -> ProgramResult {
     init_logger(true);
     let db = Database::default();
-    let module = module_for_file(options.file.clone())?;
+    let module = module_for_path(options.path.clone())?;
 
     let tracing = TracingConfig {
         register_fuzzables: TracingMode::Off,
@@ -163,7 +180,10 @@ fn build(options: CandyBuildOptions) -> ProgramResult {
         let mut debouncer = new_debouncer(Duration::from_secs(1), None, tx).unwrap();
         debouncer
             .watcher()
-            .watch(&module.package.to_path().unwrap(), RecursiveMode::Recursive)
+            .watch(
+                &module.package.to_path(&packages_path()).unwrap(),
+                RecursiveMode::Recursive,
+            )
             .unwrap();
         loop {
             match rx.recv() {
@@ -181,22 +201,33 @@ fn raw_build(
     tracing: &TracingConfig,
     debug: bool,
 ) -> Option<Arc<Lir>> {
+    let packages_path = packages_path();
+
     let rcst = db
         .rcst(module.clone())
         .unwrap_or_else(|err| panic!("Error parsing file `{}`: {:?}", module.to_rich_ir(), err));
     if debug {
-        module.dump_associated_debug_file("rcst", &format!("{}\n", rcst.to_rich_ir()));
+        module.dump_associated_debug_file(
+            &packages_path,
+            "rcst",
+            &format!("{}\n", rcst.to_rich_ir()),
+        );
     }
 
     let cst = db.cst(module.clone()).unwrap();
     if debug {
-        module.dump_associated_debug_file("cst", &format!("{:#?}\n", cst));
+        module.dump_associated_debug_file(&packages_path, "cst", &format!("{:#?}\n", cst));
     }
 
     let (asts, ast_cst_id_map) = db.ast(module.clone()).unwrap();
     if debug {
-        module.dump_associated_debug_file("ast", &format!("{}\n", asts.to_rich_ir()));
         module.dump_associated_debug_file(
+            &packages_path,
+            "ast",
+            &format!("{}\n", asts.to_rich_ir()),
+        );
+        module.dump_associated_debug_file(
+            &packages_path,
             "ast_to_cst_ids",
             &ast_cst_id_map
                 .keys()
@@ -214,8 +245,13 @@ fn raw_build(
 
     let (hir, hir_ast_id_map) = db.hir(module.clone()).unwrap();
     if debug {
-        module.dump_associated_debug_file("hir", &format!("{}\n", hir.to_rich_ir()));
         module.dump_associated_debug_file(
+            &packages_path,
+            "hir",
+            &format!("{}\n", hir.to_rich_ir()),
+        );
+        module.dump_associated_debug_file(
+            &packages_path,
             "hir_to_ast_ids",
             &hir_ast_id_map
                 .keys()
@@ -251,7 +287,11 @@ fn raw_build(
 
     let mir = db.mir(module.clone(), tracing.clone()).unwrap();
     if debug {
-        module.dump_associated_debug_file("mir", &format!("{}\n", mir.to_rich_ir()));
+        module.dump_associated_debug_file(
+            &packages_path,
+            "mir",
+            &format!("{}\n", mir.to_rich_ir()),
+        );
     }
 
     let optimized_mir = db
@@ -259,6 +299,7 @@ fn raw_build(
         .unwrap();
     if debug {
         module.dump_associated_debug_file(
+            &packages_path,
             "optimized_mir",
             &format!("{}\n", optimized_mir.to_rich_ir()),
         );
@@ -266,7 +307,11 @@ fn raw_build(
 
     let lir = db.lir(module.clone(), tracing.clone()).unwrap();
     if debug {
-        module.dump_associated_debug_file("lir", &format!("{}\n", lir.to_rich_ir()));
+        module.dump_associated_debug_file(
+            &packages_path,
+            "lir",
+            &format!("{}\n", lir.to_rich_ir()),
+        );
     }
 
     Some(lir)
@@ -274,8 +319,10 @@ fn raw_build(
 
 fn run(options: CandyRunOptions) -> ProgramResult {
     init_logger(true);
+
+    let packages_path = packages_path();
     let db = Database::default();
-    let module = module_for_file(options.file.clone())?;
+    let module = module_for_path(options.path.clone())?;
 
     let tracing = TracingConfig {
         register_fuzzables: TracingMode::Off,
@@ -309,7 +356,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     let result = vm.tear_down();
 
     if options.debug {
-        module.dump_associated_debug_file("trace", &format!("{tracer:?}"));
+        module.dump_associated_debug_file(&packages_path, "trace", &format!("{tracer:?}"));
     }
 
     let (mut heap, exported_definitions): (_, Struct) = match result {
@@ -394,7 +441,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         vm.free_unreferenced_channels();
     }
     if options.debug {
-        module.dump_associated_debug_file("trace", &format!("{tracer:?}"));
+        module.dump_associated_debug_file(&packages_path, "trace", &format!("{tracer:?}"));
     }
     match vm.tear_down() {
         ExecutionResult::Finished(return_value) => {
@@ -492,7 +539,7 @@ impl StdinService {
 fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
     init_logger(true);
     let db = Database::default();
-    let module = module_for_file(options.file.clone())?;
+    let module = module_for_path(options.path.clone())?;
 
     let tracing = TracingConfig {
         register_fuzzables: TracingMode::All,
@@ -526,7 +573,7 @@ fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
 async fn lsp() -> ProgramResult {
     init_logger(false);
     info!("Starting language server…");
-    let (service, socket) = Server::create();
+    let (service, socket) = Server::create(packages_path());
     tower_lsp::Server::new(tokio::io::stdin(), tokio::io::stdout(), socket)
         .serve(service)
         .await;

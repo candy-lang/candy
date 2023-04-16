@@ -16,6 +16,7 @@ use candy_frontend::{
     string_to_rcst::StringToRcstStorage,
 };
 use candy_vm::mir_to_lir::MirToLirStorage;
+use std::path::PathBuf;
 
 #[salsa::database(
     AstDbStorage,
@@ -33,20 +34,20 @@ use candy_vm::mir_to_lir::MirToLirStorage;
 )]
 pub struct Database {
     storage: salsa::Storage<Self>,
+    pub packages_path: PathBuf,
     module_provider: OverlayModuleProvider<InMemoryModuleProvider, Box<dyn ModuleProvider + Send>>,
 }
 impl salsa::Database for Database {}
 
-impl Default for Database {
-    fn default() -> Self {
-        Self::new(Box::<FileSystemModuleProvider>::default())
-    }
-}
-
 impl Database {
-    pub fn new(module_provider: Box<dyn ModuleProvider + Send>) -> Self {
+    pub fn new_with_file_system_module_provider(packages_path: PathBuf) -> Self {
+        Self::new(packages_path, Box::<FileSystemModuleProvider>::default())
+    }
+
+    pub fn new(packages_path: PathBuf, module_provider: Box<dyn ModuleProvider + Send>) -> Self {
         Self {
             storage: salsa::Storage::default(),
+            packages_path,
             module_provider: OverlayModuleProvider::new(
                 InMemoryModuleProvider::default(),
                 module_provider,

@@ -29,15 +29,16 @@ impl Module {
         }
     }
 
-    pub fn from_file(file: &Path, kind: ModuleKind, packages_path: &Path) -> Result<Self, String> {
-        assert!(file.is_file());
-        let package = file
-            .surrounding_candy_package(packages_path)
-            .unwrap_or_else(|| Package::User(file.to_path_buf()));
+    pub fn from_path(packages_path: &Path, path: &Path, kind: ModuleKind) -> Result<Self, String> {
+        assert!(path.is_absolute());
 
-        Self::from_package_and_file(packages_path, package, file, kind)
+        let package = path
+            .surrounding_candy_package(packages_path)
+            .unwrap_or_else(|| Package::User(path.to_path_buf()));
+
+        Self::from_package_and_path(packages_path, package, path, kind)
     }
-    pub fn from_package_and_file(
+    pub fn from_package_and_path(
         packages_path: &Path,
         package: Package,
         file: &Path,

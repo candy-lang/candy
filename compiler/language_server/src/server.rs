@@ -110,31 +110,41 @@ impl ServerFeatures {
 }
 
 impl Server {
-    pub fn create() -> (LspService<Self>, ClientSocket) {
+    pub fn create(packages_path: PathBuf) -> (LspService<Self>, ClientSocket) {
         let (diagnostics_sender, mut diagnostics_receiver) = mpsc::channel(8);
         let (hints_sender, mut hints_receiver) = mpsc::channel(1024);
 
         let (service, client) = LspService::build(|client| {
             let features = ServerFeatures {
-                candy: CandyFeatures::new(diagnostics_sender.clone(), hints_sender.clone()),
+                candy: CandyFeatures::new(
+                    packages_path.clone(),
+                    diagnostics_sender.clone(),
+                    hints_sender.clone(),
+                ),
                 ir: IrFeatures::default(),
             };
 
             let client_for_closure = client.clone();
+            let packages_path_for_closure = packages_path.clone();
             let diagnostics_reporter = async move || {
                 while let Some((module, diagnostics)) = diagnostics_receiver.recv().await {
                     client_for_closure
-                        .publish_diagnostics(module_to_url(&module).unwrap(), diagnostics, None)
+                        .publish_diagnostics(
+                            module_to_url(&module, &packages_path_for_closure).unwrap(),
+                            diagnostics,
+                            None,
+                        )
                         .await;
                 }
             };
             tokio::spawn(diagnostics_reporter());
             let client_for_closure = client.clone();
+            let packages_path_for_closure = packages_path.clone();
             let hint_reporter = async move || {
                 while let Some((module, hints)) = hints_receiver.recv().await {
                     client_for_closure
                         .send_notification::<HintsNotification>(HintsNotification {
-                            uri: module_to_url(&module).unwrap(),
+                            uri: module_to_url(&module, &packages_path_for_closure).unwrap(),
                             hints,
                         })
                         .await;
@@ -144,7 +154,9 @@ impl Server {
 
             Self {
                 client,
-                db: Default::default(),
+                db: Mutex::new(Database::new_with_file_system_module_provider(
+                    packages_path.to_path_buf(),
+                )),
                 state: RwLock::new(ServerState::Initial { features }),
             }
         })
@@ -347,6 +359,7 @@ impl LanguageServer for Server {
             } else {
                 ModuleKind::Asset
             },
+            &state.packages_path,
         );
         if let Ok(module) = module_result {
             let notifications = {

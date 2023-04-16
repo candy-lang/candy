@@ -12,7 +12,10 @@ use lsp_types::{
     TextEdit, Url,
 };
 use rustc_hash::FxHashMap;
-use std::thread;
+use std::{
+    path::{Path, PathBuf},
+    thread,
+};
 use tokio::sync::{mpsc::Sender, Mutex};
 use tracing::debug;
 
@@ -43,12 +46,13 @@ pub struct CandyFeatures {
 }
 impl CandyFeatures {
     pub fn new(
+        packages_path: PathBuf,
         diagnostics_sender: Sender<(Module, Vec<Diagnostic>)>,
         hints_sender: Sender<(Module, Vec<Hint>)>,
     ) -> Self {
         let (hints_events_sender, hints_events_receiver) = tokio::sync::mpsc::channel(1024);
         thread::spawn(|| {
-            hints::run_server(hints_events_receiver, hints_sender);
+            hints::run_server(packages_path, hints_events_receiver, hints_sender);
         });
         Self {
             diagnostics_sender,
@@ -115,7 +119,7 @@ impl LanguageFeatures for CandyFeatures {
     async fn did_open(&self, db: &Mutex<Database>, uri: Url, content: Vec<u8>) {
         let module = {
             let mut db = db.lock().await;
-            let module = decode_module(&uri);
+            let module = decode_module(&uri, &db.packages_path);
             db.did_open_module(&module, content.clone());
             module
         };
@@ -134,7 +138,7 @@ impl LanguageFeatures for CandyFeatures {
     ) {
         let (module, content, open_modules) = {
             let mut db = db.lock().await;
-            let module = decode_module(&uri);
+            let module = decode_module(&uri, &db.packages_path);
             let content = apply_text_changes(&db, module.clone(), changes).into_bytes();
             db.did_change_module(&module, content.clone());
             (module, content, db.get_open_modules())
@@ -149,7 +153,7 @@ impl LanguageFeatures for CandyFeatures {
     async fn did_close(&self, db: &Mutex<Database>, uri: Url) {
         let module = {
             let mut db = db.lock().await;
-            let module = decode_module(&uri);
+            let module = decode_module(&uri, &db.packages_path);
             db.did_close_module(&module);
             module
         };
@@ -162,7 +166,7 @@ impl LanguageFeatures for CandyFeatures {
     }
     async fn folding_ranges(&self, db: &Mutex<Database>, uri: Url) -> Vec<FoldingRange> {
         let db = db.lock().await;
-        let module = decode_module(&uri);
+        let module = decode_module(&uri, &db.packages_path);
         folding_ranges(&*db, module)
     }
 
@@ -171,7 +175,7 @@ impl LanguageFeatures for CandyFeatures {
     }
     async fn format(&self, db: &Mutex<Database>, uri: Url) -> Vec<TextEdit> {
         let db = db.lock().await;
-        let module = decode_module(&uri);
+        let module = decode_module(&uri, &db.packages_path);
         let Ok(cst) = db.cst(module.clone()) else { return vec![]; };
 
         cst.format_to_edits()
@@ -194,7 +198,7 @@ impl LanguageFeatures for CandyFeatures {
         position: lsp_types::Position,
     ) -> Option<LocationLink> {
         let db = db.lock().await;
-        let module = decode_module(&uri);
+        let module = decode_module(&uri, &db.packages_path);
         let offset = db.lsp_position_to_offset(module.clone(), position);
         find_definition(&*db, module, offset)
     }
@@ -211,7 +215,7 @@ impl LanguageFeatures for CandyFeatures {
         include_declaration: bool,
     ) -> FxHashMap<Url, Vec<Reference>> {
         let db = db.lock().await;
-        let module = decode_module(&uri);
+        let module = decode_module(&uri, &db.packages_path);
         let offset = db.lsp_position_to_offset(module.clone(), position);
 
         let mut all_references = FxHashMap::default();
@@ -228,13 +232,13 @@ impl LanguageFeatures for CandyFeatures {
     }
     async fn semantic_tokens(&self, db: &Mutex<Database>, uri: Url) -> Vec<SemanticToken> {
         let db = db.lock().await;
-        let module = decode_module(&uri);
+        let module = decode_module(&uri, &db.packages_path);
         semantic_tokens(&*db, module)
     }
 }
 
-fn decode_module(uri: &Url) -> Module {
-    module_from_url(uri, ModuleKind::Code).unwrap()
+fn decode_module(uri: &Url, packages_path: &Path) -> Module {
+    module_from_url(uri, ModuleKind::Code, packages_path).unwrap()
 }
 fn apply_text_changes(
     db: &Database,

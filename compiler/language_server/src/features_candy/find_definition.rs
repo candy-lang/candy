@@ -2,18 +2,17 @@ use candy_frontend::{
     ast_to_hir::AstToHir,
     cst::{CstDb, CstKind},
     hir::{Expression, HirDb},
-    module::{Module, ModuleDb},
-    position::{Offset, PositionConversionDb},
-    rcst_to_cst::RcstToCst,
+    module::Module,
+    position::Offset,
 };
 use lsp_types::LocationLink;
 
-use crate::utils::{module_to_url, LspPositionConversion};
+use crate::{
+    database::Database,
+    utils::{module_to_url, LspPositionConversion},
+};
 
-pub fn find_definition<DB>(db: &DB, module: Module, offset: Offset) -> Option<LocationLink>
-where
-    DB: AstToHir + CstDb + HirDb + ModuleDb + PositionConversionDb + RcstToCst,
-{
+pub fn find_definition(db: &Database, module: Module, offset: Offset) -> Option<LocationLink> {
     let origin_cst = db.find_cst_by_offset(module.clone(), offset);
     match origin_cst.kind {
         CstKind::Identifier { .. } => {}
@@ -31,7 +30,7 @@ where
 
     Some(LocationLink {
         origin_selection_range: Some(db.range_to_lsp_range(module.clone(), origin_cst.data.span)),
-        target_uri: module_to_url(&module).unwrap(),
+        target_uri: module_to_url(&module, &db.packages_path).unwrap(),
         target_range: db.range_to_lsp_range(module.clone(), target_cst.data.span.clone()),
         target_selection_range: db.range_to_lsp_range(module, target_cst.display_span()),
     })

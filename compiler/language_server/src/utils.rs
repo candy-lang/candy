@@ -1,3 +1,4 @@
+use crate::database::Database;
 use candy_frontend::{
     cst::CstDb,
     error::CompilerError,
@@ -9,20 +10,12 @@ use itertools::Itertools;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Url};
 use std::{ops::Range, path::Path};
 
-pub fn error_into_diagnostic<DB>(
-    db: &DB,
-    module: Module,
-    error: CompilerError,
-    packages_path: &Path,
-) -> Diagnostic
-where
-    DB: CstDb + ModuleDb + PositionConversionDb,
-{
+pub fn error_into_diagnostic(db: &Database, module: Module, error: CompilerError) -> Diagnostic {
     let related_information = error
         .to_related_information()
         .into_iter()
         .filter_map(|(module, cst_id, message)| {
-            let uri = module_to_url(&module, packages_path)?;
+            let uri = module_to_url(&module, &db.packages_path)?;
 
             let span = db.find_cst(module.clone(), cst_id).display_span();
             let range = db.range_to_lsp_range(module, span);
@@ -52,7 +45,7 @@ pub fn module_from_url(
     packages_path: &Path,
 ) -> Result<Module, String> {
     match url.scheme() {
-        "file" => Module::from_file(&url.to_file_path().unwrap(), kind, packages_path),
+        "file" => Module::from_path(packages_path, &url.to_file_path().unwrap(), kind),
         "untitled" => Ok(Module {
             package: Package::Anonymous {
                 url: url
