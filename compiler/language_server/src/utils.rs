@@ -7,9 +7,14 @@ use candy_frontend::{
 use extension_trait::extension_trait;
 use itertools::Itertools;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Url};
-use std::ops::Range;
+use std::{ops::Range, path::Path};
 
-pub fn error_into_diagnostic<DB>(db: &DB, module: Module, error: CompilerError) -> Diagnostic
+pub fn error_into_diagnostic<DB>(
+    db: &DB,
+    module: Module,
+    error: CompilerError,
+    packages_path: &Path,
+) -> Diagnostic
 where
     DB: CstDb + ModuleDb + PositionConversionDb,
 {
@@ -17,7 +22,7 @@ where
         .to_related_information()
         .into_iter()
         .filter_map(|(module, cst_id, message)| {
-            let uri = module_to_url(&module)?;
+            let uri = module_to_url(&module, packages_path)?;
 
             let span = db.find_cst(module.clone(), cst_id).display_span();
             let range = db.range_to_lsp_range(module, span);
@@ -41,9 +46,13 @@ where
     }
 }
 
-pub fn module_from_url(url: &Url, kind: ModuleKind) -> Result<Module, String> {
+pub fn module_from_url(
+    url: &Url,
+    kind: ModuleKind,
+    packages_path: &Path,
+) -> Result<Module, String> {
     match url.scheme() {
-        "file" => Module::from_file(url.to_file_path().unwrap(), kind),
+        "file" => Module::from_file(&url.to_file_path().unwrap(), kind, packages_path),
         "untitled" => Ok(Module {
             package: Package::Anonymous {
                 url: url
@@ -59,12 +68,12 @@ pub fn module_from_url(url: &Url, kind: ModuleKind) -> Result<Module, String> {
     }
 }
 
-pub fn module_to_url(module: &Module) -> Option<Url> {
+pub fn module_to_url(module: &Module, packages_path: &Path) -> Option<Url> {
     match &module.package {
-        Package::User(_) | Package::External(_) => Some(
+        Package::User(_) | Package::Managed(_) => Some(
             Url::from_file_path(
                 module
-                    .to_possible_paths()
+                    .to_possible_paths(packages_path)
                     .unwrap()
                     .into_iter()
                     .find_or_first(|path| path.exists())

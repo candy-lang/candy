@@ -1,7 +1,7 @@
 use super::module::Module;
 use crate::rich_ir::ToRichIr;
 use rustc_hash::FxHashMap;
-use std::{fs, sync::Arc};
+use std::{fs, path::PathBuf, sync::Arc};
 use tracing::error;
 
 pub trait ModuleProvider {
@@ -50,10 +50,12 @@ impl ModuleProvider for InMemoryModuleProvider {
 }
 
 #[derive(Default)]
-pub struct FileSystemModuleProvider {}
+pub struct FileSystemModuleProvider {
+    packages_path: PathBuf,
+}
 impl ModuleProvider for FileSystemModuleProvider {
     fn get_content(&self, module: &Module) -> Option<Arc<Vec<u8>>> {
-        let paths = module.to_possible_paths().unwrap_or_else(|| {
+        let paths = module.to_possible_paths(&self.packages_path).unwrap_or_else(|| {
             panic!(
                 "Tried to get content of anonymous module {} that is not cached by the language server.",
                 module.to_rich_ir(),

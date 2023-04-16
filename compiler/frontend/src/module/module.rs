@@ -1,7 +1,11 @@
 use super::package::{Package, SurroundingPackage};
 use crate::rich_ir::{RichIrBuilder, ToRichIr, TokenType};
 use itertools::Itertools;
-use std::{fs, hash::Hash, path::PathBuf};
+use std::{
+    fs,
+    hash::Hash,
+    path::{Path, PathBuf},
+};
 use tracing::{error, warn};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
@@ -17,26 +21,36 @@ pub enum ModuleKind {
 }
 
 impl Module {
-    pub fn from_file(file: PathBuf, kind: ModuleKind) -> Result<Self, String> {
-        assert!(file.is_file());
-        let package_root = file
-            .surrounding_candy_package()
-            .unwrap_or_else(|| Package::User(file.clone()));
-        Self::from_package_and_file(package_root, file, kind)
+    pub fn from_package_name(name: &str) -> Self {
+        Module {
+            package: Package::Managed(name.into()),
+            path: vec![],
+            kind: ModuleKind::Code,
+        }
     }
-    fn from_package_and_file(
+
+    pub fn from_file(file: &Path, kind: ModuleKind, packages_path: &Path) -> Result<Self, String> {
+        assert!(file.is_file());
+        let package = file
+            .surrounding_candy_package(packages_path)
+            .unwrap_or_else(|| Package::User(file.to_path_buf()));
+
+        Self::from_package_and_file(packages_path, package, file, kind)
+    }
+    pub fn from_package_and_file(
+        packages_path: &Path,
         package: Package,
-        file: PathBuf,
+        file: &Path,
         kind: ModuleKind,
     ) -> Result<Self, String> {
-        let Ok(canonicalized) = fs::canonicalize(&file) else {
+        let Ok(canonicalized) = fs::canonicalize(file) else {
             return Err(format!(
                 "File `{}` does not exist or its path is invalid.",
                 file.to_string_lossy(),
             ))
         };
         let relative_path = canonicalized
-            .strip_prefix(fs::canonicalize(package.to_path().unwrap()).unwrap())
+            .strip_prefix(package.to_path(packages_path).unwrap())
             .expect("File is not located in the package.");
 
         let mut path = relative_path
@@ -71,8 +85,8 @@ impl Module {
         })
     }
 
-    pub fn to_possible_paths(&self) -> Option<Vec<PathBuf>> {
-        let mut path = self.package.to_path()?;
+    pub fn to_possible_paths(&self, packages_path: &Path) -> Option<Vec<PathBuf>> {
+        let mut path = self.package.to_path(packages_path)?;
         for component in self.path.clone() {
             path.push(component);
         }
@@ -92,8 +106,8 @@ impl Module {
             ],
         })
     }
-    fn try_to_path(&self) -> Option<PathBuf> {
-        let paths = self.to_possible_paths().unwrap_or_else(|| {
+    fn try_to_path(&self, packages_path: &Path) -> Option<PathBuf> {
+        let paths = self.to_possible_paths(packages_path).unwrap_or_else(|| {
             panic!(
                 "Tried to get content of anonymous module {} that is not cached by the language server.",
                 self.to_rich_ir(),
@@ -110,8 +124,13 @@ impl Module {
         None
     }
 
-    pub fn dump_associated_debug_file(&self, debug_type: &str, content: &str) {
-        let Some(mut path) = self.try_to_path() else { return; };
+    pub fn dump_associated_debug_file(
+        &self,
+        packages_path: &Path,
+        debug_type: &str,
+        content: &str,
+    ) {
+        let Some(mut path) = self.try_to_path(packages_path) else { return; };
         path.set_extension(format!("candy.{}", debug_type));
         fs::write(path.clone(), content).unwrap_or_else(|error| {
             warn!(

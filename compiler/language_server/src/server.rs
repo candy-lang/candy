@@ -14,7 +14,7 @@ use lsp_types::{
 };
 use rustc_hash::FxHashMap;
 use serde::Serialize;
-use std::mem;
+use std::{mem, path::PathBuf, str::FromStr};
 use tokio::sync::{mpsc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tower_lsp::{jsonrpc, Client, ClientSocket, LanguageServer, LspService};
 use tracing::{debug, span, Level};
@@ -42,6 +42,7 @@ pub enum ServerState {
 #[derive(Debug)]
 pub struct RunningServerState {
     pub features: ServerFeatures,
+    pub packages_path: PathBuf,
 }
 impl ServerState {
     pub fn require_features(&self) -> &ServerFeatures {
@@ -176,7 +177,7 @@ impl Server {
 
 #[async_trait]
 impl LanguageServer for Server {
-    async fn initialize(&self, _params: InitializeParams) -> jsonrpc::Result<InitializeResult> {
+    async fn initialize(&self, params: InitializeParams) -> jsonrpc::Result<InitializeResult> {
         span!(Level::DEBUG, "LSP: initialize");
         self.client
             .log_message(MessageType::INFO, "Initializing!")
@@ -189,11 +190,25 @@ impl LanguageServer for Server {
             }
         }
 
+        let packages_path = {
+            let options = params
+                .initialization_options
+                .as_ref()
+                .expect("No initialization options provided.")
+                .as_object()
+                .unwrap();
+            let path_string = options.get("packagesPath").unwrap().as_str().unwrap();
+            PathBuf::from_str(path_string).expect("Invalid path")
+        };
+
         {
             RwLockWriteGuard::map(self.state.write().await, |state| {
                 let owned_state = mem::replace(state, ServerState::Shutdown);
                 let ServerState::Initial { features } = owned_state else { panic!("Already initialized"); };
-                *state = ServerState::Running(RunningServerState { features });
+                *state = ServerState::Running(RunningServerState {
+                    features,
+                    packages_path,
+                });
                 state
             });
         }
