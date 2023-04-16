@@ -41,7 +41,10 @@ impl salsa::Database for Database {}
 
 impl Database {
     pub fn new_with_file_system_module_provider(packages_path: PathBuf) -> Self {
-        Self::new(packages_path, Box::<FileSystemModuleProvider>::default())
+        Self::new(
+            packages_path.clone(),
+            Box::new(FileSystemModuleProvider { packages_path }),
+        )
     }
 
     pub fn new(packages_path: PathBuf, module_provider: Box<dyn ModuleProvider + Send>) -> Self {

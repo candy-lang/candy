@@ -163,7 +163,9 @@ fn module_for_path(path: Option<PathBuf>) -> Result<Module, Exit> {
 
 fn build(options: CandyBuildOptions) -> ProgramResult {
     init_logger(true);
-    let db = Database::default();
+
+    let packages_path = packages_path();
+    let db = Database::new_with_file_system_module_provider(&packages_path);
     let module = module_for_path(options.path.clone())?;
 
     let tracing = TracingConfig {
@@ -181,7 +183,7 @@ fn build(options: CandyBuildOptions) -> ProgramResult {
         debouncer
             .watcher()
             .watch(
-                &module.package.to_path(&packages_path()).unwrap(),
+                &module.package.to_path(&packages_path).unwrap(),
                 RecursiveMode::Recursive,
             )
             .unwrap();
@@ -202,7 +204,6 @@ fn raw_build(
     debug: bool,
 ) -> Option<Arc<Lir>> {
     let packages_path = packages_path();
-
     let rcst = db
         .rcst(module.clone())
         .unwrap_or_else(|err| panic!("Error parsing file `{}`: {:?}", module.to_rich_ir(), err));
@@ -321,7 +322,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     init_logger(true);
 
     let packages_path = packages_path();
-    let db = Database::default();
+    let db = Database::new_with_file_system_module_provider(&packages_path);
     let module = module_for_path(options.path.clone())?;
 
     let tracing = TracingConfig {
@@ -538,7 +539,9 @@ impl StdinService {
 
 fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
     init_logger(true);
-    let db = Database::default();
+
+    let packages_path = packages_path();
+    let db = Database::new_with_file_system_module_provider(&packages_path);
     let module = module_for_path(options.path.clone())?;
 
     let tracing = TracingConfig {

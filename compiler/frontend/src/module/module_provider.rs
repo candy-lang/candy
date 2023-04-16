@@ -49,9 +49,8 @@ impl ModuleProvider for InMemoryModuleProvider {
     }
 }
 
-#[derive(Default)]
 pub struct FileSystemModuleProvider {
-    packages_path: PathBuf,
+    pub packages_path: PathBuf,
 }
 impl ModuleProvider for FileSystemModuleProvider {
     fn get_content(&self, module: &Module) -> Option<Arc<Vec<u8>>> {
