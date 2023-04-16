@@ -1,6 +1,6 @@
 # Echoes whatever you send to it on stdin.
 
-[async, await, channel, function, text] = use "...Core"
+[async, await, channel, function, text] = use "Core"
 
 main := { environment ->
   print message =

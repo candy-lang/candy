@@ -1,4 +1,4 @@
-[equals, fixedDecimal, ifElse, recursive] = use "...Core"
+[equals, fixedDecimal, ifElse, recursive] = use "Core"
 
 sqrt x :=
   needs (fixedDecimal.is x)

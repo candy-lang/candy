@@ -1,4 +1,4 @@
-[ifElse, int, recursive] = use "...Core"
+[ifElse, int, recursive] = use "Core"
 
 fibonacci n =
   needs (int.is n)
