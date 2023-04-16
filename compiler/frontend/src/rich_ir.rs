@@ -1,4 +1,13 @@
-use crate::{builtin_functions::BuiltinFunction, hir, mir, module::Module, position::Offset};
+use crate::{
+    ast::Ast,
+    builtin_functions::BuiltinFunction,
+    hir,
+    mir::{self, Mir},
+    module::Module,
+    position::Offset,
+    string_to_rcst::{InvalidModuleError, RcstResult},
+    TracingConfig, TracingMode,
+};
 use derive_more::From;
 use enumset::{EnumSet, EnumSetType};
 use num_bigint::BigInt;
@@ -229,7 +238,117 @@ impl RichIrBuilder {
             .push(range);
     }
 
+    pub fn push_tracing_config(&mut self, tracing_config: &TracingConfig) {
+        fn push_mode(builder: &mut RichIrBuilder, title: &str, mode: &TracingMode) {
+            builder.push_comment_line(format!(
+                "• {title} {}",
+                match mode {
+                    TracingMode::Off => "No",
+                    TracingMode::OnlyCurrent => "Only for the current module",
+                    TracingMode::All => "Yes",
+                },
+            ));
+        }
+
+        self.push_comment_line("");
+        self.push_comment_line("Tracing Config:");
+        self.push_comment_line("");
+        push_mode(
+            self,
+            "Include tracing of fuzzable closures?",
+            &tracing_config.register_fuzzables,
+        );
+        push_mode(self, "Include tracing of calls?", &tracing_config.calls);
+        push_mode(
+            self,
+            "Include tracing of evaluated expressions?",
+            &tracing_config.evaluated_expressions,
+        );
+    }
+
     pub fn finish(self) -> RichIr {
         self.ir
+    }
+}
+
+impl RichIr {
+    pub fn for_rcst(module: &Module, rcst: &RcstResult) -> Option<RichIr> {
+        let mut builder = RichIrBuilder::default();
+        builder.push(
+            format!("# RCST for module {}", module.to_rich_ir()),
+            TokenType::Comment,
+            EnumSet::empty(),
+        );
+        builder.push_newline();
+        match rcst {
+            Ok(rcst) => rcst.build_rich_ir(&mut builder),
+            Err(InvalidModuleError::DoesNotExist) => return None,
+            Err(InvalidModuleError::InvalidUtf8) => {
+                builder.push("# Invalid UTF-8", TokenType::Comment, EnumSet::empty());
+            }
+            Err(InvalidModuleError::IsNotCandy) => {
+                builder.push("# Is not Candy code", TokenType::Comment, EnumSet::empty());
+            }
+            Err(InvalidModuleError::IsToolingModule) => {
+                builder.push(
+                    "# Is a tooling module",
+                    TokenType::Comment,
+                    EnumSet::empty(),
+                );
+            }
+        }
+        Some(builder.finish())
+    }
+
+    pub fn for_ast(module: &Module, asts: &[Ast]) -> RichIr {
+        let mut builder = RichIrBuilder::default();
+        builder.push(
+            format!("# AST for module {}", module.to_rich_ir()),
+            TokenType::Comment,
+            EnumSet::empty(),
+        );
+        builder.push_newline();
+        asts.build_rich_ir(&mut builder);
+        builder.finish()
+    }
+
+    pub fn for_hir(module: &Module, body: &hir::Body) -> RichIr {
+        let mut builder = RichIrBuilder::default();
+        builder.push(
+            format!("# HIR for module {}", module.to_rich_ir()),
+            TokenType::Comment,
+            EnumSet::empty(),
+        );
+        builder.push_newline();
+        body.build_rich_ir(&mut builder);
+        builder.finish()
+    }
+
+    pub fn for_mir(module: &Module, mir: &Mir, tracing_config: &TracingConfig) -> RichIr {
+        let mut builder = RichIrBuilder::default();
+        builder.push(
+            format!("# MIR for module {}", module.to_rich_ir()),
+            TokenType::Comment,
+            EnumSet::empty(),
+        );
+        builder.push_newline();
+        builder.push_tracing_config(tracing_config);
+        builder.push_newline();
+        mir.build_rich_ir(&mut builder);
+        builder.finish()
+    }
+
+    pub fn for_optimized_mir(module: &Module, mir: &Mir, tracing_config: &TracingConfig) -> RichIr {
+        let mut builder = RichIrBuilder::default();
+        builder.push(
+            format!("# Optimized MIR for module {}", module.to_rich_ir()),
+            TokenType::Comment,
+            EnumSet::empty(),
+        );
+        builder.push_newline();
+        builder.push_tracing_config(tracing_config);
+        builder.push_newline();
+        mir.build_rich_ir(&mut builder);
+        builder.finish()
     }
 }

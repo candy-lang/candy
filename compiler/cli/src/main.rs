@@ -10,7 +10,7 @@ use candy_frontend::{
     module::{Module, ModuleKind},
     position::PositionConversionDb,
     rcst_to_cst::RcstToCst,
-    rich_ir::ToRichIr,
+    rich_ir::{RichIr, ToRichIr},
     string_to_rcst::StringToRcst,
     TracingConfig, TracingMode,
 };
@@ -20,7 +20,7 @@ use candy_vm::{
     context::{DbUseProvider, RunForever},
     fiber::{ExecutionResult, FiberId},
     heap::{Closure, Data, Heap, SendPort, Struct},
-    lir::Lir,
+    lir::{Lir, RichIrForLir},
     mir_to_lir::MirToLir,
     tracer::{full::FullTracer, DummyTracer, Tracer},
     vm::{CompletedOperation, OperationId, Status, Vm},
@@ -49,10 +49,26 @@ use tracing_subscriber::{
 #[derive(Parser, Debug)]
 #[command(name = "candy", about = "The 🍭 Candy CLI.")]
 enum CandyOptions {
+    #[command(subcommand)]
+    Debug(CandyDebugOptions),
     Build(CandyBuildOptions),
     Run(CandyRunOptions),
     Fuzz(CandyFuzzOptions),
     Lsp,
+}
+
+#[derive(Parser, Debug)]
+enum CandyDebugOptions {
+    Cst(CandyDebugPath),
+    Ast(CandyDebugPath),
+    Hir(CandyDebugPath),
+    Mir(CandyDebugPath),
+    OptimizedMir(CandyDebugPath),
+    Lir(CandyDebugPath),
+}
+#[derive(Parser, Debug)]
+struct CandyDebugPath {
+    path: PathBuf,
 }
 
 #[derive(Parser, Debug)]
@@ -93,7 +109,13 @@ struct CandyFuzzOptions {
 
 #[tokio::main]
 async fn main() -> ProgramResult {
-    match CandyOptions::parse() {
+    let options = CandyOptions::parse();
+
+    let should_log_to_stdout = !matches!(options, CandyOptions::Lsp);
+    init_logger(should_log_to_stdout);
+
+    match options {
+        CandyOptions::Debug(options) => debug(options),
         CandyOptions::Build(options) => build(options),
         CandyOptions::Run(options) => run(options),
         CandyOptions::Fuzz(options) => fuzz(options),
@@ -109,8 +131,81 @@ enum Exit {
     CodePanicked,
 }
 
+fn debug(options: CandyDebugOptions) -> ProgramResult {
+    let db = Database::default();
+    let tracing_config = TracingConfig {
+        register_fuzzables: TracingMode::Off,
+        calls: TracingMode::Off,
+        evaluated_expressions: TracingMode::Off,
+    };
+
+    let rich_ir = match options {
+        CandyDebugOptions::Cst(path) => {
+            let module = Module::from_package_root_and_file(
+                current_dir().unwrap(),
+                path.path,
+                ModuleKind::Code,
+            );
+            let rcst = db.rcst(module.clone());
+            RichIr::for_rcst(&module, &rcst)
+        }
+        CandyDebugOptions::Ast(path) => {
+            let module = Module::from_package_root_and_file(
+                current_dir().unwrap(),
+                path.path,
+                ModuleKind::Code,
+            );
+            let ast = db.ast(module.clone());
+            ast.map(|(ast, _)| RichIr::for_ast(&module, &ast))
+        }
+        CandyDebugOptions::Hir(path) => {
+            let module = Module::from_package_root_and_file(
+                current_dir().unwrap(),
+                path.path,
+                ModuleKind::Code,
+            );
+            let hir = db.hir(module.clone());
+            hir.map(|(hir, _)| RichIr::for_hir(&module, &hir))
+        }
+        CandyDebugOptions::Mir(path) => {
+            let module = Module::from_package_root_and_file(
+                current_dir().unwrap(),
+                path.path,
+                ModuleKind::Code,
+            );
+            let mir = db.mir(module.clone(), tracing_config.clone());
+            mir.map(|mir| RichIr::for_mir(&module, &mir, &tracing_config))
+        }
+        CandyDebugOptions::OptimizedMir(path) => {
+            let module = Module::from_package_root_and_file(
+                current_dir().unwrap(),
+                path.path,
+                ModuleKind::Code,
+            );
+            let mir = db.mir_with_obvious_optimized(module.clone(), tracing_config.clone());
+            mir.map(|mir| RichIr::for_mir(&module, &mir, &tracing_config))
+        }
+        CandyDebugOptions::Lir(path) => {
+            let module = Module::from_package_root_and_file(
+                current_dir().unwrap(),
+                path.path,
+                ModuleKind::Code,
+            );
+            let lir = db.lir(module.clone(), tracing_config.clone());
+            lir.map(|lir| RichIr::for_lir(&module, &lir, &tracing_config))
+        }
+    };
+
+    match rich_ir {
+        Some(rich_ir) => {
+            println!("{}", rich_ir.to_string());
+            Ok(())
+        }
+        None => Err(Exit::FileNotFound),
+    }
+}
+
 fn build(options: CandyBuildOptions) -> ProgramResult {
-    init_logger(true);
     let db = Database::default();
     let module = Module::from_package_root_and_file(
         current_dir().unwrap(),
@@ -241,7 +336,6 @@ fn raw_build(
 }
 
 fn run(options: CandyRunOptions) -> ProgramResult {
-    init_logger(true);
     let db = Database::default();
     let module = Module::from_package_root_and_file(
         current_dir().unwrap(),
@@ -462,7 +556,6 @@ impl StdinService {
 }
 
 fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
-    init_logger(true);
     let db = Database::default();
     let module = Module::from_package_root_and_file(
         current_dir().unwrap(),
@@ -499,7 +592,6 @@ fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
 }
 
 async fn lsp() -> ProgramResult {
-    init_logger(false);
     info!("Starting language server…");
     let (service, socket) = Server::create();
     tower_lsp::Server::new(tokio::io::stdin(), tokio::io::stdout(), socket)
