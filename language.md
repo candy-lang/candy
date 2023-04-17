@@ -196,7 +196,7 @@ See the [Concurrency](#concurrency) section for more information.
 
 ### More?
 
-TODO: Tuples? Tags? Sets?
+TODO: Tuples? Sets?
 
 - sets: Clojure has `%{ value }`
   - or like Toit? `{hey, you, there}` for set, empty map is `{:}`
