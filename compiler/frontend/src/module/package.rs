@@ -1,7 +1,7 @@
 use extension_trait::extension_trait;
 use rustc_hash::FxHashSet;
 use std::{
-    ffi::OsString,
+    ffi::{OsStr, OsString},
     fmt::{self, Display, Formatter},
     fs,
     hash::Hash,
@@ -62,11 +62,11 @@ pub impl SurroundingPackage for Path {
                 .map(|child| child.unwrap().file_name())
                 .collect::<FxHashSet<OsString>>();
 
-            if !children.contains(&OsString::from("_.candy".to_string())) {
+            if !children.contains(OsStr::new("_.candy")) {
                 return None;
             }
 
-            if children.contains(&OsString::from("_package.candy".to_string())) {
+            if children.contains(OsStr::new("_package.candy")) {
                 break;
             } else if let Some(parent) = candidate.parent() {
                 candidate = parent.to_path_buf();
