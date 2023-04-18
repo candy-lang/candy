@@ -40,8 +40,8 @@ impl Package {
 impl Display for Package {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Package::User(path) => write!(f, "user:{path:?}"),
-            Package::Managed(path) => write!(f, "managed:{path:?}"),
+            Package::User(path) => write!(f, "{path:?}"),
+            Package::Managed(path) => write!(f, "{path:?}"),
             Package::Anonymous { url } => write!(f, "anonymous:{url}"),
             Package::Tooling(tooling) => write!(f, "tooling:{tooling}"),
         }
@@ -51,7 +51,7 @@ impl Display for Package {
 #[extension_trait]
 pub impl SurroundingPackage for Path {
     fn surrounding_candy_package(&self, packages_path: &Path) -> Option<Package> {
-        let mut candidate = fs::canonicalize(self.to_path_buf()).unwrap();
+        let mut candidate = fs::canonicalize(self).unwrap();
         if !candidate.is_dir() {
             candidate = candidate.parent().unwrap().to_path_buf();
         }

@@ -101,7 +101,7 @@ fn load_core(module_provider: &mut InMemoryModuleProvider) {
         .filter(|it| it.file_type().is_file())
         .filter(|it| it.file_name().to_string_lossy().ends_with(".candy"))
     {
-        let module = Module::from_package_and_file(
+        let module = Module::from_package_and_path(
             &packages_path,
             package.clone(),
             file.path(),

@@ -81,7 +81,7 @@ impl CandyFeatures {
                 hir.collect_errors(&mut errors);
                 errors
                     .into_iter()
-                    .map(|it| error_into_diagnostic(&*db, module.clone(), it))
+                    .map(|it| error_into_diagnostic(&db, module.clone(), it))
                     .collect()
             };
             self.diagnostics_sender
@@ -200,7 +200,7 @@ impl LanguageFeatures for CandyFeatures {
         let db = db.lock().await;
         let module = decode_module(&uri, &db.packages_path);
         let offset = db.lsp_position_to_offset(module.clone(), position);
-        find_definition(&*db, module, offset)
+        find_definition(&db, module, offset)
     }
 
     fn supports_references(&self) -> bool {

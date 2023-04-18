@@ -142,7 +142,7 @@ fn module_for_path(path: Option<PathBuf>) -> Result<Module, Exit> {
             Ok(path) => Ok(Module::from_path(&packages_path, &path, ModuleKind::Code).unwrap()),
             Err(error) if error.kind() == ErrorKind::NotFound => {
                 error!("The given file doesn't exist.");
-                return Err(Exit::FileNotFound);
+                Err(Exit::FileNotFound)
             }
             Err(_) => unreachable!(),
         },
@@ -335,7 +335,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         return Err(Exit::FileNotFound);
     };
 
-    debug!("Running `{module:?}`.");
+    debug!("Running {}.", module.to_rich_ir());
 
     let module_closure = Closure::of_module(&db, module.clone(), tracing.clone()).unwrap();
     let mut tracer = FullTracer::default();

@@ -41,13 +41,13 @@ impl Module {
     pub fn from_package_and_path(
         packages_path: &Path,
         package: Package,
-        file: &Path,
+        path: &Path,
         kind: ModuleKind,
     ) -> Result<Self, String> {
-        let Ok(canonicalized) = fs::canonicalize(file) else {
+        let Ok(canonicalized) = fs::canonicalize(path) else {
             return Err(format!(
                 "File `{}` does not exist or its path is invalid.",
-                file.to_string_lossy(),
+                path.to_string_lossy(),
             ))
         };
         let relative_path = canonicalized
