@@ -78,7 +78,7 @@ impl Display for UsePath {
             UsePath::Relative {
                 parent_navigations,
                 path,
-            } => write!(f, "{}{}", ".".repeat(1 + parent_navigations), path),
+            } => write!(f, "{}{path}", ".".repeat(1 + parent_navigations)),
         }
     }
 }

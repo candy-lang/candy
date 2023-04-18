@@ -209,8 +209,7 @@ impl LanguageServer for Server {
                 .expect("No initialization options provided.")
                 .as_object()
                 .unwrap();
-            let path_string = options.get("packagesPath").unwrap().as_str().unwrap();
-            PathBuf::from_str(path_string).expect("Invalid path")
+            options.get("packagesPath").unwrap().as_str().unwrap().into()
         };
 
         {

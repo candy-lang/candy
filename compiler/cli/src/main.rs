@@ -75,7 +75,7 @@ struct CandyBuildOptions {
 
 /// Run a Candy program.
 ///
-/// This command runs the given file, or if no file is provided, the package of
+/// This command runs the given file, or, if no file is provided, the package of
 /// your current working directory. The module should export a `main` function.
 /// This function is then called with an environment.
 #[derive(Parser, Debug)]
@@ -86,7 +86,7 @@ struct CandyRunOptions {
     #[arg(long)]
     tracing: bool,
 
-    /// The file or package to run. If non is provided, the package of your
+    /// The file or package to run. If none is provided, the package of your
     /// current working directory will be run.
     #[arg(value_hint = ValueHint::FilePath)]
     path: Option<PathBuf>,

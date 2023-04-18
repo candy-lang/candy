@@ -21,9 +21,9 @@ pub enum ModuleKind {
 }
 
 impl Module {
-    pub fn from_package_name(name: &str) -> Self {
+    pub fn from_package_name(name: String) -> Self {
         Module {
-            package: Package::Managed(name.into()),
+            package: Package::Managed(name),
             path: vec![],
             kind: ModuleKind::Code,
         }
