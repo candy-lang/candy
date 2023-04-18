@@ -149,6 +149,8 @@ fn raw_build(
     tracing: &TracingConfig,
     debug: bool,
 ) -> Option<Arc<Lir>> {
+    debug!("Compiling `{}`.", module.to_rich_ir());
+
     let rcst = db
         .rcst(module.clone())
         .unwrap_or_else(|err| panic!("Error parsing file `{}`: {:?}", module.to_rich_ir(), err));
@@ -259,8 +261,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         return Err(Exit::FileNotFound);
     };
 
-    let path_string = options.file.to_string_lossy();
-    debug!("Running `{path_string}`.");
+    debug!("Running `{}`.", module.to_rich_ir());
 
     let module_closure = Closure::of_module(&db, module.clone(), tracing.clone()).unwrap();
     let mut tracer = FullTracer::default();
