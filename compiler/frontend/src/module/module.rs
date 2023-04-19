@@ -23,7 +23,7 @@ pub enum ModuleKind {
 impl Module {
     pub fn from_package_name(name: String) -> Self {
         Module {
-            package: Package::Managed(name),
+            package: Package::Managed(name.into()),
             path: vec![],
             kind: ModuleKind::Code,
         }

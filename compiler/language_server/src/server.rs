@@ -14,7 +14,7 @@ use lsp_types::{
 };
 use rustc_hash::FxHashMap;
 use serde::Serialize;
-use std::{mem, path::PathBuf, str::FromStr};
+use std::{mem, path::PathBuf};
 use tokio::sync::{mpsc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tower_lsp::{jsonrpc, Client, ClientSocket, LanguageServer, LspService};
 use tracing::{debug, span, Level};
@@ -209,7 +209,12 @@ impl LanguageServer for Server {
                 .expect("No initialization options provided.")
                 .as_object()
                 .unwrap();
-            options.get("packagesPath").unwrap().as_str().unwrap().into()
+            options
+                .get("packagesPath")
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .into()
         };
 
         {

@@ -49,8 +49,8 @@ pub struct ViewIrParams {
 
 impl Server {
     pub async fn candy_view_ir(&self, params: ViewIrParams) -> jsonrpc::Result<String> {
-        let config = IrConfig::decode(&params.uri, &state.require_running().packages_path);
         let state = self.state.read().await;
+        let config = IrConfig::decode(&params.uri, &state.require_running().packages_path);
         let features = state.require_features();
 
         features.ir.open(&self.db, config, params.uri.clone()).await;
