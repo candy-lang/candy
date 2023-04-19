@@ -14,13 +14,25 @@ use std::sync::Arc;
 
 #[salsa::query_group(MirToLirStorage)]
 pub trait MirToLir: CstDb + OptimizeMir {
-    fn lir(&self, module: Module, tracing: TracingConfig) -> Option<Arc<Lir>>;
+    fn lir(&self, module: Module, tracing: TracingConfig) -> Result<Arc<Lir>, CompilationError>;
 }
 
-fn lir(db: &dyn MirToLir, module: Module, tracing: TracingConfig) -> Option<Arc<Lir>> {
-    let mir = db.mir_with_obvious_optimized(module, tracing)?;
-    let instructions = compile_lambda(&FxHashSet::default(), &[], Id::from_usize(0), &mir.body);
-    Some(Arc::new(Lir { instructions }))
+fn lir(
+    db: &dyn MirToLir,
+    module: Module,
+    tracing: TracingConfig,
+) -> Result<Arc<Lir>, CompilationError> {
+    let Some(mir) = db.mir_with_obvious_optimized(module, tracing) else {
+        return Err(CompilationError::FileNotFound);
+    };
+    let instructions = compile_lambda(&FxHashSet::default(), &[], Id::from_usize(0), &mir.body)?;
+    Ok(Arc::new(Lir { instructions }))
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+enum CompilationError {
+    FileNotFound,
+    StillContainsUse,
 }
 
 fn compile_lambda(
@@ -28,7 +40,7 @@ fn compile_lambda(
     parameters: &[Id],
     responsible_parameter: Id,
     body: &Body,
-) -> Vec<Instruction> {
+) -> Result<Vec<Instruction>, CompilationError> {
     let mut context = LoweringContext::default();
     for captured in captured {
         context.stack.push(*captured);
@@ -39,7 +51,7 @@ fn compile_lambda(
     context.stack.push(responsible_parameter);
 
     for (id, expression) in body.iter() {
-        context.compile_expression(id, expression);
+        context.compile_expression(id, expression)?;
     }
 
     if matches!(
@@ -60,7 +72,7 @@ fn compile_lambda(
         context.emit(dummy_id, Instruction::Return);
     }
 
-    context.instructions
+    Ok(context.instructions)
 }
 
 #[derive(Default)]
@@ -69,7 +81,11 @@ struct LoweringContext {
     instructions: Vec<Instruction>,
 }
 impl LoweringContext {
-    fn compile_expression(&mut self, id: Id, expression: &Expression) {
+    fn compile_expression(
+        &mut self,
+        id: Id,
+        expression: &Expression,
+    ) -> Result<(), CompilationError> {
         match expression {
             Expression::Int(int) => self.emit(id, Instruction::CreateInt(int.clone())),
             Expression::Text(text) => self.emit(id, Instruction::CreateText(text.clone())),
@@ -223,6 +239,7 @@ impl LoweringContext {
                 self.emit(id, Instruction::TraceFoundFuzzableClosure);
             }
         }
+        Ok(())
     }
 
     fn emit_push_from_stack(&mut self, id: Id) {
