@@ -91,7 +91,7 @@ pub fn setup() -> Database {
     db
 }
 fn load_core(module_provider: &mut InMemoryModuleProvider) {
-    let packages_path: PathBuf = "../../packages".into();
+    let packages_path: PathBuf = fs::canonicalize("../../packages").unwrap();
     let core_path: PathBuf = packages_path.join("Core");
     let package = Package::Managed("Core".into());
 

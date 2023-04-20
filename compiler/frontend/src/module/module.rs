@@ -30,6 +30,7 @@ impl Module {
     }
 
     pub fn from_path(packages_path: &Path, path: &Path, kind: ModuleKind) -> Result<Self, String> {
+        assert!(packages_path.is_absolute());
         assert!(path.is_absolute());
 
         let package = path
@@ -44,6 +45,8 @@ impl Module {
         path: &Path,
         kind: ModuleKind,
     ) -> Result<Self, String> {
+        assert!(packages_path.is_absolute());
+
         let Ok(canonicalized) = fs::canonicalize(path) else {
             return Err(format!(
                 "File `{}` does not exist or its path is invalid.",
