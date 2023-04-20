@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use async_trait::async_trait;
 use lsp_types::{
     self, FoldingRange, LocationLink, SemanticToken, TextDocumentContentChangeEvent, TextEdit, Url,
@@ -20,13 +18,7 @@ pub trait LanguageFeatures: Send + Sync {
     fn supports_did_open(&self) -> bool {
         false
     }
-    async fn did_open(
-        &self,
-        _db: &Mutex<Database>,
-        _project_directory: &Path,
-        _uri: Url,
-        _content: Vec<u8>,
-    ) {
+    async fn did_open(&self, _db: &Mutex<Database>, _uri: Url, _content: Vec<u8>) {
         unimplemented!()
     }
     fn supports_did_change(&self) -> bool {
@@ -35,8 +27,6 @@ pub trait LanguageFeatures: Send + Sync {
     async fn did_change(
         &self,
         _db: &Mutex<Database>,
-
-        _project_directory: &Path,
         _uri: Url,
         _changes: Vec<TextDocumentContentChangeEvent>,
     ) {
@@ -45,31 +35,21 @@ pub trait LanguageFeatures: Send + Sync {
     fn supports_did_close(&self) -> bool {
         false
     }
-    async fn did_close(&self, _db: &Mutex<Database>, _project_directory: &Path, _uri: Url) {
+    async fn did_close(&self, _db: &Mutex<Database>, _uri: Url) {
         unimplemented!()
     }
 
     fn supports_folding_ranges(&self) -> bool {
         false
     }
-    async fn folding_ranges(
-        &self,
-        _db: &Mutex<Database>,
-        _project_directory: &Path,
-        _uri: Url,
-    ) -> Vec<FoldingRange> {
+    async fn folding_ranges(&self, _db: &Mutex<Database>, _uri: Url) -> Vec<FoldingRange> {
         unimplemented!()
     }
 
     fn supports_format(&self) -> bool {
         false
     }
-    async fn format(
-        &self,
-        _db: &Mutex<Database>,
-        _project_directory: &Path,
-        _uri: Url,
-    ) -> Vec<TextEdit> {
+    async fn format(&self, _db: &Mutex<Database>, _uri: Url) -> Vec<TextEdit> {
         unimplemented!()
     }
 
@@ -79,7 +59,6 @@ pub trait LanguageFeatures: Send + Sync {
     async fn find_definition(
         &self,
         _db: &Mutex<Database>,
-        _project_directory: &Path,
         _uri: Url,
         _position: lsp_types::Position,
     ) -> Option<LocationLink> {
@@ -93,7 +72,6 @@ pub trait LanguageFeatures: Send + Sync {
     async fn references(
         &self,
         _db: &Mutex<Database>,
-        _project_directory: &Path,
         _uri: Url,
         _position: lsp_types::Position,
         _only_in_same_document: bool,
@@ -105,12 +83,7 @@ pub trait LanguageFeatures: Send + Sync {
     fn supports_semantic_tokens(&self) -> bool {
         false
     }
-    async fn semantic_tokens(
-        &self,
-        _db: &Mutex<Database>,
-        _project_directory: &Path,
-        _uri: Url,
-    ) -> Vec<SemanticToken> {
+    async fn semantic_tokens(&self, _db: &Mutex<Database>, _uri: Url) -> Vec<SemanticToken> {
         unimplemented!()
     }
 }

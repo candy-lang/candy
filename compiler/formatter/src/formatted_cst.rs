@@ -57,7 +57,7 @@ impl<'a> FormattedCst<'a> {
     ) -> Width {
         self.whitespace
             .into_space_and_move_comments_to(edits, other);
-        self.child_width + SinglelineWidth::SPACE
+        self.child_width + *SinglelineWidth::SPACE
     }
     #[must_use]
     pub fn into_empty_and_move_comments_to(

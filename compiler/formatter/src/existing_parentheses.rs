@@ -9,6 +9,7 @@ use candy_frontend::{
     cst::{Cst, CstKind},
     position::Offset,
 };
+use once_cell::sync::Lazy;
 use std::borrow::Cow;
 
 #[must_use]
@@ -151,9 +152,9 @@ impl<'a> ExistingParentheses<'a> {
         let fits_in_one_line = !self.are_required_due_to_comments()
             && previous_width.last_line_fits(
                 info.indentation,
-                &(&SinglelineWidth::PARENTHESIS.into()
+                &(&(*SinglelineWidth::PARENTHESIS).into()
                     + child.min_width(info.indentation.with_indent())
-                    + &SinglelineWidth::PARENTHESIS.into()),
+                    + &(*SinglelineWidth::PARENTHESIS).into()),
             );
         let child_trailing = if fits_in_one_line {
             TrailingWhitespace::None
@@ -163,7 +164,7 @@ impl<'a> ExistingParentheses<'a> {
         match self {
             ExistingParentheses::None { child_start_offset } => {
                 let (opening, opening_width) = if fits_in_one_line {
-                    (Cow::Borrowed("("), SinglelineWidth::PARENTHESIS)
+                    (Cow::Borrowed("("), *SinglelineWidth::PARENTHESIS)
                 } else {
                     (
                         Cow::Owned(format!("(\n{}", info.indentation.with_indent())),
@@ -180,7 +181,7 @@ impl<'a> ExistingParentheses<'a> {
                 edits.insert(child_end_offset, ")");
 
                 FormattedCst::new(
-                    &opening_width.into() + child_width + &SinglelineWidth::PARENTHESIS.into(),
+                    &opening_width.into() + child_width + &(*SinglelineWidth::PARENTHESIS).into(),
                     ExistingWhitespace::empty(child_end_offset),
                 )
             }
@@ -194,7 +195,7 @@ impl<'a> ExistingParentheses<'a> {
                     opening.whitespace.into_trailing_with_indentation(
                         edits,
                         &TrailingWithIndentationConfig::Trailing {
-                            previous_width: previous_width + SinglelineWidth::PARENTHESIS,
+                            previous_width: previous_width + *SinglelineWidth::PARENTHESIS,
                             indentation: info.indentation.with_indent(),
                         },
                     )
@@ -218,7 +219,7 @@ impl<'a> ExistingParentheses<'a> {
 }
 
 impl SinglelineWidth {
-    pub const PARENTHESIS: SinglelineWidth = 1.into();
+    pub const PARENTHESIS: Lazy<SinglelineWidth> = Lazy::new(|| 1.into());
 }
 
 fn split_whitespace(cst: &Cst) -> UnformattedCst {

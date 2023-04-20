@@ -1,4 +1,4 @@
-[async, await, channel, parallel, text] = use "..Core"
+[async, await, channel, parallel, text] = use "Core"
 
 main := { environment ->
   print message =
