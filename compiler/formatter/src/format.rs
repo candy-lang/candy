@@ -17,6 +17,7 @@ use candy_frontend::{
 };
 use extension_trait::extension_trait;
 use itertools::Itertools;
+use once_cell::sync::Lazy;
 use traversal::dft_post_rev;
 
 #[derive(Clone, Default)]
@@ -60,7 +61,7 @@ impl FormattingInfo {
         Self {
             indentation: if self.is_single_expression_in_assignment_body
                 && previous_width
-                    .last_line_fits(self.indentation, &SinglelineWidth::PARENTHESIS.into())
+                    .last_line_fits(self.indentation, &(*SinglelineWidth::PARENTHESIS).into())
             {
                 self.indentation.with_dedent()
             } else {
@@ -310,8 +311,8 @@ pub(crate) fn format_cst<'a>(
                 (
                     &width_for_right_side
                         + &bar_width
-                        + SinglelineWidth::PARENTHESIS
-                        + SinglelineWidth::PARENTHESIS,
+                        + *SinglelineWidth::PARENTHESIS
+                        + *SinglelineWidth::PARENTHESIS,
                     info.with_indent(),
                 )
             } else {
@@ -325,9 +326,9 @@ pub(crate) fn format_cst<'a>(
                     edits,
                     &(previous_width
                         + left.min_width(info.indentation)
-                        + SinglelineWidth::SPACE
+                        + *SinglelineWidth::SPACE
                         + &bar_width
-                        + SinglelineWidth::SPACE),
+                        + *SinglelineWidth::SPACE),
                     right,
                     info,
                 )
@@ -338,7 +339,7 @@ pub(crate) fn format_cst<'a>(
 
             let left_trailing = if let Some(right_first_line_width) = right_width.first_line_width()
                 && (left.min_width(info.indentation)
-                    + SinglelineWidth::SPACE
+                    + *SinglelineWidth::SPACE
                     + &bar_width
                     + right_first_line_width)
                 .fits(info.indentation)
@@ -400,7 +401,7 @@ pub(crate) fn format_cst<'a>(
             let min_width = &receiver.min_width(info.indentation)
                 + arguments
                     .iter()
-                    .map(|it| &SinglelineWidth::SPACE.into() + it.min_singleline_width())
+                    .map(|it| &(*SinglelineWidth::SPACE).into() + it.min_singleline_width())
                     .sum::<Width>();
             let (is_singleline, argument_info, trailing) =
                 if previous_width.last_line_fits(info.indentation, &min_width) {
@@ -574,7 +575,7 @@ pub(crate) fn format_cst<'a>(
                 {
                     Width::multiline(None, info.indentation.with_indent().width())
                 } else {
-                    previous_width + SinglelineWidth::PARENTHESIS
+                    previous_width + *SinglelineWidth::PARENTHESIS
                 };
                 (previous_width_for_struct, info.with_indent())
             } else {
@@ -686,7 +687,7 @@ pub(crate) fn format_cst<'a>(
             let (body_width, whitespace) = format_csts(
                 edits,
                 &(previous_width_for_arrow
-                    + SinglelineWidth::SPACE
+                    + *SinglelineWidth::SPACE
                     + arrow.min_width(info.indentation.with_indent())),
                 body,
                 arrow.whitespace.end_offset(),
@@ -696,7 +697,7 @@ pub(crate) fn format_cst<'a>(
 
             let arrow_trailing = if pattern_width.last_line_fits(
                 info.indentation,
-                &(arrow.min_width(info.indentation) + SinglelineWidth::SPACE + &body_width),
+                &(arrow.min_width(info.indentation) + *SinglelineWidth::SPACE + &body_width),
             ) {
                 TrailingWhitespace::Space
             } else {
@@ -732,10 +733,10 @@ pub(crate) fn format_cst<'a>(
                         format_cst(edits, &previous_width_for_inner, arrow, &info.with_indent());
 
                     let parameters_trailing = if (opening_curly_brace.min_width(info.indentation)
-                        + SinglelineWidth::SPACE
+                        + *SinglelineWidth::SPACE
                         + parameters
                             .iter()
-                            .map(|it| it.min_width(info.indentation) + SinglelineWidth::SPACE)
+                            .map(|it| it.min_width(info.indentation) + *SinglelineWidth::SPACE)
                             .sum::<Width>()
                         + arrow.min_width(info.indentation))
                     .fits(info.indentation)
@@ -756,7 +757,7 @@ pub(crate) fn format_cst<'a>(
                             let trailing = if parameters_width.last_line_fits(
                                 info.indentation,
                                 &(it.min_width(info.indentation)
-                                    + SinglelineWidth::SPACE
+                                    + *SinglelineWidth::SPACE
                                     + arrow.child_width()),
                             ) {
                                 TrailingWhitespace::Space
@@ -800,7 +801,7 @@ pub(crate) fn format_cst<'a>(
                 .unwrap_or_default();
             let body_min_width = body.min_width(info.indentation);
             let width_until_arrow = opening_curly_brace.min_width(info.indentation)
-                + SinglelineWidth::SPACE
+                + *SinglelineWidth::SPACE
                 + &parameters_and_arrow_min_width;
 
             // Opening curly brace
@@ -810,7 +811,7 @@ pub(crate) fn format_cst<'a>(
             } else {
                 &width_until_arrow
                     + &body_min_width
-                    + SinglelineWidth::SPACE
+                    + *SinglelineWidth::SPACE
                     + &closing_curly_brace_width
             };
             let opening_curly_brace_trailing =
@@ -824,14 +825,14 @@ pub(crate) fn format_cst<'a>(
 
             // Body
             let space_if_parameters = if parameters_width_and_arrow.is_some() {
-                SinglelineWidth::SPACE
+                *SinglelineWidth::SPACE
             } else {
                 SinglelineWidth::default()
             };
             let space_if_body_not_empty = if body_min_width.is_empty() {
                 SinglelineWidth::default()
             } else {
-                SinglelineWidth::SPACE
+                *SinglelineWidth::SPACE
             };
             let width_from_body =
                 body_min_width + space_if_body_not_empty + &closing_curly_brace_width;
@@ -900,7 +901,7 @@ pub(crate) fn format_cst<'a>(
                 edits,
                 &(previous_width_for_assignment_sign
                     + assignment_sign.min_width(info.indentation)
-                    + SinglelineWidth::SPACE),
+                    + *SinglelineWidth::SPACE),
                 body,
                 assignment_sign.whitespace.end_offset(),
                 &body_info,
@@ -917,14 +918,14 @@ pub(crate) fn format_cst<'a>(
 
             let assignment_sign_trailing = if left_width.last_line_fits(
                 info.indentation,
-                &(&assignment_sign.min_width(info.indentation) + SinglelineWidth::SPACE + &body_width + &body_whitespace_width),
+                &(&assignment_sign.min_width(info.indentation) + *SinglelineWidth::SPACE + &body_width + &body_whitespace_width),
             ) {
                 TrailingWhitespace::Space
             } else if !body_whitespace_has_comments
                 && let Some(body_first_line_width) = body_width.first_line_width()
                 && left_width.last_line_fits(
                     info.indentation,
-                    &(&assignment_sign.min_width(info.indentation) + SinglelineWidth::SPACE + body_first_line_width),
+                    &(&assignment_sign.min_width(info.indentation) + *SinglelineWidth::SPACE + body_first_line_width),
             ) {
                 TrailingWhitespace::Space
             } else {
@@ -975,12 +976,12 @@ impl<'a> Argument<'a> {
         } else {
             let argument = format_cst(edits, previous_width, argument, info);
             let mut min_singleline_width = argument.min_width(info.indentation.with_indent());
-            const PARENTHESES_WIDTH: SinglelineWidth =
-                SinglelineWidth::PARENTHESIS + SinglelineWidth::PARENTHESIS;
+            let parentheses_width: SinglelineWidth =
+                *SinglelineWidth::PARENTHESIS + *SinglelineWidth::PARENTHESIS;
             match precedence {
                 Some(PrecedenceCategory::High) => {}
-                Some(PrecedenceCategory::Low) => min_singleline_width += &PARENTHESES_WIDTH.into(),
-                None if parentheses.is_some() => min_singleline_width += &PARENTHESES_WIDTH.into(),
+                Some(PrecedenceCategory::Low) => min_singleline_width += &parentheses_width.into(),
+                None if parentheses.is_some() => min_singleline_width += &parentheses_width.into(),
                 None => {}
             }
             MaybeSandwichLikeArgument::Other {
@@ -996,11 +997,12 @@ impl<'a> Argument<'a> {
     }
 
     /// Width of the opening parenthesis / bracket / curly brace
-    const SANDWICH_LIKE_MIN_SINGLELINE_WIDTH: SinglelineWidth = SinglelineWidth::PARENTHESIS;
+    const SANDWICH_LIKE_MIN_SINGLELINE_WIDTH: Lazy<SinglelineWidth> =
+        Lazy::new(|| *SinglelineWidth::PARENTHESIS);
     fn min_singleline_width(&self) -> Width {
         match &self.argument {
             MaybeSandwichLikeArgument::SandwichLike(_) => {
-                Self::SANDWICH_LIKE_MIN_SINGLELINE_WIDTH.into()
+                (*Self::SANDWICH_LIKE_MIN_SINGLELINE_WIDTH).into()
             }
             MaybeSandwichLikeArgument::Other {
                 min_singleline_width,
