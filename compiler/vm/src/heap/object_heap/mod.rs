@@ -162,7 +162,7 @@ impl Pointer for HeapObject {
 impl Eq for HeapObject {}
 impl PartialEq for HeapObject {
     fn eq(&self, other: &Self) -> bool {
-        self.pointer_equals(*other) && HeapData::from(*self) == HeapData::from(*other)
+        self.pointer_equals(*other) || HeapData::from(*self) == HeapData::from(*other)
     }
 }
 impl Hash for HeapObject {
