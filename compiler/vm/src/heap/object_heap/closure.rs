@@ -51,7 +51,7 @@ impl HeapClosure {
             HeapObject::KIND_CLOSURE
                 | ((captured_len as u64) << Self::CAPTURED_LEN_SHIFT)
                 | ((argument_count as u64) << Self::ARGUMENT_COUNT_SHIFT),
-            (1 + captured_len) * HeapObject::WORD_SIZE + mem::size_of_val(&instructions),
+            (1 + captured_len) * HeapObject::WORD_SIZE + mem::size_of_val(instructions.as_slice()),
         ));
         let instructions_len = instructions.len();
         unsafe {
@@ -175,8 +175,7 @@ heap_object_impls!(HeapClosure);
 
 impl HeapObjectTrait for HeapClosure {
     fn content_size(self) -> usize {
-        (1 + self.captured_len()) * HeapObject::WORD_SIZE
-            + self.instructions_len() * mem::size_of::<Instruction>()
+        (1 + self.captured_len()) * HeapObject::WORD_SIZE + mem::size_of_val(self.instructions())
     }
 
     fn clone_content_to_heap_with_mapping(
