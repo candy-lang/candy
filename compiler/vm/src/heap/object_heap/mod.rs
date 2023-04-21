@@ -66,7 +66,8 @@ impl HeapObject {
         unsafe { *self.word_pointer(offset).as_ref() }
     }
     pub fn word_pointer(self, offset: usize) -> NonNull<u64> {
-        self.0.map_addr(|it| it.checked_add(offset).unwrap())
+        self.0
+            .map_addr(|it| it.checked_add(offset * Self::WORD_SIZE).unwrap())
     }
     pub fn header_word(self) -> u64 {
         self.unsafe_get_word(0)
@@ -142,7 +143,7 @@ impl HeapObject {
         unsafe { *self.content_word_pointer(offset).as_mut() = value }
     }
     pub fn content_word_pointer(self, offset: usize) -> NonNull<u64> {
-        self.0.map_addr(|it| it.checked_add(2 + offset).unwrap())
+        self.word_pointer(2 + offset)
     }
 }
 
