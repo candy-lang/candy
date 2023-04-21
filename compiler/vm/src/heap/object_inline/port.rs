@@ -18,7 +18,8 @@ pub struct InlinePort(InlineObject);
 impl InlinePort {
     const CHANNEL_ID_SHIFT: usize = 3;
 
-    pub fn create(channel_id: ChannelId, is_send: bool) -> InlineObject {
+    pub fn create(heap: &mut Heap, channel_id: ChannelId, is_send: bool) -> InlineObject {
+        heap.notify_port_created(channel_id);
         let channel_id = channel_id.to_usize();
         debug_assert_eq!(
             (channel_id << Self::CHANNEL_ID_SHIFT) >> Self::CHANNEL_ID_SHIFT,
@@ -67,8 +68,8 @@ impl InlineSendPort {
     pub fn new_unchecked(object: InlineObject) -> Self {
         Self(InlinePort(object))
     }
-    pub fn create(channel_id: ChannelId) -> InlineObject {
-        InlinePort::create(channel_id, true)
+    pub fn create(heap: &mut Heap, channel_id: ChannelId) -> InlineObject {
+        InlinePort::create(heap, channel_id, true)
     }
 }
 
@@ -98,8 +99,8 @@ impl InlineReceivePort {
     pub fn new_unchecked(object: InlineObject) -> Self {
         Self(InlinePort(object))
     }
-    pub fn create(channel_id: ChannelId) -> InlineObject {
-        InlinePort::create(channel_id, false)
+    pub fn create(heap: &mut Heap, channel_id: ChannelId) -> InlineObject {
+        InlinePort::create(heap, channel_id, false)
     }
 }
 

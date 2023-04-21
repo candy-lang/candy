@@ -348,7 +348,7 @@ impl Struct {
     ) -> Self {
         let fields = fields
             .into_iter()
-            .map(|(key, value)| ((**Symbol::create(heap, key)).into(), value))
+            .map(|(key, value)| ((Symbol::create(heap, key)).into(), value))
             .collect();
         Self::create(heap, &fields)
     }
@@ -437,8 +437,8 @@ impls_via_0!(Builtin);
 pub struct SendPort(InlineSendPort);
 
 impl SendPort {
-    pub fn create(channel_id: ChannelId) -> InlineObject {
-        InlineSendPort::create(channel_id)
+    pub fn create(heap: &mut Heap, channel_id: ChannelId) -> InlineObject {
+        InlineSendPort::create(heap, channel_id)
     }
 }
 
@@ -451,8 +451,8 @@ impl_try_froms!(SendPort, "Expected a send port.");
 pub struct ReceivePort(InlineReceivePort);
 
 impl ReceivePort {
-    pub fn create(channel_id: ChannelId) -> InlineObject {
-        InlineReceivePort::create(channel_id)
+    pub fn create(heap: &mut Heap, channel_id: ChannelId) -> InlineObject {
+        InlineReceivePort::create(heap, channel_id)
     }
 }
 

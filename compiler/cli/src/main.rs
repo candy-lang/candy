@@ -377,14 +377,12 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     let mut vm = Vm::default();
     let mut stdout = StdoutService::new(&mut vm);
     let mut stdin = StdinService::new(&mut vm);
-    let environment = Struct::create_with_symbol_keys(
-        &mut heap,
-        [
-            ("Stdout", SendPort::create(stdout.channel)),
-            ("Stdin", SendPort::create(stdin.channel)),
-        ],
-    )
-    .into();
+    let fields = [
+        ("Stdout", SendPort::create(&mut heap, stdout.channel)),
+        ("Stdin", SendPort::create(&mut heap, stdin.channel)),
+    ];
+    let environment = Struct::create_with_symbol_keys(&mut heap, fields).into();
+    dbg!(environment);
     let platform = HirId::create(&mut heap, hir::Id::platform());
     tracer.for_fiber(FiberId::root()).call_started(
         platform,

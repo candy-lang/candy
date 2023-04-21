@@ -174,8 +174,8 @@ impl Fiber {
         assert!(matches!(self.status, Status::CreatingChannel { .. }));
 
         let fields = [
-            ("SendPort", SendPort::create(channel)),
-            ("ReceivePort", ReceivePort::create(channel)),
+            ("SendPort", SendPort::create(&mut self.heap, channel)),
+            ("ReceivePort", ReceivePort::create(&mut self.heap, channel)),
         ];
         let struct_ = Struct::create_with_symbol_keys(&mut self.heap, fields);
         self.push_to_data_stack(struct_);

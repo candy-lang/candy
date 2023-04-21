@@ -349,7 +349,7 @@ impl Vm {
                     let body = Data::from(body.clone_to_heap(&mut heap))
                         .try_into()
                         .unwrap();
-                    let nursery_send_port = SendPort::create(nursery_id);
+                    let nursery_send_port = SendPort::create(&mut heap, nursery_id);
                     let id = self.fiber_id_generator.generate();
                     self.fibers.insert(
                         id,

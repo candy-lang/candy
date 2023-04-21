@@ -71,19 +71,25 @@ impl Heap {
         unsafe { alloc::Global.deallocate(object.word_pointer(0).cast(), layout) };
     }
 
-    pub(self) fn dup_channel_by(&mut self, channel: ChannelId, amount: usize) {
-        *self.channel_refcounts.entry(channel).or_insert_with(|| {
-            panic!("Called `dup_channel_by`, but the channel doesn't exist.")
+    pub(self) fn notify_port_created(&mut self, channel_id: ChannelId) {
+        self.channel_refcounts
+            .entry(channel_id)
+            .and_modify(|count| *count += 1)
+            .or_insert(1);
+    }
+    pub(self) fn dup_channel_by(&mut self, channel_id: ChannelId, amount: usize) {
+        *self.channel_refcounts.entry(channel_id).or_insert_with(|| {
+            panic!("Called `dup_channel_by`, but {channel_id:?} doesn't exist.")
         }) += amount;
     }
-    pub(self) fn drop_channel(&mut self, channel: ChannelId) {
+    pub(self) fn drop_channel(&mut self, channel_id: ChannelId) {
         let channel_refcount = self
             .channel_refcounts
-            .entry(channel)
-            .or_insert_with(|| panic!("Called `drop_channel`, but the channel doesn't exist."));
+            .entry(channel_id)
+            .or_insert_with(|| panic!("Called `drop_channel`, but {channel_id:?} doesn't exist."));
         *channel_refcount -= 1;
         if *channel_refcount == 0 {
-            self.channel_refcounts.remove(&channel).unwrap();
+            self.channel_refcounts.remove(&channel_id).unwrap();
         }
     }
 
