@@ -1,7 +1,7 @@
 use super::{InlineObject, InlineObjectTrait};
 use crate::{
     heap::{object_heap::HeapObject, Heap, Int, Symbol},
-    utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
+    utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_via_get, DebugDisplay},
 };
 use derive_more::Deref;
 use extension_trait::extension_trait;
@@ -13,7 +13,7 @@ use std::{
     ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Shl, Shr, Sub},
 };
 
-#[derive(Clone, Copy, Deref, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Deref)]
 pub struct InlineInt(InlineObject);
 impl InlineInt {
     const VALUE_SHIFT: usize = 2;
@@ -103,6 +103,8 @@ impl DebugDisplay for InlineInt {
     }
 }
 impl_debug_display_via_debugdisplay!(InlineInt);
+
+impl_eq_hash_via_get!(InlineInt);
 
 impl TryFrom<&BigInt> for InlineInt {
     type Error = ();

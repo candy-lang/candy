@@ -7,9 +7,12 @@ use crate::{
 use candy_frontend::id::CountableId;
 use derive_more::Deref;
 use rustc_hash::FxHashMap;
-use std::fmt::{self, Formatter};
+use std::{
+    fmt::{self, Formatter},
+    hash::{Hash, Hasher},
+};
 
-#[derive(Clone, Copy, Deref, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Deref)]
 pub struct InlinePort(InlineObject);
 
 impl InlinePort {
@@ -40,6 +43,18 @@ impl InlinePort {
 impl From<InlinePort> for InlineObject {
     fn from(port: InlinePort) -> Self {
         port.0
+    }
+}
+
+impl Eq for InlinePort {}
+impl PartialEq for InlinePort {
+    fn eq(&self, other: &Self) -> bool {
+        self.channel_id() == other.channel_id()
+    }
+}
+impl Hash for InlinePort {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.channel_id().hash(state)
     }
 }
 

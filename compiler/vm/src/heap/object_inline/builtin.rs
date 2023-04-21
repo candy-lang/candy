@@ -6,9 +6,12 @@ use crate::{
 use candy_frontend::builtin_functions::{self, BuiltinFunction};
 use derive_more::Deref;
 use rustc_hash::FxHashMap;
-use std::fmt::{self, Formatter};
+use std::{
+    fmt::{self, Formatter},
+    hash::{Hash, Hasher},
+};
 
-#[derive(Clone, Copy, Deref, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Deref)]
 pub struct InlineBuiltin(InlineObject);
 
 impl InlineBuiltin {
@@ -18,9 +21,11 @@ impl InlineBuiltin {
         Self(object)
     }
 
+    fn index(self) -> usize {
+        (self.raw_word() >> Self::BUILTIN_FUNCTION_INDEX_SHIFT) as usize
+    }
     pub fn get(self) -> BuiltinFunction {
-        let index = self.raw_word() >> Self::BUILTIN_FUNCTION_INDEX_SHIFT;
-        builtin_functions::VALUES[index as usize]
+        builtin_functions::VALUES[self.index()]
     }
 }
 
@@ -30,6 +35,18 @@ impl DebugDisplay for InlineBuiltin {
     }
 }
 impl_debug_display_via_debugdisplay!(InlineBuiltin);
+
+impl Eq for InlineBuiltin {}
+impl PartialEq for InlineBuiltin {
+    fn eq(&self, other: &Self) -> bool {
+        self.index() == other.index()
+    }
+}
+impl Hash for InlineBuiltin {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.index().hash(state)
+    }
+}
 
 impl From<BuiltinFunction> for InlineObject {
     fn from(builtin_function: BuiltinFunction) -> Self {
