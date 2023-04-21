@@ -1,10 +1,11 @@
 # Heap Object Representation
 
-The lowest granularity for values in Candy's memory (stack and heap) is one _word_: 64 bit = 8 byte.
-These words are usually \_Inline Word_s.
-An inline word is a tagged union of different types of values:
+The lowest granularity for objects in Candy's memory (stack and heap) is one _word_: 64 bit = 8 byte.
+An object is stored as an _inline object_:
 
-## Inline Word
+## Inline Object
+
+An inline object is a single word containing a tagged union of different types of values:
 
 |                                                                     Value | Meaning     |
 | ------------------------------------------------------------------------: | :---------- |
@@ -16,7 +17,35 @@ An inline word is a tagged union of different types of values:
 
 > The remaining patterns are reserved for future use.
 
-## Header Word
+### Pointer
+
+Values that don't fit inside an inline word are stored in the heap.
+The whole word is used as a pointer directly (i.e., the three trailing zeros are part of the pointer).
+Each pointer points to the _header word_ of a heap object.
+
+### Int
+
+`x` stores the signed integer value.
+For larger values, a pointer to a heap object containing an integer of (practically) unlimited size is used.
+
+### SendPort, ReceivePort
+
+`x` stores the channel ID as an unsigned integer.
+
+### Builtin
+
+`x` stores the builtin function index as an unsigned integer.
+
+## Heap Object
+
+Each heap object has the following structure:
+
+- one header word
+- one word containing the reference count as an unsigned integer (`u64`)
+- zero to many words containing the actual data
+  - for now, there are some objects whose content data length isn't a multiple of the word size since they use Rust's representation for simplicity
+
+The header word is a tagged union of different types of values:
 
 |                                                                     Value | Meaning |
 | ------------------------------------------------------------------------: | :------ |
@@ -30,11 +59,10 @@ An inline word is a tagged union of different types of values:
 
 > The remaining patterns are reserved for future use.
 
-Directly after the header word, the reference count is stored as a `u64`.
-
 ### Int
 
 Uses Rust's `BigInt` representation after the header word.
+Values that fit into an inline word _must_ be stored inline.
 
 ### List
 
@@ -68,7 +96,7 @@ Uses Rust's `BigInt` representation after the header word.
 
 ### Symbol
 
-See text.
+Same as text.
 
 ### Text
 
