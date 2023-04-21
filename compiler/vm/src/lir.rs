@@ -1,3 +1,4 @@
+use crate::utils::{impl_debug_display_via_debugdisplay, DebugDisplay};
 use candy_frontend::{
     builtin_functions::BuiltinFunction,
     hir,
@@ -8,6 +9,7 @@ use candy_frontend::{
 use enumset::EnumSet;
 use itertools::Itertools;
 use num_bigint::BigInt;
+use std::fmt::{self, Formatter};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -17,7 +19,7 @@ pub struct Lir {
 
 pub type StackOffset = usize; // 0 is the last item, 1 the one before that, etc.
 
-#[derive(Clone, Debug, EnumDiscriminants, Eq, Hash, PartialEq, IntoStaticStr)]
+#[derive(Clone, EnumDiscriminants, Eq, Hash, IntoStaticStr, PartialEq)]
 #[strum_discriminants(derive(Hash, IntoStaticStr), strum(serialize_all = "camelCase"))]
 pub enum Instruction {
     /// Pushes an int.
@@ -374,6 +376,17 @@ impl ToRichIr for Instruction {
         }
     }
 }
+
+impl DebugDisplay for Instruction {
+    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
+        if is_debug {
+            write!(f, "{:?}", self)
+        } else {
+            write!(f, "{}", self.to_rich_ir().text)
+        }
+    }
+}
+impl_debug_display_via_debugdisplay!(Instruction);
 
 fn arguments_plural(num_args: usize) -> &'static str {
     if num_args == 1 {

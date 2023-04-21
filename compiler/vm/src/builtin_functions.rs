@@ -2,24 +2,25 @@ use crate::{
     channel::ChannelId,
     channel::{Capacity, Packet},
     fiber::{Fiber, Status},
-    heap::{Closure, Data, Heap, Int, List, Pointer, ReceivePort, SendPort, Struct, Text},
+    heap::{
+        Closure, Data, Heap, HirId, InlineObject, Int, List, ReceivePort, SendPort, Struct, Symbol,
+        Text,
+    },
 };
 use candy_frontend::builtin_functions::BuiltinFunction;
 use itertools::Itertools;
 use num_bigint::BigInt;
-use num_integer::Integer;
-use num_traits::ToPrimitive;
 use paste::paste;
-use std::{ops::Deref, str::FromStr};
+use std::str::{self, FromStr};
 use tracing::{info, span, Level};
 use unicode_segmentation::UnicodeSegmentation;
 
 impl Fiber {
     pub(super) fn run_builtin_function(
         &mut self,
-        builtin_function: &BuiltinFunction,
-        args: &[Pointer],
-        responsible: Pointer,
+        builtin_function: BuiltinFunction,
+        args: &[InlineObject],
+        responsible: HirId,
     ) {
         let result = span!(Level::TRACE, "Running builtin").in_scope(|| match &builtin_function {
             BuiltinFunction::ChannelCreate => self.heap.channel_create(args),
@@ -74,23 +75,24 @@ impl Fiber {
             Ok(DivergeControlFlow {
                 closure,
                 responsible,
-            }) => self.call(closure, vec![], responsible),
+            }) => self.call_closure(closure, &[], responsible),
             Ok(CreateChannel { capacity }) => self.status = Status::CreatingChannel { capacity },
             Ok(Send { channel, packet }) => self.status = Status::Sending { channel, packet },
             Ok(Receive { channel }) => self.status = Status::Receiving { channel },
             Ok(Parallel { body }) => self.status = Status::InParallelScope { body },
             Ok(Try { body }) => self.status = Status::InTry { body },
-            Err(reason) => self.panic(reason, self.heap.get_hir_id(responsible)),
+            Err(reason) => self.panic(reason, responsible.get().to_owned()),
         }
     }
 }
 
+// FIXME: Convert error type to `&'static str`
 type BuiltinResult = Result<SuccessfulBehavior, String>;
 enum SuccessfulBehavior {
-    Return(Pointer),
+    Return(InlineObject),
     DivergeControlFlow {
-        closure: Pointer,
-        responsible: Pointer,
+        closure: Closure,
+        responsible: HirId,
     },
     CreateChannel {
         capacity: Capacity,
@@ -103,12 +105,13 @@ enum SuccessfulBehavior {
         channel: ChannelId,
     },
     Parallel {
-        body: Pointer,
+        body: Closure,
     },
     Try {
-        body: Pointer,
+        body: Closure,
     },
 }
+use derive_more::Deref;
 use SuccessfulBehavior::*;
 
 impl From<SuccessfulBehavior> for BuiltinResult {
@@ -129,8 +132,8 @@ macro_rules! unpack {
             };
             let ( $( $arg, )+ ): ( $( UnpackedData<$type>, )+ ) = ( $(
                 UnpackedData {
-                    address: $arg,
-                    data: (&$heap.get($arg).data).try_into()?,
+                    object: $arg,
+                    data: $arg.try_into()?,
                 },
             )+ );
 
@@ -150,389 +153,379 @@ macro_rules! unpack_and_later_drop {
             };
             let ( $( $arg, )+ ): ( $( UnpackedData<$type>, )+ ) = ( $(
                 UnpackedData {
-                    address: $arg,
-                    data: (&$heap.get($arg).data).try_into()?,
+                    object: $arg,
+                    data: $arg.try_into()?,
                 },
             )+ );
 
             // Structs are called `struct_`, so we sometimes generate
             // identifiers containing a double underscore.
             #[allow(non_snake_case)]
-            $( let paste!([< $arg _address >]) = $arg.address; )+
+            $( let paste!([< $arg _object >]) = $arg.object; )+
 
             let result = $body;
 
-            $( $heap.drop(paste!([< $arg _address >])); )+
+            $( paste!([< $arg _object >]).drop($heap); )+
             result.into()
         }
     };
 }
 
 impl Heap {
-    fn channel_create(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |capacity: &Int| {
-            match capacity.value.clone().try_into() {
-                Ok(capacity) => CreateChannel { capacity },
-                Err(_) => return Err("You tried to create a channel with a capacity that is either negative or bigger than the maximum usize.".to_string()),
+    fn channel_create(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |capacity: Int| {
+            match capacity.try_get() {
+                Some(capacity) => CreateChannel { capacity },
+                None => return Err("You tried to create a channel with a capacity that is either negative or bigger than the maximum usize.".to_string()),
             }
         })
     }
 
-    fn channel_send(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |port: &SendPort, packet: Any| {
+    fn channel_send(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |port: SendPort, packet: Any| {
             let mut heap = Heap::default();
-            let address = self.clone_single_to_other_heap(&mut heap, packet.address);
+            let object = packet.object.clone_to_heap(&mut heap);
             Send {
-                channel: port.channel,
-                packet: Packet { heap, address },
+                channel: port.channel_id(),
+                packet: Packet { heap, object },
             }
         })
     }
 
-    fn channel_receive(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |port: &ReceivePort| {
+    fn channel_receive(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |port: ReceivePort| {
             Receive {
-                channel: port.channel,
+                channel: port.channel_id(),
             }
         })
     }
 
-    fn equals(&mut self, args: &[Pointer]) -> BuiltinResult {
+    fn equals(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |a: Any, b: Any| {
-            let is_equal = a.equals(self, &b);
-            Return(self.create_bool(is_equal))
+            Return(Symbol::create_bool(self, **a == **b).into())
         })
     }
 
-    fn function_run(&mut self, args: &[Pointer], responsible: Pointer) -> BuiltinResult {
-        unpack!(self, args, |closure: &Closure| {
+    fn function_run(&mut self, args: &[InlineObject], responsible: HirId) -> BuiltinResult {
+        unpack!(self, args, |closure: Closure| {
             closure.should_take_no_arguments()?;
             DivergeControlFlow {
-                closure: closure.address,
+                closure: *closure,
                 responsible,
             }
         })
     }
 
-    fn get_argument_count(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |closure: &Closure| {
-            let num_args = closure.num_args.into();
-            Return(self.create_int(num_args))
+    fn get_argument_count(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |closure: Closure| {
+            Return(Int::create(self, closure.argument_count()).into())
         })
     }
 
-    fn if_else(&mut self, args: &[Pointer], responsible: Pointer) -> BuiltinResult {
+    fn if_else(&mut self, args: &[InlineObject], responsible: HirId) -> BuiltinResult {
         unpack!(self, args, |condition: bool,
-                             then: &Closure,
-                             else_: &Closure| {
+                             then: Closure,
+                             else_: Closure| {
             let (run, dont_run) = if *condition {
                 (then, else_)
             } else {
                 (else_, then)
             };
 
-            let condition_address = condition.address;
-            let run_address = run.address;
-            let dont_run_address = dont_run.address;
-            self.drop(condition_address);
-            self.drop(dont_run_address);
+            condition.object.drop(self);
+            dont_run.object.drop(self);
 
             DivergeControlFlow {
-                closure: run_address,
+                closure: *run,
                 responsible,
             }
         })
     }
 
-    fn int_add(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |a: &Int, b: &Int| {
-            Return(self.create_int(&a.value + &b.value))
+    fn int_add(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |a: Int, b: Int| {
+            Return(a.add(self, &b).into())
         })
     }
-    fn int_bit_length(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |a: &Int| {
-            Return(self.create_int(a.value.bits().into()))
+    fn int_bit_length(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |a: Int| { Return(a.bit_length(self).into()) })
+    }
+    fn int_bitwise_and(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |a: Int, b: Int| {
+            Return(a.bitwise_and(self, &b).into())
         })
     }
-    fn int_bitwise_and(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |a: &Int, b: &Int| {
-            Return(self.create_int(&a.value & &b.value))
+    fn int_bitwise_or(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |a: Int, b: Int| {
+            Return(a.bitwise_or(self, &b).into())
         })
     }
-    fn int_bitwise_or(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |a: &Int, b: &Int| {
-            Return(self.create_int(&a.value | &b.value))
+    fn int_bitwise_xor(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |a: Int, b: Int| {
+            Return(a.bitwise_xor(self, &b).into())
         })
     }
-    fn int_bitwise_xor(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |a: &Int, b: &Int| {
-            Return(self.create_int(&a.value ^ &b.value))
+    fn int_compare_to(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |a: Int, b: Int| {
+            Return(a.compare_to(self, &b).into())
         })
     }
-    fn int_compare_to(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |a: &Int, b: &Int| {
-            Return(self.create_ordering(a.value.cmp(&b.value)))
-        })
-    }
-    fn int_divide_truncating(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |dividend: &Int, divisor: &Int| {
-            if divisor.data.value == 0.into() {
+    fn int_divide_truncating(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
+            if divisor.try_get::<u8>() == 0.into() {
                 return Err("Can't divide by zero.".to_string());
             }
-            Return(self.create_int(&dividend.value / &divisor.value))
+            Return(dividend.int_divide_truncating(self, &divisor).into())
         })
     }
-    fn int_modulo(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |dividend: &Int, divisor: &Int| {
-            if divisor.data.value == 0.into() {
+    fn int_modulo(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
+            if divisor.try_get::<u8>() == 0.into() {
                 return Err("Can't divide by zero.".to_string());
             }
-            Return(self.create_int(dividend.value.mod_floor(&divisor.value)))
+            Return(dividend.modulo(self, &divisor).into())
         })
     }
-    fn int_multiply(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |factor_a: &Int, factor_b: &Int| {
-            Return(self.create_int(&factor_a.value * &factor_b.value))
+    fn int_multiply(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |factor_a: Int, factor_b: Int| {
+            Return(factor_a.multiply(self, &factor_b).into())
         })
     }
-    fn int_parse(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |text: &Text| {
-            let result = match BigInt::from_str(&text.value) {
-                Ok(int) => Ok(self.create_int(int)),
-                Err(err) => Err(self.create_text(format!("{err}"))),
+    fn int_parse(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |text: Text| {
+            let result = match BigInt::from_str(text.get()) {
+                Ok(int) => Ok(Int::create_from_bigint(self, int).into()),
+                Err(err) => Err(Text::create(self, &err.to_string()).into()),
             };
-            Return(self.create_result(result))
+            Return(Struct::create_result(self, result).into())
         })
     }
-    fn int_remainder(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |dividend: &Int, divisor: &Int| {
-            if divisor.data.value == 0.into() {
+    fn int_remainder(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
+            if divisor.try_get::<u8>() == 0.into() {
                 return Err("Can't divide by zero.".to_string());
             }
-            Return(self.create_int(&dividend.value % &divisor.value))
+            Return(dividend.remainder(self, &divisor).into())
         })
     }
-    fn int_shift_left(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |value: &Int, amount: &Int| {
-            let amount = amount.value.to_u128().unwrap();
-            Return(self.create_int(&value.value << amount))
+    fn int_shift_left(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |value: Int, amount: Int| {
+            Return(value.shift_left(self, &amount).into())
         })
     }
-    fn int_shift_right(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |value: &Int, amount: &Int| {
-            let amount = amount.value.to_u128().unwrap();
-            Return(self.create_int(&value.value >> amount))
+    fn int_shift_right(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |value: Int, amount: Int| {
+            Return(value.shift_right(self, &amount).into())
         })
     }
-    fn int_subtract(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |minuend: &Int, subtrahend: &Int| {
-            Return(self.create_int(&minuend.value - &subtrahend.value))
+    fn int_subtract(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |minuend: Int, subtrahend: Int| {
+            Return(minuend.subtract(self, &subtrahend).into())
         })
     }
 
-    fn list_filled(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |length: &Int, item: Any| {
-            let length = length.value.to_usize().unwrap();
-            let item_address = item.address;
-            self.dup_by(item.address, length);
-            Return(self.create_list(vec![item_address; length]))
+    fn list_filled(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack!(self, args, |length: Int, item: Any| {
+            let length_usize = length.try_get().unwrap();
+            length.object.drop(self);
+
+            let item_object = item.object;
+            if length_usize == 0 {
+                item.object.drop(self);
+            } else {
+                item.object.dup_by(self, length_usize - 1);
+            }
+
+            Return(List::create(self, &vec![item_object; length_usize]).into())
         })
     }
-    fn list_get(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |list: &List, index: &Int| {
-            let index = index.value.to_usize().unwrap();
-            let item = list.items[index];
-            self.dup(item);
+    fn list_get(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |list: List, index: Int| {
+            let index = index.try_get().unwrap();
+            let item = list.get(index);
+            item.dup(self);
             Return(item)
         })
     }
-    fn list_insert(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |list: &List, index: &Int, item: Any| {
-            let mut new_list = list.items.clone();
+    fn list_insert(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack!(self, args, |list: List, index: Int, item: Any| {
+            let index_usize = index.try_get().unwrap();
+            index.object.drop(self);
 
-            let index = index.value.to_usize().unwrap();
-            let item_address = item.address;
-            self.dup(item.address);
-            new_list.insert(index, item_address);
-
-            Return(self.create_list(new_list))
+            let new_list = list.insert(self, index_usize, item.object).into();
+            list.object.drop(self);
+            Return(new_list)
         })
     }
-    fn list_length(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |list: &List| {
-            Return(self.create_int(list.items.len().into()))
+    fn list_length(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |list: List| {
+            Return(Int::create(self, list.len()).into())
         })
     }
-    fn list_remove_at(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |list: &List, index: &Int| {
-            let mut new_list = list.items.clone();
-
-            let index = index.value.to_usize().unwrap();
-            new_list.remove(index);
-
-            Return(self.create_list(new_list))
+    fn list_remove_at(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |list: List, index: Int| {
+            Return(list.remove(self, index.try_get().unwrap()).into())
         })
     }
-    fn list_replace(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |list: &List, index: &Int, new_item: Any| {
-            let mut new_list = list.items.clone();
+    fn list_replace(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack!(self, args, |list: List, index: Int, new_item: Any| {
+            let index_usize = index.try_get().unwrap();
+            index.object.drop(self);
 
-            let index = index.value.to_usize().unwrap();
-            let new_item_address = new_item.address;
-            self.dup(new_item.address);
-            new_list[index] = new_item_address;
+            list.get(index_usize).drop(self);
 
-            Return(self.create_list(new_list))
+            let new_list = list.replace(self, index_usize, new_item.object).into();
+            list.object.drop(self);
+            Return(new_list)
         })
     }
 
-    fn parallel(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack!(self, args, |body_taking_nursery: &Closure| {
-            if body_taking_nursery.num_args != 1 {
+    fn parallel(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack!(self, args, |body_taking_nursery: Closure| {
+            if body_taking_nursery.argument_count() != 1 {
                 return Err("`parallel` expects a closure taking a nursery.".to_string());
             }
             Parallel {
-                body: body_taking_nursery.address,
+                body: *body_taking_nursery,
             }
         })
     }
 
-    fn print(&mut self, args: &[Pointer]) -> BuiltinResult {
+    fn print(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |message: Any| {
-            info!("{}", message.address.format(self));
-            Return(self.create_nothing())
+            info!("{}", message.object);
+            Return(Symbol::create_nothing(self).into())
         })
     }
 
-    fn struct_get(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |struct_: &Struct, key: Any| {
-            match struct_.get(self, key.address) {
+    fn struct_get(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |struct_: Struct, key: Any| {
+            match struct_.get(key.object) {
                 Some(value) => {
-                    self.dup(value);
+                    value.dup(self);
                     Ok(Return(value))
                 }
                 None => Err(format!(
                     "The struct does not contain the key {}.",
-                    key.address.format(self),
+                    key.object,
                 )),
             }
         })
     }
-    fn struct_get_keys(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |struct_: &Struct| {
-            Return(self.create_list(struct_.iter().map(|(key, _)| key).collect_vec()))
+    fn struct_get_keys(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |struct_: Struct| {
+            Return(List::create(self, struct_.keys()).into())
         })
     }
-    fn struct_has_key(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |struct_: &Struct, key: Any| {
-            let has_key = struct_.get(self, key.address).is_some();
-            Return(self.create_bool(has_key))
+    fn struct_has_key(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |struct_: Struct, key: Any| {
+            Return(Symbol::create_bool(self, struct_.contains(key.object)).into())
         })
     }
 
-    fn text_characters(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |text: &Text| {
-            let text = text.value.clone();
-            let character_addresses = text
+    fn text_characters(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |text: Text| {
+            let characters = text
+                .get()
                 .graphemes(true)
-                .map(|it| self.create_text(it.to_string()))
+                .map(|it| Text::create(self, it).into())
                 .collect_vec();
-            Return(self.create_list(character_addresses))
+            Return(List::create(self, &characters).into())
         })
     }
-    fn text_concatenate(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |text_a: &Text, text_b: &Text| {
-            Return(self.create_text(format!("{}{}", text_a.value, text_b.value)))
+    fn text_concatenate(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |text_a: Text, text_b: Text| {
+            Return(Text::create(self, &format!("{}{}", text_a.get(), text_b.get())).into())
         })
     }
-    fn text_contains(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |text: &Text, pattern: &Text| {
-            Return(self.create_bool(text.value.contains(&pattern.value)))
+    fn text_contains(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |text: Text, pattern: Text| {
+            Return(Symbol::create_bool(self, text.get().contains(pattern.get())).into())
         })
     }
-    fn text_ends_with(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |text: &Text, suffix: &Text| {
-            Return(self.create_bool(text.value.ends_with(&suffix.value)))
+    fn text_ends_with(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |text: Text, suffix: Text| {
+            Return(Symbol::create_bool(self, text.get().ends_with(suffix.get())).into())
         })
     }
-    fn text_from_utf8(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |bytes: &List| {
-            let bytes = bytes
-                .items
+    fn text_from_utf8(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |bytes: List| {
+            let bytes: Vec<_> = bytes
+                .items()
                 .iter()
                 .map(|&it| {
-                    let int: Int = self.get(it).data.clone().try_into()?;
-                    int.value
-                        .to_u8()
-                        .ok_or_else(|| format!("Number is not a byte: {}.", int.value))
+                    Int::try_from(it)
+                        .ok()
+                        .and_then(|it| it.try_get())
+                        .ok_or_else(|| format!("Value is not a byte: {it}."))
                 })
                 .try_collect()?;
-            let result = String::from_utf8(bytes)
-                .map(|string| self.create_text(string))
-                .map_err(|_| self.create_text("Invalid UTF-8.".to_string()));
-            Return(self.create_result(result))
+            let result = str::from_utf8(&bytes)
+                .map(|it| Text::create(self, it).into())
+                .map_err(|_| Text::create(self, "Invalid UTF-8.").into());
+            Return(Struct::create_result(self, result).into())
         })
     }
-    fn text_get_range(&mut self, args: &[Pointer]) -> BuiltinResult {
+    fn text_get_range(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(
             self,
             args,
-            |text: &Text, start_inclusive: &Int, end_exclusive: &Int| {
-                let start_inclusive = start_inclusive.value.to_usize().expect(
+            |text: Text, start_inclusive: Int, end_exclusive: Int| {
+                let start_inclusive = start_inclusive.try_get().expect(
                     "Tried to get a range from a text with an index that's too large for usize.",
                 );
-                let end_exclusive = end_exclusive.value.to_usize().expect(
+                let end_exclusive = end_exclusive.try_get::<usize>().expect(
                     "Tried to get a range from a text with an index that's too large for usize.",
                 );
-                let text = text
-                    .value
+                let text: String = text
+                    .get()
                     .graphemes(true)
                     .skip(start_inclusive)
                     .take(end_exclusive - start_inclusive)
                     .collect();
-                Return(self.create_text(text))
+                Return(Text::create(self, &text).into())
             }
         )
     }
-    fn text_is_empty(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |text: &Text| {
-            Return(self.create_bool(text.value.is_empty()))
+    fn text_is_empty(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |text: Text| {
+            Return(Symbol::create_bool(self, text.get().is_empty()).into())
         })
     }
-    fn text_length(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |text: &Text| {
-            let length = text.value.graphemes(true).count().into();
-            Return(self.create_int(length))
+    fn text_length(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |text: Text| {
+            let length = text.get().graphemes(true).count();
+            Return(Int::create(self, length).into())
         })
     }
-    fn text_starts_with(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |text: &Text, prefix: &Text| {
-            Return(self.create_bool(text.value.starts_with(&prefix.value)))
+    fn text_starts_with(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |text: Text, prefix: Text| {
+            Return(Symbol::create_bool(self, text.get().starts_with(prefix.get())).into())
         })
     }
-    fn text_trim_end(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |text: &Text| {
-            Return(self.create_text(text.value.trim_end().to_string()))
+    fn text_trim_end(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |text: Text| {
+            Return(Text::create(self, text.get().trim_end()).into())
         })
     }
-    fn text_trim_start(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |text: &Text| {
-            Return(self.create_text(text.value.trim_start().to_string()))
+    fn text_trim_start(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |text: Text| {
+            Return(Text::create(self, text.get().trim_start()).into())
         })
     }
 
     #[allow(clippy::wrong_self_convention)]
-    fn to_debug_text(&mut self, args: &[Pointer]) -> BuiltinResult {
+    fn to_debug_text(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Any| {
-            Return(self.create_text(value.address.format(self)))
+            Return(Text::create(self, &format!("{:?}", **value)).into())
         })
     }
 
-    fn try_(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack!(self, args, |body: &Closure| { Try { body: body.address } })
+    fn try_(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack!(self, args, |body: Closure| { Try { body: *body } })
     }
 
-    fn type_of(&mut self, args: &[Pointer]) -> BuiltinResult {
+    fn type_of(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Any| {
             let symbol = match **value {
                 Data::Int(_) => "Int",
@@ -540,53 +533,44 @@ impl Heap {
                 Data::Symbol(_) => "Symbol",
                 Data::List(_) => "List",
                 Data::Struct(_) => "Struct",
-                Data::HirId(_) => unreachable!(),
+                Data::HirId(_) => panic!(
+                    "HIR ID shouldn't occurr in Candy programs except in VM-controlled places."
+                ),
                 Data::Closure(_) => "Function",
                 Data::Builtin(_) => "Builtin",
                 Data::SendPort(_) => "SendPort",
                 Data::ReceivePort(_) => "ReceivePort",
             };
-            Return(self.create_symbol(symbol.to_string()))
+            Return(Symbol::create(self, symbol).into())
         })
     }
 }
 
 impl Closure {
     fn should_take_no_arguments(&self) -> Result<(), String> {
-        match self.num_args {
+        match self.argument_count() {
             0 => Ok(()),
             n => Err(format!("A builtin function expected a function without arguments, but got one that takes {n} arguments.")),
         }
     }
 }
 
+#[derive(Deref)]
 struct UnpackedData<T> {
-    address: Pointer,
+    object: InlineObject,
+
+    #[deref]
     data: T,
 }
-impl<T> Deref for UnpackedData<T> {
-    type Target = T;
 
-    fn deref(&self) -> &Self::Target {
-        &self.data
-    }
+#[derive(Deref)]
+struct Any {
+    data: Data,
 }
-
-struct Any<'a> {
-    data: &'a Data,
-}
-impl<'a> Deref for Any<'a> {
-    type Target = Data;
-
-    fn deref(&self) -> &Self::Target {
-        self.data
-    }
-}
-
-impl<'a> TryInto<Any<'a>> for &'a Data {
+impl TryInto<Any> for InlineObject {
     type Error = String;
 
-    fn try_into(self) -> Result<Any<'a>, Self::Error> {
-        Ok(Any { data: self })
+    fn try_into(self) -> Result<Any, Self::Error> {
+        Ok(Any { data: self.into() })
     }
 }

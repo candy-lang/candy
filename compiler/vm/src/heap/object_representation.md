@@ -1,6 +1,8 @@
 # Heap Object Representation
 
-Word Size: 64 bit
+The lowest granularity for values in Candy's memory (stack and heap) is one _word_: 64 bit = 8 byte.
+These words are usually \_Inline Word_s.
+An inline word is a tagged union of different types of values:
 
 ## Inline Word
 
@@ -8,8 +10,8 @@ Word Size: 64 bit
 | ------------------------------------------------------------------------: | :---------- |
 | `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx000` | Pointer     |
 | `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx01` | Int         |
-| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx010` | ReceivePort |
-| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx110` | SendPort    |
+| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx010` | SendPort    |
+| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx110` | ReceivePort |
 | `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx11` | Builtin     |
 
 > The remaining patterns are reserved for future use.
@@ -41,6 +43,7 @@ Uses Rust's `BigInt` representation after the header word.
 | Word               |
 | :----------------- |
 | Header Word (list) |
+| Reference count    |
 | Item 0             |
 | …                  |
 | Item a-1           |
@@ -52,6 +55,10 @@ Uses Rust's `BigInt` representation after the header word.
 | Word                 |
 | :------------------- |
 | Header Word (struct) |
+| Reference count      |
+| Hash of key 0        |
+| …                    |
+| Hash of key a-1      |
 | Key 0                |
 | …                    |
 | Key a-1              |
@@ -71,21 +78,31 @@ The last word is padded with zeros if necessary.
 | Word               |
 | :----------------- |
 | Header Word (text) |
+| Reference count    |
 | First 8 bytes      |
 | …                  |
 | Last 1 to 8 bytes  |
+
+> For now, we don't pad the last word but reuse Rust's `str` for storing text in this representation.
 
 ### Closure
 
 A closure capturing `c` values, taking `a` arguments, and containing `b` instructions.
 
-| Word                                        |
-| :------------------------------------------ |
-| Header Word (closure)                       |
-| Captured value 0                            |
-| …                                           |
-| Captured value c-1                          |
-| `Vec<Instruction>` in Rust's representation |
+| Word                  |
+| :-------------------- |
+| Header Word (closure) |
+| Reference count       |
+| `b`                   |
+| Captured value 0      |
+| …                     |
+| Captured value c-1    |
+| Instruction 0         |
+| …                     |
+| Instruction b-1       |
+
+> Instructions are stored in Rust's representation.
+> They may take up multiple words and might not align to word boundaries.
 
 ### HirId
 

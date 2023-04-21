@@ -4,7 +4,7 @@ use candy_vm::{
     context::{
         CombiningExecutionController, CountingExecutionController, ExecutionController, UseProvider,
     },
-    heap::{Data, Heap, Pointer},
+    heap::{Closure, Data, Heap, InlineObjectSliceCloneToHeap},
     tracer::full::FullTracer,
     vm::{self, Vm},
 };
@@ -50,14 +50,15 @@ impl RunResult {
 }
 
 impl Runner {
-    pub fn new(closure_heap: &Heap, closure: Pointer, input: Input) -> Self {
-        assert!(matches!(closure_heap.get(closure).data, Data::Closure(_)));
+    pub fn new(closure: Closure, input: Input) -> Self {
         let mut vm_heap = Heap::default();
-        let closure = closure_heap.clone_single_to_other_heap(&mut vm_heap, closure);
-        let argument_addresses = input.clone_to_other_heap(&mut vm_heap);
+        let closure = Data::from(closure.clone_to_heap(&mut vm_heap))
+            .try_into()
+            .unwrap();
+        let arguments = input.arguments.clone_to_heap(&mut vm_heap);
 
         let mut vm = Vm::default();
-        vm.set_up_for_running_closure(vm_heap, closure, argument_addresses, Id::fuzzer());
+        vm.set_up_for_running_closure(vm_heap, closure, &arguments, Id::fuzzer());
 
         Runner {
             vm: Some(vm),
@@ -68,10 +69,10 @@ impl Runner {
         }
     }
 
-    pub fn run<U: UseProvider, E: ExecutionController>(
+    pub fn run(
         &mut self,
-        use_provider: &U,
-        execution_controller: &mut E,
+        use_provider: &impl UseProvider,
+        execution_controller: &mut impl ExecutionController,
     ) {
         assert!(self.vm.is_some());
         assert!(self.result.is_none());
