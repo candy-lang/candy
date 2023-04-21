@@ -11,7 +11,7 @@ use std::{
     fmt::{self, Formatter},
     mem,
     ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Shl, Shr, Sub},
-    ptr,
+    ptr::{self, NonNull},
 };
 
 #[derive(Clone, Copy, Deref)]
@@ -27,12 +27,15 @@ impl HeapInt {
         }
 
         let int = Self(heap.allocate(HeapObject::KIND_INT, mem::size_of::<BigInt>()));
-        unsafe { ptr::write(int.content_word_pointer(0).cast().as_ptr(), value) };
+        unsafe { ptr::write(int.int_pointer().as_ptr(), value) };
         int
     }
 
+    fn int_pointer(self) -> NonNull<BigInt> {
+        self.content_word_pointer(0).cast()
+    }
     pub fn get<'a>(self) -> &'a BigInt {
-        unsafe { self.content_word_pointer(0).cast().as_ref() }
+        unsafe { self.int_pointer().as_ref() }
     }
 
     operator_fn!(add, Add, add);
@@ -98,10 +101,10 @@ impl HeapObjectTrait for HeapInt {
     ) {
         let clone = Self(clone);
         let value = self.get().to_owned();
-        unsafe { ptr::write(clone.content_word_pointer(0).cast().as_ptr(), value) };
+        unsafe { ptr::write(clone.int_pointer().as_ptr(), value) };
     }
 
     fn drop_children(self, _heap: &mut Heap) {
-        unsafe { ptr::drop_in_place(self.content_word_pointer(0).cast::<BigInt>().as_ptr()) };
+        unsafe { ptr::drop_in_place(self.int_pointer().as_ptr()) };
     }
 }

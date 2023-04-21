@@ -8,7 +8,8 @@ use derive_more::Deref;
 use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Formatter},
-    mem, ptr,
+    mem,
+    ptr::{self, NonNull},
 };
 
 #[derive(Clone, Copy, Deref)]
@@ -19,13 +20,16 @@ impl HeapHirId {
         Self(object)
     }
     pub fn create(heap: &mut Heap, value: Id) -> Self {
-        let object = heap.allocate(HeapObject::KIND_HIR_ID, mem::size_of::<Id>());
-        unsafe { ptr::write(object.content_word_pointer(0).cast().as_ptr(), value) };
-        HeapHirId(object)
+        let id = HeapHirId(heap.allocate(HeapObject::KIND_HIR_ID, mem::size_of::<Id>()));
+        unsafe { ptr::write(id.id_pointer().as_ptr(), value) };
+        id
     }
 
+    fn id_pointer(self) -> NonNull<Id> {
+        self.content_word_pointer(0).cast()
+    }
     pub fn get<'a>(self) -> &'a Id {
-        unsafe { &*self.content_word_pointer(0).cast().as_ptr() }
+        unsafe { &*self.id_pointer().as_ptr() }
     }
 }
 
@@ -53,10 +57,10 @@ impl HeapObjectTrait for HeapHirId {
     ) {
         let clone = Self(clone);
         let value = self.get().to_owned();
-        unsafe { ptr::write(clone.content_word_pointer(0).cast().as_ptr(), value) };
+        unsafe { ptr::write(clone.id_pointer().as_ptr(), value) };
     }
 
     fn drop_children(self, _heap: &mut Heap) {
-        unsafe { ptr::drop_in_place(self.content_word_pointer(0).cast::<Id>().as_ptr()) };
+        unsafe { ptr::drop_in_place(self.id_pointer().as_ptr()) };
     }
 }

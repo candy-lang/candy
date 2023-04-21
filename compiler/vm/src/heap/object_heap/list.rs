@@ -9,7 +9,8 @@ use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Formatter},
     hash::{Hash, Hasher},
-    ptr, slice,
+    ptr::{self, NonNull},
+    slice,
 };
 
 #[derive(Clone, Copy, Deref)]
@@ -24,13 +25,7 @@ impl HeapList {
     pub fn create(heap: &mut Heap, value: &[InlineObject]) -> Self {
         let len = value.len();
         let list = Self::create_uninitialized(heap, len);
-        unsafe {
-            ptr::copy_nonoverlapping(
-                value.as_ptr(),
-                list.content_word_pointer(0).cast().as_ptr(),
-                len,
-            )
-        };
+        unsafe { ptr::copy_nonoverlapping(value.as_ptr(), list.items_pointer().as_ptr(), len) };
         list
     }
     fn create_uninitialized(heap: &mut Heap, len: usize) -> Self {
@@ -52,9 +47,12 @@ impl HeapList {
         debug_assert!(index < self.len());
         InlineObject::new(self.unsafe_get_content_word(index))
     }
+    fn items_pointer(self) -> NonNull<InlineObject> {
+        self.content_word_pointer(0).cast()
+    }
     pub fn items<'a>(self) -> &'a [InlineObject] {
         unsafe {
-            let pointer = self.content_word_pointer(0).cast().as_ref();
+            let pointer = self.items_pointer().as_ref();
             slice::from_raw_parts(pointer, self.len())
         }
     }

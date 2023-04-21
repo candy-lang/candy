@@ -172,10 +172,10 @@ impl HeapObjectTrait for HeapClosure {
         address_map: &mut FxHashMap<HeapObject, HeapObject>,
     ) {
         let clone = Self(clone);
-        unsafe { *clone.content_word_pointer(0).cast().as_mut() = self.instructions_len() };
+        unsafe { *clone.instructions_len_pointer().as_mut() = self.instructions_len() as u64 };
         for (index, &captured) in self.captured().iter().enumerate() {
             clone.unsafe_set_content_word(
-                index,
+                1 + index,
                 captured
                     .clone_to_heap_with_mapping(heap, address_map)
                     .raw_word(),

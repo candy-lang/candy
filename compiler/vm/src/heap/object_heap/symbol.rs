@@ -7,7 +7,8 @@ use derive_more::Deref;
 use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Formatter},
-    ptr, slice, str,
+    ptr::{self, NonNull},
+    slice, str,
 };
 
 #[derive(Clone, Copy, Deref)]
@@ -30,21 +31,18 @@ impl HeapSymbol {
             HeapObject::KIND_SYMBOL | ((len as u64) << Self::LEN_SHIFT),
             len,
         ));
-        unsafe {
-            ptr::copy_nonoverlapping(
-                value.as_ptr(),
-                symbol.content_word_pointer(0).cast().as_ptr(),
-                len,
-            )
-        };
+        unsafe { ptr::copy_nonoverlapping(value.as_ptr(), symbol.symbol_pointer().as_ptr(), len) };
         symbol
     }
 
     pub fn len(self) -> usize {
         (self.header_word() >> Self::LEN_SHIFT) as usize
     }
+    fn symbol_pointer(self) -> NonNull<u8> {
+        self.content_word_pointer(0).cast()
+    }
     pub fn get<'a>(self) -> &'a str {
-        let pointer = self.content_word_pointer(0).cast().as_ptr();
+        let pointer = self.symbol_pointer().as_ptr();
         unsafe { str::from_utf8_unchecked(slice::from_raw_parts(pointer, self.len())) }
     }
 }
@@ -74,8 +72,8 @@ impl HeapObjectTrait for HeapSymbol {
         let clone = Self(clone);
         unsafe {
             ptr::copy_nonoverlapping(
-                self.content_word_pointer(0).as_ptr(),
-                clone.content_word_pointer(0).as_ptr(),
+                self.symbol_pointer().as_ptr(),
+                clone.symbol_pointer().as_ptr(),
                 self.len(),
             )
         };
