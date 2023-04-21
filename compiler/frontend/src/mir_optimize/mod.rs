@@ -56,7 +56,9 @@ mod tree_shaking;
 mod utils;
 
 use super::{hir, hir_to_mir::HirToMir, mir::Mir, tracing::TracingConfig};
-use crate::{error::CompilerError, mir::MirError, module::Module, rich_ir::ToRichIr};
+use crate::{
+    error::CompilerError, hir_to_mir::MirResult, mir::MirError, module::Module, rich_ir::ToRichIr,
+};
 use rustc_hash::{FxHashSet, FxHasher};
 use std::{
     hash::{Hash, Hasher},
@@ -69,20 +71,12 @@ use itertools::Itertools;
 #[salsa::query_group(OptimizeMirStorage)]
 pub trait OptimizeMir: HirToMir {
     #[salsa::cycle(recover_from_cycle)]
-    fn optimized_mir(
-        &self,
-        module: Module,
-        tracing: TracingConfig,
-    ) -> (Arc<Mir>, Arc<FxHashSet<CompilerError>>);
+    fn optimized_mir(&self, module: Module, tracing: TracingConfig) -> MirResult;
 }
 
-fn optimized_mir(
-    db: &dyn OptimizeMir,
-    module: Module,
-    tracing: TracingConfig,
-) -> (Arc<Mir>, Arc<FxHashSet<CompilerError>>) {
+fn optimized_mir(db: &dyn OptimizeMir, module: Module, tracing: TracingConfig) -> MirResult {
     debug!("{}: Compiling.", module.to_rich_ir());
-    let (mir, errors) = db.mir(module.clone(), tracing.clone());
+    let (mir, errors) = db.mir(module.clone(), tracing.clone())?;
     let mut mir = (*mir).clone();
     let mut errors = (*errors).clone();
 
@@ -94,7 +88,7 @@ fn optimized_mir(
         "{}: Done. Optimized from {complexity_before} to {complexity_after}",
         module.to_rich_ir(),
     );
-    (Arc::new(mir), Arc::new(errors))
+    Ok((Arc::new(mir), Arc::new(errors)))
 }
 
 impl Mir {
@@ -173,7 +167,7 @@ fn recover_from_cycle(
     cycle: &[String],
     module: &Module,
     _tracing: &TracingConfig,
-) -> (Arc<Mir>, Arc<FxHashSet<CompilerError>>) {
+) -> MirResult {
     let error = CompilerError::for_whole_module(
         module.clone(),
         MirError::ModuleHasCycle {
@@ -187,5 +181,5 @@ fn recover_from_cycle(
         body.push_panic(reason, responsible);
     });
 
-    (Arc::new(mir), Arc::new(vec![error].into_iter().collect()))
+    Ok((Arc::new(mir), Arc::new(vec![error].into_iter().collect())))
 }

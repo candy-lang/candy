@@ -17,6 +17,8 @@ pub trait RcstToCst: StringToRcst {
     fn cst(&self, module: Module) -> Result<Arc<Vec<Cst>>, ModuleError>;
 }
 
+pub type CstResult = Result<Arc<Vec<Cst>>, ModuleError>;
+
 fn cst(db: &dyn RcstToCst, module: Module) -> Result<Arc<Vec<Cst>>, ModuleError> {
     let rcsts = db.rcst(module)?;
     Ok(Arc::new(rcsts.to_csts()))

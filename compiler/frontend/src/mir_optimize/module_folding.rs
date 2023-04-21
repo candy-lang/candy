@@ -28,7 +28,7 @@
 //! [inlining]: super::inlining
 
 use crate::{
-    error::CompilerError,
+    error::{CompilerError, CompilerErrorPayload},
     id::IdGenerator,
     mir::{Body, Expression, Id, Mir, MirError, VisitorResult},
     mir_optimize::OptimizeMir,
@@ -67,17 +67,26 @@ impl Mir {
                     },
                 };
 
-                let (mir, more_errors) = db.optimized_mir(module_to_import, tracing.for_child_module());
-                errors.extend((*more_errors).clone().into_iter());
-
-                let mapping: FxHashMap<Id, Id> = mir
-                    .body
+                let mut body_to_insert = match db.optimized_mir(module_to_import.clone(), tracing.for_child_module()) {
+                    Ok((mir, more_errors)) => {
+                        errors.extend((*more_errors).clone().into_iter());
+                        mir.body.clone()
+                    },
+                    Err(error) => {
+                        errors.insert(CompilerError::for_whole_module(module_to_import, error));
+                        Mir::build(|body| {
+                            let reason = body.push_text(CompilerErrorPayload::Module(error).to_string());
+                            body.push_panic(reason, *responsible);
+                        }).body
+                    },
+                };
+                let mapping: FxHashMap<Id, Id> = body_to_insert
                     .all_ids()
                     .into_iter()
+                    .filter(|id| id != responsible)
                     .map(|id| (id, self.id_generator.generate()))
                     .collect();
-                let mut body_to_insert = mir.body.clone();
-                body_to_insert.replace_ids(&mut |id| *id = mapping[&*id]);
+                body_to_insert.replace_ids(&mut |id| if let Some(new_id) = mapping.get(id) { *id = *new_id; });
 
                 *expression = Expression::Multiple(body_to_insert);
             });

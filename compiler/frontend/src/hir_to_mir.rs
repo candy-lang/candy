@@ -8,7 +8,6 @@ use super::{
 };
 use crate::{
     builtin_functions::BuiltinFunction,
-    error::CompilerErrorPayload,
     module::{Module, ModuleKind, Package},
     position::PositionConversionDb,
     rich_ir::ToRichIr,
@@ -19,23 +18,27 @@ use linked_hash_map::LinkedHashMap;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 
-type MirResult = (Arc<Mir>, Arc<FxHashSet<CompilerError>>);
-
 #[salsa::query_group(HirToMirStorage)]
 pub trait HirToMir: PositionConversionDb + CstDb + AstToHir {
     fn mir(&self, module: Module, tracing: TracingConfig) -> MirResult;
 }
 
+pub type MirResult = Result<(Arc<Mir>, Arc<FxHashSet<CompilerError>>), ModuleError>;
+
 fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> MirResult {
     let (mir, errors) = match module.kind {
         ModuleKind::Code => {
-            let (hir, _) = db.hir(module.clone());
+            let (hir, _) = db.hir(module.clone())?;
             let mut errors = FxHashSet::default();
-            let mir = LoweringContext::compile_module(db, module, &hir, &tracing, &mut errors);
+            let mir =
+                LoweringContext::compile_module(db, module.clone(), &hir, &tracing, &mut errors);
             (mir, errors)
         }
-        ModuleKind::Asset => match db.get_module_content(module.clone()) {
-            Some(bytes) => (
+        ModuleKind::Asset => {
+            let Some(bytes) = db.get_module_content(module.clone()) else {
+                return Err(ModuleError::DoesNotExist);
+            };
+            (
                 Mir::build(|body| {
                     let bytes = bytes
                         .iter()
@@ -44,25 +47,10 @@ fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> MirResult {
                     body.push_list(bytes);
                 }),
                 FxHashSet::default(),
-            ),
-            None => (
-                Mir::build(|body| {
-                    let reason = body.push_text(
-                        CompilerErrorPayload::Module(ModuleError::DoesNotExist).to_string(),
-                    );
-                    let responsible = body.push_hir_id(hir::Id::new(module.clone(), vec![]));
-                    body.push_panic(reason, responsible);
-                }),
-                vec![CompilerError::for_whole_module(
-                    module,
-                    ModuleError::DoesNotExist,
-                )]
-                .into_iter()
-                .collect(),
-            ),
-        },
+            )
+        }
     };
-    (Arc::new(mir), Arc::new(errors))
+    Ok((Arc::new(mir), Arc::new(errors)))
 }
 
 /// In the MIR, there's no longer the concept of needs. Instead, HIR IDs are

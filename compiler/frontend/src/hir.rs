@@ -26,7 +26,7 @@ pub trait HirDb: AstToHir {
     fn all_hir_ids(&self, module: Module) -> Vec<Id>;
 }
 fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
-    let (hir, _) = db.hir(id.module.clone());
+    let (hir, _) = db.hir(id.module.clone()).ok()?;
     if id.is_root() {
         panic!("You can't get the root because that got lowered into multiple IDs.");
     }
@@ -34,30 +34,29 @@ fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
     hir.find(&id).map(|it| it.to_owned())
 }
 fn containing_body_of(db: &dyn HirDb, id: Id) -> Arc<Body> {
-    match id.parent() {
-        Some(parent_id) => {
-            if parent_id.is_root() {
-                db.hir(id.module).0
-            } else {
-                match db.find_expression(parent_id).unwrap() {
-                    Expression::Match { cases, .. } => {
-                        let body = cases
-                            .into_iter()
-                            .map(|(_, body)| body)
-                            .find(|body| body.expressions.contains_key(&id))
-                            .unwrap();
-                        Arc::new(body)
-                    }
-                    Expression::Lambda(lambda) => Arc::new(lambda.body),
-                    _ => panic!("Parent of an expression must be a lambda (or root scope)."),
-                }
+    let parent_id = id.parent().unwrap();
+
+    if parent_id.is_root() {
+        db.hir(id.module).unwrap().0
+    } else {
+        match db.find_expression(parent_id).unwrap() {
+            Expression::Match { cases, .. } => {
+                let body = cases
+                    .into_iter()
+                    .map(|(_, body)| body)
+                    .find(|body| body.expressions.contains_key(&id))
+                    .unwrap();
+                Arc::new(body)
             }
+            Expression::Lambda(lambda) => Arc::new(lambda.body),
+            _ => panic!("Parent of an expression must be a lambda (or root scope)."),
         }
-        None => panic!("The root scope has no parent."),
     }
 }
 fn all_hir_ids(db: &dyn HirDb, module: Module) -> Vec<Id> {
-    let (hir, _) = db.hir(module);
+    let Ok((hir, _)) = db.hir(module) else {
+        return vec![];
+    };
     let mut ids = vec![];
     hir.collect_all_ids(&mut ids);
     info!("All HIR IDs: {ids:?}");
@@ -151,6 +150,12 @@ impl Id {
             },
             keys: vec![],
         }
+    }
+    /// The user of the Candy tooling is responsible. For example, when the user
+    /// instructs the tooling to run a non-existent module, then the program
+    /// will panic with this responsiblity.
+    pub fn user() -> Self {
+        Self::tooling("user".to_string())
     }
     /// Refers to the platform (non-Candy code).
     pub fn platform() -> Self {

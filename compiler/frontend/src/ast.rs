@@ -17,7 +17,7 @@ pub trait AstDb: CstToAst {
     fn find_ast(&self, id: Id) -> Option<Ast>;
 }
 fn find_ast(db: &dyn AstDb, id: Id) -> Option<Ast> {
-    let (ast, _) = db.ast(id.module.clone());
+    let (ast, _) = db.ast(id.module.clone()).ok()?;
     ast.find(&id).map(|it| it.to_owned())
 }
 

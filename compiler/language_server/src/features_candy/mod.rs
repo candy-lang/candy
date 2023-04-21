@@ -75,7 +75,7 @@ impl CandyFeatures {
         for module in modules {
             let diagnostics = {
                 let db = db.lock().await;
-                let (hir, _mapping) = db.hir(module.clone());
+                let (hir, _mapping) = db.hir(module.clone()).unwrap();
 
                 let mut errors = vec![];
                 hir.collect_errors(&mut errors);

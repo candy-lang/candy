@@ -11,7 +11,7 @@ use crate::{
     module::Module,
     position::Offset,
     rcst_to_cst::RcstToCst,
-    utils::AdjustCasingOfFirstLetter,
+    utils::AdjustCasingOfFirstLetter, string_to_rcst::ModuleError,
 };
 use std::{ops::Range, sync::Arc};
 
@@ -26,10 +26,10 @@ pub trait CstToAst: CstDb + RcstToCst {
     fn ast(&self, module: Module) -> AstResult;
 }
 
-type AstResult = (Arc<Vec<Ast>>, Arc<FxHashMap<ast::Id, cst::Id>>);
+pub type AstResult = Result<(Arc<Vec<Ast>>, Arc<FxHashMap<ast::Id, cst::Id>>), ModuleError>;
 
 fn ast_to_cst_id(db: &dyn CstToAst, id: ast::Id) -> Option<cst::Id> {
-    let (_, ast_to_cst_id_mapping) = db.ast(id.module.clone());
+    let (_, ast_to_cst_id_mapping) = db.ast(id.module.clone()).ok()?;
     ast_to_cst_id_mapping.get(&id).cloned()
 }
 fn ast_id_to_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<Offset>> {
@@ -42,7 +42,7 @@ fn ast_id_to_display_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<Offset
 }
 
 fn cst_to_ast_id(db: &dyn CstToAst, module: Module, id: cst::Id) -> Option<ast::Id> {
-    let (_, ast_to_cst_id_mapping) = db.ast(module);
+    let (_, ast_to_cst_id_mapping) = db.ast(module).ok()?;
     ast_to_cst_id_mapping
         .iter()
         .find_map(|(key, &value)| if value == id { Some(key) } else { None })
@@ -52,23 +52,12 @@ fn cst_to_ast_id(db: &dyn CstToAst, module: Module, id: cst::Id) -> Option<ast::
 fn ast(db: &dyn CstToAst, module: Module) -> AstResult {
     let mut context = LoweringContext::new(module.clone());
 
-    let asts = match db.cst(module.clone()) {
-        Ok(cst) => {
-            let cst = cst.unwrap_whitespace_and_comment();
-            context.lower_csts(&cst)
-        }
-        Err(error) => {
-            vec![Ast {
-                id: context.create_next_id_without_mapping(),
-                kind: AstKind::Error {
-                    child: None,
-                    errors: vec![CompilerError::for_whole_module(module, error)],
-                },
-            }]
-        }
-    };
+    db.cst(module.clone()).map(|cst| {
+        let cst = cst.unwrap_whitespace_and_comment();
+        let asts = context.lower_csts(&cst);
+        (Arc::new(asts), Arc::new(context.id_mapping))
+    })
 
-    (Arc::new(asts), Arc::new(context.id_mapping))
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

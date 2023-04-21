@@ -1,9 +1,10 @@
 use crate::lir::{Instruction, Lir, StackOffset};
 use candy_frontend::{
     cst::CstDb,
-    error::CompilerError,
+    error::{CompilerError, CompilerErrorPayload},
+    hir,
     id::CountableId,
-    mir::{Body, Expression, Id},
+    mir::{Body, Expression, Id, Mir},
     mir_optimize::OptimizeMir,
     module::Module,
     rich_ir::ToRichIr,
@@ -27,7 +28,20 @@ fn lir(
     module: Module,
     tracing: TracingConfig,
 ) -> (Arc<Lir>, Arc<FxHashSet<CompilerError>>) {
-    let (mir, errors) = db.optimized_mir(module, tracing);
+    let (mir, errors) = db
+        .optimized_mir(module.clone(), tracing)
+        .unwrap_or_else(|error| {
+            let payload = CompilerErrorPayload::Module(error);
+            let mir = Mir::build(|body| {
+                let reason = body.push_text(payload.to_string());
+                let responsible = body.push_hir_id(hir::Id::user());
+                body.push_panic(reason, responsible);
+            });
+            let errors = vec![CompilerError::for_whole_module(module, payload)]
+                .into_iter()
+                .collect();
+            (Arc::new(mir), Arc::new(errors))
+        });
     let instructions = compile_lambda(&FxHashSet::default(), &[], Id::from_usize(0), &mir.body);
     (Arc::new(Lir { instructions }), errors)
 }

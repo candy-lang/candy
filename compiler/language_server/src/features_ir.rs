@@ -1,11 +1,8 @@
 use async_trait::async_trait;
 use candy_frontend::{
-    ast::Ast,
-    ast_to_hir::AstToHir,
-    cst_to_ast::CstToAst,
-    hir,
-    hir_to_mir::HirToMir,
-    mir::Mir,
+    ast_to_hir::{AstToHir, HirResult},
+    cst_to_ast::{AstResult, CstToAst},
+    hir_to_mir::{HirToMir, MirResult},
     mir_optimize::OptimizeMir,
     module::{Module, ModuleKind},
     position::{line_start_offsets_raw, Offset},
@@ -128,17 +125,16 @@ impl IrFeatures {
     fn create(&self, db: &Database, config: IrConfig) -> OpenIr {
         let ir = match &config.ir {
             Ir::Rcst => Self::rich_ir_for_rcst(&config.module, db.rcst(config.module.clone())),
-            Ir::Ast => Self::rich_ir_for_ast(&config.module, db.ast(config.module.clone()).0),
-            Ir::Hir => Self::rich_ir_for_hir(&config.module, db.hir(config.module.clone()).0),
+            Ir::Ast => Self::rich_ir_for_ast(&config.module, db.ast(config.module.clone())),
+            Ir::Hir => Self::rich_ir_for_hir(&config.module, db.hir(config.module.clone())),
             Ir::Mir(tracing_config) => Self::rich_ir_for_mir(
                 &config.module,
-                db.mir(config.module.clone(), tracing_config.to_owned()).0,
+                db.mir(config.module.clone(), tracing_config.to_owned()),
                 tracing_config,
             ),
             Ir::OptimizedMir(tracing_config) => Self::rich_ir_for_optimized_mir(
                 &config.module,
-                db.optimized_mir(config.module.clone(), tracing_config.to_owned())
-                    .0,
+                db.optimized_mir(config.module.clone(), tracing_config.to_owned()),
                 tracing_config,
             ),
             Ir::Lir(tracing_config) => Self::rich_ir_for_lir(
@@ -166,30 +162,11 @@ impl IrFeatures {
         builder.push_newline();
         match rcst {
             Ok(rcst) => rcst.build_rich_ir(&mut builder),
-            Err(ModuleError::DoesNotExist) => {
-                builder.push(
-                    format!("# Module {} does not exist", module.to_rich_ir()),
-                    TokenType::Comment,
-                    EnumSet::empty(),
-                );
-            }
-            Err(ModuleError::InvalidUtf8) => {
-                builder.push("# Invalid UTF-8", TokenType::Comment, EnumSet::empty());
-            }
-            Err(ModuleError::IsNotCandy) => {
-                builder.push("# Is not Candy code", TokenType::Comment, EnumSet::empty());
-            }
-            Err(ModuleError::IsToolingModule) => {
-                builder.push(
-                    "# Is a tooling module",
-                    TokenType::Comment,
-                    EnumSet::empty(),
-                );
-            }
+            Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
         }
         builder.finish()
     }
-    fn rich_ir_for_ast(module: &Module, asts: Arc<Vec<Ast>>) -> RichIr {
+    fn rich_ir_for_ast(module: &Module, asts: AstResult) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
             format!("# AST for module {}", module.to_rich_ir()),
@@ -197,10 +174,13 @@ impl IrFeatures {
             EnumSet::empty(),
         );
         builder.push_newline();
-        asts.build_rich_ir(&mut builder);
+        match asts {
+            Ok((asts, _)) => asts.build_rich_ir(&mut builder),
+            Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
+        }
         builder.finish()
     }
-    fn rich_ir_for_hir(module: &Module, body: Arc<hir::Body>) -> RichIr {
+    fn rich_ir_for_hir(module: &Module, hir: HirResult) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
             format!("# HIR for module {}", module.to_rich_ir()),
@@ -208,10 +188,13 @@ impl IrFeatures {
             EnumSet::empty(),
         );
         builder.push_newline();
-        body.build_rich_ir(&mut builder);
+        match hir {
+            Ok((hir, _)) => hir.build_rich_ir(&mut builder),
+            Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
+        }
         builder.finish()
     }
-    fn rich_ir_for_mir(module: &Module, mir: Arc<Mir>, tracing_config: &TracingConfig) -> RichIr {
+    fn rich_ir_for_mir(module: &Module, mir: MirResult, tracing_config: &TracingConfig) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
             format!("# MIR for module {}", module.to_rich_ir()),
@@ -221,12 +204,15 @@ impl IrFeatures {
         builder.push_newline();
         push_tracing_config(&mut builder, tracing_config);
         builder.push_newline();
-        mir.build_rich_ir(&mut builder);
+        match mir {
+            Ok((mir, _)) => mir.build_rich_ir(&mut builder),
+            Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
+        }
         builder.finish()
     }
     fn rich_ir_for_optimized_mir(
         module: &Module,
-        mir: Arc<Mir>,
+        mir: MirResult,
         tracing_config: &TracingConfig,
     ) -> RichIr {
         let mut builder = RichIrBuilder::default();
@@ -238,7 +224,10 @@ impl IrFeatures {
         builder.push_newline();
         push_tracing_config(&mut builder, tracing_config);
         builder.push_newline();
-        mir.build_rich_ir(&mut builder);
+        match mir {
+            Ok((mir, _)) => mir.build_rich_ir(&mut builder),
+            Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
+        }
         builder.finish()
     }
     fn rich_ir_for_lir(module: &Module, lir: Arc<Lir>, tracing_config: &TracingConfig) -> RichIr {
@@ -253,6 +242,34 @@ impl IrFeatures {
         builder.push_newline();
         lir.build_rich_ir(&mut builder);
         builder.finish()
+    }
+    fn build_rich_ir_for_module_error(
+        builder: &mut RichIrBuilder,
+        module: &Module,
+        module_error: &ModuleError,
+    ) {
+        match module_error {
+            ModuleError::DoesNotExist => {
+                builder.push(
+                    format!("# Module {} does not exist", module.to_rich_ir()),
+                    TokenType::Comment,
+                    EnumSet::empty(),
+                );
+            }
+            ModuleError::InvalidUtf8 => {
+                builder.push("# Invalid UTF-8", TokenType::Comment, EnumSet::empty());
+            }
+            ModuleError::IsNotCandy => {
+                builder.push("# Is not Candy code", TokenType::Comment, EnumSet::empty());
+            }
+            ModuleError::IsToolingModule => {
+                builder.push(
+                    "# Is a tooling module",
+                    TokenType::Comment,
+                    EnumSet::empty(),
+                );
+            }
+        }
     }
 }
 

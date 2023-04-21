@@ -217,7 +217,7 @@ fn raw_build(db: &Database, module: Module, tracing: &TracingConfig, debug: bool
         module.dump_associated_debug_file(&packages_path, "cst", &format!("{:#?}\n", cst));
     }
 
-    let (asts, ast_cst_id_map) = db.ast(module.clone());
+    let (asts, ast_cst_id_map) = db.ast(module.clone()).unwrap();
     if debug {
         module.dump_associated_debug_file(
             &packages_path,
@@ -241,7 +241,7 @@ fn raw_build(db: &Database, module: Module, tracing: &TracingConfig, debug: bool
         );
     }
 
-    let (hir, hir_ast_id_map) = db.hir(module.clone());
+    let (hir, hir_ast_id_map) = db.hir(module.clone()).unwrap();
     if debug {
         module.dump_associated_debug_file(
             &packages_path,
@@ -264,7 +264,7 @@ fn raw_build(db: &Database, module: Module, tracing: &TracingConfig, debug: bool
         );
     }
 
-    let (mir, _) = db.mir(module.clone(), tracing.clone());
+    let (mir, _) = db.mir(module.clone(), tracing.clone()).unwrap();
     if debug {
         module.dump_associated_debug_file(
             &packages_path,
@@ -273,7 +273,7 @@ fn raw_build(db: &Database, module: Module, tracing: &TracingConfig, debug: bool
         );
     }
 
-    let (optimized_mir, _) = db.optimized_mir(module.clone(), tracing.clone());
+    let (optimized_mir, _) = db.optimized_mir(module.clone(), tracing.clone()).unwrap();
     if debug {
         module.dump_associated_debug_file(
             &packages_path,
