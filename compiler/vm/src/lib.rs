@@ -52,7 +52,7 @@ pub fn run_lir(
 impl Packet {
     pub fn into_main_function(mut self) -> Result<(Heap, Closure), &'static str> {
         let exported_definitions: Struct = self.object.try_into().unwrap();
-        debug!("The module exports these definitions: {exported_definitions:?}");
+        debug!("The module exports these definitions: {exported_definitions}");
 
         let main = Symbol::create(&mut self.heap, "Main");
         exported_definitions
