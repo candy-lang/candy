@@ -14,9 +14,14 @@ let client: LanguageClient;
 export async function activate(context: vs.ExtensionContext) {
   console.log('Activated 🍭 Candy extension!');
 
+  const configuration = vs.workspace.getConfiguration('candy');
   let clientOptions: LanguageClientOptions = {
     outputChannelName: '🍭 Candy Language Server',
+    initializationOptions: {
+      packagesPath: configuration.get<string>('packagesPath'),
+    },
   };
+
   client = new LanguageClient(
     'candyLanguageServer',
     'Candy Language Server',

@@ -1,3 +1,4 @@
+use crate::database::Database;
 use candy_frontend::{
     cst::CstDb,
     error::CompilerError,
@@ -7,17 +8,14 @@ use candy_frontend::{
 use extension_trait::extension_trait;
 use itertools::Itertools;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Url};
-use std::{ops::Range, path::PathBuf};
+use std::{ops::Range, path::Path};
 
-pub fn error_into_diagnostic<DB>(db: &DB, module: Module, error: CompilerError) -> Diagnostic
-where
-    DB: CstDb + ModuleDb + PositionConversionDb,
-{
+pub fn error_into_diagnostic(db: &Database, module: Module, error: CompilerError) -> Diagnostic {
     let related_information = error
         .to_related_information()
         .into_iter()
         .filter_map(|(module, cst_id, message)| {
-            let uri = module_to_url(&module)?;
+            let uri = module_to_url(&module, &db.packages_path)?;
 
             let span = db.find_cst(module.clone(), cst_id).display_span();
             let range = db.range_to_lsp_range(module, span);
@@ -41,16 +39,14 @@ where
     }
 }
 
-pub fn module_from_package_root_and_url(
-    package_root: PathBuf,
+pub fn module_from_url(
     url: &Url,
     kind: ModuleKind,
+    packages_path: &Path,
 ) -> Result<Module, String> {
-    let module = match url.scheme() {
-        "file" => {
-            Module::from_package_root_and_file(package_root, url.to_file_path().unwrap(), kind)
-        }
-        "untitled" => Module {
+    match url.scheme() {
+        "file" => Module::from_path(packages_path, &url.to_file_path().unwrap(), kind),
+        "untitled" => Ok(Module {
             package: Package::Anonymous {
                 url: url
                     .to_string()
@@ -60,18 +56,17 @@ pub fn module_from_package_root_and_url(
             },
             path: vec![],
             kind,
-        },
-        _ => return Err(format!("Unsupported URI scheme: {}", url.scheme())),
-    };
-    Ok(module)
+        }),
+        _ => Err(format!("Unsupported URI scheme: {}", url.scheme())),
+    }
 }
 
-pub fn module_to_url(module: &Module) -> Option<Url> {
+pub fn module_to_url(module: &Module, packages_path: &Path) -> Option<Url> {
     match &module.package {
-        Package::User(_) | Package::External(_) => Some(
+        Package::User(_) | Package::Managed(_) => Some(
             Url::from_file_path(
                 module
-                    .to_possible_paths()
+                    .to_possible_paths(packages_path)
                     .unwrap()
                     .into_iter()
                     .find_or_first(|path| path.exists())

@@ -7,8 +7,6 @@ use utils::{compile, run, setup, setup_and_compile};
 
 mod utils;
 
-// `Core` is available via `use "..Core"`.
-
 fn benchmark_compiler<M: Measurement>(c: &mut Criterion<M>, prefix: &str) {
     let mut group = c.benchmark_group(format!("{prefix}: Compiler"));
 
@@ -43,7 +41,7 @@ fn benchmark_vm_runtime<M: Measurement>(c: &mut Criterion<M>, prefix: &str) {
 
 fn create_fibonacci_code(n: usize) -> String {
     format!(
-        r#"[ifElse, int] = use "..Core"
+        r#"[ifElse, int] = use "Core"
 
 fibRec = {{ fibRec n ->
   ifElse (n | int.isLessThan 2) {{ n }} {{

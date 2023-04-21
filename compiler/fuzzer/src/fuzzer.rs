@@ -11,7 +11,6 @@ use candy_vm::{
     heap::{Closure, Data, Heap},
     tracer::full::FullTracer,
 };
-use std::mem;
 use tracing::trace;
 
 pub struct Fuzzer {
@@ -66,7 +65,7 @@ impl Fuzzer {
         use_provider: &mut impl UseProvider,
         execution_controller: &mut impl ExecutionController,
     ) {
-        let mut status = mem::replace(&mut self.status, None).unwrap();
+        let mut status = self.status.take().unwrap();
         while !matches!(status, Status::FoundPanic { .. })
             && execution_controller.should_continue_running()
         {

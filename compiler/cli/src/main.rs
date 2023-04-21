@@ -7,7 +7,7 @@ use candy_frontend::{
     hir::{self, CollectErrors},
     hir_to_mir::HirToMir,
     mir_optimize::OptimizeMir,
-    module::{Module, ModuleKind},
+    module::{Module, ModuleKind, SurroundingPackage},
     position::PositionConversionDb,
     rcst_to_cst::RcstToCst,
     rich_ir::ToRichIr,
@@ -33,8 +33,9 @@ use notify::RecursiveMode;
 use notify_debouncer_mini::new_debouncer;
 use std::{
     convert::TryInto,
-    env::current_dir,
-    io::{self, BufRead, Write},
+    env::{current_dir, current_exe},
+    fs,
+    io::{self, BufRead, ErrorKind, Write},
     path::PathBuf,
     sync::{mpsc::channel, Arc},
     time::Duration,
@@ -52,6 +53,8 @@ enum CandyOptions {
     Build(CandyBuildOptions),
     Run(CandyRunOptions),
     Fuzz(CandyFuzzOptions),
+
+    /// Start a Language Server.
     Lsp,
 }
 
@@ -67,9 +70,14 @@ struct CandyBuildOptions {
     tracing: bool,
 
     #[arg(value_hint = ValueHint::FilePath)]
-    file: PathBuf,
+    path: Option<PathBuf>,
 }
 
+/// Run a Candy program.
+///
+/// This command runs the given file, or, if no file is provided, the package of
+/// your current working directory. The module should export a `main` function.
+/// This function is then called with an environment.
 #[derive(Parser, Debug)]
 struct CandyRunOptions {
     #[arg(long)]
@@ -78,17 +86,26 @@ struct CandyRunOptions {
     #[arg(long)]
     tracing: bool,
 
+    /// The file or package to run. If none is provided, the package of your
+    /// current working directory will be run.
     #[arg(value_hint = ValueHint::FilePath)]
-    file: PathBuf,
+    path: Option<PathBuf>,
 }
 
+/// Fuzz a Candy module.
+///
+/// This command runs the given file or, if no file is provided, the package of
+/// your current working directory. It finds all fuzzable functions and then
+/// fuzzes them.
+///
+/// Fuzzable functions are functions written without curly braces.
 #[derive(Parser, Debug)]
 struct CandyFuzzOptions {
     #[arg(long)]
     debug: bool,
 
     #[arg(value_hint = ValueHint::FilePath)]
-    file: PathBuf,
+    path: Option<PathBuf>,
 }
 
 #[tokio::main]
@@ -104,19 +121,53 @@ async fn main() -> ProgramResult {
 type ProgramResult = Result<(), Exit>;
 #[derive(Debug)]
 enum Exit {
+    CodePanicked,
     FileNotFound,
     FuzzingFoundFailingCases,
-    CodePanicked,
+    NotInCandyPackage,
+}
+
+fn packages_path() -> PathBuf {
+    // We assume the candy executable lives inside the Candy Git repository at
+    // its usual location, `$candy/target/[release or debug]/candy`.
+    let candy_exe = current_exe().unwrap();
+    let target_dir = candy_exe.parent().unwrap().parent().unwrap();
+    let candy_repo = target_dir.parent().unwrap();
+    candy_repo.join("packages")
+}
+fn module_for_path(path: Option<PathBuf>) -> Result<Module, Exit> {
+    let packages_path = packages_path();
+    match path {
+        Some(file) => match fs::canonicalize(file) {
+            Ok(path) => Ok(Module::from_path(&packages_path, &path, ModuleKind::Code).unwrap()),
+            Err(error) if error.kind() == ErrorKind::NotFound => {
+                error!("The given file doesn't exist.");
+                Err(Exit::FileNotFound)
+            }
+            Err(_) => unreachable!(),
+        },
+        None => {
+            let Some(package) = current_dir().unwrap().surrounding_candy_package(&packages_path) else {
+                error!("You are not in a Candy package. Either navigate into a package or specify a Candy file.");
+                error!("Candy packages are folders that contain a `_package.candy` file. This file marks the root folder of a package. Relative imports can only happen within the package.");
+                return Err(Exit::NotInCandyPackage)
+            };
+            Ok(Module {
+                package,
+                path: vec![],
+                kind: ModuleKind::Code,
+            })
+        }
+    }
 }
 
 fn build(options: CandyBuildOptions) -> ProgramResult {
     init_logger(true);
-    let db = Database::default();
-    let module = Module::from_package_root_and_file(
-        current_dir().unwrap(),
-        options.file.clone(),
-        ModuleKind::Code,
-    );
+
+    let packages_path = packages_path();
+    let db = Database::new_with_file_system_module_provider(&packages_path);
+    let module = module_for_path(options.path.clone())?;
+
     let tracing = TracingConfig {
         register_fuzzables: TracingMode::Off,
         calls: TracingMode::all_or_off(options.tracing),
@@ -131,7 +182,10 @@ fn build(options: CandyBuildOptions) -> ProgramResult {
         let mut debouncer = new_debouncer(Duration::from_secs(1), None, tx).unwrap();
         debouncer
             .watcher()
-            .watch(&options.file, RecursiveMode::Recursive)
+            .watch(
+                &module.package.to_path(&packages_path).unwrap(),
+                RecursiveMode::Recursive,
+            )
             .unwrap();
         loop {
             match rx.recv() {
@@ -149,22 +203,32 @@ fn raw_build(
     tracing: &TracingConfig,
     debug: bool,
 ) -> Option<Arc<Lir>> {
+    let packages_path = packages_path();
     let rcst = db
         .rcst(module.clone())
         .unwrap_or_else(|err| panic!("Error parsing file `{}`: {:?}", module.to_rich_ir(), err));
     if debug {
-        module.dump_associated_debug_file("rcst", &format!("{}\n", rcst.to_rich_ir()));
+        module.dump_associated_debug_file(
+            &packages_path,
+            "rcst",
+            &format!("{}\n", rcst.to_rich_ir()),
+        );
     }
 
     let cst = db.cst(module.clone()).unwrap();
     if debug {
-        module.dump_associated_debug_file("cst", &format!("{:#?}\n", cst));
+        module.dump_associated_debug_file(&packages_path, "cst", &format!("{:#?}\n", cst));
     }
 
     let (asts, ast_cst_id_map) = db.ast(module.clone()).unwrap();
     if debug {
-        module.dump_associated_debug_file("ast", &format!("{}\n", asts.to_rich_ir()));
         module.dump_associated_debug_file(
+            &packages_path,
+            "ast",
+            &format!("{}\n", asts.to_rich_ir()),
+        );
+        module.dump_associated_debug_file(
+            &packages_path,
             "ast_to_cst_ids",
             &ast_cst_id_map
                 .keys()
@@ -182,8 +246,13 @@ fn raw_build(
 
     let (hir, hir_ast_id_map) = db.hir(module.clone()).unwrap();
     if debug {
-        module.dump_associated_debug_file("hir", &format!("{}\n", hir.to_rich_ir()));
         module.dump_associated_debug_file(
+            &packages_path,
+            "hir",
+            &format!("{}\n", hir.to_rich_ir()),
+        );
+        module.dump_associated_debug_file(
+            &packages_path,
             "hir_to_ast_ids",
             &hir_ast_id_map
                 .keys()
@@ -219,7 +288,11 @@ fn raw_build(
 
     let mir = db.mir(module.clone(), tracing.clone()).unwrap();
     if debug {
-        module.dump_associated_debug_file("mir", &format!("{}\n", mir.to_rich_ir()));
+        module.dump_associated_debug_file(
+            &packages_path,
+            "mir",
+            &format!("{}\n", mir.to_rich_ir()),
+        );
     }
 
     let optimized_mir = db
@@ -227,6 +300,7 @@ fn raw_build(
         .unwrap();
     if debug {
         module.dump_associated_debug_file(
+            &packages_path,
             "optimized_mir",
             &format!("{}\n", optimized_mir.to_rich_ir()),
         );
@@ -234,7 +308,11 @@ fn raw_build(
 
     let lir = db.lir(module.clone(), tracing.clone()).unwrap();
     if debug {
-        module.dump_associated_debug_file("lir", &format!("{}\n", lir.to_rich_ir()));
+        module.dump_associated_debug_file(
+            &packages_path,
+            "lir",
+            &format!("{}\n", lir.to_rich_ir()),
+        );
     }
 
     Some(lir)
@@ -242,12 +320,10 @@ fn raw_build(
 
 fn run(options: CandyRunOptions) -> ProgramResult {
     init_logger(true);
-    let db = Database::default();
-    let module = Module::from_package_root_and_file(
-        current_dir().unwrap(),
-        options.file.clone(),
-        ModuleKind::Code,
-    );
+
+    let packages_path = packages_path();
+    let db = Database::new_with_file_system_module_provider(&packages_path);
+    let module = module_for_path(options.path.clone())?;
 
     let tracing = TracingConfig {
         register_fuzzables: TracingMode::Off,
@@ -259,8 +335,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         return Err(Exit::FileNotFound);
     };
 
-    let path_string = options.file.to_string_lossy();
-    debug!("Running `{path_string}`.");
+    debug!("Running {}.", module.to_rich_ir());
 
     let mut tracer = FullTracer::default();
     let lir = db.lir(module.clone(), tracing.clone()).unwrap();
@@ -270,7 +345,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     };
     let result = run_lir(module.clone(), lir.as_ref(), &use_provider, &mut tracer);
     if options.debug {
-        module.dump_associated_debug_file("trace", &format!("{tracer:?}"));
+        module.dump_associated_debug_file(&packages_path, "trace", &format!("{tracer:?}"));
     }
 
     let (mut heap, main) = match result {
@@ -281,8 +356,9 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         } => {
             error!("The module panicked: {reason}");
             error!("{responsible} is responsible.");
-            let span = db.hir_id_to_span(responsible).unwrap();
-            error!("Responsible is at {span:?}.");
+            if let Some(span) = db.hir_id_to_span(responsible) {
+                error!("Responsible is at {span:?}.");
+            }
             error!(
                 "This is the stack trace:\n{}",
                 tracer.format_panic_stack_trace_to_root_fiber(&db),
@@ -333,7 +409,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         vm.free_unreferenced_channels();
     }
     if options.debug {
-        module.dump_associated_debug_file("trace", &format!("{tracer:?}"));
+        module.dump_associated_debug_file(&packages_path, "trace", &format!("{tracer:?}"));
     }
     match vm.tear_down() {
         ExecutionResult::Finished(return_value) => {
@@ -427,12 +503,11 @@ impl StdinService {
 
 fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
     init_logger(true);
-    let db = Database::default();
-    let module = Module::from_package_root_and_file(
-        current_dir().unwrap(),
-        options.file.clone(),
-        ModuleKind::Code,
-    );
+
+    let packages_path = packages_path();
+    let db = Database::new_with_file_system_module_provider(&packages_path);
+    let module = module_for_path(options.path.clone())?;
+
     let tracing = TracingConfig {
         register_fuzzables: TracingMode::All,
         calls: TracingMode::Off,
@@ -465,7 +540,7 @@ fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
 async fn lsp() -> ProgramResult {
     init_logger(false);
     info!("Starting language server…");
-    let (service, socket) = Server::create();
+    let (service, socket) = Server::create(packages_path());
     tower_lsp::Server::new(tokio::io::stdin(), tokio::io::stdout(), socket)
         .serve(service)
         .await;

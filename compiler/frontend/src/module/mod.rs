@@ -8,7 +8,7 @@ pub use self::{
         FileSystemModuleProvider, InMemoryModuleProvider, ModuleProvider, OverlayModuleProvider,
     },
     module_provider_owner::{ModuleProviderOwner, MutableModuleProviderOwner},
-    package::Package,
+    package::{Package, SurroundingPackage},
     use_path::UsePath,
 };
 
