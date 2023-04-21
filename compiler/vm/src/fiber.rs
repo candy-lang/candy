@@ -275,6 +275,7 @@ impl Fiber {
         instruction: Instruction,
     ) {
         if TRACE {
+            trace!("----- run_instruction -----");
             let next_instruction = self.next_instruction.unwrap();
             trace!(
                 "Instruction pointer: {}:{}",
@@ -283,17 +284,25 @@ impl Fiber {
             );
             trace!(
                 "Data stack: {}",
-                self.data_stack
-                    .iter()
-                    .map(|it| format!("{it:?}"))
-                    .join(", "),
+                if self.data_stack.is_empty() {
+                    "<empty>".to_string()
+                } else {
+                    self.data_stack
+                        .iter()
+                        .map(|it| format!("{it:?}"))
+                        .join(", ")
+                },
             );
             trace!(
                 "Call stack: {}",
-                self.call_stack
-                    .iter()
-                    .map(|ip| format!("{}:{}", ip.closure, ip.instruction))
-                    .join(", "),
+                if self.call_stack.is_empty() {
+                    "<empty>".to_string()
+                } else {
+                    self.call_stack
+                        .iter()
+                        .map(|ip| format!("{}:{}", ip.closure, ip.instruction))
+                        .join(", ")
+                },
             );
             trace!("Heap: {:?}", self.heap);
             trace!("Running instruction: {instruction:?}");
