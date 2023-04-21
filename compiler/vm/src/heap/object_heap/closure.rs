@@ -53,8 +53,7 @@ impl HeapClosure {
             HeapObject::KIND_CLOSURE
                 | ((captured_len as u64) << Self::CAPTURED_LEN_SHIFT)
                 | ((argument_count as u64) << Self::ARGUMENT_COUNT_SHIFT),
-            (1 + captured_len) * HeapObject::WORD_SIZE
-                + instructions_len * mem::size_of::<Instruction>(),
+            (1 + captured_len) * HeapObject::WORD_SIZE + mem::size_of_val(instructions),
         );
         unsafe {
             *object.content_word_pointer(0).cast().as_mut() = instructions_len;
