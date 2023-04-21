@@ -23,10 +23,10 @@ use tracing::info;
 pub trait HirDb: AstToHir {
     fn find_expression(&self, id: Id) -> Option<Expression>;
     fn containing_body_of(&self, id: Id) -> Arc<Body>;
-    fn all_hir_ids(&self, module: Module) -> Option<Vec<Id>>;
+    fn all_hir_ids(&self, module: Module) -> Vec<Id>;
 }
 fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
-    let (hir, _) = db.hir(id.module.clone()).unwrap();
+    let (hir, _) = db.hir(id.module.clone());
     if id.is_root() {
         panic!("You can't get the root because that got lowered into multiple IDs.");
     }
@@ -37,7 +37,7 @@ fn containing_body_of(db: &dyn HirDb, id: Id) -> Arc<Body> {
     match id.parent() {
         Some(parent_id) => {
             if parent_id.is_root() {
-                db.hir(id.module).unwrap().0
+                db.hir(id.module).0
             } else {
                 match db.find_expression(parent_id).unwrap() {
                     Expression::Match { cases, .. } => {
@@ -56,12 +56,12 @@ fn containing_body_of(db: &dyn HirDb, id: Id) -> Arc<Body> {
         None => panic!("The root scope has no parent."),
     }
 }
-fn all_hir_ids(db: &dyn HirDb, module: Module) -> Option<Vec<Id>> {
-    let (hir, _) = db.hir(module)?;
+fn all_hir_ids(db: &dyn HirDb, module: Module) -> Vec<Id> {
+    let (hir, _) = db.hir(module);
     let mut ids = vec![];
     hir.collect_all_ids(&mut ids);
     info!("All HIR IDs: {ids:?}");
-    Some(ids)
+    ids
 }
 
 impl Expression {

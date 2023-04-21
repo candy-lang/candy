@@ -2,10 +2,13 @@ use enumset::EnumSet;
 
 use super::{ast::AstError, cst, cst::CstError, hir::HirError};
 use crate::{
+    mir::MirError,
     module::Module,
     position::Offset,
     rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr},
+    string_to_rcst::ModuleError,
 };
+use itertools::Itertools;
 use std::{fmt::Display, hash::Hash, ops::Range};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -17,15 +20,30 @@ pub struct CompilerError {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum CompilerErrorPayload {
-    InvalidUtf8,
+    Module(ModuleError),
     Cst(CstError),
     Ast(AstError),
     Hir(HirError),
+    Mir(MirError),
+}
+impl CompilerError {
+    pub fn for_whole_module(module: Module, payload: impl Into<CompilerErrorPayload>) -> Self {
+        Self {
+            module,
+            span: Offset(0)..Offset(0),
+            payload: payload.into(),
+        }
+    }
 }
 impl Display for CompilerErrorPayload {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let message = match self {
-            CompilerErrorPayload::InvalidUtf8 => "The module contains invalid UTF-8.".to_string(),
+            CompilerErrorPayload::Module(error) => match error {
+                ModuleError::DoesNotExist => "The module doesn't exist.".to_string(),
+                ModuleError::InvalidUtf8 => "The module contains invalid UTF-8.".to_string(),
+                ModuleError::IsNotCandy => "The module is not Candy.".to_string(),
+                ModuleError::IsToolingModule => "The module is a tooling module.".to_string(),
+            },
             CompilerErrorPayload::Cst(error) => match error {
                 CstError::BinaryBarMissesRight => "There should be a right side after this bar.",
                 CstError::CurlyBraceNotClosed => "The curly brace is not closed.",
@@ -140,10 +158,60 @@ impl Display for CompilerErrorPayload {
                 }
                 HirError::UnknownReference { name } => format!("`{name}` is not in scope."),
             },
+            CompilerErrorPayload::Mir(error) => match error {
+            MirError::UseWithInvalidPath { module, path } => {
+                format!(
+                    "{} tries to `use` {path:?}, but that's an invalid path.",
+                    module.to_rich_ir(),
+                )
+            }
+            MirError::UseHasTooManyParentNavigations { module, path } => format!("{} tries to `use` {path:?}, but that has too many parent navigations. You can't navigate out of the current package (the module that also contains a `_package.candy` file).", module.to_rich_ir()),
+            MirError::ModuleNotFound { module, path } => format!(
+                "{} tries to use {path:?}, but that module is not found.",
+                module.to_rich_ir(),
+            ),
+            MirError::UseNotStaticallyResolvable { containing_module } => format!(
+                "A `use` in {} is not statically resolvable.",
+                containing_module.to_rich_ir(),
+            ),
+            MirError::ModuleHasCycle { cycle } => {
+                format!(
+                    "There's a cycle in the used modules: {}",
+                    cycle.iter().join(" → "),
+                )
+            }
+        },
         };
         write!(f, "{message}")
     }
 }
+
+impl From<ModuleError> for CompilerErrorPayload {
+    fn from(error: ModuleError) -> Self {
+        Self::Module(error)
+    }
+}
+impl From<CstError> for CompilerErrorPayload {
+    fn from(error: CstError) -> Self {
+        Self::Cst(error)
+    }
+}
+impl From<AstError> for CompilerErrorPayload {
+    fn from(error: AstError) -> Self {
+        Self::Ast(error)
+    }
+}
+impl From<HirError> for CompilerErrorPayload {
+    fn from(error: HirError) -> Self {
+        Self::Hir(error)
+    }
+}
+impl From<MirError> for CompilerErrorPayload {
+    fn from(error: MirError) -> Self {
+        Self::Mir(error)
+    }
+}
+
 impl CompilerError {
     pub fn to_related_information(&self) -> Vec<(Module, cst::Id, String)> {
         match &self.payload {

@@ -10,7 +10,7 @@ use crate::{
 
 use candy_frontend::hir::Id;
 use candy_vm::{
-    context::{ExecutionController, UseProvider},
+    context::ExecutionController,
     heap::{Closure, Data, Heap, Pointer},
     tracer::full::FullTracer,
 };
@@ -64,18 +64,14 @@ impl Fuzzer {
         self.status.unwrap()
     }
 
-    pub fn run<U: UseProvider, E: ExecutionController>(
-        &mut self,
-        use_provider: &mut U,
-        execution_controller: &mut E,
-    ) {
+    pub fn run<E: ExecutionController>(&mut self, execution_controller: &mut E) {
         let mut status = self.status.take().unwrap();
         while !matches!(status, Status::FoundPanic { .. })
             && execution_controller.should_continue_running()
         {
             status = match status {
                 Status::StillFuzzing { pool, runner } => {
-                    self.continue_fuzzing(use_provider, execution_controller, pool, runner)
+                    self.continue_fuzzing(execution_controller, pool, runner)
                 }
                 // We already found some arguments that caused the closure to panic,
                 // so there's nothing more to do.
@@ -95,14 +91,13 @@ impl Fuzzer {
         self.status = Some(status);
     }
 
-    fn continue_fuzzing<U: UseProvider, E: ExecutionController>(
+    fn continue_fuzzing<E: ExecutionController>(
         &self,
-        use_provider: &mut U,
         execution_controller: &mut E,
         mut pool: InputPool,
         mut runner: Runner,
     ) -> Status {
-        runner.run(use_provider, execution_controller);
+        runner.run(execution_controller);
         let Some(result) = runner.result else {
             return Status::StillFuzzing { pool, runner };
         };

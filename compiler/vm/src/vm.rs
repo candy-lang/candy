@@ -14,10 +14,7 @@ use rand::{seq::SliceRandom, thread_rng};
 
 use crate::{
     channel::{Channel, ChannelId, Completer, Packet, Performer},
-    context::{
-        CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions,
-        UseProvider,
-    },
+    context::{CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions},
     fiber::{self, ExecutionResult, Fiber, FiberId},
     heap::{Closure, Heap, Pointer, SendPort, Struct},
     tracer::Tracer,
@@ -263,15 +260,13 @@ impl Vm {
         self.unreferenced_channels.remove(&channel);
     }
 
-    pub fn run<U: UseProvider, E: ExecutionController, T: Tracer>(
+    pub fn run<E: ExecutionController, T: Tracer>(
         &mut self,
-        use_provider: &U,
         execution_controller: &mut E,
         tracer: &mut T,
     ) {
         while self.can_run() && execution_controller.should_continue_running() {
             self.run_raw(
-                use_provider,
                 &mut CombiningExecutionController::new(
                     execution_controller,
                     &mut RunLimitedNumberOfInstructions::new(100),
@@ -280,9 +275,8 @@ impl Vm {
             );
         }
     }
-    fn run_raw<U: UseProvider, E: ExecutionController, T: Tracer>(
+    fn run_raw<E: ExecutionController, T: Tracer>(
         &mut self,
-        use_provider: &U,
         execution_controller: &mut E,
         tracer: &mut T,
     ) {
@@ -309,11 +303,7 @@ impl Vm {
         }
 
         tracer.fiber_execution_started(fiber_id);
-        fiber.run(
-            use_provider,
-            execution_controller,
-            &mut tracer.for_fiber(fiber_id),
-        );
+        fiber.run(execution_controller, &mut tracer.for_fiber(fiber_id));
         tracer.fiber_execution_ended(fiber_id);
 
         let is_finished = match fiber.status() {

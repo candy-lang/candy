@@ -8,5 +8,4 @@ pub mod heap;
 pub mod lir;
 pub mod mir_to_lir;
 pub mod tracer;
-mod use_module;
 pub mod vm;

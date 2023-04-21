@@ -21,6 +21,9 @@ pub struct Body {
     expressions: Vec<(Id, Expression)>,
 }
 impl Body {
+    pub fn new(expressions: Vec<(Id, Expression)>) -> Self {
+        Self { expressions }
+    }
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = (Id, &Expression)> {
         self.expressions
             .iter()

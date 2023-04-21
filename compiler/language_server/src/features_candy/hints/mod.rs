@@ -105,7 +105,7 @@ pub async fn run_server(
         // priority. When constant evaluation is done, we try fuzzing the
         // functions we found.
         let module_with_new_insight = 'new_insight: {
-            if let Some(module) = constant_evaluator.run(&db) {
+            if let Some(module) = constant_evaluator.run() {
                 let (heap, closures) = constant_evaluator.get_fuzzable_closures(&module);
                 fuzzer.update_module(module.clone(), &heap, &closures);
                 debug!(
@@ -116,7 +116,7 @@ pub async fn run_server(
             }
             // For fuzzing, we're a bit more resource-conscious.
             sleep(Duration::from_millis(200)).await;
-            if let Some(module) = fuzzer.run(&db) {
+            if let Some(module) = fuzzer.run() {
                 debug!("The fuzzer made progress in {}.", module.to_rich_ir());
                 break 'new_insight Some(module);
             }

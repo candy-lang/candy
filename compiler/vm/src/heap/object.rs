@@ -154,13 +154,9 @@ impl Closure {
             body: lir.instructions,
         }
     }
-    pub fn of_module<DB: MirToLir>(
-        db: &DB,
-        module: Module,
-        tracing: TracingConfig,
-    ) -> Option<Self> {
-        let lir = db.lir(module, tracing)?;
-        Some(Self::of_module_lir((*lir).clone()))
+    pub fn of_module<DB: MirToLir>(db: &DB, module: Module, tracing: TracingConfig) -> Self {
+        let (lir, _) = db.lir(module, tracing);
+        Self::of_module_lir((*lir).clone())
     }
 }
 

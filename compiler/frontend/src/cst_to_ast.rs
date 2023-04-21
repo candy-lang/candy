@@ -7,16 +7,13 @@ use crate::{
         Match, MatchCase, OrPattern, Struct, Symbol, Text, TextPart,
     },
     cst::{self, Cst, CstDb, CstKind, UnwrapWhitespaceAndComment},
-    error::{CompilerError, CompilerErrorPayload},
+    error::{CompilerError},
     module::Module,
     position::Offset,
     rcst_to_cst::RcstToCst,
-    rich_ir::ToRichIr,
-    string_to_rcst::InvalidModuleError,
     utils::AdjustCasingOfFirstLetter,
 };
 use std::{ops::Range, sync::Arc};
-use tracing::warn;
 
 #[salsa::query_group(CstToAstStorage)]
 pub trait CstToAst: CstDb + RcstToCst {
@@ -26,13 +23,13 @@ pub trait CstToAst: CstDb + RcstToCst {
 
     fn cst_to_ast_id(&self, module: Module, id: cst::Id) -> Option<ast::Id>;
 
-    fn ast(&self, module: Module) -> Option<AstResult>;
+    fn ast(&self, module: Module) -> AstResult;
 }
 
 type AstResult = (Arc<Vec<Ast>>, Arc<FxHashMap<ast::Id, cst::Id>>);
 
 fn ast_to_cst_id(db: &dyn CstToAst, id: ast::Id) -> Option<cst::Id> {
-    let (_, ast_to_cst_id_mapping) = db.ast(id.module.clone()).unwrap();
+    let (_, ast_to_cst_id_mapping) = db.ast(id.module.clone());
     ast_to_cst_id_mapping.get(&id).cloned()
 }
 fn ast_id_to_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<Offset>> {
@@ -45,14 +42,14 @@ fn ast_id_to_display_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<Offset
 }
 
 fn cst_to_ast_id(db: &dyn CstToAst, module: Module, id: cst::Id) -> Option<ast::Id> {
-    let (_, ast_to_cst_id_mapping) = db.ast(module).unwrap();
+    let (_, ast_to_cst_id_mapping) = db.ast(module);
     ast_to_cst_id_mapping
         .iter()
         .find_map(|(key, &value)| if value == id { Some(key) } else { None })
         .cloned()
 }
 
-fn ast(db: &dyn CstToAst, module: Module) -> Option<AstResult> {
+fn ast(db: &dyn CstToAst, module: Module) -> AstResult {
     let mut context = LoweringContext::new(module.clone());
 
     let asts = match db.cst(module.clone()) {
@@ -60,43 +57,18 @@ fn ast(db: &dyn CstToAst, module: Module) -> Option<AstResult> {
             let cst = cst.unwrap_whitespace_and_comment();
             context.lower_csts(&cst)
         }
-        Err(InvalidModuleError::DoesNotExist) => {
-            warn!(
-                "Tried to get AST of module that doesn't exist: {}.",
-                module.to_rich_ir(),
-            );
-            return None;
-        }
-        Err(InvalidModuleError::InvalidUtf8) => {
+        Err(error) => {
             vec![Ast {
                 id: context.create_next_id_without_mapping(),
                 kind: AstKind::Error {
                     child: None,
-                    errors: vec![CompilerError {
-                        module,
-                        span: Offset(0)..Offset(0),
-                        payload: CompilerErrorPayload::InvalidUtf8,
-                    }],
+                    errors: vec![CompilerError::for_whole_module(module, error)],
                 },
             }]
         }
-        Err(InvalidModuleError::IsNotCandy) => {
-            warn!(
-                "Tried to get AST of a module that's not Candy code: {}.",
-                module.to_rich_ir(),
-            );
-            return None;
-        }
-        Err(InvalidModuleError::IsToolingModule) => {
-            warn!(
-                "Tried to get AST of tooling module: {}.",
-                module.to_rich_ir(),
-            );
-            return None;
-        }
     };
 
-    Some((Arc::new(asts), Arc::new(context.id_mapping)))
+    (Arc::new(asts), Arc::new(context.id_mapping))
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -244,9 +216,9 @@ impl LoweringContext {
                                         errors: vec![CompilerError {
                                             module: self.module.clone(),
                                             span: part.data.span.clone(),
-                                            payload: CompilerErrorPayload::Ast(
-                                                AstError::TextInterpolationMissesClosingCurlyBraces,
-                                            ),
+                                            payload: 
+                                                AstError::TextInterpolationMissesClosingCurlyBraces.into()
+                                            ,
                                         }],
                                     },
                                 );
@@ -256,7 +228,7 @@ impl LoweringContext {
                         CstKind::Error { error, .. } => errors.push(CompilerError {
                             module: self.module.clone(),
                             span: part.data.span.clone(),
-                            payload: CompilerErrorPayload::Cst(error.clone()),
+                            payload: error.clone().into(),
                         }),
                         _ => panic!("Text contains non-TextPart. Whitespaces should have been removed already."),
                     }
@@ -802,7 +774,7 @@ impl LoweringContext {
                                     errors: vec![CompilerError {
                                         module: self.module.clone(),
                                         span: name.data.span.clone(),
-                                        payload: CompilerErrorPayload::Cst(error.clone()),
+                                        payload: error.clone().into(),
                                     }],
                                 },
                             );
@@ -815,9 +787,9 @@ impl LoweringContext {
                                     errors: vec![CompilerError {
                                         module: self.module.clone(),
                                         span: name.data.span.clone(),
-                                        payload: CompilerErrorPayload::Ast(
-                                            AstError::ExpectedNameOrPatternInAssignment,
-                                        ),
+                                        payload: 
+                                            AstError::ExpectedNameOrPatternInAssignment.into(),
+                                    
                                     }],
                                 },
                             );
@@ -858,7 +830,7 @@ impl LoweringContext {
                     errors: vec![CompilerError {
                         module: self.module.clone(),
                         span: cst.data.span.clone(),
-                        payload: CompilerErrorPayload::Cst(error.clone()),
+                        payload: error.clone().into(),
                     }],
                 },
             ),
@@ -893,7 +865,7 @@ impl LoweringContext {
                     errors: vec![CompilerError {
                         module: self.module.clone(),
                         span: key.data.span.clone(),
-                        payload: CompilerErrorPayload::Cst(error),
+                        payload: error.into(),
                     }],
                 },
             ),
@@ -969,7 +941,7 @@ impl LoweringContext {
         CompilerError {
             module: self.module.clone(),
             span: cst.data.span.clone(),
-            payload: CompilerErrorPayload::Ast(error),
+            payload: error.into(),
         }
     }
     fn create_ast_for_invalid_expression_in_pattern(&mut self, cst: &Cst) -> Ast {

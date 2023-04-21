@@ -92,27 +92,6 @@ pub enum Instruction {
     /// instruction pointer to continue where the current function was called.
     Return,
 
-    /// Pops a string path and responsilbe HIR ID and then resolves the path
-    /// relative to the current module. Then does different things depending on
-    /// whether this is a code or asset module.
-    ///
-    /// - Code module:
-    ///
-    ///   Loads and parses the module, then runs the module closure. Later,
-    ///   when the module returns, the stack will contain the struct of the
-    ///   exported definitions:
-    ///
-    ///   a, path, responsible ~> a, structOfModuleExports
-    ///
-    /// - Asset module:
-    ///   
-    ///   Loads the file and pushes its content onto the stack:
-    ///
-    ///   a, path, responsible -> a, listOfContentBytes
-    UseModule {
-        current_module: Module,
-    },
-
     /// Panics. Because the panic instruction only occurs inside the generated
     /// needs function, the reason is already guaranteed to be a text.
     ///
@@ -198,11 +177,6 @@ impl Instruction {
             Instruction::Return => {
                 // Only modifies the call stack and the instruction pointer.
                 // Leaves the return value untouched on the stack.
-            }
-            Instruction::UseModule { .. } => {
-                stack.pop(); // responsible
-                stack.pop(); // module path
-                stack.push(result); // exported members or bytes of file
             }
             Instruction::Panic => {
                 stack.pop(); // responsible
@@ -350,11 +324,6 @@ impl ToRichIr for Instruction {
                 );
             }
             Instruction::Return => {}
-            Instruction::UseModule { current_module } => {
-                builder.push(" (currently in ", None, EnumSet::empty());
-                current_module.build_rich_ir(builder);
-                builder.push(")", None, EnumSet::empty());
-            }
             Instruction::Panic => {}
             Instruction::ModuleStarts { module } => {
                 builder.push(" ", None, EnumSet::empty());

@@ -1,7 +1,7 @@
 use super::{
     cst::{Cst, CstKind},
     rcst::Rcst,
-    string_to_rcst::{InvalidModuleError, StringToRcst},
+    string_to_rcst::{ModuleError, StringToRcst},
 };
 use crate::{
     cst::{CstData, Id},
@@ -14,10 +14,10 @@ use std::sync::Arc;
 
 #[salsa::query_group(RcstToCstStorage)]
 pub trait RcstToCst: StringToRcst {
-    fn cst(&self, module: Module) -> Result<Arc<Vec<Cst>>, InvalidModuleError>;
+    fn cst(&self, module: Module) -> Result<Arc<Vec<Cst>>, ModuleError>;
 }
 
-fn cst(db: &dyn RcstToCst, module: Module) -> Result<Arc<Vec<Cst>>, InvalidModuleError> {
+fn cst(db: &dyn RcstToCst, module: Module) -> Result<Arc<Vec<Cst>>, ModuleError> {
     let rcsts = db.rcst(module)?;
     Ok(Arc::new(rcsts.to_csts()))
 }

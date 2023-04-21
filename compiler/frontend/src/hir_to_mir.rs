@@ -8,38 +8,61 @@ use super::{
 };
 use crate::{
     builtin_functions::BuiltinFunction,
+    error::CompilerErrorPayload,
     module::{Module, ModuleKind, Package},
     position::PositionConversionDb,
     rich_ir::ToRichIr,
+    string_to_rcst::ModuleError,
 };
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
+
+type MirResult = (Arc<Mir>, Arc<FxHashSet<CompilerError>>);
 
 #[salsa::query_group(HirToMirStorage)]
 pub trait HirToMir: PositionConversionDb + CstDb + AstToHir {
-    fn mir(&self, module: Module, tracing: TracingConfig) -> Option<Arc<Mir>>;
+    fn mir(&self, module: Module, tracing: TracingConfig) -> MirResult;
 }
 
-fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> Option<Arc<Mir>> {
-    let mir = match module.kind {
+fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> MirResult {
+    let (mir, errors) = match module.kind {
         ModuleKind::Code => {
-            let (hir, _) = db.hir(module.clone())?;
-            LoweringContext::compile_module(db, module, &hir, &tracing)
+            let (hir, _) = db.hir(module.clone());
+            let mut errors = FxHashSet::default();
+            let mir = LoweringContext::compile_module(db, module, &hir, &tracing, &mut errors);
+            (mir, errors)
         }
-        ModuleKind::Asset => {
-            let bytes = db.get_module_content(module)?;
-            Mir::build(|body| {
-                let bytes = bytes
-                    .iter()
-                    .map(|&it| body.push_int(it.into()))
-                    .collect_vec();
-                body.push_list(bytes);
-            })
-        }
+        ModuleKind::Asset => match db.get_module_content(module.clone()) {
+            Some(bytes) => (
+                Mir::build(|body| {
+                    let bytes = bytes
+                        .iter()
+                        .map(|&it| body.push_int(it.into()))
+                        .collect_vec();
+                    body.push_list(bytes);
+                }),
+                FxHashSet::default(),
+            ),
+            None => (
+                Mir::build(|body| {
+                    let reason = body.push_text(
+                        CompilerErrorPayload::Module(ModuleError::DoesNotExist).to_string(),
+                    );
+                    let responsible = body.push_hir_id(hir::Id::new(module.clone(), vec![]));
+                    body.push_panic(reason, responsible);
+                }),
+                vec![CompilerError::for_whole_module(
+                    module,
+                    ModuleError::DoesNotExist,
+                )]
+                .into_iter()
+                .collect(),
+            ),
+        },
     };
-    Some(Arc::new(mir))
+    (Arc::new(mir), Arc::new(errors))
 }
 
 /// In the MIR, there's no longer the concept of needs. Instead, HIR IDs are
@@ -162,6 +185,7 @@ struct LoweringContext<'a> {
     needs_function: Id,
     tracing: &'a TracingConfig,
     ongoing_destructuring: Option<OngoingDestructuring>,
+    errors: &'a mut FxHashSet<CompilerError>,
 }
 #[derive(Clone)]
 struct OngoingDestructuring {
@@ -177,6 +201,7 @@ impl<'a> LoweringContext<'a> {
         module: Module,
         hir: &hir::Body,
         tracing: &TracingConfig,
+        errors: &mut FxHashSet<CompilerError>,
     ) -> Mir {
         Mir::build(|body| {
             let mut mapping = FxHashMap::default();
@@ -194,6 +219,7 @@ impl<'a> LoweringContext<'a> {
                 needs_function,
                 tracing,
                 ongoing_destructuring: None,
+                errors,
             };
             context.compile_expressions(body, module_hir_id, &hir.expressions);
 
@@ -401,6 +427,7 @@ impl<'a> LoweringContext<'a> {
                 )
             }
             hir::Expression::Error { errors, .. } => {
+                self.errors.extend(errors.iter().cloned());
                 let responsible = body.push_hir_id(hir_id.clone());
                 body.compile_errors(self.db, responsible, errors)
             }

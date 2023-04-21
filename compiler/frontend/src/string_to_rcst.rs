@@ -10,23 +10,23 @@ pub trait StringToRcst: ModuleDb {
     fn rcst(&self, module: Module) -> RcstResult;
 }
 
-pub type RcstResult = Result<Arc<Vec<Rcst>>, InvalidModuleError>;
+pub type RcstResult = Result<Arc<Vec<Rcst>>, ModuleError>;
 
 fn rcst(db: &dyn StringToRcst, module: Module) -> RcstResult {
     if module.kind != ModuleKind::Code {
-        return Err(InvalidModuleError::IsNotCandy);
+        return Err(ModuleError::IsNotCandy);
     }
 
     if let Package::Tooling(_) = &module.package {
-        return Err(InvalidModuleError::IsToolingModule);
+        return Err(ModuleError::IsToolingModule);
     }
     let source = db
         .get_module_content(module)
-        .ok_or(InvalidModuleError::DoesNotExist)?;
+        .ok_or(ModuleError::DoesNotExist)?;
     let source = match str::from_utf8(source.as_slice()) {
         Ok(source) => source,
         Err(_) => {
-            return Err(InvalidModuleError::InvalidUtf8);
+            return Err(ModuleError::InvalidUtf8);
         }
     };
     Ok(Arc::new(parse_rcst(source)))
@@ -45,8 +45,8 @@ pub fn parse_rcst(source: &str) -> Vec<Rcst> {
     rcsts
 }
 
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
-pub enum InvalidModuleError {
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Hash)]
+pub enum ModuleError {
     DoesNotExist,
     InvalidUtf8,
     IsNotCandy,

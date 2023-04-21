@@ -4,7 +4,7 @@ use candy_frontend::{
     ast_to_hir::AstToHir,
     cst_to_ast::CstToAst,
     error::CompilerError,
-    hir::{self, CollectErrors},
+    hir,
     hir_to_mir::HirToMir,
     mir_optimize::OptimizeMir,
     module::{Module, ModuleKind, SurroundingPackage},
@@ -17,7 +17,7 @@ use candy_frontend::{
 use candy_language_server::server::Server;
 use candy_vm::{
     channel::{ChannelId, Packet},
-    context::{DbUseProvider, RunForever},
+    context::RunForever,
     fiber::{ExecutionResult, FiberId},
     heap::{Closure, Data, Heap, SendPort, Struct},
     lir::Lir,
@@ -173,11 +173,9 @@ fn build(options: CandyBuildOptions) -> ProgramResult {
         calls: TracingMode::all_or_off(options.tracing),
         evaluated_expressions: TracingMode::all_or_off(options.tracing),
     };
-    let result = raw_build(&db, module.clone(), &tracing, options.debug);
+    raw_build(&db, module.clone(), &tracing, options.debug);
 
-    if !options.watch {
-        result.ok_or(Exit::FileNotFound).map(|_| ())
-    } else {
+    if options.watch {
         let (tx, rx) = channel();
         let mut debouncer = new_debouncer(Duration::from_secs(1), None, tx).unwrap();
         debouncer
@@ -195,14 +193,11 @@ fn build(options: CandyBuildOptions) -> ProgramResult {
                 Err(e) => error!("watch error: {e:#?}"),
             }
         }
+    } else {
+        Ok(())
     }
 }
-fn raw_build(
-    db: &Database,
-    module: Module,
-    tracing: &TracingConfig,
-    debug: bool,
-) -> Option<Arc<Lir>> {
+fn raw_build(db: &Database, module: Module, tracing: &TracingConfig, debug: bool) -> Arc<Lir> {
     debug!("Compiling `{}`.", module.to_rich_ir());
 
     let packages_path = packages_path();
@@ -222,7 +217,7 @@ fn raw_build(
         module.dump_associated_debug_file(&packages_path, "cst", &format!("{:#?}\n", cst));
     }
 
-    let (asts, ast_cst_id_map) = db.ast(module.clone()).unwrap();
+    let (asts, ast_cst_id_map) = db.ast(module.clone());
     if debug {
         module.dump_associated_debug_file(
             &packages_path,
@@ -246,7 +241,7 @@ fn raw_build(
         );
     }
 
-    let (hir, hir_ast_id_map) = db.hir(module.clone()).unwrap();
+    let (hir, hir_ast_id_map) = db.hir(module.clone());
     if debug {
         module.dump_associated_debug_file(
             &packages_path,
@@ -269,15 +264,40 @@ fn raw_build(
         );
     }
 
-    let mut errors = vec![];
-    hir.collect_errors(&mut errors);
+    let (mir, _) = db.mir(module.clone(), tracing.clone());
+    if debug {
+        module.dump_associated_debug_file(
+            &packages_path,
+            "mir",
+            &format!("{}\n", mir.to_rich_ir()),
+        );
+    }
+
+    let (optimized_mir, _) = db.optimized_mir(module.clone(), tracing.clone());
+    if debug {
+        module.dump_associated_debug_file(
+            &packages_path,
+            "optimized_mir",
+            &format!("{}\n", optimized_mir.to_rich_ir()),
+        );
+    }
+
+    let (lir, errors) = db.lir(module.clone(), tracing.clone());
+    if debug {
+        module.dump_associated_debug_file(
+            &packages_path,
+            "lir",
+            &format!("{}\n", lir.to_rich_ir()),
+        );
+    }
+
     for CompilerError {
         module,
         span,
         payload,
-    } in errors
+    } in errors.iter()
     {
-        let range = db.range_to_positions(module.clone(), span);
+        let range = db.range_to_positions(module.clone(), span.clone());
         warn!(
             "{}:{}:{} – {}:{}: {payload}",
             module.to_rich_ir(),
@@ -288,36 +308,7 @@ fn raw_build(
         );
     }
 
-    let mir = db.mir(module.clone(), tracing.clone()).unwrap();
-    if debug {
-        module.dump_associated_debug_file(
-            &packages_path,
-            "mir",
-            &format!("{}\n", mir.to_rich_ir()),
-        );
-    }
-
-    let optimized_mir = db
-        .mir_with_obvious_optimized(module.clone(), tracing.clone())
-        .unwrap();
-    if debug {
-        module.dump_associated_debug_file(
-            &packages_path,
-            "optimized_mir",
-            &format!("{}\n", optimized_mir.to_rich_ir()),
-        );
-    }
-
-    let lir = db.lir(module.clone(), tracing.clone()).unwrap();
-    if debug {
-        module.dump_associated_debug_file(
-            &packages_path,
-            "lir",
-            &format!("{}\n", lir.to_rich_ir()),
-        );
-    }
-
-    Some(lir)
+    lir
 }
 
 fn run(options: CandyRunOptions) -> ProgramResult {
@@ -332,26 +323,16 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         calls: TracingMode::all_or_off(options.tracing),
         evaluated_expressions: TracingMode::only_current_or_off(options.tracing),
     };
-    if raw_build(&db, module.clone(), &tracing, options.debug).is_none() {
-        warn!("File not found.");
-        return Err(Exit::FileNotFound);
-    };
+    raw_build(&db, module.clone(), &tracing, options.debug);
 
     debug!("Running {}.", module.to_rich_ir());
 
-    let module_closure = Closure::of_module(&db, module.clone(), tracing.clone()).unwrap();
+    let module_closure = Closure::of_module(&db, module.clone(), tracing);
     let mut tracer = FullTracer::default();
 
     let mut vm = Vm::default();
     vm.set_up_for_running_module_closure(module.clone(), module_closure);
-    vm.run(
-        &DbUseProvider {
-            db: &db,
-            tracing: tracing.clone(),
-        },
-        &mut RunForever,
-        &mut tracer,
-    );
+    vm.run(&mut RunForever, &mut tracer);
     if let Status::WaitingForOperations = vm.status() {
         error!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");
         // TODO: Show stack traces of all fibers?
@@ -427,14 +408,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     loop {
         match vm.status() {
             Status::CanRun => {
-                vm.run(
-                    &DbUseProvider {
-                        db: &db,
-                        tracing: tracing.clone(),
-                    },
-                    &mut RunForever,
-                    &mut tracer,
-                );
+                vm.run(&mut RunForever, &mut tracer);
             }
             Status::WaitingForOperations => {}
             _ => break,
@@ -552,10 +526,7 @@ fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
         evaluated_expressions: TracingMode::Off,
     };
 
-    if raw_build(&db, module.clone(), &tracing, options.debug).is_none() {
-        warn!("File not found.");
-        return Err(Exit::FileNotFound);
-    }
+    raw_build(&db, module.clone(), &tracing, options.debug);
 
     debug!("Fuzzing `{}`.", module.to_rich_ir());
     let failing_cases = candy_fuzzer::fuzz(&db, module);

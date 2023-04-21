@@ -1,9 +1,7 @@
 use candy_frontend::hir::Id;
 use candy_vm::{
     self,
-    context::{
-        CombiningExecutionController, CountingExecutionController, ExecutionController, UseProvider,
-    },
+    context::{CombiningExecutionController, CountingExecutionController, ExecutionController},
     heap::{Data, Heap, Pointer},
     tracer::full::FullTracer,
     vm::{self, Vm},
@@ -68,11 +66,7 @@ impl Runner {
         }
     }
 
-    pub fn run<U: UseProvider, E: ExecutionController>(
-        &mut self,
-        use_provider: &U,
-        execution_controller: &mut E,
-    ) {
+    pub fn run<E: ExecutionController>(&mut self, execution_controller: &mut E) {
         assert!(self.vm.is_some());
         assert!(self.result.is_none());
 
@@ -83,11 +77,10 @@ impl Runner {
         while matches!(self.vm.as_ref().unwrap().status(), vm::Status::CanRun)
             && execution_controller.should_continue_running()
         {
-            self.vm.as_mut().unwrap().run(
-                use_provider,
-                &mut execution_controller,
-                &mut self.tracer,
-            );
+            self.vm
+                .as_mut()
+                .unwrap()
+                .run(&mut execution_controller, &mut self.tracer);
         }
 
         self.num_instructions += instruction_counter.num_instructions;

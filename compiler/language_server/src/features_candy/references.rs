@@ -80,7 +80,7 @@ fn find_references<DB: AstToHir + HirDb + PositionConversionDb>(
         ReferenceQuery::Symbol(module, _) => module.to_owned(),
         ReferenceQuery::Needs(module) => module.to_owned(),
     };
-    let (hir, _) = db.hir(module).unwrap();
+    let (hir, _) = db.hir(module);
 
     let mut context = Context::new(db, query, include_declaration);
     context.visit_body(hir.as_ref());

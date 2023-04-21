@@ -9,7 +9,7 @@ use candy_frontend::{
     TracingConfig, TracingMode,
 };
 use candy_vm::{
-    context::{DbUseProvider, RunLimitedNumberOfInstructions},
+    context::RunLimitedNumberOfInstructions,
     fiber::FiberId,
     heap::{Closure, Heap, Pointer},
     mir_to_lir::MirToLir,
@@ -44,7 +44,7 @@ impl ConstantEvaluator {
         let mut vm = Vm::default();
         vm.set_up_for_running_module_closure(
             module.clone(),
-            Closure::of_module(db, module.clone(), tracing).unwrap(),
+            Closure::of_module(db, module.clone(), tracing),
         );
         self.evaluators.insert(module, Evaluator { tracer, vm });
     }
@@ -53,10 +53,7 @@ impl ConstantEvaluator {
         self.evaluators.remove(&module).unwrap();
     }
 
-    pub fn run<DB>(&mut self, db: &DB) -> Option<Module>
-    where
-        DB: AstDb + AstToHir + HirDb + MirToLir + ModuleDb + PositionConversionDb,
-    {
+    pub fn run(&mut self) -> Option<Module> {
         let mut running_evaluators = self
             .evaluators
             .iter_mut()
@@ -65,10 +62,6 @@ impl ConstantEvaluator {
         let (module, evaluator) = running_evaluators.choose_mut(&mut thread_rng())?;
 
         evaluator.vm.run(
-            &DbUseProvider {
-                db,
-                tracing: TracingConfig::off(),
-            },
             &mut RunLimitedNumberOfInstructions::new(500),
             &mut evaluator.tracer,
         );

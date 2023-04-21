@@ -19,7 +19,7 @@ use candy_frontend::{
     {hir::Id, TracingConfig, TracingMode},
 };
 use candy_vm::{
-    context::{DbUseProvider, RunForever, RunLimitedNumberOfInstructions},
+    context::{RunForever, RunLimitedNumberOfInstructions},
     heap::{Closure, Heap, Pointer},
     mir_to_lir::MirToLir,
     tracer::full::FullTracer,
@@ -43,16 +43,9 @@ where
         let mut vm = Vm::default();
         vm.set_up_for_running_module_closure(
             module.clone(),
-            Closure::of_module(db, module, tracing.clone()).unwrap(),
+            Closure::of_module(db, module, tracing),
         );
-        vm.run(
-            &DbUseProvider {
-                db,
-                tracing: tracing.clone(),
-            },
-            &mut RunForever,
-            &mut tracer,
-        );
+        vm.run(&mut RunForever, &mut tracer);
         (tracer.heap, tracer.fuzzables)
     };
 
@@ -66,13 +59,7 @@ where
     for (id, closure) in fuzzables {
         info!("Fuzzing {id}.");
         let mut fuzzer = Fuzzer::new(&fuzzables_heap, closure, id.clone());
-        fuzzer.run(
-            &mut DbUseProvider {
-                db,
-                tracing: tracing.clone(),
-            },
-            &mut RunLimitedNumberOfInstructions::new(100000),
-        );
+        fuzzer.run(&mut RunLimitedNumberOfInstructions::new(100000));
         match fuzzer.into_status() {
             Status::StillFuzzing { .. } => {}
             Status::FoundPanic {

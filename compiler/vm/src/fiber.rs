@@ -4,7 +4,7 @@ use crate::channel::ChannelId;
 
 use super::{
     channel::{Capacity, Packet},
-    context::{ExecutionController, UseProvider},
+    context::ExecutionController,
     heap::{Builtin, Closure, Data, Heap, Pointer, Text},
     lir::Instruction,
     tracer::FiberTracer,
@@ -240,7 +240,6 @@ impl Fiber {
 
     pub fn run(
         &mut self,
-        use_provider: &dyn UseProvider,
         execution_controller: &mut dyn ExecutionController,
         tracer: &mut FiberTracer,
     ) {
@@ -268,16 +267,11 @@ impl Fiber {
                 .clone();
 
             self.next_instruction.instruction += 1;
-            self.run_instruction(use_provider, tracer, instruction);
+            self.run_instruction(tracer, instruction);
             execution_controller.instruction_executed();
         }
     }
-    pub fn run_instruction(
-        &mut self,
-        use_provider: &dyn UseProvider,
-        tracer: &mut FiberTracer,
-        instruction: Instruction,
-    ) {
+    pub fn run_instruction(&mut self, tracer: &mut FiberTracer, instruction: Instruction) {
         if TRACE {
             trace!(
                 "Instruction pointer: {}:{}",
@@ -416,18 +410,6 @@ impl Fiber {
                 self.heap.drop(self.next_instruction.closure);
                 let caller = self.call_stack.pop().unwrap();
                 self.next_instruction = caller;
-            }
-            Instruction::UseModule { current_module } => {
-                let responsible = self.data_stack.pop().unwrap();
-                let relative_path = self.data_stack.pop().unwrap();
-
-                match self.use_module(use_provider, current_module, relative_path) {
-                    Ok(()) => {}
-                    Err(reason) => {
-                        let responsible = self.heap.get_hir_id(responsible);
-                        self.panic(reason, responsible);
-                    }
-                }
             }
             Instruction::Panic => {
                 let responsible_for_panic = self.data_stack.pop().unwrap();

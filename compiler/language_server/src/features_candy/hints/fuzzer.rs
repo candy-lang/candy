@@ -3,13 +3,11 @@ use candy_frontend::{
     hir::{Expression, HirDb, Id, Lambda},
     module::{Module, ModuleDb},
     position::PositionConversionDb,
-    TracingConfig,
 };
 use candy_fuzzer::{Fuzzer, Status};
 use candy_vm::{
-    context::{DbUseProvider, RunLimitedNumberOfInstructions},
+    context::RunLimitedNumberOfInstructions,
     heap::{Heap, Pointer},
-    mir_to_lir::MirToLir,
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
@@ -46,7 +44,7 @@ impl FuzzerManager {
         self.fuzzers.remove(&module).unwrap();
     }
 
-    pub fn run<DB: MirToLir>(&mut self, db: &DB) -> Option<Module> {
+    pub fn run(&mut self) -> Option<Module> {
         let mut running_fuzzers = self
             .fuzzers
             .values_mut()
@@ -55,13 +53,7 @@ impl FuzzerManager {
             .collect_vec();
 
         let fuzzer = running_fuzzers.choose_mut(&mut thread_rng())?;
-        fuzzer.run(
-            &mut DbUseProvider {
-                db,
-                tracing: TracingConfig::off(),
-            },
-            &mut RunLimitedNumberOfInstructions::new(1000),
-        );
+        fuzzer.run(&mut RunLimitedNumberOfInstructions::new(1000));
 
         match &fuzzer.status() {
             Status::StillFuzzing { .. } => None,
