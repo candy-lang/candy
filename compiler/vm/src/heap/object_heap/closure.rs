@@ -47,16 +47,15 @@ impl HeapClosure {
             "Closure accepts too many arguments.",
         );
 
-        let instructions_len = instructions.len();
-
         let object = heap.allocate(
             HeapObject::KIND_CLOSURE
                 | ((captured_len as u64) << Self::CAPTURED_LEN_SHIFT)
                 | ((argument_count as u64) << Self::ARGUMENT_COUNT_SHIFT),
             (1 + captured_len) * HeapObject::WORD_SIZE + mem::size_of_val(instructions),
         );
+        let instructions_len = instructions.len();
         unsafe {
-            *object.content_word_pointer(0).cast().as_mut() = instructions_len;
+            *object.content_word_pointer(0).as_mut() = instructions_len as u64;
             ptr::copy_nonoverlapping(
                 captured.as_ptr(),
                 object.content_word_pointer(1).cast().as_ptr(),
@@ -75,7 +74,7 @@ impl HeapClosure {
     }
 
     pub fn captured_len(self) -> usize {
-        (self.header_word() >> 32) as usize
+        (self.header_word() >> Self::CAPTURED_LEN_SHIFT) as usize
     }
     pub fn captured<'a>(self) -> &'a [InlineObject] {
         unsafe {
@@ -87,7 +86,7 @@ impl HeapClosure {
     }
 
     pub fn argument_count(self) -> usize {
-        ((self.header_word() & 0xFFFF_FFFF) >> 3) as usize
+        ((self.header_word() & 0xFFFF_FFFF) >> Self::ARGUMENT_COUNT_SHIFT) as usize
     }
 
     fn instructions_pointer(self) -> NonNull<Instruction> {
