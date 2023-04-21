@@ -90,7 +90,6 @@ impl HeapObject {
     pub fn dup_by(self, amount: usize) {
         let new_reference_count = self.reference_count() + amount;
         self.set_reference_count(new_reference_count);
-
         trace!("RefCount of {self:p} increased to {new_reference_count}. Value: {self:?}");
     }
     pub fn drop(self, heap: &mut Heap) {
