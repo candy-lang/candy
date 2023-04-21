@@ -47,53 +47,51 @@ impl HeapClosure {
             "Closure accepts too many arguments.",
         );
 
-        let object = heap.allocate(
+        let closure = Self(heap.allocate(
             HeapObject::KIND_CLOSURE
                 | ((captured_len as u64) << Self::CAPTURED_LEN_SHIFT)
                 | ((argument_count as u64) << Self::ARGUMENT_COUNT_SHIFT),
             (1 + captured_len) * HeapObject::WORD_SIZE + mem::size_of_val(instructions),
-        );
+        ));
         let instructions_len = instructions.len();
         unsafe {
-            *object.content_word_pointer(0).as_mut() = instructions_len as u64;
+            *closure.instructions_len_pointer().as_mut() = instructions_len as u64;
             ptr::copy_nonoverlapping(
                 captured.as_ptr(),
-                object.content_word_pointer(1).cast().as_ptr(),
+                closure.captured_pointer().as_ptr(),
                 captured_len,
             );
             ptr::copy_nonoverlapping(
                 instructions.as_ptr(),
-                object
-                    .content_word_pointer(1 + captured_len)
-                    .cast()
-                    .as_ptr(),
+                closure.instructions_pointer().as_ptr(),
                 instructions_len,
             );
         }
-        Self(object)
+        closure
     }
 
     pub fn captured_len(self) -> usize {
         (self.header_word() >> Self::CAPTURED_LEN_SHIFT) as usize
     }
+    fn captured_pointer(self) -> NonNull<InlineObject> {
+        self.content_word_pointer(1).cast()
+    }
     pub fn captured<'a>(self) -> &'a [InlineObject] {
-        unsafe {
-            slice::from_raw_parts(
-                self.content_word_pointer(0).cast().as_ptr(),
-                self.captured_len(),
-            )
-        }
+        unsafe { slice::from_raw_parts(self.captured_pointer().as_ptr(), self.captured_len()) }
     }
 
     pub fn argument_count(self) -> usize {
         ((self.header_word() & 0xFFFF_FFFF) >> Self::ARGUMENT_COUNT_SHIFT) as usize
     }
 
-    fn instructions_pointer(self) -> NonNull<Instruction> {
-        self.content_word_pointer(self.captured_len()).cast()
+    fn instructions_len_pointer(self) -> NonNull<u64> {
+        self.content_word_pointer(0)
     }
     pub fn instructions_len(self) -> usize {
-        unsafe { *self.content_word_pointer(0).as_ref() as usize }
+        unsafe { *self.instructions_len_pointer().as_ref() as usize }
+    }
+    fn instructions_pointer(self) -> NonNull<Instruction> {
+        self.content_word_pointer(1 + self.captured_len()).cast()
     }
     pub fn instructions<'a>(self) -> &'a [Instruction] {
         unsafe {
