@@ -773,15 +773,15 @@ impl LoweringContext {
                 );
                 self.wrap_in_errors(cst.data.id, ast, errors)
             }
+            #[allow(unused_parens)]
             CstKind::Assignment {
                 left,
                 assignment_sign,
                 body,
             } => {
                 assert!(
-                    matches!(assignment_sign.kind, CstKind::EqualsSign | CstKind::ColonEqualsSign),
-                    "Expected an equals sign or colon equals sign for the assignment, but found {} instead.",
-                    assignment_sign,
+                    matches!(assignment_sign.kind, (CstKind::EqualsSign | CstKind::ColonEqualsSign)),
+                    "Expected an equals sign or colon equals sign for the assignment, but found {assignment_sign} instead.",
                 );
 
                 let body = self.lower_csts(body);
