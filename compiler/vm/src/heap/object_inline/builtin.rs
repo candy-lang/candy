@@ -15,14 +15,14 @@ use std::{
 pub struct InlineBuiltin(InlineObject);
 
 impl InlineBuiltin {
-    const BUILTIN_FUNCTION_INDEX_SHIFT: usize = 2;
+    const INDEX_SHIFT: usize = 2;
 
     pub fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
     }
 
     fn index(self) -> usize {
-        (self.raw_word() >> Self::BUILTIN_FUNCTION_INDEX_SHIFT) as usize
+        (self.raw_word() >> Self::INDEX_SHIFT) as usize
     }
     pub fn get(self) -> BuiltinFunction {
         builtin_functions::VALUES[self.index()]
@@ -57,12 +57,11 @@ impl From<BuiltinFunction> for InlineBuiltin {
     fn from(builtin_function: BuiltinFunction) -> Self {
         let index = builtin_function as usize;
         debug_assert_eq!(
-            (index << Self::BUILTIN_FUNCTION_INDEX_SHIFT) >> Self::BUILTIN_FUNCTION_INDEX_SHIFT,
+            (index << Self::INDEX_SHIFT) >> Self::INDEX_SHIFT,
             index,
             "Builtin function index is too large.",
         );
-        let header_word =
-            InlineObject::KIND_BUILTIN | ((index as u64) << Self::BUILTIN_FUNCTION_INDEX_SHIFT);
+        let header_word = InlineObject::KIND_BUILTIN | ((index as u64) << Self::INDEX_SHIFT);
         Self(InlineObject::new(header_word))
     }
 }
