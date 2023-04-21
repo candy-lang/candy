@@ -31,7 +31,7 @@ pub mod vm;
 
 pub fn run_lir(
     module: Module,
-    lir: &Lir,
+    lir: Lir,
     use_provider: &impl UseProvider,
     tracer: &mut impl Tracer,
 ) -> ExecutionResult {

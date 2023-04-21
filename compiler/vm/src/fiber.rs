@@ -348,7 +348,7 @@ impl Fiber {
                         object
                     })
                     .collect_vec();
-                let closure = Closure::create(&mut self.heap, &captured, num_args, &body);
+                let closure = Closure::create(&mut self.heap, &captured, num_args, body);
                 self.push_to_data_stack(closure);
             }
             Instruction::CreateBuiltin(builtin) => {

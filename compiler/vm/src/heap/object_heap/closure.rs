@@ -29,7 +29,7 @@ impl HeapClosure {
         heap: &mut Heap,
         captured: &[InlineObject],
         argument_count: usize,
-        instructions: &[Instruction],
+        instructions: Vec<Instruction>,
     ) -> Self {
         let captured_len = captured.len();
         assert_eq!(
@@ -51,7 +51,7 @@ impl HeapClosure {
             HeapObject::KIND_CLOSURE
                 | ((captured_len as u64) << Self::CAPTURED_LEN_SHIFT)
                 | ((argument_count as u64) << Self::ARGUMENT_COUNT_SHIFT),
-            (1 + captured_len) * HeapObject::WORD_SIZE + mem::size_of_val(instructions),
+            (1 + captured_len) * HeapObject::WORD_SIZE + mem::size_of_val(&instructions),
         ));
         let instructions_len = instructions.len();
         unsafe {
@@ -67,6 +67,12 @@ impl HeapClosure {
                 instructions_len,
             );
         }
+
+        // `Instruction`s are not self-contained, but can contain pointers to other objects on the
+        // Rust heap. Hence, we transfer ownership of the original instructions (including whatever
+        // they reference) to this `HeapClosure` object.
+        mem::forget(instructions);
+
         closure
     }
 
@@ -90,13 +96,21 @@ impl HeapClosure {
     pub fn instructions_len(self) -> usize {
         unsafe { *self.instructions_len_pointer().as_ref() as usize }
     }
-    fn instructions_pointer(self) -> NonNull<Instruction> {
+    pub fn instructions_pointer(self) -> NonNull<Instruction> {
         self.content_word_pointer(1 + self.captured_len()).cast()
     }
     pub fn instructions<'a>(self) -> &'a [Instruction] {
         unsafe {
             slice::from_raw_parts(
                 self.instructions_pointer().as_ref(),
+                self.instructions_len(),
+            )
+        }
+    }
+    fn instructions_mut<'a>(self) -> &'a mut [Instruction] {
+        unsafe {
+            slice::from_raw_parts_mut(
+                self.instructions_pointer().as_mut(),
                 self.instructions_len(),
             )
         }
@@ -194,5 +208,6 @@ impl HeapObjectTrait for HeapClosure {
         for captured in self.captured() {
             captured.drop(heap);
         }
+        unsafe { ptr::drop_in_place(self.instructions_mut() as *mut [_]) };
     }
 }

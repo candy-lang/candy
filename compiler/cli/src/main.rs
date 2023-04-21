@@ -343,7 +343,12 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         db: &db,
         tracing: tracing.clone(),
     };
-    let result = run_lir(module.clone(), lir.as_ref(), &use_provider, &mut tracer);
+    let result = run_lir(
+        module.clone(),
+        lir.as_ref().to_owned(),
+        &use_provider,
+        &mut tracer,
+    );
     if options.debug {
         module.dump_associated_debug_file(&packages_path, "trace", &format!("{tracer:?}"));
     }

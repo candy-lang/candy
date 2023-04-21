@@ -76,9 +76,14 @@ fuzz_target!(|data: &[u8]| {
         tracing: TRACING.clone(),
     };
     let mut tracer = DummyTracer::default();
-    let (mut heap, main) = run_lir(MODULE.clone(), lir.as_ref(), &use_provider, &mut tracer)
-        .into_main_function()
-        .unwrap();
+    let (mut heap, main) = run_lir(
+        MODULE.clone(),
+        lir.as_ref().to_owned(),
+        &use_provider,
+        &mut tracer,
+    )
+    .into_main_function()
+    .unwrap();
 
     // Run the `main` function.
     let environment = Struct::create(&mut heap, &Default::default());

@@ -75,9 +75,9 @@ impl MutableModuleProviderOwner for Database {
     }
 }
 
-pub fn setup_and_compile(source_code: &str) -> (Database, Arc<Lir>) {
+pub fn setup_and_compile(source_code: &str) -> (Database, Lir) {
     let mut db = setup();
-    let lir = compile(&mut db, source_code);
+    let lir = compile(&mut db, source_code).as_ref().to_owned();
     (db, lir)
 }
 
@@ -121,7 +121,7 @@ pub fn compile(db: &mut Database, source_code: &str) -> Arc<Lir> {
     db.lir(MODULE.clone(), TRACING.clone()).unwrap()
 }
 
-pub fn run(db: &Database, lir: &Lir) -> Packet {
+pub fn run(db: &Database, lir: Lir) -> Packet {
     let use_provider = DbUseProvider {
         db,
         tracing: TRACING.clone(),

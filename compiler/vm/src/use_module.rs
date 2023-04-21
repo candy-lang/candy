@@ -29,7 +29,7 @@ impl Fiber {
                 module.to_rich_ir(),
             )
         })?;
-        let closure = Closure::create_from_module_lir(&mut self.heap, lir.as_ref());
+        let closure = Closure::create_from_module_lir(&mut self.heap, lir.as_ref().to_owned());
         let responsible = HirId::create(&mut self.heap, Id::dummy());
         self.call_closure(closure, &[], responsible);
 

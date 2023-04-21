@@ -380,12 +380,12 @@ impl Closure {
         heap: &mut Heap,
         captured: &[InlineObject],
         argument_count: usize,
-        instructions: &[Instruction],
+        instructions: Vec<Instruction>,
     ) -> Self {
         HeapClosure::create(heap, captured, argument_count, instructions).into()
     }
-    pub fn create_from_module_lir(heap: &mut Heap, lir: &Lir) -> Self {
-        Self::create(heap, &[], 0, &lir.instructions)
+    pub fn create_from_module_lir(heap: &mut Heap, lir: Lir) -> Self {
+        Self::create(heap, &[], 0, lir.instructions)
     }
     pub fn create_from_module(
         heap: &mut Heap,
@@ -394,7 +394,7 @@ impl Closure {
         tracing: TracingConfig,
     ) -> Option<Self> {
         let lir = db.lir(module, tracing)?;
-        Some(Self::create_from_module_lir(heap, lir.as_ref()))
+        Some(Self::create_from_module_lir(heap, lir.as_ref().to_owned()))
     }
 }
 
