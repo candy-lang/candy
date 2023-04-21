@@ -136,7 +136,7 @@ impl DebugDisplay for HeapClosure {
                 } else {
                     captured
                         .iter()
-                        .map(|it| DebugDisplay::to_string(it, true))
+                        .map(|it| DebugDisplay::to_string(it, false))
                         .join(", ")
                 },
                 self.instructions()
