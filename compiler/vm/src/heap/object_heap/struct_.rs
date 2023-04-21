@@ -162,8 +162,9 @@ impl HeapStruct {
             .iter()
             .enumerate()
             .take_while(|(_, &existing_hash)| existing_hash == key_hash)
-            .map(|(index, _)| (index_of_first_hash_occurrence + index, keys[index]))
-            .find(|(_, existing_key)| key == *existing_key)
+            .map(|(index, _)| index_of_first_hash_occurrence + index)
+            .map(|index| (index, keys[index]))
+            .find(|(_, existing_key)| *existing_key == key)
             .map(|(index, _)| index)
             .ok_or(index_of_first_hash_occurrence)
     }
