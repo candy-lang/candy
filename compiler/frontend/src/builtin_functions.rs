@@ -7,7 +7,7 @@ pub enum BuiltinFunction {
     ChannelCreate,       // capacity -> [sendPort, receivePort]
     ChannelSend,         // channel any -> Nothing
     ChannelReceive,      // channel -> any
-    Equals,              // any any -> booleanSymbol
+    Equals,              // any any -> booleanTag
     FunctionRun,         // (lambdaWith0Arguments) -> (returnValue: any)
     GetArgumentCount,    // closure -> argumentCount
     IfElse,              // condition thenClosure elseClosure -> resultOfExecutedClosure
@@ -35,24 +35,24 @@ pub enum BuiltinFunction {
     Print,               // message -> Nothing
     StructGet,           // struct key -> value
     StructGetKeys,       // struct -> listOfKeys
-    StructHasKey,        // struct key -> booleanSymbol
-    TagWithoutValue,     // symbol -> symbol
-    TagHasValue,         // symbol -> booleanSymbol
-    TagGetValue,         // symbol -> any
+    StructHasKey,        // struct key -> booleanTag
+    TagWithoutValue,     // tag -> tag
+    TagHasValue,         // tag -> booleanTag
+    TagGetValue,         // tag -> any
     TextCharacters,      // text -> (listOfText: list)
     TextConcatenate,     // (textA: text) (textB: text) -> (concatenated: text)
-    TextContains,        // text (pattern: text) -> booleanSymbol
-    TextEndsWith,        // text (pattern: text) -> booleanSymbol
+    TextContains,        // text (pattern: text) -> booleanTag
+    TextEndsWith,        // text (pattern: text) -> booleanTag
     TextFromUtf8,        // (bytes: listOfInteger) -> resultOfText
     TextGetRange,        // text (startInclusive: int) (endExclusive: int) -> (substring: text)
-    TextIsEmpty,         // text -> (isEmpty: booleanSymbol)
+    TextIsEmpty,         // text -> (isEmpty: booleanTag)
     TextLength,          // text -> (length: int)
-    TextStartsWith,      // text (pattern: text) -> booleanSymbol
+    TextStartsWith,      // text (pattern: text) -> booleanTag
     TextTrimEnd,         // text -> text
     TextTrimStart,       // text -> text
     ToDebugText,         // any -> text
     Try,                 // closure -> okWithClosureResultOrErrorWithPanicReason
-    TypeOf,              // any -> typeSymbol
+    TypeOf,              // any -> typeTag
 }
 lazy_static! {
     pub static ref VALUES: Vec<BuiltinFunction> = BuiltinFunction::iter().collect();
