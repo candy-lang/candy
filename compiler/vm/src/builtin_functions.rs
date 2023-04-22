@@ -54,7 +54,7 @@ impl Fiber {
             BuiltinFunction::StructGet => self.heap.struct_get(args),
             BuiltinFunction::StructGetKeys => self.heap.struct_get_keys(args),
             BuiltinFunction::StructHasKey => self.heap.struct_has_key(args),
-            BuiltinFunction::TagGetSymbol => self.heap.tag_get_symbol(args),
+            BuiltinFunction::TagWithoutValue => self.heap.tag_without_value(args),
             BuiltinFunction::TagHasValue => self.heap.tag_has_value(args),
             BuiltinFunction::TagGetValue => self.heap.tag_get_value(args),
             BuiltinFunction::TextCharacters => self.heap.text_characters(args),
@@ -433,7 +433,7 @@ impl Heap {
         })
     }
 
-    fn tag_get_symbol(&mut self, args: &[Pointer]) -> BuiltinResult {
+    fn tag_without_value(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |tag: &Tag| {
             Return(self.create_tag(tag.symbol.to_string(), None))
         })

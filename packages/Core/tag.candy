@@ -3,9 +3,9 @@ type = use "..type"
 
 is value := type.is value Tag
 
-getSymbol tag :=
+withoutValue tag :=
   needs (is tag)
-  tag | ✨.tagGetSymbol
+  tag | ✨.tagWithoutValue
 
 hasValue tag :=
   needs (is tag)
@@ -19,9 +19,9 @@ getValue tag :=
 withSymbol tag symbolTag :=
   needs (is tag)
   needs (is symbolTag)
-  ifElse (tag | hasValue) { symbolTag (tag | getValue) } { symbolTag | getSymbol }
+  ifElse (tag | hasValue) { symbolTag (tag | getValue) } { symbolTag | withoutValue }
 
 withValue tag valueTag :=
   needs (is tag)
   needs (is valueTag)
-  ifElse (valueTag | hasValue) { tag (valueTag | getValue) } { tag | getSymbol }
+  ifElse (valueTag | hasValue) { tag (valueTag | getValue) } { tag | withoutValue }

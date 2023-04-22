@@ -36,7 +36,7 @@ pub enum BuiltinFunction {
     StructGet,           // struct key -> value
     StructGetKeys,       // struct -> listOfKeys
     StructHasKey,        // struct key -> booleanSymbol
-    TagGetSymbol,        // symbol -> symbol
+    TagWithoutValue,     // symbol -> symbol
     TagHasValue,         // symbol -> booleanSymbol
     TagGetValue,         // symbol -> any
     TextCharacters,      // text -> (listOfText: list)
@@ -93,7 +93,7 @@ impl BuiltinFunction {
             BuiltinFunction::StructGet => true,
             BuiltinFunction::StructGetKeys => true,
             BuiltinFunction::StructHasKey => true,
-            BuiltinFunction::TagGetSymbol => true,
+            BuiltinFunction::TagWithoutValue => true,
             BuiltinFunction::TagHasValue => true,
             BuiltinFunction::TagGetValue => true,
             BuiltinFunction::TextCharacters => true,
@@ -147,7 +147,7 @@ impl BuiltinFunction {
             BuiltinFunction::StructGet => 2,
             BuiltinFunction::StructGetKeys => 1,
             BuiltinFunction::StructHasKey => 2,
-            BuiltinFunction::TagGetSymbol => 1,
+            BuiltinFunction::TagWithoutValue => 1,
             BuiltinFunction::TagHasValue => 1,
             BuiltinFunction::TagGetValue => 1,
             BuiltinFunction::TextCharacters => 1,

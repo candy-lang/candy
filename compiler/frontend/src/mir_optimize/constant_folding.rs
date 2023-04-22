@@ -248,7 +248,7 @@ fn run_builtin(
 
             is_contained?.into()
         }
-        BuiltinFunction::TagGetSymbol => return None,
+        BuiltinFunction::TagWithoutValue => return None,
         BuiltinFunction::TagHasValue => return None,
         BuiltinFunction::TagGetValue => return None,
         BuiltinFunction::TextCharacters => return None,
@@ -327,7 +327,7 @@ fn run_builtin(
                     BuiltinFunction::StructGet => return None,
                     BuiltinFunction::StructGetKeys => "List",
                     BuiltinFunction::StructHasKey => "Tag",
-                    BuiltinFunction::TagGetSymbol => "Tag",
+                    BuiltinFunction::TagWithoutValue => "Tag",
                     BuiltinFunction::TagHasValue => "Tag",
                     BuiltinFunction::TagGetValue => return None,
                     BuiltinFunction::TextCharacters => "List",
