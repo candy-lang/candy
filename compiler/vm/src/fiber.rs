@@ -311,7 +311,6 @@ impl Fiber {
                 let address = self.heap.create_text(text);
                 self.data_stack.push(address);
             }
-            // TODO: Support tags with values
             Instruction::CreateSymbol(symbol) => {
                 let address = self.heap.create_tag(symbol, None);
                 self.data_stack.push(address);
