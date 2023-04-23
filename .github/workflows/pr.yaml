@@ -23,3 +23,15 @@ jobs:
       - uses: samspills/assign-pr-to-author@v1.0
         with:
           repo-token: ${{ secrets.BOT_TOKEN }}
+
+  automerge-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    if: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
+    steps:
+      - run: gh pr merge --auto --merge "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
