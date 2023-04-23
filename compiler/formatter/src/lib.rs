@@ -34,12 +34,12 @@ pub impl<C: AsRef<[Cst]>> Formatter for C {
 
         let formatted = format_csts(
             &mut edits,
-            &Width::default(),
+            Width::default(),
             csts,
             Offset::default(),
             &FormattingInfo::default(),
         );
-        if formatted.child_width() == &Width::default() {
+        if formatted.child_width() == Width::default() {
             _ = formatted.into_empty_trailing(&mut edits);
         } else {
             _ = formatted.into_trailing_with_indentation_detailed(
