@@ -22,11 +22,11 @@ jobs:
 
       # Compiler
       - name: 'Compiler: clippy'
-        run: caro clippy -- --deny warnings
+        run: cargo clippy -- --deny warnings
       - name: 'Compiler: test'
-        run: caro test --workspace
+        run: cargo test --workspace
       - name: 'Compiler: fmt'
-        run: caro fmt --check
+        run: cargo fmt --check
 
       # Core
       - name: 'Core: run'
