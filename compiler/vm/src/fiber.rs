@@ -527,7 +527,15 @@ impl Fiber {
                 self.heap.drop(callee);
                 self.run_builtin_function(&builtin, &arguments, responsible);
             }
-            Data::Tag(Tag { symbol, .. }) => {
+            Data::Tag(Tag { symbol, value }) => {
+                if value.is_some() {
+                    self.panic(
+                        "A tags value cannot be overwritten by calling it. Use tag.withValue instead.".to_string(),
+                        self.heap.get_hir_id(responsible),
+                    );
+                    return;
+                }
+
                 if let [value] = arguments.as_slice() {
                     let tag = self.heap.create_tag(symbol.to_string(), *value);
                     self.data_stack.push(tag);
@@ -545,7 +553,7 @@ impl Fiber {
             _ => {
                 self.panic(
                     format!(
-                        "You can only call closures and builtins, but you tried to call {}.",
+                        "You can only call closures, builtins and tags, but you tried to call {}.",
                         callee.format(&self.heap),
                     ),
                     self.heap.get_hir_id(responsible),
