@@ -240,7 +240,7 @@ impl<'a> ExistingWhitespace<'a> {
         } else {
             edits.insert(self.start_offset, SPACE);
         }
-        *SinglelineWidth::SPACE
+        SinglelineWidth::SPACE
     }
 
     #[must_use]
@@ -319,7 +319,7 @@ impl<'a> ExistingWhitespace<'a> {
             trailing_range,
             format!("{}{indentation}", NEWLINE.repeat(trailing_newline_count)),
         );
-        comments_width + (*Width::NEWLINE).clone() + indentation.width()
+        comments_width + Width::NEWLINE + indentation.width()
     }
     fn format_trailing_comments(
         edits: &mut TextEdits,
@@ -392,7 +392,7 @@ impl<'a> ExistingWhitespace<'a> {
                         };
 
                         comment_position = CommentPosition::NextLine(newline_count);
-                        width += Width::NEWLINE.clone();
+                        width += Width::NEWLINE;
                     }
                     CommentPosition::NextLine(_) if is_adopted => {
                         // We already encountered a newline (owned or adopted) and the new
@@ -419,14 +419,14 @@ impl<'a> ExistingWhitespace<'a> {
                             edits.delete(item.data.span.to_owned());
                         } else {
                             *count = count.checked_add(1).unwrap();
-                            width += Width::NEWLINE.clone();
+                            width += Width::NEWLINE;
                         }
                     }
                 },
                 CstKind::Comment { comment, .. } => {
                     let (comment_width, comment_whitespace) = format_cst(
                         edits,
-                        &previous_width,
+                        previous_width,
                         item,
                         &FormattingInfo {
                             indentation,
@@ -441,18 +441,17 @@ impl<'a> ExistingWhitespace<'a> {
                     let space = match comment_position {
                         CommentPosition::FirstLine => {
                             let (space, space_width) = if ensure_space_before_first_comment {
-                                (Cow::Borrowed(SPACE), *SinglelineWidth::SPACE)
+                                (Cow::Borrowed(SPACE), SinglelineWidth::SPACE)
                             } else {
                                 (Cow::default(), SinglelineWidth::default())
                             };
-                            if previous_width.last_line_fits(
-                                indentation,
-                                &(&space_width.into() + &comment_width),
-                            ) {
-                                width += &space_width.into();
+                            if previous_width
+                                .last_line_fits(indentation, space_width + comment_width)
+                            {
+                                width += Width::from(space_width);
                                 space
                             } else {
-                                width += Width::NEWLINE.clone() + indentation.width();
+                                width += Width::NEWLINE + indentation.width();
                                 Cow::Owned(format!("{NEWLINE}{indentation}"))
                             }
                         }
@@ -467,9 +466,9 @@ impl<'a> ExistingWhitespace<'a> {
                                             .unwrap_or(item.data.span.start),
                                         NEWLINE,
                                     );
-                                    width += Width::NEWLINE.clone() + indentation.width();
+                                    width += Width::NEWLINE + indentation.width();
                                 }
-                                NewlineCount::Owned(_) => width += &indentation.width().into(),
+                                NewlineCount::Owned(_) => width += indentation.width(),
                             }
                             Cow::Owned(indentation.to_string())
                         }
@@ -597,7 +596,7 @@ mod test {
         let mut edits = TextEdits::new(reduced_source);
         let (child_width, whitespace) = format_cst(
             &mut edits,
-            &Width::default(),
+            Width::default(),
             &cst,
             &FormattingInfo::default(),
         )
