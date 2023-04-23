@@ -308,8 +308,11 @@ impl Heap {
     pub fn create_text(&mut self, text: String) -> Pointer {
         self.create(Data::Text(Text { value: text }))
     }
-    pub fn create_tag(&mut self, symbol: String, value: Option<Pointer>) -> Pointer {
-        self.create(Data::Tag(Tag { symbol, value }))
+    pub fn create_tag(&mut self, symbol: String, value: impl Into<Option<Pointer>>) -> Pointer {
+        self.create(Data::Tag(Tag {
+            symbol,
+            value: value.into(),
+        }))
     }
     pub fn create_struct(&mut self, fields: FxHashMap<Pointer, Pointer>) -> Pointer {
         self.create(Data::Struct(Struct::from_fields(self, fields)))

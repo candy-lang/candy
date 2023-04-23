@@ -529,7 +529,7 @@ impl Fiber {
             }
             Data::Tag(Tag { symbol, .. }) => {
                 if let [value] = arguments.as_slice() {
-                    let tag = self.heap.create_tag(symbol.to_string(), Some(*value));
+                    let tag = self.heap.create_tag(symbol.to_string(), *value);
                     self.data_stack.push(tag);
                     self.heap.dup(*value);
                 } else {
