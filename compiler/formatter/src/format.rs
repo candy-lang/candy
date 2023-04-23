@@ -293,19 +293,25 @@ pub(crate) fn format_cst<'a>(
             width
         }
         CstKind::BinaryBar { left, bar, right } => {
-            let mut left = format_cst(edits, previous_width, left, info);
+            // Left
+            let mut left = format_receiver(edits, previous_width, left, info, false);
 
+            // Bar
             let width_for_right_side = Width::multiline(None, info.indentation.width());
             let bar_width = format_cst(edits, &width_for_right_side, bar, info)
                 .into_space_and_move_comments_to(edits, &mut left.whitespace);
+            let left_min_width = left.min_width(info.indentation);
 
+            // Right
             let (right, right_parentheses) = ExistingParentheses::split_from(edits, right);
             // Depending on the precedence of `right` and whether there's an opening parenthesis
             // with a comment, we might be able to remove the parentheses. However, we won't insert
             // any by ourselves.
             let right_needs_parentheses = match right.precedence() {
                 Some(PrecedenceCategory::High) => right_parentheses.are_required_due_to_comments(),
-                Some(PrecedenceCategory::Low) | None => right_parentheses.is_some(),
+                Some(PrecedenceCategory::BinaryBar | PrecedenceCategory::Low) | None => {
+                    right_parentheses.is_some()
+                }
             };
             let (previous_width_for_right, info_for_right) = if right_needs_parentheses {
                 (
@@ -325,7 +331,7 @@ pub(crate) fn format_cst<'a>(
                 right_parentheses.into_some(
                     edits,
                     &(previous_width
-                        + left.min_width(info.indentation)
+                        + &left_min_width
                         + *SinglelineWidth::SPACE
                         + &bar_width
                         + *SinglelineWidth::SPACE),
@@ -337,22 +343,19 @@ pub(crate) fn format_cst<'a>(
             }
             .split();
 
-            let left_trailing = if let Some(right_first_line_width) = right_width.first_line_width()
-                && (left.min_width(info.indentation)
+            let left_width = if let Some(right_first_line_width) = right_width.first_line_width()
+                && (&left_min_width
                     + *SinglelineWidth::SPACE
                     + &bar_width
                     + right_first_line_width)
                 .fits(info.indentation)
             {
-                TrailingWhitespace::Space
+                left.into_trailing_with_space(edits)
             } else {
-                TrailingWhitespace::Indentation(info.indentation)
+                left.into_trailing_with_indentation(edits, info.indentation)
             };
 
-            return FormattedCst::new(
-                left.into_trailing(edits, left_trailing) + bar_width + right_width,
-                whitespace,
-            );
+            return FormattedCst::new(left_width + bar_width + right_width, whitespace);
         }
         CstKind::Parenthesized { .. } => {
             // Whenever parentheses are necessary, they are handled by the parent. Hence, we try to
@@ -377,11 +380,12 @@ pub(crate) fn format_cst<'a>(
             receiver,
             arguments,
         } => {
-            let receiver = format_cst(edits, previous_width, receiver, info);
+            let receiver = format_receiver(edits, previous_width, receiver, info, true);
             if arguments.is_empty() {
                 return receiver;
             }
 
+            // Arguments
             let previous_width_for_arguments = Width::multiline(None, info.indentation.width());
             let last_argument_index = arguments.len() - 1;
             let mut arguments = arguments
@@ -567,7 +571,7 @@ pub(crate) fn format_cst<'a>(
             let (struct_, struct_parentheses) = ExistingParentheses::split_from(edits, struct_);
             let struct_needs_parentheses = match struct_.precedence() {
                 Some(PrecedenceCategory::High) => struct_parentheses.are_required_due_to_comments(),
-                Some(PrecedenceCategory::Low) => true,
+                Some(PrecedenceCategory::BinaryBar | PrecedenceCategory::Low) => true,
                 None => struct_parentheses.is_some(),
             };
             let (previous_width_for_struct, info_for_struct) = if struct_needs_parentheses {
@@ -943,6 +947,36 @@ pub(crate) fn format_cst<'a>(
     };
     FormattedCst::new(width, ExistingWhitespace::empty(cst.data.span.end))
 }
+fn format_receiver<'a>(
+    edits: &mut TextEdits,
+    previous_width: &Width,
+    receiver: &'a Cst,
+    info: &FormattingInfo,
+    are_parentheses_always_required_for_binary_bar: bool,
+) -> FormattedCst<'a> {
+    let (receiver, receiver_parentheses) = ExistingParentheses::split_from(edits, receiver);
+    let receiver_needs_parentheses = match receiver.precedence() {
+        Some(PrecedenceCategory::High) => receiver_parentheses.are_required_due_to_comments(),
+        Some(PrecedenceCategory::BinaryBar) => {
+            are_parentheses_always_required_for_binary_bar
+                || receiver_parentheses.are_required_due_to_comments()
+        }
+        Some(PrecedenceCategory::Low) => true,
+        None => receiver_parentheses.is_some(),
+    };
+    let previous_width_for_receiver = if receiver_needs_parentheses {
+        previous_width + *SinglelineWidth::PARENTHESIS + *SinglelineWidth::PARENTHESIS
+    } else {
+        previous_width.to_owned()
+    };
+    let receiver = format_cst(edits, &previous_width_for_receiver, receiver, info);
+
+    if receiver_needs_parentheses {
+        receiver_parentheses.into_some(edits, previous_width, receiver, info)
+    } else {
+        receiver_parentheses.into_none(edits, receiver)
+    }
+}
 
 struct Argument<'a> {
     argument: MaybeSandwichLikeArgument<'a>,
@@ -980,7 +1014,9 @@ impl<'a> Argument<'a> {
                 *SinglelineWidth::PARENTHESIS + *SinglelineWidth::PARENTHESIS;
             match precedence {
                 Some(PrecedenceCategory::High) => {}
-                Some(PrecedenceCategory::Low) => min_singleline_width += &parentheses_width.into(),
+                Some(PrecedenceCategory::BinaryBar | PrecedenceCategory::Low) => {
+                    min_singleline_width += &parentheses_width.into()
+                }
                 None if parentheses.is_some() => min_singleline_width += &parentheses_width.into(),
                 None => {}
             }
@@ -1059,7 +1095,12 @@ enum MaybeSandwichLikeArgument<'a> {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PrecedenceCategory {
+    /// Literals, parentheses, struct accesses, etc.
     High,
+
+    BinaryBar,
+
+    /// Calls and match
     Low,
 }
 
@@ -1112,7 +1153,7 @@ pub impl<D> CstExtension for Cst<D> {
             CstKind::OpeningText { .. } | CstKind::ClosingText { .. } => None,
             CstKind::Text { .. } => Some(PrecedenceCategory::High),
             CstKind::TextPart(_) | CstKind::TextInterpolation { .. } => None,
-            CstKind::BinaryBar { .. } => Some(PrecedenceCategory::Low),
+            CstKind::BinaryBar { .. } => Some(PrecedenceCategory::BinaryBar),
             CstKind::Parenthesized { .. } => Some(PrecedenceCategory::High),
             CstKind::Call { .. } => Some(PrecedenceCategory::Low),
             CstKind::List { .. } => Some(PrecedenceCategory::High),
@@ -1235,6 +1276,8 @@ mod test {
         test("foo | (\n  bar\n)", "foo | bar\n");
         test("foo | (bar baz)", "foo | (bar baz)\n");
         test("foo | (bar | baz)", "foo | (bar | baz)\n");
+        test("(foo bar) | baz", "(foo bar) | baz\n");
+        test("(foo | bar) | baz", "foo | bar | baz\n");
         test(
             "looooooooooooooooooooooooooooooooongReceiver | (looooooooooooooooooooooooooooooooooooooooongFunction)",
             "looooooooooooooooooooooooooooooooongReceiver | looooooooooooooooooooooooooooooooooooooooongFunction\n",
@@ -1384,6 +1427,8 @@ mod test {
         //   )
         test("foo (# abc\n  bar\n)", "foo\n  ( # abc\n    bar\n  )\n");
         test("needs (is foo) \"message\"", "needs (is foo) \"message\"\n");
+        test("(foo bar) baz", "(foo bar) baz\n");
+        test("(foo | bar) baz", "(foo | bar) baz\n");
 
         // Trailing sandwich-like
 
