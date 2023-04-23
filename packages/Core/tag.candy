@@ -21,7 +21,8 @@ withSymbol tag symbolTag :=
   needs (is symbolTag)
   ifElse (tag | hasValue) { symbolTag (tag | getValue) } { symbolTag | withoutValue }
 
-withValue tag valueTag :=
+withValue tag value :=
   needs (is tag)
-  needs (is valueTag)
-  ifElse (valueTag | hasValue) { tag (valueTag | getValue) } { tag | withoutValue }
+  ## TODO: Fix formatter to allow (tag | withoutValue) value
+  tagWithoutValue = tag | withoutValue
+  tagWithoutValue value
