@@ -21,12 +21,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2.2.1
 
       # Compiler
-      - name: 'Compiler: check'
-        run: caro check --workspace
-      - name: 'Compiler: test'
-        run: caro test --workspace
       - name: 'Compiler: clippy'
         run: caro clippy -- --deny warnings
+      - name: 'Compiler: test'
+        run: caro test --workspace
       - name: 'Compiler: fmt'
         run: caro fmt --check
 
