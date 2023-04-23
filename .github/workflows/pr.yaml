@@ -27,7 +27,7 @@ jobs:
   automerge-pr:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
     if: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
     steps:
