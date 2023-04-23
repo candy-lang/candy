@@ -173,14 +173,14 @@ impl Fiber {
     pub fn complete_channel_create(&mut self, channel: ChannelId) {
         assert!(matches!(self.status, Status::CreatingChannel { .. }));
 
-        let send_port_symbol = self.heap.create_tag("SendPort".to_string(), None);
-        let receive_port_symbol = self.heap.create_tag("ReceivePort".to_string(), None);
+        let send_port_tag = self.heap.create_tag("SendPort".to_string(), None);
+        let receive_port_tag = self.heap.create_tag("ReceivePort".to_string(), None);
         let send_port = self.heap.create_send_port(channel);
         let receive_port = self.heap.create_receive_port(channel);
         self.data_stack
             .push(self.heap.create_struct(FxHashMap::from_iter([
-                (send_port_symbol, send_port),
-                (receive_port_symbol, receive_port),
+                (send_port_tag, send_port),
+                (receive_port_tag, receive_port),
             ])));
         self.status = Status::Running;
     }
