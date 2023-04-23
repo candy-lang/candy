@@ -10,7 +10,7 @@ updates:
     schedule:
       interval: daily
   - package-ecosystem: cargo
-    directory: /compiler/compiler_fuzzer
+    directory: /compiler/formatter
     schedule:
       interval: daily
   - package-ecosystem: cargo
@@ -27,6 +27,10 @@ updates:
       interval: daily
   - package-ecosystem: cargo
     directory: /compiler/vm
+    schedule:
+      interval: daily
+  - package-ecosystem: cargo
+    directory: /compiler/vm/fuzz
     schedule:
       interval: daily
 
