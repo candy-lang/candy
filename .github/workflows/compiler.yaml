@@ -18,18 +18,7 @@ jobs:
         with:
           toolchain: ${{ env.RUST_VERSION }}
           components: clippy, rustfmt
-
-      - name: Cache Rust dependencies and build
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/git/db/
-            ~/.cargo/registry/cache/
-            ~/.cargo/registry/index/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+      - uses: Swatinem/rust-cache@v2.2.1
 
       # Compiler
       - name: 'Compiler: check'
@@ -53,18 +42,7 @@ jobs:
   #     - uses: dtolnay/rust-toolchain@b44cb146d03e8d870c57ab64b80f04586349ca5d
   #       with:
   #         toolchain: ${{ env.RUST_VERSION }}
-  
-  #     - name: Cache Rust dependencies and build
-  #       uses: actions/cache@v3
-  #       with:
-  #         path: |
-  #           ~/.cargo/bin/
-  #           ~/.cargo/git/db/
-  #           ~/.cargo/registry/cache/
-  #           ~/.cargo/registry/index/
-  #           target/
-  #         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-  #         restore-keys: ${{ runner.os }}-cargo-
+  #     - uses: Swatinem/rust-cache@v2.2.1
   
   #     - run: cargo run --release -- fuzz packages/Benchmark.candy
 
@@ -76,18 +54,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@b44cb146d03e8d870c57ab64b80f04586349ca5d
         with:
           toolchain: ${{ env.RUST_VERSION }}
-
-      - name: Cache Rust dependencies and build
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/git/db/
-            ~/.cargo/registry/cache/
-            ~/.cargo/registry/index/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+      - uses: Swatinem/rust-cache@v2.2.1
 
       - name: Run benchmark
         working-directory: compiler/vm/
