@@ -535,7 +535,7 @@ impl Fiber {
                 } else {
                     self.panic(
                         format!(
-                            "Assigning the value of a tag expects 1 parameter, but you provided {} arguments.",
+                            "A tag can only hold exactly one value, but you called it with {} arguments.",
                             arguments.len(),
                         ),
                         self.heap.get_hir_id(responsible),
