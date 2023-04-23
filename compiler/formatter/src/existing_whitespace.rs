@@ -240,7 +240,7 @@ impl<'a> ExistingWhitespace<'a> {
         } else {
             edits.insert(self.start_offset, SPACE);
         }
-        SinglelineWidth::SPACE
+        *SinglelineWidth::SPACE
     }
 
     #[must_use]
@@ -319,7 +319,7 @@ impl<'a> ExistingWhitespace<'a> {
             trailing_range,
             format!("{}{indentation}", NEWLINE.repeat(trailing_newline_count)),
         );
-        comments_width + Width::NEWLINE + indentation.width()
+        comments_width + (*Width::NEWLINE).clone() + indentation.width()
     }
     fn format_trailing_comments(
         edits: &mut TextEdits,
@@ -392,7 +392,7 @@ impl<'a> ExistingWhitespace<'a> {
                         };
 
                         comment_position = CommentPosition::NextLine(newline_count);
-                        width += Width::NEWLINE;
+                        width += Width::NEWLINE.clone();
                     }
                     CommentPosition::NextLine(_) if is_adopted => {
                         // We already encountered a newline (owned or adopted) and the new
@@ -419,7 +419,7 @@ impl<'a> ExistingWhitespace<'a> {
                             edits.delete(item.data.span.to_owned());
                         } else {
                             *count = count.checked_add(1).unwrap();
-                            width += Width::NEWLINE;
+                            width += Width::NEWLINE.clone();
                         }
                     }
                 },
@@ -441,7 +441,7 @@ impl<'a> ExistingWhitespace<'a> {
                     let space = match comment_position {
                         CommentPosition::FirstLine => {
                             let (space, space_width) = if ensure_space_before_first_comment {
-                                (Cow::Borrowed(SPACE), SinglelineWidth::SPACE)
+                                (Cow::Borrowed(SPACE), *SinglelineWidth::SPACE)
                             } else {
                                 (Cow::default(), SinglelineWidth::default())
                             };
@@ -452,7 +452,7 @@ impl<'a> ExistingWhitespace<'a> {
                                 width += &space_width.into();
                                 space
                             } else {
-                                width += Width::NEWLINE + indentation.width();
+                                width += Width::NEWLINE.clone() + indentation.width();
                                 Cow::Owned(format!("{NEWLINE}{indentation}"))
                             }
                         }
@@ -467,7 +467,7 @@ impl<'a> ExistingWhitespace<'a> {
                                             .unwrap_or(item.data.span.start),
                                         NEWLINE,
                                     );
-                                    width += Width::NEWLINE + indentation.width();
+                                    width += Width::NEWLINE.clone() + indentation.width();
                                 }
                                 NewlineCount::Owned(_) => width += &indentation.width().into(),
                             }

@@ -91,24 +91,25 @@ pub fn setup() -> Database {
     db
 }
 fn load_core(module_provider: &mut InMemoryModuleProvider) {
-    let packages_directory: PathBuf = "../../packages".into();
-    let core_directory: PathBuf = "../../packages/Core".into();
-    for file in WalkDir::new(&core_directory)
+    let packages_path: PathBuf = fs::canonicalize("../../packages").unwrap();
+    let core_path: PathBuf = packages_path.join("Core");
+    let package = Package::Managed("Core".into());
+
+    for file in WalkDir::new(&core_path)
         .into_iter()
         .map(|it| it.unwrap())
         .filter(|it| it.file_type().is_file())
         .filter(|it| it.file_name().to_string_lossy().ends_with(".candy"))
     {
-        let path = file.path();
-
-        let mut module = Module::from_package_root_and_file(
-            packages_directory.clone(),
-            path.to_owned(),
+        let module = Module::from_package_and_path(
+            &packages_path,
+            package.clone(),
+            file.path(),
             ModuleKind::Code,
-        );
-        module.package = PACKAGE.clone();
+        )
+        .unwrap();
 
-        let source_code = fs::read_to_string(path).unwrap();
+        let source_code = fs::read_to_string(file.path()).unwrap();
         module_provider.add_str(&module, source_code);
     }
 }

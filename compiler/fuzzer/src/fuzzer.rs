@@ -14,6 +14,7 @@ use candy_vm::{
     heap::{Closure, Data, Heap, Pointer},
     tracer::full::FullTracer,
 };
+
 pub struct Fuzzer {
     pub closure_heap: Heap,
     pub closure: Pointer,
