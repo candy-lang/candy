@@ -3,11 +3,6 @@ type = use "..type"
 
 is value := type.is value Tag
 
-getValue tag :=
-  needs (is tag)
-  needs (hasValue tag)
-  tag | ✨.tagGetValue
-
 hasValue tag :=
   needs (is tag)
   tag | ✨.tagHasValue
@@ -15,6 +10,11 @@ hasValue tag :=
 withoutValue tag :=
   needs (is tag)
   tag | ✨.tagWithoutValue
+
+getValue tag :=
+  needs (is tag)
+  needs (hasValue tag)
+  tag | ✨.tagGetValue
 
 withSymbol tag symbolTag :=
   needs (is tag)
