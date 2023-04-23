@@ -1,5 +1,5 @@
-type = use "..type"
 [ifElse] = use "..controlFlow"
+type = use "..type"
 
 is value := type.is value Tag
 
