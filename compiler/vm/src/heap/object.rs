@@ -317,7 +317,7 @@ impl Pointer {
             Data::Int(int) => format!("{}", int.value),
             Data::Text(text) => format!("\"{}\"", text.value),
             Data::Tag(Tag { symbol, value }) => value.map_or(symbol.to_string(), |value| {
-                format!("{}({})", symbol, value.format_helper(heap, is_debug))
+                format!("{} ({})", symbol, value.format_helper(heap, is_debug))
             }),
             Data::List(List { items }) => format!(
                 "({})",
