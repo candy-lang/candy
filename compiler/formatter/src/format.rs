@@ -350,7 +350,7 @@ pub(crate) fn format_cst<'a>(
                     + right_first_line_width)
                 .fits(info.indentation)
             {
-                left.into_trailing_with_space(edits).into()
+                left.into_trailing_with_space(edits)
             } else {
                 left.into_trailing_with_indentation(edits, info.indentation)
             };
