@@ -18,7 +18,7 @@ use itertools::Itertools;
 use std::fmt::{self, Debug};
 use tracing::trace;
 
-const TRACE: bool = false;
+const TRACE: bool = true;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FiberId(usize);
@@ -282,17 +282,17 @@ impl Fiber {
                 next_instruction.closure,
                 next_instruction.instruction,
             );
-            trace!(
-                "Data stack: {}",
-                if self.data_stack.is_empty() {
-                    "<empty>".to_string()
-                } else {
-                    self.data_stack
-                        .iter()
-                        .map(|it| format!("{it:?}"))
-                        .join(", ")
-                },
-            );
+            // trace!(
+            //     "Data stack: {}",
+            //     if self.data_stack.is_empty() {
+            //         "<empty>".to_string()
+            //     } else {
+            //         self.data_stack
+            //             .iter()
+            //             .map(|it| format!("{it:?}"))
+            //             .join(", ")
+            //     },
+            // );
             trace!(
                 "Call stack: {}",
                 if self.call_stack.is_empty() {
@@ -304,7 +304,7 @@ impl Fiber {
                         .join(", ")
                 },
             );
-            trace!("Heap: {:?}", self.heap);
+            // trace!("Heap: {:?}", self.heap);
         }
 
         match instruction {

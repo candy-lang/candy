@@ -10,6 +10,7 @@ use std::{
     ptr::{self, NonNull},
     slice, str,
 };
+use tracing::debug;
 
 #[derive(Clone, Copy, Deref)]
 pub struct HeapText(HeapObject);
@@ -32,6 +33,7 @@ impl HeapText {
             len,
         ));
         unsafe { ptr::copy_nonoverlapping(value.as_ptr(), text.text_pointer().as_ptr(), len) };
+        debug!("Created Text: {text:?}");
         text
     }
 
