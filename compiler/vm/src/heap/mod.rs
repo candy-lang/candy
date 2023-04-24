@@ -28,9 +28,9 @@ pub struct Heap {
 }
 
 impl Debug for Heap {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         writeln!(f, "{{")?;
-        for object in &self.objects {
+        for &object in &self.objects {
             let reference_count = object.reference_count();
             writeln!(
                 f,
