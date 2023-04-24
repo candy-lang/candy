@@ -530,7 +530,7 @@ impl Fiber {
             Data::Tag(Tag { symbol, value }) => {
                 if value.is_some() {
                     self.panic(
-                        "A tags value cannot be overwritten by calling it. Use tag.withValue instead.".to_string(),
+                        "A tag's value cannot be overwritten by calling it. Use `tag.withValue` instead.".to_string(),
                         self.heap.get_hir_id(responsible),
                     );
                     return;
