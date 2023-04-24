@@ -13,7 +13,6 @@ use candy_vm::{
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
-use std::collections::HashMap;
 use tracing::{debug, error};
 
 use crate::{
@@ -22,10 +21,11 @@ use crate::{
 };
 
 use super::Hint;
+use rustc_hash::FxHashMap;
 
 #[derive(Default)]
 pub struct FuzzerManager {
-    fuzzers: HashMap<Module, HashMap<Id, Fuzzer>>,
+    fuzzers: FxHashMap<Module, FxHashMap<Id, Fuzzer>>,
 }
 
 impl FuzzerManager {
