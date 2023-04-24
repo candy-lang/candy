@@ -23,6 +23,4 @@ withSymbol tag symbolTag :=
 
 withValue tag value :=
   needs (is tag)
-  ## TODO: Fix formatter to allow (tag | withoutValue) value
-  tagWithoutValue = tag | withoutValue
-  tagWithoutValue value
+  (tag | withoutValue) value
