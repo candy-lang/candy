@@ -25,7 +25,7 @@ use crate::{
     features_candy::{hints::HintsNotification, CandyFeatures},
     features_ir::{IrFeatures, UpdateIrNotification},
     semantic_tokens,
-    utils::{module_from_package_root_and_url, module_to_url},
+    utils::{module_from_url, module_to_url},
 };
 
 pub struct Server {
@@ -41,8 +41,8 @@ pub enum ServerState {
 }
 #[derive(Debug)]
 pub struct RunningServerState {
-    pub project_directory: PathBuf,
     pub features: ServerFeatures,
+    pub packages_path: PathBuf,
 }
 impl ServerState {
     pub fn require_features(&self) -> &ServerFeatures {
@@ -110,31 +110,41 @@ impl ServerFeatures {
 }
 
 impl Server {
-    pub fn create() -> (LspService<Self>, ClientSocket) {
+    pub fn create(packages_path: PathBuf) -> (LspService<Self>, ClientSocket) {
         let (diagnostics_sender, mut diagnostics_receiver) = mpsc::channel(8);
         let (hints_sender, mut hints_receiver) = mpsc::channel(1024);
 
         let (service, client) = LspService::build(|client| {
             let features = ServerFeatures {
-                candy: CandyFeatures::new(diagnostics_sender.clone(), hints_sender.clone()),
+                candy: CandyFeatures::new(
+                    packages_path.clone(),
+                    diagnostics_sender.clone(),
+                    hints_sender.clone(),
+                ),
                 ir: IrFeatures::default(),
             };
 
             let client_for_closure = client.clone();
+            let packages_path_for_closure = packages_path.clone();
             let diagnostics_reporter = async move || {
                 while let Some((module, diagnostics)) = diagnostics_receiver.recv().await {
                     client_for_closure
-                        .publish_diagnostics(module_to_url(&module).unwrap(), diagnostics, None)
+                        .publish_diagnostics(
+                            module_to_url(&module, &packages_path_for_closure).unwrap(),
+                            diagnostics,
+                            None,
+                        )
                         .await;
                 }
             };
             tokio::spawn(diagnostics_reporter());
             let client_for_closure = client.clone();
+            let packages_path_for_closure = packages_path.clone();
             let hint_reporter = async move || {
                 while let Some((module, hints)) = hints_receiver.recv().await {
                     client_for_closure
                         .send_notification::<HintsNotification>(HintsNotification {
-                            uri: module_to_url(&module).unwrap(),
+                            uri: module_to_url(&module, &packages_path_for_closure).unwrap(),
                             hints,
                         })
                         .await;
@@ -144,7 +154,9 @@ impl Server {
 
             Self {
                 client,
-                db: Default::default(),
+                db: Mutex::new(Database::new_with_file_system_module_provider(
+                    packages_path.to_path_buf(),
+                )),
                 state: RwLock::new(ServerState::Initial { features }),
             }
         })
@@ -183,18 +195,6 @@ impl LanguageServer for Server {
             .log_message(MessageType::INFO, "Initializing!")
             .await;
 
-        let first_workspace_folder = params
-            .workspace_folders
-            .unwrap()
-            .first()
-            .unwrap()
-            .uri
-            .clone();
-        let project_directory = match first_workspace_folder.scheme() {
-            "file" => first_workspace_folder.to_file_path().unwrap(),
-            _ => panic!("Workspace folder must be a file URI."),
-        };
-
         {
             let state = self.state.read().await;
             for features in state.require_features().all_features() {
@@ -202,13 +202,28 @@ impl LanguageServer for Server {
             }
         }
 
+        let packages_path = {
+            let options = params
+                .initialization_options
+                .as_ref()
+                .expect("No initialization options provided.")
+                .as_object()
+                .unwrap();
+            options
+                .get("packagesPath")
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .into()
+        };
+
         {
             RwLockWriteGuard::map(self.state.write().await, |state| {
                 let owned_state = mem::replace(state, ServerState::Shutdown);
                 let ServerState::Initial { features } = owned_state else { panic!("Already initialized"); };
                 *state = ServerState::Running(RunningServerState {
-                    project_directory,
                     features,
+                    packages_path,
                 });
                 state
             });
@@ -322,12 +337,7 @@ impl LanguageServer for Server {
         assert!(features.supports_did_open());
         let content = params.text_document.text.into_bytes();
         features
-            .did_open(
-                &self.db,
-                &state.project_directory,
-                params.text_document.uri,
-                content,
-            )
+            .did_open(&self.db, params.text_document.uri, content)
             .await;
     }
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
@@ -340,21 +350,20 @@ impl LanguageServer for Server {
             features
                 .did_change(
                     &self.db,
-                    &state.project_directory,
                     params.text_document.uri.clone(),
                     params.content_changes,
                 )
                 .await;
         };
 
-        let module_result = module_from_package_root_and_url(
-            state.project_directory.to_owned(),
+        let module_result = module_from_url(
             &params.text_document.uri,
             if params.text_document.uri.path().ends_with(".candy") {
                 ModuleKind::Code
             } else {
                 ModuleKind::Asset
             },
+            &state.packages_path,
         );
         if let Ok(module) = module_result {
             let notifications = {
@@ -378,9 +387,7 @@ impl LanguageServer for Server {
             .features_from_url(&state.features, &params.text_document.uri)
             .await;
         assert!(features.supports_did_close());
-        features
-            .did_close(&self.db, &state.project_directory, params.text_document.uri)
-            .await;
+        features.did_close(&self.db, params.text_document.uri).await;
     }
 
     async fn goto_definition(
@@ -398,7 +405,6 @@ impl LanguageServer for Server {
         let response = features
             .find_definition(
                 &self.db,
-                &state.project_directory,
                 params.text_document_position_params.text_document.uri,
                 params.text_document_position_params.position,
             )
@@ -471,7 +477,7 @@ impl LanguageServer for Server {
         assert!(features.supports_folding_ranges());
         Ok(Some(
             features
-                .folding_ranges(&self.db, &state.project_directory, params.text_document.uri)
+                .folding_ranges(&self.db, params.text_document.uri)
                 .await,
         ))
     }
@@ -486,9 +492,7 @@ impl LanguageServer for Server {
             .await;
         assert!(features.supports_format());
         Ok(Some(
-            features
-                .format(&self.db, &state.project_directory, params.text_document.uri)
-                .await,
+            features.format(&self.db, params.text_document.uri).await,
         ))
     }
 
@@ -500,8 +504,7 @@ impl LanguageServer for Server {
         let features = self
             .features_from_url(&state.features, &params.text_document.uri)
             .await;
-        let tokens =
-            features.semantic_tokens(&self.db, &state.project_directory, params.text_document.uri);
+        let tokens = features.semantic_tokens(&self.db, params.text_document.uri);
         let tokens = tokens.await;
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
             result_id: None,
@@ -524,7 +527,6 @@ impl Server {
         features
             .references(
                 &self.db,
-                &state.project_directory,
                 uri,
                 position,
                 only_in_same_document,

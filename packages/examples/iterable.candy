@@ -1,4 +1,4 @@
-core = use "...Core"
+core = use "Core"
 bool = core.bool
 ifElse = core.ifElse
 iterable = core.iterable

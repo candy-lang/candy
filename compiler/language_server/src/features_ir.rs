@@ -25,13 +25,7 @@ use lsp_types::{
 };
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::{
-    fmt::Debug,
-    hash::Hash,
-    ops::Range,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{fmt::Debug, hash::Hash, ops::Range, path::Path, sync::Arc};
 use strum::{EnumDiscriminants, EnumString, IntoStaticStr};
 use tokio::sync::{Mutex, RwLock};
 use tower_lsp::jsonrpc;
@@ -42,8 +36,8 @@ use crate::{
     semantic_tokens::{SemanticTokenModifier, SemanticTokenType, SemanticTokensBuilder},
     server::Server,
     utils::{
-        lsp_position_to_offset_raw, module_from_package_root_and_url, module_to_url,
-        range_to_lsp_range_raw, LspPositionConversion,
+        lsp_position_to_offset_raw, module_from_url, module_to_url, range_to_lsp_range_raw,
+        LspPositionConversion,
     },
 };
 
@@ -55,13 +49,8 @@ pub struct ViewIrParams {
 
 impl Server {
     pub async fn candy_view_ir(&self, params: ViewIrParams) -> jsonrpc::Result<String> {
-        let project_directory = {
-            let state = self.state.read().await;
-            state.require_running().project_directory.to_owned()
-        };
-        let config = IrConfig::decode(&params.uri, project_directory);
-
         let state = self.state.read().await;
+        let config = IrConfig::decode(&params.uri, &state.require_running().packages_path);
         let features = state.require_features();
 
         features.ir.open(&self.db, config, params.uri.clone()).await;
@@ -116,7 +105,11 @@ impl IrFeatures {
     }
 
     async fn ensure_is_open(&self, db: &Mutex<Database>, config: IrConfig) {
-        let uri = Url::from(&config);
+        let packages_path = {
+            let db = db.lock().await;
+            db.packages_path.to_path_buf()
+        };
+        let uri = Url::from_config(&config, &packages_path);
         {
             let open_irs = self.open_irs.read().await;
             if open_irs.contains_key(&uri) {
@@ -275,7 +268,7 @@ struct IrConfig {
     ir: Ir,
 }
 impl IrConfig {
-    fn decode(uri: &Url, package_root: PathBuf) -> Self {
+    fn decode(uri: &Url, packages_path: &Path) -> Self {
         let (path, ir) = uri.path().rsplit_once('.').unwrap();
         let details = urlencoding::decode(uri.fragment().unwrap()).unwrap();
         let mut details: serde_json::Map<String, serde_json::Value> =
@@ -305,16 +298,17 @@ impl IrConfig {
         };
 
         IrConfig {
-            module: module_from_package_root_and_url(package_root, &original_uri, module_kind)
-                .unwrap(),
+            module: module_from_url(&original_uri, module_kind, packages_path).unwrap(),
             ir,
         }
     }
 }
-impl From<&IrConfig> for Url {
-    fn from(config: &IrConfig) -> Self {
+
+#[extension_trait]
+impl UrlFromIrConfig for Url {
+    fn from_config(config: &IrConfig, packages_path: &Path) -> Self {
         let ir: &'static str = IrDiscriminants::from(&config.ir).into();
-        let original_url = module_to_url(&config.module).unwrap();
+        let original_url = module_to_url(&config.module, packages_path).unwrap();
 
         let mut details = serde_json::Map::new();
         details.insert("scheme".to_string(), original_url.scheme().into());
@@ -391,7 +385,6 @@ impl LanguageFeatures for IrFeatures {
     async fn find_definition(
         &self,
         db: &Mutex<Database>,
-        _project_directory: &Path,
         uri: Url,
         position: lsp_types::Position,
     ) -> Option<LocationLink> {
@@ -426,8 +419,14 @@ impl LanguageFeatures for IrFeatures {
             )
         };
 
+        let packages_path = {
+            let db = db.lock().await;
+            db.packages_path.to_path_buf()
+        };
+
+        let packages_path_for_closure = packages_path.clone();
         let find_in_other_ir = async move |config: IrConfig, key: &ReferenceKey| {
-            let uri = Url::from(&config);
+            let uri = Url::from_config(&config, &packages_path_for_closure);
             self.ensure_is_open(db, config).await;
 
             let rich_irs = self.open_irs.read().await;
@@ -446,13 +445,14 @@ impl LanguageFeatures for IrFeatures {
                 // These don't have a definition in Candy source code.
                 return None;
             }
-            ReferenceKey::Module(module) => {
-                (module_to_url(module).unwrap(), lsp_types::Range::default())
-            }
+            ReferenceKey::Module(module) => (
+                module_to_url(module, &packages_path).unwrap(),
+                lsp_types::Range::default(),
+            ),
             ReferenceKey::ModuleWithSpan(module, span) => {
                 let db = db.lock().await;
                 let range = db.range_to_lsp_range(module.to_owned(), span.to_owned());
-                (module_to_url(module).unwrap(), range)
+                (module_to_url(module, &packages_path).unwrap(), range)
             }
             ReferenceKey::HirId(id) => {
                 let config = IrConfig {
@@ -486,12 +486,7 @@ impl LanguageFeatures for IrFeatures {
     fn supports_folding_ranges(&self) -> bool {
         true
     }
-    async fn folding_ranges(
-        &self,
-        _db: &Mutex<Database>,
-        _project_directory: &Path,
-        uri: Url,
-    ) -> Vec<FoldingRange> {
+    async fn folding_ranges(&self, _db: &Mutex<Database>, uri: Url) -> Vec<FoldingRange> {
         let open_irs = self.open_irs.read().await;
         let open_ir = open_irs.get(&uri).unwrap();
         open_ir.folding_ranges()
@@ -503,7 +498,6 @@ impl LanguageFeatures for IrFeatures {
     async fn references(
         &self,
         _db: &Mutex<Database>,
-        _project_directory: &Path,
         uri: Url,
         position: lsp_types::Position,
         only_in_same_document: bool,
@@ -536,12 +530,7 @@ impl LanguageFeatures for IrFeatures {
     fn supports_semantic_tokens(&self) -> bool {
         true
     }
-    async fn semantic_tokens(
-        &self,
-        _db: &Mutex<Database>,
-        _project_directory: &Path,
-        uri: Url,
-    ) -> Vec<SemanticToken> {
+    async fn semantic_tokens(&self, _db: &Mutex<Database>, uri: Url) -> Vec<SemanticToken> {
         let open_irs = self.open_irs.read().await;
         let open_ir = open_irs.get(&uri).unwrap();
         open_ir.semantic_tokens()

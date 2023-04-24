@@ -426,7 +426,7 @@ impl<'a> ExistingWhitespace<'a> {
                 CstKind::Comment { comment, .. } => {
                     let (comment_width, comment_whitespace) = format_cst(
                         edits,
-                        &previous_width,
+                        previous_width,
                         item,
                         &FormattingInfo {
                             indentation,
@@ -445,11 +445,10 @@ impl<'a> ExistingWhitespace<'a> {
                             } else {
                                 (Cow::default(), SinglelineWidth::default())
                             };
-                            if previous_width.last_line_fits(
-                                indentation,
-                                &(&space_width.into() + &comment_width),
-                            ) {
-                                width += &space_width.into();
+                            if previous_width
+                                .last_line_fits(indentation, space_width + comment_width)
+                            {
+                                width += Width::from(space_width);
                                 space
                             } else {
                                 width += Width::NEWLINE + indentation.width();
@@ -469,7 +468,7 @@ impl<'a> ExistingWhitespace<'a> {
                                     );
                                     width += Width::NEWLINE + indentation.width();
                                 }
-                                NewlineCount::Owned(_) => width += &indentation.width().into(),
+                                NewlineCount::Owned(_) => width += indentation.width(),
                             }
                             Cow::Owned(indentation.to_string())
                         }
@@ -597,7 +596,7 @@ mod test {
         let mut edits = TextEdits::new(reduced_source);
         let (child_width, whitespace) = format_cst(
             &mut edits,
-            &Width::default(),
+            Width::default(),
             &cst,
             &FormattingInfo::default(),
         )

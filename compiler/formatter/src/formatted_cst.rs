@@ -33,15 +33,15 @@ impl<'a> FormattedCst<'a> {
     }
 
     #[must_use]
-    pub fn child_width(&self) -> &Width {
-        &self.child_width
+    pub fn child_width(&self) -> Width {
+        self.child_width
     }
     #[must_use]
     pub fn min_width(&self, indentation: Indentation) -> Width {
         if self.whitespace.has_comments() {
-            &self.child_width + Width::multiline(SinglelineWidth::default(), indentation.width())
+            self.child_width + Width::multiline(SinglelineWidth::default(), indentation.width())
         } else {
-            self.child_width.clone()
+            self.child_width
         }
     }
 
@@ -125,7 +125,7 @@ impl<'a> FormattedCst<'a> {
                 previous_width,
                 indentation,
             } => TrailingWithIndentationConfig::Trailing {
-                previous_width: previous_width + &self.child_width,
+                previous_width: *previous_width + self.child_width,
                 indentation: *indentation,
             },
         };

@@ -20,7 +20,7 @@ use extension_trait::extension_trait;
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position, Url};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, time::Duration, vec};
+use std::{collections::HashMap, path::PathBuf, time::Duration, vec};
 use tokio::{
     sync::mpsc::{error::TryRecvError, Receiver, Sender},
     time::sleep,
@@ -65,10 +65,11 @@ impl Notification for HintsNotification {
 #[tokio::main(worker_threads = 1)]
 #[allow(unused_must_use)]
 pub async fn run_server(
+    packages_path: PathBuf,
     mut incoming_events: Receiver<Event>,
     outgoing_hints: Sender<(Module, Vec<Hint>)>,
 ) {
-    let mut db = Database::default();
+    let mut db = Database::new_with_file_system_module_provider(packages_path);
     let mut constant_evaluator = ConstantEvaluator::default();
     let mut fuzzer = FuzzerManager::default();
     let mut outgoing_hints = OutgoingHints::new(outgoing_hints);

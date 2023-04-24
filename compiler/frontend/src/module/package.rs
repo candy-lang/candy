@@ -1,7 +1,11 @@
+use extension_trait::extension_trait;
+use rustc_hash::FxHashSet;
 use std::{
+    ffi::{OsStr, OsString},
     fmt::{self, Display, Formatter},
+    fs,
     hash::Hash,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
@@ -11,18 +15,7 @@ pub enum Package {
 
     /// A package managed by the Candy tooling. This is in some special cache
     /// directory where `use`d packages are downloaded to.
-    ///
-    /// For now, this option is also used for files picked from the file system
-    /// that are not part of the current working directory.
-    //
-    // TODO: Maybe add some sort of package indicator file after all so that we
-    // can allow arbitrary opened files from the file system to access parent
-    // and sibling modules if they're actually part of a larger package.
-    //
-    // TODO: Change this to just storing the package name or something like
-    // that so that the root of the cached packages folder isn't stored
-    // everywhere.
-    External(PathBuf),
+    Managed(PathBuf),
 
     /// An anonymous package. This is created for single untitled files that are
     /// not yet persisted to disk (such as when opening a new VSCode tab and
@@ -35,10 +28,10 @@ pub enum Package {
 }
 
 impl Package {
-    pub fn to_path(&self) -> Option<PathBuf> {
+    pub fn to_path(&self, packages_path: &Path) -> Option<PathBuf> {
         match self {
             Package::User(path) => Some(path.clone()),
-            Package::External(path) => Some(path.clone()),
+            Package::Managed(path) => Some(packages_path.join(path)),
             Package::Anonymous { .. } => None,
             Package::Tooling(_) => None,
         }
@@ -47,10 +40,50 @@ impl Package {
 impl Display for Package {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Package::User(path) => write!(f, "user:{path:?}"),
-            Package::External(path) => write!(f, "extern:{path:?}"),
+            Package::User(path) => write!(f, "{path:?}"),
+            Package::Managed(path) => write!(f, "{path:?}"),
             Package::Anonymous { url } => write!(f, "anonymous:{url}"),
             Package::Tooling(tooling) => write!(f, "tooling:{tooling}"),
         }
+    }
+}
+
+#[extension_trait]
+pub impl SurroundingPackage for Path {
+    fn surrounding_candy_package(&self, packages_path: &Path) -> Option<Package> {
+        let mut candidate = fs::canonicalize(self).unwrap();
+        if !candidate.is_dir() {
+            candidate = candidate.parent().unwrap().to_path_buf();
+        }
+
+        loop {
+            let children = fs::read_dir(&candidate)
+                .unwrap()
+                .map(|child| child.unwrap().file_name())
+                .collect::<FxHashSet<OsString>>();
+
+            if !children.contains(OsStr::new("_.candy")) {
+                return None;
+            }
+
+            if children.contains(OsStr::new("_package.candy")) {
+                break;
+            } else if let Some(parent) = candidate.parent() {
+                candidate = parent.to_path_buf();
+            } else {
+                return None;
+            }
+        }
+
+        // The `candidate` folder contains the `_package.candy` file.
+        Some(
+            if let Ok(path_relative_to_packages) =
+                candidate.strip_prefix(fs::canonicalize(packages_path).unwrap())
+            {
+                Package::Managed(path_relative_to_packages.to_path_buf())
+            } else {
+                Package::User(candidate)
+            },
+        )
     }
 }

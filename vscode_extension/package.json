@@ -91,6 +91,12 @@
           "default": "",
           "markdownDescription": "Command to start the 🍭 Candy language server. If empty, we'll attempt to find the 🍭 Candy executable in the `PATH` environment variable.",
           "scope": "machine"
+        },
+        "candy.packagesPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path of a folder that contains all packages.",
+          "scope": "machine"
         }
       }
     },
@@ -130,12 +136,12 @@
   "devDependencies": {
     "@types/glob": "^8.0.1",
     "@types/mocha": "^10.0.1",
-    "@types/node": "^18.15.11",
+    "@types/node": "^18.16.0",
     "@types/vscode": "^1.77.0",
-    "@typescript-eslint/eslint-plugin": "^5.57.1",
-    "@typescript-eslint/parser": "^5.57.1",
-    "eslint": "^8.38.0",
-    "glob": "^10.0.0",
+    "@typescript-eslint/eslint-plugin": "^5.59.0",
+    "@typescript-eslint/parser": "^5.59.0",
+    "eslint": "^8.39.0",
+    "glob": "^10.2.2",
     "mocha": "^10.2.0",
     "typescript": "^5.0.4",
     "vscode-test": "^1.4.0"
