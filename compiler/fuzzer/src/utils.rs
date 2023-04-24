@@ -6,9 +6,8 @@ use candy_vm::{
 use rustc_hash::{FxHashMap, FxHashSet};
 
 pub fn collect_symbols_in_heap(heap: &Heap) -> FxHashSet<String> {
-    heap.all_objects()
-        .iter()
-        .filter_map(|object| Symbol::try_from(*object).ok().map(|it| it.to_string()))
+    heap.iter()
+        .filter_map(|object| Symbol::try_from(object).ok().map(|it| it.to_string()))
         .collect()
 }
 

@@ -10,10 +10,12 @@ pub use self::{
     pointer::Pointer,
 };
 use crate::channel::ChannelId;
-use rustc_hash::FxHashMap;
+use derive_more::{DebugCustom, Deref, Pointer};
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     alloc::{self, Allocator, Layout},
     fmt::{self, Debug, Formatter},
+    hash::{Hash, Hasher},
 };
 
 mod object;
@@ -23,23 +25,8 @@ mod pointer;
 
 #[derive(Clone, Default)]
 pub struct Heap {
-    objects: Vec<HeapObject>,
+    objects: FxHashSet<ObjectInHeap>,
     channel_refcounts: FxHashMap<ChannelId, usize>,
-}
-
-impl Debug for Heap {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        writeln!(f, "{{")?;
-        for &object in &self.objects {
-            let reference_count = object.reference_count();
-            writeln!(
-                f,
-                "  {object:p} ({reference_count} {}): {object:?}",
-                if reference_count == 1 { "ref" } else { "refs" },
-            )?;
-        }
-        write!(f, "}}")
-    }
 }
 
 impl Heap {
@@ -58,7 +45,7 @@ impl Heap {
         unsafe { *pointer.as_ptr() = header_word };
         let object = HeapObject(pointer);
         object.set_reference_count(1);
-        self.objects.push(object);
+        self.objects.insert(ObjectInHeap(object));
         object
     }
     /// Don't call this method directly, call [drop] or [free] instead!
@@ -68,7 +55,8 @@ impl Heap {
             HeapObject::WORD_SIZE,
         )
         .unwrap();
-        unsafe { alloc::Global.deallocate(object.word_pointer(0).cast(), layout) };
+        self.objects.remove(&ObjectInHeap(*object));
+        unsafe { alloc::Global.deallocate(object.address().cast(), layout) };
     }
 
     pub(self) fn notify_port_created(&mut self, channel_id: ChannelId) {
@@ -93,11 +81,44 @@ impl Heap {
         }
     }
 
-    pub fn all_objects(&self) -> &[HeapObject] {
-        &self.objects
+    pub fn iter(&self) -> impl Iterator<Item = HeapObject> + '_ {
+        self.objects.iter().map(|it| **it)
     }
 
     pub fn known_channels(&self) -> impl IntoIterator<Item = ChannelId> + '_ {
         self.channel_refcounts.keys().copied()
+    }
+}
+
+impl Debug for Heap {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        writeln!(f, "{{")?;
+        for &object in &self.objects {
+            let reference_count = object.reference_count();
+            println!("Formatting object at {object:p}");
+            writeln!(
+                f,
+                "  {object:p} ({reference_count} {}): {object:?}",
+                if reference_count == 1 { "ref" } else { "refs" },
+            )?;
+        }
+        write!(f, "}}")
+    }
+}
+
+/// For tracking objects allocated in the heap, we don't want deep equality, but
+/// only care about the addresses.
+#[derive(Clone, Copy, DebugCustom, Deref, Pointer)]
+struct ObjectInHeap(HeapObject);
+
+impl Eq for ObjectInHeap {}
+impl PartialEq for ObjectInHeap {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.address() == other.0.address()
+    }
+}
+impl Hash for ObjectInHeap {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.address().hash(state)
     }
 }
