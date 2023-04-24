@@ -104,7 +104,7 @@ struct Context<'a> {
     is_top_level: bool,
 }
 
-impl<'a> Context<'a> {
+impl Context<'_> {
     fn start_non_top_level(&mut self) -> NonTopLevelResetState {
         NonTopLevelResetState(mem::replace(&mut self.is_top_level, false))
     }
@@ -114,7 +114,7 @@ impl<'a> Context<'a> {
 }
 struct NonTopLevelResetState(bool);
 
-impl<'a> Context<'a> {
+impl Context<'_> {
     #[must_use]
     fn start_scope(&mut self) -> ScopeResetState {
         ScopeResetState {
@@ -140,7 +140,7 @@ struct ScopeResetState {
     non_top_level_reset_state: NonTopLevelResetState,
 }
 
-impl<'a> Context<'a> {
+impl Context<'_> {
     fn compile(&mut self, asts: &[Ast]) -> hir::Id {
         if asts.is_empty() {
             self.push(None, Expression::nothing(), None)
