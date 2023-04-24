@@ -170,7 +170,6 @@ impl<'a> Context<'a> {
                     None => {
                         return self.push_error(
                             Some(name.id.clone()),
-                            ast.id.module.clone(),
                             self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
                             HirError::UnknownReference {
                                 name: name.value.clone(),
@@ -283,7 +282,6 @@ impl<'a> Context<'a> {
                             if self.public_identifiers.contains_key(&name) {
                                 self.push_error(
                                     None,
-                                    ast.id.module.clone(),
                                     self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
                                     HirError::PublicAssignmentWithSameName {
                                         name: name.to_owned(),
@@ -295,7 +293,6 @@ impl<'a> Context<'a> {
                     } else {
                         self.push_error(
                             None,
-                            ast.id.module.clone(),
                             self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
                             HirError::PublicAssignmentInNotTopLevel,
                         );
@@ -576,7 +573,6 @@ impl<'a> Context<'a> {
                     _ => {
                         return self.push_error(
                             id,
-                            name_id.module.clone(),
                             self.db.ast_id_to_span(name_id.to_owned()).unwrap(),
                             HirError::NeedsWithWrongNumberOfArguments {
                                 num_args: call.arguments.len(),
@@ -630,7 +626,6 @@ impl<'a> Context<'a> {
     fn push_error(
         &mut self,
         ast_id: Option<ast::Id>,
-        module: Module,
         span: Range<Offset>,
         error: HirError,
     ) -> hir::Id {
@@ -639,7 +634,7 @@ impl<'a> Context<'a> {
             Expression::Error {
                 child: None,
                 errors: vec![CompilerError {
-                    module,
+                    module: self.module.clone(),
                     span,
                     payload: CompilerErrorPayload::Hir(error),
                 }],
