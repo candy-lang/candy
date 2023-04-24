@@ -8,6 +8,7 @@ rust-version = "1.56"
 
 [dependencies]
 derive_more = "0.99.17"
+dunce = "1.0.4"
 enumset = "1.0.12"
 extension-trait = "1.0.1"
 im = "15.1.0"

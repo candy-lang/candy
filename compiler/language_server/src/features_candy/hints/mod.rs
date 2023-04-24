@@ -12,7 +12,7 @@
 use self::{constant_evaluator::ConstantEvaluator, fuzzer::FuzzerManager};
 use crate::database::Database;
 use candy_frontend::{
-    module::{Module, MutableModuleProviderOwner},
+    module::{Module, MutableModuleProviderOwner, PackagesPath},
     rich_ir::ToRichIr,
 };
 use candy_vm::heap::Heap;
@@ -65,7 +65,7 @@ impl Notification for HintsNotification {
 #[tokio::main(worker_threads = 1)]
 #[allow(unused_must_use)]
 pub async fn run_server(
-    packages_path: PathBuf,
+    packages_path: PackagesPath,
     mut incoming_events: Receiver<Event>,
     outgoing_hints: Sender<(Module, Vec<Hint>)>,
 ) {

@@ -2,13 +2,13 @@ use crate::database::Database;
 use candy_frontend::{
     cst::CstDb,
     error::CompilerError,
-    module::{Module, ModuleDb, ModuleKind, Package},
+    module::{Module, ModuleDb, ModuleKind, Package, PackagesPath},
     position::{line_start_offsets_raw, Offset, PositionConversionDb},
 };
 use extension_trait::extension_trait;
 use itertools::Itertools;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Url};
-use std::{ops::Range, path::Path};
+use std::ops::Range;
 
 pub fn error_into_diagnostic(db: &Database, module: Module, error: CompilerError) -> Diagnostic {
     let related_information = error
@@ -42,10 +42,11 @@ pub fn error_into_diagnostic(db: &Database, module: Module, error: CompilerError
 pub fn module_from_url(
     url: &Url,
     kind: ModuleKind,
-    packages_path: &Path,
+    packages_path: &PackagesPath,
 ) -> Result<Module, String> {
     match url.scheme() {
-        "file" => Module::from_path(packages_path, &url.to_file_path().unwrap(), kind),
+        "file" => Module::from_path(packages_path, &url.to_file_path().unwrap(), kind)
+            .map_err(|it| it.to_string()),
         "untitled" => Ok(Module {
             package: Package::Anonymous {
                 url: url
@@ -61,7 +62,7 @@ pub fn module_from_url(
     }
 }
 
-pub fn module_to_url(module: &Module, packages_path: &Path) -> Option<Url> {
+pub fn module_to_url(module: &Module, packages_path: &PackagesPath) -> Option<Url> {
     match &module.package {
         Package::User(_) | Package::Managed(_) => Some(
             Url::from_file_path(

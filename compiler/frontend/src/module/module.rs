@@ -1,7 +1,8 @@
-use super::package::{Package, SurroundingPackage};
+use super::package::{Package, PackagesPath};
 use crate::rich_ir::{RichIrBuilder, ToRichIr, TokenType};
 use itertools::Itertools;
 use std::{
+    fmt::{self, Display, Formatter},
     fs,
     hash::Hash,
     path::{Path, PathBuf},
@@ -29,33 +30,30 @@ impl Module {
         }
     }
 
-    pub fn from_path(packages_path: &Path, path: &Path, kind: ModuleKind) -> Result<Self, String> {
-        assert!(packages_path.is_absolute());
+    pub fn from_path(
+        packages_path: &PackagesPath,
+        path: &Path,
+        kind: ModuleKind,
+    ) -> Result<Self, ModuleFromPathError> {
         assert!(path.is_absolute());
 
-        let package = path
-            .surrounding_candy_package(packages_path)
+        let package = packages_path
+            .find_surrounding_package(path)
             .unwrap_or_else(|| Package::User(path.to_path_buf()));
 
         Self::from_package_and_path(packages_path, package, path, kind)
     }
     pub fn from_package_and_path(
-        packages_path: &Path,
+        packages_path: &PackagesPath,
         package: Package,
         path: &Path,
         kind: ModuleKind,
-    ) -> Result<Self, String> {
-        assert!(packages_path.is_absolute());
-
-        let Ok(canonicalized) = fs::canonicalize(path) else {
-            return Err(format!(
-                "File `{}` does not exist or its path is invalid.",
-                path.to_string_lossy(),
-            ))
-        };
+    ) -> Result<Self, ModuleFromPathError> {
+        let canonicalized = dunce::canonicalize(path)
+            .map_err(|_| ModuleFromPathError::NotFound(path.to_owned()))?;
         let relative_path = canonicalized
             .strip_prefix(package.to_path(packages_path).unwrap())
-            .expect("File is not located in the package.");
+            .map_err(|_| ModuleFromPathError::NotInPackage(path.to_owned()))?;
 
         let mut path = relative_path
             .components()
@@ -89,7 +87,7 @@ impl Module {
         })
     }
 
-    pub fn to_possible_paths(&self, packages_path: &Path) -> Option<Vec<PathBuf>> {
+    pub fn to_possible_paths(&self, packages_path: &PackagesPath) -> Option<Vec<PathBuf>> {
         let mut path = self.package.to_path(packages_path)?;
         for component in self.path.clone() {
             path.push(component);
@@ -110,7 +108,7 @@ impl Module {
             ],
         })
     }
-    fn try_to_path(&self, packages_path: &Path) -> Option<PathBuf> {
+    fn try_to_path(&self, packages_path: &PackagesPath) -> Option<PathBuf> {
         let paths = self.to_possible_paths(packages_path).unwrap_or_else(|| {
             panic!(
                 "Tried to get content of anonymous module {} that is not cached by the language server.",
@@ -130,11 +128,12 @@ impl Module {
 
     pub fn dump_associated_debug_file(
         &self,
-        packages_path: &Path,
+        packages_path: &PackagesPath,
         debug_type: &str,
         content: &str,
     ) {
         let Some(mut path) = self.try_to_path(packages_path) else { return; };
+
         path.set_extension(format!("candy.{}", debug_type));
         fs::write(path.clone(), content).unwrap_or_else(|error| {
             warn!(
@@ -144,6 +143,7 @@ impl Module {
         });
     }
 }
+
 impl ToRichIr for Module {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         let range = builder.push(
@@ -159,5 +159,27 @@ impl ToRichIr for Module {
             Default::default(),
         );
         builder.push_reference(self.to_owned(), range);
+    }
+}
+
+#[derive(Debug)]
+pub enum ModuleFromPathError {
+    NotFound(PathBuf),
+    NotInPackage(PathBuf),
+}
+impl Display for ModuleFromPathError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            ModuleFromPathError::NotFound(path) => {
+                write!(
+                    f,
+                    "File `{}` does not exist or its path is invalid.",
+                    path.to_string_lossy(),
+                )
+            }
+            ModuleFromPathError::NotInPackage(path) => {
+                write!(f, "File {:?} is not located in the package.", path)
+            }
+        }
     }
 }
