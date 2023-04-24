@@ -35,8 +35,6 @@ impl Module {
         path: &Path,
         kind: ModuleKind,
     ) -> Result<Self, ModuleFromPathError> {
-        assert!(path.is_absolute());
-
         let package = packages_path
             .find_surrounding_package(path)
             .unwrap_or_else(|| Package::User(path.to_path_buf()));
