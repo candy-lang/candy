@@ -11,11 +11,12 @@ pub use self::{
 };
 use crate::channel::ChannelId;
 use derive_more::{DebugCustom, Deref, Pointer};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
+use sorted_vec::SortedSet;
 use std::{
     alloc::{self, Allocator, Layout},
+    cmp::Ordering,
     fmt::{self, Debug, Formatter},
-    hash::{Hash, Hasher},
 };
 
 mod object;
@@ -25,7 +26,7 @@ mod pointer;
 
 #[derive(Clone, Default)]
 pub struct Heap {
-    objects: FxHashSet<ObjectInHeap>,
+    objects: SortedSet<ObjectInHeap>,
     channel_refcounts: FxHashMap<ChannelId, usize>,
 }
 
@@ -45,7 +46,7 @@ impl Heap {
         unsafe { *pointer.as_ptr() = header_word };
         let object = HeapObject(pointer);
         object.set_reference_count(1);
-        self.objects.insert(ObjectInHeap(object));
+        self.objects.replace(ObjectInHeap(object));
         object
     }
     /// Don't call this method directly, call [drop] or [free] instead!
@@ -55,7 +56,7 @@ impl Heap {
             HeapObject::WORD_SIZE,
         )
         .unwrap();
-        self.objects.remove(&ObjectInHeap(*object));
+        self.objects.remove_item(&ObjectInHeap(*object));
         unsafe { alloc::Global.deallocate(object.address().cast(), layout) };
     }
 
@@ -93,7 +94,7 @@ impl Heap {
 impl Debug for Heap {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         writeln!(f, "{{")?;
-        for &object in &self.objects {
+        for &object in self.objects.iter() {
             let reference_count = object.reference_count();
             println!("Formatting object at {object:p}");
             writeln!(
@@ -117,8 +118,14 @@ impl PartialEq for ObjectInHeap {
         self.0.address() == other.0.address()
     }
 }
-impl Hash for ObjectInHeap {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.address().hash(state)
+
+impl Ord for ObjectInHeap {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.address().cmp(&other.0.address())
+    }
+}
+impl PartialOrd for ObjectInHeap {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
