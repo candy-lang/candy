@@ -275,7 +275,7 @@ impl Fiber {
         instruction: Instruction,
     ) {
         if TRACE {
-            trace!("----- run_instruction -----");
+            trace!("Running instruction: {instruction:?}");
             let next_instruction = self.next_instruction.unwrap();
             trace!(
                 "Instruction pointer: {}:{}",
@@ -305,7 +305,6 @@ impl Fiber {
                 },
             );
             trace!("Heap: {:?}", self.heap);
-            trace!("Running instruction: {instruction:?}");
         }
 
         match instruction {
