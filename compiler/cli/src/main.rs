@@ -132,7 +132,7 @@ fn packages_path() -> PackagesPath {
     let candy_exe = current_exe().unwrap();
     let target_dir = candy_exe.parent().unwrap().parent().unwrap();
     let candy_repo = target_dir.parent().unwrap();
-    PackagesPath::try_from(candy_repo.join("packages").as_ref()).unwrap()
+    PackagesPath::try_from(candy_repo.join("packages").as_path()).unwrap()
 }
 fn module_for_path(path: Option<PathBuf>) -> Result<Module, Exit> {
     let packages_path = packages_path();

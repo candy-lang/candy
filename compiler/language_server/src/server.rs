@@ -209,14 +209,7 @@ impl LanguageServer for Server {
                 .expect("No initialization options provided.")
                 .as_object()
                 .unwrap();
-            match PackagesPath::try_from(
-                options
-                    .get("packagesPath")
-                    .unwrap()
-                    .as_str()
-                    .unwrap()
-                    .as_ref(),
-            ) {
+            match PackagesPath::try_from(options.get("packagesPath").unwrap().as_str().unwrap()) {
                 Ok(packages_path) => packages_path,
                 Err(err) => {
                     let message = format!("Failed to initialize: {}", err);

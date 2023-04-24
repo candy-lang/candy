@@ -1,4 +1,5 @@
 use derive_more::Deref;
+use expanduser::expanduser;
 use rustc_hash::FxHashSet;
 use std::{
     ffi::OsStr,
@@ -54,6 +55,15 @@ impl Display for PackagesPath {
     }
 }
 
+impl TryFrom<&str> for PackagesPath {
+    type Error = String;
+
+    fn try_from(path: &str) -> Result<Self, Self::Error> {
+        expanduser(path)
+            .map_err(|it| it.to_string())
+            .and_then(|it| it.as_path().try_into())
+    }
+}
 impl TryFrom<&Path> for PackagesPath {
     type Error = String;
 
