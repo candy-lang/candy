@@ -75,7 +75,14 @@ impl FuzzerManager {
     {
         let mut hints = vec![];
 
-        debug!("There are {} fuzzers.", self.fuzzers.len());
+        debug!(
+            "There {}.",
+            if self.fuzzers.len() == 1 {
+                "is 1 fuzzer".to_string()
+            } else {
+                format!("are {} fuzzers", self.fuzzers.len())
+            }
+        );
 
         for fuzzer in self.fuzzers[module].values() {
             let Status::FoundPanic {
