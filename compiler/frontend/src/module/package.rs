@@ -58,9 +58,9 @@ impl TryFrom<&Path> for PackagesPath {
     type Error = String;
 
     fn try_from(path: &Path) -> Result<Self, Self::Error> {
-        let path = dunce::canonicalize(path).map_err(|_| {
+        let path = dunce::canonicalize(path).map_err(|err| {
             format!(
-                "The packages path `{}` does not exist or its path is invalid.",
+                "The packages path `{}` does not exist or its path is invalid: {err}.",
                 path.to_string_lossy(),
             )
         })?;

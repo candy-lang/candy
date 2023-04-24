@@ -14,7 +14,7 @@ use lsp_types::{
 };
 use rustc_hash::FxHashMap;
 use serde::Serialize;
-use std::{mem, path::Path};
+use std::mem;
 use tokio::sync::{mpsc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tower_lsp::{jsonrpc, Client, ClientSocket, LanguageServer, LspService};
 use tracing::{debug, span, Level};
@@ -209,9 +209,23 @@ impl LanguageServer for Server {
                 .expect("No initialization options provided.")
                 .as_object()
                 .unwrap();
-            Path::new(options.get("packagesPath").unwrap().as_str().unwrap())
-                .try_into()
-                .unwrap()
+            match PackagesPath::try_from(
+                options
+                    .get("packagesPath")
+                    .unwrap()
+                    .as_str()
+                    .unwrap()
+                    .as_ref(),
+            ) {
+                Ok(packages_path) => packages_path,
+                Err(err) => {
+                    let message = format!("Failed to initialize: {}", err);
+                    self.client
+                        .show_message(MessageType::ERROR, message.clone())
+                        .await;
+                    return Err(jsonrpc::Error::invalid_params(message));
+                }
+            }
         };
 
         {
