@@ -9,7 +9,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/labeler@v4.0.3
+      - uses: actions/labeler@4.1.0
         with:
           configuration-path: .github/labels.yaml
           repo-token: ${{ secrets.BOT_TOKEN }}
