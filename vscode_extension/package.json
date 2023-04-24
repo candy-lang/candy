@@ -95,7 +95,7 @@
         "candy.packagesPath": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Path of a folder that contains all packages.",
+          "markdownDescription": "Path of a folder containing all packages.",
           "scope": "machine"
         }
       }
