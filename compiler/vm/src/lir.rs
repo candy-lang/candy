@@ -26,7 +26,7 @@ pub enum Instruction {
     /// Pushes a text.
     CreateText(String),
 
-    /// Pushes a symbol.
+    /// Pushes an empty tag.
     CreateSymbol(String),
 
     /// Pushes a builtin function.

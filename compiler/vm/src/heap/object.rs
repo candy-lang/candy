@@ -25,7 +25,7 @@ pub struct Object {
 pub enum Data {
     Int(Int),
     Text(Text),
-    Symbol(Symbol),
+    Tag(Tag),
     List(List),
     Struct(Struct),
     HirId(Id),
@@ -46,9 +46,10 @@ pub struct Text {
 }
 
 #[derive(Clone)]
-pub struct Symbol {
+pub struct Tag {
     // TODO: Choose a more efficient representation.
-    pub value: String,
+    pub symbol: String,
+    pub value: Option<Pointer>,
 }
 
 #[derive(Default, Clone)]
@@ -73,6 +74,19 @@ pub struct Builtin {
     pub function: BuiltinFunction,
 }
 
+impl Tag {
+    fn equals(&self, heap: &Heap, other: &Tag) -> bool {
+        if self.symbol != other.symbol {
+            return false;
+        }
+
+        if let Some(a) = self.value && let Some(b) = other.value {
+            a.equals(heap, b)
+        } else {
+            self.value.is_none() && other.value.is_none()
+        }
+    }
+}
 impl List {
     fn equals(&self, heap: &Heap, other: &List) -> bool {
         if self.items.len() != other.items.len() {
@@ -195,7 +209,10 @@ impl Data {
         match self {
             Data::Int(int) => int.value.hash(state),
             Data::Text(text) => text.value.hash(state),
-            Data::Symbol(symbol) => symbol.value.hash(state),
+            Data::Tag(tag) => {
+                tag.symbol.hash(state);
+                tag.value.hash(state);
+            }
             Data::List(List { items }) => {
                 let mut s = 0;
                 for item in items {
@@ -229,7 +246,7 @@ impl Data {
         match (self, other) {
             (Data::Int(a), Data::Int(b)) => a.value == b.value,
             (Data::Text(a), Data::Text(b)) => a.value == b.value,
-            (Data::Symbol(a), Data::Symbol(b)) => a.value == b.value,
+            (Data::Tag(a), Data::Tag(b)) => a.equals(heap, b),
             (Data::List(a), Data::List(b)) => a.equals(heap, b),
             (Data::Struct(a), Data::Struct(b)) => a.equals(heap, b),
             (Data::HirId(a), Data::HirId(b)) => a == b,
@@ -245,11 +262,11 @@ impl Data {
         match self {
             Data::Int(_)
             | Data::Text(_)
-            | Data::Symbol(_)
             | Data::Builtin(_)
             | Data::HirId(_)
             | Data::SendPort(_)
             | Data::ReceivePort(_) => Box::new(iter::empty()),
+            Data::Tag(Tag { value, .. }) => Box::new(value.iter().copied()),
             Data::List(List { items }) => Box::new(items.iter().copied()),
             Data::Struct(struct_) => Box::new(struct_.iter().flat_map(|(a, b)| vec![a, b])),
             Data::Closure(closure) => Box::new(closure.captured.iter().copied()),
@@ -299,7 +316,9 @@ impl Pointer {
         match &heap.get(*self).data {
             Data::Int(int) => format!("{}", int.value),
             Data::Text(text) => format!("\"{}\"", text.value),
-            Data::Symbol(symbol) => symbol.value.to_string(),
+            Data::Tag(Tag { symbol, value }) => value.map_or(symbol.to_string(), |value| {
+                format!("{} ({})", symbol, value.format_helper(heap, is_debug))
+            }),
             Data::List(List { items }) => format!(
                 "({})",
                 if items.is_empty() {
@@ -364,7 +383,7 @@ macro_rules! impl_data_try_into_type {
 }
 impl_data_try_into_type!(Int, Int, "Expected an int.");
 impl_data_try_into_type!(Text, Text, "Expected a text.");
-impl_data_try_into_type!(Symbol, Symbol, "Expected a symbol.");
+impl_data_try_into_type!(Tag, Tag, "Expected a symbol.");
 impl_data_try_into_type!(List, List, "Expected a list.");
 impl_data_try_into_type!(Struct, Struct, "Expected a struct.");
 impl_data_try_into_type!(Id, HirId, "Expected a HIR ID.");
@@ -376,8 +395,13 @@ impl TryInto<bool> for &Data {
     type Error = String;
 
     fn try_into(self) -> Result<bool, Self::Error> {
-        let symbol: &Symbol = self.try_into()?;
-        match symbol.value.as_str() {
+        let tag: &Tag = self.try_into()?;
+
+        if tag.value.is_some() {
+            return Err("Expected boolean symbol to have no associated value.".to_string());
+        }
+
+        match tag.symbol.as_str() {
             "True" => Ok(true),
             "False" => Ok(false),
             _ => Err("Expected `True` or `False`.".to_string()),

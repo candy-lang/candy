@@ -24,9 +24,10 @@ impl InputPool {
     pub fn new(num_args: usize, symbols_in_heap: Vec<String>) -> Self {
         let mut heap = Heap::default();
 
+        // FIXME: This should support tags with values
         let mut symbols = symbols_in_heap
             .into_iter()
-            .map(|symbol| heap.create_symbol(symbol))
+            .map(|symbol| heap.create_tag(symbol, None))
             .collect_vec();
         if symbols.is_empty() {
             symbols.push(heap.create_nothing());

@@ -2,7 +2,7 @@ use crate::{
     channel::ChannelId,
     channel::{Capacity, Packet},
     fiber::{Fiber, Status},
-    heap::{Closure, Data, Heap, Int, List, Pointer, ReceivePort, SendPort, Struct, Text},
+    heap::{Closure, Data, Heap, Int, List, Pointer, ReceivePort, SendPort, Struct, Tag, Text},
 };
 use candy_frontend::builtin_functions::BuiltinFunction;
 use itertools::Itertools;
@@ -54,6 +54,9 @@ impl Fiber {
             BuiltinFunction::StructGet => self.heap.struct_get(args),
             BuiltinFunction::StructGetKeys => self.heap.struct_get_keys(args),
             BuiltinFunction::StructHasKey => self.heap.struct_has_key(args),
+            BuiltinFunction::TagGetValue => self.heap.tag_get_value(args),
+            BuiltinFunction::TagHasValue => self.heap.tag_has_value(args),
+            BuiltinFunction::TagWithoutValue => self.heap.tag_without_value(args),
             BuiltinFunction::TextCharacters => self.heap.text_characters(args),
             BuiltinFunction::TextConcatenate => self.heap.text_concatenate(args),
             BuiltinFunction::TextContains => self.heap.text_contains(args),
@@ -430,6 +433,26 @@ impl Heap {
         })
     }
 
+    fn tag_get_value(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |tag: &Tag| {
+            tag.value
+                .map_or(Err("The tag doesn't have a value.".to_string()), |value| {
+                    self.dup(value);
+                    Ok(Return(value))
+                })
+        })
+    }
+    fn tag_has_value(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |tag: &Tag| {
+            Return(self.create_bool(tag.value.is_some()))
+        })
+    }
+    fn tag_without_value(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |tag: &Tag| {
+            Return(self.create_tag(tag.symbol.to_string(), None))
+        })
+    }
+
     fn text_characters(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: &Text| {
             let text = text.value.clone();
@@ -534,10 +557,10 @@ impl Heap {
 
     fn type_of(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Any| {
-            let symbol = match **value {
+            let type_name = match **value {
                 Data::Int(_) => "Int",
                 Data::Text(_) => "Text",
-                Data::Symbol(_) => "Symbol",
+                Data::Tag(_) => "Tag",
                 Data::List(_) => "List",
                 Data::Struct(_) => "Struct",
                 Data::HirId(_) => unreachable!(),
@@ -546,7 +569,7 @@ impl Heap {
                 Data::SendPort(_) => "SendPort",
                 Data::ReceivePort(_) => "ReceivePort",
             };
-            Return(self.create_symbol(symbol.to_string()))
+            Return(self.create_tag(type_name.to_string(), None))
         })
     }
 }

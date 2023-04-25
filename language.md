@@ -22,7 +22,7 @@ Note that not all of the features described here are implemented or even finaliz
 - [Values](#values)
   - [Integers](#integers)
   - [Texts](#texts)
-  - [Symbols](#symbols)
+  - [Tags](#tags)
   - [Lists](#lists)
   - [Structs](#structs)
   - [Closures](#closures)
@@ -128,14 +128,21 @@ Finally, you can use curly braces (`{}`) containing a text value to insert it in
 '"In meta texts, {{interpolation}} requires more curly braces; otherwise, the values are {not interpolated}."'
 ```
 
-### Symbols
+### Tags
 
-Symbols are uppercase identifiers that can only be compared for equality.
+Tags are uppercase identifiers that can only be compared for equality.
 
 ```candy
 True
 Green
 Foo
+```
+
+A tag can also hold a value.
+
+```candy
+Result 5
+Error "Something went wrong"
 ```
 
 ### Lists
@@ -196,7 +203,7 @@ See the [Concurrency](#concurrency) section for more information.
 
 ### More?
 
-TODO: Tuples? Tags? Sets?
+TODO: Tuples? Sets?
 
 - sets: Clojure has `%{ value }`
   - or like Toit? `{hey, you, there}` for set, empty map is `{:}`

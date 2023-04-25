@@ -1,9 +1,7 @@
 use crate::channel::ChannelId;
 
 pub use self::{
-    object::{
-        Builtin, Closure, Data, Int, List, Object, ReceivePort, SendPort, Struct, Symbol, Text,
-    },
+    object::{Builtin, Closure, Data, Int, List, Object, ReceivePort, SendPort, Struct, Tag, Text},
     pointer::Pointer,
 };
 use candy_frontend::{builtin_functions::BuiltinFunction, hir::Id};
@@ -249,7 +247,10 @@ impl Heap {
         match data {
             Data::Int(int) => Data::Int(int.clone()),
             Data::Text(text) => Data::Text(text.clone()),
-            Data::Symbol(symbol) => Data::Symbol(symbol.clone()),
+            Data::Tag(Tag { symbol, value }) => Data::Tag(Tag {
+                symbol: symbol.clone(),
+                value: value.as_ref().map(|value| address_map[value]),
+            }),
             Data::List(List { items }) => Data::List(List {
                 items: items.iter().map(|item| address_map[item]).collect(),
             }),
@@ -307,8 +308,11 @@ impl Heap {
     pub fn create_text(&mut self, text: String) -> Pointer {
         self.create(Data::Text(Text { value: text }))
     }
-    pub fn create_symbol(&mut self, symbol: String) -> Pointer {
-        self.create(Data::Symbol(Symbol { value: symbol }))
+    pub fn create_tag(&mut self, symbol: String, value: impl Into<Option<Pointer>>) -> Pointer {
+        self.create(Data::Tag(Tag {
+            symbol,
+            value: value.into(),
+        }))
     }
     pub fn create_struct(&mut self, fields: FxHashMap<Pointer, Pointer>) -> Pointer {
         self.create(Data::Struct(Struct::from_fields(self, fields)))
@@ -337,36 +341,38 @@ impl Heap {
         self.create(Data::ReceivePort(ReceivePort::new(channel)))
     }
     pub fn create_nothing(&mut self) -> Pointer {
-        self.create_symbol("Nothing".to_string())
+        self.create_tag("Nothing".to_string(), None)
     }
     pub fn create_list(&mut self, items: Vec<Pointer>) -> Pointer {
         self.create(Data::List(List { items }))
     }
     pub fn create_bool(&mut self, value: bool) -> Pointer {
-        self.create_symbol(if value { "True" } else { "False" }.to_string())
+        self.create_tag(if value { "True" } else { "False" }.to_string(), None)
     }
     pub fn create_result(&mut self, result: Result<Pointer, Pointer>) -> Pointer {
         let (type_, value) = match result {
             Ok(it) => ("Ok".to_string(), it),
             Err(it) => ("Error".to_string(), it),
         };
+        // TODO: Simplify using tags
         let fields = FxHashMap::from_iter([
             (
-                self.create_symbol("Type".to_string()),
-                self.create_symbol(type_),
+                self.create_tag("Type".to_string(), None),
+                self.create_tag(type_, None),
             ),
-            (self.create_symbol("Value".to_string()), value),
+            (self.create_tag("Value".to_string(), None), value),
         ]);
         self.create_struct(fields)
     }
     pub fn create_ordering(&mut self, ordering: Ordering) -> Pointer {
-        self.create_symbol(
+        self.create_tag(
             match ordering {
                 Ordering::Less => "Less",
                 Ordering::Equal => "Equal",
                 Ordering::Greater => "Greater",
             }
             .to_string(),
+            None,
         )
     }
 }

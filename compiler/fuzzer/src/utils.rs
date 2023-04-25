@@ -10,8 +10,8 @@ use candy_vm::{
 pub fn collect_symbols_in_heap(heap: &Heap) -> Vec<String> {
     heap.all_objects()
         .filter_map(|object| {
-            if let Data::Symbol(symbol) = &object.data {
-                Some(symbol.value.to_string())
+            if let Data::Tag(tag) = &object.data {
+                Some(tag.symbol.to_string())
             } else {
                 None
             }
