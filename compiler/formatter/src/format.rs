@@ -515,7 +515,7 @@ pub(crate) fn format_cst<'a>(
             let previous_width_for_value = if key_and_colon.is_some() {
                 Width::multiline(None, info.indentation.with_indent().width())
             } else {
-                previous_width.to_owned()
+                previous_width
             };
             let value = format_cst(edits, previous_width_for_value, value, &info.with_indent());
 
@@ -566,7 +566,7 @@ pub(crate) fn format_cst<'a>(
                 };
                 (previous_width_for_struct, info.with_indent())
             } else {
-                (previous_width.to_owned(), info.to_owned())
+                (previous_width, info.to_owned())
             };
             let struct_ = format_cst(edits, previous_width_for_struct, struct_, &info_for_struct);
             let mut struct_ = if struct_needs_parentheses {
@@ -949,7 +949,7 @@ fn format_receiver<'a>(
     let previous_width_for_receiver = if receiver_needs_parentheses {
         previous_width + SinglelineWidth::PARENTHESIS + SinglelineWidth::PARENTHESIS
     } else {
-        previous_width.to_owned()
+        previous_width
     };
     let receiver = format_cst(edits, previous_width_for_receiver, receiver, info);
 
@@ -1023,7 +1023,7 @@ impl<'a> Argument<'a> {
             MaybeSandwichLikeArgument::Other {
                 min_singleline_width,
                 ..
-            } => min_singleline_width.to_owned(),
+            } => *min_singleline_width,
         }
     }
     fn format(
