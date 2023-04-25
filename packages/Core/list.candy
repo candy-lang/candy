@@ -100,3 +100,12 @@ generate length valueGetter :=
       recurse [list, Index: int.add index 1]
     }
   }
+
+concatenate listA listB :=
+  needs (is listA)
+  needs (is listB)
+  generate (listA | length | int.add (listB | length)) { index ->
+    ifElse (index | int.isLessThan (listA | length)) { listA | get index } {
+      listB | get (index | int.subtract (listA | length))
+    }
+  }
