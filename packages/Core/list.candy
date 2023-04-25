@@ -33,6 +33,11 @@ isValidIndex list index :=
   needs (int.is index)
   ifElse (list | isEmpty) { False } { index | int.isNonNegative }
   | bool.lazyAnd { index | int.isLessThanOrEqualTo (list | lastIndex | result.unwrap) }
+isValidInsertIndex list index :=
+  needs (is list)
+  needs (int.is index)
+  ifElse (list | isEmpty) { False } { index | int.isNonNegative }
+  | bool.lazyAnd { index | int.isLessThanOrEqualTo (list | length) }
 
 get list index :=
   needs (is list)
@@ -50,8 +55,7 @@ insert list index item :=
   needs (is list)
 
   needs (int.is index)
-  needs (int.isNonNegative index)
-  needs (index | int.isLessThanOrEqualTo (length list))
+  needs (list | isValidInsertIndex index)
 
   list | ✨.listInsert index item
 
