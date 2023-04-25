@@ -12,23 +12,27 @@ use lsp_types::{
     TextEdit, Url,
 };
 use rustc_hash::FxHashMap;
-use std::thread;
+use std::{collections::HashMap, thread};
 use tokio::sync::{mpsc::Sender, Mutex};
 use tracing::debug;
 
 use crate::{
     database::Database,
-    features::{LanguageFeatures, Reference},
+    features::{LanguageFeatures, Reference, RenameError},
     utils::{
         error_into_diagnostic, lsp_range_to_range_raw, module_from_url, LspPositionConversion,
     },
 };
 
 use self::{
-    find_definition::find_definition, folding_ranges::folding_ranges, hints::Hint,
-    references::references, semantic_tokens::semantic_tokens,
+    find_definition::find_definition,
+    folding_ranges::folding_ranges,
+    hints::Hint,
+    references::{reference_query_for_offset, references, ReferenceQuery},
+    semantic_tokens::semantic_tokens,
 };
 use candy_formatter::Formatter;
+use regex::Regex;
 
 pub mod find_definition;
 pub mod folding_ranges;
@@ -222,6 +226,75 @@ impl LanguageFeatures for CandyFeatures {
             all_references.insert(uri, references);
         }
         all_references
+    }
+
+    fn supports_rename(&self) -> bool {
+        true
+    }
+    async fn prepare_rename(
+        &self,
+        db: &Mutex<Database>,
+        uri: Url,
+        position: lsp_types::Position,
+    ) -> Option<lsp_types::Range> {
+        let db = db.lock().await;
+        let module = decode_module(&uri, &db.packages_path);
+        let offset = db.lsp_position_to_offset(module.clone(), position);
+
+        match reference_query_for_offset(&*db, module.clone(), offset) {
+            Some((ReferenceQuery::Id(_), range)) => Some(db.range_to_lsp_range(module, range)),
+            Some((
+                ReferenceQuery::Symbol(_, _) | ReferenceQuery::Int(_, _) | ReferenceQuery::Needs(_),
+                _,
+            ))
+            | None => None,
+        }
+    }
+    async fn rename(
+        &self,
+        db: &Mutex<Database>,
+        uri: Url,
+        position: lsp_types::Position,
+        new_name: String,
+    ) -> Result<HashMap<Url, Vec<TextEdit>>, RenameError> {
+        {
+            let db = db.lock().await;
+            let module = decode_module(&uri, &db.packages_path);
+            let offset = db.lsp_position_to_offset(module.clone(), position);
+
+            let regex =
+                match reference_query_for_offset(&*db, module, offset).map(|(query, _)| query) {
+                    Some(ReferenceQuery::Id(_)) => Regex::new(r"^[a-z][A-Za-z0-9_]*$").unwrap(),
+                    Some(
+                        ReferenceQuery::Symbol(_, _)
+                        | ReferenceQuery::Int(_, _)
+                        | ReferenceQuery::Needs(_),
+                    )
+                    | None => {
+                        panic!("Renaming is not supported at this position.")
+                    }
+                };
+            if !regex.is_match(&new_name) {
+                return Err(RenameError::NewNameInvalid);
+            }
+        }
+
+        let references = self.references(db, uri, position, false, true).await;
+        assert!(!references.is_empty());
+        let changes = references
+            .into_iter()
+            .map(|(url, references)| {
+                let changes = references
+                    .into_iter()
+                    .map(|it| TextEdit {
+                        range: it.range,
+                        new_text: new_name.clone(),
+                    })
+                    .collect();
+                (url, changes)
+            })
+            .collect();
+        Ok(changes)
     }
 
     fn supports_semantic_tokens(&self) -> bool {

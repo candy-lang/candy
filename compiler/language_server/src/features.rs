@@ -1,11 +1,11 @@
+use crate::database::Database;
 use async_trait::async_trait;
 use lsp_types::{
     self, FoldingRange, LocationLink, SemanticToken, TextDocumentContentChangeEvent, TextEdit, Url,
 };
 use rustc_hash::FxHashMap;
+use std::collections::HashMap;
 use tokio::sync::Mutex;
-
-use crate::database::Database;
 
 #[async_trait]
 pub trait LanguageFeatures: Send + Sync {
@@ -80,6 +80,27 @@ pub trait LanguageFeatures: Send + Sync {
         unimplemented!()
     }
 
+    fn supports_rename(&self) -> bool {
+        false
+    }
+    async fn prepare_rename(
+        &self,
+        _db: &Mutex<Database>,
+        _uri: Url,
+        _position: lsp_types::Position,
+    ) -> Option<lsp_types::Range> {
+        unimplemented!()
+    }
+    async fn rename(
+        &self,
+        _db: &Mutex<Database>,
+        _uri: Url,
+        _position: lsp_types::Position,
+        _new_name: String,
+    ) -> Result<HashMap<Url, Vec<TextEdit>>, RenameError> {
+        unimplemented!()
+    }
+
     fn supports_semantic_tokens(&self) -> bool {
         false
     }
@@ -91,4 +112,8 @@ pub trait LanguageFeatures: Send + Sync {
 pub struct Reference {
     pub range: lsp_types::Range,
     pub is_write: bool,
+}
+
+pub enum RenameError {
+    NewNameInvalid,
 }

@@ -19,6 +19,7 @@ lazy_static = "1.4.0"
 lsp-types = "0.94.0"
 num-bigint = { version = "0.4.3", features = ["rand"] }
 rand = "0.8.5"
+regex = "1.8.1"
 rustc-hash = "1.1.0"
 salsa = "0.16.1"
 serde = { version = "1.0.152", features = ["derive"] }
