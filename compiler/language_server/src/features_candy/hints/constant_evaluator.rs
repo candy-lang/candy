@@ -34,7 +34,7 @@ struct Evaluator {
 }
 
 impl ConstantEvaluator {
-    pub fn update_module<DB: MirToLir>(&mut self, db: &DB, module: Module) {
+    pub fn update_module(&mut self, db: &impl MirToLir, module: Module) {
         let tracing = TracingConfig {
             register_fuzzables: TracingMode::OnlyCurrent,
             calls: TracingMode::Off,
