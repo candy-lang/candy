@@ -29,7 +29,6 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    if: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
     steps:
       - run: gh pr merge --auto --merge "$PR_URL"
         env:
