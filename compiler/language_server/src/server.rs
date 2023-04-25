@@ -523,7 +523,7 @@ impl LanguageServer for Server {
         let result = features
             .prepare_rename(&self.db, uri, params.position)
             .await;
-        Ok(result.map(|it| PrepareRenameResponse::Range(it)))
+        Ok(result.map(PrepareRenameResponse::Range))
     }
     async fn rename(&self, params: RenameParams) -> jsonrpc::Result<Option<WorkspaceEdit>> {
         let state = self.require_running_state().await;
