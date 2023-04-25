@@ -1,3 +1,4 @@
+use crate::{features::Reference, utils::LspPositionConversion};
 use candy_frontend::{
     ast_to_hir::AstToHir,
     cst::{CstDb, CstKind},
@@ -7,10 +8,8 @@ use candy_frontend::{
     rich_ir::ToRichIr,
 };
 use num_bigint::BigUint;
-use std::collections::HashSet;
+use rustc_hash::FxHashSet;
 use tracing::{debug, info};
-
-use crate::{features::Reference, utils::LspPositionConversion};
 
 pub fn references<DB>(
     db: &DB,
@@ -91,7 +90,7 @@ struct Context<'a, DB: PositionConversionDb + ?Sized> {
     db: &'a DB,
     query: ReferenceQuery,
     include_declaration: bool,
-    discovered_references: HashSet<hir::Id>,
+    discovered_references: FxHashSet<hir::Id>,
     references: Vec<Reference>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -110,7 +109,7 @@ where
             db,
             query,
             include_declaration,
-            discovered_references: HashSet::new(),
+            discovered_references: FxHashSet::default(),
             references: vec![],
         }
     }

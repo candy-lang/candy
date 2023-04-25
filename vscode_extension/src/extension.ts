@@ -1,6 +1,6 @@
 import * as child_process from 'child_process';
 import * as stream from 'stream';
-import * as vs from 'vscode';
+import * as vscode from 'vscode';
 import {
   LanguageClient,
   LanguageClientOptions,
@@ -11,15 +11,28 @@ import { HintsDecorations } from './hints';
 
 let client: LanguageClient;
 
-export async function activate(context: vs.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
   console.log('Activated 🍭 Candy extension!');
 
-  const configuration = vs.workspace.getConfiguration('candy');
+  const configuration = vscode.workspace.getConfiguration('candy');
+  const packagesPath = configuration.get<string>('packagesPath');
+  if (!packagesPath) {
+    const result = await vscode.window.showErrorMessage(
+      'Please configure the setting `candy.packagesPath` and reload this window.',
+      'Open settings'
+    );
+    if (result) {
+      vscode.commands.executeCommand(
+        'workbench.action.openSettings',
+        'candy.packagesPath'
+      );
+    }
+    return;
+  }
+
   let clientOptions: LanguageClientOptions = {
     outputChannelName: '🍭 Candy Language Server',
-    initializationOptions: {
-      packagesPath: configuration.get<string>('packagesPath'),
-    },
+    initializationOptions: { packagesPath },
   };
 
   client = new LanguageClient(
@@ -80,7 +93,7 @@ type SpawnedProcess = child_process.ChildProcess & {
   stderr: stream.Readable;
 };
 function safeSpawn(): SpawnedProcess {
-  const configuration = vs.workspace.getConfiguration('candy');
+  const configuration = vscode.workspace.getConfiguration('candy');
 
   let command: [string, string[]] = ['candy', ['lsp']];
   const languageServerCommand = configuration.get<string>(

@@ -3046,7 +3046,7 @@ mod parse {
             }
         };
 
-        let (i, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
+        let (input, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
         if let Some((parameters, arrow)) = parameters_and_arrow {
             parameters_and_arrow = Some((parameters, arrow.wrap_in_whitespace(whitespace)));
         } else {
@@ -3054,14 +3054,15 @@ mod parse {
         }
 
         let (input, mut body, mut whitespace_before_closing_curly_brace, closing_curly_brace) = {
-            let input_before_parsing_expression = i;
-            let (i, body_expression) = match expression(i, indentation + 1, true, true, true) {
-                Some((i, expression)) => (i, vec![expression]),
-                None => (i, vec![]),
-            };
-            let (i, whitespace) = whitespaces_and_newlines(i, indentation + 1, true);
-            if let Some((i, curly_brace)) = closing_curly_brace(i) {
-                (i, body_expression, whitespace, curly_brace)
+            let input_before_parsing_expression = input;
+            let (input, body_expression) =
+                match expression(input, indentation + 1, true, true, true) {
+                    Some((input, expression)) => (input, vec![expression]),
+                    None => (input, vec![]),
+                };
+            let (input, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
+            if let Some((input, curly_brace)) = closing_curly_brace(input) {
+                (input, body_expression, whitespace, curly_brace)
             } else {
                 // There is no closing brace after a single expression. Thus,
                 // we now try to parse a body of multiple expressions. We didn't
@@ -3070,20 +3071,24 @@ mod parse {
                 // For example, for the lambda `{ 2 }`, the body parser would
                 // have already consumed the `}`. The body parser works great
                 // for multiline bodies, though.
-                let (i, body) = body(input_before_parsing_expression, indentation + 1);
-                let (i, whitespace) = whitespaces_and_newlines(i, indentation, true);
-                let (i, curly_brace) = match closing_curly_brace(i) {
-                    Some(it) => it,
+                let (input, body) = body(input_before_parsing_expression, indentation + 1);
+                let input_after_body = input;
+                let (input, whitespace) = whitespaces_and_newlines(input, indentation, true);
+                match closing_curly_brace(input) {
+                    Some((input, closing_curly_brace)) => {
+                        (input, body, whitespace, closing_curly_brace)
+                    }
                     None => (
-                        i,
+                        input_after_body,
+                        body,
+                        vec![],
                         CstKind::Error {
                             unparsable_input: "".to_string(),
                             error: CstError::CurlyBraceNotClosed,
                         }
                         .into(),
                     ),
-                };
-                (i, body, whitespace, curly_brace)
+                }
             }
         };
 
@@ -3155,12 +3160,9 @@ mod parse {
         assert_eq!(
             lambda("{\nfoo", 0),
             Some((
-                "foo",
+                "\nfoo",
                 CstKind::Lambda {
-                    opening_curly_brace: Box::new(
-                        CstKind::OpeningCurlyBrace
-                            .with_trailing_whitespace(vec![CstKind::Newline("\n".to_string())])
-                    ),
+                    opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.into()),
                     parameters_and_arrow: None,
                     body: vec![],
                     closing_curly_brace: Box::new(

@@ -1,12 +1,10 @@
-use itertools::Itertools;
-
+use super::rcst::Rcst;
 use crate::{
     cst::{self, CstDb},
     hir::{self, HirDb},
 };
+use itertools::Itertools;
 use std::sync::Arc;
-
-use super::rcst::Rcst;
 
 #[salsa::query_group(CommentStringToRcstStorage)]
 pub trait CommentStringToRcst: CstDb + HirDb {
@@ -96,13 +94,12 @@ mod parse {
     // All parsers take an input and return an input that may have advanced a
     // little.
 
-    use std::collections::HashSet;
-
     use super::{
         super::rcst::{Rcst, RcstError, RcstListItemMarker},
         whitespace_indentation_score,
     };
     use itertools::Itertools;
+    use rustc_hash::FxHashSet;
     use tracing::instrument;
     use url::Url;
 
@@ -391,7 +388,7 @@ mod parse {
         ) -> Option<(Vec<Rcst>, Vec<InlineFormatting>)> {
             assert_eq!(
                 initial_state.len(),
-                initial_state.iter().collect::<HashSet<_>>().len()
+                initial_state.iter().collect::<FxHashSet<_>>().len()
             );
             let parser = SingleLineInlineParser {
                 top_level_parts: vec![],
