@@ -1,6 +1,6 @@
 use std::fmt::{self, Debug};
 
-use crate::channel::ChannelId;
+use crate::{channel::ChannelId, heap::Tag};
 
 use super::{
     channel::{Capacity, Packet},
@@ -173,14 +173,14 @@ impl Fiber {
     pub fn complete_channel_create(&mut self, channel: ChannelId) {
         assert!(matches!(self.status, Status::CreatingChannel { .. }));
 
-        let send_port_symbol = self.heap.create_symbol("SendPort".to_string());
-        let receive_port_symbol = self.heap.create_symbol("ReceivePort".to_string());
+        let send_port_tag = self.heap.create_tag("SendPort".to_string(), None);
+        let receive_port_tag = self.heap.create_tag("ReceivePort".to_string(), None);
         let send_port = self.heap.create_send_port(channel);
         let receive_port = self.heap.create_receive_port(channel);
         self.data_stack
             .push(self.heap.create_struct(FxHashMap::from_iter([
-                (send_port_symbol, send_port),
-                (receive_port_symbol, receive_port),
+                (send_port_tag, send_port),
+                (receive_port_tag, receive_port),
             ])));
         self.status = Status::Running;
     }
@@ -312,7 +312,7 @@ impl Fiber {
                 self.data_stack.push(address);
             }
             Instruction::CreateSymbol(symbol) => {
-                let address = self.heap.create_symbol(symbol);
+                let address = self.heap.create_tag(symbol, None);
                 self.data_stack.push(address);
             }
             Instruction::CreateList { num_items } => {
@@ -527,10 +527,33 @@ impl Fiber {
                 self.heap.drop(callee);
                 self.run_builtin_function(&builtin, &arguments, responsible);
             }
+            Data::Tag(Tag { symbol, value }) => {
+                if value.is_some() {
+                    self.panic(
+                        "A tag's value cannot be overwritten by calling it. Use `tag.withValue` instead.".to_string(),
+                        self.heap.get_hir_id(responsible),
+                    );
+                    return;
+                }
+
+                if let [value] = arguments.as_slice() {
+                    let tag = self.heap.create_tag(symbol.to_string(), *value);
+                    self.data_stack.push(tag);
+                    self.heap.dup(*value);
+                } else {
+                    self.panic(
+                        format!(
+                            "A tag can only hold exactly one value, but you called it with {} arguments.",
+                            arguments.len(),
+                        ),
+                        self.heap.get_hir_id(responsible),
+                    );
+                }
+            }
             _ => {
                 self.panic(
                     format!(
-                        "You can only call closures and builtins, but you tried to call {}.",
+                        "You can only call closures, builtins and tags, but you tried to call {}.",
                         callee.format(&self.heap),
                     ),
                     self.heap.get_hir_id(responsible),

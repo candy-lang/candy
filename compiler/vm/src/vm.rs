@@ -638,15 +638,15 @@ impl Vm {
         let Packet { mut heap, address } = packet;
         let arguments: Struct = heap.get(address).data.clone().try_into().ok()?;
 
-        let closure_symbol = heap.create_symbol("Closure".to_string());
-        let closure_address = arguments.get(&heap, closure_symbol)?;
+        let closure_tag = heap.create_tag("Closure".to_string(), None);
+        let closure_address = arguments.get(&heap, closure_tag)?;
         let closure: Closure = heap.get(closure_address).data.clone().try_into().ok()?;
         if closure.num_args > 0 {
             return None;
         }
 
-        let return_channel_symbol = heap.create_symbol("ReturnChannel".to_string());
-        let return_channel_address = arguments.get(&heap, return_channel_symbol)?;
+        let return_channel_tag = heap.create_tag("ReturnChannel".to_string(), None);
+        let return_channel_address = arguments.get(&heap, return_channel_tag)?;
         let return_channel: SendPort = heap
             .get(return_channel_address)
             .data

@@ -92,9 +92,10 @@ fn generate_mutated_value(
         Data::Text(text) => {
             mutate_string(rng, &mut text.value);
         }
-        Data::Symbol(symbol) => {
+        // FIXME: This should support tags with values
+        Data::Tag(tag) => {
             if !symbols.is_empty() {
-                symbol.value = symbols.choose(rng).unwrap().to_string();
+                tag.symbol = symbols.choose(rng).unwrap().to_string();
             }
         }
         Data::List(List { items }) => {
@@ -166,7 +167,8 @@ fn complexity_of_value(heap: &Ref<Heap>, address: Pointer) -> usize {
     match &heap.get(address).data {
         Data::Int(int) => int.value.bits() as usize,
         Data::Text(text) => text.value.len() + 1,
-        Data::Symbol(symbol) => symbol.value.len(),
+        // FIXME: This should support tags with values
+        Data::Tag(tag) => tag.symbol.len(),
         Data::List(list) => {
             list.items
                 .iter()

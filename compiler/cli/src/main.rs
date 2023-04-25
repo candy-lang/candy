@@ -394,7 +394,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         }
     };
 
-    let main = heap.create_symbol("Main".to_string());
+    let main = heap.create_tag("Main".to_string(), None);
     let main = match exported_definitions.get(&heap, main) {
         Some(main) => main,
         None => {
@@ -409,9 +409,9 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     let mut stdout = StdoutService::new(&mut vm);
     let mut stdin = StdinService::new(&mut vm);
     let environment = {
-        let stdout_symbol = heap.create_symbol("Stdout".to_string());
+        let stdout_symbol = heap.create_tag("Stdout".to_string(), None);
         let stdout_port = heap.create_send_port(stdout.channel);
-        let stdin_symbol = heap.create_symbol("Stdin".to_string());
+        let stdin_symbol = heap.create_tag("Stdin".to_string(), None);
         let stdin_port = heap.create_send_port(stdin.channel);
         heap.create_struct(FxHashMap::from_iter([
             (stdout_symbol, stdout_port),

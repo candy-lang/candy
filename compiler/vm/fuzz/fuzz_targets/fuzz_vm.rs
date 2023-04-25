@@ -109,7 +109,7 @@ fuzz_target!(|data: &[u8]| {
     };
 
     // Run the `main` function.
-    let main = heap.create_symbol("Main".to_string());
+    let main = heap.create_tag("Main".to_string(), None);
     let Some(main) = exported_definitions.get(&heap, main) else {
         println!("The module doesn't contain a main function.");
         return;

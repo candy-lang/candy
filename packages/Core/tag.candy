@@ -1,0 +1,26 @@
+[ifElse] = use "..controlFlow"
+type = use "..type"
+
+is value := type.is value Tag
+
+hasValue tag :=
+  needs (is tag)
+  tag | ✨.tagHasValue
+
+withoutValue tag :=
+  needs (is tag)
+  tag | ✨.tagWithoutValue
+
+getValue tag :=
+  needs (is tag)
+  needs (hasValue tag)
+  tag | ✨.tagGetValue
+
+withSymbol tag symbolTag :=
+  needs (is tag)
+  needs (is symbolTag)
+  ifElse (tag | hasValue) { symbolTag (tag | getValue) } { symbolTag | withoutValue }
+
+withValue tag value :=
+  needs (is tag)
+  (tag | withoutValue) value
