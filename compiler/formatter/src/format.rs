@@ -1040,9 +1040,13 @@ impl<'a> Argument<'a> {
             MaybeSandwichLikeArgument::Other { argument, .. } => argument,
         };
 
+        let are_parentheses_necessary_due_to_precedence = match self.precedence {
+            Some(PrecedenceCategory::High) => false,
+            Some(PrecedenceCategory::BinaryBar | PrecedenceCategory::Low) | None => true,
+        };
         if self.parentheses.is_some() {
             // We already have parentheses …
-            if is_singleline && self.precedence != Some(PrecedenceCategory::High)
+            if is_singleline && are_parentheses_necessary_due_to_precedence
                 || self.parentheses.are_required_due_to_comments()
             {
                 // … and we actually need them.
@@ -1054,7 +1058,7 @@ impl<'a> Argument<'a> {
             }
         } else {
             // We don't have parentheses …
-            if is_singleline && self.precedence == Some(PrecedenceCategory::Low) {
+            if is_singleline && are_parentheses_necessary_due_to_precedence {
                 // … but we need them.
                 self.parentheses
                     .into_some(edits, previous_width, argument, info)
