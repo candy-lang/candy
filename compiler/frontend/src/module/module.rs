@@ -176,7 +176,11 @@ impl Display for ModuleFromPathError {
                 )
             }
             ModuleFromPathError::NotInPackage(path) => {
-                write!(f, "File {:?} is not located in the package.", path)
+                write!(
+                    f,
+                    "File `{}` is not located in the package.",
+                    path.to_string_lossy()
+                )
             }
         }
     }
