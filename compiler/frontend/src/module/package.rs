@@ -1,6 +1,6 @@
 use derive_more::Deref;
-use expanduser::expanduser;
 use rustc_hash::FxHashSet;
+use shellexpand::tilde;
 use std::{
     ffi::OsStr,
     fmt::{self, Display, Formatter},
@@ -59,9 +59,7 @@ impl TryFrom<&str> for PackagesPath {
     type Error = String;
 
     fn try_from(path: &str) -> Result<Self, Self::Error> {
-        expanduser(path)
-            .map_err(|it| it.to_string())
-            .and_then(|it| it.as_path().try_into())
+        PathBuf::from(tilde(path).to_string()).as_path().try_into()
     }
 }
 impl TryFrom<&Path> for PackagesPath {
