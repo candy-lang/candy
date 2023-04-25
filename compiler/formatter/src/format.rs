@@ -296,9 +296,7 @@ pub(crate) fn format_cst<'a>(
                     Some(PrecedenceCategory::High) => {
                         right_parentheses.are_required_due_to_comments()
                     }
-                    Some(PrecedenceCategory::BinaryBar | PrecedenceCategory::Low) | None => {
-                        right_parentheses.is_some()
-                    }
+                    Some(PrecedenceCategory::Low) | None => right_parentheses.is_some(),
                 };
                 let (previous_width_for_right, info_for_right) = if right_needs_parentheses {
                     (
@@ -559,7 +557,7 @@ pub(crate) fn format_cst<'a>(
             let (struct_, struct_parentheses) = ExistingParentheses::split_from(edits, struct_);
             let struct_needs_parentheses = match struct_.precedence() {
                 Some(PrecedenceCategory::High) => struct_parentheses.are_required_due_to_comments(),
-                Some(PrecedenceCategory::BinaryBar | PrecedenceCategory::Low) => true,
+                Some(PrecedenceCategory::Low) => true,
                 None => struct_parentheses.is_some(),
             };
             let (previous_width_for_struct, info_for_struct) = if struct_needs_parentheses {
@@ -949,7 +947,7 @@ fn format_receiver<'a>(
     let (receiver, receiver_parentheses) = ExistingParentheses::split_from(edits, receiver);
     let receiver_needs_parentheses = match receiver.precedence() {
         Some(PrecedenceCategory::High) => receiver_parentheses.are_required_due_to_comments(),
-        Some(PrecedenceCategory::BinaryBar | PrecedenceCategory::Low) => match parent {
+        Some(PrecedenceCategory::Low) => match parent {
             ReceiverParent::BinaryBar => receiver_parentheses.are_required_due_to_comments(),
             ReceiverParent::Call => true,
         },
@@ -1004,9 +1002,7 @@ impl<'a> Argument<'a> {
             let parentheses_width = SinglelineWidth::PARENTHESIS + SinglelineWidth::PARENTHESIS;
             match precedence {
                 Some(PrecedenceCategory::High) => {}
-                Some(PrecedenceCategory::BinaryBar | PrecedenceCategory::Low) => {
-                    min_singleline_width += parentheses_width
-                }
+                Some(PrecedenceCategory::Low) => min_singleline_width += parentheses_width,
                 None if parentheses.is_some() => min_singleline_width += parentheses_width,
                 None => {}
             }
@@ -1051,7 +1047,7 @@ impl<'a> Argument<'a> {
 
         let are_parentheses_necessary_due_to_precedence = match self.precedence {
             Some(PrecedenceCategory::High) => false,
-            Some(PrecedenceCategory::BinaryBar | PrecedenceCategory::Low) | None => true,
+            Some(PrecedenceCategory::Low) | None => true,
         };
         if self.parentheses.is_some() {
             // We already have parentheses …
@@ -1088,12 +1084,10 @@ enum MaybeSandwichLikeArgument<'a> {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PrecedenceCategory {
-    /// Literals, parentheses, struct accesses, etc.
+    /// Literals, parenthesized, struct access, etc.
     High,
 
-    BinaryBar,
-
-    /// Calls and match
+    /// Binary bar, call, and match
     Low,
 }
 
@@ -1146,7 +1140,7 @@ pub impl<D> CstExtension for Cst<D> {
             CstKind::OpeningText { .. } | CstKind::ClosingText { .. } => None,
             CstKind::Text { .. } => Some(PrecedenceCategory::High),
             CstKind::TextPart(_) | CstKind::TextInterpolation { .. } => None,
-            CstKind::BinaryBar { .. } => Some(PrecedenceCategory::BinaryBar),
+            CstKind::BinaryBar { .. } => Some(PrecedenceCategory::Low),
             CstKind::Parenthesized { .. } => Some(PrecedenceCategory::High),
             CstKind::Call { .. } => Some(PrecedenceCategory::Low),
             CstKind::List { .. } => Some(PrecedenceCategory::High),
