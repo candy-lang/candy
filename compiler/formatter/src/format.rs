@@ -1247,6 +1247,13 @@ mod test {
         // # abc
         test("foo\n# abc", "foo\n# abc\n");
         test("foo\n # abc", "foo\n# abc\n");
+        // # abc
+        // # def
+        test("# abc\n# def\n", "# abc\n# def\n");
+        // # abc
+        //
+        // # def
+        test("# abc\n\n# def\n", "# abc\n\n# def\n");
     }
     #[test]
     fn test_int() {
