@@ -537,23 +537,17 @@ impl LanguageServer for Server {
                 params.new_name,
             )
             .await;
-        result
-            .map(|it| {
-                Some(WorkspaceEdit {
-                    changes: Some(it),
-                    ..Default::default()
-                })
-            })
-            .map_err(|it| {
-                let message = match it {
-                    RenameError::NewNameInvalid => "The new name is not valid.",
-                };
-                jsonrpc::Error {
-                    code: jsonrpc::ErrorCode::InvalidParams,
-                    message: message.to_string(),
-                    data: None,
-                }
-            })
+        match result {
+            Ok(changes) => Ok(Some(WorkspaceEdit {
+                changes: Some(changes),
+                ..Default::default()
+            })),
+            Err(RenameError::NewNameInvalid) => Err(jsonrpc::Error {
+                code: jsonrpc::ErrorCode::InvalidParams,
+                message: "The new name is not valid.".to_string(),
+                data: None,
+            }),
+        }
     }
 
     async fn semantic_tokens_full(
