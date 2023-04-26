@@ -112,7 +112,10 @@ impl FuzzerManager {
                         parameter_names
                             .iter()
                             .zip(input.arguments.iter())
-                            .map(|(name, argument)| format!("`{name} = {argument:?}`"))
+                            .map(|(name, argument)| format!(
+                                "`{name} = {}`",
+                                argument.format_debug(&input.heap.borrow()),
+                            ))
                             .collect_vec()
                             .join_with_commas_and_and(),
                     ),

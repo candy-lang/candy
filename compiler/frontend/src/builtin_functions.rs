@@ -138,7 +138,7 @@ impl BuiltinFunction {
             BuiltinFunction::IntSubtract => 2,
             BuiltinFunction::ListFilled => 2,
             BuiltinFunction::ListGet => 2,
-            BuiltinFunction::ListInsert => 2,
+            BuiltinFunction::ListInsert => 3,
             BuiltinFunction::ListLength => 1,
             BuiltinFunction::ListRemoveAt => 2,
             BuiltinFunction::ListReplace => 3,
