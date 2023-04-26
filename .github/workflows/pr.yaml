@@ -28,7 +28,7 @@ jobs:
     if: github.event.action == 'opened'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
     steps:
       - run: gh pr merge --auto --merge "$PR_URL"
