@@ -79,13 +79,14 @@ removeAt list index :=
   list | ✨.listRemoveAt index
 
 filled length item :=
-  # Creates a new list of the given length, where each slot is filled with the same item.
+  # Creates a new list of the given `length`, where each slot is filled with the same item.
   needs (int.is length)
   needs (int.isNonNegative length)
   needs (int.fitsInRustU32 length)
   ✨.listFilled length item
 generate length valueGetter :=
-  # Creates a new list of the given length, where each slot is filled with the same item.
+  # Creates a new list of the given `length`, where each slot is filled by calling `valueGetter`
+  # with the index.
   needs (int.is length)
   needs (int.isNonNegative length)
   needs (int.fitsInRustU32 length)
