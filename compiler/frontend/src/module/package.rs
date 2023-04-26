@@ -59,7 +59,7 @@ impl TryFrom<&str> for PackagesPath {
     type Error = String;
 
     fn try_from(path: &str) -> Result<Self, Self::Error> {
-        PathBuf::from(tilde(path).to_string()).as_path().try_into()
+        Path::new(tilde(path).as_ref()).try_into()
     }
 }
 impl TryFrom<&Path> for PackagesPath {
