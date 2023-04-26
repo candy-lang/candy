@@ -10,7 +10,6 @@ rust-version = "1.56"
 derive_more = "0.99.17"
 dunce = "1.0.4"
 enumset = "1.0.12"
-expanduser = "1.2.2"
 extension-trait = "1.0.1"
 im = "15.1.0"
 itertools = "0.10.0"
@@ -21,6 +20,7 @@ num-traits = { version = "0.2.15", features = ["i128"] }
 rustc-hash = "1.1.0"
 salsa = "0.16.1"
 serde = { version = "1.0.152", features = ["derive"] }
+shellexpand = "3.1.0"
 strum = "0.24.0"
 strum_macros = "0.24"
 tracing = { version = "0.1", features = ["release_max_level_debug"] }
