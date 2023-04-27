@@ -15,19 +15,20 @@ jobs:
           repo-token: ${{ secrets.BOT_TOKEN }}
 
   assign-author:
-    permissions:
-      pull-requests: write
     if: github.event.action == 'opened'
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     steps:
       - uses: samspills/assign-pr-to-author@v1.0.2
         with:
           repo-token: ${{ secrets.BOT_TOKEN }}
 
   automerge-pr:
+    if: github.event.action == 'opened'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
     steps:
       - run: gh pr merge --auto --merge "$PR_URL"
@@ -36,22 +37,22 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   approve-dependabot-pr:
+    if: github.event.action == 'opened' && github.event.pull_request.user.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
-    if: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
     steps:
       - uses: dependabot/fetch-metadata@v1.4.0
         id: dependabot-metadata
       - name: Approve patch and minor updates
-        if: ${{ steps.dependabot-metadata.outputs.update-type == 'version-update:semver-patch' || steps.dependabot-metadata.outputs.update-type == 'version-update:semver-minor' }}
+        if: steps.dependabot-metadata.outputs.update-type == 'version-update:semver-patch' || steps.dependabot-metadata.outputs.update-type == 'version-update:semver-minor'
         run: gh pr review "$PR_URL" --approve
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Request manual review for major updates
-        if: ${{ steps.dependabot-metadata.outputs.update-type == 'version-update:semver-major' && toJSON(github.event.pull_request.requested_reviewers) == '[]' }}
+        if: steps.dependabot-metadata.outputs.update-type == 'version-update:semver-major' && toJSON(github.event.pull_request.requested_reviewers) == '[]'
         run: gh pr edit "$PR_URL" --add-reviewer JonasWanke
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}

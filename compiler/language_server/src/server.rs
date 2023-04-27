@@ -5,15 +5,15 @@ use lsp_types::{
     DocumentFilter, DocumentFormattingParams, DocumentHighlight, DocumentHighlightKind,
     DocumentHighlightParams, FoldingRange, FoldingRangeParams, GotoDefinitionParams,
     GotoDefinitionResponse, InitializeParams, InitializeResult, InitializedParams, Location,
-    MessageType, Position, ReferenceParams, Registration, SemanticTokens,
-    SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
-    SemanticTokensRegistrationOptions, SemanticTokensResult, SemanticTokensServerCapabilities,
-    ServerCapabilities, ServerInfo, StaticRegistrationOptions,
-    TextDocumentChangeRegistrationOptions, TextDocumentRegistrationOptions, TextEdit, Url,
-    WorkDoneProgressOptions,
+    MessageType, Position, PrepareRenameResponse, ReferenceParams, Registration, RenameOptions,
+    RenameParams, SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions,
+    SemanticTokensParams, SemanticTokensRegistrationOptions, SemanticTokensResult,
+    SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo, StaticRegistrationOptions,
+    TextDocumentChangeRegistrationOptions, TextDocumentPositionParams,
+    TextDocumentRegistrationOptions, TextEdit, Url, WorkDoneProgressOptions, WorkspaceEdit,
 };
 use rustc_hash::FxHashMap;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::mem;
 use tokio::sync::{mpsc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tower_lsp::{jsonrpc, Client, ClientSocket, LanguageServer, LspService};
@@ -21,7 +21,7 @@ use tracing::{debug, span, Level};
 
 use crate::{
     database::Database,
-    features::{LanguageFeatures, Reference},
+    features::{LanguageFeatures, Reference, RenameError},
     features_candy::{hints::HintsNotification, CandyFeatures},
     features_ir::{IrFeatures, UpdateIrNotification},
     semantic_tokens,
@@ -296,6 +296,19 @@ impl LanguageServer for Server {
                     features.registration_options_where(|it| it.supports_format()),
                 ),
                 registration(
+                    "textDocument/rename",
+                    RenameRegistrationOptions {
+                        text_document_registration_options: features
+                            .registration_options_where(|it| it.supports_rename()),
+                        rename_options: RenameOptions {
+                            prepare_provider: Some(true),
+                            work_done_progress_options: WorkDoneProgressOptions {
+                                work_done_progress: None,
+                            },
+                        },
+                    },
+                ),
+                registration(
                     "textDocument/semanticTokens",
                     SemanticTokensServerCapabilities::SemanticTokensRegistrationOptions(
                         SemanticTokensRegistrationOptions {
@@ -500,15 +513,51 @@ impl LanguageServer for Server {
         ))
     }
 
+    async fn prepare_rename(
+        &self,
+        params: TextDocumentPositionParams,
+    ) -> jsonrpc::Result<Option<PrepareRenameResponse>> {
+        let state = self.require_running_state().await;
+        let uri = params.text_document.uri;
+        let features = self.features_from_url(&state.features, &uri).await;
+        let result = features
+            .prepare_rename(&self.db, uri, params.position)
+            .await;
+        Ok(result.map(PrepareRenameResponse::Range))
+    }
+    async fn rename(&self, params: RenameParams) -> jsonrpc::Result<Option<WorkspaceEdit>> {
+        let state = self.require_running_state().await;
+        let uri = params.text_document_position.text_document.uri;
+        let features = self.features_from_url(&state.features, &uri).await;
+        let result = features
+            .rename(
+                &self.db,
+                uri,
+                params.text_document_position.position,
+                params.new_name,
+            )
+            .await;
+        match result {
+            Ok(changes) => Ok(Some(WorkspaceEdit {
+                changes: Some(changes),
+                ..Default::default()
+            })),
+            Err(RenameError::NewNameInvalid) => Err(jsonrpc::Error {
+                code: jsonrpc::ErrorCode::InvalidParams,
+                message: "The new name is not valid.".to_string(),
+                data: None,
+            }),
+        }
+    }
+
     async fn semantic_tokens_full(
         &self,
         params: SemanticTokensParams,
     ) -> jsonrpc::Result<Option<SemanticTokensResult>> {
         let state = self.require_running_state().await;
-        let features = self
-            .features_from_url(&state.features, &params.text_document.uri)
-            .await;
-        let tokens = features.semantic_tokens(&self.db, params.text_document.uri);
+        let uri = params.text_document.uri;
+        let features = self.features_from_url(&state.features, &uri).await;
+        let tokens = features.semantic_tokens(&self.db, uri);
         let tokens = tokens.await;
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
             result_id: None,
@@ -538,4 +587,15 @@ impl Server {
             )
             .await
     }
+}
+
+/// https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#renameRegistrationOptions
+#[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenameRegistrationOptions {
+    #[serde(flatten)]
+    pub text_document_registration_options: TextDocumentRegistrationOptions,
+
+    #[serde(flatten)]
+    pub rename_options: RenameOptions,
 }
