@@ -20,12 +20,11 @@ use candy_frontend::{
 };
 use candy_vm::{
     context::{DbUseProvider, RunForever, RunLimitedNumberOfInstructions},
-    heap::{Closure, Heap, Pointer},
+    heap::{Closure, Heap},
     mir_to_lir::MirToLir,
     tracer::full::FullTracer,
     vm::Vm,
 };
-use rustc_hash::FxHashMap;
 use tracing::{error, info};
 
 pub fn fuzz<DB>(db: &DB, module: Module) -> Vec<FailingFuzzCase>
@@ -38,13 +37,14 @@ where
         evaluated_expressions: TracingMode::Off,
     };
 
-    let (fuzzables_heap, fuzzables): (Heap, FxHashMap<Id, Pointer>) = {
-        let mut tracer = FuzzablesFinder::default();
+    let fuzzables = {
+        let mut heap = Heap::default();
+        let closure =
+            Closure::create_from_module(&mut heap, db, module.clone(), tracing.clone()).unwrap();
         let mut vm = Vm::default();
-        vm.set_up_for_running_module_closure(
-            module.clone(),
-            Closure::of_module(db, module, tracing.clone()).unwrap(),
-        );
+        vm.set_up_for_running_module_closure(heap, module, closure);
+
+        let mut tracer = FuzzablesFinder::default();
         vm.run(
             &DbUseProvider {
                 db,
@@ -53,19 +53,19 @@ where
             &mut RunForever,
             &mut tracer,
         );
-        (tracer.heap, tracer.fuzzables)
+        tracer.fuzzables
     };
 
     info!(
         "Now, the fuzzing begins. So far, we have {} closures to fuzz.",
-        fuzzables.len()
+        fuzzables.len(),
     );
 
     let mut failing_cases = vec![];
 
     for (id, closure) in fuzzables {
         info!("Fuzzing {id}.");
-        let mut fuzzer = Fuzzer::new(&fuzzables_heap, closure, id.clone());
+        let mut fuzzer = Fuzzer::new(closure, id.clone());
         fuzzer.run(
             &mut DbUseProvider {
                 db,

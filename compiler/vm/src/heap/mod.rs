@@ -1,378 +1,136 @@
-use crate::channel::ChannelId;
-
 pub use self::{
-    object::{Builtin, Closure, Data, Int, List, Object, ReceivePort, SendPort, Struct, Tag, Text},
+    object::{Builtin, Closure, Data, HirId, Int, List, ReceivePort, SendPort, Struct, Tag, Text},
+    object_heap::{HeapData, HeapObject, HeapObjectTrait},
+    object_inline::{
+        int::I64BitLength, InlineData, InlineObject, InlineObjectSliceCloneToHeap,
+        InlineObjectTrait,
+    },
     pointer::Pointer,
 };
-use candy_frontend::{builtin_functions::BuiltinFunction, hir::Id};
-use itertools::Itertools;
-use num_bigint::BigInt;
+use crate::channel::ChannelId;
+use derive_more::{DebugCustom, Deref, Pointer};
 use rustc_hash::FxHashMap;
-use std::cmp::Ordering;
+use sorted_vec::SortedSet;
+use std::{
+    alloc::{self, Allocator, Layout},
+    cmp::Ordering,
+    fmt::{self, Debug, Formatter},
+    mem,
+};
 
 mod object;
+mod object_heap;
+mod object_inline;
 mod pointer;
 
-const TRACE: bool = false;
-
-macro_rules! trace {
-    ($format_string:tt, $($args:expr,)+) => {
-        if TRACE {
-            tracing::trace!($format_string, $($args),+)
-        }
-    };
-    ($format_string:tt, $($args:expr),+) => {
-        if TRACE {
-            tracing::trace!($format_string, $($args),+)
-        }
-    };
-    ($format_string:tt) => {
-        if TRACE {
-            tracing::trace!($format_string)
-        }
-    };
-}
-
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Heap {
-    objects: Vec<Option<Object>>,
-    empty_addresses: Vec<Pointer>,
+    objects: SortedSet<ObjectInHeap>,
     channel_refcounts: FxHashMap<ChannelId, usize>,
 }
 
-impl std::fmt::Debug for Heap {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{{")?;
-        for (address, object) in self
-            .objects
-            .iter()
-            .enumerate()
-            .filter_map(|(address, object)| {
-                object
-                    .as_ref()
-                    .map(|object| (Pointer::from_raw(address), object))
-            })
-        {
-            writeln!(
-                f,
-                "  {address} ({} {}): {}",
-                object.reference_count,
-                if object.reference_count == 1 {
-                    "ref"
-                } else {
-                    "refs"
-                },
-                address.format_debug(self),
-            )?;
-        }
-        if !self.empty_addresses.is_empty() {
-            writeln!(
-                f,
-                "  empty_addresses: {}",
-                self.empty_addresses
-                    .iter()
-                    .map(|it| format!("{it}"))
-                    .join(", ")
-            )?;
-        }
-        write!(f, "}}")
-    }
-}
-
-impl Default for Heap {
-    fn default() -> Self {
-        Self {
-            objects: vec![None],
-            empty_addresses: vec![],
-            channel_refcounts: FxHashMap::default(),
-        }
-    }
-}
 impl Heap {
-    pub fn get(&self, address: Pointer) -> &Object {
-        self.objects
-            .get(address.raw())
-            .and_then(|it| it.as_ref())
-            .unwrap_or_else(|| panic!("Couldn't get object {address}."))
-    }
-    pub fn get_mut(&mut self, address: Pointer) -> &mut Object {
-        self.objects
-            .get_mut(address.raw())
-            .and_then(|it| it.as_mut())
-            .unwrap_or_else(|| panic!("Couldn't get object {address}."))
-    }
-    pub fn get_hir_id(&self, address: Pointer) -> Id {
-        let Data::HirId(id) = &self.get(address).data else { panic!(); };
-        id.clone()
-    }
-
-    pub fn dup(&mut self, address: Pointer) {
-        self.dup_by(address, 1);
-    }
-    pub fn dup_by(&mut self, address: Pointer, amount: usize) {
-        let object = self.get_mut(address);
-        object.reference_count += amount;
-        let new_reference_count = object.reference_count;
-
-        if let Some(channel) = object.data.channel() {
-            *self
-                .channel_refcounts
-                .entry(channel)
-                .or_insert_with(|| panic!("Called `dup_by` on a channel that doesn't exist.")) +=
-                amount;
-        };
-
-        trace!(
-            "RefCount of {address} increased to {}. Value: {}",
-            new_reference_count,
-            address.format_debug(self),
-        );
-    }
-    pub fn drop(&mut self, address: Pointer) {
-        trace!(
-            "RefCount of {address} reduced to {}. Value: {}",
-            self.get(address).reference_count - 1,
-            address.format(self),
-        );
-
-        let object = self.get_mut(address);
-
-        object.reference_count -= 1;
-        let new_reference_count = object.reference_count;
-
-        if let Some(channel) = object.data.channel() {
-            let channel_refcount = self
-                .channel_refcounts
-                .entry(channel)
-                .or_insert_with(|| panic!("Called `drop` on a channel that doesn't exist."));
-            *channel_refcount -= 1;
-            if *channel_refcount == 0 {
-                self.channel_refcounts.remove(&channel).unwrap();
-            }
-        };
-
-        if new_reference_count == 0 {
-            self.free(address);
-        }
-    }
-
-    pub fn create(&mut self, object: Data) -> Pointer {
-        let address = self.reserve_address();
-        let object = Object {
-            reference_count: 1,
-            data: object,
-        };
-        trace!("Creating object at {address}.");
-        if address.raw() < self.objects.len() {
-            self.objects[address.raw()] = Some(object);
-        } else {
-            assert_eq!(address.raw(), self.objects.len());
-            self.objects.push(Some(object));
-        }
-
-        address
-    }
-    fn reserve_address(&mut self) -> Pointer {
-        self.empty_addresses.pop().unwrap_or_else(|| {
-            let address = Pointer::from_raw(self.objects.len());
-            self.objects.push(None);
-            address
-        })
-    }
-    fn free(&mut self, address: Pointer) {
-        let object = std::mem::take(&mut self.objects[address.raw()]).unwrap();
-        self.empty_addresses.push(address);
-        trace!("Freeing object at {address}.");
-        assert_eq!(object.reference_count, 0);
-        for child in object.children() {
-            self.drop(child);
-        }
-    }
-
-    /// Clones all objects at the `root_addresses` into the `other` heap and
-    /// returns a list of their addresses in the other heap.
-    pub fn clone_multiple_to_other_heap_with_existing_mapping(
-        &self,
-        other: &mut Heap,
-        addresses: &[Pointer],
-        address_map: &mut FxHashMap<Pointer, Pointer>,
-    ) -> Vec<Pointer> {
-        let mut additional_refcounts = FxHashMap::default();
-        for address in addresses {
-            self.prepare_object_cloning(address_map, &mut additional_refcounts, other, *address);
-        }
-
-        for object in additional_refcounts.keys() {
-            address_map
-                .entry(*object)
-                .or_insert_with(|| other.reserve_address());
-        }
-
-        for (address, refcount) in additional_refcounts {
-            let new_address = address_map[&address];
-            let object = &mut other.objects[new_address.raw()];
-            if let Some(object) = object {
-                object.reference_count += refcount;
-            } else {
-                *object = Some(Object {
-                    reference_count: refcount,
-                    data: Self::map_data(address_map, &self.get(address).data),
-                });
-            }
-        }
-
-        addresses
-            .iter()
-            .map(|address| address_map[address])
-            .collect()
-    }
-    fn prepare_object_cloning(
-        &self,
-        address_map: &mut FxHashMap<Pointer, Pointer>,
-        additional_refcounts: &mut FxHashMap<Pointer, usize>,
-        other: &mut Heap,
-        address: Pointer,
-    ) {
-        *additional_refcounts.entry(address).or_default() += 1;
-
-        let is_new = !address_map.contains_key(&address);
-        if is_new {
-            address_map.insert(address, other.reserve_address());
-            for child in self.get(address).children() {
-                self.prepare_object_cloning(address_map, additional_refcounts, other, child);
-            }
-        }
-    }
-    fn map_data(address_map: &FxHashMap<Pointer, Pointer>, data: &Data) -> Data {
-        match data {
-            Data::Int(int) => Data::Int(int.clone()),
-            Data::Text(text) => Data::Text(text.clone()),
-            Data::Tag(Tag { symbol, value }) => Data::Tag(Tag {
-                symbol: symbol.clone(),
-                value: value.as_ref().map(|value| address_map[value]),
-            }),
-            Data::List(List { items }) => Data::List(List {
-                items: items.iter().map(|item| address_map[item]).collect(),
-            }),
-            Data::Struct(struct_) => Data::Struct(Struct {
-                fields: struct_
-                    .fields
-                    .iter()
-                    .map(|(hash, key, value)| (*hash, address_map[key], address_map[value]))
-                    .collect(),
-            }),
-            Data::HirId(id) => Data::HirId(id.clone()),
-            Data::Closure(closure) => Data::Closure(Closure {
-                captured: closure
-                    .captured
-                    .iter()
-                    .map(|address| address_map[address])
-                    .collect(),
-                num_args: closure.num_args,
-                body: closure.body.clone(),
-            }),
-            Data::Builtin(builtin) => Data::Builtin(builtin.clone()),
-            Data::SendPort(port) => Data::SendPort(SendPort::new(port.channel)),
-            Data::ReceivePort(port) => Data::ReceivePort(ReceivePort::new(port.channel)),
-        }
-    }
-    pub fn clone_single_to_other_heap_with_existing_mapping(
-        &self,
-        other: &mut Heap,
-        address: Pointer,
-        address_map: &mut FxHashMap<Pointer, Pointer>,
-    ) -> Pointer {
-        self.clone_multiple_to_other_heap_with_existing_mapping(other, &[address], address_map)
-            .pop()
-            .unwrap()
-    }
-    pub fn clone_single_to_other_heap(&self, other: &mut Heap, address: Pointer) -> Pointer {
-        self.clone_single_to_other_heap_with_existing_mapping(
-            other,
-            address,
-            &mut FxHashMap::default(),
+    pub fn allocate(&mut self, header_word: u64, content_size: usize) -> HeapObject {
+        let layout = Layout::from_size_align(
+            2 * HeapObject::WORD_SIZE + content_size,
+            HeapObject::WORD_SIZE,
         )
+        .unwrap();
+
+        // TODO: Handle allocation failure by stopping the fiber.
+        let pointer = alloc::Global
+            .allocate(layout)
+            .expect("Not enough memory.")
+            .cast();
+        unsafe { *pointer.as_ptr() = header_word };
+        let object = HeapObject::new(pointer);
+        object.set_reference_count(1);
+        self.objects.replace(ObjectInHeap(object));
+        object
+    }
+    /// Don't call this method directly, call [drop] or [free] instead!
+    pub(super) fn deallocate(&mut self, object: HeapData) {
+        let layout = Layout::from_size_align(
+            2 * HeapObject::WORD_SIZE + object.content_size(),
+            HeapObject::WORD_SIZE,
+        )
+        .unwrap();
+        self.objects.remove_item(&ObjectInHeap(*object));
+        unsafe { alloc::Global.deallocate(object.address().cast(), layout) };
     }
 
-    pub fn all_objects(&self) -> impl Iterator<Item = &Object> {
-        self.objects.iter().filter_map(|it| it.as_ref())
+    pub(self) fn notify_port_created(&mut self, channel_id: ChannelId) {
+        self.channel_refcounts
+            .entry(channel_id)
+            .and_modify(|count| *count += 1)
+            .or_insert(1);
+    }
+    pub(self) fn dup_channel_by(&mut self, channel_id: ChannelId, amount: usize) {
+        *self.channel_refcounts.entry(channel_id).or_insert_with(|| {
+            panic!("Called `dup_channel_by`, but {channel_id:?} doesn't exist.")
+        }) += amount;
+    }
+    pub(self) fn drop_channel(&mut self, channel_id: ChannelId) {
+        let channel_refcount = self
+            .channel_refcounts
+            .entry(channel_id)
+            .or_insert_with(|| panic!("Called `drop_channel`, but {channel_id:?} doesn't exist."));
+        *channel_refcount -= 1;
+        if *channel_refcount == 0 {
+            self.channel_refcounts.remove(&channel_id).unwrap();
+        }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = HeapObject> + '_ {
+        self.objects.iter().map(|it| **it)
     }
 
     pub fn known_channels(&self) -> impl IntoIterator<Item = ChannelId> + '_ {
         self.channel_refcounts.keys().copied()
     }
 
-    pub fn create_int(&mut self, int: BigInt) -> Pointer {
-        self.create(Data::Int(Int { value: int }))
+    pub fn clear(&mut self) {
+        for object in mem::take(&mut self.objects).iter() {
+            object.free(self);
+        }
+        self.channel_refcounts.clear();
     }
-    pub fn create_text(&mut self, text: String) -> Pointer {
-        self.create(Data::Text(Text { value: text }))
+}
+
+impl Debug for Heap {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        writeln!(f, "{{")?;
+        for &object in self.objects.iter() {
+            let reference_count = object.reference_count();
+            writeln!(
+                f,
+                "  {object:p} ({reference_count} {}): {object:?}",
+                if reference_count == 1 { "ref" } else { "refs" },
+            )?;
+        }
+        write!(f, "}}")
     }
-    pub fn create_tag(&mut self, symbol: String, value: impl Into<Option<Pointer>>) -> Pointer {
-        self.create(Data::Tag(Tag {
-            symbol,
-            value: value.into(),
-        }))
+}
+
+/// For tracking objects allocated in the heap, we don't want deep equality, but
+/// only care about the addresses.
+#[derive(Clone, Copy, DebugCustom, Deref, Pointer)]
+struct ObjectInHeap(HeapObject);
+
+impl Eq for ObjectInHeap {}
+impl PartialEq for ObjectInHeap {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.address() == other.0.address()
     }
-    pub fn create_struct(&mut self, fields: FxHashMap<Pointer, Pointer>) -> Pointer {
-        self.create(Data::Struct(Struct::from_fields(self, fields)))
+}
+
+impl Ord for ObjectInHeap {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.address().cmp(&other.0.address())
     }
-    pub fn create_hir_id(&mut self, id: Id) -> Pointer {
-        self.create(Data::HirId(id))
-    }
-    pub fn create_closure(&mut self, closure: Closure) -> Pointer {
-        self.create(Data::Closure(closure))
-    }
-    pub fn create_builtin(&mut self, builtin: BuiltinFunction) -> Pointer {
-        self.create(Data::Builtin(Builtin { function: builtin }))
-    }
-    pub fn create_send_port(&mut self, channel: ChannelId) -> Pointer {
-        self.channel_refcounts
-            .entry(channel)
-            .and_modify(|count| *count += 1)
-            .or_insert(1);
-        self.create(Data::SendPort(SendPort::new(channel)))
-    }
-    pub fn create_receive_port(&mut self, channel: ChannelId) -> Pointer {
-        self.channel_refcounts
-            .entry(channel)
-            .and_modify(|count| *count += 1)
-            .or_insert(1);
-        self.create(Data::ReceivePort(ReceivePort::new(channel)))
-    }
-    pub fn create_nothing(&mut self) -> Pointer {
-        self.create_tag("Nothing".to_string(), None)
-    }
-    pub fn create_list(&mut self, items: Vec<Pointer>) -> Pointer {
-        self.create(Data::List(List { items }))
-    }
-    pub fn create_bool(&mut self, value: bool) -> Pointer {
-        self.create_tag(if value { "True" } else { "False" }.to_string(), None)
-    }
-    pub fn create_result(&mut self, result: Result<Pointer, Pointer>) -> Pointer {
-        let (type_, value) = match result {
-            Ok(it) => ("Ok".to_string(), it),
-            Err(it) => ("Error".to_string(), it),
-        };
-        // TODO: Simplify using tags
-        let fields = FxHashMap::from_iter([
-            (
-                self.create_tag("Type".to_string(), None),
-                self.create_tag(type_, None),
-            ),
-            (self.create_tag("Value".to_string(), None), value),
-        ]);
-        self.create_struct(fields)
-    }
-    pub fn create_ordering(&mut self, ordering: Ordering) -> Pointer {
-        self.create_tag(
-            match ordering {
-                Ordering::Less => "Less",
-                Ordering::Equal => "Equal",
-                Ordering::Greater => "Greater",
-            }
-            .to_string(),
-            None,
-        )
+}
+impl PartialOrd for ObjectInHeap {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }

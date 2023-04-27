@@ -1,10 +1,7 @@
-use std::{
-    cell::{Ref, RefCell, RefMut},
-    rc::Rc,
-};
+use std::{cell::RefCell, rc::Rc};
 
 use candy_frontend::builtin_functions;
-use candy_vm::heap::{Data, Heap, List, Pointer};
+use candy_vm::heap::{Data, Heap, I64BitLength, InlineObject, Int, List, Struct, Tag, Text};
 use itertools::Itertools;
 use num_bigint::RandBigInt;
 use rand::{
@@ -16,7 +13,7 @@ use rustc_hash::FxHashMap;
 
 use super::input::Input;
 
-pub fn generate_input(heap: Rc<RefCell<Heap>>, num_args: usize, symbols: &[Pointer]) -> Input {
+pub fn generate_input(heap: Rc<RefCell<Heap>>, num_args: usize, symbols: &[Text]) -> Input {
     let mut arguments = vec![];
     for _ in 0..num_args {
         let address = generate_value_with_complexity(
@@ -34,12 +31,13 @@ fn generate_value_with_complexity(
     heap: &mut Heap,
     rng: &mut ThreadRng,
     mut complexity: f32,
-    symbols: &[Pointer],
-) -> Pointer {
+    symbols: &[Text],
+) -> InlineObject {
     match rng.gen_range(1..=5) {
-        1 => heap.create_int(rng.gen_bigint(10)),
-        2 => heap.create_text("test".to_string()),
-        3 => *symbols.choose(rng).unwrap(),
+        1 => Int::create_from_bigint(heap, rng.gen_bigint(10)).into(),
+        2 => Text::create(heap, "test").into(),
+        // TODO: This should support tags with values
+        3 => Tag::create(heap, *symbols.choose(rng).unwrap(), None).into(),
         4 => {
             complexity -= 1.0;
             let mut items = vec![];
@@ -48,7 +46,7 @@ fn generate_value_with_complexity(
                 items.push(item);
                 complexity -= 10.0;
             }
-            heap.create_list(items)
+            List::create(heap, &items).into()
         }
         5 => {
             complexity -= 1.0;
@@ -59,16 +57,14 @@ fn generate_value_with_complexity(
                 fields.insert(key, value);
                 complexity -= 20.0;
             }
-            heap.create_struct(fields)
+            Struct::create(heap, &fields).into()
         }
-        6 => heap.create_builtin(
-            builtin_functions::VALUES[rng.gen_range(0..builtin_functions::VALUES.len())],
-        ),
+        6 => builtin_functions::VALUES[rng.gen_range(0..builtin_functions::VALUES.len())].into(),
         _ => unreachable!(),
     }
 }
 
-pub fn generate_mutated_input(rng: &mut ThreadRng, input: &mut Input, symbols: &[Pointer]) {
+pub fn generate_mutated_input(rng: &mut ThreadRng, input: &mut Input, symbols: &[Text]) {
     let mut heap = input.heap.borrow_mut();
     let num_args = input.arguments.len();
     let argument = input.arguments.get_mut(rng.gen_range(0..num_args)).unwrap();
@@ -76,71 +72,65 @@ pub fn generate_mutated_input(rng: &mut ThreadRng, input: &mut Input, symbols: &
 }
 fn generate_mutated_value(
     rng: &mut ThreadRng,
-    heap: &mut RefMut<Heap>,
-    address: Pointer,
-    symbols: &[Pointer],
-) -> Pointer {
+    heap: &mut Heap,
+    object: InlineObject,
+    symbols: &[Text],
+) -> InlineObject {
     if rng.gen_bool(0.1) {
         return generate_value_with_complexity(heap, rng, 100.0, symbols);
     }
 
-    let mut data = heap.get(address).data.clone();
-    match &mut data {
+    match object.into() {
         Data::Int(int) => {
-            int.value += rng.gen_range(-10..10);
+            Int::create_from_bigint(heap, int.get().as_ref() + rng.gen_range(-10..10)).into()
         }
-        Data::Text(text) => {
-            mutate_string(rng, &mut text.value);
+        Data::Text(text) => mutate_string(rng, heap, text.get().to_string()).into(),
+        // TODO: This should support tags with values
+        Data::Tag(_) => {
+            assert!(!symbols.is_empty());
+            Tag::create(heap, *symbols.choose(rng).unwrap(), None).into()
         }
-        // FIXME: This should support tags with values
-        Data::Tag(tag) => {
-            if !symbols.is_empty() {
-                tag.symbol = symbols.choose(rng).unwrap().to_string();
-            }
-        }
-        Data::List(List { items }) => {
-            if rng.gen_bool(0.9) && !items.is_empty() {
-                let index = rng.gen_range(0..items.len());
-                items[index] = generate_mutated_value(rng, heap, items[index], symbols);
-            } else if rng.gen_bool(0.5) && !items.is_empty() {
-                items.remove(rng.gen_range(0..items.len()));
+        Data::List(list) => {
+            let len = list.len();
+            if rng.gen_bool(0.9) && len > 0 {
+                let index = rng.gen_range(0..len);
+                let new_item = generate_mutated_value(rng, heap, list.get(index), symbols);
+                list.replace(heap, index, new_item).into()
+            } else if rng.gen_bool(0.5) && len > 0 {
+                list.remove(heap, rng.gen_range(0..len)).into()
             } else {
-                items.insert(
-                    rng.gen_range(0..=items.len()),
-                    generate_value_with_complexity(heap, rng, 100.0, symbols),
-                );
+                let new_item = generate_value_with_complexity(heap, rng, 100.0, symbols);
+                list.insert(heap, rng.gen_range(0..=len), new_item).into()
             }
         }
         Data::Struct(struct_) => {
-            if rng.gen_bool(0.9) && !struct_.fields.is_empty() {
-                let index = rng.gen_range(0..struct_.fields.len());
-                let (_, _, value) = struct_.fields[index];
-                struct_.fields[index].2 = generate_mutated_value(rng, heap, value, symbols);
-            } else if rng.gen_bool(0.5) && !struct_.fields.is_empty() {
-                struct_
-                    .fields
-                    .remove(rng.gen_range(0..struct_.fields.len()));
+            let len = struct_.len();
+            if rng.gen_bool(0.9) && len > 0 {
+                let index = rng.gen_range(0..len);
+                let key = struct_.keys()[index];
+                let value = generate_mutated_value(rng, heap, struct_.values()[index], symbols);
+                struct_.insert(heap, key, value).into()
+            // TODO: Support removing value from a struct
+            // } else if rng.gen_bool(0.5) && len > 0 {
+            //     struct_
+            //         .remove(rng.gen_range(0..len));
             } else {
                 let key = generate_value_with_complexity(heap, rng, 10.0, symbols);
                 let value = generate_value_with_complexity(heap, rng, 100.0, symbols);
-                struct_.insert(heap, key, value);
+                struct_.insert(heap, key, value).into()
             }
         }
-        Data::Builtin(builtin) => {
-            builtin.function = *builtin_functions::VALUES.choose(rng).unwrap();
-        }
+        Data::Builtin(_) => (*builtin_functions::VALUES.choose(rng).unwrap()).into(),
         Data::HirId(_) | Data::Closure(_) | Data::SendPort(_) | Data::ReceivePort(_) => {
             panic!("Couldn't have been created for fuzzing.")
         }
     }
-
-    heap.create(data)
 }
-fn mutate_string(rng: &mut ThreadRng, string: &mut String) {
+fn mutate_string(rng: &mut ThreadRng, heap: &mut Heap, mut string: String) -> Text {
     if rng.gen_bool(0.5) && !string.is_empty() {
         let start = string.floor_char_boundary(rng.gen_range(0..=string.len()));
         let end = string.floor_char_boundary(start + rng.gen_range(0..=(string.len() - start)));
-        string.replace_range(start..end, "");
+        string.replace_range(start..end, "")
     } else {
         let insertion_point = string.floor_char_boundary(rng.gen_range(0..=string.len()));
         let string_to_insert = (0..rng.gen_range(0..10))
@@ -151,44 +141,45 @@ fn mutate_string(rng: &mut ThreadRng, string: &mut String) {
                     .unwrap()
             })
             .join("");
-        string.insert_str(insertion_point, &string_to_insert);
+        string.insert_str(insertion_point, &string_to_insert)
     }
+    Text::create(heap, &string)
 }
 
 pub fn complexity_of_input(input: &Input) -> usize {
-    let heap = input.heap.borrow();
     input
         .arguments
         .iter()
-        .map(|argument| complexity_of_value(&heap, *argument))
+        .map(|argument| complexity_of_value(*argument))
         .sum()
 }
-fn complexity_of_value(heap: &Ref<Heap>, address: Pointer) -> usize {
-    match &heap.get(address).data {
-        Data::Int(int) => int.value.bits() as usize,
-        Data::Text(text) => text.value.len() + 1,
-        // FIXME: This should support tags with values
-        Data::Tag(tag) => tag.symbol.len(),
+fn complexity_of_value(object: InlineObject) -> usize {
+    match object.into() {
+        Data::Int(int) => match int {
+            Int::Inline(int) => int.get().bit_length() as usize,
+            Int::Heap(int) => int.get().bits() as usize,
+        },
+        Data::Text(text) => text.len() + 1,
+        // TODO: This should support tags with values
+        Data::Tag(tag) => tag.symbol().get().len(),
         Data::List(list) => {
-            list.items
+            list.items()
                 .iter()
-                .map(|item| complexity_of_value(heap, *item))
+                .map(|item| complexity_of_value(*item))
                 .sum::<usize>()
                 + 1
         }
         Data::Struct(struct_) => {
             struct_
                 .iter()
-                .map(|(key, value)| {
-                    complexity_of_value(heap, key) + complexity_of_value(heap, value)
-                })
+                .map(|(_, key, value)| complexity_of_value(key) + complexity_of_value(value))
                 .sum::<usize>()
                 + 1
         }
-        Data::HirId(_) => 1,
-        Data::Closure(_) => 1,
-        Data::Builtin(_) => 1,
-        Data::SendPort(_) => 1,
-        Data::ReceivePort(_) => 1,
+        Data::HirId(_)
+        | Data::Closure(_)
+        | Data::Builtin(_)
+        | Data::SendPort(_)
+        | Data::ReceivePort(_) => 1,
     }
 }

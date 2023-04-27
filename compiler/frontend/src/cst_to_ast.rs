@@ -783,8 +783,7 @@ impl LoweringContext {
 
                 assert!(
                     matches!(assignment_sign.kind, CstKind::EqualsSign | CstKind::ColonEqualsSign),
-                    "Expected an equals sign or colon equals sign for the assignment, but found {} instead.",
-                    assignment_sign,
+                    "Expected an equals sign or colon equals sign for the assignment, but found {assignment_sign} instead.",
                 );
 
                 let body = self.lower_csts(body);

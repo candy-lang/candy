@@ -19,9 +19,10 @@ use candy_vm::{
     channel::{ChannelId, Packet},
     context::{DbUseProvider, RunForever},
     fiber::{ExecutionResult, FiberId},
-    heap::{Closure, Data, Heap, SendPort, Struct},
+    heap::{Data, Heap, HirId, SendPort, Struct, Text},
     lir::Lir,
     mir_to_lir::MirToLir,
+    run_lir,
     tracer::{full::FullTracer, DummyTracer, Tracer},
     vm::{CompletedOperation, OperationId, Status, Vm},
 };
@@ -30,7 +31,6 @@ use database::Database;
 use itertools::Itertools;
 use notify::RecursiveMode;
 use notify_debouncer_mini::new_debouncer;
-use rustc_hash::FxHashMap;
 use std::{
     convert::TryInto,
     env::{current_dir, current_exe},
@@ -342,41 +342,24 @@ fn run(options: CandyRunOptions) -> ProgramResult {
 
     debug!("Running {}.", module.to_rich_ir());
 
-    let module_closure = Closure::of_module(&db, module.clone(), tracing.clone()).unwrap();
     let mut tracer = FullTracer::default();
-
-    let mut vm = Vm::default();
-    vm.set_up_for_running_module_closure(module.clone(), module_closure);
-    vm.run(
-        &DbUseProvider {
-            db: &db,
-            tracing: tracing.clone(),
-        },
-        &mut RunForever,
+    let lir = db.lir(module.clone(), tracing.clone()).unwrap();
+    let use_provider = DbUseProvider {
+        db: &db,
+        tracing: tracing.clone(),
+    };
+    let result = run_lir(
+        module.clone(),
+        lir.as_ref().to_owned(),
+        &use_provider,
         &mut tracer,
     );
-    if let Status::WaitingForOperations = vm.status() {
-        error!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");
-        // TODO: Show stack traces of all fibers?
-    }
-    let result = vm.tear_down();
-
     if options.debug {
         module.dump_associated_debug_file(&packages_path, "trace", &format!("{tracer:?}"));
     }
 
-    let (mut heap, exported_definitions): (_, Struct) = match result {
-        ExecutionResult::Finished(return_value) => {
-            debug!("The module exports these definitions: {return_value:?}",);
-            let exported = return_value
-                .heap
-                .get(return_value.address)
-                .data
-                .clone()
-                .try_into()
-                .unwrap();
-            (return_value.heap, exported)
-        }
+    let (mut heap, main) = match result {
+        ExecutionResult::Finished(return_value) => return_value.into_main_function().unwrap(),
         ExecutionResult::Panicked {
             reason,
             responsible,
@@ -388,17 +371,8 @@ fn run(options: CandyRunOptions) -> ProgramResult {
             }
             error!(
                 "This is the stack trace:\n{}",
-                tracer.format_panic_stack_trace_to_root_fiber(&db)
+                tracer.format_panic_stack_trace_to_root_fiber(&db),
             );
-            return Err(Exit::CodePanicked);
-        }
-    };
-
-    let main = heap.create_tag("Main".to_string(), None);
-    let main = match exported_definitions.get(&heap, main) {
-        Some(main) => main,
-        None => {
-            error!("The module doesn't contain a main function.");
             return Err(Exit::CodePanicked);
         }
     };
@@ -408,25 +382,20 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     let mut vm = Vm::default();
     let mut stdout = StdoutService::new(&mut vm);
     let mut stdin = StdinService::new(&mut vm);
-    let environment = {
-        let stdout_symbol = heap.create_tag("Stdout".to_string(), None);
-        let stdout_port = heap.create_send_port(stdout.channel);
-        let stdin_symbol = heap.create_tag("Stdin".to_string(), None);
-        let stdin_port = heap.create_send_port(stdin.channel);
-        heap.create_struct(FxHashMap::from_iter([
-            (stdout_symbol, stdout_port),
-            (stdin_symbol, stdin_port),
-        ]))
-    };
-    let platform = heap.create_hir_id(hir::Id::platform());
+    let fields = [
+        ("Stdout", SendPort::create(&mut heap, stdout.channel)),
+        ("Stdin", SendPort::create(&mut heap, stdin.channel)),
+    ];
+    let environment = Struct::create_with_symbol_keys(&mut heap, fields).into();
+    let platform = HirId::create(&mut heap, hir::Id::platform());
     tracer.for_fiber(FiberId::root()).call_started(
         platform,
-        main,
+        main.into(),
         vec![environment],
         platform,
         &heap,
     );
-    vm.set_up_for_running_closure(heap, main, vec![environment], hir::Id::platform());
+    vm.set_up_for_running_closure(heap, main, &[environment], hir::Id::platform());
     loop {
         match vm.status() {
             Status::CanRun => {
@@ -453,7 +422,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         ExecutionResult::Finished(return_value) => {
             tracer
                 .for_fiber(FiberId::root())
-                .call_ended(return_value.address, &return_value.heap);
+                .call_ended(return_value.object, &return_value.heap);
             debug!("The main function returned: {return_value:?}");
             Ok(())
         }
@@ -491,8 +460,8 @@ impl StdoutService {
         while let Some(CompletedOperation::Received { packet }) =
             vm.completed_operations.remove(&self.current_receive)
         {
-            match &packet.heap.get(packet.address).data {
-                Data::Text(text) => println!("{}", text.value),
+            match packet.object.into() {
+                Data::Text(text) => println!("{}", text.get()),
                 _ => info!("Non-text value sent to stdout: {packet:?}"),
             }
             self.current_receive = vm.receive(self.channel);
@@ -517,12 +486,9 @@ impl StdinService {
             vm.completed_operations.remove(&self.current_receive)
         {
             let request: SendPort = packet
-                .heap
-                .get(packet.address)
-                .data
-                .clone()
+                .object
                 .try_into()
-                .expect("expected a send port");
+                .expect("Expected a send port to be sent to stdin.");
             print!(">> ");
             io::stdout().flush().unwrap();
             let input = {
@@ -531,10 +497,10 @@ impl StdinService {
             };
             let packet = {
                 let mut heap = Heap::default();
-                let address = heap.create_text(input);
-                Packet { heap, address }
+                let object = Text::create(&mut heap, &input).into();
+                Packet { heap, object }
             };
-            vm.send(&mut DummyTracer, request.channel, packet);
+            vm.send(&mut DummyTracer, request.channel_id(), packet);
 
             // Receive the next request
             self.current_receive = vm.receive(self.channel);

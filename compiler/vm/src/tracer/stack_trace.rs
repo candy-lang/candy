@@ -2,7 +2,7 @@ use super::{
     full::{FullTracer, StoredFiberEvent, StoredVmEvent},
     FiberId,
 };
-use crate::heap::Pointer;
+use crate::heap::{HirId, InlineObject};
 use candy_frontend::{
     ast_to_hir::AstToHir, cst::CstKind, module::Package, position::PositionConversionDb,
 };
@@ -16,10 +16,10 @@ use tracing::debug;
 
 #[derive(Clone)]
 pub struct Call {
-    pub call_site: Pointer,
-    pub callee: Pointer,
-    pub arguments: Vec<Pointer>,
-    pub responsible: Pointer,
+    pub call_site: HirId,
+    pub callee: InlineObject,
+    pub arguments: Vec<InlineObject>,
+    pub responsible: HirId,
 }
 
 impl FullTracer {
@@ -63,7 +63,7 @@ impl FullTracer {
             ..
         } in stack.iter().rev()
         {
-            let hir_id = self.heap.get_hir_id(*call_site);
+            let hir_id = call_site.get();
             let module = hir_id.module.clone();
             let is_tooling = matches!(module.package, Package::Tooling(_));
             let cst_id = if is_tooling {
@@ -91,8 +91,8 @@ impl FullTracer {
                             _ => None,
                         }
                     })
-                    .unwrap_or_else(|| callee.format(&self.heap)),
-                arguments.iter().map(|arg| arg.format(&self.heap)).join(" "),
+                    .unwrap_or_else(|| format!("{callee}")),
+                arguments.iter().map(|arg| format!("{arg:?}")).join(" "),
             );
             caller_locations_and_calls.push((caller_location_string, call_string));
         }

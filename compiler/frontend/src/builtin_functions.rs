@@ -2,7 +2,7 @@ use lazy_static::lazy_static;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-#[derive(Debug, EnumIter, PartialEq, Eq, Clone, Hash, Copy)]
+#[derive(Clone, Copy, Debug, EnumIter, Eq, Hash, PartialEq)]
 pub enum BuiltinFunction {
     ChannelCreate,       // capacity -> [sendPort, receivePort]
     ChannelSend,         // channel any -> Nothing

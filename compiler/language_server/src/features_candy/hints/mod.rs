@@ -15,7 +15,6 @@ use candy_frontend::{
     module::{Module, MutableModuleProviderOwner, PackagesPath},
     rich_ir::ToRichIr,
 };
-use candy_vm::heap::Heap;
 use extension_trait::extension_trait;
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position, Url};
@@ -89,7 +88,7 @@ pub async fn run_server(
                     db.did_change_module(&module, content);
                     outgoing_hints.report_hints(module.clone(), vec![]).await;
                     constant_evaluator.update_module(&db, module.clone());
-                    fuzzer.update_module(module, &Heap::default(), &[]);
+                    fuzzer.update_module(module, &[]);
                 }
                 Event::CloseModule(module) => {
                     db.did_close_module(&module);
@@ -107,8 +106,8 @@ pub async fn run_server(
         // functions we found.
         let module_with_new_insight = 'new_insight: {
             if let Some(module) = constant_evaluator.run(&db) {
-                let (heap, closures) = constant_evaluator.get_fuzzable_closures(&module);
-                fuzzer.update_module(module.clone(), &heap, &closures);
+                let closures = constant_evaluator.get_fuzzable_closures(&module);
+                fuzzer.update_module(module.clone(), &closures);
                 debug!(
                     "The constant evaluator made progress in {}.",
                     module.to_rich_ir(),

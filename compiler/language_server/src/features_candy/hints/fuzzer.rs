@@ -8,7 +8,7 @@ use candy_frontend::{
 use candy_fuzzer::{Fuzzer, Status};
 use candy_vm::{
     context::{DbUseProvider, RunLimitedNumberOfInstructions},
-    heap::{Heap, Pointer},
+    heap::Closure,
     mir_to_lir::MirToLir,
 };
 use itertools::Itertools;
@@ -29,15 +29,10 @@ pub struct FuzzerManager {
 }
 
 impl FuzzerManager {
-    pub fn update_module(
-        &mut self,
-        module: Module,
-        heap: &Heap,
-        fuzzable_closures: &[(Id, Pointer)],
-    ) {
+    pub fn update_module(&mut self, module: Module, fuzzable_closures: &[(Id, Closure)]) {
         let fuzzers = fuzzable_closures
             .iter()
-            .map(|(id, closure)| (id.clone(), Fuzzer::new(heap, *closure, id.clone())))
+            .map(|(id, closure)| (id.clone(), Fuzzer::new(*closure, id.clone())))
             .collect();
         self.fuzzers.insert(module, fuzzers);
     }
@@ -112,10 +107,7 @@ impl FuzzerManager {
                         parameter_names
                             .iter()
                             .zip(input.arguments.iter())
-                            .map(|(name, argument)| format!(
-                                "`{name} = {}`",
-                                argument.format_debug(&input.heap.borrow()),
-                            ))
+                            .map(|(name, argument)| format!("`{name} = {argument:?}`"))
                             .collect_vec()
                             .join_with_commas_and_and(),
                     ),

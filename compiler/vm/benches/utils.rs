@@ -3,7 +3,7 @@ use candy_frontend::{
     ast_to_hir::AstToHirStorage,
     cst::CstDbStorage,
     cst_to_ast::CstToAstStorage,
-    hir::{self, HirDbStorage},
+    hir::HirDbStorage,
     hir_to_mir::HirToMirStorage,
     mir_optimize::OptimizeMirStorage,
     module::{
@@ -17,15 +17,16 @@ use candy_frontend::{
 };
 use candy_vm::{
     channel::Packet,
-    context::{DbUseProvider, RunForever},
+    context::DbUseProvider,
     fiber::ExecutionResult,
-    heap::{Closure, Struct},
+    heap::Struct,
     lir::Lir,
     mir_to_lir::{MirToLir, MirToLirStorage},
+    run_lir, run_main,
     tracer::DummyTracer,
-    vm::{Status, Vm},
 };
 use lazy_static::lazy_static;
+use rustc_hash::FxHashMap;
 use std::{fs, sync::Arc};
 use walkdir::WalkDir;
 
@@ -120,49 +121,18 @@ pub fn compile(db: &mut Database, source_code: &str) -> Arc<Lir> {
 }
 
 pub fn run(db: &Database, lir: Lir) -> Packet {
-    let module_closure = Closure::of_module_lir(lir);
-    let mut tracer = DummyTracer::default();
     let use_provider = DbUseProvider {
         db,
         tracing: TRACING.clone(),
     };
-
-    // Run once to generate exports.
-    let mut vm = Vm::default();
-    vm.set_up_for_running_module_closure(MODULE.clone(), module_closure);
-    vm.run(&use_provider, &mut RunForever, &mut tracer);
-    if let Status::WaitingForOperations = vm.status() {
-        panic!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");
-    }
-
-    let (mut heap, exported_definitions): (_, Struct) = match vm.tear_down() {
-        ExecutionResult::Finished(return_value) => {
-            let exported = return_value
-                .heap
-                .get(return_value.address)
-                .data
-                .clone()
-                .try_into()
-                .unwrap();
-            (return_value.heap, exported)
-        }
-        ExecutionResult::Panicked { reason, .. } => {
-            panic!("The module panicked: {reason}");
-        }
-    };
+    let mut tracer = DummyTracer::default();
+    let (mut heap, main) = run_lir(MODULE.clone(), lir, &use_provider, &mut tracer)
+        .into_main_function()
+        .unwrap();
 
     // Run the `main` function.
-    let main = heap.create_tag("Main".to_string(), None);
-    let main = match exported_definitions.get(&heap, main) {
-        Some(main) => main,
-        None => panic!("The module doesn't contain a main function."),
-    };
-
-    let mut vm = Vm::default();
-    let environment = heap.create_struct(Default::default());
-    vm.set_up_for_running_closure(heap, main, vec![environment], hir::Id::platform());
-    vm.run(&use_provider, &mut RunForever, &mut tracer);
-    match vm.tear_down() {
+    let environment = Struct::create(&mut heap, &FxHashMap::default());
+    match run_main(heap, main, environment, &use_provider, &mut tracer) {
         ExecutionResult::Finished(return_value) => return_value,
         ExecutionResult::Panicked { reason, .. } => panic!("The main function panicked: {reason}"),
     }
