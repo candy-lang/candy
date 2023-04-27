@@ -326,7 +326,6 @@ impl<'a> ExistingWhitespace<'a> {
         comments_and_whitespace: &[(&Cst, Option<Offset>)],
         config: &TrailingWithIndentationConfig,
     ) -> Width {
-        #[allow(unused_parens)] // False positive
         let (previous_width, indentation, ensure_space_before_first_comment, inner_newline_limit) =
             match config {
                 TrailingWithIndentationConfig::Body {
@@ -337,7 +336,7 @@ impl<'a> ExistingWhitespace<'a> {
                     *indentation,
                     matches!(
                         position,
-                        (WhitespacePositionInBody::Middle | WhitespacePositionInBody::End),
+                        WhitespacePositionInBody::Middle | WhitespacePositionInBody::End,
                     ),
                     MAX_CONSECUTIVE_EMPTY_LINES,
                 ),

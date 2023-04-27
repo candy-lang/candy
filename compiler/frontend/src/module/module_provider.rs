@@ -1,7 +1,7 @@
 use super::{module::Module, package::PackagesPath};
 use crate::rich_ir::ToRichIr;
 use rustc_hash::FxHashMap;
-use std::{fs, sync::Arc};
+use std::{fs, io, sync::Arc};
 use tracing::error;
 
 pub trait ModuleProvider {
@@ -61,13 +61,12 @@ impl ModuleProvider for FileSystemModuleProvider {
             )
         });
         for path in paths {
-            #[allow(unused_parens)]
             match fs::read(path.clone()) {
                 Ok(content) => return Some(Arc::new(content)),
                 Err(error)
                     if matches!(
                         error.kind(),
-                        (std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory),
+                        io::ErrorKind::NotFound | io::ErrorKind::NotADirectory,
                     ) => {}
                 Err(error) => error!("Unexpected error when reading file {path:?}: {error:?}"),
             }

@@ -126,16 +126,15 @@ pub fn format_csts<'a>(
 
 fn split_leading_whitespace(start_offset: Offset, csts: &[Cst]) -> (ExistingWhitespace, &[Cst]) {
     let first_expression_index = csts.iter().find_position(|cst| {
-        #[allow(unused_parens)] // False positive
         !matches!(
             cst.kind,
-            (CstKind::Whitespace(_)
+            CstKind::Whitespace(_)
                 | CstKind::Error {
                     error: CstError::TooMuchWhitespace,
                     ..
                 }
                 | CstKind::Newline(_)
-                | CstKind::Comment { .. }),
+                | CstKind::Comment { .. },
         )
     });
     let (leading_whitespace, rest) =
@@ -1098,11 +1097,10 @@ pub impl<D> CstExtension for Cst<D> {
             .any(|(_, it)| matches!(it.kind, CstKind::Comment { .. }))
     }
 
-    #[allow(unused_parens)] // False positive
     fn is_sandwich_like(&self) -> bool {
         matches!(
             &self.kind,
-            (CstKind::List { .. } | CstKind::Struct { .. } | CstKind::Lambda { .. }),
+            CstKind::List { .. } | CstKind::Struct { .. } | CstKind::Lambda { .. },
         )
     }
 
