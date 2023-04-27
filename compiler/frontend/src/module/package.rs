@@ -50,7 +50,7 @@ impl PackagesPath {
 }
 
 impl Display for PackagesPath {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}", self.to_string_lossy())
     }
 }
