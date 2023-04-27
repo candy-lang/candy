@@ -61,7 +61,7 @@ The header word is a tagged union of different types of values:
 
 ### Int
 
-Uses Rust's `BigInt` representation after the header word.
+Uses Rust's `BigInt` representation after the header word and reference count.
 Values that fit into an inline word _must_ be stored inline.
 
 ### List
