@@ -96,7 +96,6 @@ impl Debug for Heap {
         writeln!(f, "{{")?;
         for &object in self.objects.iter() {
             let reference_count = object.reference_count();
-            println!("Formatting object at {object:p}");
             writeln!(
                 f,
                 "  {object:p} ({reference_count} {}): {object:?}",
