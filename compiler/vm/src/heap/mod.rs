@@ -9,12 +9,11 @@ pub use self::{
 };
 use crate::channel::ChannelId;
 use derive_more::{DebugCustom, Deref, Pointer};
-use rustc_hash::FxHashMap;
-use sorted_vec::SortedSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     alloc::{self, Allocator, Layout},
-    cmp::Ordering,
     fmt::{self, Debug, Formatter},
+    hash::{Hash, Hasher},
     mem,
 };
 
@@ -25,7 +24,7 @@ mod pointer;
 
 #[derive(Clone, Default)]
 pub struct Heap {
-    objects: SortedSet<ObjectInHeap>,
+    objects: FxHashSet<ObjectInHeap>,
     channel_refcounts: FxHashMap<ChannelId, usize>,
 }
 
@@ -45,7 +44,7 @@ impl Heap {
         unsafe { *pointer.as_ptr() = header_word };
         let object = HeapObject::new(pointer);
         object.set_reference_count(1);
-        self.objects.replace(ObjectInHeap(object));
+        self.objects.insert(ObjectInHeap(object));
         object
     }
     /// Don't call this method directly, call [drop] or [free] instead!
@@ -55,7 +54,7 @@ impl Heap {
             HeapObject::WORD_SIZE,
         )
         .unwrap();
-        self.objects.remove_item(&ObjectInHeap(*object));
+        self.objects.remove(&ObjectInHeap(*object));
         unsafe { alloc::Global.deallocate(object.address().cast(), layout) };
     }
 
@@ -124,13 +123,8 @@ impl PartialEq for ObjectInHeap {
     }
 }
 
-impl Ord for ObjectInHeap {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.0.address().cmp(&other.0.address())
-    }
-}
-impl PartialOrd for ObjectInHeap {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+impl Hash for ObjectInHeap {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.address().hash(state)
     }
 }
