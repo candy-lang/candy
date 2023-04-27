@@ -120,7 +120,7 @@ impl HeapStruct {
             }
             Err(index) => {
                 let struct_ = Self::create_uninitialized(heap, self.len() + 1);
-                // FIXME: Merge consecutive copies.
+                // PERF: Merge consecutive copies.
                 self.insert_into_items(struct_, 0, index, hash);
                 self.insert_into_items(struct_, 1, index, key);
                 self.insert_into_items(struct_, 2, index, value);

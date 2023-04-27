@@ -89,7 +89,6 @@ impl Fiber {
     }
 }
 
-// FIXME: Convert error type to `&'static str`
 type BuiltinResult = Result<SuccessfulBehavior, String>;
 enum SuccessfulBehavior {
     Return(InlineObject),

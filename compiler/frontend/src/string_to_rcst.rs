@@ -697,7 +697,7 @@ mod parse {
         ))
     }
 
-    // FIXME: It might be a good idea to ignore text interpolations in patterns
+    // TODO: It might be a good idea to ignore text interpolations in patterns
     #[instrument(level = "trace")]
     fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
         let (input, opening_single_quotes) = parse_multiple(input, single_quote, None)?;
