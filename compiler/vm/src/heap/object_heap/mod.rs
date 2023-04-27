@@ -118,7 +118,6 @@ impl HeapObject {
         heap: &mut Heap,
         address_map: &mut FxHashMap<HeapObject, HeapObject>,
     ) -> Self {
-        trace!("Cloning {self:p} to heap. Value: {self:?}");
         match address_map.entry(self) {
             hash_map::Entry::Occupied(entry) => {
                 let object = entry.get();

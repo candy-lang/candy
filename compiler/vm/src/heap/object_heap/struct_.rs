@@ -11,7 +11,6 @@ use std::{
     hash::{Hash, Hasher},
     ptr, slice,
 };
-use tracing::debug;
 
 #[derive(Clone, Copy, Deref)]
 pub struct HeapStruct(HeapObject);
@@ -45,7 +44,6 @@ impl HeapStruct {
                     .as_ptr() = value;
             }
         };
-        debug!("Created Struct: {struct_:?}");
         struct_
     }
     fn create_uninitialized(heap: &mut Heap, len: usize) -> Self {

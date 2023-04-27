@@ -18,7 +18,6 @@ use std::{
     cmp::Ordering,
     fmt::{self, Debug, Formatter},
 };
-use tracing::trace;
 
 mod object;
 mod object_heap;
@@ -44,7 +43,6 @@ impl Heap {
             .allocate(layout)
             .expect("Not enough memory.")
             .cast();
-        trace!("allocate for header {header_word:X} at {pointer:p} ({layout:?})");
         unsafe { *pointer.as_ptr() = header_word };
         let object = HeapObject(pointer);
         object.set_reference_count(1);
@@ -58,11 +56,6 @@ impl Heap {
             HeapObject::WORD_SIZE,
         )
         .unwrap();
-        trace!(
-            "deallocate for header {:X} at {:p} ({layout:?})",
-            object.header_word(),
-            *object,
-        );
         self.objects.remove_item(&ObjectInHeap(*object));
         unsafe { alloc::Global.deallocate(object.address().cast(), layout) };
     }
@@ -103,6 +96,7 @@ impl Debug for Heap {
         writeln!(f, "{{")?;
         for &object in self.objects.iter() {
             let reference_count = object.reference_count();
+            println!("Formatting object at {object:p}");
             writeln!(
                 f,
                 "  {object:p} ({reference_count} {}): {object:?}",

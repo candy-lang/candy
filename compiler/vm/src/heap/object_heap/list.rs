@@ -12,7 +12,6 @@ use std::{
     ptr::{self, NonNull},
     slice,
 };
-use tracing::debug;
 
 #[derive(Clone, Copy, Deref)]
 pub struct HeapList(HeapObject);
@@ -27,7 +26,6 @@ impl HeapList {
         let len = value.len();
         let list = Self::create_uninitialized(heap, len);
         unsafe { ptr::copy_nonoverlapping(value.as_ptr(), list.items_pointer().as_ptr(), len) };
-        debug!("Created List: {list:?}");
         list
     }
     fn create_uninitialized(heap: &mut Heap, len: usize) -> Self {

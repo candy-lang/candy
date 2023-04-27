@@ -11,7 +11,6 @@ use std::{
     mem,
     ptr::{self, NonNull},
 };
-use tracing::debug;
 
 #[derive(Clone, Copy, Deref)]
 pub struct HeapHirId(HeapObject);
@@ -23,7 +22,6 @@ impl HeapHirId {
     pub fn create(heap: &mut Heap, value: Id) -> Self {
         let id = HeapHirId(heap.allocate(HeapObject::KIND_HIR_ID, mem::size_of::<Id>()));
         unsafe { ptr::write(id.id_pointer().as_ptr(), value) };
-        debug!("Created HirId: {id:?}");
         id
     }
 
@@ -63,7 +61,6 @@ impl HeapObjectTrait for HeapHirId {
     }
 
     fn drop_children(self, _heap: &mut Heap) {
-        debug!("Dropping HirId at {:p}: {:?}", *self, self.get());
         unsafe { ptr::drop_in_place(self.id_pointer().as_ptr()) };
     }
 }

@@ -582,8 +582,8 @@ fn init_logger(use_stdout: bool) {
             "candy_language_server",
             Level::TRACE,
         )))
-        .with_filter(filter::filter_fn(level_for("candy_vm", Level::TRACE)))
-        .with_filter(filter::filter_fn(level_for("candy_vm::heap", Level::TRACE)));
+        .with_filter(filter::filter_fn(level_for("candy_vm", Level::DEBUG)))
+        .with_filter(filter::filter_fn(level_for("candy_vm::heap", Level::DEBUG)));
     tracing_subscriber::registry().with(console_log).init();
 }
 fn level_for(module: &'static str, level: Level) -> impl Fn(&Metadata) -> bool {

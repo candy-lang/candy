@@ -18,11 +18,6 @@ impl InlineBuiltin {
     const INDEX_SHIFT: usize = 2;
 
     pub fn new_unchecked(object: InlineObject) -> Self {
-        debug_assert_eq!(
-            object.raw_word() & InlineObject::KIND_MASK,
-            InlineObject::KIND_BUILTIN,
-            "Object is not a builtin function.",
-        );
         Self(object)
     }
 

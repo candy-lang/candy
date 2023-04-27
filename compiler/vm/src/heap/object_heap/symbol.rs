@@ -10,7 +10,6 @@ use std::{
     ptr::{self, NonNull},
     slice, str,
 };
-use tracing::debug;
 
 #[derive(Clone, Copy, Deref)]
 pub struct HeapSymbol(HeapObject);
@@ -33,7 +32,6 @@ impl HeapSymbol {
             len,
         ));
         unsafe { ptr::copy_nonoverlapping(value.as_ptr(), symbol.symbol_pointer().as_ptr(), len) };
-        debug!("Created Symbol: {symbol:?}");
         symbol
     }
 

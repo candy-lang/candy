@@ -14,7 +14,6 @@ use std::{
     ptr::{self, NonNull},
     slice,
 };
-use tracing::debug;
 
 #[derive(Clone, Copy, Deref)]
 pub struct HeapClosure(HeapObject);
@@ -74,7 +73,6 @@ impl HeapClosure {
         // they reference) to this `HeapClosure` object.
         mem::forget(instructions);
 
-        debug!("Created Closure: {closure:?}");
         closure
     }
 
