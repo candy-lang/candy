@@ -6,7 +6,7 @@
     strict_provenance
 )]
 
-use crate::heap::{Struct, Symbol};
+use crate::heap::{Struct, Tag};
 use candy_frontend::{hir, module::Module};
 use channel::Packet;
 use context::{RunForever, UseProvider};
@@ -54,7 +54,7 @@ impl Packet {
         let exported_definitions: Struct = self.object.try_into().unwrap();
         debug!("The module exports these definitions: {exported_definitions}");
 
-        let main = Symbol::create(&mut self.heap, "Main");
+        let main = Tag::create_from_str(&mut self.heap, "Main", None);
         exported_definitions
             .get(main)
             .ok_or("The module doesn't export a main function.")

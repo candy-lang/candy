@@ -52,7 +52,7 @@ The header word is a tagged union of different types of values:
 | `00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000` | Int     |
 | `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaa001` | List    |
 | `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaa101` | Struct  |
-| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaa010` | Symbol  |
+| `00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000010` | Tag     |
 | `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaa110` | Text    |
 | `cccccccc cccccccc cccccccc cccccccc aaaaaaaa aaaaaaaa aaaaaaaa aaaaa011` | Closure |
 | `00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000111` | HirId   |
@@ -94,9 +94,14 @@ Values that fit into an inline word _must_ be stored inline.
 | …                    |
 | Value a-1            |
 
-### Symbol
+### Tag
 
-Same as text.
+| Word                                           |
+| :--------------------------------------------- |
+| Header Word (tag)                              |
+| Reference count                                |
+| InlineWord pointing to symbol (stored as text) |
+| InlineWord with value or 0                     |
 
 ### Text
 

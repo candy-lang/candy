@@ -4,7 +4,7 @@ use self::{
     pointer::InlinePointer,
     port::{InlineReceivePort, InlineSendPort},
 };
-use super::{object_heap::HeapObject, Closure, Data, Heap, HirId, Struct, Symbol};
+use super::{object_heap::HeapObject, Data, Heap, HirId};
 use crate::{
     channel::ChannelId,
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
@@ -98,18 +98,6 @@ impl InlineObject {
         address_map: &mut FxHashMap<HeapObject, HeapObject>,
     ) -> Self {
         *InlineData::from(self).clone_to_heap_with_mapping(heap, address_map)
-    }
-
-    pub fn main_function(self, heap: &mut Heap) -> Result<Closure, &'static str> {
-        let exported_definitions: Struct = self.try_into().unwrap();
-        let main = Symbol::create(heap, "Main");
-        exported_definitions
-            .get(main)
-            .ok_or("The module doesn't contain a main function.")
-            .and_then(|main| {
-                main.try_into()
-                    .map_err(|_| "The exported main object is not a function.")
-            })
     }
 }
 

@@ -1,6 +1,6 @@
 use self::{
     closure::HeapClosure, hir_id::HeapHirId, int::HeapInt, list::HeapList, struct_::HeapStruct,
-    symbol::HeapSymbol, text::HeapText,
+    tag::HeapTag, text::HeapText,
 };
 use super::Heap;
 use crate::utils::{impl_debug_display_via_debugdisplay, DebugDisplay};
@@ -19,7 +19,7 @@ pub(super) mod hir_id;
 pub(super) mod int;
 pub(super) mod list;
 pub(super) mod struct_;
-pub(super) mod symbol;
+pub(super) mod tag;
 pub(super) mod text;
 mod utils;
 
@@ -51,7 +51,7 @@ impl HeapObject {
     const KIND_INT: u64 = 0b000;
     const KIND_LIST: u64 = 0b001;
     const KIND_STRUCT: u64 = 0b101;
-    const KIND_SYMBOL: u64 = 0b010;
+    const KIND_TAG: u64 = 0b010;
     const KIND_TEXT: u64 = 0b110;
     const KIND_CLOSURE: u64 = 0b011;
     const KIND_HIR_ID: u64 = 0b111;
@@ -197,7 +197,7 @@ pub enum HeapData {
     List(HeapList),
     Struct(HeapStruct),
     Text(HeapText),
-    Symbol(HeapSymbol),
+    Tag(HeapTag),
     Closure(HeapClosure),
     HirId(HeapHirId),
 }
@@ -209,7 +209,7 @@ impl DebugDisplay for HeapData {
             Self::List(list) => DebugDisplay::fmt(list, f, is_debug),
             Self::Struct(struct_) => DebugDisplay::fmt(struct_, f, is_debug),
             Self::Text(text) => DebugDisplay::fmt(text, f, is_debug),
-            Self::Symbol(symbol) => DebugDisplay::fmt(symbol, f, is_debug),
+            Self::Tag(tag) => DebugDisplay::fmt(tag, f, is_debug),
             Self::Closure(closure) => DebugDisplay::fmt(closure, f, is_debug),
             Self::HirId(hir_id) => DebugDisplay::fmt(hir_id, f, is_debug),
         }
@@ -227,7 +227,7 @@ impl From<HeapObject> for HeapData {
             }
             HeapObject::KIND_LIST => HeapData::List(HeapList::new_unchecked(object)),
             HeapObject::KIND_STRUCT => HeapData::Struct(HeapStruct::new_unchecked(object)),
-            HeapObject::KIND_SYMBOL => HeapData::Symbol(HeapSymbol::new_unchecked(object)),
+            HeapObject::KIND_TAG => HeapData::Tag(HeapTag::new_unchecked(object)),
             HeapObject::KIND_TEXT => HeapData::Text(HeapText::new_unchecked(object)),
             HeapObject::KIND_CLOSURE => HeapData::Closure(HeapClosure::new_unchecked(object)),
             HeapObject::KIND_HIR_ID => {
@@ -247,7 +247,7 @@ impl Deref for HeapData {
             HeapData::List(list) => list,
             HeapData::Struct(struct_) => struct_,
             HeapData::Text(text) => text,
-            HeapData::Symbol(symbol) => symbol,
+            HeapData::Tag(tag) => tag,
             HeapData::Closure(closure) => closure,
             HeapData::HirId(hir_id) => hir_id,
         }

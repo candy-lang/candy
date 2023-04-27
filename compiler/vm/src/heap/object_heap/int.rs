@@ -1,6 +1,6 @@
 use super::{utils::heap_object_impls, HeapObjectTrait};
 use crate::{
-    heap::{object_heap::HeapObject, object_inline::int::InlineInt, Heap, Int, Symbol},
+    heap::{object_heap::HeapObject, object_inline::int::InlineInt, Heap, Int, Tag},
     utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_via_get, DebugDisplay},
 };
 use derive_more::Deref;
@@ -47,9 +47,9 @@ impl HeapInt {
         Int::create_from_bigint(heap, self.get().mod_floor(rhs))
     }
 
-    pub fn compare_to(self, heap: &mut Heap, rhs: &BigInt) -> Symbol {
+    pub fn compare_to(self, heap: &mut Heap, rhs: &BigInt) -> Tag {
         // PERF: Add manual check if the `rhs` is an [InlineInt]?
-        Symbol::create_ordering(heap, self.get().cmp(rhs))
+        Tag::create_ordering(heap, self.get().cmp(rhs))
     }
 
     operator_fn!(shift_left, Shl, shl);

@@ -1,6 +1,6 @@
 use super::{InlineObject, InlineObjectTrait};
 use crate::{
-    heap::{object_heap::HeapObject, Heap, Int, Symbol},
+    heap::{object_heap::HeapObject, Heap, Int, Tag},
     utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_via_get, DebugDisplay},
 };
 use derive_more::Deref;
@@ -57,8 +57,8 @@ impl InlineInt {
             })
     }
 
-    pub fn compare_to(self, heap: &mut Heap, rhs: Self) -> Symbol {
-        Symbol::create_ordering(heap, self.get().cmp(&rhs.get()))
+    pub fn compare_to(self, heap: &mut Heap, rhs: Self) -> Tag {
+        Tag::create_ordering(heap, self.get().cmp(&rhs.get()))
     }
 
     operator_fn!(shift_left, i64::checked_shl, Shl::shl);
