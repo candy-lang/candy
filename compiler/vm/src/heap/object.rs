@@ -50,15 +50,6 @@ impl Data {
             None
         }
     }
-
-    pub fn unwrap_hir_id(&self) -> HirId {
-        // FIXME: unify
-        if let Data::HirId(hir_id) = self {
-            *hir_id
-        } else {
-            panic!("Expected HirId, got {:?}", self)
-        }
-    }
 }
 
 impl From<InlineObject> for Data {

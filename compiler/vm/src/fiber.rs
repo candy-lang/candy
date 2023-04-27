@@ -375,7 +375,7 @@ impl Fiber {
                 self.push_to_data_stack(top);
             }
             Instruction::Call { num_args } => {
-                let responsible = self.pop_from_data_stack().unwrap_hir_id();
+                let responsible = self.pop_from_data_stack().try_into().unwrap();
                 let mut arguments = (0..num_args)
                     .map(|_| self.pop_from_data_stack())
                     .collect_vec();
@@ -389,7 +389,7 @@ impl Fiber {
                 num_locals_to_pop,
                 num_args,
             } => {
-                let responsible = self.pop_from_data_stack().unwrap_hir_id();
+                let responsible = self.pop_from_data_stack().try_into().unwrap();
                 let mut arguments = (0..num_args)
                     .map(|_| self.pop_from_data_stack())
                     .collect_vec();
@@ -416,7 +416,7 @@ impl Fiber {
                 match self.use_module(use_provider, current_module, relative_path) {
                     Ok(()) => {}
                     Err(reason) => {
-                        let responsible = responsible.unwrap_hir_id();
+                        let responsible: HirId = responsible.try_into().unwrap();
                         self.panic(reason, responsible.get().to_owned());
                     }
                 }
@@ -432,7 +432,7 @@ impl Fiber {
                     // HIR to the MIR.
                     panic!("We should never generate a LIR where the reason is not a text.");
                 };
-                let responsible = responsible_for_panic.unwrap_hir_id();
+                let responsible: HirId = responsible_for_panic.try_into().unwrap();
 
                 self.panic(reason.get().to_owned(), responsible.get().to_owned());
             }

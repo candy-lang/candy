@@ -4,7 +4,7 @@ use self::{
     pointer::InlinePointer,
     port::{InlineReceivePort, InlineSendPort},
 };
-use super::{object_heap::HeapObject, Data, Heap, HirId};
+use super::{object_heap::HeapObject, Heap};
 use crate::{
     channel::ChannelId,
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
@@ -60,10 +60,6 @@ impl InlineObject {
     }
     pub fn raw_word(self) -> NonZeroU64 {
         self.0
-    }
-
-    pub fn unwrap_hir_id(self) -> HirId {
-        Data::from(self).unwrap_hir_id()
     }
 
     // Reference Counting

@@ -113,7 +113,7 @@ impl FullTracer {
                 let expression = expression.clone_to_heap(&mut self.heap);
                 let value = value.clone_to_heap(&mut self.heap);
                 StoredFiberEvent::ValueEvaluated {
-                    expression: Data::from(expression).unwrap_hir_id(),
+                    expression: Data::from(expression).try_into().unwrap(),
                     value,
                 }
             }
@@ -125,7 +125,7 @@ impl FullTracer {
                 let definition = definition.clone_to_heap(&mut self.heap);
                 let closure = closure.clone_to_heap(&mut self.heap);
                 StoredFiberEvent::FoundFuzzableClosure {
-                    definition: Data::from(definition).unwrap_hir_id(),
+                    definition: Data::from(definition).try_into().unwrap(),
                     closure: Data::from(closure).try_into().unwrap(),
                 }
             }
@@ -144,10 +144,10 @@ impl FullTracer {
                     .collect();
                 let responsible = responsible.clone_to_heap(&mut self.heap);
                 StoredFiberEvent::CallStarted {
-                    call_site: Data::from(call_site).unwrap_hir_id(),
+                    call_site: Data::from(call_site).try_into().unwrap(),
                     callee,
                     arguments,
-                    responsible: Data::from(responsible).unwrap_hir_id(),
+                    responsible: Data::from(responsible).try_into().unwrap(),
                 }
             }
             FiberEvent::CallEnded { return_value, .. } => {
