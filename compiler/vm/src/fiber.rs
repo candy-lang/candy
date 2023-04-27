@@ -402,8 +402,7 @@ impl Fiber {
 
                 // Tail calling a function is basically just a normal call, but
                 // pretending we are our caller.
-                let caller = self.call_stack.pop().unwrap();
-                self.next_instruction = Some(caller);
+                self.next_instruction = self.call_stack.pop();
                 self.call(callee, &arguments, responsible);
             }
             Instruction::Return => {
