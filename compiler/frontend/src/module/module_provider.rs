@@ -1,7 +1,7 @@
-use super::module::Module;
+use super::{module::Module, package::PackagesPath};
 use crate::rich_ir::ToRichIr;
 use rustc_hash::FxHashMap;
-use std::{fs, path::PathBuf, sync::Arc};
+use std::{fs, sync::Arc};
 use tracing::error;
 
 pub trait ModuleProvider {
@@ -50,7 +50,7 @@ impl ModuleProvider for InMemoryModuleProvider {
 }
 
 pub struct FileSystemModuleProvider {
-    pub packages_path: PathBuf,
+    pub packages_path: PackagesPath,
 }
 impl ModuleProvider for FileSystemModuleProvider {
     fn get_content(&self, module: &Module) -> Option<Arc<Vec<u8>>> {

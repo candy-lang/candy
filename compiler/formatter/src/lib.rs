@@ -34,21 +34,23 @@ pub impl<C: AsRef<[Cst]>> Formatter for C {
 
         let formatted = format_csts(
             &mut edits,
-            &Width::default(),
+            Width::default(),
             csts,
             Offset::default(),
             &FormattingInfo::default(),
         );
-        if formatted.child_width() == &Width::default() {
+        if formatted.child_width() == Width::default() && !formatted.whitespace.has_comments() {
             _ = formatted.into_empty_trailing(&mut edits);
         } else {
-            _ = formatted.into_trailing_with_indentation_detailed(
-                &mut edits,
-                &TrailingWithIndentationConfig::Body {
-                    position: WhitespacePositionInBody::End,
-                    indentation: Indentation::default(),
+            let config = TrailingWithIndentationConfig::Body {
+                position: if formatted.child_width() == Width::default() {
+                    WhitespacePositionInBody::Start
+                } else {
+                    WhitespacePositionInBody::End
                 },
-            );
+                indentation: Indentation::default(),
+            };
+            _ = formatted.into_trailing_with_indentation_detailed(&mut edits, &config);
         };
 
         edits

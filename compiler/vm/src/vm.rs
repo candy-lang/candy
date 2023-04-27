@@ -19,7 +19,7 @@ use crate::{
         UseProvider,
     },
     fiber::{self, ExecutionResult, Fiber, FiberId},
-    heap::{Closure, Data, Heap, InlineObject, SendPort, Struct, Symbol},
+    heap::{Closure, Data, Heap, InlineObject, SendPort, Struct, Tag},
     tracer::Tracer,
 };
 
@@ -646,14 +646,14 @@ impl Vm {
         let Packet { mut heap, object } = packet;
         let arguments: Struct = object.try_into().ok()?;
 
-        let closure_symbol = Symbol::create(&mut heap, "Closure");
-        let closure: Closure = arguments.get(**closure_symbol)?.try_into().ok()?;
+        let closure_tag = Tag::create_from_str(&mut heap, "Closure", None);
+        let closure: Closure = arguments.get(**closure_tag)?.try_into().ok()?;
         if closure.argument_count() > 0 {
             return None;
         }
 
-        let return_channel_symbol = Symbol::create(&mut heap, "ReturnChannel");
-        let return_channel: SendPort = arguments.get(**return_channel_symbol)?.try_into().ok()?;
+        let return_channel_tag = Tag::create_from_str(&mut heap, "ReturnChannel", None);
+        let return_channel: SendPort = arguments.get(**return_channel_tag)?.try_into().ok()?;
 
         Some((heap, closure, return_channel.channel_id()))
     }

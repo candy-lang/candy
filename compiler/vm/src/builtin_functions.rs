@@ -3,7 +3,7 @@ use crate::{
     channel::{Capacity, Packet},
     fiber::{Fiber, Status},
     heap::{
-        Closure, Data, Heap, HirId, InlineObject, Int, List, ReceivePort, SendPort, Struct, Symbol,
+        Closure, Data, Heap, HirId, InlineObject, Int, List, ReceivePort, SendPort, Struct, Tag,
         Text,
     },
 };
@@ -55,6 +55,9 @@ impl Fiber {
             BuiltinFunction::StructGet => self.heap.struct_get(args),
             BuiltinFunction::StructGetKeys => self.heap.struct_get_keys(args),
             BuiltinFunction::StructHasKey => self.heap.struct_has_key(args),
+            BuiltinFunction::TagGetValue => self.heap.tag_get_value(args),
+            BuiltinFunction::TagHasValue => self.heap.tag_has_value(args),
+            BuiltinFunction::TagWithoutValue => self.heap.tag_without_value(args),
             BuiltinFunction::TextCharacters => self.heap.text_characters(args),
             BuiltinFunction::TextConcatenate => self.heap.text_concatenate(args),
             BuiltinFunction::TextContains => self.heap.text_contains(args),
@@ -202,7 +205,7 @@ impl Heap {
 
     fn equals(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |a: Any, b: Any| {
-            Return(Symbol::create_bool(self, **a == **b).into())
+            Return(Tag::create_bool(self, **a == **b).into())
         })
     }
 
@@ -394,7 +397,7 @@ impl Heap {
     fn print(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |message: Any| {
             info!("{}", message.object);
-            Return(Symbol::create_nothing(self).into())
+            Return(Tag::create_nothing(self).into())
         })
     }
 
@@ -419,7 +422,28 @@ impl Heap {
     }
     fn struct_has_key(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |struct_: Struct, key: Any| {
-            Return(Symbol::create_bool(self, struct_.contains(key.object)).into())
+            Return(Tag::create_bool(self, struct_.contains(key.object)).into())
+        })
+    }
+
+    fn tag_get_value(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |tag: Tag| {
+            tag.value()
+                .map(|value| {
+                    value.dup(self);
+                    Return(value)
+                })
+                .ok_or_else(|| "The tag doesn't have a value.".to_string())
+        })
+    }
+    fn tag_has_value(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |tag: Tag| {
+            Return(Tag::create_bool(self, tag.value().is_some()).into())
+        })
+    }
+    fn tag_without_value(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |tag: Tag| {
+            Return(Tag::create(self, tag.symbol(), None).into())
         })
     }
 
@@ -440,12 +464,12 @@ impl Heap {
     }
     fn text_contains(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text, pattern: Text| {
-            Return(Symbol::create_bool(self, text.get().contains(pattern.get())).into())
+            Return(Tag::create_bool(self, text.get().contains(pattern.get())).into())
         })
     }
     fn text_ends_with(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text, suffix: Text| {
-            Return(Symbol::create_bool(self, text.get().ends_with(suffix.get())).into())
+            Return(Tag::create_bool(self, text.get().ends_with(suffix.get())).into())
         })
     }
     fn text_from_utf8(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -489,7 +513,7 @@ impl Heap {
     }
     fn text_is_empty(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text| {
-            Return(Symbol::create_bool(self, text.get().is_empty()).into())
+            Return(Tag::create_bool(self, text.get().is_empty()).into())
         })
     }
     fn text_length(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -500,7 +524,7 @@ impl Heap {
     }
     fn text_starts_with(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text, prefix: Text| {
-            Return(Symbol::create_bool(self, text.get().starts_with(prefix.get())).into())
+            Return(Tag::create_bool(self, text.get().starts_with(prefix.get())).into())
         })
     }
     fn text_trim_end(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -527,10 +551,10 @@ impl Heap {
 
     fn type_of(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Any| {
-            let symbol = match **value {
+            let type_name = match **value {
                 Data::Int(_) => "Int",
                 Data::Text(_) => "Text",
-                Data::Symbol(_) => "Symbol",
+                Data::Tag(_) => "Tag",
                 Data::List(_) => "List",
                 Data::Struct(_) => "Struct",
                 Data::HirId(_) => panic!(
@@ -541,7 +565,7 @@ impl Heap {
                 Data::SendPort(_) => "SendPort",
                 Data::ReceivePort(_) => "ReceivePort",
             };
-            Return(Symbol::create(self, symbol).into())
+            Return(Tag::create_from_str(self, type_name, None).into())
         })
     }
 }

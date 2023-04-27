@@ -729,8 +729,6 @@ impl LoweringContext {
                 body,
                 closing_curly_brace,
             } => {
-                let mut errors = vec![];
-
                 if lowering_type != LoweringType::Expression {
                     return self.create_ast_for_invalid_expression_in_pattern(cst);
                 }
@@ -741,6 +739,7 @@ impl LoweringContext {
                     opening_curly_brace,
                 );
 
+                let mut errors = vec![];
                 let (parameters, mut parameter_errors) =
                     if let Some((parameters, arrow)) = parameters_and_arrow {
                         assert!(
@@ -779,6 +778,10 @@ impl LoweringContext {
                 assignment_sign,
                 body,
             } => {
+                if lowering_type != LoweringType::Expression {
+                    return self.create_ast_for_invalid_expression_in_pattern(cst);
+                };
+
                 assert!(
                     matches!(assignment_sign.kind, (CstKind::EqualsSign | CstKind::ColonEqualsSign)),
                     "Expected an equals sign or colon equals sign for the assignment, but found {assignment_sign} instead.",

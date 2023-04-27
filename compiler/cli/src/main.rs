@@ -7,7 +7,7 @@ use candy_frontend::{
     hir::{self, CollectErrors},
     hir_to_mir::HirToMir,
     mir_optimize::OptimizeMir,
-    module::{Module, ModuleKind, SurroundingPackage},
+    module::{Module, ModuleFromPathError, ModuleKind, PackagesPath},
     position::PositionConversionDb,
     rcst_to_cst::RcstToCst,
     rich_ir::ToRichIr,
@@ -34,8 +34,7 @@ use notify_debouncer_mini::new_debouncer;
 use std::{
     convert::TryInto,
     env::{current_dir, current_exe},
-    fs,
-    io::{self, BufRead, ErrorKind, Write},
+    io::{self, BufRead, Write},
     path::PathBuf,
     sync::{mpsc::channel, Arc},
     time::Duration,
@@ -127,27 +126,33 @@ enum Exit {
     NotInCandyPackage,
 }
 
-fn packages_path() -> PathBuf {
+fn packages_path() -> PackagesPath {
     // We assume the candy executable lives inside the Candy Git repository at
     // its usual location, `$candy/target/[release or debug]/candy`.
     let candy_exe = current_exe().unwrap();
     let target_dir = candy_exe.parent().unwrap().parent().unwrap();
     let candy_repo = target_dir.parent().unwrap();
-    candy_repo.join("packages")
+    PackagesPath::try_from(candy_repo.join("packages").as_path()).unwrap()
 }
 fn module_for_path(path: Option<PathBuf>) -> Result<Module, Exit> {
     let packages_path = packages_path();
     match path {
-        Some(file) => match fs::canonicalize(file) {
-            Ok(path) => Ok(Module::from_path(&packages_path, &path, ModuleKind::Code).unwrap()),
-            Err(error) if error.kind() == ErrorKind::NotFound => {
-                error!("The given file doesn't exist.");
-                Err(Exit::FileNotFound)
-            }
-            Err(_) => unreachable!(),
-        },
+        Some(file) => {
+            Module::from_path(&packages_path, &file, ModuleKind::Code).map_err(
+                |error| match error {
+                    ModuleFromPathError::NotFound(_) => {
+                        error!("The given file doesn't exist.");
+                        Exit::FileNotFound
+                    }
+                    ModuleFromPathError::NotInPackage(_) => {
+                        error!("The given file is not in a Candy package.");
+                        Exit::NotInCandyPackage
+                    }
+                },
+            )
+        }
         None => {
-            let Some(package) = current_dir().unwrap().surrounding_candy_package(&packages_path) else {
+            let Some(package) = packages_path.find_surrounding_package(&current_dir().unwrap()) else {
                 error!("You are not in a Candy package. Either navigate into a package or specify a Candy file.");
                 error!("Candy packages are folders that contain a `_package.candy` file. This file marks the root folder of a package. Relative imports can only happen within the package.");
                 return Err(Exit::NotInCandyPackage)
@@ -165,7 +170,7 @@ fn build(options: CandyBuildOptions) -> ProgramResult {
     init_logger(true);
 
     let packages_path = packages_path();
-    let db = Database::new_with_file_system_module_provider(&packages_path);
+    let db = Database::new_with_file_system_module_provider(packages_path.clone());
     let module = module_for_path(options.path.clone())?;
 
     let tracing = TracingConfig {
@@ -322,7 +327,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     init_logger(true);
 
     let packages_path = packages_path();
-    let db = Database::new_with_file_system_module_provider(&packages_path);
+    let db = Database::new_with_file_system_module_provider(packages_path.clone());
     let module = module_for_path(options.path.clone())?;
 
     let tracing = TracingConfig {
@@ -506,8 +511,7 @@ impl StdinService {
 fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
     init_logger(true);
 
-    let packages_path = packages_path();
-    let db = Database::new_with_file_system_module_provider(&packages_path);
+    let db = Database::new_with_file_system_module_provider(packages_path());
     let module = module_for_path(options.path.clone())?;
 
     let tracing = TracingConfig {

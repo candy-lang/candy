@@ -1,13 +1,13 @@
 use candy_frontend::hir::Id;
 use candy_vm::{
-    heap::{Closure, Heap, Symbol},
+    heap::{Closure, Heap, Tag, Text},
     tracer::{FiberEvent, Tracer, VmEvent},
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 
-pub fn collect_symbols_in_heap(heap: &Heap) -> FxHashSet<String> {
+pub fn collect_symbols_in_heap(heap: &Heap) -> FxHashSet<Text> {
     heap.iter()
-        .filter_map(|object| Symbol::try_from(object).ok().map(|it| it.to_string()))
+        .filter_map(|object| Tag::try_from(object).ok().map(|it| it.symbol()))
         .collect()
 }
 

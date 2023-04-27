@@ -11,7 +11,6 @@ import {
 export class HintsDecorations implements vs.Disposable {
   private subscriptions: vs.Disposable[] = [];
   private hints = new Map<String, Hint[]>();
-  private editors = new Map<String, vs.TextEditor>();
 
   private readonly decorationTypes = new Map<
     HintKind,
@@ -60,23 +59,19 @@ export class HintsDecorations implements vs.Disposable {
     );
 
     this.subscriptions.push(
-      vs.window.onDidChangeActiveTextEditor(() => this.update())
+      vs.window.onDidChangeVisibleTextEditors(() => this.update())
     );
     this.subscriptions.push(
       vs.workspace.onDidCloseTextDocument((document) => {
         this.hints.delete(document.uri.toString());
       })
     );
-    if (vs.window.activeTextEditor) this.update();
+    this.update();
   }
 
   private update() {
-    const activeEditor = vs.window.activeTextEditor;
-    if (activeEditor && activeEditor.document) {
-      this.editors.set(activeEditor.document.uri.toString(), activeEditor);
-    }
-
-    for (const [uri, editor] of this.editors.entries()) {
+    for (const editor of vs.window.visibleTextEditors) {
+      const uri = editor.document.uri.toString();
       const hints = this.hints.get(uri);
       if (hints === undefined) {
         return;
@@ -115,14 +110,9 @@ export class HintsDecorations implements vs.Disposable {
   }
 
   public dispose() {
-    for (const editor of this.editors.values()) {
-      try {
-        for (const decorationType of this.decorationTypes.values()) {
-          editor.setDecorations(decorationType, []);
-        }
-      } catch {
-        // It's possible the editor was closed, but there doesn't seem to be a
-        // way to tell.
+    for (const editor of vs.window.visibleTextEditors) {
+      for (const decorationType of this.decorationTypes.values()) {
+        editor.setDecorations(decorationType, []);
       }
     }
     this.subscriptions.forEach((s) => s.dispose());

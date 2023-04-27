@@ -13,103 +13,46 @@ jobs:
     name: Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3.5.2
+      - uses: dtolnay/rust-toolchain@b44cb146d03e8d870c57ab64b80f04586349ca5d
         with:
-          profile: minimal
           toolchain: ${{ env.RUST_VERSION }}
-          override: true
           components: clippy, rustfmt
-
-      - name: Cache Rust dependencies and build
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/git/db/
-            ~/.cargo/registry/cache/
-            ~/.cargo/registry/index/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+      - uses: Swatinem/rust-cache@v2.2.1
 
       # Compiler
-      - name: 'Compiler: check'
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
-      - name: 'Compiler: test'
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
       - name: 'Compiler: clippy'
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -- --deny warnings
+        run: cargo clippy -- --deny warnings
+      - name: 'Compiler: test'
+        run: cargo test --workspace
       - name: 'Compiler: fmt'
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --check
+        run: cargo fmt --check
 
       # Core
       - name: 'Core: run'
-        uses: actions-rs/cargo@v1
-        with:
-          command: run
-          args: --release --manifest-path=compiler/cli/Cargo.toml -- build --debug packages/Core/_.candy
+        run: cargo run --release -- build --debug packages/Core/_.candy
 
   # fuzzing:
   #   name: Fuzzing
   #   runs-on: ubuntu-latest
   #   steps:
-  #     - uses: actions/checkout@v3
-  #     - uses: actions-rs/toolchain@v1
+  #     - uses: actions/checkout@v3.5.2
+  #     - uses: dtolnay/rust-toolchain@b44cb146d03e8d870c57ab64b80f04586349ca5d
   #       with:
-  #         profile: minimal
   #         toolchain: ${{ env.RUST_VERSION }}
-  #         override: true
-  #
-  #     - name: Cache Rust dependencies and build
-  #       uses: actions/cache@v3
-  #       with:
-  #         path: |
-  #           ~/.cargo/bin/
-  #           ~/.cargo/git/db/
-  #           ~/.cargo/registry/cache/
-  #           ~/.cargo/registry/index/
-  #           target/
-  #         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-  #         restore-keys: ${{ runner.os }}-cargo-
-  #
-  #     - uses: actions-rs/cargo@v1
-  #       with:
-  #         command: run
-  #         args: --manifest-path compiler/Cargo.toml -- fuzz packages/Benchmark.candy
+  #     - uses: Swatinem/rust-cache@v2.2.1
+  
+  #     - run: cargo run --release -- fuzz packages/Benchmark.candy
 
   benchmark:
     name: Benchmark
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3.5.2
+      - uses: dtolnay/rust-toolchain@b44cb146d03e8d870c57ab64b80f04586349ca5d
         with:
-          profile: minimal
           toolchain: ${{ env.RUST_VERSION }}
-          override: true
-
-      - name: Cache Rust dependencies and build
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/git/db/
-            ~/.cargo/registry/cache/
-            ~/.cargo/registry/index/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+      - uses: Swatinem/rust-cache@v2.2.1
 
       - name: Run benchmark
         working-directory: compiler/vm/

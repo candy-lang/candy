@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use candy_frontend::builtin_functions;
-use candy_vm::heap::{Data, Heap, I64BitLength, InlineObject, Int, List, Struct, Symbol, Text};
+use candy_vm::heap::{Data, Heap, I64BitLength, InlineObject, Int, List, Struct, Tag, Text};
 use itertools::Itertools;
 use num_bigint::RandBigInt;
 use rand::{
@@ -13,7 +13,7 @@ use rustc_hash::FxHashMap;
 
 use super::input::Input;
 
-pub fn generate_input(heap: Rc<RefCell<Heap>>, num_args: usize, symbols: &[Symbol]) -> Input {
+pub fn generate_input(heap: Rc<RefCell<Heap>>, num_args: usize, symbols: &[Text]) -> Input {
     let mut arguments = vec![];
     for _ in 0..num_args {
         let address = generate_value_with_complexity(
@@ -31,12 +31,13 @@ fn generate_value_with_complexity(
     heap: &mut Heap,
     rng: &mut ThreadRng,
     mut complexity: f32,
-    symbols: &[Symbol],
+    symbols: &[Text],
 ) -> InlineObject {
     match rng.gen_range(1..=5) {
         1 => Int::create_from_bigint(heap, rng.gen_bigint(10)).into(),
         2 => Text::create(heap, "test").into(),
-        3 => (*symbols.choose(rng).unwrap()).into(),
+        // TODO: This should support tags with values
+        3 => Tag::create(heap, *symbols.choose(rng).unwrap(), None).into(),
         4 => {
             complexity -= 1.0;
             let mut items = vec![];
@@ -63,7 +64,7 @@ fn generate_value_with_complexity(
     }
 }
 
-pub fn generate_mutated_input(rng: &mut ThreadRng, input: &mut Input, symbols: &[Symbol]) {
+pub fn generate_mutated_input(rng: &mut ThreadRng, input: &mut Input, symbols: &[Text]) {
     let mut heap = input.heap.borrow_mut();
     let num_args = input.arguments.len();
     let argument = input.arguments.get_mut(rng.gen_range(0..num_args)).unwrap();
@@ -73,7 +74,7 @@ fn generate_mutated_value(
     rng: &mut ThreadRng,
     heap: &mut Heap,
     object: InlineObject,
-    symbols: &[Symbol],
+    symbols: &[Text],
 ) -> InlineObject {
     if rng.gen_bool(0.1) {
         return generate_value_with_complexity(heap, rng, 100.0, symbols);
@@ -84,12 +85,10 @@ fn generate_mutated_value(
             Int::create_from_bigint(heap, int.get().as_ref() + rng.gen_range(-10..10)).into()
         }
         Data::Text(text) => mutate_string(rng, heap, text.get().to_string()).into(),
-        Data::Symbol(symbol) => {
-            if symbols.is_empty() {
-                symbol.into()
-            } else {
-                (*symbols.choose(rng).unwrap()).into()
-            }
+        // TODO: This should support tags with values
+        Data::Tag(_) => {
+            assert!(!symbols.is_empty());
+            Tag::create(heap, *symbols.choose(rng).unwrap(), None).into()
         }
         Data::List(list) => {
             let len = list.len();
@@ -111,7 +110,7 @@ fn generate_mutated_value(
                 let key = struct_.keys()[index];
                 let value = generate_mutated_value(rng, heap, struct_.values()[index], symbols);
                 struct_.insert(heap, key, value).into()
-            // FIXME: Support removing value from a struct
+            // TODO: Support removing value from a struct
             // } else if rng.gen_bool(0.5) && len > 0 {
             //     struct_
             //         .remove(rng.gen_range(0..len));
@@ -161,7 +160,8 @@ fn complexity_of_value(object: InlineObject) -> usize {
             Int::Heap(int) => int.get().bits() as usize,
         },
         Data::Text(text) => text.len() + 1,
-        Data::Symbol(symbol) => symbol.len(),
+        // TODO: This should support tags with values
+        Data::Tag(tag) => tag.symbol().get().len(),
         Data::List(list) => {
             list.items()
                 .iter()

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use candy_frontend::module::ModuleKind;
+use candy_frontend::module::{ModuleKind, PackagesPath};
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentFilter, DocumentFormattingParams, DocumentHighlight, DocumentHighlightKind,
@@ -14,7 +14,7 @@ use lsp_types::{
 };
 use rustc_hash::FxHashMap;
 use serde::Serialize;
-use std::{mem, path::PathBuf};
+use std::mem;
 use tokio::sync::{mpsc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tower_lsp::{jsonrpc, Client, ClientSocket, LanguageServer, LspService};
 use tracing::{debug, span, Level};
@@ -42,7 +42,7 @@ pub enum ServerState {
 #[derive(Debug)]
 pub struct RunningServerState {
     pub features: ServerFeatures,
-    pub packages_path: PathBuf,
+    pub packages_path: PackagesPath,
 }
 impl ServerState {
     pub fn require_features(&self) -> &ServerFeatures {
@@ -110,7 +110,7 @@ impl ServerFeatures {
 }
 
 impl Server {
-    pub fn create(packages_path: PathBuf) -> (LspService<Self>, ClientSocket) {
+    pub fn create(packages_path: PackagesPath) -> (LspService<Self>, ClientSocket) {
         let (diagnostics_sender, mut diagnostics_receiver) = mpsc::channel(8);
         let (hints_sender, mut hints_receiver) = mpsc::channel(1024);
 
@@ -155,7 +155,7 @@ impl Server {
             Self {
                 client,
                 db: Mutex::new(Database::new_with_file_system_module_provider(
-                    packages_path.to_path_buf(),
+                    packages_path,
                 )),
                 state: RwLock::new(ServerState::Initial { features }),
             }
@@ -209,12 +209,16 @@ impl LanguageServer for Server {
                 .expect("No initialization options provided.")
                 .as_object()
                 .unwrap();
-            options
-                .get("packagesPath")
-                .unwrap()
-                .as_str()
-                .unwrap()
-                .into()
+            match PackagesPath::try_from(options.get("packagesPath").unwrap().as_str().unwrap()) {
+                Ok(packages_path) => packages_path,
+                Err(err) => {
+                    let message = format!("Failed to initialize: {}", err);
+                    self.client
+                        .show_message(MessageType::ERROR, message.clone())
+                        .await;
+                    return Err(jsonrpc::Error::invalid_params(message));
+                }
+            }
         };
 
         {

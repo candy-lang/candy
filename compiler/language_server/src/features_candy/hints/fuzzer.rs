@@ -13,7 +13,6 @@ use candy_vm::{
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
-use std::collections::HashMap;
 use tracing::{debug, error};
 
 use crate::{
@@ -22,10 +21,11 @@ use crate::{
 };
 
 use super::Hint;
+use rustc_hash::FxHashMap;
 
 #[derive(Default)]
 pub struct FuzzerManager {
-    fuzzers: HashMap<Module, HashMap<Id, Fuzzer>>,
+    fuzzers: FxHashMap<Module, FxHashMap<Id, Fuzzer>>,
 }
 
 impl FuzzerManager {
@@ -70,7 +70,14 @@ impl FuzzerManager {
     {
         let mut hints = vec![];
 
-        debug!("There are {} fuzzers.", self.fuzzers.len());
+        debug!(
+            "There {}.",
+            if self.fuzzers.len() == 1 {
+                "is 1 fuzzer".to_string()
+            } else {
+                format!("are {} fuzzers", self.fuzzers.len())
+            }
+        );
 
         for fuzzer in self.fuzzers[module].values() {
             let Status::FoundPanic {
@@ -100,7 +107,10 @@ impl FuzzerManager {
                         parameter_names
                             .iter()
                             .zip(input.arguments.iter())
-                            .map(|(name, argument)| format!("`{name} = {argument:?}`"))
+                            .map(|(name, argument)| format!(
+                                "`{name} = {}`",
+                                argument.format_debug(&input.heap.borrow()),
+                            ))
                             .collect_vec()
                             .join_with_commas_and_and(),
                     ),

@@ -1,5 +1,3 @@
-use std::{fs, path::PathBuf, sync::Arc};
-
 use candy_frontend::{
     ast::AstDbStorage,
     ast_to_hir::AstToHirStorage,
@@ -10,7 +8,7 @@ use candy_frontend::{
     mir_optimize::OptimizeMirStorage,
     module::{
         GetModuleContentQuery, InMemoryModuleProvider, Module, ModuleDbStorage, ModuleKind,
-        ModuleProvider, ModuleProviderOwner, MutableModuleProviderOwner, Package,
+        ModuleProvider, ModuleProviderOwner, MutableModuleProviderOwner, Package, PackagesPath,
     },
     position::PositionConversionStorage,
     rcst_to_cst::RcstToCstStorage,
@@ -29,6 +27,7 @@ use candy_vm::{
 };
 use lazy_static::lazy_static;
 use rustc_hash::FxHashMap;
+use std::{fs, sync::Arc};
 use walkdir::WalkDir;
 
 const TRACING: TracingConfig = TracingConfig::off();
@@ -92,8 +91,8 @@ pub fn setup() -> Database {
     db
 }
 fn load_core(module_provider: &mut InMemoryModuleProvider) {
-    let packages_path: PathBuf = fs::canonicalize("../../packages").unwrap();
-    let core_path: PathBuf = packages_path.join("Core");
+    let packages_path = PackagesPath::try_from("../../packages").unwrap();
+    let core_path = packages_path.join("Core");
     let package = Package::Managed("Core".into());
 
     for file in WalkDir::new(&core_path)

@@ -1,7 +1,7 @@
 use super::{
     object_heap::{
         closure::HeapClosure, hir_id::HeapHirId, int::HeapInt, list::HeapList, struct_::HeapStruct,
-        symbol::HeapSymbol, text::HeapText, HeapData, HeapObject,
+        tag::HeapTag, text::HeapText, HeapData, HeapObject,
     },
     object_inline::{
         builtin::InlineBuiltin,
@@ -32,7 +32,7 @@ use std::{
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub enum Data {
     Int(Int),
-    Symbol(Symbol),
+    Tag(Tag),
     Text(Text),
     List(List),
     Struct(Struct),
@@ -78,7 +78,7 @@ impl From<HeapObject> for Data {
             HeapData::Int(int) => Data::Int(Int::Heap(int)),
             HeapData::List(list) => Data::List(List(list)),
             HeapData::Struct(struct_) => Data::Struct(Struct(struct_)),
-            HeapData::Symbol(symbol) => Data::Symbol(Symbol(symbol)),
+            HeapData::Tag(tag) => Data::Tag(Tag(tag)),
             HeapData::Text(text) => Data::Text(Text(text)),
             HeapData::Closure(closure) => Data::Closure(Closure(closure)),
             HeapData::HirId(hir_id) => Data::HirId(HirId(hir_id)),
@@ -90,7 +90,7 @@ impl DebugDisplay for Data {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         match self {
             Data::Int(int) => DebugDisplay::fmt(int, f, is_debug),
-            Data::Symbol(symbol) => DebugDisplay::fmt(symbol, f, is_debug),
+            Data::Tag(tag) => DebugDisplay::fmt(tag, f, is_debug),
             Data::Text(text) => DebugDisplay::fmt(text, f, is_debug),
             Data::List(list) => DebugDisplay::fmt(list, f, is_debug),
             Data::Struct(struct_) => DebugDisplay::fmt(struct_, f, is_debug),
@@ -164,7 +164,7 @@ impl Int {
         }
     }
 
-    pub fn compare_to(&self, heap: &mut Heap, rhs: &Int) -> Symbol {
+    pub fn compare_to(&self, heap: &mut Heap, rhs: &Int) -> Tag {
         match (self, rhs) {
             (Int::Inline(lhs), Int::Inline(rhs)) => lhs.compare_to(heap, *rhs),
             (Int::Heap(on_heap), Int::Inline(inline))
@@ -254,20 +254,28 @@ impl From<Int> for InlineObject {
 impl_try_froms!(Int, "Expected an int.");
 impl_try_from_heap_object!(Int, "Expected an int.");
 
-// Symbol
+// Tag
 
 #[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
-pub struct Symbol(HeapSymbol);
+pub struct Tag(HeapTag);
 
-impl Symbol {
-    pub fn create(heap: &mut Heap, value: &str) -> Self {
-        HeapSymbol::create(heap, value).into()
+impl Tag {
+    pub fn create(heap: &mut Heap, symbol: Text, value: impl Into<Option<InlineObject>>) -> Self {
+        HeapTag::create(heap, symbol, value).into()
+    }
+    pub fn create_from_str(
+        heap: &mut Heap,
+        symbol: &str,
+        value: impl Into<Option<InlineObject>>,
+    ) -> Self {
+        let symbol = Text::create(heap, symbol);
+        Self::create(heap, symbol, value)
     }
     pub fn create_nothing(heap: &mut Heap) -> Self {
-        Self::create(heap, "Nothing")
+        Self::create_from_str(heap, "Nothing", None)
     }
     pub fn create_bool(heap: &mut Heap, value: bool) -> Self {
-        Self::create(heap, if value { "True" } else { "False" })
+        Self::create_from_str(heap, if value { "True" } else { "False" }, None)
     }
     pub fn create_ordering(heap: &mut Heap, value: Ordering) -> Self {
         let value = match value {
@@ -275,13 +283,13 @@ impl Symbol {
             Ordering::Equal => "Equal",
             Ordering::Greater => "Greater",
         };
-        Self::create(heap, value)
+        Self::create_from_str(heap, value, None)
     }
 }
 
-impls_via_0!(Symbol);
-impl_try_froms!(Symbol, "Expected a symbol.");
-impl_try_from_heap_object!(Symbol, "Expected a symbol.");
+impls_via_0!(Tag);
+impl_try_froms!(Tag, "Expected a tag.");
+impl_try_from_heap_object!(Tag, "Expected a tag.");
 
 impl TryFrom<InlineObject> for bool {
     type Error = &'static str;
@@ -294,8 +302,12 @@ impl TryFrom<Data> for bool {
     type Error = &'static str;
 
     fn try_from(value: Data) -> Result<Self, Self::Error> {
-        let symbol: Symbol = value.try_into()?;
-        match symbol.get() {
+        let tag: Tag = value.try_into()?;
+        if tag.value().is_some() {
+            return Err("Expected a tag without a value.");
+        }
+
+        match tag.symbol().get() {
             "True" => Ok(true),
             "False" => Ok(false),
             _ => Err("Expected `True` or `False`."),
@@ -348,7 +360,7 @@ impl Struct {
     ) -> Self {
         let fields = fields
             .into_iter()
-            .map(|(key, value)| ((Symbol::create(heap, key)).into(), value))
+            .map(|(key, value)| ((Tag::create_from_str(heap, key, None)).into(), value))
             .collect();
         Self::create(heap, &fields)
     }
@@ -359,7 +371,7 @@ impl Struct {
         };
         // PERF: Avoid allocating an intermediate map.
         let fields = [
-            ("Type", (**Symbol::create(heap, type_)).into()),
+            ("Type", Tag::create_from_str(heap, type_, None).into()),
             ("Value", value),
         ];
         Self::create_with_symbol_keys(heap, fields)

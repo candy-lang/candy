@@ -2,7 +2,7 @@ use super::{
     input::Input,
     values::{generate_input, generate_mutated_input},
 };
-use candy_vm::heap::{Heap, Symbol};
+use candy_vm::heap::{Heap, Text};
 use itertools::Itertools;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -13,20 +13,21 @@ pub type Score = f64;
 pub struct InputPool {
     heap: Rc<RefCell<Heap>>,
     num_args: usize,
-    symbols: Vec<Symbol>,
+    symbols: Vec<Text>,
     input_scores: FxHashMap<Input, Score>,
 }
 
 impl InputPool {
-    pub fn new(num_args: usize, symbols_in_heap: &FxHashSet<String>) -> Self {
+    pub fn new(num_args: usize, symbols_in_heap: &FxHashSet<Text>) -> Self {
         let mut heap = Heap::default();
 
+        // TODO: This should support tags with values
         let mut symbols = symbols_in_heap
             .iter()
-            .map(|symbol| Symbol::create(&mut heap, symbol))
+            .map(|symbol| symbol.clone_to_heap(&mut heap).try_into().unwrap())
             .collect_vec();
         if symbols.is_empty() {
-            symbols.push(Symbol::create_nothing(&mut heap));
+            symbols.push(Text::create(&mut heap, "Nothing"));
         }
 
         Self {

@@ -7,7 +7,7 @@ use super::{
 };
 use crate::{
     channel::ChannelId,
-    heap::{HirId, InlineObject, Int, List, Pointer, ReceivePort, SendPort, Struct, Symbol},
+    heap::{HirId, InlineObject, Int, List, Pointer, ReceivePort, SendPort, Struct, Tag},
 };
 use candy_frontend::{
     hir::{self, Id},
@@ -184,7 +184,7 @@ impl Fiber {
     pub fn complete_send(&mut self) {
         assert!(matches!(self.status, Status::Sending { .. }));
 
-        let nothing = Symbol::create_nothing(&mut self.heap);
+        let nothing = Tag::create_nothing(&mut self.heap);
         self.push_to_data_stack(nothing);
         self.status = Status::Running;
     }
@@ -317,8 +317,8 @@ impl Fiber {
                 self.push_to_data_stack(text);
             }
             Instruction::CreateSymbol(symbol) => {
-                let symbol = Symbol::create(&mut self.heap, &symbol);
-                self.push_to_data_stack(symbol);
+                let tag = Tag::create_from_str(&mut self.heap, &symbol, None);
+                self.push_to_data_stack(tag);
             }
             Instruction::CreateList { num_items } => {
                 let mut item_addresses = vec![];
@@ -487,10 +487,33 @@ impl Fiber {
                 callee.drop(&mut self.heap);
                 self.run_builtin_function(builtin.get(), arguments, responsible);
             }
+            Data::Tag(tag) => {
+                if tag.has_value() {
+                    self.panic(
+                        "A tag's value cannot be overwritten by calling it. Use `tag.withValue` instead.".to_string(),
+                        responsible.get().to_owned(),
+                    );
+                    return;
+                }
+
+                if let [value] = arguments {
+                    let tag = Tag::create(&mut self.heap, tag.symbol(), *value);
+                    self.push_to_data_stack(tag);
+                    value.dup(&mut self.heap);
+                } else {
+                    self.panic(
+                        format!(
+                            "A tag can only hold exactly one value, but you called it with {} arguments.",
+                            arguments.len(),
+                        ),
+                        responsible.get().to_owned(),
+                    );
+                }
+            }
             _ => {
                 self.panic(
                     format!(
-                        "You can only call closures and builtins, but you tried to call {callee}.",
+                        "You can only call closures, builtins and tags, but you tried to call {callee}.",
                     ),
                     responsible.get().to_owned(),
                 );

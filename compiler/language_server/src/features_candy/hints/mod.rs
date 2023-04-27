@@ -12,14 +12,15 @@
 use self::{constant_evaluator::ConstantEvaluator, fuzzer::FuzzerManager};
 use crate::database::Database;
 use candy_frontend::{
-    module::{Module, MutableModuleProviderOwner},
+    module::{Module, MutableModuleProviderOwner, PackagesPath},
     rich_ir::ToRichIr,
 };
 use extension_trait::extension_trait;
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position, Url};
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf, time::Duration, vec};
+use std::{time::Duration, vec};
 use tokio::{
     sync::mpsc::{error::TryRecvError, Receiver, Sender},
     time::sleep,
@@ -64,7 +65,7 @@ impl Notification for HintsNotification {
 #[tokio::main(worker_threads = 1)]
 #[allow(unused_must_use)]
 pub async fn run_server(
-    packages_path: PathBuf,
+    packages_path: PackagesPath,
     mut incoming_events: Receiver<Event>,
     outgoing_hints: Sender<(Module, Vec<Hint>)>,
 ) {
@@ -152,13 +153,13 @@ pub async fn run_server(
 
 struct OutgoingHints {
     sender: Sender<(Module, Vec<Hint>)>,
-    last_sent: HashMap<Module, Vec<Hint>>,
+    last_sent: FxHashMap<Module, Vec<Hint>>,
 }
 impl OutgoingHints {
     fn new(sender: Sender<(Module, Vec<Hint>)>) -> Self {
         Self {
             sender,
-            last_sent: HashMap::new(),
+            last_sent: FxHashMap::default(),
         }
     }
 

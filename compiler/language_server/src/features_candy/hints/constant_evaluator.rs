@@ -21,12 +21,12 @@ use candy_vm::{
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use tracing::{span, Level};
 
 #[derive(Default)]
 pub struct ConstantEvaluator {
-    evaluators: HashMap<Module, Evaluator>,
+    evaluators: FxHashMap<Module, Evaluator>,
 }
 struct Evaluator {
     tracer: FullTracer,

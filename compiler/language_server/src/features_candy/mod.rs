@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use candy_frontend::{
     ast_to_hir::AstToHir,
     hir::CollectErrors,
-    module::{Module, ModuleDb, ModuleKind, MutableModuleProviderOwner},
+    module::{Module, ModuleDb, ModuleKind, MutableModuleProviderOwner, PackagesPath},
     rcst_to_cst::RcstToCst,
     rich_ir::ToRichIr,
 };
@@ -12,10 +12,7 @@ use lsp_types::{
     TextEdit, Url,
 };
 use rustc_hash::FxHashMap;
-use std::{
-    path::{Path, PathBuf},
-    thread,
-};
+use std::thread;
 use tokio::sync::{mpsc::Sender, Mutex};
 use tracing::debug;
 
@@ -46,7 +43,7 @@ pub struct CandyFeatures {
 }
 impl CandyFeatures {
     pub fn new(
-        packages_path: PathBuf,
+        packages_path: PackagesPath,
         diagnostics_sender: Sender<(Module, Vec<Diagnostic>)>,
         hints_sender: Sender<(Module, Vec<Hint>)>,
     ) -> Self {
@@ -237,7 +234,7 @@ impl LanguageFeatures for CandyFeatures {
     }
 }
 
-fn decode_module(uri: &Url, packages_path: &Path) -> Module {
+fn decode_module(uri: &Url, packages_path: &PackagesPath) -> Module {
     module_from_url(uri, ModuleKind::Code, packages_path).unwrap()
 }
 fn apply_text_changes(
