@@ -191,7 +191,8 @@ impl HeapObjectTrait for HeapClosure {
                 1 + index,
                 captured
                     .clone_to_heap_with_mapping(heap, address_map)
-                    .raw_word(),
+                    .raw_word()
+                    .get(),
             );
         }
         unsafe {

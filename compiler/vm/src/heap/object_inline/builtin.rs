@@ -9,6 +9,7 @@ use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Formatter},
     hash::{Hash, Hasher},
+    num::NonZeroU64,
 };
 
 #[derive(Clone, Copy, Deref)]
@@ -22,7 +23,7 @@ impl InlineBuiltin {
     }
 
     fn index(self) -> usize {
-        (self.raw_word() >> Self::INDEX_SHIFT) as usize
+        (self.raw_word().get() >> Self::INDEX_SHIFT) as usize
     }
     pub fn get(self) -> BuiltinFunction {
         builtin_functions::VALUES[self.index()]
@@ -62,6 +63,7 @@ impl From<BuiltinFunction> for InlineBuiltin {
             "Builtin function index is too large.",
         );
         let header_word = InlineObject::KIND_BUILTIN | ((index as u64) << Self::INDEX_SHIFT);
+        let header_word = unsafe { NonZeroU64::new_unchecked(header_word) };
         Self(InlineObject::new(header_word))
     }
 }

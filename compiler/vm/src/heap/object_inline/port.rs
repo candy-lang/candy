@@ -10,6 +10,7 @@ use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Formatter},
     hash::{Hash, Hasher},
+    num::NonZeroU64,
 };
 
 #[derive(Clone, Copy, Deref)]
@@ -32,13 +33,14 @@ impl InlinePort {
         } else {
             InlineObject::KIND_PORT_SUBKIND_RECEIVE
         };
-        InlineObject(
-            InlineObject::KIND_PORT | subkind | ((channel_id as u64) << Self::CHANNEL_ID_SHIFT),
-        )
+        let header_word =
+            InlineObject::KIND_PORT | subkind | ((channel_id as u64) << Self::CHANNEL_ID_SHIFT);
+        let header_word = unsafe { NonZeroU64::new_unchecked(header_word) };
+        InlineObject(header_word)
     }
 
     pub fn channel_id(self) -> ChannelId {
-        ChannelId::from_usize((self.0 .0 >> Self::CHANNEL_ID_SHIFT) as usize)
+        ChannelId::from_usize((self.raw_word().get() >> Self::CHANNEL_ID_SHIFT) as usize)
     }
 }
 impl From<InlinePort> for InlineObject {

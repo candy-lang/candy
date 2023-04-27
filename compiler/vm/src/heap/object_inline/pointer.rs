@@ -7,6 +7,7 @@ use derive_more::Deref;
 use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Formatter},
+    num::NonZeroU64,
     ptr::NonNull,
 };
 
@@ -18,7 +19,7 @@ impl InlinePointer {
     }
 
     pub fn get(self) -> HeapObject {
-        let pointer = unsafe { NonNull::new_unchecked(self.raw_word() as *mut u64) };
+        let pointer = unsafe { NonNull::new_unchecked(self.raw_word().get() as *mut u64) };
         HeapObject(pointer)
     }
 }
@@ -41,6 +42,7 @@ impl From<HeapObject> for InlineObject {
     fn from(value: HeapObject) -> Self {
         let address = value.address().addr().get() as u64;
         debug_assert_eq!(address & Self::KIND_MASK, Self::KIND_POINTER);
+        let address = unsafe { NonZeroU64::new_unchecked(address) };
         Self(address)
     }
 }

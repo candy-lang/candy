@@ -15,6 +15,7 @@ use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Formatter},
     hash::{Hash, Hasher},
+    num::NonZeroU64,
     ops::Deref,
 };
 
@@ -41,7 +42,7 @@ pub impl InlineObjectSliceCloneToHeap for [InlineObject] {
 
 #[derive(Clone, Copy)]
 #[repr(transparent)]
-pub struct InlineObject(u64);
+pub struct InlineObject(NonZeroU64);
 
 impl InlineObject {
     pub const KIND_WIDTH: usize = 2;
@@ -54,10 +55,10 @@ impl InlineObject {
     pub const KIND_PORT_SUBKIND_RECEIVE: u64 = 0b100;
     pub const KIND_BUILTIN: u64 = 0b11;
 
-    pub fn new(value: u64) -> Self {
+    pub fn new(value: NonZeroU64) -> Self {
         Self(value)
     }
-    pub fn raw_word(self) -> u64 {
+    pub fn raw_word(self) -> NonZeroU64 {
         self.0
     }
 
@@ -162,13 +163,13 @@ impl InlineData {
 impl From<InlineObject> for InlineData {
     fn from(object: InlineObject) -> Self {
         let value = object.0;
-        match value & InlineObject::KIND_MASK {
+        match value.get() & InlineObject::KIND_MASK {
             InlineObject::KIND_POINTER => {
-                debug_assert_eq!(value & 0b100, 0);
+                debug_assert_eq!(value.get() & 0b100, 0);
                 InlineData::Pointer(InlinePointer::new_unchecked(object))
             }
             InlineObject::KIND_INT => InlineData::Int(InlineInt::new_unchecked(object)),
-            InlineObject::KIND_PORT => match value & InlineObject::KIND_PORT_SUBKIND_MASK {
+            InlineObject::KIND_PORT => match value.get() & InlineObject::KIND_PORT_SUBKIND_MASK {
                 InlineObject::KIND_PORT_SUBKIND_SEND => {
                     InlineData::SendPort(InlineSendPort::new_unchecked(object))
                 }

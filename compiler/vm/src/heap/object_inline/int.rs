@@ -10,6 +10,7 @@ use num_integer::Integer;
 use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Formatter},
+    num::NonZeroU64,
     ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Shl, Shr, Sub},
 };
 
@@ -32,11 +33,12 @@ impl InlineInt {
             "Integer is too large.",
         );
         let header_word = InlineObject::KIND_INT | ((value as u64) << Self::VALUE_SHIFT);
+        let header_word = unsafe { NonZeroU64::new_unchecked(header_word) };
         Self(InlineObject(header_word))
     }
 
     pub fn get(self) -> i64 {
-        self.raw_word() as i64 >> Self::VALUE_SHIFT
+        self.raw_word().get() as i64 >> Self::VALUE_SHIFT
     }
     pub fn try_get<T: TryFrom<i64>>(&self) -> Option<T> {
         self.get().try_into().ok()

@@ -9,6 +9,7 @@ use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Formatter},
     hash::{Hash, Hasher},
+    num::NonZeroU64,
     ptr::{self, NonNull},
     slice,
 };
@@ -45,7 +46,9 @@ impl HeapList {
     }
     pub fn get(self, index: usize) -> InlineObject {
         debug_assert!(index < self.len());
-        InlineObject::new(self.unsafe_get_content_word(index))
+        let word = self.unsafe_get_content_word(index);
+        let word = unsafe { NonZeroU64::new_unchecked(word) };
+        InlineObject::new(word)
     }
     fn items_pointer(self) -> NonNull<InlineObject> {
         self.content_word_pointer(0).cast()
@@ -157,7 +160,8 @@ impl HeapObjectTrait for HeapList {
             clone.unsafe_set_content_word(
                 index,
                 item.clone_to_heap_with_mapping(heap, address_map)
-                    .raw_word(),
+                    .raw_word()
+                    .get(),
             );
         }
     }

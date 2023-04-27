@@ -8,6 +8,7 @@ use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Formatter},
     hash::{Hash, Hasher},
+    num::NonZeroU64,
     ptr::NonNull,
     str,
 };
@@ -24,7 +25,7 @@ impl HeapTag {
         let tag = Self(heap.allocate(HeapObject::KIND_TAG, 2 * HeapObject::WORD_SIZE));
         unsafe {
             *tag.symbol_pointer().as_mut() = symbol.into();
-            *tag.value_pointer().as_mut() = value.map_or(0, |value| value.raw_word());
+            *tag.value_pointer().as_mut() = value.map_or(0, |value| value.raw_word().get());
         };
         tag
     }
@@ -45,11 +46,7 @@ impl HeapTag {
     }
     pub fn value(self) -> Option<InlineObject> {
         let value = unsafe { *self.value_pointer().as_ref() };
-        if value == 0 {
-            None
-        } else {
-            Some(InlineObject::new(value))
-        }
+        NonZeroU64::new(value).map(InlineObject::new)
     }
 }
 
@@ -104,7 +101,7 @@ impl HeapObjectTrait for HeapTag {
         let clone = Self(clone);
         unsafe {
             *clone.symbol_pointer().as_mut() = symbol.into();
-            *clone.value_pointer().as_mut() = value.map_or(0, |it| it.raw_word());
+            *clone.value_pointer().as_mut() = value.map_or(0, |it| it.raw_word().get());
         };
     }
 
