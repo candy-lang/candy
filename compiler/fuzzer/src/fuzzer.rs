@@ -19,6 +19,8 @@ pub struct Fuzzer {
     pub closure_id: Id,
     status: Option<Status>, // only `None` during transitions
 }
+// TODO: Decrease enum variant sizes and size differences
+#[allow(clippy::large_enum_variant)]
 pub enum Status {
     StillFuzzing {
         pool: InputPool,
