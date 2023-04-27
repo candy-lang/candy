@@ -15,7 +15,7 @@ An inline object is a single word containing a tagged union of different types o
 | `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx110` | ReceivePort |
 | `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx11` | Builtin     |
 
-> The remaining patterns are reserved for future use.
+> The remaining patterns are invalid.
 
 ### Pointer
 
@@ -57,7 +57,7 @@ The header word is a tagged union of different types of values:
 | `cccccccc cccccccc cccccccc cccccccc aaaaaaaa aaaaaaaa aaaaaaaa aaaaa011` | Closure |
 | `00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000111` | HirId   |
 
-> The remaining patterns are reserved for future use.
+> The remaining patterns are invalid.
 
 ### Int
 
