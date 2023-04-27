@@ -43,7 +43,7 @@ impl Heap {
             .expect("Not enough memory.")
             .cast();
         unsafe { *pointer.as_ptr() = header_word };
-        let object = HeapObject(pointer);
+        let object = HeapObject::new(pointer);
         object.set_reference_count(1);
         self.objects.replace(ObjectInHeap(object));
         object

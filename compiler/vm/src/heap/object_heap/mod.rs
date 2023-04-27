@@ -43,7 +43,7 @@ macro_rules! trace {
 }
 
 #[derive(Clone, Copy)]
-pub struct HeapObject(pub(super) NonNull<u64>); // FIXME: private
+pub struct HeapObject(NonNull<u64>);
 impl HeapObject {
     pub const WORD_SIZE: usize = 8;
 
@@ -55,6 +55,10 @@ impl HeapObject {
     const KIND_TEXT: u64 = 0b110;
     const KIND_CLOSURE: u64 = 0b011;
     const KIND_HIR_ID: u64 = 0b111;
+
+    pub fn new(address: NonNull<u64>) -> Self {
+        Self(address)
+    }
 
     pub fn address(self) -> NonNull<u64> {
         self.0

@@ -20,7 +20,7 @@ impl InlinePointer {
 
     pub fn get(self) -> HeapObject {
         let pointer = unsafe { NonNull::new_unchecked(self.raw_word().get() as *mut u64) };
-        HeapObject(pointer)
+        HeapObject::new(pointer)
     }
 }
 
