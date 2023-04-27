@@ -480,9 +480,7 @@ macro_rules! impls_via_0 {
         }
     };
 }
-pub(self) use impls_via_0;
 
-// FIXME: merge with sections above
 macro_rules! impl_try_froms {
     ($type:tt, $error_message:expr$(,)?) => {
         impl TryFrom<InlineObject> for $type {
@@ -525,4 +523,4 @@ macro_rules! impl_try_from_heap_object {
         }
     };
 }
-use {impl_try_from_heap_object, impl_try_froms};
+use {impl_try_from_heap_object, impl_try_froms, impls_via_0};
