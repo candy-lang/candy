@@ -15,6 +15,7 @@ use std::{
     alloc::{self, Allocator, Layout},
     cmp::Ordering,
     fmt::{self, Debug, Formatter},
+    mem,
 };
 
 mod object;
@@ -86,6 +87,13 @@ impl Heap {
 
     pub fn known_channels(&self) -> impl IntoIterator<Item = ChannelId> + '_ {
         self.channel_refcounts.keys().copied()
+    }
+
+    pub fn clear(&mut self) {
+        for object in mem::take(&mut self.objects).iter() {
+            object.free(self);
+        }
+        self.channel_refcounts.clear();
     }
 }
 

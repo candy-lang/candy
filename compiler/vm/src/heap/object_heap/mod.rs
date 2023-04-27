@@ -101,7 +101,7 @@ impl HeapObject {
             self.free(heap);
         }
     }
-    fn free(self, heap: &mut Heap) {
+    pub(super) fn free(self, heap: &mut Heap) {
         trace!("Freeing object at {self:p}.");
         assert_eq!(self.reference_count(), 0);
         let data = HeapData::from(self);

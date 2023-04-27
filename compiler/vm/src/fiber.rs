@@ -231,7 +231,7 @@ impl Fiber {
             self.status,
             (Status::Done | Status::Panicked { .. }),
         ));
-        // FIXME: Clear heap except objects referenced by the tracer
+        self.heap.clear();
         self.status = Status::Panicked {
             reason,
             responsible,
