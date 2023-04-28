@@ -15,12 +15,13 @@ use lsp_types::{
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::mem;
-use tokio::sync::{mpsc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use tokio::sync::{mpsc, Mutex, RwLock, RwLockMappedWriteGuard, RwLockReadGuard, RwLockWriteGuard};
 use tower_lsp::{jsonrpc, Client, ClientSocket, LanguageServer, LspService};
 use tracing::{debug, span, Level};
 
 use crate::{
     database::Database,
+    debug_adapter::DebugAdapterServer,
     features::{LanguageFeatures, Reference, RenameError},
     features_candy::{hints::HintsNotification, CandyFeatures},
     features_ir::{IrFeatures, UpdateIrNotification},
@@ -43,6 +44,7 @@ pub enum ServerState {
 pub struct RunningServerState {
     pub features: ServerFeatures,
     pub packages_path: PackagesPath,
+    pub debug_adapter_server: DebugAdapterServer,
 }
 impl ServerState {
     pub fn require_features(&self) -> &ServerFeatures {
@@ -53,6 +55,12 @@ impl ServerState {
         }
     }
     pub fn require_running(&self) -> &RunningServerState {
+        match self {
+            ServerState::Running(state) => state,
+            _ => panic!("Server is not running."),
+        }
+    }
+    pub fn require_running_mut(&mut self) -> &mut RunningServerState {
         match self {
             ServerState::Running(state) => state,
             _ => panic!("Server is not running."),
@@ -160,6 +168,14 @@ impl Server {
                 state: RwLock::new(ServerState::Initial { features }),
             }
         })
+        .custom_method(
+            "candy/debugAdapter.create",
+            Server::candy_debug_adapter_create,
+        )
+        .custom_method(
+            "candy/debugAdapter.message",
+            Server::candy_debug_adapter_message,
+        )
         .custom_method("candy/viewIr", Server::candy_view_ir)
         .finish();
 
@@ -172,6 +188,11 @@ impl Server {
 
     pub async fn require_running_state(&self) -> RwLockReadGuard<RunningServerState> {
         RwLockReadGuard::map(self.state.read().await, |state| state.require_running())
+    }
+    pub async fn require_running_state_mut(&self) -> RwLockMappedWriteGuard<RunningServerState> {
+        RwLockWriteGuard::map(self.state.write().await, |state| {
+            state.require_running_mut()
+        })
     }
     pub async fn features_from_url<'a>(
         &self,
@@ -228,6 +249,7 @@ impl LanguageServer for Server {
                 *state = ServerState::Running(RunningServerState {
                     features,
                     packages_path,
+                    debug_adapter_server: DebugAdapterServer::default(),
                 });
                 state
             });

@@ -12,6 +12,8 @@ candy_formatter = { path = "../formatter" }
 candy_frontend = { path = "../frontend" }
 candy_fuzzer = { path = "../fuzzer" }
 candy_vm = { path = "../vm" }
+dap = "0.2.0-alpha1"
+derive_more = "0.99.17"
 enumset = "1.0.12"
 extension-trait = "1.0.1"
 itertools = "0.10.0"

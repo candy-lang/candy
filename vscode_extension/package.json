@@ -14,8 +14,8 @@
   },
   "categories": [
     "Programming Languages",
-    "Linters",
-    "Snippets"
+    "Formatters",
+    "Debuggers"
   ],
   "activationEvents": [
     "workspaceContains:**/*.candy"
@@ -109,6 +109,37 @@
         "editor.tabSize": 2
       }
     },
+    "debuggers": [
+      {
+        "type": "candy",
+        "label": "🍭 Candy",
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "markdownDescription": "Path to the program to start (e.g., `_.candy`)"
+              }
+            }
+          }
+        },
+        "configurationSnippets": [
+          {
+            "label": "🍭 Candy: Launch",
+            "description": "Launch and debug a 🍭 Candy app",
+            "body": {
+              "type": "candy",
+              "name": "🍭 Candy",
+              "request": "launch",
+              "program": "^\"_.candy\""
+            }
+          }
+        ]
+      }
+    ],
     "languages": [
       {
         "id": "candy",
@@ -131,6 +162,7 @@
     "test": "node ./out/test/runTest.js"
   },
   "dependencies": {
+    "@vscode/debugadapter": "^1.59.0",
     "vscode-languageclient": "^8.1.0"
   },
   "devDependencies": {
