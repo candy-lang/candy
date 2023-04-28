@@ -21,7 +21,7 @@ use tracing::{debug, span, Level};
 
 use crate::{
     database::Database,
-    debug_adapter::DebugAdapterServer,
+    debug_adapter::DebugSessionManager,
     features::{LanguageFeatures, Reference, RenameError},
     features_candy::{hints::HintsNotification, CandyFeatures},
     features_ir::{IrFeatures, UpdateIrNotification},
@@ -36,7 +36,10 @@ pub struct Server {
 }
 #[derive(Debug)]
 pub enum ServerState {
-    Initial { features: ServerFeatures },
+    Initial {
+        features: ServerFeatures,
+        debug_session_manager: DebugSessionManager,
+    },
     Running(RunningServerState),
     Shutdown,
 }
@@ -44,12 +47,12 @@ pub enum ServerState {
 pub struct RunningServerState {
     pub features: ServerFeatures,
     pub packages_path: PackagesPath,
-    pub debug_adapter_server: DebugAdapterServer,
+    pub debug_session_manager: DebugSessionManager,
 }
 impl ServerState {
     pub fn require_features(&self) -> &ServerFeatures {
         match self {
-            ServerState::Initial { features } => features,
+            ServerState::Initial { features, .. } => features,
             ServerState::Running(RunningServerState { features, .. }) => features,
             ServerState::Shutdown => panic!("Server is shut down."),
         }
@@ -123,13 +126,16 @@ impl Server {
         let (hints_sender, mut hints_receiver) = mpsc::channel(1024);
 
         let (service, client) = LspService::build(|client| {
-            let features = ServerFeatures {
-                candy: CandyFeatures::new(
-                    packages_path.clone(),
-                    diagnostics_sender.clone(),
-                    hints_sender.clone(),
-                ),
-                ir: IrFeatures::default(),
+            let state = ServerState::Initial {
+                features: ServerFeatures {
+                    candy: CandyFeatures::new(
+                        packages_path.clone(),
+                        diagnostics_sender.clone(),
+                        hints_sender.clone(),
+                    ),
+                    ir: IrFeatures::default(),
+                },
+                debug_session_manager: DebugSessionManager::run(client.clone()),
             };
 
             let client_for_closure = client.clone();
@@ -146,6 +152,7 @@ impl Server {
                 }
             };
             tokio::spawn(diagnostics_reporter());
+
             let client_for_closure = client.clone();
             let packages_path_for_closure = packages_path.clone();
             let hint_reporter = async move || {
@@ -165,7 +172,7 @@ impl Server {
                 db: Mutex::new(Database::new_with_file_system_module_provider(
                     packages_path,
                 )),
-                state: RwLock::new(ServerState::Initial { features }),
+                state: RwLock::new(state),
             }
         })
         .custom_method(
@@ -243,15 +250,15 @@ impl LanguageServer for Server {
         };
 
         {
-            RwLockWriteGuard::map(self.state.write().await, |state| {
-                let owned_state = mem::replace(state, ServerState::Shutdown);
-                let ServerState::Initial { features } = owned_state else { panic!("Already initialized"); };
-                *state = ServerState::Running(RunningServerState {
-                    features,
-                    packages_path,
-                    debug_adapter_server: DebugAdapterServer::default(),
-                });
-                state
+            let mut state = self.state.write().await;
+            let owned_state = mem::replace(&mut *state, ServerState::Shutdown);
+            let ServerState::Initial { features, debug_session_manager } = owned_state else {
+                panic!("Server is already initialized.");
+            };
+            *state = ServerState::Running(RunningServerState {
+                features,
+                packages_path,
+                debug_session_manager,
             });
         }
 

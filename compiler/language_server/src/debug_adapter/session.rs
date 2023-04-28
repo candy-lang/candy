@@ -1,21 +1,34 @@
-use super::SessionId;
+use super::{ServerToClient, ServerToClientMessage, SessionId};
 use dap::{
-    prelude::{Event, EventBody},
+    prelude::EventBody,
     requests::{Command, Request},
     responses::{Response, ResponseBody},
     types::Capabilities,
 };
-use lsp_types::notification::Notification;
-use serde::{Deserialize, Serialize};
-use tower_lsp::Client;
+use tokio::sync::mpsc;
 
-#[derive(Debug)]
-pub struct DebugAdapter {
-    pub session_id: SessionId,
-    pub client: Client,
+#[tokio::main(worker_threads = 1)]
+pub async fn run_debug_session(
+    session_id: SessionId,
+    mut client_to_server: mpsc::Receiver<Request>,
+    server_to_client: mpsc::Sender<ServerToClient>,
+) {
+    let mut session = DebugSession {
+        session_id,
+        server_to_client,
+    };
+    while let Some(message) = client_to_server.recv().await {
+        session.handle(message).await;
+    }
 }
 
-impl DebugAdapter {
+#[derive(Debug)]
+pub struct DebugSession {
+    session_id: SessionId,
+    server_to_client: mpsc::Sender<ServerToClient>,
+}
+
+impl DebugSession {
     pub async fn handle(&mut self, request: Request) {
         match request.command {
             Command::Attach(_) => todo!(),
@@ -74,7 +87,7 @@ impl DebugAdapter {
                 };
                 self.send_response(request.seq, ResponseBody::Initialize(Some(capabilities)))
                     .await;
-                self.send_event(EventBody::Initialized).await;
+                self.send(EventBody::Initialized).await;
             }
             Command::Launch(_) => todo!(),
             Command::LoadedSources => todo!(),
@@ -109,68 +122,19 @@ impl DebugAdapter {
     }
 
     async fn send_response(&self, seq: i64, body: ResponseBody) {
-        self.client
-            .send_notification::<ResponseNotification>(ResponseNotification {
-                session_id: self.session_id.to_owned(),
-                message: Response {
-                    request_seq: seq,
-                    success: true,
-                    message: None,
-                    body: Some(body),
-                },
-            })
-            .await;
+        self.send(Response {
+            request_seq: seq,
+            success: true,
+            message: None,
+            body: Some(body),
+        })
+        .await;
     }
-    async fn send_event(&self, body: EventBody) {
-        self.client
-            .send_notification::<EventNotification>(EventNotification {
-                session_id: self.session_id.to_owned(),
-                message: Event::make_event(body),
-            })
-            .await;
-    }
-}
-
-// Response
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ResponseNotification {
-    pub session_id: SessionId,
-    pub message: Response,
-}
-impl Notification for ResponseNotification {
-    const METHOD: &'static str = "candy/debugAdapter/message";
-
-    type Params = Self;
-}
-// Even though we only ever send this notification, `tower_lsp` still requires it to be deserializeable.
-impl<'de> Deserialize<'de> for ResponseNotification {
-    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        panic!("ResponseNotification is not deserializable.")
-    }
-}
-
-// Event
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct EventNotification {
-    pub session_id: SessionId,
-    pub message: Event,
-}
-impl Notification for EventNotification {
-    const METHOD: &'static str = "candy/debugAdapter/message";
-
-    type Params = Self;
-}
-// Even though we only ever send this notification, `tower_lsp` still requires it to be deserializeable.
-impl<'de> Deserialize<'de> for EventNotification {
-    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        panic!("EventNotification is not deserializable.")
+    async fn send(&self, message: impl Into<ServerToClientMessage>) {
+        let message = ServerToClient {
+            session_id: self.session_id.to_owned(),
+            message: message.into(),
+        };
+        self.server_to_client.send(message).await.unwrap();
     }
 }
