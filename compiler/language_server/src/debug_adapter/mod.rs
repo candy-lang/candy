@@ -1,5 +1,6 @@
 use self::session::run_debug_session;
 use crate::server::Server;
+use candy_frontend::module::PackagesPath;
 use dap::{prelude::EventBody, requests::Request, responses::Response};
 use derive_more::{Display, From};
 use lsp_types::notification::Notification;
@@ -35,7 +36,12 @@ pub struct DebugSessionManager {
     sessions: RwLock<FxHashMap<SessionId, mpsc::Sender<Request>>>,
 }
 impl DebugSessionManager {
-    async fn create_session(&mut self, session_id: SessionId, client: Client) {
+    async fn create_session(
+        &mut self,
+        session_id: SessionId,
+        client: Client,
+        packages_path: PackagesPath,
+    ) {
         let (client_to_server_sender, client_to_server_receiver) = mpsc::channel(4);
 
         {
@@ -43,7 +49,9 @@ impl DebugSessionManager {
             sessions.insert(session_id.clone(), client_to_server_sender);
         }
 
-        thread::spawn(|| run_debug_session(session_id, client, client_to_server_receiver));
+        thread::spawn(|| {
+            run_debug_session(session_id, client, packages_path, client_to_server_receiver)
+        });
     }
     async fn handle_message(&self, request: RequestNotification) {
         let sessions = self.sessions.read().await;
@@ -64,14 +72,16 @@ impl Server {
         params: DebugSessionCreateParams,
     ) -> jsonrpc::Result<()> {
         let mut state = self.require_running_state_mut().await;
+        let packages_path = state.packages_path.clone();
         state
             .debug_session_manager
-            .create_session(params.session_id, self.client.clone())
+            .create_session(params.session_id, self.client.clone(), packages_path)
             .await;
         Ok(())
     }
 
-    pub async fn candy_debug_adapter_message(&self, params: RequestNotification) {
+    pub async fn candy_debug_adapter_message(&self, params: serde_json::Value) {
+        let params = serde_json::from_value(params).unwrap();
         let state = self.require_running_state().await;
         state.debug_session_manager.handle_message(params).await;
     }
