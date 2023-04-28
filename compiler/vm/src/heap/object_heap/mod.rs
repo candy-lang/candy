@@ -226,7 +226,7 @@ impl From<HeapObject> for HeapData {
         let header_word = object.header_word();
         match header_word & HeapObject::KIND_MASK {
             HeapObject::KIND_INT => {
-                assert_eq!(header_word, HeapObject::KIND_MASK);
+                assert_eq!(header_word, HeapObject::KIND_INT);
                 HeapData::Int(HeapInt::new_unchecked(object))
             }
             HeapObject::KIND_LIST => HeapData::List(HeapList::new_unchecked(object)),
