@@ -135,7 +135,7 @@ impl Server {
                     ),
                     ir: IrFeatures::default(),
                 },
-                debug_session_manager: DebugSessionManager::run(client.clone()),
+                debug_session_manager: DebugSessionManager::default(),
             };
 
             let client_for_closure = client.clone();

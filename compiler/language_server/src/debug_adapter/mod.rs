@@ -1,10 +1,6 @@
 use self::session::run_debug_session;
 use crate::server::Server;
-use dap::{
-    prelude::{Event, EventBody},
-    requests::Request,
-    responses::Response,
-};
+use dap::{prelude::EventBody, requests::Request, responses::Response};
 use derive_more::{Display, From};
 use lsp_types::notification::Notification;
 use rustc_hash::FxHashMap;
@@ -33,35 +29,13 @@ pub struct SessionId(String);
 /// message is forwarded to the corresponding [`DebugSession`]. Each session
 /// runs in its own thread and has a channel for receiving messages.
 ///
-/// Messages from the server to the client are sent via
-/// [`DebugSession::send`], which sends the message to a channel shared between
-/// all [`DebugSession`]s. [`run`] spawns a task that forwards these messages
-/// to the client.
-#[derive(Debug)]
+/// Messages from the server to the client are sent directly.
+#[derive(Debug, Default)]
 pub struct DebugSessionManager {
-    server_to_client_sender: mpsc::Sender<ServerToClient>,
     sessions: RwLock<FxHashMap<SessionId, mpsc::Sender<Request>>>,
 }
 impl DebugSessionManager {
-    pub fn run(client: Client) -> Self {
-        let (server_to_client_sender, mut server_to_client_receiver) = mpsc::channel(1024);
-
-        let server = Self {
-            sessions: RwLock::new(FxHashMap::default()),
-            server_to_client_sender,
-        };
-
-        let server_to_client_forwarder = async move || {
-            while let Some(message) = server_to_client_receiver.recv().await {
-                client.send_notification::<ServerToClient>(message).await;
-            }
-        };
-        tokio::spawn(server_to_client_forwarder());
-
-        server
-    }
-
-    async fn create_session(&mut self, session_id: SessionId) {
+    async fn create_session(&mut self, session_id: SessionId, client: Client) {
         let (client_to_server_sender, client_to_server_receiver) = mpsc::channel(4);
 
         {
@@ -69,14 +43,7 @@ impl DebugSessionManager {
             sessions.insert(session_id.clone(), client_to_server_sender);
         }
 
-        let server_to_client_sender = self.server_to_client_sender.clone();
-        thread::spawn(|| {
-            run_debug_session(
-                session_id,
-                client_to_server_receiver,
-                server_to_client_sender,
-            )
-        });
+        thread::spawn(|| run_debug_session(session_id, client, client_to_server_receiver));
     }
     async fn handle_message(&self, request: RequestNotification) {
         let sessions = self.sessions.read().await;
@@ -99,7 +66,7 @@ impl Server {
         let mut state = self.require_running_state_mut().await;
         state
             .debug_session_manager
-            .create_session(params.session_id)
+            .create_session(params.session_id, self.client.clone())
             .await;
         Ok(())
     }

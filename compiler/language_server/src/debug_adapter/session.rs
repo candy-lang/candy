@@ -2,20 +2,21 @@ use super::{ServerToClient, ServerToClientMessage, SessionId};
 use dap::{
     prelude::EventBody,
     requests::{Command, Request},
-    responses::{Response, ResponseBody},
+    responses::{Response, ResponseBody, SetExceptionBreakpointsResponse},
     types::Capabilities,
 };
 use tokio::sync::mpsc;
+use tower_lsp::Client;
 
 #[tokio::main(worker_threads = 1)]
 pub async fn run_debug_session(
     session_id: SessionId,
+    client: Client,
     mut client_to_server: mpsc::Receiver<Request>,
-    server_to_client: mpsc::Sender<ServerToClient>,
 ) {
     let mut session = DebugSession {
         session_id,
-        server_to_client,
+        client,
     };
     while let Some(message) = client_to_server.recv().await {
         session.handle(message).await;
@@ -25,7 +26,7 @@ pub async fn run_debug_session(
 #[derive(Debug)]
 pub struct DebugSession {
     session_id: SessionId,
-    server_to_client: mpsc::Sender<ServerToClient>,
+    client: Client,
 }
 
 impl DebugSession {
@@ -135,6 +136,8 @@ impl DebugSession {
             session_id: self.session_id.to_owned(),
             message: message.into(),
         };
-        self.server_to_client.send(message).await.unwrap();
+        self.client
+            .send_notification::<ServerToClient>(message)
+            .await;
     }
 }
