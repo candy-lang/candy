@@ -32,23 +32,18 @@ class CandyDebugAdapterDescriptorFactory
 {
   constructor(private readonly client: LanguageClient) {}
 
-  private readonly debugAdapters = new Map<
-    DebugSessionId,
-    vscode.DebugAdapter
-  >();
+  private readonly debugAdapters = new Map<DebugSessionId, CandyDebugAdapter>();
 
   private readonly onNotificationDisposable = this.client.onNotification(
     debugAdapterMessage,
     (message) => {
-      const debugAdapter = this.debugAdapters.get(message.debugSessionId);
+      const debugAdapter = this.debugAdapters.get(message.sessionId);
       if (!debugAdapter) {
-        console.error(
-          `No debug adapter found with ID ${message.debugSessionId}`
-        );
+        console.error(`No debug adapter found with ID ${message.sessionId}`);
         return;
       }
 
-      debugAdapter.handleMessage(message);
+      debugAdapter.sendMessage.fire(message.message);
     }
   );
 
@@ -114,27 +109,22 @@ class CandyDebugAdapterDescriptorFactory
 
 class CandyDebugAdapter implements vscode.DebugAdapter {
   constructor(
-    private readonly debugSessionId: DebugSessionId,
+    private readonly sessionId: DebugSessionId,
     private readonly client: LanguageClient
   ) {}
 
   // VS Code → Candy
   handleMessage(message: vscode.DebugProtocolMessage): void {
-    console.log(message);
-    this.client.sendNotification(debugAdapterMessage, message);
+    this.client.sendNotification(debugAdapterMessage, {
+      sessionId: this.sessionId,
+      message: message,
+    });
   }
 
   // VS Code ← Candy
-  private readonly onClientNotificationDisposable = this.client.onNotification(
-    debugAdapterMessage,
-    (it) => this.sendMessage.fire(it)
-  );
-  private readonly sendMessage =
-    new vscode.EventEmitter<vscode.DebugProtocolMessage>();
+  readonly sendMessage = new vscode.EventEmitter<vscode.DebugProtocolMessage>();
   onDidSendMessage: vscode.Event<vscode.DebugProtocolMessage> =
     this.sendMessage.event;
 
-  dispose() {
-    this.onClientNotificationDisposable.dispose();
-  }
+  dispose() {}
 }

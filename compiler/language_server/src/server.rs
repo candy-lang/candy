@@ -169,11 +169,11 @@ impl Server {
             }
         })
         .custom_method(
-            "candy/debugAdapter.create",
+            "candy/debugAdapter/create",
             Server::candy_debug_adapter_create,
         )
         .custom_method(
-            "candy/debugAdapter.message",
+            "candy/debugAdapter/message",
             Server::candy_debug_adapter_message,
         )
         .custom_method("candy/viewIr", Server::candy_view_ir)

@@ -13,17 +13,17 @@ export const debugAdapterCreate = new RequestType<
   DebugAdapterCreateParams,
   void,
   void
->('candy/debugAdapter.create');
+>('candy/debugAdapter/create');
 export interface DebugAdapterCreateParams {
   readonly sessionId: DebugSessionId;
 }
 
 // VS Code ←→ Candy
 export const debugAdapterMessage = new NotificationType<DebugAdapterMessage>(
-  'candy/debugAdapter.message'
+  'candy/debugAdapter/message'
 );
 export interface DebugAdapterMessage {
-  readonly debugSessionId: DebugSessionId;
+  readonly sessionId: DebugSessionId;
   readonly message: vscode.DebugProtocolMessage;
 }
 
