@@ -7,16 +7,23 @@ import {
 } from 'vscode-languageclient';
 
 // Debug Adapter Protocol
-export type DebugAdapterId = number;
-export const debugAdapterCreate = new RequestType<{}, DebugAdapterId, void>(
-  'candy/debugAdapter.create'
-);
+export type DebugSessionId = string;
+
+export const debugAdapterCreate = new RequestType<
+  DebugAdapterCreateParams,
+  void,
+  void
+>('candy/debugAdapter.create');
+export interface DebugAdapterCreateParams {
+  readonly sessionId: DebugSessionId;
+}
+
 // VS Code ←→ Candy
 export const debugAdapterMessage = new NotificationType<DebugAdapterMessage>(
   'candy/debugAdapter.message'
 );
 export interface DebugAdapterMessage {
-  readonly debugAdapterId: DebugAdapterId;
+  readonly debugSessionId: DebugSessionId;
   readonly message: vscode.DebugProtocolMessage;
 }
 

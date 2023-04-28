@@ -4,8 +4,8 @@ import { LanguageClient } from 'vscode-languageclient/node';
 import { CandyDebugAdapterLoggerFactory } from './debug_adapter/logger';
 import {
   debugAdapterCreate,
-  DebugAdapterId,
   debugAdapterMessage,
+  DebugSessionId,
 } from './lsp_custom_protocol';
 
 export function registerDebugAdapter(
@@ -33,17 +33,17 @@ class CandyDebugAdapterDescriptorFactory
   constructor(private readonly client: LanguageClient) {}
 
   private readonly debugAdapters = new Map<
-    DebugAdapterId,
+    DebugSessionId,
     vscode.DebugAdapter
   >();
 
   private readonly onNotificationDisposable = this.client.onNotification(
     debugAdapterMessage,
     (message) => {
-      const debugAdapter = this.debugAdapters.get(message.debugAdapterId);
+      const debugAdapter = this.debugAdapters.get(message.debugSessionId);
       if (!debugAdapter) {
         console.error(
-          `No debug adapter found with ID ${message.debugAdapterId}`
+          `No debug adapter found with ID ${message.debugSessionId}`
         );
         return;
       }
@@ -65,13 +65,12 @@ class CandyDebugAdapterDescriptorFactory
     }
     console.log(`Creating debug adapter for \`${program}\``);
 
-    const debugAdapterId = await this.client.sendRequest(
-      debugAdapterCreate,
-      {}
-    );
-    const debugAdapter = new CandyDebugSession(debugAdapterId, this.client);
-    this.debugAdapters.set(debugAdapterId, debugAdapter);
-    console.log(`Created debug adapter with ID ${debugAdapterId}`);
+    await this.client.sendRequest(debugAdapterCreate, {
+      sessionId: session.id,
+    });
+    const debugAdapter = new CandyDebugAdapter(session.id, this.client);
+    this.debugAdapters.set(session.id, debugAdapter);
+    console.log(`Created debug adapter for session ${session.id}`);
 
     return new vscode.DebugAdapterInlineImplementation(debugAdapter);
   }
@@ -113,9 +112,9 @@ class CandyDebugAdapterDescriptorFactory
   }
 }
 
-class CandyDebugSession implements vscode.DebugAdapter {
+class CandyDebugAdapter implements vscode.DebugAdapter {
   constructor(
-    private readonly debugAdapterId: DebugAdapterId,
+    private readonly debugSessionId: DebugSessionId,
     private readonly client: LanguageClient
   ) {}
 

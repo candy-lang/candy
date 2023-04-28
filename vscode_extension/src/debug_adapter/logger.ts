@@ -6,7 +6,6 @@ export class CandyDebugAdapterLoggerFactory
   createDebugAdapterTracker(
     session: vscode.DebugSession
   ): vscode.DebugAdapterTracker {
-    console.log('createDebugAdapterTracker');
     return new CandyDebugAdapterLogger(session);
   }
 }

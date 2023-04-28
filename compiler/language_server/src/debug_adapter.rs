@@ -1,8 +1,8 @@
 use crate::server::Server;
-use candy_frontend::id::{CountableId, IdGenerator};
 use dap::{
-    requests::{Command, Request},
+    requests::{Command, InitializeArguments, Request},
     responses::{Response, ResponseBody},
+    types::Capabilities,
 };
 use derive_more::Display;
 use rustc_hash::FxHashMap;
@@ -11,37 +11,25 @@ use tokio::sync::RwLock;
 use tower_lsp::jsonrpc;
 use tracing::debug;
 
-#[derive(
-    Clone, Copy, Debug, Deserialize, Display, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize,
-)]
-pub struct DebugAdapterId(usize);
-impl CountableId for DebugAdapterId {
-    fn from_usize(id: usize) -> Self {
-        Self(id)
-    }
-    fn to_usize(&self) -> usize {
-        self.0
-    }
-}
+#[derive(Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, Serialize)]
+pub struct SessionId(String);
 
 #[derive(Debug, Default)]
 pub struct DebugAdapterServer {
-    id_generator: IdGenerator<DebugAdapterId>,
-    adapters: FxHashMap<DebugAdapterId, RwLock<DebugAdapter>>,
+    adapters: FxHashMap<SessionId, RwLock<DebugAdapter>>,
 }
 
 impl Server {
     pub async fn candy_debug_adapter_create(
         &self,
-        _params: serde_json::Value,
-    ) -> jsonrpc::Result<DebugAdapterId> {
+        params: DebugAdapterCreateParams,
+    ) -> jsonrpc::Result<()> {
         let mut state = self.require_running_state_mut().await;
-        let id = state.debug_adapter_server.id_generator.generate();
         state
             .debug_adapter_server
             .adapters
-            .insert(id, RwLock::new(DebugAdapter {}));
-        Ok(id)
+            .insert(params.session_id, RwLock::new(DebugAdapter {}));
+        Ok(())
     }
     pub async fn candy_debug_adapter_message(
         &self,
@@ -73,10 +61,16 @@ impl Server {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DebugAdapterCreateParams {
+    pub session_id: SessionId,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Message<P> {
-    pub debug_adapter_id: DebugAdapterId,
+    pub debug_adapter_id: SessionId,
     pub payload: P,
 }
 
