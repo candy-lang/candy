@@ -1,24 +1,36 @@
-use super::{ServerToClient, ServerToClientMessage, SessionId};
+use super::{tracer::DebugTracer, ServerToClient, ServerToClientMessage, SessionId};
 use crate::database::Database;
 use candy_frontend::{
+    hir::Id,
+    id::CountableId,
     module::{Module, ModuleKind, PackagesPath},
-    TracingConfig,
+    utils::AdjustCasingOfFirstLetter,
+    TracingConfig, TracingMode,
 };
 use candy_vm::{
-    context::DbUseProvider, fiber::ExecutionResult, heap::Struct, mir_to_lir::MirToLir, run_lir,
-    run_main, tracer::DummyTracer,
+    context::{DbUseProvider, RunLimitedNumberOfInstructions},
+    fiber::FiberId,
+    heap::{Data, Struct},
+    mir_to_lir::MirToLir,
+    run_lir,
+    tracer::DummyTracer,
+    vm::{FiberTree, Vm},
 };
 use dap::{
+    events::StoppedEventBody,
     prelude::EventBody,
     requests::{Command, Request},
-    responses::{Response, ResponseBody, ResponseMessage, SetExceptionBreakpointsResponse},
-    types::Capabilities,
+    responses::{
+        Response, ResponseBody, ResponseMessage, ScopesResponse, SetExceptionBreakpointsResponse,
+        StackTraceResponse, ThreadsResponse,
+    },
+    types::{Capabilities, StackFrame, StackFramePresentationhint, StoppedEventReason, Thread},
 };
 use rustc_hash::FxHashMap;
-use std::path::PathBuf;
+use std::{hash::Hash, panic, path::PathBuf};
 use tokio::sync::mpsc;
 use tower_lsp::Client;
-use tracing::{error, info};
+use tracing::error;
 
 #[tokio::main(worker_threads = 1)]
 pub async fn run_debug_session(
@@ -33,24 +45,44 @@ pub async fn run_debug_session(
         session_id,
         client,
         db,
+        state: State::Initial,
     };
     while let Some(request) = client_to_server.recv().await {
         let seq = request.seq;
         match session.handle(request).await {
             Ok(()) => {}
-            Err(message) => session.send_response_err(seq, message).await,
+            Err(message) => {
+                session
+                    .send_response_err(seq, ResponseMessage::Error(message.to_string()))
+                    .await
+            }
         }
     }
 }
 
-pub struct DebugSession {
+struct DebugSession {
     session_id: SessionId,
     client: Client,
     db: Database,
+    state: State,
+}
+
+enum State {
+    Initial,
+    Running(VmState),
+    Paused(PausedState),
+}
+struct PausedState {
+    vm_state: VmState,
+    stack_frame_ids: IdMapping<(FiberId, usize)>,
+}
+struct VmState {
+    vm: Vm,
+    tracer: DebugTracer,
 }
 
 impl DebugSession {
-    pub async fn handle(&mut self, request: Request) -> Result<(), ResponseMessage> {
+    pub async fn handle(&mut self, request: Request) -> Result<(), &'static str> {
         match request.command {
             Command::Attach(_) => todo!(),
             Command::BreakpointLocations(_) => todo!(),
@@ -65,6 +97,10 @@ impl DebugSession {
             Command::Goto(_) => todo!(),
             Command::GotoTargets(_) => todo!(),
             Command::Initialize(_) => {
+                if !matches!(self.state, State::Initial) {
+                    return Err("already-initialized");
+                }
+
                 let capabilities = Capabilities {
                     supports_configuration_done_request: None,
                     supports_function_breakpoints: None,
@@ -112,9 +148,17 @@ impl DebugSession {
                 Ok(())
             }
             Command::Launch(args) => {
+                if !matches!(self.state, State::Initial) {
+                    return Err("already-launched");
+                }
+
                 let module = self.parse_module(args.program)?;
 
-                let tracing = TracingConfig::off();
+                let tracing = TracingConfig {
+                    register_fuzzables: TracingMode::Off,
+                    calls: TracingMode::All,
+                    evaluated_expressions: TracingMode::Off,
+                };
                 let lir = self
                     .db
                     .lir(module.clone(), tracing.clone())
@@ -131,23 +175,38 @@ impl DebugSession {
                         Ok(result) => result,
                         Err(error) => {
                             error!("Failed to find main function: {error}");
-                            return Err(ResponseMessage::Error("program-invalid".to_string()));
+                            return Err("program-invalid");
                         }
                     };
 
+                let mut vm = Vm::default();
                 self.send_response_ok(request.seq, ResponseBody::Launch)
                     .await;
 
                 // Run the `main` function.
                 let environment = Struct::create(&mut heap, &FxHashMap::default());
-                match run_main(heap, main, environment, &use_provider, &mut tracer) {
-                    ExecutionResult::Finished(packet) => {
-                        info!("The main function finished: {}", packet.object)
-                    }
-                    ExecutionResult::Panicked { reason, .. } => {
-                        error!("The main function panicked: {reason}")
-                    }
-                }
+                vm.set_up_for_running_closure(heap, main, &[environment.into()], Id::platform());
+
+                let mut execution_controller = RunLimitedNumberOfInstructions::new(10000);
+                let mut tracer = DebugTracer::default();
+                // FIXME: remove
+                vm.run(&use_provider, &mut execution_controller, &mut tracer);
+
+                self.state = State::Paused(PausedState {
+                    vm_state: VmState { vm, tracer },
+                    stack_frame_ids: IdMapping::default(),
+                });
+
+                self.send(EventBody::Stopped(StoppedEventBody {
+                    reason: StoppedEventReason::Entry,
+                    description: Some("Paused on program start".to_string()),
+                    thread_id: Some(Self::fiber_id_to_thread_id(FiberId::root())),
+                    preserve_focus_hint: Some(false),
+                    text: None,
+                    all_threads_stopped: Some(true),
+                    hit_breakpoint_ids: Some(vec![]),
+                }))
+                .await;
 
                 Ok(())
             }
@@ -159,7 +218,15 @@ impl DebugSession {
             Command::Restart(_) => todo!(),
             Command::RestartFrame(_) => todo!(),
             Command::ReverseContinue(_) => todo!(),
-            Command::Scopes(_) => todo!(),
+            Command::Scopes(_) => {
+                self.send_response_ok(
+                    request.seq,
+                    // FIXME: implement
+                    ResponseBody::Scopes(ScopesResponse { scopes: vec![] }),
+                )
+                .await;
+                Ok(())
+            }
             Command::SetBreakpoints(_) => todo!(),
             Command::SetDataBreakpoints(_) => todo!(),
             Command::SetExceptionBreakpoints(_) => {
@@ -177,24 +244,115 @@ impl DebugSession {
             Command::SetInstructionBreakpoints(_) => todo!(),
             Command::SetVariable(_) => todo!(),
             Command::Source(_) => todo!(),
-            Command::StackTrace(_) => todo!(),
+            Command::StackTrace(args) => {
+                let state = self.require_paused_mut()?;
+
+                let fiber_id = Self::thread_id_to_fiber_id(args.thread_id);
+                let fiber_state = state
+                    .vm_state
+                    .tracer
+                    .fibers
+                    .get(&fiber_id)
+                    .ok_or("fiber-not-found")?;
+
+                let start_frame = args.start_frame.map(|it| it as usize).unwrap_or_default();
+                let mut call_stack = &fiber_state.call_stack[start_frame..];
+                if let Some(levels) = args.levels {
+                    let levels = levels as usize;
+                    if levels < call_stack.len() {
+                        call_stack = &call_stack[..levels];
+                    }
+                }
+
+                let stack_frames = call_stack
+                    .iter()
+                    .enumerate()
+                    .map(|(index, it)| {
+                        // TODO: format arguments
+                        let name = match Data::from(it.callee) {
+                            // TODO: resolve function name
+                            Data::Closure(closure) => format!("{:p}", closure.address()),
+                            Data::Builtin(builtin) => format!(
+                                "✨.{}",
+                                format!("{:?}", builtin.get()).lowercase_first_letter(),
+                            ),
+                            Data::Tag(tag) => tag.symbol().get().to_owned(),
+                            it => panic!("Unexpected callee: {it}"),
+                        };
+                        StackFrame {
+                            id: state.stack_frame_ids.get((fiber_id, index)),
+                            name,
+                            source: None,
+                            line: 1,
+                            column: 1,
+                            end_line: None,
+                            end_column: None,
+                            can_restart: Some(false),
+                            instruction_pointer_reference: None,
+                            module_id: None,
+                            presentation_hint: Some(StackFramePresentationhint::Normal),
+                        }
+                    })
+                    .collect();
+                let total_frames = fiber_state.call_stack.len() as i64;
+                self.send_response_ok(
+                    request.seq,
+                    ResponseBody::StackTrace(StackTraceResponse {
+                        stack_frames,
+                        total_frames: Some(total_frames),
+                    }),
+                )
+                .await;
+                Ok(())
+            }
             Command::StepBack(_) => todo!(),
             Command::StepIn(_) => todo!(),
             Command::StepInTargets(_) => todo!(),
             Command::StepOut(_) => todo!(),
             Command::Terminate(_) => todo!(),
             Command::TerminateThreads(_) => todo!(),
-            Command::Threads => todo!(),
+            Command::Threads => {
+                let state = self.require_launched()?;
+
+                dbg!(&state.tracer);
+
+                self.send_response_ok(
+                    request.seq,
+                    ResponseBody::Threads(ThreadsResponse {
+                        threads: state
+                            .vm
+                            .fibers()
+                            .iter()
+                            .map(|(id, fiber)| Thread {
+                                // FIXME: Use data from tracer?
+                                id: Self::fiber_id_to_thread_id(*id),
+                                name: format!(
+                                    "Fiber {}{}",
+                                    id.to_usize(),
+                                    match fiber {
+                                        FiberTree::Single(_) => "",
+                                        FiberTree::Parallel(_) => " (in `parallel`)",
+                                        FiberTree::Try(_) => " (in `try`)",
+                                    },
+                                ),
+                            })
+                            .collect(),
+                    }),
+                )
+                .await;
+
+                Ok(())
+            }
             Command::Variables(_) => todo!(),
             Command::WriteMemory(_) => todo!(),
             Command::Cancel(_) => todo!(),
         }
     }
 
-    fn parse_module(&self, path: Option<String>) -> Result<Module, ResponseMessage> {
+    fn parse_module(&self, path: Option<String>) -> Result<Module, &'static str> {
         let Some(path) = path else {
             error!("Missing program path");
-            return Err(ResponseMessage::Error("program-missing".to_string()));
+            return Err("program-missing");
         };
         Module::from_path(
             &self.db.packages_path,
@@ -203,8 +361,35 @@ impl DebugSession {
         )
         .map_err(|err| {
             error!("Failed to find module: {err}");
-            ResponseMessage::Error("program-invalid".to_string())
+            "program-invalid"
         })
+    }
+
+    fn require_launched(&self) -> Result<&VmState, &'static str> {
+        match &self.state {
+            State::Initial => Err("not-launched"),
+            State::Running(state) => Ok(state),
+            State::Paused(state) => Ok(&state.vm_state),
+        }
+    }
+    fn require_paused(&self) -> Result<&PausedState, &'static str> {
+        match &self.state {
+            State::Paused(state) => Ok(state),
+            _ => Err("not-paused"),
+        }
+    }
+    fn require_paused_mut(&mut self) -> Result<&mut PausedState, &'static str> {
+        match &mut self.state {
+            State::Paused(state) => Ok(state),
+            _ => Err("not-paused"),
+        }
+    }
+
+    fn fiber_id_to_thread_id(id: FiberId) -> i64 {
+        id.to_usize() as i64
+    }
+    fn thread_id_to_fiber_id(id: i64) -> FiberId {
+        FiberId::from_usize(id as usize)
     }
 
     async fn send_response_ok(&self, seq: i64, body: ResponseBody) {
@@ -233,5 +418,27 @@ impl DebugSession {
         self.client
             .send_notification::<ServerToClient>(message)
             .await;
+    }
+}
+
+struct IdMapping<T: Eq + Hash> {
+    next_id: i64,
+    map: FxHashMap<T, i64>,
+}
+impl<T: Eq + Hash> IdMapping<T> {
+    fn get(&mut self, key: T) -> i64 {
+        *self.map.entry(key).or_insert_with(|| {
+            let id = self.next_id;
+            self.next_id += 1;
+            id
+        })
+    }
+}
+impl<T: Eq + Hash> Default for IdMapping<T> {
+    fn default() -> Self {
+        Self {
+            next_id: 0,
+            map: Default::default(),
+        }
     }
 }

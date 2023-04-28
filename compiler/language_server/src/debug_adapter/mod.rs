@@ -12,6 +12,7 @@ use tower_lsp::{jsonrpc, Client};
 use tracing::error;
 
 mod session;
+mod tracer;
 
 #[derive(Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, Serialize)]
 #[serde(transparent)]

@@ -56,7 +56,7 @@ pub struct Vm {
 }
 
 #[derive(Clone)]
-enum FiberTree {
+pub enum FiberTree {
     /// This tree is currently focused on running a single fiber.
     Single(Single),
 
@@ -71,7 +71,7 @@ enum FiberTree {
 
 /// Single fibers are the leaves of the fiber tree.
 #[derive(Clone)]
-struct Single {
+pub struct Single {
     fiber: Fiber,
     parent: Option<FiberId>,
 }
@@ -84,7 +84,7 @@ struct Single {
 /// child, those children also have an explicit send port where the closure's
 /// result is sent to.
 #[derive(Clone)]
-struct Parallel {
+pub struct Parallel {
     paused_fiber: Single,
     children: HashMap<FiberId, ChildKind>,
     return_value: Option<Packet>, // will later contain the body's return value
@@ -97,7 +97,7 @@ enum ChildKind {
 }
 
 #[derive(Clone)]
-struct Try {
+pub struct Try {
     paused_fiber: Single,
     child: FiberId,
 }
@@ -226,6 +226,10 @@ impl Vm {
         matches!(self.status(), Status::CanRun)
     }
 
+    pub fn fibers(&self) -> &HashMap<FiberId, FiberTree> {
+        &self.fibers
+    }
+
     /// Can be called at any time from outside the VM to create a channel that
     /// can be used to communicate with the outside world.
     pub fn create_channel(&mut self, capacity: usize) -> ChannelId {
@@ -293,7 +297,7 @@ impl Vm {
     ) {
         assert!(
             self.can_run(),
-            "Called Vm::run on a VM that is not ready to run."
+            "Called `Vm::run(…)` on a VM that is not ready to run."
         );
 
         // Choose a random fiber to run.

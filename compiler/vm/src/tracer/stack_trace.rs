@@ -14,7 +14,7 @@ use tracing::debug;
 // Stack traces are a reduced view of the tracing state that represent the stack
 // trace at a given moment in time.
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Call {
     pub call_site: HirId,
     pub callee: InlineObject,
