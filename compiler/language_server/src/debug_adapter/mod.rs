@@ -136,11 +136,15 @@ impl Notification for ServerToClient {
 
     type Params = Self;
 }
+
+// [`dap::responses::Response`] is missing `"type": "response"` in its JSON
+// representation. Therefore, we add the `"type"` field here and use the raw
+// [`EventBody`] for events.
 #[derive(Debug, From, Serialize)]
-#[serde(untagged)]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum ServerToClientMessage {
     Response(Response),
-    Event(Event),
+    Event(EventBody),
 }
 // Even though we only ever send this notification, `tower_lsp` still requires it to be deserializeable.
 impl<'de> Deserialize<'de> for ServerToClientMessage {
@@ -149,10 +153,5 @@ impl<'de> Deserialize<'de> for ServerToClientMessage {
         D: serde::Deserializer<'de>,
     {
         panic!("ServerToClientMessage is not deserializable.")
-    }
-}
-impl From<EventBody> for ServerToClientMessage {
-    fn from(value: EventBody) -> Self {
-        Event::make_event(value).into()
     }
 }
