@@ -28,9 +28,10 @@ use std::{
     hash::Hash,
     ops::{Shl, Shr},
 };
-use strum::IntoStaticStr;
+use strum::{EnumDiscriminants, IntoStaticStr};
 
-#[derive(Clone, Copy, Eq, Hash, IntoStaticStr, PartialEq)]
+#[derive(Clone, Copy, EnumDiscriminants, Eq, Hash, IntoStaticStr, PartialEq)]
+#[strum_discriminants(derive(IntoStaticStr))]
 pub enum Data {
     Int(Int),
     Tag(Tag),
