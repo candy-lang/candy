@@ -41,7 +41,7 @@ impl FuzzerManager {
         self.fuzzers.remove(&module).unwrap();
     }
 
-    pub fn run<DB: MirToLir>(&mut self, db: &DB) -> Option<Module> {
+    pub fn run(&mut self, db: &impl MirToLir) -> Option<Module> {
         let mut running_fuzzers = self
             .fuzzers
             .values_mut()

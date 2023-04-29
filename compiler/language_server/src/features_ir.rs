@@ -41,7 +41,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ViewIrParams {
     pub uri: Url,
