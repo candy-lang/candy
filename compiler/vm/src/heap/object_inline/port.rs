@@ -8,6 +8,7 @@ use candy_frontend::id::CountableId;
 use derive_more::Deref;
 use rustc_hash::FxHashMap;
 use std::{
+    cmp::Ordering,
     fmt::{self, Formatter},
     hash::{Hash, Hasher},
     num::NonZeroU64,
@@ -60,10 +61,20 @@ impl Hash for InlinePort {
         self.channel_id().hash(state)
     }
 }
+impl Ord for InlinePort {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.channel_id().cmp(&other.channel_id())
+    }
+}
+impl PartialOrd for InlinePort {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 // Send Port
 
-#[derive(Clone, Copy, Deref, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Deref, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct InlineSendPort(InlinePort);
 
 impl InlineSendPort {
@@ -94,7 +105,7 @@ impl InlineObjectTrait for InlineSendPort {
 
 // Receive Port
 
-#[derive(Clone, Copy, Deref, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Deref, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct InlineReceivePort(InlinePort);
 
 impl InlineReceivePort {

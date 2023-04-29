@@ -108,8 +108,15 @@ impl PausedState {
                         start = start.saturating_sub(1);
                         count = count.saturating_sub(1);
 
-                        variables.extend(struct_.iter().skip(start).take(count).map(
-                            |(_, key, value)| {
+                        let mut fields = struct_
+                            .keys()
+                            .iter()
+                            .copied()
+                            .zip_eq(struct_.values().iter().copied())
+                            .collect_vec();
+                        fields.sort();
+                        variables.extend(fields.into_iter().skip(start).take(count).map(
+                            |(key, value)| {
                                 self.create_variable(key.to_string(), value, supports_variable_type)
                             },
                         ));

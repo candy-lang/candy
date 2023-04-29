@@ -7,6 +7,7 @@ use derive_more::Deref;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use std::{
+    cmp::Ordering,
     fmt::{self, Formatter},
     hash::{Hash, Hasher},
     num::NonZeroU64,
@@ -139,6 +140,17 @@ impl PartialEq for HeapList {
 impl Hash for HeapList {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.items().hash(state)
+    }
+}
+
+impl Ord for HeapList {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.items().cmp(&other.items())
+    }
+}
+impl PartialOrd for HeapList {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 

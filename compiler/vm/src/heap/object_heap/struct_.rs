@@ -7,6 +7,7 @@ use derive_more::Deref;
 use itertools::{izip, Itertools};
 use rustc_hash::{FxHashMap, FxHasher};
 use std::{
+    cmp::Ordering,
     fmt::{self, Formatter},
     hash::{Hash, Hasher},
     ptr, slice,
@@ -231,6 +232,20 @@ impl Hash for HeapStruct {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.hashes().hash(state);
         self.values().hash(state);
+    }
+}
+impl Ord for HeapStruct {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let mut self_keys = self.keys().to_vec();
+        self_keys.sort();
+        let mut other_keys = other.keys().to_vec();
+        other_keys.sort();
+        self_keys.cmp(&other_keys)
+    }
+}
+impl PartialOrd for HeapStruct {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 

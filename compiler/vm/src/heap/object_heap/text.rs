@@ -1,7 +1,7 @@
 use super::{utils::heap_object_impls, HeapObjectTrait};
 use crate::{
     heap::{object_heap::HeapObject, Heap},
-    utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_via_get, DebugDisplay},
+    utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_ord_via_get, DebugDisplay},
 };
 use derive_more::Deref;
 use rustc_hash::FxHashMap;
@@ -54,7 +54,7 @@ impl DebugDisplay for HeapText {
 }
 impl_debug_display_via_debugdisplay!(HeapText);
 
-impl_eq_hash_via_get!(HeapText);
+impl_eq_hash_ord_via_get!(HeapText);
 
 heap_object_impls!(HeapText);
 

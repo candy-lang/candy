@@ -8,6 +8,7 @@ use derive_more::Deref;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use std::{
+    cmp::Ordering,
     fmt::{self, Formatter},
     hash::{Hash, Hasher},
     mem,
@@ -168,6 +169,17 @@ impl Hash for HeapClosure {
         self.captured().hash(state);
         self.argument_count().hash(state);
         self.instructions().hash(state);
+    }
+}
+impl Ord for HeapClosure {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // TODO: Compare the underlying HIR ID once we have it here (plus captured stuff)
+        self.address().cmp(&other.address())
+    }
+}
+impl PartialOrd for HeapClosure {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
