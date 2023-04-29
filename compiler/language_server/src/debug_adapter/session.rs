@@ -175,7 +175,7 @@ impl DebugSession {
                 let tracing = TracingConfig {
                     register_fuzzables: TracingMode::Off,
                     calls: TracingMode::All,
-                    evaluated_expressions: TracingMode::Off,
+                    evaluated_expressions: TracingMode::All,
                 };
                 let lir = self
                     .db
@@ -240,7 +240,7 @@ impl DebugSession {
             Command::RestartFrame(_) => todo!(),
             Command::ReverseContinue(_) => todo!(),
             Command::Scopes(args) => {
-                let scopes = self.require_paused_mut()?.scopes(args);
+                let scopes = self.state.require_paused_mut()?.scopes(args);
                 self.send_response_ok(request.seq, ResponseBody::Scopes(scopes))
                     .await;
                 Ok(())
@@ -263,7 +263,7 @@ impl DebugSession {
             Command::SetVariable(_) => todo!(),
             Command::Source(_) => todo!(),
             Command::StackTrace(args) => {
-                let stack_trace = self.require_paused_mut()?.stack_trace(args)?;
+                let stack_trace = self.state.require_paused_mut()?.stack_trace(args)?;
                 self.send_response_ok(request.seq, ResponseBody::StackTrace(stack_trace))
                     .await;
                 Ok(())
@@ -275,7 +275,7 @@ impl DebugSession {
             Command::Terminate(_) => todo!(),
             Command::TerminateThreads(_) => todo!(),
             Command::Threads => {
-                let state = self.require_launched()?;
+                let state = self.state.require_launched()?;
 
                 self.send_response_ok(
                     request.seq,
@@ -312,12 +312,15 @@ impl DebugSession {
             }
             Command::Variables(args) => {
                 let supports_variable_type = self
+                    .state
                     .require_initialized()?
                     .supports_variable_type
                     .unwrap_or_default();
-                let variables = self
-                    .require_paused_mut()?
-                    .variables(args, supports_variable_type);
+                let variables = self.state.require_paused_mut()?.variables(
+                    &self.db,
+                    args,
+                    supports_variable_type,
+                );
                 self.send_response_ok(request.seq, ResponseBody::Variables(variables))
                     .await;
                 Ok(())
@@ -341,46 +344,6 @@ impl DebugSession {
             error!("Failed to find module: {err}");
             "program-invalid"
         })
-    }
-
-    fn require_initialized(&self) -> Result<&InitializeArguments, &'static str> {
-        match &self.state {
-            State::Initial => Err("not-initialized"),
-            State::Initialized(initialize_arguments)
-            | State::Launched {
-                initialize_arguments,
-                ..
-            } => Ok(initialize_arguments),
-        }
-    }
-    fn require_launched(&self) -> Result<&VmState, &'static str> {
-        match &self.state {
-            State::Initial | State::Initialized(_) => Err("not-launched"),
-            State::Launched {
-                execution_state:
-                    ExecutionState::Running(vm_state)
-                    | ExecutionState::Paused(PausedState { vm_state, .. }),
-                ..
-            } => Ok(vm_state),
-        }
-    }
-    fn require_paused(&self) -> Result<&PausedState, &'static str> {
-        match &self.state {
-            State::Launched {
-                execution_state: ExecutionState::Paused(state),
-                ..
-            } => Ok(state),
-            _ => Err("not-paused"),
-        }
-    }
-    fn require_paused_mut(&mut self) -> Result<&mut PausedState, &'static str> {
-        match &mut self.state {
-            State::Launched {
-                execution_state: ExecutionState::Paused(state),
-                ..
-            } => Ok(state),
-            _ => Err("not-paused"),
-        }
     }
 
     async fn send_response_ok(&self, seq: i64, body: ResponseBody) {
@@ -409,5 +372,47 @@ impl DebugSession {
         self.client
             .send_notification::<ServerToClient>(message)
             .await;
+    }
+}
+
+impl State {
+    fn require_initialized(&self) -> Result<&InitializeArguments, &'static str> {
+        match &self {
+            State::Initial => Err("not-initialized"),
+            State::Initialized(initialize_arguments)
+            | State::Launched {
+                initialize_arguments,
+                ..
+            } => Ok(initialize_arguments),
+        }
+    }
+    fn require_launched(&self) -> Result<&VmState, &'static str> {
+        match &self {
+            State::Initial | State::Initialized(_) => Err("not-launched"),
+            State::Launched {
+                execution_state:
+                    ExecutionState::Running(vm_state)
+                    | ExecutionState::Paused(PausedState { vm_state, .. }),
+                ..
+            } => Ok(vm_state),
+        }
+    }
+    fn require_paused(&self) -> Result<&PausedState, &'static str> {
+        match &self {
+            State::Launched {
+                execution_state: ExecutionState::Paused(state),
+                ..
+            } => Ok(state),
+            _ => Err("not-paused"),
+        }
+    }
+    fn require_paused_mut(&mut self) -> Result<&mut PausedState, &'static str> {
+        match self {
+            State::Launched {
+                execution_state: ExecutionState::Paused(state),
+                ..
+            } => Ok(state),
+            _ => Err("not-paused"),
+        }
     }
 }

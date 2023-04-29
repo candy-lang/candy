@@ -1,5 +1,7 @@
+use candy_frontend::hir::Id;
 use candy_vm::{
     fiber::FiberId,
+    heap::InlineObject,
     tracer::{stack_trace::Call, FiberEvent, Tracer, VmEvent},
 };
 use rustc_hash::FxHashMap;
@@ -21,13 +23,29 @@ impl Default for DebugTracer {
 #[derive(Debug)]
 pub struct FiberState {
     pub status: FiberStatus,
-    pub call_stack: Vec<Call>,
+    pub root_locals: Vec<(Id, InlineObject)>,
+    pub call_stack: Vec<StackFrame>,
 }
 impl Default for FiberState {
     fn default() -> Self {
         Self {
             status: FiberStatus::Created,
+            root_locals: vec![],
             call_stack: vec![],
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct StackFrame {
+    pub call: Call,
+    pub locals: Vec<(Id, InlineObject)>,
+}
+impl StackFrame {
+    fn new(call: Call) -> Self {
+        Self {
+            call,
+            locals: vec![],
         }
     }
 }
@@ -79,27 +97,40 @@ impl Tracer for DebugTracer {
             }
             VmEvent::FiberExecutionStarted { .. } | VmEvent::FiberExecutionEnded { .. } => {}
             VmEvent::ChannelCreated { .. } => {}
-            VmEvent::InFiber { fiber, event } => match event {
-                FiberEvent::ValueEvaluated { .. } => {}
-                FiberEvent::FoundFuzzableClosure { .. } => {}
-                FiberEvent::CallStarted {
-                    call_site,
-                    callee,
-                    arguments,
-                    responsible,
-                    ..
-                } => {
-                    self.fibers.get_mut(&fiber).unwrap().call_stack.push(Call {
+            VmEvent::InFiber { fiber, event } => {
+                let state = self.fibers.get_mut(&fiber).unwrap();
+                match event {
+                    FiberEvent::ValueEvaluated {
+                        expression, value, ..
+                    } => {
+                        state
+                            .call_stack
+                            .last_mut()
+                            .map(|it| &mut it.locals)
+                            .unwrap_or(&mut state.root_locals)
+                            .push((expression.get().to_owned(), value));
+                    }
+                    FiberEvent::FoundFuzzableClosure { .. } => {}
+                    FiberEvent::CallStarted {
                         call_site,
                         callee,
                         arguments,
                         responsible,
-                    });
+                        ..
+                    } => {
+                        let call = Call {
+                            call_site,
+                            callee,
+                            arguments,
+                            responsible,
+                        };
+                        state.call_stack.push(StackFrame::new(call));
+                    }
+                    FiberEvent::CallEnded { .. } => {
+                        state.call_stack.pop();
+                    }
                 }
-                FiberEvent::CallEnded { .. } => {
-                    self.fibers.get_mut(&fiber).unwrap().call_stack.pop();
-                }
-            },
+            }
         }
     }
 }

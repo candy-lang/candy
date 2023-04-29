@@ -1,4 +1,6 @@
 use super::{stack_trace::StackFrameKey, utils::FiberIdExtension, PausedState};
+use crate::database::Database;
+use candy_frontend::hir::HirDb;
 use candy_vm::{
     fiber::FiberId,
     heap::{Data, DataDiscriminants, InlineObject, ObjectInHeap},
@@ -12,12 +14,14 @@ use dap::{
     },
 };
 use itertools::Itertools;
+use rustc_hash::FxHashMap;
 use std::hash::Hash;
 
 impl PausedState {
     #[allow(unused_parens)]
     pub fn variables(
         &mut self,
+        db: &Database,
         args: VariablesArguments,
         supports_variable_type: bool,
     ) -> VariablesResponse {
@@ -44,6 +48,8 @@ impl PausedState {
                 if should_include_named {
                     let arguments = stack_frame_key
                         .get(&self.vm_state.tracer)
+                        .unwrap()
+                        .call
                         .arguments
                         .to_owned();
                     variables.extend(arguments[start..].iter().take(count).enumerate().map(
@@ -56,6 +62,44 @@ impl PausedState {
                             )
                         },
                     ));
+                }
+            }
+            VariablesKey::Locals(stack_frame_key) => {
+                let locals = stack_frame_key.get_locals(&self.vm_state.tracer);
+                if should_include_named && !locals.is_empty() {
+                    let body = db.containing_body_of(locals.first().unwrap().0.clone());
+                    let locals = locals
+                        .iter()
+                        .filter_map(|(id, value)| {
+                            body.identifiers.get(id).map(|it| (it.as_str(), *value))
+                        })
+                        .collect_vec();
+                    let total_name_counts = locals.iter().map(|(name, _)| *name).counts();
+
+                    let mut name_counts = FxHashMap::<_, usize>::default();
+                    let locals = locals
+                        .into_iter()
+                        .map(|(name, value)| {
+                            let count = name_counts
+                                .entry(name)
+                                .and_modify(|it| *it += 1)
+                                .or_default();
+                            (name, value, *count)
+                        })
+                        .skip(start)
+                        .take(count)
+                        .map(|(name, value, count)| {
+                            self.create_variable(
+                                if count == *total_name_counts.get(name).unwrap() - 1 {
+                                    name.to_owned()
+                                } else {
+                                    format!("{name} v{count}")
+                                },
+                                value,
+                                supports_variable_type,
+                            )
+                        });
+                    variables.extend(locals);
                 }
             }
             VariablesKey::FiberHeap(fiber_id) => {
@@ -210,6 +254,7 @@ impl PausedState {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum VariablesKey {
     Arguments(StackFrameKey),
+    Locals(StackFrameKey),
     FiberHeap(FiberId),
     Inner(ObjectInHeap),
 }
