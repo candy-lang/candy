@@ -13,7 +13,7 @@ use candy_frontend::{
     string_to_rcst::{ModuleError, RcstResult, StringToRcst},
     TracingConfig, TracingMode,
 };
-use candy_vm::{lir::Lir, mir_to_lir::MirToLir};
+use candy_vm::{lir::Lir, mir_to_lir::compile_lir};
 use enumset::EnumSet;
 use extension_trait::extension_trait;
 use lsp_types::{
@@ -139,7 +139,7 @@ impl IrFeatures {
             ),
             Ir::Lir(tracing_config) => Self::rich_ir_for_lir(
                 &config.module,
-                db.lir(config.module.clone(), tracing_config.to_owned()).0,
+                compile_lir(db, config.module.clone(), tracing_config.to_owned()).0,
                 tracing_config,
             ),
         };
@@ -647,6 +647,7 @@ impl TokenTypeToSemantic for TokenType {
             TokenType::Symbol => SemanticTokenType::Symbol,
             TokenType::Text => SemanticTokenType::Text,
             TokenType::Int => SemanticTokenType::Int,
+            TokenType::Address => SemanticTokenType::Address,
         }
     }
 }

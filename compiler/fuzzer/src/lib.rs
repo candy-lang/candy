@@ -14,37 +14,38 @@ pub use self::{
 };
 use candy_frontend::{
     ast_to_hir::AstToHir,
+    cst::CstDb,
+    mir_optimize::OptimizeMir,
     module::Module,
     position::PositionConversionDb,
     {hir::Id, TracingConfig, TracingMode},
 };
 use candy_vm::{
     context::{RunForever, RunLimitedNumberOfInstructions},
-    heap::{Closure, Heap, Pointer},
-    mir_to_lir::MirToLir,
+    heap::{Heap, Pointer},
+    mir_to_lir::compile_lir,
     tracer::full::FullTracer,
     vm::Vm,
 };
 use rustc_hash::FxHashMap;
+use std::rc::Rc;
 use tracing::{error, info};
 
 pub fn fuzz<DB>(db: &DB, module: Module) -> Vec<FailingFuzzCase>
 where
-    DB: AstToHir + MirToLir + PositionConversionDb,
+    DB: AstToHir + PositionConversionDb + CstDb + OptimizeMir,
 {
     let tracing = TracingConfig {
         register_fuzzables: TracingMode::All,
         calls: TracingMode::Off,
         evaluated_expressions: TracingMode::Off,
     };
+    let (lir, _) = compile_lir(db, module, tracing);
+    let lir = Rc::new((*lir).clone());
 
     let (fuzzables_heap, fuzzables): (Heap, FxHashMap<Id, Pointer>) = {
         let mut tracer = FuzzablesFinder::default();
-        let mut vm = Vm::default();
-        vm.set_up_for_running_module_closure(
-            module.clone(),
-            Closure::of_module(db, module, tracing),
-        );
+        let mut vm = Vm::for_module_closure(lir.clone());
         vm.run(&mut RunForever, &mut tracer);
         (tracer.heap, tracer.fuzzables)
     };
@@ -58,7 +59,7 @@ where
 
     for (id, closure) in fuzzables {
         info!("Fuzzing {id}.");
-        let mut fuzzer = Fuzzer::new(&fuzzables_heap, closure, id.clone());
+        let mut fuzzer = Fuzzer::new(lir.clone(), &fuzzables_heap, closure, id.clone());
         fuzzer.run(&mut RunLimitedNumberOfInstructions::new(100000));
         match fuzzer.into_status() {
             Status::StillFuzzing { .. } => {}

@@ -344,9 +344,7 @@ fn run_builtin(
             Expression::UseModule { .. } => return None,
             Expression::Panic { .. } => return None,
             Expression::Multiple(_) => return None,
-            Expression::ModuleStarts { .. }
-            | Expression::ModuleEnds
-            | Expression::TraceCallStarts { .. }
+            Expression::TraceCallStarts { .. }
             | Expression::TraceCallEnds { .. }
             | Expression::TraceExpressionEvaluated { .. }
             | Expression::TraceFoundFuzzableClosure { .. } => unreachable!(),

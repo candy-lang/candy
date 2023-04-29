@@ -18,10 +18,10 @@ use candy_frontend::{
     TracingConfig,
 };
 use candy_vm::{
-    context::{DbUseProvider, RunForever},
+    context::RunForever,
     fiber::ExecutionResult,
-    heap::{Closure, Struct},
-    mir_to_lir::{MirToLir, MirToLirStorage},
+    heap::Struct,
+    mir_to_lir::compile_lir,
     tracer::DummyTracer,
     vm::{Status, Vm},
 };
@@ -46,7 +46,6 @@ lazy_static! {
     CstToAstStorage,
     HirDbStorage,
     HirToMirStorage,
-    MirToLirStorage,
     ModuleDbStorage,
     OptimizeMirStorage,
     PositionConversionStorage,
@@ -69,23 +68,12 @@ fuzz_target!(|data: &[u8]| {
     let mut db = Database::default();
     db.module_provider.add(&MODULE, data.to_vec());
 
-    let lir = db
-        .lir(MODULE.clone(), TRACING.clone())
-        .unwrap()
-        .as_ref()
-        .to_owned();
-
-    let module_closure = Closure::of_module_lir(lir);
+    let lir = compile_lir(&db, MODULE.clone(), TRACING.clone()).0;
     let mut tracer = DummyTracer::default();
-    let use_provider = DbUseProvider {
-        db: &db,
-        tracing: TRACING.clone(),
-    };
 
     // Run once to generate exports.
-    let mut vm = Vm::default();
-    vm.set_up_for_running_module_closure(MODULE.clone(), module_closure);
-    vm.run(&use_provider, &mut RunForever, &mut tracer);
+    let mut vm = Vm::for_module_closure(lir.clone());
+    vm.run(&mut RunForever, &mut tracer);
     if let Status::WaitingForOperations = vm.status() {
         println!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");
         return;
@@ -115,10 +103,10 @@ fuzz_target!(|data: &[u8]| {
         return;
     };
 
-    let mut vm = Vm::default();
     let environment = heap.create_struct(Default::default());
-    vm.set_up_for_running_closure(heap, main, vec![environment], hir::Id::platform());
-    vm.run(&use_provider, &mut RunForever, &mut tracer);
+    let platform = heap.create_hir_id(hir::Id::platform());
+    let mut vm = Vm::for_closure(lir, heap, main, vec![environment], platform);
+    vm.run(&mut RunForever, &mut tracer);
     match vm.tear_down() {
         ExecutionResult::Finished(return_value) => {
             println!("The main function returned: {return_value:?}")

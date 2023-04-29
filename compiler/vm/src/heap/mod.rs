@@ -268,7 +268,7 @@ impl Heap {
                     .map(|address| address_map[address])
                     .collect(),
                 num_args: closure.num_args,
-                body: closure.body.clone(),
+                body: closure.body,
             }),
             Data::Builtin(builtin) => Data::Builtin(builtin.clone()),
             Data::SendPort(port) => Data::SendPort(SendPort::new(port.channel)),

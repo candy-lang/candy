@@ -3,16 +3,18 @@ use candy_vm::{
     self,
     context::{CombiningExecutionController, CountingExecutionController, ExecutionController},
     heap::{Data, Heap, Pointer},
+    lir::Lir,
     tracer::full::FullTracer,
     vm::{self, Vm},
 };
 
 use super::input::Input;
+use std::borrow::Borrow;
 
 const MAX_INSTRUCTIONS: usize = 10000;
 
-pub struct Runner {
-    pub vm: Option<Vm>, // Is consumed when the runner is finished.
+pub struct Runner<L: Borrow<Lir>> {
+    pub vm: Option<Vm<L>>, // Is consumed when the runner is finished.
     pub input: Input,
     pub tracer: FullTracer,
     pub num_instructions: usize,
@@ -47,15 +49,15 @@ impl RunResult {
     }
 }
 
-impl Runner {
-    pub fn new(closure_heap: &Heap, closure: Pointer, input: Input) -> Self {
+impl<L: Borrow<Lir>> Runner<L> {
+    pub fn new(lir: L, closure_heap: &Heap, closure: Pointer, input: Input) -> Self {
         assert!(matches!(closure_heap.get(closure).data, Data::Closure(_)));
-        let mut vm_heap = Heap::default();
+
+        let mut vm_heap = lir.borrow().heap.clone();
         let closure = closure_heap.clone_single_to_other_heap(&mut vm_heap, closure);
         let argument_addresses = input.clone_to_other_heap(&mut vm_heap);
-
-        let mut vm = Vm::default();
-        vm.set_up_for_running_closure(vm_heap, closure, argument_addresses, Id::fuzzer());
+        let responsible = vm_heap.create_hir_id(Id::fuzzer());
+        let vm = Vm::for_closure(lir, vm_heap, closure, argument_addresses, responsible);
 
         Runner {
             vm: Some(vm),

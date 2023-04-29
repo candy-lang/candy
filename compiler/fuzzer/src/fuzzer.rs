@@ -12,19 +12,24 @@ use candy_frontend::hir::Id;
 use candy_vm::{
     context::ExecutionController,
     heap::{Closure, Data, Heap, Pointer},
+    lir::Lir,
     tracer::full::FullTracer,
 };
+use std::rc::Rc;
 
 pub struct Fuzzer {
+    lir: Rc<Lir>,
     pub closure_heap: Heap,
     pub closure: Pointer,
     pub closure_id: Id,
     status: Option<Status>, // only `None` during transitions
 }
+
+#[allow(clippy::large_enum_variant)]
 pub enum Status {
     StillFuzzing {
         pool: InputPool,
-        runner: Runner,
+        runner: Runner<Rc<Lir>>,
     },
     // TODO: In the future, also add a state for trying to simplify the input.
     FoundPanic {
@@ -36,7 +41,7 @@ pub enum Status {
 }
 
 impl Fuzzer {
-    pub fn new(closure_heap: &Heap, closure: Pointer, closure_id: Id) -> Self {
+    pub fn new(lir: Rc<Lir>, closure_heap: &Heap, closure: Pointer, closure_id: Id) -> Self {
         assert!(matches!(closure_heap.get(closure).data, Data::Closure(_)));
 
         // The given `closure_heap` may contain other fuzzable closures.
@@ -47,9 +52,10 @@ impl Fuzzer {
             let closure: Closure = heap.get(closure).data.clone().try_into().unwrap();
             InputPool::new(closure.num_args, collect_symbols_in_heap(&heap))
         };
-        let runner = Runner::new(&heap, closure, pool.generate_new_input());
+        let runner = Runner::new(lir.clone(), &heap, closure, pool.generate_new_input());
 
         Self {
+            lir,
             closure_heap: heap,
             closure,
             closure_id,
@@ -95,7 +101,7 @@ impl Fuzzer {
         &self,
         execution_controller: &mut E,
         mut pool: InputPool,
-        mut runner: Runner,
+        mut runner: Runner<Rc<Lir>>,
     ) -> Status {
         runner.run(execution_controller);
         let Some(result) = runner.result else {
@@ -143,7 +149,12 @@ impl Fuzzer {
         }
     }
     fn create_new_fuzzing_case(&self, pool: InputPool) -> Status {
-        let runner = Runner::new(&self.closure_heap, self.closure, pool.generate_new_input());
+        let runner = Runner::new(
+            self.lir.clone(),
+            &self.closure_heap,
+            self.closure,
+            pool.generate_new_input(),
+        );
         Status::StillFuzzing { pool, runner }
     }
 }

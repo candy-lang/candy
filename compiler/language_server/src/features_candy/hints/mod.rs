@@ -14,13 +14,14 @@ use crate::database::Database;
 use candy_frontend::{
     module::{Module, MutableModuleProviderOwner},
     rich_ir::ToRichIr,
+    TracingConfig, TracingMode,
 };
-use candy_vm::heap::Heap;
+use candy_vm::{heap::Heap, mir_to_lir::compile_lir};
 use extension_trait::extension_trait;
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position, Url};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf, time::Duration, vec};
+use std::{collections::HashMap, path::PathBuf, rc::Rc, time::Duration, vec};
 use tokio::{
     sync::mpsc::{error::TryRecvError, Receiver, Sender},
     time::sleep,
@@ -74,6 +75,12 @@ pub async fn run_server(
     let mut fuzzer = FuzzerManager::default();
     let mut outgoing_hints = OutgoingHints::new(outgoing_hints);
 
+    let tracing = TracingConfig {
+        register_fuzzables: TracingMode::OnlyCurrent,
+        calls: TracingMode::Off,
+        evaluated_expressions: TracingMode::Off,
+    };
+
     'server_loop: loop {
         sleep(Duration::from_millis(100)).await;
 
@@ -87,8 +94,10 @@ pub async fn run_server(
                 Event::UpdateModule(module, content) => {
                     db.did_change_module(&module, content);
                     outgoing_hints.report_hints(module.clone(), vec![]).await;
-                    constant_evaluator.update_module(&db, module.clone());
-                    fuzzer.update_module(module, &Heap::default(), &[]);
+                    let (lir, _) = compile_lir(&db, module.clone(), tracing.clone());
+                    let lir = Rc::new((*lir).clone());
+                    constant_evaluator.update_module(module.clone(), lir.clone());
+                    fuzzer.update_module(module, lir, &Heap::default(), &[]);
                 }
                 Event::CloseModule(module) => {
                     db.did_close_module(&module);
@@ -106,8 +115,8 @@ pub async fn run_server(
         // functions we found.
         let module_with_new_insight = 'new_insight: {
             if let Some(module) = constant_evaluator.run() {
-                let (heap, closures) = constant_evaluator.get_fuzzable_closures(&module);
-                fuzzer.update_module(module.clone(), &heap, &closures);
+                let (lir, heap, closures) = constant_evaluator.get_fuzzable_closures(&module);
+                fuzzer.update_module(module.clone(), lir, &heap, &closures);
                 debug!(
                     "The constant evaluator made progress in {}.",
                     module.to_rich_ir(),

@@ -30,12 +30,13 @@
 use crate::{
     error::{CompilerError, CompilerErrorPayload},
     id::IdGenerator,
-    mir::{Body, Expression, Id, Mir, MirError, VisitorResult},
+    mir::{Body, BodyBuilder, Expression, Id, Mir, MirError, VisitorResult},
     mir_optimize::OptimizeMir,
     module::{Module, UsePath},
     tracing::TracingConfig,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::mem;
 
 impl Mir {
     pub fn fold_modules(
@@ -67,27 +68,33 @@ impl Mir {
                     },
                 };
 
-                let mut body_to_insert = match db.optimized_mir(module_to_import.clone(), tracing.for_child_module()) {
+                let body_to_insert = match db.optimized_mir(module_to_import.clone(), tracing.for_child_module()) {
                     Ok((mir, more_errors)) => {
                         errors.extend((*more_errors).clone().into_iter());
-                        mir.body.clone()
+
+                        let mut body = mir.body.clone();
+                        let mapping: FxHashMap<Id, Id> = body
+                            .all_ids()
+                            .into_iter()
+                            .map(|id| (id, self.id_generator.generate()))
+                            .collect();
+                        body.replace_ids(&mut |id| if let Some(new_id) = mapping.get(id) { *id = *new_id; });
+                        body
                     },
                     Err(error) => {
                         errors.insert(CompilerError::for_whole_module(module_to_import, error));
-                        Mir::build(|body| {
-                            let reason = body.push_text(CompilerErrorPayload::Module(error).to_string());
-                            body.push_panic(reason, *responsible);
-                        }).body
+
+                        let id_generator = mem::take(&mut self.id_generator);
+                        let mut builder = BodyBuilder::new(id_generator);
+
+                        let reason = builder.push_text(CompilerErrorPayload::Module(error).to_string());
+                        builder.push_panic(reason, *responsible);
+
+                        let (id_generator, body) = builder.finish();
+                        self.id_generator = id_generator;
+                        body
                     },
                 };
-                let mapping: FxHashMap<Id, Id> = body_to_insert
-                    .all_ids()
-                    .into_iter()
-                    .filter(|id| id != responsible)
-                    .map(|id| (id, self.id_generator.generate()))
-                    .collect();
-                body_to_insert.replace_ids(&mut |id| if let Some(new_id) = mapping.get(id) { *id = *new_id; });
-
                 *expression = Expression::Multiple(body_to_insert);
             });
     }

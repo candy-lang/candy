@@ -49,7 +49,6 @@ mod constant_folding;
 mod constant_lifting;
 mod inlining;
 mod module_folding;
-mod module_stack_cancelling;
 mod multiple_flattening;
 mod reference_following;
 mod tree_shaking;
@@ -101,7 +100,7 @@ impl Mir {
         errors: &mut FxHashSet<CompilerError>,
     ) {
         self.optimize_stuff_necessary_for_module_folding();
-        self.fold_modules(db, tracing, errors);
+        self.checked_optimization(&mut |mir| mir.fold_modules(db, tracing, errors));
         self.replace_remaining_uses_with_panics(errors);
         self.heavily_optimize();
         self.cleanup();
@@ -115,9 +114,9 @@ impl Mir {
             // function containing a `use` that's used very often, this
             // optimization leads to a big blowup of code. We should possibly
             // think about what to do in that case.
-            self.checked_optimization(|mir| mir.inline_functions_containing_use());
-            self.checked_optimization(|mir| mir.flatten_multiples());
-            self.checked_optimization(|mir| mir.follow_references());
+            self.checked_optimization(&mut |mir| mir.inline_functions_containing_use());
+            self.checked_optimization(&mut |mir| mir.flatten_multiples());
+            self.checked_optimization(&mut |mir| mir.follow_references());
 
             if self.do_hash() == hashcode_before {
                 return;
@@ -131,17 +130,15 @@ impl Mir {
         loop {
             let hashcode_before = self.do_hash();
 
-            self.checked_optimization(|mir| mir.follow_references());
-            self.checked_optimization(|mir| mir.remove_redundant_return_references());
-            self.checked_optimization(|mir| mir.tree_shake());
-            self.checked_optimization(|mir| mir.fold_constants());
-            self.checked_optimization(|mir| mir.inline_functions_only_called_once());
-            self.checked_optimization(|mir| mir.inline_tiny_functions());
-            self.checked_optimization(|mir| mir.lift_constants());
-            self.checked_optimization(|mir| mir.eliminate_common_subtrees());
-            self.checked_optimization(|mir| mir.flatten_multiples());
-            self.checked_optimization(|mir| mir.cancel_out_module_expressions());
-            self.checked_optimization(|mir| mir.remove_all_module_expressions_if_no_use_exists());
+            self.checked_optimization(&mut |mir| mir.follow_references());
+            self.checked_optimization(&mut |mir| mir.remove_redundant_return_references());
+            self.checked_optimization(&mut |mir| mir.tree_shake());
+            self.checked_optimization(&mut |mir| mir.fold_constants());
+            self.checked_optimization(&mut |mir| mir.inline_functions_only_called_once());
+            self.checked_optimization(&mut |mir| mir.inline_tiny_functions());
+            self.checked_optimization(&mut |mir| mir.lift_constants());
+            self.checked_optimization(&mut |mir| mir.eliminate_common_subtrees());
+            self.checked_optimization(&mut |mir| mir.flatten_multiples());
 
             if self.do_hash() == hashcode_before {
                 return;
@@ -154,7 +151,8 @@ impl Mir {
         hasher.finish()
     }
 
-    fn checked_optimization(&mut self, optimization: fn(&mut Mir) -> ()) {
+    fn checked_optimization(&mut self, optimization: &mut impl FnMut(&mut Mir)) {
+        self.cleanup();
         optimization(self);
         if cfg!(debug_assertions) {
             self.validate();

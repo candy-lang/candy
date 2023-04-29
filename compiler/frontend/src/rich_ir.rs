@@ -58,6 +58,7 @@ pub enum TokenType {
     Comment,
     Text,
     Int,
+    Address,
 }
 #[derive(Debug, EnumSetType)]
 pub enum TokenModifier {

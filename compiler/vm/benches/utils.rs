@@ -19,11 +19,11 @@ use candy_frontend::{
 };
 use candy_vm::{
     channel::Packet,
-    context::{DbUseProvider, RunForever},
+    context::RunForever,
     fiber::ExecutionResult,
-    heap::{Closure, Struct},
+    heap::Struct,
     lir::Lir,
-    mir_to_lir::{MirToLir, MirToLirStorage},
+    mir_to_lir::compile_lir,
     tracer::DummyTracer,
     vm::{Status, Vm},
 };
@@ -47,7 +47,6 @@ lazy_static! {
     CstToAstStorage,
     HirDbStorage,
     HirToMirStorage,
-    MirToLirStorage,
     ModuleDbStorage,
     OptimizeMirStorage,
     PositionConversionStorage,
@@ -86,7 +85,8 @@ pub fn setup() -> Database {
     db.module_provider.add_str(&MODULE, r#"_ = use "..Core""#);
 
     // Load `Core` into the cache.
-    db.lir(MODULE.clone(), TRACING.clone()).unwrap();
+    let errors = compile_lir(&db, MODULE.clone(), TRACING.clone()).1;
+    assert!(errors.is_empty());
 
     db
 }
@@ -117,21 +117,15 @@ fn load_core(module_provider: &mut InMemoryModuleProvider) {
 pub fn compile(db: &mut Database, source_code: &str) -> Arc<Lir> {
     db.did_open_module(&MODULE, source_code.as_bytes().to_owned());
 
-    db.lir(MODULE.clone(), TRACING.clone()).unwrap()
+    compile_lir(db, MODULE.clone(), TRACING.clone()).0
 }
 
-pub fn run(db: &Database, lir: Lir) -> Packet {
-    let module_closure = Closure::of_module_lir(lir);
+pub fn run(lir: &Lir) -> Packet {
     let mut tracer = DummyTracer::default();
-    let use_provider = DbUseProvider {
-        db,
-        tracing: TRACING.clone(),
-    };
 
     // Run once to generate exports.
-    let mut vm = Vm::default();
-    vm.set_up_for_running_module_closure(MODULE.clone(), module_closure);
-    vm.run(&use_provider, &mut RunForever, &mut tracer);
+    let mut vm = Vm::for_module_closure(lir);
+    vm.run(&mut RunForever, &mut tracer);
     if let Status::WaitingForOperations = vm.status() {
         panic!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");
     }
@@ -159,10 +153,10 @@ pub fn run(db: &Database, lir: Lir) -> Packet {
         None => panic!("The module doesn't contain a main function."),
     };
 
-    let mut vm = Vm::default();
     let environment = heap.create_struct(Default::default());
-    vm.set_up_for_running_closure(heap, main, vec![environment], hir::Id::platform());
-    vm.run(&use_provider, &mut RunForever, &mut tracer);
+    let platform = heap.create_hir_id(hir::Id::platform());
+    let mut vm = Vm::for_closure(lir, heap, main, vec![environment], platform);
+    vm.run(&mut RunForever, &mut tracer);
     match vm.tear_down() {
         ExecutionResult::Finished(return_value) => return_value,
         ExecutionResult::Panicked { reason, .. } => panic!("The main function panicked: {reason}"),

@@ -15,7 +15,6 @@ use candy_frontend::{
     rcst_to_cst::RcstToCstStorage,
     string_to_rcst::StringToRcstStorage,
 };
-use candy_vm::mir_to_lir::MirToLirStorage;
 use std::path::PathBuf;
 
 #[salsa::database(
@@ -25,7 +24,6 @@ use std::path::PathBuf;
     CstToAstStorage,
     HirDbStorage,
     HirToMirStorage,
-    MirToLirStorage,
     ModuleDbStorage,
     OptimizeMirStorage,
     PositionConversionStorage,

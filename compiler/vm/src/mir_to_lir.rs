@@ -1,4 +1,8 @@
-use crate::lir::{Instruction, Lir, StackOffset};
+use crate::{
+    fiber::InstructionPointer,
+    heap::Heap,
+    lir::{Instruction, Lir, StackOffset},
+};
 use candy_frontend::{
     cst::CstDb,
     error::{CompilerError, CompilerErrorPayload},
@@ -14,20 +18,14 @@ use itertools::Itertools;
 use rustc_hash::FxHashSet;
 use std::sync::Arc;
 
-#[salsa::query_group(MirToLirStorage)]
-pub trait MirToLir: CstDb + OptimizeMir {
-    fn lir(
-        &self,
-        module: Module,
-        tracing: TracingConfig,
-    ) -> (Arc<Lir>, Arc<FxHashSet<CompilerError>>);
-}
-
-fn lir(
-    db: &dyn MirToLir,
+pub fn compile_lir<Db>(
+    db: &Db,
     module: Module,
     tracing: TracingConfig,
-) -> (Arc<Lir>, Arc<FxHashSet<CompilerError>>) {
+) -> (Arc<Lir>, Arc<FxHashSet<CompilerError>>)
+where
+    Db: CstDb + OptimizeMir,
+{
     let (mir, errors) = db
         .optimized_mir(module.clone(), tracing)
         .unwrap_or_else(|error| {
@@ -37,21 +35,38 @@ fn lir(
                 let responsible = body.push_hir_id(hir::Id::user());
                 body.push_panic(reason, responsible);
             });
-            let errors = vec![CompilerError::for_whole_module(module, payload)]
+            let errors = vec![CompilerError::for_whole_module(module.clone(), payload)]
                 .into_iter()
                 .collect();
             (Arc::new(mir), Arc::new(errors))
         });
-    let instructions = compile_lambda(&FxHashSet::default(), &[], Id::from_usize(0), &mir.body);
-    (Arc::new(Lir { instructions }), errors)
+
+    let mut lir = Lir {
+        module,
+        heap: Heap::default(),
+        // This instruction is never execute it, but we still insert it into the
+        // LIR so that an instruction pointer of zero can be used to signal that
+        // the program is done.
+        instructions: vec![Instruction::Return],
+        start: InstructionPointer::null_pointer(),
+    };
+    lir.start = compile_lambda(
+        &mut lir,
+        &FxHashSet::default(),
+        &[],
+        Id::from_usize(0),
+        &mir.body,
+    );
+    (Arc::new(lir), errors)
 }
 
 fn compile_lambda(
+    lir: &mut Lir,
     captured: &FxHashSet<Id>,
     parameters: &[Id],
     responsible_parameter: Id,
     body: &Body,
-) -> Vec<Instruction> {
+) -> InstructionPointer {
     let mut context = LoweringContext::default();
     for captured in captured {
         context.stack.push(*captured);
@@ -62,7 +77,7 @@ fn compile_lambda(
     context.stack.push(responsible_parameter);
 
     for (id, expression) in body.iter() {
-        context.compile_expression(id, expression);
+        context.compile_expression(lir, id, expression);
     }
 
     if matches!(
@@ -83,7 +98,9 @@ fn compile_lambda(
         context.emit(dummy_id, Instruction::Return);
     }
 
-    context.instructions
+    let start = lir.instructions.len().into();
+    lir.instructions.append(&mut context.instructions);
+    start
 }
 
 #[derive(Default)]
@@ -92,17 +109,27 @@ struct LoweringContext {
     instructions: Vec<Instruction>,
 }
 impl LoweringContext {
-    fn compile_expression(&mut self, id: Id, expression: &Expression) {
+    fn compile_expression(&mut self, lir: &mut Lir, id: Id, expression: &Expression) {
         match expression {
-            Expression::Int(int) => self.emit(id, Instruction::CreateInt(int.clone())),
-            Expression::Text(text) => self.emit(id, Instruction::CreateText(text.clone())),
+            Expression::Int(int) => {
+                let address = lir.heap.create_int(int.clone());
+                self.emit(id, Instruction::PushFromHeap(address))
+            }
+            Expression::Text(text) => {
+                let address = lir.heap.create_text(text.clone());
+                self.emit(id, Instruction::PushFromHeap(address))
+            }
             Expression::Reference(reference) => {
                 self.emit_push_from_stack(*reference);
                 self.stack.replace_top_id(id);
             }
-            Expression::Symbol(symbol) => self.emit(id, Instruction::CreateSymbol(symbol.clone())),
+            Expression::Symbol(symbol) => {
+                let address = lir.heap.create_symbol(symbol.clone());
+                self.emit(id, Instruction::PushFromHeap(address));
+            }
             Expression::Builtin(builtin) => {
-                self.emit(id, Instruction::CreateBuiltin(*builtin));
+                let address = lir.heap.create_builtin(*builtin);
+                self.emit(id, Instruction::PushFromHeap(address));
             }
             Expression::List(items) => {
                 for item in items {
@@ -128,7 +155,8 @@ impl LoweringContext {
                 );
             }
             Expression::HirId(hir_id) => {
-                self.emit(id, Instruction::CreateHirId(hir_id.clone()));
+                let address = lir.heap.create_hir_id(hir_id.clone());
+                self.emit(id, Instruction::PushFromHeap(address));
             }
             Expression::Lambda {
                 original_hirs: _,
@@ -138,7 +166,7 @@ impl LoweringContext {
             } => {
                 let captured = expression.captured_ids();
                 let instructions =
-                    compile_lambda(&captured, parameters, *responsible_parameter, body);
+                    compile_lambda(lir, &captured, parameters, *responsible_parameter, body);
 
                 self.emit(
                     id,
@@ -186,15 +214,6 @@ impl LoweringContext {
             Expression::Multiple(_) => {
                 panic!("The MIR shouldn't contain multiple expressions anymore.");
             }
-            Expression::ModuleStarts { module } => {
-                self.emit(
-                    id,
-                    Instruction::ModuleStarts {
-                        module: module.clone(),
-                    },
-                );
-            }
-            Expression::ModuleEnds => self.emit(id, Instruction::ModuleEnds),
             Expression::TraceCallStarts {
                 hir_call,
                 function,

@@ -52,7 +52,7 @@ fn cst_to_ast_id(db: &dyn CstToAst, module: Module, id: cst::Id) -> Option<ast::
 fn ast(db: &dyn CstToAst, module: Module) -> AstResult {
     let mut context = LoweringContext::new(module.clone());
 
-    db.cst(module.clone()).map(|cst| {
+    db.cst(module).map(|cst| {
         let cst = cst.unwrap_whitespace_and_comment();
         let asts = context.lower_csts(&cst);
         (Arc::new(asts), Arc::new(context.id_mapping))

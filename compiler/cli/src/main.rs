@@ -19,9 +19,9 @@ use candy_vm::{
     channel::{ChannelId, Packet},
     context::RunForever,
     fiber::{ExecutionResult, FiberId},
-    heap::{Closure, Data, Heap, SendPort, Struct},
+    heap::{Data, Heap, SendPort, Struct},
     lir::Lir,
-    mir_to_lir::MirToLir,
+    mir_to_lir::compile_lir,
     tracer::{full::FullTracer, DummyTracer, Tracer},
     vm::{CompletedOperation, OperationId, Status, Vm},
 };
@@ -32,6 +32,7 @@ use notify::RecursiveMode;
 use notify_debouncer_mini::new_debouncer;
 use rustc_hash::FxHashMap;
 use std::{
+    borrow::Borrow,
     convert::TryInto,
     env::{current_dir, current_exe},
     fs,
@@ -282,7 +283,7 @@ fn raw_build(db: &Database, module: Module, tracing: &TracingConfig, debug: bool
         );
     }
 
-    let (lir, errors) = db.lir(module.clone(), tracing.clone());
+    let (lir, errors) = compile_lir(db, module.clone(), tracing.clone());
     if debug {
         module.dump_associated_debug_file(
             &packages_path,
@@ -323,15 +324,12 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         calls: TracingMode::all_or_off(options.tracing),
         evaluated_expressions: TracingMode::only_current_or_off(options.tracing),
     };
-    raw_build(&db, module.clone(), &tracing, options.debug);
+    let lir = raw_build(&db, module.clone(), &tracing, options.debug);
 
     debug!("Running {}.", module.to_rich_ir());
 
-    let module_closure = Closure::of_module(&db, module.clone(), tracing);
+    let mut vm = Vm::for_module_closure(lir.clone());
     let mut tracer = FullTracer::default();
-
-    let mut vm = Vm::default();
-    vm.set_up_for_running_module_closure(module.clone(), module_closure);
     vm.run(&mut RunForever, &mut tracer);
     if let Status::WaitingForOperations = vm.status() {
         error!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");
@@ -383,7 +381,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
 
     debug!("Running main function.");
     // TODO: Add more environment stuff.
-    let mut vm = Vm::default();
+    let mut vm = Vm::uninitialized(lir);
     let mut stdout = StdoutService::new(&mut vm);
     let mut stdin = StdinService::new(&mut vm);
     let environment = {
@@ -404,7 +402,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         platform,
         &heap,
     );
-    vm.set_up_for_running_closure(heap, main, vec![environment], hir::Id::platform());
+    vm.initialize_for_closure(heap, main, vec![environment], platform);
     loop {
         match vm.status() {
             Status::CanRun => {
@@ -450,7 +448,7 @@ struct StdoutService {
     current_receive: OperationId,
 }
 impl StdoutService {
-    fn new(vm: &mut Vm) -> Self {
+    fn new<L: Borrow<Lir>>(vm: &mut Vm<L>) -> Self {
         let channel = vm.create_channel(0);
         let current_receive = vm.receive(channel);
         Self {
@@ -458,7 +456,7 @@ impl StdoutService {
             current_receive,
         }
     }
-    fn run(&mut self, vm: &mut Vm) {
+    fn run<L: Borrow<Lir>>(&mut self, vm: &mut Vm<L>) {
         while let Some(CompletedOperation::Received { packet }) =
             vm.completed_operations.remove(&self.current_receive)
         {
@@ -475,7 +473,7 @@ struct StdinService {
     current_receive: OperationId,
 }
 impl StdinService {
-    fn new(vm: &mut Vm) -> Self {
+    fn new<L: Borrow<Lir>>(vm: &mut Vm<L>) -> Self {
         let channel = vm.create_channel(0);
         let current_receive = vm.receive(channel);
         Self {
@@ -483,7 +481,7 @@ impl StdinService {
             current_receive,
         }
     }
-    fn run(&mut self, vm: &mut Vm) {
+    fn run<L: Borrow<Lir>>(&mut self, vm: &mut Vm<L>) {
         while let Some(CompletedOperation::Received { packet }) =
             vm.completed_operations.remove(&self.current_receive)
         {

@@ -1,6 +1,6 @@
 use std::fmt::{self, Debug};
 
-use crate::channel::ChannelId;
+use crate::{channel::ChannelId, lir::Lir};
 
 use super::{
     channel::{Capacity, Packet},
@@ -44,7 +44,6 @@ pub struct Fiber {
     next_instruction: InstructionPointer,
     pub data_stack: Vec<Pointer>,
     pub call_stack: Vec<InstructionPointer>,
-    pub import_stack: Vec<Module>,
     pub heap: Heap,
 }
 
@@ -75,25 +74,19 @@ pub enum Status {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct InstructionPointer {
-    /// Pointer to the closure object that is currently running code.
-    closure: Pointer,
-
-    /// Index of the next instruction to run.
-    instruction: usize,
-}
+pub struct InstructionPointer(usize);
 impl InstructionPointer {
-    fn null_pointer() -> Self {
-        Self {
-            closure: Pointer::null(),
-            instruction: 0,
-        }
+    pub fn null_pointer() -> Self {
+        Self(0)
     }
-    fn start_of_closure(closure: Pointer) -> Self {
-        Self {
-            closure,
-            instruction: 0,
-        }
+    fn start_of_closure(heap: &Heap, closure: Pointer) -> Self {
+        let closure: Closure = heap.get(closure).data.clone().try_into().unwrap();
+        closure.body
+    }
+}
+impl From<usize> for InstructionPointer {
+    fn from(value: usize) -> Self {
+        Self(value)
     }
 }
 
@@ -109,26 +102,24 @@ impl Fiber {
             next_instruction: InstructionPointer::null_pointer(),
             data_stack: vec![],
             call_stack: vec![],
-            import_stack: vec![],
             heap,
         }
     }
-    pub fn new_for_running_closure(
+    pub fn for_closure(
         heap: Heap,
         closure: Pointer,
         arguments: Vec<Pointer>,
-        responsible: hir::Id,
+        responsible: Pointer,
     ) -> Self {
         assert!(matches!(heap.get(closure).data, Data::Closure(_)));
 
         let mut fiber = Self::new_with_heap(heap);
-        let responsible = fiber.heap.create(Data::HirId(responsible));
         fiber.status = Status::Running;
         fiber.call(closure, arguments, responsible);
 
         fiber
     }
-    pub fn new_for_running_module_closure(module: Module, closure: Closure) -> Self {
+    pub fn for_module_closure(mut heap: Heap, module: Module, closure: Closure) -> Self {
         assert_eq!(
             closure.captured.len(),
             0,
@@ -138,10 +129,9 @@ impl Fiber {
             closure.num_args, 0,
             "Closure is not a module closure (it has arguments)."
         );
-        let module_id = Id::new(module, vec![]);
-        let mut heap = Heap::default();
         let closure = heap.create_closure(closure);
-        Self::new_for_running_closure(heap, closure, vec![], module_id)
+        let responsible = heap.create_hir_id(Id::new(module, vec![]));
+        Self::for_closure(heap, closure, vec![], responsible)
     }
 
     pub fn tear_down(mut self) -> ExecutionResult {
@@ -240,6 +230,7 @@ impl Fiber {
 
     pub fn run(
         &mut self,
+        lir: &Lir,
         execution_controller: &mut dyn ExecutionController,
         tracer: &mut FiberTracer,
     ) {
@@ -255,29 +246,20 @@ impl Fiber {
                 break;
             }
 
-            let current_closure = self.heap.get(self.next_instruction.closure);
-            let current_body = if let Data::Closure(Closure { body, .. }) = &current_closure.data {
-                body
-            } else {
-                panic!("The instruction pointer points to a non-closure.");
-            };
-            let instruction = current_body
-                .get(self.next_instruction.instruction)
+            let instruction = lir
+                .instructions
+                .get(self.next_instruction.0)
                 .expect("invalid instruction pointer")
                 .clone();
 
-            self.next_instruction.instruction += 1;
+            self.next_instruction.0 += 1;
             self.run_instruction(tracer, instruction);
             execution_controller.instruction_executed();
         }
     }
     pub fn run_instruction(&mut self, tracer: &mut FiberTracer, instruction: Instruction) {
         if TRACE {
-            trace!(
-                "Instruction pointer: {}:{}",
-                self.next_instruction.closure,
-                self.next_instruction.instruction,
-            );
+            trace!("Instruction pointer: {}", self.next_instruction.0);
             trace!(
                 "Data stack: {}",
                 self.data_stack
@@ -289,7 +271,7 @@ impl Fiber {
                 "Call stack: {}",
                 self.call_stack
                     .iter()
-                    .map(|ip| format!("{}:{}", ip.closure, ip.instruction))
+                    .map(|ip| format!("{}", ip.0))
                     .join(", "),
             );
             trace!("Heap: {:?}", self.heap);
@@ -297,18 +279,6 @@ impl Fiber {
         }
 
         match instruction {
-            Instruction::CreateInt(int) => {
-                let address = self.heap.create_int(int);
-                self.data_stack.push(address);
-            }
-            Instruction::CreateText(text) => {
-                let address = self.heap.create_text(text);
-                self.data_stack.push(address);
-            }
-            Instruction::CreateSymbol(symbol) => {
-                let address = self.heap.create_symbol(symbol);
-                self.data_stack.push(address);
-            }
             Instruction::CreateList { num_items } => {
                 let mut item_addresses = vec![];
                 for _ in 0..num_items {
@@ -333,14 +303,10 @@ impl Fiber {
                 let address = self.heap.create_struct(entries);
                 self.data_stack.push(address);
             }
-            Instruction::CreateHirId(id) => {
-                let address = self.heap.create_hir_id(id);
-                self.data_stack.push(address);
-            }
             Instruction::CreateClosure {
+                captured,
                 num_args,
                 body,
-                captured,
             } => {
                 let captured = captured
                     .iter()
@@ -356,8 +322,8 @@ impl Fiber {
                 });
                 self.data_stack.push(address);
             }
-            Instruction::CreateBuiltin(builtin) => {
-                let address = self.heap.create_builtin(builtin);
+            Instruction::PushFromHeap(address) => {
+                self.heap.dup(address);
                 self.data_stack.push(address);
             }
             Instruction::PushFromStack(offset) => {
@@ -407,7 +373,6 @@ impl Fiber {
                 self.call(callee, arguments, responsible);
             }
             Instruction::Return => {
-                self.heap.drop(self.next_instruction.closure);
                 let caller = self.call_stack.pop().unwrap();
                 self.next_instruction = caller;
             }
@@ -426,18 +391,6 @@ impl Fiber {
                 let responsible = self.heap.get_hir_id(responsible_for_panic);
 
                 self.panic(reason.value, responsible);
-            }
-            Instruction::ModuleStarts { module } => {
-                if self.import_stack.contains(&module) {
-                    self.panic(
-                        "Import cycle.".to_string(),
-                        hir::Id::new(module.clone(), vec![]),
-                    );
-                }
-                self.import_stack.push(module);
-            }
-            Instruction::ModuleEnds => {
-                self.import_stack.pop().unwrap();
             }
             Instruction::TraceCallStarts { num_args } => {
                 let responsible = self.data_stack.pop().unwrap();
@@ -502,7 +455,7 @@ impl Fiber {
                 self.data_stack.append(&mut captured);
                 self.data_stack.append(&mut arguments);
                 self.data_stack.push(responsible);
-                self.next_instruction = InstructionPointer::start_of_closure(callee);
+                self.next_instruction = InstructionPointer::start_of_closure(&self.heap, callee);
             }
             Data::Builtin(Builtin { function: builtin }) => {
                 let builtin = *builtin;

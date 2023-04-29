@@ -8,10 +8,11 @@ use candy_fuzzer::{Fuzzer, Status};
 use candy_vm::{
     context::RunLimitedNumberOfInstructions,
     heap::{Heap, Pointer},
+    lir::Lir,
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 use tracing::{debug, error};
 
 use crate::{
@@ -20,22 +21,29 @@ use crate::{
 };
 
 use super::Hint;
+use rustc_hash::FxHashMap;
 
 #[derive(Default)]
 pub struct FuzzerManager {
-    fuzzers: HashMap<Module, HashMap<Id, Fuzzer>>,
+    fuzzers: HashMap<Module, FxHashMap<Id, Fuzzer>>,
 }
 
 impl FuzzerManager {
     pub fn update_module(
         &mut self,
         module: Module,
+        lir: Rc<Lir>,
         heap: &Heap,
         fuzzable_closures: &[(Id, Pointer)],
     ) {
         let fuzzers = fuzzable_closures
             .iter()
-            .map(|(id, closure)| (id.clone(), Fuzzer::new(heap, *closure, id.clone())))
+            .map(|(id, closure)| {
+                (
+                    id.clone(),
+                    Fuzzer::new(lir.clone(), heap, *closure, id.clone()),
+                )
+            })
             .collect();
         self.fuzzers.insert(module, fuzzers);
     }

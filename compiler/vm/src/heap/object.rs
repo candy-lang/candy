@@ -1,10 +1,6 @@
 use super::{pointer::Pointer, Heap};
-use crate::{
-    channel::ChannelId,
-    lir::{Instruction, Lir},
-    mir_to_lir::MirToLir,
-};
-use candy_frontend::{builtin_functions::BuiltinFunction, hir::Id, module::Module, TracingConfig};
+use crate::{channel::ChannelId, fiber::InstructionPointer};
+use candy_frontend::{builtin_functions::BuiltinFunction, hir::Id};
 use derive_more::Deref;
 use itertools::Itertools;
 use num_bigint::BigInt;
@@ -65,7 +61,7 @@ pub struct Struct {
 pub struct Closure {
     pub captured: Vec<Pointer>,
     pub num_args: usize,
-    pub body: Vec<Instruction>,
+    pub body: InstructionPointer,
 }
 
 #[derive(Clone)]
@@ -143,20 +139,6 @@ impl Struct {
             .all(|((key_a, value_a), (key_b, value_b))| {
                 key_a.equals(heap, key_b) && value_a.equals(heap, value_b)
             })
-    }
-}
-
-impl Closure {
-    pub fn of_module_lir(lir: Lir) -> Self {
-        Closure {
-            captured: vec![],
-            num_args: 0,
-            body: lir.instructions,
-        }
-    }
-    pub fn of_module<DB: MirToLir>(db: &DB, module: Module, tracing: TracingConfig) -> Self {
-        let (lir, _) = db.lir(module, tracing);
-        Self::of_module_lir((*lir).clone())
     }
 }
 

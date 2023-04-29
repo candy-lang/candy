@@ -6,13 +6,12 @@ use candy_frontend::{
     module::{Module, ModuleDb},
     position::PositionConversionDb,
     rich_ir::ToRichIr,
-    TracingConfig, TracingMode,
 };
 use candy_vm::{
     context::RunLimitedNumberOfInstructions,
     fiber::FiberId,
-    heap::{Closure, Heap, Pointer},
-    mir_to_lir::MirToLir,
+    heap::{Heap, Pointer},
+    lir::Lir,
     tracer::{
         full::{FullTracer, StoredFiberEvent, StoredVmEvent, TimedEvent},
         stack_trace::Call,
@@ -21,7 +20,7 @@ use candy_vm::{
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 use tracing::{span, Level};
 
 #[derive(Default)]
@@ -29,24 +28,17 @@ pub struct ConstantEvaluator {
     evaluators: HashMap<Module, Evaluator>,
 }
 struct Evaluator {
+    lir: Rc<Lir>,
     tracer: FullTracer,
-    vm: Vm,
+    vm: Vm<Rc<Lir>>,
 }
 
 impl ConstantEvaluator {
-    pub fn update_module<DB: MirToLir>(&mut self, db: &DB, module: Module) {
-        let tracing = TracingConfig {
-            register_fuzzables: TracingMode::OnlyCurrent,
-            calls: TracingMode::Off,
-            evaluated_expressions: TracingMode::OnlyCurrent,
-        };
+    pub fn update_module(&mut self, module: Module, lir: Rc<Lir>) {
         let tracer = FullTracer::default();
-        let mut vm = Vm::default();
-        vm.set_up_for_running_module_closure(
-            module.clone(),
-            Closure::of_module(db, module.clone(), tracing),
-        );
-        self.evaluators.insert(module, Evaluator { tracer, vm });
+        let vm = Vm::for_module_closure(lir.clone());
+        self.evaluators
+            .insert(module, Evaluator { lir, tracer, vm });
     }
 
     pub fn remove_module(&mut self, module: Module) {
@@ -68,7 +60,7 @@ impl ConstantEvaluator {
         Some(module.clone())
     }
 
-    pub fn get_fuzzable_closures(&self, module: &Module) -> (Heap, Vec<(Id, Pointer)>) {
+    pub fn get_fuzzable_closures(&self, module: &Module) -> (Rc<Lir>, Heap, Vec<(Id, Pointer)>) {
         let evaluator = &self.evaluators[module];
         let fuzzable_closures = evaluator
             .tracer
@@ -86,7 +78,11 @@ impl ConstantEvaluator {
                 _ => None,
             })
             .collect();
-        (evaluator.tracer.heap.clone(), fuzzable_closures)
+        (
+            evaluator.lir.clone(),
+            evaluator.tracer.heap.clone(),
+            fuzzable_closures,
+        )
     }
 
     pub fn get_hints<DB>(&self, db: &DB, module: &Module) -> Vec<Hint>

@@ -30,12 +30,11 @@ fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> MirResult {
         ModuleKind::Code => {
             let (hir, _) = db.hir(module.clone())?;
             let mut errors = FxHashSet::default();
-            let mir =
-                LoweringContext::compile_module(db, module.clone(), &hir, &tracing, &mut errors);
+            let mir = LoweringContext::compile_module(db, module, &hir, &tracing, &mut errors);
             (mir, errors)
         }
         ModuleKind::Asset => {
-            let Some(bytes) = db.get_module_content(module.clone()) else {
+            let Some(bytes) = db.get_module_content(module) else {
                 return Err(ModuleError::DoesNotExist);
             };
             (
@@ -194,10 +193,6 @@ impl<'a> LoweringContext<'a> {
         Mir::build(|body| {
             let mut mapping = FxHashMap::default();
 
-            body.push(Expression::ModuleStarts {
-                module: module.clone(),
-            });
-
             let needs_function = generate_needs_function(body);
 
             let module_hir_id = body.push_hir_id(hir::Id::new(module, vec![]));
@@ -210,10 +205,6 @@ impl<'a> LoweringContext<'a> {
                 errors,
             };
             context.compile_expressions(body, module_hir_id, &hir.expressions);
-
-            let return_value = body.current_return_value();
-            body.push(Expression::ModuleEnds);
-            body.push_reference(return_value);
         })
     }
 
