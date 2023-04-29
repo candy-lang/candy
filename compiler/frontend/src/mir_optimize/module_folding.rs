@@ -54,12 +54,15 @@ impl Mir {
                     warn!("`use` called with an invalid path: `\"{path}\"`.");
                     return; // TODO: Replace with a panic.
                 };
-                let Ok(module_to_import) = path.resolve_relative_to(current_module.clone()) else {
-                    warn!(
-                        "`use` called with a path that doesn't refer to a module: `\"{path:?}\"` relative to {}.",
-                        current_module.to_rich_ir(),
-                    );
-                    return; // TODO: Replace with a panic.
+                let module_to_import = match path.resolve_relative_to(current_module.clone()) {
+                    Ok(module) => module,
+                    Err(error) => {
+                        warn!(
+                            "`use \"{path}\"` relative to {} will fail: {error}",
+                            current_module.to_rich_ir(),
+                        );
+                        return; // TODO: Replace with a panic.
+                    }
                 };
 
                 let mir = db.mir_with_obvious_optimized(

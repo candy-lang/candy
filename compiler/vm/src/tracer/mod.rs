@@ -1,10 +1,10 @@
-use crate::channel::ChannelId;
+use crate::{
+    channel::ChannelId,
+    heap::{Closure, HirId, InlineObject},
+};
 
 pub use self::dummy::DummyTracer;
-use super::{
-    fiber::FiberId,
-    heap::{Heap, Pointer},
-};
+use super::{fiber::FiberId, heap::Heap};
 
 mod dummy;
 pub mod full;
@@ -45,24 +45,24 @@ pub enum VmEvent<'event> {
 #[derive(Clone)]
 pub enum FiberEvent<'event> {
     ValueEvaluated {
-        expression: Pointer,
-        value: Pointer,
+        expression: HirId,
+        value: InlineObject,
         heap: &'event Heap,
     },
     FoundFuzzableClosure {
-        definition: Pointer,
-        closure: Pointer,
+        definition: HirId,
+        closure: Closure,
         heap: &'event Heap,
     },
     CallStarted {
-        call_site: Pointer,
-        callee: Pointer,
-        arguments: Vec<Pointer>,
-        responsible: Pointer,
+        call_site: HirId,
+        callee: InlineObject,
+        arguments: Vec<InlineObject>,
+        responsible: HirId,
         heap: &'event Heap,
     },
     CallEnded {
-        return_value: Pointer,
+        return_value: InlineObject,
         heap: &'event Heap,
     },
 }
@@ -118,14 +118,14 @@ impl<'fiber> FiberTracer<'fiber> {
         });
     }
 
-    pub fn value_evaluated(&mut self, expression: Pointer, value: Pointer, heap: &Heap) {
+    pub fn value_evaluated(&mut self, expression: HirId, value: InlineObject, heap: &Heap) {
         self.add(FiberEvent::ValueEvaluated {
             expression,
             value,
             heap,
         });
     }
-    pub fn found_fuzzable_closure(&mut self, definition: Pointer, closure: Pointer, heap: &Heap) {
+    pub fn found_fuzzable_closure(&mut self, definition: HirId, closure: Closure, heap: &Heap) {
         self.add(FiberEvent::FoundFuzzableClosure {
             definition,
             closure,
@@ -134,10 +134,10 @@ impl<'fiber> FiberTracer<'fiber> {
     }
     pub fn call_started(
         &mut self,
-        call_site: Pointer,
-        callee: Pointer,
-        args: Vec<Pointer>,
-        responsible: Pointer,
+        call_site: HirId,
+        callee: InlineObject,
+        args: Vec<InlineObject>,
+        responsible: HirId,
         heap: &Heap,
     ) {
         self.add(FiberEvent::CallStarted {
@@ -148,7 +148,7 @@ impl<'fiber> FiberTracer<'fiber> {
             heap,
         });
     }
-    pub fn call_ended(&mut self, return_value: Pointer, heap: &Heap) {
+    pub fn call_ended(&mut self, return_value: InlineObject, heap: &Heap) {
         self.add(FiberEvent::CallEnded { return_value, heap });
     }
 }

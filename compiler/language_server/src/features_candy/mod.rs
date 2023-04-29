@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use candy_frontend::{
     ast_to_hir::AstToHir,
     hir::CollectErrors,
-    module::{Module, ModuleDb, ModuleKind, MutableModuleProviderOwner},
+    module::{Module, ModuleDb, ModuleKind, MutableModuleProviderOwner, PackagesPath},
     rcst_to_cst::RcstToCst,
     rich_ir::ToRichIr,
 };
@@ -12,24 +12,27 @@ use lsp_types::{
     TextEdit, Url,
 };
 use rustc_hash::FxHashMap;
-use std::{path::Path, thread};
+use std::{collections::HashMap, thread};
 use tokio::sync::{mpsc::Sender, Mutex};
 use tracing::debug;
 
 use crate::{
     database::Database,
-    features::{LanguageFeatures, Reference},
+    features::{LanguageFeatures, Reference, RenameError},
     utils::{
-        error_into_diagnostic, lsp_range_to_range_raw, module_from_package_root_and_url,
-        LspPositionConversion,
+        error_into_diagnostic, lsp_range_to_range_raw, module_from_url, LspPositionConversion,
     },
 };
 
 use self::{
-    find_definition::find_definition, folding_ranges::folding_ranges, hints::Hint,
-    references::references, semantic_tokens::semantic_tokens,
+    find_definition::find_definition,
+    folding_ranges::folding_ranges,
+    hints::Hint,
+    references::{reference_query_for_offset, references, ReferenceQuery},
+    semantic_tokens::semantic_tokens,
 };
 use candy_formatter::Formatter;
+use regex::Regex;
 
 pub mod find_definition;
 pub mod folding_ranges;
@@ -44,12 +47,13 @@ pub struct CandyFeatures {
 }
 impl CandyFeatures {
     pub fn new(
+        packages_path: PackagesPath,
         diagnostics_sender: Sender<(Module, Vec<Diagnostic>)>,
         hints_sender: Sender<(Module, Vec<Hint>)>,
     ) -> Self {
         let (hints_events_sender, hints_events_receiver) = tokio::sync::mpsc::channel(1024);
         thread::spawn(|| {
-            hints::run_server(hints_events_receiver, hints_sender);
+            hints::run_server(packages_path, hints_events_receiver, hints_sender);
         });
         Self {
             diagnostics_sender,
@@ -78,7 +82,7 @@ impl CandyFeatures {
                 hir.collect_errors(&mut errors);
                 errors
                     .into_iter()
-                    .map(|it| error_into_diagnostic(&*db, module.clone(), it))
+                    .map(|it| error_into_diagnostic(&db, module.clone(), it))
                     .collect()
             };
             self.diagnostics_sender
@@ -113,16 +117,10 @@ impl LanguageFeatures for CandyFeatures {
     fn supports_did_open(&self) -> bool {
         true
     }
-    async fn did_open(
-        &self,
-        db: &Mutex<Database>,
-        project_directory: &Path,
-        uri: Url,
-        content: Vec<u8>,
-    ) {
+    async fn did_open(&self, db: &Mutex<Database>, uri: Url, content: Vec<u8>) {
         let module = {
             let mut db = db.lock().await;
-            let module = decode_module(project_directory, &uri);
+            let module = decode_module(&uri, &db.packages_path);
             db.did_open_module(&module, content.clone());
             module
         };
@@ -136,13 +134,12 @@ impl LanguageFeatures for CandyFeatures {
     async fn did_change(
         &self,
         db: &Mutex<Database>,
-        project_directory: &Path,
         uri: Url,
         changes: Vec<TextDocumentContentChangeEvent>,
     ) {
         let (module, content, open_modules) = {
             let mut db = db.lock().await;
-            let module = decode_module(project_directory, &uri);
+            let module = decode_module(&uri, &db.packages_path);
             let content = apply_text_changes(&db, module.clone(), changes).into_bytes();
             db.did_change_module(&module, content.clone());
             (module, content, db.get_open_modules())
@@ -154,10 +151,10 @@ impl LanguageFeatures for CandyFeatures {
     fn supports_did_close(&self) -> bool {
         true
     }
-    async fn did_close(&self, db: &Mutex<Database>, project_directory: &Path, uri: Url) {
+    async fn did_close(&self, db: &Mutex<Database>, uri: Url) {
         let module = {
             let mut db = db.lock().await;
-            let module = decode_module(project_directory, &uri);
+            let module = decode_module(&uri, &db.packages_path);
             db.did_close_module(&module);
             module
         };
@@ -168,28 +165,18 @@ impl LanguageFeatures for CandyFeatures {
     fn supports_folding_ranges(&self) -> bool {
         true
     }
-    async fn folding_ranges(
-        &self,
-        db: &Mutex<Database>,
-        project_directory: &Path,
-        uri: Url,
-    ) -> Vec<FoldingRange> {
+    async fn folding_ranges(&self, db: &Mutex<Database>, uri: Url) -> Vec<FoldingRange> {
         let db = db.lock().await;
-        let module = decode_module(project_directory, &uri);
+        let module = decode_module(&uri, &db.packages_path);
         folding_ranges(&*db, module)
     }
 
     fn supports_format(&self) -> bool {
         true
     }
-    async fn format(
-        &self,
-        db: &Mutex<Database>,
-        project_directory: &Path,
-        uri: Url,
-    ) -> Vec<TextEdit> {
+    async fn format(&self, db: &Mutex<Database>, uri: Url) -> Vec<TextEdit> {
         let db = db.lock().await;
-        let module = decode_module(project_directory, &uri);
+        let module = decode_module(&uri, &db.packages_path);
         let Ok(cst) = db.cst(module.clone()) else { return vec![]; };
 
         cst.format_to_edits()
@@ -208,14 +195,13 @@ impl LanguageFeatures for CandyFeatures {
     async fn find_definition(
         &self,
         db: &Mutex<Database>,
-        project_directory: &Path,
         uri: Url,
         position: lsp_types::Position,
     ) -> Option<LocationLink> {
         let db = db.lock().await;
-        let module = decode_module(project_directory, &uri);
+        let module = decode_module(&uri, &db.packages_path);
         let offset = db.lsp_position_to_offset(module.clone(), position);
-        find_definition(&*db, module, offset)
+        find_definition(&db, module, offset)
     }
 
     fn supports_references(&self) -> bool {
@@ -224,14 +210,13 @@ impl LanguageFeatures for CandyFeatures {
     async fn references(
         &self,
         db: &Mutex<Database>,
-        project_directory: &Path,
         uri: Url,
         position: lsp_types::Position,
         _only_in_same_document: bool,
         include_declaration: bool,
     ) -> FxHashMap<Url, Vec<Reference>> {
         let db = db.lock().await;
-        let module = decode_module(project_directory, &uri);
+        let module = decode_module(&uri, &db.packages_path);
         let offset = db.lsp_position_to_offset(module.clone(), position);
 
         let mut all_references = FxHashMap::default();
@@ -243,24 +228,87 @@ impl LanguageFeatures for CandyFeatures {
         all_references
     }
 
+    fn supports_rename(&self) -> bool {
+        true
+    }
+    async fn prepare_rename(
+        &self,
+        db: &Mutex<Database>,
+        uri: Url,
+        position: lsp_types::Position,
+    ) -> Option<lsp_types::Range> {
+        let db = db.lock().await;
+        let module = decode_module(&uri, &db.packages_path);
+        let offset = db.lsp_position_to_offset(module.clone(), position);
+
+        match reference_query_for_offset(&*db, module.clone(), offset) {
+            Some((ReferenceQuery::Id(_), range)) => Some(db.range_to_lsp_range(module, range)),
+            Some((
+                ReferenceQuery::Symbol(_, _) | ReferenceQuery::Int(_, _) | ReferenceQuery::Needs(_),
+                _,
+            ))
+            | None => None,
+        }
+    }
+    async fn rename(
+        &self,
+        db: &Mutex<Database>,
+        uri: Url,
+        position: lsp_types::Position,
+        new_name: String,
+    ) -> Result<HashMap<Url, Vec<TextEdit>>, RenameError> {
+        {
+            let db = db.lock().await;
+            let module = decode_module(&uri, &db.packages_path);
+            let offset = db.lsp_position_to_offset(module.clone(), position);
+
+            let regex =
+                match reference_query_for_offset(&*db, module, offset).map(|(query, _)| query) {
+                    Some(ReferenceQuery::Id(_)) => Regex::new(r"^[a-z][A-Za-z0-9_]*$").unwrap(),
+                    Some(
+                        ReferenceQuery::Symbol(_, _)
+                        | ReferenceQuery::Int(_, _)
+                        | ReferenceQuery::Needs(_),
+                    )
+                    | None => {
+                        panic!("Renaming is not supported at this position.")
+                    }
+                };
+            if !regex.is_match(&new_name) {
+                return Err(RenameError::NewNameInvalid);
+            }
+        }
+
+        let references = self.references(db, uri, position, false, true).await;
+        assert!(!references.is_empty());
+        let changes = references
+            .into_iter()
+            .map(|(url, references)| {
+                let changes = references
+                    .into_iter()
+                    .map(|it| TextEdit {
+                        range: it.range,
+                        new_text: new_name.clone(),
+                    })
+                    .collect();
+                (url, changes)
+            })
+            .collect();
+        Ok(changes)
+    }
+
     fn supports_semantic_tokens(&self) -> bool {
         true
     }
-    async fn semantic_tokens(
-        &self,
-        db: &Mutex<Database>,
-        project_directory: &Path,
-        uri: Url,
-    ) -> Vec<SemanticToken> {
+    async fn semantic_tokens(&self, db: &Mutex<Database>, uri: Url) -> Vec<SemanticToken> {
         let db = db.lock().await;
-        let module = decode_module(project_directory, &uri);
+        let module = decode_module(&uri, &db.packages_path);
         semantic_tokens(&*db, module)
     }
 }
 
-fn decode_module(project_directory: &Path, uri: &Url) -> Module {
-    module_from_package_root_and_url(project_directory.to_path_buf(), uri, ModuleKind::Code)
-        .unwrap()
+fn decode_module(uri: &Url, packages_path: &PackagesPath) -> Module {
+    module_from_url(uri, ModuleKind::Code, packages_path).unwrap()
 }
 fn apply_text_changes(
     db: &Database,

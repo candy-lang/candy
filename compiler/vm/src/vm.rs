@@ -19,7 +19,7 @@ use crate::{
         UseProvider,
     },
     fiber::{self, ExecutionResult, Fiber, FiberId},
-    heap::{Closure, Heap, Pointer, SendPort, Struct},
+    heap::{Closure, Data, Heap, InlineObject, SendPort, Struct, Tag},
     tracer::Tracer,
 };
 
@@ -158,8 +158,8 @@ impl Vm {
     pub fn set_up_for_running_closure(
         &mut self,
         heap: Heap,
-        closure: Pointer,
-        arguments: Vec<Pointer>,
+        closure: Closure,
+        arguments: &[InlineObject],
         responsible: Id,
     ) {
         self.set_up_with_fiber(Fiber::new_for_running_closure(
@@ -169,8 +169,13 @@ impl Vm {
             responsible,
         ));
     }
-    pub fn set_up_for_running_module_closure(&mut self, module: Module, closure: Closure) {
-        self.set_up_with_fiber(Fiber::new_for_running_module_closure(module, closure))
+    pub fn set_up_for_running_module_closure(
+        &mut self,
+        heap: Heap,
+        module: Module,
+        closure: Closure,
+    ) {
+        self.set_up_with_fiber(Fiber::new_for_running_module_closure(heap, module, closure))
     }
 
     pub fn tear_down(mut self) -> ExecutionResult {
@@ -233,9 +238,9 @@ impl Vm {
     // This will be used as soon as the outside world tries to send something
     // into the VM.
     #[allow(dead_code)]
-    pub fn send<T: Tracer>(
+    pub fn send(
         &mut self,
-        tracer: &mut T,
+        tracer: &mut impl Tracer,
         channel: ChannelId,
         packet: Packet,
     ) -> OperationId {
@@ -263,11 +268,11 @@ impl Vm {
         self.unreferenced_channels.remove(&channel);
     }
 
-    pub fn run<U: UseProvider, E: ExecutionController, T: Tracer>(
+    pub fn run(
         &mut self,
-        use_provider: &U,
-        execution_controller: &mut E,
-        tracer: &mut T,
+        use_provider: &impl UseProvider,
+        execution_controller: &mut impl ExecutionController,
+        tracer: &mut impl Tracer,
     ) {
         while self.can_run() && execution_controller.should_continue_running() {
             self.run_raw(
@@ -280,11 +285,11 @@ impl Vm {
             );
         }
     }
-    fn run_raw<U: UseProvider, E: ExecutionController, T: Tracer>(
+    fn run_raw(
         &mut self,
-        use_provider: &U,
-        execution_controller: &mut E,
-        tracer: &mut T,
+        use_provider: &impl UseProvider,
+        execution_controller: &mut impl ExecutionController,
+        tracer: &mut impl Tracer,
     ) {
         assert!(
             self.can_run(),
@@ -341,8 +346,10 @@ impl Vm {
 
                 let first_child_id = {
                     let mut heap = Heap::default();
-                    let body = fiber.heap.clone_single_to_other_heap(&mut heap, body);
-                    let nursery_send_port = heap.create_send_port(nursery_id);
+                    let body = Data::from(body.clone_to_heap(&mut heap))
+                        .try_into()
+                        .unwrap();
+                    let nursery_send_port = SendPort::create(&mut heap, nursery_id);
                     let id = self.fiber_id_generator.generate();
                     self.fibers.insert(
                         id,
@@ -350,7 +357,7 @@ impl Vm {
                             fiber: Fiber::new_for_running_closure(
                                 heap,
                                 body,
-                                vec![nursery_send_port],
+                                &[nursery_send_port],
                                 Id::complicated_responsibility(),
                             ),
                             parent: Some(fiber_id),
@@ -374,7 +381,9 @@ impl Vm {
             fiber::Status::InTry { body } => {
                 let child_id = {
                     let mut heap = Heap::default();
-                    let body = fiber.heap.clone_single_to_other_heap(&mut heap, body);
+                    let body = Data::from(body.clone_to_heap(&mut heap))
+                        .try_into()
+                        .unwrap();
                     let id = self.fiber_id_generator.generate();
                     self.fibers.insert(
                         id,
@@ -382,7 +391,7 @@ impl Vm {
                             fiber: Fiber::new_for_running_closure(
                                 heap,
                                 body,
-                                vec![],
+                                &[],
                                 Id::complicated_responsibility(),
                             ),
                             parent: Some(fiber_id),
@@ -466,7 +475,7 @@ impl Vm {
                 FiberTree::Try(Try { .. }) => {
                     self.fibers.replace(parent, |tree| {
                         let mut paused_fiber = tree.into_try().unwrap().paused_fiber;
-                        paused_fiber.fiber.complete_try(result);
+                        paused_fiber.fiber.complete_try(&result);
                         FiberTree::Single(paused_fiber)
                     });
                 }
@@ -486,7 +495,7 @@ impl Vm {
         // communicate to the outside that no fiber references it anymore. If
         // the outside doesn't intend to re-use the channel, it should call
         // `free_channel`.
-        let unreferenced_channels = all_channels
+        self.unreferenced_channels = all_channels
             .difference(&known_channels)
             .filter(|channel| {
                 // Note that nurseries are automatically removed when their
@@ -495,7 +504,6 @@ impl Vm {
             })
             .copied()
             .collect();
-        self.unreferenced_channels = unreferenced_channels;
     }
     fn finish_parallel<T: Tracer>(
         &mut self,
@@ -598,7 +606,7 @@ impl Vm {
                                 fiber: Fiber::new_for_running_closure(
                                     heap,
                                     closure_to_spawn,
-                                    vec![],
+                                    &[],
                                     Id::complicated_responsibility(),
                                 ),
                                 parent: Some(parent_id),
@@ -634,27 +642,20 @@ impl Vm {
             }
         }
     }
-    fn parse_spawn_packet(packet: Packet) -> Option<(Heap, Pointer, ChannelId)> {
-        let Packet { mut heap, address } = packet;
-        let arguments: Struct = heap.get(address).data.clone().try_into().ok()?;
+    fn parse_spawn_packet(packet: Packet) -> Option<(Heap, Closure, ChannelId)> {
+        let Packet { mut heap, object } = packet;
+        let arguments: Struct = object.try_into().ok()?;
 
-        let closure_symbol = heap.create_symbol("Closure".to_string());
-        let closure_address = arguments.get(&heap, closure_symbol)?;
-        let closure: Closure = heap.get(closure_address).data.clone().try_into().ok()?;
-        if closure.num_args > 0 {
+        let closure_tag = Tag::create_from_str(&mut heap, "Closure", None);
+        let closure: Closure = arguments.get(**closure_tag)?.try_into().ok()?;
+        if closure.argument_count() > 0 {
             return None;
         }
 
-        let return_channel_symbol = heap.create_symbol("ReturnChannel".to_string());
-        let return_channel_address = arguments.get(&heap, return_channel_symbol)?;
-        let return_channel: SendPort = heap
-            .get(return_channel_address)
-            .data
-            .clone()
-            .try_into()
-            .ok()?;
+        let return_channel_tag = Tag::create_from_str(&mut heap, "ReturnChannel", None);
+        let return_channel: SendPort = arguments.get(**return_channel_tag)?.try_into().ok()?;
 
-        Some((heap, closure_address, return_channel.channel))
+        Some((heap, closure, return_channel.channel_id()))
     }
 
     fn receive_from_channel(&mut self, performer: Performer, channel: ChannelId) {
@@ -666,7 +667,7 @@ impl Vm {
             ChannelLike::Channel(channel) => {
                 channel.receive(&mut completer, performer);
             }
-            ChannelLike::Nursery { .. } => unreachable!("nurseries are only sent stuff"),
+            ChannelLike::Nursery { .. } => unreachable!("Nurseries are only sent stuff."),
         }
     }
 }
@@ -714,6 +715,7 @@ impl ChannelLike {
     }
 }
 impl FiberTree {
+    // TODO: Use macros to generate these.
     fn into_single(self) -> Option<Single> {
         match self {
             FiberTree::Single(single) => Some(single),

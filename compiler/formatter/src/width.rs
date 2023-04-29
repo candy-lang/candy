@@ -36,35 +36,45 @@ impl Display for Indentation {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Sub)]
 pub struct SinglelineWidth(usize);
 impl SinglelineWidth {
-    pub const SPACE: SinglelineWidth = 1usize.into();
+    pub const SPACE: SinglelineWidth = SinglelineWidth(1);
+
+    pub const fn new_const(width: usize) -> Self {
+        SinglelineWidth(width)
+    }
 
     pub fn is_empty(self) -> bool {
         self == 0.into()
     }
 }
-impl const From<usize> for SinglelineWidth {
+impl From<usize> for SinglelineWidth {
     fn from(width: usize) -> Self {
         SinglelineWidth(width)
     }
 }
-impl const Add<SinglelineWidth> for SinglelineWidth {
+impl Add<SinglelineWidth> for SinglelineWidth {
     type Output = SinglelineWidth;
     fn add(self, rhs: SinglelineWidth) -> Self::Output {
         SinglelineWidth(self.0 + rhs.0)
     }
 }
+impl Add<Width> for SinglelineWidth {
+    type Output = Width;
+    fn add(self, rhs: Width) -> Self::Output {
+        Width::from(self) + rhs
+    }
+}
 #[allow(clippy::derivable_impls)] // The derived impl is not const
-impl const Default for SinglelineWidth {
+impl Default for SinglelineWidth {
     fn default() -> Self {
         Self(Default::default())
     }
 }
-impl const Ord for SinglelineWidth {
+impl Ord for SinglelineWidth {
     fn cmp(&self, other: &Self) -> Ordering {
         self.0.cmp(&other.0)
     }
 }
-impl const PartialOrd for SinglelineWidth {
+impl PartialOrd for SinglelineWidth {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.0.partial_cmp(&other.0)
     }
@@ -72,7 +82,7 @@ impl const PartialOrd for SinglelineWidth {
 
 // Width
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Width {
     Singleline(SinglelineWidth),
     Multiline {
@@ -83,10 +93,10 @@ pub enum Width {
     },
 }
 impl Width {
-    pub const MAX: SinglelineWidth = 100.into();
+    pub const MAX: SinglelineWidth = SinglelineWidth::new_const(100);
     pub const NEWLINE: Width = Width::Multiline {
-        first_line_width: Some(SinglelineWidth::default()),
-        last_line_width: Some(SinglelineWidth::default()),
+        first_line_width: Some(SinglelineWidth::new_const(0)),
+        last_line_width: Some(SinglelineWidth::new_const(0)),
     };
 
     pub fn multiline(
@@ -99,7 +109,7 @@ impl Width {
         }
     }
 
-    pub const fn from_width_and_max(width: SinglelineWidth, max_width: SinglelineWidth) -> Self {
+    pub fn from_width_and_max(width: SinglelineWidth, max_width: SinglelineWidth) -> Self {
         if width > max_width {
             Width::Multiline {
                 first_line_width: None,
@@ -120,15 +130,6 @@ impl Width {
         match self {
             Width::Singleline(_) => true,
             Width::Multiline { .. } => false,
-        }
-    }
-    pub fn is_multiline(&self) -> bool {
-        !self.is_singleline()
-    }
-    pub fn singleline_width(&self) -> Option<SinglelineWidth> {
-        match self {
-            Width::Singleline(width) => Some(*width),
-            Width::Multiline { .. } => None,
         }
     }
     pub fn first_line_width(&self) -> Option<SinglelineWidth> {
@@ -160,29 +161,29 @@ impl Width {
             Width::Multiline { .. } => false,
         }
     }
-    pub fn last_line_fits(&self, indentation: Indentation, extra_width: &Width) -> bool {
-        let Width::Singleline(extra_width) = extra_width else { return false; };
+    pub fn last_line_fits(&self, indentation: Indentation, extra_width: impl Into<Width>) -> bool {
+        let Width::Singleline(extra_width) = extra_width.into() else { return false; };
         match self {
             Width::Singleline(self_width) => {
-                indentation.width() + *self_width + *extra_width <= Width::MAX
+                indentation.width() + *self_width + extra_width <= Width::MAX
             }
             Width::Multiline {
                 last_line_width, ..
-            } => last_line_width.unwrap() + *extra_width <= Width::MAX,
+            } => last_line_width.unwrap() + extra_width <= Width::MAX,
         }
     }
 }
-impl const Default for Width {
+impl Default for Width {
     fn default() -> Self {
         Width::Singleline(SinglelineWidth::default())
     }
 }
-impl const From<usize> for Width {
+impl From<usize> for Width {
     fn from(width: usize) -> Self {
         SinglelineWidth::from(width).into()
     }
 }
-impl const From<SinglelineWidth> for Width {
+impl From<SinglelineWidth> for Width {
     fn from(width: SinglelineWidth) -> Self {
         Self::from_width_and_max(width, Width::MAX)
     }
@@ -190,25 +191,8 @@ impl const From<SinglelineWidth> for Width {
 
 impl Add<Width> for Width {
     type Output = Width;
+
     fn add(self, rhs: Width) -> Self::Output {
-        &self + &rhs
-    }
-}
-impl<'a> Add<Width> for &'a Width {
-    type Output = Width;
-    fn add(self, rhs: Width) -> Self::Output {
-        self + &rhs
-    }
-}
-impl<'a> Add<&'a Width> for Width {
-    type Output = Width;
-    fn add(self, rhs: &'a Width) -> Self::Output {
-        &self + rhs
-    }
-}
-impl<'a, 'b> Add<&'b Width> for &'a Width {
-    type Output = Width;
-    fn add(self, rhs: &'b Width) -> Self::Output {
         fn add_singleline(
             lhs: impl Into<Option<SinglelineWidth>>,
             rhs: impl Into<Option<SinglelineWidth>>,
@@ -223,21 +207,21 @@ impl<'a, 'b> Add<&'b Width> for &'a Width {
         }
 
         match (self, rhs) {
-            (Width::Singleline(lhs), Width::Singleline(rhs)) => (*lhs + *rhs).into(),
+            (Width::Singleline(lhs), Width::Singleline(rhs)) => (lhs + rhs).into(),
             (
                 Width::Singleline(lhs),
                 Width::Multiline {
                     first_line_width,
                     last_line_width,
                 },
-            ) => Width::multiline(add_singleline(*lhs, *first_line_width), *last_line_width),
+            ) => Width::multiline(add_singleline(lhs, first_line_width), last_line_width),
             (
                 Width::Multiline {
                     first_line_width,
                     last_line_width,
                 },
                 Width::Singleline(rhs),
-            ) => Width::multiline(*first_line_width, add_singleline(*last_line_width, *rhs)),
+            ) => Width::multiline(first_line_width, add_singleline(last_line_width, rhs)),
             (
                 Width::Multiline {
                     first_line_width, ..
@@ -245,37 +229,32 @@ impl<'a, 'b> Add<&'b Width> for &'a Width {
                 Width::Multiline {
                     last_line_width, ..
                 },
-            ) => Width::multiline(*first_line_width, *last_line_width),
+            ) => Width::multiline(first_line_width, last_line_width),
         }
     }
 }
 impl Add<SinglelineWidth> for Width {
     type Output = Width;
+
     fn add(self, rhs: SinglelineWidth) -> Self::Output {
-        &self + &Width::from(rhs)
-    }
-}
-impl<'a> Add<SinglelineWidth> for &'a Width {
-    type Output = Width;
-    fn add(self, rhs: SinglelineWidth) -> Self::Output {
-        self + &Width::from(rhs)
+        self + Width::from(rhs)
     }
 }
 
 impl AddAssign<Width> for Width {
     fn add_assign(&mut self, rhs: Width) {
-        *self += &rhs;
+        *self = *self + rhs;
     }
 }
-impl AddAssign<&Width> for Width {
-    fn add_assign(&mut self, rhs: &Width) {
-        *self = &*self + rhs;
+impl AddAssign<SinglelineWidth> for Width {
+    fn add_assign(&mut self, rhs: SinglelineWidth) {
+        *self += Width::from(rhs);
     }
 }
 
 impl Sum for Width {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(Width::default(), |acc, width| &acc + &width)
+        iter.fold(Width::default(), |acc, width| acc + width)
     }
 }
 

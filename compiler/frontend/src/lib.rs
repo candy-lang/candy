@@ -1,5 +1,6 @@
 #![feature(box_patterns)]
 #![feature(entry_insert)]
+#![feature(io_error_more)]
 #![feature(let_chains)]
 
 pub mod ast;

@@ -12,15 +12,15 @@
 use self::{constant_evaluator::ConstantEvaluator, fuzzer::FuzzerManager};
 use crate::database::Database;
 use candy_frontend::{
-    module::{Module, MutableModuleProviderOwner},
+    module::{Module, MutableModuleProviderOwner, PackagesPath},
     rich_ir::ToRichIr,
 };
-use candy_vm::heap::Heap;
 use extension_trait::extension_trait;
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position, Url};
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, time::Duration, vec};
+use std::{time::Duration, vec};
 use tokio::{
     sync::mpsc::{error::TryRecvError, Receiver, Sender},
     time::sleep,
@@ -65,10 +65,11 @@ impl Notification for HintsNotification {
 #[tokio::main(worker_threads = 1)]
 #[allow(unused_must_use)]
 pub async fn run_server(
+    packages_path: PackagesPath,
     mut incoming_events: Receiver<Event>,
     outgoing_hints: Sender<(Module, Vec<Hint>)>,
 ) {
-    let mut db = Database::default();
+    let mut db = Database::new_with_file_system_module_provider(packages_path);
     let mut constant_evaluator = ConstantEvaluator::default();
     let mut fuzzer = FuzzerManager::default();
     let mut outgoing_hints = OutgoingHints::new(outgoing_hints);
@@ -87,7 +88,7 @@ pub async fn run_server(
                     db.did_change_module(&module, content);
                     outgoing_hints.report_hints(module.clone(), vec![]).await;
                     constant_evaluator.update_module(&db, module.clone());
-                    fuzzer.update_module(module, &Heap::default(), &[]);
+                    fuzzer.update_module(module, &[]);
                 }
                 Event::CloseModule(module) => {
                     db.did_close_module(&module);
@@ -105,8 +106,8 @@ pub async fn run_server(
         // functions we found.
         let module_with_new_insight = 'new_insight: {
             if let Some(module) = constant_evaluator.run(&db) {
-                let (heap, closures) = constant_evaluator.get_fuzzable_closures(&module);
-                fuzzer.update_module(module.clone(), &heap, &closures);
+                let closures = constant_evaluator.get_fuzzable_closures(&module);
+                fuzzer.update_module(module.clone(), &closures);
                 debug!(
                     "The constant evaluator made progress in {}.",
                     module.to_rich_ir(),
@@ -152,13 +153,13 @@ pub async fn run_server(
 
 struct OutgoingHints {
     sender: Sender<(Module, Vec<Hint>)>,
-    last_sent: HashMap<Module, Vec<Hint>>,
+    last_sent: FxHashMap<Module, Vec<Hint>>,
 }
 impl OutgoingHints {
     fn new(sender: Sender<(Module, Vec<Hint>)>) -> Self {
         Self {
             sender,
-            last_sent: HashMap::new(),
+            last_sent: FxHashMap::default(),
         }
     }
 

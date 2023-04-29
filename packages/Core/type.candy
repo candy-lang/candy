@@ -3,5 +3,5 @@
 typeOf value := ✨.typeOf value
 
 is value type :=
-  needs (typeOf type | equals Symbol)
+  needs (typeOf type | equals Tag)
   equals (typeOf value) type

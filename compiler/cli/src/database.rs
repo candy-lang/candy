@@ -9,7 +9,7 @@ use candy_frontend::{
     module::{
         FileSystemModuleProvider, GetModuleContentQuery, InMemoryModuleProvider, Module,
         ModuleDbStorage, ModuleProvider, ModuleProviderOwner, MutableModuleProviderOwner,
-        OverlayModuleProvider,
+        OverlayModuleProvider, PackagesPath,
     },
     position::PositionConversionStorage,
     rcst_to_cst::RcstToCstStorage,
@@ -37,13 +37,10 @@ pub struct Database {
 }
 impl salsa::Database for Database {}
 
-impl Default for Database {
-    fn default() -> Self {
-        Self::new(Box::<FileSystemModuleProvider>::default())
-    }
-}
-
 impl Database {
+    pub fn new_with_file_system_module_provider(packages_path: PackagesPath) -> Self {
+        Self::new(Box::new(FileSystemModuleProvider { packages_path }))
+    }
     pub fn new(module_provider: Box<dyn ModuleProvider + Send>) -> Self {
         Self {
             storage: salsa::Storage::default(),

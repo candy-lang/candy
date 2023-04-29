@@ -1,0 +1,29 @@
+[channel, equals, ifElse, int, iterable, list, recursive, text] = use "Core"
+
+hanoi amount from via to =
+  # https://rosettacode.org/wiki/Towers_of_Hanoi
+  needs (int.is amount)
+  needs (int.isPositive amount)
+
+  recursive [amount, from, via, to] { recurse state ->
+    ifElse (amount | equals 1) { ([from, to],) } {
+      recurse [Amount: amount | int.subtract 1, from, Via: to, To: via]
+      | list.concatenate (recurse [Amount: 1, from, via, to])
+      | list.concatenate (recurse [Amount: amount | int.subtract 1, From: via, Via: from, to])
+    }
+  }
+
+main := { environment ->
+  print message =
+    needs (text.is message)
+    environment.stdout | channel.send message
+
+  # TODO: Improve performance and memory usage. Running this with _2_ disks produces an OOM.
+  steps = hanoi 1 "A" "B" "C"
+  steps | iterable.fromList | iterable.map { step ->
+    [from, to] = step
+    from | text.concatenate " → " | text.concatenate to
+  }
+  | iterable.joinToText
+  | print
+}

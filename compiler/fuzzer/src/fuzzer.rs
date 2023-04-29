@@ -1,5 +1,3 @@
-use tracing::trace;
-
 use crate::{
     input::Input,
     input_pool::{InputPool, Score},
@@ -7,21 +5,22 @@ use crate::{
     utils::collect_symbols_in_heap,
     values::complexity_of_input,
 };
-
 use candy_frontend::hir::Id;
 use candy_vm::{
     context::{ExecutionController, UseProvider},
-    heap::{Closure, Data, Heap, Pointer},
+    heap::{Closure, Data, Heap},
     tracer::full::FullTracer,
 };
-use std::mem;
+use tracing::trace;
 
 pub struct Fuzzer {
     pub closure_heap: Heap,
-    pub closure: Pointer,
+    pub closure: Closure,
     pub closure_id: Id,
     status: Option<Status>, // only `None` during transitions
 }
+// TODO: Decrease enum variant sizes and size differences
+#[allow(clippy::large_enum_variant)]
 pub enum Status {
     StillFuzzing {
         pool: InputPool,
@@ -37,18 +36,16 @@ pub enum Status {
 }
 
 impl Fuzzer {
-    pub fn new(closure_heap: &Heap, closure: Pointer, closure_id: Id) -> Self {
-        assert!(matches!(closure_heap.get(closure).data, Data::Closure(_)));
-
+    pub fn new(closure: Closure, closure_id: Id) -> Self {
         // The given `closure_heap` may contain other fuzzable closures.
         let mut heap = Heap::default();
-        let closure = closure_heap.clone_single_to_other_heap(&mut heap, closure);
+        let closure: Closure = Data::from(closure.clone_to_heap(&mut heap))
+            .try_into()
+            .unwrap();
 
-        let pool = {
-            let closure: Closure = heap.get(closure).data.clone().try_into().unwrap();
-            InputPool::new(closure.num_args, collect_symbols_in_heap(&heap))
-        };
-        let runner = Runner::new(&heap, closure, pool.generate_new_input());
+        // PERF: Avoid collecting the symbols into a hash set of owned strings that we then copy again.
+        let pool = InputPool::new(closure.argument_count(), &collect_symbols_in_heap(&heap));
+        let runner = Runner::new(closure, pool.generate_new_input());
 
         Self {
             closure_heap: heap,
@@ -65,12 +62,12 @@ impl Fuzzer {
         self.status.unwrap()
     }
 
-    pub fn run<U: UseProvider, E: ExecutionController>(
+    pub fn run(
         &mut self,
-        use_provider: &mut U,
-        execution_controller: &mut E,
+        use_provider: &mut impl UseProvider,
+        execution_controller: &mut impl ExecutionController,
     ) {
-        let mut status = mem::replace(&mut self.status, None).unwrap();
+        let mut status = self.status.take().unwrap();
         while !matches!(status, Status::FoundPanic { .. })
             && execution_controller.should_continue_running()
         {
@@ -96,10 +93,10 @@ impl Fuzzer {
         self.status = Some(status);
     }
 
-    fn continue_fuzzing<U: UseProvider, E: ExecutionController>(
+    fn continue_fuzzing(
         &self,
-        use_provider: &mut U,
-        execution_controller: &mut E,
+        use_provider: &mut impl UseProvider,
+        execution_controller: &mut impl ExecutionController,
         mut pool: InputPool,
         mut runner: Runner,
     ) -> Status {
@@ -149,7 +146,7 @@ impl Fuzzer {
         }
     }
     fn create_new_fuzzing_case(&self, pool: InputPool) -> Status {
-        let runner = Runner::new(&self.closure_heap, self.closure, pool.generate_new_input());
+        let runner = Runner::new(self.closure, pool.generate_new_input());
         Status::StillFuzzing { pool, runner }
     }
 }

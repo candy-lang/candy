@@ -8,12 +8,11 @@ use candy_frontend::{
 use candy_fuzzer::{Fuzzer, Status};
 use candy_vm::{
     context::{DbUseProvider, RunLimitedNumberOfInstructions},
-    heap::{Heap, Pointer},
+    heap::Closure,
     mir_to_lir::MirToLir,
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
-use std::collections::HashMap;
 use tracing::{debug, error};
 
 use crate::{
@@ -22,22 +21,18 @@ use crate::{
 };
 
 use super::Hint;
+use rustc_hash::FxHashMap;
 
 #[derive(Default)]
 pub struct FuzzerManager {
-    fuzzers: HashMap<Module, HashMap<Id, Fuzzer>>,
+    fuzzers: FxHashMap<Module, FxHashMap<Id, Fuzzer>>,
 }
 
 impl FuzzerManager {
-    pub fn update_module(
-        &mut self,
-        module: Module,
-        heap: &Heap,
-        fuzzable_closures: &[(Id, Pointer)],
-    ) {
+    pub fn update_module(&mut self, module: Module, fuzzable_closures: &[(Id, Closure)]) {
         let fuzzers = fuzzable_closures
             .iter()
-            .map(|(id, closure)| (id.clone(), Fuzzer::new(heap, *closure, id.clone())))
+            .map(|(id, closure)| (id.clone(), Fuzzer::new(*closure, id.clone())))
             .collect();
         self.fuzzers.insert(module, fuzzers);
     }
@@ -75,7 +70,14 @@ impl FuzzerManager {
     {
         let mut hints = vec![];
 
-        debug!("There are {} fuzzers.", self.fuzzers.len());
+        debug!(
+            "There {}.",
+            if self.fuzzers.len() == 1 {
+                "is 1 fuzzer".to_string()
+            } else {
+                format!("are {} fuzzers", self.fuzzers.len())
+            }
+        );
 
         for fuzzer in self.fuzzers[module].values() {
             let Status::FoundPanic {

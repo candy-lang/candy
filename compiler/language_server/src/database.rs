@@ -9,7 +9,7 @@ use candy_frontend::{
     module::{
         FileSystemModuleProvider, GetModuleContentQuery, InMemoryModuleProvider, Module,
         ModuleDbStorage, ModuleProvider, ModuleProviderOwner, MutableModuleProviderOwner,
-        OverlayModuleProvider,
+        OverlayModuleProvider, PackagesPath,
     },
     position::PositionConversionStorage,
     rcst_to_cst::RcstToCstStorage,
@@ -33,20 +33,26 @@ use candy_vm::mir_to_lir::MirToLirStorage;
 )]
 pub struct Database {
     storage: salsa::Storage<Self>,
+    pub packages_path: PackagesPath,
     module_provider: OverlayModuleProvider<InMemoryModuleProvider, Box<dyn ModuleProvider + Send>>,
 }
 impl salsa::Database for Database {}
 
-impl Default for Database {
-    fn default() -> Self {
-        Self::new(Box::<FileSystemModuleProvider>::default())
-    }
-}
-
 impl Database {
-    pub fn new(module_provider: Box<dyn ModuleProvider + Send>) -> Self {
+    pub fn new_with_file_system_module_provider(packages_path: PackagesPath) -> Self {
+        Self::new(
+            packages_path.clone(),
+            Box::new(FileSystemModuleProvider { packages_path }),
+        )
+    }
+
+    pub fn new(
+        packages_path: PackagesPath,
+        module_provider: Box<dyn ModuleProvider + Send>,
+    ) -> Self {
         Self {
             storage: salsa::Storage::default(),
+            packages_path,
             module_provider: OverlayModuleProvider::new(
                 InMemoryModuleProvider::default(),
                 module_provider,

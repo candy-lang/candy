@@ -10,6 +10,7 @@ bench = false
 [dependencies]
 candy_frontend = { path = "../frontend" }
 derive_more = "0.99.17"
+enum_dispatch = "0.3.11"
 enumset = "1.0.12"
 extension-trait = "1.0.1"
 itertools = "0.10.0"

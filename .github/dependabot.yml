@@ -3,34 +3,38 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: daily
 
   - package-ecosystem: cargo
     directory: /compiler/cli
     schedule:
-      interval: weekly
+      interval: daily
   - package-ecosystem: cargo
-    directory: /compiler/compiler_fuzzer
+    directory: /compiler/formatter
     schedule:
-      interval: weekly
+      interval: daily
   - package-ecosystem: cargo
     directory: /compiler/frontend
     schedule:
-      interval: weekly
+      interval: daily
   - package-ecosystem: cargo
     directory: /compiler/fuzzer
     schedule:
-      interval: weekly
+      interval: daily
   - package-ecosystem: cargo
     directory: /compiler/language_server
     schedule:
-      interval: weekly
+      interval: daily
   - package-ecosystem: cargo
     directory: /compiler/vm
     schedule:
-      interval: weekly
+      interval: daily
+  - package-ecosystem: cargo
+    directory: /compiler/vm/fuzz
+    schedule:
+      interval: daily
 
   - package-ecosystem: npm
     directory: /vscode_extension
     schedule:
-      interval: weekly
+      interval: daily

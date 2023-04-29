@@ -1,16 +1,14 @@
-use std::{fs, path::PathBuf, sync::Arc};
-
 use candy_frontend::{
     ast::AstDbStorage,
     ast_to_hir::AstToHirStorage,
     cst::CstDbStorage,
     cst_to_ast::CstToAstStorage,
-    hir::{self, HirDbStorage},
+    hir::HirDbStorage,
     hir_to_mir::HirToMirStorage,
     mir_optimize::OptimizeMirStorage,
     module::{
         GetModuleContentQuery, InMemoryModuleProvider, Module, ModuleDbStorage, ModuleKind,
-        ModuleProvider, ModuleProviderOwner, MutableModuleProviderOwner, Package,
+        ModuleProvider, ModuleProviderOwner, MutableModuleProviderOwner, Package, PackagesPath,
     },
     position::PositionConversionStorage,
     rcst_to_cst::RcstToCstStorage,
@@ -19,15 +17,17 @@ use candy_frontend::{
 };
 use candy_vm::{
     channel::Packet,
-    context::{DbUseProvider, RunForever},
+    context::DbUseProvider,
     fiber::ExecutionResult,
-    heap::{Closure, Struct},
+    heap::Struct,
     lir::Lir,
     mir_to_lir::{MirToLir, MirToLirStorage},
+    run_lir, run_main,
     tracer::DummyTracer,
-    vm::{Status, Vm},
 };
 use lazy_static::lazy_static;
+use rustc_hash::FxHashMap;
+use std::{fs, sync::Arc};
 use walkdir::WalkDir;
 
 const TRACING: TracingConfig = TracingConfig::off();
@@ -91,24 +91,25 @@ pub fn setup() -> Database {
     db
 }
 fn load_core(module_provider: &mut InMemoryModuleProvider) {
-    let packages_directory: PathBuf = "../../packages".into();
-    let core_directory: PathBuf = "../../packages/Core".into();
-    for file in WalkDir::new(&core_directory)
+    let packages_path = PackagesPath::try_from("../../packages").unwrap();
+    let core_path = packages_path.join("Core");
+    let package = Package::Managed("Core".into());
+
+    for file in WalkDir::new(&core_path)
         .into_iter()
         .map(|it| it.unwrap())
         .filter(|it| it.file_type().is_file())
         .filter(|it| it.file_name().to_string_lossy().ends_with(".candy"))
     {
-        let path = file.path();
-
-        let mut module = Module::from_package_root_and_file(
-            packages_directory.clone(),
-            path.to_owned(),
+        let module = Module::from_package_and_path(
+            &packages_path,
+            package.clone(),
+            file.path(),
             ModuleKind::Code,
-        );
-        module.package = PACKAGE.clone();
+        )
+        .unwrap();
 
-        let source_code = fs::read_to_string(path).unwrap();
+        let source_code = fs::read_to_string(file.path()).unwrap();
         module_provider.add_str(&module, source_code);
     }
 }
@@ -120,49 +121,18 @@ pub fn compile(db: &mut Database, source_code: &str) -> Arc<Lir> {
 }
 
 pub fn run(db: &Database, lir: Lir) -> Packet {
-    let module_closure = Closure::of_module_lir(lir);
-    let mut tracer = DummyTracer::default();
     let use_provider = DbUseProvider {
         db,
         tracing: TRACING.clone(),
     };
-
-    // Run once to generate exports.
-    let mut vm = Vm::default();
-    vm.set_up_for_running_module_closure(MODULE.clone(), module_closure);
-    vm.run(&use_provider, &mut RunForever, &mut tracer);
-    if let Status::WaitingForOperations = vm.status() {
-        panic!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");
-    }
-
-    let (mut heap, exported_definitions): (_, Struct) = match vm.tear_down() {
-        ExecutionResult::Finished(return_value) => {
-            let exported = return_value
-                .heap
-                .get(return_value.address)
-                .data
-                .clone()
-                .try_into()
-                .unwrap();
-            (return_value.heap, exported)
-        }
-        ExecutionResult::Panicked { reason, .. } => {
-            panic!("The module panicked: {reason}");
-        }
-    };
+    let mut tracer = DummyTracer::default();
+    let (mut heap, main) = run_lir(MODULE.clone(), lir, &use_provider, &mut tracer)
+        .into_main_function()
+        .unwrap();
 
     // Run the `main` function.
-    let main = heap.create_symbol("Main".to_string());
-    let main = match exported_definitions.get(&heap, main) {
-        Some(main) => main,
-        None => panic!("The module doesn't contain a main function."),
-    };
-
-    let mut vm = Vm::default();
-    let environment = heap.create_struct(Default::default());
-    vm.set_up_for_running_closure(heap, main, vec![environment], hir::Id::platform());
-    vm.run(&use_provider, &mut RunForever, &mut tracer);
-    match vm.tear_down() {
+    let environment = Struct::create(&mut heap, &FxHashMap::default());
+    match run_main(heap, main, environment, &use_provider, &mut tracer) {
         ExecutionResult::Finished(return_value) => return_value,
         ExecutionResult::Panicked { reason, .. } => panic!("The main function panicked: {reason}"),
     }
