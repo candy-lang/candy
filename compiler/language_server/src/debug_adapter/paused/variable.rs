@@ -15,28 +15,29 @@ use itertools::Itertools;
 use std::hash::Hash;
 
 impl PausedState {
+    #[allow(unused_parens)]
     pub fn variables(
         &mut self,
         args: VariablesArguments,
         supports_variable_type: bool,
     ) -> VariablesResponse {
+        let should_include_indexed = matches!(
+            args.filter,
+            (Some(VariablesArgumentsFilter::Indexed) | None),
+        );
+        let should_include_named =
+            matches!(args.filter, (Some(VariablesArgumentsFilter::Named) | None));
+
+        let mut start = args.start.map(|it| it as usize).unwrap_or_default();
+        let mut count = args
+            .count
+            .and_then(|it| if it == 0 { None } else { Some(it as usize) })
+            .unwrap_or(usize::MAX);
+
         let key = self
             .variables_ids
             .id_to_key(args.variables_reference)
             .to_owned();
-        let variables = self.key_to_variables(key, args.filter, supports_variable_type);
-        VariablesResponse { variables }
-    }
-    #[allow(unused_parens)]
-    fn key_to_variables(
-        &mut self,
-        key: VariablesKey,
-        filter: Option<VariablesArgumentsFilter>,
-        supports_variable_type: bool,
-    ) -> Vec<Variable> {
-        let should_include_indexed =
-            matches!(filter, (Some(VariablesArgumentsFilter::Indexed) | None));
-        let should_include_named = matches!(filter, (Some(VariablesArgumentsFilter::Named) | None));
         let mut variables = vec![];
         match &key {
             VariablesKey::Arguments(stack_frame_key) => {
@@ -45,20 +46,26 @@ impl PausedState {
                         .get(&self.vm_state.tracer)
                         .arguments
                         .to_owned();
-                    variables.extend(arguments.iter().enumerate().map(|(index, object)| {
-                        // TODO: resolve argument name
-                        self.create_variable(index.to_string(), *object, supports_variable_type)
-                    }));
+                    variables.extend(arguments[start..].iter().take(count).enumerate().map(
+                        |(index, object)| {
+                            // TODO: resolve argument name
+                            self.create_variable(
+                                (start + index).to_string(),
+                                *object,
+                                supports_variable_type,
+                            )
+                        },
+                    ));
                 }
             }
             VariablesKey::FiberHeap(fiber_id) => {
                 if should_include_named {
                     let mut vars = fiber_id.get(&self.vm_state.vm).heap.iter().collect_vec();
                     vars.sort_by_key(|it| it.address());
-                    variables.extend(vars.into_iter().map(|object| {
+                    variables.extend(vars[start..].iter().take(count).map(|object| {
                         self.create_variable(
                             format!("{:p}", object),
-                            object.into(),
+                            (*object).into(),
                             supports_variable_type,
                         )
                     }));
@@ -67,34 +74,52 @@ impl PausedState {
             VariablesKey::Inner(object) => match Data::from(**object) {
                 Data::List(list) => {
                     if should_include_named {
-                        variables.push(Self::create_length_variable(
-                            list.len(),
-                            supports_variable_type,
-                        ));
+                        if start == 0 {
+                            variables.push(Self::create_length_variable(
+                                list.len(),
+                                supports_variable_type,
+                            ));
+                        }
+                        start = start.saturating_sub(1);
+                        count = count.saturating_sub(1);
                     }
                     if should_include_indexed {
-                        variables.extend(list.items().iter().enumerate().map(|(index, object)| {
-                            self.create_variable(index.to_string(), *object, supports_variable_type)
-                        }));
+                        variables.extend(list.items()[start..].iter().take(count).enumerate().map(
+                            |(index, object)| {
+                                self.create_variable(
+                                    (start + index).to_string(),
+                                    *object,
+                                    supports_variable_type,
+                                )
+                            },
+                        ));
                     }
                 }
                 Data::Struct(struct_) => {
                     // TODO: If the struct contains more complex keys, display
                     // this as a list of key-value pairs.
                     if should_include_named {
-                        variables.push(Self::create_length_variable(
-                            struct_.len(),
-                            supports_variable_type,
+                        if start == 0 {
+                            variables.push(Self::create_length_variable(
+                                struct_.len(),
+                                supports_variable_type,
+                            ));
+                        }
+                        start = start.saturating_sub(1);
+                        count = count.saturating_sub(1);
+
+                        variables.extend(struct_.iter().skip(start).take(count).map(
+                            |(_, key, value)| {
+                                self.create_variable(key.to_string(), value, supports_variable_type)
+                            },
                         ));
-                        variables.extend(struct_.iter().map(|(_, key, value)| {
-                            self.create_variable(key.to_string(), value, supports_variable_type)
-                        }));
                     }
                 }
                 it => panic!("Tried to get inner variables of {it}."),
             },
         }
-        variables
+
+        VariablesResponse { variables }
     }
     fn create_length_variable(length: usize, supports_variable_type: bool) -> Variable {
         Variable {
