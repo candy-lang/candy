@@ -8,7 +8,7 @@ use dap::{
     responses::VariablesResponse,
     types::{
         Variable, VariablePresentationHint, VariablePresentationHintAttributes,
-        VariablePresentationHintKind,
+        VariablePresentationHintKind, VariablesArgumentsFilter,
     },
 };
 use itertools::Itertools;
@@ -24,69 +24,77 @@ impl PausedState {
             .variables_ids
             .id_to_key(args.variables_reference)
             .to_owned();
-        let variables = self.key_to_variables(key, supports_variable_type);
+        let variables = self.key_to_variables(key, args.filter, supports_variable_type);
         VariablesResponse { variables }
     }
+    #[allow(unused_parens)]
     fn key_to_variables(
         &mut self,
         key: VariablesKey,
+        filter: Option<VariablesArgumentsFilter>,
         supports_variable_type: bool,
     ) -> Vec<Variable> {
+        let should_include_indexed =
+            matches!(filter, (Some(VariablesArgumentsFilter::Indexed) | None));
+        let should_include_named = matches!(filter, (Some(VariablesArgumentsFilter::Named) | None));
+        let mut variables = vec![];
         match &key {
             VariablesKey::Arguments(stack_frame_key) => {
-                let arguments = stack_frame_key
-                    .get(&self.vm_state.tracer)
-                    .arguments
-                    .to_owned();
-                arguments
-                    .iter()
-                    .enumerate()
-                    .map(|(index, object)| {
+                if should_include_named {
+                    let arguments = stack_frame_key
+                        .get(&self.vm_state.tracer)
+                        .arguments
+                        .to_owned();
+                    variables.extend(arguments.iter().enumerate().map(|(index, object)| {
                         // TODO: resolve argument name
                         self.create_variable(index.to_string(), *object, supports_variable_type)
-                    })
-                    .collect()
+                    }));
+                }
             }
             VariablesKey::FiberHeap(fiber_id) => {
-                let mut variables = fiber_id.get(&self.vm_state.vm).heap.iter().collect_vec();
-                variables.sort_by_key(|it| it.address());
-                variables
-                    .into_iter()
-                    .map(|object| {
+                if should_include_named {
+                    let mut vars = fiber_id.get(&self.vm_state.vm).heap.iter().collect_vec();
+                    vars.sort_by_key(|it| it.address());
+                    variables.extend(vars.into_iter().map(|object| {
                         self.create_variable(
                             format!("{:p}", object),
                             object.into(),
                             supports_variable_type,
                         )
-                    })
-                    .collect()
+                    }));
+                }
             }
             VariablesKey::Inner(object) => match Data::from(**object) {
                 Data::List(list) => {
-                    let mut variables = vec![Self::create_length_variable(
-                        list.len(),
-                        supports_variable_type,
-                    )];
-                    variables.extend(list.items().iter().enumerate().map(|(index, object)| {
-                        self.create_variable(index.to_string(), *object, supports_variable_type)
-                    }));
-                    variables
+                    if should_include_named {
+                        variables.push(Self::create_length_variable(
+                            list.len(),
+                            supports_variable_type,
+                        ));
+                    }
+                    if should_include_indexed {
+                        variables.extend(list.items().iter().enumerate().map(|(index, object)| {
+                            self.create_variable(index.to_string(), *object, supports_variable_type)
+                        }));
+                    }
                 }
                 Data::Struct(struct_) => {
                     // TODO: If the struct contains more complex keys, display
                     // this as a list of key-value pairs.
-                    let mut variables = vec![Self::create_length_variable(
-                        struct_.len(),
-                        supports_variable_type,
-                    )];
-                    variables.extend(struct_.iter().map(|(_, key, value)| {
-                        self.create_variable(key.to_string(), value, supports_variable_type)
-                    }));
-                    variables
+                    if should_include_named {
+                        variables.push(Self::create_length_variable(
+                            struct_.len(),
+                            supports_variable_type,
+                        ));
+                        variables.extend(struct_.iter().map(|(_, key, value)| {
+                            self.create_variable(key.to_string(), value, supports_variable_type)
+                        }));
+                    }
                 }
                 it => panic!("Tried to get inner variables of {it}."),
             },
         }
+        variables
     }
     fn create_length_variable(length: usize, supports_variable_type: bool) -> Variable {
         Variable {
@@ -112,7 +120,7 @@ impl PausedState {
         let (inner_variables_object, named_variables, indexed_variables) = match data {
             // TODO: support tag, closure, and ports
             // One more fields than the length since we add the “<length>” entry.
-            Data::List(list) => (Some(**list), 0, list.len() + 1),
+            Data::List(list) => (Some(**list), 1, list.len()),
             Data::Struct(struct_) => (Some(**struct_), struct_.len() + 1, 0),
             _ => (None, 0, 0),
         };
