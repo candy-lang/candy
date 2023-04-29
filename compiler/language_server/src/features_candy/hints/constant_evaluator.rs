@@ -10,7 +10,7 @@ use candy_frontend::{
 use candy_vm::{
     context::RunLimitedNumberOfInstructions,
     fiber::FiberId,
-    heap::{Heap, Pointer},
+    heap::Closure,
     lir::Lir,
     tracer::{
         full::{FullTracer, StoredFiberEvent, StoredVmEvent, TimedEvent},
@@ -20,23 +20,24 @@ use candy_vm::{
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
-use std::{collections::HashMap, rc::Rc};
+use rustc_hash::FxHashMap;
+use std::sync::Arc;
 use tracing::{span, Level};
 
 #[derive(Default)]
 pub struct ConstantEvaluator {
-    evaluators: HashMap<Module, Evaluator>,
+    evaluators: FxHashMap<Module, Evaluator>,
 }
 struct Evaluator {
-    lir: Rc<Lir>,
+    lir: Arc<Lir>,
     tracer: FullTracer,
-    vm: Vm<Rc<Lir>>,
+    vm: Vm<Arc<Lir>>,
 }
 
 impl ConstantEvaluator {
-    pub fn update_module(&mut self, module: Module, lir: Rc<Lir>) {
+    pub fn update_module(&mut self, module: Module, lir: Arc<Lir>) {
+        let vm = Vm::for_module(lir.clone());
         let tracer = FullTracer::default();
-        let vm = Vm::for_module_closure(lir.clone());
         self.evaluators
             .insert(module, Evaluator { lir, tracer, vm });
     }
@@ -60,7 +61,7 @@ impl ConstantEvaluator {
         Some(module.clone())
     }
 
-    pub fn get_fuzzable_closures(&self, module: &Module) -> (Rc<Lir>, Heap, Vec<(Id, Pointer)>) {
+    pub fn get_fuzzable_closures(&self, module: &Module) -> (Arc<Lir>, Vec<(Id, Closure)>) {
         let evaluator = &self.evaluators[module];
         let fuzzable_closures = evaluator
             .tracer
@@ -74,15 +75,11 @@ impl ConstantEvaluator {
                             closure,
                         },
                     ..
-                } => Some((evaluator.tracer.heap.get_hir_id(*id), *closure)),
+                } => Some((id.get().to_owned(), *closure)),
                 _ => None,
             })
             .collect();
-        (
-            evaluator.lir.clone(),
-            evaluator.tracer.heap.clone(),
-            fuzzable_closures,
-        )
+        (evaluator.lir.clone(), fuzzable_closures)
     }
 
     pub fn get_hints<DB>(&self, db: &DB, module: &Module) -> Vec<Hint>
@@ -106,8 +103,7 @@ impl ConstantEvaluator {
         for TimedEvent { event, .. } in &evaluator.tracer.events {
             let StoredVmEvent::InFiber { event, .. } = event else { continue; };
             let StoredFiberEvent::ValueEvaluated { expression, value } = event else { continue; };
-            let id = evaluator.tracer.heap.get_hir_id(*expression);
-
+            let id = expression.get();
             if &id.module != module {
                 continue;
             }
@@ -131,16 +127,16 @@ impl ConstantEvaluator {
 
                     hints.push(Hint {
                         kind: HintKind::Value,
-                        text: value.format(&evaluator.tracer.heap),
+                        text: value.to_string(),
                         position: db.id_to_end_of_line(id.clone()).unwrap(),
                     });
                 }
                 Expression::PatternIdentifierReference { .. } => {
                     let body = db.containing_body_of(id.clone());
-                    let name = body.identifiers.get(&id).unwrap();
+                    let name = body.identifiers.get(id).unwrap();
                     hints.push(Hint {
                         kind: HintKind::Value,
-                        text: format!("{name} = {}", value.format(&evaluator.tracer.heap)),
+                        text: format!("{name} = {value}"),
                         position: db.id_to_end_of_line(id.clone()).unwrap(),
                     });
                 }
@@ -167,26 +163,24 @@ where
         return None;
     }
 
-    let last_call_in_this_module = stack.iter().find(|call| {
-        let call_site = evaluator.tracer.heap.get_hir_id(call.call_site);
-        // Make sure the entry comes from the same file and is not generated
-        // code.
-        call_site.module == module && db.hir_to_cst_id(call_site).is_some()
-    })?;
-
-    let Call {
+    // Find the last call in this module.
+    let (
+        Call {
+            callee, arguments, ..
+        },
         call_site,
-        callee,
-        arguments: args,
-        ..
-    } = last_call_in_this_module;
-    let call_site = evaluator.tracer.heap.get_hir_id(*call_site);
+    ) = stack
+        .iter()
+        .map(|call| (call, call.call_site.get().to_owned()))
+        .find(|(_, call_site)| {
+            // Make sure the entry comes from the same file and is not generated
+            // code.
+            call_site.module == module && db.hir_to_cst_id(call_site.to_owned()).is_some()
+        })?;
+
     let call_info = format!(
-        "{} {}",
-        callee.format(&evaluator.tracer.heap),
-        args.iter()
-            .map(|arg| arg.format(&evaluator.tracer.heap))
-            .join(" "),
+        "{callee} {}",
+        arguments.iter().map(|it| it.to_string()).join(" "),
     );
 
     Some(Hint {

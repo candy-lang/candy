@@ -1,18 +1,10 @@
 bool = use "..bool"
-[ifElse] = use "..controlFlow"
+[ifElse, recursive] = use "..controlFlow"
 [equals] = use "..equality"
 function = use "..function"
 int = use "..int"
 result = use "..result"
 type = use "..type"
-
-filled length item :=
-  # Creates a new list of the given length, where each slot is filled with the same item.
-  needs (int.is length)
-  needs (int.isNonNegative length)
-  needs (int.fitsInRustU32 length)
-  ✨.listFilled length item
-# TODO: `generate length valueGetter` when we have loops
 
 is value := type.is value List
 
@@ -33,6 +25,11 @@ isValidIndex list index :=
   needs (int.is index)
   ifElse (list | isEmpty) { False } { index | int.isNonNegative }
   | bool.lazyAnd { index | int.isLessThanOrEqualTo (list | lastIndex | result.unwrap) }
+isValidInsertIndex list index :=
+  needs (is list)
+  needs (int.is index)
+  ifElse (list | isEmpty) { False } { index | int.isNonNegative }
+  | bool.lazyAnd { index | int.isLessThanOrEqualTo (list | length) }
 
 get list index :=
   needs (is list)
@@ -50,8 +47,7 @@ insert list index item :=
   needs (is list)
 
   needs (int.is index)
-  needs (int.isNonNegative index)
-  needs (index | int.isLessThanOrEqualTo (length list))
+  needs (list | isValidInsertIndex index)
 
   list | ✨.listInsert index item
 
@@ -81,3 +77,36 @@ removeAt list index :=
   needs (int.is index)
   needs (list | isValidIndex index)
   list | ✨.listRemoveAt index
+
+filled length item :=
+  # Creates a new list of the given `length`, where each slot is filled with the same item.
+  needs (int.is length)
+  needs (int.isNonNegative length)
+  needs (int.fitsInRustU32 length)
+  ✨.listFilled length item
+generate length valueGetter :=
+  # Creates a new list of the given `length`, where each slot is filled by calling `valueGetter`
+  # with the index.
+  needs (int.is length)
+  needs (int.isNonNegative length)
+  needs (int.fitsInRustU32 length)
+  needs (function.is1 valueGetter)
+
+  list = filled length Placeholder
+  recursive [list, Index: 0] { recurse state ->
+    [list, index] = state
+    ifElse (index | equals length) { list } {
+      item = valueGetter index
+      list = list | replace index item
+      recurse [list, Index: int.add index 1]
+    }
+  }
+
+concatenate listA listB :=
+  needs (is listA)
+  needs (is listB)
+  generate (listA | length | int.add (listB | length)) { index ->
+    ifElse (index | int.isLessThan (listA | length)) { listA | get index } {
+      listB | get (index | int.subtract (listA | length))
+    }
+  }

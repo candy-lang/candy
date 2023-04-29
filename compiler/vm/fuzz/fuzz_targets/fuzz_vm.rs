@@ -18,12 +18,11 @@ use candy_frontend::{
     TracingConfig,
 };
 use candy_vm::{
-    context::RunForever,
     fiber::ExecutionResult,
-    heap::Struct,
+    heap::{HirId, Struct},
     mir_to_lir::compile_lir,
     tracer::DummyTracer,
-    vm::{Status, Vm},
+    vm::Vm,
 };
 use lazy_static::lazy_static;
 use libfuzzer_sys::fuzz_target;
@@ -71,43 +70,17 @@ fuzz_target!(|data: &[u8]| {
     let lir = compile_lir(&db, MODULE.clone(), TRACING.clone()).0;
     let mut tracer = DummyTracer::default();
 
-    // Run once to generate exports.
-    let mut vm = Vm::for_module_closure(lir.clone());
-    vm.run(&mut RunForever, &mut tracer);
-    if let Status::WaitingForOperations = vm.status() {
-        println!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");
-        return;
-    }
-
-    let (mut heap, exported_definitions): (_, Struct) = match vm.tear_down() {
-        ExecutionResult::Finished(return_value) => {
-            let exported = return_value
-                .heap
-                .get(return_value.address)
-                .data
-                .clone()
-                .try_into()
-                .unwrap();
-            (return_value.heap, exported)
-        }
-        ExecutionResult::Panicked { reason, .. } => {
-            println!("The module panicked: {reason}");
-            return;
-        }
-    };
+    let (mut heap, main) = Vm::for_module(lir.clone())
+        .run_until_completion(&mut DummyTracer::default())
+        .into_main_function()
+        .unwrap();
 
     // Run the `main` function.
-    let main = heap.create_symbol("Main".to_string());
-    let Some(main) = exported_definitions.get(&heap, main) else {
-        println!("The module doesn't contain a main function.");
-        return;
-    };
-
-    let environment = heap.create_struct(Default::default());
-    let platform = heap.create_hir_id(hir::Id::platform());
-    let mut vm = Vm::for_closure(lir, heap, main, vec![environment], platform);
-    vm.run(&mut RunForever, &mut tracer);
-    match vm.tear_down() {
+    let environment = Struct::create(&mut heap, &Default::default());
+    let responsible = HirId::create(&mut heap, hir::Id::user());
+    match Vm::for_closure(lir, heap, main, &[environment.into()], responsible)
+        .run_until_completion(&mut tracer)
+    {
         ExecutionResult::Finished(return_value) => {
             println!("The main function returned: {return_value:?}")
         }

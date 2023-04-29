@@ -107,7 +107,7 @@ struct Context<'a> {
     is_top_level: bool,
 }
 
-impl<'a> Context<'a> {
+impl Context<'_> {
     fn start_non_top_level(&mut self) -> NonTopLevelResetState {
         NonTopLevelResetState(mem::replace(&mut self.is_top_level, false))
     }
@@ -117,7 +117,7 @@ impl<'a> Context<'a> {
 }
 struct NonTopLevelResetState(bool);
 
-impl<'a> Context<'a> {
+impl Context<'_> {
     #[must_use]
     fn start_scope(&mut self) -> ScopeResetState {
         ScopeResetState {
@@ -143,7 +143,7 @@ struct ScopeResetState {
     non_top_level_reset_state: NonTopLevelResetState,
 }
 
-impl<'a> Context<'a> {
+impl Context<'_> {
     fn compile(&mut self, asts: &[Ast]) -> hir::Id {
         if asts.is_empty() {
             self.push(None, Expression::nothing(), None)
@@ -173,7 +173,6 @@ impl<'a> Context<'a> {
                     None => {
                         return self.push_error(
                             Some(name.id.clone()),
-                            ast.id.module.clone(),
                             self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
                             HirError::UnknownReference {
                                 name: name.value.clone(),
@@ -286,7 +285,6 @@ impl<'a> Context<'a> {
                             if self.public_identifiers.contains_key(&name) {
                                 self.push_error(
                                     None,
-                                    ast.id.module.clone(),
                                     self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
                                     HirError::PublicAssignmentWithSameName {
                                         name: name.to_owned(),
@@ -298,7 +296,6 @@ impl<'a> Context<'a> {
                     } else {
                         self.push_error(
                             None,
-                            ast.id.module.clone(),
                             self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
                             HirError::PublicAssignmentInNotTopLevel,
                         );
@@ -579,7 +576,6 @@ impl<'a> Context<'a> {
                     _ => {
                         return self.push_error(
                             id,
-                            name_id.module.clone(),
                             self.db.ast_id_to_span(name_id.to_owned()).unwrap(),
                             HirError::NeedsWithWrongNumberOfArguments {
                                 num_args: call.arguments.len(),
@@ -633,7 +629,6 @@ impl<'a> Context<'a> {
     fn push_error(
         &mut self,
         ast_id: Option<ast::Id>,
-        module: Module,
         span: Range<Offset>,
         error: HirError,
     ) -> hir::Id {
@@ -642,7 +637,7 @@ impl<'a> Context<'a> {
             Expression::Error {
                 child: None,
                 errors: vec![CompilerError {
-                    module,
+                    module: self.module.clone(),
                     span,
                     payload: error.into(),
                 }],

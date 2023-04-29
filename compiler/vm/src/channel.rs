@@ -1,14 +1,13 @@
+use crate::{
+    fiber::FiberId,
+    heap::{Heap, InlineObject},
+    vm::OperationId,
+};
 use candy_frontend::id::CountableId;
 use itertools::Itertools;
 use std::{
     collections::VecDeque,
-    fmt::{self, Debug},
-};
-
-use crate::{
-    fiber::FiberId,
-    heap::{Heap, Pointer},
-    vm::OperationId,
+    fmt::{self, Debug, Formatter},
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -47,7 +46,7 @@ pub type Capacity = usize;
 #[derive(Clone)]
 pub struct Packet {
     pub heap: Heap,
-    pub address: Pointer,
+    pub object: InlineObject,
 }
 
 impl ChannelBuf {
@@ -151,24 +150,18 @@ impl Channel {
     }
 }
 
-impl Packet {
-    pub fn clone_to_other_heap(&self, other: &mut Heap) -> Pointer {
-        self.heap.clone_single_to_other_heap(other, self.address)
-    }
-}
-
-impl fmt::Debug for ChannelBuf {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Debug for ChannelBuf {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_list().entries(self.packets.iter()).finish()
     }
 }
-impl fmt::Debug for Packet {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.address.format(&self.heap))
+impl Debug for Packet {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.object)
     }
 }
-impl fmt::Debug for Channel {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Debug for Channel {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("Channel")
             .field("buffer", &self.buffer)
             .field(

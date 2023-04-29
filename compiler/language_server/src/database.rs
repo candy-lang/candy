@@ -9,13 +9,12 @@ use candy_frontend::{
     module::{
         FileSystemModuleProvider, GetModuleContentQuery, InMemoryModuleProvider, Module,
         ModuleDbStorage, ModuleProvider, ModuleProviderOwner, MutableModuleProviderOwner,
-        OverlayModuleProvider,
+        OverlayModuleProvider, PackagesPath,
     },
     position::PositionConversionStorage,
     rcst_to_cst::RcstToCstStorage,
     string_to_rcst::StringToRcstStorage,
 };
-use std::path::PathBuf;
 
 #[salsa::database(
     AstDbStorage,
@@ -32,20 +31,23 @@ use std::path::PathBuf;
 )]
 pub struct Database {
     storage: salsa::Storage<Self>,
-    pub packages_path: PathBuf,
+    pub packages_path: PackagesPath,
     module_provider: OverlayModuleProvider<InMemoryModuleProvider, Box<dyn ModuleProvider + Send>>,
 }
 impl salsa::Database for Database {}
 
 impl Database {
-    pub fn new_with_file_system_module_provider(packages_path: PathBuf) -> Self {
+    pub fn new_with_file_system_module_provider(packages_path: PackagesPath) -> Self {
         Self::new(
             packages_path.clone(),
             Box::new(FileSystemModuleProvider { packages_path }),
         )
     }
 
-    pub fn new(packages_path: PathBuf, module_provider: Box<dyn ModuleProvider + Send>) -> Self {
+    pub fn new(
+        packages_path: PackagesPath,
+        module_provider: Box<dyn ModuleProvider + Send>,
+    ) -> Self {
         Self {
             storage: salsa::Storage::default(),
             packages_path,

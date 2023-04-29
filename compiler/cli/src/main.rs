@@ -7,7 +7,7 @@ use candy_frontend::{
     hir,
     hir_to_mir::HirToMir,
     mir_optimize::OptimizeMir,
-    module::{Module, ModuleKind, SurroundingPackage},
+    module::{Module, ModuleFromPathError, ModuleKind, PackagesPath},
     position::PositionConversionDb,
     rcst_to_cst::RcstToCst,
     rich_ir::ToRichIr,
@@ -19,7 +19,7 @@ use candy_vm::{
     channel::{ChannelId, Packet},
     context::RunForever,
     fiber::{ExecutionResult, FiberId},
-    heap::{Data, Heap, SendPort, Struct},
+    heap::{Data, Heap, HirId, SendPort, Struct, Text},
     lir::Lir,
     mir_to_lir::compile_lir,
     tracer::{full::FullTracer, DummyTracer, Tracer},
@@ -30,13 +30,11 @@ use database::Database;
 use itertools::Itertools;
 use notify::RecursiveMode;
 use notify_debouncer_mini::new_debouncer;
-use rustc_hash::FxHashMap;
 use std::{
     borrow::Borrow,
     convert::TryInto,
     env::{current_dir, current_exe},
-    fs,
-    io::{self, BufRead, ErrorKind, Write},
+    io::{self, BufRead, Write},
     path::PathBuf,
     sync::{mpsc::channel, Arc},
     time::Duration,
@@ -128,27 +126,33 @@ enum Exit {
     NotInCandyPackage,
 }
 
-fn packages_path() -> PathBuf {
+fn packages_path() -> PackagesPath {
     // We assume the candy executable lives inside the Candy Git repository at
     // its usual location, `$candy/target/[release or debug]/candy`.
     let candy_exe = current_exe().unwrap();
     let target_dir = candy_exe.parent().unwrap().parent().unwrap();
     let candy_repo = target_dir.parent().unwrap();
-    candy_repo.join("packages")
+    PackagesPath::try_from(candy_repo.join("packages").as_path()).unwrap()
 }
 fn module_for_path(path: Option<PathBuf>) -> Result<Module, Exit> {
     let packages_path = packages_path();
     match path {
-        Some(file) => match fs::canonicalize(file) {
-            Ok(path) => Ok(Module::from_path(&packages_path, &path, ModuleKind::Code).unwrap()),
-            Err(error) if error.kind() == ErrorKind::NotFound => {
-                error!("The given file doesn't exist.");
-                Err(Exit::FileNotFound)
-            }
-            Err(_) => unreachable!(),
-        },
+        Some(file) => {
+            Module::from_path(&packages_path, &file, ModuleKind::Code).map_err(
+                |error| match error {
+                    ModuleFromPathError::NotFound(_) => {
+                        error!("The given file doesn't exist.");
+                        Exit::FileNotFound
+                    }
+                    ModuleFromPathError::NotInPackage(_) => {
+                        error!("The given file is not in a Candy package.");
+                        Exit::NotInCandyPackage
+                    }
+                },
+            )
+        }
         None => {
-            let Some(package) = current_dir().unwrap().surrounding_candy_package(&packages_path) else {
+            let Some(package) = packages_path.find_surrounding_package(&current_dir().unwrap()) else {
                 error!("You are not in a Candy package. Either navigate into a package or specify a Candy file.");
                 error!("Candy packages are folders that contain a `_package.candy` file. This file marks the root folder of a package. Relative imports can only happen within the package.");
                 return Err(Exit::NotInCandyPackage)
@@ -166,7 +170,7 @@ fn build(options: CandyBuildOptions) -> ProgramResult {
     init_logger(true);
 
     let packages_path = packages_path();
-    let db = Database::new_with_file_system_module_provider(&packages_path);
+    let db = Database::new_with_file_system_module_provider(packages_path.clone());
     let module = module_for_path(options.path.clone())?;
 
     let tracing = TracingConfig {
@@ -316,7 +320,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     init_logger(true);
 
     let packages_path = packages_path();
-    let db = Database::new_with_file_system_module_provider(&packages_path);
+    let db = Database::new_with_file_system_module_provider(packages_path.clone());
     let module = module_for_path(options.path.clone())?;
 
     let tracing = TracingConfig {
@@ -328,31 +332,14 @@ fn run(options: CandyRunOptions) -> ProgramResult {
 
     debug!("Running {}.", module.to_rich_ir());
 
-    let mut vm = Vm::for_module_closure(lir.clone());
     let mut tracer = FullTracer::default();
-    vm.run(&mut RunForever, &mut tracer);
-    if let Status::WaitingForOperations = vm.status() {
-        error!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");
-        // TODO: Show stack traces of all fibers?
-    }
-    let result = vm.tear_down();
-
+    let result = Vm::for_module(lir.clone()).run_until_completion(&mut tracer);
     if options.debug {
         module.dump_associated_debug_file(&packages_path, "trace", &format!("{tracer:?}"));
     }
 
-    let (mut heap, exported_definitions): (_, Struct) = match result {
-        ExecutionResult::Finished(return_value) => {
-            debug!("The module exports these definitions: {return_value:?}",);
-            let exported = return_value
-                .heap
-                .get(return_value.address)
-                .data
-                .clone()
-                .try_into()
-                .unwrap();
-            (return_value.heap, exported)
-        }
+    let (mut heap, main) = match result {
+        ExecutionResult::Finished(return_value) => return_value.into_main_function().unwrap(),
         ExecutionResult::Panicked {
             reason,
             responsible,
@@ -364,17 +351,8 @@ fn run(options: CandyRunOptions) -> ProgramResult {
             }
             error!(
                 "This is the stack trace:\n{}",
-                tracer.format_panic_stack_trace_to_root_fiber(&db)
+                tracer.format_panic_stack_trace_to_root_fiber(&db),
             );
-            return Err(Exit::CodePanicked);
-        }
-    };
-
-    let main = heap.create_symbol("Main".to_string());
-    let main = match exported_definitions.get(&heap, main) {
-        Some(main) => main,
-        None => {
-            error!("The module doesn't contain a main function.");
             return Err(Exit::CodePanicked);
         }
     };
@@ -384,25 +362,20 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     let mut vm = Vm::uninitialized(lir);
     let mut stdout = StdoutService::new(&mut vm);
     let mut stdin = StdinService::new(&mut vm);
-    let environment = {
-        let stdout_symbol = heap.create_symbol("Stdout".to_string());
-        let stdout_port = heap.create_send_port(stdout.channel);
-        let stdin_symbol = heap.create_symbol("Stdin".to_string());
-        let stdin_port = heap.create_send_port(stdin.channel);
-        heap.create_struct(FxHashMap::from_iter([
-            (stdout_symbol, stdout_port),
-            (stdin_symbol, stdin_port),
-        ]))
-    };
-    let platform = heap.create_hir_id(hir::Id::platform());
+    let fields = [
+        ("Stdout", SendPort::create(&mut heap, stdout.channel)),
+        ("Stdin", SendPort::create(&mut heap, stdin.channel)),
+    ];
+    let environment = Struct::create_with_symbol_keys(&mut heap, fields).into();
+    let platform = HirId::create(&mut heap, hir::Id::platform());
     tracer.for_fiber(FiberId::root()).call_started(
         platform,
-        main,
+        main.into(),
         vec![environment],
         platform,
         &heap,
     );
-    vm.initialize_for_closure(heap, main, vec![environment], platform);
+    vm.initialize_for_closure(heap, main, &[environment], platform);
     loop {
         match vm.status() {
             Status::CanRun => {
@@ -422,8 +395,9 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         ExecutionResult::Finished(return_value) => {
             tracer
                 .for_fiber(FiberId::root())
-                .call_ended(return_value.address, &return_value.heap);
-            debug!("The main function returned: {return_value:?}");
+                .call_ended(return_value.object, &return_value.heap);
+            debug!("The main function returned:");
+            debug!("{return_value:?}");
             Ok(())
         }
         ExecutionResult::Panicked {
@@ -460,8 +434,8 @@ impl StdoutService {
         while let Some(CompletedOperation::Received { packet }) =
             vm.completed_operations.remove(&self.current_receive)
         {
-            match &packet.heap.get(packet.address).data {
-                Data::Text(text) => println!("{}", text.value),
+            match packet.object.into() {
+                Data::Text(text) => println!("{}", text.get()),
                 _ => info!("Non-text value sent to stdout: {packet:?}"),
             }
             self.current_receive = vm.receive(self.channel);
@@ -486,12 +460,9 @@ impl StdinService {
             vm.completed_operations.remove(&self.current_receive)
         {
             let request: SendPort = packet
-                .heap
-                .get(packet.address)
-                .data
-                .clone()
+                .object
                 .try_into()
-                .expect("expected a send port");
+                .expect("Expected a send port to be sent to stdin.");
             print!(">> ");
             io::stdout().flush().unwrap();
             let input = {
@@ -500,10 +471,10 @@ impl StdinService {
             };
             let packet = {
                 let mut heap = Heap::default();
-                let address = heap.create_text(input);
-                Packet { heap, address }
+                let object = Text::create(&mut heap, &input).into();
+                Packet { heap, object }
             };
-            vm.send(&mut DummyTracer, request.channel, packet);
+            vm.send(&mut DummyTracer, request.channel_id(), packet);
 
             // Receive the next request
             self.current_receive = vm.receive(self.channel);
@@ -514,8 +485,7 @@ impl StdinService {
 fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
     init_logger(true);
 
-    let packages_path = packages_path();
-    let db = Database::new_with_file_system_module_provider(&packages_path);
+    let db = Database::new_with_file_system_module_provider(packages_path());
     let module = module_for_path(options.path.clone())?;
 
     let tracing = TracingConfig {

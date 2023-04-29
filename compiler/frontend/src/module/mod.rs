@@ -1,16 +1,14 @@
-use std::sync::Arc;
-
-use salsa::query_group;
-
 pub use self::{
-    module::{Module, ModuleKind},
+    module::{Module, ModuleFromPathError, ModuleKind},
     module_provider::{
         FileSystemModuleProvider, InMemoryModuleProvider, ModuleProvider, OverlayModuleProvider,
     },
     module_provider_owner::{ModuleProviderOwner, MutableModuleProviderOwner},
-    package::{Package, SurroundingPackage},
+    package::{Package, PackagesPath},
     use_path::UsePath,
 };
+use salsa::query_group;
+use std::sync::Arc;
 
 #[allow(clippy::module_inception)]
 mod module;

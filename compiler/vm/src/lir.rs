@@ -1,7 +1,6 @@
-use crate::{
-    fiber::InstructionPointer,
-    heap::{Heap, Pointer},
-};
+use crate::heap::{Closure, HirId, InlineObject};
+use crate::utils::DebugDisplay;
+use crate::{fiber::InstructionPointer, heap::Heap};
 use candy_frontend::{
     mir::Id,
     module::Module,
@@ -9,19 +8,20 @@ use candy_frontend::{
 };
 use enumset::EnumSet;
 use itertools::Itertools;
+use std::fmt::{self, Display, Formatter};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-#[derive(Clone, Debug)]
 pub struct Lir {
     pub module: Module,
-    pub heap: Heap,
+    pub constant_heap: Heap,
     pub instructions: Vec<Instruction>,
-    pub start: InstructionPointer,
+    pub module_closure: Closure,
+    pub responsible_module: HirId,
 }
 
 pub type StackOffset = usize; // 0 is the last item, 1 the one before that, etc.
 
-#[derive(Clone, Debug, EnumDiscriminants, Eq, Hash, PartialEq, IntoStaticStr)]
+#[derive(Clone, Debug, EnumDiscriminants, Eq, Hash, IntoStaticStr, PartialEq)]
 #[strum_discriminants(derive(Hash, IntoStaticStr), strum(serialize_all = "camelCase"))]
 pub enum Instruction {
     /// Pops num_items items, pushes a list.
@@ -47,9 +47,9 @@ pub enum Instruction {
         body: InstructionPointer,
     },
 
-    /// Pushes a pointer onto the stack. MIR instructions that created
+    /// Pushes a pointer onto the stack. MIR instructions that create
     /// compile-time known values are compiled to this instruction.
-    PushFromHeap(Pointer),
+    PushConstant(InlineObject),
 
     /// Pushes an item from back in the stack on the stack again.
     PushFromStack(StackOffset),
@@ -121,7 +121,7 @@ impl Instruction {
             Instruction::CreateClosure { .. } => {
                 stack.push(result);
             }
-            Instruction::PushFromHeap(_) => {
+            Instruction::PushConstant(_) => {
                 stack.push(result);
             }
             Instruction::PushFromStack(_) => {
@@ -238,9 +238,9 @@ impl ToRichIr for Instruction {
                     EnumSet::empty(),
                 );
             }
-            Instruction::PushFromHeap(address) => {
+            Instruction::PushConstant(constant) => {
                 builder.push(" ", None, EnumSet::empty());
-                builder.push(address.to_string(), TokenType::Address, EnumSet::empty());
+                builder.push(format!("{constant}"), TokenType::Address, EnumSet::empty());
             }
             Instruction::PushFromStack(offset) => {
                 builder.push(" ", None, EnumSet::empty());
@@ -283,6 +283,21 @@ impl ToRichIr for Instruction {
             Instruction::TraceExpressionEvaluated => {}
             Instruction::TraceFoundFuzzableClosure => {}
         }
+    }
+}
+
+impl DebugDisplay for Instruction {
+    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
+        if is_debug {
+            write!(f, "{:?}", self)
+        } else {
+            write!(f, "{}", self.to_rich_ir().text)
+        }
+    }
+}
+impl Display for Instruction {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        DebugDisplay::fmt(self, f, false)
     }
 }
 

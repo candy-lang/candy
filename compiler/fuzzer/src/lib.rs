@@ -22,13 +22,10 @@ use candy_frontend::{
 };
 use candy_vm::{
     context::{RunForever, RunLimitedNumberOfInstructions},
-    heap::{Heap, Pointer},
     mir_to_lir::compile_lir,
     tracer::full::FullTracer,
     vm::Vm,
 };
-use rustc_hash::FxHashMap;
-use std::rc::Rc;
 use tracing::{error, info};
 
 pub fn fuzz<DB>(db: &DB, module: Module) -> Vec<FailingFuzzCase>
@@ -41,26 +38,26 @@ where
         evaluated_expressions: TracingMode::Off,
     };
     let (lir, _) = compile_lir(db, module, tracing);
-    let lir = Rc::new((*lir).clone());
 
-    let (fuzzables_heap, fuzzables): (Heap, FxHashMap<Id, Pointer>) = {
+    let fuzzables = {
         let mut tracer = FuzzablesFinder::default();
-        let mut vm = Vm::for_module_closure(lir.clone());
+        let mut vm = Vm::for_module(lir.clone());
         vm.run(&mut RunForever, &mut tracer);
-        (tracer.heap, tracer.fuzzables)
+        tracer.fuzzables
     };
 
     info!(
         "Now, the fuzzing begins. So far, we have {} closures to fuzz.",
-        fuzzables.len()
+        fuzzables.len(),
     );
 
     let mut failing_cases = vec![];
 
     for (id, closure) in fuzzables {
         info!("Fuzzing {id}.");
-        let mut fuzzer = Fuzzer::new(lir.clone(), &fuzzables_heap, closure, id.clone());
+        let mut fuzzer = Fuzzer::new(lir.clone(), closure, id.clone());
         fuzzer.run(&mut RunLimitedNumberOfInstructions::new(100000));
+
         match fuzzer.into_status() {
             Status::StillFuzzing { .. } => {}
             Status::FoundPanic {

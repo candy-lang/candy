@@ -1,3 +1,4 @@
+use crate::{features::Reference, utils::LspPositionConversion};
 use candy_frontend::{
     ast_to_hir::AstToHir,
     cst::{CstDb, CstKind},
@@ -7,10 +8,9 @@ use candy_frontend::{
     rich_ir::ToRichIr,
 };
 use num_bigint::BigUint;
-use std::collections::HashSet;
+use rustc_hash::FxHashSet;
+use std::ops::Range;
 use tracing::{debug, info};
-
-use crate::{features::Reference, utils::LspPositionConversion};
 
 pub fn references<DB>(
     db: &DB,
@@ -21,13 +21,17 @@ pub fn references<DB>(
 where
     DB: HirDb + ModuleDb + PositionConversionDb,
 {
-    let Some(query) = query_for_offset(db, module, offset) else { return vec![]; };
+    let Some((query, _)) = reference_query_for_offset(db, module, offset) else { return vec![]; };
     find_references(db, query, include_declaration)
 }
 
-fn query_for_offset<DB: CstDb>(db: &DB, module: Module, offset: Offset) -> Option<ReferenceQuery>
+pub fn reference_query_for_offset<DB>(
+    db: &DB,
+    module: Module,
+    offset: Offset,
+) -> Option<(ReferenceQuery, Range<Offset>)>
 where
-    DB: HirDb,
+    DB: CstDb + HirDb,
 {
     let origin_cst = db.find_cst_by_offset(module.clone(), offset);
     info!("Finding references for {origin_cst:?}");
@@ -64,15 +68,15 @@ where
         CstKind::Int { value, .. } => Some(ReferenceQuery::Int(module, value)),
         _ => None,
     };
+    let query = query.map(|it| (it, origin_cst.data.span));
     debug!("Reference query: {query:?}");
     query
 }
 
-fn find_references<DB: AstToHir + HirDb + PositionConversionDb>(
-    db: &DB,
-    query: ReferenceQuery,
-    include_declaration: bool,
-) -> Vec<Reference> {
+fn find_references<DB>(db: &DB, query: ReferenceQuery, include_declaration: bool) -> Vec<Reference>
+where
+    DB: AstToHir + HirDb + PositionConversionDb,
+{
     // TODO: search all files
     let module = match &query {
         ReferenceQuery::Id(id) => id.module.clone(),
@@ -91,7 +95,7 @@ struct Context<'a, DB: PositionConversionDb + ?Sized> {
     db: &'a DB,
     query: ReferenceQuery,
     include_declaration: bool,
-    discovered_references: HashSet<hir::Id>,
+    discovered_references: FxHashSet<hir::Id>,
     references: Vec<Reference>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -110,7 +114,7 @@ where
             db,
             query,
             include_declaration,
-            discovered_references: HashSet::new(),
+            discovered_references: FxHashSet::default(),
             references: vec![],
         }
     }

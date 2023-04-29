@@ -248,6 +248,9 @@ fn run_builtin(
 
             is_contained?.into()
         }
+        BuiltinFunction::TagGetValue => return None,
+        BuiltinFunction::TagHasValue => return None,
+        BuiltinFunction::TagWithoutValue => return None,
         BuiltinFunction::TextCharacters => return None,
         BuiltinFunction::TextConcatenate => {
             let [a, b] = arguments else { unreachable!() };
@@ -278,7 +281,7 @@ fn run_builtin(
         BuiltinFunction::TypeOf => match visible.get(arguments[0]) {
             Expression::Int(_) => Expression::Symbol("Int".to_string()),
             Expression::Text(_) => Expression::Symbol("Text".to_string()),
-            Expression::Symbol(_) => Expression::Symbol("Symbol".to_string()),
+            Expression::Symbol(_) => Expression::Symbol("Tag".to_string()),
             Expression::Builtin(_) => Expression::Symbol("Function".to_string()),
             Expression::List(_) => Expression::Symbol("List".to_string()),
             Expression::Struct(_) => Expression::Symbol("Struct".to_string()),
@@ -293,9 +296,9 @@ fn run_builtin(
                     };
                 let return_type = match builtin {
                     BuiltinFunction::ChannelCreate => "Struct",
-                    BuiltinFunction::ChannelSend => "Symbol",
+                    BuiltinFunction::ChannelSend => "Tag",
                     BuiltinFunction::ChannelReceive => return None,
-                    BuiltinFunction::Equals => "Symbol",
+                    BuiltinFunction::Equals => "Tag",
                     BuiltinFunction::GetArgumentCount => "Int",
                     BuiltinFunction::FunctionRun => return None,
                     BuiltinFunction::IfElse => return None,
@@ -304,7 +307,7 @@ fn run_builtin(
                     BuiltinFunction::IntBitwiseAnd => "Int",
                     BuiltinFunction::IntBitwiseOr => "Int",
                     BuiltinFunction::IntBitwiseXor => "Int",
-                    BuiltinFunction::IntCompareTo => "Symbol",
+                    BuiltinFunction::IntCompareTo => "Tag",
                     BuiltinFunction::IntDivideTruncating => "Int",
                     BuiltinFunction::IntModulo => "Int",
                     BuiltinFunction::IntMultiply => "Int",
@@ -320,24 +323,27 @@ fn run_builtin(
                     BuiltinFunction::ListRemoveAt => "List",
                     BuiltinFunction::ListReplace => "List",
                     BuiltinFunction::Parallel => return None,
-                    BuiltinFunction::Print => "Symbol",
+                    BuiltinFunction::Print => "Tag",
                     BuiltinFunction::StructGet => return None,
                     BuiltinFunction::StructGetKeys => "List",
-                    BuiltinFunction::StructHasKey => "Symbol",
+                    BuiltinFunction::StructHasKey => "Tag",
+                    BuiltinFunction::TagGetValue => return None,
+                    BuiltinFunction::TagHasValue => "Tag",
+                    BuiltinFunction::TagWithoutValue => "Tag",
                     BuiltinFunction::TextCharacters => "List",
                     BuiltinFunction::TextConcatenate => "Text",
-                    BuiltinFunction::TextContains => "Symbol",
-                    BuiltinFunction::TextEndsWith => "Symbol",
+                    BuiltinFunction::TextContains => "Tag",
+                    BuiltinFunction::TextEndsWith => "Tag",
                     BuiltinFunction::TextFromUtf8 => "Struct",
                     BuiltinFunction::TextGetRange => "Text",
-                    BuiltinFunction::TextIsEmpty => "Symbol",
+                    BuiltinFunction::TextIsEmpty => "Tag",
                     BuiltinFunction::TextLength => "Int",
-                    BuiltinFunction::TextStartsWith => "Symbol",
+                    BuiltinFunction::TextStartsWith => "Tag",
                     BuiltinFunction::TextTrimEnd => "Text",
                     BuiltinFunction::TextTrimStart => "Text",
                     BuiltinFunction::ToDebugText => "Text",
                     BuiltinFunction::Try => "Struct",
-                    BuiltinFunction::TypeOf => "Symbol",
+                    BuiltinFunction::TypeOf => "Tag",
                 };
                 Expression::Symbol(return_type.to_string())
             }

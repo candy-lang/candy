@@ -404,8 +404,11 @@ impl ToRichIr for Ast {
                 builder.push("error:", None, EnumSet::empty());
                 builder.push_children_multiline(errors);
                 if let Some(child) = child {
-                    builder.push("fallback:", None, EnumSet::empty());
+                    builder.indent();
+                    builder.push_newline();
+                    builder.push("fallback: ", None, EnumSet::empty());
                     child.build_rich_ir(builder);
+                    builder.dedent();
                 }
             }
         }

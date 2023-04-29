@@ -1,5 +1,3 @@
-use std::{fs, path::PathBuf, sync::Arc};
-
 use candy_frontend::{
     ast::AstDbStorage,
     ast_to_hir::AstToHirStorage,
@@ -10,7 +8,7 @@ use candy_frontend::{
     mir_optimize::OptimizeMirStorage,
     module::{
         GetModuleContentQuery, InMemoryModuleProvider, Module, ModuleDbStorage, ModuleKind,
-        ModuleProvider, ModuleProviderOwner, MutableModuleProviderOwner, Package,
+        ModuleProvider, ModuleProviderOwner, MutableModuleProviderOwner, Package, PackagesPath,
     },
     position::PositionConversionStorage,
     rcst_to_cst::RcstToCstStorage,
@@ -19,15 +17,16 @@ use candy_frontend::{
 };
 use candy_vm::{
     channel::Packet,
-    context::RunForever,
     fiber::ExecutionResult,
-    heap::Struct,
+    heap::{HirId, Struct},
     lir::Lir,
     mir_to_lir::compile_lir,
     tracer::DummyTracer,
-    vm::{Status, Vm},
+    vm::Vm,
 };
 use lazy_static::lazy_static;
+use rustc_hash::FxHashMap;
+use std::{borrow::Borrow, fs, sync::Arc};
 use walkdir::WalkDir;
 
 const TRACING: TracingConfig = TracingConfig::off();
@@ -73,9 +72,9 @@ impl MutableModuleProviderOwner for Database {
     }
 }
 
-pub fn setup_and_compile(source_code: &str) -> (Database, Lir) {
+pub fn setup_and_compile(source_code: &str) -> (Database, Arc<Lir>) {
     let mut db = setup();
-    let lir = compile(&mut db, source_code).as_ref().to_owned();
+    let lir = compile(&mut db, source_code);
     (db, lir)
 }
 
@@ -91,8 +90,8 @@ pub fn setup() -> Database {
     db
 }
 fn load_core(module_provider: &mut InMemoryModuleProvider) {
-    let packages_path: PathBuf = fs::canonicalize("../../packages").unwrap();
-    let core_path: PathBuf = packages_path.join("Core");
+    let packages_path = PackagesPath::try_from("../../packages").unwrap();
+    let core_path = packages_path.join("Core");
     let package = Package::Managed("Core".into());
 
     for file in WalkDir::new(&core_path)
@@ -120,44 +119,19 @@ pub fn compile(db: &mut Database, source_code: &str) -> Arc<Lir> {
     compile_lir(db, MODULE.clone(), TRACING.clone()).0
 }
 
-pub fn run(lir: &Lir) -> Packet {
+pub fn run(lir: impl Borrow<Lir>) -> Packet {
     let mut tracer = DummyTracer::default();
-
-    // Run once to generate exports.
-    let mut vm = Vm::for_module_closure(lir);
-    vm.run(&mut RunForever, &mut tracer);
-    if let Status::WaitingForOperations = vm.status() {
-        panic!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");
-    }
-
-    let (mut heap, exported_definitions): (_, Struct) = match vm.tear_down() {
-        ExecutionResult::Finished(return_value) => {
-            let exported = return_value
-                .heap
-                .get(return_value.address)
-                .data
-                .clone()
-                .try_into()
-                .unwrap();
-            (return_value.heap, exported)
-        }
-        ExecutionResult::Panicked { reason, .. } => {
-            panic!("The module panicked: {reason}");
-        }
-    };
+    let (mut heap, main) = Vm::for_module(lir.borrow())
+        .run_until_completion(&mut tracer)
+        .into_main_function()
+        .unwrap();
 
     // Run the `main` function.
-    let main = heap.create_symbol("Main".to_string());
-    let main = match exported_definitions.get(&heap, main) {
-        Some(main) => main,
-        None => panic!("The module doesn't contain a main function."),
-    };
-
-    let environment = heap.create_struct(Default::default());
-    let platform = heap.create_hir_id(hir::Id::platform());
-    let mut vm = Vm::for_closure(lir, heap, main, vec![environment], platform);
-    vm.run(&mut RunForever, &mut tracer);
-    match vm.tear_down() {
+    let environment = Struct::create(&mut heap, &FxHashMap::default());
+    let responsible = HirId::create(&mut heap, hir::Id::user());
+    match Vm::for_closure(lir, heap, main, &[environment.into()], responsible)
+        .run_until_completion(&mut tracer)
+    {
         ExecutionResult::Finished(return_value) => return_value,
         ExecutionResult::Panicked { reason, .. } => panic!("The main function panicked: {reason}"),
     }

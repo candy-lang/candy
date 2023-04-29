@@ -2,7 +2,7 @@ use candy_frontend::hir::Id;
 use candy_vm::{
     self,
     context::{CombiningExecutionController, CountingExecutionController, ExecutionController},
-    heap::{Data, Heap, Pointer},
+    heap::{Closure, Data, HirId, InlineObjectSliceCloneToHeap},
     lir::Lir,
     tracer::full::FullTracer,
     vm::{self, Vm},
@@ -50,14 +50,14 @@ impl RunResult {
 }
 
 impl<L: Borrow<Lir>> Runner<L> {
-    pub fn new(lir: L, closure_heap: &Heap, closure: Pointer, input: Input) -> Self {
-        assert!(matches!(closure_heap.get(closure).data, Data::Closure(_)));
-
-        let mut vm_heap = lir.borrow().heap.clone();
-        let closure = closure_heap.clone_single_to_other_heap(&mut vm_heap, closure);
-        let argument_addresses = input.clone_to_other_heap(&mut vm_heap);
-        let responsible = vm_heap.create_hir_id(Id::fuzzer());
-        let vm = Vm::for_closure(lir, vm_heap, closure, argument_addresses, responsible);
+    pub fn new(lir: L, closure: Closure, input: Input) -> Self {
+        let mut vm_heap = lir.borrow().constant_heap.clone();
+        let closure = Data::from(closure.clone_to_heap(&mut vm_heap))
+            .try_into()
+            .unwrap();
+        let arguments = input.arguments.clone_to_heap(&mut vm_heap);
+        let responsible = HirId::create(&mut vm_heap, Id::fuzzer());
+        let vm = Vm::for_closure(lir, vm_heap, closure, &arguments, responsible);
 
         Runner {
             vm: Some(vm),
@@ -68,7 +68,7 @@ impl<L: Borrow<Lir>> Runner<L> {
         }
     }
 
-    pub fn run<E: ExecutionController>(&mut self, execution_controller: &mut E) {
+    pub fn run(&mut self, execution_controller: &mut impl ExecutionController) {
         assert!(self.vm.is_some());
         assert!(self.result.is_none());
 

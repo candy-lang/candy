@@ -17,7 +17,6 @@ use candy_frontend::{
 };
 use extension_trait::extension_trait;
 use itertools::Itertools;
-use once_cell::sync::Lazy;
 use traversal::dft_post_rev;
 
 #[derive(Clone, Default)]
@@ -57,11 +56,10 @@ impl FormattingInfo {
             is_single_expression_in_assignment_body: true,
         }
     }
-    pub fn resolve_for_sandwich_like(&self, previous_width: &Width) -> Self {
+    pub fn resolve_for_sandwich_like(&self, previous_width: Width) -> Self {
         Self {
             indentation: if self.is_single_expression_in_assignment_body
-                && previous_width
-                    .last_line_fits(self.indentation, &(*SinglelineWidth::PARENTHESIS).into())
+                && previous_width.last_line_fits(self.indentation, SinglelineWidth::PARENTHESIS)
             {
                 self.indentation.with_dedent()
             } else {
@@ -75,7 +73,7 @@ impl FormattingInfo {
 
 pub fn format_csts<'a>(
     edits: &mut TextEdits,
-    previous_width: &Width,
+    previous_width: Width,
     mut csts: &'a [Cst],
     fallback_offset: Offset,
     info: &FormattingInfo,
@@ -113,7 +111,7 @@ pub fn format_csts<'a>(
             )
         };
 
-        formatted = format_cst(edits, &(previous_width + &width), expression, info);
+        formatted = format_cst(edits, previous_width + width, expression, info);
         offset = formatted.whitespace.end_offset();
         expression_count += 1;
     }
@@ -128,16 +126,15 @@ pub fn format_csts<'a>(
 
 fn split_leading_whitespace(start_offset: Offset, csts: &[Cst]) -> (ExistingWhitespace, &[Cst]) {
     let first_expression_index = csts.iter().find_position(|cst| {
-        #[allow(unused_parens)] // False positive
         !matches!(
             cst.kind,
-            (CstKind::Whitespace(_)
+            CstKind::Whitespace(_)
                 | CstKind::Error {
                     error: CstError::TooMuchWhitespace,
                     ..
                 }
                 | CstKind::Newline(_)
-                | CstKind::Comment { .. }),
+                | CstKind::Comment { .. },
         )
     });
     let (leading_whitespace, rest) =
@@ -168,7 +165,7 @@ fn split_leading_whitespace(start_offset: Offset, csts: &[Cst]) -> (ExistingWhit
 /// two is reserved in the first line (for the bar and the space that follows it).
 pub(crate) fn format_cst<'a>(
     edits: &mut TextEdits,
-    previous_width: &Width,
+    previous_width: Width,
     cst: &'a Cst,
     info: &FormattingInfo,
 ) -> FormattedCst<'a> {
@@ -221,21 +218,11 @@ pub(crate) fn format_cst<'a>(
             // TODO: Format text
             let mut width = Width::default();
             for opening_single_quote in opening_single_quotes {
-                width += format_cst(
-                    edits,
-                    &(previous_width + &width),
-                    opening_single_quote,
-                    info,
-                )
-                .min_width(info.indentation);
+                width += format_cst(edits, previous_width + width, opening_single_quote, info)
+                    .min_width(info.indentation);
             }
-            width += format_cst(
-                edits,
-                &(previous_width + &width),
-                opening_double_quote,
-                info,
-            )
-            .min_width(info.indentation);
+            width += format_cst(edits, previous_width + width, opening_double_quote, info)
+                .min_width(info.indentation);
             width
         }
         CstKind::ClosingText {
@@ -246,13 +233,8 @@ pub(crate) fn format_cst<'a>(
             let mut width = format_cst(edits, previous_width, closing_double_quote, info)
                 .min_width(info.indentation);
             for closing_single_quote in closing_single_quotes {
-                width += format_cst(
-                    edits,
-                    &(previous_width + &width),
-                    closing_single_quote,
-                    info,
-                )
-                .min_width(info.indentation);
+                width += format_cst(edits, previous_width + width, closing_single_quote, info)
+                    .min_width(info.indentation);
             }
             width
         }
@@ -265,10 +247,10 @@ pub(crate) fn format_cst<'a>(
             let mut width =
                 format_cst(edits, previous_width, opening, info).min_width(info.indentation);
             for part in parts {
-                width += format_cst(edits, &(previous_width + &width), part, info)
+                width += format_cst(edits, previous_width + width, part, info)
                     .min_width(info.indentation);
             }
-            width += format_cst(edits, &(previous_width + &width), closing, info)
+            width += format_cst(edits, previous_width + width, closing, info)
                 .min_width(info.indentation);
             width
         }
@@ -281,78 +263,83 @@ pub(crate) fn format_cst<'a>(
             // TODO: Format text
             let mut width = Width::default();
             for opening_curly_brace in opening_curly_braces {
-                width += format_cst(edits, &(previous_width + &width), opening_curly_brace, info)
+                width += format_cst(edits, previous_width + width, opening_curly_brace, info)
                     .min_width(info.indentation);
             }
-            width += format_cst(edits, &(previous_width + &width), expression, info)
+            width += format_cst(edits, previous_width + width, expression, info)
                 .min_width(info.indentation);
             for closing_curly_brace in closing_curly_braces {
-                width += format_cst(edits, &(previous_width + &width), closing_curly_brace, info)
+                width += format_cst(edits, previous_width + width, closing_curly_brace, info)
                     .min_width(info.indentation);
             }
             width
         }
         CstKind::BinaryBar { left, bar, right } => {
-            let mut left = format_cst(edits, previous_width, left, info);
+            // Left
+            let mut left =
+                format_receiver(edits, previous_width, left, info, ReceiverParent::BinaryBar);
 
+            // Bar
             let width_for_right_side = Width::multiline(None, info.indentation.width());
-            let bar_width = format_cst(edits, &width_for_right_side, bar, info)
+            let bar_width = format_cst(edits, width_for_right_side, bar, info)
                 .into_space_and_move_comments_to(edits, &mut left.whitespace);
+            let left_min_width = left.min_width(info.indentation);
 
-            let (right, right_parentheses) = ExistingParentheses::split_from(edits, right);
-            // Depending on the precedence of `right` and whether there's an opening parenthesis
-            // with a comment, we might be able to remove the parentheses. However, we won't insert
-            // any by ourselves.
-            let right_needs_parentheses = match right.precedence() {
-                Some(PrecedenceCategory::High) => right_parentheses.are_required_due_to_comments(),
-                Some(PrecedenceCategory::Low) | None => right_parentheses.is_some(),
+            // Right
+            let (right_width, whitespace) = {
+                let (right, right_parentheses) = ExistingParentheses::split_from(edits, right);
+                // Depending on the precedence of `right` and whether there's an opening parenthesis
+                // with a comment, we might be able to remove the parentheses. However, we won't insert
+                // any by ourselves.
+                let right_needs_parentheses = match right.precedence() {
+                    Some(PrecedenceCategory::High) => {
+                        right_parentheses.are_required_due_to_comments()
+                    }
+                    Some(PrecedenceCategory::Low) | None => right_parentheses.is_some(),
+                };
+                let (previous_width_for_right, info_for_right) = if right_needs_parentheses {
+                    (
+                        width_for_right_side
+                            + bar_width
+                            + SinglelineWidth::PARENTHESIS
+                            + SinglelineWidth::PARENTHESIS,
+                        info.with_indent(),
+                    )
+                } else {
+                    (width_for_right_side + bar_width, info.to_owned())
+                };
+                let right = format_cst(edits, previous_width_for_right, right, &info_for_right);
+                if right_needs_parentheses {
+                    assert!(right_parentheses.is_some());
+                    right_parentheses.into_some(
+                        edits,
+                        previous_width
+                            + left_min_width
+                            + SinglelineWidth::SPACE
+                            + bar_width
+                            + SinglelineWidth::SPACE,
+                        right,
+                        info,
+                    )
+                } else {
+                    right_parentheses.into_none(edits, right)
+                }
+                .split()
             };
-            let (previous_width_for_right, info_for_right) = if right_needs_parentheses {
-                (
-                    &width_for_right_side
-                        + &bar_width
-                        + *SinglelineWidth::PARENTHESIS
-                        + *SinglelineWidth::PARENTHESIS,
-                    info.with_indent(),
-                )
-            } else {
-                (&width_for_right_side + &bar_width, info.to_owned())
-            };
-            let right = format_cst(edits, &previous_width_for_right, right, &info_for_right);
 
-            let (right_width, whitespace) = if right_needs_parentheses {
-                assert!(right_parentheses.is_some());
-                right_parentheses.into_some(
-                    edits,
-                    &(previous_width
-                        + left.min_width(info.indentation)
-                        + *SinglelineWidth::SPACE
-                        + &bar_width
-                        + *SinglelineWidth::SPACE),
-                    right,
-                    info,
-                )
-            } else {
-                right_parentheses.into_none(edits, right)
-            }
-            .split();
-
-            let left_trailing = if let Some(right_first_line_width) = right_width.first_line_width()
-                && (left.min_width(info.indentation)
-                    + *SinglelineWidth::SPACE
-                    + &bar_width
+            let left_width = if let Some(right_first_line_width) = right_width.first_line_width()
+                && (left_min_width
+                    + SinglelineWidth::SPACE
+                    + bar_width
                     + right_first_line_width)
                 .fits(info.indentation)
             {
-                TrailingWhitespace::Space
+                left.into_trailing_with_space(edits)
             } else {
-                TrailingWhitespace::Indentation(info.indentation)
+                left.into_trailing_with_indentation(edits, info.indentation)
             };
 
-            return FormattedCst::new(
-                left.into_trailing(edits, left_trailing) + bar_width + right_width,
-                whitespace,
-            );
+            return FormattedCst::new(left_width + bar_width + right_width, whitespace);
         }
         CstKind::Parenthesized { .. } => {
             // Whenever parentheses are necessary, they are handled by the parent. Hence, we try to
@@ -363,7 +350,7 @@ pub(crate) fn format_cst<'a>(
             return if parentheses.are_required_due_to_comments() {
                 let child = format_cst(
                     edits,
-                    &Width::multiline(None, info.indentation.with_indent().width()),
+                    Width::multiline(None, info.indentation.with_indent().width()),
                     child,
                     &info.with_indent(),
                 );
@@ -377,11 +364,13 @@ pub(crate) fn format_cst<'a>(
             receiver,
             arguments,
         } => {
-            let receiver = format_cst(edits, previous_width, receiver, info);
+            let receiver =
+                format_receiver(edits, previous_width, receiver, info, ReceiverParent::Call);
             if arguments.is_empty() {
                 return receiver;
             }
 
+            // Arguments
             let previous_width_for_arguments = Width::multiline(None, info.indentation.width());
             let last_argument_index = arguments.len() - 1;
             let mut arguments = arguments
@@ -390,7 +379,7 @@ pub(crate) fn format_cst<'a>(
                 .map(|(index, argument)| {
                     Argument::new(
                         edits,
-                        &previous_width_for_arguments,
+                        previous_width_for_arguments,
                         argument,
                         &info.with_indent(),
                         index == last_argument_index,
@@ -398,13 +387,13 @@ pub(crate) fn format_cst<'a>(
                 })
                 .collect_vec();
 
-            let min_width = &receiver.min_width(info.indentation)
+            let min_width = receiver.min_width(info.indentation)
                 + arguments
                     .iter()
-                    .map(|it| &(*SinglelineWidth::SPACE).into() + it.min_singleline_width())
+                    .map(|it| SinglelineWidth::SPACE + it.min_singleline_width())
                     .sum::<Width>();
             let (is_singleline, argument_info, trailing) =
-                if previous_width.last_line_fits(info.indentation, &min_width) {
+                if previous_width.last_line_fits(info.indentation, min_width) {
                     (true, info.to_owned(), TrailingWhitespace::Space)
                 } else {
                     (
@@ -420,7 +409,7 @@ pub(crate) fn format_cst<'a>(
             let width = arguments.into_iter().fold(width, |old_width, argument| {
                 let argument = argument.format(
                     edits,
-                    &(previous_width + &old_width),
+                    previous_width + old_width,
                     &argument_info,
                     is_singleline,
                 );
@@ -444,7 +433,7 @@ pub(crate) fn format_cst<'a>(
             let (last_argument_width, whitespace) = last_argument
                 .format(
                     edits,
-                    &(previous_width + &width),
+                    previous_width + width,
                     &info_for_last_argument,
                     is_singleline,
                 )
@@ -478,7 +467,7 @@ pub(crate) fn format_cst<'a>(
 
             let (comma_width, mut whitespace) = apply_trailing_comma_condition(
                 edits,
-                &(previous_width + value.child_width()),
+                previous_width + value.child_width(),
                 comma.as_deref(),
                 value_end,
                 info,
@@ -514,7 +503,7 @@ pub(crate) fn format_cst<'a>(
                 let key = format_cst(edits, previous_width, key, &info.with_indent());
                 let mut colon = format_cst(
                     edits,
-                    &(previous_width + key.child_width()),
+                    previous_width + key.child_width(),
                     colon,
                     &info.with_indent(),
                 );
@@ -528,24 +517,24 @@ pub(crate) fn format_cst<'a>(
             let previous_width_for_value = if key_and_colon.is_some() {
                 Width::multiline(None, info.indentation.with_indent().width())
             } else {
-                previous_width.to_owned()
+                previous_width
             };
-            let value = format_cst(edits, &previous_width_for_value, value, &info.with_indent());
+            let value = format_cst(edits, previous_width_for_value, value, &info.with_indent());
 
             let key_and_colon_min_width = key_width_and_colon
                 .as_ref()
-                .map(|(key_width, colon)| key_width + &colon.min_width(info.indentation))
+                .map(|(key_width, colon)| *key_width + colon.min_width(info.indentation))
                 .unwrap_or_default();
             let (comma_width, mut whitespace) = apply_trailing_comma_condition(
                 edits,
-                &(previous_width_for_value + value.child_width()),
+                previous_width_for_value + value.child_width(),
                 comma.as_deref(),
                 value_end,
                 info,
-                &key_and_colon_min_width + value.min_width(info.indentation),
+                key_and_colon_min_width + value.min_width(info.indentation),
             );
             let value_width = value.into_empty_and_move_comments_to(edits, &mut whitespace);
-            let min_width = key_and_colon_min_width + &value_width + &comma_width;
+            let min_width = key_and_colon_min_width + value_width + comma_width;
 
             return FormattedCst::new(
                 key_width_and_colon
@@ -575,13 +564,13 @@ pub(crate) fn format_cst<'a>(
                 {
                     Width::multiline(None, info.indentation.with_indent().width())
                 } else {
-                    previous_width + *SinglelineWidth::PARENTHESIS
+                    previous_width + SinglelineWidth::PARENTHESIS
                 };
                 (previous_width_for_struct, info.with_indent())
             } else {
-                (previous_width.to_owned(), info.to_owned())
+                (previous_width, info.to_owned())
             };
-            let struct_ = format_cst(edits, &previous_width_for_struct, struct_, &info_for_struct);
+            let struct_ = format_cst(edits, previous_width_for_struct, struct_, &info_for_struct);
             let mut struct_ = if struct_needs_parentheses {
                 struct_parentheses.into_some(edits, previous_width, struct_, info)
             } else {
@@ -590,18 +579,18 @@ pub(crate) fn format_cst<'a>(
 
             let previous_width_for_dot =
                 Width::multiline(None, info.indentation.with_indent().width());
-            let dot_width = format_cst(edits, &previous_width_for_dot, dot, &info.with_indent())
+            let dot_width = format_cst(edits, previous_width_for_dot, dot, &info.with_indent())
                 .into_empty_and_move_comments_to(edits, &mut struct_.whitespace);
 
             let key = format_cst(
                 edits,
-                &(previous_width_for_dot + &dot_width),
+                previous_width_for_dot + dot_width,
                 key,
                 &info.with_indent(),
             );
 
             let min_width =
-                struct_.min_width(info.indentation) + &dot_width + key.min_width(info.indentation);
+                struct_.min_width(info.indentation) + dot_width + key.min_width(info.indentation);
             let struct_trailing = if min_width.fits(info.indentation) {
                 TrailingWhitespace::None
             } else {
@@ -623,7 +612,7 @@ pub(crate) fn format_cst<'a>(
 
             let previous_width_for_indented =
                 Width::multiline(None, info.indentation.with_indent().width());
-            let mut percent = format_cst(edits, &previous_width_for_indented, percent, info);
+            let mut percent = format_cst(edits, previous_width_for_indented, percent, info);
             let expression_width =
                 expression.into_space_and_move_comments_to(edits, &mut percent.whitespace);
 
@@ -649,7 +638,7 @@ pub(crate) fn format_cst<'a>(
 
             let (last_case_width, whitespace) = format_cst(
                 edits,
-                &previous_width_for_indented,
+                previous_width_for_indented,
                 last_case,
                 &info.with_indent(),
             )
@@ -660,7 +649,7 @@ pub(crate) fn format_cst<'a>(
                     + cases
                         .iter()
                         .map(|it| {
-                            format_cst(edits, &previous_width_for_indented, it, &info.with_indent())
+                            format_cst(edits, previous_width_for_indented, it, &info.with_indent())
                                 .into_trailing_with_indentation(
                                     edits,
                                     info.indentation.with_indent(),
@@ -680,15 +669,15 @@ pub(crate) fn format_cst<'a>(
 
             let previous_width_for_arrow =
                 Width::multiline(None, info.indentation.with_indent().width());
-            let mut arrow = format_cst(edits, &previous_width_for_arrow, arrow, info);
+            let mut arrow = format_cst(edits, previous_width_for_arrow, arrow, info);
             let pattern_width =
                 pattern.into_space_and_move_comments_to(edits, &mut arrow.whitespace);
 
             let (body_width, whitespace) = format_csts(
                 edits,
-                &(previous_width_for_arrow
-                    + *SinglelineWidth::SPACE
-                    + arrow.min_width(info.indentation.with_indent())),
+                previous_width_for_arrow
+                    + SinglelineWidth::SPACE
+                    + arrow.min_width(info.indentation.with_indent()),
                 body,
                 arrow.whitespace.end_offset(),
                 &info.with_indent(),
@@ -697,7 +686,7 @@ pub(crate) fn format_cst<'a>(
 
             let arrow_trailing = if pattern_width.last_line_fits(
                 info.indentation,
-                &(arrow.min_width(info.indentation) + *SinglelineWidth::SPACE + &body_width),
+                arrow.min_width(info.indentation) + SinglelineWidth::SPACE + body_width,
             ) {
                 TrailingWhitespace::Space
             } else {
@@ -726,17 +715,17 @@ pub(crate) fn format_cst<'a>(
                     let mut parameters = parameters
                         .iter()
                         .map(|it| {
-                            format_cst(edits, &previous_width_for_inner, it, &info.with_indent())
+                            format_cst(edits, previous_width_for_inner, it, &info.with_indent())
                         })
                         .collect_vec();
                     let arrow =
-                        format_cst(edits, &previous_width_for_inner, arrow, &info.with_indent());
+                        format_cst(edits, previous_width_for_inner, arrow, &info.with_indent());
 
                     let parameters_trailing = if (opening_curly_brace.min_width(info.indentation)
-                        + *SinglelineWidth::SPACE
+                        + SinglelineWidth::SPACE
                         + parameters
                             .iter()
-                            .map(|it| it.min_width(info.indentation) + *SinglelineWidth::SPACE)
+                            .map(|it| it.min_width(info.indentation) + SinglelineWidth::SPACE)
                             .sum::<Width>()
                         + arrow.min_width(info.indentation))
                     .fits(info.indentation)
@@ -756,9 +745,9 @@ pub(crate) fn format_cst<'a>(
                             // The arrow's comment can flow to the next line.
                             let trailing = if parameters_width.last_line_fits(
                                 info.indentation,
-                                &(it.min_width(info.indentation)
-                                    + *SinglelineWidth::SPACE
-                                    + arrow.child_width()),
+                                it.min_width(info.indentation)
+                                    + SinglelineWidth::SPACE
+                                    + arrow.child_width(),
                             ) {
                                 TrailingWhitespace::Space
                             } else {
@@ -777,14 +766,14 @@ pub(crate) fn format_cst<'a>(
                 .unwrap_or_else(|| opening_curly_brace.whitespace.end_offset());
             let body = format_csts(
                 edits,
-                &previous_width_for_inner,
+                previous_width_for_inner,
                 body,
                 body_fallback_offset,
                 &info.with_indent(),
             );
             let (closing_curly_brace_width, whitespace) = format_cst(
                 edits,
-                &Width::multiline(None, info.indentation.width()),
+                Width::multiline(None, info.indentation.width()),
                 closing_curly_brace,
                 &info,
             )
@@ -794,28 +783,28 @@ pub(crate) fn format_cst<'a>(
                 .as_ref()
                 .map(|(parameters_width, arrow)| {
                     (
-                        parameters_width + arrow.child_width(),
+                        *parameters_width + arrow.child_width(),
                         arrow.whitespace.has_comments(),
                     )
                 })
                 .unwrap_or_default();
             let body_min_width = body.min_width(info.indentation);
             let width_until_arrow = opening_curly_brace.min_width(info.indentation)
-                + *SinglelineWidth::SPACE
-                + &parameters_and_arrow_min_width;
+                + SinglelineWidth::SPACE
+                + parameters_and_arrow_min_width;
 
             // Opening curly brace
             let width_for_first_line = if parameters_and_arrow.is_some() {
                 #[allow(clippy::redundant_clone)] // False positive
-                width_until_arrow.clone()
+                width_until_arrow
             } else {
-                &width_until_arrow
-                    + &body_min_width
-                    + *SinglelineWidth::SPACE
-                    + &closing_curly_brace_width
+                width_until_arrow
+                    + body_min_width
+                    + SinglelineWidth::SPACE
+                    + closing_curly_brace_width
             };
             let opening_curly_brace_trailing =
-                if previous_width.last_line_fits(info.indentation, &width_for_first_line) {
+                if previous_width.last_line_fits(info.indentation, width_for_first_line) {
                     TrailingWhitespace::Space
                 } else if body_min_width.is_empty() {
                     TrailingWhitespace::Indentation(info.indentation)
@@ -825,23 +814,23 @@ pub(crate) fn format_cst<'a>(
 
             // Body
             let space_if_parameters = if parameters_width_and_arrow.is_some() {
-                *SinglelineWidth::SPACE
+                SinglelineWidth::SPACE
             } else {
                 SinglelineWidth::default()
             };
             let space_if_body_not_empty = if body_min_width.is_empty() {
                 SinglelineWidth::default()
             } else {
-                *SinglelineWidth::SPACE
+                SinglelineWidth::SPACE
             };
             let width_from_body =
-                body_min_width + space_if_body_not_empty + &closing_curly_brace_width;
+                body_min_width + space_if_body_not_empty + closing_curly_brace_width;
             let body_trailing = if body.child_width().is_empty() {
                 TrailingWhitespace::None
             } else if !arrow_has_comments
                 && previous_width.last_line_fits(
                     info.indentation,
-                    &(&width_until_arrow + space_if_parameters + &width_from_body),
+                    width_until_arrow + space_if_parameters + width_from_body,
                 )
             {
                 TrailingWhitespace::Space
@@ -853,10 +842,9 @@ pub(crate) fn format_cst<'a>(
             let parameters_and_arrow_width = parameters_width_and_arrow
                 .map(|(parameters_width, arrow)| {
                     let arrow_trailing = if !arrow.whitespace.has_comments()
-                        && width_until_arrow.last_line_fits(
-                            info.indentation,
-                            &(&space_if_parameters.into() + width_from_body),
-                        ) {
+                        && width_until_arrow
+                            .last_line_fits(info.indentation, space_if_parameters + width_from_body)
+                    {
                         TrailingWhitespace::Space
                     } else {
                         TrailingWhitespace::Indentation(info.indentation.with_indent())
@@ -882,10 +870,10 @@ pub(crate) fn format_cst<'a>(
                 format_cst(edits, previous_width, left, info).into_trailing_with_space(edits);
             // TODO: move assignment sign to next line if it doesn't fit
 
-            let previous_width_for_assignment_sign = previous_width + &left_width;
+            let previous_width_for_assignment_sign = previous_width + left_width;
             let assignment_sign = format_cst(
                 edits,
-                &previous_width_for_assignment_sign,
+                previous_width_for_assignment_sign,
                 assignment_sign,
                 &info.with_indent(),
             );
@@ -899,9 +887,9 @@ pub(crate) fn format_cst<'a>(
             };
             let (body_width, body_whitespace) = format_csts(
                 edits,
-                &(previous_width_for_assignment_sign
+                previous_width_for_assignment_sign
                     + assignment_sign.min_width(info.indentation)
-                    + *SinglelineWidth::SPACE),
+                    + SinglelineWidth::SPACE,
                 body,
                 assignment_sign.whitespace.end_offset(),
                 &body_info,
@@ -918,14 +906,14 @@ pub(crate) fn format_cst<'a>(
 
             let assignment_sign_trailing = if left_width.last_line_fits(
                 info.indentation,
-                &(&assignment_sign.min_width(info.indentation) + *SinglelineWidth::SPACE + &body_width + &body_whitespace_width),
+                assignment_sign.min_width(info.indentation) + SinglelineWidth::SPACE + body_width + body_whitespace_width,
             ) {
                 TrailingWhitespace::Space
             } else if !body_whitespace_has_comments
                 && let Some(body_first_line_width) = body_width.first_line_width()
                 && left_width.last_line_fits(
                     info.indentation,
-                    &(&assignment_sign.min_width(info.indentation) + *SinglelineWidth::SPACE + body_first_line_width),
+                    assignment_sign.min_width(info.indentation) + SinglelineWidth::SPACE + body_first_line_width,
             ) {
                 TrailingWhitespace::Space
             } else {
@@ -935,13 +923,47 @@ pub(crate) fn format_cst<'a>(
             left_width
                 + assignment_sign.into_trailing(edits, assignment_sign_trailing)
                 + body_width
-                + &body_whitespace_width
+                + body_whitespace_width
         }
         CstKind::Error {
             unparsable_input, ..
         } => unparsable_input.width(),
     };
     FormattedCst::new(width, ExistingWhitespace::empty(cst.data.span.end))
+}
+
+enum ReceiverParent {
+    BinaryBar,
+    Call,
+}
+fn format_receiver<'a>(
+    edits: &mut TextEdits,
+    previous_width: Width,
+    receiver: &'a Cst,
+    info: &FormattingInfo,
+    parent: ReceiverParent,
+) -> FormattedCst<'a> {
+    let (receiver, receiver_parentheses) = ExistingParentheses::split_from(edits, receiver);
+    let receiver_needs_parentheses = match receiver.precedence() {
+        Some(PrecedenceCategory::High) => receiver_parentheses.are_required_due_to_comments(),
+        Some(PrecedenceCategory::Low) => match parent {
+            ReceiverParent::BinaryBar => receiver_parentheses.are_required_due_to_comments(),
+            ReceiverParent::Call => true,
+        },
+        None => receiver_parentheses.is_some(),
+    };
+    let previous_width_for_receiver = if receiver_needs_parentheses {
+        previous_width + SinglelineWidth::PARENTHESIS + SinglelineWidth::PARENTHESIS
+    } else {
+        previous_width
+    };
+    let receiver = format_cst(edits, previous_width_for_receiver, receiver, info);
+
+    if receiver_needs_parentheses {
+        receiver_parentheses.into_some(edits, previous_width, receiver, info)
+    } else {
+        receiver_parentheses.into_none(edits, receiver)
+    }
 }
 
 struct Argument<'a> {
@@ -952,7 +974,7 @@ struct Argument<'a> {
 impl<'a> Argument<'a> {
     fn new(
         edits: &mut TextEdits,
-        previous_width: &Width,
+        previous_width: Width,
         cst: &'a Cst,
         info: &FormattingInfo,
         is_last: bool,
@@ -976,12 +998,11 @@ impl<'a> Argument<'a> {
         } else {
             let argument = format_cst(edits, previous_width, argument, info);
             let mut min_singleline_width = argument.min_width(info.indentation.with_indent());
-            let parentheses_width: SinglelineWidth =
-                *SinglelineWidth::PARENTHESIS + *SinglelineWidth::PARENTHESIS;
+            let parentheses_width = SinglelineWidth::PARENTHESIS + SinglelineWidth::PARENTHESIS;
             match precedence {
                 Some(PrecedenceCategory::High) => {}
-                Some(PrecedenceCategory::Low) => min_singleline_width += &parentheses_width.into(),
-                None if parentheses.is_some() => min_singleline_width += &parentheses_width.into(),
+                Some(PrecedenceCategory::Low) => min_singleline_width += parentheses_width,
+                None if parentheses.is_some() => min_singleline_width += parentheses_width,
                 None => {}
             }
             MaybeSandwichLikeArgument::Other {
@@ -997,23 +1018,22 @@ impl<'a> Argument<'a> {
     }
 
     /// Width of the opening parenthesis / bracket / curly brace
-    const SANDWICH_LIKE_MIN_SINGLELINE_WIDTH: Lazy<SinglelineWidth> =
-        Lazy::new(|| *SinglelineWidth::PARENTHESIS);
+    const SANDWICH_LIKE_MIN_SINGLELINE_WIDTH: SinglelineWidth = SinglelineWidth::PARENTHESIS;
     fn min_singleline_width(&self) -> Width {
         match &self.argument {
             MaybeSandwichLikeArgument::SandwichLike(_) => {
-                (*Self::SANDWICH_LIKE_MIN_SINGLELINE_WIDTH).into()
+                Self::SANDWICH_LIKE_MIN_SINGLELINE_WIDTH.into()
             }
             MaybeSandwichLikeArgument::Other {
                 min_singleline_width,
                 ..
-            } => min_singleline_width.to_owned(),
+            } => *min_singleline_width,
         }
     }
     fn format(
         self,
         edits: &mut TextEdits,
-        previous_width: &Width,
+        previous_width: Width,
         info: &FormattingInfo,
         is_singleline: bool,
     ) -> FormattedCst<'a> {
@@ -1024,9 +1044,13 @@ impl<'a> Argument<'a> {
             MaybeSandwichLikeArgument::Other { argument, .. } => argument,
         };
 
+        let are_parentheses_necessary_due_to_precedence = match self.precedence {
+            Some(PrecedenceCategory::High) => false,
+            Some(PrecedenceCategory::Low) | None => true,
+        };
         if self.parentheses.is_some() {
             // We already have parentheses …
-            if is_singleline && self.precedence != Some(PrecedenceCategory::High)
+            if is_singleline && are_parentheses_necessary_due_to_precedence
                 || self.parentheses.are_required_due_to_comments()
             {
                 // … and we actually need them.
@@ -1038,7 +1062,7 @@ impl<'a> Argument<'a> {
             }
         } else {
             // We don't have parentheses …
-            if is_singleline && self.precedence == Some(PrecedenceCategory::Low) {
+            if is_singleline && are_parentheses_necessary_due_to_precedence {
                 // … but we need them.
                 self.parentheses
                     .into_some(edits, previous_width, argument, info)
@@ -1059,7 +1083,10 @@ enum MaybeSandwichLikeArgument<'a> {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PrecedenceCategory {
+    /// Literals, parenthesized, struct access, etc.
     High,
+
+    /// Binary bar, call, and match
     Low,
 }
 
@@ -1070,11 +1097,10 @@ pub impl<D> CstExtension for Cst<D> {
             .any(|(_, it)| matches!(it.kind, CstKind::Comment { .. }))
     }
 
-    #[allow(unused_parens)] // False positive
     fn is_sandwich_like(&self) -> bool {
         matches!(
             &self.kind,
-            (CstKind::List { .. } | CstKind::Struct { .. } | CstKind::Lambda { .. }),
+            CstKind::List { .. } | CstKind::Struct { .. } | CstKind::Lambda { .. },
         )
     }
 
@@ -1219,6 +1245,13 @@ mod test {
         // # abc
         test("foo\n# abc", "foo\n# abc\n");
         test("foo\n # abc", "foo\n# abc\n");
+        // # abc
+        // # def
+        test("# abc\n# def\n", "# abc\n# def\n");
+        // # abc
+        //
+        // # def
+        test("# abc\n\n# def\n", "# abc\n\n# def\n");
     }
     #[test]
     fn test_int() {
@@ -1235,6 +1268,8 @@ mod test {
         test("foo | (\n  bar\n)", "foo | bar\n");
         test("foo | (bar baz)", "foo | (bar baz)\n");
         test("foo | (bar | baz)", "foo | (bar | baz)\n");
+        test("(foo bar) | baz", "foo bar | baz\n");
+        test("(foo | bar) | baz", "foo | bar | baz\n");
         test(
             "looooooooooooooooooooooooooooooooongReceiver | (looooooooooooooooooooooooooooooooooooooooongFunction)",
             "looooooooooooooooooooooooooooooooongReceiver | looooooooooooooooooooooooooooooooooooooooongFunction\n",
@@ -1294,6 +1329,12 @@ mod test {
         test(
             "foo | bar {\n  baz\n  blub\n}",
             "foo | bar {\n  baz\n  blub\n}\n",
+        );
+        // loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongReceiver longArgument
+        // | function
+        test(
+            "loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongReceiver longArgument\n| function\n",
+            "loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongReceiver longArgument\n| function\n",
         );
 
         // Comments
@@ -1384,6 +1425,8 @@ mod test {
         //   )
         test("foo (# abc\n  bar\n)", "foo\n  ( # abc\n    bar\n  )\n");
         test("needs (is foo) \"message\"", "needs (is foo) \"message\"\n");
+        test("(foo bar) baz", "(foo bar) baz\n");
+        test("(foo | bar) baz", "(foo | bar) baz\n");
 
         // Trailing sandwich-like
 

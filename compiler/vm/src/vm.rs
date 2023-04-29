@@ -16,7 +16,7 @@ use crate::{
     channel::{Channel, ChannelId, Completer, Packet, Performer},
     context::{CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions},
     fiber::{self, ExecutionResult, Fiber, FiberId},
-    heap::{Closure, Heap, Pointer, SendPort, Struct},
+    heap::{Closure, Data, Heap, HirId, InlineObject, SendPort, Struct, Tag},
     lir::Lir,
     tracer::Tracer,
 };
@@ -143,9 +143,9 @@ impl<L: Borrow<Lir>> Vm<L> {
     pub fn initialize_for_closure(
         &mut self,
         heap: Heap,
-        closure: Pointer,
-        arguments: Vec<Pointer>,
-        responsible: Pointer,
+        closure: Closure,
+        arguments: &[InlineObject],
+        responsible: HirId,
     ) {
         assert!(self.fibers.is_empty());
         let fiber = Fiber::for_closure(heap, closure, arguments, responsible);
@@ -161,24 +161,21 @@ impl<L: Borrow<Lir>> Vm<L> {
     pub fn for_closure(
         lir: L,
         heap: Heap,
-        closure: Pointer,
-        arguments: Vec<Pointer>,
-        responsible: Pointer,
+        closure: Closure,
+        arguments: &[InlineObject],
+        responsible: HirId,
     ) -> Self {
         let mut this = Self::uninitialized(lir);
         this.initialize_for_closure(heap, closure, arguments, responsible);
         this
     }
-    pub fn for_module_closure(lir: L) -> Self {
-        let mut heap = lir.borrow().heap.clone();
-        let closure = heap.create_closure(Closure {
-            captured: vec![],
-            num_args: 0,
-            body: lir.borrow().start,
-        });
-        let responsible = heap.create_hir_id(Id::new(lir.borrow().module.clone(), vec![]));
+    pub fn for_module(lir: L) -> Self {
+        let actual_lir = lir.borrow();
+        let heap = actual_lir.constant_heap.clone();
+        let closure = actual_lir.module_closure;
+        let responsible = actual_lir.responsible_module;
 
-        Self::for_closure(lir, heap, closure, vec![], responsible)
+        Self::for_closure(lir, heap, closure, &[], responsible)
     }
 
     pub fn tear_down(mut self) -> ExecutionResult {
@@ -241,9 +238,9 @@ impl<L: Borrow<Lir>> Vm<L> {
     // This will be used as soon as the outside world tries to send something
     // into the VM.
     #[allow(dead_code)]
-    pub fn send<T: Tracer>(
+    pub fn send(
         &mut self,
-        tracer: &mut T,
+        tracer: &mut impl Tracer,
         channel: ChannelId,
         packet: Packet,
     ) -> OperationId {
@@ -271,10 +268,10 @@ impl<L: Borrow<Lir>> Vm<L> {
         self.unreferenced_channels.remove(&channel);
     }
 
-    pub fn run<E: ExecutionController, T: Tracer>(
+    pub fn run(
         &mut self,
-        execution_controller: &mut E,
-        tracer: &mut T,
+        execution_controller: &mut impl ExecutionController,
+        tracer: &mut impl Tracer,
     ) {
         while self.can_run() && execution_controller.should_continue_running() {
             self.run_raw(
@@ -286,10 +283,10 @@ impl<L: Borrow<Lir>> Vm<L> {
             );
         }
     }
-    fn run_raw<E: ExecutionController, T: Tracer>(
+    fn run_raw(
         &mut self,
-        execution_controller: &mut E,
-        tracer: &mut T,
+        execution_controller: &mut impl ExecutionController,
+        tracer: &mut impl Tracer,
     ) {
         assert!(
             self.can_run(),
@@ -346,10 +343,14 @@ impl<L: Borrow<Lir>> Vm<L> {
 
                 let first_child_id = {
                     let id = self.fiber_id_generator.generate();
+
                     let mut heap = Heap::default();
-                    let body = fiber.heap.clone_single_to_other_heap(&mut heap, body);
-                    let responsible = fiber.heap.create_hir_id(Id::complicated_responsibility());
-                    let nursery_send_port = heap.create_send_port(nursery_id);
+                    let body = Data::from(body.clone_to_heap(&mut heap))
+                        .try_into()
+                        .unwrap();
+                    let responsible =
+                        HirId::create(&mut fiber.heap, Id::complicated_responsibility());
+                    let nursery_send_port = SendPort::create(&mut heap, nursery_id);
 
                     self.fibers.insert(
                         id,
@@ -357,7 +358,7 @@ impl<L: Borrow<Lir>> Vm<L> {
                             fiber: Fiber::for_closure(
                                 heap,
                                 body,
-                                vec![nursery_send_port],
+                                &[nursery_send_port],
                                 responsible,
                             ),
                             parent: Some(fiber_id),
@@ -382,13 +383,16 @@ impl<L: Borrow<Lir>> Vm<L> {
                 let child_id = {
                     let id = self.fiber_id_generator.generate();
                     let mut heap = Heap::default();
-                    let body = fiber.heap.clone_single_to_other_heap(&mut heap, body);
-                    let responsible = fiber.heap.create_hir_id(Id::complicated_responsibility());
+                    let body = Data::from(body.clone_to_heap(&mut heap))
+                        .try_into()
+                        .unwrap();
+                    let responsible =
+                        HirId::create(&mut fiber.heap, Id::complicated_responsibility());
 
                     self.fibers.insert(
                         id,
                         FiberTree::Single(Single {
-                            fiber: Fiber::for_closure(heap, body, vec![], responsible),
+                            fiber: Fiber::for_closure(heap, body, &[], responsible),
                             parent: Some(fiber_id),
                         }),
                     );
@@ -470,7 +474,7 @@ impl<L: Borrow<Lir>> Vm<L> {
                 FiberTree::Try(Try { .. }) => {
                     self.fibers.replace(parent, |tree| {
                         let mut paused_fiber = tree.into_try().unwrap().paused_fiber;
-                        paused_fiber.fiber.complete_try(result);
+                        paused_fiber.fiber.complete_try(&result);
                         FiberTree::Single(paused_fiber)
                     });
                 }
@@ -490,7 +494,7 @@ impl<L: Borrow<Lir>> Vm<L> {
         // communicate to the outside that no fiber references it anymore. If
         // the outside doesn't intend to re-use the channel, it should call
         // `free_channel`.
-        let unreferenced_channels = all_channels
+        self.unreferenced_channels = all_channels
             .difference(&known_channels)
             .filter(|channel| {
                 // Note that nurseries are automatically removed when their
@@ -499,7 +503,6 @@ impl<L: Borrow<Lir>> Vm<L> {
             })
             .copied()
             .collect();
-        self.unreferenced_channels = unreferenced_channels;
     }
     fn finish_parallel<T: Tracer>(
         &mut self,
@@ -595,18 +598,14 @@ impl<L: Borrow<Lir>> Vm<L> {
 
                 match Self::parse_spawn_packet(packet) {
                     Some((mut heap, closure_to_spawn, return_channel)) => {
-                        let responsible = heap.create_hir_id(Id::complicated_responsibility());
+                        let responsible =
+                            HirId::create(&mut heap, Id::complicated_responsibility());
                         let child_id = self.fiber_id_generator.generate();
 
                         self.fibers.insert(
                             child_id,
                             FiberTree::Single(Single {
-                                fiber: Fiber::for_closure(
-                                    heap,
-                                    closure_to_spawn,
-                                    vec![],
-                                    responsible,
-                                ),
+                                fiber: Fiber::for_closure(heap, closure_to_spawn, &[], responsible),
                                 parent: Some(parent_id),
                             }),
                         );
@@ -640,27 +639,20 @@ impl<L: Borrow<Lir>> Vm<L> {
             }
         }
     }
-    fn parse_spawn_packet(packet: Packet) -> Option<(Heap, Pointer, ChannelId)> {
-        let Packet { mut heap, address } = packet;
-        let arguments: Struct = heap.get(address).data.clone().try_into().ok()?;
+    fn parse_spawn_packet(packet: Packet) -> Option<(Heap, Closure, ChannelId)> {
+        let Packet { mut heap, object } = packet;
+        let arguments: Struct = object.try_into().ok()?;
 
-        let closure_symbol = heap.create_symbol("Closure".to_string());
-        let closure_address = arguments.get(&heap, closure_symbol)?;
-        let closure: Closure = heap.get(closure_address).data.clone().try_into().ok()?;
-        if closure.num_args > 0 {
+        let closure_tag = Tag::create_from_str(&mut heap, "Closure", None);
+        let closure: Closure = arguments.get(**closure_tag)?.try_into().ok()?;
+        if closure.argument_count() > 0 {
             return None;
         }
 
-        let return_channel_symbol = heap.create_symbol("ReturnChannel".to_string());
-        let return_channel_address = arguments.get(&heap, return_channel_symbol)?;
-        let return_channel: SendPort = heap
-            .get(return_channel_address)
-            .data
-            .clone()
-            .try_into()
-            .ok()?;
+        let return_channel_tag = Tag::create_from_str(&mut heap, "ReturnChannel", None);
+        let return_channel: SendPort = arguments.get(**return_channel_tag)?.try_into().ok()?;
 
-        Some((heap, closure_address, return_channel.channel))
+        Some((heap, closure, return_channel.channel_id()))
     }
 
     fn receive_from_channel(&mut self, performer: Performer, channel: ChannelId) {
@@ -672,7 +664,7 @@ impl<L: Borrow<Lir>> Vm<L> {
             ChannelLike::Channel(channel) => {
                 channel.receive(&mut completer, performer);
             }
-            ChannelLike::Nursery { .. } => unreachable!("nurseries are only sent stuff"),
+            ChannelLike::Nursery { .. } => unreachable!("Nurseries are only sent stuff."),
         }
     }
 }
@@ -720,6 +712,7 @@ impl ChannelLike {
     }
 }
 impl FiberTree {
+    // TODO: Use macros to generate these.
     fn into_single(self) -> Option<Single> {
         match self {
             FiberTree::Single(single) => Some(single),

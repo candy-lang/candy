@@ -4,7 +4,7 @@ use candy_frontend::{
     cst_to_ast::{AstResult, CstToAst},
     hir_to_mir::{HirToMir, MirResult},
     mir_optimize::OptimizeMir,
-    module::{Module, ModuleKind},
+    module::{Module, ModuleKind, PackagesPath},
     position::{line_start_offsets_raw, Offset},
     rich_ir::{
         ReferenceCollection, ReferenceKey, RichIr, RichIrBuilder, ToRichIr, TokenModifier,
@@ -22,7 +22,7 @@ use lsp_types::{
 };
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, hash::Hash, ops::Range, path::Path, sync::Arc};
+use std::{fmt::Debug, hash::Hash, ops::Range, sync::Arc};
 use strum::{EnumDiscriminants, EnumString, IntoStaticStr};
 use tokio::sync::{Mutex, RwLock};
 use tower_lsp::jsonrpc;
@@ -104,7 +104,7 @@ impl IrFeatures {
     async fn ensure_is_open(&self, db: &Mutex<Database>, config: IrConfig) {
         let packages_path = {
             let db = db.lock().await;
-            db.packages_path.to_path_buf()
+            db.packages_path.to_owned()
         };
         let uri = Url::from_config(&config, &packages_path);
         {
@@ -285,7 +285,7 @@ struct IrConfig {
     ir: Ir,
 }
 impl IrConfig {
-    fn decode(uri: &Url, packages_path: &Path) -> Self {
+    fn decode(uri: &Url, packages_path: &PackagesPath) -> Self {
         let (path, ir) = uri.path().rsplit_once('.').unwrap();
         let details = urlencoding::decode(uri.fragment().unwrap()).unwrap();
         let mut details: serde_json::Map<String, serde_json::Value> =
@@ -323,7 +323,7 @@ impl IrConfig {
 
 #[extension_trait]
 impl UrlFromIrConfig for Url {
-    fn from_config(config: &IrConfig, packages_path: &Path) -> Self {
+    fn from_config(config: &IrConfig, packages_path: &PackagesPath) -> Self {
         let ir: &'static str = IrDiscriminants::from(&config.ir).into();
         let original_url = module_to_url(&config.module, packages_path).unwrap();
 
@@ -438,7 +438,7 @@ impl LanguageFeatures for IrFeatures {
 
         let packages_path = {
             let db = db.lock().await;
-            db.packages_path.to_path_buf()
+            db.packages_path.to_owned()
         };
 
         let packages_path_for_closure = packages_path.clone();
