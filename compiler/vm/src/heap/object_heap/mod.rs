@@ -192,6 +192,10 @@ pub trait HeapObjectTrait: Into<HeapObject> {
     /// This method is called by [free] prior to deallocating the object's
     /// memory.
     fn drop_children(self, heap: &mut Heap);
+
+    // TODO: This is temporary. Once we store everything in the heap (including
+    // stuff like big int values and HIR IDs), we can remove this.
+    fn deallocate_external_stuff(self);
 }
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
@@ -226,7 +230,7 @@ impl From<HeapObject> for HeapData {
         let header_word = object.header_word();
         match header_word & HeapObject::KIND_MASK {
             HeapObject::KIND_INT => {
-                assert_eq!(header_word, HeapObject::KIND_MASK);
+                assert_eq!(header_word, HeapObject::KIND_INT);
                 HeapData::Int(HeapInt::new_unchecked(object))
             }
             HeapObject::KIND_LIST => HeapData::List(HeapList::new_unchecked(object)),

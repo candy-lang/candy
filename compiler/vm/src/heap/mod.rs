@@ -49,6 +49,7 @@ impl Heap {
     }
     /// Don't call this method directly, call [drop] or [free] instead!
     pub(super) fn deallocate(&mut self, object: HeapData) {
+        object.deallocate_external_stuff();
         let layout = Layout::from_size_align(
             2 * HeapObject::WORD_SIZE + object.content_size(),
             HeapObject::WORD_SIZE,
@@ -90,7 +91,7 @@ impl Heap {
 
     pub fn clear(&mut self) {
         for object in mem::take(&mut self.objects).iter() {
-            object.free(self);
+            self.deallocate(HeapData::from(object.0));
         }
         self.channel_refcounts.clear();
     }

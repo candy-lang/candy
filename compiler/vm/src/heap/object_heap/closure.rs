@@ -165,4 +165,6 @@ impl HeapObjectTrait for HeapClosure {
             captured.drop(heap);
         }
     }
+
+    fn deallocate_external_stuff(self) {}
 }
