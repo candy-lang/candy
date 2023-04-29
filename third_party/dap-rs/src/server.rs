@@ -17,20 +17,14 @@ enum ServerState {
 
 /// The `Server` is responsible for reading the incoming bytestream and constructing deserialized
 /// requests from it. The main method of the `Server` is the `accept_request`
+#[derive(Default)]
 pub struct Server {}
 
-fn escape_crlf(instr: &String) -> String {
-    let mut str = instr.replace("\n", "\\n");
-    str = str.replace("\r", "\\r");
-    str
+fn escape_crlf(instr: &str) -> String {
+    instr.replace('\n', "\\n").replace('\r', "\\r")
 }
 
 impl Server {
-    /// Construct a new Server and take ownership of the adapter and client.
-    pub fn new() -> Self {
-        Self {}
-    }
-
     /// Accept a single request from the `input` stream, convert it into `Request` and return it to the caller
     pub async fn accept_request(
         &mut self,

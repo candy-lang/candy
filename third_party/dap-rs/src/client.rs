@@ -8,17 +8,13 @@ use crate::{
 
 /// A simple writer to the stdout, used by the server to send replies back
 /// to the IDE
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct StdoutWriter {
     should_exit: bool,
 }
 
 /// Trait for sending events and requests to the connected client.
 impl StdoutWriter {
-    pub fn new() -> Self {
-        StdoutWriter { should_exit: false }
-    }
-
     /// Sends an even to the IDE.
     pub fn send_event(&mut self, event: Event) -> Result<(), DeserializationError> {
         self.write(Sendable::Event(event))
