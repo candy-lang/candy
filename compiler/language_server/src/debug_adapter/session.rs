@@ -9,25 +9,31 @@ use candy_frontend::{
 };
 use candy_vm::{
     context::{DbUseProvider, RunLimitedNumberOfInstructions},
-    fiber::FiberId,
-    heap::{Data, Struct},
+    fiber::{Fiber, FiberId},
+    heap::{Data, InlineObject, Struct},
     mir_to_lir::MirToLir,
     run_lir,
-    tracer::DummyTracer,
-    vm::{FiberTree, Vm},
+    tracer::{stack_trace::Call, DummyTracer},
+    vm::{FiberTree, Parallel, Single, Try, Vm},
 };
 use dap::{
     events::StoppedEventBody,
     prelude::EventBody,
-    requests::{Command, Request},
+    requests::{Command, InitializeArguments, Request},
     responses::{
         Response, ResponseBody, ResponseMessage, ScopesResponse, SetExceptionBreakpointsResponse,
-        StackTraceResponse, ThreadsResponse,
+        StackTraceResponse, ThreadsResponse, VariablesResponse,
     },
-    types::{Capabilities, StackFrame, StackFramePresentationhint, StoppedEventReason, Thread},
+    types::{
+        Capabilities, Scope, ScopePresentationhint, StackFrame, StackFramePresentationhint,
+        StoppedEventReason, Thread, Variable, VariablePresentationHint,
+        VariablePresentationHintAttributes, VariablePresentationHintKind,
+    },
 };
+use extension_trait::extension_trait;
+use itertools::Itertools;
 use rustc_hash::FxHashMap;
-use std::{hash::Hash, panic, path::PathBuf};
+use std::{hash::Hash, mem, panic, path::PathBuf};
 use tokio::sync::mpsc;
 use tower_lsp::Client;
 use tracing::error;
@@ -69,12 +75,21 @@ struct DebugSession {
 
 enum State {
     Initial,
+    Initialized(InitializeArguments),
+    Launched {
+        initialize_arguments: InitializeArguments,
+        execution_state: ExecutionState,
+    },
+}
+
+enum ExecutionState {
     Running(VmState),
     Paused(PausedState),
 }
 struct PausedState {
     vm_state: VmState,
-    stack_frame_ids: IdMapping<(FiberId, usize)>,
+    stack_frame_ids: IdMapping<StackFrameKey>,
+    variables_ids: IdMapping<VariablesKey>,
 }
 struct VmState {
     vm: Vm,
@@ -96,7 +111,7 @@ impl DebugSession {
             Command::ExceptionInfo(_) => todo!(),
             Command::Goto(_) => todo!(),
             Command::GotoTargets(_) => todo!(),
-            Command::Initialize(_) => {
+            Command::Initialize(args) => {
                 if !matches!(self.state, State::Initial) {
                     return Err("already-initialized");
                 }
@@ -145,12 +160,22 @@ impl DebugSession {
                 self.send_response_ok(request.seq, ResponseBody::Initialize(Some(capabilities)))
                     .await;
                 self.send(EventBody::Initialized).await;
+                self.state = State::Initialized(args);
                 Ok(())
             }
             Command::Launch(args) => {
-                if !matches!(self.state, State::Initial) {
-                    return Err("already-launched");
-                }
+                let state = mem::replace(&mut self.state, State::Initial);
+                let initialize_arguments = match state {
+                    State::Initial => {
+                        self.state = state;
+                        return Err("not-initialized");
+                    }
+                    State::Initialized(initialize_arguments) => initialize_arguments,
+                    State::Launched { .. } => {
+                        self.state = state;
+                        return Err("already-launched");
+                    }
+                };
 
                 let module = self.parse_module(args.program)?;
 
@@ -192,10 +217,14 @@ impl DebugSession {
                 // FIXME: remove
                 vm.run(&use_provider, &mut execution_controller, &mut tracer);
 
-                self.state = State::Paused(PausedState {
-                    vm_state: VmState { vm, tracer },
-                    stack_frame_ids: IdMapping::default(),
-                });
+                self.state = State::Launched {
+                    initialize_arguments,
+                    execution_state: ExecutionState::Paused(PausedState {
+                        vm_state: VmState { vm, tracer },
+                        stack_frame_ids: IdMapping::default(),
+                        variables_ids: IdMapping::default(),
+                    }),
+                };
 
                 self.send(EventBody::Stopped(StoppedEventBody {
                     reason: StoppedEventReason::Entry,
@@ -218,11 +247,52 @@ impl DebugSession {
             Command::Restart(_) => todo!(),
             Command::RestartFrame(_) => todo!(),
             Command::ReverseContinue(_) => todo!(),
-            Command::Scopes(_) => {
+            Command::Scopes(args) => {
+                let state = self.require_paused_mut()?;
+
+                let stack_frame_key = state.stack_frame_ids.id_to_key(args.frame_id);
+                let call = stack_frame_key.get(&state.vm_state.tracer);
+                let arguments_scope = Scope {
+                    name: "Arguments".to_string(),
+                    presentation_hint: Some(ScopePresentationhint::Arguments),
+                    variables_reference: state
+                        .variables_ids
+                        .key_to_id(VariablesKey::Arguments(stack_frame_key.to_owned())),
+                    named_variables: Some(call.arguments.len() as i64),
+                    indexed_variables: Some(0),
+                    expensive: false,
+                    // TODO: source information for function
+                    source: None,
+                    line: None,
+                    column: None,
+                    end_line: None,
+                    end_column: None,
+                };
+
+                // TODO: Show channels
+
+                let fiber = stack_frame_key.fiber_id.get(&state.vm_state.vm);
+                let heap_scope = Scope {
+                    name: "Fiber Heap".to_string(),
+                    presentation_hint: None,
+                    variables_reference: state
+                        .variables_ids
+                        .key_to_id(VariablesKey::FiberHeap(stack_frame_key.fiber_id)),
+                    named_variables: Some(fiber.heap.objects_len() as i64),
+                    indexed_variables: Some(0),
+                    expensive: false,
+                    source: None,
+                    line: None,
+                    column: None,
+                    end_line: None,
+                    end_column: None,
+                };
+
                 self.send_response_ok(
                     request.seq,
-                    // FIXME: implement
-                    ResponseBody::Scopes(ScopesResponse { scopes: vec![] }),
+                    ResponseBody::Scopes(ScopesResponse {
+                        scopes: vec![arguments_scope, heap_scope],
+                    }),
                 )
                 .await;
                 Ok(())
@@ -271,7 +341,7 @@ impl DebugSession {
                         // TODO: format arguments
                         let name = match Data::from(it.callee) {
                             // TODO: resolve function name
-                            Data::Closure(closure) => format!("{:p}", closure.address()),
+                            Data::Closure(closure) => format!("Closure at {:p}", closure.address()),
                             Data::Builtin(builtin) => format!(
                                 "✨.{}",
                                 format!("{:?}", builtin.get()).lowercase_first_letter(),
@@ -280,7 +350,9 @@ impl DebugSession {
                             it => panic!("Unexpected callee: {it}"),
                         };
                         StackFrame {
-                            id: state.stack_frame_ids.get((fiber_id, index)),
+                            id: state
+                                .stack_frame_ids
+                                .key_to_id(StackFrameKey { fiber_id, index }),
                             name,
                             source: None,
                             line: 1,
@@ -314,8 +386,6 @@ impl DebugSession {
             Command::Threads => {
                 let state = self.require_launched()?;
 
-                dbg!(&state.tracer);
-
                 self.send_response_ok(
                     request.seq,
                     ResponseBody::Threads(ThreadsResponse {
@@ -326,9 +396,15 @@ impl DebugSession {
                             .map(|(id, fiber)| Thread {
                                 // FIXME: Use data from tracer?
                                 id: Self::fiber_id_to_thread_id(*id),
+                                // TODO: indicate hierarchy
                                 name: format!(
-                                    "Fiber {}{}",
+                                    "Fiber {}{}{}",
                                     id.to_usize(),
+                                    if *id == FiberId::root() {
+                                        " (root)"
+                                    } else {
+                                        ""
+                                    },
                                     match fiber {
                                         FiberTree::Single(_) => "",
                                         FiberTree::Parallel(_) => " (in `parallel`)",
@@ -343,7 +419,53 @@ impl DebugSession {
 
                 Ok(())
             }
-            Command::Variables(_) => todo!(),
+            Command::Variables(args) => {
+                let supports_variable_type = self
+                    .require_initialized()?
+                    .supports_variable_type
+                    .unwrap_or_default();
+                let state = self.require_paused_mut()?;
+
+                let variables = match state.variables_ids.id_to_key(args.variables_reference) {
+                    VariablesKey::Arguments(stack_frame_key) => {
+                        let call = stack_frame_key.get(&state.vm_state.tracer);
+                        call.arguments
+                            .iter()
+                            .enumerate()
+                            .map(|(index, object)| {
+                                // TODO: resolve argument name
+                                Self::create_variable(
+                                    index.to_string(),
+                                    *object,
+                                    supports_variable_type,
+                                )
+                            })
+                            .collect()
+                    }
+                    VariablesKey::FiberHeap(fiber_id) => {
+                        let heap = &fiber_id.get(&state.vm_state.vm).heap;
+                        let mut variables = heap.iter().collect_vec();
+                        variables.sort_by_key(|it| it.address());
+                        variables
+                            .into_iter()
+                            .map(|object| {
+                                Self::create_variable(
+                                    format!("{:p}", object),
+                                    object.into(),
+                                    supports_variable_type,
+                                )
+                            })
+                            .collect()
+                    }
+                };
+
+                self.send_response_ok(
+                    request.seq,
+                    ResponseBody::Variables(VariablesResponse { variables }),
+                )
+                .await;
+                Ok(())
+            }
             Command::WriteMemory(_) => todo!(),
             Command::Cancel(_) => todo!(),
         }
@@ -365,23 +487,86 @@ impl DebugSession {
         })
     }
 
+    fn require_initialized(&self) -> Result<&InitializeArguments, &'static str> {
+        match &self.state {
+            State::Initial => Err("not-initialized"),
+            State::Initialized(initialize_arguments)
+            | State::Launched {
+                initialize_arguments,
+                ..
+            } => Ok(initialize_arguments),
+        }
+    }
     fn require_launched(&self) -> Result<&VmState, &'static str> {
         match &self.state {
-            State::Initial => Err("not-launched"),
-            State::Running(state) => Ok(state),
-            State::Paused(state) => Ok(&state.vm_state),
+            State::Initial | State::Initialized(_) => Err("not-launched"),
+            State::Launched {
+                execution_state:
+                    ExecutionState::Running(vm_state)
+                    | ExecutionState::Paused(PausedState { vm_state, .. }),
+                ..
+            } => Ok(vm_state),
         }
     }
     fn require_paused(&self) -> Result<&PausedState, &'static str> {
         match &self.state {
-            State::Paused(state) => Ok(state),
+            State::Launched {
+                execution_state: ExecutionState::Paused(state),
+                ..
+            } => Ok(state),
             _ => Err("not-paused"),
         }
     }
     fn require_paused_mut(&mut self) -> Result<&mut PausedState, &'static str> {
         match &mut self.state {
-            State::Paused(state) => Ok(state),
+            State::Launched {
+                execution_state: ExecutionState::Paused(state),
+                ..
+            } => Ok(state),
             _ => Err("not-paused"),
+        }
+    }
+
+    fn create_variable(
+        name: String,
+        object: InlineObject,
+        supports_variable_type: bool,
+    ) -> Variable {
+        let data = Data::from(object);
+
+        let presentation_hint_kind = match data {
+            Data::Closure(_) | Data::Builtin(_) => VariablePresentationHintKind::Method,
+            Data::SendPort(_) | Data::ReceivePort(_) => VariablePresentationHintKind::Event,
+            _ => VariablePresentationHintKind::Data,
+        };
+        let presentation_hint = VariablePresentationHint {
+            kind: Some(presentation_hint_kind),
+            // TODO: Add `Constant` if applicable
+            attributes: Some(vec![
+                VariablePresentationHintAttributes::Static,
+                VariablePresentationHintAttributes::ReadOnly,
+            ]),
+            // TODO: Set `Private` by default and `Public` for exported assignments
+            visibility: None,
+            lazy: Some(false),
+        };
+
+        Variable {
+            name,
+            value: object.to_string(),
+            type_field: if supports_variable_type {
+                let kind: &str = data.into();
+                Some(kind.to_string())
+            } else {
+                None
+            },
+            presentation_hint: Some(presentation_hint),
+            evaluate_name: None,
+            // FIXME: inner values
+            variables_reference: 0,
+            named_variables: None,
+            indexed_variables: None,
+            memory_reference: None, // TODO: support memory reference
         }
     }
 
@@ -421,24 +606,63 @@ impl DebugSession {
     }
 }
 
-struct IdMapping<T: Eq + Hash> {
-    next_id: i64,
-    map: FxHashMap<T, i64>,
+#[extension_trait]
+impl FiberIdExtension for FiberId {
+    fn get(self, vm: &Vm) -> &Fiber {
+        match &vm.fiber(self).unwrap() {
+            FiberTree::Single(Single { fiber, .. })
+            | FiberTree::Parallel(Parallel {
+                paused_fiber: Single { fiber, .. },
+                ..
+            })
+            | FiberTree::Try(Try {
+                paused_fiber: Single { fiber, .. },
+                ..
+            }) => fiber,
+        }
+    }
 }
-impl<T: Eq + Hash> IdMapping<T> {
-    fn get(&mut self, key: T) -> i64 {
-        *self.map.entry(key).or_insert_with(|| {
-            let id = self.next_id;
-            self.next_id += 1;
-            id
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct StackFrameKey {
+    fiber_id: FiberId,
+    index: usize,
+}
+impl StackFrameKey {
+    fn get<'a>(&self, tracer: &'a DebugTracer) -> &'a Call {
+        &tracer.fibers.get(&self.fiber_id).unwrap().call_stack[self.index]
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+enum VariablesKey {
+    Arguments(StackFrameKey),
+    FiberHeap(FiberId),
+}
+
+// In some places (e.g., `Variable::variables_reference`), `0` is used to
+// represent no value. (Not sure why they didn't use `null` like in many other
+// places.) Therefore, the ID is the index in `keys` plus one.
+struct IdMapping<T: Clone + Eq + Hash> {
+    keys: Vec<T>,
+    key_to_id: FxHashMap<T, i64>,
+}
+impl<T: Clone + Eq + Hash> IdMapping<T> {
+    fn id_to_key(&self, id: i64) -> &T {
+        &self.keys[(id - 1) as usize]
+    }
+    fn key_to_id(&mut self, key: T) -> i64 {
+        *self.key_to_id.entry(key.clone()).or_insert_with(|| {
+            self.keys.push(key);
+            self.keys.len() as i64
         })
     }
 }
-impl<T: Eq + Hash> Default for IdMapping<T> {
+impl<T: Clone + Eq + Hash> Default for IdMapping<T> {
     fn default() -> Self {
         Self {
-            next_id: 0,
-            map: Default::default(),
+            keys: vec![],
+            key_to_id: Default::default(),
         }
     }
 }

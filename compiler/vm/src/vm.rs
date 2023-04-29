@@ -72,7 +72,7 @@ pub enum FiberTree {
 /// Single fibers are the leaves of the fiber tree.
 #[derive(Clone)]
 pub struct Single {
-    fiber: Fiber,
+    pub fiber: Fiber,
     parent: Option<FiberId>,
 }
 
@@ -85,7 +85,7 @@ pub struct Single {
 /// result is sent to.
 #[derive(Clone)]
 pub struct Parallel {
-    paused_fiber: Single,
+    pub paused_fiber: Single,
     children: HashMap<FiberId, ChildKind>,
     return_value: Option<Packet>, // will later contain the body's return value
     nursery: ChannelId,
@@ -98,7 +98,7 @@ enum ChildKind {
 
 #[derive(Clone)]
 pub struct Try {
-    paused_fiber: Single,
+    pub paused_fiber: Single,
     child: FiberId,
 }
 
@@ -228,6 +228,9 @@ impl Vm {
 
     pub fn fibers(&self) -> &HashMap<FiberId, FiberTree> {
         &self.fibers
+    }
+    pub fn fiber(&self, id: FiberId) -> Option<&FiberTree> {
+        self.fibers.get(&id)
     }
 
     /// Can be called at any time from outside the VM to create a channel that
