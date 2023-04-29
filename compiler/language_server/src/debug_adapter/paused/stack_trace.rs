@@ -28,7 +28,10 @@ impl PausedState {
             .ok_or("fiber-not-found")?;
 
         let start_frame = args.start_frame.map(|it| it as usize).unwrap_or_default();
-        let levels = args.levels.map(|it| it as usize).unwrap_or(usize::MAX);
+        let levels = args
+            .levels
+            .and_then(|it| if it == 0 { None } else { Some(it as usize) })
+            .unwrap_or(usize::MAX);
         let call_stack = &fiber_state.call_stack[..fiber_state.call_stack.len() - start_frame];
 
         let mut stack_frames = Vec::with_capacity((1 + call_stack.len()).min(levels));
