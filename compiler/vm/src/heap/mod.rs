@@ -117,6 +117,12 @@ impl Debug for Heap {
     }
 }
 
+impl Drop for Heap {
+    fn drop(&mut self) {
+        self.clear();
+    }
+}
+
 /// For tracking objects allocated in the heap, we don't want deep equality, but
 /// only care about the addresses.
 #[derive(Clone, Copy, DebugCustom, Deref, Pointer)]
