@@ -1,39 +1,34 @@
-use super::{tracer::DebugTracer, ServerToClient, ServerToClientMessage, SessionId};
+use super::{
+    paused::PausedState, tracer::DebugTracer, utils::FiberIdThreadIdConversion, ServerToClient,
+    ServerToClientMessage, SessionId,
+};
 use crate::database::Database;
 use candy_frontend::{
     hir::Id,
     id::CountableId,
     module::{Module, ModuleKind, PackagesPath},
-    utils::AdjustCasingOfFirstLetter,
     TracingConfig, TracingMode,
 };
 use candy_vm::{
     context::{DbUseProvider, RunLimitedNumberOfInstructions},
-    fiber::{Fiber, FiberId},
-    heap::{Data, InlineObject, Struct},
+    fiber::FiberId,
+    heap::Struct,
     mir_to_lir::MirToLir,
     run_lir,
-    tracer::{stack_trace::Call, DummyTracer},
-    vm::{FiberTree, Parallel, Single, Try, Vm},
+    tracer::DummyTracer,
+    vm::{FiberTree, Vm},
 };
 use dap::{
     events::StoppedEventBody,
     prelude::EventBody,
     requests::{Command, InitializeArguments, Request},
     responses::{
-        Response, ResponseBody, ResponseMessage, ScopesResponse, SetExceptionBreakpointsResponse,
-        StackTraceResponse, ThreadsResponse, VariablesResponse,
+        Response, ResponseBody, ResponseMessage, SetExceptionBreakpointsResponse, ThreadsResponse,
     },
-    types::{
-        Capabilities, Scope, ScopePresentationhint, StackFrame, StackFramePresentationhint,
-        StoppedEventReason, Thread, Variable, VariablePresentationHint,
-        VariablePresentationHintAttributes, VariablePresentationHintKind,
-    },
+    types::{Capabilities, StoppedEventReason, Thread},
 };
-use extension_trait::extension_trait;
-use itertools::Itertools;
 use rustc_hash::FxHashMap;
-use std::{hash::Hash, mem, panic, path::PathBuf};
+use std::{mem, path::PathBuf};
 use tokio::sync::mpsc;
 use tower_lsp::Client;
 use tracing::error;
@@ -73,6 +68,9 @@ struct DebugSession {
     state: State,
 }
 
+// `Launched` is much larger than `Initial` and `Initialized`, but it's also the
+// most common state while the others are only temporary during initialization.
+#[allow(clippy::large_enum_variant)]
 enum State {
     Initial,
     Initialized(InitializeArguments),
@@ -86,14 +84,9 @@ enum ExecutionState {
     Running(VmState),
     Paused(PausedState),
 }
-struct PausedState {
-    vm_state: VmState,
-    stack_frame_ids: IdMapping<StackFrameKey>,
-    variables_ids: IdMapping<VariablesKey>,
-}
-struct VmState {
-    vm: Vm,
-    tracer: DebugTracer,
+pub struct VmState {
+    pub vm: Vm,
+    pub tracer: DebugTracer,
 }
 
 impl DebugSession {
@@ -219,17 +212,16 @@ impl DebugSession {
 
                 self.state = State::Launched {
                     initialize_arguments,
-                    execution_state: ExecutionState::Paused(PausedState {
-                        vm_state: VmState { vm, tracer },
-                        stack_frame_ids: IdMapping::default(),
-                        variables_ids: IdMapping::default(),
-                    }),
+                    execution_state: ExecutionState::Paused(PausedState::new(VmState {
+                        vm,
+                        tracer,
+                    })),
                 };
 
                 self.send(EventBody::Stopped(StoppedEventBody {
                     reason: StoppedEventReason::Entry,
                     description: Some("Paused on program start".to_string()),
-                    thread_id: Some(Self::fiber_id_to_thread_id(FiberId::root())),
+                    thread_id: Some(FiberId::root().to_thread_id()),
                     preserve_focus_hint: Some(false),
                     text: None,
                     all_threads_stopped: Some(true),
@@ -248,53 +240,9 @@ impl DebugSession {
             Command::RestartFrame(_) => todo!(),
             Command::ReverseContinue(_) => todo!(),
             Command::Scopes(args) => {
-                let state = self.require_paused_mut()?;
-
-                let stack_frame_key = state.stack_frame_ids.id_to_key(args.frame_id);
-                let call = stack_frame_key.get(&state.vm_state.tracer);
-                let arguments_scope = Scope {
-                    name: "Arguments".to_string(),
-                    presentation_hint: Some(ScopePresentationhint::Arguments),
-                    variables_reference: state
-                        .variables_ids
-                        .key_to_id(VariablesKey::Arguments(stack_frame_key.to_owned())),
-                    named_variables: Some(call.arguments.len() as i64),
-                    indexed_variables: Some(0),
-                    expensive: false,
-                    // TODO: source information for function
-                    source: None,
-                    line: None,
-                    column: None,
-                    end_line: None,
-                    end_column: None,
-                };
-
-                // TODO: Show channels
-
-                let fiber = stack_frame_key.fiber_id.get(&state.vm_state.vm);
-                let heap_scope = Scope {
-                    name: "Fiber Heap".to_string(),
-                    presentation_hint: None,
-                    variables_reference: state
-                        .variables_ids
-                        .key_to_id(VariablesKey::FiberHeap(stack_frame_key.fiber_id)),
-                    named_variables: Some(fiber.heap.objects_len() as i64),
-                    indexed_variables: Some(0),
-                    expensive: false,
-                    source: None,
-                    line: None,
-                    column: None,
-                    end_line: None,
-                    end_column: None,
-                };
-
-                self.send_response_ok(
-                    request.seq,
-                    ResponseBody::Scopes(ScopesResponse {
-                        scopes: vec![arguments_scope, heap_scope],
-                    }),
-                )
-                .await;
+                let scopes = self.require_paused_mut()?.scopes(args);
+                self.send_response_ok(request.seq, ResponseBody::Scopes(scopes))
+                    .await;
                 Ok(())
             }
             Command::SetBreakpoints(_) => todo!(),
@@ -315,66 +263,9 @@ impl DebugSession {
             Command::SetVariable(_) => todo!(),
             Command::Source(_) => todo!(),
             Command::StackTrace(args) => {
-                let state = self.require_paused_mut()?;
-
-                let fiber_id = Self::thread_id_to_fiber_id(args.thread_id);
-                let fiber_state = state
-                    .vm_state
-                    .tracer
-                    .fibers
-                    .get(&fiber_id)
-                    .ok_or("fiber-not-found")?;
-
-                let start_frame = args.start_frame.map(|it| it as usize).unwrap_or_default();
-                let mut call_stack = &fiber_state.call_stack[start_frame..];
-                if let Some(levels) = args.levels {
-                    let levels = levels as usize;
-                    if levels < call_stack.len() {
-                        call_stack = &call_stack[..levels];
-                    }
-                }
-
-                let stack_frames = call_stack
-                    .iter()
-                    .enumerate()
-                    .map(|(index, it)| {
-                        // TODO: format arguments
-                        let name = match Data::from(it.callee) {
-                            // TODO: resolve function name
-                            Data::Closure(closure) => format!("Closure at {:p}", closure.address()),
-                            Data::Builtin(builtin) => format!(
-                                "✨.{}",
-                                format!("{:?}", builtin.get()).lowercase_first_letter(),
-                            ),
-                            Data::Tag(tag) => tag.symbol().get().to_owned(),
-                            it => panic!("Unexpected callee: {it}"),
-                        };
-                        StackFrame {
-                            id: state
-                                .stack_frame_ids
-                                .key_to_id(StackFrameKey { fiber_id, index }),
-                            name,
-                            source: None,
-                            line: 1,
-                            column: 1,
-                            end_line: None,
-                            end_column: None,
-                            can_restart: Some(false),
-                            instruction_pointer_reference: None,
-                            module_id: None,
-                            presentation_hint: Some(StackFramePresentationhint::Normal),
-                        }
-                    })
-                    .collect();
-                let total_frames = fiber_state.call_stack.len() as i64;
-                self.send_response_ok(
-                    request.seq,
-                    ResponseBody::StackTrace(StackTraceResponse {
-                        stack_frames,
-                        total_frames: Some(total_frames),
-                    }),
-                )
-                .await;
+                let stack_trace = self.require_paused_mut()?.stack_trace(args)?;
+                self.send_response_ok(request.seq, ResponseBody::StackTrace(stack_trace))
+                    .await;
                 Ok(())
             }
             Command::StepBack(_) => todo!(),
@@ -395,7 +286,7 @@ impl DebugSession {
                             .iter()
                             .map(|(id, fiber)| Thread {
                                 // FIXME: Use data from tracer?
-                                id: Self::fiber_id_to_thread_id(*id),
+                                id: id.to_thread_id(),
                                 // TODO: indicate hierarchy
                                 name: format!(
                                     "Fiber {}{}{}",
@@ -424,46 +315,11 @@ impl DebugSession {
                     .require_initialized()?
                     .supports_variable_type
                     .unwrap_or_default();
-                let state = self.require_paused_mut()?;
-
-                let variables = match state.variables_ids.id_to_key(args.variables_reference) {
-                    VariablesKey::Arguments(stack_frame_key) => {
-                        let call = stack_frame_key.get(&state.vm_state.tracer);
-                        call.arguments
-                            .iter()
-                            .enumerate()
-                            .map(|(index, object)| {
-                                // TODO: resolve argument name
-                                Self::create_variable(
-                                    index.to_string(),
-                                    *object,
-                                    supports_variable_type,
-                                )
-                            })
-                            .collect()
-                    }
-                    VariablesKey::FiberHeap(fiber_id) => {
-                        let heap = &fiber_id.get(&state.vm_state.vm).heap;
-                        let mut variables = heap.iter().collect_vec();
-                        variables.sort_by_key(|it| it.address());
-                        variables
-                            .into_iter()
-                            .map(|object| {
-                                Self::create_variable(
-                                    format!("{:p}", object),
-                                    object.into(),
-                                    supports_variable_type,
-                                )
-                            })
-                            .collect()
-                    }
-                };
-
-                self.send_response_ok(
-                    request.seq,
-                    ResponseBody::Variables(VariablesResponse { variables }),
-                )
-                .await;
+                let variables = self
+                    .require_paused_mut()?
+                    .variables(args, supports_variable_type);
+                self.send_response_ok(request.seq, ResponseBody::Variables(variables))
+                    .await;
                 Ok(())
             }
             Command::WriteMemory(_) => todo!(),
@@ -527,56 +383,6 @@ impl DebugSession {
         }
     }
 
-    fn create_variable(
-        name: String,
-        object: InlineObject,
-        supports_variable_type: bool,
-    ) -> Variable {
-        let data = Data::from(object);
-
-        let presentation_hint_kind = match data {
-            Data::Closure(_) | Data::Builtin(_) => VariablePresentationHintKind::Method,
-            Data::SendPort(_) | Data::ReceivePort(_) => VariablePresentationHintKind::Event,
-            _ => VariablePresentationHintKind::Data,
-        };
-        let presentation_hint = VariablePresentationHint {
-            kind: Some(presentation_hint_kind),
-            // TODO: Add `Constant` if applicable
-            attributes: Some(vec![
-                VariablePresentationHintAttributes::Static,
-                VariablePresentationHintAttributes::ReadOnly,
-            ]),
-            // TODO: Set `Private` by default and `Public` for exported assignments
-            visibility: None,
-            lazy: Some(false),
-        };
-
-        Variable {
-            name,
-            value: object.to_string(),
-            type_field: if supports_variable_type {
-                let kind: &str = data.into();
-                Some(kind.to_string())
-            } else {
-                None
-            },
-            presentation_hint: Some(presentation_hint),
-            evaluate_name: None,
-            // FIXME: inner values
-            variables_reference: 0,
-            named_variables: None,
-            indexed_variables: None,
-            memory_reference: None, // TODO: support memory reference
-        }
-    }
-
-    fn fiber_id_to_thread_id(id: FiberId) -> i64 {
-        id.to_usize() as i64
-    }
-    fn thread_id_to_fiber_id(id: i64) -> FiberId {
-        FiberId::from_usize(id as usize)
-    }
-
     async fn send_response_ok(&self, seq: i64, body: ResponseBody) {
         self.send(Response {
             request_seq: seq,
@@ -603,66 +409,5 @@ impl DebugSession {
         self.client
             .send_notification::<ServerToClient>(message)
             .await;
-    }
-}
-
-#[extension_trait]
-impl FiberIdExtension for FiberId {
-    fn get(self, vm: &Vm) -> &Fiber {
-        match &vm.fiber(self).unwrap() {
-            FiberTree::Single(Single { fiber, .. })
-            | FiberTree::Parallel(Parallel {
-                paused_fiber: Single { fiber, .. },
-                ..
-            })
-            | FiberTree::Try(Try {
-                paused_fiber: Single { fiber, .. },
-                ..
-            }) => fiber,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-struct StackFrameKey {
-    fiber_id: FiberId,
-    index: usize,
-}
-impl StackFrameKey {
-    fn get<'a>(&self, tracer: &'a DebugTracer) -> &'a Call {
-        &tracer.fibers.get(&self.fiber_id).unwrap().call_stack[self.index]
-    }
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-enum VariablesKey {
-    Arguments(StackFrameKey),
-    FiberHeap(FiberId),
-}
-
-// In some places (e.g., `Variable::variables_reference`), `0` is used to
-// represent no value. (Not sure why they didn't use `null` like in many other
-// places.) Therefore, the ID is the index in `keys` plus one.
-struct IdMapping<T: Clone + Eq + Hash> {
-    keys: Vec<T>,
-    key_to_id: FxHashMap<T, i64>,
-}
-impl<T: Clone + Eq + Hash> IdMapping<T> {
-    fn id_to_key(&self, id: i64) -> &T {
-        &self.keys[(id - 1) as usize]
-    }
-    fn key_to_id(&mut self, key: T) -> i64 {
-        *self.key_to_id.entry(key.clone()).or_insert_with(|| {
-            self.keys.push(key);
-            self.keys.len() as i64
-        })
-    }
-}
-impl<T: Clone + Eq + Hash> Default for IdMapping<T> {
-    fn default() -> Self {
-        Self {
-            keys: vec![],
-            key_to_id: Default::default(),
-        }
     }
 }

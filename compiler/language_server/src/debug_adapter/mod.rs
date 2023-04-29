@@ -11,8 +11,10 @@ use tokio::sync::{mpsc, RwLock};
 use tower_lsp::{jsonrpc, Client};
 use tracing::error;
 
+mod paused;
 mod session;
 mod tracer;
+mod utils;
 
 #[derive(Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, Serialize)]
 #[serde(transparent)]

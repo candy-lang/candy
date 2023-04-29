@@ -117,7 +117,7 @@ impl Debug for Heap {
 /// For tracking objects allocated in the heap, we don't want deep equality, but
 /// only care about the addresses.
 #[derive(Clone, Copy, DebugCustom, Deref, Pointer)]
-struct ObjectInHeap(HeapObject);
+pub struct ObjectInHeap(pub HeapObject);
 
 impl Eq for ObjectInHeap {}
 impl PartialEq for ObjectInHeap {
