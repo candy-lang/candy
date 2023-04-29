@@ -20,11 +20,14 @@ use tracing_subscriber::{
 #[derive(Parser, Debug)]
 #[command(name = "candy", about = "The 🍭 Candy CLI.")]
 enum CandyOptions {
+    Run(CandyRunOptions),
+
+    Check(CandyCheckOptions),
+
+    Fuzz(CandyFuzzOptions),
+
     #[command(subcommand)]
     Debug(CandyDebugOptions),
-    Check(CandyCheckOptions),
-    Run(CandyRunOptions),
-    Fuzz(CandyFuzzOptions),
 
     /// Start a Language Server.
     Lsp,
@@ -83,6 +86,10 @@ impl CandyDebugPathAndTracing {
     }
 }
 
+/// Check a Candy program for obvious errors.
+///
+/// This command finds very obvious errors in your program. For more extensive
+/// error reporting, fuzzing the Candy program is recommended instead.
 #[derive(Parser, Debug)]
 struct CandyCheckOptions {
     /// The file or package to check. If none is provided, the package of your
