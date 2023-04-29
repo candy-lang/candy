@@ -434,7 +434,6 @@ dependencies = [
 [[package]]
 name = "dap"
 version = "0.2.0-alpha1"
-source = "git+https://github.com/eranif/dap-rs.git?rev=eb886e8bb06227f30bd2a6ff581c2b742d29d532#eb886e8bb06227f30bd2a6ff581c2b742d29d532"
 dependencies = [
  "async-trait",
  "bytes",
