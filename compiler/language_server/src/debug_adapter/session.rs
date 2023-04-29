@@ -99,7 +99,23 @@ impl DebugSession {
             Command::Continue(_) => todo!(),
             Command::DataBreakpointInfo(_) => todo!(),
             Command::Disassamble(_) => todo!(),
-            Command::Disconnect(_) => todo!(),
+            Command::Disconnect(_) => {
+                let state = mem::replace(&mut self.state, State::Initial);
+                let initialize_arguments = match state {
+                    State::Initial | State::Initialized(_) => {
+                        self.state = state;
+                        return Err("not-launched");
+                    }
+                    State::Launched {
+                        initialize_arguments,
+                        ..
+                    } => initialize_arguments,
+                };
+                self.state = State::Initialized(initialize_arguments);
+                self.send_response_ok(request.seq, ResponseBody::Disconnect)
+                    .await;
+                Ok(())
+            }
             Command::Evaluate(_) => todo!(),
             Command::ExceptionInfo(_) => todo!(),
             Command::Goto(_) => todo!(),
