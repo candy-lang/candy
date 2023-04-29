@@ -145,7 +145,7 @@ impl Hash for HeapList {
 
 impl Ord for HeapList {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.items().cmp(&other.items())
+        self.items().cmp(other.items())
     }
 }
 impl PartialOrd for HeapList {
