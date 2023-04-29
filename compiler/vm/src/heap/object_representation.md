@@ -120,7 +120,7 @@ The last word is padded with zeros if necessary.
 
 ### Closure
 
-A closure capturing `c` values, taking `a` arguments, and containing `b` instructions.
+A closure capturing `c` values, taking `a` arguments, and with a body starting at instruction pointer `b`.
 
 | Word                  |
 | :-------------------- |
@@ -130,9 +130,6 @@ A closure capturing `c` values, taking `a` arguments, and containing `b` instruc
 | Captured value 0      |
 | …                     |
 | Captured value c-1    |
-| Instruction 0         |
-| …                     |
-| Instruction b-1       |
 
 > Instructions are stored in Rust's representation.
 > They may take up multiple words and might not align to word boundaries.

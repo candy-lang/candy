@@ -1,6 +1,6 @@
 use crate::{
     fiber::InstructionPointer,
-    heap::Heap,
+    heap::{Builtin, Closure, Heap, HirId, Int, Tag, Text},
     lir::{Instruction, Lir, StackOffset},
 };
 use candy_frontend::{
@@ -41,27 +41,34 @@ where
             (Arc::new(mir), Arc::new(errors))
         });
 
-    let mut lir = Lir {
-        module,
-        heap: Heap::default(),
-        // This instruction is never execute it, but we still insert it into the
-        // LIR so that an instruction pointer of zero can be used to signal that
-        // the program is done.
-        instructions: vec![Instruction::Return],
-        start: InstructionPointer::null_pointer(),
-    };
-    lir.start = compile_lambda(
-        &mut lir,
+    let mut constant_heap = Heap::default();
+    let mut instructions = vec![];
+    let start = compile_lambda(
+        &mut constant_heap,
+        &mut instructions,
         &FxHashSet::default(),
         &[],
         Id::from_usize(0),
         &mir.body,
     );
+
+    let module_closure = Closure::create(&mut constant_heap, &[], 0, start);
+    let responsible_module =
+        HirId::create(&mut constant_heap, hir::Id::new(module.clone(), vec![]));
+
+    let lir = Lir {
+        module,
+        constant_heap,
+        instructions,
+        module_closure,
+        responsible_module,
+    };
     (Arc::new(lir), errors)
 }
 
 fn compile_lambda(
-    lir: &mut Lir,
+    heap: &mut Heap,
+    instructions: &mut Vec<Instruction>,
     captured: &FxHashSet<Id>,
     parameters: &[Id],
     responsible_parameter: Id,
@@ -77,7 +84,7 @@ fn compile_lambda(
     context.stack.push(responsible_parameter);
 
     for (id, expression) in body.iter() {
-        context.compile_expression(lir, id, expression);
+        context.compile_expression(heap, instructions, id, expression);
     }
 
     if matches!(
@@ -98,8 +105,8 @@ fn compile_lambda(
         context.emit(dummy_id, Instruction::Return);
     }
 
-    let start = lir.instructions.len().into();
-    lir.instructions.append(&mut context.instructions);
+    let start = instructions.len().into();
+    instructions.append(&mut context.instructions);
     start
 }
 
@@ -109,27 +116,34 @@ struct LoweringContext {
     instructions: Vec<Instruction>,
 }
 impl LoweringContext {
-    fn compile_expression(&mut self, lir: &mut Lir, id: Id, expression: &Expression) {
+    fn compile_expression(
+        &mut self,
+        heap: &mut Heap,
+        instructions: &mut Vec<Instruction>,
+        id: Id,
+        expression: &Expression,
+    ) {
         match expression {
             Expression::Int(int) => {
-                let address = lir.heap.create_int(int.clone());
-                self.emit(id, Instruction::PushFromHeap(address))
+                let int = Int::create_from_bigint(heap, int.clone());
+                self.emit(id, Instruction::PushConstant(int.into()))
             }
             Expression::Text(text) => {
-                let address = lir.heap.create_text(text.clone());
-                self.emit(id, Instruction::PushFromHeap(address))
+                let text = Text::create(heap, text);
+                self.emit(id, Instruction::PushConstant(text.into()))
             }
             Expression::Reference(reference) => {
                 self.emit_push_from_stack(*reference);
                 self.stack.replace_top_id(id);
             }
             Expression::Symbol(symbol) => {
-                let address = lir.heap.create_symbol(symbol.clone());
-                self.emit(id, Instruction::PushFromHeap(address));
+                let symbol_text = Text::create(heap, symbol);
+                let tag = Tag::create(heap, symbol_text, None);
+                self.emit(id, Instruction::PushConstant(tag.into()));
             }
             Expression::Builtin(builtin) => {
-                let address = lir.heap.create_builtin(*builtin);
-                self.emit(id, Instruction::PushFromHeap(address));
+                let builtin = Builtin::create(*builtin);
+                self.emit(id, Instruction::PushConstant(builtin.into()));
             }
             Expression::List(items) => {
                 for item in items {
@@ -155,8 +169,8 @@ impl LoweringContext {
                 );
             }
             Expression::HirId(hir_id) => {
-                let address = lir.heap.create_hir_id(hir_id.clone());
-                self.emit(id, Instruction::PushFromHeap(address));
+                let hir_id = HirId::create(heap, hir_id.clone());
+                self.emit(id, Instruction::PushConstant(hir_id.into()));
             }
             Expression::Lambda {
                 original_hirs: _,
@@ -165,8 +179,14 @@ impl LoweringContext {
                 body,
             } => {
                 let captured = expression.captured_ids();
-                let instructions =
-                    compile_lambda(lir, &captured, parameters, *responsible_parameter, body);
+                let instructions = compile_lambda(
+                    heap,
+                    instructions,
+                    &captured,
+                    parameters,
+                    *responsible_parameter,
+                    body,
+                );
 
                 self.emit(
                     id,
