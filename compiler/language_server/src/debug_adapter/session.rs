@@ -81,6 +81,7 @@ enum State {
 }
 
 enum ExecutionState {
+    #[allow(dead_code)] // WIP
     Running(VmState),
     Paused(PausedState),
 }
