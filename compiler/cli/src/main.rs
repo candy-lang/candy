@@ -8,9 +8,9 @@ use candy_frontend::{
     hir_to_mir::HirToMir,
     mir_optimize::OptimizeMir,
     module::{Module, ModuleFromPathError, ModuleKind, PackagesPath},
-    position::PositionConversionDb,
+    position::{Offset, PositionConversionDb},
     rcst_to_cst::RcstToCst,
-    rich_ir::{RichIr, ToRichIr},
+    rich_ir::{RichIr, RichIrAnnotation, ToRichIr, TokenType},
     string_to_rcst::StringToRcst,
     TracingConfig, TracingMode,
 };
@@ -27,6 +27,7 @@ use candy_vm::{
     vm::{CompletedOperation, OperationId, Status, Vm},
 };
 use clap::{Parser, ValueHint};
+use colored::Colorize;
 use database::Database;
 use itertools::Itertools;
 use notify::RecursiveMode;
@@ -35,6 +36,7 @@ use std::{
     convert::TryInto,
     env::{current_dir, current_exe},
     io::{self, BufRead, Write},
+    ops::Deref,
     path::PathBuf,
     sync::{mpsc::channel, Arc},
     time::Duration,
@@ -64,16 +66,16 @@ enum CandyDebugOptions {
     Cst(CandyDebugPath),
     Ast(CandyDebugPath),
     Hir(CandyDebugPath),
-    Mir(CandyDebugPathWithTracing),
-    OptimizedMir(CandyDebugPathWithTracing),
-    Lir(CandyDebugPathWithTracing),
+    Mir(CandyDebugPathAndTracing),
+    OptimizedMir(CandyDebugPathAndTracing),
+    Lir(CandyDebugPathAndTracing),
 }
 #[derive(Parser, Debug)]
 struct CandyDebugPath {
     path: PathBuf,
 }
 #[derive(Parser, Debug)]
-struct CandyDebugPathWithTracing {
+struct CandyDebugPathAndTracing {
     path: PathBuf,
 
     #[arg(long)]
@@ -84,6 +86,17 @@ struct CandyDebugPathWithTracing {
 
     #[arg(long)]
     trace_evaluated_expressions: bool,
+}
+impl CandyDebugPathAndTracing {
+    fn to_tracing_config(&self) -> TracingConfig {
+        TracingConfig {
+            register_fuzzables: TracingMode::only_current_or_off(self.register_fuzzables),
+            calls: TracingMode::only_current_or_off(self.trace_calls),
+            evaluated_expressions: TracingMode::only_current_or_off(
+                self.trace_evaluated_expressions,
+            ),
+        }
+    }
 }
 
 #[derive(Parser, Debug)]
@@ -203,54 +216,85 @@ fn module_for_path(path: impl Into<Option<PathBuf>>) -> Result<Module, Exit> {
 
 fn debug(options: CandyDebugOptions) -> ProgramResult {
     let packages_path = packages_path();
-    let db = Database::new_with_file_system_module_provider(packages_path.clone());
-
-    let tracing = TracingConfig {
-        register_fuzzables: TracingMode::Off,
-        calls: TracingMode::Off,
-        evaluated_expressions: TracingMode::Off,
-    };
+    let db = Database::new_with_file_system_module_provider(packages_path);
 
     let rich_ir = match options {
-        CandyDebugOptions::Cst(CandyDebugPath { path }) => {
-            let module = module_for_path(path);
+        CandyDebugOptions::Cst(options) => {
+            let module = module_for_path(options.path)?;
             let rcst = db.rcst(module.clone());
             RichIr::for_rcst(&module, &rcst)
         }
-        CandyDebugOptions::Ast(CandyDebugPath { path }) => {
-            let module = module_for_path(path);
+        CandyDebugOptions::Ast(options) => {
+            let module = module_for_path(options.path)?;
             let ast = db.ast(module.clone());
             ast.map(|(ast, _)| RichIr::for_ast(&module, &ast))
         }
-        CandyDebugOptions::Hir(CandyDebugPath { path }) => {
-            let module = module_for_path(path);
+        CandyDebugOptions::Hir(options) => {
+            let module = module_for_path(options.path)?;
             let hir = db.hir(module.clone());
             hir.map(|(hir, _)| RichIr::for_hir(&module, &hir))
         }
-        CandyDebugOptions::Mir(path_and_tracing) => {
-            let module = module_for_path(path);
-            let mir = db.mir(module.clone(), tracing_config.clone());
-            mir.map(|mir| RichIr::for_mir(&module, &mir, &tracing_config))
+        CandyDebugOptions::Mir(options) => {
+            let module = module_for_path(options.path.clone())?;
+            let tracing = options.to_tracing_config();
+            let mir = db.mir(module.clone(), tracing.clone());
+            mir.map(|mir| RichIr::for_mir(&module, &mir, &tracing))
         }
-        CandyDebugOptions::OptimizedMir(path_and_tracing) => {
-            let module = module_for_path(path);
-            let mir = db.mir_with_obvious_optimized(module.clone(), tracing_config.clone());
-            mir.map(|mir| RichIr::for_mir(&module, &mir, &tracing_config))
+        CandyDebugOptions::OptimizedMir(options) => {
+            let module = module_for_path(options.path.clone())?;
+            let tracing = options.to_tracing_config();
+            let mir = db.mir_with_obvious_optimized(module.clone(), tracing.clone());
+            mir.map(|mir| RichIr::for_mir(&module, &mir, &tracing))
         }
-        CandyDebugOptions::Lir(path_and_tracing) => {
-            let module = module_for_path(path);
-            let lir = db.lir(module.clone(), tracing_config.clone());
-            lir.map(|lir| RichIr::for_lir(&module, &lir, &tracing_config))
+        CandyDebugOptions::Lir(options) => {
+            let module = module_for_path(options.path.clone())?;
+            let tracing = options.to_tracing_config();
+            let lir = db.lir(module.clone(), tracing.clone());
+            lir.map(|lir| RichIr::for_lir(&module, &lir, &tracing))
         }
     };
 
-    match rich_ir {
-        Some(rich_ir) => {
-            println!("{}", rich_ir.to_string());
-            Ok(())
+    let Some(rich_ir) = rich_ir else {
+        return Err(Exit::FileNotFound);
+    };
+
+    let bytes = rich_ir.text.as_bytes().to_vec();
+    let annotations = rich_ir.annotations.iter();
+    let mut displayed_byte = Offset(0);
+
+    for RichIrAnnotation {
+        range, token_type, ..
+    } in annotations
+    {
+        if range.start < displayed_byte {
+            continue;
         }
-        None => Err(Exit::FileNotFound),
+        let before_annotation =
+            String::from_utf8(bytes[*displayed_byte..*range.start].to_vec()).unwrap();
+        let mut in_annotation =
+            String::from_utf8(bytes[*range.start..*range.end].to_vec()).unwrap();
+
+        if let Some(token_type) = token_type {
+            in_annotation = match token_type {
+                TokenType::Module => in_annotation.yellow(),
+                TokenType::Parameter => in_annotation.red(),
+                TokenType::Variable => in_annotation.yellow(),
+                TokenType::Symbol => in_annotation.purple(),
+                TokenType::Function => in_annotation.blue(),
+                TokenType::Comment => in_annotation.green(),
+                TokenType::Text => in_annotation.cyan(),
+                TokenType::Int => in_annotation.red(),
+            }
+            .to_string();
+        }
+
+        print!("{before_annotation}{in_annotation}");
+        displayed_byte = range.end;
     }
+    let rest = String::from_utf8(bytes[*displayed_byte..].to_vec()).unwrap();
+    println!("{rest}");
+
+    Ok(())
 }
 
 fn build(options: CandyBuildOptions) -> ProgramResult {
@@ -415,8 +459,8 @@ fn run(options: CandyRunOptions) -> ProgramResult {
 
     let tracing = TracingConfig {
         register_fuzzables: TracingMode::Off,
-        calls: TracingMode::all_or_off(options.tracing),
-        evaluated_expressions: TracingMode::only_current_or_off(options.tracing),
+        calls: TracingMode::Off,
+        evaluated_expressions: TracingMode::Off,
     };
     if raw_build(&db, module.clone(), &tracing, options.debug).is_none() {
         warn!("File not found.");

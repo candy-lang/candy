@@ -1,11 +1,8 @@
 use async_trait::async_trait;
 use candy_frontend::{
-    ast::Ast,
     ast_to_hir::AstToHir,
     cst_to_ast::CstToAst,
-    hir,
     hir_to_mir::HirToMir,
-    mir::Mir,
     mir_optimize::OptimizeMir,
     module::{Module, ModuleKind, PackagesPath},
     position::{line_start_offsets_raw, Offset},
@@ -13,13 +10,10 @@ use candy_frontend::{
         ReferenceCollection, ReferenceKey, RichIr, RichIrBuilder, ToRichIr, TokenModifier,
         TokenType,
     },
-    string_to_rcst::{InvalidModuleError, RcstResult, StringToRcst},
-    TracingConfig, TracingMode,
+    string_to_rcst::StringToRcst,
+    TracingConfig,
 };
-use candy_vm::{
-    lir::{Lir, RichIrForLir},
-    mir_to_lir::MirToLir,
-};
+use candy_vm::{lir::RichIrForLir, mir_to_lir::MirToLir};
 use enumset::EnumSet;
 use extension_trait::extension_trait;
 use lsp_types::{
