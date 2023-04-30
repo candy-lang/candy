@@ -161,11 +161,11 @@ impl Display for CompilerErrorPayload {
             CompilerErrorPayload::Mir(error) => match error {
             MirError::UseWithInvalidPath { module, path } => {
                 format!(
-                    "{} tries to `use` {path:?}, but that's an invalid path.",
+                    "{} tries to `use \"{path}\"`, but that's an invalid path.",
                     module.to_rich_ir(),
                 )
             }
-            MirError::UseHasTooManyParentNavigations { module, path } => format!("{} tries to `use` {path:?}, but that has too many parent navigations. You can't navigate out of the current package (the module that also contains a `_package.candy` file).", module.to_rich_ir()),
+            MirError::UseHasTooManyParentNavigations { module, path } => format!("{} tries to `use \"{path}\"`, but that has too many parent navigations. You can't navigate out of the current package (the module that also contains a `_package.candy` file).", module.to_rich_ir()),
             MirError::ModuleNotFound { module, path } => format!(
                 "{} tries to use {path:?}, but that module is not found.",
                 module.to_rich_ir(),

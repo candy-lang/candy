@@ -75,7 +75,7 @@ pub enum Status {
     },
 }
 
-#[derive(Clone, Copy, Deref, PartialEq, Eq, From, Hash)]
+#[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
 pub struct InstructionPointer(usize);
 impl InstructionPointer {
     pub fn null_pointer() -> Self {
@@ -120,7 +120,7 @@ impl Fiber {
         fiber.call_closure(closure, arguments, responsible);
         fiber
     }
-    pub fn new_for_running_module_closure(
+    pub fn for_module_closure(
         mut heap: Heap,
         module: Module,
         closure: Closure,

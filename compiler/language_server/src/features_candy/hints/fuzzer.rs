@@ -21,7 +21,7 @@ use rustc_hash::FxHashMap;
 
 #[derive(Default)]
 pub struct FuzzerManager {
-    fuzzers: HashMap<Module, FxHashMap<Id, Fuzzer>>,
+    fuzzers: FxHashMap<Module, FxHashMap<Id, Fuzzer>>,
 }
 
 impl FuzzerManager {

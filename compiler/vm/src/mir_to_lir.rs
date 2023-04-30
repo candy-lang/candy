@@ -137,8 +137,7 @@ impl LoweringContext {
                 self.stack.replace_top_id(id);
             }
             Expression::Symbol(symbol) => {
-                let symbol_text = Text::create(heap, symbol);
-                let tag = Tag::create(heap, symbol_text, None);
+                let tag = Tag::create_from_str(heap, symbol, None);
                 self.emit(id, Instruction::PushConstant(tag.into()));
             }
             Expression::Builtin(builtin) => {

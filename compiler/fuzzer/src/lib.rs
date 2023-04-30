@@ -30,7 +30,7 @@ use tracing::{error, info};
 
 pub fn fuzz<DB>(db: &DB, module: Module) -> Vec<FailingFuzzCase>
 where
-    DB: AstToHir + PositionConversionDb + CstDb + OptimizeMir,
+    DB: AstToHir + CstDb + OptimizeMir + PositionConversionDb,
 {
     let tracing = TracingConfig {
         register_fuzzables: TracingMode::All,

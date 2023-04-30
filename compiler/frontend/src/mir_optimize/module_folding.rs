@@ -70,7 +70,7 @@ impl Mir {
 
                 let body_to_insert = match db.optimized_mir(module_to_import.clone(), tracing.for_child_module()) {
                     Ok((mir, more_errors)) => {
-                        errors.extend((*more_errors).clone().into_iter());
+                        errors.extend(more_errors.iter().cloned());
 
                         let mut body = mir.body.clone();
                         let mapping: FxHashMap<Id, Id> = body

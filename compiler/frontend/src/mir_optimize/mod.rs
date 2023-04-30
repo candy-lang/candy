@@ -169,7 +169,7 @@ fn recover_from_cycle(
     let error = CompilerError::for_whole_module(
         module.clone(),
         MirError::ModuleHasCycle {
-            cycle: cycle.iter().cloned().collect_vec(),
+            cycle: cycle.to_vec(),
         },
     );
 
@@ -179,5 +179,5 @@ fn recover_from_cycle(
         body.push_panic(reason, responsible);
     });
 
-    Ok((Arc::new(mir), Arc::new(vec![error].into_iter().collect())))
+    Ok((Arc::new(mir), Arc::new(FxHashSet::from_iter([error]))))
 }

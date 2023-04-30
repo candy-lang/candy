@@ -34,7 +34,7 @@ fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
     hir.find(&id).map(|it| it.to_owned())
 }
 fn containing_body_of(db: &dyn HirDb, id: Id) -> Arc<Body> {
-    let parent_id = id.parent().unwrap();
+    let parent_id = id.parent().expect("The root scope has no parent.");
 
     if parent_id.is_root() {
         db.hir(id.module).unwrap().0
