@@ -72,7 +72,7 @@ impl<'a, M: Measurement> BencherExtension for Bencher<'a, M> {
     fn run_vm(&mut self, source_code: &str) {
         self.iter_batched(
             || setup_and_compile(source_code),
-            |(_, lir)| run(lir),
+            run,
             BatchSize::SmallInput,
         )
     }
