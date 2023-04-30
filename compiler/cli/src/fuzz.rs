@@ -11,7 +11,7 @@ pub(crate) fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
     let db = Database::new_with_file_system_module_provider(packages_path());
     let module = module_for_path(options.path)?;
 
-    debug!("Fuzzing `{}`.", module.to_rich_ir());
+    debug!("Fuzzing `{}`…", module.to_rich_ir());
     let failing_cases = candy_fuzzer::fuzz(&db, module);
 
     if failing_cases.is_empty() {

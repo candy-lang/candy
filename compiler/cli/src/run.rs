@@ -21,11 +21,7 @@ pub(crate) fn run(options: CandyRunOptions) -> ProgramResult {
     let db = Database::new_with_file_system_module_provider(packages_path);
     let module = module_for_path(options.path)?;
 
-    let tracing = TracingConfig {
-        register_fuzzables: TracingMode::Off,
-        calls: TracingMode::Off,
-        evaluated_expressions: TracingMode::Off,
-    };
+    let tracing = TracingConfig::off();
 
     debug!("Running {}.", module.to_rich_ir());
 

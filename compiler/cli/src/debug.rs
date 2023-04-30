@@ -70,29 +70,30 @@ pub(crate) fn debug(options: CandyDebugOptions) -> ProgramResult {
         if range.start < displayed_byte {
             continue;
         }
-        let before_annotation =
-            String::from_utf8(bytes[*displayed_byte..*range.start].to_vec()).unwrap();
-        let mut in_annotation =
-            String::from_utf8(bytes[*range.start..*range.end].to_vec()).unwrap();
+        let before_annotation = std::str::from_utf8(&bytes[*displayed_byte..*range.start]).unwrap();
+        print!("{before_annotation}");
+
+        let in_annotation = std::str::from_utf8(&bytes[*range.start..*range.end]).unwrap();
 
         if let Some(token_type) = token_type {
-            in_annotation = match token_type {
-                TokenType::Module => in_annotation.yellow(),
-                TokenType::Parameter => in_annotation.red(),
-                TokenType::Variable => in_annotation.yellow(),
-                TokenType::Symbol => in_annotation.purple(),
-                TokenType::Function => in_annotation.blue(),
-                TokenType::Comment => in_annotation.green(),
-                TokenType::Text => in_annotation.cyan(),
-                TokenType::Int => in_annotation.red(),
-            }
-            .to_string();
+            let color = match token_type {
+                TokenType::Module => Color::Yellow,
+                TokenType::Parameter => Color::Red,
+                TokenType::Variable => Color::Yellow,
+                TokenType::Symbol => Color::Magenta,
+                TokenType::Function => Color::Blue,
+                TokenType::Comment => Color::Green,
+                TokenType::Text => Color::Cyan,
+                TokenType::Int => Color::Red,
+            };
+            print!("{}", in_annotation.color(color));
+        } else {
+            print!("{}", in_annotation)
         }
 
-        print!("{before_annotation}{in_annotation}");
         displayed_byte = range.end;
     }
-    let rest = String::from_utf8(bytes[*displayed_byte..].to_vec()).unwrap();
+    let rest = std::str::from_utf8(&bytes[*displayed_byte..]).unwrap();
     println!("{rest}");
 
     Ok(())
