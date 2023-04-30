@@ -414,15 +414,6 @@ impl State {
             } => Ok(vm_state),
         }
     }
-    fn require_paused(&self) -> Result<&PausedState, &'static str> {
-        match &self {
-            State::Launched {
-                execution_state: ExecutionState::Paused(state),
-                ..
-            } => Ok(state),
-            _ => Err("not-paused"),
-        }
-    }
     fn require_paused_mut(&mut self) -> Result<&mut PausedState, &'static str> {
         match self {
             State::Launched {
