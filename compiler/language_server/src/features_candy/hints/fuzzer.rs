@@ -8,7 +8,7 @@ use candy_fuzzer::{Fuzzer, Status};
 use candy_vm::{context::RunLimitedNumberOfInstructions, heap::Closure, lir::Lir};
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 use tracing::{debug, error};
 
 use crate::{
