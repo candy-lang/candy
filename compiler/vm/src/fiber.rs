@@ -81,9 +81,6 @@ impl InstructionPointer {
     pub fn null_pointer() -> Self {
         Self(0)
     }
-    fn start_of_closure(closure: Closure) -> Self {
-        closure.body()
-    }
     fn next(&self) -> Self {
         Self(self.0 + 1)
     }
@@ -120,11 +117,7 @@ impl Fiber {
         fiber.call_closure(closure, arguments, responsible);
         fiber
     }
-    pub fn for_module_closure(
-        mut heap: Heap,
-        module: Module,
-        closure: Closure,
-    ) -> Self {
+    pub fn for_module_closure(mut heap: Heap, module: Module, closure: Closure) -> Self {
         assert_eq!(
             closure.captured_len(),
             0,
@@ -496,7 +489,7 @@ impl Fiber {
         self.data_stack.extend_from_slice(captured);
         self.data_stack.extend_from_slice(arguments);
         self.push_to_data_stack(responsible);
-        self.next_instruction = Some(InstructionPointer::start_of_closure(closure));
+        self.next_instruction = Some(closure.body());
     }
 
     fn push_to_data_stack(&mut self, value: impl Into<InlineObject>) {

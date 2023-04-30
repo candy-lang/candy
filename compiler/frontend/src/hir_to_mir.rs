@@ -406,7 +406,7 @@ impl<'a> LoweringContext<'a> {
                 )
             }
             hir::Expression::Error { errors, .. } => {
-                self.errors.extend_from_slice(errors);
+                self.errors.extend(errors.clone());
                 let responsible = body.push_hir_id(hir_id.clone());
                 body.compile_errors(self.db, responsible, errors)
             }

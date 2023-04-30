@@ -8,6 +8,7 @@ use crate::{
     rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr},
     string_to_rcst::ModuleError,
 };
+use derive_more::From;
 use itertools::Itertools;
 use std::{fmt::Display, hash::Hash, ops::Range};
 
@@ -18,7 +19,7 @@ pub struct CompilerError {
     pub payload: CompilerErrorPayload,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Clone, Debug, Eq, From, Hash, PartialEq)]
 pub enum CompilerErrorPayload {
     Module(ModuleError),
     Cst(CstError),
@@ -159,56 +160,30 @@ impl Display for CompilerErrorPayload {
                 HirError::UnknownReference { name } => format!("`{name}` is not in scope."),
             },
             CompilerErrorPayload::Mir(error) => match error {
-            MirError::UseWithInvalidPath { module, path } => {
-                format!(
-                    "{} tries to `use \"{path}\"`, but that's an invalid path.",
+                MirError::UseWithInvalidPath { module, path } => {
+                    format!(
+                        "{} tries to `use` {path:?}, but that's an invalid path.",
+                        module.to_rich_ir(),
+                    )
+                }
+                MirError::UseHasTooManyParentNavigations { module, path } => format!("{} tries to `use` {path:?}, but that has too many parent navigations. You can't navigate out of the current package (the module that also contains a `_package.candy` file).", module.to_rich_ir()),
+                MirError::ModuleNotFound { module, path } => format!(
+                    "{} tries to use {path:?}, but that module is not found.",
                     module.to_rich_ir(),
-                )
-            }
-            MirError::UseHasTooManyParentNavigations { module, path } => format!("{} tries to `use \"{path}\"`, but that has too many parent navigations. You can't navigate out of the current package (the module that also contains a `_package.candy` file).", module.to_rich_ir()),
-            MirError::ModuleNotFound { module, path } => format!(
-                "{} tries to use {path:?}, but that module is not found.",
-                module.to_rich_ir(),
-            ),
-            MirError::UseNotStaticallyResolvable { containing_module } => format!(
-                "A `use` in {} is not statically resolvable.",
-                containing_module.to_rich_ir(),
-            ),
-            MirError::ModuleHasCycle { cycle } => {
-                format!(
-                    "There's a cycle in the used modules: {}",
-                    cycle.iter().join(" → "),
-                )
-            }
-        },
+                ),
+                MirError::UseNotStaticallyResolvable { containing_module } => format!(
+                    "A `use` in {} is not statically resolvable.",
+                    containing_module.to_rich_ir(),
+                ),
+                MirError::ModuleHasCycle { cycle } => {
+                    format!(
+                        "There's a cycle in the used modules: {}",
+                        cycle.iter().join(" → "),
+                    )
+                }
+            },
         };
         write!(f, "{message}")
-    }
-}
-
-impl From<ModuleError> for CompilerErrorPayload {
-    fn from(error: ModuleError) -> Self {
-        Self::Module(error)
-    }
-}
-impl From<CstError> for CompilerErrorPayload {
-    fn from(error: CstError) -> Self {
-        Self::Cst(error)
-    }
-}
-impl From<AstError> for CompilerErrorPayload {
-    fn from(error: AstError) -> Self {
-        Self::Ast(error)
-    }
-}
-impl From<HirError> for CompilerErrorPayload {
-    fn from(error: HirError) -> Self {
-        Self::Hir(error)
-    }
-}
-impl From<MirError> for CompilerErrorPayload {
-    fn from(error: MirError) -> Self {
-        Self::Mir(error)
     }
 }
 

@@ -65,8 +65,6 @@ use std::{
 };
 use tracing::debug;
 
-use itertools::Itertools;
-
 #[salsa::query_group(OptimizeMirStorage)]
 pub trait OptimizeMir: HirToMir {
     #[salsa::cycle(recover_from_cycle)]

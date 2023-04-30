@@ -72,10 +72,9 @@ impl MutableModuleProviderOwner for Database {
     }
 }
 
-pub fn setup_and_compile(source_code: &str) -> (Database, Arc<Lir>) {
+pub fn setup_and_compile(source_code: &str) -> Arc<Lir> {
     let mut db = setup();
-    let lir = compile(&mut db, source_code);
-    (db, lir)
+    compile(&mut db, source_code)
 }
 
 pub fn setup() -> Database {
