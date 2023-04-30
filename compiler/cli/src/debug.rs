@@ -1,7 +1,7 @@
 use crate::{
     database::Database,
     utils::{module_for_path, packages_path},
-    CandyDebugOptions, Exit, ProgramResult,
+    Exit, ProgramResult,
 };
 use candy_frontend::{
     ast_to_hir::AstToHir,
@@ -11,43 +11,101 @@ use candy_frontend::{
     position::Offset,
     rich_ir::{RichIr, RichIrAnnotation, TokenType},
     string_to_rcst::StringToRcst,
+    TracingConfig, TracingMode,
 };
 use candy_vm::{lir::RichIrForLir, mir_to_lir::MirToLir};
+use clap::{Parser, ValueHint};
 use colored::{Color, Colorize};
+use std::path::PathBuf;
 
-pub(crate) fn debug(options: CandyDebugOptions) -> ProgramResult {
+/// Debug the Candy compiler itself.
+///
+/// This command compiles the given file and outputs its intermediate
+/// representation.
+#[derive(Parser, Debug)]
+pub(crate) enum Options {
+    /// Concrete Syntax Tree
+    Cst(OnlyPath),
+
+    /// Abstract Syntax Tree
+    Ast(OnlyPath),
+
+    /// High-Level Intermediate Representation
+    Hir(OnlyPath),
+
+    /// Mid-Level Intermediate Representation
+    Mir(PathAndTracing),
+
+    /// Optimized Mid-Level Intermediate Representation
+    OptimizedMir(PathAndTracing),
+
+    /// Low-Level Intermediate Representation
+    Lir(PathAndTracing),
+}
+#[derive(Parser, Debug)]
+pub(crate) struct OnlyPath {
+    #[arg(value_hint = ValueHint::FilePath)]
+    path: PathBuf,
+}
+#[derive(Parser, Debug)]
+pub(crate) struct PathAndTracing {
+    #[arg(value_hint = ValueHint::FilePath)]
+    path: PathBuf,
+
+    #[arg(long)]
+    register_fuzzables: bool,
+
+    #[arg(long)]
+    trace_calls: bool,
+
+    #[arg(long)]
+    trace_evaluated_expressions: bool,
+}
+impl PathAndTracing {
+    fn to_tracing_config(&self) -> TracingConfig {
+        TracingConfig {
+            register_fuzzables: TracingMode::only_current_or_off(self.register_fuzzables),
+            calls: TracingMode::only_current_or_off(self.trace_calls),
+            evaluated_expressions: TracingMode::only_current_or_off(
+                self.trace_evaluated_expressions,
+            ),
+        }
+    }
+}
+
+pub(crate) fn debug(options: Options) -> ProgramResult {
     let packages_path = packages_path();
     let db = Database::new_with_file_system_module_provider(packages_path);
 
     let rich_ir = match options {
-        CandyDebugOptions::Cst(options) => {
+        Options::Cst(options) => {
             let module = module_for_path(options.path)?;
             let rcst = db.rcst(module.clone());
             RichIr::for_rcst(&module, &rcst)
         }
-        CandyDebugOptions::Ast(options) => {
+        Options::Ast(options) => {
             let module = module_for_path(options.path)?;
             let ast = db.ast(module.clone());
             ast.map(|(ast, _)| RichIr::for_ast(&module, &ast))
         }
-        CandyDebugOptions::Hir(options) => {
+        Options::Hir(options) => {
             let module = module_for_path(options.path)?;
             let hir = db.hir(module.clone());
             hir.map(|(hir, _)| RichIr::for_hir(&module, &hir))
         }
-        CandyDebugOptions::Mir(options) => {
+        Options::Mir(options) => {
             let module = module_for_path(options.path.clone())?;
             let tracing = options.to_tracing_config();
             let mir = db.mir(module.clone(), tracing.clone());
             mir.map(|mir| RichIr::for_mir(&module, &mir, &tracing))
         }
-        CandyDebugOptions::OptimizedMir(options) => {
+        Options::OptimizedMir(options) => {
             let module = module_for_path(options.path.clone())?;
             let tracing = options.to_tracing_config();
             let mir = db.mir_with_obvious_optimized(module.clone(), tracing.clone());
             mir.map(|mir| RichIr::for_mir(&module, &mir, &tracing))
         }
-        CandyDebugOptions::Lir(options) => {
+        Options::Lir(options) => {
             let module = module_for_path(options.path.clone())?;
             let tracing = options.to_tracing_config();
             let lir = db.lir(module.clone(), tracing.clone());

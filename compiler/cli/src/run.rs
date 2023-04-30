@@ -2,7 +2,7 @@ use crate::{
     database::Database,
     services::{stdin::StdinService, stdout::StdoutService},
     utils::{module_for_path, packages_path},
-    CandyRunOptions, Exit, ProgramResult,
+    Exit, ProgramResult,
 };
 use candy_frontend::{ast_to_hir::AstToHir, hir, rich_ir::ToRichIr, TracingConfig};
 use candy_vm::{
@@ -14,9 +14,24 @@ use candy_vm::{
     tracer::{full::FullTracer, Tracer},
     vm::{Status, Vm},
 };
+use clap::{Parser, ValueHint};
+use std::path::PathBuf;
 use tracing::{debug, error};
 
-pub(crate) fn run(options: CandyRunOptions) -> ProgramResult {
+/// Run a Candy program.
+///
+/// This command runs the given file, or, if no file is provided, the package of
+/// your current working directory. The module should export a `main` function.
+/// This function is then called with an environment.
+#[derive(Parser, Debug)]
+pub(crate) struct Options {
+    /// The file or package to run. If none is provided, the package of your
+    /// current working directory will be run.
+    #[arg(value_hint = ValueHint::FilePath)]
+    path: Option<PathBuf>,
+}
+
+pub(crate) fn run(options: Options) -> ProgramResult {
     let packages_path = packages_path();
     let db = Database::new_with_file_system_module_provider(packages_path);
     let module = module_for_path(options.path)?;
