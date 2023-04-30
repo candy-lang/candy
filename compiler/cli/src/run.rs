@@ -4,7 +4,7 @@ use crate::{
     utils::{module_for_path, packages_path},
     CandyRunOptions, Exit, ProgramResult,
 };
-use candy_frontend::{ast_to_hir::AstToHir, hir, rich_ir::ToRichIr, TracingConfig, TracingMode};
+use candy_frontend::{ast_to_hir::AstToHir, hir, rich_ir::ToRichIr, TracingConfig};
 use candy_vm::{
     context::{DbUseProvider, RunForever},
     fiber::{ExecutionResult, FiberId},

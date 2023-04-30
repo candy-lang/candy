@@ -13,7 +13,7 @@ use candy_frontend::{
     string_to_rcst::StringToRcst,
 };
 use candy_vm::{lir::RichIrForLir, mir_to_lir::MirToLir};
-use colored::Colorize;
+use colored::{Color, Colorize};
 
 pub(crate) fn debug(options: CandyDebugOptions) -> ProgramResult {
     let packages_path = packages_path();
@@ -67,9 +67,7 @@ pub(crate) fn debug(options: CandyDebugOptions) -> ProgramResult {
         range, token_type, ..
     } in annotations
     {
-        if range.start < displayed_byte {
-            continue;
-        }
+        assert!(displayed_byte <= range.start);
         let before_annotation = std::str::from_utf8(&bytes[*displayed_byte..*range.start]).unwrap();
         print!("{before_annotation}");
 
