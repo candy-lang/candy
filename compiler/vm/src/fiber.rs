@@ -7,7 +7,7 @@ use super::{
 };
 use crate::{
     channel::ChannelId,
-    heap::{HirId, InlineObject, List, Pointer, ReceivePort, SendPort, Struct, Tag},
+    heap::{HeapObject, HirId, InlineObject, List, Pointer, ReceivePort, SendPort, Struct, Tag},
     Lir,
 };
 use candy_frontend::{
@@ -17,6 +17,7 @@ use candy_frontend::{
 };
 use derive_more::{Deref, From};
 use itertools::Itertools;
+use rustc_hash::FxHashMap;
 use std::fmt::{self, Debug};
 use tracing::trace;
 
@@ -40,13 +41,17 @@ impl Debug for FiberId {
 
 /// A fiber represents an execution thread of a program. It's a stack-based
 /// machine that runs instructions from a LIR. Fibers are owned by a `Vm`.
-#[derive(Clone)]
 pub struct Fiber {
     pub status: Status,
     next_instruction: Option<InstructionPointer>,
     pub data_stack: Vec<InlineObject>,
     pub call_stack: Vec<InstructionPointer>,
     pub heap: Heap,
+
+    // TODO: Remove this as soon as refcounting can be optional for objects.
+    // Then, refcounting for all constant objects could be made optional and
+    // they could really be shared among all fibers.
+    map_from_constant_heap_to_ours: FxHashMap<HeapObject, HeapObject>,
 }
 
 #[derive(Clone, Debug)]
@@ -97,27 +102,37 @@ pub enum ExecutionResult {
 }
 
 impl Fiber {
-    fn new_with_heap(heap: Heap) -> Self {
+    fn new_with_heap(
+        heap: Heap,
+        map_from_constant_heap_to_ours: FxHashMap<HeapObject, HeapObject>,
+    ) -> Self {
         Self {
             status: Status::Done,
             next_instruction: None,
             data_stack: vec![],
             call_stack: vec![],
             heap,
+            map_from_constant_heap_to_ours,
         }
     }
     pub fn for_closure(
         heap: Heap,
+        map_from_constant_heap_to_ours: FxHashMap<HeapObject, HeapObject>,
         closure: Closure,
         arguments: &[InlineObject],
         responsible: HirId,
     ) -> Self {
-        let mut fiber = Self::new_with_heap(heap);
+        let mut fiber = Self::new_with_heap(heap, map_from_constant_heap_to_ours);
         fiber.status = Status::Running;
         fiber.call_closure(closure, arguments, responsible);
         fiber
     }
-    pub fn for_module_closure(mut heap: Heap, module: Module, closure: Closure) -> Self {
+    pub fn for_module_closure(
+        mut heap: Heap,
+        map_from_constant_heap_to_ours: FxHashMap<HeapObject, HeapObject>,
+        module: Module,
+        closure: Closure,
+    ) -> Self {
         assert_eq!(
             closure.captured_len(),
             0,
@@ -129,7 +144,13 @@ impl Fiber {
             "Closure is not a module closure (it has arguments).",
         );
         let responsible = HirId::create(&mut heap, Id::new(module, vec![]));
-        Self::for_closure(heap, closure, &[], responsible)
+        Self::for_closure(
+            heap,
+            map_from_constant_heap_to_ours,
+            closure,
+            &[],
+            responsible,
+        )
     }
 
     pub fn tear_down(mut self) -> ExecutionResult {
@@ -325,6 +346,10 @@ impl Fiber {
                 self.push_to_data_stack(closure);
             }
             Instruction::PushConstant(constant) => {
+                let constant = match HeapObject::try_from(constant) {
+                    Ok(heap_object) => self.map_from_constant_heap_to_ours[&heap_object].into(),
+                    Err(_) => constant,
+                };
                 constant.dup(&mut self.heap);
                 self.push_to_data_stack(constant);
             }

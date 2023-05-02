@@ -16,7 +16,10 @@ use crate::{
     channel::{Channel, ChannelId, Completer, Packet, Performer},
     context::{CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions},
     fiber::{self, ExecutionResult, Fiber, FiberId},
-    heap::{Closure, Data, Heap, HirId, InlineObject, SendPort, Struct, Tag},
+    heap::{
+        Closure, Data, Heap, HirId, InlineObject, InlineObjectSliceCloneToHeap, SendPort, Struct,
+        Tag,
+    },
     lir::Lir,
     tracer::Tracer,
 };
@@ -40,7 +43,6 @@ impl fmt::Debug for OperationId {
 /// A VM represents a Candy program that thinks it's currently running. Because
 /// VMs are first-class Rust structs, they enable other code to store "freezed"
 /// programs and to remain in control about when and for how long code runs.
-#[derive(Clone)]
 pub struct Vm<L: Borrow<Lir>> {
     lir: L,
     fibers: HashMap<FiberId, FiberTree>,
@@ -54,7 +56,6 @@ pub struct Vm<L: Borrow<Lir>> {
     channel_id_generator: IdGenerator<ChannelId>,
 }
 
-#[derive(Clone)]
 enum FiberTree {
     /// This tree is currently focused on running a single fiber.
     Single(Single),
@@ -69,7 +70,6 @@ enum FiberTree {
 }
 
 /// Single fibers are the leaves of the fiber tree.
-#[derive(Clone)]
 struct Single {
     fiber: Fiber,
     parent: Option<FiberId>,
@@ -82,7 +82,6 @@ struct Single {
 /// parallel section), you can also spawn other fibers. In contrast to the first
 /// child, those children also have an explicit send port where the closure's
 /// result is sent to.
-#[derive(Clone)]
 struct Parallel {
     paused_fiber: Single,
     children: HashMap<FiberId, ChildKind>,
@@ -95,19 +94,16 @@ enum ChildKind {
     SpawnedChild(ChannelId),
 }
 
-#[derive(Clone)]
 struct Try {
     paused_fiber: Single,
     child: FiberId,
 }
 
-#[derive(Clone)]
 enum ChannelLike {
     Channel(Channel),
     Nursery(FiberId),
 }
 
-#[derive(Clone)]
 pub enum CompletedOperation {
     Sent,
     Received { packet: Packet },
@@ -142,13 +138,28 @@ impl<L: Borrow<Lir>> Vm<L> {
     }
     pub fn initialize_for_closure(
         &mut self,
-        heap: Heap,
         closure: Closure,
         arguments: &[InlineObject],
         responsible: HirId,
     ) {
         assert!(self.fibers.is_empty());
-        let fiber = Fiber::for_closure(heap, closure, arguments, responsible);
+
+        let (mut heap, map_from_constant_heap_to_heap) = self.lir.borrow().constant_heap.clone();
+        let closure = Data::from(closure.clone_to_heap(&mut heap))
+            .try_into()
+            .unwrap();
+        let arguments = arguments.clone_to_heap(&mut heap);
+        let responsible = Data::from(responsible.clone_to_heap(&mut heap))
+            .try_into()
+            .unwrap();
+
+        let fiber = Fiber::for_closure(
+            heap,
+            map_from_constant_heap_to_heap,
+            closure,
+            &arguments,
+            responsible,
+        );
         self.fibers.insert(
             FiberId::root(),
             FiberTree::Single(Single {
@@ -160,22 +171,20 @@ impl<L: Borrow<Lir>> Vm<L> {
 
     pub fn for_closure(
         lir: L,
-        heap: Heap,
         closure: Closure,
         arguments: &[InlineObject],
         responsible: HirId,
     ) -> Self {
         let mut this = Self::uninitialized(lir);
-        this.initialize_for_closure(heap, closure, arguments, responsible);
+        this.initialize_for_closure(closure, arguments, responsible);
         this
     }
     pub fn for_module(lir: L) -> Self {
         let actual_lir = lir.borrow();
-        let heap = actual_lir.constant_heap.clone();
         let closure = actual_lir.module_closure;
         let responsible = actual_lir.responsible_module;
 
-        Self::for_closure(lir, heap, closure, &[], responsible)
+        Self::for_closure(lir, closure, &[], responsible)
     }
 
     pub fn tear_down(mut self) -> ExecutionResult {
@@ -344,7 +353,7 @@ impl<L: Borrow<Lir>> Vm<L> {
                 let first_child_id = {
                     let id = self.fiber_id_generator.generate();
 
-                    let mut heap = Heap::default();
+                    let (mut heap, mapping) = self.lir.borrow().constant_heap.clone();
                     let body = Data::from(body.clone_to_heap(&mut heap))
                         .try_into()
                         .unwrap();
@@ -357,6 +366,7 @@ impl<L: Borrow<Lir>> Vm<L> {
                         FiberTree::Single(Single {
                             fiber: Fiber::for_closure(
                                 heap,
+                                mapping,
                                 body,
                                 &[nursery_send_port],
                                 responsible,
@@ -382,7 +392,7 @@ impl<L: Borrow<Lir>> Vm<L> {
             fiber::Status::InTry { body } => {
                 let child_id = {
                     let id = self.fiber_id_generator.generate();
-                    let mut heap = Heap::default();
+                    let (mut heap, mapping) = self.lir.borrow().constant_heap.clone();
                     let body = Data::from(body.clone_to_heap(&mut heap))
                         .try_into()
                         .unwrap();
@@ -392,7 +402,7 @@ impl<L: Borrow<Lir>> Vm<L> {
                     self.fibers.insert(
                         id,
                         FiberTree::Single(Single {
-                            fiber: Fiber::for_closure(heap, body, &[], responsible),
+                            fiber: Fiber::for_closure(heap, mapping, body, &[], responsible),
                             parent: Some(fiber_id),
                         }),
                     );
@@ -597,7 +607,12 @@ impl<L: Borrow<Lir>> Vm<L> {
                 let parent_id = *parent_id;
 
                 match Self::parse_spawn_packet(packet) {
-                    Some((mut heap, closure_to_spawn, return_channel)) => {
+                    Some((_packet_heap, closure_to_spawn, return_channel)) => {
+                        let (mut heap, constant_mapping) = self.lir.borrow().constant_heap.clone();
+                        let closure_to_spawn: Closure = closure_to_spawn
+                            .clone_to_heap(&mut heap)
+                            .try_into()
+                            .unwrap();
                         let responsible =
                             HirId::create(&mut heap, Id::complicated_responsibility());
                         let child_id = self.fiber_id_generator.generate();
@@ -605,7 +620,13 @@ impl<L: Borrow<Lir>> Vm<L> {
                         self.fibers.insert(
                             child_id,
                             FiberTree::Single(Single {
-                                fiber: Fiber::for_closure(heap, closure_to_spawn, &[], responsible),
+                                fiber: Fiber::for_closure(
+                                    heap,
+                                    constant_mapping,
+                                    closure_to_spawn,
+                                    &[],
+                                    responsible,
+                                ),
                                 parent: Some(parent_id),
                             }),
                         );

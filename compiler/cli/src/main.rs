@@ -378,7 +378,8 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         platform,
         &heap,
     );
-    vm.initialize_for_closure(heap, main, &[environment], platform);
+    vm.initialize_for_closure(main, &[environment], platform);
+    debug!("Running VM.");
     loop {
         match vm.status() {
             Status::CanRun => {
@@ -394,6 +395,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     if options.debug {
         module.dump_associated_debug_file(&packages_path, "trace", &format!("{tracer:?}"));
     }
+    debug!("Tearing down VM.");
     match vm.tear_down() {
         ExecutionResult::Finished(return_value) => {
             tracer

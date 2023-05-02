@@ -11,11 +11,12 @@ use std::{
 };
 
 /// A full tracer that saves all events that occur with timestamps.
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct FullTracer {
     pub events: Vec<TimedEvent>,
     pub heap: Heap,
 }
+
 #[derive(Clone)]
 pub struct TimedEvent {
     pub when: Instant,
