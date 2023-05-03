@@ -39,33 +39,33 @@ impl Debug for FiberId {
 /// A fiber represents an execution thread of a program. It's a stack-based
 /// machine that runs instructions from a LIR. Fibers are owned by a `Vm`.
 #[derive(Clone)]
-pub struct Fiber {
-    pub status: Status,
-    next_instruction: Option<InstructionPointer>,
-    pub data_stack: Vec<InlineObject>,
-    pub call_stack: Vec<InstructionPointer>,
+pub struct Fiber<'h> {
+    pub status: Status<'h>,
+    next_instruction: Option<InstructionPointer<'h>>,
+    pub data_stack: Vec<InlineObject<'h>>,
+    pub call_stack: Vec<InstructionPointer<'h>>,
     pub import_stack: Vec<Module>,
-    pub heap: Heap,
+    pub heap: Heap<'h>,
 }
 
 #[derive(Clone, Debug)]
-pub enum Status {
+pub enum Status<'h> {
     Running,
     CreatingChannel {
         capacity: Capacity,
     },
     Sending {
         channel: ChannelId,
-        packet: Packet,
+        packet: Packet<'h>,
     },
     Receiving {
         channel: ChannelId,
     },
     InParallelScope {
-        body: Closure,
+        body: Closure<'h>,
     },
     InTry {
-        body: Closure,
+        body: Closure<'h>,
     },
     Done,
     Panicked {
@@ -75,15 +75,15 @@ pub enum Status {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct InstructionPointer {
+pub struct InstructionPointer<'h> {
     /// Pointer to the closure object that is currently running code.
-    closure: Closure,
+    closure: Closure<'h>,
 
     /// Index of the next instruction to run.
     instruction: usize,
 }
-impl InstructionPointer {
-    fn start_of_closure(closure: Closure) -> Self {
+impl<'h> InstructionPointer<'h> {
+    fn start_of_closure(closure: Closure<'h>) -> Self {
         Self {
             closure,
             instruction: 0,
@@ -98,13 +98,13 @@ impl InstructionPointer {
     }
 }
 
-pub enum ExecutionResult {
-    Finished(Packet),
+pub enum ExecutionResult<'h> {
+    Finished(Packet<'h>),
     Panicked { reason: String, responsible: Id },
 }
 
-impl Fiber {
-    fn new_with_heap(heap: Heap) -> Self {
+impl<'h> Fiber<'h> {
+    fn new_with_heap(heap: Heap<'h>) -> Self {
         Self {
             status: Status::Done,
             next_instruction: None,
@@ -115,9 +115,9 @@ impl Fiber {
         }
     }
     pub fn new_for_running_closure(
-        heap: Heap,
-        closure: Closure,
-        arguments: &[InlineObject],
+        heap: Heap<'h>,
+        closure: Closure<'h>,
+        arguments: &[InlineObject<'h>],
         responsible: hir::Id,
     ) -> Self {
         let mut fiber = Self::new_with_heap(heap);
@@ -141,7 +141,7 @@ impl Fiber {
         Self::new_for_running_closure(heap, closure, &[], module_id)
     }
 
-    pub fn tear_down(mut self) -> ExecutionResult {
+    pub fn tear_down(mut self) -> ExecutionResult<'h> {
         match self.status {
             Status::Done => {
                 let object = self.pop_from_data_stack();
@@ -161,7 +161,7 @@ impl Fiber {
         }
     }
 
-    pub fn status(&self) -> Status {
+    pub fn status(&self) -> Status<'h> {
         self.status.clone()
     }
 

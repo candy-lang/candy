@@ -10,6 +10,7 @@ use std::{
     collections::hash_map,
     fmt::{self, Formatter, Pointer},
     hash::{Hash, Hasher},
+    marker::PhantomData,
     ops::Deref,
     ptr::NonNull,
 };
@@ -43,8 +44,11 @@ macro_rules! trace {
 }
 
 #[derive(Clone, Copy)]
-pub struct HeapObject(NonNull<u64>);
-impl HeapObject {
+pub struct HeapObject<'h> {
+    address: NonNull<u64>,
+    phantom: PhantomData<&'h ()>,
+}
+impl HeapObject<'_> {
     pub const WORD_SIZE: usize = 8;
 
     const KIND_MASK: u64 = 0b111;
@@ -57,20 +61,23 @@ impl HeapObject {
     const KIND_HIR_ID: u64 = 0b111;
 
     pub fn new(address: NonNull<u64>) -> Self {
-        Self(address)
+        Self {
+            address,
+            phantom: PhantomData,
+        }
     }
 
     pub fn address(self) -> NonNull<u64> {
-        self.0
+        self.address
     }
     pub fn pointer_equals(self, other: HeapObject) -> bool {
-        self.0 == other.0
+        self.address == other.address
     }
     pub fn unsafe_get_word(self, offset: usize) -> u64 {
         unsafe { *self.word_pointer(offset).as_ref() }
     }
     pub fn word_pointer(self, offset: usize) -> NonNull<u64> {
-        self.0
+        self.address
             .map_addr(|it| it.checked_add(offset * Self::WORD_SIZE).unwrap())
     }
     pub fn header_word(self) -> u64 {
@@ -150,40 +157,40 @@ impl HeapObject {
     }
 }
 
-impl DebugDisplay for HeapObject {
+impl DebugDisplay for HeapObject<'_> {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         DebugDisplay::fmt(&HeapData::from(*self), f, is_debug)
     }
 }
-impl_debug_display_via_debugdisplay!(HeapObject);
-impl Pointer for HeapObject {
+impl_debug_display_via_debugdisplay!(HeapObject<'_>);
+impl Pointer for HeapObject<'_> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{:p}", self.address())
     }
 }
 
-impl Eq for HeapObject {}
-impl PartialEq for HeapObject {
+impl Eq for HeapObject<'_> {}
+impl PartialEq for HeapObject<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.pointer_equals(*other) || HeapData::from(*self) == HeapData::from(*other)
     }
 }
-impl Hash for HeapObject {
+impl Hash for HeapObject<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         HeapData::from(*self).hash(state);
     }
 }
 
 #[enum_dispatch]
-pub trait HeapObjectTrait: Into<HeapObject> {
+pub trait HeapObjectTrait<'h>: Into<HeapObject<'h>> {
     // Number of content bytes following the header and reference count words.
     fn content_size(self) -> usize;
 
-    fn clone_content_to_heap_with_mapping(
+    fn clone_content_to_heap_with_mapping<'t>(
         self,
-        heap: &mut Heap,
-        clone: HeapObject,
-        address_map: &mut FxHashMap<HeapObject, HeapObject>,
+        heap: &'t mut Heap,
+        clone: HeapObject<'t>,
+        address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
     );
 
     /// Calls [Heap::drop] for all referenced [HeapObject]s and drops allocated
@@ -191,22 +198,22 @@ pub trait HeapObjectTrait: Into<HeapObject> {
     ///
     /// This method is called by [free] prior to deallocating the object's
     /// memory.
-    fn drop_children(self, heap: &mut Heap);
+    fn drop_children(self, heap: &'h mut Heap);
 }
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 #[enum_dispatch(HeapObjectTrait)]
-pub enum HeapData {
-    Int(HeapInt),
-    List(HeapList),
-    Struct(HeapStruct),
-    Text(HeapText),
-    Tag(HeapTag),
-    Closure(HeapClosure),
-    HirId(HeapHirId),
+pub enum HeapData<'h> {
+    Int(HeapInt<'h>),
+    List(HeapList<'h>),
+    Struct(HeapStruct<'h>),
+    Text(HeapText<'h>),
+    Tag(HeapTag<'h>),
+    Closure(HeapClosure<'h>),
+    HirId(HeapHirId<'h>),
 }
 
-impl DebugDisplay for HeapData {
+impl DebugDisplay for HeapData<'_> {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         match self {
             Self::Int(int) => DebugDisplay::fmt(int, f, is_debug),
@@ -219,9 +226,9 @@ impl DebugDisplay for HeapData {
         }
     }
 }
-impl_debug_display_via_debugdisplay!(HeapData);
+impl_debug_display_via_debugdisplay!(HeapData<'_>);
 
-impl From<HeapObject> for HeapData {
+impl<'h> From<HeapObject<'h>> for HeapData<'h> {
     fn from(object: HeapObject) -> Self {
         let header_word = object.header_word();
         match header_word & HeapObject::KIND_MASK {
@@ -242,8 +249,8 @@ impl From<HeapObject> for HeapData {
         }
     }
 }
-impl Deref for HeapData {
-    type Target = HeapObject;
+impl<'h> Deref for HeapData<'h> {
+    type Target = HeapObject<'h>;
 
     fn deref(&self) -> &Self::Target {
         match &self {
@@ -257,8 +264,8 @@ impl Deref for HeapData {
         }
     }
 }
-impl From<HeapData> for HeapObject {
-    fn from(value: HeapData) -> Self {
+impl<'h> From<HeapData<'h>> for HeapObject<'h> {
+    fn from(value: HeapData<'h>) -> Self {
         *value
     }
 }

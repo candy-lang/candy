@@ -14,12 +14,12 @@ use std::{
 };
 
 #[derive(Clone, Copy, Deref)]
-pub struct InlinePort(InlineObject);
+pub struct InlinePort<'h>(InlineObject<'h>);
 
-impl InlinePort {
+impl<'h> InlinePort<'h> {
     const CHANNEL_ID_SHIFT: usize = 3;
 
-    pub fn create(heap: &mut Heap, channel_id: ChannelId, is_send: bool) -> InlineObject {
+    pub fn create(heap: &'h mut Heap, channel_id: ChannelId, is_send: bool) -> InlineObject<'h> {
         heap.notify_port_created(channel_id);
         let channel_id = channel_id.to_usize();
         debug_assert_eq!(
@@ -36,26 +36,26 @@ impl InlinePort {
         let header_word =
             InlineObject::KIND_PORT | subkind | ((channel_id as u64) << Self::CHANNEL_ID_SHIFT);
         let header_word = unsafe { NonZeroU64::new_unchecked(header_word) };
-        InlineObject(header_word)
+        InlineObject::new(header_word)
     }
 
     pub fn channel_id(self) -> ChannelId {
         ChannelId::from_usize((self.raw_word().get() >> Self::CHANNEL_ID_SHIFT) as usize)
     }
 }
-impl From<InlinePort> for InlineObject {
-    fn from(port: InlinePort) -> Self {
+impl<'h> From<InlinePort<'h>> for InlineObject<'h> {
+    fn from(port: InlinePort<'h>) -> Self {
         port.0
     }
 }
 
-impl Eq for InlinePort {}
-impl PartialEq for InlinePort {
+impl Eq for InlinePort<'_> {}
+impl PartialEq for InlinePort<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.channel_id() == other.channel_id()
     }
 }
-impl Hash for InlinePort {
+impl Hash for InlinePort<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.channel_id().hash(state)
     }
@@ -64,29 +64,29 @@ impl Hash for InlinePort {
 // Send Port
 
 #[derive(Clone, Copy, Deref, Eq, Hash, PartialEq)]
-pub struct InlineSendPort(InlinePort);
+pub struct InlineSendPort<'h>(InlinePort<'h>);
 
-impl InlineSendPort {
-    pub fn new_unchecked(object: InlineObject) -> Self {
+impl<'h> InlineSendPort<'h> {
+    pub fn new_unchecked(object: InlineObject<'h>) -> Self {
         Self(InlinePort(object))
     }
-    pub fn create(heap: &mut Heap, channel_id: ChannelId) -> InlineObject {
+    pub fn create(heap: &mut Heap, channel_id: ChannelId) -> InlineObject<'h> {
         InlinePort::create(heap, channel_id, true)
     }
 }
 
-impl DebugDisplay for InlineSendPort {
+impl DebugDisplay for InlineSendPort<'_> {
     fn fmt(&self, f: &mut Formatter, _is_debug: bool) -> fmt::Result {
         write!(f, "send port for {:?}", self.channel_id())
     }
 }
-impl_debug_display_via_debugdisplay!(InlineSendPort);
+impl_debug_display_via_debugdisplay!(InlineSendPort<'_>);
 
-impl InlineObjectTrait for InlineSendPort {
-    fn clone_to_heap_with_mapping(
+impl<'h> InlineObjectTrait<'h> for InlineSendPort<'h> {
+    fn clone_to_heap_with_mapping<'t>(
         self,
-        _heap: &mut Heap,
-        _address_map: &mut FxHashMap<HeapObject, HeapObject>,
+        _heap: &'t mut Heap,
+        _address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
     ) -> Self {
         self
     }
@@ -95,29 +95,29 @@ impl InlineObjectTrait for InlineSendPort {
 // Receive Port
 
 #[derive(Clone, Copy, Deref, Eq, Hash, PartialEq)]
-pub struct InlineReceivePort(InlinePort);
+pub struct InlineReceivePort<'h>(InlinePort<'h>);
 
-impl InlineReceivePort {
-    pub fn new_unchecked(object: InlineObject) -> Self {
+impl<'h> InlineReceivePort<'h> {
+    pub fn new_unchecked(object: InlineObject<'h>) -> Self {
         Self(InlinePort(object))
     }
-    pub fn create(heap: &mut Heap, channel_id: ChannelId) -> InlineObject {
+    pub fn create(heap: &mut Heap, channel_id: ChannelId) -> InlineObject<'h> {
         InlinePort::create(heap, channel_id, false)
     }
 }
 
-impl DebugDisplay for InlineReceivePort {
+impl DebugDisplay for InlineReceivePort<'_> {
     fn fmt(&self, f: &mut Formatter, _is_debug: bool) -> fmt::Result {
         write!(f, "receive port for {:?}", self.channel_id())
     }
 }
-impl_debug_display_via_debugdisplay!(InlineReceivePort);
+impl_debug_display_via_debugdisplay!(InlineReceivePort<'_>);
 
-impl InlineObjectTrait for InlineReceivePort {
-    fn clone_to_heap_with_mapping(
+impl<'h> InlineObjectTrait<'h> for InlineReceivePort<'h> {
+    fn clone_to_heap_with_mapping<'t>(
         self,
-        _heap: &mut Heap,
-        _address_map: &mut FxHashMap<HeapObject, HeapObject>,
+        _heap: &'t mut Heap,
+        _address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
     ) -> Self {
         self
     }

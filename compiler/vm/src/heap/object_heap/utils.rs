@@ -1,20 +1,22 @@
 macro_rules! heap_object_impls {
     ($type:ty) => {
-        impl TryFrom<$crate::heap::object_heap::HeapObject> for $type {
+        impl<'h> TryFrom<$crate::heap::object_heap::HeapObject<'h>> for $type {
             type Error = &'static str;
 
-            fn try_from(value: $crate::heap::object_heap::HeapObject) -> Result<Self, Self::Error> {
+            fn try_from(
+                value: $crate::heap::object_heap::HeapObject<'h>,
+            ) -> Result<Self, Self::Error> {
                 $crate::heap::object_heap::HeapData::from(value).try_into()
             }
         }
 
         // FIXME: remove?
-        impl From<$type> for $crate::heap::object_heap::HeapObject {
+        impl<'h> From<$type> for $crate::heap::object_heap::HeapObject<'h> {
             fn from(value: $type) -> Self {
                 *value
             }
         }
-        impl From<$type> for $crate::heap::object_inline::InlineObject {
+        impl<'h> From<$type> for $crate::heap::object_inline::InlineObject<'h> {
             fn from(value: $type) -> Self {
                 (*value).into()
             }

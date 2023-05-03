@@ -12,15 +12,15 @@ use std::{
 };
 
 #[derive(Clone, Copy, Deref)]
-pub struct HeapText(HeapObject);
+pub struct HeapText<'h>(HeapObject<'h>);
 
-impl HeapText {
+impl<'h> HeapText<'h> {
     const LEN_SHIFT: usize = 3;
 
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub fn new_unchecked(object: HeapObject<'h>) -> Self {
         Self(object)
     }
-    pub fn create(heap: &mut Heap, value: &str) -> Self {
+    pub fn create(heap: &'h mut Heap, value: &str) -> Self {
         let len = value.len();
         assert_eq!(
             (len << Self::LEN_SHIFT) >> Self::LEN_SHIFT,
@@ -41,33 +41,33 @@ impl HeapText {
     fn text_pointer(self) -> NonNull<u8> {
         self.content_word_pointer(0).cast()
     }
-    pub fn get<'a>(self) -> &'a str {
+    pub fn get(self) -> &'h str {
         let pointer = self.text_pointer().as_ptr();
         unsafe { str::from_utf8_unchecked(slice::from_raw_parts(pointer, self.len())) }
     }
 }
 
-impl DebugDisplay for HeapText {
+impl DebugDisplay for HeapText<'_> {
     fn fmt(&self, f: &mut Formatter, _is_debug: bool) -> fmt::Result {
         write!(f, "\"{}\"", self.get())
     }
 }
-impl_debug_display_via_debugdisplay!(HeapText);
+impl_debug_display_via_debugdisplay!(HeapText<'_>);
 
-impl_eq_hash_via_get!(HeapText);
+impl_eq_hash_via_get!(HeapText<'_>);
 
-heap_object_impls!(HeapText);
+heap_object_impls!(HeapText<'h>);
 
-impl HeapObjectTrait for HeapText {
+impl<'h> HeapObjectTrait<'h> for HeapText<'h> {
     fn content_size(self) -> usize {
         self.len()
     }
 
-    fn clone_content_to_heap_with_mapping(
+    fn clone_content_to_heap_with_mapping<'t>(
         self,
-        _heap: &mut Heap,
-        clone: HeapObject,
-        _address_map: &mut FxHashMap<HeapObject, HeapObject>,
+        _heap: &'t mut Heap,
+        clone: HeapObject<'t>,
+        _address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
     ) {
         let clone = Self(clone);
         unsafe {
@@ -79,5 +79,5 @@ impl HeapObjectTrait for HeapText {
         };
     }
 
-    fn drop_children(self, _heap: &mut Heap) {}
+    fn drop_children(self, _heap: &'h mut Heap) {}
 }

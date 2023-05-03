@@ -13,12 +13,12 @@ use std::{
 };
 
 #[derive(Clone, Copy, Deref)]
-pub struct InlineBuiltin(InlineObject);
+pub struct InlineBuiltin<'h>(InlineObject<'h>);
 
-impl InlineBuiltin {
+impl<'h> InlineBuiltin<'h> {
     const INDEX_SHIFT: usize = 2;
 
-    pub fn new_unchecked(object: InlineObject) -> Self {
+    pub fn new_unchecked(object: InlineObject<'h>) -> Self {
         Self(object)
     }
 
@@ -30,31 +30,31 @@ impl InlineBuiltin {
     }
 }
 
-impl DebugDisplay for InlineBuiltin {
+impl DebugDisplay for InlineBuiltin<'_> {
     fn fmt(&self, f: &mut Formatter, _is_debug: bool) -> fmt::Result {
         write!(f, "builtin{:?}", self.get())
     }
 }
-impl_debug_display_via_debugdisplay!(InlineBuiltin);
+impl_debug_display_via_debugdisplay!(InlineBuiltin<'_>);
 
-impl Eq for InlineBuiltin {}
-impl PartialEq for InlineBuiltin {
+impl Eq for InlineBuiltin<'_> {}
+impl PartialEq for InlineBuiltin<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.index() == other.index()
     }
 }
-impl Hash for InlineBuiltin {
+impl Hash for InlineBuiltin<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.index().hash(state)
     }
 }
 
-impl From<BuiltinFunction> for InlineObject {
+impl From<BuiltinFunction> for InlineObject<'_> {
     fn from(builtin_function: BuiltinFunction) -> Self {
         *InlineBuiltin::from(builtin_function)
     }
 }
-impl From<BuiltinFunction> for InlineBuiltin {
+impl From<BuiltinFunction> for InlineBuiltin<'_> {
     fn from(builtin_function: BuiltinFunction) -> Self {
         let index = builtin_function as usize;
         debug_assert_eq!(
@@ -68,11 +68,11 @@ impl From<BuiltinFunction> for InlineBuiltin {
     }
 }
 
-impl InlineObjectTrait for InlineBuiltin {
-    fn clone_to_heap_with_mapping(
+impl<'h> InlineObjectTrait<'h> for InlineBuiltin<'h> {
+    fn clone_to_heap_with_mapping<'t>(
         self,
-        _heap: &mut Heap,
-        _address_map: &mut FxHashMap<HeapObject, HeapObject>,
+        _heap: &'t mut Heap,
+        _address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
     ) -> Self {
         self
     }

@@ -13,15 +13,15 @@ use std::{
 };
 
 #[derive(Clone, Copy, Deref)]
-pub struct HeapStruct(HeapObject);
+pub struct HeapStruct<'h>(HeapObject<'h>);
 
-impl HeapStruct {
+impl<'h> HeapStruct<'h> {
     const LEN_SHIFT: usize = 3;
 
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub fn new_unchecked(object: HeapObject<'h>) -> Self {
         Self(object)
     }
-    pub fn create(heap: &mut Heap, value: &FxHashMap<InlineObject, InlineObject>) -> Self {
+    pub fn create(heap: &'h mut Heap, value: &FxHashMap<InlineObject, InlineObject>) -> Self {
         let len = value.len();
         assert_eq!(
             (len << Self::LEN_SHIFT) >> Self::LEN_SHIFT,
@@ -46,7 +46,7 @@ impl HeapStruct {
         };
         struct_
     }
-    fn create_uninitialized(heap: &mut Heap, len: usize) -> Self {
+    fn create_uninitialized(heap: &'h mut Heap, len: usize) -> Self {
         assert_eq!(
             (len << Self::LEN_SHIFT) >> Self::LEN_SHIFT,
             len,
@@ -61,23 +61,23 @@ impl HeapStruct {
     pub fn len(self) -> usize {
         (self.header_word() >> Self::LEN_SHIFT) as usize
     }
-    pub fn hashes<'a>(self) -> &'a [u64] {
+    pub fn hashes(self) -> &'h [u64] {
         self.items(0)
     }
-    pub fn keys<'a>(self) -> &'a [InlineObject] {
+    pub fn keys(self) -> &'h [InlineObject<'h>] {
         self.items(1)
     }
-    pub fn values<'a>(self) -> &'a [InlineObject] {
+    pub fn values(self) -> &'h [InlineObject<'h>] {
         self.items(2)
     }
-    pub fn iter<'a>(self) -> impl Iterator<Item = (u64, InlineObject, InlineObject)> + 'a {
+    pub fn iter(self) -> impl Iterator<Item = (u64, InlineObject<'h>, InlineObject<'h>)> + 'h {
         izip!(
             self.hashes().iter().copied(),
             self.keys().iter().copied(),
             self.values().iter().copied(),
         )
     }
-    fn items<'a, T>(self, items_index: usize) -> &'a [T] {
+    fn items<T>(self, items_index: usize) -> &'h [T] {
         let len = self.len();
         unsafe {
             slice::from_raw_parts(
@@ -90,14 +90,19 @@ impl HeapStruct {
     pub fn contains(self, key: InlineObject) -> bool {
         self.index_of_key(key, Self::do_hash(key)).is_ok()
     }
-    pub fn get(self, key: impl Into<InlineObject>) -> Option<InlineObject> {
+    pub fn get(self, key: impl Into<InlineObject>) -> Option<InlineObject<'h>> {
         let key = key.into();
         self.index_of_key(key, Self::do_hash(key))
             .ok()
             .map(|index| self.values()[index])
     }
     #[must_use]
-    pub fn insert(self, heap: &mut Heap, key: InlineObject, value: InlineObject) -> Self {
+    pub fn insert(
+        self,
+        heap: &'h mut Heap,
+        key: InlineObject<'h>,
+        value: InlineObject<'h>,
+    ) -> Self {
         let hash = Self::do_hash(key);
         match self.index_of_key(key, hash) {
             Ok(index) => {
@@ -176,7 +181,7 @@ impl HeapStruct {
     }
 }
 
-impl DebugDisplay for HeapStruct {
+impl DebugDisplay for HeapStruct<'_> {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         let keys = self.keys();
         if keys.is_empty() {
@@ -217,35 +222,35 @@ impl DebugDisplay for HeapStruct {
         }
     }
 }
-impl_debug_display_via_debugdisplay!(HeapStruct);
+impl_debug_display_via_debugdisplay!(HeapStruct<'_>);
 
-impl Eq for HeapStruct {}
-impl PartialEq for HeapStruct {
+impl Eq for HeapStruct<'_> {}
+impl PartialEq for HeapStruct<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.hashes() == other.hashes()
             && self.values() == other.values()
             && self.keys() == other.keys()
     }
 }
-impl Hash for HeapStruct {
+impl Hash for HeapStruct<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.hashes().hash(state);
         self.values().hash(state);
     }
 }
 
-heap_object_impls!(HeapStruct);
+heap_object_impls!(HeapStruct<'h>);
 
-impl HeapObjectTrait for HeapStruct {
+impl<'h> HeapObjectTrait<'h> for HeapStruct<'h> {
     fn content_size(self) -> usize {
         3 * self.len() * HeapObject::WORD_SIZE
     }
 
-    fn clone_content_to_heap_with_mapping(
+    fn clone_content_to_heap_with_mapping<'t>(
         self,
-        heap: &mut Heap,
-        clone: HeapObject,
-        address_map: &mut FxHashMap<HeapObject, HeapObject>,
+        heap: &'t mut Heap,
+        clone: HeapObject<'t>,
+        address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
     ) {
         let clone = Self(clone);
         unsafe {
@@ -274,7 +279,7 @@ impl HeapObjectTrait for HeapStruct {
         }
     }
 
-    fn drop_children(self, heap: &mut Heap) {
+    fn drop_children(self, heap: &'h mut Heap) {
         for key in self.keys() {
             key.drop(heap);
         }

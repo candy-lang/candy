@@ -14,6 +14,7 @@ use std::{
     alloc::{self, Allocator, Layout},
     fmt::{self, Debug, Formatter},
     hash::{Hash, Hasher},
+    marker::PhantomData,
     mem,
 };
 
@@ -23,13 +24,14 @@ mod object_inline;
 mod pointer;
 
 #[derive(Clone, Default)]
-pub struct Heap {
-    objects: FxHashSet<ObjectInHeap>,
+pub struct Heap<'h> {
+    objects: FxHashSet<ObjectInHeap<'h>>,
     channel_refcounts: FxHashMap<ChannelId, usize>,
+    phantom: PhantomData<&'h ()>,
 }
 
-impl Heap {
-    pub fn allocate(&mut self, header_word: u64, content_size: usize) -> HeapObject {
+impl<'h> Heap<'h> {
+    pub fn allocate(&mut self, header_word: u64, content_size: usize) -> HeapObject<'h> {
         let layout = Layout::from_size_align(
             2 * HeapObject::WORD_SIZE + content_size,
             HeapObject::WORD_SIZE,
@@ -48,7 +50,7 @@ impl Heap {
         object
     }
     /// Don't call this method directly, call [drop] or [free] instead!
-    pub(super) fn deallocate(&mut self, object: HeapData) {
+    pub(super) fn deallocate(&mut self, object: HeapData<'h>) {
         let layout = Layout::from_size_align(
             2 * HeapObject::WORD_SIZE + object.content_size(),
             HeapObject::WORD_SIZE,
@@ -80,7 +82,7 @@ impl Heap {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = HeapObject> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = HeapObject<'h>> + '_ {
         self.objects.iter().map(|it| **it)
     }
 
@@ -96,7 +98,7 @@ impl Heap {
     }
 }
 
-impl Debug for Heap {
+impl Debug for Heap<'_> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         writeln!(f, "{{")?;
         for &object in self.objects.iter() {
@@ -114,16 +116,16 @@ impl Debug for Heap {
 /// For tracking objects allocated in the heap, we don't want deep equality, but
 /// only care about the addresses.
 #[derive(Clone, Copy, DebugCustom, Deref, Pointer)]
-struct ObjectInHeap(HeapObject);
+struct ObjectInHeap<'h>(HeapObject<'h>);
 
-impl Eq for ObjectInHeap {}
-impl PartialEq for ObjectInHeap {
+impl Eq for ObjectInHeap<'_> {}
+impl PartialEq for ObjectInHeap<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.0.address() == other.0.address()
     }
 }
 
-impl Hash for ObjectInHeap {
+impl Hash for ObjectInHeap<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.address().hash(state)
     }

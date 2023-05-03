@@ -12,46 +12,46 @@ use std::{
 };
 
 #[derive(Clone, Copy, Deref)]
-pub struct InlinePointer(InlineObject);
-impl InlinePointer {
-    pub fn new_unchecked(object: InlineObject) -> Self {
+pub struct InlinePointer<'h>(InlineObject<'h>);
+impl<'h> InlinePointer<'h> {
+    pub fn new_unchecked(object: InlineObject<'h>) -> Self {
         Self(object)
     }
 
-    pub fn get(self) -> HeapObject {
+    pub fn get(self) -> HeapObject<'h> {
         let pointer = unsafe { NonNull::new_unchecked(self.raw_word().get() as *mut u64) };
         HeapObject::new(pointer)
     }
 }
 
-impl DebugDisplay for InlinePointer {
+impl DebugDisplay for InlinePointer<'_> {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         self.get().fmt(f, is_debug)
     }
 }
-impl_debug_display_via_debugdisplay!(InlinePointer);
+impl_debug_display_via_debugdisplay!(InlinePointer<'_>);
 
-impl_eq_hash_via_get!(InlinePointer);
+impl_eq_hash_via_get!(InlinePointer<'_>);
 
-impl From<HeapObject> for InlinePointer {
+impl<'h> From<HeapObject<'h>> for InlinePointer<'h> {
     fn from(value: HeapObject) -> Self {
         Self(value.into())
     }
 }
-impl From<HeapObject> for InlineObject {
+impl<'h> From<HeapObject<'h>> for InlineObject<'h> {
     fn from(value: HeapObject) -> Self {
         let address = value.address().addr().get() as u64;
         debug_assert_eq!(address & Self::KIND_MASK, Self::KIND_POINTER);
         let address = unsafe { NonZeroU64::new_unchecked(address) };
-        Self(address)
+        Self::new(address)
     }
 }
 
-impl InlineObjectTrait for InlinePointer {
-    fn clone_to_heap_with_mapping(
+impl<'h> InlineObjectTrait<'h> for InlinePointer<'h> {
+    fn clone_to_heap_with_mapping<'t>(
         self,
-        heap: &mut Heap,
-        address_map: &mut FxHashMap<HeapObject, HeapObject>,
+        heap: &'t mut Heap,
+        address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
     ) -> Self {
         self.get()
             .clone_to_heap_with_mapping(heap, address_map)

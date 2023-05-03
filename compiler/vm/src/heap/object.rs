@@ -30,20 +30,20 @@ use std::{
 };
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub enum Data {
-    Int(Int),
-    Tag(Tag),
-    Text(Text),
-    List(List),
-    Struct(Struct),
-    HirId(HirId),
-    Closure(Closure),
-    Builtin(Builtin),
-    SendPort(SendPort),
-    ReceivePort(ReceivePort),
+pub enum Data<'h> {
+    Int(Int<'h>),
+    Tag(Tag<'h>),
+    Text(Text<'h>),
+    List(List<'h>),
+    Struct(Struct<'h>),
+    HirId(HirId<'h>),
+    Closure(Closure<'h>),
+    Builtin(Builtin<'h>),
+    SendPort(SendPort<'h>),
+    ReceivePort(ReceivePort<'h>),
 }
-impl Data {
-    pub fn closure(&self) -> Option<&Closure> {
+impl<'h> Data<'h> {
+    pub fn closure(&self) -> Option<&Closure<'h>> {
         if let Data::Closure(closure) = self {
             Some(closure)
         } else {
@@ -52,8 +52,8 @@ impl Data {
     }
 }
 
-impl From<InlineObject> for Data {
-    fn from(object: InlineObject) -> Self {
+impl<'h> From<InlineObject<'h>> for Data<'h> {
+    fn from(object: InlineObject<'h>) -> Self {
         match object.into() {
             InlineData::Pointer(pointer) => pointer.get().into(),
             InlineData::Int(int) => Data::Int(Int::Inline(int)),
@@ -63,8 +63,8 @@ impl From<InlineObject> for Data {
         }
     }
 }
-impl From<HeapObject> for Data {
-    fn from(object: HeapObject) -> Self {
+impl<'h> From<HeapObject<'h>> for Data<'h> {
+    fn from(object: HeapObject<'h>) -> Self {
         match object.into() {
             HeapData::Int(int) => Data::Int(Int::Heap(int)),
             HeapData::List(list) => Data::List(List(list)),
@@ -77,7 +77,7 @@ impl From<HeapObject> for Data {
     }
 }
 
-impl DebugDisplay for Data {
+impl DebugDisplay for Data<'_> {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         match self {
             Data::Int(int) => DebugDisplay::fmt(int, f, is_debug),
@@ -93,17 +93,17 @@ impl DebugDisplay for Data {
         }
     }
 }
-impl_debug_display_via_debugdisplay!(Data);
+impl_debug_display_via_debugdisplay!(Data<'_>);
 
 // Int
 
 #[derive(Clone, Copy, Eq, From, Hash, PartialEq)]
-pub enum Int {
-    Inline(InlineInt),
-    Heap(HeapInt),
+pub enum Int<'h> {
+    Inline(InlineInt<'h>),
+    Heap(HeapInt<'h>),
 }
 
-impl Int {
+impl<'h> Int<'h> {
     pub fn create<T>(heap: &mut Heap, value: T) -> Self
     where
         T: Copy + TryInto<i64> + Into<BigInt>,
@@ -224,7 +224,7 @@ macro_rules! shift_fn {
 }
 use {bitwise_fn, operator_fn, shift_fn};
 
-impl DebugDisplay for Int {
+impl DebugDisplay for Int<'_> {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         match self {
             Int::Inline(int) => DebugDisplay::fmt(int, f, is_debug),
@@ -232,9 +232,9 @@ impl DebugDisplay for Int {
         }
     }
 }
-impl_debug_display_via_debugdisplay!(Int);
+impl_debug_display_via_debugdisplay!(Int<'_>);
 
-impl From<Int> for InlineObject {
+impl<'h> From<Int<'h>> for InlineObject<'h> {
     fn from(int: Int) -> Self {
         match int {
             Int::Inline(int) => *int,
@@ -248,10 +248,14 @@ impl_try_from_heap_object!(Int, "Expected an int.");
 // Tag
 
 #[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
-pub struct Tag(HeapTag);
+pub struct Tag<'h>(HeapTag<'h>);
 
-impl Tag {
-    pub fn create(heap: &mut Heap, symbol: Text, value: impl Into<Option<InlineObject>>) -> Self {
+impl<'h> Tag<'h> {
+    pub fn create(
+        heap: &mut Heap,
+        symbol: Text<'h>,
+        value: impl Into<Option<InlineObject<'h>>>,
+    ) -> Self {
         HeapTag::create(heap, symbol, value).into()
     }
     pub fn create_from_str(
@@ -278,18 +282,18 @@ impl Tag {
     }
 }
 
-impls_via_0!(Tag);
+impls_via_0!(Tag<'h>);
 impl_try_froms!(Tag, "Expected a tag.");
 impl_try_from_heap_object!(Tag, "Expected a tag.");
 
-impl TryFrom<InlineObject> for bool {
+impl TryFrom<InlineObject<'_>> for bool {
     type Error = &'static str;
 
     fn try_from(value: InlineObject) -> Result<Self, Self::Error> {
         (Data::from(value)).try_into()
     }
 }
-impl TryFrom<Data> for bool {
+impl TryFrom<Data<'_>> for bool {
     type Error = &'static str;
 
     fn try_from(value: Data) -> Result<Self, Self::Error> {
@@ -309,45 +313,45 @@ impl TryFrom<Data> for bool {
 // Text
 
 #[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
-pub struct Text(HeapText);
+pub struct Text<'h>(HeapText<'h>);
 
-impl Text {
+impl<'h> Text<'h> {
     pub fn create(heap: &mut Heap, value: &str) -> Self {
         HeapText::create(heap, value).into()
     }
 }
 
-impls_via_0!(Text);
+impls_via_0!(Text<'h>);
 impl_try_froms!(Text, "Expected a text.");
 impl_try_from_heap_object!(Text, "Expected a text.");
 
 // List
 
 #[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
-pub struct List(HeapList);
+pub struct List<'h>(HeapList<'h>);
 
-impl List {
+impl<'h> List<'h> {
     pub fn create(heap: &mut Heap, items: &[InlineObject]) -> Self {
         HeapList::create(heap, items).into()
     }
 }
 
-impls_via_0!(List);
+impls_via_0!(List<'h>);
 impl_try_froms!(List, "Expected a list.");
 impl_try_from_heap_object!(List, "Expected a list.");
 
 // Struct
 
 #[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
-pub struct Struct(HeapStruct);
+pub struct Struct<'h>(HeapStruct<'h>);
 
-impl Struct {
-    pub fn create(heap: &mut Heap, fields: &FxHashMap<InlineObject, InlineObject>) -> Self {
+impl<'h> Struct<'h> {
+    pub fn create(heap: &mut Heap, fields: &FxHashMap<InlineObject<'h>, InlineObject<'h>>) -> Self {
         HeapStruct::create(heap, fields).into()
     }
     pub fn create_with_symbol_keys(
         heap: &mut Heap,
-        fields: impl IntoIterator<Item = (&str, InlineObject)>,
+        fields: impl IntoIterator<Item = (&str, InlineObject<'h>)>,
     ) -> Self {
         let fields = fields
             .into_iter()
@@ -355,7 +359,10 @@ impl Struct {
             .collect();
         Self::create(heap, &fields)
     }
-    pub fn create_result(heap: &mut Heap, value: Result<InlineObject, InlineObject>) -> Self {
+    pub fn create_result(
+        heap: &mut Heap,
+        value: Result<InlineObject<'h>, InlineObject<'h>>,
+    ) -> Self {
         let (type_, value) = match value {
             Ok(it) => ("Ok", it),
             Err(it) => ("Error", it),
@@ -369,19 +376,19 @@ impl Struct {
     }
 }
 
-impls_via_0!(Struct);
+impls_via_0!(Struct<'h>);
 impl_try_froms!(Struct, "Expected a struct.");
 impl_try_from_heap_object!(Struct, "Expected a struct.");
 
 // Closure
 
 #[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
-pub struct Closure(HeapClosure);
+pub struct Closure<'h>(HeapClosure<'h>);
 
-impl Closure {
+impl<'h> Closure<'h> {
     pub fn create(
         heap: &mut Heap,
-        captured: &[InlineObject],
+        captured: &[InlineObject<'h>],
         argument_count: usize,
         instructions: Vec<Instruction>,
     ) -> Self {
@@ -401,7 +408,7 @@ impl Closure {
     }
 }
 
-impls_via_0!(Closure);
+impls_via_0!(Closure<'h>);
 impl_try_froms!(Closure, "Expected a closure.");
 impl_try_from_heap_object!(Closure, "Expected a closure.");
 
@@ -409,71 +416,80 @@ impl_try_from_heap_object!(Closure, "Expected a closure.");
 
 #[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
 
-pub struct HirId(HeapHirId);
+pub struct HirId<'h>(HeapHirId<'h>);
 
-impl HirId {
+impl<'h> HirId<'h> {
     pub fn create(heap: &mut Heap, id: Id) -> HirId {
         HeapHirId::create(heap, id).into()
     }
 }
 
-impls_via_0!(HirId);
+impls_via_0!(HirId<'h>);
 impl_try_froms!(HirId, "Expected a HIR ID.");
 impl_try_from_heap_object!(HirId, "Expected a HIR ID.");
 
 // Builtin
 
 #[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
-pub struct Builtin(InlineBuiltin);
+pub struct Builtin<'h>(InlineBuiltin<'h>);
 
-impl Builtin {
+impl Builtin<'_> {
     pub fn create(builtin: BuiltinFunction) -> Self {
         InlineBuiltin::from(builtin).into()
     }
 }
 
-impls_via_0!(Builtin);
+impls_via_0!(Builtin<'h>);
 
 // Send Port
 
 #[derive(Clone, Copy, Deref, Eq, Hash, PartialEq)]
-pub struct SendPort(InlineSendPort);
+pub struct SendPort<'h>(InlineSendPort<'h>);
 
-impl SendPort {
-    pub fn create(heap: &mut Heap, channel_id: ChannelId) -> InlineObject {
+impl<'h> SendPort<'h> {
+    pub fn create(heap: &mut Heap, channel_id: ChannelId) -> InlineObject<'h> {
         InlineSendPort::create(heap, channel_id)
     }
 }
 
-impls_via_0!(SendPort);
+impls_via_0!(SendPort<'h>);
 impl_try_froms!(SendPort, "Expected a send port.");
 
 // Receive Port
 
 #[derive(Clone, Copy, Deref, Eq, Hash, PartialEq)]
-pub struct ReceivePort(InlineReceivePort);
+pub struct ReceivePort<'h>(InlineReceivePort<'h>);
 
-impl ReceivePort {
-    pub fn create(heap: &mut Heap, channel_id: ChannelId) -> InlineObject {
+impl<'h> ReceivePort<'h> {
+    pub fn create(heap: &mut Heap, channel_id: ChannelId) -> InlineObject<'h> {
         InlineReceivePort::create(heap, channel_id)
     }
 }
 
-impls_via_0!(ReceivePort);
+impls_via_0!(ReceivePort<'h>);
 impl_try_froms!(ReceivePort, "Expected a receive port.");
 
 // Utils
 
 macro_rules! impls_via_0 {
     ($type:ty) => {
-        impl DebugDisplay for $type {
+        impl<'h> DebugDisplay for $type {
             fn fmt(&self, f: &mut std::fmt::Formatter, is_debug: bool) -> std::fmt::Result {
                 DebugDisplay::fmt(&self.0, f, is_debug)
             }
         }
-        impl_debug_display_via_debugdisplay!($type);
+        impl<'h> std::fmt::Debug for $type {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                DebugDisplay::fmt(self, f, true)
+            }
+        }
+        impl<'h> std::fmt::Display for $type {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                DebugDisplay::fmt(self, f, false)
+            }
+        }
 
-        impl From<$type> for InlineObject {
+        impl<'h> From<$type> for InlineObject<'h> {
             fn from(value: $type) -> Self {
                 (**value).into()
             }
@@ -483,24 +499,24 @@ macro_rules! impls_via_0 {
 
 macro_rules! impl_try_froms {
     ($type:tt, $error_message:expr$(,)?) => {
-        impl TryFrom<InlineObject> for $type {
+        impl<'h> TryFrom<InlineObject<'h>> for $type<'h> {
             type Error = &'static str;
 
             fn try_from(value: InlineObject) -> Result<Self, Self::Error> {
                 Data::from(value).try_into()
             }
         }
-        impl TryFrom<Data> for $type {
+        impl<'h> TryFrom<Data<'h>> for $type<'h> {
             type Error = &'static str;
 
-            fn try_from(value: Data) -> Result<Self, Self::Error> {
+            fn try_from(value: Data<'h>) -> Result<Self, Self::Error> {
                 match value {
                     Data::$type(it) => Ok(it),
                     _ => Err($error_message),
                 }
             }
         }
-        impl<'a> TryFrom<&'a Data> for &'a $type {
+        impl<'a, 'h> TryFrom<&'a Data<'h>> for &'a $type<'h> {
             type Error = &'static str;
 
             fn try_from(value: &'a Data) -> Result<Self, Self::Error> {
@@ -514,10 +530,10 @@ macro_rules! impl_try_froms {
 }
 macro_rules! impl_try_from_heap_object {
     ($type:tt, $error_message:expr$(,)?) => {
-        impl TryFrom<HeapObject> for $type {
+        impl<'h> TryFrom<HeapObject<'h>> for $type<'h> {
             type Error = &'static str;
 
-            fn try_from(value: HeapObject) -> Result<Self, Self::Error> {
+            fn try_from(value: HeapObject<'h>) -> Result<Self, Self::Error> {
                 Data::from(value).try_into()
             }
         }

@@ -16,18 +16,18 @@ use std::{
 };
 
 #[derive(Clone, Copy, Deref)]
-pub struct HeapClosure(HeapObject);
+pub struct HeapClosure<'h>(HeapObject<'h>);
 
-impl HeapClosure {
+impl<'h> HeapClosure<'h> {
     const CAPTURED_LEN_SHIFT: usize = 32;
     const ARGUMENT_COUNT_SHIFT: usize = 3;
 
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub fn new_unchecked(object: HeapObject<'h>) -> Self {
         Self(object)
     }
     pub fn create(
-        heap: &mut Heap,
-        captured: &[InlineObject],
+        heap: &'h mut Heap,
+        captured: &[InlineObject<'h>],
         argument_count: usize,
         instructions: Vec<Instruction>,
     ) -> Self {
@@ -79,10 +79,10 @@ impl HeapClosure {
     pub fn captured_len(self) -> usize {
         (self.header_word() >> Self::CAPTURED_LEN_SHIFT) as usize
     }
-    fn captured_pointer(self) -> NonNull<InlineObject> {
+    fn captured_pointer(self) -> NonNull<InlineObject<'h>> {
         self.content_word_pointer(1).cast()
     }
-    pub fn captured<'a>(self) -> &'a [InlineObject] {
+    pub fn captured(self) -> &'h [InlineObject<'h>] {
         unsafe { slice::from_raw_parts(self.captured_pointer().as_ptr(), self.captured_len()) }
     }
 
@@ -99,7 +99,7 @@ impl HeapClosure {
     pub fn instructions_pointer(self) -> NonNull<Instruction> {
         self.content_word_pointer(1 + self.captured_len()).cast()
     }
-    pub fn instructions<'a>(self) -> &'a [Instruction] {
+    pub fn instructions(self) -> &'h [Instruction] {
         unsafe {
             slice::from_raw_parts(
                 self.instructions_pointer().as_ref(),
@@ -107,7 +107,7 @@ impl HeapClosure {
             )
         }
     }
-    fn instructions_mut<'a>(self) -> &'a mut [Instruction] {
+    fn instructions_mut(self) -> &'h mut [Instruction] {
         unsafe {
             slice::from_raw_parts_mut(
                 self.instructions_pointer().as_mut(),
@@ -117,7 +117,7 @@ impl HeapClosure {
     }
 }
 
-impl DebugDisplay for HeapClosure {
+impl DebugDisplay for HeapClosure<'_> {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         let argument_count = self.argument_count();
         let captured = self.captured();
@@ -152,10 +152,10 @@ impl DebugDisplay for HeapClosure {
         }
     }
 }
-impl_debug_display_via_debugdisplay!(HeapClosure);
+impl_debug_display_via_debugdisplay!(HeapClosure<'_>);
 
-impl Eq for HeapClosure {}
-impl PartialEq for HeapClosure {
+impl Eq for HeapClosure<'_> {}
+impl PartialEq for HeapClosure<'_> {
     fn eq(&self, other: &Self) -> bool {
         // TODO: Compare the underlying HIR ID once we have it here (plus captured stuff)
         self.captured() == other.captured()
@@ -163,7 +163,7 @@ impl PartialEq for HeapClosure {
             && self.instructions() == other.instructions()
     }
 }
-impl Hash for HeapClosure {
+impl Hash for HeapClosure<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.captured().hash(state);
         self.argument_count().hash(state);
@@ -171,18 +171,18 @@ impl Hash for HeapClosure {
     }
 }
 
-heap_object_impls!(HeapClosure);
+heap_object_impls!(HeapClosure<'h>);
 
-impl HeapObjectTrait for HeapClosure {
+impl<'h> HeapObjectTrait<'h> for HeapClosure<'h> {
     fn content_size(self) -> usize {
         (1 + self.captured_len()) * HeapObject::WORD_SIZE + mem::size_of_val(self.instructions())
     }
 
-    fn clone_content_to_heap_with_mapping(
+    fn clone_content_to_heap_with_mapping<'t>(
         self,
-        heap: &mut Heap,
-        clone: HeapObject,
-        address_map: &mut FxHashMap<HeapObject, HeapObject>,
+        heap: &'t mut Heap,
+        clone: HeapObject<'t>,
+        address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
     ) {
         let clone = Self(clone);
         unsafe { *clone.instructions_len_pointer().as_mut() = self.instructions_len() as u64 };
@@ -204,7 +204,7 @@ impl HeapObjectTrait for HeapClosure {
         };
     }
 
-    fn drop_children(self, heap: &mut Heap) {
+    fn drop_children(self, heap: &'h mut Heap) {
         for captured in self.captured() {
             captured.drop(heap);
         }

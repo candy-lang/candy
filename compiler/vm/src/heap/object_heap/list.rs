@@ -15,21 +15,21 @@ use std::{
 };
 
 #[derive(Clone, Copy, Deref)]
-pub struct HeapList(HeapObject);
+pub struct HeapList<'h>(HeapObject<'h>);
 
-impl HeapList {
+impl<'h> HeapList<'h> {
     const LEN_SHIFT: usize = 3;
 
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub fn new_unchecked(object: HeapObject<'h>) -> Self {
         Self(object)
     }
-    pub fn create(heap: &mut Heap, value: &[InlineObject]) -> Self {
+    pub fn create(heap: &'h mut Heap, value: &[InlineObject<'h>]) -> Self {
         let len = value.len();
         let list = Self::create_uninitialized(heap, len);
         unsafe { ptr::copy_nonoverlapping(value.as_ptr(), list.items_pointer().as_ptr(), len) };
         list
     }
-    fn create_uninitialized(heap: &mut Heap, len: usize) -> Self {
+    fn create_uninitialized(heap: &'h mut Heap, len: usize) -> Self {
         assert_eq!(
             (len << Self::LEN_SHIFT) >> Self::LEN_SHIFT,
             len,
@@ -44,23 +44,23 @@ impl HeapList {
     pub fn len(self) -> usize {
         (self.header_word() >> Self::LEN_SHIFT) as usize
     }
-    pub fn get(self, index: usize) -> InlineObject {
+    pub fn get(self, index: usize) -> InlineObject<'h> {
         debug_assert!(index < self.len());
         let word = self.unsafe_get_content_word(index);
         let word = unsafe { NonZeroU64::new_unchecked(word) };
         InlineObject::new(word)
     }
-    fn items_pointer(self) -> NonNull<InlineObject> {
+    fn items_pointer(self) -> NonNull<InlineObject<'h>> {
         self.content_word_pointer(0).cast()
     }
-    pub fn items<'a>(self) -> &'a [InlineObject] {
+    pub fn items(self) -> &'h [InlineObject<'h>] {
         unsafe {
             let pointer = self.items_pointer().as_ref();
             slice::from_raw_parts(pointer, self.len())
         }
     }
     #[must_use]
-    pub fn insert(self, heap: &mut Heap, index: usize, value: InlineObject) -> Self {
+    pub fn insert(self, heap: &'h mut Heap, index: usize, value: InlineObject<'h>) -> Self {
         assert!(index <= self.len());
 
         let len = self.len() + 1;
@@ -81,7 +81,7 @@ impl HeapList {
         new_list
     }
     #[must_use]
-    pub fn remove(self, heap: &mut Heap, index: usize) -> Self {
+    pub fn remove(self, heap: &'h mut Heap, index: usize) -> Self {
         assert!(index < self.len());
 
         let len = self.len() - 1;
@@ -101,7 +101,7 @@ impl HeapList {
         new_list
     }
     #[must_use]
-    pub fn replace(self, heap: &mut Heap, index: usize, value: InlineObject) -> Self {
+    pub fn replace(self, heap: &'h mut Heap, index: usize, value: InlineObject) -> Self {
         assert!(index < self.len());
 
         let new_list = Self::create(heap, self.items());
@@ -110,7 +110,7 @@ impl HeapList {
     }
 }
 
-impl DebugDisplay for HeapList {
+impl DebugDisplay for HeapList<'_> {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         let items = self.items();
         write!(
@@ -127,33 +127,33 @@ impl DebugDisplay for HeapList {
         )
     }
 }
-impl_debug_display_via_debugdisplay!(HeapList);
+impl_debug_display_via_debugdisplay!(HeapList<'_>);
 
-impl Eq for HeapList {}
-impl PartialEq for HeapList {
+impl Eq for HeapList<'_> {}
+impl PartialEq for HeapList<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.items() == other.items()
     }
 }
 
-impl Hash for HeapList {
+impl Hash for HeapList<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.items().hash(state)
     }
 }
 
-heap_object_impls!(HeapList);
+heap_object_impls!(HeapList<'h>);
 
-impl HeapObjectTrait for HeapList {
+impl<'h> HeapObjectTrait<'h> for HeapList<'h> {
     fn content_size(self) -> usize {
         self.len() * HeapObject::WORD_SIZE
     }
 
-    fn clone_content_to_heap_with_mapping(
+    fn clone_content_to_heap_with_mapping<'t>(
         self,
-        heap: &mut Heap,
-        clone: HeapObject,
-        address_map: &mut FxHashMap<HeapObject, HeapObject>,
+        heap: &'t mut Heap,
+        clone: HeapObject<'t>,
+        address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
     ) {
         let clone = Self(clone);
         for (index, &item) in self.items().iter().enumerate() {
@@ -166,7 +166,7 @@ impl HeapObjectTrait for HeapList {
         }
     }
 
-    fn drop_children(self, heap: &mut Heap) {
+    fn drop_children(self, heap: &'h mut Heap) {
         for item in self.items() {
             item.drop(heap)
         }

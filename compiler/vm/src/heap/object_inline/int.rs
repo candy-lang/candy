@@ -15,11 +15,11 @@ use std::{
 };
 
 #[derive(Clone, Copy, Deref)]
-pub struct InlineInt(InlineObject);
-impl InlineInt {
+pub struct InlineInt<'h>(InlineObject<'h>);
+impl<'h> InlineInt<'h> {
     const VALUE_SHIFT: usize = 2;
 
-    pub fn new_unchecked(object: InlineObject) -> Self {
+    pub fn new_unchecked(object: InlineObject<'h>) -> Self {
         Self(object)
     }
 
@@ -34,7 +34,7 @@ impl InlineInt {
         );
         let header_word = InlineObject::KIND_INT | ((value as u64) << Self::VALUE_SHIFT);
         let header_word = unsafe { NonZeroU64::new_unchecked(header_word) };
-        Self(InlineObject(header_word))
+        Self(InlineObject::new(header_word))
     }
 
     pub fn get(self) -> i64 {
@@ -99,16 +99,16 @@ macro_rules! operator_fn_closed {
 }
 use {operator_fn, operator_fn_closed};
 
-impl DebugDisplay for InlineInt {
+impl DebugDisplay for InlineInt<'_> {
     fn fmt(&self, f: &mut Formatter, _is_debug: bool) -> fmt::Result {
         write!(f, "{}", self.get())
     }
 }
-impl_debug_display_via_debugdisplay!(InlineInt);
+impl_debug_display_via_debugdisplay!(InlineInt<'_>);
 
-impl_eq_hash_via_get!(InlineInt);
+impl_eq_hash_via_get!(InlineInt<'_>);
 
-impl TryFrom<&BigInt> for InlineInt {
+impl TryFrom<&BigInt> for InlineInt<'_> {
     type Error = ();
 
     fn try_from(value: &BigInt) -> Result<Self, Self::Error> {
@@ -117,7 +117,7 @@ impl TryFrom<&BigInt> for InlineInt {
             .and_then(|value| value.try_into())
     }
 }
-impl TryFrom<i64> for InlineInt {
+impl TryFrom<i64> for InlineInt<'_> {
     type Error = ();
 
     fn try_from(value: i64) -> Result<Self, Self::Error> {
@@ -129,11 +129,11 @@ impl TryFrom<i64> for InlineInt {
     }
 }
 
-impl InlineObjectTrait for InlineInt {
-    fn clone_to_heap_with_mapping(
+impl<'h> InlineObjectTrait<'h> for InlineInt<'h> {
+    fn clone_to_heap_with_mapping<'t>(
         self,
-        _heap: &mut Heap,
-        _address_map: &mut FxHashMap<HeapObject, HeapObject>,
+        _heap: &'t mut Heap,
+        _address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
     ) -> Self {
         self
     }

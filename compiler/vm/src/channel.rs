@@ -35,21 +35,21 @@ impl Debug for ChannelId {
 /// simultaneously – you can set it to something large, but having no limit
 /// enables buggy code that leaks memory.
 #[derive(Clone)]
-struct ChannelBuf {
+struct ChannelBuf<'h> {
     pub capacity: Capacity,
-    packets: VecDeque<Packet>,
+    packets: VecDeque<Packet<'h>>,
 }
 
 pub type Capacity = usize;
 
 /// A self-contained value that is sent over a channel.
 #[derive(Clone)]
-pub struct Packet {
-    pub heap: Heap,
-    pub object: InlineObject,
+pub struct Packet<'h> {
+    pub heap: Heap<'h>,
+    pub object: InlineObject<'h>,
 }
 
-impl ChannelBuf {
+impl<'h> ChannelBuf<'h> {
     fn new(capacity: Capacity) -> Self {
         Self {
             capacity,
@@ -64,14 +64,14 @@ impl ChannelBuf {
         self.packets.len() == self.capacity
     }
 
-    fn send(&mut self, packet: Packet) {
+    fn send(&mut self, packet: Packet<'h>) {
         if self.is_full() {
             panic!("Tried to send on a channel that is full.");
         }
         self.packets.push_back(packet);
     }
 
-    fn receive(&mut self) -> Packet {
+    fn receive(&mut self) -> Packet<'h> {
         self.packets
             .pop_front()
             .expect("Tried to receive from a channel that is empty.")
@@ -81,9 +81,9 @@ impl ChannelBuf {
 /// A wrapper around `ChannelBuf` that also stores pending operations and
 /// completes them lazily.
 #[derive(Clone)]
-pub struct Channel {
-    buffer: ChannelBuf,
-    pending_sends: VecDeque<(Performer, Packet)>,
+pub struct Channel<'h> {
+    buffer: ChannelBuf<'h>,
+    pending_sends: VecDeque<(Performer, Packet<'h>)>,
     pending_receives: VecDeque<Performer>,
 }
 
@@ -99,7 +99,7 @@ pub trait Completer {
     fn complete_receive(&mut self, performer: Performer, received: Packet);
 }
 
-impl Channel {
+impl<'h> Channel<'h> {
     pub fn new(capacity: usize) -> Self {
         Self {
             buffer: ChannelBuf::new(capacity),
@@ -108,7 +108,12 @@ impl Channel {
         }
     }
 
-    pub fn send(&mut self, completer: &mut dyn Completer, performer: Performer, packet: Packet) {
+    pub fn send(
+        &mut self,
+        completer: &mut dyn Completer,
+        performer: Performer,
+        packet: Packet<'h>,
+    ) {
         self.pending_sends.push_back((performer, packet));
         self.work_on_pending_operations(completer);
     }
@@ -150,17 +155,17 @@ impl Channel {
     }
 }
 
-impl Debug for ChannelBuf {
+impl Debug for ChannelBuf<'_> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_list().entries(self.packets.iter()).finish()
     }
 }
-impl Debug for Packet {
+impl Debug for Packet<'_> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{:?}", self.object)
     }
 }
-impl Debug for Channel {
+impl Debug for Channel<'_> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("Channel")
             .field("buffer", &self.buffer)

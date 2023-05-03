@@ -15,13 +15,13 @@ use std::{
 };
 
 #[derive(Clone, Copy, Deref)]
-pub struct HeapInt(HeapObject);
+pub struct HeapInt<'h>(HeapObject<'h>);
 
-impl HeapInt {
-    pub fn new_unchecked(object: HeapObject) -> Self {
+impl<'h> HeapInt<'h> {
+    pub fn new_unchecked(object: HeapObject<'h>) -> Self {
         Self(object)
     }
-    pub fn create(heap: &mut Heap, value: BigInt) -> Self {
+    pub fn create(heap: &'h mut Heap, value: BigInt) -> Self {
         if let Ok(value) = i64::try_from(&value) {
             debug_assert!(!InlineInt::fits(value));
         }
@@ -34,7 +34,7 @@ impl HeapInt {
     fn int_pointer(self) -> NonNull<BigInt> {
         self.content_word_pointer(0).cast()
     }
-    pub fn get<'a>(self) -> &'a BigInt {
+    pub fn get(self) -> &'h BigInt {
         unsafe { self.int_pointer().as_ref() }
     }
 
@@ -77,34 +77,34 @@ macro_rules! operator_fn {
 }
 use operator_fn;
 
-impl DebugDisplay for HeapInt {
+impl DebugDisplay for HeapInt<'_> {
     fn fmt(&self, f: &mut Formatter, _is_debug: bool) -> fmt::Result {
         write!(f, "{}", self.get())
     }
 }
-impl_debug_display_via_debugdisplay!(HeapInt);
+impl_debug_display_via_debugdisplay!(HeapInt<'_>);
 
-impl_eq_hash_via_get!(HeapInt);
+impl_eq_hash_via_get!(HeapInt<'_>);
 
-heap_object_impls!(HeapInt);
+heap_object_impls!(HeapInt<'h>);
 
-impl HeapObjectTrait for HeapInt {
+impl<'h> HeapObjectTrait<'h> for HeapInt<'h> {
     fn content_size(self) -> usize {
         mem::size_of::<BigInt>()
     }
 
-    fn clone_content_to_heap_with_mapping(
+    fn clone_content_to_heap_with_mapping<'t>(
         self,
-        _heap: &mut Heap,
-        clone: HeapObject,
-        _address_map: &mut FxHashMap<HeapObject, HeapObject>,
+        _heap: &'t mut Heap,
+        clone: HeapObject<'t>,
+        _address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
     ) {
         let clone = Self(clone);
         let value = self.get().to_owned();
         unsafe { ptr::write(clone.int_pointer().as_ptr(), value) };
     }
 
-    fn drop_children(self, _heap: &mut Heap) {
+    fn drop_children(self, _heap: &'h mut Heap) {
         unsafe { ptr::drop_in_place(self.int_pointer().as_ptr()) };
     }
 }
