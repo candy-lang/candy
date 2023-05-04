@@ -16,13 +16,11 @@ use crate::{
     channel::{Channel, ChannelId, Completer, Packet, Performer},
     context::{CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions},
     fiber::{self, ExecutionResult, Fiber, FiberId},
-    heap::{
-        Closure, Data, Heap, HirId, InlineObject, InlineObjectSliceCloneToHeap, SendPort, Struct,
-        Tag,
-    },
+    heap::{Closure, Data, Heap, HeapObject, HirId, InlineObject, SendPort, Struct, Tag},
     lir::Lir,
     tracer::Tracer,
 };
+use rustc_hash::FxHashMap;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct OperationId(usize);
@@ -138,28 +136,15 @@ impl<L: Borrow<Lir>> Vm<L> {
     }
     pub fn initialize_for_closure(
         &mut self,
+        heap: Heap,
+        constant_mapping: FxHashMap<HeapObject, HeapObject>,
         closure: Closure,
         arguments: &[InlineObject],
         responsible: HirId,
     ) {
         assert!(self.fibers.is_empty());
 
-        let (mut heap, map_from_constant_heap_to_heap) = self.lir.borrow().constant_heap.clone();
-        let closure = Data::from(closure.clone_to_heap(&mut heap))
-            .try_into()
-            .unwrap();
-        let arguments = arguments.clone_to_heap(&mut heap);
-        let responsible = Data::from(responsible.clone_to_heap(&mut heap))
-            .try_into()
-            .unwrap();
-
-        let fiber = Fiber::for_closure(
-            heap,
-            map_from_constant_heap_to_heap,
-            closure,
-            &arguments,
-            responsible,
-        );
+        let fiber = Fiber::for_closure(heap, constant_mapping, closure, arguments, responsible);
         self.fibers.insert(
             FiberId::root(),
             FiberTree::Single(Single {
@@ -171,20 +156,29 @@ impl<L: Borrow<Lir>> Vm<L> {
 
     pub fn for_closure(
         lir: L,
+        heap: Heap,
+        constant_mapping: FxHashMap<HeapObject, HeapObject>,
         closure: Closure,
         arguments: &[InlineObject],
         responsible: HirId,
     ) -> Self {
         let mut this = Self::uninitialized(lir);
-        this.initialize_for_closure(closure, arguments, responsible);
+        this.initialize_for_closure(heap, constant_mapping, closure, arguments, responsible);
         this
     }
+
     pub fn for_module(lir: L) -> Self {
         let actual_lir = lir.borrow();
-        let closure = actual_lir.module_closure;
-        let responsible = actual_lir.responsible_module;
+        let (heap, constant_mapping) = actual_lir.constant_heap.clone();
 
-        Self::for_closure(lir, closure, &[], responsible)
+        let closure = constant_mapping[&actual_lir.module_closure]
+            .try_into()
+            .unwrap();
+        let responsible = constant_mapping[&actual_lir.responsible_module]
+            .try_into()
+            .unwrap();
+
+        Self::for_closure(lir, heap, constant_mapping, closure, &[], responsible)
     }
 
     pub fn tear_down(mut self) -> ExecutionResult {
@@ -447,7 +441,10 @@ impl<L: Borrow<Lir>> Vm<L> {
                     let child = parallel.children.remove(&fiber_id).unwrap();
 
                     match result {
-                        ExecutionResult::Finished(return_value) => {
+                        ExecutionResult::Finished {
+                            packet: return_value,
+                            ..
+                        } => {
                             let is_finished = parallel.children.is_empty();
                             match child {
                                 ChildKind::InitialChild => {

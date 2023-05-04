@@ -44,8 +44,11 @@ pub(crate) fn run(options: Options) -> ProgramResult {
 
     let result = Vm::for_module(lir.clone()).run_until_completion(&mut DummyTracer);
 
-    let (mut heap, main) = match result {
-        ExecutionResult::Finished(return_value) => return_value.into_main_function().unwrap(),
+    let ((mut heap, main), constant_mapping) = match result {
+        ExecutionResult::Finished {
+            packet: return_value,
+            constant_mapping,
+        } => (return_value.into_main_function().unwrap(), constant_mapping),
         ExecutionResult::Panicked {
             reason,
             responsible,
@@ -81,7 +84,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         platform,
         &heap,
     );
-    vm.initialize_for_closure(main, &[environment], platform);
+    vm.initialize_for_closure(heap, constant_mapping, main, &[environment], platform);
     loop {
         match vm.status() {
             Status::CanRun => {
@@ -95,7 +98,10 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         vm.free_unreferenced_channels();
     }
     match vm.tear_down() {
-        ExecutionResult::Finished(return_value) => {
+        ExecutionResult::Finished {
+            packet: return_value,
+            ..
+        } => {
             tracer
                 .for_fiber(FiberId::root())
                 .call_ended(return_value.object, &return_value.heap);

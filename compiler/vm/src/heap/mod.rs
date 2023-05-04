@@ -81,6 +81,13 @@ impl Heap {
         }
     }
 
+    pub fn adopt(&mut self, other: Heap) {
+        self.objects.extend(other.objects);
+        for (channel_id, refcount) in other.channel_refcounts {
+            *self.channel_refcounts.entry(channel_id).or_default() += refcount;
+        }
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = HeapObject> + '_ {
         self.objects.iter().map(|it| **it)
     }

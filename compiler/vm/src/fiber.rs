@@ -21,7 +21,7 @@ use rustc_hash::FxHashMap;
 use std::fmt::{self, Debug};
 use tracing::trace;
 
-const TRACE: bool = false;
+const TRACE: bool = true;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FiberId(usize);
@@ -51,7 +51,7 @@ pub struct Fiber {
     // TODO: Remove this as soon as refcounting can be optional for objects.
     // Then, refcounting for all constant objects could be made optional and
     // they could really be shared among all fibers.
-    map_from_constant_heap_to_ours: FxHashMap<HeapObject, HeapObject>,
+    constant_mapping: FxHashMap<HeapObject, HeapObject>,
 }
 
 #[derive(Clone, Debug)]
@@ -97,39 +97,42 @@ impl Debug for InstructionPointer {
 }
 
 pub enum ExecutionResult {
-    Finished(Packet),
-    Panicked { reason: String, responsible: Id },
+    Finished {
+        packet: Packet,
+        constant_mapping: FxHashMap<HeapObject, HeapObject>,
+    },
+    Panicked {
+        reason: String,
+        responsible: Id,
+    },
 }
 
 impl Fiber {
-    fn new_with_heap(
-        heap: Heap,
-        map_from_constant_heap_to_ours: FxHashMap<HeapObject, HeapObject>,
-    ) -> Self {
+    fn new_with_heap(heap: Heap, constant_mapping: FxHashMap<HeapObject, HeapObject>) -> Self {
         Self {
             status: Status::Done,
             next_instruction: None,
             data_stack: vec![],
             call_stack: vec![],
             heap,
-            map_from_constant_heap_to_ours,
+            constant_mapping,
         }
     }
     pub fn for_closure(
         heap: Heap,
-        map_from_constant_heap_to_ours: FxHashMap<HeapObject, HeapObject>,
+        constant_mapping: FxHashMap<HeapObject, HeapObject>,
         closure: Closure,
         arguments: &[InlineObject],
         responsible: HirId,
     ) -> Self {
-        let mut fiber = Self::new_with_heap(heap, map_from_constant_heap_to_ours);
+        let mut fiber = Self::new_with_heap(heap, constant_mapping);
         fiber.status = Status::Running;
         fiber.call_closure(closure, arguments, responsible);
         fiber
     }
     pub fn for_module_closure(
         mut heap: Heap,
-        map_from_constant_heap_to_ours: FxHashMap<HeapObject, HeapObject>,
+        constant_mapping: FxHashMap<HeapObject, HeapObject>,
         module: Module,
         closure: Closure,
     ) -> Self {
@@ -144,23 +147,20 @@ impl Fiber {
             "Closure is not a module closure (it has arguments).",
         );
         let responsible = HirId::create(&mut heap, Id::new(module, vec![]));
-        Self::for_closure(
-            heap,
-            map_from_constant_heap_to_ours,
-            closure,
-            &[],
-            responsible,
-        )
+        Self::for_closure(heap, constant_mapping, closure, &[], responsible)
     }
 
     pub fn tear_down(mut self) -> ExecutionResult {
         match self.status {
             Status::Done => {
                 let object = self.pop_from_data_stack();
-                ExecutionResult::Finished(Packet {
-                    heap: self.heap,
-                    object,
-                })
+                ExecutionResult::Finished {
+                    packet: Packet {
+                        heap: self.heap,
+                        object,
+                    },
+                    constant_mapping: self.constant_mapping,
+                }
             }
             Status::Panicked {
                 reason,
@@ -222,9 +222,10 @@ impl Fiber {
     pub fn complete_try(&mut self, result: &ExecutionResult) {
         assert!(matches!(self.status, Status::InTry { .. }));
         let result = match result {
-            ExecutionResult::Finished(Packet { object, .. }) => {
-                Ok(object.clone_to_heap(&mut self.heap))
-            }
+            ExecutionResult::Finished {
+                packet: Packet { object, .. },
+                ..
+            } => Ok(object.clone_to_heap(&mut self.heap)),
             ExecutionResult::Panicked { reason, .. } => {
                 Err(Text::create(&mut self.heap, reason).into())
             }
@@ -347,7 +348,7 @@ impl Fiber {
             }
             Instruction::PushConstant(constant) => {
                 let constant = match HeapObject::try_from(constant) {
-                    Ok(heap_object) => self.map_from_constant_heap_to_ours[&heap_object].into(),
+                    Ok(heap_object) => self.constant_mapping[&heap_object].into(),
                     Err(_) => constant,
                 };
                 constant.dup(&mut self.heap);

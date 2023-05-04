@@ -10,8 +10,9 @@ use crate::heap::{Struct, Tag};
 use channel::Packet;
 use context::RunForever;
 use fiber::ExecutionResult;
-use heap::{Closure, Heap};
+use heap::{Closure, Heap, HeapObject};
 use lir::Lir;
+use rustc_hash::FxHashMap;
 use std::borrow::Borrow;
 use tracer::Tracer;
 use tracing::{debug, error};
@@ -57,11 +58,17 @@ impl Packet {
 }
 
 impl ExecutionResult {
-    pub fn into_main_function(self) -> Result<(Heap, Closure), String> {
+    pub fn into_main_function(
+        self,
+    ) -> Result<(Heap, Closure, FxHashMap<HeapObject, HeapObject>), String> {
         match self {
-            ExecutionResult::Finished(packet) => {
-                packet.into_main_function().map_err(|it| it.to_string())
-            }
+            ExecutionResult::Finished {
+                packet,
+                constant_mapping,
+            } => match packet.into_main_function() {
+                Ok((heap, closure)) => Ok((heap, closure, constant_mapping)),
+                Err(err) => Err(err.to_string()),
+            },
             ExecutionResult::Panicked {
                 reason,
                 responsible,
