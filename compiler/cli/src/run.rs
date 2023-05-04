@@ -6,12 +6,11 @@ use crate::{
 };
 use candy_frontend::{ast_to_hir::AstToHir, hir, rich_ir::ToRichIr, TracingConfig};
 use candy_vm::{
-    context::{DbUseProvider, RunForever},
+    context::RunForever,
     fiber::{ExecutionResult, FiberId},
     heap::{HirId, SendPort, Struct},
-    mir_to_lir::MirToLir,
-    run_lir,
-    tracer::{full::FullTracer, Tracer},
+    mir_to_lir::compile_lir,
+    tracer::{full::FullTracer, DummyTracer, Tracer},
     vm::{Status, Vm},
 };
 use clap::{Parser, ValueHint};
@@ -41,12 +40,9 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     debug!("Running {}.", module.to_rich_ir());
 
     let mut tracer = FullTracer::default();
-    let lir = db.lir(module.clone(), tracing.clone()).unwrap();
-    let use_provider = DbUseProvider {
-        db: &db,
-        tracing: tracing.clone(),
-    };
-    let result = run_lir(module, lir.as_ref().to_owned(), &use_provider, &mut tracer);
+    let (lir, _) = compile_lir(&db, module, tracing.clone());
+
+    let result = Vm::for_module(lir.clone()).run_until_completion(&mut DummyTracer);
 
     let (mut heap, main) = match result {
         ExecutionResult::Finished(return_value) => return_value.into_main_function().unwrap(),
@@ -69,7 +65,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
 
     debug!("Running main function.");
     // TODO: Add more environment stuff.
-    let mut vm = Vm::default();
+    let mut vm = Vm::uninitialized(lir);
     let mut stdout = StdoutService::new(&mut vm);
     let mut stdin = StdinService::new(&mut vm);
     let fields = [
@@ -85,18 +81,11 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         platform,
         &heap,
     );
-    vm.set_up_for_running_closure(heap, main, &[environment], hir::Id::platform());
+    vm.initialize_for_closure(main, &[environment], platform);
     loop {
         match vm.status() {
             Status::CanRun => {
-                vm.run(
-                    &DbUseProvider {
-                        db: &db,
-                        tracing: tracing.clone(),
-                    },
-                    &mut RunForever,
-                    &mut tracer,
-                );
+                vm.run(&mut RunForever, &mut tracer);
             }
             Status::WaitingForOperations => {}
             _ => break,

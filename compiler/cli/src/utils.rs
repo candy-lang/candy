@@ -7,10 +7,13 @@ use std::{
 use tracing::error;
 
 pub fn packages_path() -> PackagesPath {
-    // We assume the candy executable lives inside the Candy Git repository at
-    // its usual location, `$candy/target/[release or debug]/candy`.
+    // We assume the candy executable lives inside the Candy Git repository
+    // inside the `$candy/target/` directory.
     let candy_exe = current_exe().unwrap();
-    let target_dir = candy_exe.parent().unwrap().parent().unwrap();
+    let target_dir = candy_exe
+        .ancestors()
+        .find(|path| path.ends_with("target"))
+        .unwrap();
     let candy_repo = target_dir.parent().unwrap();
     PackagesPath::try_from(candy_repo.join("packages").as_path()).unwrap()
 }

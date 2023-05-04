@@ -1,17 +1,21 @@
 use candy_vm::{
     channel::{ChannelId, Packet},
     heap::{Heap, SendPort, Text},
+    lir::Lir,
     tracer::DummyTracer,
     vm::{CompletedOperation, OperationId, Vm},
 };
-use std::io::{self, BufRead, Write};
+use std::{
+    borrow::Borrow,
+    io::{self, BufRead, Write},
+};
 
 pub struct StdinService {
     pub channel: ChannelId,
     current_receive: OperationId,
 }
 impl StdinService {
-    pub fn new(vm: &mut Vm) -> Self {
+    pub fn new<L: Borrow<Lir>>(vm: &mut Vm<L>) -> Self {
         let channel = vm.create_channel(0);
         let current_receive = vm.receive(channel);
         Self {
@@ -20,7 +24,7 @@ impl StdinService {
         }
     }
 
-    pub fn run(&mut self, vm: &mut Vm) {
+    pub fn run<L: Borrow<Lir>>(&mut self, vm: &mut Vm<L>) {
         while let Some(CompletedOperation::Received { packet }) =
             vm.completed_operations.remove(&self.current_receive)
         {
