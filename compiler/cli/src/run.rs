@@ -40,7 +40,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     debug!("Running {}.", module.to_rich_ir());
 
     let mut tracer = FullTracer::default();
-    let (lir, _) = compile_lir(&db, module, tracing.clone());
+    let (lir, _) = compile_lir(&db, module, tracing);
 
     let result = Vm::for_module(lir.clone()).run_until_completion(&mut DummyTracer);
 

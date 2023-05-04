@@ -68,18 +68,19 @@ fuzz_target!(|data: &[u8]| {
     db.module_provider.add(&MODULE, data.to_vec());
 
     let lir = compile_lir(&db, MODULE.clone(), TRACING.clone()).0;
-    let mut tracer = DummyTracer::default();
 
-    let (mut heap, main) = Vm::for_module(lir.clone())
-        .run_until_completion(&mut DummyTracer::default())
-        .into_main_function()
-        .unwrap();
+    let result = Vm::for_module(lir.clone()).run_until_completion(&mut DummyTracer);
+
+    let Ok((mut heap, main)) = result.into_main_function() else {
+        println!("The module doesn't export a main function.");
+        return;
+    };
 
     // Run the `main` function.
     let environment = Struct::create(&mut heap, &Default::default());
     let responsible = HirId::create(&mut heap, hir::Id::user());
-    match Vm::for_closure(lir, heap, main, &[environment.into()], responsible)
-        .run_until_completion(&mut tracer)
+    match Vm::for_closure(lir, main, &[environment.into()], responsible)
+        .run_until_completion(&mut DummyTracer)
     {
         ExecutionResult::Finished(return_value) => {
             println!("The main function returned: {return_value:?}")

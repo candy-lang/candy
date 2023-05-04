@@ -128,7 +128,7 @@ pub fn run(lir: impl Borrow<Lir>) -> Packet {
     // Run the `main` function.
     let environment = Struct::create(&mut heap, &FxHashMap::default());
     let responsible = HirId::create(&mut heap, hir::Id::user());
-    match Vm::for_closure(lir, heap, main, &[environment.into()], responsible)
+    match Vm::for_closure(lir, main, &[environment.into()], responsible)
         .run_until_completion(&mut tracer)
     {
         ExecutionResult::Finished(return_value) => return_value,
