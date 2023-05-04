@@ -23,10 +23,10 @@ use tracing::info;
 pub trait HirDb: AstToHir {
     fn find_expression(&self, id: Id) -> Option<Expression>;
     fn containing_body_of(&self, id: Id) -> Arc<Body>;
-    fn all_hir_ids(&self, module: Module) -> Option<Vec<Id>>;
+    fn all_hir_ids(&self, module: Module) -> Vec<Id>;
 }
 fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
-    let (hir, _) = db.hir(id.module.clone()).unwrap();
+    let (hir, _) = db.hir(id.module.clone()).ok()?;
     if id.is_root() {
         panic!("You can't get the root because that got lowered into multiple IDs.");
     }
@@ -34,34 +34,33 @@ fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
     hir.find(&id).map(|it| it.to_owned())
 }
 fn containing_body_of(db: &dyn HirDb, id: Id) -> Arc<Body> {
-    match id.parent() {
-        Some(parent_id) => {
-            if parent_id.is_root() {
-                db.hir(id.module).unwrap().0
-            } else {
-                match db.find_expression(parent_id).unwrap() {
-                    Expression::Match { cases, .. } => {
-                        let body = cases
-                            .into_iter()
-                            .map(|(_, body)| body)
-                            .find(|body| body.expressions.contains_key(&id))
-                            .unwrap();
-                        Arc::new(body)
-                    }
-                    Expression::Lambda(lambda) => Arc::new(lambda.body),
-                    _ => panic!("Parent of an expression must be a lambda (or root scope)."),
-                }
+    let parent_id = id.parent().expect("The root scope has no parent.");
+
+    if parent_id.is_root() {
+        db.hir(id.module).unwrap().0
+    } else {
+        match db.find_expression(parent_id).unwrap() {
+            Expression::Match { cases, .. } => {
+                let body = cases
+                    .into_iter()
+                    .map(|(_, body)| body)
+                    .find(|body| body.expressions.contains_key(&id))
+                    .unwrap();
+                Arc::new(body)
             }
+            Expression::Lambda(lambda) => Arc::new(lambda.body),
+            _ => panic!("Parent of an expression must be a lambda (or root scope)."),
         }
-        None => panic!("The root scope has no parent."),
     }
 }
-fn all_hir_ids(db: &dyn HirDb, module: Module) -> Option<Vec<Id>> {
-    let (hir, _) = db.hir(module)?;
+fn all_hir_ids(db: &dyn HirDb, module: Module) -> Vec<Id> {
+    let Ok((hir, _)) = db.hir(module) else {
+        return vec![];
+    };
     let mut ids = vec![];
     hir.collect_all_ids(&mut ids);
     info!("All HIR IDs: {ids:?}");
-    Some(ids)
+    ids
 }
 
 impl Expression {
@@ -151,6 +150,12 @@ impl Id {
             },
             keys: vec![],
         }
+    }
+    /// The user of the Candy tooling is responsible. For example, when the user
+    /// instructs the tooling to run a non-existent module, then the program
+    /// will panic with this responsiblity.
+    pub fn user() -> Self {
+        Self::tooling("user".to_string())
     }
     /// Refers to the platform (non-Candy code).
     pub fn platform() -> Self {

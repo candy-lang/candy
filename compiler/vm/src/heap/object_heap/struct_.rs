@@ -282,4 +282,6 @@ impl HeapObjectTrait for HeapStruct {
             value.drop(heap);
         }
     }
+
+    fn deallocate_external_stuff(self) {}
 }

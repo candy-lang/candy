@@ -1,6 +1,6 @@
 use crate::{
     fiber::FiberId,
-    heap::{Heap, InlineObject},
+    heap::{Heap, HeapObject, InlineObject},
     vm::OperationId,
 };
 use candy_frontend::id::CountableId;
@@ -43,10 +43,19 @@ struct ChannelBuf {
 pub type Capacity = usize;
 
 /// A self-contained value that is sent over a channel.
-#[derive(Clone)]
 pub struct Packet {
     pub heap: Heap,
     pub object: InlineObject,
+}
+impl Clone for Packet {
+    fn clone(&self) -> Self {
+        let (heap, mapping) = self.heap.clone();
+        let object = match HeapObject::try_from(self.object) {
+            Ok(heap_object) => mapping[&heap_object].into(),
+            Err(_) => self.object,
+        };
+        Self { heap, object }
+    }
 }
 
 impl ChannelBuf {

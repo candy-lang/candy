@@ -6,11 +6,12 @@ use crate::{
     builtin_functions::{self, BuiltinFunction},
     cst::{self, CstDb},
     cst_to_ast::CstToAst,
-    error::{CompilerError, CompilerErrorPayload},
+    error::CompilerError,
     hir::{self, Body, Expression, HirError, Lambda, Pattern, PatternIdentifierId},
     id::IdGenerator,
     module::Module,
     position::Offset,
+    string_to_rcst::ModuleError,
     utils::AdjustCasingOfFirstLetter,
 };
 use itertools::Itertools;
@@ -27,12 +28,13 @@ pub trait AstToHir: CstDb + CstToAst {
     fn ast_to_hir_id(&self, id: ast::Id) -> Option<hir::Id>;
     fn cst_to_hir_id(&self, module: Module, id: cst::Id) -> Option<hir::Id>;
 
-    fn hir(&self, module: Module) -> Option<HirResult>;
+    fn hir(&self, module: Module) -> HirResult;
 }
-type HirResult = (Arc<Body>, Arc<FxHashMap<hir::Id, ast::Id>>);
+
+pub type HirResult = Result<(Arc<Body>, Arc<FxHashMap<hir::Id, ast::Id>>), ModuleError>;
 
 fn hir_to_ast_id(db: &dyn AstToHir, id: hir::Id) -> Option<ast::Id> {
-    let (_, hir_to_ast_id_mapping) = db.hir(id.module.clone()).unwrap();
+    let (_, hir_to_ast_id_mapping) = db.hir(id.module.clone()).ok()?;
     hir_to_ast_id_mapping.get(&id).cloned()
 }
 fn hir_to_cst_id(db: &dyn AstToHir, id: hir::Id) -> Option<cst::Id> {
@@ -47,7 +49,7 @@ fn hir_id_to_display_span(db: &dyn AstToHir, id: hir::Id) -> Option<Range<Offset
 }
 
 fn ast_to_hir_id(db: &dyn AstToHir, id: ast::Id) -> Option<hir::Id> {
-    let (_, hir_to_ast_id_mapping) = db.hir(id.module.clone()).unwrap();
+    let (_, hir_to_ast_id_mapping) = db.hir(id.module.clone()).ok()?;
     hir_to_ast_id_mapping
         .iter()
         .find_map(|(key, value)| if value == &id { Some(key) } else { None })
@@ -58,10 +60,11 @@ fn cst_to_hir_id(db: &dyn AstToHir, module: Module, id: cst::Id) -> Option<hir::
     db.ast_to_hir_id(id)
 }
 
-fn hir(db: &dyn AstToHir, module: Module) -> Option<HirResult> {
-    let (ast, _) = db.ast(module.clone())?;
-    let (body, id_mapping) = compile_top_level(db, module, &ast);
-    Some((Arc::new(body), Arc::new(id_mapping)))
+fn hir(db: &dyn AstToHir, module: Module) -> HirResult {
+    db.ast(module.clone()).map(|(ast, _)| {
+        let (body, id_mapping) = compile_top_level(db, module, &ast);
+        (Arc::new(body), Arc::new(id_mapping))
+    })
 }
 
 fn compile_top_level(
@@ -636,7 +639,7 @@ impl Context<'_> {
                 errors: vec![CompilerError {
                     module: self.module.clone(),
                     span,
-                    payload: CompilerErrorPayload::Hir(error),
+                    payload: error.into(),
                 }],
             },
             None,

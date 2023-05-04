@@ -63,22 +63,6 @@ pub enum Expression {
     /// [multiple flattening]: crate::mir_optimize::multiple_flattening
     Multiple(Body),
 
-    /// Indicates that a module started.
-    ///
-    /// Unlike the trace instructions below, this expression is not optional –
-    /// it needs to always be compiled into the MIR because the `ModuleStarts`
-    /// and `ModuleEnds` instructions directly influence the import stack of the
-    /// VM and thereby the behavior of the program. Depending on the order of
-    /// instructions being executed, an import may succeed, or panic because of
-    /// a circular import.
-    ///
-    /// If there's no `use` between the `ModuleStarts` and `ModuleEnds`
-    /// expressions, they can be optimized away.
-    ModuleStarts {
-        module: Module,
-    },
-    ModuleEnds,
-
     TraceCallStarts {
         hir_call: Id,
         function: Id,
@@ -188,8 +172,6 @@ impl hash::Hash for Expression {
                 responsible.hash(state);
             }
             Expression::Multiple(body) => body.hash(state),
-            Expression::ModuleStarts { module } => module.hash(state),
-            Expression::ModuleEnds => {}
             Expression::TraceCallStarts {
                 hir_call,
                 function,
@@ -355,14 +337,11 @@ impl ToRichIr for Expression {
                 responsible.build_rich_ir(builder);
                 builder.push(" is at fault)", None, EnumSet::empty());
             }
-            Expression::Multiple(body) => body.build_rich_ir(builder),
-            Expression::ModuleStarts { module } => {
-                builder.push("module ", None, EnumSet::empty());
-                module.build_rich_ir(builder);
-                builder.push(" starts", None, EnumSet::empty());
-            }
-            Expression::ModuleEnds => {
-                builder.push("module ends", None, EnumSet::empty());
+            Expression::Multiple(body) => {
+                builder.indent();
+                builder.push_newline();
+                body.build_rich_ir(builder);
+                builder.dedent();
             }
             Expression::TraceCallStarts {
                 hir_call,

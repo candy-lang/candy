@@ -1,4 +1,4 @@
-pub use self::{body::*, expression::*, id::*};
+pub use self::{body::*, error::*, expression::*, id::*};
 use crate::{
     id::IdGenerator,
     rich_ir::{RichIrBuilder, ToRichIr},
@@ -6,6 +6,7 @@ use crate::{
 use std::fmt::{self, Debug, Formatter};
 
 mod body;
+mod error;
 mod expression;
 mod id;
 

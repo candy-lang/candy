@@ -14,14 +14,15 @@ pub use self::{
 };
 use candy_frontend::{
     ast_to_hir::AstToHir,
+    cst::CstDb,
+    mir_optimize::OptimizeMir,
     module::Module,
     position::PositionConversionDb,
     {hir::Id, TracingConfig, TracingMode},
 };
 use candy_vm::{
-    context::{DbUseProvider, RunForever, RunLimitedNumberOfInstructions},
-    heap::{Closure, Heap},
-    mir_to_lir::MirToLir,
+    context::{RunForever, RunLimitedNumberOfInstructions},
+    mir_to_lir::compile_lir,
     tracer::full::FullTracer,
     vm::Vm,
 };
@@ -29,30 +30,19 @@ use tracing::{error, info};
 
 pub fn fuzz<DB>(db: &DB, module: Module) -> Vec<FailingFuzzCase>
 where
-    DB: AstToHir + MirToLir + PositionConversionDb,
+    DB: AstToHir + CstDb + OptimizeMir + PositionConversionDb,
 {
     let tracing = TracingConfig {
         register_fuzzables: TracingMode::All,
         calls: TracingMode::Off,
         evaluated_expressions: TracingMode::Off,
     };
+    let (lir, _) = compile_lir(db, module, tracing);
 
     let fuzzables = {
-        let mut heap = Heap::default();
-        let closure =
-            Closure::create_from_module(&mut heap, db, module.clone(), tracing.clone()).unwrap();
-        let mut vm = Vm::default();
-        vm.set_up_for_running_module_closure(heap, module, closure);
-
         let mut tracer = FuzzablesFinder::default();
-        vm.run(
-            &DbUseProvider {
-                db,
-                tracing: tracing.clone(),
-            },
-            &mut RunForever,
-            &mut tracer,
-        );
+        let mut vm = Vm::for_module(lir.clone());
+        vm.run(&mut RunForever, &mut tracer);
         tracer.fuzzables
     };
 
@@ -65,14 +55,9 @@ where
 
     for (id, closure) in fuzzables {
         info!("Fuzzing {id}.");
-        let mut fuzzer = Fuzzer::new(closure, id.clone());
-        fuzzer.run(
-            &mut DbUseProvider {
-                db,
-                tracing: tracing.clone(),
-            },
-            &mut RunLimitedNumberOfInstructions::new(100000),
-        );
+        let mut fuzzer = Fuzzer::new(lir.clone(), closure, id.clone());
+        fuzzer.run(&mut RunLimitedNumberOfInstructions::new(100000));
+
         match fuzzer.into_status() {
             Status::StillFuzzing { .. } => {}
             Status::FoundPanic {

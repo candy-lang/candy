@@ -22,7 +22,7 @@ mod object_heap;
 mod object_inline;
 mod pointer;
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct Heap {
     objects: FxHashSet<ObjectInHeap>,
     channel_refcounts: FxHashMap<ChannelId, usize>,
@@ -49,6 +49,7 @@ impl Heap {
     }
     /// Don't call this method directly, call [drop] or [free] instead!
     pub(super) fn deallocate(&mut self, object: HeapData) {
+        object.deallocate_external_stuff();
         let layout = Layout::from_size_align(
             2 * HeapObject::WORD_SIZE + object.content_size(),
             HeapObject::WORD_SIZE,
@@ -80,6 +81,13 @@ impl Heap {
         }
     }
 
+    pub fn adopt(&mut self, other: Heap) {
+        self.objects.extend(other.objects);
+        for (channel_id, refcount) in other.channel_refcounts {
+            *self.channel_refcounts.entry(channel_id).or_default() += refcount;
+        }
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = HeapObject> + '_ {
         self.objects.iter().map(|it| **it)
     }
@@ -88,9 +96,22 @@ impl Heap {
         self.channel_refcounts.keys().copied()
     }
 
+    // We do not confuse this with the `std::Clone::clone` method.
+    #[allow(clippy::should_implement_trait)]
+    pub fn clone(&self) -> (Heap, FxHashMap<HeapObject, HeapObject>) {
+        let mut cloned = Heap::default();
+        let mut mapping = FxHashMap::default();
+
+        for object in self.objects.iter() {
+            object.clone_to_heap_with_mapping(&mut cloned, &mut mapping);
+        }
+
+        (cloned, mapping)
+    }
+
     pub fn clear(&mut self) {
         for object in mem::take(&mut self.objects).iter() {
-            object.free(self);
+            self.deallocate(HeapData::from(object.0));
         }
         self.channel_refcounts.clear();
     }

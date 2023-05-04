@@ -5,7 +5,7 @@ use crate::{
     mir::{self, Mir},
     module::Module,
     position::Offset,
-    string_to_rcst::{InvalidModuleError, RcstResult},
+    string_to_rcst::{ModuleError, RcstResult},
     TracingConfig, TracingMode,
 };
 use derive_more::From;
@@ -67,6 +67,7 @@ pub enum TokenType {
     Comment,
     Text,
     Int,
+    Address,
 }
 #[derive(Debug, EnumSetType)]
 pub enum TokenModifier {
@@ -282,14 +283,14 @@ impl RichIr {
         builder.push_newline();
         match rcst {
             Ok(rcst) => rcst.build_rich_ir(&mut builder),
-            Err(InvalidModuleError::DoesNotExist) => return None,
-            Err(InvalidModuleError::InvalidUtf8) => {
+            Err(ModuleError::DoesNotExist) => return None,
+            Err(ModuleError::InvalidUtf8) => {
                 builder.push("# Invalid UTF-8", TokenType::Comment, EnumSet::empty());
             }
-            Err(InvalidModuleError::IsNotCandy) => {
+            Err(ModuleError::IsNotCandy) => {
                 builder.push("# Is not Candy code", TokenType::Comment, EnumSet::empty());
             }
-            Err(InvalidModuleError::IsToolingModule) => {
+            Err(ModuleError::IsToolingModule) => {
                 builder.push(
                     "# Is a tooling module",
                     TokenType::Comment,

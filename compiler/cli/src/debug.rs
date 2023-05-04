@@ -13,7 +13,7 @@ use candy_frontend::{
     string_to_rcst::StringToRcst,
     TracingConfig, TracingMode,
 };
-use candy_vm::{lir::RichIrForLir, mir_to_lir::MirToLir};
+use candy_vm::{lir::RichIrForLir, mir_to_lir::compile_lir};
 use clap::{Parser, ValueHint};
 use colored::{Color, Colorize};
 use std::path::PathBuf;
@@ -86,30 +86,32 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
         Options::Ast(options) => {
             let module = module_for_path(options.path)?;
             let ast = db.ast(module.clone());
-            ast.map(|(ast, _)| RichIr::for_ast(&module, &ast))
+            ast.ok().map(|(ast, _)| RichIr::for_ast(&module, &ast))
         }
         Options::Hir(options) => {
             let module = module_for_path(options.path)?;
             let hir = db.hir(module.clone());
-            hir.map(|(hir, _)| RichIr::for_hir(&module, &hir))
+            hir.ok().map(|(hir, _)| RichIr::for_hir(&module, &hir))
         }
         Options::Mir(options) => {
             let module = module_for_path(options.path.clone())?;
             let tracing = options.to_tracing_config();
             let mir = db.mir(module.clone(), tracing.clone());
-            mir.map(|mir| RichIr::for_mir(&module, &mir, &tracing))
+            mir.ok()
+                .map(|(mir, _)| RichIr::for_mir(&module, &mir, &tracing))
         }
         Options::OptimizedMir(options) => {
             let module = module_for_path(options.path.clone())?;
             let tracing = options.to_tracing_config();
-            let mir = db.mir_with_obvious_optimized(module.clone(), tracing.clone());
-            mir.map(|mir| RichIr::for_mir(&module, &mir, &tracing))
+            let mir = db.optimized_mir(module.clone(), tracing.clone());
+            mir.ok()
+                .map(|(mir, _)| RichIr::for_mir(&module, &mir, &tracing))
         }
         Options::Lir(options) => {
             let module = module_for_path(options.path.clone())?;
             let tracing = options.to_tracing_config();
-            let lir = db.lir(module.clone(), tracing.clone());
-            lir.map(|lir| RichIr::for_lir(&module, &lir, &tracing))
+            let (lir, _) = compile_lir(&db, module.clone(), tracing.clone());
+            Some(RichIr::for_lir(&module, &lir, &tracing))
         }
     };
 
@@ -141,6 +143,7 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
                 TokenType::Comment => Color::Green,
                 TokenType::Text => Color::Cyan,
                 TokenType::Int => Color::Red,
+                TokenType::Address => Color::BrightGreen,
             };
             print!("{}", in_annotation.color(color));
         } else {

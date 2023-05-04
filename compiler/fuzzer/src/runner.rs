@@ -1,20 +1,20 @@
 use candy_frontend::hir::Id;
 use candy_vm::{
     self,
-    context::{
-        CombiningExecutionController, CountingExecutionController, ExecutionController, UseProvider,
-    },
-    heap::{Closure, Data, Heap, InlineObjectSliceCloneToHeap},
+    context::{CombiningExecutionController, CountingExecutionController, ExecutionController},
+    heap::{Closure, HirId},
+    lir::Lir,
     tracer::full::FullTracer,
     vm::{self, Vm},
 };
 
 use super::input::Input;
+use std::borrow::Borrow;
 
 const MAX_INSTRUCTIONS: usize = 10000;
 
-pub struct Runner {
-    pub vm: Option<Vm>, // Is consumed when the runner is finished.
+pub struct Runner<L: Borrow<Lir>> {
+    pub vm: Option<Vm<L>>, // Is consumed when the runner is finished.
     pub input: Input,
     pub tracer: FullTracer,
     pub num_instructions: usize,
@@ -49,16 +49,18 @@ impl RunResult {
     }
 }
 
-impl Runner {
-    pub fn new(closure: Closure, input: Input) -> Self {
-        let mut vm_heap = Heap::default();
-        let closure = Data::from(closure.clone_to_heap(&mut vm_heap))
-            .try_into()
-            .unwrap();
-        let arguments = input.arguments.clone_to_heap(&mut vm_heap);
-
-        let mut vm = Vm::default();
-        vm.set_up_for_running_closure(vm_heap, closure, &arguments, Id::fuzzer());
+impl<L: Borrow<Lir>> Runner<L> {
+    pub fn new(lir: L, closure: Closure, input: Input) -> Self {
+        let (mut heap, constant_mapping) = lir.borrow().constant_heap.clone();
+        let responsible = HirId::create(&mut heap, Id::fuzzer());
+        let vm = Vm::for_closure(
+            lir,
+            heap,
+            constant_mapping,
+            closure,
+            &input.arguments,
+            responsible,
+        );
 
         Runner {
             vm: Some(vm),
@@ -69,11 +71,7 @@ impl Runner {
         }
     }
 
-    pub fn run(
-        &mut self,
-        use_provider: &impl UseProvider,
-        execution_controller: &mut impl ExecutionController,
-    ) {
+    pub fn run(&mut self, execution_controller: &mut impl ExecutionController) {
         assert!(self.vm.is_some());
         assert!(self.result.is_none());
 
@@ -84,11 +82,10 @@ impl Runner {
         while matches!(self.vm.as_ref().unwrap().status(), vm::Status::CanRun)
             && execution_controller.should_continue_running()
         {
-            self.vm.as_mut().unwrap().run(
-                use_provider,
-                &mut execution_controller,
-                &mut self.tracer,
-            );
+            self.vm
+                .as_mut()
+                .unwrap()
+                .run(&mut execution_controller, &mut self.tracer);
         }
 
         self.num_instructions += instruction_counter.num_instructions;

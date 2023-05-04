@@ -14,7 +14,9 @@ use crate::database::Database;
 use candy_frontend::{
     module::{Module, MutableModuleProviderOwner, PackagesPath},
     rich_ir::ToRichIr,
+    TracingConfig, TracingMode,
 };
+use candy_vm::mir_to_lir::compile_lir;
 use extension_trait::extension_trait;
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position, Url};
@@ -74,6 +76,12 @@ pub async fn run_server(
     let mut fuzzer = FuzzerManager::default();
     let mut outgoing_hints = OutgoingHints::new(outgoing_hints);
 
+    let tracing = TracingConfig {
+        register_fuzzables: TracingMode::OnlyCurrent,
+        calls: TracingMode::Off,
+        evaluated_expressions: TracingMode::Off,
+    };
+
     'server_loop: loop {
         sleep(Duration::from_millis(100)).await;
 
@@ -87,8 +95,9 @@ pub async fn run_server(
                 Event::UpdateModule(module, content) => {
                     db.did_change_module(&module, content);
                     outgoing_hints.report_hints(module.clone(), vec![]).await;
-                    constant_evaluator.update_module(&db, module.clone());
-                    fuzzer.update_module(module, &[]);
+                    let (lir, _) = compile_lir(&db, module.clone(), tracing.clone());
+                    constant_evaluator.update_module(module.clone(), lir.clone());
+                    fuzzer.update_module(module, lir, &[]);
                 }
                 Event::CloseModule(module) => {
                     db.did_close_module(&module);
@@ -105,9 +114,9 @@ pub async fn run_server(
         // priority. When constant evaluation is done, we try fuzzing the
         // functions we found.
         let module_with_new_insight = 'new_insight: {
-            if let Some(module) = constant_evaluator.run(&db) {
-                let closures = constant_evaluator.get_fuzzable_closures(&module);
-                fuzzer.update_module(module.clone(), &closures);
+            if let Some(module) = constant_evaluator.run() {
+                let (lir, closures) = constant_evaluator.get_fuzzable_closures(&module);
+                fuzzer.update_module(module.clone(), lir, &closures);
                 debug!(
                     "The constant evaluator made progress in {}.",
                     module.to_rich_ir(),
@@ -116,7 +125,7 @@ pub async fn run_server(
             }
             // For fuzzing, we're a bit more resource-conscious.
             sleep(Duration::from_millis(200)).await;
-            if let Some(module) = fuzzer.run(&db) {
+            if let Some(module) = fuzzer.run() {
                 debug!("The fuzzer made progress in {}.", module.to_rich_ir());
                 break 'new_insight Some(module);
             }

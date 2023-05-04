@@ -3,16 +3,12 @@ use candy_frontend::{
     hir::{Expression, HirDb, Id, Lambda},
     module::{Module, ModuleDb},
     position::PositionConversionDb,
-    TracingConfig,
 };
 use candy_fuzzer::{Fuzzer, Status};
-use candy_vm::{
-    context::{DbUseProvider, RunLimitedNumberOfInstructions},
-    heap::Closure,
-    mir_to_lir::MirToLir,
-};
+use candy_vm::{context::RunLimitedNumberOfInstructions, heap::Closure, lir::Lir};
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
+use std::sync::Arc;
 use tracing::{debug, error};
 
 use crate::{
@@ -29,10 +25,15 @@ pub struct FuzzerManager {
 }
 
 impl FuzzerManager {
-    pub fn update_module(&mut self, module: Module, fuzzable_closures: &[(Id, Closure)]) {
+    pub fn update_module(
+        &mut self,
+        module: Module,
+        lir: Arc<Lir>,
+        fuzzable_closures: &[(Id, Closure)],
+    ) {
         let fuzzers = fuzzable_closures
             .iter()
-            .map(|(id, closure)| (id.clone(), Fuzzer::new(*closure, id.clone())))
+            .map(|(id, closure)| (id.clone(), Fuzzer::new(lir.clone(), *closure, id.clone())))
             .collect();
         self.fuzzers.insert(module, fuzzers);
     }
@@ -41,7 +42,7 @@ impl FuzzerManager {
         self.fuzzers.remove(&module).unwrap();
     }
 
-    pub fn run<DB: MirToLir>(&mut self, db: &DB) -> Option<Module> {
+    pub fn run(&mut self) -> Option<Module> {
         let mut running_fuzzers = self
             .fuzzers
             .values_mut()
@@ -50,13 +51,7 @@ impl FuzzerManager {
             .collect_vec();
 
         let fuzzer = running_fuzzers.choose_mut(&mut thread_rng())?;
-        fuzzer.run(
-            &mut DbUseProvider {
-                db,
-                tracing: TracingConfig::off(),
-            },
-            &mut RunLimitedNumberOfInstructions::new(1000),
-        );
+        fuzzer.run(&mut RunLimitedNumberOfInstructions::new(1000));
 
         match &fuzzer.status() {
             Status::StillFuzzing { .. } => None,

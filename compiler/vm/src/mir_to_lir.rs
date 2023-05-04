@@ -1,8 +1,14 @@
-use crate::lir::{Instruction, Lir, StackOffset};
+use crate::{
+    fiber::InstructionPointer,
+    heap::{Builtin, Closure, Heap, HirId, Int, Tag, Text},
+    lir::{Instruction, Lir, StackOffset},
+};
 use candy_frontend::{
     cst::CstDb,
+    error::{CompilerError, CompilerErrorPayload},
+    hir,
     id::CountableId,
-    mir::{Body, Expression, Id},
+    mir::{Body, Expression, Id, Mir},
     mir_optimize::OptimizeMir,
     module::Module,
     rich_ir::ToRichIr,
@@ -12,23 +18,62 @@ use itertools::Itertools;
 use rustc_hash::FxHashSet;
 use std::sync::Arc;
 
-#[salsa::query_group(MirToLirStorage)]
-pub trait MirToLir: CstDb + OptimizeMir {
-    fn lir(&self, module: Module, tracing: TracingConfig) -> Option<Arc<Lir>>;
-}
+pub fn compile_lir<Db>(
+    db: &Db,
+    module: Module,
+    tracing: TracingConfig,
+) -> (Arc<Lir>, Arc<FxHashSet<CompilerError>>)
+where
+    Db: CstDb + OptimizeMir,
+{
+    let (mir, errors) = db
+        .optimized_mir(module.clone(), tracing)
+        .unwrap_or_else(|error| {
+            let payload = CompilerErrorPayload::Module(error);
+            let mir = Mir::build(|body| {
+                let reason = body.push_text(payload.to_string());
+                let responsible = body.push_hir_id(hir::Id::user());
+                body.push_panic(reason, responsible);
+            });
+            let errors = vec![CompilerError::for_whole_module(module.clone(), payload)]
+                .into_iter()
+                .collect();
+            (Arc::new(mir), Arc::new(errors))
+        });
 
-fn lir(db: &dyn MirToLir, module: Module, tracing: TracingConfig) -> Option<Arc<Lir>> {
-    let mir = db.mir_with_obvious_optimized(module, tracing)?;
-    let instructions = compile_lambda(&FxHashSet::default(), &[], Id::from_usize(0), &mir.body);
-    Some(Arc::new(Lir { instructions }))
+    let mut constant_heap = Heap::default();
+    let mut instructions = vec![];
+    let start = compile_lambda(
+        &mut constant_heap,
+        &mut instructions,
+        &FxHashSet::default(),
+        &[],
+        Id::from_usize(0),
+        &mir.body,
+    );
+
+    let module_closure = Closure::create(&mut constant_heap, &[], 0, start);
+    let responsible_module =
+        HirId::create(&mut constant_heap, hir::Id::new(module.clone(), vec![]));
+
+    let lir = Lir {
+        module,
+        constant_heap,
+        instructions,
+        module_closure,
+        responsible_module,
+    };
+    (Arc::new(lir), errors)
 }
 
 fn compile_lambda(
+    heap: &mut Heap,
+    instructions: &mut Vec<Instruction>,
     captured: &FxHashSet<Id>,
     parameters: &[Id],
     responsible_parameter: Id,
     body: &Body,
-) -> Vec<Instruction> {
+) -> InstructionPointer {
     let mut context = LoweringContext::default();
     for captured in captured {
         context.stack.push(*captured);
@@ -39,7 +84,7 @@ fn compile_lambda(
     context.stack.push(responsible_parameter);
 
     for (id, expression) in body.iter() {
-        context.compile_expression(id, expression);
+        context.compile_expression(heap, instructions, id, expression);
     }
 
     if matches!(
@@ -60,7 +105,9 @@ fn compile_lambda(
         context.emit(dummy_id, Instruction::Return);
     }
 
-    context.instructions
+    let start = instructions.len().into();
+    instructions.append(&mut context.instructions);
+    start
 }
 
 #[derive(Default)]
@@ -69,17 +116,33 @@ struct LoweringContext {
     instructions: Vec<Instruction>,
 }
 impl LoweringContext {
-    fn compile_expression(&mut self, id: Id, expression: &Expression) {
+    fn compile_expression(
+        &mut self,
+        heap: &mut Heap,
+        instructions: &mut Vec<Instruction>,
+        id: Id,
+        expression: &Expression,
+    ) {
         match expression {
-            Expression::Int(int) => self.emit(id, Instruction::CreateInt(int.clone())),
-            Expression::Text(text) => self.emit(id, Instruction::CreateText(text.clone())),
+            Expression::Int(int) => {
+                let int = Int::create_from_bigint(heap, int.clone());
+                self.emit(id, Instruction::PushConstant(int.into()))
+            }
+            Expression::Text(text) => {
+                let text = Text::create(heap, text);
+                self.emit(id, Instruction::PushConstant(text.into()))
+            }
             Expression::Reference(reference) => {
                 self.emit_push_from_stack(*reference);
                 self.stack.replace_top_id(id);
             }
-            Expression::Symbol(symbol) => self.emit(id, Instruction::CreateSymbol(symbol.clone())),
+            Expression::Symbol(symbol) => {
+                let tag = Tag::create_from_str(heap, symbol, None);
+                self.emit(id, Instruction::PushConstant(tag.into()));
+            }
             Expression::Builtin(builtin) => {
-                self.emit(id, Instruction::CreateBuiltin(*builtin));
+                let builtin = Builtin::create(*builtin);
+                self.emit(id, Instruction::PushConstant(builtin.into()));
             }
             Expression::List(items) => {
                 for item in items {
@@ -105,7 +168,8 @@ impl LoweringContext {
                 );
             }
             Expression::HirId(hir_id) => {
-                self.emit(id, Instruction::CreateHirId(hir_id.clone()));
+                let hir_id = HirId::create(heap, hir_id.clone());
+                self.emit(id, Instruction::PushConstant(hir_id.into()));
             }
             Expression::Lambda {
                 original_hirs: _,
@@ -114,8 +178,14 @@ impl LoweringContext {
                 body,
             } => {
                 let captured = expression.captured_ids();
-                let instructions =
-                    compile_lambda(&captured, parameters, *responsible_parameter, body);
+                let instructions = compile_lambda(
+                    heap,
+                    instructions,
+                    &captured,
+                    parameters,
+                    *responsible_parameter,
+                    body,
+                );
 
                 self.emit(
                     id,
@@ -149,19 +219,8 @@ impl LoweringContext {
                     },
                 );
             }
-            Expression::UseModule {
-                current_module,
-                relative_path,
-                responsible,
-            } => {
-                self.emit_push_from_stack(*relative_path);
-                self.emit_push_from_stack(*responsible);
-                self.emit(
-                    id,
-                    Instruction::UseModule {
-                        current_module: current_module.clone(),
-                    },
-                );
+            Expression::UseModule { .. } => {
+                panic!("MIR still contains use. This should have been optimized out.");
             }
             Expression::Panic {
                 reason,
@@ -174,15 +233,6 @@ impl LoweringContext {
             Expression::Multiple(_) => {
                 panic!("The MIR shouldn't contain multiple expressions anymore.");
             }
-            Expression::ModuleStarts { module } => {
-                self.emit(
-                    id,
-                    Instruction::ModuleStarts {
-                        module: module.clone(),
-                    },
-                );
-            }
-            Expression::ModuleEnds => self.emit(id, Instruction::ModuleEnds),
             Expression::TraceCallStarts {
                 hir_call,
                 function,

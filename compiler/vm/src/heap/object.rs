@@ -13,11 +13,10 @@ use super::{
 };
 use crate::{
     channel::ChannelId,
-    lir::{Instruction, Lir},
-    mir_to_lir::MirToLir,
+    fiber::InstructionPointer,
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
-use candy_frontend::{builtin_functions::BuiltinFunction, hir::Id, module::Module, TracingConfig};
+use candy_frontend::{builtin_functions::BuiltinFunction, hir::Id};
 use derive_more::{Deref, From};
 use num_bigint::BigInt;
 use rustc_hash::FxHashMap;
@@ -383,21 +382,9 @@ impl Closure {
         heap: &mut Heap,
         captured: &[InlineObject],
         argument_count: usize,
-        instructions: Vec<Instruction>,
+        body: InstructionPointer,
     ) -> Self {
-        HeapClosure::create(heap, captured, argument_count, instructions).into()
-    }
-    pub fn create_from_module_lir(heap: &mut Heap, lir: Lir) -> Self {
-        Self::create(heap, &[], 0, lir.instructions)
-    }
-    pub fn create_from_module(
-        heap: &mut Heap,
-        db: &impl MirToLir,
-        module: Module,
-        tracing: TracingConfig,
-    ) -> Option<Self> {
-        let lir = db.lir(module, tracing)?;
-        Some(Self::create_from_module_lir(heap, lir.as_ref().to_owned()))
+        HeapClosure::create(heap, captured, argument_count, body).into()
     }
 }
 

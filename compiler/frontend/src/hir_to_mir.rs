@@ -11,35 +11,45 @@ use crate::{
     module::{Module, ModuleKind, Package},
     position::PositionConversionDb,
     rich_ir::ToRichIr,
+    string_to_rcst::ModuleError,
 };
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 
 #[salsa::query_group(HirToMirStorage)]
 pub trait HirToMir: PositionConversionDb + CstDb + AstToHir {
-    fn mir(&self, module: Module, tracing: TracingConfig) -> Option<Arc<Mir>>;
+    fn mir(&self, module: Module, tracing: TracingConfig) -> MirResult;
 }
 
-fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> Option<Arc<Mir>> {
-    let mir = match module.kind {
+pub type MirResult = Result<(Arc<Mir>, Arc<FxHashSet<CompilerError>>), ModuleError>;
+
+fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> MirResult {
+    let (mir, errors) = match module.kind {
         ModuleKind::Code => {
             let (hir, _) = db.hir(module.clone())?;
-            LoweringContext::compile_module(db, module, &hir, &tracing)
+            let mut errors = FxHashSet::default();
+            let mir = LoweringContext::compile_module(db, module, &hir, &tracing, &mut errors);
+            (mir, errors)
         }
         ModuleKind::Asset => {
-            let bytes = db.get_module_content(module)?;
-            Mir::build(|body| {
-                let bytes = bytes
-                    .iter()
-                    .map(|&it| body.push_int(it.into()))
-                    .collect_vec();
-                body.push_list(bytes);
-            })
+            let Some(bytes) = db.get_module_content(module) else {
+                return Err(ModuleError::DoesNotExist);
+            };
+            (
+                Mir::build(|body| {
+                    let bytes = bytes
+                        .iter()
+                        .map(|&it| body.push_int(it.into()))
+                        .collect_vec();
+                    body.push_list(bytes);
+                }),
+                FxHashSet::default(),
+            )
         }
     };
-    Some(Arc::new(mir))
+    Ok((Arc::new(mir), Arc::new(errors)))
 }
 
 /// In the MIR, there's no longer the concept of needs. Instead, HIR IDs are
@@ -162,6 +172,7 @@ struct LoweringContext<'a> {
     needs_function: Id,
     tracing: &'a TracingConfig,
     ongoing_destructuring: Option<OngoingDestructuring>,
+    errors: &'a mut FxHashSet<CompilerError>,
 }
 #[derive(Clone)]
 struct OngoingDestructuring {
@@ -177,13 +188,10 @@ impl<'a> LoweringContext<'a> {
         module: Module,
         hir: &hir::Body,
         tracing: &TracingConfig,
+        errors: &mut FxHashSet<CompilerError>,
     ) -> Mir {
         Mir::build(|body| {
             let mut mapping = FxHashMap::default();
-
-            body.push(Expression::ModuleStarts {
-                module: module.clone(),
-            });
 
             let needs_function = generate_needs_function(body);
 
@@ -194,12 +202,9 @@ impl<'a> LoweringContext<'a> {
                 needs_function,
                 tracing,
                 ongoing_destructuring: None,
+                errors,
             };
             context.compile_expressions(body, module_hir_id, &hir.expressions);
-
-            let return_value = body.current_return_value();
-            body.push(Expression::ModuleEnds);
-            body.push_reference(return_value);
         })
     }
 
@@ -401,6 +406,7 @@ impl<'a> LoweringContext<'a> {
                 )
             }
             hir::Expression::Error { errors, .. } => {
+                self.errors.extend(errors.clone());
                 let responsible = body.push_hir_id(hir_id.clone());
                 body.compile_errors(self.db, responsible, errors)
             }

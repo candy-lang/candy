@@ -6,13 +6,12 @@ use candy_frontend::{
     module::{Module, ModuleDb},
     position::PositionConversionDb,
     rich_ir::ToRichIr,
-    TracingConfig, TracingMode,
 };
 use candy_vm::{
-    context::{DbUseProvider, RunLimitedNumberOfInstructions},
+    context::RunLimitedNumberOfInstructions,
     fiber::FiberId,
-    heap::{Closure, Heap},
-    mir_to_lir::MirToLir,
+    heap::Closure,
+    lir::Lir,
     tracer::{
         full::{FullTracer, StoredFiberEvent, StoredVmEvent, TimedEvent},
         stack_trace::Call,
@@ -22,6 +21,7 @@ use candy_vm::{
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
 use rustc_hash::FxHashMap;
+use std::sync::Arc;
 use tracing::{span, Level};
 
 #[derive(Default)]
@@ -29,40 +29,24 @@ pub struct ConstantEvaluator {
     evaluators: FxHashMap<Module, Evaluator>,
 }
 struct Evaluator {
+    lir: Arc<Lir>,
     tracer: FullTracer,
-    vm: Vm,
+    vm: Vm<Arc<Lir>>,
 }
 
 impl ConstantEvaluator {
-    pub fn update_module(&mut self, db: &impl MirToLir, module: Module) {
-        let tracing = TracingConfig {
-            register_fuzzables: TracingMode::OnlyCurrent,
-            calls: TracingMode::Off,
-            evaluated_expressions: TracingMode::OnlyCurrent,
-        };
-        let mut heap = Heap::default();
-        let closure = Closure::create_from_module(&mut heap, db, module.clone(), tracing).unwrap();
-
-        let mut vm = Vm::default();
-        vm.set_up_for_running_module_closure(heap, module.clone(), closure);
-
-        self.evaluators.insert(
-            module,
-            Evaluator {
-                tracer: FullTracer::default(),
-                vm,
-            },
-        );
+    pub fn update_module(&mut self, module: Module, lir: Arc<Lir>) {
+        let vm = Vm::for_module(lir.clone());
+        let tracer = FullTracer::default();
+        self.evaluators
+            .insert(module, Evaluator { lir, tracer, vm });
     }
 
     pub fn remove_module(&mut self, module: Module) {
         self.evaluators.remove(&module).unwrap();
     }
 
-    pub fn run<DB>(&mut self, db: &DB) -> Option<Module>
-    where
-        DB: AstDb + AstToHir + HirDb + MirToLir + ModuleDb + PositionConversionDb,
-    {
+    pub fn run(&mut self) -> Option<Module> {
         let mut running_evaluators = self
             .evaluators
             .iter_mut()
@@ -71,19 +55,15 @@ impl ConstantEvaluator {
         let (module, evaluator) = running_evaluators.choose_mut(&mut thread_rng())?;
 
         evaluator.vm.run(
-            &DbUseProvider {
-                db,
-                tracing: TracingConfig::off(),
-            },
             &mut RunLimitedNumberOfInstructions::new(500),
             &mut evaluator.tracer,
         );
         Some(module.clone())
     }
 
-    pub fn get_fuzzable_closures(&self, module: &Module) -> Vec<(Id, Closure)> {
+    pub fn get_fuzzable_closures(&self, module: &Module) -> (Arc<Lir>, Vec<(Id, Closure)>) {
         let evaluator = &self.evaluators[module];
-        evaluator
+        let fuzzable_closures = evaluator
             .tracer
             .events
             .iter()
@@ -98,7 +78,8 @@ impl ConstantEvaluator {
                 } => Some((id.get().to_owned(), *closure)),
                 _ => None,
             })
-            .collect()
+            .collect();
+        (evaluator.lir.clone(), fuzzable_closures)
     }
 
     pub fn get_hints<DB>(&self, db: &DB, module: &Module) -> Vec<Hint>

@@ -111,4 +111,6 @@ impl HeapObjectTrait for HeapTag {
             value.drop(heap);
         }
     }
+
+    fn deallocate_external_stuff(self) {}
 }

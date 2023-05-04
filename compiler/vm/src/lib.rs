@@ -7,12 +7,13 @@
 )]
 
 use crate::heap::{Struct, Tag};
-use candy_frontend::{hir, module::Module};
 use channel::Packet;
-use context::{RunForever, UseProvider};
+use context::RunForever;
 use fiber::ExecutionResult;
-use heap::{Closure, Heap};
+use heap::{Closure, Heap, HeapObject};
 use lir::Lir;
+use rustc_hash::FxHashMap;
+use std::borrow::Borrow;
 use tracer::Tracer;
 use tracing::{debug, error};
 use vm::{Status, Vm};
@@ -25,28 +26,18 @@ pub mod heap;
 pub mod lir;
 pub mod mir_to_lir;
 pub mod tracer;
-mod use_module;
 mod utils;
 pub mod vm;
 
-pub fn run_lir(
-    module: Module,
-    lir: Lir,
-    use_provider: &impl UseProvider,
-    tracer: &mut impl Tracer,
-) -> ExecutionResult {
-    let mut heap = Heap::default();
-    let closure = Closure::create_from_module_lir(&mut heap, lir);
-
-    let mut vm = Vm::default();
-    vm.set_up_for_running_module_closure(heap, module, closure);
-
-    vm.run(use_provider, &mut RunForever, tracer);
-    if let Status::WaitingForOperations = vm.status() {
-        error!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");
-        // TODO: Show stack traces of all fibers?
+impl<L: Borrow<Lir>> Vm<L> {
+    pub fn run_until_completion(mut self, tracer: &mut impl Tracer) -> ExecutionResult {
+        self.run(&mut RunForever, tracer);
+        if let Status::WaitingForOperations = self.status() {
+            error!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");
+            // TODO: Show stack traces of all fibers?
+        }
+        self.tear_down()
     }
-    vm.tear_down()
 }
 
 impl Packet {
@@ -67,28 +58,21 @@ impl Packet {
 }
 
 impl ExecutionResult {
-    pub fn into_main_function(self) -> Result<(Heap, Closure), String> {
+    pub fn into_main_function(
+        self,
+    ) -> Result<(Heap, Closure, FxHashMap<HeapObject, HeapObject>), String> {
         match self {
-            ExecutionResult::Finished(packet) => {
-                packet.into_main_function().map_err(|it| it.to_string())
-            }
+            ExecutionResult::Finished {
+                packet,
+                constant_mapping,
+            } => match packet.into_main_function() {
+                Ok((heap, closure)) => Ok((heap, closure, constant_mapping)),
+                Err(err) => Err(err.to_string()),
+            },
             ExecutionResult::Panicked {
                 reason,
                 responsible,
             } => Err(format!("The module panicked at {responsible}: {reason}")),
         }
     }
-}
-
-pub fn run_main(
-    heap: Heap,
-    main: Closure,
-    environment: Struct,
-    use_provider: &impl UseProvider,
-    tracer: &mut impl Tracer,
-) -> ExecutionResult {
-    let mut vm = Vm::default();
-    vm.set_up_for_running_closure(heap, main, &[environment.into()], hir::Id::platform());
-    vm.run(use_provider, &mut RunForever, tracer);
-    vm.tear_down()
 }
