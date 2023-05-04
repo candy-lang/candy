@@ -80,11 +80,16 @@ pub fn setup_and_compile(source_code: &str) -> Arc<Lir> {
 pub fn setup() -> Database {
     let mut db = Database::default();
     load_core(&mut db.module_provider);
-    db.module_provider.add_str(&MODULE, r#"_ = use "..Core""#);
+    db.module_provider.add_str(&MODULE, r#"_ = use "Core""#);
 
     // Load `Core` into the cache.
     let errors = compile_lir(&db, MODULE.clone(), TRACING.clone()).1;
-    assert!(errors.is_empty());
+    if !errors.is_empty() {
+        for error in errors.iter() {
+            println!("{error:?}");
+        }
+        panic!("There are errors in the benchmarking code.");
+    }
 
     db
 }
