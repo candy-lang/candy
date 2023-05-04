@@ -7,11 +7,12 @@ use crate::{
         Match, MatchCase, OrPattern, Struct, Symbol, Text, TextPart,
     },
     cst::{self, Cst, CstDb, CstKind, UnwrapWhitespaceAndComment},
-    error::{CompilerError},
+    error::CompilerError,
     module::Module,
     position::Offset,
     rcst_to_cst::RcstToCst,
-    utils::AdjustCasingOfFirstLetter, string_to_rcst::ModuleError,
+    string_to_rcst::ModuleError,
+    utils::AdjustCasingOfFirstLetter,
 };
 use std::{ops::Range, sync::Arc};
 
@@ -57,7 +58,6 @@ fn ast(db: &dyn CstToAst, module: Module) -> AstResult {
         let asts = context.lower_csts(&cst);
         (Arc::new(asts), Arc::new(context.id_mapping))
     })
-
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -205,9 +205,8 @@ impl LoweringContext {
                                         errors: vec![CompilerError {
                                             module: self.module.clone(),
                                             span: part.data.span.clone(),
-                                            payload: 
-                                                AstError::TextInterpolationMissesClosingCurlyBraces.into()
-                                            ,
+                                            payload:
+                                                AstError::TextInterpolationMissesClosingCurlyBraces.into(),
                                         }],
                                     },
                                 );
@@ -778,9 +777,7 @@ impl LoweringContext {
                                     errors: vec![CompilerError {
                                         module: self.module.clone(),
                                         span: name.data.span.clone(),
-                                        payload: 
-                                            AstError::ExpectedNameOrPatternInAssignment.into(),
-                                    
+                                        payload: AstError::ExpectedNameOrPatternInAssignment.into(),
                                     }],
                                 },
                             );
