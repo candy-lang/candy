@@ -4,9 +4,11 @@ use crate::{fiber::InstructionPointer, heap::Heap};
 use candy_frontend::{
     mir::Id,
     module::Module,
-    rich_ir::{RichIrBuilder, ToRichIr, TokenType},
+    rich_ir::{RichIr, RichIrBuilder, ToRichIr, TokenType},
+    TracingConfig,
 };
 use enumset::EnumSet;
+use extension_trait::extension_trait;
 use itertools::Itertools;
 use std::fmt::{self, Display, Formatter};
 use strum::{EnumDiscriminants, IntoStaticStr};
@@ -306,5 +308,22 @@ fn arguments_plural(num_args: usize) -> &'static str {
         "argument"
     } else {
         "arguments"
+    }
+}
+
+#[extension_trait]
+pub impl RichIrForLir for RichIr {
+    fn for_lir(module: &Module, lir: &Lir, tracing_config: &TracingConfig) -> RichIr {
+        let mut builder = RichIrBuilder::default();
+        builder.push(
+            format!("# LIR for module {}", module.to_rich_ir()),
+            TokenType::Comment,
+            EnumSet::empty(),
+        );
+        builder.push_newline();
+        builder.push_tracing_config(tracing_config);
+        builder.push_newline();
+        lir.build_rich_ir(&mut builder);
+        builder.finish()
     }
 }

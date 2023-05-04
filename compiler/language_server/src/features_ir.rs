@@ -11,15 +11,9 @@ use candy_frontend::{
         TokenType,
     },
     string_to_rcst::{ModuleError, RcstResult, StringToRcst},
-    TracingConfig, TracingMode,
+    TracingConfig,
 };
 use candy_vm::{lir::Lir, mir_to_lir::compile_lir};
-use enumset::EnumSet;
-use extension_trait::extension_trait;
-use lsp_types::{
-    self, notification::Notification, FoldingRange, FoldingRangeKind, LocationLink, SemanticToken,
-    Url,
-};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, hash::Hash, ops::Range, sync::Arc};
@@ -37,6 +31,12 @@ use crate::{
         LspPositionConversion,
     },
 };
+use enumset::EnumSet;
+use extension_trait::extension_trait;
+use lsp_types::{
+    notification::Notification, FoldingRange, FoldingRangeKind, LocationLink, SemanticToken,
+};
+use url::Url;
 
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -55,33 +55,6 @@ impl Server {
         let open_irs = features.ir.open_irs.read().await;
         Ok(open_irs.get(&params.uri).unwrap().ir.text.to_owned())
     }
-}
-fn push_tracing_config(builder: &mut RichIrBuilder, tracing_config: &TracingConfig) {
-    fn push_mode(builder: &mut RichIrBuilder, title: &str, mode: &TracingMode) {
-        builder.push_comment_line(format!(
-            "• {title} {}",
-            match mode {
-                TracingMode::Off => "No",
-                TracingMode::OnlyCurrent => "Only for the current module",
-                TracingMode::All => "Yes",
-            },
-        ));
-    }
-
-    builder.push_comment_line("");
-    builder.push_comment_line("Tracing Config:");
-    builder.push_comment_line("");
-    push_mode(
-        builder,
-        "Include tracing of fuzzable closures?",
-        &tracing_config.register_fuzzables,
-    );
-    push_mode(builder, "Include tracing of calls?", &tracing_config.calls);
-    push_mode(
-        builder,
-        "Include tracing of evaluated expressions?",
-        &tracing_config.evaluated_expressions,
-    );
 }
 
 #[derive(Debug, Default)]
@@ -151,7 +124,6 @@ impl IrFeatures {
             line_start_offsets,
         }
     }
-
     fn rich_ir_for_rcst(module: &Module, rcst: RcstResult) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
@@ -202,7 +174,7 @@ impl IrFeatures {
             EnumSet::empty(),
         );
         builder.push_newline();
-        push_tracing_config(&mut builder, tracing_config);
+        builder.push_tracing_config(tracing_config);
         builder.push_newline();
         match mir {
             Ok((mir, _)) => mir.build_rich_ir(&mut builder),
@@ -222,7 +194,7 @@ impl IrFeatures {
             EnumSet::empty(),
         );
         builder.push_newline();
-        push_tracing_config(&mut builder, tracing_config);
+        builder.push_tracing_config(tracing_config);
         builder.push_newline();
         match mir {
             Ok((mir, _)) => mir.build_rich_ir(&mut builder),
@@ -238,7 +210,7 @@ impl IrFeatures {
             EnumSet::empty(),
         );
         builder.push_newline();
-        push_tracing_config(&mut builder, tracing_config);
+        builder.push_tracing_config(tracing_config);
         builder.push_newline();
         lir.build_rich_ir(&mut builder);
         builder.finish()
