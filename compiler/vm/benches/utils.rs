@@ -120,7 +120,7 @@ pub fn compile(db: &mut Database, source_code: &str) -> Arc<Lir> {
 
 pub fn run(lir: impl Borrow<Lir>) -> Packet {
     let mut tracer = DummyTracer::default();
-    let (mut heap, main) = Vm::for_module(lir.borrow())
+    let (mut heap, main, constant_mapping) = Vm::for_module(lir.borrow())
         .run_until_completion(&mut tracer)
         .into_main_function()
         .unwrap();
@@ -128,10 +128,20 @@ pub fn run(lir: impl Borrow<Lir>) -> Packet {
     // Run the `main` function.
     let environment = Struct::create(&mut heap, &FxHashMap::default());
     let responsible = HirId::create(&mut heap, hir::Id::user());
-    match Vm::for_closure(lir, main, &[environment.into()], responsible)
-        .run_until_completion(&mut tracer)
+    match Vm::for_closure(
+        lir,
+        heap,
+        constant_mapping,
+        main,
+        &[environment.into()],
+        responsible,
+    )
+    .run_until_completion(&mut tracer)
     {
-        ExecutionResult::Finished(return_value) => return_value,
+        ExecutionResult::Finished {
+            packet: return_value,
+            ..
+        } => return_value,
         ExecutionResult::Panicked { reason, .. } => panic!("The main function panicked: {reason}"),
     }
 }
