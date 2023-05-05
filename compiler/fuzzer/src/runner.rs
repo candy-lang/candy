@@ -2,7 +2,7 @@ use candy_frontend::hir::Id;
 use candy_vm::{
     self,
     context::{CombiningExecutionController, CountingExecutionController, ExecutionController},
-    heap::{Closure, HirId},
+    heap::{Closure, HirId, InlineObjectSliceCloneToHeap},
     lir::Lir,
     tracer::full::FullTracer,
     vm::{self, Vm},
@@ -52,13 +52,15 @@ impl RunResult {
 impl<L: Borrow<Lir>> Runner<L> {
     pub fn new(lir: L, closure: Closure, input: Input) -> Self {
         let (mut heap, constant_mapping) = lir.borrow().constant_heap.clone();
+        let closure = closure.clone_to_heap(&mut heap).try_into().unwrap();
+        let arguments = input.arguments.clone_to_heap(&mut heap);
         let responsible = HirId::create(&mut heap, Id::fuzzer());
         let vm = Vm::for_closure(
             lir,
             heap,
             constant_mapping,
             closure,
-            &input.arguments,
+            &arguments,
             responsible,
         );
 

@@ -23,7 +23,7 @@ rand = "0.8.5"
 rustc-hash = "1.1.0"
 salsa = "0.16.1"
 strum = { version = "0.24.1", features = ["derive"] }
-tracing = { version = "0.1", features = [] } # "release_max_level_debug"
+tracing = { version = "0.1", features = ["release_max_level_debug"] }
 unicode-segmentation = "1.9.0"
 
 [dev-dependencies]
