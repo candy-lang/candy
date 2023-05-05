@@ -17,7 +17,7 @@ Candy blurs the line between those stages, for example, by replacing compile-tim
   Green               # symbol
   (Foo, Bar)          # list
   [Name: "Candy"]     # struct
-  { it -> add it 2 }  # closure
+  { it -> add it 2 }  # function
   ```
 
 - **Minimalistic syntax.**

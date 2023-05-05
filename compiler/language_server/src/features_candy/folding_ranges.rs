@@ -153,7 +153,7 @@ where
 
                 self.visit_csts(body);
             }
-            CstKind::Lambda {
+            CstKind::Function {
                 opening_curly_brace,
                 parameters_and_arrow,
                 body,

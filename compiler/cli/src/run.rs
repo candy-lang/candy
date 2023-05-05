@@ -84,7 +84,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         platform,
         &heap,
     );
-    vm.initialize_for_closure(heap, constant_mapping, main, &[environment], platform);
+    vm.initialize_for_function(heap, constant_mapping, main, &[environment], platform);
     loop {
         match vm.status() {
             Status::CanRun => {

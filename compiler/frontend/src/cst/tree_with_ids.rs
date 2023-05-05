@@ -135,7 +135,7 @@ impl TreeWithIds for Cst {
                 .find(id)
                 .or_else(|| arrow.find(id))
                 .or_else(|| body.find(id)),
-            CstKind::Lambda {
+            CstKind::Function {
                 opening_curly_brace,
                 parameters_and_arrow,
                 body,
@@ -285,7 +285,7 @@ impl TreeWithIds for Cst {
                     .or_else(|| body.find_by_offset(offset)),
                 false,
             ),
-            CstKind::Lambda { body, .. } => (body.find_by_offset(offset), false),
+            CstKind::Function { body, .. } => (body.find_by_offset(offset), false),
             CstKind::Assignment {
                 left,
                 assignment_sign,

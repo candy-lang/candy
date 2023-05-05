@@ -1,6 +1,6 @@
 use crate::{
     fiber::InstructionPointer,
-    heap::{Builtin, Closure, Heap, HirId, Int, Tag, Text},
+    heap::{Builtin, Function, Heap, HirId, Int, Tag, Text},
     lir::{Instruction, Lir, StackOffset},
 };
 use candy_frontend::{
@@ -43,7 +43,7 @@ where
 
     let mut constant_heap = Heap::default();
     let mut instructions = vec![];
-    let start = compile_lambda(
+    let start = compile_function(
         &mut constant_heap,
         &mut instructions,
         &FxHashSet::default(),
@@ -52,7 +52,7 @@ where
         &mir.body,
     );
 
-    let module_closure = Closure::create(&mut constant_heap, &[], 0, start);
+    let module_function = Function::create(&mut constant_heap, &[], 0, start);
     let responsible_module =
         HirId::create(&mut constant_heap, hir::Id::new(module.clone(), vec![]));
 
@@ -60,13 +60,13 @@ where
         module,
         constant_heap,
         instructions,
-        module_closure,
+        module_function,
         responsible_module,
     };
     (Arc::new(lir), errors)
 }
 
-fn compile_lambda(
+fn compile_function(
     heap: &mut Heap,
     instructions: &mut Vec<Instruction>,
     captured: &FxHashSet<Id>,
@@ -171,14 +171,14 @@ impl LoweringContext {
                 let hir_id = HirId::create(heap, hir_id.clone());
                 self.emit(id, Instruction::PushConstant(hir_id.into()));
             }
-            Expression::Lambda {
+            Expression::Function {
                 original_hirs: _,
                 parameters,
                 responsible_parameter,
                 body,
             } => {
                 let captured = expression.captured_ids();
-                let instructions = compile_lambda(
+                let instructions = compile_function(
                     heap,
                     instructions,
                     &captured,
@@ -189,7 +189,7 @@ impl LoweringContext {
 
                 self.emit(
                     id,
-                    Instruction::CreateClosure {
+                    Instruction::CreateFunction {
                         captured: captured
                             .iter()
                             .map(|id| self.stack.find_id(*id))
@@ -264,13 +264,13 @@ impl LoweringContext {
                 self.emit_push_from_stack(*value);
                 self.emit(id, Instruction::TraceExpressionEvaluated);
             }
-            Expression::TraceFoundFuzzableClosure {
+            Expression::TraceFoundFuzzableFunction {
                 hir_definition,
-                closure,
+                function,
             } => {
                 self.emit_push_from_stack(*hir_definition);
-                self.emit_push_from_stack(*closure);
-                self.emit(id, Instruction::TraceFoundFuzzableClosure);
+                self.emit_push_from_stack(*function);
+                self.emit(id, Instruction::TraceFoundFuzzableFunction);
             }
         }
     }

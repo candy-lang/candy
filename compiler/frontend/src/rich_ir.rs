@@ -256,7 +256,7 @@ impl RichIrBuilder {
         self.push_comment_line("");
         push_mode(
             self,
-            "Include tracing of fuzzable closures?",
+            "Include tracing of fuzzable functions?",
             &tracing_config.register_fuzzables,
         );
         push_mode(self, "Include tracing of calls?", &tracing_config.calls);

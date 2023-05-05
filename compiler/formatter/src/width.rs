@@ -87,7 +87,7 @@ pub enum Width {
     Singleline(SinglelineWidth),
     Multiline {
         /// Only [Some] if the expression can be used as a trailing multiline expression, e.g., a
-        /// trailing lambda.
+        /// trailing function.
         first_line_width: Option<SinglelineWidth>,
         last_line_width: Option<SinglelineWidth>,
     },

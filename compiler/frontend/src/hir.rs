@@ -48,8 +48,8 @@ fn containing_body_of(db: &dyn HirDb, id: Id) -> Arc<Body> {
                     .unwrap();
                 Arc::new(body)
             }
-            Expression::Lambda(lambda) => Arc::new(lambda.body),
-            _ => panic!("Parent of an expression must be a lambda (or root scope)."),
+            Expression::Function(function) => Arc::new(function.body),
+            _ => panic!("Parent of an expression must be a function (or root scope)."),
         }
     }
 }
@@ -92,7 +92,7 @@ impl Expression {
                     body.collect_all_ids(ids);
                 }
             }
-            Expression::Lambda(Lambda {
+            Expression::Function(Function {
                 parameters, body, ..
             }) => {
                 for parameter in parameters {
@@ -168,7 +168,7 @@ impl Id {
     pub fn dummy() -> Self {
         Self::tooling("dummy".to_string())
     }
-    /// TODO: Currently, when a higher-order function calls a closure passed as
+    /// TODO: Currently, when a higher-order function calls a function passed as
     /// a parameter, that's registered as a normal call instruction, making the
     /// callsite in the higher-order function responsible for the successful
     /// fulfillment of the passed function's `needs`. We probably want to change
@@ -258,7 +258,7 @@ pub enum Expression {
         /// in the pattern.
         cases: Vec<(Pattern, Body)>,
     },
-    Lambda(Lambda),
+    Function(Function),
     Builtin(BuiltinFunction),
     Call {
         function: Id,
@@ -415,7 +415,7 @@ impl Pattern {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Lambda {
+pub struct Function {
     pub parameters: Vec<Id>,
     pub body: Body,
     pub fuzzable: bool,
@@ -515,11 +515,11 @@ impl ToRichIr for Expression {
                     builder.dedent();
                 });
             }
-            Expression::Lambda(lambda) => {
+            Expression::Function(function) => {
                 builder.push(
                     format!(
                         "{{ ({}) ",
-                        if lambda.fuzzable {
+                        if function.fuzzable {
                             "fuzzable"
                         } else {
                             "non-fuzzable"
@@ -528,7 +528,7 @@ impl ToRichIr for Expression {
                     None,
                     EnumSet::empty(),
                 );
-                lambda.build_rich_ir(builder);
+                function.build_rich_ir(builder);
                 builder.push("}", None, EnumSet::empty());
             }
             Expression::Builtin(builtin) => {
@@ -632,7 +632,7 @@ fn build_errors_rich_ir<C: ToRichIr>(
         }
     });
 }
-impl ToRichIr for Lambda {
+impl ToRichIr for Function {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         for parameter in &self.parameters {
             let range = builder.push(
@@ -691,7 +691,7 @@ impl Expression {
             Expression::PatternIdentifierReference { .. } => None,
             // TODO: use binary search
             Expression::Match { cases, .. } => cases.iter().find_map(|(_, body)| body.find(id)),
-            Expression::Lambda(Lambda { body, .. }) => body.find(id),
+            Expression::Function(Function { body, .. }) => body.find(id),
             Expression::Builtin(_) => None,
             Expression::Call { .. } => None,
             Expression::UseModule { .. } => None,
@@ -738,7 +738,7 @@ impl CollectErrors for Expression {
             | Expression::Call { .. }
             | Expression::UseModule { .. }
             | Expression::Needs { .. } => {}
-            Expression::Lambda(lambda) => lambda.body.collect_errors(errors),
+            Expression::Function(function) => function.body.collect_errors(errors),
             Expression::Destructure { pattern, .. } => pattern.collect_errors(errors),
             Expression::Error {
                 errors: the_errors, ..

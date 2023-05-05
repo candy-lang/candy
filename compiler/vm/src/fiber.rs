@@ -1,7 +1,7 @@
 use super::{
     channel::{Capacity, Packet},
     context::ExecutionController,
-    heap::{Closure, Data, Heap, Text},
+    heap::{Data, Function, Heap, Text},
     lir::Instruction,
     tracer::FiberTracer,
 };
@@ -68,10 +68,10 @@ pub enum Status {
         channel: ChannelId,
     },
     InParallelScope {
-        body: Closure,
+        body: Function,
     },
     InTry {
-        body: Closure,
+        body: Function,
     },
     Done,
     Panicked {
@@ -118,36 +118,36 @@ impl Fiber {
             constant_mapping,
         }
     }
-    pub fn for_closure(
+    pub fn for_function(
         heap: Heap,
         constant_mapping: FxHashMap<HeapObject, HeapObject>,
-        closure: Closure,
+        function: Function,
         arguments: &[InlineObject],
         responsible: HirId,
     ) -> Self {
         let mut fiber = Self::new_with_heap(heap, constant_mapping);
         fiber.status = Status::Running;
-        fiber.call_closure(closure, arguments, responsible);
+        fiber.call_function(function, arguments, responsible);
         fiber
     }
-    pub fn for_module_closure(
+    pub fn for_module_function(
         mut heap: Heap,
         constant_mapping: FxHashMap<HeapObject, HeapObject>,
         module: Module,
-        closure: Closure,
+        function: Function,
     ) -> Self {
         assert_eq!(
-            closure.captured_len(),
+            function.captured_len(),
             0,
-            "Closure is not a module closure (it captures stuff).",
+            "Function is not a module function (it captures stuff).",
         );
         assert_eq!(
-            closure.argument_count(),
+            function.argument_count(),
             0,
-            "Closure is not a module closure (it has arguments).",
+            "Function is not a module function (it has arguments).",
         );
         let responsible = HirId::create(&mut heap, Id::new(module, vec![]));
-        Self::for_closure(heap, constant_mapping, closure, &[], responsible)
+        Self::for_function(heap, constant_mapping, function, &[], responsible)
     }
 
     pub fn tear_down(mut self) -> ExecutionResult {
@@ -330,7 +330,7 @@ impl Fiber {
                 let struct_ = Struct::create(&mut self.heap, &entries);
                 self.push_to_data_stack(struct_);
             }
-            Instruction::CreateClosure {
+            Instruction::CreateFunction {
                 captured,
                 num_args,
                 body,
@@ -343,8 +343,8 @@ impl Fiber {
                         object
                     })
                     .collect_vec();
-                let closure = Closure::create(&mut self.heap, &captured, num_args, body);
-                self.push_to_data_stack(closure);
+                let function = Function::create(&mut self.heap, &captured, num_args, body);
+                self.push_to_data_stack(function);
             }
             Instruction::PushConstant(constant) => {
                 let constant = match HeapObject::try_from(constant) {
@@ -438,18 +438,18 @@ impl Fiber {
 
                 tracer.value_evaluated(expression, value, &self.heap);
             }
-            Instruction::TraceFoundFuzzableClosure => {
-                let closure = self.pop_from_data_stack().try_into().expect("Instruction TraceFoundFuzzableClosure executed, but stack top is not a closure.");
+            Instruction::TraceFoundFuzzableFunction => {
+                let function = self.pop_from_data_stack().try_into().expect("Instruction TraceFoundFuzzableFunction executed, but stack top is not a function.");
                 let definition = self.pop_from_data_stack().try_into().unwrap();
 
-                tracer.found_fuzzable_closure(definition, closure, &self.heap);
+                tracer.found_fuzzable_function(definition, function, &self.heap);
             }
         }
     }
 
     pub fn call(&mut self, callee: InlineObject, arguments: &[InlineObject], responsible: HirId) {
         match callee.into() {
-            Data::Closure(closure) => self.call_closure(closure, arguments, responsible),
+            Data::Function(function) => self.call_function(function, arguments, responsible),
             Data::Builtin(builtin) => {
                 callee.drop(&mut self.heap);
                 self.run_builtin_function(builtin.get(), arguments, responsible);
@@ -480,24 +480,24 @@ impl Fiber {
             _ => {
                 self.panic(
                     format!(
-                        "You can only call closures, builtins and tags, but you tried to call {callee}.",
+                        "You can only call functions, builtins and tags, but you tried to call {callee}.",
                     ),
                     responsible.get().to_owned(),
                 );
             }
         };
     }
-    pub fn call_closure(
+    pub fn call_function(
         &mut self,
-        closure: Closure,
+        function: Function,
         arguments: &[InlineObject],
         responsible: HirId,
     ) {
-        let expected_num_args = closure.argument_count();
+        let expected_num_args = function.argument_count();
         if arguments.len() != expected_num_args {
             self.panic(
                 format!(
-                    "A closure expected {expected_num_args} parameters, but you called it with {} arguments.",
+                    "A function expected {expected_num_args} parameters, but you called it with {} arguments.",
                     arguments.len(),
                 ),
                 responsible.get().to_owned(),
@@ -508,14 +508,14 @@ impl Fiber {
         if let Some(next_instruction) = self.next_instruction {
             self.call_stack.push(next_instruction);
         }
-        let captured = closure.captured();
+        let captured = function.captured();
         for captured in captured {
             captured.dup(&mut self.heap);
         }
         self.data_stack.extend_from_slice(captured);
         self.data_stack.extend_from_slice(arguments);
         self.push_to_data_stack(responsible);
-        self.next_instruction = Some(closure.body());
+        self.next_instruction = Some(function.body());
     }
 
     fn push_to_data_stack(&mut self, value: impl Into<InlineObject>) {

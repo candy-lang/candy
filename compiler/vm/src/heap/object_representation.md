@@ -47,15 +47,15 @@ Each heap object has the following structure:
 
 The header word is a tagged union of different types of values:
 
-|                                                                     Value | Meaning |
-| ------------------------------------------------------------------------: | :------ |
-| `00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000` | Int     |
-| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaa001` | List    |
-| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaa101` | Struct  |
-| `00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000010` | Tag     |
-| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaa110` | Text    |
-| `cccccccc cccccccc cccccccc cccccccc aaaaaaaa aaaaaaaa aaaaaaaa aaaaa011` | Closure |
-| `00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000111` | HirId   |
+|                                                                     Value | Meaning  |
+| ------------------------------------------------------------------------: | :------- |
+| `00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000` | Int      |
+| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaa001` | List     |
+| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaa101` | Struct   |
+| `00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000010` | Tag      |
+| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaa110` | Text     |
+| `cccccccc cccccccc cccccccc cccccccc aaaaaaaa aaaaaaaa aaaaaaaa aaaaa011` | Function |
+| `00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000111` | HirId    |
 
 > The remaining patterns are invalid.
 
@@ -118,18 +118,18 @@ The last word is padded with zeros if necessary.
 
 > For now, we don't pad the last word but reuse Rust's `str` for storing text in this representation.
 
-### Closure
+### Function
 
-A closure capturing `c` values, taking `a` arguments, and with a body starting at instruction pointer `b`.
+A function capturing `c` values, taking `a` arguments, and with a body starting at instruction pointer `b`.
 
-| Word                  |
-| :-------------------- |
-| Header Word (closure) |
-| Reference count       |
-| `b`                   |
-| Captured value 0      |
-| …                     |
-| Captured value c-1    |
+| Word                   |
+| :--------------------- |
+| Header Word (function) |
+| Reference count        |
+| `b`                    |
+| Captured value 0       |
+| …                      |
+| Captured value c-1     |
 
 > Instructions are stored in Rust's representation.
 > They may take up multiple words and might not align to word boundaries.

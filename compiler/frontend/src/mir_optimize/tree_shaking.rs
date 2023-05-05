@@ -36,7 +36,7 @@ impl Body {
                 keep.insert(id);
                 keep.extend(expression.referenced_ids());
 
-                if let Expression::Lambda { body, .. } = expression {
+                if let Expression::Function { body, .. } = expression {
                     body.tree_shake(keep);
                 }
             } else {

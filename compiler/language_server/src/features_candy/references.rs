@@ -2,7 +2,7 @@ use crate::{features::Reference, utils::LspPositionConversion};
 use candy_frontend::{
     ast_to_hir::AstToHir,
     cst::{CstDb, CstKind},
-    hir::{self, Body, Expression, HirDb, Lambda},
+    hir::{self, Body, Expression, Function, HirDb},
     module::{Module, ModuleDb},
     position::{Offset, PositionConversionDb},
     rich_ir::ToRichIr,
@@ -168,7 +168,7 @@ where
                     self.visit_body(body);
                 }
             },
-            Expression::Lambda(Lambda { body, .. }) => {
+            Expression::Function(Function { body, .. }) => {
                 // We don't need to visit the parameters: They can only be the
                 // declaration of an identifier and don't reference it any other
                 // way. Therfore, we already visit them in [visit_body].

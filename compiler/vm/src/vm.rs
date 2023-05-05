@@ -16,7 +16,7 @@ use crate::{
     channel::{Channel, ChannelId, Completer, Packet, Performer},
     context::{CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions},
     fiber::{self, ExecutionResult, Fiber, FiberId},
-    heap::{Closure, Data, Heap, HeapObject, HirId, InlineObject, SendPort, Struct, Tag},
+    heap::{Data, Function, Heap, HeapObject, HirId, InlineObject, SendPort, Struct, Tag},
     lir::Lir,
     tracer::Tracer,
 };
@@ -60,7 +60,7 @@ enum FiberTree {
 
     /// The fiber of this tree entered a `core.parallel` scope so that it's now
     /// paused and waits for the parallel scope to end. Instead of the main
-    /// former single fiber, the tree now runs the closure passed to
+    /// former single fiber, the tree now runs the function passed to
     /// `core.parallel` as well as any other spawned children.
     Parallel(Parallel),
 
@@ -75,11 +75,11 @@ struct Single {
 
 /// When a parallel section is entered, the fiber that started the section is
 /// paused. Instead, the children of the parallel section are run. Initially,
-/// there's only one child – the closure given to the parallel builtin function.
-/// Using the nursery parameter (a nursery can be thought of as a pointer to a
-/// parallel section), you can also spawn other fibers. In contrast to the first
-/// child, those children also have an explicit send port where the closure's
-/// result is sent to.
+/// there's only one child – the function given to the parallel builtin
+/// function. Using the nursery parameter (a nursery can be thought of as a
+/// pointer to a parallel section), you can also spawn other fibers. In contrast
+/// to the first child, those children also have an explicit send port where the
+/// function's result is sent to.
 struct Parallel {
     paused_fiber: Single,
     children: HashMap<FiberId, ChildKind>,
@@ -134,17 +134,17 @@ impl<L: Borrow<Lir>> Vm<L> {
             fiber_id_generator: IdGenerator::start_at(FiberId::root().to_usize()),
         }
     }
-    pub fn initialize_for_closure(
+    pub fn initialize_for_function(
         &mut self,
         heap: Heap,
         constant_mapping: FxHashMap<HeapObject, HeapObject>,
-        closure: Closure,
+        function: Function,
         arguments: &[InlineObject],
         responsible: HirId,
     ) {
         assert!(self.fibers.is_empty());
 
-        let fiber = Fiber::for_closure(heap, constant_mapping, closure, arguments, responsible);
+        let fiber = Fiber::for_function(heap, constant_mapping, function, arguments, responsible);
         self.fibers.insert(
             FiberId::root(),
             FiberTree::Single(Single {
@@ -154,16 +154,16 @@ impl<L: Borrow<Lir>> Vm<L> {
         );
     }
 
-    pub fn for_closure(
+    pub fn for_function(
         lir: L,
         heap: Heap,
         constant_mapping: FxHashMap<HeapObject, HeapObject>,
-        closure: Closure,
+        function: Function,
         arguments: &[InlineObject],
         responsible: HirId,
     ) -> Self {
         let mut this = Self::uninitialized(lir);
-        this.initialize_for_closure(heap, constant_mapping, closure, arguments, responsible);
+        this.initialize_for_function(heap, constant_mapping, function, arguments, responsible);
         this
     }
 
@@ -171,14 +171,14 @@ impl<L: Borrow<Lir>> Vm<L> {
         let actual_lir = lir.borrow();
         let (heap, constant_mapping) = actual_lir.constant_heap.clone();
 
-        let closure = constant_mapping[&actual_lir.module_closure]
+        let function = constant_mapping[&actual_lir.module_function]
             .try_into()
             .unwrap();
         let responsible = constant_mapping[&actual_lir.responsible_module]
             .try_into()
             .unwrap();
 
-        Self::for_closure(lir, heap, constant_mapping, closure, &[], responsible)
+        Self::for_function(lir, heap, constant_mapping, function, &[], responsible)
     }
 
     pub fn tear_down(mut self) -> ExecutionResult {
@@ -358,7 +358,7 @@ impl<L: Borrow<Lir>> Vm<L> {
                     self.fibers.insert(
                         id,
                         FiberTree::Single(Single {
-                            fiber: Fiber::for_closure(
+                            fiber: Fiber::for_function(
                                 heap,
                                 mapping,
                                 body,
@@ -396,7 +396,7 @@ impl<L: Borrow<Lir>> Vm<L> {
                     self.fibers.insert(
                         id,
                         FiberTree::Single(Single {
-                            fiber: Fiber::for_closure(heap, mapping, body, &[], responsible),
+                            fiber: Fiber::for_function(heap, mapping, body, &[], responsible),
                             parent: Some(fiber_id),
                         }),
                     );
@@ -604,9 +604,9 @@ impl<L: Borrow<Lir>> Vm<L> {
                 let parent_id = *parent_id;
 
                 match Self::parse_spawn_packet(packet) {
-                    Some((_packet_heap, closure_to_spawn, return_channel)) => {
+                    Some((_packet_heap, function_to_spawn, return_channel)) => {
                         let (mut heap, constant_mapping) = self.lir.borrow().constant_heap.clone();
-                        let closure_to_spawn: Closure = closure_to_spawn
+                        let function_to_spawn: Function = function_to_spawn
                             .clone_to_heap(&mut heap)
                             .try_into()
                             .unwrap();
@@ -617,10 +617,10 @@ impl<L: Borrow<Lir>> Vm<L> {
                         self.fibers.insert(
                             child_id,
                             FiberTree::Single(Single {
-                                fiber: Fiber::for_closure(
+                                fiber: Fiber::for_function(
                                     heap,
                                     constant_mapping,
-                                    closure_to_spawn,
+                                    function_to_spawn,
                                     &[],
                                     responsible,
                                 ),
@@ -657,20 +657,20 @@ impl<L: Borrow<Lir>> Vm<L> {
             }
         }
     }
-    fn parse_spawn_packet(packet: Packet) -> Option<(Heap, Closure, ChannelId)> {
+    fn parse_spawn_packet(packet: Packet) -> Option<(Heap, Function, ChannelId)> {
         let Packet { mut heap, object } = packet;
         let arguments: Struct = object.try_into().ok()?;
 
-        let closure_tag = Tag::create_from_str(&mut heap, "Closure", None);
-        let closure: Closure = arguments.get(**closure_tag)?.try_into().ok()?;
-        if closure.argument_count() > 0 {
+        let function_tag = Tag::create_from_str(&mut heap, "Function", None);
+        let function: Function = arguments.get(**function_tag)?.try_into().ok()?;
+        if function.argument_count() > 0 {
             return None;
         }
 
         let return_channel_tag = Tag::create_from_str(&mut heap, "ReturnChannel", None);
         let return_channel: SendPort = arguments.get(**return_channel_tag)?.try_into().ok()?;
 
-        Some((heap, closure, return_channel.channel_id()))
+        Some((heap, function, return_channel.channel_id()))
     }
 
     fn receive_from_channel(&mut self, performer: Performer, channel: ChannelId) {

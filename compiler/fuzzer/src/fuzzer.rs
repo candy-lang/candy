@@ -8,7 +8,7 @@ use crate::{
 use candy_frontend::hir::Id;
 use candy_vm::{
     context::ExecutionController,
-    heap::{Closure, Data, Heap},
+    heap::{Data, Function, Heap},
     lir::Lir,
     tracer::full::FullTracer,
 };
@@ -17,9 +17,9 @@ use tracing::trace;
 
 pub struct Fuzzer {
     lir: Arc<Lir>,
-    pub closure_heap: Heap,
-    pub closure: Closure,
-    pub closure_id: Id,
+    pub function_heap: Heap,
+    pub function: Function,
+    pub function_id: Id,
     status: Option<Status>, // only `None` during transitions
 }
 
@@ -40,22 +40,21 @@ pub enum Status {
 }
 
 impl Fuzzer {
-    pub fn new(lir: Arc<Lir>, closure: Closure, closure_id: Id) -> Self {
-        // The given `closure_heap` may contain other fuzzable closures.
+    pub fn new(lir: Arc<Lir>, function: Function, function_id: Id) -> Self {
         let mut heap = Heap::default();
-        let closure: Closure = Data::from(closure.clone_to_heap(&mut heap))
+        let function: Function = Data::from(function.clone_to_heap(&mut heap))
             .try_into()
             .unwrap();
 
         // PERF: Avoid collecting the symbols into a hash set of owned strings that we then copy again.
-        let pool = InputPool::new(closure.argument_count(), &collect_symbols_in_heap(&heap));
-        let runner = Runner::new(lir.clone(), closure, pool.generate_new_input());
+        let pool = InputPool::new(function.argument_count(), &collect_symbols_in_heap(&heap));
+        let runner = Runner::new(lir.clone(), function, pool.generate_new_input());
 
         Self {
             lir,
-            closure_heap: heap,
-            closure,
-            closure_id,
+            function_heap: heap,
+            function,
+            function_id,
             status: Some(Status::StillFuzzing { pool, runner }),
         }
     }
@@ -76,7 +75,7 @@ impl Fuzzer {
                 Status::StillFuzzing { pool, runner } => {
                     self.continue_fuzzing(execution_controller, pool, runner)
                 }
-                // We already found some arguments that caused the closure to panic,
+                // We already found some arguments that caused the function to panic,
                 // so there's nothing more to do.
                 Status::FoundPanic {
                     input,
@@ -107,10 +106,10 @@ impl Fuzzer {
 
         let call_string = format!(
             "`{} {}`",
-            self.closure_id
+            self.function_id
                 .keys
                 .last()
-                .map(|closure_name| closure_name.to_string())
+                .map(|function_name| function_name.to_string())
                 .unwrap_or_else(|| "{…}".to_string()),
             runner.input,
         );
@@ -146,7 +145,7 @@ impl Fuzzer {
         }
     }
     fn create_new_fuzzing_case(&self, pool: InputPool) -> Status {
-        let runner = Runner::new(self.lir.clone(), self.closure, pool.generate_new_input());
+        let runner = Runner::new(self.lir.clone(), self.function, pool.generate_new_input());
         Status::StillFuzzing { pool, runner }
     }
 }

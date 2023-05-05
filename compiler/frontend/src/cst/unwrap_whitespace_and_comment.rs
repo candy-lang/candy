@@ -150,12 +150,12 @@ impl<D: Clone> UnwrapWhitespaceAndComment for Cst<D> {
                 arrow: arrow.unwrap_whitespace_and_comment(),
                 body: body.unwrap_whitespace_and_comment(),
             },
-            CstKind::Lambda {
+            CstKind::Function {
                 opening_curly_brace,
                 parameters_and_arrow,
                 body,
                 closing_curly_brace,
-            } => CstKind::Lambda {
+            } => CstKind::Function {
                 opening_curly_brace: opening_curly_brace.unwrap_whitespace_and_comment(),
                 parameters_and_arrow: parameters_and_arrow.as_ref().map(|(parameters, arrow)| {
                     (

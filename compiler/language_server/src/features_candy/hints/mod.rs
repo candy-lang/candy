@@ -2,7 +2,7 @@
 //! with the usual request-response model. Instead, a hints server runs in the
 //! background all the time. That way, the hints can progressively get better.
 //! For example, when opening a long file, the hints may appear from top to
-//! bottom as more code is evaluated. Then, the individual closures could get
+//! bottom as more code is evaluated. Then, the individual functions could get
 //! fuzzed with ever-more-complex inputs, resulting in some error cases to be
 //! displayed over time.
 //!
@@ -115,8 +115,8 @@ pub async fn run_server(
         // functions we found.
         let module_with_new_insight = 'new_insight: {
             if let Some(module) = constant_evaluator.run() {
-                let (lir, closures) = constant_evaluator.get_fuzzable_closures(&module);
-                fuzzer.update_module(module.clone(), lir, &closures);
+                let (lir, functions) = constant_evaluator.get_fuzzable_functions(&module);
+                fuzzer.update_module(module.clone(), lir, &functions);
                 debug!(
                     "The constant evaluator made progress in {}.",
                     module.to_rich_ir(),
