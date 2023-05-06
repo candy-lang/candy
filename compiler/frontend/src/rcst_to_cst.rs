@@ -265,12 +265,12 @@ impl Rcst {
                 inner: Box::new(inner.to_cst(state)),
                 closing_parenthesis: Box::new(closing_parenthesis.to_cst(state)),
             },
-            CstKind::Lambda {
+            CstKind::Function {
                 opening_curly_brace,
                 parameters_and_arrow,
                 body,
                 closing_curly_brace,
-            } => CstKind::Lambda {
+            } => CstKind::Function {
                 opening_curly_brace: Box::new(opening_curly_brace.to_cst(state)),
                 parameters_and_arrow: parameters_and_arrow.as_ref().map(|(parameters, arrow)| {
                     (

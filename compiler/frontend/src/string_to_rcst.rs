@@ -1099,7 +1099,7 @@ mod parse {
                                 CstKind::OpeningCurlyBrace.with_trailing_space()
                             ],
                             expression: Box::new(
-                                CstKind::Lambda {
+                                CstKind::Function {
                                     opening_curly_brace: Box::new(
                                         CstKind::OpeningCurlyBrace.into()
                                     ),
@@ -1324,7 +1324,7 @@ mod parse {
             .or_else(|| list(input, indentation))
             .or_else(|| struct_(input, indentation))
             .or_else(|| parenthesized(input, indentation))
-            .or_else(|| lambda(input, indentation))
+            .or_else(|| function(input, indentation))
             .or_else(|| identifier(input))
             .or_else(|| {
                 word(input).map(|(input, word)| {
@@ -2064,7 +2064,7 @@ mod parse {
                 CstKind::Assignment {
                     left: Box::new(build_identifier("main").with_trailing_space()),
                     assignment_sign: Box::new(CstKind::ColonEqualsSign.with_trailing_space()),
-                    body: vec![CstKind::Lambda {
+                    body: vec![CstKind::Function {
                         opening_curly_brace: Box::new(
                             CstKind::OpeningCurlyBrace.with_trailing_space()
                         ),
@@ -3010,7 +3010,7 @@ mod parse {
     }
 
     #[instrument(level = "trace")]
-    fn lambda(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
+    fn function(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
         let (input, opening_curly_brace) = opening_curly_brace(input)?;
         let (input, mut opening_curly_brace, mut parameters_and_arrow) = {
             let input_without_params = input;
@@ -3068,7 +3068,7 @@ mod parse {
                 // we now try to parse a body of multiple expressions. We didn't
                 // try this first because then the body would also have consumed
                 // any trailing closing curly brace in the same line.
-                // For example, for the lambda `{ 2 }`, the body parser would
+                // For example, for the function `{ 2 }`, the body parser would
                 // have already consumed the `}`. The body parser works great
                 // for multiline bodies, though.
                 let (input, body) = body(input_before_parsing_expression, indentation + 1);
@@ -3107,7 +3107,7 @@ mod parse {
 
         Some((
             input,
-            CstKind::Lambda {
+            CstKind::Function {
                 opening_curly_brace: Box::new(opening_curly_brace),
                 parameters_and_arrow: parameters_and_arrow
                     .map(|(parameters, arrow)| (parameters, Box::new(arrow))),
@@ -3118,13 +3118,13 @@ mod parse {
         ))
     }
     #[test]
-    fn test_lambda() {
-        assert_eq!(lambda("2", 0), None);
+    fn test_function() {
+        assert_eq!(function("2", 0), None);
         assert_eq!(
-            lambda("{ 2 }", 0),
+            function("{ 2 }", 0),
             Some((
                 "",
-                CstKind::Lambda {
+                CstKind::Function {
                     opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.with_trailing_space()),
                     parameters_and_arrow: None,
                     body: vec![build_simple_int(2), build_space()],
@@ -3137,10 +3137,10 @@ mod parse {
         //   foo
         // }
         assert_eq!(
-            lambda("{ a ->\n  foo\n}", 0),
+            function("{ a ->\n  foo\n}", 0),
             Some((
                 "",
-                CstKind::Lambda {
+                CstKind::Function {
                     opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.with_trailing_space()),
                     parameters_and_arrow: Some((
                         vec![build_identifier("a").with_trailing_space()],
@@ -3158,10 +3158,10 @@ mod parse {
         // {
         // foo
         assert_eq!(
-            lambda("{\nfoo", 0),
+            function("{\nfoo", 0),
             Some((
                 "\nfoo",
-                CstKind::Lambda {
+                CstKind::Function {
                     opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.into()),
                     parameters_and_arrow: None,
                     body: vec![],
@@ -3179,10 +3179,10 @@ mod parse {
         // {->
         // }
         assert_eq!(
-            lambda("{->\n}", 1),
+            function("{->\n}", 1),
             Some((
                 "\n}",
-                CstKind::Lambda {
+                CstKind::Function {
                     opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.into()),
                     parameters_and_arrow: Some((vec![], Box::new(CstKind::Arrow.into()))),
                     body: vec![],
@@ -3201,10 +3201,10 @@ mod parse {
         //   bar
         // }
         assert_eq!(
-            lambda("{ foo\n  bar\n}", 0),
+            function("{ foo\n  bar\n}", 0),
             Some((
                 "",
-                CstKind::Lambda {
+                CstKind::Function {
                     opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.with_trailing_space()),
                     parameters_and_arrow: None,
                     body: vec![
@@ -3222,10 +3222,10 @@ mod parse {
         // { foo # abc
         // }
         assert_eq!(
-            lambda("{ foo # abc\n}", 0),
+            function("{ foo # abc\n}", 0),
             Some((
                 "",
-                CstKind::Lambda {
+                CstKind::Function {
                     opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.with_trailing_space()),
                     parameters_and_arrow: None,
                     body: vec![

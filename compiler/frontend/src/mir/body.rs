@@ -94,7 +94,7 @@ impl Body {
                 self.expressions
                     .push((id, Expression::Reference(returned_by_inner)));
             } else {
-                if let Expression::Lambda { body, .. } = &mut expression {
+                if let Expression::Function { body, .. } = &mut expression {
                     body.flatten_multiples();
                 }
                 self.expressions.push((id, expression));
@@ -191,7 +191,7 @@ impl Body {
         is_returned: bool,
         visitor: &mut dyn FnMut(Id, &mut Expression, bool) -> VisitorResult,
     ) -> VisitorResult {
-        if let Expression::Lambda { body, .. } | Expression::Multiple(body) = expression {
+        if let Expression::Function { body, .. } | Expression::Multiple(body) = expression {
             match body.visit(visitor) {
                 VisitorResult::Continue => {}
                 VisitorResult::Abort => return VisitorResult::Abort,
@@ -201,11 +201,11 @@ impl Body {
     }
 
     /// Calls the visitor for each contained expression, even expressions in
-    /// lambdas or multiples.
+    /// functions or multiples.
     ///
     /// The visitor is called in inside-out order, so if the body contains a
-    /// lambda, the visitor is first called for its body expressions and only
-    /// then for the lambda expression itself.
+    /// function, the visitor is first called for its body expressions and only
+    /// then for the function expression itself.
     ///
     /// The visitor takes the ID of the current expression as well as the
     /// expression itself. It also takes `VisibleExpressions`, which allows it
@@ -248,7 +248,7 @@ impl Body {
         is_returned: bool,
         visitor: &mut dyn FnMut(Id, &mut Expression, &VisibleExpressions, bool),
     ) {
-        if let Expression::Lambda {
+        if let Expression::Function {
             parameters,
             responsible_parameter,
             body,
@@ -282,7 +282,7 @@ impl Body {
 impl Expression {
     pub fn visit_bodies(&mut self, visitor: &mut dyn FnMut(&mut Body)) {
         match self {
-            Expression::Lambda { body, .. } => body.visit_bodies(visitor),
+            Expression::Function { body, .. } => body.visit_bodies(visitor),
             Expression::Multiple(body) => body.visit_bodies(visitor),
             _ => {}
         }
@@ -290,7 +290,7 @@ impl Expression {
 }
 
 #[derive(Deref, DerefMut)]
-pub struct LambdaBodyBuilder {
+pub struct FunctionBodyBuilder {
     hir_id: hir::Id,
     #[deref]
     #[deref_mut]
@@ -298,10 +298,10 @@ pub struct LambdaBodyBuilder {
     responsible_parameter: Id,
     parameters: Vec<Id>,
 }
-impl LambdaBodyBuilder {
+impl FunctionBodyBuilder {
     fn new(hir_id: hir::Id, mut id_generator: IdGenerator<Id>) -> Self {
         let responsible_parameter = id_generator.generate();
-        LambdaBodyBuilder {
+        FunctionBodyBuilder {
             hir_id,
             body_builder: BodyBuilder::new(id_generator),
             parameters: vec![],
@@ -317,13 +317,13 @@ impl LambdaBodyBuilder {
 
     fn finish(self) -> (IdGenerator<Id>, Expression) {
         let (id_generator, body) = self.body_builder.finish();
-        let lambda = Expression::Lambda {
+        let function = Expression::Function {
             original_hirs: vec![self.hir_id].into_iter().collect(),
             parameters: self.parameters,
             responsible_parameter: self.responsible_parameter,
             body,
         };
-        (id_generator, lambda)
+        (id_generator, function)
     }
 }
 
@@ -389,16 +389,16 @@ impl BodyBuilder {
     }
 
     /// The builder function takes the builder and the responsible parameter.
-    pub fn push_lambda<F>(&mut self, hir_id: hir::Id, function: F) -> Id
+    pub fn push_function<F>(&mut self, hir_id: hir::Id, function: F) -> Id
     where
-        F: FnOnce(&mut LambdaBodyBuilder, Id),
+        F: FnOnce(&mut FunctionBodyBuilder, Id),
     {
-        let mut builder = LambdaBodyBuilder::new(hir_id, mem::take(&mut self.id_generator));
+        let mut builder = FunctionBodyBuilder::new(hir_id, mem::take(&mut self.id_generator));
         let responsible_parameter = builder.responsible_parameter;
         function(&mut builder, responsible_parameter);
-        let (id_generator, lambda) = builder.finish();
+        let (id_generator, function) = builder.finish();
         self.id_generator = id_generator;
-        self.push(lambda)
+        self.push(function)
     }
 
     pub fn push_call(&mut self, function: Id, arguments: Vec<Id>, responsible: Id) -> Id {
@@ -421,11 +421,11 @@ impl BodyBuilder {
         E: FnOnce(&mut Self),
     {
         let builtin_if_else = self.push_builtin(BuiltinFunction::IfElse);
-        let then_lambda = self.push_lambda(hir_id.child("then"), |body, _| then_builder(body));
-        let else_lambda = self.push_lambda(hir_id.child("else"), |body, _| else_builder(body));
+        let then_function = self.push_function(hir_id.child("then"), |body, _| then_builder(body));
+        let else_function = self.push_function(hir_id.child("else"), |body, _| else_builder(body));
         self.push_call(
             builtin_if_else,
-            vec![condition, then_lambda, else_lambda],
+            vec![condition, then_function, else_function],
             responsible,
         )
     }
@@ -449,7 +449,7 @@ impl BodyBuilder {
 impl ToRichIr for Body {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         fn push(builder: &mut RichIrBuilder, id: &Id, expression: &Expression) {
-            if let Expression::Lambda { original_hirs, .. } = expression {
+            if let Expression::Function { original_hirs, .. } = expression {
                 builder.push("# ", TokenType::Comment, EnumSet::empty());
                 builder.push_children_custom(
                     original_hirs.iter().sorted().collect_vec(),

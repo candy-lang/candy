@@ -118,7 +118,7 @@ impl<D> IsMultiline for CstKind<D> {
                 arrow,
                 body,
             } => pattern.is_multiline() || arrow.is_multiline() || body.is_multiline(),
-            CstKind::Lambda {
+            CstKind::Function {
                 opening_curly_brace,
                 parameters_and_arrow,
                 body,

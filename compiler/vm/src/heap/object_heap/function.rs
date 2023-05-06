@@ -15,9 +15,9 @@ use std::{
 };
 
 #[derive(Clone, Copy, Deref)]
-pub struct HeapClosure(HeapObject);
+pub struct HeapFunction(HeapObject);
 
-impl HeapClosure {
+impl HeapFunction {
     const CAPTURED_LEN_SHIFT: usize = 32;
     const ARGUMENT_COUNT_SHIFT: usize = 3;
 
@@ -34,7 +34,7 @@ impl HeapClosure {
         assert_eq!(
             (captured_len << Self::CAPTURED_LEN_SHIFT) >> Self::CAPTURED_LEN_SHIFT,
             captured_len,
-            "Closure captures too many things.",
+            "Function captures too many things.",
         );
 
         let argument_count_shift_for_max_size =
@@ -43,25 +43,25 @@ impl HeapClosure {
             (argument_count << argument_count_shift_for_max_size)
                 >> argument_count_shift_for_max_size,
             argument_count,
-            "Closure accepts too many arguments.",
+            "Function accepts too many arguments.",
         );
 
-        let closure = Self(heap.allocate(
-            HeapObject::KIND_CLOSURE
+        let function = Self(heap.allocate(
+            HeapObject::KIND_FUNCTION
                 | ((captured_len as u64) << Self::CAPTURED_LEN_SHIFT)
                 | ((argument_count as u64) << Self::ARGUMENT_COUNT_SHIFT),
             (1 + captured_len) * HeapObject::WORD_SIZE,
         ));
         unsafe {
-            *closure.body_pointer().as_mut() = *body as u64;
+            *function.body_pointer().as_mut() = *body as u64;
             ptr::copy_nonoverlapping(
                 captured.as_ptr(),
-                closure.captured_pointer().as_ptr(),
+                function.captured_pointer().as_ptr(),
                 captured_len,
             );
         }
 
-        closure
+        function
     }
 
     pub fn captured_len(self) -> usize {
@@ -86,7 +86,7 @@ impl HeapClosure {
     }
 }
 
-impl DebugDisplay for HeapClosure {
+impl DebugDisplay for HeapFunction {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         let argument_count = self.argument_count();
         let captured = self.captured();
@@ -115,10 +115,10 @@ impl DebugDisplay for HeapClosure {
         }
     }
 }
-impl_debug_display_via_debugdisplay!(HeapClosure);
+impl_debug_display_via_debugdisplay!(HeapFunction);
 
-impl Eq for HeapClosure {}
-impl PartialEq for HeapClosure {
+impl Eq for HeapFunction {}
+impl PartialEq for HeapFunction {
     fn eq(&self, other: &Self) -> bool {
         // TODO: Compare the underlying HIR ID once we have it here (plus captured stuff)
         self.captured() == other.captured()
@@ -126,7 +126,7 @@ impl PartialEq for HeapClosure {
             && self.body() == other.body()
     }
 }
-impl Hash for HeapClosure {
+impl Hash for HeapFunction {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.captured().hash(state);
         self.argument_count().hash(state);
@@ -134,9 +134,9 @@ impl Hash for HeapClosure {
     }
 }
 
-heap_object_impls!(HeapClosure);
+heap_object_impls!(HeapFunction);
 
-impl HeapObjectTrait for HeapClosure {
+impl HeapObjectTrait for HeapFunction {
     fn content_size(self) -> usize {
         (1 + self.captured_len()) * HeapObject::WORD_SIZE
     }

@@ -10,7 +10,7 @@ use crate::heap::{Struct, Tag};
 use channel::Packet;
 use context::RunForever;
 use fiber::ExecutionResult;
-use heap::{Closure, Heap, HeapObject};
+use heap::{Function, Heap, HeapObject};
 use lir::Lir;
 use rustc_hash::FxHashMap;
 use std::borrow::Borrow;
@@ -41,7 +41,7 @@ impl<L: Borrow<Lir>> Vm<L> {
 }
 
 impl Packet {
-    pub fn into_main_function(mut self) -> Result<(Heap, Closure), &'static str> {
+    pub fn into_main_function(mut self) -> Result<(Heap, Function), &'static str> {
         let exported_definitions: Struct = self.object.try_into().unwrap();
         debug!("The module exports these definitions: {exported_definitions}");
 
@@ -60,13 +60,13 @@ impl Packet {
 impl ExecutionResult {
     pub fn into_main_function(
         self,
-    ) -> Result<(Heap, Closure, FxHashMap<HeapObject, HeapObject>), String> {
+    ) -> Result<(Heap, Function, FxHashMap<HeapObject, HeapObject>), String> {
         match self {
             ExecutionResult::Finished {
                 packet,
                 constant_mapping,
             } => match packet.into_main_function() {
-                Ok((heap, closure)) => Ok((heap, closure, constant_mapping)),
+                Ok((heap, function)) => Ok((heap, function, constant_mapping)),
                 Err(err) => Err(err.to_string()),
             },
             ExecutionResult::Panicked {

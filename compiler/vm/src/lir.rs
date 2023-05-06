@@ -1,4 +1,4 @@
-use crate::heap::{Closure, HirId, InlineObject};
+use crate::heap::{Function, HirId, InlineObject};
 use crate::utils::DebugDisplay;
 use crate::{fiber::InstructionPointer, heap::Heap};
 use candy_frontend::{
@@ -17,7 +17,7 @@ pub struct Lir {
     pub module: Module,
     pub constant_heap: Heap,
     pub instructions: Vec<Instruction>,
-    pub module_closure: Closure,
+    pub module_function: Function,
     pub responsible_module: HirId,
 }
 
@@ -40,10 +40,10 @@ pub enum Instruction {
         num_fields: usize,
     },
 
-    /// Pushes a closure.
+    /// Pushes a function.
     ///
-    /// a -> a, pointer to closure
-    CreateClosure {
+    /// a -> a, pointer to function
+    CreateFunction {
         captured: Vec<StackOffset>,
         num_args: usize, // excluding responsible parameter
         body: InstructionPointer,
@@ -59,15 +59,15 @@ pub enum Instruction {
     /// Leaves the top stack item untouched, but removes n below.
     PopMultipleBelowTop(usize),
 
-    /// Sets up the data stack for a closure execution and then changes the
+    /// Sets up the data stack for a function execution and then changes the
     /// instruction pointer to the first instruction.
     ///
-    /// a, closure, arg1, arg2, ..., argN, responsible -> a, caller, captured vars, arg1, arg2, ..., argN, responsible
+    /// a, function, arg1, arg2, ..., argN, responsible -> a, caller, captured vars, arg1, arg2, ..., argN, responsible
     ///
-    /// Later, when the closure returns (perhaps many instructions after this
+    /// Later, when the function returns (perhaps many instructions after this
     /// one), the stack will contain the result:
     ///
-    /// a, closure, arg1, arg2, ..., argN, responsible ~> a, return value from closure
+    /// a, function, arg1, arg2, ..., argN, responsible ~> a, return value from function
     Call {
         num_args: usize, // excluding the responsible argument
     },
@@ -80,9 +80,10 @@ pub enum Instruction {
         num_args: usize, // excluding the responsible argument
     },
 
-    /// Returns from the current closure to the original caller. Leaves the data
-    /// stack untouched, but pops a caller from the call stack and returns the
-    /// instruction pointer to continue where the current function was called.
+    /// Returns from the current function to the original caller. Leaves the
+    /// data stack untouched, but pops a caller from the call stack and returns
+    /// the instruction pointer to continue where the current function was
+    /// called.
     Return,
 
     /// Panics. Because the panic instruction only occurs inside the generated
@@ -102,8 +103,8 @@ pub enum Instruction {
     /// a, HIR ID, value -> a
     TraceExpressionEvaluated,
 
-    /// a, HIR ID, closure -> a
-    TraceFoundFuzzableClosure,
+    /// a, HIR ID, function -> a
+    TraceFoundFuzzableFunction,
 }
 
 impl Instruction {
@@ -120,7 +121,7 @@ impl Instruction {
                 stack.pop_multiple(2 * num_fields); // fields
                 stack.push(result);
             }
-            Instruction::CreateClosure { .. } => {
+            Instruction::CreateFunction { .. } => {
                 stack.push(result);
             }
             Instruction::PushConstant(_) => {
@@ -137,7 +138,7 @@ impl Instruction {
             Instruction::Call { num_args } => {
                 stack.pop(); // responsible
                 stack.pop_multiple(*num_args);
-                stack.pop(); // closure/builtin
+                stack.pop(); // function/builtin
                 stack.push(result); // return value
             }
             Instruction::TailCall {
@@ -146,7 +147,7 @@ impl Instruction {
             } => {
                 stack.pop(); // responsible
                 stack.pop_multiple(*num_args);
-                stack.pop(); // closure/builtin
+                stack.pop(); // function/builtin
                 stack.pop_multiple(*num_locals_to_pop);
                 stack.push(result); // return value
             }
@@ -172,7 +173,7 @@ impl Instruction {
                 stack.pop(); // HIR ID
                 stack.pop(); // value
             }
-            Instruction::TraceFoundFuzzableClosure => {
+            Instruction::TraceFoundFuzzableFunction => {
                 stack.pop(); // HIR ID
                 stack.pop(); // value
             }
@@ -221,7 +222,7 @@ impl ToRichIr for Instruction {
                 builder.push(" ", None, EnumSet::empty());
                 builder.push(num_fields.to_string(), None, EnumSet::empty());
             }
-            Instruction::CreateClosure {
+            Instruction::CreateFunction {
                 captured,
                 num_args,
                 body,
@@ -283,7 +284,7 @@ impl ToRichIr for Instruction {
             }
             Instruction::TraceCallEnds => {}
             Instruction::TraceExpressionEvaluated => {}
-            Instruction::TraceFoundFuzzableClosure => {}
+            Instruction::TraceFoundFuzzableFunction => {}
         }
     }
 }

@@ -3,7 +3,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
     ast::{
-        self, AssignmentBody, Ast, AstError, AstKind, AstString, Identifier, Int, Lambda, List,
+        self, AssignmentBody, Ast, AstError, AstKind, AstString, Function, Identifier, Int, List,
         Match, MatchCase, OrPattern, Struct, Symbol, Text, TextPart,
     },
     cst::{self, Cst, CstDb, CstKind, UnwrapWhitespaceAndComment},
@@ -683,7 +683,7 @@ impl LoweringContext {
                     }),
                 )
             }
-            CstKind::Lambda {
+            CstKind::Function {
                 opening_curly_brace,
                 parameters_and_arrow,
                 body,
@@ -695,7 +695,7 @@ impl LoweringContext {
 
                 assert!(
                     matches!(opening_curly_brace.kind, CstKind::OpeningCurlyBrace),
-                    "Expected an opening curly brace at the beginning of a lambda, but found {}.",
+                    "Expected an opening curly brace at the beginning of a function, but found {}.",
                     opening_curly_brace,
                 );
 
@@ -704,7 +704,7 @@ impl LoweringContext {
                     if let Some((parameters, arrow)) = parameters_and_arrow {
                         assert!(
                             matches!(arrow.kind, CstKind::Arrow),
-                            "Expected an arrow after the parameters in a lambda, but found `{}`.",
+                            "Expected an arrow after the parameters in a function, but found `{}`.",
                             arrow
                         );
                         self.lower_parameters(parameters)
@@ -718,13 +718,13 @@ impl LoweringContext {
                 if !matches!(closing_curly_brace.kind, CstKind::ClosingCurlyBrace) {
                     errors.push(self.create_error(
                         closing_curly_brace,
-                        AstError::LambdaMissesClosingCurlyBrace,
+                        AstError::FunctionMissesClosingCurlyBrace,
                     ));
                 }
 
                 let ast = self.create_ast(
                     cst.data.id,
-                    AstKind::Lambda(Lambda {
+                    AstKind::Function(Function {
                         parameters,
                         body,
                         fuzzable: false,
@@ -785,9 +785,9 @@ impl LoweringContext {
                     };
 
                     let (parameters, errors) = self.lower_parameters(parameters);
-                    let body = AssignmentBody::Lambda {
+                    let body = AssignmentBody::Function {
                         name,
-                        lambda: Lambda {
+                        function: Function {
                             parameters,
                             body,
                             fuzzable: true,

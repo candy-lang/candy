@@ -413,9 +413,9 @@ impl LanguageFeatures for IrFeatures {
             db.packages_path.to_owned()
         };
 
-        let packages_path_for_closure = packages_path.clone();
+        let packages_path_for_function = packages_path.clone();
         let find_in_other_ir = async move |config: IrConfig, key: &ReferenceKey| {
-            let uri = Url::from_config(&config, &packages_path_for_closure);
+            let uri = Url::from_config(&config, &packages_path_for_function);
             self.ensure_is_open(db, config).await;
 
             let rich_irs = self.open_irs.read().await;

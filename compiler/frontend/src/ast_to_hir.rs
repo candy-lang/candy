@@ -7,7 +7,7 @@ use crate::{
     cst::{self, CstDb},
     cst_to_ast::CstToAst,
     error::CompilerError,
-    hir::{self, Body, Expression, HirError, Lambda, Pattern, PatternIdentifierId},
+    hir::{self, Body, Expression, Function, HirError, Pattern, PatternIdentifierId},
     id::IdGenerator,
     module::Module,
     position::Offset,
@@ -228,13 +228,14 @@ impl Context<'_> {
             AstKind::StructAccess(struct_access) => {
                 self.lower_struct_access(Some(ast.id.clone()), struct_access)
             }
-            AstKind::Lambda(lambda) => self.compile_lambda(ast.id.clone(), lambda, None),
+            AstKind::Function(function) => self.compile_function(ast.id.clone(), function, None),
             AstKind::Call(call) => self.lower_call(Some(ast.id.clone()), call),
             AstKind::Assignment(Assignment { is_public, body }) => {
                 let (names, body) = match body {
-                    ast::AssignmentBody::Lambda { name, lambda } => {
+                    ast::AssignmentBody::Function { name, function } => {
                         let name_string = name.value.to_owned();
-                        let body = self.compile_lambda(ast.id.clone(), lambda, Some(name_string));
+                        let body =
+                            self.compile_function(ast.id.clone(), function, Some(name_string));
                         let name_id = self.push(
                             Some(name.id.clone()),
                             Expression::Reference(body.clone()),
@@ -415,13 +416,13 @@ impl Context<'_> {
                 );
 
                 let reset_state = self.start_scope();
-                let then_lambda_id = self.create_next_id(None, None);
-                self.prefix_keys = then_lambda_id.keys.clone();
+                let then_function_id = self.create_next_id(None, None);
+                self.prefix_keys = then_function_id.keys.clone();
                 self.push(None, Expression::Reference(hir.clone()), None);
                 let then_body = self.end_scope(reset_state);
-                let then_lambda = self.push_with_existing_id(
-                    then_lambda_id,
-                    Expression::Lambda(Lambda {
+                let then_function = self.push_with_existing_id(
+                    then_function_id,
+                    Expression::Function(Function {
                         parameters: vec![],
                         body: then_body,
                         fuzzable: false,
@@ -430,8 +431,8 @@ impl Context<'_> {
                 );
 
                 let reset_state = self.start_scope();
-                let else_lambda_id = self.create_next_id(None, None);
-                self.prefix_keys = else_lambda_id.keys.clone();
+                let else_function_id = self.create_next_id(None, None);
+                self.prefix_keys = else_function_id.keys.clone();
                 self.push(
                     None,
                     Expression::Call {
@@ -441,9 +442,9 @@ impl Context<'_> {
                     None,
                 );
                 let else_body = self.end_scope(reset_state);
-                let else_lambda = self.push_with_existing_id(
-                    else_lambda_id,
-                    Expression::Lambda(Lambda {
+                let else_function = self.push_with_existing_id(
+                    else_function_id,
+                    Expression::Function(Function {
                         parameters: vec![],
                         body: else_body,
                         fuzzable: false,
@@ -455,7 +456,7 @@ impl Context<'_> {
                     None,
                     Expression::Call {
                         function: if_else_function.clone(),
-                        arguments: vec![is_text, then_lambda, else_lambda],
+                        arguments: vec![is_text, then_function, else_function],
                     },
                     None,
                 )
@@ -477,42 +478,42 @@ impl Context<'_> {
             .unwrap_or_else(|| self.push(id, Expression::Text("".to_string()), None))
     }
 
-    fn compile_lambda(
+    fn compile_function(
         &mut self,
         id: ast::Id,
-        lambda: &ast::Lambda,
+        function: &ast::Function,
         identifier: Option<String>,
     ) -> hir::Id {
         let reset_state = self.start_scope();
-        let lambda_id = self.create_next_id(Some(id), identifier);
-        self.prefix_keys = lambda_id.keys.clone();
+        let function_id = self.create_next_id(Some(id), identifier);
+        self.prefix_keys = function_id.keys.clone();
 
-        for parameter in lambda.parameters.iter() {
+        for parameter in function.parameters.iter() {
             let name = parameter.value.to_string();
             let id = self.create_next_id(Some(parameter.id.clone()), Some(name.clone()));
             self.body.identifiers.insert(id.clone(), name.clone());
             self.identifiers.insert(name, id);
         }
 
-        self.compile(&lambda.body);
+        self.compile(&function.body);
 
         let inner_body = self.end_scope(reset_state);
 
         self.push_with_existing_id(
-            lambda_id.clone(),
-            Expression::Lambda(Lambda {
-                parameters: lambda
+            function_id.clone(),
+            Expression::Function(Function {
+                parameters: function
                     .parameters
                     .iter()
                     .map(|parameter| {
                         hir::Id::new(
                             self.module.clone(),
-                            add_keys(&lambda_id.keys[..], parameter.value.to_string()),
+                            add_keys(&function_id.keys[..], parameter.value.to_string()),
                         )
                     })
                     .collect(),
                 body: inner_body,
-                fuzzable: lambda.fuzzable,
+                fuzzable: function.fuzzable,
             }),
             None,
         )
@@ -684,7 +685,7 @@ impl Context<'_> {
     }
 
     fn generate_use(&mut self) {
-        // HirId(~:test.candy:use) = lambda { HirId(~:test.candy:use:relativePath) ->
+        // HirId(~:test.candy:use) = function { HirId(~:test.candy:use:relativePath) ->
         //   HirId(~:test.candy:use:importedFileContent) = useModule
         //     currently in ~:test.candy:use:importedFileContent
         //     relative path: HirId(~:test.candy:use:relativePath)
@@ -711,7 +712,7 @@ impl Context<'_> {
 
         self.push_with_existing_id(
             use_id,
-            Expression::Lambda(Lambda {
+            Expression::Function(Function {
                 parameters: vec![relative_path],
                 body: inner_body,
                 fuzzable: false,
@@ -820,13 +821,13 @@ impl PatternContext {
                 Pattern::Struct(fields)
             }
             AstKind::StructAccess(_)
-            | AstKind::Lambda(_)
+            | AstKind::Function(_)
             | AstKind::Call(_)
             | AstKind::Assignment(_)
             | AstKind::Match(_)
             | AstKind::MatchCase(_) => {
                 panic!(
-                    "AST pattern can't contain struct access, lambda, call, assignment, match, or match case, but found {ast:?}."
+                    "AST pattern can't contain struct access, function, call, assignment, match, or match case, but found {ast:?}."
                 )
             }
             AstKind::OrPattern(OrPattern(patterns)) => {

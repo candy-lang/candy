@@ -1,6 +1,6 @@
 use crate::{
     channel::ChannelId,
-    heap::{Closure, HirId, InlineObject},
+    heap::{Function, HirId, InlineObject},
 };
 
 pub use self::dummy::DummyTracer;
@@ -49,9 +49,9 @@ pub enum FiberEvent<'event> {
         value: InlineObject,
         heap: &'event Heap,
     },
-    FoundFuzzableClosure {
+    FoundFuzzableFunction {
         definition: HirId,
-        closure: Closure,
+        function: Function,
         heap: &'event Heap,
     },
     CallStarted {
@@ -125,10 +125,10 @@ impl<'fiber> FiberTracer<'fiber> {
             heap,
         });
     }
-    pub fn found_fuzzable_closure(&mut self, definition: HirId, closure: Closure, heap: &Heap) {
-        self.add(FiberEvent::FoundFuzzableClosure {
+    pub fn found_fuzzable_function(&mut self, definition: HirId, function: Function, heap: &Heap) {
+        self.add(FiberEvent::FoundFuzzableFunction {
             definition,
-            closure,
+            function,
             heap,
         });
     }

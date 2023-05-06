@@ -2,7 +2,7 @@ use candy_frontend::hir::Id;
 use candy_vm::{
     self,
     context::{CombiningExecutionController, CountingExecutionController, ExecutionController},
-    heap::{Closure, HirId, InlineObjectSliceCloneToHeap},
+    heap::{Function, HirId, InlineObjectSliceCloneToHeap},
     lir::Lir,
     tracer::full::FullTracer,
     vm::{self, Vm},
@@ -23,14 +23,14 @@ pub struct Runner<L: Borrow<Lir>> {
 }
 
 pub enum RunResult {
-    /// Executing the closure with the input took more than `MAX_INSTRUCTIONS`.
+    /// Executing the function with the input took more than `MAX_INSTRUCTIONS`.
     Timeout,
 
     /// The execution finished successfully with a value.
     Done,
 
-    /// The execution panicked and the caller of the closure (aka the fuzzer) is
-    /// at fault.
+    /// The execution panicked and the caller of the function (aka the fuzzer)
+    /// is at fault.
     NeedsUnfulfilled { reason: String },
 
     /// The execution panicked with an internal panic. This indicates an error
@@ -51,11 +51,11 @@ impl RunResult {
 }
 
 impl<L: Borrow<Lir>> Runner<L> {
-    pub fn new(lir: L, closure: Closure, input: Input) -> Self {
+    pub fn new(lir: L, function: Function, input: Input) -> Self {
         let (mut heap, constant_mapping) = lir.borrow().constant_heap.clone();
 
         let mut mapping = FxHashMap::default();
-        let closure = closure
+        let function = function
             .clone_to_heap_with_mapping(&mut heap, &mut mapping)
             .try_into()
             .unwrap();
@@ -64,11 +64,11 @@ impl<L: Borrow<Lir>> Runner<L> {
             .clone_to_heap_with_mapping(&mut heap, &mut mapping);
         let responsible = HirId::create(&mut heap, Id::fuzzer());
 
-        let vm = Vm::for_closure(
+        let vm = Vm::for_function(
             lir,
             heap,
             constant_mapping,
-            closure,
+            function,
             &arguments,
             responsible,
         );
@@ -109,7 +109,7 @@ impl<L: Borrow<Lir>> Runner<L> {
                     None
                 }
             }
-            // Because the fuzzer never sends channels as inputs, the closure
+            // Because the fuzzer never sends channels as inputs, the function
             // waits on some internal concurrency operations that will never be
             // completed. This most likely indicates an error in the code, but
             // it's of course valid to have a function that never returns. Thus,

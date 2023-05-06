@@ -8,8 +8,8 @@ use tracing::error;
 
 impl Expression {
     /// All IDs defined inside this expression. For all expressions except
-    /// lambdas, this returns an empty vector. The IDs are returned in the order
-    /// that they are defined in.
+    /// functions, this returns an empty vector. The IDs are returned in the
+    /// order that they are defined in.
     pub fn defined_ids(&self) -> Vec<Id> {
         let mut defined = vec![];
         self.collect_defined_ids(&mut defined);
@@ -17,7 +17,7 @@ impl Expression {
     }
     fn collect_defined_ids(&self, defined: &mut Vec<Id>) {
         match self {
-            Expression::Lambda {
+            Expression::Function {
                 parameters,
                 responsible_parameter,
                 body,
@@ -47,7 +47,7 @@ impl Body {
 }
 
 impl Expression {
-    /// All IDs referenced inside this expression. If this is a lambda, this
+    /// All IDs referenced inside this expression. If this is a function, this
     /// also includes references to locally defined IDs. IDs are returned in the
     /// order that they are referenced, which means that the vector may contain
     /// the same ID multiple times.
@@ -75,7 +75,7 @@ impl Expression {
             Expression::Reference(reference) => {
                 referenced.insert(*reference);
             }
-            Expression::Lambda { body, .. } => body.collect_referenced_ids(referenced),
+            Expression::Function { body, .. } => body.collect_referenced_ids(referenced),
             Expression::Parameter => {}
             Expression::Call {
                 function,
@@ -123,12 +123,12 @@ impl Expression {
                 referenced.insert(*hir_expression);
                 referenced.insert(*value);
             }
-            Expression::TraceFoundFuzzableClosure {
+            Expression::TraceFoundFuzzableFunction {
                 hir_definition,
-                closure,
+                function,
             } => {
                 referenced.insert(*hir_definition);
-                referenced.insert(*closure);
+                referenced.insert(*function);
             }
         }
     }
@@ -168,7 +168,7 @@ impl Expression {
             Expression::Symbol(_) => true,
             Expression::List(_) => true,
             Expression::Struct(_) => true,
-            Expression::Lambda { .. } => true,
+            Expression::Function { .. } => true,
             Expression::Parameter => false,
             Expression::Builtin(_) => true,
             Expression::HirId(_) => true,
@@ -179,7 +179,7 @@ impl Expression {
             Expression::TraceCallStarts { .. }
             | Expression::TraceCallEnds { .. }
             | Expression::TraceExpressionEvaluated { .. }
-            | Expression::TraceFoundFuzzableClosure { .. } => false,
+            | Expression::TraceFoundFuzzableFunction { .. } => false,
         }
     }
 
@@ -250,7 +250,7 @@ impl Expression {
                 }
             }
             Expression::Reference(reference) => replacer(reference),
-            Expression::Lambda {
+            Expression::Function {
                 original_hirs: _,
                 parameters,
                 responsible_parameter,
@@ -313,12 +313,12 @@ impl Expression {
                 replacer(hir_expression);
                 replacer(value);
             }
-            Expression::TraceFoundFuzzableClosure {
+            Expression::TraceFoundFuzzableFunction {
                 hir_definition,
-                closure,
+                function,
             } => {
                 replacer(hir_definition);
-                replacer(closure);
+                replacer(function);
             }
         }
     }
@@ -336,7 +336,7 @@ impl Expression {
     /// definitions.
     pub fn replace_ids<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
         match self {
-            Expression::Lambda {
+            Expression::Function {
                 original_hirs: _,
                 parameters,
                 responsible_parameter,
@@ -377,7 +377,7 @@ impl Mir {
         mut visible: im::HashSet<Id>,
     ) {
         if body.iter().next().is_none() {
-            error!("A body of a lambda is empty! Lambdas should have at least a return value.");
+            error!("A body of a function is empty! Functions should have at least a return value.");
             error!("This is the MIR:\n{}", self.to_rich_ir());
             panic!("MIR is invalid!");
         }
@@ -393,7 +393,7 @@ impl Mir {
                     panic!("MIR is invalid!");
                 }
             }
-            if let Expression::Lambda {
+            if let Expression::Function {
                 original_hirs: _,
                 parameters,
                 responsible_parameter,

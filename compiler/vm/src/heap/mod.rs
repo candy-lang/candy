@@ -1,5 +1,5 @@
 pub use self::{
-    object::{Builtin, Closure, Data, HirId, Int, List, ReceivePort, SendPort, Struct, Tag, Text},
+    object::{Builtin, Data, Function, HirId, Int, List, ReceivePort, SendPort, Struct, Tag, Text},
     object_heap::{HeapData, HeapObject, HeapObjectTrait},
     object_inline::{
         int::I64BitLength, InlineData, InlineObject, InlineObjectSliceCloneToHeap,

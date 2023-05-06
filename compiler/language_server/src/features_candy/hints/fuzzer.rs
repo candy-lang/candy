@@ -1,11 +1,11 @@
 use candy_frontend::{
     ast_to_hir::AstToHir,
-    hir::{Expression, HirDb, Id, Lambda},
+    hir::{self, Expression, HirDb, Id},
     module::{Module, ModuleDb},
     position::PositionConversionDb,
 };
 use candy_fuzzer::{Fuzzer, Status};
-use candy_vm::{context::RunLimitedNumberOfInstructions, heap::Closure, lir::Lir};
+use candy_vm::{context::RunLimitedNumberOfInstructions, heap::Function, lir::Lir};
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
 use std::sync::Arc;
@@ -29,11 +29,11 @@ impl FuzzerManager {
         &mut self,
         module: Module,
         lir: Arc<Lir>,
-        fuzzable_closures: &[(Id, Closure)],
+        fuzzable_functions: &[(Id, Function)],
     ) {
-        let fuzzers = fuzzable_closures
+        let fuzzers = fuzzable_functions
             .iter()
-            .map(|(id, closure)| (id.clone(), Fuzzer::new(lir.clone(), *closure, id.clone())))
+            .map(|(id, function)| (id.clone(), Fuzzer::new(lir.clone(), *function, id.clone())))
             .collect();
         self.fuzzers.insert(module, fuzzers);
     }
@@ -55,7 +55,7 @@ impl FuzzerManager {
 
         match &fuzzer.status() {
             Status::StillFuzzing { .. } => None,
-            Status::FoundPanic { .. } => Some(fuzzer.closure_id.module.clone()),
+            Status::FoundPanic { .. } => Some(fuzzer.function_id.module.clone()),
         }
     }
 
@@ -82,16 +82,16 @@ impl FuzzerManager {
                 ..
             } = fuzzer.status() else { continue; };
 
-            let id = fuzzer.closure_id.clone();
+            let id = fuzzer.function_id.clone();
             let first_hint = {
                 let parameter_names = match db.find_expression(id.clone()) {
-                    Some(Expression::Lambda(Lambda { parameters, .. })) => parameters
+                    Some(Expression::Function(hir::Function { parameters, .. })) => parameters
                         .into_iter()
                         .map(|parameter| parameter.keys.last().unwrap().to_string())
                         .collect_vec(),
-                    Some(_) => panic!("Looks like we fuzzed a non-closure. That's weird."),
+                    Some(_) => panic!("Looks like we fuzzed a non-function. That's weird."),
                     None => {
-                        error!("Using fuzzing, we found an error in a generated closure.");
+                        error!("Using fuzzing, we found an error in a generated function.");
                         continue;
                     }
                 };

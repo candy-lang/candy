@@ -2,7 +2,7 @@ use super::{FiberEvent, Tracer, VmEvent};
 use crate::{
     channel::ChannelId,
     fiber::FiberId,
-    heap::{Closure, Data, Heap, HirId, InlineObject},
+    heap::{Data, Function, Heap, HirId, InlineObject},
 };
 use itertools::Itertools;
 use std::{
@@ -58,9 +58,9 @@ pub enum StoredFiberEvent {
         expression: HirId,
         value: InlineObject,
     },
-    FoundFuzzableClosure {
+    FoundFuzzableFunction {
         definition: HirId,
-        closure: Closure,
+        function: Function,
     },
     CallStarted {
         call_site: HirId,
@@ -118,16 +118,16 @@ impl FullTracer {
                     value,
                 }
             }
-            FiberEvent::FoundFuzzableClosure {
+            FiberEvent::FoundFuzzableFunction {
                 definition,
-                closure,
+                function,
                 ..
             } => {
                 let definition = definition.clone_to_heap(&mut self.heap);
-                let closure = closure.clone_to_heap(&mut self.heap);
-                StoredFiberEvent::FoundFuzzableClosure {
+                let function = function.clone_to_heap(&mut self.heap);
+                StoredFiberEvent::FoundFuzzableFunction {
                     definition: Data::from(definition).try_into().unwrap(),
-                    closure: Data::from(closure).try_into().unwrap(),
+                    function: Data::from(function).try_into().unwrap(),
                 }
             }
             FiberEvent::CallStarted {
@@ -192,8 +192,8 @@ impl Debug for FullTracer {
                         match event {
                             StoredFiberEvent::ValueEvaluated { expression, value } =>
                                 format!("value {expression} is {value:?}"),
-                            StoredFiberEvent::FoundFuzzableClosure { definition, .. } =>
-                                format!("found fuzzable closure {definition}"),
+                            StoredFiberEvent::FoundFuzzableFunction { definition, .. } =>
+                                format!("found fuzzable function {definition}"),
                             StoredFiberEvent::CallStarted {
                                 call_site,
                                 callee,

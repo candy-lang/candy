@@ -57,7 +57,7 @@ pub enum AstKind {
     List(List),
     Struct(Struct),
     StructAccess(StructAccess),
-    Lambda(Lambda),
+    Function(Function),
     Call(Call),
     Assignment(Assignment),
     Match(Match),
@@ -100,7 +100,7 @@ pub struct StructAccess {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct Lambda {
+pub struct Function {
     pub parameters: Vec<AstString>,
     pub body: Vec<Ast>,
     pub fuzzable: bool,
@@ -119,7 +119,7 @@ pub struct Assignment {
 }
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum AssignmentBody {
-    Lambda { name: AstString, lambda: Lambda },
+    Function { name: AstString, function: Function },
     Body { pattern: Box<Ast>, body: Vec<Ast> },
 }
 
@@ -148,7 +148,7 @@ pub enum AstError {
     CallInPattern,
     ExpectedNameOrPatternInAssignment,
     ExpectedParameter,
-    LambdaMissesClosingCurlyBrace,
+    FunctionMissesClosingCurlyBrace,
     ListItemMissesComma,
     ListMissesClosingParenthesis,
     ListWithNonListItem,
@@ -190,7 +190,7 @@ impl FindAst for Ast {
             AstKind::List(list) => list.find(id),
             AstKind::Struct(struct_) => struct_.find(id),
             AstKind::StructAccess(access) => access.find(id),
-            AstKind::Lambda(lambda) => lambda.find(id),
+            AstKind::Function(function) => function.find(id),
             AstKind::Call(call) => call.find(id),
             AstKind::Assignment(assignment) => assignment.find(id),
             AstKind::Match(match_) => match_.find(id),
@@ -219,7 +219,7 @@ impl FindAst for StructAccess {
         self.struct_.find(id)
     }
 }
-impl FindAst for Lambda {
+impl FindAst for Function {
     fn find(&self, id: &Id) -> Option<&Ast> {
         self.body.find(id)
     }
@@ -237,7 +237,7 @@ impl FindAst for Assignment {
 impl FindAst for AssignmentBody {
     fn find(&self, id: &Id) -> Option<&Ast> {
         match self {
-            AssignmentBody::Lambda { name: _, lambda } => lambda.find(id),
+            AssignmentBody::Function { name: _, function } => function.find(id),
             AssignmentBody::Body { pattern, body } => pattern.find(id).or_else(|| body.find(id)),
         }
     }
@@ -293,7 +293,7 @@ impl AstKind {
                 }
             }
             AstKind::StructAccess(_)
-            | AstKind::Lambda(_)
+            | AstKind::Function(_)
             | AstKind::Call(_)
             | AstKind::Assignment(_)
             | AstKind::Match(_)
@@ -339,10 +339,12 @@ impl CollectErrors for Ast {
             AstKind::StructAccess(StructAccess { struct_, key: _ }) => {
                 struct_.collect_errors(errors);
             }
-            AstKind::Lambda(lambda) => lambda.body.collect_errors(errors),
+            AstKind::Function(function) => function.body.collect_errors(errors),
             AstKind::Call(call) => call.arguments.collect_errors(errors),
             AstKind::Assignment(assignment) => match assignment.body {
-                AssignmentBody::Lambda { name: _, lambda } => lambda.body.collect_errors(errors),
+                AssignmentBody::Function { name: _, function } => {
+                    function.body.collect_errors(errors)
+                }
                 AssignmentBody::Body { pattern, body } => {
                     pattern.collect_errors(errors);
                     for ast in body {
@@ -394,7 +396,7 @@ impl ToRichIr for Ast {
             AstKind::List(list) => list.build_rich_ir(builder),
             AstKind::Struct(struct_) => struct_.build_rich_ir(builder),
             AstKind::StructAccess(struct_access) => struct_access.build_rich_ir(builder),
-            AstKind::Lambda(lambda) => lambda.build_rich_ir(builder),
+            AstKind::Function(function) => function.build_rich_ir(builder),
             AstKind::Call(call) => call.build_rich_ir(builder),
             AstKind::Assignment(assignment) => assignment.build_rich_ir(builder),
             AstKind::Match(match_) => match_.build_rich_ir(builder),
@@ -472,11 +474,11 @@ impl ToRichIr for StructAccess {
         self.key.build_rich_ir(builder); // TODO: `lowercase_first_letter()`?
     }
 }
-impl ToRichIr for Lambda {
+impl ToRichIr for Function {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         builder.push(
             format!(
-                "lambda ({}) {{",
+                "function ({}) {{",
                 if self.fuzzable {
                     "fuzzable"
                 } else {
@@ -512,7 +514,7 @@ impl ToRichIr for Assignment {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         builder.push("assignment: ", None, EnumSet::empty());
         match &self.body {
-            AssignmentBody::Lambda { name, .. } => name.build_rich_ir(builder),
+            AssignmentBody::Function { name, .. } => name.build_rich_ir(builder),
             AssignmentBody::Body { pattern, .. } => pattern.build_rich_ir(builder),
         }
         builder.push(
@@ -521,7 +523,7 @@ impl ToRichIr for Assignment {
             EnumSet::empty(),
         );
         match &self.body {
-            AssignmentBody::Lambda { lambda, .. } => lambda.build_rich_ir(builder),
+            AssignmentBody::Function { function, .. } => function.build_rich_ir(builder),
             AssignmentBody::Body { body, .. } => {
                 builder.push_foldable(|builder| builder.push_children_multiline(body))
             }

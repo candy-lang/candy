@@ -92,8 +92,8 @@ impl Display for CompilerErrorPayload {
                     "An assignment should have a name or pattern on the left side.".to_string()
                 }
                 AstError::ExpectedParameter => "A parameter should come here.".to_string(),
-                AstError::LambdaMissesClosingCurlyBrace => {
-                    "This lambda doesn't have a closing curly brace.".to_string()
+                AstError::FunctionMissesClosingCurlyBrace => {
+                    "This function doesn't have a closing curly brace.".to_string()
                 }
                 AstError::ListItemMissesComma => {
                     "This list item should be followed by a comma.".to_string()

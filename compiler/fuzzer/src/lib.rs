@@ -47,15 +47,15 @@ where
     };
 
     info!(
-        "Now, the fuzzing begins. So far, we have {} closures to fuzz.",
+        "Now, the fuzzing begins. So far, we have {} functions to fuzz.",
         fuzzables.len(),
     );
 
     let mut failing_cases = vec![];
 
-    for (id, closure) in fuzzables {
+    for (id, function) in fuzzables {
         info!("Fuzzing {id}.");
-        let mut fuzzer = Fuzzer::new(lir.clone(), closure, id.clone());
+        let mut fuzzer = Fuzzer::new(lir.clone(), function, id.clone());
         fuzzer.run(&mut RunLimitedNumberOfInstructions::new(100000));
 
         match fuzzer.into_status() {
@@ -68,7 +68,7 @@ where
             } => {
                 error!("The fuzzer discovered an input that crashes {id}:");
                 let case = FailingFuzzCase {
-                    closure: id,
+                    function: id,
                     input,
                     reason,
                     responsible,
@@ -84,7 +84,7 @@ where
 }
 
 pub struct FailingFuzzCase {
-    closure: Id,
+    function: Id,
     input: Input,
     reason: String,
     responsible: Id,
@@ -98,7 +98,7 @@ impl FailingFuzzCase {
     {
         error!(
             "Calling `{} {}` panics: {}",
-            self.closure, self.input, self.reason,
+            self.function, self.input, self.reason,
         );
         error!("{} is responsible.", self.responsible,);
         error!(

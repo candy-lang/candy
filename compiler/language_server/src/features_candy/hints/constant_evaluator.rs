@@ -10,7 +10,7 @@ use candy_frontend::{
 use candy_vm::{
     context::RunLimitedNumberOfInstructions,
     fiber::FiberId,
-    heap::Closure,
+    heap::Function,
     lir::Lir,
     tracer::{
         full::{FullTracer, StoredFiberEvent, StoredVmEvent, TimedEvent},
@@ -61,25 +61,25 @@ impl ConstantEvaluator {
         Some(module.clone())
     }
 
-    pub fn get_fuzzable_closures(&self, module: &Module) -> (Arc<Lir>, Vec<(Id, Closure)>) {
+    pub fn get_fuzzable_functions(&self, module: &Module) -> (Arc<Lir>, Vec<(Id, Function)>) {
         let evaluator = &self.evaluators[module];
-        let fuzzable_closures = evaluator
+        let fuzzable_functions = evaluator
             .tracer
             .events
             .iter()
             .filter_map(|event| match &event.event {
                 StoredVmEvent::InFiber {
                     event:
-                        StoredFiberEvent::FoundFuzzableClosure {
+                        StoredFiberEvent::FoundFuzzableFunction {
                             definition: id,
-                            closure,
+                            function,
                         },
                     ..
-                } => Some((id.get().to_owned(), *closure)),
+                } => Some((id.get().to_owned(), *function)),
                 _ => None,
             })
             .collect();
-        (evaluator.lir.clone(), fuzzable_closures)
+        (evaluator.lir.clone(), fuzzable_functions)
     }
 
     pub fn get_hints<DB>(&self, db: &DB, module: &Module) -> Vec<Hint>
@@ -116,7 +116,7 @@ impl ConstantEvaluator {
                     let Some(ast) = db.find_ast(ast_id) else { continue; };
                     let AstKind::Assignment(Assignment { body, .. }) = &ast.kind else { continue; };
                     let creates_hint = match body {
-                        AssignmentBody::Lambda { .. } => true,
+                        AssignmentBody::Function { .. } => true,
                         AssignmentBody::Body { pattern, .. } => {
                             matches!(pattern.kind, AstKind::Identifier(_))
                         }

@@ -32,7 +32,7 @@ pub(crate) fn fuzz(options: Options) -> ProgramResult {
     let failing_cases = candy_fuzzer::fuzz(&db, module);
 
     if failing_cases.is_empty() {
-        info!("All found fuzzable closures seem fine.");
+        info!("All found fuzzable functions seem fine.");
         Ok(())
     } else {
         error!("");

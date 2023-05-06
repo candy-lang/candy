@@ -3,7 +3,7 @@ use crate::{
     channel::{Capacity, Packet},
     fiber::{Fiber, Status},
     heap::{
-        Closure, Data, Heap, HirId, InlineObject, Int, List, ReceivePort, SendPort, Struct, Tag,
+        Data, Function, Heap, HirId, InlineObject, Int, List, ReceivePort, SendPort, Struct, Tag,
         Text,
     },
 };
@@ -76,9 +76,9 @@ impl Fiber {
         match result {
             Ok(Return(value)) => self.data_stack.push(value),
             Ok(DivergeControlFlow {
-                closure,
+                function,
                 responsible,
-            }) => self.call_closure(closure, &[], responsible),
+            }) => self.call_function(function, &[], responsible),
             Ok(CreateChannel { capacity }) => self.status = Status::CreatingChannel { capacity },
             Ok(Send { channel, packet }) => self.status = Status::Sending { channel, packet },
             Ok(Receive { channel }) => self.status = Status::Receiving { channel },
@@ -93,7 +93,7 @@ type BuiltinResult = Result<SuccessfulBehavior, String>;
 enum SuccessfulBehavior {
     Return(InlineObject),
     DivergeControlFlow {
-        closure: Closure,
+        function: Function,
         responsible: HirId,
     },
     CreateChannel {
@@ -107,10 +107,10 @@ enum SuccessfulBehavior {
         channel: ChannelId,
     },
     Parallel {
-        body: Closure,
+        body: Function,
     },
     Try {
-        body: Closure,
+        body: Function,
     },
 }
 use derive_more::Deref;
@@ -209,25 +209,25 @@ impl Heap {
     }
 
     fn function_run(&mut self, args: &[InlineObject], responsible: HirId) -> BuiltinResult {
-        unpack!(self, args, |closure: Closure| {
-            closure.should_take_no_arguments()?;
+        unpack!(self, args, |function: Function| {
+            function.should_take_no_arguments()?;
             DivergeControlFlow {
-                closure: *closure,
+                function: *function,
                 responsible,
             }
         })
     }
 
     fn get_argument_count(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |closure: Closure| {
-            Return(Int::create(self, closure.argument_count()).into())
+        unpack_and_later_drop!(self, args, |function: Function| {
+            Return(Int::create(self, function.argument_count()).into())
         })
     }
 
     fn if_else(&mut self, args: &[InlineObject], responsible: HirId) -> BuiltinResult {
         unpack!(self, args, |condition: bool,
-                             then: Closure,
-                             else_: Closure| {
+                             then: Function,
+                             else_: Function| {
             let (run, dont_run) = if *condition {
                 (then, else_)
             } else {
@@ -238,7 +238,7 @@ impl Heap {
             dont_run.object.drop(self);
 
             DivergeControlFlow {
-                closure: *run,
+                function: *run,
                 responsible,
             }
         })
@@ -383,9 +383,9 @@ impl Heap {
     }
 
     fn parallel(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack!(self, args, |body_taking_nursery: Closure| {
+        unpack!(self, args, |body_taking_nursery: Function| {
             if body_taking_nursery.argument_count() != 1 {
-                return Err("`parallel` expects a closure taking a nursery.".to_string());
+                return Err("`parallel` expects a function taking a nursery.".to_string());
             }
             Parallel {
                 body: *body_taking_nursery,
@@ -545,7 +545,7 @@ impl Heap {
     }
 
     fn try_(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack!(self, args, |body: Closure| { Try { body: *body } })
+        unpack!(self, args, |body: Function| { Try { body: *body } })
     }
 
     fn type_of(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -559,7 +559,7 @@ impl Heap {
                 Data::HirId(_) => panic!(
                     "HIR ID shouldn't occurr in Candy programs except in VM-controlled places."
                 ),
-                Data::Closure(_) => "Function",
+                Data::Function(_) => "Function",
                 Data::Builtin(_) => "Builtin",
                 Data::SendPort(_) => "SendPort",
                 Data::ReceivePort(_) => "ReceivePort",
@@ -569,7 +569,7 @@ impl Heap {
     }
 }
 
-impl Closure {
+impl Function {
     fn should_take_no_arguments(&self) -> Result<(), String> {
         match self.argument_count() {
             0 => Ok(()),
