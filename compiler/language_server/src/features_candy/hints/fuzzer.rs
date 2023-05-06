@@ -1,6 +1,6 @@
 use candy_frontend::{
     ast_to_hir::AstToHir,
-    hir::{Expression, Function, HirDb, Id},
+    hir::{self, Expression, HirDb, Id},
     module::{Module, ModuleDb},
     position::PositionConversionDb,
 };
@@ -85,7 +85,7 @@ impl FuzzerManager {
             let id = fuzzer.function_id.clone();
             let first_hint = {
                 let parameter_names = match db.find_expression(id.clone()) {
-                    Some(Expression::Function(Function { parameters, .. })) => parameters
+                    Some(Expression::Function(hir::Function { parameters, .. })) => parameters
                         .into_iter()
                         .map(|parameter| parameter.keys.last().unwrap().to_string())
                         .collect_vec(),
