@@ -9,6 +9,7 @@ use candy_vm::{
 };
 
 use super::input::Input;
+use rustc_hash::FxHashMap;
 use std::borrow::Borrow;
 
 const MAX_INSTRUCTIONS: usize = 10000;
@@ -52,9 +53,17 @@ impl RunResult {
 impl<L: Borrow<Lir>> Runner<L> {
     pub fn new(lir: L, closure: Closure, input: Input) -> Self {
         let (mut heap, constant_mapping) = lir.borrow().constant_heap.clone();
-        let closure = closure.clone_to_heap(&mut heap).try_into().unwrap();
-        let arguments = input.arguments.clone_to_heap(&mut heap);
+
+        let mut mapping = FxHashMap::default();
+        let closure = closure
+            .clone_to_heap_with_mapping(&mut heap, &mut mapping)
+            .try_into()
+            .unwrap();
+        let arguments = input
+            .arguments
+            .clone_to_heap_with_mapping(&mut heap, &mut mapping);
         let responsible = HirId::create(&mut heap, Id::fuzzer());
+
         let vm = Vm::for_closure(
             lir,
             heap,
