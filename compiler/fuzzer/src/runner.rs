@@ -2,13 +2,14 @@ use candy_frontend::hir::Id;
 use candy_vm::{
     self,
     context::{CombiningExecutionController, CountingExecutionController, ExecutionController},
-    heap::{Function, HirId},
+    heap::{Function, HirId, InlineObjectSliceCloneToHeap},
     lir::Lir,
     tracer::full::FullTracer,
     vm::{self, Vm},
 };
 
 use super::input::Input;
+use rustc_hash::FxHashMap;
 use std::borrow::Borrow;
 
 const MAX_INSTRUCTIONS: usize = 10000;
@@ -52,13 +53,23 @@ impl RunResult {
 impl<L: Borrow<Lir>> Runner<L> {
     pub fn new(lir: L, function: Function, input: Input) -> Self {
         let (mut heap, constant_mapping) = lir.borrow().constant_heap.clone();
+
+        let mut mapping = FxHashMap::default();
+        let function = function
+            .clone_to_heap_with_mapping(&mut heap, &mut mapping)
+            .try_into()
+            .unwrap();
+        let arguments = input
+            .arguments
+            .clone_to_heap_with_mapping(&mut heap, &mut mapping);
         let responsible = HirId::create(&mut heap, Id::fuzzer());
+
         let vm = Vm::for_function(
             lir,
             heap,
             constant_mapping,
             function,
-            &input.arguments,
+            &arguments,
             responsible,
         );
 
