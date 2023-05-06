@@ -21,7 +21,7 @@ use rustc_hash::FxHashMap;
 use std::fmt::{self, Debug};
 use tracing::trace;
 
-const TRACE: bool = true;
+const TRACE: bool = false;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FiberId(usize);
