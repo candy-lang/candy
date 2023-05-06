@@ -538,10 +538,12 @@ TODO: Have a way of destructuring so that the parent is at fault if it doesn't s
   - (IDE tooling)
 - (nominal typing)
 
+```candy
 metaWrapper (String value) [
-Doc: "documentation",
-ToText: { value -> ... },
+  Doc: "documentation",
+  ToText: { value -> ... },
 ]
+```
 
 TODO: Give the `ToText` a receive port to support progressive visualizations?
 
