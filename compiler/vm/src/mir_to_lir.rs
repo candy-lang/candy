@@ -148,8 +148,14 @@ impl LoweringContext {
                 let text = Text::create(&mut lir.constant_heap, text);
                 constants.insert(id, text.into());
             }
-            Expression::Reference(_) => {
-                unreachable!("Reference expressions should have been optimized out.")
+            Expression::Reference(referenced) => {
+                if let Some(&constant) = constants.get(referenced) {
+                    constants.insert(id, constant);
+                } else {
+                    let offset = self.stack.find_id(*referenced);
+                    self.emit(id, Instruction::PushFromStack(offset));
+                    self.stack.replace_top_id(id);
+                }
             }
             Expression::Symbol(symbol) => {
                 let tag = Tag::create_from_str(&mut lir.constant_heap, symbol, None);
@@ -361,5 +367,9 @@ impl StackExt for Vec<Id> {
                     self.iter().map(|it| it.to_rich_ir()).join(" "),
                 )
             })
+    }
+    fn replace_top_id(&mut self, id: Id) {
+        self.pop().unwrap();
+        self.push(id);
     }
 }
