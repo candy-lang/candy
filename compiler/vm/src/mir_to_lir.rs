@@ -23,7 +23,7 @@ pub fn compile_lir<Db>(
     db: &Db,
     module: Module,
     tracing: TracingConfig,
-) -> (Arc<Lir>, Arc<FxHashSet<CompilerError>>)
+) -> (Lir, Arc<FxHashSet<CompilerError>>)
 where
     Db: CstDb + OptimizeMir,
 {
@@ -70,7 +70,7 @@ where
     );
     module_function.set_body(start);
 
-    (Arc::new(lir), errors)
+    (lir, errors)
 }
 
 fn compile_function(

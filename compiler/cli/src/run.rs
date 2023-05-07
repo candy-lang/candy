@@ -14,7 +14,7 @@ use candy_vm::{
     vm::{Status, Vm},
 };
 use clap::{Parser, ValueHint};
-use std::path::PathBuf;
+use std::{path::PathBuf, rc::Rc};
 use tracing::{debug, error};
 
 /// Run a Candy program.
@@ -41,6 +41,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
 
     let mut tracer = FullTracer::default();
     let (lir, _) = compile_lir(&db, module, tracing);
+    let lir = Rc::new(lir);
 
     let result = Vm::for_module(lir.clone()).run_until_completion(&mut DummyTracer);
 

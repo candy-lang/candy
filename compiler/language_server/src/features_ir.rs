@@ -112,7 +112,7 @@ impl IrFeatures {
             ),
             Ir::Lir(tracing_config) => Self::rich_ir_for_lir(
                 &config.module,
-                compile_lir(db, config.module.clone(), tracing_config.to_owned()).0,
+                &compile_lir(db, config.module.clone(), tracing_config.to_owned()).0,
                 tracing_config,
             ),
         };
@@ -202,7 +202,7 @@ impl IrFeatures {
         }
         builder.finish()
     }
-    fn rich_ir_for_lir(module: &Module, lir: Arc<Lir>, tracing_config: &TracingConfig) -> RichIr {
+    fn rich_ir_for_lir(module: &Module, lir: &Lir, tracing_config: &TracingConfig) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
             format!("# LIR for module {}", module.to_rich_ir()),
