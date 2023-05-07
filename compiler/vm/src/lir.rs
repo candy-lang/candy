@@ -11,6 +11,7 @@ use candy_frontend::{
 use enumset::EnumSet;
 use extension_trait::extension_trait;
 use itertools::Itertools;
+use pad::{Alignment, PadStr};
 use rustc_hash::FxHashSet;
 use std::fmt::{self, Display, Formatter};
 use strum::{EnumDiscriminants, IntoStaticStr};
@@ -217,10 +218,19 @@ impl ToRichIr for Lir {
         builder.push_newline();
 
         builder.push("# Instructions", TokenType::Comment, EnumSet::empty());
+        let instruction_index_width = (self.instructions.len() * 10 - 1).ilog10() as usize;
         for (i, (instruction, origins)) in self.instructions.iter().zip(&self.origins).enumerate() {
             builder.push_newline();
 
-            builder.push(format!("{i:>3}: "), TokenType::Comment, EnumSet::empty());
+            builder.push(
+                format!(
+                    "{}: ",
+                    i.to_string()
+                        .pad_to_width_with_alignment(instruction_index_width, Alignment::Right),
+                ),
+                TokenType::Comment,
+                EnumSet::empty(),
+            );
 
             instruction.build_rich_ir(builder);
 
