@@ -69,7 +69,7 @@ fuzz_target!(|data: &[u8]| {
 
     let lir = compile_lir(&db, MODULE.clone(), TRACING.clone()).0;
 
-    let result = Vm::for_module(lir.clone()).run_until_completion(&mut DummyTracer);
+    let result = Vm::for_module(&lir).run_until_completion(&mut DummyTracer);
 
     let Ok((mut heap, main, constant_mapping)) = result.into_main_function() else {
         println!("The module doesn't export a main function.");
@@ -80,7 +80,7 @@ fuzz_target!(|data: &[u8]| {
     let environment = Struct::create(&mut heap, &Default::default());
     let responsible = HirId::create(&mut heap, hir::Id::user());
     match Vm::for_function(
-        lir,
+        &lir,
         heap,
         constant_mapping,
         main,
