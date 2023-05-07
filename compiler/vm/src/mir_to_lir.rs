@@ -82,7 +82,11 @@ fn compile_function(
     responsible_parameter: Id,
     body: &Body,
 ) -> InstructionPointer {
-    let mut context = LoweringContext::default();
+    let mut context = LoweringContext {
+        constants,
+        stack: vec![],
+        instructions: vec![],
+    };
     for captured in captured {
         context.stack.push(*captured);
     }
@@ -92,12 +96,12 @@ fn compile_function(
     context.stack.push(responsible_parameter);
 
     for (id, expression) in body.iter() {
-        context.compile_expression(lir, constants, id, expression);
+        context.compile_expression(lir, id, expression);
     }
     // Expressions may not push things onto the stack, but to the constant heap
     // instead.
     if !context.stack.contains(&body.return_value()) {
-        context.emit_reference_to(body.return_value(), constants);
+        context.emit_reference_to(body.return_value());
     }
 
     if matches!(
@@ -126,31 +130,25 @@ fn compile_function(
     start
 }
 
-#[derive(Default)]
-struct LoweringContext {
+struct LoweringContext<'c> {
+    constants: &'c mut FxHashMap<Id, InlineObject>,
     stack: Vec<Id>,
     instructions: Vec<Instruction>,
 }
-impl LoweringContext {
-    fn compile_expression(
-        &mut self,
-        lir: &mut Lir,
-        constants: &mut FxHashMap<Id, InlineObject>,
-        id: Id,
-        expression: &Expression,
-    ) {
+impl<'c> LoweringContext<'c> {
+    fn compile_expression(&mut self, lir: &mut Lir, id: Id, expression: &Expression) {
         match expression {
             Expression::Int(int) => {
                 let int = Int::create_from_bigint(&mut lir.constant_heap, int.clone());
-                constants.insert(id, int.into());
+                self.constants.insert(id, int.into());
             }
             Expression::Text(text) => {
                 let text = Text::create(&mut lir.constant_heap, text);
-                constants.insert(id, text.into());
+                self.constants.insert(id, text.into());
             }
             Expression::Reference(referenced) => {
-                if let Some(&constant) = constants.get(referenced) {
-                    constants.insert(id, constant);
+                if let Some(&constant) = self.constants.get(referenced) {
+                    self.constants.insert(id, constant);
                 } else {
                     let offset = self.stack.find_id(*referenced);
                     self.emit(id, Instruction::PushFromStack(offset));
@@ -158,23 +156,23 @@ impl LoweringContext {
             }
             Expression::Symbol(symbol) => {
                 let tag = Tag::create_from_str(&mut lir.constant_heap, symbol, None);
-                constants.insert(id, tag.into());
+                self.constants.insert(id, tag.into());
             }
             Expression::Builtin(builtin) => {
                 let builtin = Builtin::create(*builtin);
-                constants.insert(id, builtin.into());
+                self.constants.insert(id, builtin.into());
             }
             Expression::List(items) => {
                 if let Some(items) = items
                     .iter()
-                    .map(|item| constants.get(item).copied())
+                    .map(|item| self.constants.get(item).copied())
                     .collect::<Option<Vec<_>>>()
                 {
                     let list = List::create(&mut lir.constant_heap, &items);
-                    constants.insert(id, list.into());
+                    self.constants.insert(id, list.into());
                 } else {
                     for item in items {
-                        self.emit_reference_to(*item, constants);
+                        self.emit_reference_to(*item);
                     }
                     self.emit(
                         id,
@@ -188,16 +186,16 @@ impl LoweringContext {
                 if let Some(fields) = fields
                     .iter()
                     .flat_map(|(key, value)| [key, value].into_iter())
-                    .map(|item| constants.get(item).copied())
+                    .map(|item| self.constants.get(item).copied())
                     .collect::<Option<Vec<_>>>()
                 {
                     let fields = fields.chunks(2).map(|chunk| (chunk[0], chunk[1])).collect();
                     let struct_ = Struct::create(&mut lir.constant_heap, &fields);
-                    constants.insert(id, struct_.into());
+                    self.constants.insert(id, struct_.into());
                 } else {
                     for (key, value) in fields {
-                        self.emit_reference_to(*key, constants);
-                        self.emit_reference_to(*value, constants);
+                        self.emit_reference_to(*key);
+                        self.emit_reference_to(*value);
                     }
                     self.emit(
                         id,
@@ -209,7 +207,7 @@ impl LoweringContext {
             }
             Expression::HirId(hir_id) => {
                 let hir_id = HirId::create(&mut lir.constant_heap, hir_id.clone());
-                constants.insert(id, hir_id.into());
+                self.constants.insert(id, hir_id.into());
             }
             Expression::Function {
                 original_hirs,
@@ -220,12 +218,12 @@ impl LoweringContext {
                 let captured = expression
                     .captured_ids()
                     .into_iter()
-                    .filter(|captured| !constants.contains_key(captured))
+                    .filter(|captured| !self.constants.contains_key(captured))
                     .collect();
 
                 let instructions = compile_function(
                     lir,
-                    constants,
+                    self.constants,
                     original_hirs.clone(),
                     &captured,
                     parameters,
@@ -240,10 +238,10 @@ impl LoweringContext {
                         parameters.len(),
                         instructions,
                     );
-                    constants.insert(id, list.into());
+                    self.constants.insert(id, list.into());
                 } else {
                     for captured in &captured {
-                        self.emit_reference_to(*captured, constants);
+                        self.emit_reference_to(*captured);
                     }
                     self.emit(
                         id,
@@ -266,11 +264,11 @@ impl LoweringContext {
                 arguments,
                 responsible,
             } => {
-                self.emit_reference_to(*function, constants);
+                self.emit_reference_to(*function);
                 for argument in arguments {
-                    self.emit_reference_to(*argument, constants);
+                    self.emit_reference_to(*argument);
                 }
-                self.emit_reference_to(*responsible, constants);
+                self.emit_reference_to(*responsible);
                 self.emit(
                     id,
                     Instruction::Call {
@@ -285,8 +283,8 @@ impl LoweringContext {
                 reason,
                 responsible,
             } => {
-                self.emit_reference_to(*reason, constants);
-                self.emit_reference_to(*responsible, constants);
+                self.emit_reference_to(*reason);
+                self.emit_reference_to(*responsible);
                 self.emit(id, Instruction::Panic);
             }
             Expression::Multiple(_) => {
@@ -298,12 +296,12 @@ impl LoweringContext {
                 arguments,
                 responsible,
             } => {
-                self.emit_reference_to(*hir_call, constants);
-                self.emit_reference_to(*function, constants);
+                self.emit_reference_to(*hir_call);
+                self.emit_reference_to(*function);
                 for argument in arguments {
-                    self.emit_reference_to(*argument, constants);
+                    self.emit_reference_to(*argument);
                 }
-                self.emit_reference_to(*responsible, constants);
+                self.emit_reference_to(*responsible);
                 self.emit(
                     id,
                     Instruction::TraceCallStarts {
@@ -312,30 +310,30 @@ impl LoweringContext {
                 );
             }
             Expression::TraceCallEnds { return_value } => {
-                self.emit_reference_to(*return_value, constants);
+                self.emit_reference_to(*return_value);
                 self.emit(id, Instruction::TraceCallEnds);
             }
             Expression::TraceExpressionEvaluated {
                 hir_expression,
                 value,
             } => {
-                self.emit_reference_to(*hir_expression, constants);
-                self.emit_reference_to(*value, constants);
+                self.emit_reference_to(*hir_expression);
+                self.emit_reference_to(*value);
                 self.emit(id, Instruction::TraceExpressionEvaluated);
             }
             Expression::TraceFoundFuzzableFunction {
                 hir_definition,
                 function,
             } => {
-                self.emit_reference_to(*hir_definition, constants);
-                self.emit_reference_to(*function, constants);
+                self.emit_reference_to(*hir_definition);
+                self.emit_reference_to(*function);
                 self.emit(id, Instruction::TraceFoundFuzzableFunction);
             }
         }
     }
 
-    fn emit_reference_to(&mut self, id: Id, constants: &FxHashMap<Id, InlineObject>) {
-        if let Some(constant) = constants.get(&id) {
+    fn emit_reference_to(&mut self, id: Id) {
+        if let Some(constant) = self.constants.get(&id) {
             self.emit(id, Instruction::PushConstant(*constant));
         } else {
             let offset = self.stack.find_id(id);
