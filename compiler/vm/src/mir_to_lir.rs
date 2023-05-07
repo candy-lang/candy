@@ -154,7 +154,6 @@ impl LoweringContext {
                 } else {
                     let offset = self.stack.find_id(*referenced);
                     self.emit(id, Instruction::PushFromStack(offset));
-                    self.stack.replace_top_id(id);
                 }
             }
             Expression::Symbol(symbol) => {
@@ -367,9 +366,5 @@ impl StackExt for Vec<Id> {
                     self.iter().map(|it| it.to_rich_ir()).join(" "),
                 )
             })
-    }
-    fn replace_top_id(&mut self, id: Id) {
-        self.pop().unwrap();
-        self.push(id);
     }
 }
