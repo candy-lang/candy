@@ -189,7 +189,7 @@ impl<'c> LoweringContext<'c> {
                     .map(|item| self.constants.get(item).copied())
                     .collect::<Option<Vec<_>>>()
                 {
-                    let fields = fields.chunks(2).map(|chunk| (chunk[0], chunk[1])).collect();
+                    let fields = fields.into_iter().tuples().collect();
                     let struct_ = Struct::create(&mut lir.constant_heap, &fields);
                     self.constants.insert(id, struct_.into());
                 } else {
