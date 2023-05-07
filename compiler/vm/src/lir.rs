@@ -1,6 +1,7 @@
-use crate::heap::{Function, HirId, InlineObject};
+use crate::heap::{Function, HirId, InlineData, InlineObject};
 use crate::utils::DebugDisplay;
 use crate::{fiber::InstructionPointer, heap::Heap};
+use candy_frontend::hir;
 use candy_frontend::{
     mir::Id,
     module::Module,
@@ -10,6 +11,7 @@ use candy_frontend::{
 use enumset::EnumSet;
 use extension_trait::extension_trait;
 use itertools::Itertools;
+use rustc_hash::FxHashSet;
 use std::fmt::{self, Display, Formatter};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -17,6 +19,7 @@ pub struct Lir {
     pub module: Module,
     pub constant_heap: Heap,
     pub instructions: Vec<Instruction>,
+    pub origins: Vec<FxHashSet<hir::Id>>,
     pub module_function: Function,
     pub responsible_module: HirId,
 }
@@ -194,13 +197,39 @@ impl StackExt for Vec<Id> {
 
 impl ToRichIr for Lir {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        let mut iterator = self.instructions.iter();
-        if let Some(instruction) = iterator.next() {
-            instruction.build_rich_ir(builder);
-        }
-        for instruction in iterator {
+        builder.push("# Constant heap", TokenType::Comment, EnumSet::empty());
+        for constant in self.constant_heap.iter() {
             builder.push_newline();
+            builder.push(
+                format!("{:?}", constant.address()),
+                TokenType::Address,
+                EnumSet::empty(),
+            );
+            builder.push(": ", None, EnumSet::empty());
+            builder.push(
+                format!("{constant:?}"),
+                TokenType::Constant,
+                EnumSet::empty(),
+            );
+        }
+
+        builder.push_newline();
+        builder.push_newline();
+
+        builder.push("# Instructions", TokenType::Comment, EnumSet::empty());
+        for (i, (instruction, origins)) in self.instructions.iter().zip(&self.origins).enumerate() {
+            builder.push_newline();
+
+            builder.push(format!("{i:>3}: "), TokenType::Comment, EnumSet::empty());
+
             instruction.build_rich_ir(builder);
+
+            builder.push("  ", None, EnumSet::empty());
+            builder.push(
+                format!("# {}", origins.iter().join(", ")),
+                TokenType::Comment,
+                EnumSet::empty(),
+            );
         }
     }
 }
@@ -243,7 +272,21 @@ impl ToRichIr for Instruction {
             }
             Instruction::PushConstant(constant) => {
                 builder.push(" ", None, EnumSet::empty());
-                builder.push(format!("{constant}"), TokenType::Address, EnumSet::empty());
+                if let InlineData::Pointer(pointer) = InlineData::from(*constant) {
+                    builder.push(
+                        format!("{:?}", pointer.get().address()),
+                        TokenType::Address,
+                        EnumSet::empty(),
+                    );
+                } else {
+                    builder.push("inline", TokenType::Address, EnumSet::empty());
+                }
+                builder.push(" ", None, EnumSet::empty());
+                builder.push(
+                    format!("{constant:?}"),
+                    TokenType::Constant,
+                    EnumSet::empty(),
+                );
             }
             Instruction::PushFromStack(offset) => {
                 builder.push(" ", None, EnumSet::empty());

@@ -68,6 +68,7 @@ pub enum TokenType {
     Text,
     Int,
     Address,
+    Constant,
 }
 #[derive(Debug, EnumSetType)]
 pub enum TokenModifier {

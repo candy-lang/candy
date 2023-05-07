@@ -144,6 +144,7 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
                 TokenType::Text => Color::Cyan,
                 TokenType::Int => Color::Red,
                 TokenType::Address => Color::BrightGreen,
+                TokenType::Constant => Color::Yellow,
             };
             print!("{}", in_annotation.color(color));
         } else {
