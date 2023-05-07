@@ -42,33 +42,38 @@ where
         });
 
     let mut constant_heap = Heap::default();
-    let mut instructions = vec![];
+
+    // The body instruction pointer of the module function will be changed from
+    // zero to the correct one once the instructions are compiled.
+    let module_function = Function::create(&mut constant_heap, &[], 0, 0.into());
+    let responsible_module =
+        HirId::create(&mut constant_heap, hir::Id::new(module.clone(), vec![]));
+
+    let mut lir = Lir {
+        module: module.clone(),
+        constant_heap,
+        instructions: vec![],
+        origins: vec![],
+        module_function,
+        responsible_module,
+    };
+
     let start = compile_function(
-        &mut constant_heap,
-        &mut instructions,
+        &mut lir,
+        FxHashSet::from_iter([hir::Id::new(module, vec![])]),
         &FxHashSet::default(),
         &[],
         Id::from_usize(0),
         &mir.body,
     );
+    module_function.set_body(start);
 
-    let module_function = Function::create(&mut constant_heap, &[], 0, start);
-    let responsible_module =
-        HirId::create(&mut constant_heap, hir::Id::new(module.clone(), vec![]));
-
-    let lir = Lir {
-        module,
-        constant_heap,
-        instructions,
-        module_function,
-        responsible_module,
-    };
     (Arc::new(lir), errors)
 }
 
 fn compile_function(
-    heap: &mut Heap,
-    instructions: &mut Vec<Instruction>,
+    lir: &mut Lir,
+    original_hirs: FxHashSet<hir::Id>,
     captured: &FxHashSet<Id>,
     parameters: &[Id],
     responsible_parameter: Id,
@@ -84,7 +89,7 @@ fn compile_function(
     context.stack.push(responsible_parameter);
 
     for (id, expression) in body.iter() {
-        context.compile_expression(heap, instructions, id, expression);
+        context.compile_expression(lir, id, expression);
     }
 
     if matches!(
@@ -105,8 +110,11 @@ fn compile_function(
         context.emit(dummy_id, Instruction::Return);
     }
 
-    let start = instructions.len().into();
-    instructions.append(&mut context.instructions);
+    let num_instructions = context.instructions.len();
+    let start = lir.instructions.len().into();
+    lir.instructions.append(&mut context.instructions);
+    lir.origins
+        .extend((0..num_instructions).map(|_| original_hirs.clone()));
     start
 }
 
@@ -116,20 +124,14 @@ struct LoweringContext {
     instructions: Vec<Instruction>,
 }
 impl LoweringContext {
-    fn compile_expression(
-        &mut self,
-        heap: &mut Heap,
-        instructions: &mut Vec<Instruction>,
-        id: Id,
-        expression: &Expression,
-    ) {
+    fn compile_expression(&mut self, lir: &mut Lir, id: Id, expression: &Expression) {
         match expression {
             Expression::Int(int) => {
-                let int = Int::create_from_bigint(heap, int.clone());
+                let int = Int::create_from_bigint(&mut lir.constant_heap, int.clone());
                 self.emit(id, Instruction::PushConstant(int.into()))
             }
             Expression::Text(text) => {
-                let text = Text::create(heap, text);
+                let text = Text::create(&mut lir.constant_heap, text);
                 self.emit(id, Instruction::PushConstant(text.into()))
             }
             Expression::Reference(reference) => {
@@ -137,7 +139,7 @@ impl LoweringContext {
                 self.stack.replace_top_id(id);
             }
             Expression::Symbol(symbol) => {
-                let tag = Tag::create_from_str(heap, symbol, None);
+                let tag = Tag::create_from_str(&mut lir.constant_heap, symbol, None);
                 self.emit(id, Instruction::PushConstant(tag.into()));
             }
             Expression::Builtin(builtin) => {
@@ -168,19 +170,19 @@ impl LoweringContext {
                 );
             }
             Expression::HirId(hir_id) => {
-                let hir_id = HirId::create(heap, hir_id.clone());
+                let hir_id = HirId::create(&mut lir.constant_heap, hir_id.clone());
                 self.emit(id, Instruction::PushConstant(hir_id.into()));
             }
             Expression::Function {
-                original_hirs: _,
+                original_hirs,
                 parameters,
                 responsible_parameter,
                 body,
             } => {
                 let captured = expression.captured_ids();
                 let instructions = compile_function(
-                    heap,
-                    instructions,
+                    lir,
+                    original_hirs.clone(),
                     &captured,
                     parameters,
                     *responsible_parameter,
