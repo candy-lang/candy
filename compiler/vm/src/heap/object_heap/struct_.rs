@@ -257,7 +257,7 @@ impl HeapObjectTrait for HeapStruct {
         };
         for (index, &key) in self.keys().iter().enumerate() {
             clone.unsafe_set_content_word(
-                index,
+                self.len() + index,
                 key.clone_to_heap_with_mapping(heap, address_map)
                     .raw_word()
                     .get(),
@@ -265,7 +265,7 @@ impl HeapObjectTrait for HeapStruct {
         }
         for (index, &value) in self.values().iter().enumerate() {
             clone.unsafe_set_content_word(
-                index,
+                2 * self.len() + index,
                 value
                     .clone_to_heap_with_mapping(heap, address_map)
                     .raw_word()

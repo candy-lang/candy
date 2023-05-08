@@ -26,7 +26,7 @@ use candy_vm::{
 };
 use lazy_static::lazy_static;
 use rustc_hash::FxHashMap;
-use std::{borrow::Borrow, fs, sync::Arc};
+use std::{borrow::Borrow, fs};
 use walkdir::WalkDir;
 
 const TRACING: TracingConfig = TracingConfig::off();
@@ -72,7 +72,7 @@ impl MutableModuleProviderOwner for Database {
     }
 }
 
-pub fn setup_and_compile(source_code: &str) -> Arc<Lir> {
+pub fn setup_and_compile(source_code: &str) -> Lir {
     let mut db = setup();
     compile(&mut db, source_code)
 }
@@ -117,9 +117,8 @@ fn load_core(module_provider: &mut InMemoryModuleProvider) {
     }
 }
 
-pub fn compile(db: &mut Database, source_code: &str) -> Arc<Lir> {
+pub fn compile(db: &mut Database, source_code: &str) -> Lir {
     db.did_open_module(&MODULE, source_code.as_bytes().to_owned());
-
     compile_lir(db, MODULE.clone(), TRACING.clone()).0
 }
 

@@ -22,7 +22,7 @@ use itertools::Itertools;
 use lsp_types::{notification::Notification, Position, Url};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::{time::Duration, vec};
+use std::{sync::Arc, time::Duration, vec};
 use tokio::{
     sync::mpsc::{error::TryRecvError, Receiver, Sender},
     time::sleep,
@@ -96,6 +96,7 @@ pub async fn run_server(
                     db.did_change_module(&module, content);
                     outgoing_hints.report_hints(module.clone(), vec![]).await;
                     let (lir, _) = compile_lir(&db, module.clone(), tracing.clone());
+                    let lir = Arc::new(lir);
                     constant_evaluator.update_module(module.clone(), lir.clone());
                     fuzzer.update_module(module, lir, &FxHashMap::default());
                 }

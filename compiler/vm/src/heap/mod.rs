@@ -81,9 +81,9 @@ impl Heap {
         }
     }
 
-    pub fn adopt(&mut self, other: Heap) {
-        self.objects.extend(other.objects);
-        for (channel_id, refcount) in other.channel_refcounts {
+    pub fn adopt(&mut self, mut other: Heap) {
+        self.objects.extend(mem::take(&mut other.objects));
+        for (channel_id, refcount) in mem::take(&mut other.channel_refcounts) {
             *self.channel_refcounts.entry(channel_id).or_default() += refcount;
         }
     }
@@ -129,6 +129,12 @@ impl Debug for Heap {
             )?;
         }
         write!(f, "}}")
+    }
+}
+
+impl Drop for Heap {
+    fn drop(&mut self) {
+        self.clear();
     }
 }
 

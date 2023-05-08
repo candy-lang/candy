@@ -41,9 +41,9 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     debug!("Running {}.", module.to_rich_ir());
 
     let mut tracer = StackTracer::default();
-    let (lir, _) = compile_lir(&db, module, tracing);
+    let lir = compile_lir(&db, module, tracing).0;
 
-    let mut ended = Vm::for_module(lir.clone(), &mut tracer).run_until_completion(&mut tracer);
+    let mut ended = Vm::for_module(&lir, &mut tracer).run_until_completion(&mut tracer);
 
     let main = match ended.reason {
         ExecutionEndedReason::Finished(return_value) => {
