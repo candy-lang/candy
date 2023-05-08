@@ -155,7 +155,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
             tracer.root_fiber_created(),
         );
         self.fibers.insert(
-            FiberId::root(),
+            self.fiber_id_generator.generate(),
             FiberTree::Single(Single {
                 fiber,
                 parent: None,
