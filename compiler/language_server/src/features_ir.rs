@@ -620,6 +620,7 @@ impl TokenTypeToSemantic for TokenType {
             TokenType::Text => SemanticTokenType::Text,
             TokenType::Int => SemanticTokenType::Int,
             TokenType::Address => SemanticTokenType::Address,
+            TokenType::Constant => SemanticTokenType::Constant,
         }
     }
 }
