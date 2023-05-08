@@ -101,7 +101,7 @@ fn compile_function(
     }
     // Expressions may not push things onto the stack, but to the constant heap
     // instead.
-    if !context.stack.contains(&body.return_value()) {
+    if *context.stack.last().unwrap() != body.return_value() {
         context.emit_reference_to(body.return_value());
     }
 
