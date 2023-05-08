@@ -20,7 +20,7 @@ impl Mir {
     where
         F: FnOnce(&mut BodyBuilder),
     {
-        let mut builder = BodyBuilder::new(IdGenerator::start_at(0));
+        let mut builder = BodyBuilder::new(IdGenerator::start_at(1));
         function(&mut builder);
         let (id_generator, body) = builder.finish();
         Mir { id_generator, body }
