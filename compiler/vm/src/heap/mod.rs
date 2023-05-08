@@ -119,7 +119,8 @@ impl Heap {
 
 impl Debug for Heap {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        writeln!(f, "{{")?;
+        writeln!(f, "{{\n  channel_refcounts: {:?}", self.channel_refcounts)?;
+
         for &object in self.objects.iter() {
             let reference_count = object.reference_count();
             writeln!(
