@@ -57,6 +57,13 @@ impl Clone for Packet {
         Self { heap, object }
     }
 }
+impl From<InlineObject> for Packet {
+    fn from(object: InlineObject) -> Self {
+        let mut heap = Heap::default();
+        let object = object.clone_to_heap(&mut heap);
+        Self { heap, object }
+    }
+}
 
 impl ChannelBuf {
     fn new(capacity: Capacity) -> Self {

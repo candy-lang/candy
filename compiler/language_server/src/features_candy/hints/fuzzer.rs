@@ -29,7 +29,7 @@ impl FuzzerManager {
         &mut self,
         module: Module,
         lir: Arc<Lir>,
-        fuzzable_functions: &[(Id, Function)],
+        fuzzable_functions: &FxHashMap<Id, Function>,
     ) {
         let fuzzers = fuzzable_functions
             .iter()
@@ -77,8 +77,7 @@ impl FuzzerManager {
         for fuzzer in self.fuzzers[module].values() {
             let Status::FoundPanic {
                 input,
-                reason,
-                responsible,
+                panicked,
                 ..
             } = fuzzer.status() else { continue; };
 
@@ -111,7 +110,7 @@ impl FuzzerManager {
             };
 
             let second_hint = {
-                if &responsible.module != module {
+                if &panicked.responsible.module != module {
                     // The function panics internally for an input, but it's the
                     // fault of an inner function that's in another module.
                     // TODO: The fuzz case should instead be highlighted in the
@@ -123,7 +122,8 @@ impl FuzzerManager {
                 }
                 if db.hir_to_cst_id(id.clone()).is_none() {
                     panic!(
-                        "It looks like the generated code {responsible} is at fault for a panic."
+                        "It looks like the generated code {} is at fault for a panic.",
+                        panicked.responsible,
                     );
                 }
 
@@ -132,8 +132,8 @@ impl FuzzerManager {
                 // function in the hint.
                 Hint {
                     kind: HintKind::Fuzz,
-                    text: format!("then {responsible} panics: {reason}"),
-                    position: db.id_to_end_of_line(responsible.clone()).unwrap(),
+                    text: format!("then {} panics: {}", panicked.responsible, panicked.reason),
+                    position: db.id_to_end_of_line(panicked.responsible.clone()).unwrap(),
                 }
             };
 

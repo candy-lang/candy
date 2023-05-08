@@ -17,7 +17,7 @@ use candy_frontend::{
 };
 use candy_vm::{
     channel::Packet,
-    fiber::ExecutionResult,
+    fiber::ExecutionEndedReason,
     heap::{HirId, Struct},
     lir::Lir,
     mir_to_lir::compile_lir,
@@ -125,7 +125,7 @@ pub fn compile(db: &mut Database, source_code: &str) -> Arc<Lir> {
 
 pub fn run(lir: impl Borrow<Lir>) -> Packet {
     let mut tracer = DummyTracer::default();
-    let (mut heap, main, constant_mapping) = Vm::for_module(lir.borrow())
+    let (mut heap, main, constant_mapping) = Vm::for_module(lir.borrow(), &mut tracer)
         .run_until_completion(&mut tracer)
         .into_main_function()
         .unwrap();
@@ -133,20 +133,23 @@ pub fn run(lir: impl Borrow<Lir>) -> Packet {
     // Run the `main` function.
     let environment = Struct::create(&mut heap, &FxHashMap::default());
     let responsible = HirId::create(&mut heap, hir::Id::user());
-    match Vm::for_function(
+    let ended = Vm::for_function(
         lir,
         heap,
         constant_mapping,
         main,
         &[environment.into()],
         responsible,
+        &mut tracer,
     )
-    .run_until_completion(&mut tracer)
-    {
-        ExecutionResult::Finished {
-            packet: return_value,
-            ..
-        } => return_value,
-        ExecutionResult::Panicked { reason, .. } => panic!("The main function panicked: {reason}"),
+    .run_until_completion(&mut tracer);
+    match ended.reason {
+        ExecutionEndedReason::Finished(return_value) => Packet {
+            heap: ended.heap,
+            object: return_value,
+        },
+        ExecutionEndedReason::Panicked(panicked) => {
+            panic!("The main function panicked: {}", panicked.reason)
+        }
     }
 }

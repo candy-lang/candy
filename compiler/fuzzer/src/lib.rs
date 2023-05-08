@@ -1,4 +1,4 @@
-#![feature(round_char_boundary)]
+#![feature(let_chains, round_char_boundary)]
 
 mod fuzzer;
 mod input;
@@ -22,8 +22,9 @@ use candy_frontend::{
 };
 use candy_vm::{
     context::{RunForever, RunLimitedNumberOfInstructions},
+    fiber::ExecutionPanicked,
     mir_to_lir::compile_lir,
-    tracer::full::FullTracer,
+    tracer::stack_trace::StackTracer,
     vm::Vm,
 };
 use tracing::{error, info};
@@ -41,9 +42,9 @@ where
 
     let fuzzables = {
         let mut tracer = FuzzablesFinder::default();
-        let mut vm = Vm::for_module(lir.clone());
+        let mut vm = Vm::for_module(lir.clone(), &mut tracer);
         vm.run(&mut RunForever, &mut tracer);
-        tracer.fuzzables
+        tracer.into_fuzzables()
     };
 
     info!(
@@ -62,16 +63,14 @@ where
             Status::StillFuzzing { .. } => {}
             Status::FoundPanic {
                 input,
-                reason,
-                responsible,
+                panicked,
                 tracer,
             } => {
                 error!("The fuzzer discovered an input that crashes {id}:");
                 let case = FailingFuzzCase {
                     function: id,
                     input,
-                    reason,
-                    responsible,
+                    panicked,
                     tracer,
                 };
                 case.dump(db);
@@ -86,9 +85,8 @@ where
 pub struct FailingFuzzCase {
     function: Id,
     input: Input,
-    reason: String,
-    responsible: Id,
-    tracer: FullTracer,
+    panicked: ExecutionPanicked,
+    tracer: StackTracer,
 }
 
 impl FailingFuzzCase {
@@ -98,12 +96,12 @@ impl FailingFuzzCase {
     {
         error!(
             "Calling `{} {}` panics: {}",
-            self.function, self.input, self.reason,
+            self.function, self.input, self.panicked.reason,
         );
-        error!("{} is responsible.", self.responsible,);
+        error!("{} is responsible.", self.panicked.responsible);
         error!(
             "This is the stack trace:\n{}",
-            self.tracer.format_panic_stack_trace_to_root_fiber(db)
+            self.tracer.format_panic_stack_trace_to_root_fiber(db),
         );
     }
 }

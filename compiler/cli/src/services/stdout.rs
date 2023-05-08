@@ -2,6 +2,7 @@ use candy_vm::{
     channel::ChannelId,
     heap::Data,
     lir::Lir,
+    tracer::Tracer,
     vm::{CompletedOperation, OperationId, Vm},
 };
 use std::borrow::Borrow;
@@ -12,7 +13,7 @@ pub struct StdoutService {
     current_receive: OperationId,
 }
 impl StdoutService {
-    pub fn new<L: Borrow<Lir>>(vm: &mut Vm<L>) -> Self {
+    pub fn new<L: Borrow<Lir>, T: Tracer>(vm: &mut Vm<L, T>) -> Self {
         let channel = vm.create_channel(0);
         let current_receive = vm.receive(channel);
         Self {
@@ -21,7 +22,7 @@ impl StdoutService {
         }
     }
 
-    pub fn run<L: Borrow<Lir>>(&mut self, vm: &mut Vm<L>) {
+    pub fn run<L: Borrow<Lir>, T: Tracer>(&mut self, vm: &mut Vm<L, T>) {
         while let Some(CompletedOperation::Received { packet }) =
             vm.completed_operations.remove(&self.current_receive)
         {

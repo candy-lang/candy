@@ -97,7 +97,7 @@ pub async fn run_server(
                     outgoing_hints.report_hints(module.clone(), vec![]).await;
                     let (lir, _) = compile_lir(&db, module.clone(), tracing.clone());
                     constant_evaluator.update_module(module.clone(), lir.clone());
-                    fuzzer.update_module(module, lir, &[]);
+                    fuzzer.update_module(module, lir, &FxHashMap::default());
                 }
                 Event::CloseModule(module) => {
                     db.did_close_module(&module);

@@ -18,7 +18,7 @@ use candy_frontend::{
     TracingConfig,
 };
 use candy_vm::{
-    fiber::ExecutionResult,
+    fiber::ExecutionEndedReason,
     heap::{HirId, Struct},
     mir_to_lir::compile_lir,
     tracer::DummyTracer,
@@ -69,7 +69,8 @@ fuzz_target!(|data: &[u8]| {
 
     let lir = compile_lir(&db, MODULE.clone(), TRACING.clone()).0;
 
-    let result = Vm::for_module(lir.clone()).run_until_completion(&mut DummyTracer);
+    let result =
+        Vm::for_module(lir.clone(), &mut DummyTracer).run_until_completion(&mut DummyTracer);
 
     let Ok((mut heap, main, constant_mapping)) = result.into_main_function() else {
         println!("The module doesn't export a main function.");
@@ -86,15 +87,16 @@ fuzz_target!(|data: &[u8]| {
         main,
         &[environment.into()],
         responsible,
+        &mut DummyTracer,
     )
     .run_until_completion(&mut DummyTracer)
+    .reason
     {
-        ExecutionResult::Finished {
-            packet: return_value,
-            ..
-        } => {
+        ExecutionEndedReason::Finished(return_value) => {
             println!("The main function returned: {return_value:?}")
         }
-        ExecutionResult::Panicked { reason, .. } => panic!("The main function panicked: {reason}"),
+        ExecutionEndedReason::Panicked(panicked) => {
+            panic!("The main function panicked: {}", panicked.reason)
+        }
     }
 });
