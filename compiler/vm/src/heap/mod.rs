@@ -60,10 +60,7 @@ impl Heap {
     }
 
     pub(self) fn notify_port_created(&mut self, channel_id: ChannelId) {
-        self.channel_refcounts
-            .entry(channel_id)
-            .and_modify(|count| *count += 1)
-            .or_insert(1);
+        *self.channel_refcounts.entry(channel_id).or_default() += 1;
     }
     pub(self) fn dup_channel_by(&mut self, channel_id: ChannelId, amount: usize) {
         *self.channel_refcounts.entry(channel_id).or_insert_with(|| {
