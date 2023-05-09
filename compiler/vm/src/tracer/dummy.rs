@@ -18,4 +18,6 @@ impl FiberTracer for DummyFiberTracer {
     fn child_fiber_created(&mut self, _child: FiberId) -> Self {
         DummyFiberTracer
     }
+
+    fn dup_all_stored_objects(&self, _heap: &mut crate::heap::Heap) {}
 }

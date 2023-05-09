@@ -63,4 +63,10 @@ impl FiberTracer for FiberEvaluatedValuesTracer {
         value.dup(heap);
         self.evaluated_values.insert(id.to_owned(), value);
     }
+
+    fn dup_all_stored_objects(&self, heap: &mut Heap) {
+        for value in self.evaluated_values.values() {
+            value.dup(heap);
+        }
+    }
 }

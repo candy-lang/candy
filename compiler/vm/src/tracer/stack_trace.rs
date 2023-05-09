@@ -185,6 +185,15 @@ impl FiberTracer for FiberStackTracer {
     fn call_ended(&mut self, heap: &mut Heap, _return_value: InlineObject) {
         self.call_stack.pop().unwrap().drop(heap);
     }
+
+    fn dup_all_stored_objects(&self, heap: &mut Heap) {
+        for call in &self.call_stack {
+            call.dup(heap);
+        }
+        for call in self.panic_chains.values().flatten() {
+            call.dup(heap);
+        }
+    }
 }
 
 impl FiberStackTracer {

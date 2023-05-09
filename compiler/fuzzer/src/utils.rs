@@ -57,4 +57,10 @@ impl FiberTracer for FiberFuzzablesFinder {
         function.dup();
         self.fuzzables.insert(definition.get().to_owned(), function);
     }
+
+    fn dup_all_stored_objects(&self, _heap: &mut Heap) {
+        for function in self.fuzzables.values() {
+            function.dup();
+        }
+    }
 }

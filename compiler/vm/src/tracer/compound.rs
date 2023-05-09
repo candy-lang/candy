@@ -106,4 +106,9 @@ impl<T0: FiberTracer, T1: FiberTracer> FiberTracer for CompoundFiberTracer<T0, T
         self.tracer0.call_ended(heap, return_value);
         self.tracer1.call_ended(heap, return_value);
     }
+
+    fn dup_all_stored_objects(&self, heap: &mut Heap) {
+        self.tracer0.dup_all_stored_objects(heap);
+        self.tracer1.dup_all_stored_objects(heap);
+    }
 }

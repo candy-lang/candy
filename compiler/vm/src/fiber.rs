@@ -273,7 +273,11 @@ impl<T: FiberTracer> Fiber<T> {
             self.status,
             (Status::Done | Status::Panicked { .. }),
         ));
-        self.heap.clear(); // FIXME
+
+        self.heap.reset_reference_counts();
+        self.tracer.dup_all_stored_objects(&mut self.heap);
+        self.heap.drop_all_unreferenced();
+
         self.status = Status::Panicked(panicked);
     }
 

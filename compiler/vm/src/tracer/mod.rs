@@ -50,6 +50,8 @@ where
     ) {
     }
     fn call_ended(&mut self, _heap: &mut Heap, _return_value: InlineObject) {}
+
+    fn dup_all_stored_objects(&self, _heap: &mut Heap);
 }
 
 pub struct FiberEnded<'h, T: FiberTracer> {
