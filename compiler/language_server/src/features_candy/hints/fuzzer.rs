@@ -77,7 +77,7 @@ impl FuzzerManager {
         for fuzzer in self.fuzzers[module].values() {
             let Status::FoundPanic {
                 input,
-                panicked,
+                panic,
                 ..
             } = fuzzer.status() else { continue; };
 
@@ -110,7 +110,7 @@ impl FuzzerManager {
             };
 
             let second_hint = {
-                if &panicked.responsible.module != module {
+                if &panic.responsible.module != module {
                     // The function panics internally for an input, but it's the
                     // fault of an inner function that's in another module.
                     // TODO: The fuzz case should instead be highlighted in the
@@ -123,7 +123,7 @@ impl FuzzerManager {
                 if db.hir_to_cst_id(id.clone()).is_none() {
                     panic!(
                         "It looks like the generated code {} is at fault for a panic.",
-                        panicked.responsible,
+                        panic.responsible,
                     );
                 }
 
@@ -132,8 +132,8 @@ impl FuzzerManager {
                 // function in the hint.
                 Hint {
                     kind: HintKind::Fuzz,
-                    text: format!("then {} panics: {}", panicked.responsible, panicked.reason),
-                    position: db.id_to_end_of_line(panicked.responsible.clone()).unwrap(),
+                    text: format!("then {} panics: {}", panic.responsible, panic.reason),
+                    position: db.id_to_end_of_line(panic.responsible.clone()).unwrap(),
                 }
             };
 

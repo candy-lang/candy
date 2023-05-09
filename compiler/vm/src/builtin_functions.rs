@@ -1,7 +1,7 @@
 use crate::{
     channel::ChannelId,
     channel::{Capacity, Packet},
-    fiber::{ExecutionPanicked, Fiber, Status},
+    fiber::{Fiber, Panic, Status},
     heap::{
         Data, Function, Heap, HirId, InlineObject, Int, List, ReceivePort, SendPort, Struct, Tag,
         Text,
@@ -85,7 +85,7 @@ impl<FT: FiberTracer> Fiber<FT> {
             Ok(Receive { channel }) => self.status = Status::Receiving { channel },
             Ok(Parallel { body }) => self.status = Status::InParallelScope { body },
             Ok(Try { body }) => self.status = Status::InTry { body },
-            Err(reason) => self.panic(ExecutionPanicked::new(reason, responsible.get().to_owned())),
+            Err(reason) => self.panic(Panic::new(reason, responsible.get().to_owned())),
         }
     }
 }

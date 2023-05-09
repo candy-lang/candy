@@ -50,9 +50,9 @@ impl<T: FiberTracer> ExecutionEnded<T> {
                     Err(err) => Err(err.to_string()),
                 }
             }
-            ExecutionEndedReason::Panicked(panicked) => Err(format!(
+            ExecutionEndedReason::Panicked(panic) => Err(format!(
                 "The module panicked at {}: {}",
-                panicked.responsible, panicked.reason,
+                panic.responsible, panic.reason,
             )),
         }
     }

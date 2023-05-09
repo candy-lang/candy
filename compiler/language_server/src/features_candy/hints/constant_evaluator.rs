@@ -100,8 +100,8 @@ impl ConstantEvaluator {
         let mut hints = vec![];
 
         // TODO: Think about how to highlight the responsible piece of code.
-        if let vm::Status::Panicked(panicked) = evaluator.vm.status() {
-            if let Some(hint) = panic_hint(db, module.clone(), evaluator, panicked.reason) {
+        if let vm::Status::Panicked(panic) = evaluator.vm.status() {
+            if let Some(hint) = panic_hint(db, module.clone(), evaluator, panic.reason) {
                 hints.push(hint);
             }
         };

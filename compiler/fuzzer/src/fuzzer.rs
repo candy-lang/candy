@@ -8,7 +8,7 @@ use crate::{
 use candy_frontend::hir::Id;
 use candy_vm::{
     context::ExecutionController,
-    fiber::ExecutionPanicked,
+    fiber::Panic,
     heap::{Data, Function, Heap},
     lir::Lir,
     tracer::stack_trace::StackTracer,
@@ -34,7 +34,7 @@ pub enum Status {
     // TODO: In the future, also add a state for trying to simplify the input.
     FoundPanic {
         input: Input,
-        panicked: ExecutionPanicked,
+        panic: Panic,
         tracer: StackTracer,
     },
 }
@@ -79,11 +79,11 @@ impl Fuzzer {
                 // so there's nothing more to do.
                 Status::FoundPanic {
                     input,
-                    panicked,
+                    panic,
                     tracer,
                 } => Status::FoundPanic {
                     input,
-                    panicked,
+                    panic,
                     tracer,
                 },
             };
@@ -131,9 +131,9 @@ impl Fuzzer {
                 pool.add(runner.input, score);
                 self.create_new_fuzzing_case(pool)
             }
-            RunResult::Panicked(panicked) => Status::FoundPanic {
+            RunResult::Panicked(panic) => Status::FoundPanic {
                 input: runner.input,
-                panicked,
+                panic,
                 tracer: runner.tracer,
             },
         }

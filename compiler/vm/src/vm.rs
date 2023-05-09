@@ -15,7 +15,7 @@ use rand::{seq::SliceRandom, thread_rng};
 use crate::{
     channel::{Channel, ChannelId, Completer, Packet, Performer},
     context::{CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions},
-    fiber::{self, ExecutionEnded, ExecutionEndedReason, ExecutionPanicked, Fiber, FiberId},
+    fiber::{self, ExecutionEnded, ExecutionEndedReason, Fiber, FiberId, Panic},
     heap::{Data, Function, Heap, HeapObject, HirId, InlineObject, SendPort, Struct, Tag},
     lir::Lir,
     tracer::{FiberEnded, FiberEndedReason, FiberTracer, Tracer},
@@ -113,7 +113,7 @@ pub enum Status {
     CanRun,
     WaitingForOperations,
     Done,
-    Panicked(ExecutionPanicked),
+    Panicked(Panic),
 }
 
 impl FiberId {
@@ -226,7 +226,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
                 | fiber::Status::InParallelScope { .. }
                 | fiber::Status::InTry { .. } => unreachable!(),
                 fiber::Status::Done => Status::Done,
-                fiber::Status::Panicked(panicked) => Status::Panicked(panicked.clone()),
+                fiber::Status::Panicked(panic) => Status::Panicked(panic.clone()),
             },
             FiberTree::Parallel(Parallel { children, .. }) => {
                 for child_fiber in children.keys() {
@@ -467,7 +467,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
                                 None
                             }
                         }
-                        ExecutionEndedReason::Panicked(panicked) => Some(Err(panicked.to_owned())),
+                        ExecutionEndedReason::Panicked(panic) => Some(Err(panic.to_owned())),
                     };
 
                     self.fibers
@@ -520,7 +520,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
             .copied()
             .collect();
     }
-    fn finish_parallel(&mut self, parallel_id: FiberId, result: Result<(), ExecutionPanicked>) {
+    fn finish_parallel(&mut self, parallel_id: FiberId, result: Result<(), Panic>) {
         let parallel = self
             .fibers
             .get_mut(&parallel_id)
@@ -578,12 +578,13 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
                 // The channel was a nursery that died.
                 if let Performer::Fiber(fiber) = performer {
                     let tree = self.fibers.get_mut(&fiber).unwrap();
-                    tree.as_single_mut().unwrap().fiber.panic(
-                        ExecutionPanicked::new_without_responsible(
+                    tree.as_single_mut()
+                        .unwrap()
+                        .fiber
+                        .panic(Panic::new_without_responsible(
                             "The nursery is already dead because the parallel section ended."
                                 .to_string(),
-                        ),
-                    );
+                        ));
                 }
                 return;
             }
@@ -646,7 +647,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
                     }
                     None => self.finish_parallel(
                         parent_id,
-                        Err(ExecutionPanicked::new_without_responsible(
+                        Err(Panic::new_without_responsible(
                             "A nursery received an invalid message.".to_string(),
                         )),
                     ),

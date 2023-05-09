@@ -2,7 +2,7 @@ pub use self::dummy::DummyTracer;
 use super::{fiber::FiberId, heap::Heap};
 use crate::{
     channel::ChannelId,
-    fiber::ExecutionPanicked,
+    fiber::Panic,
     heap::{Function, HirId, InlineObject},
 };
 
@@ -63,6 +63,6 @@ pub struct FiberEnded<'h, T: FiberTracer> {
 #[derive(Clone)]
 pub enum FiberEndedReason {
     Finished(InlineObject),
-    Panicked(ExecutionPanicked),
+    Panicked(Panic),
     Canceled,
 }

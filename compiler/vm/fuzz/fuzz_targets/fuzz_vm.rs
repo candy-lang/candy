@@ -94,8 +94,8 @@ fuzz_target!(|data: &[u8]| {
         ExecutionEndedReason::Finished(return_value) => {
             println!("The main function returned: {return_value:?}")
         }
-        ExecutionEndedReason::Panicked(panicked) => {
-            panic!("The main function panicked: {}", panicked.reason)
+        ExecutionEndedReason::Panicked(panic) => {
+            panic!("The main function panicked: {}", panic.reason)
         }
     }
 });

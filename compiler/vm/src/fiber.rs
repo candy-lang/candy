@@ -65,7 +65,7 @@ pub enum Status {
     InParallelScope { body: Function },
     InTry { body: Function },
     Done,
-    Panicked(ExecutionPanicked),
+    Panicked(Panic),
 }
 
 #[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
@@ -93,15 +93,15 @@ pub struct ExecutionEnded<T: FiberTracer> {
 #[derive(Clone, Debug)]
 pub enum ExecutionEndedReason {
     Finished(InlineObject),
-    Panicked(ExecutionPanicked),
+    Panicked(Panic),
 }
 #[derive(Clone, Debug)]
-pub struct ExecutionPanicked {
+pub struct Panic {
     pub reason: String,
     pub responsible: Id,
     pub panicked_child: Option<FiberId>,
 }
-impl ExecutionPanicked {
+impl Panic {
     pub fn new(reason: String, responsible: Id) -> Self {
         Self {
             reason,
@@ -179,7 +179,7 @@ impl<T: FiberTracer> Fiber<T> {
     pub fn tear_down(mut self) -> ExecutionEnded<T> {
         let reason = match self.status {
             Status::Done => ExecutionEndedReason::Finished(self.pop_from_data_stack()),
-            Status::Panicked(panicked) => ExecutionEndedReason::Panicked(panicked),
+            Status::Panicked(panic) => ExecutionEndedReason::Panicked(panic),
             _ => panic!("Called `tear_down` on a fiber that's still running."),
         };
         ExecutionEnded {
@@ -195,7 +195,7 @@ impl<T: FiberTracer> Fiber<T> {
             ExecutionEndedReason::Finished(return_value) => {
                 FiberEndedReason::Finished(return_value)
             }
-            ExecutionEndedReason::Panicked(panicked) => FiberEndedReason::Panicked(panicked),
+            ExecutionEndedReason::Panicked(panic) => FiberEndedReason::Panicked(panic),
         };
         self.tracer.child_fiber_ended(FiberEnded {
             id: child_id,
@@ -239,7 +239,7 @@ impl<T: FiberTracer> Fiber<T> {
         self.push_to_data_stack(object);
         self.status = Status::Running;
     }
-    pub fn complete_parallel_scope(&mut self, result: Result<InlineObject, ExecutionPanicked>) {
+    pub fn complete_parallel_scope(&mut self, result: Result<InlineObject, Panic>) {
         assert!(matches!(self.status, Status::InParallelScope { .. }));
 
         match result {
@@ -247,7 +247,7 @@ impl<T: FiberTracer> Fiber<T> {
                 self.push_to_data_stack(object);
                 self.status = Status::Running;
             }
-            Err(panicked) => self.panic(panicked),
+            Err(panic) => self.panic(panic),
         }
     }
     pub fn complete_try(&mut self, ended_reason: &ExecutionEndedReason) {
@@ -255,8 +255,8 @@ impl<T: FiberTracer> Fiber<T> {
 
         let result = match ended_reason {
             ExecutionEndedReason::Finished(return_value) => Ok(*return_value),
-            ExecutionEndedReason::Panicked(panicked) => {
-                Err(Text::create(&mut self.heap, &panicked.reason).into())
+            ExecutionEndedReason::Panicked(panic) => {
+                Err(Text::create(&mut self.heap, &panic.reason).into())
             }
         };
         let result = Struct::create_result(&mut self.heap, result);
@@ -268,7 +268,7 @@ impl<T: FiberTracer> Fiber<T> {
         self.data_stack[self.data_stack.len() - 1 - offset]
     }
     #[allow(unused_parens)]
-    pub fn panic(&mut self, panicked: ExecutionPanicked) {
+    pub fn panic(&mut self, panic: Panic) {
         assert!(!matches!(
             self.status,
             (Status::Done | Status::Panicked { .. }),
@@ -278,7 +278,7 @@ impl<T: FiberTracer> Fiber<T> {
         self.tracer.dup_all_stored_objects(&mut self.heap);
         self.heap.drop_all_unreferenced();
 
-        self.status = Status::Panicked(panicked);
+        self.status = Status::Panicked(panic);
     }
 
     pub fn run(&mut self, lir: &Lir, execution_controller: &mut dyn ExecutionController) {
@@ -442,7 +442,7 @@ impl<T: FiberTracer> Fiber<T> {
                 };
                 let responsible: HirId = responsible_for_panic.try_into().unwrap();
 
-                self.panic(ExecutionPanicked::new(
+                self.panic(Panic::new(
                     reason.get().to_owned(),
                     responsible.get().to_owned(),
                 ));
@@ -491,7 +491,7 @@ impl<T: FiberTracer> Fiber<T> {
             }
             Data::Tag(tag) => {
                 if tag.has_value() {
-                    self.panic(ExecutionPanicked::new(
+                    self.panic(Panic::new(
                         "A tag's value cannot be overwritten by calling it. Use `tag.withValue` instead.".to_string(),
                         responsible.get().to_owned(),)
                     );
@@ -503,7 +503,7 @@ impl<T: FiberTracer> Fiber<T> {
                     self.push_to_data_stack(tag);
                     value.dup(&mut self.heap);
                 } else {
-                    self.panic(ExecutionPanicked::new(
+                    self.panic(Panic::new(
                         format!(
                             "A tag can only hold exactly one value, but you called it with {} arguments.",
                             arguments.len(),
@@ -513,7 +513,7 @@ impl<T: FiberTracer> Fiber<T> {
                 }
             }
             _ => {
-                self.panic(ExecutionPanicked::new(
+                self.panic(Panic::new(
                     format!(
                         "You can only call functions, builtins and tags, but you tried to call {callee}.",
                     ),
@@ -530,7 +530,7 @@ impl<T: FiberTracer> Fiber<T> {
     ) {
         let expected_num_args = function.argument_count();
         if arguments.len() != expected_num_args {
-            self.panic(ExecutionPanicked::new(
+            self.panic(Panic::new(
                 format!(
                     "A function expected {expected_num_args} parameters, but you called it with {} arguments.",
                     arguments.len(),

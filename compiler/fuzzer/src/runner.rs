@@ -2,7 +2,7 @@ use candy_frontend::hir::Id;
 use candy_vm::{
     self,
     context::{CombiningExecutionController, CountingExecutionController, ExecutionController},
-    fiber::ExecutionPanicked,
+    fiber::Panic,
     heap::{Function, HirId, InlineObjectSliceCloneToHeap},
     lir::Lir,
     tracer::stack_trace::StackTracer,
@@ -36,7 +36,7 @@ pub enum RunResult {
 
     /// The execution panicked with an internal panic. This indicates an error
     /// in the code that should be shown to the user.
-    Panicked(ExecutionPanicked),
+    Panicked(Panic),
 }
 impl RunResult {
     pub fn to_string(&self, call: &str) -> String {
@@ -46,8 +46,8 @@ impl RunResult {
             RunResult::NeedsUnfulfilled { reason } => {
                 format!("{call} panicked and it's our fault: {reason}")
             }
-            RunResult::Panicked(panicked) => {
-                format!("{call} panicked internally: {}", panicked.reason)
+            RunResult::Panicked(panic) => {
+                format!("{call} panicked internally: {}", panic.reason)
             }
         }
     }
@@ -121,12 +121,12 @@ impl<L: Borrow<Lir>> Runner<L> {
             // this should be treated just like a regular timeout.
             vm::Status::WaitingForOperations => Some(RunResult::Timeout),
             vm::Status::Done => Some(RunResult::Done),
-            vm::Status::Panicked(panicked) => Some(if panicked.responsible == Id::fuzzer() {
+            vm::Status::Panicked(panic) => Some(if panic.responsible == Id::fuzzer() {
                 RunResult::NeedsUnfulfilled {
-                    reason: panicked.reason,
+                    reason: panic.reason,
                 }
             } else {
-                RunResult::Panicked(panicked)
+                RunResult::Panicked(panic)
             }),
         };
     }

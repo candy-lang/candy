@@ -56,8 +56,8 @@ impl Tracer for StackTracer {
     fn root_fiber_ended(&mut self, mut ended: FiberEnded<Self::ForFiber>) {
         assert!(self.panic_chain.is_none());
 
-        let FiberEndedReason::Panicked(panicked) = ended.reason else { return; };
-        self.panic_chain = Some(ended.tracer.take_panic_call_stack(panicked.panicked_child));
+        let FiberEndedReason::Panicked(panic) = ended.reason else { return; };
+        self.panic_chain = Some(ended.tracer.take_panic_call_stack(panic.panicked_child));
         ended.tracer.drop(ended.heap);
     }
 }
@@ -157,10 +157,10 @@ impl FiberTracer for FiberStackTracer {
         FiberStackTracer::default()
     }
     fn child_fiber_ended(&mut self, mut ended: FiberEnded<Self>) {
-        let FiberEndedReason::Panicked(panicked) = ended.reason else { return; };
+        let FiberEndedReason::Panicked(panic) = ended.reason else { return; };
         self.panic_chains.insert(
             ended.id,
-            ended.tracer.take_panic_call_stack(panicked.panicked_child),
+            ended.tracer.take_panic_call_stack(panic.panicked_child),
         );
         ended.tracer.drop(ended.heap);
     }

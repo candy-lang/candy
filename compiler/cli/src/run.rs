@@ -49,10 +49,10 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         ExecutionEndedReason::Finished(return_value) => {
             return_value_into_main_function(&mut ended.heap, return_value).unwrap()
         }
-        ExecutionEndedReason::Panicked(panicked) => {
-            error!("The module panicked: {}", panicked.reason);
-            error!("{} is responsible.", panicked.responsible);
-            if let Some(span) = db.hir_id_to_span(panicked.responsible) {
+        ExecutionEndedReason::Panicked(panic) => {
+            error!("The module panicked: {}", panic.reason);
+            error!("{} is responsible.", panic.responsible);
+            if let Some(span) = db.hir_id_to_span(panic.responsible) {
                 error!("Responsible is at {span:?}.");
             }
             error!(
@@ -99,9 +99,9 @@ pub(crate) fn run(options: Options) -> ProgramResult {
             debug!("The main function returned: {return_value:?}");
             Ok(())
         }
-        ExecutionEndedReason::Panicked(panicked) => {
-            error!("The main function panicked: {}", panicked.reason);
-            error!("{} is responsible.", panicked.responsible);
+        ExecutionEndedReason::Panicked(panic) => {
+            error!("The main function panicked: {}", panic.reason);
+            error!("{} is responsible.", panic.responsible);
             error!(
                 "This is the stack trace:\n{}",
                 tracer.format_panic_stack_trace_to_root_fiber(&db),

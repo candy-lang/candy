@@ -22,7 +22,7 @@ use candy_frontend::{
 };
 use candy_vm::{
     context::{RunForever, RunLimitedNumberOfInstructions},
-    fiber::ExecutionPanicked,
+    fiber::Panic,
     mir_to_lir::compile_lir,
     tracer::stack_trace::StackTracer,
     vm::Vm,
@@ -65,14 +65,14 @@ where
             Status::StillFuzzing { .. } => {}
             Status::FoundPanic {
                 input,
-                panicked,
+                panic,
                 tracer,
             } => {
                 error!("The fuzzer discovered an input that crashes {id}:");
                 let case = FailingFuzzCase {
                     function: id,
                     input,
-                    panicked,
+                    panic,
                     tracer,
                 };
                 case.dump(db);
@@ -87,7 +87,7 @@ where
 pub struct FailingFuzzCase {
     function: Id,
     input: Input,
-    panicked: ExecutionPanicked,
+    panic: Panic,
     tracer: StackTracer,
 }
 
@@ -98,9 +98,9 @@ impl FailingFuzzCase {
     {
         error!(
             "Calling `{} {}` panics: {}",
-            self.function, self.input, self.panicked.reason,
+            self.function, self.input, self.panic.reason,
         );
-        error!("{} is responsible.", self.panicked.responsible);
+        error!("{} is responsible.", self.panic.responsible);
         error!(
             "This is the stack trace:\n{}",
             self.tracer.format_panic_stack_trace_to_root_fiber(db),

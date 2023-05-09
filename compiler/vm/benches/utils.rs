@@ -147,8 +147,8 @@ pub fn run(lir: impl Borrow<Lir>) -> Packet {
             heap: ended.heap,
             object: return_value,
         },
-        ExecutionEndedReason::Panicked(panicked) => {
-            panic!("The main function panicked: {}", panicked.reason)
+        ExecutionEndedReason::Panicked(panic) => {
+            panic!("The main function panicked: {}", panic.reason)
         }
     }
 }
