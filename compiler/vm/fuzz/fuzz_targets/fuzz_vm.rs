@@ -5,7 +5,7 @@ use candy_frontend::{
     ast_to_hir::AstToHirStorage,
     cst::CstDbStorage,
     cst_to_ast::CstToAstStorage,
-    hir::HirDbStorage,
+    hir::{self, HirDbStorage},
     hir_to_mir::HirToMirStorage,
     mir_optimize::OptimizeMirStorage,
     module::{
@@ -18,12 +18,11 @@ use candy_frontend::{
     TracingConfig,
 };
 use candy_vm::{
-    context::DbUseProvider,
-    fiber::ExecutionResult,
-    heap::Struct,
-    mir_to_lir::{MirToLir, MirToLirStorage},
-    run_lir, run_main,
+    fiber::ExecutionEndedReason,
+    heap::{HirId, Struct},
+    mir_to_lir::compile_lir,
     tracer::DummyTracer,
+    vm::Vm,
 };
 use lazy_static::lazy_static;
 use libfuzzer_sys::fuzz_target;
@@ -46,7 +45,6 @@ lazy_static! {
     CstToAstStorage,
     HirDbStorage,
     HirToMirStorage,
-    MirToLirStorage,
     ModuleDbStorage,
     OptimizeMirStorage,
     PositionConversionStorage,
@@ -69,28 +67,35 @@ fuzz_target!(|data: &[u8]| {
     let mut db = Database::default();
     db.module_provider.add(&MODULE, data.to_vec());
 
-    let lir = db.lir(MODULE.clone(), TRACING.clone()).unwrap();
+    let lir = compile_lir(&db, MODULE.clone(), TRACING.clone()).0;
 
-    let use_provider = DbUseProvider {
-        db: &db,
-        tracing: TRACING.clone(),
+    let result = Vm::for_module(&lir, &mut DummyTracer).run_until_completion(&mut DummyTracer);
+
+    let Ok((mut heap, main, constant_mapping)) = result.into_main_function() else {
+        println!("The module doesn't export a main function.");
+        return;
     };
-    let mut tracer = DummyTracer::default();
-    let (mut heap, main) = run_lir(
-        MODULE.clone(),
-        lir.as_ref().to_owned(),
-        &use_provider,
-        &mut tracer,
-    )
-    .into_main_function()
-    .unwrap();
 
     // Run the `main` function.
     let environment = Struct::create(&mut heap, &Default::default());
-    match run_main(heap, main, environment, &use_provider, &mut tracer) {
-        ExecutionResult::Finished(return_value) => {
+    let responsible = HirId::create(&mut heap, hir::Id::user());
+    match Vm::for_function(
+        &lir,
+        heap,
+        constant_mapping,
+        main,
+        &[environment.into()],
+        responsible,
+        &mut DummyTracer,
+    )
+    .run_until_completion(&mut DummyTracer)
+    .reason
+    {
+        ExecutionEndedReason::Finished(return_value) => {
             println!("The main function returned: {return_value:?}")
         }
-        ExecutionResult::Panicked { reason, .. } => panic!("The main function panicked: {reason}"),
+        ExecutionEndedReason::Panicked(panic) => {
+            panic!("The main function panicked: {}", panic.reason)
+        }
     }
 });

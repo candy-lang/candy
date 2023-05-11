@@ -134,7 +134,7 @@ async function pickTracingConfig(
   options: { canSelectOnlyCurrent: boolean } = { canSelectOnlyCurrent: true }
 ): Promise<TracingConfig | undefined> {
   const registerFuzzables = await pickTracingMode(
-    'Include tracing of fuzzable closures?',
+    'Include tracing of fuzzable functions?',
     options
   );
   if (registerFuzzables === undefined) return;

@@ -1,20 +1,28 @@
+use crate::heap::{Function, HirId, InlineData, InlineObject};
 use crate::utils::DebugDisplay;
+use crate::{fiber::InstructionPointer, heap::Heap};
+use candy_frontend::hir;
 use candy_frontend::{
-    builtin_functions::BuiltinFunction,
-    hir,
     mir::Id,
     module::Module,
-    rich_ir::{RichIrBuilder, ToRichIr, TokenType},
+    rich_ir::{RichIr, RichIrBuilder, ToRichIr, TokenType},
+    TracingConfig,
 };
 use enumset::EnumSet;
+use extension_trait::extension_trait;
 use itertools::Itertools;
-use num_bigint::BigInt;
+use pad::{Alignment, PadStr};
+use rustc_hash::FxHashSet;
 use std::fmt::{self, Display, Formatter};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lir {
+    pub module: Module,
+    pub constant_heap: Heap,
     pub instructions: Vec<Instruction>,
+    pub origins: Vec<FxHashSet<hir::Id>>,
+    pub module_function: Function,
+    pub responsible_module: HirId,
 }
 
 pub type StackOffset = usize; // 0 is the last item, 1 the one before that, etc.
@@ -22,20 +30,6 @@ pub type StackOffset = usize; // 0 is the last item, 1 the one before that, etc.
 #[derive(Clone, Debug, EnumDiscriminants, Eq, Hash, IntoStaticStr, PartialEq)]
 #[strum_discriminants(derive(Hash, IntoStaticStr), strum(serialize_all = "camelCase"))]
 pub enum Instruction {
-    /// Pushes an int.
-    CreateInt(BigInt),
-
-    /// Pushes a text.
-    CreateText(String),
-
-    /// Pushes an empty tag.
-    CreateSymbol(String),
-
-    /// Pushes a builtin function.
-    ///
-    /// a -> a, builtin
-    CreateBuiltin(BuiltinFunction),
-
     /// Pops num_items items, pushes a list.
     ///
     /// a, item, item, ..., item -> a, pointer to list
@@ -50,17 +44,18 @@ pub enum Instruction {
         num_fields: usize,
     },
 
-    /// Pushes a HIR ID.
-    CreateHirId(hir::Id),
-
-    /// Pushes a closure.
+    /// Pushes a function.
     ///
-    /// a -> a, pointer to closure
-    CreateClosure {
+    /// a -> a, pointer to function
+    CreateFunction {
         captured: Vec<StackOffset>,
         num_args: usize, // excluding responsible parameter
-        body: Vec<Instruction>,
+        body: InstructionPointer,
     },
+
+    /// Pushes a pointer onto the stack. MIR instructions that create
+    /// compile-time known values are compiled to this instruction.
+    PushConstant(InlineObject),
 
     /// Pushes an item from back in the stack on the stack again.
     PushFromStack(StackOffset),
@@ -68,15 +63,15 @@ pub enum Instruction {
     /// Leaves the top stack item untouched, but removes n below.
     PopMultipleBelowTop(usize),
 
-    /// Sets up the data stack for a closure execution and then changes the
+    /// Sets up the data stack for a function execution and then changes the
     /// instruction pointer to the first instruction.
     ///
-    /// a, closure, arg1, arg2, ..., argN, responsible -> a, caller, captured vars, arg1, arg2, ..., argN, responsible
+    /// a, function, arg1, arg2, ..., argN, responsible -> a, caller, captured vars, arg1, arg2, ..., argN, responsible
     ///
-    /// Later, when the closure returns (perhaps many instructions after this
+    /// Later, when the function returns (perhaps many instructions after this
     /// one), the stack will contain the result:
     ///
-    /// a, closure, arg1, arg2, ..., argN, responsible ~> a, return value from closure
+    /// a, function, arg1, arg2, ..., argN, responsible ~> a, return value from function
     Call {
         num_args: usize, // excluding the responsible argument
     },
@@ -89,42 +84,17 @@ pub enum Instruction {
         num_args: usize, // excluding the responsible argument
     },
 
-    /// Returns from the current closure to the original caller. Leaves the data
-    /// stack untouched, but pops a caller from the call stack and returns the
-    /// instruction pointer to continue where the current function was called.
+    /// Returns from the current function to the original caller. Leaves the
+    /// data stack untouched, but pops a caller from the call stack and returns
+    /// the instruction pointer to continue where the current function was
+    /// called.
     Return,
-
-    /// Pops a string path and responsilbe HIR ID and then resolves the path
-    /// relative to the current module. Then does different things depending on
-    /// whether this is a code or asset module.
-    ///
-    /// - Code module:
-    ///
-    ///   Loads and parses the module, then runs the module closure. Later,
-    ///   when the module returns, the stack will contain the struct of the
-    ///   exported definitions:
-    ///
-    ///   a, path, responsible ~> a, structOfModuleExports
-    ///
-    /// - Asset module:
-    ///   
-    ///   Loads the file and pushes its content onto the stack:
-    ///
-    ///   a, path, responsible -> a, listOfContentBytes
-    UseModule {
-        current_module: Module,
-    },
 
     /// Panics. Because the panic instruction only occurs inside the generated
     /// needs function, the reason is already guaranteed to be a text.
     ///
     /// a, reason, responsible -> 💥
     Panic,
-
-    ModuleStarts {
-        module: Module,
-    },
-    ModuleEnds,
 
     /// a, HIR ID, function, arg1, arg2, ..., argN, responsible -> a
     TraceCallStarts {
@@ -137,8 +107,8 @@ pub enum Instruction {
     /// a, HIR ID, value -> a
     TraceExpressionEvaluated,
 
-    /// a, HIR ID, closure -> a
-    TraceFoundFuzzableClosure,
+    /// a, HIR ID, function -> a
+    TraceFoundFuzzableFunction,
 }
 
 impl Instruction {
@@ -147,18 +117,6 @@ impl Instruction {
     /// this instruction.
     pub fn apply_to_stack(&self, stack: &mut Vec<Id>, result: Id) {
         match self {
-            Instruction::CreateInt(_) => {
-                stack.push(result);
-            }
-            Instruction::CreateText(_) => {
-                stack.push(result);
-            }
-            Instruction::CreateSymbol(_) => {
-                stack.push(result);
-            }
-            Instruction::CreateBuiltin(_) => {
-                stack.push(result);
-            }
             Instruction::CreateList { num_items } => {
                 stack.pop_multiple(*num_items);
                 stack.push(result);
@@ -167,10 +125,10 @@ impl Instruction {
                 stack.pop_multiple(2 * num_fields); // fields
                 stack.push(result);
             }
-            Instruction::CreateHirId { .. } => {
+            Instruction::CreateFunction { .. } => {
                 stack.push(result);
             }
-            Instruction::CreateClosure { .. } => {
+            Instruction::PushConstant(_) => {
                 stack.push(result);
             }
             Instruction::PushFromStack(_) => {
@@ -184,7 +142,7 @@ impl Instruction {
             Instruction::Call { num_args } => {
                 stack.pop(); // responsible
                 stack.pop_multiple(*num_args);
-                stack.pop(); // closure/builtin
+                stack.pop(); // function/builtin
                 stack.push(result); // return value
             }
             Instruction::TailCall {
@@ -193,7 +151,7 @@ impl Instruction {
             } => {
                 stack.pop(); // responsible
                 stack.pop_multiple(*num_args);
-                stack.pop(); // closure/builtin
+                stack.pop(); // function/builtin
                 stack.pop_multiple(*num_locals_to_pop);
                 stack.push(result); // return value
             }
@@ -201,18 +159,11 @@ impl Instruction {
                 // Only modifies the call stack and the instruction pointer.
                 // Leaves the return value untouched on the stack.
             }
-            Instruction::UseModule { .. } => {
-                stack.pop(); // responsible
-                stack.pop(); // module path
-                stack.push(result); // exported members or bytes of file
-            }
             Instruction::Panic => {
                 stack.pop(); // responsible
                 stack.pop(); // reason
                 stack.push(result);
             }
-            Instruction::ModuleStarts { .. } => {}
-            Instruction::ModuleEnds => {}
             Instruction::TraceCallStarts { num_args } => {
                 stack.pop(); // HIR ID
                 stack.pop(); // responsible
@@ -226,7 +177,7 @@ impl Instruction {
                 stack.pop(); // HIR ID
                 stack.pop(); // value
             }
-            Instruction::TraceFoundFuzzableClosure => {
+            Instruction::TraceFoundFuzzableFunction => {
                 stack.pop(); // HIR ID
                 stack.pop(); // value
             }
@@ -247,13 +198,48 @@ impl StackExt for Vec<Id> {
 
 impl ToRichIr for Lir {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        let mut iterator = self.instructions.iter();
-        if let Some(instruction) = iterator.next() {
-            instruction.build_rich_ir(builder);
-        }
-        for instruction in iterator {
+        builder.push("# Constant heap", TokenType::Comment, EnumSet::empty());
+        for constant in self.constant_heap.iter() {
             builder.push_newline();
+            builder.push(
+                format!("{:?}", constant.address()),
+                TokenType::Address,
+                EnumSet::empty(),
+            );
+            builder.push(": ", None, EnumSet::empty());
+            builder.push(
+                format!("{constant:?}"),
+                TokenType::Constant,
+                EnumSet::empty(),
+            );
+        }
+
+        builder.push_newline();
+        builder.push_newline();
+
+        builder.push("# Instructions", TokenType::Comment, EnumSet::empty());
+        let instruction_index_width = (self.instructions.len() * 10 - 1).ilog10() as usize;
+        for (i, (instruction, origins)) in self.instructions.iter().zip(&self.origins).enumerate() {
+            builder.push_newline();
+
+            builder.push(
+                format!(
+                    "{}: ",
+                    i.to_string()
+                        .pad_to_width_with_alignment(instruction_index_width, Alignment::Right),
+                ),
+                TokenType::Comment,
+                EnumSet::empty(),
+            );
+
             instruction.build_rich_ir(builder);
+
+            builder.push("  ", None, EnumSet::empty());
+            builder.push(
+                format!("# {}", origins.iter().join(", ")),
+                TokenType::Comment,
+                EnumSet::empty(),
+            );
         }
     }
 }
@@ -267,22 +253,6 @@ impl ToRichIr for Instruction {
         );
 
         match self {
-            Instruction::CreateInt(int) => {
-                builder.push(" ", None, EnumSet::empty());
-                let range = builder.push(int.to_string(), TokenType::Int, EnumSet::empty());
-                builder.push_reference(int.to_owned(), range);
-            }
-            Instruction::CreateText(text) => {
-                builder.push(" ", None, EnumSet::empty());
-                let range =
-                    builder.push(format!(r#""{}""#, text), TokenType::Text, EnumSet::empty());
-                builder.push_reference(text.to_owned(), range);
-            }
-            Instruction::CreateSymbol(symbol) => {
-                builder.push(" ", None, EnumSet::empty());
-                let range = builder.push(symbol, TokenType::Text, EnumSet::empty());
-                builder.push_reference(symbol.to_owned(), range);
-            }
             Instruction::CreateList { num_items } => {
                 builder.push(" ", None, EnumSet::empty());
                 builder.push(num_items.to_string(), None, EnumSet::empty());
@@ -291,19 +261,14 @@ impl ToRichIr for Instruction {
                 builder.push(" ", None, EnumSet::empty());
                 builder.push(num_fields.to_string(), None, EnumSet::empty());
             }
-            Instruction::CreateHirId(id) => {
-                builder.push(" ", None, EnumSet::empty());
-                let range = builder.push(id.to_string(), None, EnumSet::empty());
-                builder.push_reference(id.to_owned(), range);
-            }
-            Instruction::CreateClosure {
+            Instruction::CreateFunction {
                 captured,
                 num_args,
                 body,
             } => {
                 builder.push(
                     format!(
-                        " with {num_args} {} capturing {}",
+                        " with {num_args} {} capturing {} starting at {body:?}",
                         arguments_plural(*num_args),
                         if captured.is_empty() {
                             "nothing".to_string()
@@ -314,14 +279,24 @@ impl ToRichIr for Instruction {
                     None,
                     EnumSet::empty(),
                 );
-                builder.push_foldable(|builder| {
-                    builder.push_children_multiline(body);
-                });
             }
-            Instruction::CreateBuiltin(builtin_function) => {
+            Instruction::PushConstant(constant) => {
                 builder.push(" ", None, EnumSet::empty());
-                let range = builder.push(format!("{:?}", builtin_function), None, EnumSet::empty());
-                builder.push_reference(*builtin_function, range);
+                if let InlineData::Pointer(pointer) = InlineData::from(*constant) {
+                    builder.push(
+                        format!("{:?}", pointer.get().address()),
+                        TokenType::Address,
+                        EnumSet::empty(),
+                    );
+                } else {
+                    builder.push("inline", TokenType::Address, EnumSet::empty());
+                }
+                builder.push(" ", None, EnumSet::empty());
+                builder.push(
+                    format!("{constant:?}"),
+                    TokenType::Constant,
+                    EnumSet::empty(),
+                );
             }
             Instruction::PushFromStack(offset) => {
                 builder.push(" ", None, EnumSet::empty());
@@ -352,17 +327,7 @@ impl ToRichIr for Instruction {
                 );
             }
             Instruction::Return => {}
-            Instruction::UseModule { current_module } => {
-                builder.push(" (currently in ", None, EnumSet::empty());
-                current_module.build_rich_ir(builder);
-                builder.push(")", None, EnumSet::empty());
-            }
             Instruction::Panic => {}
-            Instruction::ModuleStarts { module } => {
-                builder.push(" ", None, EnumSet::empty());
-                module.build_rich_ir(builder);
-            }
-            Instruction::ModuleEnds => {}
             Instruction::TraceCallStarts { num_args } => {
                 builder.push(
                     format!(" ({num_args} {})", arguments_plural(*num_args),),
@@ -372,7 +337,7 @@ impl ToRichIr for Instruction {
             }
             Instruction::TraceCallEnds => {}
             Instruction::TraceExpressionEvaluated => {}
-            Instruction::TraceFoundFuzzableClosure => {}
+            Instruction::TraceFoundFuzzableFunction => {}
         }
     }
 }
@@ -397,5 +362,22 @@ fn arguments_plural(num_args: usize) -> &'static str {
         "argument"
     } else {
         "arguments"
+    }
+}
+
+#[extension_trait]
+pub impl RichIrForLir for RichIr {
+    fn for_lir(module: &Module, lir: &Lir, tracing_config: &TracingConfig) -> RichIr {
+        let mut builder = RichIrBuilder::default();
+        builder.push(
+            format!("# LIR for module {}", module.to_rich_ir()),
+            TokenType::Comment,
+            EnumSet::empty(),
+        );
+        builder.push_newline();
+        builder.push_tracing_config(tracing_config);
+        builder.push_newline();
+        lir.build_rich_ir(&mut builder);
+        builder.finish()
     }
 }

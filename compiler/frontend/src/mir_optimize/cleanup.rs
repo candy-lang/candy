@@ -71,7 +71,7 @@ impl Mir {
     }
 
     pub fn normalize_ids(&mut self) {
-        let mut generator = IdGenerator::start_at(0);
+        let mut generator = IdGenerator::start_at(1);
         let mapping: FxHashMap<Id, Id> = self
             .body
             .defined_ids()

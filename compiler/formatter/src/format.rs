@@ -157,7 +157,7 @@ fn split_leading_whitespace(start_offset: Offset, csts: &[Cst]) -> (ExistingWhit
 /// 2. Tell each [ExistingWhitespace] (often through [FormattedCst]) whether it should be empty,
 ///    become a single space, or become a newline with indentation.
 ///
-/// See the case of [CstKind::StructAccess] for a simple example and [CstKind::Lambda] for the
+/// See the case of [CstKind::StructAccess] for a simple example and [CstKind::Function] for the
 /// opposite.
 ///
 /// [previous_width] is relevant for the minimum width that is reserved on the first line: E.g.,
@@ -698,7 +698,7 @@ pub(crate) fn format_cst<'a>(
                 whitespace,
             );
         }
-        CstKind::Lambda {
+        CstKind::Function {
             opening_curly_brace,
             parameters_and_arrow,
             body,
@@ -879,7 +879,7 @@ pub(crate) fn format_cst<'a>(
             );
 
             let body_info = if body.len() == 1 {
-                // Avoid double indentation for bodies/items/entries in trailing lambdas/lists/
+                // Avoid double indentation for bodies/items/entries in trailing functions/lists/
                 // structs.
                 info.for_single_expression_in_assignment_body()
             } else {
@@ -1100,7 +1100,7 @@ pub impl<D> CstExtension for Cst<D> {
     fn is_sandwich_like(&self) -> bool {
         matches!(
             &self.kind,
-            CstKind::List { .. } | CstKind::Struct { .. } | CstKind::Lambda { .. },
+            CstKind::List { .. } | CstKind::Struct { .. } | CstKind::Function { .. },
         )
     }
 
@@ -1148,7 +1148,7 @@ pub impl<D> CstExtension for Cst<D> {
             CstKind::StructAccess { .. } => Some(PrecedenceCategory::High),
             CstKind::Match { .. } => Some(PrecedenceCategory::Low),
             CstKind::MatchCase { .. } => None,
-            CstKind::Lambda { .. } => Some(PrecedenceCategory::High),
+            CstKind::Function { .. } => Some(PrecedenceCategory::High),
             CstKind::Assignment { .. } | CstKind::Error { .. } => None,
         }
     }
@@ -1700,7 +1700,7 @@ mod test {
         );
     }
     #[test]
-    fn test_lambda() {
+    fn test_function() {
         // No parameters
 
         test("{}", "{ }\n");

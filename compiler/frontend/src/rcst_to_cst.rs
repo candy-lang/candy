@@ -1,7 +1,7 @@
 use super::{
     cst::{Cst, CstKind},
     rcst::Rcst,
-    string_to_rcst::{InvalidModuleError, StringToRcst},
+    string_to_rcst::{ModuleError, StringToRcst},
 };
 use crate::{
     cst::{CstData, Id},
@@ -14,10 +14,12 @@ use std::sync::Arc;
 
 #[salsa::query_group(RcstToCstStorage)]
 pub trait RcstToCst: StringToRcst {
-    fn cst(&self, module: Module) -> Result<Arc<Vec<Cst>>, InvalidModuleError>;
+    fn cst(&self, module: Module) -> Result<Arc<Vec<Cst>>, ModuleError>;
 }
 
-fn cst(db: &dyn RcstToCst, module: Module) -> Result<Arc<Vec<Cst>>, InvalidModuleError> {
+pub type CstResult = Result<Arc<Vec<Cst>>, ModuleError>;
+
+fn cst(db: &dyn RcstToCst, module: Module) -> Result<Arc<Vec<Cst>>, ModuleError> {
     let rcsts = db.rcst(module)?;
     Ok(Arc::new(rcsts.to_csts()))
 }
@@ -263,12 +265,12 @@ impl Rcst {
                 inner: Box::new(inner.to_cst(state)),
                 closing_parenthesis: Box::new(closing_parenthesis.to_cst(state)),
             },
-            CstKind::Lambda {
+            CstKind::Function {
                 opening_curly_brace,
                 parameters_and_arrow,
                 body,
                 closing_curly_brace,
-            } => CstKind::Lambda {
+            } => CstKind::Function {
                 opening_curly_brace: Box::new(opening_curly_brace.to_cst(state)),
                 parameters_and_arrow: parameters_and_arrow.as_ref().map(|(parameters, arrow)| {
                     (

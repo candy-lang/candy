@@ -8,9 +8,9 @@ pub enum BuiltinFunction {
     ChannelSend,         // channel any -> Nothing
     ChannelReceive,      // channel -> any
     Equals,              // any any -> booleanTag
-    FunctionRun,         // (lambdaWith0Arguments) -> (returnValue: any)
-    GetArgumentCount,    // closure -> argumentCount
-    IfElse,              // condition thenClosure elseClosure -> resultOfExecutedClosure
+    FunctionRun,         // (functionWith0Arguments) -> (returnValue: any)
+    GetArgumentCount,    // function -> argumentCount
+    IfElse,              // condition thenFunction elseFunction -> resultOfExecutedFunction
     IntAdd,              // (summandA: int) (summandB: int) -> (sum: int)
     IntBitLength,        // (value: int) -> (numberOfBits: int)
     IntBitwiseAnd,       // (valueA: int) (valueB: int) -> (result: int)
@@ -31,7 +31,7 @@ pub enum BuiltinFunction {
     ListLength,          // list -> int
     ListRemoveAt,        // list (index: int) -> (list, item)
     ListReplace,         // list (index: int) newItem -> list
-    Parallel,            // body: Closure -> returnValueOfClosure
+    Parallel,            // body: Function -> returnValueOfFunction
     Print,               // message -> Nothing
     StructGet,           // struct key -> value
     StructGetKeys,       // struct -> listOfKeys
@@ -51,7 +51,7 @@ pub enum BuiltinFunction {
     TextTrimEnd,         // text -> text
     TextTrimStart,       // text -> text
     ToDebugText,         // any -> text
-    Try,                 // closure -> okWithClosureResultOrErrorWithPanicReason
+    Try,                 // function -> okWithFunctionResultOrErrorWithPanicReason
     TypeOf,              // any -> typeTag
 }
 lazy_static! {

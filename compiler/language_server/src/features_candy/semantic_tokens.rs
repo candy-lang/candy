@@ -242,7 +242,7 @@ fn visit_cst(
             visit_cst(builder, arrow, None);
             visit_csts(builder, body, None);
         }
-        CstKind::Lambda {
+        CstKind::Function {
             opening_curly_brace,
             parameters_and_arrow,
             body,

@@ -49,20 +49,16 @@ mod constant_folding;
 mod constant_lifting;
 mod inlining;
 mod module_folding;
-mod module_stack_cancelling;
 mod multiple_flattening;
 mod reference_following;
 mod tree_shaking;
 mod utils;
 
-use super::{
-    hir,
-    hir_to_mir::HirToMir,
-    mir::{Body, Expression, Mir},
-    tracing::TracingConfig,
+use super::{hir, hir_to_mir::HirToMir, mir::Mir, tracing::TracingConfig};
+use crate::{
+    error::CompilerError, hir_to_mir::MirResult, mir::MirError, module::Module, rich_ir::ToRichIr,
 };
-use crate::{id::IdGenerator, module::Module, rich_ir::ToRichIr};
-use rustc_hash::FxHasher;
+use rustc_hash::{FxHashSet, FxHasher};
 use std::{
     hash::{Hash, Hasher},
     sync::Arc,
@@ -72,73 +68,75 @@ use tracing::debug;
 #[salsa::query_group(OptimizeMirStorage)]
 pub trait OptimizeMir: HirToMir {
     #[salsa::cycle(recover_from_cycle)]
-    fn mir_with_obvious_optimized(
-        &self,
-        module: Module,
-        tracing: TracingConfig,
-    ) -> Option<Arc<Mir>>;
+    fn optimized_mir(&self, module: Module, tracing: TracingConfig) -> MirResult;
 }
 
-fn mir_with_obvious_optimized(
-    db: &dyn OptimizeMir,
-    module: Module,
-    tracing: TracingConfig,
-) -> Option<Arc<Mir>> {
+fn optimized_mir(db: &dyn OptimizeMir, module: Module, tracing: TracingConfig) -> MirResult {
     debug!("{}: Compiling.", module.to_rich_ir());
-    let mir = db.mir(module.clone(), tracing.clone())?;
+    let (mir, errors) = db.mir(module.clone(), tracing.clone())?;
     let mut mir = (*mir).clone();
+    let mut errors = (*errors).clone();
 
     let complexity_before = mir.complexity();
-    mir.optimize_obvious(db, &tracing);
+    mir.optimize_obvious(db, &tracing, &mut errors);
     let complexity_after = mir.complexity();
 
     debug!(
         "{}: Done. Optimized from {complexity_before} to {complexity_after}",
         module.to_rich_ir(),
     );
-    Some(Arc::new(mir))
+    Ok((Arc::new(mir), Arc::new(errors)))
 }
 
 impl Mir {
     /// Performs optimizations that (usually) improve both performance and code
     /// size.
-    pub fn optimize_obvious(&mut self, db: &dyn OptimizeMir, tracing: &TracingConfig) {
+    pub fn optimize_obvious(
+        &mut self,
+        db: &dyn OptimizeMir,
+        tracing: &TracingConfig,
+        errors: &mut FxHashSet<CompilerError>,
+    ) {
+        self.optimize_stuff_necessary_for_module_folding();
+        self.checked_optimization(&mut |mir| mir.fold_modules(db, tracing, errors));
+        self.replace_remaining_uses_with_panics(errors);
+        self.heavily_optimize();
+        self.cleanup();
+    }
+
+    pub fn optimize_stuff_necessary_for_module_folding(&mut self) {
         loop {
             let hashcode_before = self.do_hash();
 
-            self.optimize_obvious_self_contained();
-            self.fold_modules(db, tracing);
+            // TODO: If you have the (unusual) code structure of a very long
+            // function containing a `use` that's used very often, this
+            // optimization leads to a big blowup of code. We should possibly
+            // think about what to do in that case.
+            self.checked_optimization(&mut |mir| mir.inline_functions_containing_use());
+            self.checked_optimization(&mut |mir| mir.flatten_multiples());
+            self.checked_optimization(&mut |mir| mir.follow_references());
 
             if self.do_hash() == hashcode_before {
-                break;
+                return;
             }
         }
-        self.optimize_obvious_self_contained();
-        self.cleanup();
     }
 
     /// Performs optimizations that (usually) improve both performance and code
     /// size and that work without looking at other modules.
-    pub fn optimize_obvious_self_contained(&mut self) {
-        // TODO: This optimization may make the code more inefficient for very
-        // long functions containing a `use`. Remove this optimization as soon
-        // as we support general speculative inlining.
-        self.checked_optimization(|mir| mir.inline_functions_containing_use());
-
+    pub fn heavily_optimize(&mut self) {
         loop {
             let hashcode_before = self.do_hash();
 
-            self.checked_optimization(|mir| mir.follow_references());
-            self.checked_optimization(|mir| mir.remove_redundant_return_references());
-            self.checked_optimization(|mir| mir.tree_shake());
-            self.checked_optimization(|mir| mir.fold_constants());
-            self.checked_optimization(|mir| mir.inline_functions_only_called_once());
-            self.checked_optimization(|mir| mir.inline_tiny_functions());
-            self.checked_optimization(|mir| mir.lift_constants());
-            self.checked_optimization(|mir| mir.eliminate_common_subtrees());
-            self.checked_optimization(|mir| mir.flatten_multiples());
-            self.checked_optimization(|mir| mir.cancel_out_module_expressions());
-            self.checked_optimization(|mir| mir.remove_all_module_expressions_if_no_use_exists());
+            self.checked_optimization(&mut |mir| mir.follow_references());
+            self.checked_optimization(&mut |mir| mir.remove_redundant_return_references());
+            self.checked_optimization(&mut |mir| mir.tree_shake());
+            self.checked_optimization(&mut |mir| mir.fold_constants());
+            self.checked_optimization(&mut |mir| mir.inline_functions_only_called_once());
+            self.checked_optimization(&mut |mir| mir.inline_tiny_functions());
+            self.checked_optimization(&mut |mir| mir.lift_constants());
+            self.checked_optimization(&mut |mir| mir.eliminate_common_subtrees());
+            self.checked_optimization(&mut |mir| mir.flatten_multiples());
 
             if self.do_hash() == hashcode_before {
                 return;
@@ -151,7 +149,8 @@ impl Mir {
         hasher.finish()
     }
 
-    fn checked_optimization(&mut self, optimization: fn(&mut Mir) -> ()) {
+    fn checked_optimization(&mut self, optimization: &mut impl FnMut(&mut Mir)) {
+        self.cleanup();
         optimization(self);
         if cfg!(debug_assertions) {
             self.validate();
@@ -164,26 +163,19 @@ fn recover_from_cycle(
     cycle: &[String],
     module: &Module,
     _tracing: &TracingConfig,
-) -> Option<Arc<Mir>> {
-    let mut id_generator = IdGenerator::start_at(0);
-    let mut body = Body::default();
-    let reason = body.push_with_new_id(
-        &mut id_generator,
-        Expression::Text(format!(
-            "There's a cycle in the used modules: {}",
-            cycle.join(" → "),
-        )),
-    );
-    let responsible = body.push_with_new_id(
-        &mut id_generator,
-        Expression::HirId(hir::Id::new(module.clone(), vec![])),
-    );
-    body.push_with_new_id(
-        &mut id_generator,
-        Expression::Panic {
-            reason,
-            responsible,
+) -> MirResult {
+    let error = CompilerError::for_whole_module(
+        module.clone(),
+        MirError::ModuleHasCycle {
+            cycle: cycle.to_vec(),
         },
     );
-    Some(Arc::new(Mir { id_generator, body }))
+
+    let mir = Mir::build(|body| {
+        let reason = body.push_text(error.payload.to_string());
+        let responsible = body.push_hir_id(hir::Id::new(module.clone(), vec![]));
+        body.push_panic(reason, responsible);
+    });
+
+    Ok((Arc::new(mir), Arc::new(FxHashSet::from_iter([error]))))
 }

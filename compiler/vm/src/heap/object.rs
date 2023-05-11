@@ -1,7 +1,7 @@
 use super::{
     object_heap::{
-        closure::HeapClosure, hir_id::HeapHirId, int::HeapInt, list::HeapList, struct_::HeapStruct,
-        tag::HeapTag, text::HeapText, HeapData, HeapObject,
+        function::HeapFunction, hir_id::HeapHirId, int::HeapInt, list::HeapList,
+        struct_::HeapStruct, tag::HeapTag, text::HeapText, HeapData, HeapObject,
     },
     object_inline::{
         builtin::InlineBuiltin,
@@ -13,11 +13,10 @@ use super::{
 };
 use crate::{
     channel::ChannelId,
-    lir::{Instruction, Lir},
-    mir_to_lir::MirToLir,
+    fiber::InstructionPointer,
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
-use candy_frontend::{builtin_functions::BuiltinFunction, hir::Id, module::Module, TracingConfig};
+use candy_frontend::{builtin_functions::BuiltinFunction, hir::Id};
 use derive_more::{Deref, From};
 use num_bigint::BigInt;
 use rustc_hash::FxHashMap;
@@ -39,15 +38,15 @@ pub enum Data {
     List(List),
     Struct(Struct),
     HirId(HirId),
-    Closure(Closure),
+    Function(Function),
     Builtin(Builtin),
     SendPort(SendPort),
     ReceivePort(ReceivePort),
 }
 impl Data {
-    pub fn closure(&self) -> Option<&Closure> {
-        if let Data::Closure(closure) = self {
-            Some(closure)
+    pub fn function(&self) -> Option<&Function> {
+        if let Data::Function(function) = self {
+            Some(function)
         } else {
             None
         }
@@ -73,7 +72,7 @@ impl From<HeapObject> for Data {
             HeapData::Struct(struct_) => Data::Struct(Struct(struct_)),
             HeapData::Tag(tag) => Data::Tag(Tag(tag)),
             HeapData::Text(text) => Data::Text(Text(text)),
-            HeapData::Closure(closure) => Data::Closure(Closure(closure)),
+            HeapData::Function(function) => Data::Function(Function(function)),
             HeapData::HirId(hir_id) => Data::HirId(HirId(hir_id)),
         }
     }
@@ -88,7 +87,7 @@ impl DebugDisplay for Data {
             Data::List(list) => DebugDisplay::fmt(list, f, is_debug),
             Data::Struct(struct_) => DebugDisplay::fmt(struct_, f, is_debug),
             Data::HirId(hir_id) => DebugDisplay::fmt(hir_id, f, is_debug),
-            Data::Closure(closure) => DebugDisplay::fmt(closure, f, is_debug),
+            Data::Function(function) => DebugDisplay::fmt(function, f, is_debug),
             Data::Builtin(builtin) => DebugDisplay::fmt(builtin, f, is_debug),
             Data::SendPort(send_port) => DebugDisplay::fmt(send_port, f, is_debug),
             Data::ReceivePort(receive_port) => DebugDisplay::fmt(receive_port, f, is_debug),
@@ -375,37 +374,25 @@ impls_via_0!(Struct);
 impl_try_froms!(Struct, "Expected a struct.");
 impl_try_from_heap_object!(Struct, "Expected a struct.");
 
-// Closure
+// Function
 
 #[derive(Clone, Copy, Deref, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Closure(HeapClosure);
+pub struct Function(HeapFunction);
 
-impl Closure {
+impl Function {
     pub fn create(
         heap: &mut Heap,
         captured: &[InlineObject],
         argument_count: usize,
-        instructions: Vec<Instruction>,
+        body: InstructionPointer,
     ) -> Self {
-        HeapClosure::create(heap, captured, argument_count, instructions).into()
-    }
-    pub fn create_from_module_lir(heap: &mut Heap, lir: Lir) -> Self {
-        Self::create(heap, &[], 0, lir.instructions)
-    }
-    pub fn create_from_module(
-        heap: &mut Heap,
-        db: &impl MirToLir,
-        module: Module,
-        tracing: TracingConfig,
-    ) -> Option<Self> {
-        let lir = db.lir(module, tracing)?;
-        Some(Self::create_from_module_lir(heap, lir.as_ref().to_owned()))
+        HeapFunction::create(heap, captured, argument_count, body).into()
     }
 }
 
-impls_via_0!(Closure);
-impl_try_froms!(Closure, "Expected a closure.");
-impl_try_from_heap_object!(Closure, "Expected a closure.");
+impls_via_0!(Function);
+impl_try_froms!(Function, "Expected a function.");
+impl_try_from_heap_object!(Function, "Expected a function.");
 
 // HIR ID
 

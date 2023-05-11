@@ -1,7 +1,7 @@
 use super::{utils::heap_object_impls, HeapObjectTrait};
 use crate::{
+    fiber::InstructionPointer,
     heap::{object_heap::HeapObject, Heap, InlineObject},
-    lir::Instruction,
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
 use derive_more::Deref;
@@ -11,15 +11,14 @@ use std::{
     cmp::Ordering,
     fmt::{self, Formatter},
     hash::{Hash, Hasher},
-    mem,
     ptr::{self, NonNull},
     slice,
 };
 
 #[derive(Clone, Copy, Deref)]
-pub struct HeapClosure(HeapObject);
+pub struct HeapFunction(HeapObject);
 
-impl HeapClosure {
+impl HeapFunction {
     const CAPTURED_LEN_SHIFT: usize = 32;
     const ARGUMENT_COUNT_SHIFT: usize = 3;
 
@@ -30,13 +29,13 @@ impl HeapClosure {
         heap: &mut Heap,
         captured: &[InlineObject],
         argument_count: usize,
-        instructions: Vec<Instruction>,
+        body: InstructionPointer,
     ) -> Self {
         let captured_len = captured.len();
         assert_eq!(
             (captured_len << Self::CAPTURED_LEN_SHIFT) >> Self::CAPTURED_LEN_SHIFT,
             captured_len,
-            "Closure captures too many things.",
+            "Function captures too many things.",
         );
 
         let argument_count_shift_for_max_size =
@@ -45,36 +44,25 @@ impl HeapClosure {
             (argument_count << argument_count_shift_for_max_size)
                 >> argument_count_shift_for_max_size,
             argument_count,
-            "Closure accepts too many arguments.",
+            "Function accepts too many arguments.",
         );
 
-        let closure = Self(heap.allocate(
-            HeapObject::KIND_CLOSURE
+        let function = Self(heap.allocate(
+            HeapObject::KIND_FUNCTION
                 | ((captured_len as u64) << Self::CAPTURED_LEN_SHIFT)
                 | ((argument_count as u64) << Self::ARGUMENT_COUNT_SHIFT),
-            (1 + captured_len) * HeapObject::WORD_SIZE + mem::size_of_val(instructions.as_slice()),
+            (1 + captured_len) * HeapObject::WORD_SIZE,
         ));
-        let instructions_len = instructions.len();
         unsafe {
-            *closure.instructions_len_pointer().as_mut() = instructions_len as u64;
+            *function.body_pointer().as_mut() = *body as u64;
             ptr::copy_nonoverlapping(
                 captured.as_ptr(),
-                closure.captured_pointer().as_ptr(),
+                function.captured_pointer().as_ptr(),
                 captured_len,
-            );
-            ptr::copy_nonoverlapping(
-                instructions.as_ptr(),
-                closure.instructions_pointer().as_ptr(),
-                instructions_len,
             );
         }
 
-        // `Instruction`s are not self-contained, but can contain pointers to other objects on the
-        // Rust heap. Hence, we transfer ownership of the original instructions (including whatever
-        // they reference) to this `HeapClosure` object.
-        mem::forget(instructions);
-
-        closure
+        function
     }
 
     pub fn captured_len(self) -> usize {
@@ -91,41 +79,27 @@ impl HeapClosure {
         ((self.header_word() & 0xFFFF_FFFF) >> Self::ARGUMENT_COUNT_SHIFT) as usize
     }
 
-    fn instructions_len_pointer(self) -> NonNull<u64> {
+    fn body_pointer(self) -> NonNull<u64> {
         self.content_word_pointer(0)
     }
-    pub fn instructions_len(self) -> usize {
-        unsafe { *self.instructions_len_pointer().as_ref() as usize }
+    pub fn body(self) -> InstructionPointer {
+        unsafe { *self.body_pointer().as_ref() as usize }.into()
     }
-    pub fn instructions_pointer(self) -> NonNull<Instruction> {
-        self.content_word_pointer(1 + self.captured_len()).cast()
-    }
-    pub fn instructions<'a>(self) -> &'a [Instruction] {
+    pub fn set_body(self, body: InstructionPointer) {
         unsafe {
-            slice::from_raw_parts(
-                self.instructions_pointer().as_ref(),
-                self.instructions_len(),
-            )
-        }
-    }
-    fn instructions_mut<'a>(self) -> &'a mut [Instruction] {
-        unsafe {
-            slice::from_raw_parts_mut(
-                self.instructions_pointer().as_mut(),
-                self.instructions_len(),
-            )
+            *self.body_pointer().as_mut() = *body as u64;
         }
     }
 }
 
-impl DebugDisplay for HeapClosure {
+impl DebugDisplay for HeapFunction {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         let argument_count = self.argument_count();
         let captured = self.captured();
         if is_debug {
             write!(
                 f,
-                "{{ {} {} (capturing {}) →{}\n}}",
+                "{{ {} {} (capturing {}) → {:?} }}",
                 argument_count,
                 if argument_count == 1 {
                     "argument"
@@ -140,35 +114,29 @@ impl DebugDisplay for HeapClosure {
                         .map(|it| DebugDisplay::to_string(it, false))
                         .join(", ")
                 },
-                self.instructions()
-                    .iter()
-                    .map(|it| DebugDisplay::to_string(it, true)
-                        .lines()
-                        .map(|it| format!("\n  {it}"))
-                        .join(""))
-                    .join(""),
+                self.body(),
             )
         } else {
             write!(f, "{{…}}")
         }
     }
 }
-impl_debug_display_via_debugdisplay!(HeapClosure);
+impl_debug_display_via_debugdisplay!(HeapFunction);
 
-impl Eq for HeapClosure {}
-impl PartialEq for HeapClosure {
+impl Eq for HeapFunction {}
+impl PartialEq for HeapFunction {
     fn eq(&self, other: &Self) -> bool {
         // TODO: Compare the underlying HIR ID once we have it here (plus captured stuff)
         self.captured() == other.captured()
             && self.argument_count() == other.argument_count()
-            && self.instructions() == other.instructions()
+            && self.body() == other.body()
     }
 }
-impl Hash for HeapClosure {
+impl Hash for HeapFunction {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.captured().hash(state);
         self.argument_count().hash(state);
-        self.instructions().hash(state);
+        self.body().hash(state);
     }
 }
 impl Ord for HeapClosure {
@@ -183,11 +151,11 @@ impl PartialOrd for HeapClosure {
     }
 }
 
-heap_object_impls!(HeapClosure);
+heap_object_impls!(HeapFunction);
 
-impl HeapObjectTrait for HeapClosure {
+impl HeapObjectTrait for HeapFunction {
     fn content_size(self) -> usize {
-        (1 + self.captured_len()) * HeapObject::WORD_SIZE + mem::size_of_val(self.instructions())
+        (1 + self.captured_len()) * HeapObject::WORD_SIZE
     }
 
     fn clone_content_to_heap_with_mapping(
@@ -197,7 +165,7 @@ impl HeapObjectTrait for HeapClosure {
         address_map: &mut FxHashMap<HeapObject, HeapObject>,
     ) {
         let clone = Self(clone);
-        unsafe { *clone.instructions_len_pointer().as_mut() = self.instructions_len() as u64 };
+        unsafe { *clone.body_pointer().as_mut() = *self.body() as u64 };
         for (index, &captured) in self.captured().iter().enumerate() {
             clone.unsafe_set_content_word(
                 1 + index,
@@ -207,19 +175,13 @@ impl HeapObjectTrait for HeapClosure {
                     .get(),
             );
         }
-        unsafe {
-            ptr::copy_nonoverlapping(
-                self.instructions_pointer().as_ptr(),
-                clone.instructions_pointer().as_ptr(),
-                self.instructions_len(),
-            )
-        };
     }
 
     fn drop_children(self, heap: &mut Heap) {
         for captured in self.captured() {
             captured.drop(heap);
         }
-        unsafe { ptr::drop_in_place(self.instructions_mut() as *mut [_]) };
     }
+
+    fn deallocate_external_stuff(self) {}
 }

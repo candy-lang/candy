@@ -1,8 +1,5 @@
 pub use self::{
-    object::{
-        Builtin, Closure, Data, DataDiscriminants, HirId, Int, List, ReceivePort, SendPort, Struct,
-        Tag, Text,
-    },
+    object::{Builtin, Data, Function, HirId, Int, List, ReceivePort, SendPort, Struct, Tag, Text},
     object_heap::{HeapData, HeapObject, HeapObjectTrait},
     object_inline::{
         int::I64BitLength, InlineData, InlineObject, InlineObjectSliceCloneToHeap,
@@ -12,6 +9,7 @@ pub use self::{
 };
 use crate::channel::ChannelId;
 use derive_more::{DebugCustom, Deref, Pointer};
+use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     alloc::{self, Allocator, Layout},
@@ -25,7 +23,7 @@ mod object_heap;
 mod object_inline;
 mod pointer;
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct Heap {
     objects: FxHashSet<ObjectInHeap>,
     channel_refcounts: FxHashMap<ChannelId, usize>,
@@ -52,6 +50,7 @@ impl Heap {
     }
     /// Don't call this method directly, call [drop] or [free] instead!
     pub(super) fn deallocate(&mut self, object: HeapData) {
+        object.deallocate_external_stuff();
         let layout = Layout::from_size_align(
             2 * HeapObject::WORD_SIZE + object.content_size(),
             HeapObject::WORD_SIZE,
@@ -62,10 +61,7 @@ impl Heap {
     }
 
     pub(self) fn notify_port_created(&mut self, channel_id: ChannelId) {
-        self.channel_refcounts
-            .entry(channel_id)
-            .and_modify(|count| *count += 1)
-            .or_insert(1);
+        *self.channel_refcounts.entry(channel_id).or_default() += 1;
     }
     pub(self) fn dup_channel_by(&mut self, channel_id: ChannelId, amount: usize) {
         *self.channel_refcounts.entry(channel_id).or_insert_with(|| {
@@ -83,6 +79,13 @@ impl Heap {
         }
     }
 
+    pub fn adopt(&mut self, mut other: Heap) {
+        self.objects.extend(mem::take(&mut other.objects));
+        for (channel_id, refcount) in mem::take(&mut other.channel_refcounts) {
+            *self.channel_refcounts.entry(channel_id).or_default() += refcount;
+        }
+    }
+
     pub fn objects_len(&self) -> usize {
         self.objects.len()
     }
@@ -94,9 +97,48 @@ impl Heap {
         self.channel_refcounts.keys().copied()
     }
 
+    // We do not confuse this with the `std::Clone::clone` method.
+    #[allow(clippy::should_implement_trait)]
+    pub fn clone(&self) -> (Heap, FxHashMap<HeapObject, HeapObject>) {
+        let mut cloned = Heap {
+            objects: FxHashSet::default(),
+            channel_refcounts: self.channel_refcounts.clone(),
+        };
+
+        let mut mapping = FxHashMap::default();
+        for object in &self.objects {
+            object.clone_to_heap_with_mapping(&mut cloned, &mut mapping);
+        }
+
+        (cloned, mapping)
+    }
+
+    pub(super) fn reset_reference_counts(&mut self) {
+        for value in self.channel_refcounts.values_mut() {
+            *value = 0;
+        }
+
+        let to_deallocate = self
+            .objects
+            .iter()
+            .filter(|it| it.reference_count() == 0)
+            .map(|&it| *it)
+            .collect_vec();
+        for object in to_deallocate {
+            self.deallocate(object.into());
+        }
+    }
+    pub(super) fn drop_all_unreferenced(&mut self) {
+        self.channel_refcounts
+            .retain(|_, &mut refcount| refcount > 0);
+        for object in &self.objects {
+            object.set_reference_count(0);
+        }
+    }
+
     pub fn clear(&mut self) {
         for object in mem::take(&mut self.objects).iter() {
-            object.free(self);
+            self.deallocate(HeapData::from(object.0));
         }
         self.channel_refcounts.clear();
     }
@@ -104,8 +146,9 @@ impl Heap {
 
 impl Debug for Heap {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        writeln!(f, "{{")?;
-        for &object in self.objects.iter() {
+        writeln!(f, "{{\n  channel_refcounts: {:?}", self.channel_refcounts)?;
+
+        for &object in &self.objects {
             let reference_count = object.reference_count();
             writeln!(
                 f,

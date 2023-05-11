@@ -1,34 +1,3 @@
-use std::sync::Arc;
-
-use crate::{lir::Lir, mir_to_lir::MirToLir};
-use candy_frontend::{module::Module, TracingConfig};
-
-// VMs and fibers need some of these traits when they run some expressions. This
-// allows parameterizing the running of the code over the outside world and
-// effects without bleeding implementation details (such as salsa) into the code
-// of the VM.
-
-pub trait UseProvider {
-    fn use_module(&self, module: Module) -> Option<Arc<Lir>>;
-}
-
-pub struct PanickingUseProvider;
-impl UseProvider for PanickingUseProvider {
-    fn use_module(&self, _: Module) -> Option<Arc<Lir>> {
-        panic!()
-    }
-}
-
-pub struct DbUseProvider<'a, DB: MirToLir> {
-    pub db: &'a DB,
-    pub tracing: TracingConfig,
-}
-impl<'a, DB: MirToLir> UseProvider for DbUseProvider<'a, DB> {
-    fn use_module(&self, module: Module) -> Option<Arc<Lir>> {
-        self.db.lir(module, self.tracing.clone())
-    }
-}
-
 pub trait ExecutionController {
     fn should_continue_running(&self) -> bool;
     fn instruction_executed(&mut self);

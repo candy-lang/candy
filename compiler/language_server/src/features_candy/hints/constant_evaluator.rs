@@ -6,22 +6,23 @@ use candy_frontend::{
     module::{Module, ModuleDb},
     position::PositionConversionDb,
     rich_ir::ToRichIr,
-    TracingConfig, TracingMode,
 };
+use candy_fuzzer::FuzzablesFinder;
 use candy_vm::{
-    context::{DbUseProvider, RunLimitedNumberOfInstructions},
-    fiber::FiberId,
-    heap::{Closure, Heap},
-    mir_to_lir::MirToLir,
+    context::RunLimitedNumberOfInstructions,
+    heap::Function,
+    lir::Lir,
     tracer::{
-        full::{FullTracer, StoredFiberEvent, StoredVmEvent, TimedEvent},
-        stack_trace::Call,
+        compound::CompoundTracer,
+        evaluated_values::EvaluatedValuesTracer,
+        stack_trace::{Call, StackTracer},
     },
     vm::{self, Vm},
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
 use rustc_hash::FxHashMap;
+use std::sync::Arc;
 use tracing::{span, Level};
 
 #[derive(Default)]
@@ -29,40 +30,32 @@ pub struct ConstantEvaluator {
     evaluators: FxHashMap<Module, Evaluator>,
 }
 struct Evaluator {
-    tracer: FullTracer,
-    vm: Vm,
+    lir: Arc<Lir>,
+    tracer: EvaluatorTracer,
+    vm: Vm<Arc<Lir>, EvaluatorTracer>,
 }
+type EvaluatorTracer =
+    CompoundTracer<StackTracer, CompoundTracer<EvaluatedValuesTracer, FuzzablesFinder>>;
 
 impl ConstantEvaluator {
-    pub fn update_module(&mut self, db: &impl MirToLir, module: Module) {
-        let tracing = TracingConfig {
-            register_fuzzables: TracingMode::OnlyCurrent,
-            calls: TracingMode::Off,
-            evaluated_expressions: TracingMode::OnlyCurrent,
-        };
-        let mut heap = Heap::default();
-        let closure = Closure::create_from_module(&mut heap, db, module.clone(), tracing).unwrap();
-
-        let mut vm = Vm::default();
-        vm.set_up_for_running_module_closure(heap, module.clone(), closure);
-
-        self.evaluators.insert(
-            module,
-            Evaluator {
-                tracer: FullTracer::default(),
-                vm,
+    pub fn update_module(&mut self, module: Module, lir: Arc<Lir>) {
+        let mut tracer = CompoundTracer {
+            tracer0: StackTracer::default(),
+            tracer1: CompoundTracer {
+                tracer0: EvaluatedValuesTracer::new(module.clone()),
+                tracer1: FuzzablesFinder::default(),
             },
-        );
+        };
+        let vm = Vm::for_module(lir.clone(), &mut tracer);
+        self.evaluators
+            .insert(module, Evaluator { lir, tracer, vm });
     }
 
     pub fn remove_module(&mut self, module: Module) {
         self.evaluators.remove(&module).unwrap();
     }
 
-    pub fn run<DB>(&mut self, db: &DB) -> Option<Module>
-    where
-        DB: AstDb + AstToHir + HirDb + MirToLir + ModuleDb + PositionConversionDb,
-    {
+    pub fn run(&mut self) -> Option<Module> {
         let mut running_evaluators = self
             .evaluators
             .iter_mut()
@@ -71,34 +64,28 @@ impl ConstantEvaluator {
         let (module, evaluator) = running_evaluators.choose_mut(&mut thread_rng())?;
 
         evaluator.vm.run(
-            &DbUseProvider {
-                db,
-                tracing: TracingConfig::off(),
-            },
             &mut RunLimitedNumberOfInstructions::new(500),
             &mut evaluator.tracer,
         );
-        Some(module.clone())
+
+        // TODO: Report incremental progress during constant evaluation.
+        if evaluator.tracer.tracer1.tracer1.fuzzables().is_some() {
+            Some(module.clone())
+        } else {
+            None
+        }
     }
 
-    pub fn get_fuzzable_closures(&self, module: &Module) -> Vec<(Id, Closure)> {
+    pub fn get_fuzzable_functions(&self, module: &Module) -> (Arc<Lir>, FxHashMap<Id, Function>) {
         let evaluator = &self.evaluators[module];
-        evaluator
+        let fuzzable_functions = evaluator
             .tracer
-            .events
-            .iter()
-            .filter_map(|event| match &event.event {
-                StoredVmEvent::InFiber {
-                    event:
-                        StoredFiberEvent::FoundFuzzableClosure {
-                            definition: id,
-                            closure,
-                        },
-                    ..
-                } => Some((id.get().to_owned(), *closure)),
-                _ => None,
-            })
-            .collect()
+            .tracer1
+            .tracer1
+            .fuzzables()
+            .map(|it| it.to_owned())
+            .unwrap_or_default();
+        (evaluator.lir.clone(), fuzzable_functions)
     }
 
     pub fn get_hints<DB>(&self, db: &DB, module: &Module) -> Vec<Hint>
@@ -113,20 +100,13 @@ impl ConstantEvaluator {
         let mut hints = vec![];
 
         // TODO: Think about how to highlight the responsible piece of code.
-        if let vm::Status::Panicked { reason, .. } = evaluator.vm.status() {
-            if let Some(hint) = panic_hint(db, module.clone(), evaluator, reason) {
+        if let vm::Status::Panicked(panic) = evaluator.vm.status() {
+            if let Some(hint) = panic_hint(db, module.clone(), evaluator, panic.reason) {
                 hints.push(hint);
             }
         };
 
-        for TimedEvent { event, .. } in &evaluator.tracer.events {
-            let StoredVmEvent::InFiber { event, .. } = event else { continue; };
-            let StoredFiberEvent::ValueEvaluated { expression, value } = event else { continue; };
-            let id = expression.get();
-            if &id.module != module {
-                continue;
-            }
-
+        for (id, value) in evaluator.tracer.tracer1.tracer0.values() {
             let Some(hir) = db.find_expression(id.clone()) else { continue; };
             match hir {
                 Expression::Reference(_) => {
@@ -135,7 +115,7 @@ impl ConstantEvaluator {
                     let Some(ast) = db.find_ast(ast_id) else { continue; };
                     let AstKind::Assignment(Assignment { body, .. }) = &ast.kind else { continue; };
                     let creates_hint = match body {
-                        AssignmentBody::Lambda { .. } => true,
+                        AssignmentBody::Function { .. } => true,
                         AssignmentBody::Body { pattern, .. } => {
                             matches!(pattern.kind, AstKind::Identifier(_))
                         }
@@ -174,13 +154,7 @@ where
     // We want to show the hint at the last call site still inside the current
     // module. If there is no call site in this module, then the panic results
     // from a compiler error in a previous stage which is already reported.
-    let stack_traces = evaluator.tracer.stack_traces();
-    let stack = stack_traces.get(&FiberId::root()).unwrap();
-    if stack.len() == 1 {
-        // The stack only contains an `InModule` entry. This indicates an error
-        // during compilation resulting in a top-level error instruction.
-        return None;
-    }
+    let stack = evaluator.tracer.tracer0.panic_chain().unwrap();
 
     // Find the last call in this module.
     let (

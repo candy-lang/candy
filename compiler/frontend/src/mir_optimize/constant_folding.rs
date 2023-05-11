@@ -100,16 +100,16 @@ fn run_builtin(
             a.semantically_equals(*b, visible)?.into()
         }
         BuiltinFunction::FunctionRun => {
-            let [lambda] = arguments else { unreachable!() };
+            let [function] = arguments else { unreachable!() };
             Expression::Call {
-                function: *lambda,
+                function: *function,
                 arguments: vec![],
                 responsible,
             }
         }
         BuiltinFunction::GetArgumentCount => {
-            let [lambda] = arguments else { unreachable!() };
-            let Expression::Lambda { parameters, .. } = visible.get(*lambda) else { return None; };
+            let [function] = arguments else { unreachable!() };
+            let Expression::Function { parameters, .. } = visible.get(*function) else { return None; };
             Expression::Int(parameters.len().into())
         }
         BuiltinFunction::IfElse => {
@@ -287,7 +287,7 @@ fn run_builtin(
             Expression::Struct(_) => Expression::Symbol("Struct".to_string()),
             Expression::Reference(_) => return None,
             Expression::HirId(_) => unreachable!(),
-            Expression::Lambda { .. } => Expression::Symbol("Function".to_string()),
+            Expression::Function { .. } => Expression::Symbol("Function".to_string()),
             Expression::Parameter => return None,
             Expression::Call { function, .. } => {
                 let callee = visible.get(*function);
@@ -350,12 +350,10 @@ fn run_builtin(
             Expression::UseModule { .. } => return None,
             Expression::Panic { .. } => return None,
             Expression::Multiple(_) => return None,
-            Expression::ModuleStarts { .. }
-            | Expression::ModuleEnds
-            | Expression::TraceCallStarts { .. }
+            Expression::TraceCallStarts { .. }
             | Expression::TraceCallEnds { .. }
             | Expression::TraceExpressionEvaluated { .. }
-            | Expression::TraceFoundFuzzableClosure { .. } => unreachable!(),
+            | Expression::TraceFoundFuzzableFunction { .. } => unreachable!(),
         },
     };
     Some(Ok(return_value))

@@ -104,9 +104,9 @@ pub enum CstKind<D = CstData> {
         arrow: Box<Cst<D>>,
         body: Vec<Cst<D>>,
     },
-    Lambda {
+    Function {
         opening_curly_brace: Box<Cst<D>>,
-        parameters_and_arrow: Option<LambdaParametersAndArrow<D>>,
+        parameters_and_arrow: Option<FunctionParametersAndArrow<D>>,
         body: Vec<Cst<D>>,
         closing_curly_brace: Box<Cst<D>>,
     },
@@ -120,7 +120,7 @@ pub enum CstKind<D = CstData> {
         error: CstError,
     },
 }
-pub type LambdaParametersAndArrow<D> = (Vec<Cst<D>>, Box<Cst<D>>);
+pub type FunctionParametersAndArrow<D> = (Vec<Cst<D>>, Box<Cst<D>>);
 impl<D> CstKind<D> {
     pub fn is_whitespace(&self) -> bool {
         match self {
@@ -285,7 +285,7 @@ impl<D> CstKind<D> {
                 children.extend(body);
                 children
             }
-            CstKind::Lambda {
+            CstKind::Function {
                 opening_curly_brace,
                 parameters_and_arrow,
                 body,
@@ -494,7 +494,7 @@ impl<D> Display for CstKind<D> {
                 }
                 Ok(())
             }
-            CstKind::Lambda {
+            CstKind::Function {
                 opening_curly_brace,
                 parameters_and_arrow,
                 body,

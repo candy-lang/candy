@@ -30,7 +30,7 @@ jobs:
 
       # Core
       - name: 'Core: run'
-        run: cargo run --release -- build --debug packages/Core/_.candy
+        run: cargo run --release -- check packages/Core/_.candy
 
   # fuzzing:
   #   name: Fuzzing

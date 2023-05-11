@@ -1,4 +1,5 @@
 use std::{
+    borrow::Borrow,
     collections::{HashMap, HashSet},
     fmt::{self, Debug, Formatter},
     hash::Hash,
@@ -7,21 +8,20 @@ use std::{
 use candy_frontend::{
     hir::Id,
     id::{CountableId, IdGenerator},
-    module::Module,
 };
 use itertools::Itertools;
 use rand::{seq::SliceRandom, thread_rng};
 
 use crate::{
     channel::{Channel, ChannelId, Completer, Packet, Performer},
-    context::{
-        CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions,
-        UseProvider,
-    },
-    fiber::{self, ExecutionResult, Fiber, FiberId},
-    heap::{Closure, Data, Heap, InlineObject, SendPort, Struct, Tag},
-    tracer::Tracer,
+    context::{CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions},
+    fiber::{self, ExecutionEnded, ExecutionEndedReason, Fiber, FiberId, Panic},
+    heap::{Data, Function, Heap, HeapObject, HirId, InlineObject, SendPort, Struct, Tag},
+    lir::Lir,
+    tracer::{FiberEnded, FiberEndedReason, FiberTracer, Tracer},
 };
+use extension_trait::extension_trait;
+use rustc_hash::FxHashMap;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct OperationId(usize);
@@ -42,9 +42,9 @@ impl fmt::Debug for OperationId {
 /// A VM represents a Candy program that thinks it's currently running. Because
 /// VMs are first-class Rust structs, they enable other code to store "freezed"
 /// programs and to remain in control about when and for how long code runs.
-#[derive(Clone)]
-pub struct Vm {
-    fibers: HashMap<FiberId, FiberTree>,
+pub struct Vm<L: Borrow<Lir>, T: Tracer> {
+    lir: L,
+    fibers: HashMap<FiberId, FiberTree<T::ForFiber>>,
 
     channels: HashMap<ChannelId, ChannelLike>,
     pub completed_operations: HashMap<OperationId, CompletedOperation>,
@@ -55,39 +55,36 @@ pub struct Vm {
     channel_id_generator: IdGenerator<ChannelId>,
 }
 
-#[derive(Clone)]
-pub enum FiberTree {
+pub enum FiberTree<T: FiberTracer> {
     /// This tree is currently focused on running a single fiber.
-    Single(Single),
+    Single(Single<T>),
 
     /// The fiber of this tree entered a `core.parallel` scope so that it's now
     /// paused and waits for the parallel scope to end. Instead of the main
-    /// former single fiber, the tree now runs the closure passed to
+    /// former single fiber, the tree now runs the function passed to
     /// `core.parallel` as well as any other spawned children.
-    Parallel(Parallel),
+    Parallel(Parallel<T>),
 
-    Try(Try),
+    Try(Try<T>),
 }
 
 /// Single fibers are the leaves of the fiber tree.
-#[derive(Clone)]
-pub struct Single {
-    pub fiber: Fiber,
+struct Single<T: FiberTracer> {
+    pub fiber: Fiber<T>,
     parent: Option<FiberId>,
 }
 
 /// When a parallel section is entered, the fiber that started the section is
 /// paused. Instead, the children of the parallel section are run. Initially,
-/// there's only one child – the closure given to the parallel builtin function.
-/// Using the nursery parameter (a nursery can be thought of as a pointer to a
-/// parallel section), you can also spawn other fibers. In contrast to the first
-/// child, those children also have an explicit send port where the closure's
-/// result is sent to.
-#[derive(Clone)]
-pub struct Parallel {
-    pub paused_fiber: Single,
+/// there's only one child – the function given to the parallel builtin
+/// function. Using the nursery parameter (a nursery can be thought of as a
+/// pointer to a parallel section), you can also spawn other fibers. In contrast
+/// to the first child, those children also have an explicit send port where the
+/// function's result is sent to.
+struct Parallel<T: FiberTracer> {
+    pub paused_fiber: Single<T>,
     children: HashMap<FiberId, ChildKind>,
-    return_value: Option<Packet>, // will later contain the body's return value
+    return_value: Option<InlineObject>, // will later contain the body's return value
     nursery: ChannelId,
 }
 #[derive(Clone)]
@@ -96,19 +93,16 @@ enum ChildKind {
     SpawnedChild(ChannelId),
 }
 
-#[derive(Clone)]
-pub struct Try {
-    pub paused_fiber: Single,
+struct Try<T: FiberTracer> {
+    pub paused_fiber: Single<T>,
     child: FiberId,
 }
 
-#[derive(Clone)]
 enum ChannelLike {
     Channel(Channel),
     Nursery(FiberId),
 }
 
-#[derive(Clone)]
 pub enum CompletedOperation {
     Sent,
     Received { packet: Packet },
@@ -119,7 +113,7 @@ pub enum Status {
     CanRun,
     WaitingForOperations,
     Done,
-    Panicked { reason: String, responsible: Id },
+    Panicked(Panic),
 }
 
 impl FiberId {
@@ -128,57 +122,91 @@ impl FiberId {
     }
 }
 
-impl Default for Vm {
-    fn default() -> Self {
+impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
+    pub fn uninitialized(lir: L) -> Self {
         Self {
+            lir,
             fibers: HashMap::new(),
             channels: HashMap::new(),
             completed_operations: Default::default(),
             unreferenced_channels: Default::default(),
             operation_id_generator: Default::default(),
             channel_id_generator: Default::default(),
-            fiber_id_generator: IdGenerator::start_at(FiberId::root().to_usize() + 1),
+            fiber_id_generator: IdGenerator::start_at(FiberId::root().to_usize()),
         }
     }
-}
-impl Vm {
-    fn set_up_with_fiber(&mut self, fiber: Fiber) {
-        assert!(
-            !self.fibers.contains_key(&FiberId::root()),
-            "already set up"
+    pub fn initialize_for_function(
+        &mut self,
+        heap: Heap,
+        constant_mapping: FxHashMap<HeapObject, HeapObject>,
+        function: Function,
+        arguments: &[InlineObject],
+        responsible: HirId,
+        tracer: &mut T,
+    ) {
+        assert!(self.fibers.is_empty());
+
+        let fiber = Fiber::for_function(
+            heap,
+            constant_mapping,
+            function,
+            arguments,
+            responsible,
+            tracer.root_fiber_created(),
         );
         self.fibers.insert(
-            FiberId::root(),
+            self.fiber_id_generator.generate(),
             FiberTree::Single(Single {
                 fiber,
                 parent: None,
             }),
         );
     }
-    pub fn set_up_for_running_closure(
-        &mut self,
+
+    pub fn for_function(
+        lir: L,
         heap: Heap,
-        closure: Closure,
+        constant_mapping: FxHashMap<HeapObject, HeapObject>,
+        function: Function,
         arguments: &[InlineObject],
-        responsible: Id,
-    ) {
-        self.set_up_with_fiber(Fiber::new_for_running_closure(
+        responsible: HirId,
+        tracer: &mut T,
+    ) -> Self {
+        let mut this = Self::uninitialized(lir);
+        this.initialize_for_function(
             heap,
-            closure,
+            constant_mapping,
+            function,
             arguments,
             responsible,
-        ));
-    }
-    pub fn set_up_for_running_module_closure(
-        &mut self,
-        heap: Heap,
-        module: Module,
-        closure: Closure,
-    ) {
-        self.set_up_with_fiber(Fiber::new_for_running_module_closure(heap, module, closure))
+            tracer,
+        );
+        this
     }
 
-    pub fn tear_down(mut self) -> ExecutionResult {
+    pub fn for_module(lir: L, tracer: &mut T) -> Self {
+        let actual_lir = lir.borrow();
+        let (heap, constant_mapping) = actual_lir.constant_heap.clone();
+
+        let function = constant_mapping[&actual_lir.module_function]
+            .try_into()
+            .unwrap();
+        let responsible = constant_mapping[&actual_lir.responsible_module]
+            .try_into()
+            .unwrap();
+
+        Self::for_function(
+            lir,
+            heap,
+            constant_mapping,
+            function,
+            &[],
+            responsible,
+            tracer,
+        )
+    }
+
+    pub fn tear_down(mut self) -> ExecutionEnded<T::ForFiber> {
         let tree = self.fibers.remove(&FiberId::root()).unwrap();
         let single = tree.into_single().unwrap();
         single.fiber.tear_down()
@@ -198,13 +226,7 @@ impl Vm {
                 | fiber::Status::InParallelScope { .. }
                 | fiber::Status::InTry { .. } => unreachable!(),
                 fiber::Status::Done => Status::Done,
-                fiber::Status::Panicked {
-                    reason,
-                    responsible,
-                } => Status::Panicked {
-                    reason: reason.clone(),
-                    responsible: responsible.clone(),
-                },
+                fiber::Status::Panicked(panic) => Status::Panicked(panic.clone()),
             },
             FiberTree::Parallel(Parallel { children, .. }) => {
                 for child_fiber in children.keys() {
@@ -245,14 +267,9 @@ impl Vm {
     // This will be used as soon as the outside world tries to send something
     // into the VM.
     #[allow(dead_code)]
-    pub fn send(
-        &mut self,
-        tracer: &mut impl Tracer,
-        channel: ChannelId,
-        packet: Packet,
-    ) -> OperationId {
+    pub fn send(&mut self, channel: ChannelId, packet: Packet) -> OperationId {
         let operation_id = self.operation_id_generator.generate();
-        self.send_to_channel(tracer, Performer::External(operation_id), channel, packet);
+        self.send_to_channel(Performer::External(operation_id), channel, packet);
         operation_id
     }
 
@@ -275,15 +292,9 @@ impl Vm {
         self.unreferenced_channels.remove(&channel);
     }
 
-    pub fn run(
-        &mut self,
-        use_provider: &impl UseProvider,
-        execution_controller: &mut impl ExecutionController,
-        tracer: &mut impl Tracer,
-    ) {
+    pub fn run(&mut self, execution_controller: &mut impl ExecutionController, tracer: &mut T) {
         while self.can_run() && execution_controller.should_continue_running() {
             self.run_raw(
-                use_provider,
                 &mut CombiningExecutionController::new(
                     execution_controller,
                     &mut RunLimitedNumberOfInstructions::new(100),
@@ -292,12 +303,7 @@ impl Vm {
             );
         }
     }
-    fn run_raw(
-        &mut self,
-        use_provider: &impl UseProvider,
-        execution_controller: &mut impl ExecutionController,
-        tracer: &mut impl Tracer,
-    ) {
+    fn run_raw(&mut self, execution_controller: &mut impl ExecutionController, tracer: &mut T) {
         assert!(
             self.can_run(),
             "Called `Vm::run(…)` on a VM that is not ready to run."
@@ -321,12 +327,7 @@ impl Vm {
         }
 
         tracer.fiber_execution_started(fiber_id);
-        fiber.run(
-            use_provider,
-            execution_controller,
-            &mut tracer.for_fiber(fiber_id),
-        );
-        tracer.fiber_execution_ended(fiber_id);
+        fiber.run(self.lir.borrow(), execution_controller);
 
         let is_finished = match fiber.status() {
             fiber::Status::Running => false,
@@ -339,7 +340,7 @@ impl Vm {
                 false
             }
             fiber::Status::Sending { channel, packet } => {
-                self.send_to_channel(tracer, Performer::Fiber(fiber_id), channel, packet);
+                self.send_to_channel(Performer::Fiber(fiber_id), channel, packet);
                 false
             }
             fiber::Status::Receiving { channel } => {
@@ -352,20 +353,27 @@ impl Vm {
                     .insert(nursery_id, ChannelLike::Nursery(fiber_id));
 
                 let first_child_id = {
-                    let mut heap = Heap::default();
+                    let id = self.fiber_id_generator.generate();
+
+                    let (mut heap, mapping) = self.lir.borrow().constant_heap.clone();
                     let body = Data::from(body.clone_to_heap(&mut heap))
                         .try_into()
                         .unwrap();
+                    let responsible =
+                        HirId::create(&mut fiber.heap, Id::complicated_responsibility());
                     let nursery_send_port = SendPort::create(&mut heap, nursery_id);
-                    let id = self.fiber_id_generator.generate();
+
+                    let child_tracer = fiber.tracer.child_fiber_created(id);
                     self.fibers.insert(
                         id,
                         FiberTree::Single(Single {
-                            fiber: Fiber::new_for_running_closure(
+                            fiber: Fiber::for_function(
                                 heap,
+                                mapping,
                                 body,
                                 &[nursery_send_port],
-                                Id::complicated_responsibility(),
+                                responsible,
+                                child_tracer,
                             ),
                             parent: Some(fiber_id),
                         }),
@@ -387,19 +395,25 @@ impl Vm {
             }
             fiber::Status::InTry { body } => {
                 let child_id = {
-                    let mut heap = Heap::default();
+                    let id = self.fiber_id_generator.generate();
+                    let (mut heap, mapping) = self.lir.borrow().constant_heap.clone();
                     let body = Data::from(body.clone_to_heap(&mut heap))
                         .try_into()
                         .unwrap();
-                    let id = self.fiber_id_generator.generate();
+                    let responsible =
+                        HirId::create(&mut fiber.heap, Id::complicated_responsibility());
+
+                    let child_tracer = fiber.tracer.child_fiber_created(id);
                     self.fibers.insert(
                         id,
                         FiberTree::Single(Single {
-                            fiber: Fiber::new_for_running_closure(
+                            fiber: Fiber::for_function(
                                 heap,
+                                mapping,
                                 body,
                                 &[],
-                                Id::complicated_responsibility(),
+                                responsible,
+                                child_tracer,
                             ),
                             parent: Some(fiber_id),
                         }),
@@ -417,14 +431,7 @@ impl Vm {
 
                 false
             }
-            fiber::Status::Done => {
-                tracer.fiber_done(fiber_id);
-                true
-            }
-            fiber::Status::Panicked { .. } => {
-                tracer.fiber_panicked(fiber_id, None);
-                true
-            }
+            fiber::Status::Done | fiber::Status::Panicked { .. } => true,
         };
 
         if is_finished && fiber_id != FiberId::root() {
@@ -434,55 +441,63 @@ impl Vm {
                 .unwrap()
                 .into_single()
                 .unwrap();
-            let result = single.fiber.tear_down();
+            let mut ended = single.fiber.tear_down();
             let parent = single
                 .parent
-                .expect("we already checked we're not the root fiber");
+                .expect("We already checked we're not the root fiber.");
 
             match self.fibers.get_mut(&parent).unwrap() {
-                FiberTree::Single(_) => unreachable!("single fibers can't have children"),
+                FiberTree::Single(_) => unreachable!("Single fibers can't have children."),
                 FiberTree::Parallel(parallel) => {
                     let child = parallel.children.remove(&fiber_id).unwrap();
 
-                    match result {
-                        ExecutionResult::Finished(return_value) => {
+                    let parallel_result = match &ended.reason {
+                        ExecutionEndedReason::Finished(return_value) => {
                             let is_finished = parallel.children.is_empty();
                             match child {
                                 ChildKind::InitialChild => {
-                                    parallel.return_value = Some(return_value)
+                                    parallel.return_value = Some(*return_value)
                                 }
-                                ChildKind::SpawnedChild(return_channel) => self.send_to_channel(
-                                    tracer,
-                                    Performer::Nursery,
-                                    return_channel,
-                                    return_value,
-                                ),
+                                ChildKind::SpawnedChild(return_channel) => {
+                                    self.send_to_channel(
+                                        Performer::Nursery,
+                                        return_channel,
+                                        (*return_value).into(),
+                                    );
+                                    return_value.drop(&mut ended.heap);
+                                }
                             }
 
                             if is_finished {
-                                self.finish_parallel(
-                                    tracer,
-                                    parent,
-                                    Performer::Fiber(fiber_id),
-                                    Ok(()),
-                                )
+                                Some(Ok(()))
+                            } else {
+                                None
                             }
                         }
-                        ExecutionResult::Panicked {
-                            reason,
-                            responsible,
-                        } => self.finish_parallel(
-                            tracer,
-                            parent,
-                            Performer::Fiber(fiber_id),
-                            Err((reason, responsible)),
-                        ),
+                        ExecutionEndedReason::Panicked(panic) => Some(Err(panic.to_owned())),
+                    };
+
+                    self.fibers
+                        .get_mut(&parent)
+                        .unwrap()
+                        .as_parallel_mut()
+                        .unwrap()
+                        .paused_fiber
+                        .fiber
+                        .adopt_finished_child(fiber_id, ended);
+
+                    if let Some(parallel_result) = parallel_result {
+                        self.finish_parallel(parent, parallel_result)
                     }
                 }
-                FiberTree::Try(Try { .. }) => {
+                FiberTree::Try(Try { child, .. }) => {
+                    let child_id = *child;
                     self.fibers.replace(parent, |tree| {
                         let mut paused_fiber = tree.into_try().unwrap().paused_fiber;
-                        paused_fiber.fiber.complete_try(&result);
+
+                        let reason = ended.reason.clone();
+                        paused_fiber.fiber.adopt_finished_child(child_id, ended);
+                        paused_fiber.fiber.complete_try(&reason);
                         FiberTree::Single(paused_fiber)
                     });
                 }
@@ -512,13 +527,7 @@ impl Vm {
             .copied()
             .collect();
     }
-    fn finish_parallel<T: Tracer>(
-        &mut self,
-        tracer: &mut T,
-        parallel_id: FiberId,
-        cause: Performer,
-        result: Result<(), (String, Id)>,
-    ) {
+    fn finish_parallel(&mut self, parallel_id: FiberId, result: Result<(), Panic>) {
         let parallel = self
             .fibers
             .get_mut(&parallel_id)
@@ -527,7 +536,7 @@ impl Vm {
             .unwrap();
 
         for child_id in parallel.children.clone().into_keys() {
-            self.cancel(tracer, child_id);
+            self.cancel(parallel_id, child_id);
         }
 
         self.fibers.replace(parallel_id, |tree| {
@@ -543,52 +552,46 @@ impl Vm {
                 .complete_parallel_scope(result.map(|_| return_value.unwrap()));
             FiberTree::Single(paused_fiber)
         });
-        tracer.fiber_panicked(
-            parallel_id,
-            match cause {
-                Performer::Fiber(fiber) => Some(fiber),
-                _ => None,
-            },
-        );
     }
-    fn cancel(&mut self, tracer: &mut dyn Tracer, fiber: FiberId) {
-        match self.fibers.remove(&fiber).unwrap() {
+    fn cancel(&mut self, parent_id: FiberId, fiber_id: FiberId) {
+        let fiber_tree = self.fibers.remove(&fiber_id).unwrap();
+        match &fiber_tree {
             FiberTree::Single(_) => {}
             FiberTree::Parallel(Parallel {
                 children, nursery, ..
             }) => {
-                self.channels
-                    .remove(&nursery)
-                    .unwrap()
-                    .to_nursery()
-                    .unwrap();
+                self.channels.remove(nursery).unwrap().to_nursery().unwrap();
+
                 for child_fiber in children.keys() {
-                    self.cancel(tracer, *child_fiber);
+                    self.cancel(fiber_id, *child_fiber);
                 }
             }
-            FiberTree::Try(Try { child, .. }) => self.cancel(tracer, child),
+            FiberTree::Try(Try { child, .. }) => self.cancel(fiber_id, *child),
         }
-        tracer.fiber_canceled(fiber);
+
+        let parent = self.fibers.get_mut(&parent_id).unwrap().fiber_mut();
+        parent.tracer.child_fiber_ended(FiberEnded {
+            id: fiber_id,
+            heap: &mut parent.heap,
+            tracer: fiber_tree.into_fiber().tracer,
+            reason: FiberEndedReason::Canceled,
+        });
     }
 
-    fn send_to_channel<T: Tracer>(
-        &mut self,
-        tracer: &mut T,
-        performer: Performer,
-        channel_id: ChannelId,
-        packet: Packet,
-    ) {
+    fn send_to_channel(&mut self, performer: Performer, channel_id: ChannelId, packet: Packet) {
         let channel = match self.channels.get_mut(&channel_id) {
             Some(channel) => channel,
             None => {
                 // The channel was a nursery that died.
                 if let Performer::Fiber(fiber) = performer {
                     let tree = self.fibers.get_mut(&fiber).unwrap();
-                    tree.as_single_mut().unwrap().fiber.panic(
-                        "The nursery is already dead because the parallel section ended."
-                            .to_string(),
-                        Id::complicated_responsibility(),
-                    );
+                    tree.as_single_mut()
+                        .unwrap()
+                        .fiber
+                        .panic(Panic::new_without_responsible(
+                            "The nursery is already dead because the parallel section ended."
+                                .to_string(),
+                        ));
                 }
                 return;
             }
@@ -605,16 +608,37 @@ impl Vm {
                 let parent_id = *parent_id;
 
                 match Self::parse_spawn_packet(packet) {
-                    Some((heap, closure_to_spawn, return_channel)) => {
+                    Some((_packet_heap, function_to_spawn, return_channel)) => {
+                        let (mut heap, constant_mapping) = self.lir.borrow().constant_heap.clone();
+                        let function_to_spawn: Function = function_to_spawn
+                            .clone_to_heap(&mut heap)
+                            .try_into()
+                            .unwrap();
+                        let responsible =
+                            HirId::create(&mut heap, Id::complicated_responsibility());
                         let child_id = self.fiber_id_generator.generate();
+
+                        let parent = self
+                            .fibers
+                            .get_mut(&parent_id)
+                            .unwrap()
+                            .as_parallel_mut()
+                            .unwrap();
+                        let child_tracer = parent
+                            .paused_fiber
+                            .fiber
+                            .tracer
+                            .child_fiber_created(child_id);
                         self.fibers.insert(
                             child_id,
                             FiberTree::Single(Single {
-                                fiber: Fiber::new_for_running_closure(
+                                fiber: Fiber::for_function(
                                     heap,
-                                    closure_to_spawn,
+                                    constant_mapping,
+                                    function_to_spawn,
                                     &[],
-                                    Id::complicated_responsibility(),
+                                    responsible,
+                                    child_tracer,
                                 ),
                                 parent: Some(parent_id),
                             }),
@@ -627,16 +651,11 @@ impl Vm {
                             .unwrap()
                             .children
                             .insert(child_id, ChildKind::SpawnedChild(return_channel));
-
-                        tracer.fiber_created(child_id);
                     }
                     None => self.finish_parallel(
-                        tracer,
                         parent_id,
-                        performer.clone(),
-                        Err((
-                            "a nursery received an invalid message".to_string(),
-                            Id::complicated_responsibility(),
+                        Err(Panic::new_without_responsible(
+                            "A nursery received an invalid message.".to_string(),
                         )),
                     ),
                 }
@@ -649,20 +668,20 @@ impl Vm {
             }
         }
     }
-    fn parse_spawn_packet(packet: Packet) -> Option<(Heap, Closure, ChannelId)> {
+    fn parse_spawn_packet(packet: Packet) -> Option<(Heap, Function, ChannelId)> {
         let Packet { mut heap, object } = packet;
         let arguments: Struct = object.try_into().ok()?;
 
-        let closure_tag = Tag::create_from_str(&mut heap, "Closure", None);
-        let closure: Closure = arguments.get(**closure_tag)?.try_into().ok()?;
-        if closure.argument_count() > 0 {
+        let function_tag = Tag::create_from_str(&mut heap, "Function", None);
+        let function: Function = arguments.get(**function_tag)?.try_into().ok()?;
+        if function.argument_count() > 0 {
             return None;
         }
 
         let return_channel_tag = Tag::create_from_str(&mut heap, "ReturnChannel", None);
         let return_channel: SendPort = arguments.get(**return_channel_tag)?.try_into().ok()?;
 
-        Some((heap, closure, return_channel.channel_id()))
+        Some((heap, function, return_channel.channel_id()))
     }
 
     fn receive_from_channel(&mut self, performer: Performer, channel: ChannelId) {
@@ -679,11 +698,11 @@ impl Vm {
     }
 }
 
-struct InternalCompleter<'a> {
-    fibers: &'a mut HashMap<FiberId, FiberTree>,
+struct InternalCompleter<'a, T: FiberTracer> {
+    fibers: &'a mut HashMap<FiberId, FiberTree<T>>,
     completed_operations: &'a mut HashMap<OperationId, CompletedOperation>,
 }
-impl<'a> Completer for InternalCompleter<'a> {
+impl<'a, T: FiberTracer> Completer for InternalCompleter<'a, T> {
     fn complete_send(&mut self, performer: Performer) {
         match performer {
             Performer::Fiber(fiber) => {
@@ -721,41 +740,56 @@ impl ChannelLike {
         }
     }
 }
-impl FiberTree {
+impl<T: FiberTracer> FiberTree<T> {
+    fn into_fiber(self) -> Fiber<T> {
+        match self {
+            FiberTree::Single(single) => single.fiber,
+            FiberTree::Parallel(parallel) => parallel.paused_fiber.fiber,
+            FiberTree::Try(try_) => try_.paused_fiber.fiber,
+        }
+    }
+    fn fiber_mut(&mut self) -> &mut Fiber<T> {
+        match self {
+            FiberTree::Single(single) => &mut single.fiber,
+            FiberTree::Parallel(parallel) => &mut parallel.paused_fiber.fiber,
+            FiberTree::Try(try_) => &mut try_.paused_fiber.fiber,
+        }
+    }
+
     // TODO: Use macros to generate these.
-    fn into_single(self) -> Option<Single> {
+    fn into_single(self) -> Option<Single<T>> {
         match self {
             FiberTree::Single(single) => Some(single),
             _ => None,
         }
     }
-    fn as_single(&self) -> Option<&Single> {
+    fn as_single(&self) -> Option<&Single<T>> {
         match self {
             FiberTree::Single(single) => Some(single),
             _ => None,
         }
     }
-    fn as_single_mut(&mut self) -> Option<&mut Single> {
+    fn as_single_mut(&mut self) -> Option<&mut Single<T>> {
         match self {
             FiberTree::Single(single) => Some(single),
             _ => None,
         }
     }
 
-    fn into_parallel(self) -> Option<Parallel> {
+    fn into_parallel(self) -> Option<Parallel<T>> {
         match self {
             FiberTree::Parallel(parallel) => Some(parallel),
             _ => None,
         }
     }
-    fn as_parallel_mut(&mut self) -> Option<&mut Parallel> {
+    fn as_parallel_mut(&mut self) -> Option<&mut Parallel<T>> {
         match self {
             FiberTree::Parallel(parallel) => Some(parallel),
             _ => None,
         }
     }
 
-    fn into_try(self) -> Option<Try> {
+    fn into_try(self) -> Option<Try<T>> {
         match self {
             FiberTree::Try(try_) => Some(try_),
             _ => None,
@@ -763,7 +797,7 @@ impl FiberTree {
     }
 }
 
-impl Debug for Vm {
+impl<L: Borrow<Lir>, T: Tracer> Debug for Vm<L, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Vm")
             .field("fibers", &self.fibers)
@@ -771,7 +805,7 @@ impl Debug for Vm {
             .finish()
     }
 }
-impl Debug for FiberTree {
+impl<T: FiberTracer> Debug for FiberTree<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Single(Single { fiber, parent }) => f
@@ -807,9 +841,7 @@ impl Debug for ChannelLike {
     }
 }
 
-trait ReplaceHashMapValue<K, V> {
-    fn replace<F: FnOnce(V) -> V>(&mut self, key: K, replacer: F);
-}
+#[extension_trait]
 impl<K: Eq + Hash, V> ReplaceHashMapValue<K, V> for HashMap<K, V> {
     fn replace<F: FnOnce(V) -> V>(&mut self, key: K, replacer: F) {
         let value = self.remove(&key).unwrap();

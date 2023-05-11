@@ -15,7 +15,6 @@ use candy_frontend::{
     rcst_to_cst::RcstToCstStorage,
     string_to_rcst::StringToRcstStorage,
 };
-use candy_vm::mir_to_lir::MirToLirStorage;
 
 #[salsa::database(
     AstDbStorage,
@@ -24,7 +23,6 @@ use candy_vm::mir_to_lir::MirToLirStorage;
     CstToAstStorage,
     HirDbStorage,
     HirToMirStorage,
-    MirToLirStorage,
     ModuleDbStorage,
     OptimizeMirStorage,
     PositionConversionStorage,

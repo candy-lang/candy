@@ -1,4 +1,4 @@
-//! Inlining means inserting a lambda's code at the caller site.
+//! Inlining means inserting a function's code at the caller site.
 //!
 //! Here's a before-and-after example of a `use "Core"` call being inlined:
 //!
@@ -22,9 +22,9 @@
 //! ```
 //!
 //! Inlining makes lots of other optimizations more effective, in partiuclar
-//! [tree shaking] of lambdas that were inlined into all call sites. Because at
-//! the call sites, more information about arguments exist, [constant folding]
-//! and [module folding] can be more effective.
+//! [tree shaking] of functions that were inlined into all call sites. Because
+//! at the call sites, more information about arguments exist,
+//! [constant folding] and [module folding] can be more effective.
 //!
 //! TODO: When we have a metric for judging performance vs. code size, also
 //! speculatively inline more call sites, such as smallish functions and
@@ -56,13 +56,13 @@ impl Expression {
         } = self else {
             return Err("Tried to inline, but the expression is not a call.");
         };
-        let Expression::Lambda {
+        let Expression::Function {
             original_hirs: _,
             parameters,
             responsible_parameter,
             body,
         } = visible.get(*function) else {
-            return Err("Tried to inline, but the callee is not a lambda.");
+            return Err("Tried to inline, but the callee is not a function.");
         };
         if arguments.len() != parameters.len() {
             return Err("Tried to inline, but the number of arguments doesn't match the expected parameter count.");
@@ -96,7 +96,7 @@ impl Mir {
     pub fn inline_functions_containing_use(&mut self) {
         let mut functions_with_use = FxHashSet::default();
         for (id, expression) in self.body.iter() {
-            if let Expression::Lambda { body, .. } = expression &&
+            if let Expression::Function { body, .. } = expression &&
                     body.iter().any(|(_, expr)| matches!(expr, Expression::UseModule { .. })) {
                 functions_with_use.insert(id);
             }
@@ -115,7 +115,7 @@ impl Mir {
     pub fn inline_functions_of_maximum_complexity(&mut self, complexity: Complexity) {
         let mut small_functions = FxHashSet::default();
         for (id, expression) in self.body.iter() {
-            if let Expression::Lambda { body, .. } = expression && body.complexity() <= complexity {
+            if let Expression::Function { body, .. } = expression && body.complexity() <= complexity {
                 small_functions.insert(id);
             }
         }

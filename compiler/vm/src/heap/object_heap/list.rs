@@ -183,4 +183,6 @@ impl HeapObjectTrait for HeapList {
             item.drop(heap)
         }
     }
+
+    fn deallocate_external_stuff(self) {}
 }

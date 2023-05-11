@@ -3,20 +3,18 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
     ast::{
-        self, AssignmentBody, Ast, AstError, AstKind, AstString, Identifier, Int, Lambda, List,
+        self, AssignmentBody, Ast, AstError, AstKind, AstString, Function, Identifier, Int, List,
         Match, MatchCase, OrPattern, Struct, Symbol, Text, TextPart,
     },
     cst::{self, Cst, CstDb, CstKind, UnwrapWhitespaceAndComment},
-    error::{CompilerError, CompilerErrorPayload},
+    error::CompilerError,
     module::Module,
     position::Offset,
     rcst_to_cst::RcstToCst,
-    rich_ir::ToRichIr,
-    string_to_rcst::InvalidModuleError,
+    string_to_rcst::ModuleError,
     utils::AdjustCasingOfFirstLetter,
 };
 use std::{ops::Range, sync::Arc};
-use tracing::warn;
 
 #[salsa::query_group(CstToAstStorage)]
 pub trait CstToAst: CstDb + RcstToCst {
@@ -26,13 +24,13 @@ pub trait CstToAst: CstDb + RcstToCst {
 
     fn cst_to_ast_id(&self, module: Module, id: cst::Id) -> Option<ast::Id>;
 
-    fn ast(&self, module: Module) -> Option<AstResult>;
+    fn ast(&self, module: Module) -> AstResult;
 }
 
-type AstResult = (Arc<Vec<Ast>>, Arc<FxHashMap<ast::Id, cst::Id>>);
+pub type AstResult = Result<(Arc<Vec<Ast>>, Arc<FxHashMap<ast::Id, cst::Id>>), ModuleError>;
 
 fn ast_to_cst_id(db: &dyn CstToAst, id: ast::Id) -> Option<cst::Id> {
-    let (_, ast_to_cst_id_mapping) = db.ast(id.module.clone()).unwrap();
+    let (_, ast_to_cst_id_mapping) = db.ast(id.module.clone()).ok()?;
     ast_to_cst_id_mapping.get(&id).cloned()
 }
 fn ast_id_to_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<Offset>> {
@@ -45,58 +43,21 @@ fn ast_id_to_display_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<Offset
 }
 
 fn cst_to_ast_id(db: &dyn CstToAst, module: Module, id: cst::Id) -> Option<ast::Id> {
-    let (_, ast_to_cst_id_mapping) = db.ast(module).unwrap();
+    let (_, ast_to_cst_id_mapping) = db.ast(module).ok()?;
     ast_to_cst_id_mapping
         .iter()
         .find_map(|(key, &value)| if value == id { Some(key) } else { None })
         .cloned()
 }
 
-fn ast(db: &dyn CstToAst, module: Module) -> Option<AstResult> {
+fn ast(db: &dyn CstToAst, module: Module) -> AstResult {
     let mut context = LoweringContext::new(module.clone());
 
-    let asts = match db.cst(module.clone()) {
-        Ok(cst) => {
-            let cst = cst.unwrap_whitespace_and_comment();
-            context.lower_csts(&cst)
-        }
-        Err(InvalidModuleError::DoesNotExist) => {
-            warn!(
-                "Tried to get AST of module that doesn't exist: {}.",
-                module.to_rich_ir(),
-            );
-            return None;
-        }
-        Err(InvalidModuleError::InvalidUtf8) => {
-            vec![Ast {
-                id: context.create_next_id_without_mapping(),
-                kind: AstKind::Error {
-                    child: None,
-                    errors: vec![CompilerError {
-                        module,
-                        span: Offset(0)..Offset(0),
-                        payload: CompilerErrorPayload::InvalidUtf8,
-                    }],
-                },
-            }]
-        }
-        Err(InvalidModuleError::IsNotCandy) => {
-            warn!(
-                "Tried to get AST of a module that's not Candy code: {}.",
-                module.to_rich_ir(),
-            );
-            return None;
-        }
-        Err(InvalidModuleError::IsToolingModule) => {
-            warn!(
-                "Tried to get AST of tooling module: {}.",
-                module.to_rich_ir(),
-            );
-            return None;
-        }
-    };
-
-    Some((Arc::new(asts), Arc::new(context.id_mapping)))
+    db.cst(module).map(|cst| {
+        let cst = cst.unwrap_whitespace_and_comment();
+        let asts = context.lower_csts(&cst);
+        (Arc::new(asts), Arc::new(context.id_mapping))
+    })
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -244,9 +205,8 @@ impl LoweringContext {
                                         errors: vec![CompilerError {
                                             module: self.module.clone(),
                                             span: part.data.span.clone(),
-                                            payload: CompilerErrorPayload::Ast(
-                                                AstError::TextInterpolationMissesClosingCurlyBraces,
-                                            ),
+                                            payload:
+                                                AstError::TextInterpolationMissesClosingCurlyBraces.into(),
                                         }],
                                     },
                                 );
@@ -256,7 +216,7 @@ impl LoweringContext {
                         CstKind::Error { error, .. } => errors.push(CompilerError {
                             module: self.module.clone(),
                             span: part.data.span.clone(),
-                            payload: CompilerErrorPayload::Cst(error.clone()),
+                            payload: error.clone().into(),
                         }),
                         _ => panic!("Text contains non-TextPart. Whitespaces should have been removed already."),
                     }
@@ -723,7 +683,7 @@ impl LoweringContext {
                     }),
                 )
             }
-            CstKind::Lambda {
+            CstKind::Function {
                 opening_curly_brace,
                 parameters_and_arrow,
                 body,
@@ -735,7 +695,7 @@ impl LoweringContext {
 
                 assert!(
                     matches!(opening_curly_brace.kind, CstKind::OpeningCurlyBrace),
-                    "Expected an opening curly brace at the beginning of a lambda, but found {}.",
+                    "Expected an opening curly brace at the beginning of a function, but found {}.",
                     opening_curly_brace,
                 );
 
@@ -744,7 +704,7 @@ impl LoweringContext {
                     if let Some((parameters, arrow)) = parameters_and_arrow {
                         assert!(
                             matches!(arrow.kind, CstKind::Arrow),
-                            "Expected an arrow after the parameters in a lambda, but found `{}`.",
+                            "Expected an arrow after the parameters in a function, but found `{}`.",
                             arrow
                         );
                         self.lower_parameters(parameters)
@@ -758,13 +718,13 @@ impl LoweringContext {
                 if !matches!(closing_curly_brace.kind, CstKind::ClosingCurlyBrace) {
                     errors.push(self.create_error(
                         closing_curly_brace,
-                        AstError::LambdaMissesClosingCurlyBrace,
+                        AstError::FunctionMissesClosingCurlyBrace,
                     ));
                 }
 
                 let ast = self.create_ast(
                     cst.data.id,
-                    AstKind::Lambda(Lambda {
+                    AstKind::Function(Function {
                         parameters,
                         body,
                         fuzzable: false,
@@ -804,7 +764,7 @@ impl LoweringContext {
                                     errors: vec![CompilerError {
                                         module: self.module.clone(),
                                         span: name.data.span.clone(),
-                                        payload: CompilerErrorPayload::Cst(error.clone()),
+                                        payload: error.clone().into(),
                                     }],
                                 },
                             );
@@ -817,9 +777,7 @@ impl LoweringContext {
                                     errors: vec![CompilerError {
                                         module: self.module.clone(),
                                         span: name.data.span.clone(),
-                                        payload: CompilerErrorPayload::Ast(
-                                            AstError::ExpectedNameOrPatternInAssignment,
-                                        ),
+                                        payload: AstError::ExpectedNameOrPatternInAssignment.into(),
                                     }],
                                 },
                             );
@@ -827,9 +785,9 @@ impl LoweringContext {
                     };
 
                     let (parameters, errors) = self.lower_parameters(parameters);
-                    let body = AssignmentBody::Lambda {
+                    let body = AssignmentBody::Function {
                         name,
-                        lambda: Lambda {
+                        function: Function {
                             parameters,
                             body,
                             fuzzable: true,
@@ -860,7 +818,7 @@ impl LoweringContext {
                     errors: vec![CompilerError {
                         module: self.module.clone(),
                         span: cst.data.span.clone(),
-                        payload: CompilerErrorPayload::Cst(error.clone()),
+                        payload: error.clone().into(),
                     }],
                 },
             ),
@@ -895,7 +853,7 @@ impl LoweringContext {
                     errors: vec![CompilerError {
                         module: self.module.clone(),
                         span: key.data.span.clone(),
-                        payload: CompilerErrorPayload::Cst(error),
+                        payload: error.into(),
                     }],
                 },
             ),
@@ -971,7 +929,7 @@ impl LoweringContext {
         CompilerError {
             module: self.module.clone(),
             span: cst.data.span.clone(),
-            payload: CompilerErrorPayload::Ast(error),
+            payload: error.into(),
         }
     }
     fn create_ast_for_invalid_expression_in_pattern(&mut self, cst: &Cst) -> Ast {
