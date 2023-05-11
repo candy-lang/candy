@@ -5,7 +5,6 @@ use crate::{
     heap::{Function, Heap, HirId, InlineObject},
 };
 
-/// A dummy version of the tracer that remembers nothing.
 #[derive(Default)]
 pub struct CompoundTracer<T0: Tracer, T1: Tracer> {
     pub tracer0: T0,
