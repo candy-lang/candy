@@ -2,7 +2,7 @@ use candy_frontend::hir::Id;
 use candy_vm::{
     fiber::FiberId,
     heap::{Heap, HirId, InlineObject},
-    tracer::{stack_trace::Call, FiberEnded, FiberEndedReason, FiberTracer, Tracer},
+    tracer::{stack_trace::Call, FiberEnded, FiberTracer, Tracer},
 };
 use rustc_hash::FxHashMap;
 
@@ -48,7 +48,6 @@ impl Tracer for DebugTracer {
 
 #[derive(Debug, Default)]
 pub struct FiberState {
-    pub status: FiberStatus,
     pub root_locals: Vec<(Id, InlineObject)>,
     pub call_stack: Vec<StackFrame>,
 }
@@ -73,24 +72,6 @@ impl StackFrame {
     fn drop(&self, heap: &mut Heap) {
         self.call.drop(heap);
         self.locals.iter().for_each(|(_, value)| value.drop(heap));
-    }
-}
-
-#[derive(Debug, Default)]
-pub enum FiberStatus {
-    #[default]
-    Created,
-    Done,
-    Panicked,
-    Canceled,
-}
-impl From<FiberEndedReason> for FiberStatus {
-    fn from(reason: FiberEndedReason) -> Self {
-        match reason {
-            FiberEndedReason::Finished(_) => Self::Done,
-            FiberEndedReason::Panicked(_) => Self::Panicked,
-            FiberEndedReason::Canceled => Self::Canceled,
-        }
     }
 }
 
