@@ -2,7 +2,7 @@ use candy_vm::{
     fiber::{Fiber, FiberId},
     lir::Lir,
     tracer::Tracer,
-    vm::{FiberTree, Parallel, Single, Try, Vm},
+    vm::Vm,
 };
 use extension_trait::extension_trait;
 use rustc_hash::FxHashMap;
@@ -11,17 +11,7 @@ use std::{borrow::Borrow, hash::Hash};
 #[extension_trait]
 pub impl FiberIdExtension for FiberId {
     fn get<L: Borrow<Lir>, T: Tracer>(self, vm: &Vm<L, T>) -> &Fiber<T::ForFiber> {
-        match &vm.fiber(self).unwrap() {
-            FiberTree::Single(Single { fiber, .. })
-            | FiberTree::Parallel(Parallel {
-                paused_fiber: Single { fiber, .. },
-                ..
-            })
-            | FiberTree::Try(Try {
-                paused_fiber: Single { fiber, .. },
-                ..
-            }) => fiber,
-        }
+        vm.fiber(self).unwrap().fiber_ref()
     }
 }
 
