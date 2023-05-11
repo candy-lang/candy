@@ -2,7 +2,7 @@ use candy_vm::{
     channel::{ChannelId, Packet},
     heap::{Heap, SendPort, Text},
     lir::Lir,
-    tracer::DummyTracer,
+    tracer::Tracer,
     vm::{CompletedOperation, OperationId, Vm},
 };
 use std::{
@@ -15,7 +15,7 @@ pub struct StdinService {
     current_receive: OperationId,
 }
 impl StdinService {
-    pub fn new<L: Borrow<Lir>>(vm: &mut Vm<L>) -> Self {
+    pub fn new<L: Borrow<Lir>, T: Tracer>(vm: &mut Vm<L, T>) -> Self {
         let channel = vm.create_channel(0);
         let current_receive = vm.receive(channel);
         Self {
@@ -24,7 +24,7 @@ impl StdinService {
         }
     }
 
-    pub fn run<L: Borrow<Lir>>(&mut self, vm: &mut Vm<L>) {
+    pub fn run<L: Borrow<Lir>, T: Tracer>(&mut self, vm: &mut Vm<L, T>) {
         while let Some(CompletedOperation::Received { packet }) =
             vm.completed_operations.remove(&self.current_receive)
         {
@@ -43,7 +43,7 @@ impl StdinService {
                 let object = Text::create(&mut heap, &input).into();
                 Packet { heap, object }
             };
-            vm.send(&mut DummyTracer, request.channel_id(), packet);
+            vm.send(request.channel_id(), packet);
 
             // Receive the next request
             self.current_receive = vm.receive(self.channel);

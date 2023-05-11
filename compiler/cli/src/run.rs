@@ -7,10 +7,11 @@ use crate::{
 use candy_frontend::{ast_to_hir::AstToHir, hir, rich_ir::ToRichIr, TracingConfig};
 use candy_vm::{
     context::RunForever,
-    fiber::{ExecutionResult, FiberId},
+    fiber::ExecutionEndedReason,
     heap::{HirId, SendPort, Struct},
     mir_to_lir::compile_lir,
-    tracer::{full::FullTracer, DummyTracer, Tracer},
+    return_value_into_main_function,
+    tracer::stack_trace::StackTracer,
     vm::{Status, Vm},
 };
 use clap::{Parser, ValueHint};
@@ -39,23 +40,19 @@ pub(crate) fn run(options: Options) -> ProgramResult {
 
     debug!("Running {}.", module.to_rich_ir());
 
-    let mut tracer = FullTracer::default();
+    let mut tracer = StackTracer::default();
     let lir = compile_lir(&db, module, tracing).0;
 
-    let result = Vm::for_module(&lir).run_until_completion(&mut DummyTracer);
+    let mut ended = Vm::for_module(&lir, &mut tracer).run_until_completion(&mut tracer);
 
-    let ((mut heap, main), constant_mapping) = match result {
-        ExecutionResult::Finished {
-            packet: return_value,
-            constant_mapping,
-        } => (return_value.into_main_function().unwrap(), constant_mapping),
-        ExecutionResult::Panicked {
-            reason,
-            responsible,
-        } => {
-            error!("The module panicked: {reason}");
-            error!("{responsible} is responsible.");
-            if let Some(span) = db.hir_id_to_span(responsible) {
+    let main = match ended.reason {
+        ExecutionEndedReason::Finished(return_value) => {
+            return_value_into_main_function(&mut ended.heap, return_value).unwrap()
+        }
+        ExecutionEndedReason::Panicked(panic) => {
+            error!("The module panicked: {}", panic.reason);
+            error!("{} is responsible.", panic.responsible);
+            if let Some(span) = db.hir_id_to_span(panic.responsible) {
                 error!("Responsible is at {span:?}.");
             }
             error!(
@@ -72,19 +69,19 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     let mut stdout = StdoutService::new(&mut vm);
     let mut stdin = StdinService::new(&mut vm);
     let fields = [
-        ("Stdout", SendPort::create(&mut heap, stdout.channel)),
-        ("Stdin", SendPort::create(&mut heap, stdin.channel)),
+        ("Stdout", SendPort::create(&mut ended.heap, stdout.channel)),
+        ("Stdin", SendPort::create(&mut ended.heap, stdin.channel)),
     ];
-    let environment = Struct::create_with_symbol_keys(&mut heap, fields).into();
-    let platform = HirId::create(&mut heap, hir::Id::platform());
-    tracer.for_fiber(FiberId::root()).call_started(
+    let environment = Struct::create_with_symbol_keys(&mut ended.heap, fields).into();
+    let platform = HirId::create(&mut ended.heap, hir::Id::platform());
+    vm.initialize_for_function(
+        ended.heap,
+        ended.constant_mapping,
+        main,
+        &[environment],
         platform,
-        main.into(),
-        vec![environment],
-        platform,
-        &heap,
+        &mut tracer,
     );
-    vm.initialize_for_function(heap, constant_mapping, main, &[environment], platform);
     loop {
         match vm.status() {
             Status::CanRun => {
@@ -97,26 +94,17 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         stdin.run(&mut vm);
         vm.free_unreferenced_channels();
     }
-    match vm.tear_down() {
-        ExecutionResult::Finished {
-            packet: return_value,
-            ..
-        } => {
-            tracer
-                .for_fiber(FiberId::root())
-                .call_ended(return_value.object, &return_value.heap);
+    match vm.tear_down().reason {
+        ExecutionEndedReason::Finished(return_value) => {
             debug!("The main function returned: {return_value:?}");
             Ok(())
         }
-        ExecutionResult::Panicked {
-            reason,
-            responsible,
-        } => {
-            error!("The main function panicked: {reason}");
-            error!("{responsible} is responsible.");
+        ExecutionEndedReason::Panicked(panic) => {
+            error!("The main function panicked: {}", panic.reason);
+            error!("{} is responsible.", panic.responsible);
             error!(
                 "This is the stack trace:\n{}",
-                tracer.format_panic_stack_trace_to_root_fiber(&db)
+                tracer.format_panic_stack_trace_to_root_fiber(&db),
             );
             Err(Exit::CodePanicked)
         }

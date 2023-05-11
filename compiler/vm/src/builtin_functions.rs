@@ -1,11 +1,12 @@
 use crate::{
     channel::ChannelId,
     channel::{Capacity, Packet},
-    fiber::{Fiber, Status},
+    fiber::{Fiber, Panic, Status},
     heap::{
         Data, Function, Heap, HirId, InlineObject, Int, List, ReceivePort, SendPort, Struct, Tag,
         Text,
     },
+    tracer::FiberTracer,
 };
 use candy_frontend::builtin_functions::BuiltinFunction;
 use itertools::Itertools;
@@ -15,7 +16,7 @@ use std::str::{self, FromStr};
 use tracing::{info, span, Level};
 use unicode_segmentation::UnicodeSegmentation;
 
-impl Fiber {
+impl<FT: FiberTracer> Fiber<FT> {
     pub(super) fn run_builtin_function(
         &mut self,
         builtin_function: BuiltinFunction,
@@ -84,7 +85,7 @@ impl Fiber {
             Ok(Receive { channel }) => self.status = Status::Receiving { channel },
             Ok(Parallel { body }) => self.status = Status::InParallelScope { body },
             Ok(Try { body }) => self.status = Status::InTry { body },
-            Err(reason) => self.panic(reason, responsible.get().to_owned()),
+            Err(reason) => self.panic(Panic::new(reason, responsible.get().to_owned())),
         }
     }
 }
