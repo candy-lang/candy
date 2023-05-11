@@ -1,4 +1,3 @@
-use crate::debug_adapter::tracer::{DebugTracer, FiberState};
 use candy_vm::{
     fiber::{Fiber, FiberId},
     lir::Lir,
@@ -23,9 +22,6 @@ pub impl FiberIdExtension for FiberId {
                 ..
             }) => fiber,
         }
-    }
-    fn state<'a, L: Borrow<Lir>>(&self, vm: &'a Vm<L, DebugTracer>) -> &'a FiberState {
-        &self.get(vm).tracer.0
     }
 }
 

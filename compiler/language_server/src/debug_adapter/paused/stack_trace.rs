@@ -28,7 +28,7 @@ impl PausedState {
             .fiber(fiber_id)
             .ok_or("fiber-not-found")?
             .fiber_ref();
-        let fiber_state = &fiber.tracer.0;
+        let fiber_state = &fiber.tracer;
 
         let start_frame = args.start_frame.map(|it| it as usize).unwrap_or_default();
         let levels = args
@@ -108,13 +108,13 @@ impl StackFrameKey {
             return None;
         }
 
-        Some(&self.fiber_id.state(vm).call_stack[self.index - 1])
+        Some(&self.fiber_id.get(vm).tracer.call_stack[self.index - 1])
     }
     pub fn get_locals<'a, L: Borrow<Lir>>(
         &self,
         vm: &'a Vm<L, DebugTracer>,
     ) -> &'a Vec<(Id, InlineObject)> {
-        let fiber_state = self.fiber_id.state(vm);
+        let fiber_state = &self.fiber_id.get(vm).tracer;
         if self.index == 0 {
             &fiber_state.root_locals
         } else {

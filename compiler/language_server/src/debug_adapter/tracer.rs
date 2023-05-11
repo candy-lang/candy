@@ -4,38 +4,11 @@ use candy_vm::{
     heap::{Heap, HirId, InlineObject},
     tracer::{stack_trace::Call, FiberEnded, FiberTracer, Tracer},
 };
-use rustc_hash::FxHashMap;
 
-#[derive(Debug)]
-pub struct DebugTracer {
-    pub fibers: FxHashMap<FiberId, FiberState>,
-}
-impl Default for DebugTracer {
-    fn default() -> Self {
-        Self {
-            fibers: FxHashMap::from_iter([(FiberId::root(), FiberState::default())]),
-        }
-    }
-}
+#[derive(Debug, Default)]
+pub struct DebugTracer;
 
 impl Tracer for DebugTracer {
-    // fn add(&mut self, event: VmEvent) {
-    //     match event {
-    //         VmEvent::FiberCreated { fiber } => {
-    //             self.fibers.insert(fiber, FiberState::default());
-    //         }
-    //         VmEvent::FiberDone { fiber } => {
-    //             self.fibers.get_mut(&fiber).unwrap().status = FiberStatus::Done;
-    //         }
-    //         VmEvent::FiberPanicked { fiber, .. } => {
-    //             self.fibers.get_mut(&fiber).unwrap().status = FiberStatus::Panicked;
-    //         }
-    //         VmEvent::FiberCanceled { fiber } => {
-    //             self.fibers.get_mut(&fiber).unwrap().status = FiberStatus::Canceled;
-    //         }
-    //     }
-    // }
-
     type ForFiber = FiberDebugTracer;
 
     fn root_fiber_created(&mut self) -> Self::ForFiber {
@@ -44,12 +17,6 @@ impl Tracer for DebugTracer {
     fn root_fiber_ended(&mut self, ended: FiberEnded<Self::ForFiber>) {
         ended.tracer.drop(ended.heap);
     }
-}
-
-#[derive(Debug, Default)]
-pub struct FiberState {
-    pub root_locals: Vec<(Id, InlineObject)>,
-    pub call_stack: Vec<StackFrame>,
 }
 
 #[derive(Debug)]
@@ -75,9 +42,11 @@ impl StackFrame {
     }
 }
 
-// FIXME: inline state
-#[derive(Default)]
-pub struct FiberDebugTracer(pub FiberState);
+#[derive(Debug, Default)]
+pub struct FiberDebugTracer {
+    pub root_locals: Vec<(Id, InlineObject)>,
+    pub call_stack: Vec<StackFrame>,
+}
 impl FiberTracer for FiberDebugTracer {
     fn child_fiber_created(&mut self, _child: FiberId) -> Self {
         FiberDebugTracer::default()
@@ -88,11 +57,10 @@ impl FiberTracer for FiberDebugTracer {
 
     fn value_evaluated(&mut self, heap: &mut Heap, expression: HirId, value: InlineObject) {
         value.dup(heap);
-        self.0
-            .call_stack
+        self.call_stack
             .last_mut()
             .map(|it| &mut it.locals)
-            .unwrap_or(&mut self.0.root_locals)
+            .unwrap_or(&mut self.root_locals)
             .push((expression.get().to_owned(), value));
     }
 
@@ -111,18 +79,17 @@ impl FiberTracer for FiberDebugTracer {
             responsible,
         };
         call.dup(heap);
-        self.0.call_stack.push(StackFrame::new(call));
+        self.call_stack.push(StackFrame::new(call));
     }
     fn call_ended(&mut self, heap: &mut Heap, _return_value: InlineObject) {
-        self.0.call_stack.pop().unwrap().drop(heap);
+        self.call_stack.pop().unwrap().drop(heap);
     }
 
     fn dup_all_stored_objects(&self, heap: &mut Heap) {
-        self.0
-            .root_locals
+        self.root_locals
             .iter()
             .for_each(|(_, value)| value.dup(heap));
-        for frame in &self.0.call_stack {
+        for frame in &self.call_stack {
             frame.dup(heap);
         }
     }
@@ -130,11 +97,10 @@ impl FiberTracer for FiberDebugTracer {
 
 impl FiberDebugTracer {
     fn drop(self, heap: &mut Heap) {
-        self.0
-            .root_locals
+        self.root_locals
             .into_iter()
             .for_each(|(_, value)| value.drop(heap));
-        for frame in self.0.call_stack {
+        for frame in self.call_stack {
             frame.drop(heap);
         }
     }
