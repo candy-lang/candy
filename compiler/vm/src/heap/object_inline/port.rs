@@ -85,9 +85,10 @@ impl_debug_display_via_debugdisplay!(InlineSendPort<'_>);
 impl<'h> InlineObjectTrait<'h> for InlineSendPort<'h> {
     fn clone_to_heap_with_mapping<'t>(
         self,
-        _heap: &'t mut Heap,
+        heap: &'t mut Heap,
         _address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
     ) -> Self {
+        heap.notify_port_created(self.channel_id());
         self
     }
 }
@@ -116,9 +117,10 @@ impl_debug_display_via_debugdisplay!(InlineReceivePort<'_>);
 impl<'h> InlineObjectTrait<'h> for InlineReceivePort<'h> {
     fn clone_to_heap_with_mapping<'t>(
         self,
-        _heap: &'t mut Heap,
+        heap: &'t mut Heap,
         _address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
     ) -> Self {
+        heap.notify_port_created(self.channel_id());
         self
     }
 }

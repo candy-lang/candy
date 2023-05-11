@@ -121,7 +121,7 @@ fn generate_mutated_value(
             }
         }
         Data::Builtin(_) => (*builtin_functions::VALUES.choose(rng).unwrap()).into(),
-        Data::HirId(_) | Data::Closure(_) | Data::SendPort(_) | Data::ReceivePort(_) => {
+        Data::HirId(_) | Data::Function(_) | Data::SendPort(_) | Data::ReceivePort(_) => {
             panic!("Couldn't have been created for fuzzing.")
         }
     }
@@ -177,7 +177,7 @@ fn complexity_of_value(object: InlineObject) -> usize {
                 + 1
         }
         Data::HirId(_)
-        | Data::Closure(_)
+        | Data::Function(_)
         | Data::Builtin(_)
         | Data::SendPort(_)
         | Data::ReceivePort(_) => 1,

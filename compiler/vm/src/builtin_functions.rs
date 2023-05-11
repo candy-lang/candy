@@ -1,11 +1,12 @@
 use crate::{
     channel::ChannelId,
     channel::{Capacity, Packet},
-    fiber::{Fiber, Status},
+    fiber::{Fiber, Panic, Status},
     heap::{
-        Closure, Data, Heap, HirId, InlineObject, Int, List, ReceivePort, SendPort, Struct, Tag,
+        Data, Function, Heap, HirId, InlineObject, Int, List, ReceivePort, SendPort, Struct, Tag,
         Text,
     },
+    tracer::FiberTracer,
 };
 use candy_frontend::builtin_functions::BuiltinFunction;
 use itertools::Itertools;
@@ -15,7 +16,7 @@ use std::str::{self, FromStr};
 use tracing::{info, span, Level};
 use unicode_segmentation::UnicodeSegmentation;
 
-impl<'h> Fiber<'h> {
+impl<'h, FT: FiberTracer> Fiber<'h, FT> {
     pub(super) fn run_builtin_function(
         &mut self,
         builtin_function: BuiltinFunction,
@@ -76,15 +77,15 @@ impl<'h> Fiber<'h> {
         match result {
             Ok(Return(value)) => self.data_stack.push(value),
             Ok(DivergeControlFlow {
-                closure,
+                function,
                 responsible,
-            }) => self.call_closure(closure, &[], responsible),
+            }) => self.call_function(function, &[], responsible),
             Ok(CreateChannel { capacity }) => self.status = Status::CreatingChannel { capacity },
             Ok(Send { channel, packet }) => self.status = Status::Sending { channel, packet },
             Ok(Receive { channel }) => self.status = Status::Receiving { channel },
             Ok(Parallel { body }) => self.status = Status::InParallelScope { body },
             Ok(Try { body }) => self.status = Status::InTry { body },
-            Err(reason) => self.panic(reason, responsible.get().to_owned()),
+            Err(reason) => self.panic(Panic::new(reason, responsible.get().to_owned())),
         }
     }
 }
@@ -93,7 +94,7 @@ type BuiltinResult<'h> = Result<SuccessfulBehavior<'h>, String>;
 enum SuccessfulBehavior<'h> {
     Return(InlineObject<'h>),
     DivergeControlFlow {
-        closure: Closure<'h>,
+        function: Function<'h>,
         responsible: HirId<'h>,
     },
     CreateChannel {
@@ -107,10 +108,10 @@ enum SuccessfulBehavior<'h> {
         channel: ChannelId,
     },
     Parallel {
-        body: Closure<'h>,
+        body: Function<'h>,
     },
     Try {
-        body: Closure<'h>,
+        body: Function<'h>,
     },
 }
 use derive_more::Deref;
@@ -209,25 +210,25 @@ impl<'h> Heap<'h> {
     }
 
     fn function_run(&mut self, args: &[InlineObject], responsible: HirId) -> BuiltinResult<'h> {
-        unpack!(self, args, |closure: Closure| {
-            closure.should_take_no_arguments()?;
+        unpack!(self, args, |function: Function| {
+            function.should_take_no_arguments()?;
             DivergeControlFlow {
-                closure: *closure,
+                function: *function,
                 responsible,
             }
         })
     }
 
     fn get_argument_count(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
-        unpack_and_later_drop!(self, args, |closure: Closure| {
-            Return(Int::create(self, closure.argument_count()).into())
+        unpack_and_later_drop!(self, args, |function: Function| {
+            Return(Int::create(self, function.argument_count()).into())
         })
     }
 
     fn if_else(&mut self, args: &[InlineObject], responsible: HirId) -> BuiltinResult<'h> {
         unpack!(self, args, |condition: bool,
-                             then: Closure,
-                             else_: Closure| {
+                             then: Function,
+                             else_: Function| {
             let (run, dont_run) = if *condition {
                 (then, else_)
             } else {
@@ -238,7 +239,7 @@ impl<'h> Heap<'h> {
             dont_run.object.drop(self);
 
             DivergeControlFlow {
-                closure: *run,
+                function: *run,
                 responsible,
             }
         })
@@ -383,9 +384,9 @@ impl<'h> Heap<'h> {
     }
 
     fn parallel(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
-        unpack!(self, args, |body_taking_nursery: Closure| {
+        unpack!(self, args, |body_taking_nursery: Function| {
             if body_taking_nursery.argument_count() != 1 {
-                return Err("`parallel` expects a closure taking a nursery.".to_string());
+                return Err("`parallel` expects a function taking a nursery.".to_string());
             }
             Parallel {
                 body: *body_taking_nursery,
@@ -545,7 +546,7 @@ impl<'h> Heap<'h> {
     }
 
     fn try_(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
-        unpack!(self, args, |body: Closure| { Try { body: *body } })
+        unpack!(self, args, |body: Function| { Try { body: *body } })
     }
 
     fn type_of(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
@@ -559,7 +560,7 @@ impl<'h> Heap<'h> {
                 Data::HirId(_) => panic!(
                     "HIR ID shouldn't occurr in Candy programs except in VM-controlled places."
                 ),
-                Data::Closure(_) => "Function",
+                Data::Function(_) => "Function",
                 Data::Builtin(_) => "Builtin",
                 Data::SendPort(_) => "SendPort",
                 Data::ReceivePort(_) => "ReceivePort",
@@ -569,7 +570,7 @@ impl<'h> Heap<'h> {
     }
 }
 
-impl Closure<'_> {
+impl Function<'_> {
     fn should_take_no_arguments(&self) -> Result<(), String> {
         match self.argument_count() {
             0 => Ok(()),

@@ -60,7 +60,9 @@ impl<'h> HeapObjectTrait<'h> for HeapHirId<'h> {
         unsafe { ptr::write(clone.id_pointer().as_ptr(), value) };
     }
 
-    fn drop_children(self, _heap: &'h mut Heap) {
+    fn drop_children(self, _heap: &'h mut Heap) {}
+
+    fn deallocate_external_stuff(self) {
         unsafe { ptr::drop_in_place(self.id_pointer().as_ptr()) };
     }
 }

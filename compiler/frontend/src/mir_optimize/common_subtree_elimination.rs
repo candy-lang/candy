@@ -30,8 +30,8 @@ use std::collections::hash_map::Entry;
 impl Mir {
     pub fn eliminate_common_subtrees(&mut self) {
         let mut pure_expressions = FxHashMap::default();
-        let mut inner_lambdas: FxHashMap<Id, Vec<Id>> = FxHashMap::default();
-        let mut additional_lambda_hirs: FxHashMap<Id, FxHashSet<hir::Id>> = FxHashMap::default();
+        let mut inner_functions: FxHashMap<Id, Vec<Id>> = FxHashMap::default();
+        let mut additional_function_hirs: FxHashMap<Id, FxHashSet<hir::Id>> = FxHashMap::default();
 
         self.body
             .visit_with_visible(&mut |id, expression, visible, _| {
@@ -42,10 +42,10 @@ impl Mir {
                 let mut normalized = expression.clone();
                 normalized.normalize();
 
-                if let Expression::Lambda { body, .. } = expression {
-                    inner_lambdas.insert(
+                if let Expression::Function { body, .. } = expression {
+                    inner_functions.insert(
                         id,
-                        body.all_lambdas().into_iter().map(|(id, _)| id).collect(),
+                        body.all_functions().into_iter().map(|(id, _)| id).collect(),
                     );
                 }
 
@@ -58,23 +58,26 @@ impl Mir {
                             expression,
                             Expression::Reference(*id_of_canonical_expression.get()),
                         );
-                        if let Expression::Lambda {
+                        if let Expression::Function {
                             mut body,
                             original_hirs,
                             ..
                         } = old_expression
                         {
-                            additional_lambda_hirs
+                            additional_function_hirs
                                 .entry(*id_of_canonical_expression.get())
                                 .or_default()
                                 .extend(original_hirs);
 
-                            let canonical_child_lambdas =
-                                inner_lambdas.get(id_of_canonical_expression.get()).unwrap();
-                            for ((_, child_hirs), canonical_child_id) in
-                                body.all_lambdas().into_iter().zip(canonical_child_lambdas)
+                            let canonical_child_functions = inner_functions
+                                .get(id_of_canonical_expression.get())
+                                .unwrap();
+                            for ((_, child_hirs), canonical_child_id) in body
+                                .all_functions()
+                                .into_iter()
+                                .zip(canonical_child_functions)
                             {
-                                additional_lambda_hirs
+                                additional_function_hirs
                                     .entry(*canonical_child_id)
                                     .or_default()
                                     .extend(child_hirs);
@@ -88,7 +91,7 @@ impl Mir {
             });
 
         self.body.visit(&mut |id, expression, _| {
-            if let Expression::Lambda { original_hirs, .. } = expression && let Some(additional_hirs) = additional_lambda_hirs.remove(&id) {
+            if let Expression::Function { original_hirs, .. } = expression && let Some(additional_hirs) = additional_function_hirs.remove(&id) {
                 original_hirs.extend(additional_hirs);
             }
             VisitorResult::Continue
@@ -97,7 +100,7 @@ impl Mir {
 }
 
 impl Expression {
-    /// Two lambdas where local expressions have different IDs are usually not
+    /// Two functions where local expressions have different IDs are usually not
     /// considered equal. This method normalizes expressions by replacing all
     /// locally defined IDs.
     fn normalize(&mut self) {
@@ -122,7 +125,7 @@ impl Expression {
         self.strip_original_hirs();
     }
     fn strip_original_hirs(&mut self) {
-        if let Expression::Lambda {
+        if let Expression::Function {
             original_hirs,
             body,
             ..
@@ -137,10 +140,10 @@ impl Expression {
 }
 
 impl Body {
-    fn all_lambdas(&mut self) -> Vec<(Id, FxHashSet<hir::Id>)> {
+    fn all_functions(&mut self) -> Vec<(Id, FxHashSet<hir::Id>)> {
         let mut ids_and_expressions = vec![];
         self.visit(&mut |id, expression, _| {
-            if let Expression::Lambda { original_hirs, .. } = expression {
+            if let Expression::Function { original_hirs, .. } = expression {
                 ids_and_expressions.push((id, original_hirs.clone()));
             }
             VisitorResult::Continue

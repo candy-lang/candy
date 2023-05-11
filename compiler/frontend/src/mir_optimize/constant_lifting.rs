@@ -1,4 +1,4 @@
-//! Constant lifting refers to lifting constants from lambdas into surrounding
+//! Constant lifting refers to lifting constants from functions into surrounding
 //! scopes.
 //!
 //! Here's a before-and-after example:

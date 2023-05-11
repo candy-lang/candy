@@ -57,7 +57,7 @@ impl<'h> HeapTag<'h> {
 impl DebugDisplay for HeapTag<'_> {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         // We can always use the display formatter since the symbol has a constrained charset.
-        write!(f, "{}", self.symbol())?;
+        write!(f, "{}", self.symbol().get())?;
 
         if let Some(value) = self.value() {
             write!(f, " (")?;
@@ -115,4 +115,6 @@ impl<'h> HeapObjectTrait<'h> for HeapTag<'h> {
             value.drop(heap);
         }
     }
+
+    fn deallocate_external_stuff(self) {}
 }

@@ -11,35 +11,45 @@ use crate::{
     module::{Module, ModuleKind, Package},
     position::PositionConversionDb,
     rich_ir::ToRichIr,
+    string_to_rcst::ModuleError,
 };
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 
 #[salsa::query_group(HirToMirStorage)]
 pub trait HirToMir: PositionConversionDb + CstDb + AstToHir {
-    fn mir(&self, module: Module, tracing: TracingConfig) -> Option<Arc<Mir>>;
+    fn mir(&self, module: Module, tracing: TracingConfig) -> MirResult;
 }
 
-fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> Option<Arc<Mir>> {
-    let mir = match module.kind {
+pub type MirResult = Result<(Arc<Mir>, Arc<FxHashSet<CompilerError>>), ModuleError>;
+
+fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> MirResult {
+    let (mir, errors) = match module.kind {
         ModuleKind::Code => {
             let (hir, _) = db.hir(module.clone())?;
-            LoweringContext::compile_module(db, module, &hir, &tracing)
+            let mut errors = FxHashSet::default();
+            let mir = LoweringContext::compile_module(db, module, &hir, &tracing, &mut errors);
+            (mir, errors)
         }
         ModuleKind::Asset => {
-            let bytes = db.get_module_content(module)?;
-            Mir::build(|body| {
-                let bytes = bytes
-                    .iter()
-                    .map(|&it| body.push_int(it.into()))
-                    .collect_vec();
-                body.push_list(bytes);
-            })
+            let Some(bytes) = db.get_module_content(module) else {
+                return Err(ModuleError::DoesNotExist);
+            };
+            (
+                Mir::build(|body| {
+                    let bytes = bytes
+                        .iter()
+                        .map(|&it| body.push_int(it.into()))
+                        .collect_vec();
+                    body.push_list(bytes);
+                }),
+                FxHashSet::default(),
+            )
         }
     };
-    Some(Arc::new(mir))
+    Ok((Arc::new(mir), Arc::new(errors)))
 }
 
 /// In the MIR, there's no longer the concept of needs. Instead, HIR IDs are
@@ -79,7 +89,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
         },
         vec!["needs".to_string()],
     );
-    body.push_lambda(needs_id.clone(), |body, responsible_for_call| {
+    body.push_function(needs_id.clone(), |body, responsible_for_call| {
         let condition = body.new_parameter();
         let reason = body.new_parameter();
         let responsible_for_condition = body.new_parameter();
@@ -162,6 +172,7 @@ struct LoweringContext<'a> {
     needs_function: Id,
     tracing: &'a TracingConfig,
     ongoing_destructuring: Option<OngoingDestructuring>,
+    errors: &'a mut FxHashSet<CompilerError>,
 }
 #[derive(Clone)]
 struct OngoingDestructuring {
@@ -177,13 +188,10 @@ impl<'a> LoweringContext<'a> {
         module: Module,
         hir: &hir::Body,
         tracing: &TracingConfig,
+        errors: &mut FxHashSet<CompilerError>,
     ) -> Mir {
         Mir::build(|body| {
             let mut mapping = FxHashMap::default();
-
-            body.push(Expression::ModuleStarts {
-                module: module.clone(),
-            });
 
             let needs_function = generate_needs_function(body);
 
@@ -194,12 +202,9 @@ impl<'a> LoweringContext<'a> {
                 needs_function,
                 tracing,
                 ongoing_destructuring: None,
+                errors,
             };
             context.compile_expressions(body, module_hir_id, &hir.expressions);
-
-            let return_value = body.current_return_value();
-            body.push(Expression::ModuleEnds);
-            body.push_reference(return_value);
         })
     }
 
@@ -315,38 +320,39 @@ impl<'a> LoweringContext<'a> {
                     responsible_for_match,
                 )
             }
-            hir::Expression::Lambda(hir::Lambda {
+            hir::Expression::Function(hir::Function {
                 parameters: original_parameters,
                 body: original_body,
                 fuzzable,
             }) => {
-                let lambda = body.push_lambda(hir_id.clone(), |lambda, responsible_parameter| {
-                    for original_parameter in original_parameters {
-                        let parameter = lambda.new_parameter();
-                        self.mapping.insert(original_parameter.clone(), parameter);
-                    }
+                let function =
+                    body.push_function(hir_id.clone(), |function, responsible_parameter| {
+                        for original_parameter in original_parameters {
+                            let parameter = function.new_parameter();
+                            self.mapping.insert(original_parameter.clone(), parameter);
+                        }
 
-                    let responsible = if *fuzzable {
-                        responsible_parameter
-                    } else {
-                        // This is a lambda with curly braces, so whoever is responsible
-                        // for `needs` in the current scope is also responsible for
-                        // `needs` in the lambda.
-                        responsible_for_needs
-                    };
+                        let responsible = if *fuzzable {
+                            responsible_parameter
+                        } else {
+                            // This is a function with curly braces, so whoever is responsible
+                            // for `needs` in the current scope is also responsible for
+                            // `needs` in the function.
+                            responsible_for_needs
+                        };
 
-                    self.compile_expressions(lambda, responsible, &original_body.expressions);
-                });
+                        self.compile_expressions(function, responsible, &original_body.expressions);
+                    });
 
                 if self.tracing.register_fuzzables.is_enabled() && *fuzzable {
                     let hir_definition = body.push(Expression::HirId(hir_id.clone()));
-                    body.push(Expression::TraceFoundFuzzableClosure {
+                    body.push(Expression::TraceFoundFuzzableFunction {
                         hir_definition,
-                        closure: lambda,
+                        function,
                     });
-                    body.push_reference(lambda)
+                    body.push_reference(function)
                 } else {
-                    lambda
+                    function
                 }
             }
             hir::Expression::Call {
@@ -401,6 +407,7 @@ impl<'a> LoweringContext<'a> {
                 )
             }
             hir::Expression::Error { errors, .. } => {
+                self.errors.extend(errors.clone());
                 let responsible = body.push_hir_id(hir_id.clone());
                 body.compile_errors(self.db, responsible, errors)
             }
@@ -469,14 +476,14 @@ impl<'a> LoweringContext<'a> {
 
                 let case_id = hir_id.child(&format!("case-{case_index}"));
                 let builtin_if_else = body.push_builtin(BuiltinFunction::IfElse);
-                let then_lambda = body.push_lambda(case_id.child("matched"), |body, _| {
+                let then_function = body.push_function(case_id.child("matched"), |body, _| {
                     self.ongoing_destructuring = Some(OngoingDestructuring {
                         result: pattern_result,
                         is_trivial: false,
                     });
                     self.compile_expressions(body, responsible_for_needs, &case_body.expressions);
                 });
-                let else_lambda = body.push_lambda(case_id.child("didNotMatch"), |body, _| {
+                let else_function = body.push_function(case_id.child("didNotMatch"), |body, _| {
                     let list_get_function = body.push_builtin(BuiltinFunction::ListGet);
                     let one = body.push_int(1.into());
                     let reason = body.push_call(
@@ -499,7 +506,7 @@ impl<'a> LoweringContext<'a> {
                 });
                 body.push_call(
                     builtin_if_else,
-                    vec![is_match, then_lambda, else_lambda],
+                    vec![is_match, then_function, else_function],
                     responsible_for_match,
                 )
             }

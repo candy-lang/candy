@@ -77,7 +77,9 @@ impl Body {
 impl Expression {
     fn complexity(&self) -> Complexity {
         match self {
-            Expression::Lambda { body, .. } => Complexity::single_expression() + body.complexity(),
+            Expression::Function { body, .. } => {
+                Complexity::single_expression() + body.complexity()
+            }
             Expression::UseModule { .. } => Complexity {
                 is_self_contained: false,
                 expressions: 1,

@@ -1,40 +1,42 @@
 use candy_frontend::hir::Id;
 use candy_vm::{
     self,
-    context::{
-        CombiningExecutionController, CountingExecutionController, ExecutionController, UseProvider,
-    },
-    heap::{Closure, Data, Heap, InlineObjectSliceCloneToHeap},
-    tracer::full::FullTracer,
+    context::{CombiningExecutionController, CountingExecutionController, ExecutionController},
+    fiber::Panic,
+    heap::{Function, HirId, InlineObjectSliceCloneToHeap},
+    lir::Lir,
+    tracer::stack_trace::StackTracer,
     vm::{self, Vm},
 };
 
 use super::input::Input;
+use rustc_hash::FxHashMap;
+use std::borrow::Borrow;
 
 const MAX_INSTRUCTIONS: usize = 10000;
 
-pub struct Runner {
-    pub vm: Option<Vm>, // Is consumed when the runner is finished.
+pub struct Runner<L: Borrow<Lir>> {
+    pub vm: Option<Vm<L, StackTracer>>, // Is consumed when the runner is finished.
     pub input: Input,
-    pub tracer: FullTracer,
+    pub tracer: StackTracer,
     pub num_instructions: usize,
     pub result: Option<RunResult>,
 }
 
 pub enum RunResult {
-    /// Executing the closure with the input took more than `MAX_INSTRUCTIONS`.
+    /// Executing the function with the input took more than `MAX_INSTRUCTIONS`.
     Timeout,
 
     /// The execution finished successfully with a value.
     Done,
 
-    /// The execution panicked and the caller of the closure (aka the fuzzer) is
-    /// at fault.
+    /// The execution panicked and the caller of the function (aka the fuzzer)
+    /// is at fault.
     NeedsUnfulfilled { reason: String },
 
     /// The execution panicked with an internal panic. This indicates an error
     /// in the code that should be shown to the user.
-    Panicked { reason: String, responsible: Id },
+    Panicked(Panic),
 }
 impl RunResult {
     pub fn to_string(&self, call: &str) -> String {
@@ -44,36 +46,48 @@ impl RunResult {
             RunResult::NeedsUnfulfilled { reason } => {
                 format!("{call} panicked and it's our fault: {reason}")
             }
-            RunResult::Panicked { reason, .. } => format!("{call} panicked internally: {reason}"),
+            RunResult::Panicked(panic) => {
+                format!("{call} panicked internally: {}", panic.reason)
+            }
         }
     }
 }
 
-impl Runner {
-    pub fn new(closure: Closure, input: Input) -> Self {
-        let mut vm_heap = Heap::default();
-        let closure = Data::from(closure.clone_to_heap(&mut vm_heap))
+impl<L: Borrow<Lir>> Runner<L> {
+    pub fn new(lir: L, function: Function, input: Input) -> Self {
+        let (mut heap, constant_mapping) = lir.borrow().constant_heap.clone();
+
+        let mut mapping = FxHashMap::default();
+        let function = function
+            .clone_to_heap_with_mapping(&mut heap, &mut mapping)
             .try_into()
             .unwrap();
-        let arguments = input.arguments.clone_to_heap(&mut vm_heap);
+        let arguments = input
+            .arguments
+            .clone_to_heap_with_mapping(&mut heap, &mut mapping);
+        let responsible = HirId::create(&mut heap, Id::fuzzer());
 
-        let mut vm = Vm::default();
-        vm.set_up_for_running_closure(vm_heap, closure, &arguments, Id::fuzzer());
+        let mut tracer = StackTracer::default();
+        let vm = Vm::for_function(
+            lir,
+            heap,
+            constant_mapping,
+            function,
+            &arguments,
+            responsible,
+            &mut tracer,
+        );
 
         Runner {
             vm: Some(vm),
             input,
-            tracer: FullTracer::default(),
+            tracer,
             num_instructions: 0,
             result: None,
         }
     }
 
-    pub fn run(
-        &mut self,
-        use_provider: &impl UseProvider,
-        execution_controller: &mut impl ExecutionController,
-    ) {
+    pub fn run(&mut self, execution_controller: &mut impl ExecutionController) {
         assert!(self.vm.is_some());
         assert!(self.result.is_none());
 
@@ -84,11 +98,10 @@ impl Runner {
         while matches!(self.vm.as_ref().unwrap().status(), vm::Status::CanRun)
             && execution_controller.should_continue_running()
         {
-            self.vm.as_mut().unwrap().run(
-                use_provider,
-                &mut execution_controller,
-                &mut self.tracer,
-            );
+            self.vm
+                .as_mut()
+                .unwrap()
+                .run(&mut execution_controller, &mut self.tracer);
         }
 
         self.num_instructions += instruction_counter.num_instructions;
@@ -101,23 +114,19 @@ impl Runner {
                     None
                 }
             }
-            // Because the fuzzer never sends channels as inputs, the closure
+            // Because the fuzzer never sends channels as inputs, the function
             // waits on some internal concurrency operations that will never be
             // completed. This most likely indicates an error in the code, but
             // it's of course valid to have a function that never returns. Thus,
             // this should be treated just like a regular timeout.
             vm::Status::WaitingForOperations => Some(RunResult::Timeout),
             vm::Status::Done => Some(RunResult::Done),
-            vm::Status::Panicked {
-                reason,
-                responsible,
-            } => Some(if responsible == Id::fuzzer() {
-                RunResult::NeedsUnfulfilled { reason }
-            } else {
-                RunResult::Panicked {
-                    reason,
-                    responsible,
+            vm::Status::Panicked(panic) => Some(if panic.responsible == Id::fuzzer() {
+                RunResult::NeedsUnfulfilled {
+                    reason: panic.reason,
                 }
+            } else {
+                RunResult::Panicked(panic)
             }),
         };
     }

@@ -80,4 +80,6 @@ impl<'h> HeapObjectTrait<'h> for HeapText<'h> {
     }
 
     fn drop_children(self, _heap: &'h mut Heap) {}
+
+    fn deallocate_external_stuff(self) {}
 }

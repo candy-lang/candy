@@ -1,5 +1,5 @@
 use self::{
-    closure::HeapClosure, hir_id::HeapHirId, int::HeapInt, list::HeapList, struct_::HeapStruct,
+    function::HeapFunction, hir_id::HeapHirId, int::HeapInt, list::HeapList, struct_::HeapStruct,
     tag::HeapTag, text::HeapText,
 };
 use super::Heap;
@@ -15,7 +15,7 @@ use std::{
     ptr::NonNull,
 };
 
-pub(super) mod closure;
+pub(super) mod function;
 pub(super) mod hir_id;
 pub(super) mod int;
 pub(super) mod list;
@@ -57,7 +57,7 @@ impl HeapObject<'_> {
     const KIND_STRUCT: u64 = 0b101;
     const KIND_TAG: u64 = 0b010;
     const KIND_TEXT: u64 = 0b110;
-    const KIND_CLOSURE: u64 = 0b011;
+    const KIND_FUNCTION: u64 = 0b011;
     const KIND_HIR_ID: u64 = 0b111;
 
     pub fn new(address: NonNull<u64>) -> Self {
@@ -199,6 +199,10 @@ pub trait HeapObjectTrait<'h>: Into<HeapObject<'h>> {
     /// This method is called by [free] prior to deallocating the object's
     /// memory.
     fn drop_children(self, heap: &'h mut Heap);
+
+    // TODO: This is temporary. Once we store everything in the heap (including
+    // stuff like big int values and HIR IDs), we can remove this.
+    fn deallocate_external_stuff(self);
 }
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
@@ -209,7 +213,7 @@ pub enum HeapData<'h> {
     Struct(HeapStruct<'h>),
     Text(HeapText<'h>),
     Tag(HeapTag<'h>),
-    Closure(HeapClosure<'h>),
+    Function(HeapFunction<'h>),
     HirId(HeapHirId<'h>),
 }
 
@@ -221,7 +225,7 @@ impl DebugDisplay for HeapData<'_> {
             Self::Struct(struct_) => DebugDisplay::fmt(struct_, f, is_debug),
             Self::Text(text) => DebugDisplay::fmt(text, f, is_debug),
             Self::Tag(tag) => DebugDisplay::fmt(tag, f, is_debug),
-            Self::Closure(closure) => DebugDisplay::fmt(closure, f, is_debug),
+            Self::Function(function) => DebugDisplay::fmt(function, f, is_debug),
             Self::HirId(hir_id) => DebugDisplay::fmt(hir_id, f, is_debug),
         }
     }
@@ -233,14 +237,14 @@ impl<'h> From<HeapObject<'h>> for HeapData<'h> {
         let header_word = object.header_word();
         match header_word & HeapObject::KIND_MASK {
             HeapObject::KIND_INT => {
-                assert_eq!(header_word, HeapObject::KIND_MASK);
+                assert_eq!(header_word, HeapObject::KIND_INT);
                 HeapData::Int(HeapInt::new_unchecked(object))
             }
             HeapObject::KIND_LIST => HeapData::List(HeapList::new_unchecked(object)),
             HeapObject::KIND_STRUCT => HeapData::Struct(HeapStruct::new_unchecked(object)),
             HeapObject::KIND_TAG => HeapData::Tag(HeapTag::new_unchecked(object)),
             HeapObject::KIND_TEXT => HeapData::Text(HeapText::new_unchecked(object)),
-            HeapObject::KIND_CLOSURE => HeapData::Closure(HeapClosure::new_unchecked(object)),
+            HeapObject::KIND_FUNCTION => HeapData::Function(HeapFunction::new_unchecked(object)),
             HeapObject::KIND_HIR_ID => {
                 assert_eq!(header_word, HeapObject::KIND_HIR_ID);
                 HeapData::HirId(HeapHirId::new_unchecked(object))
@@ -259,7 +263,7 @@ impl<'h> Deref for HeapData<'h> {
             HeapData::Struct(struct_) => struct_,
             HeapData::Text(text) => text,
             HeapData::Tag(tag) => tag,
-            HeapData::Closure(closure) => closure,
+            HeapData::Function(function) => function,
             HeapData::HirId(hir_id) => hir_id,
         }
     }

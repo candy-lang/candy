@@ -117,7 +117,10 @@ impl Display for Package {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             Package::User(path) => write!(f, "{path:?}"),
-            Package::Managed(path) => write!(f, "{path:?}"),
+            Package::Managed(path) => match path.as_os_str().to_str() {
+                Some(string) => write!(f, "{string}"),
+                None => write!(f, "{path:?}"),
+            },
             Package::Anonymous { url } => write!(f, "anonymous:{url}"),
             Package::Tooling(tooling) => write!(f, "tooling:{tooling}"),
         }

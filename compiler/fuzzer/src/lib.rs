@@ -1,4 +1,4 @@
-#![feature(round_char_boundary)]
+#![feature(let_chains, round_char_boundary)]
 
 mod fuzzer;
 mod input;
@@ -14,79 +14,65 @@ pub use self::{
 };
 use candy_frontend::{
     ast_to_hir::AstToHir,
+    cst::CstDb,
+    mir_optimize::OptimizeMir,
     module::Module,
     position::PositionConversionDb,
     {hir::Id, TracingConfig, TracingMode},
 };
 use candy_vm::{
-    context::{DbUseProvider, RunForever, RunLimitedNumberOfInstructions},
-    heap::{Closure, Heap},
-    mir_to_lir::MirToLir,
-    tracer::full::FullTracer,
+    context::{RunForever, RunLimitedNumberOfInstructions},
+    fiber::Panic,
+    mir_to_lir::compile_lir,
+    tracer::stack_trace::StackTracer,
     vm::Vm,
 };
+use std::sync::Arc;
 use tracing::{error, info};
 
 pub fn fuzz<DB>(db: &DB, module: Module) -> Vec<FailingFuzzCase>
 where
-    DB: AstToHir + MirToLir + PositionConversionDb,
+    DB: AstToHir + CstDb + OptimizeMir + PositionConversionDb,
 {
     let tracing = TracingConfig {
         register_fuzzables: TracingMode::All,
         calls: TracingMode::Off,
         evaluated_expressions: TracingMode::Off,
     };
+    let (lir, _) = compile_lir(db, module, tracing);
+    let lir = Arc::new(lir);
 
     let fuzzables = {
-        let mut heap = Heap::default();
-        let closure =
-            Closure::create_from_module(&mut heap, db, module.clone(), tracing.clone()).unwrap();
-        let mut vm = Vm::default();
-        vm.set_up_for_running_module_closure(heap, module, closure);
-
         let mut tracer = FuzzablesFinder::default();
-        vm.run(
-            &DbUseProvider {
-                db,
-                tracing: tracing.clone(),
-            },
-            &mut RunForever,
-            &mut tracer,
-        );
-        tracer.fuzzables
+        let mut vm = Vm::for_module(lir.clone(), &mut tracer);
+        vm.run(&mut RunForever, &mut tracer);
+        tracer.into_fuzzables()
     };
 
     info!(
-        "Now, the fuzzing begins. So far, we have {} closures to fuzz.",
+        "Now, the fuzzing begins. So far, we have {} functions to fuzz.",
         fuzzables.len(),
     );
 
     let mut failing_cases = vec![];
 
-    for (id, closure) in fuzzables {
+    for (id, function) in fuzzables {
         info!("Fuzzing {id}.");
-        let mut fuzzer = Fuzzer::new(closure, id.clone());
-        fuzzer.run(
-            &mut DbUseProvider {
-                db,
-                tracing: tracing.clone(),
-            },
-            &mut RunLimitedNumberOfInstructions::new(100000),
-        );
+        let mut fuzzer = Fuzzer::new(lir.clone(), function, id.clone());
+        fuzzer.run(&mut RunLimitedNumberOfInstructions::new(100000));
+
         match fuzzer.into_status() {
             Status::StillFuzzing { .. } => {}
             Status::FoundPanic {
                 input,
-                reason,
-                responsible,
+                panic,
                 tracer,
             } => {
                 error!("The fuzzer discovered an input that crashes {id}:");
                 let case = FailingFuzzCase {
-                    closure: id,
+                    function: id,
                     input,
-                    reason,
-                    responsible,
+                    panic,
                     tracer,
                 };
                 case.dump(db);
@@ -99,11 +85,10 @@ where
 }
 
 pub struct FailingFuzzCase {
-    closure: Id,
+    function: Id,
     input: Input,
-    reason: String,
-    responsible: Id,
-    tracer: FullTracer,
+    panic: Panic,
+    tracer: StackTracer,
 }
 
 impl FailingFuzzCase {
@@ -113,12 +98,12 @@ impl FailingFuzzCase {
     {
         error!(
             "Calling `{} {}` panics: {}",
-            self.closure, self.input, self.reason,
+            self.function, self.input, self.panic.reason,
         );
-        error!("{} is responsible.", self.responsible,);
+        error!("{} is responsible.", self.panic.responsible);
         error!(
             "This is the stack trace:\n{}",
-            self.tracer.format_panic_stack_trace_to_root_fiber(db)
+            self.tracer.format_panic_stack_trace_to_root_fiber(db),
         );
     }
 }

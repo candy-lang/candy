@@ -10,7 +10,6 @@ macro_rules! heap_object_impls {
             }
         }
 
-        // FIXME: remove?
         impl<'h> From<$type> for $crate::heap::object_heap::HeapObject<'h> {
             fn from(value: $type) -> Self {
                 *value

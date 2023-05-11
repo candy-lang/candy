@@ -1,20 +1,23 @@
 use super::{
     channel::{Capacity, Packet},
-    context::{ExecutionController, UseProvider},
-    heap::{Builtin, Closure, Data, Heap, Text},
+    context::ExecutionController,
+    heap::{Data, Function, Heap, Text},
     lir::Instruction,
-    tracer::FiberTracer,
 };
 use crate::{
     channel::ChannelId,
-    heap::{HirId, InlineObject, Int, List, Pointer, ReceivePort, SendPort, Struct, Tag},
+    heap::{HeapObject, HirId, InlineObject, List, Pointer, ReceivePort, SendPort, Struct, Tag},
+    tracer::{FiberEnded, FiberEndedReason, FiberTracer},
+    Lir,
 };
 use candy_frontend::{
     hir::{self, Id},
     id::CountableId,
     module::Module,
 };
+use derive_more::{Deref, From};
 use itertools::Itertools;
+use rustc_hash::FxHashMap;
 use std::fmt::{self, Debug};
 use tracing::trace;
 
@@ -38,14 +41,19 @@ impl Debug for FiberId {
 
 /// A fiber represents an execution thread of a program. It's a stack-based
 /// machine that runs instructions from a LIR. Fibers are owned by a `Vm`.
-#[derive(Clone)]
-pub struct Fiber<'h> {
+pub struct Fiber<'h, T: FiberTracer> {
     pub status: Status<'h>,
     next_instruction: Option<InstructionPointer<'h>>,
     pub data_stack: Vec<InlineObject<'h>>,
     pub call_stack: Vec<InstructionPointer<'h>>,
-    pub import_stack: Vec<Module>,
     pub heap: Heap<'h>,
+
+    // TODO: Remove this as soon as refcounting can be optional for objects.
+    // Then, refcounting for all constant objects could be made optional and
+    // they could really be shared among all fibers.
+    constant_mapping: FxHashMap<HeapObject<'h>, HeapObject<'h>>,
+
+    pub tracer: T,
 }
 
 #[derive(Clone, Debug)]
@@ -62,103 +70,150 @@ pub enum Status<'h> {
         channel: ChannelId,
     },
     InParallelScope {
-        body: Closure<'h>,
+        body: Function<'h>,
     },
     InTry {
-        body: Closure<'h>,
+        body: Function<'h>,
     },
     Done,
-    Panicked {
-        reason: String,
-        responsible: hir::Id,
-    },
+    Panicked(Panic),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct InstructionPointer<'h> {
-    /// Pointer to the closure object that is currently running code.
-    closure: Closure<'h>,
-
-    /// Index of the next instruction to run.
-    instruction: usize,
-}
-impl<'h> InstructionPointer<'h> {
-    fn start_of_closure(closure: Closure<'h>) -> Self {
-        Self {
-            closure,
-            instruction: 0,
-        }
+#[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
+pub struct InstructionPointer(usize);
+impl InstructionPointer {
+    pub fn null_pointer() -> Self {
+        Self(0)
     }
-
     fn next(&self) -> Self {
-        Self {
-            closure: self.closure,
-            instruction: self.instruction + 1,
-        }
+        Self(self.0 + 1)
+    }
+}
+impl Debug for InstructionPointer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ip-{}", self.0)
     }
 }
 
-pub enum ExecutionResult<'h> {
-    Finished(Packet<'h>),
-    Panicked { reason: String, responsible: Id },
+pub struct ExecutionEnded<'h, T: FiberTracer> {
+    pub heap: Heap<'h>,
+    pub constant_mapping: FxHashMap<HeapObject<'h>, HeapObject<'h>>,
+    tracer: T,
+    pub reason: ExecutionEndedReason<'h>,
+}
+#[derive(Clone, Debug)]
+pub enum ExecutionEndedReason<'h> {
+    Finished(InlineObject<'h>),
+    Panicked(Panic),
+}
+#[derive(Clone, Debug)]
+pub struct Panic {
+    pub reason: String,
+    pub responsible: Id,
+    pub panicked_child: Option<FiberId>,
+}
+impl Panic {
+    pub fn new(reason: String, responsible: Id) -> Self {
+        Self {
+            reason,
+            responsible,
+            panicked_child: None,
+        }
+    }
+    pub fn new_without_responsible(reason: String) -> Self {
+        Self::new(reason, Id::complicated_responsibility())
+    }
 }
 
-impl<'h> Fiber<'h> {
-    fn new_with_heap(heap: Heap<'h>) -> Self {
+impl<'h, T: FiberTracer> Fiber<'h, T> {
+    fn new_with_heap(
+        heap: Heap,
+        constant_mapping: FxHashMap<HeapObject, HeapObject>,
+        tracer: T,
+    ) -> Self {
         Self {
             status: Status::Done,
             next_instruction: None,
             data_stack: vec![],
             call_stack: vec![],
-            import_stack: vec![],
             heap,
+            constant_mapping,
+            tracer,
         }
     }
-    pub fn new_for_running_closure(
+    pub fn for_function(
         heap: Heap<'h>,
-        closure: Closure<'h>,
+        constant_mapping: FxHashMap<HeapObject<'h>, HeapObject<'h>>,
+        function: Function<'h>,
         arguments: &[InlineObject<'h>],
-        responsible: hir::Id,
+        responsible: HirId<'h>,
+        tracer: T,
     ) -> Self {
-        let mut fiber = Self::new_with_heap(heap);
-        let responsible = HirId::create(&mut fiber.heap, responsible);
+        let mut fiber = Self::new_with_heap(heap, constant_mapping, tracer);
+
+        let platform_id = HirId::create(&mut fiber.heap, hir::Id::platform());
+        fiber.tracer.call_started(
+            &mut fiber.heap,
+            platform_id,
+            function.into(),
+            arguments.to_vec(),
+            platform_id,
+        );
+        platform_id.drop(&mut fiber.heap);
+
         fiber.status = Status::Running;
-        fiber.call_closure(closure, arguments, responsible);
+        fiber.call_function(function, arguments, responsible);
+
         fiber
     }
-    pub fn new_for_running_module_closure(heap: Heap, module: Module, closure: Closure) -> Self {
+    pub fn for_module_function(
+        mut heap: Heap,
+        constant_mapping: FxHashMap<HeapObject, HeapObject>,
+        module: Module,
+        function: Function,
+        tracer: T,
+    ) -> Self {
         assert_eq!(
-            closure.captured_len(),
+            function.captured_len(),
             0,
-            "Closure is not a module closure (it captures stuff).",
+            "Function is not a module function (it captures stuff).",
         );
         assert_eq!(
-            closure.argument_count(),
+            function.argument_count(),
             0,
-            "Closure is not a module closure (it has arguments).",
+            "Function is not a module function (it has arguments).",
         );
-        let module_id = Id::new(module, vec![]);
-        Self::new_for_running_closure(heap, closure, &[], module_id)
+        let responsible = HirId::create(&mut heap, Id::new(module, vec![]));
+        Self::for_function(heap, constant_mapping, function, &[], responsible, tracer)
     }
 
-    pub fn tear_down(mut self) -> ExecutionResult<'h> {
-        match self.status {
-            Status::Done => {
-                let object = self.pop_from_data_stack();
-                ExecutionResult::Finished(Packet {
-                    heap: self.heap,
-                    object,
-                })
-            }
-            Status::Panicked {
-                reason,
-                responsible,
-            } => ExecutionResult::Panicked {
-                reason,
-                responsible,
-            },
+    pub fn tear_down(mut self) -> ExecutionEnded<'h, T> {
+        let reason = match self.status {
+            Status::Done => ExecutionEndedReason::Finished(self.pop_from_data_stack()),
+            Status::Panicked(panic) => ExecutionEndedReason::Panicked(panic),
             _ => panic!("Called `tear_down` on a fiber that's still running."),
+        };
+        ExecutionEnded {
+            heap: self.heap,
+            constant_mapping: self.constant_mapping,
+            tracer: self.tracer,
+            reason,
         }
+    }
+    pub fn adopt_finished_child(&mut self, child_id: FiberId, ended: ExecutionEnded<T>) {
+        self.heap.adopt(ended.heap);
+        let reason = match ended.reason {
+            ExecutionEndedReason::Finished(return_value) => {
+                FiberEndedReason::Finished(return_value)
+            }
+            ExecutionEndedReason::Panicked(panic) => FiberEndedReason::Panicked(panic),
+        };
+        self.tracer.child_fiber_ended(FiberEnded {
+            id: child_id,
+            heap: &mut self.heap,
+            tracer: ended.tracer,
+            reason,
+        });
     }
 
     pub fn status(&self) -> Status<'h> {
@@ -195,26 +250,24 @@ impl<'h> Fiber<'h> {
         self.push_to_data_stack(object);
         self.status = Status::Running;
     }
-    pub fn complete_parallel_scope(&mut self, result: Result<Packet, (String, Id)>) {
+    pub fn complete_parallel_scope(&mut self, result: Result<InlineObject, Panic>) {
         assert!(matches!(self.status, Status::InParallelScope { .. }));
 
         match result {
-            Ok(packet) => {
-                let object = packet.object.clone_to_heap(&mut self.heap);
+            Ok(object) => {
                 self.push_to_data_stack(object);
                 self.status = Status::Running;
             }
-            Err((reason, responsible)) => self.panic(reason, responsible),
+            Err(panic) => self.panic(panic),
         }
     }
-    pub fn complete_try(&mut self, result: &ExecutionResult) {
+    pub fn complete_try(&mut self, ended_reason: &ExecutionEndedReason) {
         assert!(matches!(self.status, Status::InTry { .. }));
-        let result = match result {
-            ExecutionResult::Finished(Packet { object, .. }) => {
-                Ok(object.clone_to_heap(&mut self.heap))
-            }
-            ExecutionResult::Panicked { reason, .. } => {
-                Err(Text::create(&mut self.heap, reason).into())
+
+        let result = match ended_reason {
+            ExecutionEndedReason::Finished(return_value) => Ok(*return_value),
+            ExecutionEndedReason::Panicked(panic) => {
+                Err(Text::create(&mut self.heap, &panic.reason).into())
             }
         };
         let result = Struct::create_result(&mut self.heap, result);
@@ -226,24 +279,20 @@ impl<'h> Fiber<'h> {
         self.data_stack[self.data_stack.len() - 1 - offset]
     }
     #[allow(unused_parens)]
-    pub fn panic(&mut self, reason: String, responsible: hir::Id) {
+    pub fn panic(&mut self, panic: Panic) {
         assert!(!matches!(
             self.status,
             (Status::Done | Status::Panicked { .. }),
         ));
-        self.heap.clear();
-        self.status = Status::Panicked {
-            reason,
-            responsible,
-        };
+
+        self.heap.reset_reference_counts();
+        self.tracer.dup_all_stored_objects(&mut self.heap);
+        self.heap.drop_all_unreferenced();
+
+        self.status = Status::Panicked(panic);
     }
 
-    pub fn run(
-        &mut self,
-        use_provider: &dyn UseProvider,
-        execution_controller: &mut dyn ExecutionController,
-        tracer: &mut FiberTracer,
-    ) {
+    pub fn run(&mut self, lir: &Lir, execution_controller: &mut dyn ExecutionController) {
         assert!(
             matches!(self.status, Status::Running),
             "Called Fiber::run on a fiber that is not ready to run."
@@ -253,35 +302,29 @@ impl<'h> Fiber<'h> {
         {
             let Some(next_instruction) = self.next_instruction else {
                 self.status = Status::Done;
+                self.tracer.call_ended(
+                    &mut self.heap,
+                    *self.data_stack.last().unwrap(),
+                );
                 break;
             };
 
-            let instruction = next_instruction
-                .closure
-                .instructions()
-                .get(next_instruction.instruction)
-                .expect("Invalid instruction pointer")
-                .to_owned(); // PERF: Can we avoid this clone?
-
+            let instruction = lir
+                .instructions
+                .get(*next_instruction)
+                .expect("invalid instruction pointer")
+                .clone(); // PERF: Can we avoid this clone?
             self.next_instruction = Some(next_instruction.next());
-            self.run_instruction(use_provider, tracer, instruction);
+
+            self.run_instruction(instruction);
             execution_controller.instruction_executed();
         }
     }
-    pub fn run_instruction(
-        &mut self,
-        use_provider: &dyn UseProvider,
-        tracer: &mut FiberTracer,
-        instruction: Instruction,
-    ) {
+    pub fn run_instruction(&mut self, instruction: Instruction) {
         if TRACE {
             trace!("Running instruction: {instruction:?}");
             let next_instruction = self.next_instruction.unwrap();
-            trace!(
-                "Instruction pointer: {}:{}",
-                next_instruction.closure,
-                next_instruction.instruction,
-            );
+            trace!("Instruction pointer: {:?}", next_instruction);
             trace!(
                 "Data stack: {}",
                 if self.data_stack.is_empty() {
@@ -300,7 +343,7 @@ impl<'h> Fiber<'h> {
                 } else {
                     self.call_stack
                         .iter()
-                        .map(|ip| format!("{}:{}", ip.closure, ip.instruction))
+                        .map(|ip| format!("{ip:?}"))
                         .join(", ")
                 },
             );
@@ -308,18 +351,6 @@ impl<'h> Fiber<'h> {
         }
 
         match instruction {
-            Instruction::CreateInt(int) => {
-                let int = Int::create_from_bigint(&mut self.heap, int);
-                self.push_to_data_stack(int);
-            }
-            Instruction::CreateText(text) => {
-                let text = Text::create(&mut self.heap, &text);
-                self.push_to_data_stack(text);
-            }
-            Instruction::CreateSymbol(symbol) => {
-                let tag = Tag::create_from_str(&mut self.heap, &symbol, None);
-                self.push_to_data_stack(tag);
-            }
             Instruction::CreateList { num_items } => {
                 let mut item_addresses = vec![];
                 for _ in 0..num_items {
@@ -339,14 +370,10 @@ impl<'h> Fiber<'h> {
                 let struct_ = Struct::create(&mut self.heap, &entries);
                 self.push_to_data_stack(struct_);
             }
-            Instruction::CreateHirId(id) => {
-                let id = HirId::create(&mut self.heap, id);
-                self.push_to_data_stack(id);
-            }
-            Instruction::CreateClosure {
+            Instruction::CreateFunction {
+                captured,
                 num_args,
                 body,
-                captured,
             } => {
                 let captured = captured
                     .iter()
@@ -356,11 +383,16 @@ impl<'h> Fiber<'h> {
                         object
                     })
                     .collect_vec();
-                let closure = Closure::create(&mut self.heap, &captured, num_args, body);
-                self.push_to_data_stack(closure);
+                let function = Function::create(&mut self.heap, &captured, num_args, body);
+                self.push_to_data_stack(function);
             }
-            Instruction::CreateBuiltin(builtin) => {
-                self.push_to_data_stack(Builtin::create(builtin));
+            Instruction::PushConstant(constant) => {
+                let constant = match HeapObject::try_from(constant) {
+                    Ok(heap_object) => self.constant_mapping[&heap_object].into(),
+                    Err(_) => constant,
+                };
+                constant.dup(&mut self.heap);
+                self.push_to_data_stack(constant);
             }
             Instruction::PushFromStack(offset) => {
                 let address = self.get_from_data_stack(offset);
@@ -406,20 +438,7 @@ impl<'h> Fiber<'h> {
                 self.call(callee, &arguments, responsible);
             }
             Instruction::Return => {
-                self.next_instruction.unwrap().closure.drop(&mut self.heap);
                 self.next_instruction = self.call_stack.pop();
-            }
-            Instruction::UseModule { current_module } => {
-                let responsible = self.pop_from_data_stack();
-                let relative_path = self.pop_from_data_stack();
-
-                match self.use_module(use_provider, current_module, relative_path) {
-                    Ok(()) => {}
-                    Err(reason) => {
-                        let responsible: HirId = responsible.try_into().unwrap();
-                        self.panic(reason, responsible.get().to_owned());
-                    }
-                }
             }
             Instruction::Panic => {
                 let responsible_for_panic = self.pop_from_data_stack();
@@ -434,19 +453,10 @@ impl<'h> Fiber<'h> {
                 };
                 let responsible: HirId = responsible_for_panic.try_into().unwrap();
 
-                self.panic(reason.get().to_owned(), responsible.get().to_owned());
-            }
-            Instruction::ModuleStarts { module } => {
-                if self.import_stack.contains(&module) {
-                    self.panic(
-                        "Import cycle.".to_string(),
-                        hir::Id::new(module.clone(), vec![]),
-                    );
-                }
-                self.import_stack.push(module);
-            }
-            Instruction::ModuleEnds => {
-                self.import_stack.pop().unwrap();
+                self.panic(Panic::new(
+                    reason.get().to_owned(),
+                    responsible.get().to_owned(),
+                ));
             }
             Instruction::TraceCallStarts { num_args } => {
                 let responsible = self.pop_from_data_stack().try_into().unwrap();
@@ -458,40 +468,43 @@ impl<'h> Fiber<'h> {
                 let call_site = self.pop_from_data_stack().try_into().unwrap();
 
                 args.reverse();
-                tracer.call_started(call_site, callee, args, responsible, &self.heap);
+                self.tracer
+                    .call_started(&mut self.heap, call_site, callee, args, responsible);
             }
             Instruction::TraceCallEnds => {
                 let return_value = self.pop_from_data_stack();
 
-                tracer.call_ended(return_value, &self.heap);
+                self.tracer.call_ended(&mut self.heap, return_value);
             }
             Instruction::TraceExpressionEvaluated => {
                 let value = self.pop_from_data_stack();
                 let expression = self.pop_from_data_stack().try_into().unwrap();
 
-                tracer.value_evaluated(expression, value, &self.heap);
+                self.tracer
+                    .value_evaluated(&mut self.heap, expression, value);
             }
-            Instruction::TraceFoundFuzzableClosure => {
-                let closure = self.pop_from_data_stack().try_into().expect("Instruction TraceFoundFuzzableClosure executed, but stack top is not a closure.");
+            Instruction::TraceFoundFuzzableFunction => {
+                let function = self.pop_from_data_stack().try_into().expect("Instruction TraceFoundFuzzableFunction executed, but stack top is not a function.");
                 let definition = self.pop_from_data_stack().try_into().unwrap();
 
-                tracer.found_fuzzable_closure(definition, closure, &self.heap);
+                self.tracer
+                    .found_fuzzable_function(&mut self.heap, definition, function);
             }
         }
     }
 
     pub fn call(&mut self, callee: InlineObject, arguments: &[InlineObject], responsible: HirId) {
         match callee.into() {
-            Data::Closure(closure) => self.call_closure(closure, arguments, responsible),
+            Data::Function(function) => self.call_function(function, arguments, responsible),
             Data::Builtin(builtin) => {
                 callee.drop(&mut self.heap);
                 self.run_builtin_function(builtin.get(), arguments, responsible);
             }
             Data::Tag(tag) => {
                 if tag.has_value() {
-                    self.panic(
+                    self.panic(Panic::new(
                         "A tag's value cannot be overwritten by calling it. Use `tag.withValue` instead.".to_string(),
-                        responsible.get().to_owned(),
+                        responsible.get().to_owned(),)
                     );
                     return;
                 }
@@ -501,39 +514,39 @@ impl<'h> Fiber<'h> {
                     self.push_to_data_stack(tag);
                     value.dup(&mut self.heap);
                 } else {
-                    self.panic(
+                    self.panic(Panic::new(
                         format!(
                             "A tag can only hold exactly one value, but you called it with {} arguments.",
                             arguments.len(),
                         ),
                         responsible.get().to_owned(),
-                    );
+                    ));
                 }
             }
             _ => {
-                self.panic(
+                self.panic(Panic::new(
                     format!(
-                        "You can only call closures, builtins and tags, but you tried to call {callee}.",
+                        "You can only call functions, builtins and tags, but you tried to call {callee}.",
                     ),
                     responsible.get().to_owned(),
-                );
+                ));
             }
         };
     }
-    pub fn call_closure(
+    pub fn call_function(
         &mut self,
-        closure: Closure,
+        function: Function,
         arguments: &[InlineObject],
         responsible: HirId,
     ) {
-        let expected_num_args = closure.argument_count();
+        let expected_num_args = function.argument_count();
         if arguments.len() != expected_num_args {
-            self.panic(
+            self.panic(Panic::new(
                 format!(
-                    "A closure expected {expected_num_args} parameters, but you called it with {} arguments.",
+                    "A function expected {expected_num_args} parameters, but you called it with {} arguments.",
                     arguments.len(),
                 ),
-                responsible.get().to_owned(),
+                responsible.get().to_owned(),)
             );
             return;
         }
@@ -541,14 +554,14 @@ impl<'h> Fiber<'h> {
         if let Some(next_instruction) = self.next_instruction {
             self.call_stack.push(next_instruction);
         }
-        let captured = closure.captured();
+        let captured = function.captured();
         for captured in captured {
             captured.dup(&mut self.heap);
         }
         self.data_stack.extend_from_slice(captured);
         self.data_stack.extend_from_slice(arguments);
         self.push_to_data_stack(responsible);
-        self.next_instruction = Some(InstructionPointer::start_of_closure(closure));
+        self.next_instruction = Some(function.body());
     }
 
     fn push_to_data_stack(&mut self, value: impl Into<InlineObject>) {

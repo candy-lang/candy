@@ -23,10 +23,10 @@ use tracing::info;
 pub trait HirDb: AstToHir {
     fn find_expression(&self, id: Id) -> Option<Expression>;
     fn containing_body_of(&self, id: Id) -> Arc<Body>;
-    fn all_hir_ids(&self, module: Module) -> Option<Vec<Id>>;
+    fn all_hir_ids(&self, module: Module) -> Vec<Id>;
 }
 fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
-    let (hir, _) = db.hir(id.module.clone()).unwrap();
+    let (hir, _) = db.hir(id.module.clone()).ok()?;
     if id.is_root() {
         panic!("You can't get the root because that got lowered into multiple IDs.");
     }
@@ -34,34 +34,33 @@ fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
     hir.find(&id).map(|it| it.to_owned())
 }
 fn containing_body_of(db: &dyn HirDb, id: Id) -> Arc<Body> {
-    match id.parent() {
-        Some(parent_id) => {
-            if parent_id.is_root() {
-                db.hir(id.module).unwrap().0
-            } else {
-                match db.find_expression(parent_id).unwrap() {
-                    Expression::Match { cases, .. } => {
-                        let body = cases
-                            .into_iter()
-                            .map(|(_, body)| body)
-                            .find(|body| body.expressions.contains_key(&id))
-                            .unwrap();
-                        Arc::new(body)
-                    }
-                    Expression::Lambda(lambda) => Arc::new(lambda.body),
-                    _ => panic!("Parent of an expression must be a lambda (or root scope)."),
-                }
+    let parent_id = id.parent().expect("The root scope has no parent.");
+
+    if parent_id.is_root() {
+        db.hir(id.module).unwrap().0
+    } else {
+        match db.find_expression(parent_id).unwrap() {
+            Expression::Match { cases, .. } => {
+                let body = cases
+                    .into_iter()
+                    .map(|(_, body)| body)
+                    .find(|body| body.expressions.contains_key(&id))
+                    .unwrap();
+                Arc::new(body)
             }
+            Expression::Function(function) => Arc::new(function.body),
+            _ => panic!("Parent of an expression must be a function (or root scope)."),
         }
-        None => panic!("The root scope has no parent."),
     }
 }
-fn all_hir_ids(db: &dyn HirDb, module: Module) -> Option<Vec<Id>> {
-    let (hir, _) = db.hir(module)?;
+fn all_hir_ids(db: &dyn HirDb, module: Module) -> Vec<Id> {
+    let Ok((hir, _)) = db.hir(module) else {
+        return vec![];
+    };
     let mut ids = vec![];
     hir.collect_all_ids(&mut ids);
     info!("All HIR IDs: {ids:?}");
-    Some(ids)
+    ids
 }
 
 impl Expression {
@@ -93,7 +92,7 @@ impl Expression {
                     body.collect_all_ids(ids);
                 }
             }
-            Expression::Lambda(Lambda {
+            Expression::Function(Function {
                 parameters, body, ..
             }) => {
                 for parameter in parameters {
@@ -152,6 +151,12 @@ impl Id {
             keys: vec![],
         }
     }
+    /// The user of the Candy tooling is responsible. For example, when the user
+    /// instructs the tooling to run a non-existent module, then the program
+    /// will panic with this responsiblity.
+    pub fn user() -> Self {
+        Self::tooling("user".to_string())
+    }
     /// Refers to the platform (non-Candy code).
     pub fn platform() -> Self {
         Self::tooling("platform".to_string())
@@ -163,7 +168,7 @@ impl Id {
     pub fn dummy() -> Self {
         Self::tooling("dummy".to_string())
     }
-    /// TODO: Currently, when a higher-order function calls a closure passed as
+    /// TODO: Currently, when a higher-order function calls a function passed as
     /// a parameter, that's registered as a normal call instruction, making the
     /// callsite in the higher-order function responsible for the successful
     /// fulfillment of the passed function's `needs`. We probably want to change
@@ -253,7 +258,7 @@ pub enum Expression {
         /// in the pattern.
         cases: Vec<(Pattern, Body)>,
     },
-    Lambda(Lambda),
+    Function(Function),
     Builtin(BuiltinFunction),
     Call {
         function: Id,
@@ -410,7 +415,7 @@ impl Pattern {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Lambda {
+pub struct Function {
     pub parameters: Vec<Id>,
     pub body: Body,
     pub fuzzable: bool,
@@ -510,11 +515,11 @@ impl ToRichIr for Expression {
                     builder.dedent();
                 });
             }
-            Expression::Lambda(lambda) => {
+            Expression::Function(function) => {
                 builder.push(
                     format!(
                         "{{ ({}) ",
-                        if lambda.fuzzable {
+                        if function.fuzzable {
                             "fuzzable"
                         } else {
                             "non-fuzzable"
@@ -523,7 +528,7 @@ impl ToRichIr for Expression {
                     None,
                     EnumSet::empty(),
                 );
-                lambda.build_rich_ir(builder);
+                function.build_rich_ir(builder);
                 builder.push("}", None, EnumSet::empty());
             }
             Expression::Builtin(builtin) => {
@@ -548,9 +553,9 @@ impl ToRichIr for Expression {
                 current_module,
                 relative_path,
             } => {
-                builder.push("use module ", None, EnumSet::empty());
+                builder.push("relative to module ", None, EnumSet::empty());
                 current_module.build_rich_ir(builder);
-                builder.push(" relative to ", None, EnumSet::empty());
+                builder.push(", use ", None, EnumSet::empty());
                 relative_path.build_rich_ir(builder);
             }
             Expression::Needs { condition, reason } => {
@@ -627,7 +632,7 @@ fn build_errors_rich_ir<C: ToRichIr>(
         }
     });
 }
-impl ToRichIr for Lambda {
+impl ToRichIr for Function {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         for parameter in &self.parameters {
             let range = builder.push(
@@ -686,7 +691,7 @@ impl Expression {
             Expression::PatternIdentifierReference { .. } => None,
             // TODO: use binary search
             Expression::Match { cases, .. } => cases.iter().find_map(|(_, body)| body.find(id)),
-            Expression::Lambda(Lambda { body, .. }) => body.find(id),
+            Expression::Function(Function { body, .. }) => body.find(id),
             Expression::Builtin(_) => None,
             Expression::Call { .. } => None,
             Expression::UseModule { .. } => None,
@@ -733,7 +738,7 @@ impl CollectErrors for Expression {
             | Expression::Call { .. }
             | Expression::UseModule { .. }
             | Expression::Needs { .. } => {}
-            Expression::Lambda(lambda) => lambda.body.collect_errors(errors),
+            Expression::Function(function) => function.body.collect_errors(errors),
             Expression::Destructure { pattern, .. } => pattern.collect_errors(errors),
             Expression::Error {
                 errors: the_errors, ..

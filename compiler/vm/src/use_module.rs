@@ -3,14 +3,17 @@ use super::{
     fiber::Fiber,
     heap::{Closure, Text},
 };
-use crate::heap::{HirId, InlineObject};
+use crate::{
+    heap::{HirId, InlineObject},
+    tracer::FiberTracer,
+};
 use candy_frontend::{
     hir::Id,
     module::{Module, UsePath},
     rich_ir::ToRichIr,
 };
 
-impl Fiber {
+impl<FT: FiberTracer> Fiber<FT> {
     pub fn use_module(
         &mut self,
         use_provider: &dyn UseProvider,

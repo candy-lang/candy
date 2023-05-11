@@ -12,7 +12,7 @@ async nursery body :=
   needs (channel.isSendPort nursery)
   needs (function.is0 body)
   returnChannel = channel.create 1
-  nursery | channel.send [Closure: body, ReturnChannel: returnChannel.sendPort]
+  nursery | channel.send [Function: body, ReturnChannel: returnChannel.sendPort]
   returnChannel.receivePort
 
 await fiber :=

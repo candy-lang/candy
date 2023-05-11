@@ -3,7 +3,7 @@ use candy_frontend::{
     ast_to_hir::AstToHirStorage,
     cst::CstDbStorage,
     cst_to_ast::CstToAstStorage,
-    hir::HirDbStorage,
+    hir::{self, HirDbStorage},
     hir_to_mir::HirToMirStorage,
     mir_optimize::OptimizeMirStorage,
     module::{
@@ -17,17 +17,16 @@ use candy_frontend::{
 };
 use candy_vm::{
     channel::Packet,
-    context::DbUseProvider,
-    fiber::ExecutionResult,
-    heap::Struct,
+    fiber::ExecutionEndedReason,
+    heap::{HirId, Struct},
     lir::Lir,
-    mir_to_lir::{MirToLir, MirToLirStorage},
-    run_lir, run_main,
+    mir_to_lir::compile_lir,
     tracer::DummyTracer,
+    vm::Vm,
 };
 use lazy_static::lazy_static;
 use rustc_hash::FxHashMap;
-use std::{fs, sync::Arc};
+use std::{borrow::Borrow, fs};
 use walkdir::WalkDir;
 
 const TRACING: TracingConfig = TracingConfig::off();
@@ -47,7 +46,6 @@ lazy_static! {
     CstToAstStorage,
     HirDbStorage,
     HirToMirStorage,
-    MirToLirStorage,
     ModuleDbStorage,
     OptimizeMirStorage,
     PositionConversionStorage,
@@ -74,19 +72,24 @@ impl MutableModuleProviderOwner for Database {
     }
 }
 
-pub fn setup_and_compile(source_code: &str) -> (Database, Lir) {
+pub fn setup_and_compile(source_code: &str) -> Lir {
     let mut db = setup();
-    let lir = compile(&mut db, source_code).as_ref().to_owned();
-    (db, lir)
+    compile(&mut db, source_code)
 }
 
 pub fn setup() -> Database {
     let mut db = Database::default();
     load_core(&mut db.module_provider);
-    db.module_provider.add_str(&MODULE, r#"_ = use "..Core""#);
+    db.module_provider.add_str(&MODULE, r#"_ = use "Core""#);
 
     // Load `Core` into the cache.
-    db.lir(MODULE.clone(), TRACING.clone()).unwrap();
+    let errors = compile_lir(&db, MODULE.clone(), TRACING.clone()).1;
+    if !errors.is_empty() {
+        for error in errors.iter() {
+            println!("{error:?}");
+        }
+        panic!("There are errors in the benchmarking code.");
+    }
 
     db
 }
@@ -114,26 +117,38 @@ fn load_core(module_provider: &mut InMemoryModuleProvider) {
     }
 }
 
-pub fn compile(db: &mut Database, source_code: &str) -> Arc<Lir> {
+pub fn compile(db: &mut Database, source_code: &str) -> Lir {
     db.did_open_module(&MODULE, source_code.as_bytes().to_owned());
-
-    db.lir(MODULE.clone(), TRACING.clone()).unwrap()
+    compile_lir(db, MODULE.clone(), TRACING.clone()).0
 }
 
-pub fn run(db: &Database, lir: Lir) -> Packet {
-    let use_provider = DbUseProvider {
-        db,
-        tracing: TRACING.clone(),
-    };
+pub fn run(lir: impl Borrow<Lir>) -> Packet {
     let mut tracer = DummyTracer::default();
-    let (mut heap, main) = run_lir(MODULE.clone(), lir, &use_provider, &mut tracer)
+    let (mut heap, main, constant_mapping) = Vm::for_module(lir.borrow(), &mut tracer)
+        .run_until_completion(&mut tracer)
         .into_main_function()
         .unwrap();
 
     // Run the `main` function.
     let environment = Struct::create(&mut heap, &FxHashMap::default());
-    match run_main(heap, main, environment, &use_provider, &mut tracer) {
-        ExecutionResult::Finished(return_value) => return_value,
-        ExecutionResult::Panicked { reason, .. } => panic!("The main function panicked: {reason}"),
+    let responsible = HirId::create(&mut heap, hir::Id::user());
+    let ended = Vm::for_function(
+        lir,
+        heap,
+        constant_mapping,
+        main,
+        &[environment.into()],
+        responsible,
+        &mut tracer,
+    )
+    .run_until_completion(&mut tracer);
+    match ended.reason {
+        ExecutionEndedReason::Finished(return_value) => Packet {
+            heap: ended.heap,
+            object: return_value,
+        },
+        ExecutionEndedReason::Panicked(panic) => {
+            panic!("The main function panicked: {}", panic.reason)
+        }
     }
 }

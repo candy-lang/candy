@@ -23,11 +23,11 @@ pub enum Expression {
     Reference(Id),
     /// A HIR ID that can be used to refer to code in the HIR.
     HirId(hir::Id),
-    /// In the MIR, responsibilities are explicitly tracked. All lambdas take a
-    /// responsible HIR ID as an extra parameter. Based on whether the function
-    /// is fuzzable or not, this parameter may be used to dynamically determine
-    /// who's at fault if some `needs` is not fulfilled.
-    Lambda {
+    /// In the MIR, responsibilities are explicitly tracked. All functions take
+    /// a responsible HIR ID as an extra parameter. Based on whether the
+    /// function is fuzzable or not, this parameter may be used to dynamically
+    /// determine who's at fault if some `needs` is not fulfilled.
+    Function {
         original_hirs: FxHashSet<hir::Id>,
         parameters: Vec<Id>,
         responsible_parameter: Id,
@@ -63,22 +63,6 @@ pub enum Expression {
     /// [multiple flattening]: crate::mir_optimize::multiple_flattening
     Multiple(Body),
 
-    /// Indicates that a module started.
-    ///
-    /// Unlike the trace instructions below, this expression is not optional –
-    /// it needs to always be compiled into the MIR because the `ModuleStarts`
-    /// and `ModuleEnds` instructions directly influence the import stack of the
-    /// VM and thereby the behavior of the program. Depending on the order of
-    /// instructions being executed, an import may succeed, or panic because of
-    /// a circular import.
-    ///
-    /// If there's no `use` between the `ModuleStarts` and `ModuleEnds`
-    /// expressions, they can be optimized away.
-    ModuleStarts {
-        module: Module,
-    },
-    ModuleEnds,
-
     TraceCallStarts {
         hir_call: Id,
         function: Id,
@@ -92,9 +76,9 @@ pub enum Expression {
         hir_expression: Id,
         value: Id,
     },
-    TraceFoundFuzzableClosure {
+    TraceFoundFuzzableFunction {
         hir_definition: Id,
-        closure: Id,
+        function: Id,
     },
 }
 
@@ -142,7 +126,7 @@ impl hash::Hash for Expression {
             Expression::Struct(fields) => fields.len().hash(state),
             Expression::Reference(id) => id.hash(state),
             Expression::HirId(id) => id.hash(state),
-            Expression::Lambda {
+            Expression::Function {
                 original_hirs,
                 parameters,
                 responsible_parameter,
@@ -188,8 +172,6 @@ impl hash::Hash for Expression {
                 responsible.hash(state);
             }
             Expression::Multiple(body) => body.hash(state),
-            Expression::ModuleStarts { module } => module.hash(state),
-            Expression::ModuleEnds => {}
             Expression::TraceCallStarts {
                 hir_call,
                 function,
@@ -209,12 +191,12 @@ impl hash::Hash for Expression {
                 hir_expression.hash(state);
                 value.hash(state);
             }
-            Expression::TraceFoundFuzzableClosure {
+            Expression::TraceFoundFuzzableFunction {
                 hir_definition,
-                closure,
+                function,
             } => {
                 hir_definition.hash(state);
-                closure.hash(state);
+                function.hash(state);
             }
         }
     }
@@ -266,7 +248,7 @@ impl ToRichIr for Expression {
                 let range = builder.push(id.to_string(), TokenType::Symbol, EnumSet::empty());
                 builder.push_reference(id.to_owned(), range);
             }
-            Expression::Lambda {
+            Expression::Function {
                 // IDs are displayed by the body before the entire expression
                 // assignment.
                 original_hirs: _,
@@ -355,14 +337,11 @@ impl ToRichIr for Expression {
                 responsible.build_rich_ir(builder);
                 builder.push(" is at fault)", None, EnumSet::empty());
             }
-            Expression::Multiple(body) => body.build_rich_ir(builder),
-            Expression::ModuleStarts { module } => {
-                builder.push("module ", None, EnumSet::empty());
-                module.build_rich_ir(builder);
-                builder.push(" starts", None, EnumSet::empty());
-            }
-            Expression::ModuleEnds => {
-                builder.push("module ends", None, EnumSet::empty());
+            Expression::Multiple(body) => {
+                builder.indent();
+                builder.push_newline();
+                body.build_rich_ir(builder);
+                builder.dedent();
             }
             Expression::TraceCallStarts {
                 hir_call,
@@ -397,12 +376,12 @@ impl ToRichIr for Expression {
                 builder.push(" evaluated to ", None, EnumSet::empty());
                 value.build_rich_ir(builder);
             }
-            Expression::TraceFoundFuzzableClosure {
+            Expression::TraceFoundFuzzableFunction {
                 hir_definition,
-                closure,
+                function,
             } => {
-                builder.push("trace: found fuzzable closure ", None, EnumSet::empty());
-                closure.build_rich_ir(builder);
+                builder.push("trace: found fuzzable function ", None, EnumSet::empty());
+                function.build_rich_ir(builder);
                 builder.push(" defined at ", None, EnumSet::empty());
                 hir_definition.build_rich_ir(builder);
             }

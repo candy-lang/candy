@@ -21,6 +21,8 @@ pub enum SemanticTokenType {
     Text,
     Int,
     Operator,
+    Address,
+    Constant,
 }
 lazy_static! {
     static ref TOKEN_TYPE_MAPPING: FxHashMap<SemanticTokenType, u32> = SemanticTokenType::iter()
@@ -41,6 +43,8 @@ impl SemanticTokenType {
             SemanticTokenType::Text => lsp_types::SemanticTokenType::STRING,
             SemanticTokenType::Int => lsp_types::SemanticTokenType::NUMBER,
             SemanticTokenType::Operator => lsp_types::SemanticTokenType::OPERATOR,
+            SemanticTokenType::Address => lsp_types::SemanticTokenType::EVENT,
+            SemanticTokenType::Constant => lsp_types::SemanticTokenType::VARIABLE,
         }
     }
 }

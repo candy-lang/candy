@@ -1,18 +1,14 @@
 use candy_frontend::{
     ast_to_hir::AstToHir,
-    hir::{Expression, HirDb, Id, Lambda},
+    hir::{self, Expression, HirDb, Id},
     module::{Module, ModuleDb},
     position::PositionConversionDb,
-    TracingConfig,
 };
 use candy_fuzzer::{Fuzzer, Status};
-use candy_vm::{
-    context::{DbUseProvider, RunLimitedNumberOfInstructions},
-    heap::Closure,
-    mir_to_lir::MirToLir,
-};
+use candy_vm::{context::RunLimitedNumberOfInstructions, heap::Function, lir::Lir};
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
+use std::sync::Arc;
 use tracing::{debug, error};
 
 use crate::{
@@ -29,10 +25,15 @@ pub struct FuzzerManager {
 }
 
 impl FuzzerManager {
-    pub fn update_module(&mut self, module: Module, fuzzable_closures: &[(Id, Closure)]) {
-        let fuzzers = fuzzable_closures
+    pub fn update_module(
+        &mut self,
+        module: Module,
+        lir: Arc<Lir>,
+        fuzzable_functions: &FxHashMap<Id, Function>,
+    ) {
+        let fuzzers = fuzzable_functions
             .iter()
-            .map(|(id, closure)| (id.clone(), Fuzzer::new(*closure, id.clone())))
+            .map(|(id, function)| (id.clone(), Fuzzer::new(lir.clone(), *function, id.clone())))
             .collect();
         self.fuzzers.insert(module, fuzzers);
     }
@@ -41,7 +42,7 @@ impl FuzzerManager {
         self.fuzzers.remove(&module).unwrap();
     }
 
-    pub fn run<DB: MirToLir>(&mut self, db: &DB) -> Option<Module> {
+    pub fn run(&mut self) -> Option<Module> {
         let mut running_fuzzers = self
             .fuzzers
             .values_mut()
@@ -50,17 +51,11 @@ impl FuzzerManager {
             .collect_vec();
 
         let fuzzer = running_fuzzers.choose_mut(&mut thread_rng())?;
-        fuzzer.run(
-            &mut DbUseProvider {
-                db,
-                tracing: TracingConfig::off(),
-            },
-            &mut RunLimitedNumberOfInstructions::new(1000),
-        );
+        fuzzer.run(&mut RunLimitedNumberOfInstructions::new(1000));
 
         match &fuzzer.status() {
             Status::StillFuzzing { .. } => None,
-            Status::FoundPanic { .. } => Some(fuzzer.closure_id.module.clone()),
+            Status::FoundPanic { .. } => Some(fuzzer.function_id.module.clone()),
         }
     }
 
@@ -82,21 +77,20 @@ impl FuzzerManager {
         for fuzzer in self.fuzzers[module].values() {
             let Status::FoundPanic {
                 input,
-                reason,
-                responsible,
+                panic,
                 ..
             } = fuzzer.status() else { continue; };
 
-            let id = fuzzer.closure_id.clone();
+            let id = fuzzer.function_id.clone();
             let first_hint = {
                 let parameter_names = match db.find_expression(id.clone()) {
-                    Some(Expression::Lambda(Lambda { parameters, .. })) => parameters
+                    Some(Expression::Function(hir::Function { parameters, .. })) => parameters
                         .into_iter()
                         .map(|parameter| parameter.keys.last().unwrap().to_string())
                         .collect_vec(),
-                    Some(_) => panic!("Looks like we fuzzed a non-closure. That's weird."),
+                    Some(_) => panic!("Looks like we fuzzed a non-function. That's weird."),
                     None => {
-                        error!("Using fuzzing, we found an error in a generated closure.");
+                        error!("Using fuzzing, we found an error in a generated function.");
                         continue;
                     }
                 };
@@ -116,7 +110,7 @@ impl FuzzerManager {
             };
 
             let second_hint = {
-                if &responsible.module != module {
+                if &panic.responsible.module != module {
                     // The function panics internally for an input, but it's the
                     // fault of an inner function that's in another module.
                     // TODO: The fuzz case should instead be highlighted in the
@@ -128,7 +122,8 @@ impl FuzzerManager {
                 }
                 if db.hir_to_cst_id(id.clone()).is_none() {
                     panic!(
-                        "It looks like the generated code {responsible} is at fault for a panic."
+                        "It looks like the generated code {} is at fault for a panic.",
+                        panic.responsible,
                     );
                 }
 
@@ -137,8 +132,8 @@ impl FuzzerManager {
                 // function in the hint.
                 Hint {
                     kind: HintKind::Fuzz,
-                    text: format!("then {responsible} panics: {reason}"),
-                    position: db.id_to_end_of_line(responsible.clone()).unwrap(),
+                    text: format!("then {} panics: {}", panic.responsible, panic.reason),
+                    position: db.id_to_end_of_line(panic.responsible.clone()).unwrap(),
                 }
             };
 

@@ -171,4 +171,6 @@ impl<'h> HeapObjectTrait<'h> for HeapList<'h> {
             item.drop(heap)
         }
     }
+
+    fn deallocate_external_stuff(self) {}
 }
