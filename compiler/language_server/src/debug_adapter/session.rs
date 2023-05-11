@@ -214,7 +214,7 @@ impl DebugSession {
                 // Run the `main` function.
                 let environment = Struct::create(&mut heap, &FxHashMap::default()).into();
                 let platform = HirId::create(&mut heap, Id::platform());
-                let mut tracer = DebugTracer::default();
+                let mut tracer = DebugTracer;
                 vm.initialize_for_function(
                     heap,
                     constant_mapping,
