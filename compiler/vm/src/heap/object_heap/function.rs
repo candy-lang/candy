@@ -139,13 +139,13 @@ impl Hash for HeapFunction {
         self.body().hash(state);
     }
 }
-impl Ord for HeapClosure {
+impl Ord for HeapFunction {
     fn cmp(&self, other: &Self) -> Ordering {
         // TODO: Compare the underlying HIR ID once we have it here (plus captured stuff)
         self.address().cmp(&other.address())
     }
 }
-impl PartialOrd for HeapClosure {
+impl PartialOrd for HeapFunction {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }

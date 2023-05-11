@@ -1,39 +1,56 @@
 use candy_frontend::hir::Id;
 use candy_vm::{
     fiber::FiberId,
-    heap::InlineObject,
-    tracer::{stack_trace::Call, FiberEvent, Tracer, VmEvent},
+    heap::{Heap, HirId, InlineObject},
+    tracer::{stack_trace::Call, FiberEnded, FiberEndedReason, FiberTracer, Tracer},
 };
 use rustc_hash::FxHashMap;
 
 #[derive(Debug)]
 pub struct DebugTracer {
-    pub new_status_events: Vec<FiberStatusEvent>,
     pub fibers: FxHashMap<FiberId, FiberState>,
 }
 impl Default for DebugTracer {
     fn default() -> Self {
         Self {
-            new_status_events: vec![],
             fibers: FxHashMap::from_iter([(FiberId::root(), FiberState::default())]),
         }
     }
 }
 
-#[derive(Debug)]
+impl Tracer for DebugTracer {
+    // fn add(&mut self, event: VmEvent) {
+    //     match event {
+    //         VmEvent::FiberCreated { fiber } => {
+    //             self.fibers.insert(fiber, FiberState::default());
+    //         }
+    //         VmEvent::FiberDone { fiber } => {
+    //             self.fibers.get_mut(&fiber).unwrap().status = FiberStatus::Done;
+    //         }
+    //         VmEvent::FiberPanicked { fiber, .. } => {
+    //             self.fibers.get_mut(&fiber).unwrap().status = FiberStatus::Panicked;
+    //         }
+    //         VmEvent::FiberCanceled { fiber } => {
+    //             self.fibers.get_mut(&fiber).unwrap().status = FiberStatus::Canceled;
+    //         }
+    //     }
+    // }
+
+    type ForFiber = FiberDebugTracer;
+
+    fn root_fiber_created(&mut self) -> Self::ForFiber {
+        FiberDebugTracer::default()
+    }
+    fn root_fiber_ended(&mut self, ended: FiberEnded<Self::ForFiber>) {
+        ended.tracer.drop(ended.heap);
+    }
+}
+
+#[derive(Debug, Default)]
 pub struct FiberState {
     pub status: FiberStatus,
     pub root_locals: Vec<(Id, InlineObject)>,
     pub call_stack: Vec<StackFrame>,
-}
-impl Default for FiberState {
-    fn default() -> Self {
-        Self {
-            status: FiberStatus::Created,
-            root_locals: vec![],
-            call_stack: vec![],
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -48,89 +65,96 @@ impl StackFrame {
             locals: vec![],
         }
     }
+
+    fn dup(&self, heap: &mut Heap) {
+        self.call.dup(heap);
+        self.locals.iter().for_each(|(_, value)| value.dup(heap));
+    }
+    fn drop(&self, heap: &mut Heap) {
+        self.call.drop(heap);
+        self.locals.iter().for_each(|(_, value)| value.drop(heap));
+    }
 }
 
-#[derive(Debug)]
-pub struct FiberStatusEvent {
-    pub fiber: FiberId,
-    pub status: FiberStatus,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum FiberStatus {
+    #[default]
     Created,
     Done,
     Panicked,
     Canceled,
 }
+impl From<FiberEndedReason> for FiberStatus {
+    fn from(reason: FiberEndedReason) -> Self {
+        match reason {
+            FiberEndedReason::Finished(_) => Self::Done,
+            FiberEndedReason::Panicked(_) => Self::Panicked,
+            FiberEndedReason::Canceled => Self::Canceled,
+        }
+    }
+}
 
-impl Tracer for DebugTracer {
-    fn add(&mut self, event: VmEvent) {
-        match event {
-            VmEvent::FiberCreated { fiber } => {
-                self.fibers.insert(fiber, FiberState::default());
-                self.new_status_events.push(FiberStatusEvent {
-                    fiber,
-                    status: FiberStatus::Created,
-                });
-            }
-            VmEvent::FiberDone { fiber } => {
-                self.fibers.get_mut(&fiber).unwrap().status = FiberStatus::Done;
-                self.new_status_events.push(FiberStatusEvent {
-                    fiber,
-                    status: FiberStatus::Done,
-                });
-            }
-            VmEvent::FiberPanicked { fiber, .. } => {
-                self.fibers.get_mut(&fiber).unwrap().status = FiberStatus::Panicked;
-                self.new_status_events.push(FiberStatusEvent {
-                    fiber,
-                    status: FiberStatus::Panicked,
-                });
-            }
-            VmEvent::FiberCanceled { fiber } => {
-                self.fibers.get_mut(&fiber).unwrap().status = FiberStatus::Canceled;
-                self.new_status_events.push(FiberStatusEvent {
-                    fiber,
-                    status: FiberStatus::Canceled,
-                })
-            }
-            VmEvent::FiberExecutionStarted { .. } | VmEvent::FiberExecutionEnded { .. } => {}
-            VmEvent::ChannelCreated { .. } => {}
-            VmEvent::InFiber { fiber, event } => {
-                let state = self.fibers.get_mut(&fiber).unwrap();
-                match event {
-                    FiberEvent::ValueEvaluated {
-                        expression, value, ..
-                    } => {
-                        state
-                            .call_stack
-                            .last_mut()
-                            .map(|it| &mut it.locals)
-                            .unwrap_or(&mut state.root_locals)
-                            .push((expression.get().to_owned(), value));
-                    }
-                    FiberEvent::FoundFuzzableClosure { .. } => {}
-                    FiberEvent::CallStarted {
-                        call_site,
-                        callee,
-                        arguments,
-                        responsible,
-                        ..
-                    } => {
-                        let call = Call {
-                            call_site,
-                            callee,
-                            arguments,
-                            responsible,
-                        };
-                        state.call_stack.push(StackFrame::new(call));
-                    }
-                    FiberEvent::CallEnded { .. } => {
-                        state.call_stack.pop();
-                    }
-                }
-            }
+// FIXME: inline state
+#[derive(Default)]
+pub struct FiberDebugTracer(pub FiberState);
+impl FiberTracer for FiberDebugTracer {
+    fn child_fiber_created(&mut self, _child: FiberId) -> Self {
+        FiberDebugTracer::default()
+    }
+    fn child_fiber_ended(&mut self, ended: FiberEnded<Self>) {
+        ended.tracer.drop(ended.heap);
+    }
+
+    fn value_evaluated(&mut self, heap: &mut Heap, expression: HirId, value: InlineObject) {
+        value.dup(heap);
+        self.0
+            .call_stack
+            .last_mut()
+            .map(|it| &mut it.locals)
+            .unwrap_or(&mut self.0.root_locals)
+            .push((expression.get().to_owned(), value));
+    }
+
+    fn call_started(
+        &mut self,
+        heap: &mut Heap,
+        call_site: HirId,
+        callee: InlineObject,
+        arguments: Vec<InlineObject>,
+        responsible: HirId,
+    ) {
+        let call = Call {
+            call_site,
+            callee,
+            arguments,
+            responsible,
+        };
+        call.dup(heap);
+        self.0.call_stack.push(StackFrame::new(call));
+    }
+    fn call_ended(&mut self, heap: &mut Heap, _return_value: InlineObject) {
+        self.0.call_stack.pop().unwrap().drop(heap);
+    }
+
+    fn dup_all_stored_objects(&self, heap: &mut Heap) {
+        self.0
+            .root_locals
+            .iter()
+            .for_each(|(_, value)| value.dup(heap));
+        for frame in &self.0.call_stack {
+            frame.dup(heap);
+        }
+    }
+}
+
+impl FiberDebugTracer {
+    fn drop(self, heap: &mut Heap) {
+        self.0
+            .root_locals
+            .into_iter()
+            .for_each(|(_, value)| value.drop(heap));
+        for frame in self.0.call_stack {
+            frame.drop(heap);
         }
     }
 }

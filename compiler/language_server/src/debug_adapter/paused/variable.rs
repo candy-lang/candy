@@ -47,7 +47,7 @@ impl PausedState {
             VariablesKey::Arguments(stack_frame_key) => {
                 if should_include_named {
                     let arguments = stack_frame_key
-                        .get(&self.vm_state.tracer)
+                        .get(&self.vm_state.vm)
                         .unwrap()
                         .call
                         .arguments
@@ -65,7 +65,7 @@ impl PausedState {
                 }
             }
             VariablesKey::Locals(stack_frame_key) => {
-                let locals = stack_frame_key.get_locals(&self.vm_state.tracer);
+                let locals = stack_frame_key.get_locals(&self.vm_state.vm);
                 if should_include_named && !locals.is_empty() {
                     let body = db.containing_body_of(locals.first().unwrap().0.clone());
                     let locals = locals
@@ -280,7 +280,7 @@ impl PausedState {
     }
     fn presentation_hint_for(kind: DataDiscriminants) -> VariablePresentationHint {
         let kind = match kind {
-            DataDiscriminants::Closure | DataDiscriminants::Builtin => {
+            DataDiscriminants::Function | DataDiscriminants::Builtin => {
                 VariablePresentationHintKind::Method
             }
             DataDiscriminants::SendPort | DataDiscriminants::ReceivePort => {

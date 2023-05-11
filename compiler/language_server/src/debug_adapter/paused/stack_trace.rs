@@ -1,18 +1,20 @@
-use super::PausedState;
+use super::{utils::FiberIdExtension, PausedState};
 use crate::debug_adapter::{
-    tracer::{DebugTracer, FiberState, StackFrame},
+    tracer::{DebugTracer, StackFrame},
     utils::FiberIdThreadIdConversion,
 };
 use candy_frontend::{hir::Id, utils::AdjustCasingOfFirstLetter};
 use candy_vm::{
     fiber::FiberId,
     heap::{Data, InlineObject},
+    lir::Lir,
+    vm::Vm,
 };
 use dap::{
     self, requests::StackTraceArguments, responses::StackTraceResponse,
     types::StackFramePresentationhint,
 };
-use std::hash::Hash;
+use std::{borrow::Borrow, hash::Hash};
 
 impl PausedState {
     pub fn stack_trace(
@@ -20,12 +22,13 @@ impl PausedState {
         args: StackTraceArguments,
     ) -> Result<StackTraceResponse, &'static str> {
         let fiber_id = FiberId::from_thread_id(args.thread_id);
-        let fiber_state = self
+        let fiber = self
             .vm_state
-            .tracer
-            .fibers
-            .get(&fiber_id)
-            .ok_or("fiber-not-found")?;
+            .vm
+            .fiber(fiber_id)
+            .ok_or("fiber-not-found")?
+            .fiber_ref();
+        let fiber_state = &fiber.tracer.0;
 
         let start_frame = args.start_frame.map(|it| it as usize).unwrap_or_default();
         let levels = args
@@ -40,7 +43,7 @@ impl PausedState {
                 // TODO: format arguments
                 let name = match Data::from(it.call.callee) {
                     // TODO: resolve function name
-                    Data::Closure(closure) => format!("Closure at {:p}", closure.address()),
+                    Data::Function(function) => format!("Function at {:p}", function.address()),
                     Data::Builtin(builtin) => format!(
                         "✨.{}",
                         format!("{:?}", builtin.get()).lowercase_first_letter(),
@@ -100,22 +103,22 @@ pub struct StackFrameKey {
     index: usize,
 }
 impl StackFrameKey {
-    pub fn get<'a>(&self, tracer: &'a DebugTracer) -> Option<&'a StackFrame> {
+    pub fn get<'a, L: Borrow<Lir>>(&self, vm: &'a Vm<L, DebugTracer>) -> Option<&'a StackFrame> {
         if self.index == 0 {
             return None;
         }
 
-        Some(&self.get_fiber_state(tracer).call_stack[self.index - 1])
+        Some(&self.fiber_id.state(vm).call_stack[self.index - 1])
     }
-    pub fn get_locals<'a>(&self, tracer: &'a DebugTracer) -> &'a Vec<(Id, InlineObject)> {
-        let fiber_state = self.get_fiber_state(tracer);
+    pub fn get_locals<'a, L: Borrow<Lir>>(
+        &self,
+        vm: &'a Vm<L, DebugTracer>,
+    ) -> &'a Vec<(Id, InlineObject)> {
+        let fiber_state = self.fiber_id.state(vm);
         if self.index == 0 {
             &fiber_state.root_locals
         } else {
             &fiber_state.call_stack[self.index - 1].locals
         }
-    }
-    fn get_fiber_state<'a>(&self, tracer: &'a DebugTracer) -> &'a FiberState {
-        tracer.fibers.get(&self.fiber_id).unwrap()
     }
 }

@@ -10,11 +10,11 @@ use candy_frontend::{
     TracingConfig, TracingMode,
 };
 use candy_vm::{
-    context::{DbUseProvider, RunLimitedNumberOfInstructions},
+    context::RunLimitedNumberOfInstructions,
     fiber::FiberId,
-    heap::Struct,
-    mir_to_lir::MirToLir,
-    run_lir,
+    heap::{HirId, Struct},
+    lir::Lir,
+    mir_to_lir::compile_lir,
     tracer::DummyTracer,
     vm::{FiberTree, Vm},
 };
@@ -28,7 +28,7 @@ use dap::{
     types::{Capabilities, StoppedEventReason, Thread},
 };
 use rustc_hash::FxHashMap;
-use std::{mem, path::PathBuf};
+use std::{mem, path::PathBuf, rc::Rc};
 use tokio::sync::mpsc;
 use tower_lsp::Client;
 use tracing::error;
@@ -86,7 +86,7 @@ enum ExecutionState {
     Paused(PausedState),
 }
 pub struct VmState {
-    pub vm: Vm,
+    pub vm: Vm<Rc<Lir>, DebugTracer>,
     pub tracer: DebugTracer,
 }
 
@@ -194,19 +194,12 @@ impl DebugSession {
                     calls: TracingMode::All,
                     evaluated_expressions: TracingMode::All,
                 };
-                let lir = self
-                    .db
-                    .lir(module.clone(), tracing.clone())
-                    .unwrap()
-                    .as_ref()
-                    .to_owned();
-                let use_provider = DbUseProvider {
-                    db: &self.db,
-                    tracing,
-                };
-                let mut tracer = DummyTracer::default();
-                let (mut heap, main) =
-                    match run_lir(module, lir, &use_provider, &mut tracer).into_main_function() {
+                let lir = compile_lir(&self.db, module.clone(), tracing.clone()).0;
+                let (mut heap, main, constant_mapping) =
+                    match Vm::for_module(&lir, &mut DummyTracer)
+                        .run_until_completion(&mut DummyTracer)
+                        .into_main_function()
+                    {
                         Ok(result) => result,
                         Err(error) => {
                             error!("Failed to find main function: {error}");
@@ -214,18 +207,26 @@ impl DebugSession {
                         }
                     };
 
-                let mut vm = Vm::default();
+                let mut vm = Vm::uninitialized(Rc::new(lir));
                 self.send_response_ok(request.seq, ResponseBody::Launch)
                     .await;
 
                 // Run the `main` function.
-                let environment = Struct::create(&mut heap, &FxHashMap::default());
-                vm.set_up_for_running_closure(heap, main, &[environment.into()], Id::platform());
+                let environment = Struct::create(&mut heap, &FxHashMap::default()).into();
+                let platform = HirId::create(&mut heap, Id::platform());
+                let mut tracer = DebugTracer::default();
+                vm.initialize_for_function(
+                    heap,
+                    constant_mapping,
+                    main,
+                    &[environment],
+                    platform,
+                    &mut tracer,
+                );
 
                 let mut execution_controller = RunLimitedNumberOfInstructions::new(10000);
-                let mut tracer = DebugTracer::default();
-                // FIXME: remove
-                vm.run(&use_provider, &mut execution_controller, &mut tracer);
+                // TODO: remove when we support pause and continue
+                vm.run(&mut execution_controller, &mut tracer);
 
                 self.state = State::Launched {
                     initialize_arguments,

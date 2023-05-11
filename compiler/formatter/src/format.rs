@@ -499,7 +499,7 @@ pub(crate) fn format_cst<'a>(
             value,
             comma,
         } => {
-            let key_width_and_colon = key_and_colon.as_ref().map(|box (key, colon)| {
+            let key_width_and_colon = key_and_colon.as_deref().map(|(key, colon)| {
                 let key = format_cst(edits, previous_width, key, &info.with_indent());
                 let mut colon = format_cst(
                     edits,

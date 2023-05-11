@@ -1,14 +1,17 @@
+use crate::debug_adapter::tracer::{DebugTracer, FiberState};
 use candy_vm::{
     fiber::{Fiber, FiberId},
+    lir::Lir,
+    tracer::Tracer,
     vm::{FiberTree, Parallel, Single, Try, Vm},
 };
 use extension_trait::extension_trait;
 use rustc_hash::FxHashMap;
-use std::hash::Hash;
+use std::{borrow::Borrow, hash::Hash};
 
 #[extension_trait]
 pub impl FiberIdExtension for FiberId {
-    fn get(self, vm: &Vm) -> &Fiber {
+    fn get<L: Borrow<Lir>, T: Tracer>(self, vm: &Vm<L, T>) -> &Fiber<T::ForFiber> {
         match &vm.fiber(self).unwrap() {
             FiberTree::Single(Single { fiber, .. })
             | FiberTree::Parallel(Parallel {
@@ -20,6 +23,9 @@ pub impl FiberIdExtension for FiberId {
                 ..
             }) => fiber,
         }
+    }
+    fn state<'a, L: Borrow<Lir>>(&self, vm: &'a Vm<L, DebugTracer>) -> &'a FiberState {
+        &self.get(vm).tracer.0
     }
 }
 

@@ -96,8 +96,8 @@ impl<D> IsMultiline for CstKind<D> {
                 comma,
             } => {
                 key_and_colon
-                    .as_ref()
-                    .map(|box (key, colon)| key.is_multiline() || colon.is_multiline())
+                    .as_deref()
+                    .map(|(key, colon)| key.is_multiline() || colon.is_multiline())
                     .unwrap_or(false)
                     || value.is_multiline()
                     || comma

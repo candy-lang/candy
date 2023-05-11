@@ -111,8 +111,8 @@ impl TreeWithIds for Cst {
                 value,
                 comma,
             } => key_and_colon
-                .as_ref()
-                .and_then(|box (key, colon)| key.find(id).or_else(|| colon.find(id)))
+                .as_deref()
+                .and_then(| (key, colon)| key.find(id).or_else(|| colon.find(id)))
                 .or_else(|| value.find(id))
                 .or_else(|| comma.as_ref().and_then(|comma| comma.find(id))),
             CstKind::StructAccess { struct_, dot, key } => struct_
@@ -247,8 +247,8 @@ impl TreeWithIds for Cst {
                 comma,
             } => (
                 key_and_colon
-                    .as_ref()
-                    .and_then(|box (key, colon)| {
+                    .as_deref()
+                    .and_then(|(key, colon)| {
                         key.find_by_offset(offset)
                             .or_else(|| colon.find_by_offset(offset))
                     })
