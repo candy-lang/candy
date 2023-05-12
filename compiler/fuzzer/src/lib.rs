@@ -21,11 +21,8 @@ use candy_frontend::{
     {hir::Id, TracingConfig, TracingMode},
 };
 use candy_vm::{
-    context::{RunForever, RunLimitedNumberOfInstructions},
-    fiber::Panic,
-    mir_to_lir::compile_lir,
-    tracer::stack_trace::StackTracer,
-    vm::Vm,
+    context::RunLimitedNumberOfInstructions, fiber::Panic, mir_to_lir::compile_lir,
+    tracer::stack_trace::StackTracer, vm::Vm,
 };
 use std::sync::Arc;
 use tracing::{error, info};
@@ -42,11 +39,11 @@ where
     let (lir, _) = compile_lir(db, module, tracing);
     let lir = Arc::new(lir);
 
-    let fuzzables = {
+    let (_heap, fuzzables) = {
         let mut tracer = FuzzablesFinder::default();
-        let mut vm = Vm::for_module(lir.clone(), &mut tracer);
-        vm.run(&mut RunForever, &mut tracer);
-        tracer.into_fuzzables()
+        let result = Vm::for_module(lir.clone(), &mut tracer).run_until_completion(&mut tracer);
+        dbg!(result.reason);
+        (result.heap, tracer.into_fuzzables())
     };
 
     info!(

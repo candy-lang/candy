@@ -15,10 +15,10 @@ use rand::{seq::SliceRandom, thread_rng};
 use crate::{
     channel::{Channel, ChannelId, Completer, Packet, Performer},
     context::{CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions},
-    fiber::{self, ExecutionEnded, ExecutionEndedReason, Fiber, FiberId, Panic},
+    fiber::{self, EndedReason, Fiber, FiberId, Panic, VmEnded},
     heap::{Data, Function, Heap, HeapObject, HirId, InlineObject, SendPort, Struct, Tag},
     lir::Lir,
-    tracer::{FiberEnded, FiberEndedReason, FiberTracer, Tracer},
+    tracer::{FiberTracer, TracedFiberEnded, TracedFiberEndedReason, Tracer},
 };
 use extension_trait::extension_trait;
 use rustc_hash::FxHashMap;
@@ -206,10 +206,24 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
         )
     }
 
-    pub fn tear_down(mut self) -> ExecutionEnded<T::ForFiber> {
+    pub fn tear_down(mut self, tracer: &mut T) -> VmEnded {
         let tree = self.fibers.remove(&FiberId::root()).unwrap();
         let single = tree.into_single().unwrap();
-        single.fiber.tear_down()
+        let mut ended = single.fiber.tear_down();
+        tracer.root_fiber_ended(TracedFiberEnded {
+            id: FiberId::root(),
+            heap: &mut ended.heap,
+            tracer: ended.tracer,
+            reason: match &ended.reason {
+                EndedReason::Finished(object) => TracedFiberEndedReason::Finished(*object),
+                EndedReason::Panicked(reason) => TracedFiberEndedReason::Panicked(reason.clone()),
+            },
+        });
+        VmEnded {
+            heap: ended.heap,
+            constant_mapping: ended.constant_mapping,
+            reason: ended.reason,
+        }
     }
 
     pub fn status(&self) -> Status {
@@ -445,7 +459,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
                     let child = parallel.children.remove(&fiber_id).unwrap();
 
                     let parallel_result = match &ended.reason {
-                        ExecutionEndedReason::Finished(return_value) => {
+                        EndedReason::Finished(return_value) => {
                             let is_finished = parallel.children.is_empty();
                             match child {
                                 ChildKind::InitialChild => {
@@ -467,7 +481,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
                                 None
                             }
                         }
-                        ExecutionEndedReason::Panicked(panic) => Some(Err(panic.to_owned())),
+                        EndedReason::Panicked(panic) => Some(Err(panic.to_owned())),
                     };
 
                     self.fibers
@@ -563,11 +577,11 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
         }
 
         let parent = self.fibers.get_mut(&parent_id).unwrap().fiber_mut();
-        parent.tracer.child_fiber_ended(FiberEnded {
+        parent.tracer.child_fiber_ended(TracedFiberEnded {
             id: fiber_id,
             heap: &mut parent.heap,
             tracer: fiber_tree.into_fiber().tracer,
-            reason: FiberEndedReason::Canceled,
+            reason: TracedFiberEndedReason::Canceled,
         });
     }
 

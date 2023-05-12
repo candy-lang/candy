@@ -7,7 +7,7 @@ use crate::{
 use candy_frontend::{ast_to_hir::AstToHir, hir, rich_ir::ToRichIr, TracingConfig};
 use candy_vm::{
     context::RunForever,
-    fiber::ExecutionEndedReason,
+    fiber::EndedReason,
     heap::{HirId, SendPort, Struct},
     mir_to_lir::compile_lir,
     return_value_into_main_function,
@@ -46,10 +46,10 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     let mut ended = Vm::for_module(&lir, &mut tracer).run_until_completion(&mut tracer);
 
     let main = match ended.reason {
-        ExecutionEndedReason::Finished(return_value) => {
+        EndedReason::Finished(return_value) => {
             return_value_into_main_function(&mut ended.heap, return_value).unwrap()
         }
-        ExecutionEndedReason::Panicked(panic) => {
+        EndedReason::Panicked(panic) => {
             error!("The module panicked: {}", panic.reason);
             error!("{} is responsible.", panic.responsible);
             if let Some(span) = db.hir_id_to_span(panic.responsible) {
@@ -94,12 +94,12 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         stdin.run(&mut vm);
         vm.free_unreferenced_channels();
     }
-    match vm.tear_down().reason {
-        ExecutionEndedReason::Finished(return_value) => {
+    match vm.tear_down(&mut tracer).reason {
+        EndedReason::Finished(return_value) => {
             debug!("The main function returned: {return_value:?}");
             Ok(())
         }
-        ExecutionEndedReason::Panicked(panic) => {
+        EndedReason::Panicked(panic) => {
             error!("The main function panicked: {}", panic.reason);
             error!("{} is responsible.", panic.responsible);
             error!(

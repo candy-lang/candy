@@ -1,4 +1,4 @@
-use super::{FiberEnded, FiberEndedReason, FiberId, FiberTracer, Tracer};
+use super::{FiberId, FiberTracer, TracedFiberEnded, TracedFiberEndedReason, Tracer};
 use crate::heap::{Heap, HirId, InlineObject};
 use candy_frontend::{
     ast_to_hir::AstToHir, cst::CstKind, module::Package, position::PositionConversionDb,
@@ -53,10 +53,10 @@ impl Tracer for StackTracer {
     fn root_fiber_created(&mut self) -> Self::ForFiber {
         FiberStackTracer::default()
     }
-    fn root_fiber_ended(&mut self, mut ended: FiberEnded<Self::ForFiber>) {
+    fn root_fiber_ended(&mut self, mut ended: TracedFiberEnded<Self::ForFiber>) {
         assert!(self.panic_chain.is_none());
 
-        let FiberEndedReason::Panicked(panic) = ended.reason else { return; };
+        let TracedFiberEndedReason::Panicked(panic) = ended.reason else { return; };
         self.panic_chain = Some(ended.tracer.take_panic_call_stack(panic.panicked_child));
         ended.tracer.drop(ended.heap);
     }
@@ -156,8 +156,8 @@ impl FiberTracer for FiberStackTracer {
     fn child_fiber_created(&mut self, _child: FiberId) -> Self {
         FiberStackTracer::default()
     }
-    fn child_fiber_ended(&mut self, mut ended: FiberEnded<Self>) {
-        let FiberEndedReason::Panicked(panic) = ended.reason else { return; };
+    fn child_fiber_ended(&mut self, mut ended: TracedFiberEnded<Self>) {
+        let TracedFiberEndedReason::Panicked(panic) = ended.reason else { return; };
         self.panic_chains.insert(
             ended.id,
             ended.tracer.take_panic_call_stack(panic.panicked_child),

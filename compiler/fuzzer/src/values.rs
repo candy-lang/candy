@@ -12,6 +12,7 @@ use rand::{
 use rustc_hash::FxHashMap;
 
 use super::input::Input;
+use tracing::info;
 
 pub fn generate_input(heap: Rc<RefCell<Heap>>, num_args: usize, symbols: &[Text]) -> Input {
     let mut arguments = vec![];
@@ -33,7 +34,7 @@ fn generate_value_with_complexity(
     mut complexity: f32,
     symbols: &[Text],
 ) -> InlineObject {
-    match rng.gen_range(1..=5) {
+    let value = match rng.gen_range(1..=5) {
         1 => Int::create_from_bigint(heap, rng.gen_bigint(10)).into(),
         2 => Text::create(heap, "test").into(),
         // TODO: This should support tags with values
@@ -61,7 +62,9 @@ fn generate_value_with_complexity(
         }
         6 => builtin_functions::VALUES[rng.gen_range(0..builtin_functions::VALUES.len())].into(),
         _ => unreachable!(),
-    }
+    };
+    info!("Generated value {value}");
+    value
 }
 
 pub fn generate_mutated_input(rng: &mut ThreadRng, input: &mut Input, symbols: &[Text]) {
@@ -80,7 +83,8 @@ fn generate_mutated_value(
         return generate_value_with_complexity(heap, rng, 100.0, symbols);
     }
 
-    match object.into() {
+    info!("Mutating value {object}");
+    let value = match object.into() {
         Data::Int(int) => {
             Int::create_from_bigint(heap, int.get().as_ref() + rng.gen_range(-10..10)).into()
         }
@@ -124,7 +128,9 @@ fn generate_mutated_value(
         Data::HirId(_) | Data::Function(_) | Data::SendPort(_) | Data::ReceivePort(_) => {
             panic!("Couldn't have been created for fuzzing.")
         }
-    }
+    };
+    info!("Generated mutated value {value}");
+    value
 }
 fn mutate_string(rng: &mut ThreadRng, heap: &mut Heap, mut string: String) -> Text {
     if rng.gen_bool(0.5) && !string.is_empty() {

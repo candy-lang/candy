@@ -1,4 +1,4 @@
-use super::{FiberEnded, FiberId, FiberTracer, Tracer};
+use super::{FiberId, FiberTracer, TracedFiberEnded, Tracer};
 use crate::heap::{Heap, HirId, InlineObject};
 use candy_frontend::{hir::Id, module::Module};
 use rustc_hash::FxHashMap;
@@ -31,7 +31,7 @@ impl Tracer for EvaluatedValuesTracer {
             evaluated_values: FxHashMap::default(),
         }
     }
-    fn root_fiber_ended(&mut self, ended: FiberEnded<Self::ForFiber>) {
+    fn root_fiber_ended(&mut self, ended: TracedFiberEnded<Self::ForFiber>) {
         assert!(self.evaluated_values.is_none());
         self.evaluated_values = Some(ended.tracer.evaluated_values);
     }
@@ -49,7 +49,7 @@ impl FiberTracer for FiberEvaluatedValuesTracer {
             evaluated_values: FxHashMap::default(),
         }
     }
-    fn child_fiber_ended(&mut self, mut ended: FiberEnded<Self>) {
+    fn child_fiber_ended(&mut self, mut ended: TracedFiberEnded<Self>) {
         self.evaluated_values
             .extend(ended.tracer.evaluated_values.drain());
     }
