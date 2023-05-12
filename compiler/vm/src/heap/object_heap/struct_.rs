@@ -129,24 +129,22 @@ impl HeapStruct {
         }
     }
     fn insert_into_items<T>(self, other: Self, items_index: usize, index: usize, item: T) {
-        let len = self.len();
+        let self_base = items_index * self.len();
+        let other_base = items_index * other.len();
         unsafe {
             ptr::copy_nonoverlapping(
-                self.content_word_pointer(items_index * len).as_ptr(),
-                other.content_word_pointer(items_index * len).as_ptr(),
+                self.content_word_pointer(self_base).as_ptr(),
+                other.content_word_pointer(other_base).as_ptr(),
                 index,
             );
             *other
-                .content_word_pointer(items_index * len + index)
+                .content_word_pointer(other_base + index)
                 .cast()
                 .as_ptr() = item;
             ptr::copy_nonoverlapping(
-                self.content_word_pointer(items_index * len + index)
-                    .as_ptr(),
-                other
-                    .content_word_pointer(items_index * len + index + 1)
-                    .as_ptr(),
-                len - index,
+                self.content_word_pointer(self_base + index).as_ptr(),
+                other.content_word_pointer(other_base + index + 1).as_ptr(),
+                self.len() - index,
             );
         }
     }
