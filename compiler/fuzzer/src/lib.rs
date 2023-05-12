@@ -84,14 +84,14 @@ where
     failing_cases
 }
 
-pub struct FailingFuzzCase {
+pub struct FailingFuzzCase<'h> {
     function: Id,
-    input: Input,
+    input: Input<'h>,
     panic: Panic,
-    tracer: StackTracer,
+    tracer: StackTracer<'h>,
 }
 
-impl FailingFuzzCase {
+impl FailingFuzzCase<'_> {
     pub fn dump<DB>(&self, db: &DB)
     where
         DB: AstToHir + PositionConversionDb,

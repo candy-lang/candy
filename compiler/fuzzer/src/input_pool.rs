@@ -10,14 +10,14 @@ use std::{cell::RefCell, rc::Rc};
 
 pub type Score = f64;
 
-pub struct InputPool {
-    heap: Rc<RefCell<Heap>>,
+pub struct InputPool<'h> {
+    heap: Rc<RefCell<Heap<'h>>>,
     num_args: usize,
-    symbols: Vec<Text>,
-    input_scores: FxHashMap<Input, Score>,
+    symbols: Vec<Text<'h>>,
+    input_scores: FxHashMap<Input<'h>, Score>,
 }
 
-impl InputPool {
+impl<'h> InputPool<'h> {
     pub fn new(num_args: usize, symbols_in_heap: &FxHashSet<Text>) -> Self {
         let mut heap = Heap::default();
 
@@ -38,7 +38,7 @@ impl InputPool {
         }
     }
 
-    pub fn generate_new_input(&self) -> Input {
+    pub fn generate_new_input(&self) -> Input<'h> {
         loop {
             let input = self.generate_input();
             if !self.input_scores.contains_key(&input) {
@@ -46,7 +46,7 @@ impl InputPool {
             }
         }
     }
-    pub fn generate_input(&self) -> Input {
+    pub fn generate_input(&self) -> Input<'h> {
         let mut rng = ThreadRng::default();
 
         if rng.gen_bool(0.1) || self.input_scores.len() < 20 {
@@ -62,7 +62,7 @@ impl InputPool {
         input
     }
 
-    pub fn add(&mut self, input: Input, score: Score) {
+    pub fn add(&mut self, input: Input<'h>, score: Score) {
         self.input_scores.insert(input, score);
     }
 }

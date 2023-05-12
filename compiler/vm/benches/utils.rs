@@ -117,12 +117,12 @@ fn load_core(module_provider: &mut InMemoryModuleProvider) {
     }
 }
 
-pub fn compile(db: &mut Database, source_code: &str) -> Lir {
+pub fn compile<'c>(db: &mut Database, source_code: &str) -> Lir<'c> {
     db.did_open_module(&MODULE, source_code.as_bytes().to_owned());
     compile_lir(db, MODULE.clone(), TRACING.clone()).0
 }
 
-pub fn run(lir: impl Borrow<Lir>) -> Packet {
+pub fn run<'c: 'h, 'h>(lir: impl Borrow<Lir<'c>>) -> Packet<'h> {
     let mut tracer = DummyTracer::default();
     let (mut heap, main, constant_mapping) = Vm::for_module(lir.borrow(), &mut tracer)
         .run_until_completion(&mut tracer)

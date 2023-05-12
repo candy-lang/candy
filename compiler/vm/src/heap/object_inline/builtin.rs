@@ -69,11 +69,13 @@ impl From<BuiltinFunction> for InlineBuiltin<'_> {
 }
 
 impl<'h> InlineObjectTrait<'h> for InlineBuiltin<'h> {
+    type Clone<'t> = InlineBuiltin<'t>;
+
     fn clone_to_heap_with_mapping<'t>(
         self,
-        _heap: &'t mut Heap,
+        _heap: &mut Heap<'t>,
         _address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
-    ) -> Self {
-        self
+    ) -> Self::Clone<'t> {
+        InlineBuiltin(InlineObject::new(self.raw_word()))
     }
 }

@@ -21,7 +21,7 @@ impl<'h> HeapTag<'h> {
         Self(object)
     }
     pub fn create(
-        heap: &'h mut Heap,
+        heap: &mut Heap<'h>,
         symbol: Text,
         value: impl Into<Option<InlineObject>>,
     ) -> Self {
@@ -37,7 +37,7 @@ impl<'h> HeapTag<'h> {
     fn symbol_pointer(self) -> NonNull<InlineObject<'h>> {
         self.content_word_pointer(0).cast()
     }
-    pub fn symbol(self) -> Text {
+    pub fn symbol(self) -> Text<'h> {
         let symbol = unsafe { *self.symbol_pointer().as_ref() };
         symbol.try_into().unwrap()
     }
@@ -94,7 +94,7 @@ impl<'h> HeapObjectTrait<'h> for HeapTag<'h> {
 
     fn clone_content_to_heap_with_mapping<'t>(
         self,
-        heap: &'t mut Heap,
+        heap: &mut Heap<'t>,
         clone: HeapObject<'t>,
         address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
     ) {
@@ -102,14 +102,14 @@ impl<'h> HeapObjectTrait<'h> for HeapTag<'h> {
         let value = self
             .value()
             .map(|it| it.clone_to_heap_with_mapping(heap, address_map));
-        let clone = Self(clone);
+        let clone = HeapTag(clone);
         unsafe {
             *clone.symbol_pointer().as_mut() = symbol.into();
             *clone.value_pointer().as_mut() = value.map_or(0, |it| it.raw_word().get());
         };
     }
 
-    fn drop_children(self, heap: &'h mut Heap) {
+    fn drop_children(self, heap: &mut Heap<'h>) {
         self.symbol().drop(heap);
         if let Some(value) = self.value() {
             value.drop(heap);

@@ -19,7 +19,7 @@ impl<'h> HeapHirId<'h> {
     pub fn new_unchecked(object: HeapObject<'h>) -> Self {
         Self(object)
     }
-    pub fn create(heap: &'h mut Heap, value: Id) -> Self {
+    pub fn create(heap: &mut Heap<'h>, value: Id) -> Self {
         let id = HeapHirId(heap.allocate(HeapObject::KIND_HIR_ID, mem::size_of::<Id>()));
         unsafe { ptr::write(id.id_pointer().as_ptr(), value) };
         id
@@ -51,16 +51,16 @@ impl<'h> HeapObjectTrait<'h> for HeapHirId<'h> {
 
     fn clone_content_to_heap_with_mapping<'t>(
         self,
-        _heap: &'t mut Heap,
+        _heap: &mut Heap<'t>,
         clone: HeapObject<'t>,
         _address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
     ) {
-        let clone = Self(clone);
+        let clone = HeapHirId(clone);
         let value = self.get().to_owned();
         unsafe { ptr::write(clone.id_pointer().as_ptr(), value) };
     }
 
-    fn drop_children(self, _heap: &'h mut Heap) {}
+    fn drop_children(self, _heap: &mut Heap<'h>) {}
 
     fn deallocate_external_stuff(self) {
         unsafe { ptr::drop_in_place(self.id_pointer().as_ptr()) };

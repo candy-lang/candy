@@ -26,26 +26,29 @@ use std::sync::Arc;
 use tracing::{span, Level};
 
 #[derive(Default)]
-pub struct ConstantEvaluator {
-    evaluators: FxHashMap<Module, Evaluator>,
+pub struct ConstantEvaluator<'c: 'h, 'h> {
+    evaluators: FxHashMap<Module, Evaluator<'c, 'h>>,
 }
-struct Evaluator {
-    lir: Arc<Lir>,
-    tracer: EvaluatorTracer,
-    vm: Vm<Arc<Lir>, EvaluatorTracer>,
+struct Evaluator<'c: 'h, 'h> {
+    lir: Arc<Lir<'c>>,
+    tracer: EvaluatorTracer<'h>,
+    vm: Vm<'c, 'h, Arc<Lir<'c>>, EvaluatorTracer<'h>>,
 }
-type EvaluatorTracer =
-    CompoundTracer<StackTracer, CompoundTracer<EvaluatedValuesTracer, FuzzablesFinder>>;
+type EvaluatorTracer<'h> = CompoundTracer<
+    'h,
+    StackTracer<'h>,
+    CompoundTracer<'h, EvaluatedValuesTracer<'h>, FuzzablesFinder<'h>>,
+>;
 
-impl ConstantEvaluator {
-    pub fn update_module(&mut self, module: Module, lir: Arc<Lir>) {
-        let mut tracer = CompoundTracer {
-            tracer0: StackTracer::default(),
-            tracer1: CompoundTracer {
-                tracer0: EvaluatedValuesTracer::new(module.clone()),
-                tracer1: FuzzablesFinder::default(),
-            },
-        };
+impl<'c: 'h, 'h> ConstantEvaluator<'c, 'h> {
+    pub fn update_module(&mut self, module: Module, lir: Arc<Lir<'c>>) {
+        let mut tracer = CompoundTracer::new(
+            StackTracer::default(),
+            CompoundTracer::new(
+                EvaluatedValuesTracer::new(module.clone()),
+                FuzzablesFinder::default(),
+            ),
+        );
         let vm = Vm::for_module(lir.clone(), &mut tracer);
         self.evaluators
             .insert(module, Evaluator { lir, tracer, vm });
@@ -76,7 +79,10 @@ impl ConstantEvaluator {
         }
     }
 
-    pub fn get_fuzzable_functions(&self, module: &Module) -> (Arc<Lir>, FxHashMap<Id, Function>) {
+    pub fn get_fuzzable_functions(
+        &self,
+        module: &Module,
+    ) -> (Arc<Lir<'c>>, FxHashMap<Id, Function<'h>>) {
         let evaluator = &self.evaluators[module];
         let fuzzable_functions = evaluator
             .tracer

@@ -25,7 +25,7 @@ impl<'h> HeapFunction<'h> {
         Self(object)
     }
     pub fn create(
-        heap: &'h mut Heap,
+        heap: &mut Heap<'h>,
         captured: &[InlineObject<'h>],
         argument_count: usize,
         body: InstructionPointer,
@@ -141,18 +141,18 @@ impl Hash for HeapFunction<'_> {
 
 heap_object_impls!(HeapFunction<'h>);
 
-impl HeapObjectTrait<'h> for HeapFunction<'h> {
+impl<'h> HeapObjectTrait<'h> for HeapFunction<'h> {
     fn content_size(self) -> usize {
         (1 + self.captured_len()) * HeapObject::WORD_SIZE
     }
 
     fn clone_content_to_heap_with_mapping<'t>(
         self,
-        heap: &'t mut Heap,
+        heap: &mut Heap<'t>,
         clone: HeapObject<'t>,
         address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
     ) {
-        let clone = Self(clone);
+        let clone = HeapFunction(clone);
         unsafe { *clone.body_pointer().as_mut() = *self.body() as u64 };
         for (index, &captured) in self.captured().iter().enumerate() {
             clone.unsafe_set_content_word(
@@ -165,7 +165,7 @@ impl HeapObjectTrait<'h> for HeapFunction<'h> {
         }
     }
 
-    fn drop_children(self, heap: &'h mut Heap) {
+    fn drop_children(self, heap: &mut Heap<'h>) {
         for captured in self.captured() {
             captured.drop(heap);
         }

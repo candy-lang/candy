@@ -49,7 +49,7 @@ impl<'h> InlineInt<'h> {
     operator_fn!(multiply, i64::checked_mul, Mul::mul);
     operator_fn!(int_divide_truncating, i64::checked_div, Div::div);
     operator_fn!(remainder, i64::checked_rem, Rem::rem);
-    pub fn modulo(self, heap: &mut Heap, rhs: Self) -> Int {
+    pub fn modulo(self, heap: &mut Heap<'h>, rhs: Self) -> Int<'h> {
         let lhs = self.get();
         let rhs = rhs.get();
         lhs.checked_rem_euclid(rhs)
@@ -59,7 +59,7 @@ impl<'h> InlineInt<'h> {
             })
     }
 
-    pub fn compare_to(self, heap: &mut Heap, rhs: Self) -> Tag {
+    pub fn compare_to<'t>(self, heap: &mut Heap<'t>, rhs: Self) -> Tag<'t> {
         Tag::create_ordering(heap, self.get().cmp(&rhs.get()))
     }
 
@@ -78,7 +78,7 @@ impl<'h> InlineInt<'h> {
 
 macro_rules! operator_fn {
     ($name:ident, $inline_operation:expr, $bigint_operation:expr) => {
-        pub fn $name(self, heap: &mut Heap, rhs: Self) -> Int {
+        pub fn $name(self, heap: &mut Heap<'h>, rhs: Self) -> Int<'h> {
             let lhs = self.get();
             rhs.try_get()
                 .and_then(|rhs| $inline_operation(lhs, rhs))
@@ -130,12 +130,14 @@ impl TryFrom<i64> for InlineInt<'_> {
 }
 
 impl<'h> InlineObjectTrait<'h> for InlineInt<'h> {
+    type Clone<'t> = InlineInt<'t>;
+
     fn clone_to_heap_with_mapping<'t>(
         self,
-        _heap: &'t mut Heap,
+        _heap: &mut Heap<'t>,
         _address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
-    ) -> Self {
-        self
+    ) -> Self::Clone<'t> {
+        InlineInt(InlineObject::new(self.raw_word()))
     }
 }
 

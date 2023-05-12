@@ -97,4 +97,5 @@ fn run_time_benchmarks(c: &mut Criterion) {
 }
 criterion_group!(time_benchmarks, run_time_benchmarks);
 
-criterion_main!(cycle_benchmarks, time_benchmarks);
+// TODO: Re-add `cycle_benchmarks` when they show up in our graphs.
+criterion_main!(time_benchmarks);

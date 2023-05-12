@@ -21,7 +21,7 @@ impl<'h> HeapStruct<'h> {
     pub fn new_unchecked(object: HeapObject<'h>) -> Self {
         Self(object)
     }
-    pub fn create(heap: &'h mut Heap, value: &FxHashMap<InlineObject, InlineObject>) -> Self {
+    pub fn create(heap: &mut Heap<'h>, value: &FxHashMap<InlineObject, InlineObject>) -> Self {
         let len = value.len();
         assert_eq!(
             (len << Self::LEN_SHIFT) >> Self::LEN_SHIFT,
@@ -46,7 +46,7 @@ impl<'h> HeapStruct<'h> {
         };
         struct_
     }
-    fn create_uninitialized(heap: &'h mut Heap, len: usize) -> Self {
+    fn create_uninitialized(heap: &mut Heap<'h>, len: usize) -> Self {
         assert_eq!(
             (len << Self::LEN_SHIFT) >> Self::LEN_SHIFT,
             len,
@@ -99,7 +99,7 @@ impl<'h> HeapStruct<'h> {
     #[must_use]
     pub fn insert(
         self,
-        heap: &'h mut Heap,
+        heap: &mut Heap<'h>,
         key: InlineObject<'h>,
         value: InlineObject<'h>,
     ) -> Self {
@@ -248,11 +248,11 @@ impl<'h> HeapObjectTrait<'h> for HeapStruct<'h> {
 
     fn clone_content_to_heap_with_mapping<'t>(
         self,
-        heap: &'t mut Heap,
+        heap: &mut Heap<'t>,
         clone: HeapObject<'t>,
         address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
     ) {
-        let clone = Self(clone);
+        let clone = HeapStruct(clone);
         unsafe {
             ptr::copy_nonoverlapping(
                 self.content_word_pointer(0).as_ptr(),
@@ -279,7 +279,7 @@ impl<'h> HeapObjectTrait<'h> for HeapStruct<'h> {
         }
     }
 
-    fn drop_children(self, heap: &'h mut Heap) {
+    fn drop_children(self, heap: &mut Heap<'h>) {
         for key in self.keys() {
             key.drop(heap);
         }

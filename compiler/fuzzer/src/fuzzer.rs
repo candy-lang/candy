@@ -16,31 +16,31 @@ use candy_vm::{
 use std::sync::Arc;
 use tracing::trace;
 
-pub struct Fuzzer {
-    lir: Arc<Lir>,
-    pub function_heap: Heap,
-    pub function: Function,
+pub struct Fuzzer<'i, 'c: 'h, 'h> {
+    lir: Arc<Lir<'c>>,
+    pub function_heap: Heap<'h>,
+    pub function: Function<'h>,
     pub function_id: Id,
-    status: Option<Status>, // only `None` during transitions
+    status: Option<Status<'i, 'c, 'h>>, // only `None` during transitions
 }
 
 // TODO: Decrease enum variant sizes and size differences
 #[allow(clippy::large_enum_variant)]
-pub enum Status {
+pub enum Status<'i, 'c: 'h, 'h> {
     StillFuzzing {
-        pool: InputPool,
-        runner: Runner<Arc<Lir>>,
+        pool: InputPool<'i>,
+        runner: Runner<'i, 'c, 'h, Arc<Lir<'c>>>,
     },
     // TODO: In the future, also add a state for trying to simplify the input.
     FoundPanic {
-        input: Input,
+        input: Input<'i>,
         panic: Panic,
-        tracer: StackTracer,
+        tracer: StackTracer<'h>,
     },
 }
 
-impl Fuzzer {
-    pub fn new(lir: Arc<Lir>, function: Function, function_id: Id) -> Self {
+impl<'i, 'c: 'h, 'h> Fuzzer<'i, 'c, 'h> {
+    pub fn new(lir: Arc<Lir<'c>>, function: Function, function_id: Id) -> Self {
         let mut heap = Heap::default();
         let function: Function = Data::from(function.clone_to_heap(&mut heap))
             .try_into()
@@ -59,10 +59,10 @@ impl Fuzzer {
         }
     }
 
-    pub fn status(&self) -> &Status {
+    pub fn status(&self) -> &Status<'i, 'c, 'h> {
         self.status.as_ref().unwrap()
     }
-    pub fn into_status(self) -> Status {
+    pub fn into_status(self) -> Status<'i, 'c, 'h> {
         self.status.unwrap()
     }
 
@@ -94,9 +94,9 @@ impl Fuzzer {
     fn continue_fuzzing(
         &self,
         execution_controller: &mut impl ExecutionController,
-        mut pool: InputPool,
-        mut runner: Runner<Arc<Lir>>,
-    ) -> Status {
+        mut pool: InputPool<'i>,
+        mut runner: Runner<'i, 'c, 'h, Arc<Lir<'c>>>,
+    ) -> Status<'i, 'c, 'h> {
         runner.run(execution_controller);
         let Some(result) = runner.result else {
             return Status::StillFuzzing { pool, runner };
@@ -138,7 +138,7 @@ impl Fuzzer {
             },
         }
     }
-    fn create_new_fuzzing_case(&self, pool: InputPool) -> Status {
+    fn create_new_fuzzing_case(&self, pool: InputPool<'i>) -> Status<'i, 'c, 'h> {
         let runner = Runner::new(self.lir.clone(), self.function, pool.generate_new_input());
         Status::StillFuzzing { pool, runner }
     }

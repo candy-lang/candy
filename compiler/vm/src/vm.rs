@@ -3,6 +3,7 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::{self, Debug, Formatter},
     hash::Hash,
+    marker::PhantomData,
 };
 
 use candy_frontend::{
@@ -42,12 +43,13 @@ impl fmt::Debug for OperationId {
 /// A VM represents a Candy program that thinks it's currently running. Because
 /// VMs are first-class Rust structs, they enable other code to store "freezed"
 /// programs and to remain in control about when and for how long code runs.
-pub struct Vm<L: Borrow<Lir>, T: Tracer> {
+pub struct Vm<'c: 'h, 'h, L: Borrow<Lir<'c>>, T: Tracer<'h>> {
     lir: L,
-    fibers: HashMap<FiberId, FiberTree<T::ForFiber>>,
+    phantom: PhantomData<Heap<'c>>,
+    fibers: HashMap<FiberId, FiberTree<'c, 'h, T::ForFiber>>,
 
-    channels: HashMap<ChannelId, ChannelLike>,
-    pub completed_operations: HashMap<OperationId, CompletedOperation>,
+    channels: HashMap<ChannelId, ChannelLike<'h>>,
+    pub completed_operations: HashMap<OperationId, CompletedOperation<'h>>,
     pub unreferenced_channels: HashSet<ChannelId>,
 
     operation_id_generator: IdGenerator<OperationId>,
@@ -55,22 +57,22 @@ pub struct Vm<L: Borrow<Lir>, T: Tracer> {
     channel_id_generator: IdGenerator<ChannelId>,
 }
 
-enum FiberTree<T: FiberTracer> {
+enum FiberTree<'c, 'h, T: FiberTracer<'h>> {
     /// This tree is currently focused on running a single fiber.
-    Single(Single<T>),
+    Single(Single<'c, 'h, T>),
 
     /// The fiber of this tree entered a `core.parallel` scope so that it's now
     /// paused and waits for the parallel scope to end. Instead of the main
     /// former single fiber, the tree now runs the function passed to
     /// `core.parallel` as well as any other spawned children.
-    Parallel(Parallel<T>),
+    Parallel(Parallel<'c, 'h, T>),
 
-    Try(Try<T>),
+    Try(Try<'c, 'h, T>),
 }
 
 /// Single fibers are the leaves of the fiber tree.
-struct Single<T: FiberTracer> {
-    fiber: Fiber<T>,
+struct Single<'c, 'h, T: FiberTracer<'h>> {
+    fiber: Fiber<'c, 'h, T>,
     parent: Option<FiberId>,
 }
 
@@ -81,10 +83,10 @@ struct Single<T: FiberTracer> {
 /// pointer to a parallel section), you can also spawn other fibers. In contrast
 /// to the first child, those children also have an explicit send port where the
 /// function's result is sent to.
-struct Parallel<T: FiberTracer> {
-    paused_fiber: Single<T>,
+struct Parallel<'c, 'h, T: FiberTracer<'h>> {
+    paused_fiber: Single<'c, 'h, T>,
     children: HashMap<FiberId, ChildKind>,
-    return_value: Option<InlineObject>, // will later contain the body's return value
+    return_value: Option<InlineObject<'h>>, // will later contain the body's return value
     nursery: ChannelId,
 }
 #[derive(Clone)]
@@ -93,19 +95,19 @@ enum ChildKind {
     SpawnedChild(ChannelId),
 }
 
-struct Try<T: FiberTracer> {
-    paused_fiber: Single<T>,
+struct Try<'c, 'h, T: FiberTracer<'h>> {
+    paused_fiber: Single<'c, 'h, T>,
     child: FiberId,
 }
 
-enum ChannelLike {
-    Channel(Channel),
+enum ChannelLike<'h> {
+    Channel(Channel<'h>),
     Nursery(FiberId),
 }
 
-pub enum CompletedOperation {
+pub enum CompletedOperation<'h> {
     Sent,
-    Received { packet: Packet },
+    Received { packet: Packet<'h> },
 }
 
 #[derive(Clone, Debug)]
@@ -122,10 +124,11 @@ impl FiberId {
     }
 }
 
-impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
+impl<'c: 'h, 'h, L: Borrow<Lir<'c>>, T: Tracer<'h>> Vm<'c, 'h, L, T> {
     pub fn uninitialized(lir: L) -> Self {
         Self {
             lir,
+            phantom: PhantomData,
             fibers: HashMap::new(),
             channels: HashMap::new(),
             completed_operations: Default::default(),
@@ -137,11 +140,11 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
     }
     pub fn initialize_for_function(
         &mut self,
-        heap: Heap,
-        constant_mapping: FxHashMap<HeapObject, HeapObject>,
-        function: Function,
-        arguments: &[InlineObject],
-        responsible: HirId,
+        heap: Heap<'h>,
+        constant_mapping: FxHashMap<HeapObject<'c>, HeapObject<'h>>,
+        function: Function<'h>,
+        arguments: &[InlineObject<'h>],
+        responsible: HirId<'h>,
         tracer: &mut T,
     ) {
         assert!(self.fibers.is_empty());
@@ -165,11 +168,11 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
 
     pub fn for_function(
         lir: L,
-        heap: Heap,
-        constant_mapping: FxHashMap<HeapObject, HeapObject>,
-        function: Function,
-        arguments: &[InlineObject],
-        responsible: HirId,
+        heap: Heap<'h>,
+        constant_mapping: FxHashMap<HeapObject<'c>, HeapObject<'h>>,
+        function: Function<'h>,
+        arguments: &[InlineObject<'h>],
+        responsible: HirId<'h>,
         tracer: &mut T,
     ) -> Self {
         let mut this = Self::uninitialized(lir);
@@ -206,7 +209,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
         )
     }
 
-    pub fn tear_down(mut self) -> ExecutionEnded<T::ForFiber> {
+    pub fn tear_down(mut self) -> ExecutionEnded<'c, 'h, T::ForFiber> {
         let tree = self.fibers.remove(&FiberId::root()).unwrap();
         let single = tree.into_single().unwrap();
         single.fiber.tear_down()
@@ -260,7 +263,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
     // This will be used as soon as the outside world tries to send something
     // into the VM.
     #[allow(dead_code)]
-    pub fn send(&mut self, channel: ChannelId, packet: Packet) -> OperationId {
+    pub fn send(&mut self, channel: ChannelId, packet: Packet<'h>) -> OperationId {
         let operation_id = self.operation_id_generator.generate();
         self.send_to_channel(Performer::External(operation_id), channel, packet);
         operation_id
@@ -571,7 +574,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
         });
     }
 
-    fn send_to_channel(&mut self, performer: Performer, channel_id: ChannelId, packet: Packet) {
+    fn send_to_channel(&mut self, performer: Performer, channel_id: ChannelId, packet: Packet<'h>) {
         let channel = match self.channels.get_mut(&channel_id) {
             Some(channel) => channel,
             None => {
@@ -691,11 +694,11 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
     }
 }
 
-struct InternalCompleter<'a, T: FiberTracer> {
-    fibers: &'a mut HashMap<FiberId, FiberTree<T>>,
-    completed_operations: &'a mut HashMap<OperationId, CompletedOperation>,
+struct InternalCompleter<'a, 'c, 'h, T: FiberTracer<'h>> {
+    fibers: &'a mut HashMap<FiberId, FiberTree<'c, 'h, T>>,
+    completed_operations: &'a mut HashMap<OperationId, CompletedOperation<'h>>,
 }
-impl<'a, T: FiberTracer> Completer for InternalCompleter<'a, T> {
+impl<'a, 'c, 'h, T: FiberTracer<'h>> Completer<'h> for InternalCompleter<'a, 'c, 'h, T> {
     fn complete_send(&mut self, performer: Performer) {
         match performer {
             Performer::Fiber(fiber) => {
@@ -710,7 +713,7 @@ impl<'a, T: FiberTracer> Completer for InternalCompleter<'a, T> {
         }
     }
 
-    fn complete_receive(&mut self, performer: Performer, packet: Packet) {
+    fn complete_receive(&mut self, performer: Performer, packet: Packet<'h>) {
         match performer {
             Performer::Fiber(fiber) => {
                 let tree = self.fibers.get_mut(&fiber).unwrap();
@@ -725,7 +728,7 @@ impl<'a, T: FiberTracer> Completer for InternalCompleter<'a, T> {
     }
 }
 
-impl ChannelLike {
+impl ChannelLike<'_> {
     fn to_nursery(&self) -> Option<FiberId> {
         match self {
             ChannelLike::Nursery(fiber) => Some(*fiber),
@@ -733,15 +736,15 @@ impl ChannelLike {
         }
     }
 }
-impl<T: FiberTracer> FiberTree<T> {
-    fn into_fiber(self) -> Fiber<T> {
+impl<'c, 'h, T: FiberTracer<'h>> FiberTree<'c, 'h, T> {
+    fn into_fiber(self) -> Fiber<'c, 'h, T> {
         match self {
             FiberTree::Single(single) => single.fiber,
             FiberTree::Parallel(parallel) => parallel.paused_fiber.fiber,
             FiberTree::Try(try_) => try_.paused_fiber.fiber,
         }
     }
-    fn fiber_mut(&mut self) -> &mut Fiber<T> {
+    fn fiber_mut(&mut self) -> &mut Fiber<'c, 'h, T> {
         match self {
             FiberTree::Single(single) => &mut single.fiber,
             FiberTree::Parallel(parallel) => &mut parallel.paused_fiber.fiber,
@@ -750,39 +753,39 @@ impl<T: FiberTracer> FiberTree<T> {
     }
 
     // TODO: Use macros to generate these.
-    fn into_single(self) -> Option<Single<T>> {
+    fn into_single(self) -> Option<Single<'c, 'h, T>> {
         match self {
             FiberTree::Single(single) => Some(single),
             _ => None,
         }
     }
-    fn as_single(&self) -> Option<&Single<T>> {
+    fn as_single(&self) -> Option<&Single<'c, 'h, T>> {
         match self {
             FiberTree::Single(single) => Some(single),
             _ => None,
         }
     }
-    fn as_single_mut(&mut self) -> Option<&mut Single<T>> {
+    fn as_single_mut(&mut self) -> Option<&mut Single<'c, 'h, T>> {
         match self {
             FiberTree::Single(single) => Some(single),
             _ => None,
         }
     }
 
-    fn into_parallel(self) -> Option<Parallel<T>> {
+    fn into_parallel(self) -> Option<Parallel<'c, 'h, T>> {
         match self {
             FiberTree::Parallel(parallel) => Some(parallel),
             _ => None,
         }
     }
-    fn as_parallel_mut(&mut self) -> Option<&mut Parallel<T>> {
+    fn as_parallel_mut(&mut self) -> Option<&mut Parallel<'c, 'h, T>> {
         match self {
             FiberTree::Parallel(parallel) => Some(parallel),
             _ => None,
         }
     }
 
-    fn into_try(self) -> Option<Try<T>> {
+    fn into_try(self) -> Option<Try<'c, 'h, T>> {
         match self {
             FiberTree::Try(try_) => Some(try_),
             _ => None,
@@ -790,7 +793,7 @@ impl<T: FiberTracer> FiberTree<T> {
     }
 }
 
-impl<L: Borrow<Lir>, T: Tracer> Debug for Vm<L, T> {
+impl<'c, 'h, L: Borrow<Lir<'c>>, T: Tracer<'h>> Debug for Vm<'c, 'h, L, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Vm")
             .field("fibers", &self.fibers)
@@ -798,7 +801,7 @@ impl<L: Borrow<Lir>, T: Tracer> Debug for Vm<L, T> {
             .finish()
     }
 }
-impl<T: FiberTracer> Debug for FiberTree<T> {
+impl<'h, T: FiberTracer<'h>> Debug for FiberTree<'_, 'h, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Single(Single { fiber, parent }) => f
@@ -825,7 +828,7 @@ impl Debug for ChildKind {
         }
     }
 }
-impl Debug for ChannelLike {
+impl Debug for ChannelLike<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Channel(channel) => channel.fmt(f),

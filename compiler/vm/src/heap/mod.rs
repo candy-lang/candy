@@ -81,8 +81,15 @@ impl<'h> Heap<'h> {
         }
     }
 
-    pub fn adopt(&mut self, mut other: Heap) {
-        self.objects.extend(mem::take(&mut other.objects));
+    pub fn adopt<'o>(&mut self, mut other: Heap<'o>) {
+        let other_objects = mem::take(&mut other.objects);
+        let other_objects_with_overwritten_lifetime = unsafe {
+            mem::transmute::<FxHashSet<ObjectInHeap<'o>>, FxHashSet<ObjectInHeap<'h>>>(
+                other_objects,
+            )
+        };
+        self.objects.extend(other_objects_with_overwritten_lifetime);
+
         for (channel_id, refcount) in mem::take(&mut other.channel_refcounts) {
             *self.channel_refcounts.entry(channel_id).or_default() += refcount;
         }
@@ -98,10 +105,11 @@ impl<'h> Heap<'h> {
 
     // We do not confuse this with the `std::Clone::clone` method.
     #[allow(clippy::should_implement_trait)]
-    pub fn clone(&self) -> (Heap, FxHashMap<HeapObject, HeapObject>) {
+    pub fn clone<'t>(&self) -> (Heap<'t>, FxHashMap<HeapObject<'h>, HeapObject<'t>>) {
         let mut cloned = Heap {
             objects: FxHashSet::default(),
             channel_refcounts: self.channel_refcounts.clone(),
+            phantom: PhantomData,
         };
 
         let mut mapping = FxHashMap::default();
@@ -159,7 +167,7 @@ impl Debug for Heap<'_> {
     }
 }
 
-impl Drop for Heap {
+impl Drop for Heap<'_> {
     fn drop(&mut self) {
         self.clear();
     }

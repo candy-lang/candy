@@ -48,7 +48,7 @@ pub struct HeapObject<'h> {
     address: NonNull<u64>,
     phantom: PhantomData<&'h ()>,
 }
-impl HeapObject<'_> {
+impl<'h> HeapObject<'h> {
     pub const WORD_SIZE: usize = 8;
 
     const KIND_MASK: u64 = 0b111;
@@ -103,7 +103,7 @@ impl HeapObject<'_> {
         self.set_reference_count(new_reference_count);
         trace!("RefCount of {self:p} increased to {new_reference_count}. Value: {self:?}");
     }
-    pub fn drop(self, heap: &mut Heap) {
+    pub fn drop(self, heap: &mut Heap<'h>) {
         let new_reference_count = self.reference_count() - 1;
         trace!("RefCount of {self:p} reduced to {new_reference_count}. Value: {self:?}");
         self.set_reference_count(new_reference_count);
@@ -112,7 +112,7 @@ impl HeapObject<'_> {
             self.free(heap);
         }
     }
-    pub(super) fn free(self, heap: &mut Heap) {
+    pub(super) fn free(self, heap: &mut Heap<'h>) {
         trace!("Freeing object at {self:p}.");
         assert_eq!(self.reference_count(), 0);
         let data = HeapData::from(self);
@@ -121,14 +121,14 @@ impl HeapObject<'_> {
     }
 
     // Cloning
-    pub fn clone_to_heap(self, heap: &mut Heap) -> Self {
+    pub fn clone_to_heap<'t>(self, heap: &mut Heap<'t>) -> HeapObject<'t> {
         self.clone_to_heap_with_mapping(heap, &mut FxHashMap::default())
     }
-    pub fn clone_to_heap_with_mapping(
+    pub fn clone_to_heap_with_mapping<'t>(
         self,
-        heap: &mut Heap,
-        address_map: &mut FxHashMap<HeapObject, HeapObject>,
-    ) -> Self {
+        heap: &mut Heap<'t>,
+        address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
+    ) -> HeapObject<'t> {
         match address_map.entry(self) {
             hash_map::Entry::Occupied(entry) => {
                 let object = entry.get();
@@ -188,7 +188,7 @@ pub trait HeapObjectTrait<'h>: Into<HeapObject<'h>> {
 
     fn clone_content_to_heap_with_mapping<'t>(
         self,
-        heap: &'t mut Heap,
+        heap: &mut Heap<'t>,
         clone: HeapObject<'t>,
         address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
     );
@@ -198,7 +198,7 @@ pub trait HeapObjectTrait<'h>: Into<HeapObject<'h>> {
     ///
     /// This method is called by [free] prior to deallocating the object's
     /// memory.
-    fn drop_children(self, heap: &'h mut Heap);
+    fn drop_children(self, heap: &mut Heap<'h>);
 
     // TODO: This is temporary. Once we store everything in the heap (including
     // stuff like big int values and HIR IDs), we can remove this.
@@ -233,7 +233,7 @@ impl DebugDisplay for HeapData<'_> {
 impl_debug_display_via_debugdisplay!(HeapData<'_>);
 
 impl<'h> From<HeapObject<'h>> for HeapData<'h> {
-    fn from(object: HeapObject) -> Self {
+    fn from(object: HeapObject<'h>) -> Self {
         let header_word = object.header_word();
         match header_word & HeapObject::KIND_MASK {
             HeapObject::KIND_INT => {

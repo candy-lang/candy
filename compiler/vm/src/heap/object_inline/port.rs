@@ -19,7 +19,7 @@ pub struct InlinePort<'h>(InlineObject<'h>);
 impl<'h> InlinePort<'h> {
     const CHANNEL_ID_SHIFT: usize = 3;
 
-    pub fn create(heap: &'h mut Heap, channel_id: ChannelId, is_send: bool) -> InlineObject<'h> {
+    pub fn create(heap: &mut Heap<'h>, channel_id: ChannelId, is_send: bool) -> InlineObject<'h> {
         heap.notify_port_created(channel_id);
         let channel_id = channel_id.to_usize();
         debug_assert_eq!(
@@ -70,7 +70,7 @@ impl<'h> InlineSendPort<'h> {
     pub fn new_unchecked(object: InlineObject<'h>) -> Self {
         Self(InlinePort(object))
     }
-    pub fn create(heap: &mut Heap, channel_id: ChannelId) -> InlineObject<'h> {
+    pub fn create(heap: &mut Heap<'h>, channel_id: ChannelId) -> InlineObject<'h> {
         InlinePort::create(heap, channel_id, true)
     }
 }
@@ -83,13 +83,15 @@ impl DebugDisplay for InlineSendPort<'_> {
 impl_debug_display_via_debugdisplay!(InlineSendPort<'_>);
 
 impl<'h> InlineObjectTrait<'h> for InlineSendPort<'h> {
+    type Clone<'t> = InlineSendPort<'t>;
+
     fn clone_to_heap_with_mapping<'t>(
         self,
-        heap: &'t mut Heap,
+        heap: &mut Heap<'t>,
         _address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
-    ) -> Self {
+    ) -> Self::Clone<'t> {
         heap.notify_port_created(self.channel_id());
-        self
+        InlineSendPort(InlinePort(InlineObject::new(self.raw_word())))
     }
 }
 
@@ -102,7 +104,7 @@ impl<'h> InlineReceivePort<'h> {
     pub fn new_unchecked(object: InlineObject<'h>) -> Self {
         Self(InlinePort(object))
     }
-    pub fn create(heap: &mut Heap, channel_id: ChannelId) -> InlineObject<'h> {
+    pub fn create(heap: &mut Heap<'h>, channel_id: ChannelId) -> InlineObject<'h> {
         InlinePort::create(heap, channel_id, false)
     }
 }
@@ -115,12 +117,14 @@ impl DebugDisplay for InlineReceivePort<'_> {
 impl_debug_display_via_debugdisplay!(InlineReceivePort<'_>);
 
 impl<'h> InlineObjectTrait<'h> for InlineReceivePort<'h> {
+    type Clone<'t> = InlineReceivePort<'t>;
+
     fn clone_to_heap_with_mapping<'t>(
         self,
-        heap: &'t mut Heap,
+        heap: &mut Heap<'t>,
         _address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
-    ) -> Self {
+    ) -> Self::Clone<'t> {
         heap.notify_port_created(self.channel_id());
-        self
+        InlineReceivePort(InlinePort(InlineObject::new(self.raw_word())))
     }
 }

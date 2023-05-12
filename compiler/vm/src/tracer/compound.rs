@@ -4,22 +4,34 @@ use crate::{
     fiber::FiberId,
     heap::{Function, Heap, HirId, InlineObject},
 };
+use std::marker::PhantomData;
 
 #[derive(Default)]
-pub struct CompoundTracer<T0: Tracer, T1: Tracer> {
+pub struct CompoundTracer<'h, T0: Tracer<'h>, T1: Tracer<'h>> {
     pub tracer0: T0,
     pub tracer1: T1,
+    phantom: PhantomData<&'h ()>,
 }
-impl<T0: Tracer, T1: Tracer> Tracer for CompoundTracer<T0, T1> {
-    type ForFiber = CompoundFiberTracer<T0::ForFiber, T1::ForFiber>;
+impl<'h, T0: Tracer<'h>, T1: Tracer<'h>> CompoundTracer<'h, T0, T1> {
+    pub fn new(tracer0: T0, tracer1: T1) -> Self {
+        Self {
+            tracer0,
+            tracer1,
+            phantom: PhantomData,
+        }
+    }
+}
+impl<'h, T0: Tracer<'h>, T1: Tracer<'h>> Tracer<'h> for CompoundTracer<'h, T0, T1> {
+    type ForFiber = CompoundFiberTracer<'h, T0::ForFiber, T1::ForFiber>;
 
     fn root_fiber_created(&mut self) -> Self::ForFiber {
         CompoundFiberTracer {
             tracer0: self.tracer0.root_fiber_created(),
             tracer1: self.tracer1.root_fiber_created(),
+            phantom: PhantomData,
         }
     }
-    fn root_fiber_ended(&mut self, ended: FiberEnded<Self::ForFiber>) {
+    fn root_fiber_ended<'a>(&mut self, ended: FiberEnded<'a, 'h, Self::ForFiber>) {
         self.tracer0.root_fiber_ended(FiberEnded {
             id: ended.id,
             heap: ended.heap,
@@ -50,18 +62,22 @@ impl<T0: Tracer, T1: Tracer> Tracer for CompoundTracer<T0, T1> {
 }
 
 #[derive(Default)]
-pub struct CompoundFiberTracer<T0: FiberTracer, T1: FiberTracer> {
+pub struct CompoundFiberTracer<'h, T0: FiberTracer<'h>, T1: FiberTracer<'h>> {
     tracer0: T0,
     tracer1: T1,
+    phantom: PhantomData<&'h ()>,
 }
-impl<T0: FiberTracer, T1: FiberTracer> FiberTracer for CompoundFiberTracer<T0, T1> {
+impl<'h, T0: FiberTracer<'h>, T1: FiberTracer<'h>> FiberTracer<'h>
+    for CompoundFiberTracer<'h, T0, T1>
+{
     fn child_fiber_created(&mut self, _child: FiberId) -> Self {
         CompoundFiberTracer {
             tracer0: self.tracer0.child_fiber_created(_child),
             tracer1: self.tracer1.child_fiber_created(_child),
+            phantom: PhantomData,
         }
     }
-    fn child_fiber_ended(&mut self, ended: FiberEnded<Self>) {
+    fn child_fiber_ended<'a>(&mut self, ended: FiberEnded<'a, 'h, Self>) {
         self.tracer0.child_fiber_ended(FiberEnded {
             id: ended.id,
             heap: ended.heap,
@@ -76,12 +92,22 @@ impl<T0: FiberTracer, T1: FiberTracer> FiberTracer for CompoundFiberTracer<T0, T
         });
     }
 
-    fn value_evaluated(&mut self, heap: &mut Heap, expression: HirId, value: InlineObject) {
+    fn value_evaluated(
+        &mut self,
+        heap: &mut Heap<'h>,
+        expression: HirId<'h>,
+        value: InlineObject<'h>,
+    ) {
         self.tracer0.value_evaluated(heap, expression, value);
         self.tracer1.value_evaluated(heap, expression, value);
     }
 
-    fn found_fuzzable_function(&mut self, heap: &mut Heap, definition: HirId, function: Function) {
+    fn found_fuzzable_function(
+        &mut self,
+        heap: &mut Heap<'h>,
+        definition: HirId<'h>,
+        function: Function<'h>,
+    ) {
         self.tracer0
             .found_fuzzable_function(heap, definition, function);
         self.tracer1
@@ -90,23 +116,23 @@ impl<T0: FiberTracer, T1: FiberTracer> FiberTracer for CompoundFiberTracer<T0, T
 
     fn call_started(
         &mut self,
-        heap: &mut Heap,
-        call_site: HirId,
-        callee: InlineObject,
-        arguments: Vec<InlineObject>,
-        responsible: HirId,
+        heap: &mut Heap<'h>,
+        call_site: HirId<'h>,
+        callee: InlineObject<'h>,
+        arguments: Vec<InlineObject<'h>>,
+        responsible: HirId<'h>,
     ) {
         self.tracer0
             .call_started(heap, call_site, callee, arguments.clone(), responsible);
         self.tracer1
             .call_started(heap, call_site, callee, arguments, responsible);
     }
-    fn call_ended(&mut self, heap: &mut Heap, return_value: InlineObject) {
+    fn call_ended(&mut self, heap: &mut Heap<'h>, return_value: InlineObject<'h>) {
         self.tracer0.call_ended(heap, return_value);
         self.tracer1.call_ended(heap, return_value);
     }
 
-    fn dup_all_stored_objects(&self, heap: &mut Heap) {
+    fn dup_all_stored_objects(&self, heap: &mut Heap<'h>) {
         self.tracer0.dup_all_stored_objects(heap);
         self.tracer1.dup_all_stored_objects(heap);
     }

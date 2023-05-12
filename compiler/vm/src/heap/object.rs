@@ -103,7 +103,7 @@ pub enum Int<'h> {
 }
 
 impl<'h> Int<'h> {
-    pub fn create<T>(heap: &mut Heap, value: T) -> Self
+    pub fn create<T>(heap: &mut Heap<'h>, value: T) -> Self
     where
         T: Copy + TryInto<i64> + Into<BigInt>,
     {
@@ -114,7 +114,7 @@ impl<'h> Int<'h> {
             .map(|it| it.into())
             .unwrap_or_else(|_| HeapInt::create(heap, value.into()).into())
     }
-    pub fn create_from_bigint(heap: &mut Heap, value: BigInt) -> Self {
+    pub fn create_from_bigint(heap: &mut Heap<'h>, value: BigInt) -> Self {
         i64::try_from(&value)
             .map_err(|_| ())
             .and_then(InlineInt::try_from)
@@ -143,7 +143,7 @@ impl<'h> Int<'h> {
     operator_fn!(multiply);
     operator_fn!(int_divide_truncating);
     operator_fn!(remainder);
-    pub fn modulo(&self, heap: &mut Heap, rhs: &Int) -> Self {
+    pub fn modulo(&self, heap: &mut Heap<'h>, rhs: &Self) -> Int<'h> {
         match (self, rhs) {
             (Int::Inline(lhs), Int::Inline(rhs)) => lhs.modulo(heap, *rhs),
             (Int::Heap(on_heap), Int::Inline(inline))
@@ -154,7 +154,7 @@ impl<'h> Int<'h> {
         }
     }
 
-    pub fn compare_to(&self, heap: &mut Heap, rhs: &Int) -> Tag {
+    pub fn compare_to(&self, heap: &mut Heap<'h>, rhs: &Self) -> Tag<'h> {
         match (self, rhs) {
             (Int::Inline(lhs), Int::Inline(rhs)) => lhs.compare_to(heap, *rhs),
             (Int::Heap(on_heap), Int::Inline(inline))
@@ -168,7 +168,7 @@ impl<'h> Int<'h> {
     shift_fn!(shift_left, shl);
     shift_fn!(shift_right, shr);
 
-    pub fn bit_length(&self, heap: &mut Heap) -> Self {
+    pub fn bit_length(&self, heap: &mut Heap<'h>) -> Self {
         match self {
             Int::Inline(int) => int.bit_length().into(),
             Int::Heap(int) => int.bit_length(heap),
@@ -182,7 +182,7 @@ impl<'h> Int<'h> {
 
 macro_rules! bitwise_fn {
     ($name:ident) => {
-        pub fn $name(&self, heap: &mut Heap, rhs: &Int) -> Self {
+        pub fn $name(&self, heap: &mut Heap<'h>, rhs: &Self) -> Int<'h> {
             match (self, rhs) {
                 (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(*rhs).into(),
                 (Int::Heap(on_heap), Int::Inline(inline))
@@ -196,7 +196,7 @@ macro_rules! bitwise_fn {
 }
 macro_rules! operator_fn {
     ($name:ident) => {
-        pub fn $name(&self, heap: &mut Heap, rhs: &Int) -> Self {
+        pub fn $name(&self, heap: &mut Heap<'h>, rhs: &Self) -> Int<'h> {
             match (self, rhs) {
                 (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(heap, *rhs),
                 (Int::Heap(on_heap), Int::Inline(inline))
@@ -208,7 +208,7 @@ macro_rules! operator_fn {
 }
 macro_rules! shift_fn {
     ($name:ident, $function:ident) => {
-        pub fn $name(&self, heap: &mut Heap, rhs: &Int) -> Self {
+        pub fn $name(&self, heap: &mut Heap<'h>, rhs: &Self) -> Int<'h> {
             match (self, rhs) {
                 (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(heap, *rhs),
                 // TODO: Support shifting by larger numbers
@@ -234,7 +234,7 @@ impl DebugDisplay for Int<'_> {
 impl_debug_display_via_debugdisplay!(Int<'_>);
 
 impl<'h> From<Int<'h>> for InlineObject<'h> {
-    fn from(int: Int) -> Self {
+    fn from(int: Int<'h>) -> Self {
         match int {
             Int::Inline(int) => *int,
             Int::Heap(int) => (*int).into(),
@@ -251,27 +251,27 @@ pub struct Tag<'h>(HeapTag<'h>);
 
 impl<'h> Tag<'h> {
     pub fn create(
-        heap: &mut Heap,
+        heap: &mut Heap<'h>,
         symbol: Text<'h>,
         value: impl Into<Option<InlineObject<'h>>>,
     ) -> Self {
         HeapTag::create(heap, symbol, value).into()
     }
     pub fn create_from_str(
-        heap: &mut Heap,
+        heap: &mut Heap<'h>,
         symbol: &str,
-        value: impl Into<Option<InlineObject>>,
+        value: impl Into<Option<InlineObject<'h>>>,
     ) -> Self {
         let symbol = Text::create(heap, symbol);
         Self::create(heap, symbol, value)
     }
-    pub fn create_nothing(heap: &mut Heap) -> Self {
+    pub fn create_nothing(heap: &mut Heap<'h>) -> Self {
         Self::create_from_str(heap, "Nothing", None)
     }
-    pub fn create_bool(heap: &mut Heap, value: bool) -> Self {
+    pub fn create_bool(heap: &mut Heap<'h>, value: bool) -> Self {
         Self::create_from_str(heap, if value { "True" } else { "False" }, None)
     }
-    pub fn create_ordering(heap: &mut Heap, value: Ordering) -> Self {
+    pub fn create_ordering(heap: &mut Heap<'h>, value: Ordering) -> Self {
         let value = match value {
             Ordering::Less => "Less",
             Ordering::Equal => "Equal",
@@ -315,7 +315,7 @@ impl TryFrom<Data<'_>> for bool {
 pub struct Text<'h>(HeapText<'h>);
 
 impl<'h> Text<'h> {
-    pub fn create(heap: &mut Heap, value: &str) -> Self {
+    pub fn create(heap: &mut Heap<'h>, value: &str) -> Self {
         HeapText::create(heap, value).into()
     }
 }
@@ -330,7 +330,7 @@ impl_try_from_heap_object!(Text, "Expected a text.");
 pub struct List<'h>(HeapList<'h>);
 
 impl<'h> List<'h> {
-    pub fn create(heap: &mut Heap, items: &[InlineObject]) -> Self {
+    pub fn create(heap: &mut Heap<'h>, items: &[InlineObject<'h>]) -> Self {
         HeapList::create(heap, items).into()
     }
 }
@@ -345,11 +345,14 @@ impl_try_from_heap_object!(List, "Expected a list.");
 pub struct Struct<'h>(HeapStruct<'h>);
 
 impl<'h> Struct<'h> {
-    pub fn create(heap: &mut Heap, fields: &FxHashMap<InlineObject<'h>, InlineObject<'h>>) -> Self {
+    pub fn create(
+        heap: &mut Heap<'h>,
+        fields: &FxHashMap<InlineObject<'h>, InlineObject<'h>>,
+    ) -> Self {
         HeapStruct::create(heap, fields).into()
     }
     pub fn create_with_symbol_keys(
-        heap: &mut Heap,
+        heap: &mut Heap<'h>,
         fields: impl IntoIterator<Item = (&str, InlineObject<'h>)>,
     ) -> Self {
         let fields = fields
@@ -359,7 +362,7 @@ impl<'h> Struct<'h> {
         Self::create(heap, &fields)
     }
     pub fn create_result(
-        heap: &mut Heap,
+        heap: &mut Heap<'h>,
         value: Result<InlineObject<'h>, InlineObject<'h>>,
     ) -> Self {
         let (type_, value) = match value {
@@ -386,7 +389,7 @@ pub struct Function<'h>(HeapFunction<'h>);
 
 impl<'h> Function<'h> {
     pub fn create(
-        heap: &mut Heap,
+        heap: &mut Heap<'h>,
         captured: &[InlineObject<'h>],
         argument_count: usize,
         body: InstructionPointer,
@@ -406,7 +409,7 @@ impl_try_from_heap_object!(Function, "Expected a function.");
 pub struct HirId<'h>(HeapHirId<'h>);
 
 impl<'h> HirId<'h> {
-    pub fn create(heap: &mut Heap, id: Id) -> HirId {
+    pub fn create(heap: &mut Heap<'h>, id: Id) -> HirId<'h> {
         HeapHirId::create(heap, id).into()
     }
 }
@@ -434,7 +437,7 @@ impls_via_0!(Builtin<'h>);
 pub struct SendPort<'h>(InlineSendPort<'h>);
 
 impl<'h> SendPort<'h> {
-    pub fn create(heap: &mut Heap, channel_id: ChannelId) -> InlineObject<'h> {
+    pub fn create(heap: &mut Heap<'h>, channel_id: ChannelId) -> InlineObject<'h> {
         InlineSendPort::create(heap, channel_id)
     }
 }
@@ -448,7 +451,7 @@ impl_try_froms!(SendPort, "Expected a send port.");
 pub struct ReceivePort<'h>(InlineReceivePort<'h>);
 
 impl<'h> ReceivePort<'h> {
-    pub fn create(heap: &mut Heap, channel_id: ChannelId) -> InlineObject<'h> {
+    pub fn create(heap: &mut Heap<'h>, channel_id: ChannelId) -> InlineObject<'h> {
         InlineReceivePort::create(heap, channel_id)
     }
 }
@@ -489,7 +492,7 @@ macro_rules! impl_try_froms {
         impl<'h> TryFrom<InlineObject<'h>> for $type<'h> {
             type Error = &'static str;
 
-            fn try_from(value: InlineObject) -> Result<Self, Self::Error> {
+            fn try_from(value: InlineObject<'h>) -> Result<Self, Self::Error> {
                 Data::from(value).try_into()
             }
         }
@@ -506,7 +509,7 @@ macro_rules! impl_try_froms {
         impl<'a, 'h> TryFrom<&'a Data<'h>> for &'a $type<'h> {
             type Error = &'static str;
 
-            fn try_from(value: &'a Data) -> Result<Self, Self::Error> {
+            fn try_from(value: &'a Data<'h>) -> Result<Self, Self::Error> {
                 match &value {
                     Data::$type(it) => Ok(it),
                     _ => Err($error_message),

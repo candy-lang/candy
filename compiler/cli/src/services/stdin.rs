@@ -15,7 +15,7 @@ pub struct StdinService {
     current_receive: OperationId,
 }
 impl StdinService {
-    pub fn new<L: Borrow<Lir>, T: Tracer>(vm: &mut Vm<L, T>) -> Self {
+    pub fn new<'c: 'h, 'h, L: Borrow<Lir<'c>>, T: Tracer<'h>>(vm: &mut Vm<'c, 'h, L, T>) -> Self {
         let channel = vm.create_channel(0);
         let current_receive = vm.receive(channel);
         Self {
@@ -24,7 +24,10 @@ impl StdinService {
         }
     }
 
-    pub fn run<L: Borrow<Lir>, T: Tracer>(&mut self, vm: &mut Vm<L, T>) {
+    pub fn run<'c: 'h, 'h, L: Borrow<Lir<'c>>, T: Tracer<'h>>(
+        &mut self,
+        vm: &mut Vm<'c, 'h, L, T>,
+    ) {
         while let Some(CompletedOperation::Received { packet }) =
             vm.completed_operations.remove(&self.current_receive)
         {

@@ -15,10 +15,10 @@ use std::borrow::Borrow;
 
 const MAX_INSTRUCTIONS: usize = 10000;
 
-pub struct Runner<L: Borrow<Lir>> {
-    pub vm: Option<Vm<L, StackTracer>>, // Is consumed when the runner is finished.
-    pub input: Input,
-    pub tracer: StackTracer,
+pub struct Runner<'i, 'c: 'h, 'h, L: Borrow<Lir<'c>>> {
+    pub vm: Option<Vm<'c, 'h, L, StackTracer<'h>>>, // Is consumed when the runner is finished.
+    pub input: Input<'i>,
+    pub tracer: StackTracer<'h>,
     pub num_instructions: usize,
     pub result: Option<RunResult>,
 }
@@ -53,8 +53,8 @@ impl RunResult {
     }
 }
 
-impl<L: Borrow<Lir>> Runner<L> {
-    pub fn new(lir: L, function: Function, input: Input) -> Self {
+impl<'i, 'c: 'h, 'h, L: Borrow<Lir<'c>>> Runner<'i, 'c, 'h, L> {
+    pub fn new(lir: L, function: Function, input: Input<'i>) -> Self {
         let (mut heap, constant_mapping) = lir.borrow().constant_heap.clone();
 
         let mut mapping = FxHashMap::default();

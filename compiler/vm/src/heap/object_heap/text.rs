@@ -20,7 +20,7 @@ impl<'h> HeapText<'h> {
     pub fn new_unchecked(object: HeapObject<'h>) -> Self {
         Self(object)
     }
-    pub fn create(heap: &'h mut Heap, value: &str) -> Self {
+    pub fn create(heap: &mut Heap<'h>, value: &str) -> Self {
         let len = value.len();
         assert_eq!(
             (len << Self::LEN_SHIFT) >> Self::LEN_SHIFT,
@@ -65,11 +65,11 @@ impl<'h> HeapObjectTrait<'h> for HeapText<'h> {
 
     fn clone_content_to_heap_with_mapping<'t>(
         self,
-        _heap: &'t mut Heap,
+        _heap: &mut Heap<'t>,
         clone: HeapObject<'t>,
         _address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
     ) {
-        let clone = Self(clone);
+        let clone = HeapText(clone);
         unsafe {
             ptr::copy_nonoverlapping(
                 self.text_pointer().as_ptr(),
@@ -79,7 +79,7 @@ impl<'h> HeapObjectTrait<'h> for HeapText<'h> {
         };
     }
 
-    fn drop_children(self, _heap: &'h mut Heap) {}
+    fn drop_children(self, _heap: &mut Heap<'h>) {}
 
     fn deallocate_external_stuff(self) {}
 }

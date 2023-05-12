@@ -21,7 +21,7 @@ impl<'h> HeapInt<'h> {
     pub fn new_unchecked(object: HeapObject<'h>) -> Self {
         Self(object)
     }
-    pub fn create(heap: &'h mut Heap, value: BigInt) -> Self {
+    pub fn create(heap: &mut Heap<'h>, value: BigInt) -> Self {
         if let Ok(value) = i64::try_from(&value) {
             debug_assert!(!InlineInt::fits(value));
         }
@@ -34,7 +34,10 @@ impl<'h> HeapInt<'h> {
     fn int_pointer(self) -> NonNull<BigInt> {
         self.content_word_pointer(0).cast()
     }
-    pub fn get(self) -> &'h BigInt {
+    pub fn get<'a>(self) -> &'a BigInt
+    where
+        'h: 'a,
+    {
         unsafe { self.int_pointer().as_ref() }
     }
 
@@ -43,11 +46,11 @@ impl<'h> HeapInt<'h> {
     operator_fn!(multiply, Mul, mul);
     operator_fn!(int_divide_truncating, Div, div);
     operator_fn!(remainder, Rem, rem);
-    pub fn modulo(self, heap: &mut Heap, rhs: &BigInt) -> Int {
+    pub fn modulo(self, heap: &mut Heap<'h>, rhs: &BigInt) -> Int<'h> {
         Int::create_from_bigint(heap, self.get().mod_floor(rhs))
     }
 
-    pub fn compare_to(self, heap: &mut Heap, rhs: &BigInt) -> Tag {
+    pub fn compare_to(self, heap: &mut Heap<'h>, rhs: &BigInt) -> Tag<'h> {
         // PERF: Add manual check if the `rhs` is an [InlineInt]?
         Tag::create_ordering(heap, self.get().cmp(rhs))
     }
@@ -55,7 +58,7 @@ impl<'h> HeapInt<'h> {
     operator_fn!(shift_left, Shl, shl);
     operator_fn!(shift_right, Shr, shr);
 
-    pub fn bit_length(self, heap: &mut Heap) -> Int {
+    pub fn bit_length(self, heap: &mut Heap<'h>) -> Int<'h> {
         Int::create(heap, self.get().bits())
     }
 
@@ -66,7 +69,7 @@ impl<'h> HeapInt<'h> {
 
 macro_rules! operator_fn {
     ($name:ident, $trait:ident, $function:ident) => {
-        pub fn $name<T>(self, heap: &mut Heap, rhs: T) -> Int
+        pub fn $name<'t, T>(self, heap: &mut Heap<'h>, rhs: T) -> Int<'h>
         where
             for<'a> &'a BigInt: $trait<T, Output = BigInt>,
         {
@@ -95,16 +98,16 @@ impl<'h> HeapObjectTrait<'h> for HeapInt<'h> {
 
     fn clone_content_to_heap_with_mapping<'t>(
         self,
-        _heap: &'t mut Heap,
+        _heap: &mut Heap<'t>,
         clone: HeapObject<'t>,
         _address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
     ) {
-        let clone = Self(clone);
+        let clone = HeapInt(clone);
         let value = self.get().to_owned();
         unsafe { ptr::write(clone.int_pointer().as_ptr(), value) };
     }
 
-    fn drop_children(self, _heap: &'h mut Heap) {}
+    fn drop_children(self, _heap: &mut Heap<'h>) {}
 
     fn deallocate_external_stuff(self) {
         unsafe { ptr::drop_in_place(self.int_pointer().as_ptr()) };

@@ -13,7 +13,11 @@ use rustc_hash::FxHashMap;
 
 use super::input::Input;
 
-pub fn generate_input(heap: Rc<RefCell<Heap>>, num_args: usize, symbols: &[Text]) -> Input {
+pub fn generate_input<'h>(
+    heap: Rc<RefCell<Heap<'h>>>,
+    num_args: usize,
+    symbols: &[Text<'h>],
+) -> Input<'h> {
     let mut arguments = vec![];
     for _ in 0..num_args {
         let address = generate_value_with_complexity(
@@ -27,12 +31,12 @@ pub fn generate_input(heap: Rc<RefCell<Heap>>, num_args: usize, symbols: &[Text]
     Input { heap, arguments }
 }
 
-fn generate_value_with_complexity(
-    heap: &mut Heap,
+fn generate_value_with_complexity<'h>(
+    heap: &mut Heap<'h>,
     rng: &mut ThreadRng,
     mut complexity: f32,
-    symbols: &[Text],
-) -> InlineObject {
+    symbols: &[Text<'h>],
+) -> InlineObject<'h> {
     match rng.gen_range(1..=5) {
         1 => Int::create_from_bigint(heap, rng.gen_bigint(10)).into(),
         2 => Text::create(heap, "test").into(),
@@ -64,18 +68,22 @@ fn generate_value_with_complexity(
     }
 }
 
-pub fn generate_mutated_input(rng: &mut ThreadRng, input: &mut Input, symbols: &[Text]) {
+pub fn generate_mutated_input<'h>(
+    rng: &mut ThreadRng,
+    input: &mut Input<'h>,
+    symbols: &[Text<'h>],
+) {
     let mut heap = input.heap.borrow_mut();
     let num_args = input.arguments.len();
     let argument = input.arguments.get_mut(rng.gen_range(0..num_args)).unwrap();
     *argument = generate_mutated_value(rng, &mut heap, *argument, symbols);
 }
-fn generate_mutated_value(
+fn generate_mutated_value<'h>(
     rng: &mut ThreadRng,
-    heap: &mut Heap,
-    object: InlineObject,
-    symbols: &[Text],
-) -> InlineObject {
+    heap: &mut Heap<'h>,
+    object: InlineObject<'h>,
+    symbols: &[Text<'h>],
+) -> InlineObject<'h> {
     if rng.gen_bool(0.1) {
         return generate_value_with_complexity(heap, rng, 100.0, symbols);
     }
@@ -126,7 +134,7 @@ fn generate_mutated_value(
         }
     }
 }
-fn mutate_string(rng: &mut ThreadRng, heap: &mut Heap, mut string: String) -> Text {
+fn mutate_string<'h>(rng: &mut ThreadRng, heap: &mut Heap<'h>, mut string: String) -> Text<'h> {
     if rng.gen_bool(0.5) && !string.is_empty() {
         let start = string.floor_char_boundary(rng.gen_range(0..=string.len()));
         let end = string.floor_char_boundary(start + rng.gen_range(0..=(string.len() - start)));

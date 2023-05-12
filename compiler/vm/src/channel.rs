@@ -47,7 +47,7 @@ pub struct Packet<'h> {
     pub heap: Heap<'h>,
     pub object: InlineObject<'h>,
 }
-impl Clone for Packet {
+impl Clone for Packet<'_> {
     fn clone(&self) -> Self {
         let (heap, mapping) = self.heap.clone();
         let object = match HeapObject::try_from(self.object) {
@@ -57,7 +57,7 @@ impl Clone for Packet {
         Self { heap, object }
     }
 }
-impl From<InlineObject> for Packet {
+impl From<InlineObject<'_>> for Packet<'_> {
     fn from(object: InlineObject) -> Self {
         let mut heap = Heap::default();
         let object = object.clone_to_heap(&mut heap);
@@ -110,9 +110,9 @@ pub enum Performer {
     External(OperationId),
 }
 
-pub trait Completer {
+pub trait Completer<'h> {
     fn complete_send(&mut self, performer: Performer);
-    fn complete_receive(&mut self, performer: Performer, received: Packet);
+    fn complete_receive(&mut self, performer: Performer, received: Packet<'h>);
 }
 
 impl<'h> Channel<'h> {
@@ -126,7 +126,7 @@ impl<'h> Channel<'h> {
 
     pub fn send(
         &mut self,
-        completer: &mut dyn Completer,
+        completer: &mut dyn Completer<'h>,
         performer: Performer,
         packet: Packet<'h>,
     ) {
@@ -134,12 +134,12 @@ impl<'h> Channel<'h> {
         self.work_on_pending_operations(completer);
     }
 
-    pub fn receive(&mut self, completer: &mut dyn Completer, performer: Performer) {
+    pub fn receive(&mut self, completer: &mut dyn Completer<'h>, performer: Performer) {
         self.pending_receives.push_back(performer);
         self.work_on_pending_operations(completer);
     }
 
-    fn work_on_pending_operations(&mut self, completer: &mut dyn Completer) {
+    fn work_on_pending_operations(&mut self, completer: &mut dyn Completer<'h>) {
         if self.buffer.capacity == 0 {
             while !self.pending_sends.is_empty() && !self.pending_receives.is_empty() {
                 let (sender, packet) = self.pending_sends.pop_front().unwrap();

@@ -16,7 +16,7 @@ use std::str::{self, FromStr};
 use tracing::{info, span, Level};
 use unicode_segmentation::UnicodeSegmentation;
 
-impl<'h, FT: FiberTracer> Fiber<'h, FT> {
+impl<'c, 'h, FT: FiberTracer<'h>> Fiber<'c, 'h, FT> {
     pub(super) fn run_builtin_function(
         &mut self,
         builtin_function: BuiltinFunction,
@@ -175,7 +175,7 @@ macro_rules! unpack_and_later_drop {
 }
 
 impl<'h> Heap<'h> {
-    fn channel_create(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn channel_create(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |capacity: Int| {
             match capacity.try_get() {
                 Some(capacity) => CreateChannel { capacity },
@@ -184,7 +184,7 @@ impl<'h> Heap<'h> {
         })
     }
 
-    fn channel_send(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn channel_send(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |port: SendPort, packet: Any| {
             let mut heap = Heap::default();
             let object = packet.object.clone_to_heap(&mut heap);
@@ -195,7 +195,7 @@ impl<'h> Heap<'h> {
         })
     }
 
-    fn channel_receive(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn channel_receive(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |port: ReceivePort| {
             Receive {
                 channel: port.channel_id(),
@@ -203,13 +203,17 @@ impl<'h> Heap<'h> {
         })
     }
 
-    fn equals(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn equals(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |a: Any, b: Any| {
             Return(Tag::create_bool(self, **a == **b).into())
         })
     }
 
-    fn function_run(&mut self, args: &[InlineObject], responsible: HirId) -> BuiltinResult<'h> {
+    fn function_run(
+        &mut self,
+        args: &[InlineObject<'h>],
+        responsible: HirId<'h>,
+    ) -> BuiltinResult<'h> {
         unpack!(self, args, |function: Function| {
             function.should_take_no_arguments()?;
             DivergeControlFlow {
@@ -219,13 +223,13 @@ impl<'h> Heap<'h> {
         })
     }
 
-    fn get_argument_count(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn get_argument_count(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |function: Function| {
             Return(Int::create(self, function.argument_count()).into())
         })
     }
 
-    fn if_else(&mut self, args: &[InlineObject], responsible: HirId) -> BuiltinResult<'h> {
+    fn if_else(&mut self, args: &[InlineObject<'h>], responsible: HirId<'h>) -> BuiltinResult<'h> {
         unpack!(self, args, |condition: bool,
                              then: Function,
                              else_: Function| {
@@ -245,35 +249,35 @@ impl<'h> Heap<'h> {
         })
     }
 
-    fn int_add(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn int_add(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |a: Int, b: Int| {
             Return(a.add(self, &b).into())
         })
     }
-    fn int_bit_length(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn int_bit_length(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |a: Int| { Return(a.bit_length(self).into()) })
     }
-    fn int_bitwise_and(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn int_bitwise_and(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |a: Int, b: Int| {
             Return(a.bitwise_and(self, &b).into())
         })
     }
-    fn int_bitwise_or(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn int_bitwise_or(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |a: Int, b: Int| {
             Return(a.bitwise_or(self, &b).into())
         })
     }
-    fn int_bitwise_xor(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn int_bitwise_xor(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |a: Int, b: Int| {
             Return(a.bitwise_xor(self, &b).into())
         })
     }
-    fn int_compare_to(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn int_compare_to(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |a: Int, b: Int| {
             Return(a.compare_to(self, &b).into())
         })
     }
-    fn int_divide_truncating(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn int_divide_truncating(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
             if divisor.try_get::<u8>() == 0.into() {
                 return Err("Can't divide by zero.".to_string());
@@ -281,7 +285,7 @@ impl<'h> Heap<'h> {
             Return(dividend.int_divide_truncating(self, &divisor).into())
         })
     }
-    fn int_modulo(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn int_modulo(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
             if divisor.try_get::<u8>() == 0.into() {
                 return Err("Can't divide by zero.".to_string());
@@ -289,12 +293,12 @@ impl<'h> Heap<'h> {
             Return(dividend.modulo(self, &divisor).into())
         })
     }
-    fn int_multiply(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn int_multiply(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |factor_a: Int, factor_b: Int| {
             Return(factor_a.multiply(self, &factor_b).into())
         })
     }
-    fn int_parse(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn int_parse(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |text: Text| {
             let result = match BigInt::from_str(text.get()) {
                 Ok(int) => Ok(Int::create_from_bigint(self, int).into()),
@@ -303,7 +307,7 @@ impl<'h> Heap<'h> {
             Return(Struct::create_result(self, result).into())
         })
     }
-    fn int_remainder(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn int_remainder(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
             if divisor.try_get::<u8>() == 0.into() {
                 return Err("Can't divide by zero.".to_string());
@@ -311,23 +315,23 @@ impl<'h> Heap<'h> {
             Return(dividend.remainder(self, &divisor).into())
         })
     }
-    fn int_shift_left(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn int_shift_left(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |value: Int, amount: Int| {
             Return(value.shift_left(self, &amount).into())
         })
     }
-    fn int_shift_right(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn int_shift_right(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |value: Int, amount: Int| {
             Return(value.shift_right(self, &amount).into())
         })
     }
-    fn int_subtract(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn int_subtract(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |minuend: Int, subtrahend: Int| {
             Return(minuend.subtract(self, &subtrahend).into())
         })
     }
 
-    fn list_filled(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn list_filled(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack!(self, args, |length: Int, item: Any| {
             let length_usize = length.try_get().unwrap();
             length.object.drop(self);
@@ -342,7 +346,7 @@ impl<'h> Heap<'h> {
             Return(List::create(self, &vec![item_object; length_usize]).into())
         })
     }
-    fn list_get(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn list_get(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |list: List, index: Int| {
             let index = index.try_get().unwrap();
             let item = list.get(index);
@@ -350,7 +354,7 @@ impl<'h> Heap<'h> {
             Return(item)
         })
     }
-    fn list_insert(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn list_insert(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack!(self, args, |list: List, index: Int, item: Any| {
             let index_usize = index.try_get().unwrap();
             index.object.drop(self);
@@ -360,17 +364,17 @@ impl<'h> Heap<'h> {
             Return(new_list)
         })
     }
-    fn list_length(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn list_length(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |list: List| {
             Return(Int::create(self, list.len()).into())
         })
     }
-    fn list_remove_at(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn list_remove_at(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |list: List, index: Int| {
             Return(list.remove(self, index.try_get().unwrap()).into())
         })
     }
-    fn list_replace(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn list_replace(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack!(self, args, |list: List, index: Int, new_item: Any| {
             let index_usize = index.try_get().unwrap();
             index.object.drop(self);
@@ -383,7 +387,7 @@ impl<'h> Heap<'h> {
         })
     }
 
-    fn parallel(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn parallel(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack!(self, args, |body_taking_nursery: Function| {
             if body_taking_nursery.argument_count() != 1 {
                 return Err("`parallel` expects a function taking a nursery.".to_string());
@@ -394,14 +398,14 @@ impl<'h> Heap<'h> {
         })
     }
 
-    fn print(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn print(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |message: Any| {
             info!("{}", message.object);
             Return(Tag::create_nothing(self).into())
         })
     }
 
-    fn struct_get(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn struct_get(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |struct_: Struct, key: Any| {
             match struct_.get(key.object) {
                 Some(value) => {
@@ -415,18 +419,18 @@ impl<'h> Heap<'h> {
             }
         })
     }
-    fn struct_get_keys(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn struct_get_keys(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |struct_: Struct| {
             Return(List::create(self, struct_.keys()).into())
         })
     }
-    fn struct_has_key(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn struct_has_key(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |struct_: Struct, key: Any| {
             Return(Tag::create_bool(self, struct_.contains(key.object)).into())
         })
     }
 
-    fn tag_get_value(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn tag_get_value(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |tag: Tag| {
             tag.value()
                 .map(|value| {
@@ -436,18 +440,18 @@ impl<'h> Heap<'h> {
                 .ok_or_else(|| "The tag doesn't have a value.".to_string())
         })
     }
-    fn tag_has_value(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn tag_has_value(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |tag: Tag| {
             Return(Tag::create_bool(self, tag.value().is_some()).into())
         })
     }
-    fn tag_without_value(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn tag_without_value(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |tag: Tag| {
             Return(Tag::create(self, tag.symbol(), None).into())
         })
     }
 
-    fn text_characters(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn text_characters(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |text: Text| {
             let characters = text
                 .get()
@@ -457,22 +461,22 @@ impl<'h> Heap<'h> {
             Return(List::create(self, &characters).into())
         })
     }
-    fn text_concatenate(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn text_concatenate(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |text_a: Text, text_b: Text| {
             Return(Text::create(self, &format!("{}{}", text_a.get(), text_b.get())).into())
         })
     }
-    fn text_contains(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn text_contains(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |text: Text, pattern: Text| {
             Return(Tag::create_bool(self, text.get().contains(pattern.get())).into())
         })
     }
-    fn text_ends_with(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn text_ends_with(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |text: Text, suffix: Text| {
             Return(Tag::create_bool(self, text.get().ends_with(suffix.get())).into())
         })
     }
-    fn text_from_utf8(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn text_from_utf8(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |bytes: List| {
             let bytes: Vec<_> = bytes
                 .items()
@@ -490,7 +494,7 @@ impl<'h> Heap<'h> {
             Return(Struct::create_result(self, result).into())
         })
     }
-    fn text_get_range(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn text_get_range(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(
             self,
             args,
@@ -511,45 +515,45 @@ impl<'h> Heap<'h> {
             }
         )
     }
-    fn text_is_empty(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn text_is_empty(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |text: Text| {
             Return(Tag::create_bool(self, text.get().is_empty()).into())
         })
     }
-    fn text_length(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn text_length(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |text: Text| {
             let length = text.get().graphemes(true).count();
             Return(Int::create(self, length).into())
         })
     }
-    fn text_starts_with(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn text_starts_with(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |text: Text, prefix: Text| {
             Return(Tag::create_bool(self, text.get().starts_with(prefix.get())).into())
         })
     }
-    fn text_trim_end(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn text_trim_end(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |text: Text| {
             Return(Text::create(self, text.get().trim_end()).into())
         })
     }
-    fn text_trim_start(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn text_trim_start(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |text: Text| {
             Return(Text::create(self, text.get().trim_start()).into())
         })
     }
 
     #[allow(clippy::wrong_self_convention)]
-    fn to_debug_text(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn to_debug_text(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |value: Any| {
             Return(Text::create(self, &format!("{:?}", **value)).into())
         })
     }
 
-    fn try_(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn try_(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack!(self, args, |body: Function| { Try { body: *body } })
     }
 
-    fn type_of(&mut self, args: &[InlineObject]) -> BuiltinResult<'h> {
+    fn type_of(&mut self, args: &[InlineObject<'h>]) -> BuiltinResult<'h> {
         unpack_and_later_drop!(self, args, |value: Any| {
             let type_name = match **value {
                 Data::Int(_) => "Int",

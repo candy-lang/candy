@@ -16,20 +16,20 @@ use rustc_hash::FxHashSet;
 use std::fmt::{self, Display, Formatter};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-pub struct Lir {
+pub struct Lir<'h> {
     pub module: Module,
-    pub constant_heap: Heap,
-    pub instructions: Vec<Instruction>,
+    pub constant_heap: Heap<'h>,
+    pub instructions: Vec<Instruction<'h>>,
     pub origins: Vec<FxHashSet<hir::Id>>,
-    pub module_function: Function,
-    pub responsible_module: HirId,
+    pub module_function: Function<'h>,
+    pub responsible_module: HirId<'h>,
 }
 
 pub type StackOffset = usize; // 0 is the last item, 1 the one before that, etc.
 
 #[derive(Clone, Debug, EnumDiscriminants, Eq, Hash, IntoStaticStr, PartialEq)]
 #[strum_discriminants(derive(Hash, IntoStaticStr), strum(serialize_all = "camelCase"))]
-pub enum Instruction {
+pub enum Instruction<'h> {
     /// Pops num_items items, pushes a list.
     ///
     /// a, item, item, ..., item -> a, pointer to list
@@ -55,7 +55,7 @@ pub enum Instruction {
 
     /// Pushes a pointer onto the stack. MIR instructions that create
     /// compile-time known values are compiled to this instruction.
-    PushConstant(InlineObject),
+    PushConstant(InlineObject<'h>),
 
     /// Pushes an item from back in the stack on the stack again.
     PushFromStack(StackOffset),
@@ -111,7 +111,7 @@ pub enum Instruction {
     TraceFoundFuzzableFunction,
 }
 
-impl Instruction {
+impl Instruction<'_> {
     /// Applies the instruction's effect on the stack. After calling it, the
     /// stack will be in the same state as when the control flow continues after
     /// this instruction.
@@ -196,7 +196,7 @@ impl StackExt for Vec<Id> {
     }
 }
 
-impl ToRichIr for Lir {
+impl ToRichIr for Lir<'_> {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         builder.push("# Constant heap", TokenType::Comment, EnumSet::empty());
         for constant in self.constant_heap.iter() {
@@ -243,7 +243,7 @@ impl ToRichIr for Lir {
         }
     }
 }
-impl ToRichIr for Instruction {
+impl ToRichIr for Instruction<'_> {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         let discriminant: InstructionDiscriminants = self.into();
         builder.push(
@@ -342,7 +342,7 @@ impl ToRichIr for Instruction {
     }
 }
 
-impl DebugDisplay for Instruction {
+impl DebugDisplay for Instruction<'_> {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         if is_debug {
             write!(f, "{:?}", self)
@@ -351,7 +351,7 @@ impl DebugDisplay for Instruction {
         }
     }
 }
-impl Display for Instruction {
+impl Display for Instruction<'_> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         DebugDisplay::fmt(self, f, false)
     }

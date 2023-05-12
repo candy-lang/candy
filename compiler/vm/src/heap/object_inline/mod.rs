@@ -9,7 +9,7 @@ use crate::{
     channel::ChannelId,
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
-use enum_dispatch::enum_dispatch;
+use derive_more::From;
 use extension_trait::extension_trait;
 use rustc_hash::FxHashMap;
 use std::{
@@ -27,14 +27,14 @@ pub(super) mod port;
 
 #[extension_trait]
 pub impl<'h> InlineObjectSliceCloneToHeap<'h> for [InlineObject<'h>] {
-    fn clone_to_heap(&self, heap: &mut Heap) -> Vec<InlineObject> {
+    fn clone_to_heap<'t>(&self, heap: &mut Heap<'t>) -> Vec<InlineObject<'t>> {
         self.clone_to_heap_with_mapping(heap, &mut FxHashMap::default())
     }
-    fn clone_to_heap_with_mapping(
+    fn clone_to_heap_with_mapping<'t>(
         &self,
-        heap: &mut Heap,
-        address_map: &mut FxHashMap<HeapObject, HeapObject>,
-    ) -> Vec<InlineObject> {
+        heap: &mut Heap<'t>,
+        address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
+    ) -> Vec<InlineObject<'t>> {
         self.iter()
             .map(|&item| item.clone_to_heap_with_mapping(heap, address_map))
             .collect()
@@ -70,10 +70,10 @@ impl<'h> InlineObject<'h> {
     }
 
     // Reference Counting
-    pub fn dup(self, heap: &'h mut Heap) {
+    pub fn dup(self, heap: &mut Heap<'h>) {
         self.dup_by(heap, 1);
     }
-    pub fn dup_by(self, heap: &'h mut Heap, amount: usize) {
+    pub fn dup_by(self, heap: &mut Heap<'h>, amount: usize) {
         if let Some(channel) = InlineData::from(self).channel_id() {
             heap.dup_channel_by(channel, amount);
         };
@@ -82,7 +82,7 @@ impl<'h> InlineObject<'h> {
             it.dup_by(amount)
         }
     }
-    pub fn drop(self, heap: &'h mut Heap) {
+    pub fn drop(self, heap: &mut Heap<'h>) {
         if let Some(channel) = InlineData::from(self).channel_id() {
             heap.drop_channel(channel);
         };
@@ -93,14 +93,14 @@ impl<'h> InlineObject<'h> {
     }
 
     // Cloning
-    pub fn clone_to_heap(self, heap: &mut Heap) -> Self {
+    pub fn clone_to_heap<'t>(self, heap: &mut Heap<'t>) -> InlineObject<'t> {
         self.clone_to_heap_with_mapping(heap, &mut FxHashMap::default())
     }
-    pub fn clone_to_heap_with_mapping(
+    pub fn clone_to_heap_with_mapping<'t>(
         self,
-        heap: &mut Heap,
-        address_map: &mut FxHashMap<HeapObject, HeapObject>,
-    ) -> Self {
+        heap: &mut Heap<'t>,
+        address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
+    ) -> InlineObject<'t> {
         *InlineData::from(self).clone_to_heap_with_mapping(heap, address_map)
     }
 }
@@ -127,7 +127,7 @@ impl Hash for InlineObject<'_> {
 impl<'h> TryFrom<InlineObject<'h>> for HeapObject<'h> {
     type Error = ();
 
-    fn try_from(object: InlineObject) -> Result<Self, Self::Error> {
+    fn try_from(object: InlineObject<'h>) -> Result<Self, Self::Error> {
         match InlineData::from(object) {
             InlineData::Pointer(value) => Ok(value.get()),
             _ => Err(()),
@@ -135,17 +135,17 @@ impl<'h> TryFrom<InlineObject<'h>> for HeapObject<'h> {
     }
 }
 
-#[enum_dispatch]
 pub trait InlineObjectTrait<'h>: Copy + DebugDisplay + Eq + Hash {
+    type Clone<'t>: InlineObjectTrait<'t>;
+
     fn clone_to_heap_with_mapping<'t>(
         self,
-        heap: &'t mut Heap,
+        heap: &mut Heap<'t>,
         address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
-    ) -> Self;
+    ) -> Self::Clone<'t>;
 }
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
-#[enum_dispatch(InlineObjectTrait)]
+#[derive(Clone, Copy, Eq, From, Hash, PartialEq)]
 pub enum InlineData<'h> {
     Pointer(InlinePointer<'h>),
     Int(InlineInt<'h>),
@@ -164,7 +164,7 @@ impl InlineData<'_> {
 }
 
 impl<'h> From<InlineObject<'h>> for InlineData<'h> {
-    fn from(object: InlineObject) -> Self {
+    fn from(object: InlineObject<'h>) -> Self {
         let value = object.value.get();
         match value & InlineObject::KIND_MASK {
             InlineObject::KIND_POINTER => {
@@ -210,6 +210,32 @@ impl<'h> Deref for InlineData<'h> {
             InlineData::SendPort(value) => value,
             InlineData::ReceivePort(value) => value,
             InlineData::Builtin(value) => value,
+        }
+    }
+}
+
+impl<'h> InlineObjectTrait<'h> for InlineData<'h> {
+    type Clone<'t> = InlineData<'t>;
+
+    fn clone_to_heap_with_mapping<'t>(
+        self,
+        heap: &mut Heap<'t>,
+        address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
+    ) -> Self::Clone<'t> {
+        match self {
+            InlineData::Pointer(pointer) => {
+                pointer.clone_to_heap_with_mapping(heap, address_map).into()
+            }
+            InlineData::Int(int) => int.clone_to_heap_with_mapping(heap, address_map).into(),
+            InlineData::SendPort(send_port) => send_port
+                .clone_to_heap_with_mapping(heap, address_map)
+                .into(),
+            InlineData::ReceivePort(receive_port) => receive_port
+                .clone_to_heap_with_mapping(heap, address_map)
+                .into(),
+            InlineData::Builtin(builtin) => {
+                builtin.clone_to_heap_with_mapping(heap, address_map).into()
+            }
         }
     }
 }

@@ -19,11 +19,11 @@ use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 
-pub fn compile_lir<Db>(
+pub fn compile_lir<'c, Db>(
     db: &Db,
     module: Module,
     tracing: TracingConfig,
-) -> (Lir, Arc<FxHashSet<CompilerError>>)
+) -> (Lir<'c>, Arc<FxHashSet<CompilerError>>)
 where
     Db: CstDb + OptimizeMir,
 {
@@ -73,9 +73,9 @@ where
     (lir, errors)
 }
 
-fn compile_function(
-    lir: &mut Lir,
-    constants: &mut FxHashMap<Id, InlineObject>,
+fn compile_function<'c>(
+    lir: &mut Lir<'c>,
+    constants: &mut FxHashMap<Id, InlineObject<'c>>,
     original_hirs: FxHashSet<hir::Id>,
     captured: &FxHashSet<Id>,
     parameters: &[Id],
@@ -132,13 +132,13 @@ fn compile_function(
     start
 }
 
-struct LoweringContext<'c> {
-    lir: &'c mut Lir,
-    constants: &'c mut FxHashMap<Id, InlineObject>,
+struct LoweringContext<'a, 'c> {
+    lir: &'a mut Lir<'c>,
+    constants: &'a mut FxHashMap<Id, InlineObject<'c>>,
     stack: Vec<Id>,
-    instructions: Vec<Instruction>,
+    instructions: Vec<Instruction<'c>>,
 }
-impl<'c> LoweringContext<'c> {
+impl<'c> LoweringContext<'_, 'c> {
     fn compile_expression(&mut self, id: Id, expression: &Expression) {
         match expression {
             Expression::Int(int) => {
@@ -343,7 +343,7 @@ impl<'c> LoweringContext<'c> {
             self.emit(id, Instruction::PushFromStack(offset));
         }
     }
-    fn emit(&mut self, id: Id, instruction: Instruction) {
+    fn emit(&mut self, id: Id, instruction: Instruction<'c>) {
         instruction.apply_to_stack(&mut self.stack, id);
         self.instructions.push(instruction);
     }

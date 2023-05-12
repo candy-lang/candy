@@ -18,7 +18,10 @@ use candy_frontend::{
 use derive_more::{Deref, From};
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
-use std::fmt::{self, Debug};
+use std::{
+    fmt::{self, Debug},
+    marker::PhantomData,
+};
 use tracing::trace;
 
 const TRACE: bool = false;
@@ -41,17 +44,18 @@ impl Debug for FiberId {
 
 /// A fiber represents an execution thread of a program. It's a stack-based
 /// machine that runs instructions from a LIR. Fibers are owned by a `Vm`.
-pub struct Fiber<'h, T: FiberTracer> {
+pub struct Fiber<'c, 'h, T: FiberTracer<'h>> {
     pub status: Status<'h>,
-    next_instruction: Option<InstructionPointer<'h>>,
+    next_instruction: Option<InstructionPointer>,
     pub data_stack: Vec<InlineObject<'h>>,
-    pub call_stack: Vec<InstructionPointer<'h>>,
+    pub call_stack: Vec<InstructionPointer>,
     pub heap: Heap<'h>,
 
     // TODO: Remove this as soon as refcounting can be optional for objects.
     // Then, refcounting for all constant objects could be made optional and
     // they could really be shared among all fibers.
-    constant_mapping: FxHashMap<HeapObject<'h>, HeapObject<'h>>,
+    constant_mapping: FxHashMap<HeapObject<'c>, HeapObject<'h>>,
+    phantom: PhantomData<&'c ()>,
 
     pub tracer: T,
 }
@@ -95,9 +99,10 @@ impl Debug for InstructionPointer {
     }
 }
 
-pub struct ExecutionEnded<'h, T: FiberTracer> {
+pub struct ExecutionEnded<'c, 'h, T: FiberTracer<'h>> {
     pub heap: Heap<'h>,
-    pub constant_mapping: FxHashMap<HeapObject<'h>, HeapObject<'h>>,
+    pub constant_mapping: FxHashMap<HeapObject<'c>, HeapObject<'h>>,
+    phantom: PhantomData<&'c ()>,
     tracer: T,
     pub reason: ExecutionEndedReason<'h>,
 }
@@ -125,10 +130,10 @@ impl Panic {
     }
 }
 
-impl<'h, T: FiberTracer> Fiber<'h, T> {
+impl<'c, 'h, T: FiberTracer<'h>> Fiber<'c, 'h, T> {
     fn new_with_heap(
-        heap: Heap,
-        constant_mapping: FxHashMap<HeapObject, HeapObject>,
+        heap: Heap<'h>,
+        constant_mapping: FxHashMap<HeapObject<'c>, HeapObject<'h>>,
         tracer: T,
     ) -> Self {
         Self {
@@ -138,12 +143,13 @@ impl<'h, T: FiberTracer> Fiber<'h, T> {
             call_stack: vec![],
             heap,
             constant_mapping,
+            phantom: PhantomData,
             tracer,
         }
     }
     pub fn for_function(
         heap: Heap<'h>,
-        constant_mapping: FxHashMap<HeapObject<'h>, HeapObject<'h>>,
+        constant_mapping: FxHashMap<HeapObject<'c>, HeapObject<'h>>,
         function: Function<'h>,
         arguments: &[InlineObject<'h>],
         responsible: HirId<'h>,
@@ -167,10 +173,10 @@ impl<'h, T: FiberTracer> Fiber<'h, T> {
         fiber
     }
     pub fn for_module_function(
-        mut heap: Heap,
-        constant_mapping: FxHashMap<HeapObject, HeapObject>,
+        mut heap: Heap<'h>,
+        constant_mapping: FxHashMap<HeapObject<'c>, HeapObject<'h>>,
         module: Module,
-        function: Function,
+        function: Function<'h>,
         tracer: T,
     ) -> Self {
         assert_eq!(
@@ -187,7 +193,7 @@ impl<'h, T: FiberTracer> Fiber<'h, T> {
         Self::for_function(heap, constant_mapping, function, &[], responsible, tracer)
     }
 
-    pub fn tear_down(mut self) -> ExecutionEnded<'h, T> {
+    pub fn tear_down(mut self) -> ExecutionEnded<'c, 'h, T> {
         let reason = match self.status {
             Status::Done => ExecutionEndedReason::Finished(self.pop_from_data_stack()),
             Status::Panicked(panic) => ExecutionEndedReason::Panicked(panic),
@@ -196,11 +202,12 @@ impl<'h, T: FiberTracer> Fiber<'h, T> {
         ExecutionEnded {
             heap: self.heap,
             constant_mapping: self.constant_mapping,
+            phantom: PhantomData,
             tracer: self.tracer,
             reason,
         }
     }
-    pub fn adopt_finished_child(&mut self, child_id: FiberId, ended: ExecutionEnded<T>) {
+    pub fn adopt_finished_child(&mut self, child_id: FiberId, ended: ExecutionEnded<'c, 'h, T>) {
         self.heap.adopt(ended.heap);
         let reason = match ended.reason {
             ExecutionEndedReason::Finished(return_value) => {
@@ -250,7 +257,7 @@ impl<'h, T: FiberTracer> Fiber<'h, T> {
         self.push_to_data_stack(object);
         self.status = Status::Running;
     }
-    pub fn complete_parallel_scope(&mut self, result: Result<InlineObject, Panic>) {
+    pub fn complete_parallel_scope(&mut self, result: Result<InlineObject<'h>, Panic>) {
         assert!(matches!(self.status, Status::InParallelScope { .. }));
 
         match result {
@@ -261,7 +268,7 @@ impl<'h, T: FiberTracer> Fiber<'h, T> {
             Err(panic) => self.panic(panic),
         }
     }
-    pub fn complete_try(&mut self, ended_reason: &ExecutionEndedReason) {
+    pub fn complete_try(&mut self, ended_reason: &ExecutionEndedReason<'h>) {
         assert!(matches!(self.status, Status::InTry { .. }));
 
         let result = match ended_reason {
@@ -275,7 +282,7 @@ impl<'h, T: FiberTracer> Fiber<'h, T> {
         self.status = Status::Running;
     }
 
-    fn get_from_data_stack(&self, offset: usize) -> InlineObject {
+    fn get_from_data_stack(&self, offset: usize) -> InlineObject<'h> {
         self.data_stack[self.data_stack.len() - 1 - offset]
     }
     #[allow(unused_parens)]
@@ -292,7 +299,7 @@ impl<'h, T: FiberTracer> Fiber<'h, T> {
         self.status = Status::Panicked(panic);
     }
 
-    pub fn run(&mut self, lir: &Lir, execution_controller: &mut dyn ExecutionController) {
+    pub fn run(&mut self, lir: &Lir<'c>, execution_controller: &mut dyn ExecutionController) {
         assert!(
             matches!(self.status, Status::Running),
             "Called Fiber::run on a fiber that is not ready to run."
@@ -320,7 +327,7 @@ impl<'h, T: FiberTracer> Fiber<'h, T> {
             execution_controller.instruction_executed();
         }
     }
-    pub fn run_instruction(&mut self, instruction: Instruction) {
+    pub fn run_instruction(&mut self, instruction: Instruction<'c>) {
         if TRACE {
             trace!("Running instruction: {instruction:?}");
             let next_instruction = self.next_instruction.unwrap();
@@ -389,7 +396,7 @@ impl<'h, T: FiberTracer> Fiber<'h, T> {
             Instruction::PushConstant(constant) => {
                 let constant = match HeapObject::try_from(constant) {
                     Ok(heap_object) => self.constant_mapping[&heap_object].into(),
-                    Err(_) => constant,
+                    Err(_) => InlineObject::new(constant.raw_word()),
                 };
                 constant.dup(&mut self.heap);
                 self.push_to_data_stack(constant);
@@ -493,7 +500,12 @@ impl<'h, T: FiberTracer> Fiber<'h, T> {
         }
     }
 
-    pub fn call(&mut self, callee: InlineObject, arguments: &[InlineObject], responsible: HirId) {
+    pub fn call(
+        &mut self,
+        callee: InlineObject<'h>,
+        arguments: &[InlineObject<'h>],
+        responsible: HirId<'h>,
+    ) {
         match callee.into() {
             Data::Function(function) => self.call_function(function, arguments, responsible),
             Data::Builtin(builtin) => {
@@ -535,9 +547,9 @@ impl<'h, T: FiberTracer> Fiber<'h, T> {
     }
     pub fn call_function(
         &mut self,
-        function: Function,
-        arguments: &[InlineObject],
-        responsible: HirId,
+        function: Function<'h>,
+        arguments: &[InlineObject<'h>],
+        responsible: HirId<'h>,
     ) {
         let expected_num_args = function.argument_count();
         if arguments.len() != expected_num_args {
@@ -564,10 +576,10 @@ impl<'h, T: FiberTracer> Fiber<'h, T> {
         self.next_instruction = Some(function.body());
     }
 
-    fn push_to_data_stack(&mut self, value: impl Into<InlineObject>) {
+    fn push_to_data_stack(&mut self, value: impl Into<InlineObject<'h>>) {
         self.data_stack.push(value.into());
     }
-    fn pop_from_data_stack(&mut self) -> InlineObject {
+    fn pop_from_data_stack(&mut self) -> InlineObject<'h> {
         self.data_stack.pop().expect("Data stack is empty.")
     }
 }

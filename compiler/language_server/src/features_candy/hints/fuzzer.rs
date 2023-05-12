@@ -20,15 +20,15 @@ use super::Hint;
 use rustc_hash::FxHashMap;
 
 #[derive(Default)]
-pub struct FuzzerManager {
-    fuzzers: FxHashMap<Module, FxHashMap<Id, Fuzzer>>,
+pub struct FuzzerManager<'i, 'c: 'h, 'h> {
+    fuzzers: FxHashMap<Module, FxHashMap<Id, Fuzzer<'i, 'c, 'h>>>,
 }
 
-impl FuzzerManager {
+impl<'i, 'c: 'h, 'h> FuzzerManager<'i, 'c, 'h> {
     pub fn update_module(
         &mut self,
         module: Module,
-        lir: Arc<Lir>,
+        lir: Arc<Lir<'c>>,
         fuzzable_functions: &FxHashMap<Id, Function>,
     ) {
         let fuzzers = fuzzable_functions

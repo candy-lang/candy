@@ -34,7 +34,7 @@ impl_debug_display_via_debugdisplay!(InlinePointer<'_>);
 impl_eq_hash_via_get!(InlinePointer<'_>);
 
 impl<'h> From<HeapObject<'h>> for InlinePointer<'h> {
-    fn from(value: HeapObject) -> Self {
+    fn from(value: HeapObject<'h>) -> Self {
         Self(value.into())
     }
 }
@@ -48,11 +48,13 @@ impl<'h> From<HeapObject<'h>> for InlineObject<'h> {
 }
 
 impl<'h> InlineObjectTrait<'h> for InlinePointer<'h> {
+    type Clone<'t> = InlinePointer<'t>;
+
     fn clone_to_heap_with_mapping<'t>(
         self,
-        heap: &'t mut Heap,
+        heap: &mut Heap<'t>,
         address_map: &mut FxHashMap<HeapObject<'h>, HeapObject<'t>>,
-    ) -> Self {
+    ) -> Self::Clone<'t> {
         self.get()
             .clone_to_heap_with_mapping(heap, address_map)
             .into()
