@@ -7,7 +7,6 @@ use itertools::Itertools;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{cell::RefCell, rc::Rc};
-use tracing::info;
 
 pub type Score = f64;
 

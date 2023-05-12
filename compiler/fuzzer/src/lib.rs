@@ -72,7 +72,7 @@ where
                     panic,
                     tracer,
                 };
-                case.dump(db);
+                // case.dump(db);
                 failing_cases.push(case);
             }
         }

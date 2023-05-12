@@ -37,11 +37,11 @@ pub(crate) fn fuzz(options: Options) -> ProgramResult {
     } else {
         error!("");
         error!("Finished fuzzing.");
-        error!("These are the failing cases:");
-        for case in failing_cases {
-            error!("");
-            case.dump(&db);
-        }
+        // error!("These are the failing cases:");
+        // for case in failing_cases {
+        //     error!("");
+        //     case.dump(&db);
+        // }
         Err(Exit::FuzzingFoundFailingCases)
     }
 }

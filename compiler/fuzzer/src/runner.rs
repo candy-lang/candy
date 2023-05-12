@@ -12,7 +12,6 @@ use candy_vm::{
 use super::input::Input;
 use rustc_hash::FxHashMap;
 use std::borrow::Borrow;
-use tracing::info;
 
 const MAX_INSTRUCTIONS: usize = 10000;
 
@@ -89,8 +88,6 @@ impl<L: Borrow<Lir>> Runner<L> {
     }
 
     pub fn run(&mut self, execution_controller: &mut impl ExecutionController) {
-        info!("Running with input {}", self.input);
-        let input_before = format!("{}", self.input);
         assert!(self.vm.is_some());
         assert!(self.result.is_none());
 
@@ -129,11 +126,9 @@ impl<L: Borrow<Lir>> Runner<L> {
                     reason: panic.reason,
                 }
             } else {
+                self.vm.take().unwrap().tear_down(&mut self.tracer);
                 RunResult::Panicked(panic)
             }),
         };
-        info!("Ran with input {}", self.input);
-        let input_after = format!("{}", self.input);
-        assert_eq!(input_before, input_after);
     }
 }

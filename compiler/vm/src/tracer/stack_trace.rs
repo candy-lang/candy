@@ -57,6 +57,7 @@ impl Tracer for StackTracer {
         assert!(self.panic_chain.is_none());
 
         let TracedFiberEndedReason::Panicked(panic) = ended.reason else { return; };
+        ended.tracer.dup_all_stored_objects(ended.heap);
         self.panic_chain = Some(ended.tracer.take_panic_call_stack(panic.panicked_child));
         ended.tracer.drop(ended.heap);
     }
