@@ -1,7 +1,7 @@
 use super::{utils::heap_object_impls, HeapObjectTrait};
 use crate::{
     heap::{object_heap::HeapObject, object_inline::int::InlineInt, Heap, Int, Tag},
-    utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_via_get, DebugDisplay},
+    utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_ord_via_get, DebugDisplay},
 };
 use derive_more::Deref;
 use num_bigint::BigInt;
@@ -87,7 +87,7 @@ impl DebugDisplay for HeapInt<'_> {
 }
 impl_debug_display_via_debugdisplay!(HeapInt<'_>);
 
-impl_eq_hash_via_get!(HeapInt<'_>);
+impl_eq_hash_ord_via_get!(HeapInt<'_>);
 
 heap_object_impls!(HeapInt<'h>);
 

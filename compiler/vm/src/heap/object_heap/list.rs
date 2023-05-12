@@ -7,6 +7,7 @@ use derive_more::Deref;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use std::{
+    cmp::Ordering,
     fmt::{self, Formatter},
     hash::{Hash, Hasher},
     num::NonZeroU64,
@@ -142,7 +143,18 @@ impl Hash for HeapList<'_> {
     }
 }
 
-heap_object_impls!(HeapList<'h>);
+impl Ord for HeapList<'_> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.items().cmp(other.items())
+    }
+}
+impl PartialOrd for HeapList<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+heap_object_impls!(HeapList<'_>);
 
 impl<'h> HeapObjectTrait<'h> for HeapList<'h> {
     fn content_size(self) -> usize {

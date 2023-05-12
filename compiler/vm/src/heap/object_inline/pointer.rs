@@ -1,7 +1,7 @@
 use super::{InlineObject, InlineObjectTrait};
 use crate::{
     heap::{object_heap::HeapObject, Heap},
-    utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_via_get, DebugDisplay},
+    utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_ord_via_get, DebugDisplay},
 };
 use derive_more::Deref;
 use rustc_hash::FxHashMap;
@@ -31,7 +31,7 @@ impl DebugDisplay for InlinePointer<'_> {
 }
 impl_debug_display_via_debugdisplay!(InlinePointer<'_>);
 
-impl_eq_hash_via_get!(InlinePointer<'_>);
+impl_eq_hash_ord_via_get!(InlinePointer<'_>);
 
 impl<'h> From<HeapObject<'h>> for InlinePointer<'h> {
     fn from(value: HeapObject<'h>) -> Self {

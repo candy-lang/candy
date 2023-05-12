@@ -27,8 +27,10 @@ use std::{
     hash::Hash,
     ops::{Shl, Shr},
 };
+use strum::{EnumDiscriminants, IntoStaticStr};
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, EnumDiscriminants, Eq, Hash, IntoStaticStr, Ord, PartialEq, PartialOrd)]
+#[strum_discriminants(derive(IntoStaticStr))]
 pub enum Data<'h> {
     Int(Int<'h>),
     Tag(Tag<'h>),
@@ -96,7 +98,7 @@ impl_debug_display_via_debugdisplay!(Data<'_>);
 
 // Int
 
-#[derive(Clone, Copy, Eq, From, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Int<'h> {
     Inline(InlineInt<'h>),
     Heap(HeapInt<'h>),
@@ -246,7 +248,7 @@ impl_try_from_heap_object!(Int, "Expected an int.");
 
 // Tag
 
-#[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
+#[derive(Clone, Copy, Deref, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Tag<'h>(HeapTag<'h>);
 
 impl<'h> Tag<'h> {
@@ -311,7 +313,7 @@ impl TryFrom<Data<'_>> for bool {
 
 // Text
 
-#[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
+#[derive(Clone, Copy, Deref, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Text<'h>(HeapText<'h>);
 
 impl<'h> Text<'h> {
@@ -326,7 +328,7 @@ impl_try_from_heap_object!(Text, "Expected a text.");
 
 // List
 
-#[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
+#[derive(Clone, Copy, Deref, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
 pub struct List<'h>(HeapList<'h>);
 
 impl<'h> List<'h> {
@@ -341,14 +343,10 @@ impl_try_from_heap_object!(List, "Expected a list.");
 
 // Struct
 
-#[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
+#[derive(Clone, Copy, Deref, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Struct<'h>(HeapStruct<'h>);
-
 impl<'h> Struct<'h> {
-    pub fn create(
-        heap: &mut Heap<'h>,
-        fields: &FxHashMap<InlineObject<'h>, InlineObject<'h>>,
-    ) -> Self {
+    pub fn create(heap: &mut Heap<'h>) -> Self {
         HeapStruct::create(heap, fields).into()
     }
     pub fn create_with_symbol_keys(
@@ -384,7 +382,7 @@ impl_try_from_heap_object!(Struct, "Expected a struct.");
 
 // Function
 
-#[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
+#[derive(Clone, Copy, Deref, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Function<'h>(HeapFunction<'h>);
 
 impl<'h> Function<'h> {
@@ -404,7 +402,7 @@ impl_try_from_heap_object!(Function, "Expected a function.");
 
 // HIR ID
 
-#[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
+#[derive(Clone, Copy, Deref, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
 
 pub struct HirId<'h>(HeapHirId<'h>);
 
@@ -420,7 +418,7 @@ impl_try_from_heap_object!(HirId, "Expected a HIR ID.");
 
 // Builtin
 
-#[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
+#[derive(Clone, Copy, Deref, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Builtin<'h>(InlineBuiltin<'h>);
 
 impl Builtin<'_> {
@@ -433,7 +431,7 @@ impls_via_0!(Builtin<'h>);
 
 // Send Port
 
-#[derive(Clone, Copy, Deref, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Deref, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SendPort<'h>(InlineSendPort<'h>);
 
 impl<'h> SendPort<'h> {
@@ -447,7 +445,7 @@ impl_try_froms!(SendPort, "Expected a send port.");
 
 // Receive Port
 
-#[derive(Clone, Copy, Deref, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Deref, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ReceivePort<'h>(InlineReceivePort<'h>);
 
 impl<'h> ReceivePort<'h> {

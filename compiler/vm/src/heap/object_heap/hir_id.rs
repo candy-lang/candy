@@ -1,7 +1,7 @@
 use super::{utils::heap_object_impls, HeapObjectTrait};
 use crate::{
     heap::{object_heap::HeapObject, Heap},
-    utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_via_get, DebugDisplay},
+    utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_ord_via_get, DebugDisplay},
 };
 use candy_frontend::hir::Id;
 use derive_more::Deref;
@@ -40,7 +40,7 @@ impl DebugDisplay for HeapHirId<'_> {
 }
 impl_debug_display_via_debugdisplay!(HeapHirId<'_>);
 
-impl_eq_hash_via_get!(HeapHirId<'_>);
+impl_eq_hash_ord_via_get!(HeapHirId<'_>);
 
 heap_object_impls!(HeapHirId<'h>);
 

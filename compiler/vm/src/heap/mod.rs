@@ -1,5 +1,8 @@
 pub use self::{
-    object::{Builtin, Data, Function, HirId, Int, List, ReceivePort, SendPort, Struct, Tag, Text},
+    object::{
+        Builtin, Data, DataDiscriminants, Function, HirId, Int, List, ReceivePort, SendPort,
+        Struct, Tag, Text,
+    },
     object_heap::{HeapData, HeapObject, HeapObjectTrait},
     object_inline::{
         int::I64BitLength, InlineData, InlineObject, InlineObjectSliceCloneToHeap,
@@ -95,6 +98,9 @@ impl<'h> Heap<'h> {
         }
     }
 
+    pub fn objects_len(&self) -> usize {
+        self.objects.len()
+    }
     pub fn iter(&self) -> impl Iterator<Item = HeapObject<'h>> + '_ {
         self.objects.iter().map(|it| **it)
     }
@@ -176,7 +182,7 @@ impl Drop for Heap<'_> {
 /// For tracking objects allocated in the heap, we don't want deep equality, but
 /// only care about the addresses.
 #[derive(Clone, Copy, DebugCustom, Deref, Pointer)]
-struct ObjectInHeap<'h>(HeapObject<'h>);
+pub struct ObjectInHeap<'h>(pub HeapObject<'h>);
 
 impl Eq for ObjectInHeap<'_> {}
 impl PartialEq for ObjectInHeap<'_> {

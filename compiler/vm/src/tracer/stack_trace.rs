@@ -21,7 +21,7 @@ pub struct FiberStackTracer<'h> {
 
 // Stack traces are a reduced view of the tracing state that represent the stack
 // trace at a given moment in time.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Call<'h> {
     pub call_site: HirId<'h>,
     pub callee: InlineObject<'h>,
@@ -29,7 +29,7 @@ pub struct Call<'h> {
     pub responsible: HirId<'h>,
 }
 impl<'h> Call<'h> {
-    fn dup(&self, heap: &mut Heap<'h>) {
+    pub fn dup(&self, heap: &mut Heap<'h>) {
         self.call_site.dup();
         self.callee.dup(heap);
         for argument in &self.arguments {
@@ -37,7 +37,7 @@ impl<'h> Call<'h> {
         }
         self.responsible.dup();
     }
-    fn drop(&self, heap: &mut Heap<'h>) {
+    pub fn drop(&self, heap: &mut Heap<'h>) {
         self.call_site.drop(heap);
         self.callee.drop(heap);
         for argument in &self.arguments {

@@ -57,7 +57,7 @@ pub struct Vm<'c: 'h, 'h, L: Borrow<Lir<'c>>, T: Tracer<'h>> {
     channel_id_generator: IdGenerator<ChannelId>,
 }
 
-enum FiberTree<'c, 'h, T: FiberTracer<'h>> {
+pub enum FiberTree<'c, 'h, T: FiberTracer<'h>> {
     /// This tree is currently focused on running a single fiber.
     Single(Single<'c, 'h, T>),
 
@@ -71,8 +71,8 @@ enum FiberTree<'c, 'h, T: FiberTracer<'h>> {
 }
 
 /// Single fibers are the leaves of the fiber tree.
-struct Single<'c, 'h, T: FiberTracer<'h>> {
-    fiber: Fiber<'c, 'h, T>,
+pub struct Single<'c, 'h, T: FiberTracer<'h>> {
+    pub fiber: Fiber<'c, 'h, T>,
     parent: Option<FiberId>,
 }
 
@@ -83,8 +83,8 @@ struct Single<'c, 'h, T: FiberTracer<'h>> {
 /// pointer to a parallel section), you can also spawn other fibers. In contrast
 /// to the first child, those children also have an explicit send port where the
 /// function's result is sent to.
-struct Parallel<'c, 'h, T: FiberTracer<'h>> {
-    paused_fiber: Single<'c, 'h, T>,
+pub struct Parallel<'c, 'h, T: FiberTracer<'h>> {
+    pub paused_fiber: Single<'c, 'h, T>,
     children: HashMap<FiberId, ChildKind>,
     return_value: Option<InlineObject<'h>>, // will later contain the body's return value
     nursery: ChannelId,
@@ -95,8 +95,8 @@ enum ChildKind {
     SpawnedChild(ChannelId),
 }
 
-struct Try<'c, 'h, T: FiberTracer<'h>> {
-    paused_fiber: Single<'c, 'h, T>,
+pub struct Try<'c, 'h, T: FiberTracer<'h>> {
+    pub paused_fiber: Single<'c, 'h, T>,
     child: FiberId,
 }
 
@@ -251,6 +251,13 @@ impl<'c: 'h, 'h, L: Borrow<Lir<'c>>, T: Tracer<'h>> Vm<'c, 'h, L, T> {
         matches!(self.status(), Status::CanRun)
     }
 
+    pub fn fibers(&self) -> &HashMap<FiberId, FiberTree<T::ForFiber>> {
+        &self.fibers
+    }
+    pub fn fiber(&self, id: FiberId) -> Option<&FiberTree<T::ForFiber>> {
+        self.fibers.get(&id)
+    }
+
     /// Can be called at any time from outside the VM to create a channel that
     /// can be used to communicate with the outside world.
     pub fn create_channel(&mut self, capacity: usize) -> ChannelId {
@@ -302,7 +309,7 @@ impl<'c: 'h, 'h, L: Borrow<Lir<'c>>, T: Tracer<'h>> Vm<'c, 'h, L, T> {
     fn run_raw(&mut self, execution_controller: &mut impl ExecutionController, tracer: &mut T) {
         assert!(
             self.can_run(),
-            "Called Vm::run on a VM that is not ready to run.",
+            "Called `Vm::run(…)` on a VM that is not ready to run."
         );
 
         // Choose a random fiber to run.
@@ -744,7 +751,14 @@ impl<'c, 'h, T: FiberTracer<'h>> FiberTree<'c, 'h, T> {
             FiberTree::Try(try_) => try_.paused_fiber.fiber,
         }
     }
-    fn fiber_mut(&mut self) -> &mut Fiber<'c, 'h, T> {
+    pub fn fiber_ref(&self) -> &Fiber<'c, 'h, T> {
+        match self {
+            FiberTree::Single(single) => &single.fiber,
+            FiberTree::Parallel(parallel) => &parallel.paused_fiber.fiber,
+            FiberTree::Try(try_) => &try_.paused_fiber.fiber,
+        }
+    }
+    pub fn fiber_mut(&mut self) -> &mut Fiber<'c, 'h, T> {
         match self {
             FiberTree::Single(single) => &mut single.fiber,
             FiberTree::Parallel(parallel) => &mut parallel.paused_fiber.fiber,

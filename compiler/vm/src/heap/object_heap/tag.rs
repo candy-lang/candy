@@ -6,6 +6,7 @@ use crate::{
 use derive_more::Deref;
 use rustc_hash::FxHashMap;
 use std::{
+    cmp::Ordering,
     fmt::{self, Formatter},
     hash::{Hash, Hasher},
     num::NonZeroU64,
@@ -85,7 +86,20 @@ impl Hash for HeapTag<'_> {
     }
 }
 
-heap_object_impls!(HeapTag<'h>);
+impl Ord for HeapTag<'_> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.symbol()
+            .cmp(&other.symbol())
+            .then_with(|| self.value().cmp(&other.value()))
+    }
+}
+impl PartialOrd for HeapTag<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+heap_object_impls!(HeapTag<'_>);
 
 impl<'h> HeapObjectTrait<'h> for HeapTag<'h> {
     fn content_size(self) -> usize {

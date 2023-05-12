@@ -1,7 +1,7 @@
 use super::{InlineObject, InlineObjectTrait};
 use crate::{
     heap::{object_heap::HeapObject, Heap, Int, Tag},
-    utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_via_get, DebugDisplay},
+    utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_ord_via_get, DebugDisplay},
 };
 use derive_more::Deref;
 use extension_trait::extension_trait;
@@ -106,7 +106,7 @@ impl DebugDisplay for InlineInt<'_> {
 }
 impl_debug_display_via_debugdisplay!(InlineInt<'_>);
 
-impl_eq_hash_via_get!(InlineInt<'_>);
+impl_eq_hash_ord_via_get!(InlineInt<'_>);
 
 impl TryFrom<&BigInt> for InlineInt<'_> {
     type Error = ();

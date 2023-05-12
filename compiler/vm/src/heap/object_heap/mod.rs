@@ -2,11 +2,12 @@ use self::{
     function::HeapFunction, hir_id::HeapHirId, int::HeapInt, list::HeapList, struct_::HeapStruct,
     tag::HeapTag, text::HeapText,
 };
-use super::Heap;
+use super::{Data, Heap};
 use crate::utils::{impl_debug_display_via_debugdisplay, DebugDisplay};
 use enum_dispatch::enum_dispatch;
 use rustc_hash::FxHashMap;
 use std::{
+    cmp::Ordering,
     collections::hash_map,
     fmt::{self, Formatter, Pointer},
     hash::{Hash, Hasher},
@@ -178,6 +179,16 @@ impl PartialEq for HeapObject<'_> {
 impl Hash for HeapObject<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         HeapData::from(*self).hash(state);
+    }
+}
+impl Ord for HeapObject {
+    fn cmp(&self, other: &Self) -> Ordering {
+        Data::from(*self).cmp(&Data::from(*other))
+    }
+}
+impl PartialOrd for HeapObject {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
