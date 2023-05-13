@@ -25,7 +25,7 @@ macro_rules! impl_debug_display_via_debugdisplay {
     };
 }
 
-macro_rules! impl_eq_hash_via_get {
+macro_rules! impl_eq_hash_ord_via_get {
     ($type:ty) => {
         impl Eq for $type {}
         impl PartialEq for $type {
@@ -39,7 +39,18 @@ macro_rules! impl_eq_hash_via_get {
                 self.get().hash(state)
             }
         }
+
+        impl Ord for $type {
+            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+                self.get().cmp(&other.get())
+            }
+        }
+        impl PartialOrd for $type {
+            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+                Some(self.cmp(other))
+            }
+        }
     };
 }
 
-pub(super) use {impl_debug_display_via_debugdisplay, impl_eq_hash_via_get};
+pub(super) use {impl_debug_display_via_debugdisplay, impl_eq_hash_ord_via_get};

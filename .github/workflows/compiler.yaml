@@ -76,7 +76,6 @@ jobs:
           # results.
           comment-always: ${{ github.secret_source == 'Actions' || github.secret_source == 'Dependabot' }}
           comment-on-alert: ${{ github.secret_source == 'Actions' || github.secret_source == 'Dependabot' }}
-          alert-threshold: 150%
-          # Benchmarks running on GitHub Actions have a high variance, making
-          # this unreliable.
-          fail-on-alert: false
+          alert-threshold: 200%
+          # Benchmarks running on GitHub Actions have a very high variance.
+          fail-on-alert: true
