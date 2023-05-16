@@ -33,9 +33,42 @@ use num_traits::ToPrimitive;
 
 use crate::{
     builtin_functions::BuiltinFunction,
+    id::IdGenerator,
     mir::{Body, Expression, Id, Mir, VisibleExpressions},
     rich_ir::ToRichIr,
 };
+
+pub fn apply(
+    expression: &mut Expression,
+    visible: &VisibleExpressions,
+    id_generator: &mut IdGenerator<Id>,
+) {
+    let Expression::Call {
+        function,
+        arguments,
+        responsible,
+    } = expression else { return; };
+    let Expression::Builtin(builtin) = visible.get(*function) else { return; };
+    let Some(result) = run_builtin(*builtin, arguments, *responsible, visible) else {
+        return;
+    };
+    let evaluated_call = match result {
+        Ok(return_value) => return_value,
+        Err(panic_reason) => {
+            let mut body = Body::default();
+            let reason = body.push_with_new_id(id_generator, Expression::Text(panic_reason));
+            body.push_with_new_id(
+                id_generator,
+                Expression::Panic {
+                    reason,
+                    responsible: *responsible,
+                },
+            );
+            Expression::Multiple(body)
+        }
+    };
+    *expression = evaluated_call;
+}
 
 impl Mir {
     pub fn fold_constants(&mut self) {

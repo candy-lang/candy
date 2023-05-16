@@ -43,6 +43,47 @@ use crate::{
 
 use super::complexity::Complexity;
 
+pub fn inline_tiny_functions(
+    expression: &mut Expression,
+    visible: &VisibleExpressions,
+    id_generator: &mut IdGenerator<Id>,
+) {
+    inline_functions_of_maximum_complexity(
+        expression,
+        Complexity {
+            is_self_contained: true,
+            expressions: 2,
+        },
+        visible,
+        id_generator,
+    );
+}
+
+pub fn inline_functions_of_maximum_complexity(
+    expression: &mut Expression,
+    complexity: Complexity,
+    visible: &VisibleExpressions,
+    id_generator: &mut IdGenerator<Id>,
+) {
+    if let Expression::Call { function, .. } = expression
+        && let Expression::Function { body, .. } = visible.get(*function)
+        && body.complexity() <= complexity {
+        let _ = expression.inline_call(visible, id_generator);
+    }
+}
+
+pub fn inline_functions_containing_use(
+    expression: &mut Expression,
+    visible: &VisibleExpressions,
+    id_generator: &mut IdGenerator<Id>,
+) {
+    if let Expression::Call { function, .. } = expression
+        && let Expression::Function { body, .. } = visible.get(*function)
+        && body.iter().any(|(_, expr)| matches!(expr, Expression::UseModule { .. })) {
+        let _ = expression.inline_call(visible, id_generator);
+    }
+}
+
 impl Expression {
     pub fn inline_call(
         &mut self,
@@ -130,7 +171,7 @@ impl Mir {
     pub fn inline_tiny_functions(&mut self) {
         self.inline_functions_of_maximum_complexity(Complexity {
             is_self_contained: true,
-            expressions: 1,
+            expressions: 100,
         });
     }
 

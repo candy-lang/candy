@@ -18,6 +18,26 @@ use crate::mir::{Body, Expression, Id, Mir};
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
+pub fn apply(body: &mut Body) {
+    let expressions = body.iter_mut().collect_vec();
+    let mut keep = FxHashSet::default();
+    let mut ids_to_remove = vec![];
+
+    let return_value_id = expressions.last().unwrap().0;
+    keep.insert(return_value_id);
+
+    for (id, expression) in expressions.into_iter().rev() {
+        if !expression.is_pure() || keep.contains(&id) {
+            keep.insert(id);
+            keep.extend(expression.referenced_ids());
+        } else {
+            ids_to_remove.push(id);
+        }
+    }
+
+    body.remove_all(|id, _| ids_to_remove.contains(&id));
+}
+
 impl Mir {
     pub fn tree_shake(&mut self) {
         self.body.tree_shake(&mut FxHashSet::default());

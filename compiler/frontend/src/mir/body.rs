@@ -18,7 +18,7 @@ use std::{
 
 #[derive(Clone, PartialEq, Eq, Hash, Default)]
 pub struct Body {
-    expressions: Vec<(Id, Expression)>,
+    pub expressions: Vec<(Id, Expression)>,
 }
 impl Body {
     pub fn new(expressions: Vec<(Id, Expression)>) -> Self {
@@ -138,7 +138,7 @@ pub enum VisitorResult {
 
 #[derive(Clone)]
 pub struct VisibleExpressions {
-    expressions: FxHashMap<Id, Expression>,
+    pub expressions: FxHashMap<Id, Expression>,
 }
 impl VisibleExpressions {
     pub fn none_visible() -> Self {
@@ -148,6 +148,9 @@ impl VisibleExpressions {
     }
     pub fn insert(&mut self, id: Id, expression: Expression) {
         self.expressions.insert(id, expression);
+    }
+    pub fn remove(&mut self, id: Id) {
+        self.expressions.remove(&id);
     }
     pub fn get(&self, id: Id) -> &Expression {
         self.expressions.get(&id).unwrap()

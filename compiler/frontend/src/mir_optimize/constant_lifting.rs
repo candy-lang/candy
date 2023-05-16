@@ -38,9 +38,66 @@
 use rustc_hash::FxHashSet;
 
 use crate::{
+    builtin_functions::BuiltinFunction,
     id::IdGenerator,
     mir::{Body, Expression, Id, Mir, VisitorResult},
+    rich_ir::ToRichIr,
 };
+use itertools::Itertools;
+use std::mem;
+
+pub fn apply(expression: &mut Expression, id_generator: &mut IdGenerator<Id>) {
+    let Expression::Function { body, .. } = expression else { return; };
+
+    let mut constants = vec![];
+    let mut constant_ids = FxHashSet::default();
+
+    let mut index = 0;
+    while index < body.expressions.len() {
+        let (id, expression) = &body.expressions[index];
+        let id = *id;
+        let is_constant = expression.is_pure()
+            && expression
+                .captured_ids()
+                .iter()
+                .all(|captured| constant_ids.contains(captured));
+        let is_return_value = id == body.return_value();
+
+        if !is_constant {
+            index += 1;
+            continue;
+        }
+        if is_return_value && let Expression::Reference(_) = expression {
+            // Returned references shouldn't be lifted. If we would lift one,
+            // we'd have to add a reference anyway.
+            index += 1;
+            continue;
+        }
+
+        // This is a constant and should be lifted.
+
+        constants.push(body.expressions.remove(index));
+        constant_ids.insert(id);
+
+        if is_return_value {
+            // The return value was removed. Add a reference to the lifted
+            // constant.
+            body.push(id_generator.generate(), Expression::Reference(id));
+        }
+    }
+
+    if constants.is_empty() {
+        return; // Nothing to lift.
+    }
+
+    let original_expression = mem::replace(expression, Expression::Parameter);
+    *expression = Expression::Multiple(Body::new(
+        constants
+            .into_iter()
+            .chain([(id_generator.generate(), original_expression)])
+            .collect_vec(),
+    ));
+}
 
 impl Mir {
     pub fn lift_constants(&mut self) {

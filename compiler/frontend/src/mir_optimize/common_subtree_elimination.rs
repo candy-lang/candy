@@ -23,9 +23,85 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::{
     hir,
     id::{CountableId, IdGenerator},
-    mir::{Body, Expression, Id, Mir, VisitorResult},
+    mir::{Body, Expression, Id, Mir, VisibleExpressions, VisitorResult},
+    rich_ir::ToRichIr,
 };
 use std::collections::hash_map::Entry;
+use tracing::info;
+
+pub fn apply(body: &mut Body, visible: &VisibleExpressions, id_generator: &mut IdGenerator<Id>) {
+    // info!(
+    //     "Applying common subtree elimination to this body:\n{}",
+    //     body.to_rich_ir()
+    // );
+    let mut pure_expressions = FxHashMap::default();
+    let mut inner_functions: FxHashMap<Id, Vec<Id>> = FxHashMap::default();
+    let mut additional_function_hirs: FxHashMap<Id, FxHashSet<hir::Id>> = FxHashMap::default();
+    let mut updated_references: FxHashMap<Id, Id> = FxHashMap::default();
+
+    for (id, expression) in &mut body.expressions {
+        expression.replace_id_references(&mut |id| {
+            if let Some(update) = updated_references.get(id) {
+                *id = *update;
+            }
+        });
+
+        if !expression.is_pure() {
+            continue;
+        }
+
+        let mut normalized = expression.clone();
+        normalized.normalize();
+        // info!("Normalized expression is {}", normalized.to_rich_ir());
+
+        if let Expression::Function { body, .. } = expression {
+            inner_functions.insert(
+                *id,
+                body.all_functions().into_iter().map(|(id, _)| id).collect(),
+            );
+        }
+
+        let existing_entry = pure_expressions.entry(normalized);
+        match existing_entry {
+            Entry::Occupied(canonical_id) => {
+                let canonical_id = *canonical_id.get();
+                let old_expression =
+                    std::mem::replace(expression, Expression::Reference(canonical_id));
+                updated_references.insert(*id, canonical_id);
+
+                // info!("Found match! {}", old_expression.to_rich_ir());
+                if let Expression::Function {
+                    mut body,
+                    original_hirs,
+                    ..
+                } = old_expression
+                {
+                    additional_function_hirs
+                        .entry(canonical_id)
+                        .or_default()
+                        .extend(original_hirs);
+
+                    let canonical_child_functions = inner_functions.get(&canonical_id).unwrap();
+                    for ((_, child_hirs), canonical_child_id) in body
+                        .all_functions()
+                        .into_iter()
+                        .zip(canonical_child_functions)
+                    {
+                        additional_function_hirs
+                            .entry(*canonical_child_id)
+                            .or_default()
+                            .extend(child_hirs);
+                    }
+                }
+            }
+            _ => {
+                existing_entry.insert_entry(*id);
+            }
+        }
+    }
+
+    // info!("Result of CSE:\n{}", body.to_rich_ir());
+}
 
 impl Mir {
     pub fn eliminate_common_subtrees(&mut self) {

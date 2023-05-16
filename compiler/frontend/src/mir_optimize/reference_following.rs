@@ -18,7 +18,30 @@
 
 use rustc_hash::FxHashMap;
 
-use crate::mir::{Expression, Mir, VisitorResult};
+use crate::mir::{Body, Expression, Mir, VisibleExpressions, VisitorResult};
+
+pub fn apply(expression: &mut Expression, visible: &VisibleExpressions) {
+    expression.replace_id_references(&mut |id| {
+        if visible.contains(*id) && let Expression::Reference(referenced) = visible.get(*id) {
+            *id = *referenced;
+        }
+    });
+}
+
+pub fn remove_redundant_return_references(body: &mut Body) {
+    while body.expressions.len() > 1 {
+        let mut from_back = body.iter_mut().rev();
+        let (_, last_expression) = from_back.next().unwrap();
+        let (second_last_id, _) = from_back.next().unwrap();
+
+        if let Expression::Reference(referenced) = last_expression && *referenced == second_last_id {
+            drop(from_back);
+            body.expressions.pop();
+        } else {
+            break;
+        }
+    }
+}
 
 impl Mir {
     pub fn follow_references(&mut self) {
