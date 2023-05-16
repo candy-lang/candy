@@ -79,56 +79,6 @@ impl Body {
     {
         self.expressions.sort_by(predicate);
     }
-
-    /// Flattens all `Expression::Multiple`.
-    pub fn flatten_multiples(&mut self) {
-        let old_expressions = mem::take(&mut self.expressions);
-
-        for (id, mut expression) in old_expressions.into_iter() {
-            if let Expression::Multiple(mut inner_body) = expression {
-                inner_body.flatten_multiples();
-                let returned_by_inner = inner_body.return_value();
-                for (id, expression) in inner_body.expressions {
-                    self.expressions.push((id, expression));
-                }
-                self.expressions
-                    .push((id, Expression::Reference(returned_by_inner)));
-            } else {
-                if let Expression::Function { body, .. } = &mut expression {
-                    body.flatten_multiples();
-                }
-                self.expressions.push((id, expression));
-            }
-        }
-    }
-}
-#[test]
-fn test_multiple_flattening() {
-    use crate::{
-        builtin_functions::BuiltinFunction,
-        mir::{Expression, Mir},
-    };
-
-    // $0 =
-    //   $1 = builtinEquals
-    //
-    // # becomes:
-    // $0 = builtinEquals
-    // $1 = $0
-    let mut mir = Mir::build(|body| {
-        body.push_multiple(|body| {
-            body.push(Expression::Builtin(BuiltinFunction::Equals));
-        });
-    });
-    mir.flatten_multiples();
-    mir.normalize_ids();
-    assert_eq!(
-        mir,
-        Mir::build(|body| {
-            let inlined = body.push(Expression::Builtin(BuiltinFunction::Equals));
-            body.push(Expression::Reference(inlined));
-        }),
-    );
 }
 
 pub enum VisitorResult {

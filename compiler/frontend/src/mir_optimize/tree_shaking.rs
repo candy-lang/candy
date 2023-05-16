@@ -14,11 +14,11 @@
 //!
 //! [constant folding]: super::constant_folding
 
-use crate::mir::{Body, Expression, Id, Mir};
+use crate::mir::Body;
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
-pub fn apply(body: &mut Body) {
+pub fn tree_shake(body: &mut Body) {
     let expressions = body.iter_mut().collect_vec();
     let mut keep = FxHashSet::default();
     let mut ids_to_remove = vec![];
@@ -36,34 +36,4 @@ pub fn apply(body: &mut Body) {
     }
 
     body.remove_all(|id, _| ids_to_remove.contains(&id));
-}
-
-impl Mir {
-    pub fn tree_shake(&mut self) {
-        self.body.tree_shake(&mut FxHashSet::default());
-    }
-}
-impl Body {
-    fn tree_shake(&mut self, keep: &mut FxHashSet<Id>) {
-        let body = self.iter_mut().collect_vec();
-        let mut ids_to_remove = vec![];
-
-        let return_value_id = body.last().unwrap().0;
-        keep.insert(return_value_id);
-
-        for (id, expression) in body.into_iter().rev() {
-            if !expression.is_pure() || keep.contains(&id) {
-                keep.insert(id);
-                keep.extend(expression.referenced_ids());
-
-                if let Expression::Function { body, .. } = expression {
-                    body.tree_shake(keep);
-                }
-            } else {
-                ids_to_remove.push(id);
-            }
-        }
-
-        self.remove_all(|id, _| ids_to_remove.contains(&id));
-    }
 }

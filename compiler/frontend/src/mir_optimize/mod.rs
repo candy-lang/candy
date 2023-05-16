@@ -42,7 +42,6 @@
 //! both performance and code size. Whenever they can be applied, they should be
 //! applied.
 
-mod base;
 mod cleanup;
 mod common_subtree_elimination;
 mod complexity;
@@ -50,29 +49,27 @@ mod constant_folding;
 mod constant_lifting;
 mod inlining;
 mod module_folding;
-mod multiple_flattening;
 mod reference_following;
 mod tree_shaking;
 mod utils;
+mod validate;
 
-use self::base::ExpressionOptimization;
 use super::{hir, hir_to_mir::HirToMir, mir::Mir, tracing::TracingConfig};
 use crate::{
     error::CompilerError,
     hir_to_mir::MirResult,
-    id::{CountableId, IdGenerator},
+    id::IdGenerator,
     mir::{Body, Expression, Id, MirError, VisibleExpressions},
     module::Module,
     rich_ir::ToRichIr,
 };
-use itertools::Itertools;
 use rustc_hash::{FxHashSet, FxHasher};
 use std::{
     hash::{Hash, Hasher},
     mem,
     sync::Arc,
 };
-use tracing::{debug, error, info};
+use tracing::debug;
 
 #[salsa::query_group(OptimizeMirStorage)]
 pub trait OptimizeMir: HirToMir {
@@ -134,12 +131,7 @@ impl Body {
             // info!("Body so far:\n{}", self.to_rich_ir().to_string());
 
             // Thoroughly optimize the expression.
-            if cfg!(debug_assertions) {
-                expression.validate(visible);
-            }
-            // info!("Expression to optimize: {}", expression.to_rich_ir());
             expression.optimize(visible, id_generator, db, tracing, errors);
-            // info!("Optimized expression: {}", expression.to_rich_ir());
             if cfg!(debug_assertions) {
                 expression.validate(visible);
             }
@@ -152,7 +144,6 @@ impl Body {
             }
 
             module_folding::apply(&mut expression, visible, id_generator, db, tracing, errors);
-            // info!("Optimized more: {}", expression.to_rich_ir());
             if let Some(index_after_module) = self.fold_multiple(id, &mut expression, index) {
                 // A module folding actually happened. Because the inserted
                 // module's MIR is already optimized and doesn't depend on any
@@ -176,8 +167,8 @@ impl Body {
             *expression = (*id, visible.expressions.remove(id).unwrap()).1;
         }
 
-        common_subtree_elimination::apply(self, visible, id_generator);
-        tree_shaking::apply(self);
+        common_subtree_elimination::eliminate_common_subtrees(self);
+        tree_shaking::tree_shake(self);
         reference_following::remove_redundant_return_references(self);
     }
 
@@ -218,11 +209,11 @@ impl Expression {
         loop {
             let hashcode_before = self.do_hash();
 
-            reference_following::apply(self, visible);
-            constant_folding::apply(self, visible, id_generator);
+            reference_following::follow_references(self, visible);
+            constant_folding::fold_constants(self, visible, id_generator);
             inlining::inline_tiny_functions(self, visible, id_generator);
             inlining::inline_functions_containing_use(self, visible, id_generator);
-            constant_lifting::apply(self, id_generator);
+            constant_lifting::lift_constants(self, id_generator);
 
             if let Expression::Function {
                 parameters,
@@ -254,16 +245,6 @@ impl Expression {
         let mut hasher = FxHasher::default();
         self.hash(&mut hasher);
         hasher.finish()
-    }
-
-    fn validate(&self, visible: &VisibleExpressions) {
-        for id in self.captured_ids() {
-            if !visible.contains(id) {
-                error!("Expression references ID {id:?}, but that ID is not visible:");
-                error!("{}", self.to_rich_ir());
-                assert!(false, "Expression references ID that is not in its scope.");
-            }
-        }
     }
 }
 

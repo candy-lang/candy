@@ -23,17 +23,11 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::{
     hir,
     id::{CountableId, IdGenerator},
-    mir::{Body, Expression, Id, Mir, VisibleExpressions, VisitorResult},
-    rich_ir::ToRichIr,
+    mir::{Body, Expression, Id, VisitorResult},
 };
 use std::collections::hash_map::Entry;
-use tracing::info;
 
-pub fn apply(body: &mut Body, visible: &VisibleExpressions, id_generator: &mut IdGenerator<Id>) {
-    // info!(
-    //     "Applying common subtree elimination to this body:\n{}",
-    //     body.to_rich_ir()
-    // );
+pub fn eliminate_common_subtrees(body: &mut Body) {
     let mut pure_expressions = FxHashMap::default();
     let mut inner_functions: FxHashMap<Id, Vec<Id>> = FxHashMap::default();
     let mut additional_function_hirs: FxHashMap<Id, FxHashSet<hir::Id>> = FxHashMap::default();
@@ -101,78 +95,6 @@ pub fn apply(body: &mut Body, visible: &VisibleExpressions, id_generator: &mut I
     }
 
     // info!("Result of CSE:\n{}", body.to_rich_ir());
-}
-
-impl Mir {
-    pub fn eliminate_common_subtrees(&mut self) {
-        let mut pure_expressions = FxHashMap::default();
-        let mut inner_functions: FxHashMap<Id, Vec<Id>> = FxHashMap::default();
-        let mut additional_function_hirs: FxHashMap<Id, FxHashSet<hir::Id>> = FxHashMap::default();
-
-        self.body
-            .visit_with_visible(&mut |id, expression, visible, _| {
-                if !expression.is_pure() {
-                    return;
-                }
-
-                let mut normalized = expression.clone();
-                normalized.normalize();
-
-                if let Expression::Function { body, .. } = expression {
-                    inner_functions.insert(
-                        id,
-                        body.all_functions().into_iter().map(|(id, _)| id).collect(),
-                    );
-                }
-
-                let existing_entry = pure_expressions.entry(normalized);
-                match existing_entry {
-                    Entry::Occupied(id_of_canonical_expression)
-                        if visible.contains(*id_of_canonical_expression.get()) =>
-                    {
-                        let old_expression = std::mem::replace(
-                            expression,
-                            Expression::Reference(*id_of_canonical_expression.get()),
-                        );
-                        if let Expression::Function {
-                            mut body,
-                            original_hirs,
-                            ..
-                        } = old_expression
-                        {
-                            additional_function_hirs
-                                .entry(*id_of_canonical_expression.get())
-                                .or_default()
-                                .extend(original_hirs);
-
-                            let canonical_child_functions = inner_functions
-                                .get(id_of_canonical_expression.get())
-                                .unwrap();
-                            for ((_, child_hirs), canonical_child_id) in body
-                                .all_functions()
-                                .into_iter()
-                                .zip(canonical_child_functions)
-                            {
-                                additional_function_hirs
-                                    .entry(*canonical_child_id)
-                                    .or_default()
-                                    .extend(child_hirs);
-                            }
-                        }
-                    }
-                    _ => {
-                        existing_entry.insert_entry(id);
-                    }
-                }
-            });
-
-        self.body.visit(&mut |id, expression, _| {
-            if let Expression::Function { original_hirs, .. } = expression && let Some(additional_hirs) = additional_function_hirs.remove(&id) {
-                original_hirs.extend(additional_hirs);
-            }
-            VisitorResult::Continue
-        });
-    }
 }
 
 impl Expression {

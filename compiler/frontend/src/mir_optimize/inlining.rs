@@ -34,11 +34,11 @@
 //! [module folding]: super::module_folding
 //! [tree shaking]: super::tree_shaking
 
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 
 use crate::{
     id::IdGenerator,
-    mir::{Expression, Id, Mir, VisibleExpressions},
+    mir::{Expression, Id, VisibleExpressions},
 };
 
 use super::complexity::Complexity;
@@ -130,60 +130,5 @@ impl Expression {
         *self = Expression::Multiple(inlined_body);
 
         Ok(())
-    }
-}
-
-impl Mir {
-    pub fn inline_functions_containing_use(&mut self) {
-        let mut functions_with_use = FxHashSet::default();
-        for (id, expression) in self.body.iter() {
-            if let Expression::Function { body, .. } = expression &&
-                    body.iter().any(|(_, expr)| matches!(expr, Expression::UseModule { .. })) {
-                functions_with_use.insert(id);
-            }
-        }
-
-        self.body.visit_with_visible(&mut |_, expression, visible, _| {
-            if let Expression::Call { function, .. } = expression && functions_with_use.contains(function) {
-                // If inlining fails with an `Err`, there's nothing we can do
-                // except apply other optimizations first and then try again
-                // later.
-                let _ = expression.inline_call(visible, &mut self.id_generator);
-            }
-        });
-    }
-
-    pub fn inline_functions_of_maximum_complexity(&mut self, complexity: Complexity) {
-        let mut small_functions = FxHashSet::default();
-        for (id, expression) in self.body.iter() {
-            if let Expression::Function { body, .. } = expression && body.complexity() <= complexity {
-                small_functions.insert(id);
-            }
-        }
-
-        self.body.visit_with_visible(&mut |_, expression, visible, _| {
-            if let Expression::Call { function, .. } = expression && small_functions.contains(function) {
-                let _ = expression.inline_call(visible, &mut self.id_generator);
-            }
-        });
-    }
-
-    pub fn inline_tiny_functions(&mut self) {
-        self.inline_functions_of_maximum_complexity(Complexity {
-            is_self_contained: true,
-            expressions: 100,
-        });
-    }
-
-    pub fn inline_functions_only_called_once(&mut self) {
-        let mut reference_counts: FxHashMap<Id, usize> = FxHashMap::default();
-        self.body.replace_id_references(&mut |id| {
-            *reference_counts.entry(*id).or_default() += 1;
-        });
-        self.body.visit_with_visible(&mut |_, expression, visible, _| {
-            if let Expression::Call { function, .. } = expression && reference_counts[function] == 1 {
-                let _ = expression.inline_call(visible, &mut self.id_generator);
-            }
-        });
     }
 }

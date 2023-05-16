@@ -38,15 +38,13 @@
 use rustc_hash::FxHashSet;
 
 use crate::{
-    builtin_functions::BuiltinFunction,
     id::IdGenerator,
-    mir::{Body, Expression, Id, Mir, VisitorResult},
-    rich_ir::ToRichIr,
+    mir::{Body, Expression, Id},
 };
 use itertools::Itertools;
 use std::mem;
 
-pub fn apply(expression: &mut Expression, id_generator: &mut IdGenerator<Id>) {
+pub fn lift_constants(expression: &mut Expression, id_generator: &mut IdGenerator<Id>) {
     let Expression::Function { body, .. } = expression else { return; };
 
     let mut constants = vec![];
@@ -97,65 +95,4 @@ pub fn apply(expression: &mut Expression, id_generator: &mut IdGenerator<Id>) {
             .chain([(id_generator.generate(), original_expression)])
             .collect_vec(),
     ));
-}
-
-impl Mir {
-    pub fn lift_constants(&mut self) {
-        // Expressions in the top level should not be lifted as that would just
-        // mean moving some constants and then creating references to them in
-        // the original places.
-        let top_level_ids: FxHashSet<_> = self.body.iter().map(|(id, _)| id).collect();
-
-        let mut constants = vec![];
-        let mut constant_ids = FxHashSet::default();
-
-        self.body.visit(&mut |id, expression, is_return_value| {
-            if top_level_ids.contains(&id) {
-                return VisitorResult::Continue;
-            }
-            let is_constant = expression.is_pure()
-                && expression
-                    .captured_ids()
-                    .iter()
-                    .all(|captured| constant_ids.contains(captured));
-            if !is_constant {
-                return VisitorResult::Continue;
-            }
-            if is_return_value && let Expression::Reference(_) = expression {
-                // Returned references shouldn't be lifted. If we would lift
-                // one, we'd have to add a reference anyway.
-                return VisitorResult::Continue;
-            }
-            constants.push((id, expression.clone()));
-            constant_ids.insert(id);
-            VisitorResult::Continue
-        });
-
-        self.body.visit_bodies(&mut |body| {
-            Self::remove_constants(body, &constant_ids, &mut self.id_generator)
-        });
-        Self::remove_constants(&mut self.body, &constant_ids, &mut self.id_generator);
-        for (_, expression) in &mut constants {
-            expression.visit_bodies(&mut |body| {
-                Self::remove_constants(body, &constant_ids, &mut self.id_generator);
-            })
-        }
-
-        self.body.insert_at_front(constants);
-    }
-
-    fn remove_constants(
-        body: &mut Body,
-        constant_ids: &FxHashSet<Id>,
-        id_generator: &mut IdGenerator<Id>,
-    ) {
-        let return_value = body.return_value();
-        body.remove_all(|id, _| constant_ids.contains(&id));
-
-        if constant_ids.contains(&return_value) {
-            // The return value was removed. Add a reference to the lifted
-            // constant.
-            body.push(id_generator.generate(), Expression::Reference(return_value));
-        }
-    }
 }
