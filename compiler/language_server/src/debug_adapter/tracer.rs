@@ -2,7 +2,7 @@ use candy_frontend::hir::Id;
 use candy_vm::{
     fiber::FiberId,
     heap::{Heap, HirId, InlineObject},
-    tracer::{stack_trace::Call, FiberEnded, FiberTracer, Tracer},
+    tracer::{stack_trace::Call, FiberTracer, TracedFiberEnded, Tracer},
 };
 
 #[derive(Debug, Default)]
@@ -14,7 +14,7 @@ impl Tracer for DebugTracer {
     fn root_fiber_created(&mut self) -> Self::ForFiber {
         FiberDebugTracer::default()
     }
-    fn root_fiber_ended(&mut self, ended: FiberEnded<Self::ForFiber>) {
+    fn root_fiber_ended(&mut self, ended: TracedFiberEnded<Self::ForFiber>) {
         ended.tracer.drop(ended.heap);
     }
 }
@@ -51,7 +51,7 @@ impl FiberTracer for FiberDebugTracer {
     fn child_fiber_created(&mut self, _child: FiberId) -> Self {
         FiberDebugTracer::default()
     }
-    fn child_fiber_ended(&mut self, ended: FiberEnded<Self>) {
+    fn child_fiber_ended(&mut self, ended: TracedFiberEnded<Self>) {
         ended.tracer.drop(ended.heap);
     }
 
