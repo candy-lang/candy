@@ -116,7 +116,7 @@ impl<D: Clone> UnwrapWhitespaceAndComment for Cst<D> {
                 value,
                 comma,
             } => CstKind::StructField {
-                key_and_colon: key_and_colon.as_ref().map(|box (key, colon)| {
+                key_and_colon: key_and_colon.as_deref().map(|(key, colon)| {
                     Box::new((
                         key.unwrap_whitespace_and_comment(),
                         colon.unwrap_whitespace_and_comment(),

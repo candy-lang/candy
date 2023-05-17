@@ -7,6 +7,7 @@ use candy_frontend::builtin_functions::{self, BuiltinFunction};
 use derive_more::Deref;
 use rustc_hash::FxHashMap;
 use std::{
+    cmp::Ordering,
     fmt::{self, Formatter},
     hash::{Hash, Hasher},
     num::NonZeroU64,
@@ -46,6 +47,16 @@ impl PartialEq for InlineBuiltin {
 impl Hash for InlineBuiltin {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.index().hash(state)
+    }
+}
+impl Ord for InlineBuiltin {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.index().cmp(&other.index())
+    }
+}
+impl PartialOrd for InlineBuiltin {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
