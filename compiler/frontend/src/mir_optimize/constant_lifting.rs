@@ -54,17 +54,18 @@ pub fn lift_constants(expression: &mut Expression, id_generator: &mut IdGenerato
     while index < body.expressions.len() {
         let (id, expression) = &body.expressions[index];
         let id = *id;
+
         let is_constant = expression.is_pure()
             && expression
                 .captured_ids()
                 .iter()
                 .all(|captured| constant_ids.contains(captured));
-        let is_return_value = id == body.return_value();
-
         if !is_constant {
             index += 1;
             continue;
         }
+
+        let is_return_value = id == body.return_value();
         if is_return_value && let Expression::Reference(_) = expression {
             // Returned references shouldn't be lifted. If we would lift one,
             // we'd have to add a reference anyway.
@@ -89,10 +90,6 @@ pub fn lift_constants(expression: &mut Expression, id_generator: &mut IdGenerato
     }
 
     let original_expression = mem::replace(expression, Expression::Parameter);
-    *expression = Expression::Multiple(Body::new(
-        constants
-            .into_iter()
-            .chain([(id_generator.generate(), original_expression)])
-            .collect_vec(),
-    ));
+    constants.push((id_generator.generate(), original_expression));
+    *expression = Expression::Multiple(Body::new(constants));
 }

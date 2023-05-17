@@ -46,7 +46,6 @@ pub fn eliminate_common_subtrees(body: &mut Body) {
 
         let mut normalized = expression.clone();
         normalized.normalize();
-        // info!("Normalized expression is {}", normalized.to_rich_ir());
 
         if let Expression::Function { body, .. } = expression {
             inner_functions.insert(
@@ -63,7 +62,6 @@ pub fn eliminate_common_subtrees(body: &mut Body) {
                     std::mem::replace(expression, Expression::Reference(canonical_id));
                 updated_references.insert(*id, canonical_id);
 
-                // info!("Found match! {}", old_expression.to_rich_ir());
                 if let Expression::Function {
                     mut body,
                     original_hirs,
@@ -93,8 +91,6 @@ pub fn eliminate_common_subtrees(body: &mut Body) {
             }
         }
     }
-
-    // info!("Result of CSE:\n{}", body.to_rich_ir());
 }
 
 impl Expression {

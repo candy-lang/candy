@@ -19,7 +19,7 @@ use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
 pub fn tree_shake(body: &mut Body) {
-    let expressions = body.iter_mut().collect_vec();
+    let expressions = body.iter().collect_vec();
     let mut keep = FxHashSet::default();
     let mut ids_to_remove = vec![];
 

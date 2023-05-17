@@ -14,7 +14,7 @@ impl Mir {
 
 impl Body {
     pub fn validate(&self, defined_ids: &mut FxHashSet<Id>, mut visible: im::HashSet<Id>) {
-        if self.iter().next().is_none() {
+        if self.expressions.is_empty() {
             error!("A body of a function is empty! Functions should have at least a return value.");
             error!("This is the MIR:\n{}", self.to_rich_ir());
             panic!("MIR is invalid!");

@@ -128,7 +128,6 @@ impl Body {
             let id = self.expressions[index].0;
             let mut expression =
                 mem::replace(&mut self.expressions[index].1, Expression::Parameter);
-            // info!("Body so far:\n{}", self.to_rich_ir().to_string());
 
             // Thoroughly optimize the expression.
             expression.optimize(visible, id_generator, db, tracing, errors);
@@ -148,7 +147,6 @@ impl Body {
                 // A module folding actually happened. Because the inserted
                 // module's MIR is already optimized and doesn't depend on any
                 // context outside of itself, we don't need to analyze it again.
-                // info!("inserted module content: {}", self.to_rich_ir());
                 while index < index_after_module {
                     let id = self.expressions[index].0;
                     let expression =
@@ -164,7 +162,7 @@ impl Body {
         }
 
         for (id, expression) in &mut self.expressions {
-            *expression = (*id, visible.expressions.remove(id).unwrap()).1;
+            *expression = visible.expressions.remove(id).unwrap();
         }
 
         common_subtree_elimination::eliminate_common_subtrees(self);
@@ -180,20 +178,17 @@ impl Body {
         expression: &mut Expression,
         index: usize,
     ) -> Option<usize> {
-        if let Expression::Multiple(expressions) = expression {
-            let return_value = expressions.return_value();
-            let num_expressions = expressions.expressions.len();
-            self.expressions.splice(
-                index..(index + 1),
-                expressions
-                    .expressions
-                    .drain(..)
-                    .chain([(id, Expression::Reference(return_value))]),
-            );
-            Some(index + num_expressions + 1)
-        } else {
-            None
-        }
+        let Expression::Multiple(expressions) = expression else { return None; };
+        let return_value = expressions.return_value();
+        let num_expressions = expressions.expressions.len();
+        self.expressions.splice(
+            index..(index + 1),
+            expressions
+                .expressions
+                .drain(..)
+                .chain([(id, Expression::Reference(return_value))]),
+        );
+        Some(index + num_expressions + 1)
     }
 }
 

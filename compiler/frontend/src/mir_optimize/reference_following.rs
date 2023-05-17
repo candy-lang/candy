@@ -28,12 +28,9 @@ pub fn follow_references(expression: &mut Expression, visible: &VisibleExpressio
 
 pub fn remove_redundant_return_references(body: &mut Body) {
     while body.expressions.len() > 1 {
-        let mut from_back = body.iter_mut().rev();
-        let (_, last_expression) = from_back.next().unwrap();
-        let (second_last_id, _) = from_back.next().unwrap();
+        let [.., (second_last_id, _), (_, last_expression)] = &body.expressions[..] else { unreachable!() };
 
-        if let Expression::Reference(referenced) = last_expression && *referenced == second_last_id {
-            drop(from_back);
+        if let Expression::Reference(referenced) = last_expression && referenced == second_last_id {
             body.expressions.pop();
         } else {
             break;
