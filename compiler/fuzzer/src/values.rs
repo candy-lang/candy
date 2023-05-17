@@ -33,7 +33,7 @@ fn generate_value_with_complexity(
     mut complexity: f32,
     symbols: &[Text],
 ) -> InlineObject {
-    let value = match rng.gen_range(1..=5) {
+    match rng.gen_range(1..=5) {
         1 => Int::create_from_bigint(heap, rng.gen_bigint(10)).into(),
         2 => Text::create(heap, "test").into(),
         // TODO: This should support tags with values
@@ -61,8 +61,7 @@ fn generate_value_with_complexity(
         }
         6 => builtin_functions::VALUES[rng.gen_range(0..builtin_functions::VALUES.len())].into(),
         _ => unreachable!(),
-    };
-    value
+    }
 }
 
 pub fn generate_mutated_input(rng: &mut ThreadRng, input: &mut Input, symbols: &[Text]) {

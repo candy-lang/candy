@@ -42,7 +42,6 @@ where
     let (_heap, fuzzables) = {
         let mut tracer = FuzzablesFinder::default();
         let result = Vm::for_module(lir.clone(), &mut tracer).run_until_completion(&mut tracer);
-        dbg!(result.reason);
         (result.heap, tracer.into_fuzzables())
     };
 
