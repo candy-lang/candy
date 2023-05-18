@@ -18,7 +18,7 @@ clap = { version = "4.1.8", features = ["derive"] }
 colored = "2.0.0"
 itertools = "0.10.0"
 notify = "5.1.0"
-notify-debouncer-mini = { version = "0.2.1", default-features = false }
+notify-debouncer-mini = { version = "0.3.0", default-features = false }
 rustc-hash = "1.1.0"
 salsa = "0.16.1"
 tokio = { version = "1.24.2", features = ["full"] }
