@@ -2,7 +2,7 @@ use candy_frontend::hir::Id;
 use candy_vm::{
     fiber::FiberId,
     heap::{Function, Heap, Tag, Text},
-    tracer::{FiberEnded, FiberTracer, Tracer},
+    tracer::{FiberTracer, TracedFiberEnded, Tracer},
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -30,7 +30,7 @@ impl Tracer for FuzzablesFinder {
     fn root_fiber_created(&mut self) -> Self::ForFiber {
         FiberFuzzablesFinder::default()
     }
-    fn root_fiber_ended(&mut self, ended: FiberEnded<Self::ForFiber>) {
+    fn root_fiber_ended(&mut self, ended: TracedFiberEnded<Self::ForFiber>) {
         assert!(self.fuzzables.is_none());
         self.fuzzables = Some(ended.tracer.fuzzables);
     }
@@ -44,7 +44,7 @@ impl FiberTracer for FiberFuzzablesFinder {
     fn child_fiber_created(&mut self, _child: FiberId) -> Self {
         FiberFuzzablesFinder::default()
     }
-    fn child_fiber_ended(&mut self, ended: FiberEnded<Self>) {
+    fn child_fiber_ended(&mut self, ended: TracedFiberEnded<Self>) {
         self.fuzzables.extend(ended.tracer.fuzzables)
     }
 

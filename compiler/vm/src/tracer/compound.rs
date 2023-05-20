@@ -1,4 +1,4 @@
-use super::{FiberEnded, FiberTracer, Tracer};
+use super::{FiberTracer, TracedFiberEnded, Tracer};
 use crate::{
     channel::ChannelId,
     fiber::FiberId,
@@ -19,14 +19,14 @@ impl<T0: Tracer, T1: Tracer> Tracer for CompoundTracer<T0, T1> {
             tracer1: self.tracer1.root_fiber_created(),
         }
     }
-    fn root_fiber_ended(&mut self, ended: FiberEnded<Self::ForFiber>) {
-        self.tracer0.root_fiber_ended(FiberEnded {
+    fn root_fiber_ended(&mut self, ended: TracedFiberEnded<Self::ForFiber>) {
+        self.tracer0.root_fiber_ended(TracedFiberEnded {
             id: ended.id,
             heap: ended.heap,
             tracer: ended.tracer.tracer0,
             reason: ended.reason.clone(),
         });
-        self.tracer1.root_fiber_ended(FiberEnded {
+        self.tracer1.root_fiber_ended(TracedFiberEnded {
             id: ended.id,
             heap: ended.heap,
             tracer: ended.tracer.tracer1,
@@ -61,14 +61,14 @@ impl<T0: FiberTracer, T1: FiberTracer> FiberTracer for CompoundFiberTracer<T0, T
             tracer1: self.tracer1.child_fiber_created(_child),
         }
     }
-    fn child_fiber_ended(&mut self, ended: FiberEnded<Self>) {
-        self.tracer0.child_fiber_ended(FiberEnded {
+    fn child_fiber_ended(&mut self, ended: TracedFiberEnded<Self>) {
+        self.tracer0.child_fiber_ended(TracedFiberEnded {
             id: ended.id,
             heap: ended.heap,
             tracer: ended.tracer.tracer0,
             reason: ended.reason.clone(),
         });
-        self.tracer1.child_fiber_ended(FiberEnded {
+        self.tracer1.child_fiber_ended(TracedFiberEnded {
             id: ended.id,
             heap: ended.heap,
             tracer: ended.tracer.tracer1,

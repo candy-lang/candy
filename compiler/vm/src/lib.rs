@@ -8,12 +8,12 @@
 
 use crate::heap::{Struct, Tag};
 use context::RunForever;
-use fiber::{ExecutionEnded, ExecutionEndedReason};
+use fiber::{EndedReason, VmEnded};
 use heap::{Function, Heap, HeapObject, InlineObject};
 use lir::Lir;
 use rustc_hash::FxHashMap;
 use std::borrow::Borrow;
-use tracer::{FiberTracer, Tracer};
+use tracer::Tracer;
 use tracing::{debug, error};
 use vm::{Status, Vm};
 
@@ -29,28 +29,28 @@ mod utils;
 pub mod vm;
 
 impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
-    pub fn run_until_completion(mut self, tracer: &mut T) -> ExecutionEnded<T::ForFiber> {
+    pub fn run_until_completion(mut self, tracer: &mut T) -> VmEnded {
         self.run(&mut RunForever, tracer);
         if let Status::WaitingForOperations = self.status() {
             error!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");
             // TODO: Show stack traces of all fibers?
         }
-        self.tear_down()
+        self.tear_down(tracer)
     }
 }
 
-impl<T: FiberTracer> ExecutionEnded<T> {
+impl VmEnded {
     pub fn into_main_function(
         mut self,
     ) -> Result<(Heap, Function, FxHashMap<HeapObject, HeapObject>), String> {
         match self.reason {
-            ExecutionEndedReason::Finished(return_value) => {
+            EndedReason::Finished(return_value) => {
                 match return_value_into_main_function(&mut self.heap, return_value) {
                     Ok(main) => Ok((self.heap, main, self.constant_mapping)),
                     Err(err) => Err(err.to_string()),
                 }
             }
-            ExecutionEndedReason::Panicked(panic) => Err(format!(
+            EndedReason::Panicked(panic) => Err(format!(
                 "The module panicked at {}: {}",
                 panic.responsible, panic.reason,
             )),

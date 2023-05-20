@@ -7,7 +7,7 @@ use super::{
 use crate::{
     channel::ChannelId,
     heap::{HeapObject, HirId, InlineObject, List, Pointer, ReceivePort, SendPort, Struct, Tag},
-    tracer::{FiberEnded, FiberEndedReason, FiberTracer},
+    tracer::{FiberTracer, TracedFiberEnded, TracedFiberEndedReason},
     Lir,
 };
 use candy_frontend::{
@@ -84,14 +84,19 @@ impl Debug for InstructionPointer {
     }
 }
 
-pub struct ExecutionEnded<T: FiberTracer> {
+pub struct VmEnded {
     pub heap: Heap,
     pub constant_mapping: FxHashMap<HeapObject, HeapObject>,
-    tracer: T,
-    pub reason: ExecutionEndedReason,
+    pub reason: EndedReason,
+}
+pub struct FiberEnded<T: FiberTracer> {
+    pub heap: Heap,
+    pub constant_mapping: FxHashMap<HeapObject, HeapObject>,
+    pub tracer: T,
+    pub reason: EndedReason,
 }
 #[derive(Clone, Debug)]
-pub enum ExecutionEndedReason {
+pub enum EndedReason {
     Finished(InlineObject),
     Panicked(Panic),
 }
@@ -176,28 +181,26 @@ impl<T: FiberTracer> Fiber<T> {
         Self::for_function(heap, constant_mapping, function, &[], responsible, tracer)
     }
 
-    pub fn tear_down(mut self) -> ExecutionEnded<T> {
+    pub fn tear_down(mut self) -> FiberEnded<T> {
         let reason = match self.status {
-            Status::Done => ExecutionEndedReason::Finished(self.pop_from_data_stack()),
-            Status::Panicked(panic) => ExecutionEndedReason::Panicked(panic),
+            Status::Done => EndedReason::Finished(self.pop_from_data_stack()),
+            Status::Panicked(panic) => EndedReason::Panicked(panic),
             _ => panic!("Called `tear_down` on a fiber that's still running."),
         };
-        ExecutionEnded {
+        FiberEnded {
             heap: self.heap,
             constant_mapping: self.constant_mapping,
             tracer: self.tracer,
             reason,
         }
     }
-    pub fn adopt_finished_child(&mut self, child_id: FiberId, ended: ExecutionEnded<T>) {
+    pub fn adopt_finished_child(&mut self, child_id: FiberId, ended: FiberEnded<T>) {
         self.heap.adopt(ended.heap);
         let reason = match ended.reason {
-            ExecutionEndedReason::Finished(return_value) => {
-                FiberEndedReason::Finished(return_value)
-            }
-            ExecutionEndedReason::Panicked(panic) => FiberEndedReason::Panicked(panic),
+            EndedReason::Finished(return_value) => TracedFiberEndedReason::Finished(return_value),
+            EndedReason::Panicked(panic) => TracedFiberEndedReason::Panicked(panic),
         };
-        self.tracer.child_fiber_ended(FiberEnded {
+        self.tracer.child_fiber_ended(TracedFiberEnded {
             id: child_id,
             heap: &mut self.heap,
             tracer: ended.tracer,
@@ -250,14 +253,12 @@ impl<T: FiberTracer> Fiber<T> {
             Err(panic) => self.panic(panic),
         }
     }
-    pub fn complete_try(&mut self, ended_reason: &ExecutionEndedReason) {
+    pub fn complete_try(&mut self, ended_reason: &EndedReason) {
         assert!(matches!(self.status, Status::InTry { .. }));
 
         let result = match ended_reason {
-            ExecutionEndedReason::Finished(return_value) => Ok(*return_value),
-            ExecutionEndedReason::Panicked(panic) => {
-                Err(Text::create(&mut self.heap, &panic.reason).into())
-            }
+            EndedReason::Finished(return_value) => Ok(*return_value),
+            EndedReason::Panicked(panic) => Err(Text::create(&mut self.heap, &panic.reason).into()),
         };
         let result = Struct::create_result(&mut self.heap, result);
         self.push_to_data_stack(result);

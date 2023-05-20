@@ -15,7 +15,7 @@ pub trait Tracer {
     type ForFiber: FiberTracer;
 
     fn root_fiber_created(&mut self) -> Self::ForFiber;
-    fn root_fiber_ended(&mut self, _ended: FiberEnded<Self::ForFiber>) {}
+    fn root_fiber_ended(&mut self, _ended: TracedFiberEnded<Self::ForFiber>) {}
 
     fn fiber_execution_started(&mut self, _fiber: FiberId) {}
     fn fiber_execution_ended(&mut self, _fiber: FiberId) {}
@@ -28,7 +28,7 @@ where
     Self: Sized,
 {
     fn child_fiber_created(&mut self, child: FiberId) -> Self;
-    fn child_fiber_ended(&mut self, _ended: FiberEnded<Self>) {}
+    fn child_fiber_ended(&mut self, _ended: TracedFiberEnded<Self>) {}
 
     fn value_evaluated(&mut self, _heap: &mut Heap, _expression: HirId, _value: InlineObject) {}
 
@@ -54,14 +54,14 @@ where
     fn dup_all_stored_objects(&self, _heap: &mut Heap);
 }
 
-pub struct FiberEnded<'h, T: FiberTracer> {
+pub struct TracedFiberEnded<'h, T: FiberTracer> {
     pub id: FiberId,
     pub heap: &'h mut Heap,
     pub tracer: T,
-    pub reason: FiberEndedReason,
+    pub reason: TracedFiberEndedReason,
 }
 #[derive(Clone)]
-pub enum FiberEndedReason {
+pub enum TracedFiberEndedReason {
     Finished(InlineObject),
     Panicked(Panic),
     Canceled,

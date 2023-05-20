@@ -18,7 +18,7 @@ use candy_frontend::{
     TracingConfig,
 };
 use candy_vm::{
-    fiber::ExecutionEndedReason,
+    fiber::EndedReason,
     heap::{HirId, Struct},
     mir_to_lir::compile_lir,
     tracer::DummyTracer,
@@ -91,10 +91,10 @@ fuzz_target!(|data: &[u8]| {
     .run_until_completion(&mut DummyTracer)
     .reason
     {
-        ExecutionEndedReason::Finished(return_value) => {
+        EndedReason::Finished(return_value) => {
             println!("The main function returned: {return_value:?}")
         }
-        ExecutionEndedReason::Panicked(panic) => {
+        EndedReason::Panicked(panic) => {
             panic!("The main function panicked: {}", panic.reason)
         }
     }

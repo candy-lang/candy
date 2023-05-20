@@ -126,6 +126,7 @@ impl<L: Borrow<Lir>> Runner<L> {
                     reason: panic.reason,
                 }
             } else {
+                self.vm.take().unwrap().tear_down(&mut self.tracer);
                 RunResult::Panicked(panic)
             }),
         };

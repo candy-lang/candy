@@ -17,7 +17,7 @@ use candy_frontend::{
 };
 use candy_vm::{
     channel::Packet,
-    fiber::ExecutionEndedReason,
+    fiber::EndedReason,
     heap::{HirId, Struct},
     lir::Lir,
     mir_to_lir::compile_lir,
@@ -143,11 +143,11 @@ pub fn run(lir: impl Borrow<Lir>) -> Packet {
     )
     .run_until_completion(&mut tracer);
     match ended.reason {
-        ExecutionEndedReason::Finished(return_value) => Packet {
+        EndedReason::Finished(return_value) => Packet {
             heap: ended.heap,
             object: return_value,
         },
-        ExecutionEndedReason::Panicked(panic) => {
+        EndedReason::Panicked(panic) => {
             panic!("The main function panicked: {}", panic.reason)
         }
     }
