@@ -1,5 +1,6 @@
 #![feature(let_chains, round_char_boundary)]
 
+mod coverage;
 mod fuzzer;
 mod input;
 mod input_pool;

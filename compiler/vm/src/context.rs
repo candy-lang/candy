@@ -1,6 +1,8 @@
+use crate::fiber::InstructionPointer;
+
 pub trait ExecutionController {
     fn should_continue_running(&self) -> bool;
-    fn instruction_executed(&mut self);
+    fn instruction_executed(&mut self, ip: InstructionPointer);
 }
 
 pub struct RunForever;
@@ -9,7 +11,7 @@ impl ExecutionController for RunForever {
         true
     }
 
-    fn instruction_executed(&mut self) {}
+    fn instruction_executed(&mut self, _: InstructionPointer) {}
 }
 
 pub struct RunLimitedNumberOfInstructions {
@@ -27,7 +29,7 @@ impl ExecutionController for RunLimitedNumberOfInstructions {
         self.instructions_left > 0
     }
 
-    fn instruction_executed(&mut self) {
+    fn instruction_executed(&mut self, _: InstructionPointer) {
         if self.instructions_left == 0 {
             panic!();
         }
@@ -44,7 +46,7 @@ impl ExecutionController for CountingExecutionController {
         true
     }
 
-    fn instruction_executed(&mut self) {
+    fn instruction_executed(&mut self, _: InstructionPointer) {
         self.num_instructions += 1;
     }
 }
@@ -67,8 +69,8 @@ impl<'a, 'b, A: ExecutionController, B: ExecutionController> ExecutionController
         self.a.should_continue_running() && self.b.should_continue_running()
     }
 
-    fn instruction_executed(&mut self) {
-        self.a.instruction_executed();
-        self.b.instruction_executed();
+    fn instruction_executed(&mut self, ip: InstructionPointer) {
+        self.a.instruction_executed(ip);
+        self.b.instruction_executed(ip);
     }
 }

@@ -307,7 +307,7 @@ impl<T: FiberTracer> Fiber<T> {
             self.next_instruction = Some(next_instruction.next());
 
             self.run_instruction(instruction);
-            execution_controller.instruction_executed();
+            execution_controller.instruction_executed(next_instruction);
         }
     }
     pub fn run_instruction(&mut self, instruction: Instruction) {
