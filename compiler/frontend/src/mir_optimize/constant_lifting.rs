@@ -41,7 +41,6 @@ use crate::{
     id::IdGenerator,
     mir::{Body, Expression, Id},
 };
-use itertools::Itertools;
 use std::mem;
 
 pub fn lift_constants(expression: &mut Expression, id_generator: &mut IdGenerator<Id>) {
