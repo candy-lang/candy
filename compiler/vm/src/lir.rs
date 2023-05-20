@@ -14,6 +14,7 @@ use itertools::Itertools;
 use pad::{Alignment, PadStr};
 use rustc_hash::FxHashSet;
 use std::fmt::{self, Display, Formatter};
+use std::ops::Range;
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 pub struct Lir {
@@ -193,6 +194,24 @@ impl StackExt for Vec<Id> {
         for _ in 0..n {
             self.pop();
         }
+    }
+}
+
+impl Lir {
+    pub fn range_of_function(&self, function: &hir::Id) -> Range<InstructionPointer> {
+        let start = self
+            .origins
+            .iter()
+            .position(|origins| origins.contains(function))
+            .unwrap();
+        let end = start
+            + self
+                .origins
+                .iter()
+                .skip(start)
+                .take_while(|origins| origins.contains(function))
+                .count();
+        start.into()..end.into()
     }
 }
 

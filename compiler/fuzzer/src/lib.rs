@@ -26,7 +26,7 @@ use candy_vm::{
     tracer::stack_trace::StackTracer, vm::Vm,
 };
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 pub fn fuzz<DB>(db: &DB, module: Module) -> Vec<FailingFuzzCase>
 where
@@ -60,7 +60,11 @@ where
         fuzzer.run(&mut RunLimitedNumberOfInstructions::new(100000));
 
         match fuzzer.into_status() {
-            Status::StillFuzzing { .. } => {}
+            Status::StillFuzzing { total_coverage, .. } => {
+                let coverage =
+                    total_coverage.relative_coverage_of_range(lir.range_of_function(&id));
+                debug!("Achieved a coverage of {:.1}%.", coverage * 100.0);
+            }
             Status::FoundPanic {
                 input,
                 panic,
@@ -76,6 +80,7 @@ where
                 // case.dump(db);
                 failing_cases.push(case);
             }
+            Status::TotalCoverageButNoPanic => {}
         }
     }
 

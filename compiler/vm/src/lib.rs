@@ -3,6 +3,7 @@
     anonymous_lifetime_in_impl_trait,
     let_chains,
     slice_ptr_get,
+    step_trait,
     strict_provenance
 )]
 

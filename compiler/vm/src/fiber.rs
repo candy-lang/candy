@@ -18,7 +18,10 @@ use candy_frontend::{
 use derive_more::{Deref, From};
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
-use std::fmt::{self, Debug};
+use std::{
+    fmt::{self, Debug},
+    iter::Step,
+};
 use tracing::trace;
 
 const TRACE: bool = false;
@@ -76,6 +79,28 @@ impl InstructionPointer {
     }
     fn next(&self) -> Self {
         Self(self.0 + 1)
+    }
+}
+impl PartialOrd for InstructionPointer {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        (**self).partial_cmp(&**other)
+    }
+}
+impl Step for InstructionPointer {
+    fn steps_between(start: &Self, end: &Self) -> Option<usize> {
+        Some(**end - **start)
+    }
+
+    fn forward_checked(start: Self, count: usize) -> Option<Self> {
+        Some((*start + count).into())
+    }
+
+    fn backward_checked(start: Self, count: usize) -> Option<Self> {
+        if count > *start {
+            None
+        } else {
+            Some((*start - count).into())
+        }
     }
 }
 impl Debug for InstructionPointer {
