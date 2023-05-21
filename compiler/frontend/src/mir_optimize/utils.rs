@@ -1,10 +1,6 @@
-use crate::{
-    mir::{Body, Expression, Id, Mir, VisibleExpressions},
-    rich_ir::ToRichIr,
-};
+use crate::mir::{Body, Expression, Id, VisibleExpressions};
 use rustc_hash::FxHashSet;
 use std::mem;
-use tracing::error;
 
 impl Expression {
     /// All IDs defined inside this expression. For all expressions except
@@ -362,61 +358,6 @@ impl Body {
             replacer(&mut id);
             expression.replace_ids(replacer);
             self.push(id, expression);
-        }
-    }
-}
-
-impl Mir {
-    pub fn validate(&self) {
-        self.validate_body(&self.body, &mut FxHashSet::default(), im::HashSet::new());
-    }
-    fn validate_body(
-        &self,
-        body: &Body,
-        defined_ids: &mut FxHashSet<Id>,
-        mut visible: im::HashSet<Id>,
-    ) {
-        if body.iter().next().is_none() {
-            error!("A body of a function is empty! Functions should have at least a return value.");
-            error!("This is the MIR:\n{}", self.to_rich_ir());
-            panic!("MIR is invalid!");
-        }
-        for (id, expression) in body.iter() {
-            for captured in expression.captured_ids() {
-                if !visible.contains(&captured) {
-                    error!(
-                        "MIR is invalid! {} captures {}, but that's not visible.",
-                        id.to_rich_ir().text,
-                        captured.to_rich_ir().text,
-                    );
-                    error!("This is the MIR:\n{}", self.to_rich_ir());
-                    panic!("MIR is invalid!");
-                }
-            }
-            if let Expression::Function {
-                original_hirs: _,
-                parameters,
-                responsible_parameter,
-                body,
-            } = expression
-            {
-                let mut inner_visible = visible.clone();
-                inner_visible.extend(parameters.iter().copied());
-                inner_visible.insert(*responsible_parameter);
-                self.validate_body(body, defined_ids, inner_visible);
-            }
-            if let Expression::Multiple(body) = expression {
-                self.validate_body(body, defined_ids, visible.clone());
-            }
-
-            if defined_ids.contains(&id) {
-                error!("ID {} exists twice.", id.to_rich_ir().text);
-                error!("This is the MIR:\n{}", self.to_rich_ir());
-                panic!("MIR is invalid!");
-            }
-            defined_ids.insert(id);
-
-            visible.insert(id);
         }
     }
 }

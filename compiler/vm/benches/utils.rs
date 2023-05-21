@@ -123,7 +123,7 @@ pub fn compile(db: &mut Database, source_code: &str) -> Lir {
 }
 
 pub fn run(lir: impl Borrow<Lir>) -> Packet {
-    let mut tracer = DummyTracer::default();
+    let mut tracer = DummyTracer;
     let (mut heap, main, constant_mapping) = Vm::for_module(lir.borrow(), &mut tracer)
         .run_until_completion(&mut tracer)
         .into_main_function()

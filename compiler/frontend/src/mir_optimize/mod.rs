@@ -49,18 +49,24 @@ mod constant_folding;
 mod constant_lifting;
 mod inlining;
 mod module_folding;
-mod multiple_flattening;
 mod reference_following;
 mod tree_shaking;
 mod utils;
+mod validate;
 
 use super::{hir, hir_to_mir::HirToMir, mir::Mir, tracing::TracingConfig};
 use crate::{
-    error::CompilerError, hir_to_mir::MirResult, mir::MirError, module::Module, rich_ir::ToRichIr,
+    error::CompilerError,
+    hir_to_mir::MirResult,
+    id::IdGenerator,
+    mir::{Body, Expression, Id, MirError, VisibleExpressions},
+    module::Module,
+    rich_ir::ToRichIr,
 };
 use rustc_hash::{FxHashSet, FxHasher};
 use std::{
     hash::{Hash, Hasher},
+    mem,
     sync::Arc,
 };
 use tracing::debug;
@@ -78,7 +84,7 @@ fn optimized_mir(db: &dyn OptimizeMir, module: Module, tracing: TracingConfig) -
     let mut errors = (*errors).clone();
 
     let complexity_before = mir.complexity();
-    mir.optimize_obvious(db, &tracing, &mut errors);
+    mir.optimize(db, &tracing, &mut errors);
     let complexity_after = mir.complexity();
 
     debug!(
@@ -89,32 +95,140 @@ fn optimized_mir(db: &dyn OptimizeMir, module: Module, tracing: TracingConfig) -
 }
 
 impl Mir {
-    /// Performs optimizations that (usually) improve both performance and code
-    /// size.
-    pub fn optimize_obvious(
+    pub fn optimize(
         &mut self,
         db: &dyn OptimizeMir,
         tracing: &TracingConfig,
         errors: &mut FxHashSet<CompilerError>,
     ) {
-        self.optimize_stuff_necessary_for_module_folding();
-        self.checked_optimization(&mut |mir| mir.fold_modules(db, tracing, errors));
-        self.replace_remaining_uses_with_panics(errors);
-        self.heavily_optimize();
+        self.body.optimize(
+            &mut VisibleExpressions::none_visible(),
+            &mut self.id_generator,
+            db,
+            tracing,
+            errors,
+        );
         self.cleanup();
     }
+}
 
-    pub fn optimize_stuff_necessary_for_module_folding(&mut self) {
+impl Body {
+    // Even though visible is mut, this function guarantees that the value is
+    // the same after returning.
+    fn optimize(
+        &mut self,
+        visible: &mut VisibleExpressions,
+        id_generator: &mut IdGenerator<Id>,
+        db: &dyn OptimizeMir,
+        tracing: &TracingConfig,
+        errors: &mut FxHashSet<CompilerError>,
+    ) {
+        let mut index = 0;
+        'expression_loop: while index < self.expressions.len() {
+            let id = self.expressions[index].0;
+            let mut expression =
+                mem::replace(&mut self.expressions[index].1, Expression::Parameter);
+
+            // Thoroughly optimize the expression.
+            expression.optimize(visible, id_generator, db, tracing, errors);
+            if cfg!(debug_assertions) {
+                expression.validate(visible);
+            }
+
+            if self.fold_multiple(id, &mut expression, index).is_some() {
+                // We replaced the expression with other expressions, so instead
+                // of continuing to the next expression, we should try to
+                // optimize the newly inserted expressions next.
+                continue 'expression_loop;
+            }
+
+            module_folding::apply(&mut expression, visible, id_generator, db, tracing, errors);
+            if let Some(index_after_module) = self.fold_multiple(id, &mut expression, index) {
+                // A module folding actually happened. Because the inserted
+                // module's MIR is already optimized and doesn't depend on any
+                // context outside of itself, we don't need to analyze it again.
+                while index < index_after_module {
+                    let id = self.expressions[index].0;
+                    let expression =
+                        mem::replace(&mut self.expressions[index].1, Expression::Parameter);
+                    visible.insert(id, expression);
+                    index += 1;
+                }
+                continue 'expression_loop;
+            }
+
+            visible.insert(id, expression);
+            index += 1;
+        }
+
+        for (id, expression) in &mut self.expressions {
+            *expression = visible.expressions.remove(id).unwrap();
+        }
+
+        common_subtree_elimination::eliminate_common_subtrees(self);
+        tree_shaking::tree_shake(self);
+        reference_following::remove_redundant_return_references(self);
+    }
+
+    // If an `Expression::Multiple` was actually folded, this returns the index
+    // of the expression after the newly inserted ones.
+    fn fold_multiple(
+        &mut self,
+        id: Id,
+        expression: &mut Expression,
+        index: usize,
+    ) -> Option<usize> {
+        let Expression::Multiple(expressions) = expression else { return None; };
+        let return_value = expressions.return_value();
+        let num_expressions = expressions.expressions.len();
+        self.expressions.splice(
+            index..(index + 1),
+            expressions
+                .expressions
+                .drain(..)
+                .chain([(id, Expression::Reference(return_value))]),
+        );
+        Some(index + num_expressions + 1)
+    }
+}
+
+impl Expression {
+    fn optimize(
+        &mut self,
+        visible: &mut VisibleExpressions,
+        id_generator: &mut IdGenerator<Id>,
+        db: &dyn OptimizeMir,
+        tracing: &TracingConfig,
+        errors: &mut FxHashSet<CompilerError>,
+    ) {
         loop {
             let hashcode_before = self.do_hash();
 
-            // TODO: If you have the (unusual) code structure of a very long
-            // function containing a `use` that's used very often, this
-            // optimization leads to a big blowup of code. We should possibly
-            // think about what to do in that case.
-            self.checked_optimization(&mut |mir| mir.inline_functions_containing_use());
-            self.checked_optimization(&mut |mir| mir.flatten_multiples());
-            self.checked_optimization(&mut |mir| mir.follow_references());
+            reference_following::follow_references(self, visible);
+            constant_folding::fold_constants(self, visible, id_generator);
+            inlining::inline_tiny_functions(self, visible, id_generator);
+            inlining::inline_functions_containing_use(self, visible, id_generator);
+            constant_lifting::lift_constants(self, id_generator);
+
+            if let Expression::Function {
+                parameters,
+                responsible_parameter,
+                body,
+                ..
+            } = self
+            {
+                for parameter in &*parameters {
+                    visible.insert(*parameter, Expression::Parameter);
+                }
+                visible.insert(*responsible_parameter, Expression::Parameter);
+
+                body.optimize(visible, id_generator, db, tracing, errors);
+
+                for parameter in &*parameters {
+                    visible.remove(*parameter);
+                }
+                visible.remove(*responsible_parameter);
+            }
 
             if self.do_hash() == hashcode_before {
                 return;
@@ -122,39 +236,10 @@ impl Mir {
         }
     }
 
-    /// Performs optimizations that (usually) improve both performance and code
-    /// size and that work without looking at other modules.
-    pub fn heavily_optimize(&mut self) {
-        loop {
-            let hashcode_before = self.do_hash();
-
-            self.checked_optimization(&mut |mir| mir.follow_references());
-            self.checked_optimization(&mut |mir| mir.remove_redundant_return_references());
-            self.checked_optimization(&mut |mir| mir.tree_shake());
-            self.checked_optimization(&mut |mir| mir.fold_constants());
-            self.checked_optimization(&mut |mir| mir.inline_functions_only_called_once());
-            self.checked_optimization(&mut |mir| mir.inline_tiny_functions());
-            self.checked_optimization(&mut |mir| mir.lift_constants());
-            self.checked_optimization(&mut |mir| mir.eliminate_common_subtrees());
-            self.checked_optimization(&mut |mir| mir.flatten_multiples());
-
-            if self.do_hash() == hashcode_before {
-                return;
-            }
-        }
-    }
     fn do_hash(&self) -> u64 {
         let mut hasher = FxHasher::default();
         self.hash(&mut hasher);
         hasher.finish()
-    }
-
-    fn checked_optimization(&mut self, optimization: &mut impl FnMut(&mut Mir)) {
-        self.cleanup();
-        optimization(self);
-        if cfg!(debug_assertions) {
-            self.validate();
-        }
     }
 }
 

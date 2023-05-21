@@ -33,50 +33,47 @@ use num_traits::ToPrimitive;
 
 use crate::{
     builtin_functions::BuiltinFunction,
-    mir::{Body, Expression, Id, Mir, VisibleExpressions},
+    id::IdGenerator,
+    mir::{Body, Expression, Id, VisibleExpressions},
     rich_ir::ToRichIr,
 };
 
-impl Mir {
-    pub fn fold_constants(&mut self) {
-        self.body
-            .visit_with_visible(&mut |_, expression, visible, _| {
-                let Expression::Call {
-                    function,
-                    arguments,
-                    responsible,
-                } = expression else { return; };
-                let Expression::Builtin(builtin) = visible.get(*function) else { return; };
-                let Some(result) = run_builtin(*builtin, arguments, *responsible, visible) else {
-                    return;
-                };
-                let evaluated_call = match result {
-                    Ok(return_value) => return_value,
-                    Err(panic_reason) => {
-                        let mut body = Body::default();
-                        let reason = body.push_with_new_id(
-                            &mut self.id_generator,
-                            Expression::Text(panic_reason),
-                        );
-                        body.push_with_new_id(
-                            &mut self.id_generator,
-                            Expression::Panic {
-                                reason,
-                                responsible: *responsible,
-                            },
-                        );
-                        Expression::Multiple(body)
-                    }
-                };
-                *expression = evaluated_call;
-            });
-    }
+pub fn fold_constants(
+    expression: &mut Expression,
+    visible: &VisibleExpressions,
+    id_generator: &mut IdGenerator<Id>,
+) {
+    let Expression::Call {
+        function,
+        arguments,
+        responsible,
+    } = expression else { return; };
+    let Expression::Builtin(builtin) = visible.get(*function) else { return; };
+    let Some(result) = run_builtin(*builtin, arguments, *responsible, visible) else {
+        return;
+    };
+    let evaluated_call = match result {
+        Ok(return_value) => return_value,
+        Err(panic_reason) => {
+            let mut body = Body::default();
+            let reason = body.push_with_new_id(id_generator, Expression::Text(panic_reason));
+            body.push_with_new_id(
+                id_generator,
+                Expression::Panic {
+                    reason,
+                    responsible: *responsible,
+                },
+            );
+            Expression::Multiple(body)
+        }
+    };
+    *expression = evaluated_call;
 }
 
-/// This function tries to run a builtin, requiring a minimal amount of
-/// static knowledge. For example, it can find out that the result of
-/// `builtinEquals $3 $3` is `True`, even if the value of `$3` is not known
-/// at compile-time.
+/// This function tries to run a builtin, requiring a minimal amount of static
+/// knowledge. For example, it can find out that the result of
+/// `builtinEquals $3 $3` is `True`, even if the value of `$3` is not known at
+/// compile-time.
 ///
 /// Returns `None` if the call couldn't be evaluated statically. Returns
 /// `Some(Ok(expression))` if the call successfully completed with a return

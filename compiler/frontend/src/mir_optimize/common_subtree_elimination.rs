@@ -23,79 +23,73 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::{
     hir,
     id::{CountableId, IdGenerator},
-    mir::{Body, Expression, Id, Mir, VisitorResult},
+    mir::{Body, Expression, Id, VisitorResult},
 };
 use std::collections::hash_map::Entry;
 
-impl Mir {
-    pub fn eliminate_common_subtrees(&mut self) {
-        let mut pure_expressions = FxHashMap::default();
-        let mut inner_functions: FxHashMap<Id, Vec<Id>> = FxHashMap::default();
-        let mut additional_function_hirs: FxHashMap<Id, FxHashSet<hir::Id>> = FxHashMap::default();
+pub fn eliminate_common_subtrees(body: &mut Body) {
+    let mut pure_expressions = FxHashMap::default();
+    let mut inner_functions: FxHashMap<Id, Vec<Id>> = FxHashMap::default();
+    let mut additional_function_hirs: FxHashMap<Id, FxHashSet<hir::Id>> = FxHashMap::default();
+    let mut updated_references: FxHashMap<Id, Id> = FxHashMap::default();
 
-        self.body
-            .visit_with_visible(&mut |id, expression, visible, _| {
-                if !expression.is_pure() {
-                    return;
-                }
-
-                let mut normalized = expression.clone();
-                normalized.normalize();
-
-                if let Expression::Function { body, .. } = expression {
-                    inner_functions.insert(
-                        id,
-                        body.all_functions().into_iter().map(|(id, _)| id).collect(),
-                    );
-                }
-
-                let existing_entry = pure_expressions.entry(normalized);
-                match existing_entry {
-                    Entry::Occupied(id_of_canonical_expression)
-                        if visible.contains(*id_of_canonical_expression.get()) =>
-                    {
-                        let old_expression = std::mem::replace(
-                            expression,
-                            Expression::Reference(*id_of_canonical_expression.get()),
-                        );
-                        if let Expression::Function {
-                            mut body,
-                            original_hirs,
-                            ..
-                        } = old_expression
-                        {
-                            additional_function_hirs
-                                .entry(*id_of_canonical_expression.get())
-                                .or_default()
-                                .extend(original_hirs);
-
-                            let canonical_child_functions = inner_functions
-                                .get(id_of_canonical_expression.get())
-                                .unwrap();
-                            for ((_, child_hirs), canonical_child_id) in body
-                                .all_functions()
-                                .into_iter()
-                                .zip(canonical_child_functions)
-                            {
-                                additional_function_hirs
-                                    .entry(*canonical_child_id)
-                                    .or_default()
-                                    .extend(child_hirs);
-                            }
-                        }
-                    }
-                    _ => {
-                        existing_entry.insert_entry(id);
-                    }
-                }
-            });
-
-        self.body.visit(&mut |id, expression, _| {
-            if let Expression::Function { original_hirs, .. } = expression && let Some(additional_hirs) = additional_function_hirs.remove(&id) {
-                original_hirs.extend(additional_hirs);
+    for (id, expression) in &mut body.expressions {
+        expression.replace_id_references(&mut |id| {
+            if let Some(update) = updated_references.get(id) {
+                *id = *update;
             }
-            VisitorResult::Continue
         });
+
+        if !expression.is_pure() {
+            continue;
+        }
+
+        let mut normalized = expression.clone();
+        normalized.normalize();
+
+        if let Expression::Function { body, .. } = expression {
+            inner_functions.insert(
+                *id,
+                body.all_functions().into_iter().map(|(id, _)| id).collect(),
+            );
+        }
+
+        let existing_entry = pure_expressions.entry(normalized);
+        match existing_entry {
+            Entry::Occupied(canonical_id) => {
+                let canonical_id = *canonical_id.get();
+                let old_expression =
+                    std::mem::replace(expression, Expression::Reference(canonical_id));
+                updated_references.insert(*id, canonical_id);
+
+                if let Expression::Function {
+                    mut body,
+                    original_hirs,
+                    ..
+                } = old_expression
+                {
+                    additional_function_hirs
+                        .entry(canonical_id)
+                        .or_default()
+                        .extend(original_hirs);
+
+                    let canonical_child_functions = inner_functions.get(&canonical_id).unwrap();
+                    for ((_, child_hirs), canonical_child_id) in body
+                        .all_functions()
+                        .into_iter()
+                        .zip(canonical_child_functions)
+                    {
+                        additional_function_hirs
+                            .entry(*canonical_child_id)
+                            .or_default()
+                            .extend(child_hirs);
+                    }
+                }
+            }
+            _ => {
+                existing_entry.insert_entry(*id);
+            }
+        }
     }
 }
 

@@ -30,7 +30,7 @@
 use crate::{
     error::{CompilerError, CompilerErrorPayload},
     id::IdGenerator,
-    mir::{Body, BodyBuilder, Expression, Id, Mir, MirError, VisitorResult},
+    mir::{Body, BodyBuilder, Expression, Id, MirError, VisibleExpressions},
     mir_optimize::OptimizeMir,
     module::{Module, UsePath},
     tracing::TracingConfig,
@@ -38,100 +38,102 @@ use crate::{
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::mem;
 
-impl Mir {
-    pub fn fold_modules(
-        &mut self,
-        db: &dyn OptimizeMir,
-        tracing: &TracingConfig,
-        errors: &mut FxHashSet<CompilerError>,
-    ) {
-        self.body
-            .visit_with_visible(&mut |_, expression, visible, _| {
-                let Expression::UseModule {
-                    current_module,
-                    relative_path,
-                    responsible,
-                } = expression else { return; };
+pub fn apply(
+    expression: &mut Expression,
+    visible: &VisibleExpressions,
+    id_generator: &mut IdGenerator<Id>,
+    db: &dyn OptimizeMir,
+    tracing: &TracingConfig,
+    errors: &mut FxHashSet<CompilerError>,
+) {
+    let Expression::UseModule { current_module, relative_path, responsible } = expression else { return; };
+    let path = match visible.get(*relative_path) {
+        Expression::Text(path) => path,
+        Expression::Parameter => {
+            // After optimizing, the MIR should no longer contain any `use`.
+            // However, here we are in the `use` function. All calls to this
+            // function are guaranteed to be inlined using the
+            // `inlining::inline_functions_containing_use` optimization and
+            // then, this function will be removed entirely. That's why it's
+            // fine to leave the `use` here.
+            return;
+        }
+        Expression::Call { .. } => {
+            let error = CompilerError::for_whole_module(
+                current_module.clone(),
+                MirError::UseNotStaticallyResolvable {
+                    containing_module: current_module.clone(),
+                },
+            );
+            *expression =
+                panicking_expression(id_generator, error.payload.to_string(), *responsible);
+            errors.insert(error);
+            return;
+        }
+        _ => {
+            *expression = panicking_expression(
+                id_generator,
+                "`use` expects a text as a path.".to_string(),
+                *responsible,
+            );
+            return;
+        }
+    };
 
-                let Expression::Text(path) = visible.get(*relative_path) else {
-                    *expression = panicking_expression(&mut self.id_generator, "`use` expects a text as a path.".to_string(), *responsible);
-                    return;
-                };
+    let module_to_import = match resolve_module(current_module, path) {
+        Ok(module) => module,
+        Err(error) => {
+            let error = CompilerError::for_whole_module(current_module.clone(), error);
+            *expression =
+                panicking_expression(id_generator, error.payload.to_string(), *responsible);
+            errors.insert(error);
+            return;
+        }
+    };
 
-                let module_to_import = match Self::resolve_module(current_module, path) {
-                    Ok(module) => module,
-                    Err(error) => {
-                        let error = CompilerError::for_whole_module(current_module.clone(), error);
-                        *expression = panicking_expression(&mut self.id_generator, error.payload.to_string(), *responsible);
-                        errors.insert(error);
-                        return;
-                    },
-                };
+    let body_to_insert =
+        match db.optimized_mir(module_to_import.clone(), tracing.for_child_module()) {
+            Ok((mir, more_errors)) => {
+                errors.extend(more_errors.iter().cloned());
 
-                let body_to_insert = match db.optimized_mir(module_to_import.clone(), tracing.for_child_module()) {
-                    Ok((mir, more_errors)) => {
-                        errors.extend(more_errors.iter().cloned());
+                let mut body = mir.body.clone();
+                let mapping: FxHashMap<Id, Id> = body
+                    .all_ids()
+                    .into_iter()
+                    .map(|id| (id, id_generator.generate()))
+                    .collect();
+                body.replace_ids(&mut |id| {
+                    if let Some(new_id) = mapping.get(id) {
+                        *id = *new_id;
+                    }
+                });
+                body
+            }
+            Err(error) => {
+                errors.insert(CompilerError::for_whole_module(module_to_import, error));
 
-                        let mut body = mir.body.clone();
-                        let mapping: FxHashMap<Id, Id> = body
-                            .all_ids()
-                            .into_iter()
-                            .map(|id| (id, self.id_generator.generate()))
-                            .collect();
-                        body.replace_ids(&mut |id| if let Some(new_id) = mapping.get(id) { *id = *new_id; });
-                        body
-                    },
-                    Err(error) => {
-                        errors.insert(CompilerError::for_whole_module(module_to_import, error));
+                let inner_id_generator = mem::take(id_generator);
+                let mut builder = BodyBuilder::new(inner_id_generator);
 
-                        let id_generator = mem::take(&mut self.id_generator);
-                        let mut builder = BodyBuilder::new(id_generator);
+                let reason = builder.push_text(CompilerErrorPayload::Module(error).to_string());
+                builder.push_panic(reason, *responsible);
 
-                        let reason = builder.push_text(CompilerErrorPayload::Module(error).to_string());
-                        builder.push_panic(reason, *responsible);
+                let (inner_id_generator, body) = builder.finish();
+                *id_generator = inner_id_generator;
+                body
+            }
+        };
+    *expression = Expression::Multiple(body_to_insert);
+}
 
-                        let (id_generator, body) = builder.finish();
-                        self.id_generator = id_generator;
-                        body
-                    },
-                };
-                *expression = Expression::Multiple(body_to_insert);
-            });
-    }
-    fn resolve_module(current_module: &Module, path: &str) -> Result<Module, MirError> {
-        let Ok(path) = UsePath::parse(path) else {
+fn resolve_module(current_module: &Module, path: &str) -> Result<Module, MirError> {
+    let Ok(path) = UsePath::parse(path) else {
             return Err(MirError::UseWithInvalidPath { module: current_module.clone(), path: path.to_string() });
         };
-        let Ok(module) = path.resolve_relative_to(current_module.clone()) else {
+    let Ok(module) = path.resolve_relative_to(current_module.clone()) else {
             return Err(MirError::UseHasTooManyParentNavigations { module: current_module.clone(), path: path.to_string() });
         };
-        Ok(module)
-    }
-
-    pub fn replace_remaining_uses_with_panics(&mut self, errors: &mut FxHashSet<CompilerError>) {
-        self.body.visit(&mut |_, expression, _| {
-            if let Expression::UseModule {
-                current_module,
-                responsible,
-                ..
-            } = expression
-            {
-                let error = CompilerError::for_whole_module(
-                    current_module.clone(),
-                    MirError::UseNotStaticallyResolvable {
-                        containing_module: current_module.clone(),
-                    },
-                );
-                *expression = panicking_expression(
-                    &mut self.id_generator,
-                    error.payload.to_string(),
-                    *responsible,
-                );
-                errors.insert(error);
-            }
-            VisitorResult::Continue
-        });
-    }
+    Ok(module)
 }
 
 fn panicking_expression(
