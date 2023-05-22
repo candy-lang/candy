@@ -77,7 +77,7 @@ where
                     panic,
                     tracer,
                 };
-                // case.dump(db);
+                case.dump(db);
                 failing_cases.push(case);
             }
             Status::TotalCoverageButNoPanic => {}
@@ -91,10 +91,12 @@ pub struct FailingFuzzCase {
     function: Id,
     input: Input,
     panic: Panic,
+    #[allow(dead_code)]
     tracer: StackTracer,
 }
 
 impl FailingFuzzCase {
+    #[allow(unused_variables)]
     pub fn dump<DB>(&self, db: &DB)
     where
         DB: AstToHir + PositionConversionDb,
@@ -104,9 +106,10 @@ impl FailingFuzzCase {
             self.function, self.input, self.panic.reason,
         );
         error!("{} is responsible.", self.panic.responsible);
-        error!(
-            "This is the stack trace:\n{}",
-            self.tracer.format_panic_stack_trace_to_root_fiber(db),
-        );
+        // Segfaults: https://github.com/candy-lang/candy/issues/458
+        // error!(
+        //     "This is the stack trace:\n{}",
+        //     self.tracer.format_panic_stack_trace_to_root_fiber(db),
+        // );
     }
 }

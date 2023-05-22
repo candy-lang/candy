@@ -128,7 +128,7 @@ impl Fuzzer {
             RunResult::Done { .. } | RunResult::NeedsUnfulfilled { .. } => {
                 if total_coverage
                     .relative_coverage_of_range(self.lir.range_of_function(&self.function_id))
-                    == 1f64
+                    == 1.0
                 {
                     Status::TotalCoverageButNoPanic
                 } else {
