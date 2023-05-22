@@ -2975,7 +2975,7 @@ mod parse {
 
     #[instrument(level = "trace")]
     fn match_case(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
-        let (input, pattern) = expression(input, indentation, false, false, true)?;
+        let (input, pattern) = expression(input, indentation, false, true, true)?;
         let (input, whitespace) = whitespaces_and_newlines(input, indentation, true);
         let pattern = pattern.wrap_in_whitespace(whitespace);
 

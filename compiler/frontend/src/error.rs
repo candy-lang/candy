@@ -87,7 +87,6 @@ impl Display for CompilerErrorPayload {
             }
             .to_string(),
             CompilerErrorPayload::Ast(error) => match error {
-                AstError::CallInPattern => "Calls in patterns are not allowed.".to_string(),
                 AstError::ExpectedNameOrPatternInAssignment => {
                     "An assignment should have a name or pattern on the left side.".to_string()
                 }
@@ -151,6 +150,7 @@ impl Display for CompilerErrorPayload {
                 HirError::NeedsWithWrongNumberOfArguments { num_args } => {
                     format!("`needs` accepts one or two arguments, but was called with {num_args} arguments. Its parameters are the `condition` and an optional `message`.")
                 }
+                HirError::PatternContainsCall => "Calls in patterns are not allowed.".to_string(),
                 HirError::PublicAssignmentInNotTopLevel => {
                     "Public assignments (:=) can only be used in top-level code.".to_string()
                 }

@@ -392,19 +392,6 @@ impl LoweringContext {
                 receiver,
                 arguments,
             } => {
-                match lowering_type {
-                    LoweringType::Expression => {}
-                    LoweringType::Pattern | LoweringType::PatternLiteralPart => {
-                        return self.create_ast(
-                            cst.data.id,
-                            AstKind::Error {
-                                child: None,
-                                errors: vec![self.create_error(cst, AstError::CallInPattern)],
-                            },
-                        )
-                    }
-                }
-
                 let mut receiver_kind = &receiver.kind;
                 loop {
                     receiver_kind = match receiver_kind {

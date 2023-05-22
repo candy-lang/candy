@@ -321,7 +321,10 @@ pub enum Pattern {
     NewIdentifier(PatternIdentifierId),
     Int(BigUint),
     Text(String),
-    Symbol(String),
+    Tag {
+        symbol: String,
+        value: Option<Box<Pattern>>,
+    },
     List(Vec<Pattern>),
     // Keys may not contain `NewIdentifier`.
     Struct(Vec<(Pattern, Pattern)>),
@@ -341,7 +344,11 @@ impl Pattern {
     pub fn contains_captured_identifiers(&self) -> bool {
         match self {
             Pattern::NewIdentifier(_) => true,
-            Pattern::Int(_) | Pattern::Text(_) | Pattern::Symbol(_) => false,
+            Pattern::Int(_) | Pattern::Text(_) => false,
+            Pattern::Tag { value, .. } => value
+                .as_ref()
+                .map(|value| value.contains_captured_identifiers())
+                .unwrap_or_default(),
             Pattern::List(list) => list.iter().any(|it| it.contains_captured_identifiers()),
             Pattern::Struct(struct_) => struct_
                 .iter()
@@ -356,7 +363,11 @@ impl Pattern {
     pub fn captured_identifier_count(&self) -> usize {
         match self {
             Pattern::NewIdentifier(_) => 1,
-            Pattern::Int(_) | Pattern::Text(_) | Pattern::Symbol(_) => 0,
+            Pattern::Int(_) | Pattern::Text(_) => 0,
+            Pattern::Tag { value, .. } => value
+                .as_ref()
+                .map(|value| value.captured_identifier_count())
+                .unwrap_or_default(),
             Pattern::List(list) => list.iter().map(|it| it.captured_identifier_count()).sum(),
             Pattern::Struct(struct_) => struct_
                 .iter()
@@ -390,7 +401,12 @@ impl Pattern {
     fn collect_captured_identifiers(&self, ids: &mut Vec<PatternIdentifierId>) {
         match self {
             Pattern::NewIdentifier(identifier_id) => ids.push(*identifier_id),
-            Pattern::Int(_) | Pattern::Text(_) | Pattern::Symbol(_) => {}
+            Pattern::Int(_) | Pattern::Text(_) => {}
+            Pattern::Tag { value, .. } => {
+                if let Some(value) = value {
+                    value.collect_captured_identifiers(ids);
+                }
+            }
             Pattern::List(list) => {
                 for pattern in list {
                     pattern.collect_captured_identifiers(ids);
@@ -436,6 +452,7 @@ impl Hash for Body {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum HirError {
     NeedsWithWrongNumberOfArguments { num_args: usize },
+    PatternContainsCall,
     PublicAssignmentInNotTopLevel,
     PublicAssignmentWithSameName { name: String },
     UnknownReference { name: String },
@@ -580,8 +597,13 @@ impl ToRichIr for Pattern {
                 builder.push(format!(r#""{text:?}\""#), TokenType::Text, EnumSet::empty());
             }
             Pattern::NewIdentifier(reference) => reference.build_rich_ir(builder),
-            Pattern::Symbol(symbol) => {
+            Pattern::Tag { symbol, value } => {
                 builder.push(symbol, TokenType::Symbol, EnumSet::empty());
+                if let Some(value) = value {
+                    builder.push(" (", None, EnumSet::empty());
+                    value.build_rich_ir(builder);
+                    builder.push(")", None, EnumSet::empty());
+                }
             }
             Pattern::List(items) => {
                 builder.push("(", None, EnumSet::empty());
@@ -751,7 +773,11 @@ impl CollectErrors for Expression {
 impl CollectErrors for Pattern {
     fn collect_errors(&self, errors: &mut Vec<CompilerError>) {
         match self {
-            Pattern::NewIdentifier(_) | Pattern::Int(_) | Pattern::Text(_) | Pattern::Symbol(_) => {
+            Pattern::NewIdentifier(_) | Pattern::Int(_) | Pattern::Text(_) => {}
+            Pattern::Tag { value, .. } => {
+                if let Some(value) = value {
+                    value.collect_errors(errors);
+                }
             }
             Pattern::List(patterns) => {
                 for item_pattern in patterns {
