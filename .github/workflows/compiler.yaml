@@ -18,7 +18,7 @@ jobs:
         with:
           toolchain: ${{ env.RUST_VERSION }}
           components: clippy, rustfmt
-      - uses: Swatinem/rust-cache@v2.3.0
+      - uses: Swatinem/rust-cache@v2.4.0
 
       # Compiler
       - name: 'Compiler: clippy'
@@ -40,7 +40,7 @@ jobs:
   #     - uses: dtolnay/rust-toolchain@b44cb146d03e8d870c57ab64b80f04586349ca5d
   #       with:
   #         toolchain: ${{ env.RUST_VERSION }}
-  #     - uses: Swatinem/rust-cache@v2.3.0
+  #     - uses: Swatinem/rust-cache@v2.4.0
 
   #     - run: cargo run --release -- fuzz packages/Benchmark.candy
 
@@ -52,7 +52,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@b44cb146d03e8d870c57ab64b80f04586349ca5d
         with:
           toolchain: ${{ env.RUST_VERSION }}
-      - uses: Swatinem/rust-cache@v2.3.0
+      - uses: Swatinem/rust-cache@v2.4.0
 
       - name: Run benchmark
         working-directory: compiler/vm/
