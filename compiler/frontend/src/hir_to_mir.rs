@@ -97,21 +97,21 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
         // Common stuff.
         let needs_code = body.push_hir_id(needs_id.clone());
         let builtin_equals = body.push_builtin(BuiltinFunction::Equals);
-        let nothing_symbol = body.push_nothing();
+        let nothing_tag = body.push_nothing();
 
         // Make sure the condition is a bool.
-        let true_symbol = body.push_bool(true);
-        let false_symbol = body.push_bool(false);
+        let true_tag = body.push_bool(true);
+        let false_tag = body.push_bool(false);
         let is_condition_true =
-            body.push_call(builtin_equals, vec![condition, true_symbol], needs_code);
+            body.push_call(builtin_equals, vec![condition, true_tag], needs_code);
         let is_condition_bool = body.push_if_else(
             needs_id.child("isConditionTrue"),
             is_condition_true,
             |body| {
-                body.push_reference(true_symbol);
+                body.push_reference(true_tag);
             },
             |body| {
-                body.push_call(builtin_equals, vec![condition, false_symbol], needs_code);
+                body.push_call(builtin_equals, vec![condition, false_tag], needs_code);
             },
             needs_code,
         );
@@ -119,7 +119,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
             needs_id.child("isConditionBool"),
             is_condition_bool,
             |body| {
-                body.push_reference(nothing_symbol);
+                body.push_reference(nothing_tag);
             },
             |body| {
                 let panic_reason =
@@ -132,17 +132,17 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
         // Make sure the reason is a text.
         let builtin_type_of = body.push_builtin(BuiltinFunction::TypeOf);
         let type_of_reason = body.push_call(builtin_type_of, vec![reason], responsible_for_call);
-        let text_symbol = body.push_symbol("Text".to_string());
+        let text_tag = body.push_tag("Text".to_string(), None);
         let is_reason_text = body.push_call(
             builtin_equals,
-            vec![type_of_reason, text_symbol],
+            vec![type_of_reason, text_tag],
             responsible_for_call,
         );
         body.push_if_else(
             needs_id.child("isReasonText"),
             is_reason_text,
             |body| {
-                body.push_reference(nothing_symbol);
+                body.push_reference(nothing_tag);
             },
             |body| {
                 let panic_reason = body.push_text("The `reason` must be a text.".to_string());
@@ -156,7 +156,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
             needs_id.child("condition"),
             condition,
             |body| {
-                body.push_reference(nothing_symbol);
+                body.push_reference(nothing_tag);
             },
             |body| {
                 body.push_panic(reason, responsible_for_condition);
@@ -229,7 +229,7 @@ impl<'a> LoweringContext<'a> {
             hir::Expression::Int(int) => body.push_int(int.clone().into()),
             hir::Expression::Text(text) => body.push_text(text.clone()),
             hir::Expression::Reference(reference) => body.push_reference(self.mapping[reference]),
-            hir::Expression::Symbol(symbol) => body.push_symbol(symbol.clone()),
+            hir::Expression::Symbol(symbol) => body.push_tag(symbol.clone(), None),
             hir::Expression::Builtin(builtin) => body.push_builtin(*builtin),
             hir::Expression::List(items) => {
                 body.push_list(items.iter().map(|item| self.mapping[item]).collect())
@@ -517,8 +517,8 @@ impl<'a> LoweringContext<'a> {
 struct PatternLoweringContext<'a> {
     db: &'a dyn HirToMir,
     hir_id: hir::Id,
-    match_symbol: Id,
-    no_match_symbol: Id,
+    match_tag: Id,
+    no_match_tag: Id,
     responsible: Id,
 }
 impl<'a> PatternLoweringContext<'a> {
@@ -532,13 +532,13 @@ impl<'a> PatternLoweringContext<'a> {
         expression: Id,
         pattern: &hir::Pattern,
     ) -> Id {
-        let match_symbol = body.push_match_symbol();
-        let no_match_symbol = body.push_no_match_symbol();
+        let match_tag = body.push_match_tag();
+        let no_match_tag = body.push_no_match_tag();
         let context = PatternLoweringContext {
             db,
             hir_id,
-            match_symbol,
-            no_match_symbol,
+            match_tag,
+            no_match_tag,
             responsible,
         };
         context.compile(body, expression, pattern)
@@ -564,7 +564,7 @@ impl<'a> PatternLoweringContext<'a> {
                         vec![expression],
                         self.responsible,
                     );
-                    let expected_symbol = body.push_symbol(symbol.to_owned());
+                    let expected_symbol = body.push_tag(symbol.to_owned(), None);
                     self.compile_equals(body, expected_symbol, actual_symbol, |body| {
                         let builtin_tag_has_value = body.push_builtin(BuiltinFunction::TagHasValue);
                         let actual_has_value = body.push_call(builtin_tag_has_value, vec![expression], self.responsible);
@@ -803,7 +803,7 @@ impl<'a> PatternLoweringContext<'a> {
     where
         T: FnOnce(&mut BodyBuilder),
     {
-        let expected_type = body.push_symbol(expected_type);
+        let expected_type = body.push_tag(expected_type, None);
         let builtin_type_of = body.push_builtin(BuiltinFunction::TypeOf);
         let type_ = body.push_call(builtin_type_of, vec![expression], self.responsible);
         self.compile_equals(
@@ -940,21 +940,21 @@ impl<'a> PatternLoweringContext<'a> {
     }
 
     fn push_match(&self, body: &mut BodyBuilder, mut captured_identifiers: Vec<Id>) -> Id {
-        captured_identifiers.insert(0, self.match_symbol);
+        captured_identifiers.insert(0, self.match_tag);
         body.push_list(captured_identifiers)
     }
     fn push_no_match(&self, body: &mut BodyBuilder, reason_text: Id) -> Id {
-        let no_match_symbol = self.no_match_symbol;
-        body.push_list(vec![no_match_symbol, reason_text])
+        let no_match_tag = self.no_match_tag;
+        body.push_list(vec![no_match_tag, reason_text])
     }
 }
 
 impl BodyBuilder {
-    fn push_match_symbol(&mut self) -> Id {
-        self.push_symbol("Match".to_string())
+    fn push_match_tag(&mut self) -> Id {
+        self.push_tag("Match".to_string(), None)
     }
-    fn push_no_match_symbol(&mut self) -> Id {
-        self.push_symbol("NoMatch".to_string())
+    fn push_no_match_tag(&mut self) -> Id {
+        self.push_tag("NoMatch".to_string(), None)
     }
 
     /// Compiles to code taking a `(Match, …)` or `(NoMatch, …)` and returning a
@@ -962,17 +962,17 @@ impl BodyBuilder {
     fn push_is_match(&mut self, match_or_no_match: Id, responsible: Id) -> Id {
         let list_get_function = self.push_builtin(BuiltinFunction::ListGet);
         let zero = self.push_int(0.into());
-        let match_or_no_match_symbol = self.push_call(
+        let match_or_no_match_tag = self.push_call(
             list_get_function,
             vec![match_or_no_match, zero],
             responsible,
         );
 
         let equals_function = self.push_builtin(BuiltinFunction::Equals);
-        let match_symbol = self.push_match_symbol();
+        let match_tag = self.push_match_tag();
         self.push_call(
             equals_function,
-            vec![match_or_no_match_symbol, match_symbol],
+            vec![match_or_no_match_tag, match_tag],
             responsible,
         )
     }

@@ -1,4 +1,4 @@
-use crate::heap::{Function, HirId, InlineData, InlineObject};
+use crate::heap::{Function, HirId, InlineData, InlineObject, Text};
 use crate::utils::DebugDisplay;
 use crate::{fiber::InstructionPointer, heap::Heap};
 use candy_frontend::hir;
@@ -31,6 +31,13 @@ pub type StackOffset = usize; // 0 is the last item, 1 the one before that, etc.
 #[derive(Clone, Debug, EnumDiscriminants, Eq, Hash, IntoStaticStr, PartialEq)]
 #[strum_discriminants(derive(Hash, IntoStaticStr), strum(serialize_all = "camelCase"))]
 pub enum Instruction {
+    /// Pops 1 argument, pushes a tag.
+    ///
+    /// a, value -> a, tag
+    CreateTag {
+        symbol: Text,
+    },
+
     /// Pops num_items items, pushes a list.
     ///
     /// a, item, item, ..., item -> a, pointer to list
@@ -118,6 +125,10 @@ impl Instruction {
     /// this instruction.
     pub fn apply_to_stack(&self, stack: &mut Vec<Id>, result: Id) {
         match self {
+            Instruction::CreateTag { .. } => {
+                stack.pop();
+                stack.push(result);
+            }
             Instruction::CreateList { num_items } => {
                 stack.pop_multiple(*num_items);
                 stack.push(result);
@@ -272,6 +283,14 @@ impl ToRichIr for Instruction {
         );
 
         match self {
+            Instruction::CreateTag { symbol } => {
+                builder.push(" ", None, EnumSet::empty());
+                builder.push(
+                    DebugDisplay::to_string(symbol, false),
+                    None,
+                    EnumSet::empty(),
+                );
+            }
             Instruction::CreateList { num_items } => {
                 builder.push(" ", None, EnumSet::empty());
                 builder.push(num_items.to_string(), None, EnumSet::empty());

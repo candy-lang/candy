@@ -59,6 +59,12 @@ impl Expression {
             | Expression::Symbol(_)
             | Expression::Builtin(_)
             | Expression::HirId(_) => {}
+            Expression::Tag { symbol, value } => {
+                referenced.insert(*symbol);
+                if let Some(value) = value {
+                    referenced.insert(*value);
+                }
+            }
             Expression::List(items) => {
                 referenced.extend(items);
             }
@@ -162,6 +168,7 @@ impl Expression {
             Expression::Text(_) => true,
             Expression::Reference(_) => true,
             Expression::Symbol(_) => true,
+            Expression::Tag { .. } => true,
             Expression::List(_) => true,
             Expression::Struct(_) => true,
             Expression::Function { .. } => true,
@@ -234,6 +241,12 @@ impl Expression {
             | Expression::Symbol(_)
             | Expression::Builtin(_)
             | Expression::HirId(_) => {}
+            Expression::Tag { symbol, value } => {
+                replacer(symbol);
+                if let Some(value) = value {
+                    replacer(value);
+                }
+            }
             Expression::List(items) => {
                 for item in items {
                     replacer(item);

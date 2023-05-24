@@ -158,8 +158,28 @@ impl<'c> LoweringContext<'c> {
                 }
             }
             Expression::Symbol(symbol) => {
-                let tag = Tag::create_from_str(&mut self.lir.constant_heap, symbol, None);
-                self.constants.insert(id, tag.into());
+                let symbol = Text::create(&mut self.lir.constant_heap, symbol);
+                self.constants.insert(id, symbol.into());
+            }
+            Expression::Tag { symbol, value } => {
+                let symbol = *self.constants.get(symbol).unwrap();
+                let symbol: Text = symbol.try_into().unwrap();
+
+                match value {
+                    Some(value) => {
+                        if let Some(value) = self.constants.get(value) {
+                            let tag = Tag::create(&mut self.lir.constant_heap, symbol, *value);
+                            self.constants.insert(id, tag.into());
+                        } else {
+                            self.emit_reference_to(*value);
+                            self.emit(id, Instruction::CreateTag { symbol });
+                        }
+                    }
+                    None => {
+                        let tag = Tag::create(&mut self.lir.constant_heap, symbol, None);
+                        self.constants.insert(id, tag.into());
+                    }
+                }
             }
             Expression::Builtin(builtin) => {
                 let builtin = Builtin::create(*builtin);
