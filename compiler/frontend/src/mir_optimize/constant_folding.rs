@@ -258,7 +258,12 @@ fn run_builtin(
 
             Returns(is_contained?.into())
         }
-        BuiltinFunction::TagGetValue => return None,
+        BuiltinFunction::TagGetValue => {
+            let [tag] = arguments else { unreachable!() };
+            let Expression::Tag { value: Some(value), .. } = visible.get(*tag) else { return None; };
+
+            Returns(Expression::Reference(*value))
+        }
         BuiltinFunction::TagHasValue => {
             let [tag] = arguments else { unreachable!() };
             let Expression::Tag { value, .. } = visible.get(*tag) else { return None; };
