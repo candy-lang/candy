@@ -316,27 +316,16 @@ impl BodyBuilder {
     }
 
     pub fn push_tag(&mut self, symbol: String, value: impl Into<Option<Id>>) -> Id {
-        let symbol = self.push(Expression::Symbol(symbol));
         self.push(Expression::Tag {
             symbol,
             value: value.into(),
         })
     }
     pub fn push_nothing(&mut self) -> Id {
-        let symbol = self.push(Expression::Symbol("Nothing".to_string()));
-        self.push(Expression::Tag {
-            symbol,
-            value: None,
-        })
+        self.push(Expression::nothing())
     }
     pub fn push_bool(&mut self, value: bool) -> Id {
-        let symbol = self.push(Expression::Symbol(
-            if value { "True" } else { "False" }.to_string(),
-        ));
-        self.push(Expression::Tag {
-            symbol,
-            value: None,
-        })
+        self.push(value.into())
     }
 
     pub fn push_builtin(&mut self, function: BuiltinFunction) -> Id {

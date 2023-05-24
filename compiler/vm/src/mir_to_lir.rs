@@ -157,13 +157,8 @@ impl<'c> LoweringContext<'c> {
                     self.emit(id, Instruction::PushFromStack(offset));
                 }
             }
-            Expression::Symbol(symbol) => {
-                let symbol = Text::create(&mut self.lir.constant_heap, symbol);
-                self.constants.insert(id, symbol.into());
-            }
             Expression::Tag { symbol, value } => {
-                let symbol = *self.constants.get(symbol).unwrap();
-                let symbol: Text = symbol.try_into().unwrap();
+                let symbol = Text::create(&mut self.lir.constant_heap, symbol);
 
                 match value {
                     Some(value) => {

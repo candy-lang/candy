@@ -51,7 +51,7 @@ impl Mir {
                 match expr {
                     Expression::HirId(_) => 0,
                     Expression::Builtin(_) => 1,
-                    Expression::Symbol(_) => 2,
+                    Expression::Tag { value: None, .. } => 2,
                     Expression::Int(_) => 3,
                     Expression::Text(_) => 4,
                     _ => 5,
@@ -62,7 +62,6 @@ impl Mir {
                 (Expression::Builtin(a), Expression::Builtin(b)) => {
                     format!("{a:?}").cmp(&format!("{b:?}"))
                 }
-                (Expression::Symbol(a), Expression::Symbol(b)) => a.cmp(b),
                 (Expression::Int(a), Expression::Int(b)) => a.cmp(b),
                 (Expression::Text(a), Expression::Text(b)) => a.cmp(b),
                 _ => order_score(a).cmp(&order_score(b)),

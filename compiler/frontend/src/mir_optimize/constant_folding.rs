@@ -50,12 +50,12 @@ pub fn fold_constants(
     } = expression else { return; };
 
     if let Expression::Tag { symbol, value: None } = visible.get(*function) && arguments.len() == 1 {
-        *expression = Expression::Tag { symbol: *symbol, value: Some(arguments[0]) };
+        *expression = Expression::Tag { symbol: symbol.clone(), value: Some(arguments[0]) };
         return;
     }
 
     let Expression::Builtin(builtin) = visible.get(*function) else { return; };
-    let Some(result) = run_builtin(*builtin, arguments, *responsible, visible, id_generator) else {
+    let Some(result) = run_builtin(*builtin, arguments, *responsible, visible) else {
         return;
     };
     let evaluated_call = match result {
@@ -94,7 +94,6 @@ fn run_builtin(
     arguments: &[Id],
     responsible: Id,
     visible: &VisibleExpressions,
-    id_generator: &mut IdGenerator<Id>,
 ) -> Option<BuiltinResult> {
     use BuiltinResult::*;
 
@@ -125,13 +124,7 @@ fn run_builtin(
         }
         BuiltinFunction::IfElse => {
             let [condition, then_body, else_body] = arguments else { unreachable!() };
-            let Expression::Tag { symbol, value: None } = visible.get(*condition) else { return None; };
-            let Expression::Symbol(symbol) = visible.get(*symbol) else { return None; };
-            let condition = match symbol.as_str() {
-                "True" => true,
-                "False" => false,
-                _ => return None,
-            };
+            let condition = visible.get(*condition).try_into().ok()?;
             Returns(Expression::Call {
                 function: if condition { *then_body } else { *else_body },
                 arguments: vec![],
@@ -266,13 +259,18 @@ fn run_builtin(
             Returns(is_contained?.into())
         }
         BuiltinFunction::TagGetValue => return None,
-        BuiltinFunction::TagHasValue => return None,
+        BuiltinFunction::TagHasValue => {
+            let [tag] = arguments else { unreachable!() };
+            let Expression::Tag { value, .. } = visible.get(*tag) else { return None; };
+
+            Returns(value.is_some().into())
+        }
         BuiltinFunction::TagWithoutValue => {
             let [tag] = arguments else { unreachable!() };
             let Expression::Tag { symbol, .. } = visible.get(*tag) else { return None; };
 
             Returns(Expression::Tag {
-                symbol: *symbol,
+                symbol: symbol.clone(),
                 value: None,
             })
         }
@@ -304,11 +302,9 @@ fn run_builtin(
         BuiltinFunction::ToDebugText => return None,
         BuiltinFunction::Try => return None,
         BuiltinFunction::TypeOf => Returns(Expression::tag(
-            id_generator,
             match visible.get(arguments[0]) {
                 Expression::Int(_) => "Int",
                 Expression::Text(_) => "Text",
-                Expression::Symbol(_) => unreachable!(),
                 Expression::Tag { .. } => "Tag",
                 Expression::Builtin(_) => "Function",
                 Expression::List(_) => "List",
@@ -383,7 +379,6 @@ fn run_builtin(
                 | Expression::TraceFoundFuzzableFunction { .. } => unreachable!(),
             }
             .to_string(),
-            None,
         )),
     };
     Some(result)

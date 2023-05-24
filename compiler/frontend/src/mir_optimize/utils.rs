@@ -56,11 +56,9 @@ impl Expression {
         match self {
             Expression::Int(_)
             | Expression::Text(_)
-            | Expression::Symbol(_)
             | Expression::Builtin(_)
             | Expression::HirId(_) => {}
-            Expression::Tag { symbol, value } => {
-                referenced.insert(*symbol);
+            Expression::Tag { value, .. } => {
                 if let Some(value) = value {
                     referenced.insert(*value);
                 }
@@ -167,7 +165,6 @@ impl Expression {
             Expression::Int(_) => true,
             Expression::Text(_) => true,
             Expression::Reference(_) => true,
-            Expression::Symbol(_) => true,
             Expression::Tag { .. } => true,
             Expression::List(_) => true,
             Expression::Struct(_) => true,
@@ -238,11 +235,9 @@ impl Expression {
         match self {
             Expression::Int(_)
             | Expression::Text(_)
-            | Expression::Symbol(_)
             | Expression::Builtin(_)
             | Expression::HirId(_) => {}
-            Expression::Tag { symbol, value } => {
-                replacer(symbol);
+            Expression::Tag { value, .. } => {
                 if let Some(value) = value {
                     replacer(value);
                 }

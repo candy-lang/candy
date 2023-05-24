@@ -1,7 +1,6 @@
 use crate::{
     builtin_functions::BuiltinFunction,
     hir,
-    id::IdGenerator,
     module::Module,
     rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr, TokenModifier, TokenType},
 };
@@ -17,9 +16,8 @@ use super::{body::Body, id::Id};
 pub enum Expression {
     Int(BigInt),
     Text(String),
-    Symbol(String),
     Tag {
-        symbol: Id,
+        symbol: String,
         value: Option<Id>,
     },
     Builtin(BuiltinFunction),
@@ -88,37 +86,26 @@ pub enum Expression {
 }
 
 impl Expression {
-    pub fn tag(
-        id_generator: &mut IdGenerator<Id>,
-        symbol: String,
-        value: impl Into<Option<Id>>,
-    ) -> Self {
-        let mut body = Body::default();
-        let symbol = body.push_with_new_id(id_generator, Expression::Symbol(symbol));
-        body.push_with_new_id(
-            id_generator,
-            Expression::Tag {
-                symbol,
-                value: value.into(),
-            },
-        );
-        Expression::Multiple(body)
+    pub fn tag(symbol: String) -> Self {
+        Expression::Tag {
+            symbol,
+            value: None,
+        }
     }
-
-    pub fn nothing(id_generator: &mut IdGenerator<Id>) -> Self {
-        Self::tag(id_generator, "Nothing".to_string(), None)
+    pub fn nothing() -> Self {
+        Self::tag("Nothing".to_string())
     }
 }
 impl From<bool> for Expression {
     fn from(value: bool) -> Self {
-        Expression::Symbol(if value { "True" } else { "False" }.to_string())
+        Self::tag(if value { "True" } else { "False" }.to_string())
     }
 }
 impl TryInto<bool> for &Expression {
     type Error = ();
 
     fn try_into(self) -> Result<bool, ()> {
-        let Expression::Symbol(symbol) = self else { return Err(()); };
+        let Expression::Tag { symbol, .. } = self else { return Err(()); };
         match symbol.as_str() {
             "True" => Ok(true),
             "False" => Ok(false),
@@ -142,7 +129,6 @@ impl hash::Hash for Expression {
         match self {
             Expression::Int(int) => int.hash(state),
             Expression::Text(text) => text.hash(state),
-            Expression::Symbol(symbol) => symbol.hash(state),
             Expression::Tag { symbol, value } => {
                 symbol.hash(state);
                 value.hash(state);
@@ -239,13 +225,10 @@ impl ToRichIr for Expression {
                     builder.push(format!(r#""{}""#, text), TokenType::Text, EnumSet::empty());
                 builder.push_reference(text.to_owned(), range);
             }
-            Expression::Symbol(symbol) => {
-                let range = builder.push(symbol, TokenType::Symbol, EnumSet::empty());
-                builder.push_reference(ReferenceKey::Symbol(symbol.to_owned()), range);
-            }
             Expression::Tag { symbol, value } => {
-                builder.push("tag ", TokenType::Symbol, EnumSet::empty());
-                symbol.build_rich_ir(builder);
+                let range = builder.push(format!("{symbol}"), TokenType::Symbol, EnumSet::empty());
+                builder.push_reference(ReferenceKey::Symbol(symbol.to_owned()), range);
+                builder.push(" ", None, EnumSet::empty());
                 if let Some(value) = value {
                     builder.push(" ", None, EnumSet::empty());
                     value.build_rich_ir(builder);
