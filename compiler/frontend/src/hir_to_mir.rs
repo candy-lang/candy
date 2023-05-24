@@ -574,6 +574,8 @@ impl<'a> PatternLoweringContext<'a> {
                                 let builtin_tag_get_value = body.push_builtin(BuiltinFunction::TagGetValue);
                                 let actual_value = body.push_call(builtin_tag_get_value, vec![expression], self.responsible);
                                 self.compile(body, actual_value, value);
+                            } else {
+                                self.push_match(body, vec![]);
                             }
                         }, |body, _, _| {
                             if value.is_some() {
@@ -865,8 +867,11 @@ impl<'a> PatternLoweringContext<'a> {
             }
             hir::Pattern::Int(int) => body.push_int(int.to_owned().into()),
             hir::Pattern::Text(text) => body.push_text(text.to_owned()),
-            hir::Pattern::Tag { .. } => {
-                panic!("Tags can't be used in this part of a pattern.")
+            hir::Pattern::Tag { symbol, value } => {
+                let value = value
+                    .as_ref()
+                    .map(|value| self.compile_pattern_to_key_expression(body, value));
+                body.push_tag(symbol.to_string(), value)
             }
             hir::Pattern::List(_) => panic!("Lists can't be used in this part of a pattern."),
             hir::Pattern::Struct(_) => panic!("Structs can't be used in this part of a pattern."),
