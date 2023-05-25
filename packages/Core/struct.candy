@@ -9,8 +9,8 @@ hasKey struct key :=
 
 get struct key :=
   needs (is struct)
-  ifElse (struct | hasKey key) { [Type: Ok, Value: struct | ✨.structGet key] } {
-    [Type: Error, Value: "Key {key} not found in struct"]
+  ifElse (struct | hasKey key) { Ok (struct | ✨.structGet key) } {
+    Error "Key {key} not found in struct"
   }
 
 getKeys struct :=

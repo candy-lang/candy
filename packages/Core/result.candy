@@ -3,39 +3,37 @@ bool = use "..bool"
 [equals] = use "..equality"
 function = use "..function"
 struct = use "..struct"
+tag = use "..tag"
 
-is value := struct.is value | bool.lazyAnd {
-  value | struct.hasKey Type | bool.and (value | struct.hasKey Value) | bool.lazyAnd {
-    type = value.type
-    equals type Ok | bool.or (equals type Error)
-  }
-}
+is value :=
+  value %
+    Ok _ -> True
+    Error _ -> True
+    _ -> False
 
-ok value := [Type: Ok, Value: value]
 isOk result :=
   needs (is result)
-  equals result.type Ok
+  result | tag.withoutValue | equals Ok
 unwrap result :=
   needs (is result)
   needs (isOk result)
-  result.value
+  result | tag.getValue
 expect result message :=
   needs (is result)
   needs (isOk result) message
-  result.value
+  result | tag.getValue
 
-error value := [Type: Error, Value: value]
 isError result :=
   needs (is result)
-  equals result.type Error
+  result | tag.withoutValue | equals Error
 unwrapError result :=
   needs (is result)
   needs (isError result)
-  result.value
+  result | tag.getValue
 expectError result message :=
   needs (is result)
   needs (isError result) message
-  result.value
+  result | tag.getValue
 
 mapOrElse result okMapper errorMapper :=
   # Returns `okMapper result.value` if `isOk result` and
@@ -43,7 +41,9 @@ mapOrElse result okMapper errorMapper :=
   needs (is result)
   needs (function.is1 okMapper)
   needs (function.is1 errorMapper)
-  ifElse (equals result.type Ok) { okMapper result.value } { errorMapper result.value }
+  result %
+    Ok value -> okMapper value
+    Error value -> errorMapper value
 mapOr result okMapper errorValue :=
   # Returns `okMapper result.value` if `isOk result` and `errorValue` if
   # `isError result`.
@@ -61,11 +61,11 @@ flatMap result okMapper :=
   needs (function.is1 okMapper)
   result | mapOr { value -> okMapper value } result
 map result okMapper :=
-  # Returns `ok (okMapper result.value)` if it `isOk` and `result` if it
+  # Returns `Ok (okMapper result.value)` if it `isOk` and `result` if it
   # `isError`.
   needs (is result)
   needs (function.is1 okMapper)
-  result | flatMap { value -> ok (okMapper value) }
+  result | flatMap { value -> Ok (okMapper value) }
 and resultA resultB :=
   # Returns `resultA` if it `isError` and `resultB` otherwise.
   needs (is resultA)
@@ -81,11 +81,11 @@ flatMapError result errorMapper :=
   needs (function.is1 errorMapper)
   result | mapOr { value -> result } { value -> errorMapper value }
 mapError result errorMapper :=
-  # Returns `result` if it `isOk` and `error (errorMapper result.value)` if it
+  # Returns `result` if it `isOk` and `Error (errorMapper result.value)` if it
   # `isError`.
   needs (is result)
   needs (function.is1 errorMapper)
-  result | flatMapError { value -> error (errorMapper value) }
+  result | flatMapError { value -> Error (errorMapper value) }
 or resultA resultB :=
   # Returns `resultA` if it `isOk` and `resultB` otherwise.
   needs (is resultA)
