@@ -135,8 +135,8 @@ impl Fuzzer {
                     // We favor small inputs with good code coverage.
                     let score = {
                         let complexity = complexity_of_input(&runner.input) as Score;
-                        let score: Score = 0.1
-                            * runner.coverage.improvement_on(&total_coverage) as f64
+                        let score: Score = (0.2 * runner.num_instructions as f64)
+                            + (0.1 * runner.coverage.improvement_on(&total_coverage) as f64)
                             - 0.4 * complexity;
                         score.clamp(0.1, Score::MAX)
                     };

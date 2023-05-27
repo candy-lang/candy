@@ -295,7 +295,14 @@ impl<'c> LoweringContext<'c> {
                 );
             }
             Expression::UseModule { .. } => {
-                panic!("MIR still contains use. This should have been optimized out.");
+                // Calls of the use function are completely inlined and if
+                // they're not statically known, are replaced by panics.
+                // The only way a use can still be in the MIR is if the tracing
+                // of evaluated expressions is enabled. We can emit any nonsense
+                // here, since the instructions will never be executed anyway.
+                // We just push an empty struct, as if the imported module
+                // hadn't exported anything.
+                self.emit(id, Instruction::CreateStruct { num_fields: 0 });
             }
             Expression::Panic {
                 reason,
