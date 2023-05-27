@@ -21,7 +21,7 @@ use lsp_types::{notification::Notification, Position, Url};
 use rand::{seq::IteratorRandom, thread_rng};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::{time::Duration, vec};
+use std::{collections::hash_map, time::Duration, vec};
 use tokio::{
     sync::mpsc::{error::TryRecvError, Receiver, Sender},
     time::sleep,
@@ -70,7 +70,7 @@ pub async fn run_server(
     outgoing_hints: Sender<(Module, Vec<Hint>)>,
 ) {
     let mut db = Database::new_with_file_system_module_provider(packages_path);
-    let mut hints_finders = FxHashMap::default();
+    let mut hints_finders: FxHashMap<Module, HintsFinder> = FxHashMap::default();
     let mut outgoing_hints = OutgoingHints::new(outgoing_hints);
 
     'server_loop: loop {
@@ -86,8 +86,12 @@ pub async fn run_server(
                 Event::UpdateModule(module, content) => {
                     db.did_change_module(&module, content);
                     outgoing_hints.report_hints(module.clone(), vec![]).await;
-                    hints_finders
-                        .insert(module.clone(), HintsFinder::for_module(&db, module.clone()));
+                    match hints_finders.entry(module.clone()) {
+                        hash_map::Entry::Occupied(mut entry) => entry.get_mut().module_changed(),
+                        hash_map::Entry::Vacant(entry) => {
+                            entry.insert(HintsFinder::for_module(module.clone()));
+                        }
+                    };
                 }
                 Event::CloseModule(module) => {
                     db.did_close_module(&module);
@@ -102,7 +106,7 @@ pub async fn run_server(
         let Some(module) = hints_finders.keys().choose(&mut thread_rng()).cloned() else { continue; };
         let hints_finder = hints_finders.get_mut(&module).unwrap();
 
-        hints_finder.run();
+        hints_finder.run(&db);
         let hints = hints_finder
             .hints(&db, &module)
             .into_iter()

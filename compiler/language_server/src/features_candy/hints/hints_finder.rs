@@ -26,89 +26,158 @@ use candy_vm::{
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
 use rustc_hash::FxHashMap;
-use std::{mem, sync::Arc};
+use std::sync::Arc;
 use tracing::error;
 
-pub enum HintsFinder {
-    /// First, we run the module. This produces hints for constants and finds
-    /// fuzzable closures that we can later analyze.
-    Evaluate {
-        lir: Arc<Lir>,
-        tracer: HintsTracer,
-        vm: Vm<Arc<Lir>, HintsTracer>,
+/// A hints finder is responsible for finding hints for a single module.
+pub struct HintsFinder {
+    module: Module,
+    state: Option<State>, // only None during state transition
+}
+enum State {
+    Initial,
+    /// First, we run the module with tracing of evaluated expressions enabled.
+    /// This enables us to show hints for constants.
+    EvaluateConstants {
+        tracer: CompoundTracer<StackTracer, EvaluatedValuesTracer>,
+        vm: Vm<Lir, CompoundTracer<StackTracer, EvaluatedValuesTracer>>,
     },
-    /// Then, functions are fuzzed.
-    Fuzz {
-        ended: VmEnded,
+    /// Next, we run the module again to finds fuzzable functions. This time, we
+    /// disable tracing of evaluated expressions, but we enable registration of
+    /// fuzzable functions. Thus, the found functions to fuzz have the most
+    /// efficient LIR possible.
+    FindFuzzables {
+        constants_ended: VmEnded,
         stack_tracer: StackTracer,
         evaluated_values: EvaluatedValuesTracer,
+        lir: Arc<Lir>,
+        tracer: FuzzablesFinder,
+        vm: Vm<Arc<Lir>, FuzzablesFinder>,
+    },
+    /// Then, the functions are actually fuzzed.
+    Fuzz {
+        constants_ended: VmEnded,
+        stack_tracer: StackTracer,
+        evaluated_values: EvaluatedValuesTracer,
+        fuzzable_finder_ended: VmEnded,
         fuzzers: FxHashMap<Id, Fuzzer>,
     },
 }
-type HintsTracer =
-    CompoundTracer<StackTracer, CompoundTracer<EvaluatedValuesTracer, FuzzablesFinder>>;
 
 impl HintsFinder {
-    pub fn for_module(db: &(impl CstDb + OptimizeMir), module: Module) -> Self {
-        let tracing = TracingConfig {
-            register_fuzzables: TracingMode::OnlyCurrent,
-            calls: TracingMode::Off,
-            evaluated_expressions: TracingMode::OnlyCurrent,
-        };
-        let (lir, _) = compile_lir(db, module.clone(), tracing);
-        let lir = Arc::new(lir);
-
-        let mut tracer = CompoundTracer(
-            StackTracer::default(),
-            CompoundTracer(
-                EvaluatedValuesTracer::new(module),
-                FuzzablesFinder::default(),
-            ),
-        );
-        let vm = Vm::for_module(lir.clone(), &mut tracer);
-
-        Self::Evaluate { lir, tracer, vm }
+    pub fn for_module(module: Module) -> Self {
+        Self {
+            module,
+            state: Some(State::Initial),
+        }
+    }
+    pub fn module_changed(&mut self) {
+        // Todo: Save some incremental state.
+        self.state = Some(State::Initial);
     }
 
-    pub fn run(&mut self) {
-        match self {
-            HintsFinder::Evaluate { lir, tracer, vm } => {
-                vm.run(&mut RunLimitedNumberOfInstructions::new(500), tracer);
-                if matches!(vm.status(), vm::Status::Done | vm::Status::Panicked(_)) {
-                    let vm = mem::replace(vm, Vm::uninitialized(lir.clone()));
-                    let ended = vm.tear_down(tracer);
-                    let CompoundTracer(
-                        stack_tracer,
-                        CompoundTracer(evaluated_values, fuzzables_finder),
-                    ) = tracer;
+    pub fn run(&mut self, db: &(impl CstDb + OptimizeMir)) {
+        let state = self.state.take().unwrap();
+        let state = self.update_state(db, state);
+        self.state = Some(state);
+    }
+    fn update_state(&self, db: &(impl CstDb + OptimizeMir), state: State) -> State {
+        match state {
+            State::Initial => {
+                let tracing = TracingConfig {
+                    register_fuzzables: TracingMode::Off,
+                    calls: TracingMode::Off,
+                    evaluated_expressions: TracingMode::OnlyCurrent,
+                };
+                let (lir, _) = compile_lir(db, self.module.clone(), tracing);
 
-                    let fuzzers = fuzzables_finder
-                        .fuzzables()
-                        .unwrap()
-                        .iter()
-                        .map(|(id, function)| {
-                            (id.clone(), Fuzzer::new(lir.clone(), *function, id.clone()))
-                        })
-                        .collect();
-                    *self = Self::Fuzz {
-                        ended,
-                        stack_tracer: mem::take(stack_tracer),
-                        evaluated_values: mem::replace(
-                            evaluated_values,
-                            EvaluatedValuesTracer::new(Module::from_package_name(
-                                "Dummy".to_string(),
-                            )),
-                        ),
-                        fuzzers,
-                    };
+                let mut tracer = CompoundTracer(
+                    StackTracer::default(),
+                    EvaluatedValuesTracer::new(self.module.clone()),
+                );
+                let vm = Vm::for_module(lir, &mut tracer);
+
+                State::EvaluateConstants { tracer, vm }
+            }
+            State::EvaluateConstants { mut tracer, mut vm } => {
+                vm.run(&mut RunLimitedNumberOfInstructions::new(500), &mut tracer);
+                if !matches!(vm.status(), vm::Status::Done | vm::Status::Panicked(_)) {
+                    return State::EvaluateConstants { tracer, vm };
+                }
+
+                let constants_ended = vm.tear_down(&mut tracer);
+                let CompoundTracer(stack_tracer, evaluated_values) = tracer;
+
+                let tracing = TracingConfig {
+                    register_fuzzables: TracingMode::OnlyCurrent,
+                    calls: TracingMode::Off,
+                    evaluated_expressions: TracingMode::Off,
+                };
+                let (lir, _) = compile_lir(db, self.module.clone(), tracing);
+                let lir = Arc::new(lir);
+
+                let mut tracer = FuzzablesFinder::default();
+                let vm = Vm::for_module(lir.clone(), &mut tracer);
+                State::FindFuzzables {
+                    constants_ended,
+                    stack_tracer,
+                    evaluated_values,
+                    lir,
+                    tracer,
+                    vm,
                 }
             }
-            HintsFinder::Fuzz { fuzzers, .. } => {
+            State::FindFuzzables {
+                constants_ended,
+                stack_tracer,
+                evaluated_values,
+                lir,
+                mut tracer,
+                mut vm,
+            } => {
+                vm.run(&mut RunLimitedNumberOfInstructions::new(500), &mut tracer);
+                if !matches!(vm.status(), vm::Status::Done | vm::Status::Panicked(_)) {
+                    return State::FindFuzzables {
+                        constants_ended,
+                        stack_tracer,
+                        evaluated_values,
+                        lir,
+                        tracer,
+                        vm,
+                    };
+                }
+
+                let fuzzable_finder_ended = vm.tear_down(&mut tracer);
+                let fuzzers = tracer
+                    .fuzzables()
+                    .unwrap()
+                    .iter()
+                    .map(|(id, function)| {
+                        (id.clone(), Fuzzer::new(lir.clone(), *function, id.clone()))
+                    })
+                    .collect();
+                State::Fuzz {
+                    constants_ended,
+                    stack_tracer,
+                    evaluated_values,
+                    fuzzable_finder_ended,
+                    fuzzers,
+                }
+            }
+            State::Fuzz {
+                constants_ended,
+                stack_tracer,
+                evaluated_values,
+                fuzzable_finder_ended,
+                mut fuzzers,
+            } => {
                 let mut running_fuzzers = fuzzers
                     .values_mut()
                     .filter(|fuzzer| matches!(fuzzer.status(), Status::StillFuzzing { .. }))
                     .collect_vec();
-                let Some(fuzzer) = running_fuzzers.choose_mut(&mut thread_rng()) else { return; };
+                let Some(fuzzer) = running_fuzzers.choose_mut(&mut thread_rng()) else {
+                    return State::Fuzz { constants_ended, stack_tracer, evaluated_values, fuzzable_finder_ended, fuzzers };
+                };
 
                 fuzzer.run(&mut RunLimitedNumberOfInstructions::new(500));
 
@@ -117,6 +186,13 @@ impl HintsFinder {
                     Status::FoundPanic { .. } => Some(fuzzer.function_id.module.clone()),
                     Status::TotalCoverageButNoPanic => None,
                 };
+                State::Fuzz {
+                    constants_ended,
+                    stack_tracer,
+                    evaluated_values,
+                    fuzzable_finder_ended,
+                    fuzzers,
+                }
             }
         }
     }
@@ -127,18 +203,20 @@ impl HintsFinder {
     {
         let mut hints = vec![];
 
-        match &self {
-            HintsFinder::Evaluate { .. } => {
+        match self.state.as_ref().unwrap() {
+            State::Initial => {}
+            State::EvaluateConstants { .. } | State::FindFuzzables { .. } => {
                 // TODO: Show incremental constant evaluation hints.
             }
-            HintsFinder::Fuzz {
-                ended,
+            State::Fuzz {
+                constants_ended,
                 stack_tracer,
                 evaluated_values,
                 fuzzers,
+                ..
             } => {
                 // TODO: Think about how to highlight the responsible piece of code.
-                if let EndedReason::Panicked(panic) = &ended.reason {
+                if let EndedReason::Panicked(panic) = &constants_ended.reason {
                     if let Some(hint) = panic_hint(db, module.clone(), stack_tracer, &panic.reason)
                     {
                         hints.push(vec![hint]);
