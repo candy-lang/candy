@@ -58,13 +58,13 @@ impl HintsFinder {
         let (lir, _) = compile_lir(db, module.clone(), tracing);
         let lir = Arc::new(lir);
 
-        let mut tracer = CompoundTracer {
-            tracer0: StackTracer::default(),
-            tracer1: CompoundTracer {
-                tracer0: EvaluatedValuesTracer::new(module),
-                tracer1: FuzzablesFinder::default(),
-            },
-        };
+        let mut tracer = CompoundTracer(
+            StackTracer::default(),
+            CompoundTracer(
+                EvaluatedValuesTracer::new(module),
+                FuzzablesFinder::default(),
+            ),
+        );
         let vm = Vm::for_module(lir.clone(), &mut tracer);
 
         Self::Evaluate { lir, tracer, vm }
@@ -77,17 +77,12 @@ impl HintsFinder {
                 if matches!(vm.status(), vm::Status::Done | vm::Status::Panicked(_)) {
                     let vm = mem::replace(vm, Vm::uninitialized(lir.clone()));
                     let ended = vm.tear_down(tracer);
-                    let CompoundTracer {
-                        tracer0: stack_tracer,
-                        tracer1:
-                            CompoundTracer {
-                                tracer0: evaluated_values,
-                                tracer1: fuzzables_finder,
-                            },
-                    } = tracer;
-                    let fuzzers = tracer
-                        .tracer1
-                        .tracer1
+                    let CompoundTracer(
+                        stack_tracer,
+                        CompoundTracer(evaluated_values, fuzzables_finder),
+                    ) = tracer;
+
+                    let fuzzers = fuzzables_finder
                         .fuzzables()
                         .unwrap()
                         .iter()
@@ -108,13 +103,13 @@ impl HintsFinder {
                     };
                 }
             }
-            HintsFinder::Fuzz { ended, fuzzers, .. } => {
-                // debug!("Fuzzing with {} fuzzers.", fuzzers.len());
+            HintsFinder::Fuzz { fuzzers, .. } => {
                 let mut running_fuzzers = fuzzers
                     .values_mut()
                     .filter(|fuzzer| matches!(fuzzer.status(), Status::StillFuzzing { .. }))
                     .collect_vec();
                 let Some(fuzzer) = running_fuzzers.choose_mut(&mut thread_rng()) else { return; };
+
                 fuzzer.run(&mut RunLimitedNumberOfInstructions::new(500));
 
                 match &fuzzer.status() {
@@ -133,7 +128,7 @@ impl HintsFinder {
         let mut hints = vec![];
 
         match &self {
-            HintsFinder::Evaluate { lir, tracer, vm } => {
+            HintsFinder::Evaluate { .. } => {
                 // TODO: Show incremental constant evaluation hints.
             }
             HintsFinder::Fuzz {
