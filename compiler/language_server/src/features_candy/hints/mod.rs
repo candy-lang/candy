@@ -9,28 +9,26 @@
 //! While doing all that, we can pause regularly between executing instructions
 //! so that we don't occupy a single CPU at 100 %.
 
-use self::{constant_evaluator::ConstantEvaluator, fuzzer::FuzzerManager};
+use self::hints_finder::HintsFinder;
 use crate::database::Database;
 use candy_frontend::{
     module::{Module, MutableModuleProviderOwner, PackagesPath},
     rich_ir::ToRichIr,
-    TracingConfig, TracingMode,
 };
-use candy_vm::mir_to_lir::compile_lir;
 use extension_trait::extension_trait;
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position, Url};
+use rand::{seq::IteratorRandom, thread_rng};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::{sync::Arc, time::Duration, vec};
+use std::{time::Duration, vec};
 use tokio::{
     sync::mpsc::{error::TryRecvError, Receiver, Sender},
     time::sleep,
 };
 use tracing::debug;
 
-mod constant_evaluator;
-mod fuzzer;
+mod hints_finder;
 mod utils;
 
 pub enum Event {
@@ -72,15 +70,8 @@ pub async fn run_server(
     outgoing_hints: Sender<(Module, Vec<Hint>)>,
 ) {
     let mut db = Database::new_with_file_system_module_provider(packages_path);
-    let mut constant_evaluator = ConstantEvaluator::default();
-    let mut fuzzer = FuzzerManager::default();
+    let mut hints_finders = FxHashMap::default();
     let mut outgoing_hints = OutgoingHints::new(outgoing_hints);
-
-    let tracing = TracingConfig {
-        register_fuzzables: TracingMode::OnlyCurrent,
-        calls: TracingMode::Off,
-        evaluated_expressions: TracingMode::Off,
-    };
 
     'server_loop: loop {
         sleep(Duration::from_millis(100)).await;
@@ -95,15 +86,12 @@ pub async fn run_server(
                 Event::UpdateModule(module, content) => {
                     db.did_change_module(&module, content);
                     outgoing_hints.report_hints(module.clone(), vec![]).await;
-                    let (lir, _) = compile_lir(&db, module.clone(), tracing.clone());
-                    let lir = Arc::new(lir);
-                    constant_evaluator.update_module(module.clone(), lir.clone());
-                    fuzzer.update_module(module, lir, &FxHashMap::default());
+                    hints_finders
+                        .insert(module.clone(), HintsFinder::for_module(&db, module.clone()));
                 }
                 Event::CloseModule(module) => {
                     db.did_close_module(&module);
-                    constant_evaluator.remove_module(module.clone());
-                    fuzzer.remove_module(module);
+                    hints_finders.remove(&module);
                 }
                 Event::Shutdown => {
                     incoming_events.close();
@@ -111,53 +99,30 @@ pub async fn run_server(
             }
         }
 
-        // First, try to constant-evaluate opened modules – that has a higher
-        // priority. When constant evaluation is done, we try fuzzing the
-        // functions we found.
-        let module_with_new_insight = 'new_insight: {
-            if let Some(module) = constant_evaluator.run() {
-                let (lir, functions) = constant_evaluator.get_fuzzable_functions(&module);
-                fuzzer.update_module(module.clone(), lir, &functions);
-                debug!(
-                    "The constant evaluator made progress in {}.",
-                    module.to_rich_ir(),
-                );
-                break 'new_insight Some(module);
-            }
-            // For fuzzing, we're a bit more resource-conscious.
-            sleep(Duration::from_millis(200)).await;
-            if let Some(module) = fuzzer.run() {
-                debug!("The fuzzer made progress in {}.", module.to_rich_ir());
-                break 'new_insight Some(module);
-            }
-            None
-        };
+        let Some(module) = hints_finders.keys().choose(&mut thread_rng()).cloned() else { continue; };
+        let hints_finder = hints_finders.get_mut(&module).unwrap();
 
-        if let Some(module) = module_with_new_insight {
-            let hints = constant_evaluator
-                .get_hints(&db, &module)
-                .into_iter()
-                // The fuzzer returns groups of related hints.
-                .map(|hint| vec![hint])
-                .chain(fuzzer.get_hints(&db, &module).into_iter())
-                // Make hints look like comments.
-                .map(|mut hint_group| {
-                    for hint in &mut hint_group {
-                        hint.text =
-                            format!("{}# {}", quasi_spaces(2), hint.text.replace('\n', r#"\n"#));
-                    }
-                    hint_group
-                })
-                // Show related hints at the same indentation.
-                .flat_map(|mut hint_group| {
-                    hint_group.align_hint_columns();
-                    hint_group
-                })
-                .sorted_by_key(|hint| hint.position)
-                .collect_vec();
+        hints_finder.run();
+        let hints = hints_finder
+            .hints(&db, &module)
+            .into_iter()
+            // Make hints look like comments.
+            .map(|mut hint_group| {
+                for hint in &mut hint_group {
+                    hint.text =
+                        format!("{}# {}", quasi_spaces(2), hint.text.replace('\n', r#"\n"#));
+                }
+                hint_group
+            })
+            // Show related hints at the same indentation.
+            .flat_map(|mut hint_group| {
+                hint_group.align_hint_columns();
+                hint_group
+            })
+            .sorted_by_key(|hint| hint.position)
+            .collect_vec();
 
-            outgoing_hints.report_hints(module, hints).await;
-        }
+        outgoing_hints.report_hints(module, hints).await;
     }
 }
 
@@ -174,12 +139,10 @@ impl OutgoingHints {
     }
 
     async fn report_hints(&mut self, module: Module, hints: Vec<Hint>) {
-        debug!("Reporting hints for {}:\n{hints:?}", module.to_rich_ir());
         if self.last_sent.get(&module) != Some(&hints) {
+            debug!("Reporting hints for {}: {hints:?}", module.to_rich_ir());
             self.last_sent.insert(module.clone(), hints.clone());
             self.sender.send((module, hints)).await.unwrap();
-        } else {
-            debug!("Not sending hints to the main thread because they're the same as last time.");
         }
     }
 }
