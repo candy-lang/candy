@@ -77,6 +77,6 @@ impl Coverage {
 }
 impl fmt::Debug for Coverage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.format_range(0.into()..self.0.len().into()),)
+        write!(f, "{}", self.format_range(0.into()..self.0.len().into()))
     }
 }
