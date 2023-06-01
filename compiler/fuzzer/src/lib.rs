@@ -61,8 +61,9 @@ where
 
         match fuzzer.into_status() {
             Status::StillFuzzing { total_coverage, .. } => {
-                let coverage =
-                    total_coverage.in_range(lir.range_of_function(&id)).relative_coverage();
+                let coverage = total_coverage
+                    .in_range(lir.range_of_function(&id))
+                    .relative_coverage();
                 debug!("Achieved a coverage of {:.1} %.", coverage * 100.0);
             }
             Status::FoundPanic {
