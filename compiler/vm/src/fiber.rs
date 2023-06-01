@@ -71,7 +71,7 @@ pub enum Status {
     Panicked(Panic),
 }
 
-#[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
+#[derive(Clone, Copy, Deref, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
 pub struct InstructionPointer(usize);
 impl InstructionPointer {
     pub fn null_pointer() -> Self {
@@ -79,11 +79,6 @@ impl InstructionPointer {
     }
     fn next(&self) -> Self {
         Self(self.0 + 1)
-    }
-}
-impl PartialOrd for InstructionPointer {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        (**self).partial_cmp(&**other)
     }
 }
 impl Step for InstructionPointer {
@@ -311,7 +306,7 @@ impl<T: FiberTracer> Fiber<T> {
         while matches!(self.status, Status::Running)
             && execution_controller.should_continue_running()
         {
-            let Some(next_instruction) = self.next_instruction else {
+            let Some(current_instruction) = self.next_instruction else {
                 self.status = Status::Done;
                 self.tracer.call_ended(
                     &mut self.heap,
@@ -322,20 +317,20 @@ impl<T: FiberTracer> Fiber<T> {
 
             let instruction = lir
                 .instructions
-                .get(*next_instruction)
+                .get(*current_instruction)
                 .expect("invalid instruction pointer")
                 .clone(); // PERF: Can we avoid this clone?
-            self.next_instruction = Some(next_instruction.next());
+            self.next_instruction = Some(current_instruction.next());
 
             self.run_instruction(instruction);
-            execution_controller.instruction_executed(next_instruction);
+            execution_controller.instruction_executed(current_instruction);
         }
     }
     pub fn run_instruction(&mut self, instruction: Instruction) {
         if TRACE {
             trace!("Running instruction: {instruction:?}");
-            let next_instruction = self.next_instruction.unwrap();
-            trace!("Instruction pointer: {:?}", next_instruction);
+            let current_instruction = self.next_instruction.unwrap();
+            trace!("Instruction pointer: {:?}", current_instruction);
             trace!(
                 "Data stack: {}",
                 if self.data_stack.is_empty() {
