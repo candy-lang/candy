@@ -1,6 +1,5 @@
 use bitvec::prelude::*;
 use candy_vm::fiber::InstructionPointer;
-use itertools::Itertools;
 use std::{
     fmt,
     ops::{Add, Range},
