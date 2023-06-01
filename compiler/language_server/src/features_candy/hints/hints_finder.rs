@@ -1,13 +1,19 @@
-use super::{utils::IdToEndOfLine, Hint, HintKind};
-use crate::utils::JoinWithCommasAndAnd;
+use super::{
+    hint::{Hint, HintKind},
+    utils::IdToEndOfLine,
+};
+use crate::{
+    database::Database,
+    utils::{error_into_diagnostic, LspPositionConversion},
+};
 use candy_frontend::{
     ast::{Assignment, AssignmentBody, AstDb, AstKind},
     ast_to_hir::AstToHir,
     cst::CstDb,
-    hir::{self, Expression, HirDb, Id},
+    error::CompilerError,
+    hir::{CollectErrors, Expression, HirDb, Id},
     mir_optimize::OptimizeMir,
-    module::{Module, ModuleDb},
-    position::PositionConversionDb,
+    module::Module,
     TracingConfig, TracingMode,
 };
 use candy_fuzzer::{FuzzablesFinder, Fuzzer, Status};
@@ -24,10 +30,10 @@ use candy_vm::{
     vm::{self, Vm},
 };
 use itertools::Itertools;
+use lsp_types::{Diagnostic, DiagnosticSeverity, Range};
 use rand::{prelude::SliceRandom, thread_rng};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
-use tracing::error;
 
 /// A hints finder is responsible for finding hints for a single module.
 pub struct HintsFinder {
@@ -39,6 +45,7 @@ enum State {
     /// First, we run the module with tracing of evaluated expressions enabled.
     /// This enables us to show hints for constants.
     EvaluateConstants {
+        errors: Vec<CompilerError>,
         tracer: CompoundTracer<StackTracer, EvaluatedValuesTracer>,
         vm: Vm<Lir, CompoundTracer<StackTracer, EvaluatedValuesTracer>>,
     },
@@ -47,6 +54,7 @@ enum State {
     /// fuzzable functions. Thus, the found functions to fuzz have the most
     /// efficient LIR possible.
     FindFuzzables {
+        errors: Vec<CompilerError>,
         constants_ended: VmEnded,
         stack_tracer: StackTracer,
         evaluated_values: EvaluatedValuesTracer,
@@ -56,6 +64,7 @@ enum State {
     },
     /// Then, the functions are actually fuzzed.
     Fuzz {
+        errors: Vec<CompilerError>,
         constants_ended: VmEnded,
         stack_tracer: StackTracer,
         evaluated_values: EvaluatedValuesTracer,
@@ -84,6 +93,10 @@ impl HintsFinder {
     fn update_state(&self, db: &(impl CstDb + OptimizeMir), state: State) -> State {
         match state {
             State::Initial => {
+                let (hir, _) = db.hir(self.module.clone()).unwrap();
+                let mut errors = vec![];
+                hir.collect_errors(&mut errors);
+
                 let tracing = TracingConfig {
                     register_fuzzables: TracingMode::Off,
                     calls: TracingMode::Off,
@@ -97,12 +110,16 @@ impl HintsFinder {
                 );
                 let vm = Vm::for_module(lir, &mut tracer);
 
-                State::EvaluateConstants { tracer, vm }
+                State::EvaluateConstants { errors, tracer, vm }
             }
-            State::EvaluateConstants { mut tracer, mut vm } => {
+            State::EvaluateConstants {
+                errors,
+                mut tracer,
+                mut vm,
+            } => {
                 vm.run(&mut RunLimitedNumberOfInstructions::new(500), &mut tracer);
                 if !matches!(vm.status(), vm::Status::Done | vm::Status::Panicked(_)) {
-                    return State::EvaluateConstants { tracer, vm };
+                    return State::EvaluateConstants { errors, tracer, vm };
                 }
 
                 let constants_ended = vm.tear_down(&mut tracer);
@@ -119,6 +136,7 @@ impl HintsFinder {
                 let mut tracer = FuzzablesFinder::default();
                 let vm = Vm::for_module(lir.clone(), &mut tracer);
                 State::FindFuzzables {
+                    errors,
                     constants_ended,
                     stack_tracer,
                     evaluated_values,
@@ -128,6 +146,7 @@ impl HintsFinder {
                 }
             }
             State::FindFuzzables {
+                errors,
                 constants_ended,
                 stack_tracer,
                 evaluated_values,
@@ -138,6 +157,7 @@ impl HintsFinder {
                 vm.run(&mut RunLimitedNumberOfInstructions::new(500), &mut tracer);
                 if !matches!(vm.status(), vm::Status::Done | vm::Status::Panicked(_)) {
                     return State::FindFuzzables {
+                        errors,
                         constants_ended,
                         stack_tracer,
                         evaluated_values,
@@ -157,6 +177,7 @@ impl HintsFinder {
                     })
                     .collect();
                 State::Fuzz {
+                    errors,
                     constants_ended,
                     stack_tracer,
                     evaluated_values,
@@ -165,6 +186,7 @@ impl HintsFinder {
                 }
             }
             State::Fuzz {
+                errors,
                 constants_ended,
                 stack_tracer,
                 evaluated_values,
@@ -176,7 +198,7 @@ impl HintsFinder {
                     .filter(|fuzzer| matches!(fuzzer.status(), Status::StillFuzzing { .. }))
                     .collect_vec();
                 let Some(fuzzer) = running_fuzzers.choose_mut(&mut thread_rng()) else {
-                    return State::Fuzz { constants_ended, stack_tracer, evaluated_values, fuzzable_finder_ended, fuzzers };
+                    return State::Fuzz { errors, constants_ended, stack_tracer, evaluated_values, fuzzable_finder_ended, fuzzers };
                 };
 
                 fuzzer.run(&mut RunLimitedNumberOfInstructions::new(500));
@@ -187,6 +209,7 @@ impl HintsFinder {
                     Status::TotalCoverageButNoPanic => None,
                 };
                 State::Fuzz {
+                    errors,
                     constants_ended,
                     stack_tracer,
                     evaluated_values,
@@ -197,29 +220,39 @@ impl HintsFinder {
         }
     }
 
-    pub fn hints<DB>(&self, db: &DB, module: &Module) -> Vec<Vec<Hint>>
-    where
-        DB: AstDb + AstToHir + HirDb + ModuleDb + PositionConversionDb,
-    {
+    pub fn hints(&self, db: &Database, module: &Module) -> (Vec<Hint>, Vec<Diagnostic>) {
         let mut hints = vec![];
+        let mut diagnostics = vec![];
 
         match self.state.as_ref().unwrap() {
             State::Initial => {}
-            State::EvaluateConstants { .. } | State::FindFuzzables { .. } => {
+            State::EvaluateConstants { errors, .. } | State::FindFuzzables { errors, .. } => {
                 // TODO: Show incremental constant evaluation hints.
+                diagnostics.extend(
+                    errors
+                        .iter()
+                        .map(|it| error_into_diagnostic(db, module.clone(), it)),
+                );
             }
             State::Fuzz {
+                errors,
                 constants_ended,
                 stack_tracer,
                 evaluated_values,
                 fuzzers,
                 ..
             } => {
+                diagnostics.extend(
+                    errors
+                        .iter()
+                        .map(|it| error_into_diagnostic(db, module.clone(), it)),
+                );
+
                 // TODO: Think about how to highlight the responsible piece of code.
                 if let EndedReason::Panicked(panic) = &constants_ended.reason {
                     if let Some(hint) = panic_hint(db, module.clone(), stack_tracer, &panic.reason)
                     {
-                        hints.push(vec![hint]);
+                        hints.push(hint);
                     }
                 }
 
@@ -241,20 +274,20 @@ impl HintsFinder {
                                 continue;
                             }
 
-                            hints.push(vec![Hint {
-                                kind: HintKind::Value,
-                                text: value.to_string(),
-                                position: db.id_to_end_of_line(id.clone()).unwrap(),
-                            }]);
+                            hints.push(Hint::like_comment(
+                                HintKind::Value,
+                                value.to_string(),
+                                db.id_to_end_of_line(id.clone()).unwrap(),
+                            ));
                         }
                         Expression::PatternIdentifierReference { .. } => {
                             let body = db.containing_body_of(id.clone());
                             let name = body.identifiers.get(id).unwrap();
-                            hints.push(vec![Hint {
-                                kind: HintKind::Value,
-                                text: format!("{name} = {value}"),
-                                position: db.id_to_end_of_line(id.clone()).unwrap(),
-                            }]);
+                            hints.push(Hint::like_comment(
+                                HintKind::Value,
+                                format!("{name} = {value}"),
+                                db.id_to_end_of_line(id.clone()).unwrap(),
+                            ));
                         }
                         _ => {}
                     }
@@ -268,76 +301,63 @@ impl HintsFinder {
                     } = fuzzer.status() else { continue; };
 
                     let id = fuzzer.function_id.clone();
-                    let first_hint = {
-                        let parameter_names = match db.find_expression(id.clone()) {
-                            Some(Expression::Function(hir::Function { parameters, .. })) => {
-                                parameters
-                                    .into_iter()
-                                    .map(|parameter| parameter.keys.last().unwrap().to_string())
-                                    .collect_vec()
-                            }
-                            Some(_) => panic!("Looks like we fuzzed a non-function. That's weird."),
-                            None => {
-                                error!("Using fuzzing, we found an error in a generated function.");
-                                continue;
-                            }
-                        };
-                        Hint {
-                            kind: HintKind::Fuzz,
-                            text: format!(
-                                "If this is called with {},",
-                                parameter_names
-                                    .iter()
-                                    .zip(input.arguments.iter())
-                                    .map(|(name, argument)| format!("`{name} = {argument:?}`"))
-                                    .collect_vec()
-                                    .join_with_commas_and_and(),
-                            ),
-                            position: db.id_to_end_of_line(id.clone()).unwrap(),
-                        }
-                    };
+                    if !id.is_same_module_and_any_parent_of(&panic.responsible) {
+                        // The function panics internally for an input, but it's
+                        // the fault of another function that's called
+                        // internally.
+                        // TODO: The fuzz case should instead be highlighted in
+                        // the used function directly. We don't do that right
+                        // now because we assume the fuzzer will find the panic
+                        // when fuzzing the faulty function, but we should save
+                        // the panicking case (or something like that) in the
+                        // future.
+                        continue;
+                    }
+                    if db.hir_to_cst_id(id.clone()).is_none() {
+                        panic!(
+                            "It looks like the generated code {} is at fault for a panic.",
+                            panic.responsible,
+                        );
+                    }
 
-                    let second_hint = {
-                        if !id.is_same_module_and_any_parent_of(&panic.responsible) {
-                            // The function panics internally for an input, but it's the
-                            // fault of another function that's in another module.
-                            // TODO: The fuzz case should instead be highlighted in the
-                            // used function directly. We don't do that right now
-                            // because we assume the fuzzer will find the panic when
-                            // fuzzing the faulty function, but we should save the
-                            // panicking case (or something like that) in the future.
-                            continue;
-                        }
-                        if db.hir_to_cst_id(id.clone()).is_none() {
-                            panic!(
-                                "It looks like the generated code {} is at fault for a panic.",
-                                panic.responsible,
-                            );
-                        }
-
-                        // TODO: In the future, re-run only the failing case with
-                        // tracing enabled and also show the arguments to the failing
-                        // function in the hint.
-                        Hint {
-                            kind: HintKind::Fuzz,
-                            text: format!("then {} panics: {}", panic.responsible, panic.reason),
-                            position: db.id_to_end_of_line(panic.responsible.clone()).unwrap(),
-                        }
-                    };
-
-                    hints.push(vec![first_hint, second_hint]);
+                    // TODO: In the future, re-run only the failing case with
+                    // tracing enabled and also show the arguments to the failing
+                    // function in the hint.
+                    let call_span = db
+                        .hir_id_to_display_span(panic.responsible.clone())
+                        .unwrap();
+                    diagnostics.push(Diagnostic {
+                        range: Range::new(
+                            db.offset_to_lsp_position(module.clone(), call_span.start),
+                            db.offset_to_lsp_position(module.clone(), call_span.end),
+                        ),
+                        severity: Some(DiagnosticSeverity::ERROR),
+                        code: None,
+                        code_description: None,
+                        source: None,
+                        message: format!(
+                            "For `{} {}`, this call panics: {}",
+                            fuzzer.function_id.keys.last().unwrap(),
+                            input
+                                .arguments
+                                .iter()
+                                .map(|argument| format!("{argument}"))
+                                .join(" "),
+                            panic.reason
+                        ),
+                        related_information: None,
+                        tags: None,
+                        data: None,
+                    });
                 }
             }
         }
 
-        hints
+        (hints, diagnostics)
     }
 }
 
-fn panic_hint<DB>(db: &DB, module: Module, tracer: &StackTracer, reason: &str) -> Option<Hint>
-where
-    DB: AstToHir + ModuleDb + PositionConversionDb,
-{
+fn panic_hint(db: &Database, module: Module, tracer: &StackTracer, reason: &str) -> Option<Hint> {
     // We want to show the hint at the last call site still inside the current
     // module. If there is no call site in this module, then the panic results
     // from a compiler error in a previous stage which is already reported.
@@ -363,9 +383,9 @@ where
         arguments.iter().map(|it| it.to_string()).join(" "),
     );
 
-    Some(Hint {
-        kind: HintKind::Panic,
-        text: format!("Calling `{call_info}` panics: {reason}"),
-        position: db.id_to_end_of_line(call_site)?,
-    })
+    Some(Hint::like_comment(
+        HintKind::Panic,
+        format!("Calling `{call_info}` panics: {reason}"),
+        db.id_to_end_of_line(call_site)?,
+    ))
 }

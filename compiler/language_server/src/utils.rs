@@ -10,7 +10,7 @@ use itertools::Itertools;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Url};
 use std::ops::Range;
 
-pub fn error_into_diagnostic(db: &Database, module: Module, error: CompilerError) -> Diagnostic {
+pub fn error_into_diagnostic(db: &Database, module: Module, error: &CompilerError) -> Diagnostic {
     let related_information = error
         .to_related_information()
         .into_iter()
@@ -27,7 +27,7 @@ pub fn error_into_diagnostic(db: &Database, module: Module, error: CompilerError
         })
         .collect();
     Diagnostic {
-        range: db.range_to_lsp_range(module, error.span),
+        range: db.range_to_lsp_range(module, error.span.clone()),
         severity: Some(DiagnosticSeverity::ERROR),
         code: None,
         code_description: None,
