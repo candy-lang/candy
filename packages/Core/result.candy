@@ -7,8 +7,7 @@ tag = use "..tag"
 
 is value :=
   value %
-    Ok _ -> True
-    Error _ -> True
+    Ok _ | Error _ -> True
     _ -> False
 
 isOk result :=
