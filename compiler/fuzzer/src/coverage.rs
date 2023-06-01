@@ -6,38 +6,44 @@ use std::{
     ops::{Add, Range},
 };
 
-pub struct Coverage {
-    covered: BitVec,
-}
+pub struct Coverage(BitVec);
+
 impl Coverage {
     pub fn none() -> Self {
-        Self { covered: bitvec![] }
+        Self(bitvec![])
     }
 
     pub fn add(&mut self, ip: InstructionPointer) {
-        if *ip >= self.covered.len() {
-            self.covered
-                .extend([false].repeat(*ip - self.covered.len() + 1));
+        if *ip >= self.0.len() {
+            self.0.extend([false].repeat(*ip - self.0.len() + 1));
         }
-        self.covered.set(*ip, true);
+        self.0.set(*ip, true);
     }
 
     pub fn is_covered(&self, ip: InstructionPointer) -> bool {
-        *self.covered.get(*ip).unwrap()
+        *self.0.get(*ip).unwrap()
     }
 
     pub fn improvement_on(&self, other: &Coverage) -> usize {
-        self.covered
+        self.0
             .iter()
-            .zip(other.covered.iter())
+            .zip(other.0.iter())
             .filter(|(a, b)| **a && !**b)
             .count()
     }
 
-    pub fn relative_coverage_of_range(&self, range: Range<InstructionPointer>) -> f64 {
-        assert!(!range.is_empty());
-        let len = *range.end - *range.start;
-        range.filter(|ip| self.is_covered(*ip)).count() as f64 / len as f64
+    fn bitslice_in_range(&self, range: Range<InstructionPointer>) -> &BitSlice {
+        &self.0[*range.start..*range.end]
+    }
+    pub fn in_range(&self, range: Range<InstructionPointer>) -> Coverage {
+        Self(self.bitslice_in_range(range).to_bitvec())
+    }
+
+    pub fn relative_coverage(&self) -> f64 {
+        assert!(!self.0.is_empty());
+        let num_covered = self.0.iter().filter(|bit| **bit).count();
+        let num_total = self.0.len();
+        (num_covered as f64) / (num_total as f64)
     }
 }
 impl Add for &Coverage {
@@ -45,16 +51,16 @@ impl Add for &Coverage {
 
     fn add(self, rhs: Self) -> Self::Output {
         let covered = self
-            .covered
+            .0
             .iter()
             .map(|bit| *bit)
-            .zip_longest(rhs.covered.iter().map(|bit| *bit))
+            .zip_longest(rhs.0.iter().map(|bit| *bit))
             .map(|it| {
                 let (a, b) = it.or_default();
                 a | b
             })
             .collect();
-        Coverage { covered }
+        Coverage(covered)
     }
 }
 
@@ -71,10 +77,6 @@ impl Coverage {
 }
 impl fmt::Debug for Coverage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.format_range(0.into()..self.covered.len().into()),
-        )
+        write!(f, "{}", self.format_range(0.into()..self.0.len().into()),)
     }
 }

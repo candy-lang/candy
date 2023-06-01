@@ -126,8 +126,10 @@ impl Fuzzer {
         match result {
             RunResult::Timeout => self.create_new_fuzzing_case(pool, total_coverage),
             RunResult::Done { .. } | RunResult::NeedsUnfulfilled { .. } => {
+                let function_range = self.lir.range_of_function(&self.function_id);
                 if total_coverage
-                    .relative_coverage_of_range(self.lir.range_of_function(&self.function_id))
+                    .in_range(function_range.clone())
+                    .relative_coverage()
                     == 1.0
                 {
                     Status::TotalCoverageButNoPanic
@@ -136,7 +138,11 @@ impl Fuzzer {
                     let score = {
                         let complexity = complexity_of_input(&runner.input) as Score;
                         let score: Score = 0.1
-                            * runner.coverage.improvement_on(&total_coverage) as f64
+                            * runner
+                                .coverage
+                                .in_range(function_range)
+                                .improvement_on(&total_coverage)
+                                as f64
                             - 0.4 * complexity;
                         score.clamp(0.1, Score::MAX)
                     };
