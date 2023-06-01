@@ -160,20 +160,17 @@ impl<'c> LoweringContext<'c> {
             Expression::Tag { symbol, value } => {
                 let symbol = Text::create(&mut self.lir.constant_heap, symbol);
 
-                match value {
-                    Some(value) => {
-                        if let Some(value) = self.constants.get(value) {
-                            let tag = Tag::create(&mut self.lir.constant_heap, symbol, *value);
-                            self.constants.insert(id, tag.into());
-                        } else {
-                            self.emit_reference_to(*value);
-                            self.emit(id, Instruction::CreateTag { symbol });
-                        }
-                    }
-                    None => {
-                        let tag = Tag::create(&mut self.lir.constant_heap, symbol, None);
+                if let Some(value) = value {
+                    if let Some(value) = self.constants.get(value) {
+                        let tag = Tag::create(&mut self.lir.constant_heap, symbol, *value);
                         self.constants.insert(id, tag.into());
+                    } else {
+                        self.emit_reference_to(*value);
+                        self.emit(id, Instruction::CreateTag { symbol });
                     }
+                } else {
+                    let tag = Tag::create(&mut self.lir.constant_heap, symbol, None);
+                    self.constants.insert(id, tag.into());
                 }
             }
             Expression::Builtin(builtin) => {

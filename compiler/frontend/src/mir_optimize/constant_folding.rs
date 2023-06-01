@@ -172,7 +172,7 @@ fn run_builtin(
             };
 
             let Some(value) = index.to_usize().and_then(|index| list.get(index)) else {
-                return Some(Panics(format!("List access will panic because index {} is out of bounds.", index)));
+                return Some(Panics(format!("List access will panic because index {index} is out of bounds.")));
             };
             Returns(Expression::Reference(*value))
         }

@@ -228,7 +228,6 @@ impl ToRichIr for Expression {
             Expression::Tag { symbol, value } => {
                 let range = builder.push(format!("{symbol}"), TokenType::Symbol, EnumSet::empty());
                 builder.push_reference(ReferenceKey::Symbol(symbol.to_owned()), range);
-                builder.push(" ", None, EnumSet::empty());
                 if let Some(value) = value {
                     builder.push(" ", None, EnumSet::empty());
                     value.build_rich_ir(builder);
