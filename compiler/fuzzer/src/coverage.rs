@@ -1,3 +1,4 @@
+use bitvec::prelude::*;
 use candy_vm::fiber::InstructionPointer;
 use itertools::Itertools;
 use std::{
@@ -6,11 +7,11 @@ use std::{
 };
 
 pub struct Coverage {
-    covered: Vec<bool>,
+    covered: BitVec,
 }
 impl Coverage {
     pub fn none() -> Self {
-        Self { covered: vec![] }
+        Self { covered: bitvec![] }
     }
 
     pub fn add(&mut self, ip: InstructionPointer) {
@@ -18,19 +19,18 @@ impl Coverage {
             self.covered
                 .extend([false].repeat(*ip - self.covered.len() + 1));
         }
-        self.covered[*ip] = true;
+        self.covered.set(*ip, true);
     }
 
     pub fn is_covered(&self, ip: InstructionPointer) -> bool {
-        self.covered.get(*ip).copied().unwrap_or_default()
+        *self.covered.get(*ip).unwrap()
     }
 
     pub fn improvement_on(&self, other: &Coverage) -> usize {
         self.covered
             .iter()
-            .copied()
-            .zip(other.covered.iter().copied())
-            .filter(|(a, b)| *a && !b)
+            .zip(other.covered.iter())
+            .filter(|(a, b)| **a && !**b)
             .count()
     }
 
@@ -47,8 +47,8 @@ impl Add for &Coverage {
         let covered = self
             .covered
             .iter()
-            .copied()
-            .zip_longest(rhs.covered.iter().copied())
+            .map(|bit| *bit)
+            .zip_longest(rhs.covered.iter().map(|bit| *bit))
             .map(|it| {
                 let (a, b) = it.or_default();
                 a | b
