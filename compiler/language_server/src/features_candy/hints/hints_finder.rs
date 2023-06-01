@@ -353,6 +353,10 @@ impl HintsFinder {
             }
         }
 
+        for hint in &mut hints {
+            hint.ensure_leading_spaces_visible();
+        }
+
         (hints, diagnostics)
     }
 }

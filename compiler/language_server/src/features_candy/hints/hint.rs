@@ -29,18 +29,3 @@ impl Hint {
         self.text = format!("⠀{}", self.text);
     }
 }
-
-pub fn align_hints(hints: &mut [&mut Hint]) {
-    assert!(!hints.is_empty());
-
-    let max_indentation = hints.iter().map(|it| it.position.character).max().unwrap();
-    for hint in hints {
-        let hint = &mut **hint;
-        let additional_indentation = max_indentation - hint.position.character;
-        hint.text = format!(
-            "{}{}",
-            " ".repeat(additional_indentation as usize),
-            hint.text
-        );
-    }
-}
