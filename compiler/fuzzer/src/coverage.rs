@@ -41,7 +41,7 @@ impl Coverage {
 
     pub fn relative_coverage(&self) -> f64 {
         assert!(!self.0.is_empty());
-        let num_covered = self.0.iter().filter(|bit| **bit).count();
+        let num_covered = self.0.count_ones();
         let num_total = self.0.len();
         (num_covered as f64) / (num_total as f64)
     }
