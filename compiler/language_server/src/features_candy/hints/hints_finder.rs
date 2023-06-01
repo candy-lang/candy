@@ -298,9 +298,9 @@ impl HintsFinder {
                     };
 
                     let second_hint = {
-                        if &panic.responsible.module != module {
+                        if !id.is_same_module_and_any_parent_of(&panic.responsible) {
                             // The function panics internally for an input, but it's the
-                            // fault of an inner function that's in another module.
+                            // fault of another function that's in another module.
                             // TODO: The fuzz case should instead be highlighted in the
                             // used function directly. We don't do that right now
                             // because we assume the fuzzer will find the panic when
