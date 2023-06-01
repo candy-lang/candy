@@ -226,7 +226,7 @@ impl ToRichIr for Expression {
                 builder.push_reference(text.to_owned(), range);
             }
             Expression::Tag { symbol, value } => {
-                let range = builder.push(symbol.to_string(), TokenType::Symbol, EnumSet::empty());
+                let range = builder.push(symbol, TokenType::Symbol, EnumSet::empty());
                 builder.push_reference(ReferenceKey::Symbol(symbol.to_owned()), range);
                 if let Some(value) = value {
                     builder.push(" ", None, EnumSet::empty());
