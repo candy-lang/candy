@@ -53,6 +53,7 @@ impl Fuzzer {
         let pool = InputPool::new(function.argument_count(), &collect_symbols_in_heap(&heap));
         let runner = Runner::new(lir.clone(), function, pool.generate_new_input());
 
+        let num_instructions = lir.instructions.len();
         Self {
             lir,
             function_heap: heap,
@@ -60,7 +61,7 @@ impl Fuzzer {
             function_id,
             status: Some(Status::StillFuzzing {
                 pool,
-                total_coverage: Coverage::none(),
+                total_coverage: Coverage::none(num_instructions),
                 runner,
             }),
         }
@@ -127,22 +128,17 @@ impl Fuzzer {
             RunResult::Timeout => self.create_new_fuzzing_case(pool, total_coverage),
             RunResult::Done { .. } | RunResult::NeedsUnfulfilled { .. } => {
                 let function_range = self.lir.range_of_function(&self.function_id);
-                if total_coverage
-                    .in_range(function_range.clone())
-                    .relative_coverage()
-                    == 1.0
-                {
+                let function_coverage = total_coverage.in_range(&function_range);
+
+                if function_coverage.relative_coverage() == 1.0 {
                     Status::TotalCoverageButNoPanic
                 } else {
                     // We favor small inputs with good code coverage.
                     let score = {
                         let complexity = complexity_of_input(&runner.input) as Score;
+                        let new_function_coverage = runner.coverage.in_range(&function_range);
                         let score: Score = 0.1
-                            * runner
-                                .coverage
-                                .in_range(function_range)
-                                .improvement_on(&total_coverage)
-                                as f64
+                            * new_function_coverage.improvement_on(&function_coverage) as f64
                             - 0.4 * complexity;
                         score.clamp(0.1, Score::MAX)
                     };
