@@ -63,7 +63,7 @@ where
             Status::StillFuzzing { total_coverage, .. } => {
                 let coverage =
                     total_coverage.relative_coverage_of_range(lir.range_of_function(&id));
-                debug!("Achieved a coverage of {:.1}%.", coverage * 100.0);
+                debug!("Achieved a coverage of {:.1} %.", coverage * 100.0);
             }
             Status::FoundPanic {
                 input,

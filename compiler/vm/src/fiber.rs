@@ -92,15 +92,11 @@ impl Step for InstructionPointer {
     }
 
     fn forward_checked(start: Self, count: usize) -> Option<Self> {
-        Some((*start + count).into())
+        (*start).checked_add(count).map(Self)
     }
 
     fn backward_checked(start: Self, count: usize) -> Option<Self> {
-        if count > *start {
-            None
-        } else {
-            Some((*start - count).into())
-        }
+        (*start).checked_sub(count).map(Self)
     }
 }
 impl Debug for InstructionPointer {

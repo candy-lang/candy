@@ -60,14 +60,13 @@ impl Add for &Coverage {
 
 impl Coverage {
     pub fn format_range(&self, range: Range<InstructionPointer>) -> String {
-        let mut s = vec![];
+        let mut s = "[".to_owned();
 
-        s.push('[');
         for ip in *range.start..*range.end {
             s.push(if self.is_covered(ip.into()) { '*' } else { ' ' });
         }
         s.push(']');
-        s.into_iter().join("")
+        s
     }
 }
 impl fmt::Debug for Coverage {
@@ -75,7 +74,7 @@ impl fmt::Debug for Coverage {
         write!(
             f,
             "{}",
-            self.format_range(0.into()..self.covered.len().into())
+            self.format_range(0.into()..self.covered.len().into()),
         )
     }
 }
