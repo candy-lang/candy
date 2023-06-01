@@ -79,7 +79,7 @@ flatMapError result errorMapper :=
   # `errorMapper` can also return a result.
   needs (is result)
   needs (function.is1 errorMapper)
-  result | mapOr { value -> result } { value -> errorMapper value }
+  result | mapOrElse { value -> result } { value -> errorMapper value }
 mapError result errorMapper :=
   # Returns `result` if it `isOk` and `Error (errorMapper result.value)` if it
   # `isError`.
