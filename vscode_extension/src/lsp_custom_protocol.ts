@@ -1,7 +1,7 @@
 import {
   DocumentUri,
   NotificationType,
-  Position,
+  Range,
   RequestType,
 } from 'vscode-languageclient';
 
@@ -33,6 +33,6 @@ export interface HintsParams {
 export interface Hint {
   readonly kind: HintKind;
   readonly text: string;
-  readonly position: Position;
+  readonly range: Range;
 }
-export type HintKind = 'value' | 'panic' | 'fuzz';
+export type HintKind = 'value' | 'panic' | 'fuzz' | 'fuzzCallSite';

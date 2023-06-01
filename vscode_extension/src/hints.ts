@@ -21,6 +21,7 @@ export class HintsDecorations implements vs.Disposable {
       vs.window.createTextEditorDecorationType({
         after: { color: new vs.ThemeColor('candy.hints.valueColor') },
         rangeBehavior: vs.DecorationRangeBehavior.ClosedOpen,
+        isWholeLine: true,
       }),
     ],
     [
@@ -28,6 +29,7 @@ export class HintsDecorations implements vs.Disposable {
       vs.window.createTextEditorDecorationType({
         after: { color: new vs.ThemeColor('candy.hints.panicColor') },
         rangeBehavior: vs.DecorationRangeBehavior.ClosedOpen,
+        isWholeLine: true,
       }),
     ],
     [
@@ -35,6 +37,15 @@ export class HintsDecorations implements vs.Disposable {
       vs.window.createTextEditorDecorationType({
         after: { color: new vs.ThemeColor('candy.hints.fuzzColor') },
         rangeBehavior: vs.DecorationRangeBehavior.ClosedOpen,
+        isWholeLine: true,
+      }),
+    ],
+    [
+      'fuzzCallSite',
+      vs.window.createTextEditorDecorationType({
+        after: { color: new vs.ThemeColor('candy.hints.fuzzColor') },
+        rangeBehavior: vs.DecorationRangeBehavior.ClosedClosed,
+        backgroundColor: 'rgba(255, 0, 0, 0.2)',
       }),
     ],
   ]);
@@ -82,22 +93,14 @@ export class HintsDecorations implements vs.Disposable {
       };
       const decorations = new Map<HintKind, Item[]>();
       for (const hint of hints) {
-        const position = this.client.protocol2CodeConverter.asPosition(
-          hint.position
+        const range = new vs.Range(
+          this.client.protocol2CodeConverter.asPosition(hint.range.start),
+          this.client.protocol2CodeConverter.asPosition(hint.range.end)
         );
-
-        // Ensure that the hint we got has a sensible position. Otherwise, the
-        // hint might be stale (e.g., we sent two updates, and the hint from in
-        // between them just arrived). In this case, we'll just bail and do
-        // nothing, assuming a future update will have the correct hint.
-        // TODO(later, JonasWanke): do we really need this check?
-        if (position.character < 1) {
-          return;
-        }
 
         const existing = decorations.get(hint.kind) || [];
         existing.push({
-          range: new vs.Range(position, position),
+          range: range,
           renderOptions: { after: { contentText: hint.text } },
         });
         decorations.set(hint.kind, existing);

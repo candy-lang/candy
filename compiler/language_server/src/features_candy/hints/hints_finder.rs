@@ -1,5 +1,8 @@
-use super::{utils::IdToEndOfLine, Hint, HintKind};
-use crate::utils::JoinWithCommasAndAnd;
+use super::{
+    hint::{align_hints, Hint, HintKind},
+    utils::IdToEndOfLine,
+};
+use crate::utils::{JoinWithCommasAndAnd, LspPositionConversion};
 use candy_frontend::{
     ast::{Assignment, AssignmentBody, AstDb, AstKind},
     ast_to_hir::AstToHir,
@@ -197,7 +200,7 @@ impl HintsFinder {
         }
     }
 
-    pub fn hints<DB>(&self, db: &DB, module: &Module) -> Vec<Vec<Hint>>
+    pub fn hints<DB>(&self, db: &DB, module: &Module) -> Vec<Hint>
     where
         DB: AstDb + AstToHir + HirDb + ModuleDb + PositionConversionDb,
     {
@@ -219,7 +222,7 @@ impl HintsFinder {
                 if let EndedReason::Panicked(panic) = &constants_ended.reason {
                     if let Some(hint) = panic_hint(db, module.clone(), stack_tracer, &panic.reason)
                     {
-                        hints.push(vec![hint]);
+                        hints.push(hint);
                     }
                 }
 
@@ -241,20 +244,20 @@ impl HintsFinder {
                                 continue;
                             }
 
-                            hints.push(vec![Hint {
-                                kind: HintKind::Value,
-                                text: value.to_string(),
-                                position: db.id_to_end_of_line(id.clone()).unwrap(),
-                            }]);
+                            hints.push(Hint::like_comment(
+                                HintKind::Value,
+                                value.to_string(),
+                                db.id_to_end_of_line(id.clone()).unwrap(),
+                            ));
                         }
                         Expression::PatternIdentifierReference { .. } => {
                             let body = db.containing_body_of(id.clone());
                             let name = body.identifiers.get(id).unwrap();
-                            hints.push(vec![Hint {
-                                kind: HintKind::Value,
-                                text: format!("{name} = {value}"),
-                                position: db.id_to_end_of_line(id.clone()).unwrap(),
-                            }]);
+                            hints.push(Hint::like_comment(
+                                HintKind::Value,
+                                format!("{name} = {value}"),
+                                db.id_to_end_of_line(id.clone()).unwrap(),
+                            ));
                         }
                         _ => {}
                     }
@@ -268,7 +271,26 @@ impl HintsFinder {
                     } = fuzzer.status() else { continue; };
 
                     let id = fuzzer.function_id.clone();
-                    let first_hint = {
+
+                    if !id.is_same_module_and_any_parent_of(&panic.responsible) {
+                        // The function panics internally for an input, but it's the
+                        // fault of another function that's in another module.
+                        // TODO: The fuzz case should instead be highlighted in the
+                        // used function directly. We don't do that right now
+                        // because we assume the fuzzer will find the panic when
+                        // fuzzing the faulty function, but we should save the
+                        // panicking case (or something like that) in the future.
+                        continue;
+                    }
+
+                    if db.hir_to_cst_id(id.clone()).is_none() {
+                        panic!(
+                            "It looks like the generated code {} is at fault for a panic.",
+                            panic.responsible,
+                        );
+                    }
+
+                    let mut first_hint = {
                         let parameter_names = match db.find_expression(id.clone()) {
                             Some(Expression::Function(hir::Function { parameters, .. })) => {
                                 parameters
@@ -282,9 +304,9 @@ impl HintsFinder {
                                 continue;
                             }
                         };
-                        Hint {
-                            kind: HintKind::Fuzz,
-                            text: format!(
+                        Hint::like_comment(
+                            HintKind::Fuzz,
+                            format!(
                                 "If this is called with {},",
                                 parameter_names
                                     .iter()
@@ -293,39 +315,35 @@ impl HintsFinder {
                                     .collect_vec()
                                     .join_with_commas_and_and(),
                             ),
-                            position: db.id_to_end_of_line(id.clone()).unwrap(),
-                        }
+                            db.id_to_end_of_line(id.clone()).unwrap(),
+                        )
                     };
 
-                    let second_hint = {
-                        if !id.is_same_module_and_any_parent_of(&panic.responsible) {
-                            // The function panics internally for an input, but it's the
-                            // fault of another function that's in another module.
-                            // TODO: The fuzz case should instead be highlighted in the
-                            // used function directly. We don't do that right now
-                            // because we assume the fuzzer will find the panic when
-                            // fuzzing the faulty function, but we should save the
-                            // panicking case (or something like that) in the future.
-                            continue;
-                        }
-                        if db.hir_to_cst_id(id.clone()).is_none() {
-                            panic!(
-                                "It looks like the generated code {} is at fault for a panic.",
-                                panic.responsible,
-                            );
-                        }
+                    // TODO: In the future, re-run only the failing case with
+                    // tracing enabled and also show the arguments to the failing
+                    // function in the hint.
+                    let mut second_hint = Hint::like_comment(
+                        HintKind::Fuzz,
+                        format!("then this call panics: {}", panic.reason),
+                        db.id_to_end_of_line(panic.responsible.clone()).unwrap(),
+                    );
 
-                        // TODO: In the future, re-run only the failing case with
-                        // tracing enabled and also show the arguments to the failing
-                        // function in the hint.
+                    align_hints(&mut [&mut first_hint, &mut second_hint]);
+                    hints.push(first_hint);
+                    hints.push(second_hint);
+
+                    let third_hint = {
+                        let range = db
+                            .hir_id_to_display_span(panic.responsible.clone())
+                            .unwrap();
                         Hint {
-                            kind: HintKind::Fuzz,
-                            text: format!("then {} panics: {}", panic.responsible, panic.reason),
-                            position: db.id_to_end_of_line(panic.responsible.clone()).unwrap(),
+                            kind: HintKind::FuzzCallSite,
+                            text: None,
+                            range: db.offset_to_lsp_position(module.clone(), range.start)
+                                ..db.offset_to_lsp_position(module.clone(), range.end),
                         }
                     };
-
-                    hints.push(vec![first_hint, second_hint]);
+                    hints.push(third_hint);
                 }
             }
         }
@@ -363,9 +381,10 @@ where
         arguments.iter().map(|it| it.to_string()).join(" "),
     );
 
-    Some(Hint {
-        kind: HintKind::Panic,
-        text: format!("Calling `{call_info}` panics: {reason}"),
-        position: db.id_to_end_of_line(call_site)?,
-    })
+    let position = db.id_to_end_of_line(call_site)?;
+    Some(Hint::like_comment(
+        HintKind::Panic,
+        format!("Calling `{call_info}` panics: {reason}"),
+        position,
+    ))
 }

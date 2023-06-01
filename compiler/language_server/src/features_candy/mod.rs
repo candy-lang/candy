@@ -27,7 +27,7 @@ use crate::{
 use self::{
     find_definition::find_definition,
     folding_ranges::folding_ranges,
-    hints::Hint,
+    hints::hint::Hint,
     references::{reference_query_for_offset, references, ReferenceQuery},
     semantic_tokens::semantic_tokens,
 };

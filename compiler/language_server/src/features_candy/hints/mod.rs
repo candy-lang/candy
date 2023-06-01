@@ -9,15 +9,14 @@
 //! While doing all that, we can pause regularly between executing instructions
 //! so that we don't occupy a single CPU at 100 %.
 
-use self::hints_finder::HintsFinder;
+use self::{hint::Hint, hints_finder::HintsFinder};
 use crate::database::Database;
 use candy_frontend::{
     module::{Module, MutableModuleProviderOwner, PackagesPath},
     rich_ir::ToRichIr,
 };
-use extension_trait::extension_trait;
 use itertools::Itertools;
-use lsp_types::{notification::Notification, Position, Url};
+use lsp_types::{notification::Notification, Url};
 use rand::{seq::IteratorRandom, thread_rng};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -28,6 +27,7 @@ use tokio::{
 };
 use tracing::debug;
 
+pub mod hint;
 mod hints_finder;
 mod utils;
 
@@ -35,20 +35,6 @@ pub enum Event {
     UpdateModule(Module, Vec<u8>),
     CloseModule(Module),
     Shutdown,
-}
-
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
-pub struct Hint {
-    kind: HintKind,
-    text: String,
-    position: Position,
-}
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, PartialOrd, Ord, Copy)]
-#[serde(rename_all = "camelCase")]
-pub enum HintKind {
-    Value,
-    Fuzz,
-    Panic,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -110,20 +96,11 @@ pub async fn run_server(
         let hints = hints_finder
             .hints(&db, &module)
             .into_iter()
-            // Make hints look like comments.
-            .map(|mut hint_group| {
-                for hint in &mut hint_group {
-                    hint.text =
-                        format!("{}# {}", quasi_spaces(2), hint.text.replace('\n', r#"\n"#));
-                }
-                hint_group
+            .map(|mut hint| {
+                hint.ensure_leading_spaces_visible();
+                hint
             })
-            // Show related hints at the same indentation.
-            .flat_map(|mut hint_group| {
-                hint_group.align_hint_columns();
-                hint_group
-            })
-            .sorted_by_key(|hint| hint.position)
+            .sorted_by_key(|hint| hint.range.start)
             .collect_vec();
 
         outgoing_hints.report_hints(module, hints).await;
@@ -147,29 +124,6 @@ impl OutgoingHints {
             debug!("Reporting hints for {}: {hints:?}", module.to_rich_ir());
             self.last_sent.insert(module.clone(), hints.clone());
             self.sender.send((module, hints)).await.unwrap();
-        }
-    }
-}
-
-/// VSCode trims multiple leading spaces to one. That's why we use an
-/// [em quad](https://en.wikipedia.org/wiki/Quad_(typography)) instead, which
-/// seems to have the same width as a normal space in VSCode.
-fn quasi_spaces(n: usize) -> String {
-    format!(" {}", " ".repeat(n))
-}
-
-#[extension_trait]
-impl AlignHints for Vec<Hint> {
-    fn align_hint_columns(&mut self) {
-        assert!(!self.is_empty());
-        let max_indentation = self.iter().map(|it| it.position.character).max().unwrap();
-        for hint in self {
-            let additional_indentation = max_indentation - hint.position.character;
-            hint.text = format!(
-                "{}{}",
-                quasi_spaces(additional_indentation as usize),
-                hint.text
-            );
         }
     }
 }
