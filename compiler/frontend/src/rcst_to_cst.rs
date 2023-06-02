@@ -223,8 +223,8 @@ impl Rcst {
                 comma,
             } => CstKind::StructField {
                 key_and_colon: key_and_colon
-                    .as_ref()
-                    .map(|box (key, colon)| Box::new((key.to_cst(state), colon.to_cst(state)))),
+                    .as_deref()
+                    .map(|(key, colon)| Box::new((key.to_cst(state), colon.to_cst(state)))),
                 value: Box::new(value.to_cst(state)),
                 comma: comma.as_ref().map(|comma| Box::new(comma.to_cst(state))),
             },

@@ -61,7 +61,7 @@ impl CandyFeatures {
         }
     }
 
-    async fn analyze_modules<M: AsRef<[Module]>>(&self, db: &Mutex<Database>, modules: M) {
+    async fn analyze_modules(&self, db: &Mutex<Database>, modules: impl AsRef<[Module]>) {
         let modules = modules.as_ref();
         debug!(
             "Analyzing {} {}",
