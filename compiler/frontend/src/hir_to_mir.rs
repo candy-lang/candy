@@ -588,8 +588,9 @@ impl<'a> PatternLoweringContext<'a> {
                                 let builtin_to_debug_text = body.push_builtin(BuiltinFunction::ToDebugText);
                                 let actual_value_text = body.push_call(builtin_to_debug_text, vec![actual_value], self.responsible);
                                 vec![
-                                    body.push_text("Expected tag to not have a value, but it has one: ".to_string()),
+                                    body.push_text("Expected tag to not have a value, but it has one: `".to_string()),
                                     actual_value_text,
+                                    body.push_text("`.".to_string()),
                                 ]
                             }
                         });
