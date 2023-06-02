@@ -13,11 +13,7 @@ pub struct RangeCoverage<'a> {
 
 impl Coverage {
     pub fn none(size: usize) -> Self {
-        let mut coverage = bitvec![];
-        for _ in 0..size {
-            coverage.push(false);
-        }
-        Self(coverage)
+        Self(BitVec::repeat(false, size))
     }
 
     pub fn add(&mut self, ip: InstructionPointer) {
