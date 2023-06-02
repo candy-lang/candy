@@ -1,0 +1,10 @@
+{
+  "configurations": [
+    {
+      "type": "candy",
+      "name": "🍭 Candy",
+      "request": "launch",
+      "program": "${workspaceFolder}/examples/fibonacci.candy"
+    }
+  ]
+}

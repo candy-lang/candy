@@ -58,6 +58,7 @@ impl RunResult {
 impl<L: Borrow<Lir>> Runner<L> {
     pub fn new(lir: L, function: Function, input: Input) -> Self {
         let (mut heap, constant_mapping) = lir.borrow().constant_heap.clone();
+        let num_instructions = lir.borrow().instructions.len();
 
         let mut mapping = FxHashMap::default();
         let function = function
@@ -85,7 +86,7 @@ impl<L: Borrow<Lir>> Runner<L> {
             input,
             tracer,
             num_instructions: 0,
-            coverage: Coverage::none(),
+            coverage: Coverage::none(num_instructions),
             result: None,
         }
     }

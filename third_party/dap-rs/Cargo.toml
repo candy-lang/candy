@@ -1,0 +1,23 @@
+[package]
+name = "dap"
+version = "0.2.0-alpha1"
+edition = "2021"
+rust-version = "1.56.0"
+authors = ["Tamás Szelei <szelei.t@gmail.com>"]
+description = "A Rust implementation of the Debug Adapter Protocol"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/sztomi/dap-rs"
+homepage = "https://github.com/sztomi/dap-rs"
+readme = "README.md"
+keywords = ["debugging", "protocol", "debug", "framework"]
+categories = ["development-tools::debugging"]
+
+[dependencies]
+serde = { version = "1.*", features = ["derive"] }
+serde_json = "1.*"
+thiserror = "1.*"
+tokio = { version = "1.2", features = ["full"] }
+tracing = "*"
+tracing-subscriber = "0.3"
+async-trait = "0.1.63"
+bytes = "1"

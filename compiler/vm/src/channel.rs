@@ -10,7 +10,7 @@ use std::{
     fmt::{self, Debug, Formatter},
 };
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ChannelId(usize);
 
 impl CountableId for ChannelId {

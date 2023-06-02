@@ -15,12 +15,13 @@ use lsp_types::{
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::mem;
-use tokio::sync::{mpsc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use tokio::sync::{mpsc, Mutex, RwLock, RwLockMappedWriteGuard, RwLockReadGuard, RwLockWriteGuard};
 use tower_lsp::{jsonrpc, Client, ClientSocket, LanguageServer, LspService};
 use tracing::{debug, span, Level};
 
 use crate::{
     database::Database,
+    debug_adapter::DebugSessionManager,
     features::{LanguageFeatures, Reference, RenameError},
     features_candy::{hints::HintsNotification, CandyFeatures},
     features_ir::{IrFeatures, UpdateIrNotification},
@@ -35,7 +36,10 @@ pub struct Server {
 }
 #[derive(Debug)]
 pub enum ServerState {
-    Initial { features: ServerFeatures },
+    Initial {
+        features: ServerFeatures,
+        debug_session_manager: DebugSessionManager,
+    },
     Running(RunningServerState),
     Shutdown,
 }
@@ -43,16 +47,23 @@ pub enum ServerState {
 pub struct RunningServerState {
     pub features: ServerFeatures,
     pub packages_path: PackagesPath,
+    pub debug_session_manager: DebugSessionManager,
 }
 impl ServerState {
     pub fn require_features(&self) -> &ServerFeatures {
         match self {
-            ServerState::Initial { features } => features,
+            ServerState::Initial { features, .. } => features,
             ServerState::Running(RunningServerState { features, .. }) => features,
             ServerState::Shutdown => panic!("Server is shut down."),
         }
     }
     pub fn require_running(&self) -> &RunningServerState {
+        match self {
+            ServerState::Running(state) => state,
+            _ => panic!("Server is not running."),
+        }
+    }
+    pub fn require_running_mut(&mut self) -> &mut RunningServerState {
         match self {
             ServerState::Running(state) => state,
             _ => panic!("Server is not running."),
@@ -115,13 +126,16 @@ impl Server {
         let (hints_sender, mut hints_receiver) = mpsc::channel(1024);
 
         let (service, client) = LspService::build(|client| {
-            let features = ServerFeatures {
-                candy: CandyFeatures::new(
-                    packages_path.clone(),
-                    diagnostics_sender.clone(),
-                    hints_sender.clone(),
-                ),
-                ir: IrFeatures::default(),
+            let state = ServerState::Initial {
+                features: ServerFeatures {
+                    candy: CandyFeatures::new(
+                        packages_path.clone(),
+                        diagnostics_sender.clone(),
+                        hints_sender.clone(),
+                    ),
+                    ir: IrFeatures::default(),
+                },
+                debug_session_manager: DebugSessionManager::default(),
             };
 
             let client_for_closure = client.clone();
@@ -138,6 +152,7 @@ impl Server {
                 }
             };
             tokio::spawn(diagnostics_reporter());
+
             let client_for_closure = client.clone();
             let packages_path_for_closure = packages_path.clone();
             let hint_reporter = async move || {
@@ -157,9 +172,17 @@ impl Server {
                 db: Mutex::new(Database::new_with_file_system_module_provider(
                     packages_path,
                 )),
-                state: RwLock::new(ServerState::Initial { features }),
+                state: RwLock::new(state),
             }
         })
+        .custom_method(
+            "candy/debugAdapter/create",
+            Server::candy_debug_adapter_create,
+        )
+        .custom_method(
+            "candy/debugAdapter/message",
+            Server::candy_debug_adapter_message,
+        )
         .custom_method("candy/viewIr", Server::candy_view_ir)
         .finish();
 
@@ -172,6 +195,11 @@ impl Server {
 
     pub async fn require_running_state(&self) -> RwLockReadGuard<RunningServerState> {
         RwLockReadGuard::map(self.state.read().await, |state| state.require_running())
+    }
+    pub async fn require_running_state_mut(&self) -> RwLockMappedWriteGuard<RunningServerState> {
+        RwLockWriteGuard::map(self.state.write().await, |state| {
+            state.require_running_mut()
+        })
     }
     pub async fn features_from_url<'a>(
         &self,
@@ -222,14 +250,15 @@ impl LanguageServer for Server {
         };
 
         {
-            RwLockWriteGuard::map(self.state.write().await, |state| {
-                let owned_state = mem::replace(state, ServerState::Shutdown);
-                let ServerState::Initial { features } = owned_state else { panic!("Already initialized"); };
-                *state = ServerState::Running(RunningServerState {
-                    features,
-                    packages_path,
-                });
-                state
+            let mut state = self.state.write().await;
+            let owned_state = mem::replace(&mut *state, ServerState::Shutdown);
+            let ServerState::Initial { features, debug_session_manager } = owned_state else {
+                panic!("Server is already initialized.");
+            };
+            *state = ServerState::Running(RunningServerState {
+                features,
+                packages_path,
+                debug_session_manager,
             });
         }
 

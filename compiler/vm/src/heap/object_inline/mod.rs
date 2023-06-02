@@ -4,7 +4,7 @@ use self::{
     pointer::InlinePointer,
     port::{InlineReceivePort, InlineSendPort},
 };
-use super::{object_heap::HeapObject, Heap};
+use super::{object_heap::HeapObject, Data, Heap};
 use crate::{
     channel::ChannelId,
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
@@ -13,6 +13,7 @@ use enum_dispatch::enum_dispatch;
 use extension_trait::extension_trait;
 use rustc_hash::FxHashMap;
 use std::{
+    cmp::Ordering,
     fmt::{self, Formatter},
     hash::{Hash, Hasher},
     num::NonZeroU64,
@@ -114,6 +115,16 @@ impl PartialEq for InlineObject {
 impl Hash for InlineObject {
     fn hash<H: Hasher>(&self, state: &mut H) {
         InlineData::from(*self).hash(state)
+    }
+}
+impl Ord for InlineObject {
+    fn cmp(&self, other: &Self) -> Ordering {
+        Data::from(*self).cmp(&Data::from(*other))
+    }
+}
+impl PartialOrd for InlineObject {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
