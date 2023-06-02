@@ -56,6 +56,7 @@ impl FuzzerManager {
         match &fuzzer.status() {
             Status::StillFuzzing { .. } => None,
             Status::FoundPanic { .. } => Some(fuzzer.function_id.module.clone()),
+            Status::TotalCoverageButNoPanic => None,
         }
     }
 
