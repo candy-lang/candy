@@ -50,7 +50,7 @@ impl Add for &Coverage {
 
 impl<'a> RangeCoverage<'a> {
     pub fn is_covered(&self, ip: InstructionPointer) -> bool {
-        *self.coverage.get(*ip).unwrap()
+        *self.coverage.get(*ip - *self.offset).unwrap()
     }
 
     pub fn improvement_on(&self, other: &RangeCoverage) -> usize {
