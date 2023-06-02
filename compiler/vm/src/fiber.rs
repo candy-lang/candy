@@ -357,6 +357,12 @@ impl<T: FiberTracer> Fiber<T> {
         }
 
         match instruction {
+            Instruction::CreateTag { symbol } => {
+                let value = self.pop_from_data_stack();
+                symbol.dup();
+                let tag = Tag::create(&mut self.heap, symbol, value);
+                self.push_to_data_stack(tag);
+            }
             Instruction::CreateList { num_items } => {
                 let mut item_addresses = vec![];
                 for _ in 0..num_items {

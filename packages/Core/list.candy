@@ -17,8 +17,8 @@ isEmpty list :=
 
 lastIndex list :=
   needs (is list)
-  ifElse (list | isEmpty) { result.error "Can't get the last index of an empty list." } {
-    list | length | int.subtract 1 | result.ok
+  ifElse (list | isEmpty) { Error "Can't get the last index of an empty list." } {
+    Ok (list | length | int.subtract 1)
   }
 isValidIndex list index :=
   needs (is list)

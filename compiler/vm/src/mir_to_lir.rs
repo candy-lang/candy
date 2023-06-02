@@ -157,9 +157,21 @@ impl<'c> LoweringContext<'c> {
                     self.emit(id, Instruction::PushFromStack(offset));
                 }
             }
-            Expression::Symbol(symbol) => {
-                let tag = Tag::create_from_str(&mut self.lir.constant_heap, symbol, None);
-                self.constants.insert(id, tag.into());
+            Expression::Tag { symbol, value } => {
+                let symbol = Text::create(&mut self.lir.constant_heap, symbol);
+
+                if let Some(value) = value {
+                    if let Some(value) = self.constants.get(value) {
+                        let tag = Tag::create(&mut self.lir.constant_heap, symbol, *value);
+                        self.constants.insert(id, tag.into());
+                    } else {
+                        self.emit_reference_to(*value);
+                        self.emit(id, Instruction::CreateTag { symbol });
+                    }
+                } else {
+                    let tag = Tag::create(&mut self.lir.constant_heap, symbol, None);
+                    self.constants.insert(id, tag.into());
+                }
             }
             Expression::Builtin(builtin) => {
                 let builtin = Builtin::create(*builtin);

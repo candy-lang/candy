@@ -6,7 +6,7 @@ use crate::{
     builtin_functions::{self, BuiltinFunction},
     cst::{self, CstDb},
     cst_to_ast::CstToAst,
-    error::CompilerError,
+    error::{CompilerError, CompilerErrorPayload},
     hir::{self, Body, Expression, Function, HirError, Pattern, PatternIdentifierId},
     id::IdGenerator,
     module::Module,
@@ -248,7 +248,7 @@ impl Context<'_> {
                         let body = self.compile(body);
                         self.end_non_top_level(reset_state);
 
-                        let (pattern, identifier_ids) = PatternContext::compile(pattern);
+                        let (pattern, identifier_ids) = self.lower_pattern(pattern);
                         let body = self.push(
                             None,
                             Expression::Destructure {
@@ -315,7 +315,7 @@ impl Context<'_> {
                     .iter()
                     .map(|case| match &case.kind {
                         AstKind::MatchCase(MatchCase { box pattern, body }) => {
-                            let (pattern, pattern_identifiers) = PatternContext::compile(pattern);
+                            let (pattern, pattern_identifiers) = self.lower_pattern(pattern);
 
                             let reset_state = self.start_scope();
                             for (name, (ast_id, identifier_id)) in pattern_identifiers {
@@ -605,6 +605,17 @@ impl Context<'_> {
             .collect_vec()
     }
 
+    fn lower_pattern(&mut self, ast: &Ast) -> (Pattern, PatternIdentifierIds) {
+        let mut context = PatternContext {
+            db: self.db,
+            module: self.module.clone(),
+            identifier_id_generator: Default::default(),
+            identifier_ids: Default::default(),
+        };
+        let pattern = context.compile_pattern(ast);
+        (pattern, context.identifier_ids)
+    }
+
     fn push(
         &mut self,
         ast_id: Option<ast::Id>,
@@ -754,18 +765,13 @@ fn add_keys(parents: &[String], id: String) -> Vec<String> {
 /// AST.
 type PatternIdentifierIds = FxHashMap<String, (ast::Id, PatternIdentifierId)>;
 
-#[derive(Default)]
-struct PatternContext {
+struct PatternContext<'a> {
+    db: &'a dyn AstToHir,
+    module: Module,
     identifier_id_generator: IdGenerator<PatternIdentifierId>,
     identifier_ids: PatternIdentifierIds,
 }
-impl PatternContext {
-    fn compile(ast: &Ast) -> (Pattern, PatternIdentifierIds) {
-        let mut context = PatternContext::default();
-        let pattern = context.compile_pattern(ast);
-        (pattern, context.identifier_ids)
-    }
-
+impl<'a> PatternContext<'a> {
     fn compile_pattern(&mut self, ast: &Ast) -> Pattern {
         match &ast.kind {
             AstKind::Int(Int(int)) => Pattern::Int(int.to_owned()),
@@ -787,7 +793,10 @@ impl PatternContext {
                     });
                 Pattern::NewIdentifier(pattern_id.to_owned())
             }
-            AstKind::Symbol(Symbol(symbol)) => Pattern::Symbol(symbol.value.to_owned()),
+            AstKind::Symbol(Symbol(symbol)) => Pattern::Tag {
+                symbol: symbol.value.to_owned(),
+                value: None,
+            },
             AstKind::List(List(items)) => {
                 let items = items
                     .iter()
@@ -803,9 +812,10 @@ impl PatternContext {
                             .as_ref()
                             .map(|key| self.compile_pattern(key))
                             .unwrap_or_else(|| match &value.kind {
-                                AstKind::Identifier(Identifier(name)) => {
-                                    Pattern::Symbol(name.value.uppercase_first_letter())
-                                }
+                                AstKind::Identifier(Identifier(name)) => Pattern::Tag {
+                                    symbol: name.value.uppercase_first_letter(),
+                                    value: None,
+                                },
                                 AstKind::Error { errors, .. } => Pattern::Error {
                                     child: None,
                                     // TODO: These errors are already reported for the value itself.
@@ -820,9 +830,25 @@ impl PatternContext {
                     .collect();
                 Pattern::Struct(fields)
             }
+            AstKind::Call(call) => {
+                let receiver = self.compile_pattern(&call.receiver);
+                let Pattern::Tag { symbol, value } = receiver else {
+                    return self.error(ast, HirError::PatternContainsCall);
+                };
+                if value.is_some() {
+                    return self.error(ast, HirError::PatternContainsCall);
+                }
+                if call.arguments.len() != 1 {
+                    return self.error(ast, HirError::PatternContainsCall);
+                }
+
+                Pattern::Tag {
+                    symbol,
+                    value: Some(Box::new(self.compile_pattern(&call.arguments[0]))),
+                }
+            }
             AstKind::StructAccess(_)
             | AstKind::Function(_)
-            | AstKind::Call(_)
             | AstKind::Assignment(_)
             | AstKind::Match(_)
             | AstKind::MatchCase(_) => {
@@ -846,6 +872,17 @@ impl PatternContext {
                     errors: errors.to_owned(),
                 }
             }
+        }
+    }
+
+    fn error(&self, ast: &Ast, error: HirError) -> Pattern {
+        Pattern::Error {
+            child: None,
+            errors: vec![CompilerError {
+                module: self.module.clone(),
+                span: self.db.ast_id_to_span(ast.id.clone()).unwrap(),
+                payload: CompilerErrorPayload::Hir(error),
+            }],
         }
     }
 }

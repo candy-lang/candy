@@ -108,6 +108,7 @@ impl Mir {
             tracing,
             errors,
         );
+        self.validate();
         self.cleanup();
     }
 }
