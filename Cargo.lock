@@ -218,6 +218,7 @@ dependencies = [
  "enum_dispatch",
  "enumset",
  "extension-trait",
+ "impl-trait-for-tuples",
  "itertools",
  "lazy_static",
  "num-bigint",
@@ -836,6 +837,17 @@ dependencies = [
  "sized-chunks",
  "typenum",
  "version_check",
+]
+
+[[package]]
+name = "impl-trait-for-tuples"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11d7a9f6330b71fea57921c9b61c47ee6e84f72d394754eff6163ae67e7395eb"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
