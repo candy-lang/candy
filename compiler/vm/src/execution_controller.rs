@@ -52,8 +52,8 @@ impl ExecutionController for CountingExecutionController {
 }
 
 macro_rules! impl_execution_controller_tuple {
-    ($($name:ident: $lifetime:lifetime $type:ident),+) => {
-        impl<$($lifetime),+, $($type),+> ExecutionController for ($(&$lifetime mut $type),+) where $($type: ExecutionController),+ {
+    ($($name:ident: $type:ident),+) => {
+        impl<'c, $($type),+> ExecutionController for ($(&'c mut $type),+) where $($type: ExecutionController),+ {
             fn should_continue_running(&self) -> bool {
                 let ($($name),+) = self;
                 $($name.should_continue_running())&&+
@@ -66,5 +66,5 @@ macro_rules! impl_execution_controller_tuple {
         }
     };
 }
-impl_execution_controller_tuple!(c0: 'c0 C0, c1: 'c1 C1);
-impl_execution_controller_tuple!(c0: 'c0 C0, c1: 'c1 C1, c2: 'c2 C2);
+impl_execution_controller_tuple!(c0: C0, c1: C1);
+impl_execution_controller_tuple!(c0: C0, c1: C1, c2: C2);
