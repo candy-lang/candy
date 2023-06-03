@@ -215,7 +215,7 @@ impl HintsFinder {
                     return State::Fuzz { errors, constants_ended, stack_tracer, evaluated_values, fuzzable_finder_ended, fuzzers };
                 };
 
-                set_status(Some(format!("Fuzzing {}", fuzzer.function_id.to_rich_ir()))).await;
+                set_status(Some(format!("Fuzzing {}", fuzzer.function_id))).await;
 
                 fuzzer.run(&mut RunLimitedNumberOfInstructions::new(500));
 

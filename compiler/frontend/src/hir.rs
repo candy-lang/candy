@@ -216,7 +216,7 @@ impl Debug for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(
             f,
-            "HirId({}:{})",
+            "{}:{}",
             self.module.to_rich_ir(),
             self.keys.iter().join(":"),
         )
