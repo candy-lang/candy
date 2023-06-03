@@ -71,7 +71,7 @@ impl HintsFinder {
         }
     }
     pub fn module_changed(&mut self) {
-        // Todo: Save some incremental state.
+        // PERF: Save some incremental state.
         self.state = Some(State::Initial);
     }
 
@@ -148,8 +148,7 @@ impl HintsFinder {
 
                 let fuzzable_finder_ended = vm.tear_down(&mut tracer);
                 let fuzzers = tracer
-                    .fuzzables()
-                    .unwrap()
+                    .into_fuzzables()
                     .iter()
                     .map(|(id, function)| {
                         (id.clone(), Fuzzer::new(lir.clone(), *function, id.clone()))
@@ -180,11 +179,6 @@ impl HintsFinder {
 
                 fuzzer.run(&mut RunLimitedNumberOfInstructions::new(500));
 
-                match &fuzzer.status() {
-                    Status::StillFuzzing { .. } => None,
-                    Status::FoundPanic { .. } => Some(fuzzer.function_id.module.clone()),
-                    Status::TotalCoverageButNoPanic => None,
-                };
                 State::Fuzz {
                     constants_ended,
                     stack_tracer,
@@ -215,11 +209,10 @@ impl HintsFinder {
                 ..
             } => {
                 // TODO: Think about how to highlight the responsible piece of code.
-                if let EndedReason::Panicked(panic) = &constants_ended.reason {
-                    if let Some(hint) = panic_hint(db, module.clone(), stack_tracer, &panic.reason)
-                    {
+                if let EndedReason::Panicked(panic) = &constants_ended.reason
+                    && let Some(hint) = panic_hint(db, module.clone(), stack_tracer, &panic.reason)
+                {
                         hints.push(vec![hint]);
-                    }
                 }
 
                 for (id, value) in evaluated_values.values() {
