@@ -21,7 +21,7 @@ use lsp_types::{notification::Notification, Position, Url};
 use rand::{seq::IteratorRandom, thread_rng};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::{collections::hash_map, time::Duration, vec};
+use std::{time::Duration, vec};
 use tokio::{
     sync::mpsc::{error::TryRecvError, Receiver, Sender},
     time::sleep,
