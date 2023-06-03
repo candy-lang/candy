@@ -6,7 +6,7 @@ use crate::{
 };
 use candy_frontend::{ast_to_hir::AstToHir, hir, rich_ir::ToRichIr, TracingConfig};
 use candy_vm::{
-    context::RunForever,
+    execution_controller::RunForever,
     fiber::EndedReason,
     heap::{HirId, SendPort, Struct},
     mir_to_lir::compile_lir,

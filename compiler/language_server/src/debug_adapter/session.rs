@@ -10,7 +10,7 @@ use candy_frontend::{
     TracingConfig, TracingMode,
 };
 use candy_vm::{
-    context::RunLimitedNumberOfInstructions,
+    execution_controller::RunLimitedNumberOfInstructions,
     fiber::FiberId,
     heap::{HirId, Struct},
     lir::Lir,

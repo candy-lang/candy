@@ -1,7 +1,7 @@
 use candy_frontend::hir::Id;
 use candy_vm::{
     self,
-    context::{CombiningExecutionController, CountingExecutionController, ExecutionController},
+    execution_controller::{CountingExecutionController, ExecutionController},
     fiber::{InstructionPointer, Panic},
     heap::{Function, HirId, InlineObjectSliceCloneToHeap},
     lir::Lir,
@@ -99,10 +99,11 @@ impl<L: Borrow<Lir>> Runner<L> {
             coverage: &mut self.coverage,
         };
         let mut instruction_counter = CountingExecutionController::default();
-        let mut additional_controllers =
-            CombiningExecutionController::new(&mut coverage_tracker, &mut instruction_counter);
-        let mut execution_controller =
-            CombiningExecutionController::new(execution_controller, &mut additional_controllers);
+        let mut execution_controller = (
+            execution_controller,
+            &mut coverage_tracker,
+            &mut instruction_counter,
+        );
 
         while matches!(self.vm.as_ref().unwrap().status(), vm::Status::CanRun)
             && execution_controller.should_continue_running()

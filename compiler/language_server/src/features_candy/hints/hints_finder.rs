@@ -12,12 +12,11 @@ use candy_frontend::{
 };
 use candy_fuzzer::{FuzzablesFinder, Fuzzer, Status};
 use candy_vm::{
-    context::RunLimitedNumberOfInstructions,
+    execution_controller::RunLimitedNumberOfInstructions,
     fiber::{EndedReason, VmEnded},
     lir::Lir,
     mir_to_lir::compile_lir,
     tracer::{
-        compound::CompoundTracer,
         evaluated_values::EvaluatedValuesTracer,
         stack_trace::{Call, StackTracer},
     },
@@ -39,8 +38,8 @@ enum State {
     /// First, we run the module with tracing of evaluated expressions enabled.
     /// This enables us to show hints for constants.
     EvaluateConstants {
-        tracer: CompoundTracer<StackTracer, EvaluatedValuesTracer>,
-        vm: Vm<Lir, CompoundTracer<StackTracer, EvaluatedValuesTracer>>,
+        tracer: (StackTracer, EvaluatedValuesTracer),
+        vm: Vm<Lir, (StackTracer, EvaluatedValuesTracer)>,
     },
     /// Next, we run the module again to finds fuzzable functions. This time, we
     /// disable tracing of evaluated expressions, but we enable registration of
@@ -91,7 +90,7 @@ impl HintsFinder {
                 };
                 let (lir, _) = compile_lir(db, self.module.clone(), tracing);
 
-                let mut tracer = CompoundTracer(
+                let mut tracer = (
                     StackTracer::default(),
                     EvaluatedValuesTracer::new(self.module.clone()),
                 );
@@ -106,7 +105,7 @@ impl HintsFinder {
                 }
 
                 let constants_ended = vm.tear_down(&mut tracer);
-                let CompoundTracer(stack_tracer, evaluated_values) = tracer;
+                let (stack_tracer, evaluated_values) = tracer;
 
                 let tracing = TracingConfig {
                     register_fuzzables: TracingMode::OnlyCurrent,

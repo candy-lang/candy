@@ -1,6 +1,6 @@
 use super::{
     channel::{Capacity, Packet},
-    context::ExecutionController,
+    execution_controller::ExecutionController,
     heap::{Data, Function, Heap, Text},
     lir::Instruction,
 };
