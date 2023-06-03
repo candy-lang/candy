@@ -22,7 +22,7 @@ use candy_frontend::{
     {hir::Id, TracingConfig, TracingMode},
 };
 use candy_vm::{
-    context::RunLimitedNumberOfInstructions, fiber::Panic, mir_to_lir::compile_lir,
+    execution_controller::RunLimitedNumberOfInstructions, fiber::Panic, mir_to_lir::compile_lir,
     tracer::stack_trace::StackTracer, vm::Vm,
 };
 use std::sync::Arc;

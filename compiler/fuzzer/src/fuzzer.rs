@@ -8,7 +8,7 @@ use crate::{
 };
 use candy_frontend::hir::Id;
 use candy_vm::{
-    context::ExecutionController,
+    execution_controller::ExecutionController,
     fiber::Panic,
     heap::{Data, Function, Heap},
     lir::Lir,

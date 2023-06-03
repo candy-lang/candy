@@ -12,7 +12,7 @@ use candy_frontend::{
 };
 use candy_fuzzer::{FuzzablesFinder, Fuzzer, Status};
 use candy_vm::{
-    context::RunLimitedNumberOfInstructions,
+    execution_controller::RunLimitedNumberOfInstructions,
     fiber::{EndedReason, VmEnded},
     lir::Lir,
     mir_to_lir::compile_lir,
