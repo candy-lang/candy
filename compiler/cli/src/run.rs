@@ -15,7 +15,7 @@ use candy_vm::{
     vm::{Status, Vm},
 };
 use clap::{Parser, ValueHint};
-use std::path::PathBuf;
+use std::{path::PathBuf, rc::Rc};
 use tracing::{debug, error};
 
 /// Run a Candy program.
@@ -41,9 +41,9 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     debug!("Running {}.", module.to_rich_ir());
 
     let mut tracer = StackTracer::default();
-    let lir = compile_lir(&db, module, tracing).0;
+    let lir = Rc::new(compile_lir(&db, module, tracing).0);
 
-    let mut ended = Vm::for_module(&lir, &mut tracer).run_until_completion(&mut tracer);
+    let mut ended = Vm::for_module(&*lir, &mut tracer).run_until_completion(&mut tracer);
 
     let main = match ended.reason {
         EndedReason::Finished(return_value) => {
@@ -65,7 +65,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
 
     debug!("Running main function.");
     // TODO: Add more environment stuff.
-    let mut vm = Vm::uninitialized(lir);
+    let mut vm = Vm::uninitialized(lir.clone());
     let mut stdout = StdoutService::new(&mut vm);
     let mut stdin = StdinService::new(&mut vm);
     let fields = [
@@ -95,7 +95,8 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         stdin.run(&mut vm);
         vm.free_unreferenced_channels();
     }
-    match vm.tear_down(&mut tracer).reason {
+    let ended = vm.tear_down(&mut tracer);
+    let result = match ended.reason {
         EndedReason::Finished(return_value) => {
             debug!("The main function returned: {return_value:?}");
             Ok(())
@@ -109,5 +110,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
             );
             Err(Exit::CodePanicked)
         }
-    }
+    };
+    drop(lir); // Make sure the LIR is kept around until here.
+    result
 }

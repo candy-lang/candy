@@ -227,9 +227,7 @@ windowed iterable size step allowPartialWindows :=
     isLongEnough = ifElse allowPartialWindows { length | int.isPositive } {
       length | int.equals size
     }
-    ifElse isLongEnough { Ok [Item: items, State: iterable | skip step] } {
-      Error Empty
-    }
+    ifElse isLongEnough { Ok [Item: items, State: iterable | skip step] } { Error Empty }
   }
 chunked iterable size :=
   needs (is iterable)

@@ -19,7 +19,7 @@ pub fn generate_input(heap: Rc<RefCell<Heap>>, num_args: usize, symbols: &[Text]
         let address = generate_value_with_complexity(
             &mut heap.borrow_mut(),
             &mut rand::thread_rng(),
-            100.0,
+            5.0,
             symbols,
         );
         arguments.push(address);

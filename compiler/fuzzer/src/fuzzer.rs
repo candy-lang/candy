@@ -15,7 +15,7 @@ use candy_vm::{
     tracer::stack_trace::StackTracer,
 };
 use std::sync::Arc;
-use tracing::trace;
+use tracing::debug;
 
 pub struct Fuzzer {
     lir: Arc<Lir>,
@@ -123,7 +123,7 @@ impl Fuzzer {
                 .unwrap_or_else(|| "{…}".to_string()),
             runner.input,
         );
-        trace!("{}", result.to_string(&call_string));
+        debug!("{}", result.to_string(&call_string));
         match result {
             RunResult::Timeout => self.create_new_fuzzing_case(pool, total_coverage),
             RunResult::Done { .. } | RunResult::NeedsUnfulfilled { .. } => {
@@ -137,8 +137,9 @@ impl Fuzzer {
                     let score = {
                         let complexity = complexity_of_input(&runner.input) as Score;
                         let new_function_coverage = runner.coverage.in_range(&function_range);
-                        let score: Score = 0.1
-                            * new_function_coverage.improvement_on(&function_coverage) as f64
+                        let score: Score = (0.2 * runner.num_instructions as f64)
+                            + (0.1
+                                * new_function_coverage.improvement_on(&function_coverage) as f64)
                             - 0.4 * complexity;
                         score.clamp(0.1, Score::MAX)
                     };
