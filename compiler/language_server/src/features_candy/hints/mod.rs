@@ -86,12 +86,10 @@ pub async fn run_server(
                 Event::UpdateModule(module, content) => {
                     db.did_change_module(&module, content);
                     outgoing_hints.report_hints(module.clone(), vec![]).await;
-                    match hints_finders.entry(module.clone()) {
-                        hash_map::Entry::Occupied(mut entry) => entry.get_mut().module_changed(),
-                        hash_map::Entry::Vacant(entry) => {
-                            entry.insert(HintsFinder::for_module(module.clone()));
-                        }
-                    };
+                    hints_finders
+                        .entry(module.clone())
+                        .and_modify(|it| it.module_changed())
+                        .or_insert_with(|| HintsFinder::for_module(module.clone()));
                 }
                 Event::CloseModule(module) => {
                     db.did_close_module(&module);
