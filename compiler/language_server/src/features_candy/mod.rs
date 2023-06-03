@@ -4,8 +4,8 @@ use candy_frontend::{
     rcst_to_cst::RcstToCst,
 };
 use lsp_types::{
-    self, Diagnostic, FoldingRange, LocationLink, SemanticToken, TextDocumentContentChangeEvent,
-    TextEdit, Url,
+    self, notification::Notification, Diagnostic, FoldingRange, LocationLink, SemanticToken,
+    TextDocumentContentChangeEvent, TextEdit, Url,
 };
 use rustc_hash::FxHashMap;
 use std::{collections::HashMap, thread};
@@ -26,12 +26,23 @@ use self::{
 };
 use candy_formatter::Formatter;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 
 pub mod find_definition;
 pub mod folding_ranges;
 pub mod hints;
 pub mod references;
 pub mod semantic_tokens;
+
+#[derive(Serialize, Deserialize)]
+pub struct ServerStatusNotification {
+    pub text: String,
+}
+impl Notification for ServerStatusNotification {
+    const METHOD: &'static str = "candy/publishServerStatus";
+
+    type Params = Self;
+}
 
 #[derive(Debug)]
 pub struct CandyFeatures {
@@ -40,6 +51,7 @@ pub struct CandyFeatures {
 impl CandyFeatures {
     pub fn new(
         packages_path: PackagesPath,
+        status_sender: Sender<String>,
         diagnostics_sender: Sender<(Module, Vec<Diagnostic>)>,
         hints_sender: Sender<(Module, Vec<Hint>)>,
     ) -> Self {
@@ -47,6 +59,7 @@ impl CandyFeatures {
         thread::spawn(|| {
             hints::run_server(
                 packages_path,
+                status_sender,
                 hints_events_receiver,
                 hints_sender,
                 diagnostics_sender,

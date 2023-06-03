@@ -22,7 +22,7 @@ use tracing::{debug, span, Level};
 use crate::{
     database::Database,
     features::{LanguageFeatures, Reference, RenameError},
-    features_candy::{hints::HintsNotification, CandyFeatures},
+    features_candy::{hints::HintsNotification, CandyFeatures, ServerStatusNotification},
     features_ir::{IrFeatures, UpdateIrNotification},
     semantic_tokens,
     utils::{module_from_url, module_to_url},
@@ -113,11 +113,13 @@ impl Server {
     pub fn create(packages_path: PackagesPath) -> (LspService<Self>, ClientSocket) {
         let (diagnostics_sender, mut diagnostics_receiver) = mpsc::channel(8);
         let (hints_sender, mut hints_receiver) = mpsc::channel(1024);
+        let (server_status_sender, mut server_status_receiver) = mpsc::channel(128);
 
         let (service, client) = LspService::build(|client| {
             let features = ServerFeatures {
                 candy: CandyFeatures::new(
                     packages_path.clone(),
+                    server_status_sender.clone(),
                     diagnostics_sender.clone(),
                     hints_sender.clone(),
                 ),
@@ -138,6 +140,7 @@ impl Server {
                 }
             };
             tokio::spawn(diagnostics_reporter());
+
             let client_for_closure = client.clone();
             let packages_path_for_closure = packages_path.clone();
             let hint_reporter = async move || {
@@ -151,6 +154,18 @@ impl Server {
                 }
             };
             tokio::spawn(hint_reporter());
+
+            let client_for_closure = client.clone();
+            let server_status_reporter = async move || {
+                while let Some(status) = server_status_receiver.recv().await {
+                    client_for_closure
+                        .send_notification::<ServerStatusNotification>(ServerStatusNotification {
+                            text: status,
+                        })
+                        .await;
+                }
+            };
+            tokio::spawn(server_status_reporter());
 
             Self {
                 client,

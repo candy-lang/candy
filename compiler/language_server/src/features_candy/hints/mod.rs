@@ -51,6 +51,7 @@ impl Notification for HintsNotification {
 #[allow(unused_must_use)]
 pub async fn run_server(
     packages_path: PackagesPath,
+    status_sender: Sender<String>,
     mut incoming_events: Receiver<Event>,
     outgoing_hints: Sender<(Module, Vec<Hint>)>,
     outgoing_diagnostics: Sender<(Module, Vec<Diagnostic>)>,
@@ -90,10 +91,28 @@ pub async fn run_server(
             }
         }
 
-        let Some(module) = hints_finders.keys().choose(&mut thread_rng()).cloned() else { continue; };
+        let Some(module) = hints_finders.keys().choose(&mut thread_rng()).cloned() else { 
+            status_sender
+                .send(format!("🍭"))
+                .await
+                .unwrap();
+            continue;
+        };
         let hints_finder = hints_finders.get_mut(&module).unwrap();
 
-        hints_finder.run(&db);
+        let status_sender_clone = status_sender.clone();
+        let set_status = move |status: Option<String>| {
+            let status_sender_clone = status_sender_clone.clone();
+            async move {
+                let status_string = match status {
+                    Some(status) => format!("🍭 {status}"),
+                    None => "🍭".to_string(),
+                };
+                status_sender_clone.send(status_string).await.unwrap()
+            }
+        };
+        hints_finder.run(&db, &set_status).await;
+
         let (mut hints, diagnostics) = hints_finder.hints(&db, &module);
         hints.sort_by_key(|hint| hint.position);
 
