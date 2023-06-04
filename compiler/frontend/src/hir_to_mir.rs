@@ -10,7 +10,6 @@ use crate::{
     builtin_functions::BuiltinFunction,
     module::{Module, ModuleKind, Package},
     position::PositionConversionDb,
-    rich_ir::ToRichIr,
     string_to_rcst::ModuleError,
 };
 use itertools::Itertools;
@@ -30,7 +29,7 @@ fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> MirResult {
         ModuleKind::Code => {
             let (hir, _) = db.hir(module.clone())?;
             let mut errors = FxHashSet::default();
-            let mir = LoweringContext::compile_module(db, module, &hir, &tracing, &mut errors);
+            let mir = LoweringContext::compile_module(module, &hir, &tracing, &mut errors);
             (mir, errors)
         }
         ModuleKind::Asset => {
@@ -167,7 +166,6 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
 }
 
 struct LoweringContext<'a> {
-    db: &'a dyn HirToMir,
     mapping: &'a mut FxHashMap<hir::Id, Id>,
     needs_function: Id,
     tracing: &'a TracingConfig,
@@ -184,7 +182,6 @@ struct OngoingDestructuring {
 
 impl<'a> LoweringContext<'a> {
     fn compile_module(
-        db: &dyn HirToMir,
         module: Module,
         hir: &hir::Body,
         tracing: &TracingConfig,
@@ -197,7 +194,6 @@ impl<'a> LoweringContext<'a> {
 
             let module_hir_id = body.push_hir_id(hir::Id::new(module, vec![]));
             let mut context = LoweringContext {
-                db,
                 mapping: &mut mapping,
                 needs_function,
                 tracing,
@@ -258,7 +254,6 @@ impl<'a> LoweringContext<'a> {
                     result
                 } else {
                     let pattern_result = PatternLoweringContext::compile_pattern(
-                        self.db,
                         body,
                         hir_id.clone(),
                         responsible,
@@ -409,7 +404,7 @@ impl<'a> LoweringContext<'a> {
             hir::Expression::Error { errors, .. } => {
                 self.errors.extend(errors.clone());
                 let responsible = body.push_hir_id(hir_id.clone());
-                body.compile_errors(self.db, responsible, errors)
+                body.compile_errors(responsible, errors)
             }
         };
         self.mapping.insert(hir_id.clone(), id);
@@ -464,7 +459,6 @@ impl<'a> LoweringContext<'a> {
             }
             [(case_pattern, case_body), rest @ ..] => {
                 let pattern_result = PatternLoweringContext::compile_pattern(
-                    self.db,
                     body,
                     hir_id.clone(),
                     responsible_for_match,
@@ -514,19 +508,17 @@ impl<'a> LoweringContext<'a> {
     }
 }
 
-struct PatternLoweringContext<'a> {
-    db: &'a dyn HirToMir,
+struct PatternLoweringContext {
     hir_id: hir::Id,
     match_tag: Id,
     no_match_tag: Id,
     responsible: Id,
 }
-impl<'a> PatternLoweringContext<'a> {
+impl PatternLoweringContext {
     /// Checks a pattern and returns an expression of type
     /// `(Match, variable0, …, variableN) | (NoMatch, reasonText)`.
     fn compile_pattern(
-        db: &'a dyn HirToMir,
-        body: &'a mut BodyBuilder,
+        body: &mut BodyBuilder,
         hir_id: hir::Id,
         responsible: Id,
         expression: Id,
@@ -535,7 +527,6 @@ impl<'a> PatternLoweringContext<'a> {
         let match_tag = body.push_match_tag();
         let no_match_tag = body.push_no_match_tag();
         let context = PatternLoweringContext {
-            db,
             hir_id,
             match_tag,
             no_match_tag,
@@ -761,7 +752,7 @@ impl<'a> PatternLoweringContext<'a> {
                 result
             }
             hir::Pattern::Error { child, errors } => {
-                let result = body.compile_errors(self.db, self.responsible, errors);
+                let result = body.compile_errors(self.responsible, errors);
                 if let Some(child) = child {
                     self.compile(body, expression, child)
                 } else {
@@ -876,9 +867,7 @@ impl<'a> PatternLoweringContext<'a> {
             hir::Pattern::List(_) => panic!("Lists can't be used in this part of a pattern."),
             hir::Pattern::Struct(_) => panic!("Structs can't be used in this part of a pattern."),
             hir::Pattern::Or(_) => panic!("Or-patterns can't be used in this part of a pattern."),
-            hir::Pattern::Error { errors, .. } => {
-                body.compile_errors(self.db, self.responsible, errors)
-            }
+            hir::Pattern::Error { errors, .. } => body.compile_errors(self.responsible, errors),
         }
     }
 
@@ -982,42 +971,16 @@ impl BodyBuilder {
         )
     }
 
-    fn compile_errors(
-        &mut self,
-        db: &dyn HirToMir,
-        responsible: Id,
-        errors: &Vec<CompilerError>,
-    ) -> Id {
+    fn compile_errors(&mut self, responsible: Id, errors: &Vec<CompilerError>) -> Id {
         let reason = if errors.len() == 1 {
-            format!(
-                "The code still contains an error: {}",
-                errors.iter().next().unwrap().format_nicely(db),
-            )
+            format!("{}", errors.iter().next().unwrap().payload)
         } else {
-            format!(
-                "The code still contains errors:\n{}",
-                errors
-                    .iter()
-                    .map(|error| format!("- {}", error.format_nicely(db)))
-                    .join("\n"),
-            )
+            errors
+                .iter()
+                .map(|error| format!("{}", error.payload))
+                .join("\n")
         };
         let reason = self.push_text(reason);
         self.push_panic(reason, responsible)
-    }
-}
-
-impl CompilerError {
-    fn format_nicely(&self, db: &dyn HirToMir) -> String {
-        let range = db.range_to_positions(self.module.clone(), self.span.clone());
-        format!(
-            "{}:{}:{} – {}:{}: {}",
-            self.module.to_rich_ir(),
-            range.start.line,
-            range.start.character,
-            range.end.line,
-            range.end.character,
-            self.payload,
-        )
     }
 }
