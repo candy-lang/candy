@@ -542,6 +542,14 @@ impl Context<'_> {
     }
 
     fn lower_call(&mut self, id: Option<ast::Id>, call: &Call) -> hir::Id {
+        let (mut arguments, uncompiled_arguments) = if call.pipe {
+            let [first_argument, remaining @ ..] = &call.arguments[..] else {
+                panic!("Calls that are generated from the pipe operator must have at least one argument");
+            };
+            (vec![(self.compile_single(first_argument))], remaining)
+        } else {
+            (vec![], &call.arguments[..])
+        };
         let function = match &call.receiver.kind {
             AstKind::Identifier(Identifier(AstString {
                 id: name_id,
@@ -588,7 +596,7 @@ impl Context<'_> {
             }
             _ => self.compile_single(call.receiver.as_ref()),
         };
-        let arguments = self.lower_call_arguments(&call.arguments[..]);
+        arguments.extend(self.lower_call_arguments(uncompiled_arguments));
         self.push(
             id,
             Expression::Call {
