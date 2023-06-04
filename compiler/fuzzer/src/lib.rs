@@ -22,7 +22,7 @@ use candy_frontend::{
     {hir::Id, TracingConfig, TracingMode},
 };
 use candy_vm::{
-    context::RunLimitedNumberOfInstructions, fiber::Panic, mir_to_lir::compile_lir,
+    execution_controller::RunLimitedNumberOfInstructions, fiber::Panic, mir_to_lir::compile_lir,
     tracer::stack_trace::StackTracer, vm::Vm,
 };
 use std::sync::Arc;
@@ -43,7 +43,6 @@ where
     let (_heap, fuzzables) = {
         let mut tracer = FuzzablesFinder::default();
         let result = Vm::for_module(lir.clone(), &mut tracer).run_until_completion(&mut tracer);
-        dbg!(result.reason);
         (result.heap, tracer.into_fuzzables())
     };
 
@@ -61,9 +60,10 @@ where
 
         match fuzzer.into_status() {
             Status::StillFuzzing { total_coverage, .. } => {
-                let coverage =
-                    total_coverage.relative_coverage_of_range(lir.range_of_function(&id));
-                debug!("Achieved a coverage of {:.1}%.", coverage * 100.0);
+                let coverage = total_coverage
+                    .in_range(&lir.range_of_function(&id))
+                    .relative_coverage();
+                debug!("Achieved a coverage of {:.1} %.", coverage * 100.0);
             }
             Status::FoundPanic {
                 input,

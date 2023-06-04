@@ -22,6 +22,6 @@ pub mod rcst_to_cst;
 pub mod rich_ir;
 pub mod string_to_rcst;
 pub mod tracing;
-mod utils;
+pub mod utils;
 
 pub use self::tracing::{TracingConfig, TracingMode};

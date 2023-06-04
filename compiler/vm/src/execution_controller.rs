@@ -51,26 +51,20 @@ impl ExecutionController for CountingExecutionController {
     }
 }
 
-pub struct CombiningExecutionController<'a, 'b, A: ExecutionController, B: ExecutionController> {
-    a: &'a mut A,
-    b: &'b mut B,
-}
-impl<'a, 'b, A: ExecutionController, B: ExecutionController>
-    CombiningExecutionController<'a, 'b, A, B>
-{
-    pub fn new(a: &'a mut A, b: &'b mut B) -> Self {
-        CombiningExecutionController { a, b }
-    }
-}
-impl<'a, 'b, A: ExecutionController, B: ExecutionController> ExecutionController
-    for CombiningExecutionController<'a, 'b, A, B>
-{
-    fn should_continue_running(&self) -> bool {
-        self.a.should_continue_running() && self.b.should_continue_running()
-    }
+macro_rules! impl_execution_controller_tuple {
+    ($($name:ident: $type:ident),+) => {
+        impl<'c, $($type),+> ExecutionController for ($(&'c mut $type),+) where $($type: ExecutionController),+ {
+            fn should_continue_running(&self) -> bool {
+                let ($($name),+) = self;
+                $($name.should_continue_running())&&+
+            }
 
-    fn instruction_executed(&mut self, ip: InstructionPointer) {
-        self.a.instruction_executed(ip);
-        self.b.instruction_executed(ip);
-    }
+            fn instruction_executed(&mut self, ip: InstructionPointer) {
+                let ($($name),+) = self;
+                $($name.instruction_executed(ip);)+
+            }
+        }
+    };
 }
+impl_execution_controller_tuple!(c0: C0, c1: C1);
+impl_execution_controller_tuple!(c0: C0, c1: C1, c2: C2);

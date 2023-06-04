@@ -18,12 +18,11 @@ use candy_frontend::{
 };
 use candy_fuzzer::{FuzzablesFinder, Fuzzer, Status};
 use candy_vm::{
-    context::RunLimitedNumberOfInstructions,
+    execution_controller::RunLimitedNumberOfInstructions,
     fiber::{EndedReason, VmEnded},
     lir::Lir,
     mir_to_lir::compile_lir,
     tracer::{
-        compound::CompoundTracer,
         evaluated_values::EvaluatedValuesTracer,
         stack_trace::{Call, StackTracer},
     },
@@ -46,8 +45,8 @@ enum State {
     /// This enables us to show hints for constants.
     EvaluateConstants {
         errors: Vec<CompilerError>,
-        tracer: CompoundTracer<StackTracer, EvaluatedValuesTracer>,
-        vm: Vm<Lir, CompoundTracer<StackTracer, EvaluatedValuesTracer>>,
+        tracer: (StackTracer, EvaluatedValuesTracer),
+        vm: Vm<Lir, (StackTracer, EvaluatedValuesTracer)>,
     },
     /// Next, we run the module again to finds fuzzable functions. This time, we
     /// disable tracing of evaluated expressions, but we enable registration of
@@ -81,7 +80,7 @@ impl HintsFinder {
         }
     }
     pub fn module_changed(&mut self) {
-        // Todo: Save some incremental state.
+        // PERF: Save some incremental state.
         self.state = Some(State::Initial);
     }
 
@@ -104,7 +103,7 @@ impl HintsFinder {
                 };
                 let (lir, _) = compile_lir(db, self.module.clone(), tracing);
 
-                let mut tracer = CompoundTracer(
+                let mut tracer = (
                     StackTracer::default(),
                     EvaluatedValuesTracer::new(self.module.clone()),
                 );
@@ -123,7 +122,7 @@ impl HintsFinder {
                 }
 
                 let constants_ended = vm.tear_down(&mut tracer);
-                let CompoundTracer(stack_tracer, evaluated_values) = tracer;
+                let (stack_tracer, evaluated_values) = tracer;
 
                 let tracing = TracingConfig {
                     register_fuzzables: TracingMode::OnlyCurrent,
@@ -169,8 +168,7 @@ impl HintsFinder {
 
                 let fuzzable_finder_ended = vm.tear_down(&mut tracer);
                 let fuzzers = tracer
-                    .fuzzables()
-                    .unwrap()
+                    .into_fuzzables()
                     .iter()
                     .map(|(id, function)| {
                         (id.clone(), Fuzzer::new(lir.clone(), *function, id.clone()))
@@ -203,11 +201,6 @@ impl HintsFinder {
 
                 fuzzer.run(&mut RunLimitedNumberOfInstructions::new(500));
 
-                match &fuzzer.status() {
-                    Status::StillFuzzing { .. } => None,
-                    Status::FoundPanic { .. } => Some(fuzzer.function_id.module.clone()),
-                    Status::TotalCoverageButNoPanic => None,
-                };
                 State::Fuzz {
                     errors,
                     constants_ended,
@@ -249,11 +242,10 @@ impl HintsFinder {
                 );
 
                 // TODO: Think about how to highlight the responsible piece of code.
-                if let EndedReason::Panicked(panic) = &constants_ended.reason {
-                    if let Some(hint) = panic_hint(db, module.clone(), stack_tracer, &panic.reason)
-                    {
-                        hints.push(hint);
-                    }
+                if let EndedReason::Panicked(panic) = &constants_ended.reason
+                    && let Some(hint) = panic_hint(db, module.clone(), stack_tracer, &panic.reason)
+                {
+                    hints.push(hint);
                 }
 
                 for (id, value) in evaluated_values.values() {
