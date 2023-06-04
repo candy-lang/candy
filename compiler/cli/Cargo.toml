@@ -17,7 +17,7 @@ candy_vm = { path = "../vm" }
 clap = { version = "4.1.8", features = ["derive"] }
 colored = "2.0.0"
 itertools = "0.10.0"
-notify = "5.1.0"
+notify = "6.0.0"
 notify-debouncer-mini = { version = "0.2.1", default-features = false }
 rustc-hash = "1.1.0"
 salsa = "0.16.1"
