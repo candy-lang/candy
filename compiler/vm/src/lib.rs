@@ -3,11 +3,12 @@
     anonymous_lifetime_in_impl_trait,
     let_chains,
     slice_ptr_get,
+    step_trait,
     strict_provenance
 )]
 
 use crate::heap::{Struct, Tag};
-use context::RunForever;
+use execution_controller::RunForever;
 use fiber::{EndedReason, VmEnded};
 use heap::{Function, Heap, HeapObject, InlineObject};
 use lir::Lir;
@@ -19,7 +20,7 @@ use vm::{Status, Vm};
 
 mod builtin_functions;
 pub mod channel;
-pub mod context;
+pub mod execution_controller;
 pub mod fiber;
 pub mod heap;
 pub mod lir;

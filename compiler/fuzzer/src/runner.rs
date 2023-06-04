@@ -1,8 +1,8 @@
 use candy_frontend::hir::Id;
 use candy_vm::{
     self,
-    context::{CombiningExecutionController, CountingExecutionController, ExecutionController},
-    fiber::Panic,
+    execution_controller::{CountingExecutionController, ExecutionController},
+    fiber::{InstructionPointer, Panic},
     heap::{Function, HirId, InlineObjectSliceCloneToHeap},
     lir::Lir,
     tracer::stack_trace::StackTracer,
@@ -10,16 +10,18 @@ use candy_vm::{
 };
 
 use super::input::Input;
+use crate::coverage::Coverage;
 use rustc_hash::FxHashMap;
 use std::borrow::Borrow;
 
-const MAX_INSTRUCTIONS: usize = 10000;
+const MAX_INSTRUCTIONS: usize = 1000000;
 
 pub struct Runner<L: Borrow<Lir>> {
     pub vm: Option<Vm<L, StackTracer>>, // Is consumed when the runner is finished.
     pub input: Input,
     pub tracer: StackTracer,
     pub num_instructions: usize,
+    pub coverage: Coverage,
     pub result: Option<RunResult>,
 }
 
@@ -56,6 +58,7 @@ impl RunResult {
 impl<L: Borrow<Lir>> Runner<L> {
     pub fn new(lir: L, function: Function, input: Input) -> Self {
         let (mut heap, constant_mapping) = lir.borrow().constant_heap.clone();
+        let num_instructions = lir.borrow().instructions.len();
 
         let mut mapping = FxHashMap::default();
         let function = function
@@ -83,6 +86,7 @@ impl<L: Borrow<Lir>> Runner<L> {
             input,
             tracer,
             num_instructions: 0,
+            coverage: Coverage::none(num_instructions),
             result: None,
         }
     }
@@ -91,9 +95,15 @@ impl<L: Borrow<Lir>> Runner<L> {
         assert!(self.vm.is_some());
         assert!(self.result.is_none());
 
+        let mut coverage_tracker = CoverageTrackingExecutionController {
+            coverage: &mut self.coverage,
+        };
         let mut instruction_counter = CountingExecutionController::default();
-        let mut execution_controller =
-            CombiningExecutionController::new(execution_controller, &mut instruction_counter);
+        let mut execution_controller = (
+            execution_controller,
+            &mut coverage_tracker,
+            &mut instruction_counter,
+        );
 
         while matches!(self.vm.as_ref().unwrap().status(), vm::Status::CanRun)
             && execution_controller.should_continue_running()
@@ -130,5 +140,18 @@ impl<L: Borrow<Lir>> Runner<L> {
                 RunResult::Panicked(panic)
             }),
         };
+    }
+}
+
+pub struct CoverageTrackingExecutionController<'a> {
+    coverage: &'a mut Coverage,
+}
+impl<'a> ExecutionController for CoverageTrackingExecutionController<'a> {
+    fn should_continue_running(&self) -> bool {
+        true
+    }
+
+    fn instruction_executed(&mut self, ip: InstructionPointer) {
+        self.coverage.add(ip);
     }
 }

@@ -14,7 +14,7 @@ use rand::{seq::SliceRandom, thread_rng};
 
 use crate::{
     channel::{Channel, ChannelId, Completer, Packet, Performer},
-    context::{CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions},
+    execution_controller::{ExecutionController, RunLimitedNumberOfInstructions},
     fiber::{self, EndedReason, Fiber, FiberId, Panic, VmEnded},
     heap::{Data, Function, Heap, HeapObject, HirId, InlineObject, SendPort, Struct, Tag},
     lir::Lir,
@@ -309,8 +309,8 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
     pub fn run(&mut self, execution_controller: &mut impl ExecutionController, tracer: &mut T) {
         while self.can_run() && execution_controller.should_continue_running() {
             self.run_raw(
-                &mut CombiningExecutionController::new(
-                    execution_controller,
+                &mut (
+                    &mut *execution_controller,
                     &mut RunLimitedNumberOfInstructions::new(100),
                 ),
                 tracer,
