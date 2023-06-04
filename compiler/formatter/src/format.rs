@@ -1679,18 +1679,18 @@ mod test {
     }
     #[test]
     fn test_match() {
-        // test("foo % ", "foo %\n");
-        // // foo %
-        // //   Foo -> Foo
-        // //   Bar -> Bar
-        // test(
-        //     "foo %\n  Foo -> Foo\n  Bar -> Bar",
-        //     "foo %\n  Foo -> Foo\n  Bar -> Bar\n",
-        // );
-        // test(
-        //     "foo%\n  Foo->Foo\n\n  Bar  ->  Bar",
-        //     "foo %\n  Foo -> Foo\n  Bar -> Bar\n",
-        // );
+        test("foo % ", "foo %\n");
+        // foo %
+        //   Foo -> Foo
+        //   Bar -> Bar
+        test(
+            "foo %\n  Foo -> Foo\n  Bar -> Bar",
+            "foo %\n  Foo -> Foo\n  Bar -> Bar\n",
+        );
+        test(
+            "foo%\n  Foo->Foo\n\n  Bar  ->  Bar",
+            "foo %\n  Foo -> Foo\n  Bar -> Bar\n",
+        );
         // foo := bar %
         //   Baz -> Blub
         test(
