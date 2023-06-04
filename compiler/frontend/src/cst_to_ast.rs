@@ -270,7 +270,7 @@ impl LoweringContext {
                                         ..
                                     }),
                                 ..
-                            } => {
+                            } if matches!(right.kind, CstKind::Call { .. }) => {
                                 arguments.insert(0, left);
                                 ast::Call {
                                     receiver,
