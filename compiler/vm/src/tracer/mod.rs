@@ -6,10 +6,10 @@ use crate::{
     heap::{Function, HirId, InlineObject},
 };
 
-pub mod compound;
 mod dummy;
 pub mod evaluated_values;
 pub mod stack_trace;
+pub mod tuple;
 
 pub trait Tracer {
     type ForFiber: FiberTracer;

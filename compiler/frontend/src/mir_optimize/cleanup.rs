@@ -62,6 +62,16 @@ impl Mir {
                 (Expression::Builtin(a), Expression::Builtin(b)) => {
                     format!("{a:?}").cmp(&format!("{b:?}"))
                 }
+                (
+                    Expression::Tag {
+                        symbol: a,
+                        value: None,
+                    },
+                    Expression::Tag {
+                        symbol: b,
+                        value: None,
+                    },
+                ) => a.cmp(b),
                 (Expression::Int(a), Expression::Int(b)) => a.cmp(b),
                 (Expression::Text(a), Expression::Text(b)) => a.cmp(b),
                 _ => order_score(a).cmp(&order_score(b)),

@@ -1,9 +1,31 @@
+import * as vscode from 'vscode';
 import {
   DocumentUri,
   NotificationType,
   Position,
   RequestType,
 } from 'vscode-languageclient';
+
+// Debug Adapter Protocol
+export type DebugSessionId = string;
+
+export const debugAdapterCreate = new RequestType<
+  DebugAdapterCreateParams,
+  void,
+  void
+>('candy/debugAdapter/create');
+export interface DebugAdapterCreateParams {
+  readonly sessionId: DebugSessionId;
+}
+
+// VS Code ←→ Candy
+export const debugAdapterMessage = new NotificationType<DebugAdapterMessage>(
+  'candy/debugAdapter/message'
+);
+export interface DebugAdapterMessage {
+  readonly sessionId: DebugSessionId;
+  readonly message: vscode.DebugProtocolMessage;
+}
 
 // Debug IRs
 export interface ViewIrParams {

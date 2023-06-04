@@ -549,7 +549,7 @@ impl PatternLoweringContext {
             hir::Pattern::Tag { symbol, value } => {
                 self.compile_verify_type_condition(body, expression, "Tag".to_string(), |body| {
                     let builtin_tag_without_value =
-                    body.push_builtin(BuiltinFunction::TagWithoutValue);
+                        body.push_builtin(BuiltinFunction::TagWithoutValue);
                     let actual_symbol = body.push_call(
                         builtin_tag_without_value,
                         vec![expression],
@@ -572,10 +572,16 @@ impl PatternLoweringContext {
                             if value.is_some() {
                                 vec![
                                     body.push_text("Expected tag to have a value, but it doesn't have any.".to_string()),
-                                    ]
-                                } else {
-                                    vec![
-                                    body.push_text("Expected tag to not have a value, but it has one.".to_string()),
+                                ]
+                            } else {
+                                let builtin_tag_get_value = body.push_builtin(BuiltinFunction::TagGetValue);
+                                let actual_value = body.push_call(builtin_tag_get_value, vec![expression], self.responsible);
+                                let builtin_to_debug_text = body.push_builtin(BuiltinFunction::ToDebugText);
+                                let actual_value_text = body.push_call(builtin_to_debug_text, vec![actual_value], self.responsible);
+                                vec![
+                                    body.push_text("Expected tag to not have a value, but it has one: `".to_string()),
+                                    actual_value_text,
+                                    body.push_text("`.".to_string()),
                                 ]
                             }
                         });

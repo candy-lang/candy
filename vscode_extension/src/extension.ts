@@ -6,6 +6,7 @@ import {
   LanguageClientOptions,
   StreamInfo,
 } from 'vscode-languageclient/node';
+import { registerDebugAdapter } from './debug_adapter';
 import { registerDebugIrCommands } from './debug_irs';
 import { HintsDecorations } from './hints';
 import { ServerStatusService } from './server_status';
@@ -47,10 +48,13 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(new HintsDecorations(client));
   context.subscriptions.push(new ServerStatusService(client));
   registerDebugIrCommands(client);
+  registerDebugAdapter(context, client);
 }
 
 export function deactivate(): Thenable<void> | undefined {
-  if (!client) return undefined;
+  if (!client) {
+    return undefined;
+  }
 
   return client.stop();
 }
@@ -107,6 +111,7 @@ function safeSpawn(): SpawnedProcess {
   }
 
   return child_process.spawn(command[0], command[1], {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     env: { ...process.env, RUST_BACKTRACE: 'FULL' },
     shell: true,
   }) as SpawnedProcess;

@@ -6,7 +6,7 @@ use crate::{
 };
 use candy_frontend::{ast_to_hir::AstToHir, hir, rich_ir::ToRichIr, TracingConfig};
 use candy_vm::{
-    context::RunForever,
+    execution_controller::RunForever,
     fiber::EndedReason,
     heap::{HirId, SendPort, Struct},
     mir_to_lir::compile_lir,
@@ -73,6 +73,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         ("Stdin", SendPort::create(&mut ended.heap, stdin.channel)),
     ];
     let environment = Struct::create_with_symbol_keys(&mut ended.heap, fields).into();
+    let mut tracer = StackTracer::default();
     let platform = HirId::create(&mut ended.heap, hir::Id::platform());
     vm.initialize_for_function(
         ended.heap,

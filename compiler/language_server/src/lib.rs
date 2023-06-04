@@ -3,6 +3,7 @@
 #![feature(let_chains)]
 
 pub mod database;
+pub mod debug_adapter;
 pub mod features;
 pub mod features_candy;
 pub mod features_ir;
