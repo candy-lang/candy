@@ -131,6 +131,7 @@ impl Server {
                 features: ServerFeatures {
                     candy: CandyFeatures::new(
                         packages_path.clone(),
+                        server_status_sender.clone(),
                         diagnostics_sender.clone(),
                         hints_sender.clone(),
                     ),
