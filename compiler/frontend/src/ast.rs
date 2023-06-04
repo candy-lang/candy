@@ -145,7 +145,6 @@ pub struct AstString {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum AstError {
-    CallInPattern,
     ExpectedNameOrPatternInAssignment,
     ExpectedParameter,
     FunctionMissesClosingCurlyBrace,

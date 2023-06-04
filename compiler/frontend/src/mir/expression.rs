@@ -16,7 +16,10 @@ use super::{body::Body, id::Id};
 pub enum Expression {
     Int(BigInt),
     Text(String),
-    Symbol(String),
+    Tag {
+        symbol: String,
+        value: Option<Id>,
+    },
     Builtin(BuiltinFunction),
     List(Vec<Id>),
     Struct(Vec<(Id, Id)>),
@@ -83,20 +86,26 @@ pub enum Expression {
 }
 
 impl Expression {
+    pub fn tag(symbol: String) -> Self {
+        Expression::Tag {
+            symbol,
+            value: None,
+        }
+    }
     pub fn nothing() -> Self {
-        Expression::Symbol("Nothing".to_string())
+        Self::tag("Nothing".to_string())
     }
 }
 impl From<bool> for Expression {
     fn from(value: bool) -> Self {
-        Expression::Symbol(if value { "True" } else { "False" }.to_string())
+        Self::tag(if value { "True" } else { "False" }.to_string())
     }
 }
 impl TryInto<bool> for &Expression {
     type Error = ();
 
     fn try_into(self) -> Result<bool, ()> {
-        let Expression::Symbol(symbol) = self else { return Err(()); };
+        let Expression::Tag { symbol, .. } = self else { return Err(()); };
         match symbol.as_str() {
             "True" => Ok(true),
             "False" => Ok(false),
@@ -120,7 +129,10 @@ impl hash::Hash for Expression {
         match self {
             Expression::Int(int) => int.hash(state),
             Expression::Text(text) => text.hash(state),
-            Expression::Symbol(symbol) => symbol.hash(state),
+            Expression::Tag { symbol, value } => {
+                symbol.hash(state);
+                value.hash(state);
+            }
             Expression::Builtin(builtin) => builtin.hash(state),
             Expression::List(items) => items.hash(state),
             Expression::Struct(fields) => fields.len().hash(state),
@@ -213,9 +225,13 @@ impl ToRichIr for Expression {
                     builder.push(format!(r#""{}""#, text), TokenType::Text, EnumSet::empty());
                 builder.push_reference(text.to_owned(), range);
             }
-            Expression::Symbol(symbol) => {
+            Expression::Tag { symbol, value } => {
                 let range = builder.push(symbol, TokenType::Symbol, EnumSet::empty());
                 builder.push_reference(ReferenceKey::Symbol(symbol.to_owned()), range);
+                if let Some(value) = value {
+                    builder.push(" ", None, EnumSet::empty());
+                    value.build_rich_ir(builder);
+                }
             }
             Expression::Builtin(builtin) => {
                 let range = builder.push(

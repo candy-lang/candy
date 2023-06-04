@@ -56,10 +56,14 @@ impl FormattingInfo {
             is_single_expression_in_assignment_body: true,
         }
     }
-    pub fn resolve_for_sandwich_like(&self, previous_width: Width) -> Self {
+    pub fn resolve_for_expression_with_indented_lines(
+        &self,
+        previous_width: Width,
+        first_line_extra_width: Width,
+    ) -> Self {
         Self {
             indentation: if self.is_single_expression_in_assignment_body
-                && previous_width.last_line_fits(self.indentation, SinglelineWidth::PARENTHESIS)
+                && previous_width.last_line_fits(self.indentation, first_line_extra_width)
             {
                 self.indentation.with_dedent()
             } else {
@@ -630,30 +634,28 @@ pub(crate) fn format_cst<'a>(
                 (cases, last_case)
             } else {
                 let (percent_width, whitespace) = percent.split();
-                return FormattedCst::new(expression_width + percent_width, whitespace, );
+                return FormattedCst::new(expression_width + percent_width, whitespace);
             };
 
+            let case_info = info
+                .resolve_for_expression_with_indented_lines(
+                    previous_width,
+                    expression_width + SinglelineWidth::PERCENT,
+                )
+                .with_indent();
             let percent_width =
-                percent.into_trailing_with_indentation(edits, info.indentation.with_indent());
+                percent.into_trailing_with_indentation(edits, case_info.indentation);
 
-            let (last_case_width, whitespace) = format_cst(
-                edits,
-                previous_width_for_indented,
-                last_case,
-                &info.with_indent(),
-            )
-            .split();
+            let (last_case_width, whitespace) =
+                format_cst(edits, previous_width_for_indented, last_case, &case_info).split();
             return FormattedCst::new(
                 expression_width
                     + percent_width
                     + cases
                         .iter()
                         .map(|it| {
-                            format_cst(edits, previous_width_for_indented, it, &info.with_indent())
-                                .into_trailing_with_indentation(
-                                    edits,
-                                    info.indentation.with_indent(),
-                                )
+                            format_cst(edits, previous_width_for_indented, it, &case_info)
+                                .into_trailing_with_indentation(edits, case_info.indentation)
                         })
                         .sum::<Width>()
                     + last_case_width,
@@ -704,7 +706,10 @@ pub(crate) fn format_cst<'a>(
             body,
             closing_curly_brace,
         } => {
-            let info = info.resolve_for_sandwich_like(previous_width);
+            let info = info.resolve_for_expression_with_indented_lines(
+                previous_width,
+                SinglelineWidth::PARENTHESIS.into(),
+            );
 
             let opening_curly_brace = format_cst(edits, previous_width, opening_curly_brace, &info);
 
@@ -1685,6 +1690,12 @@ mod test {
         test(
             "foo%\n  Foo->Foo\n\n  Bar  ->  Bar",
             "foo %\n  Foo -> Foo\n  Bar -> Bar\n",
+        );
+        // foo := bar %
+        //   Baz -> Blub
+        test(
+            "foo := bar %\n  Baz -> Blub\n",
+            "foo := bar %\n  Baz -> Blub\n",
         );
 
         // Comments

@@ -1,5 +1,6 @@
 #![feature(let_chains, round_char_boundary)]
 
+mod coverage;
 mod fuzzer;
 mod input;
 mod input_pool;
@@ -21,11 +22,11 @@ use candy_frontend::{
     {hir::Id, TracingConfig, TracingMode},
 };
 use candy_vm::{
-    context::RunLimitedNumberOfInstructions, fiber::Panic, mir_to_lir::compile_lir,
+    execution_controller::RunLimitedNumberOfInstructions, fiber::Panic, mir_to_lir::compile_lir,
     tracer::stack_trace::StackTracer, vm::Vm,
 };
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 pub fn fuzz<DB>(db: &DB, module: Module) -> Vec<FailingFuzzCase>
 where
@@ -58,7 +59,12 @@ where
         fuzzer.run(&mut RunLimitedNumberOfInstructions::new(100000));
 
         match fuzzer.into_status() {
-            Status::StillFuzzing { .. } => {}
+            Status::StillFuzzing { total_coverage, .. } => {
+                let coverage = total_coverage
+                    .in_range(&lir.range_of_function(&id))
+                    .relative_coverage();
+                debug!("Achieved a coverage of {:.1} %.", coverage * 100.0);
+            }
             Status::FoundPanic {
                 input,
                 panic,
@@ -71,9 +77,10 @@ where
                     panic,
                     tracer,
                 };
-                // case.dump(db);
+                case.dump(db);
                 failing_cases.push(case);
             }
+            Status::TotalCoverageButNoPanic => {}
         }
     }
 
@@ -84,10 +91,12 @@ pub struct FailingFuzzCase {
     function: Id,
     input: Input,
     panic: Panic,
+    #[allow(dead_code)]
     tracer: StackTracer,
 }
 
 impl FailingFuzzCase {
+    #[allow(unused_variables)]
     pub fn dump<DB>(&self, db: &DB)
     where
         DB: AstToHir + PositionConversionDb,
@@ -97,9 +106,10 @@ impl FailingFuzzCase {
             self.function, self.input, self.panic.reason,
         );
         error!("{} is responsible.", self.panic.responsible);
-        error!(
-            "This is the stack trace:\n{}",
-            self.tracer.format_panic_stack_trace_to_root_fiber(db),
-        );
+        // Segfaults: https://github.com/candy-lang/candy/issues/458
+        // error!(
+        //     "This is the stack trace:\n{}",
+        //     self.tracer.format_panic_stack_trace_to_root_fiber(db),
+        // );
     }
 }

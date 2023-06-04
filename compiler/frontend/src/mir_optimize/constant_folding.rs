@@ -48,15 +48,21 @@ pub fn fold_constants(
         arguments,
         responsible,
     } = expression else { return; };
+
+    if let Expression::Tag { symbol, value: None } = visible.get(*function) && arguments.len() == 1 {
+        *expression = Expression::Tag { symbol: symbol.clone(), value: Some(arguments[0]) };
+        return;
+    }
+
     let Expression::Builtin(builtin) = visible.get(*function) else { return; };
     let Some(result) = run_builtin(*builtin, arguments, *responsible, visible) else {
         return;
     };
     let evaluated_call = match result {
-        Ok(return_value) => return_value,
-        Err(panic_reason) => {
+        BuiltinResult::Returns(expression) => expression,
+        BuiltinResult::Panics(reason) => {
             let mut body = Body::default();
-            let reason = body.push_with_new_id(id_generator, Expression::Text(panic_reason));
+            let reason = body.push_with_new_id(id_generator, Expression::Text(reason));
             body.push_with_new_id(
                 id_generator,
                 Expression::Panic {
@@ -68,6 +74,11 @@ pub fn fold_constants(
         }
     };
     *expression = evaluated_call;
+}
+
+enum BuiltinResult {
+    Returns(Expression),
+    Panics(String),
 }
 
 /// This function tries to run a builtin, requiring a minimal amount of static
@@ -83,51 +94,53 @@ fn run_builtin(
     arguments: &[Id],
     responsible: Id,
     visible: &VisibleExpressions,
-) -> Option<Result<Expression, String>> {
+) -> Option<BuiltinResult> {
+    use BuiltinResult::*;
+
     if arguments.len() != builtin.num_parameters() {
-        return Some(Err("wrong number of arguments".to_string()));
+        return Panics("wrong number of arguments".to_string()).into();
     }
 
-    let return_value = match builtin {
+    let result = match builtin {
         BuiltinFunction::ChannelCreate
         | BuiltinFunction::ChannelSend
         | BuiltinFunction::ChannelReceive => return None,
         BuiltinFunction::Equals => {
             let [a, b] = arguments else { unreachable!() };
-            a.semantically_equals(*b, visible)?.into()
+            Returns(a.semantically_equals(*b, visible)?.into())
         }
         BuiltinFunction::FunctionRun => {
             let [function] = arguments else { unreachable!() };
-            Expression::Call {
+            Returns(Expression::Call {
                 function: *function,
                 arguments: vec![],
                 responsible,
-            }
+            })
         }
         BuiltinFunction::GetArgumentCount => {
             let [function] = arguments else { unreachable!() };
             let Expression::Function { parameters, .. } = visible.get(*function) else { return None; };
-            Expression::Int(parameters.len().into())
+            Returns(Expression::Int(parameters.len().into()))
         }
         BuiltinFunction::IfElse => {
             let [condition, then_body, else_body] = arguments else { unreachable!() };
             let condition = visible.get(*condition).try_into().ok()?;
-            Expression::Call {
+            Returns(Expression::Call {
                 function: if condition { *then_body } else { *else_body },
                 arguments: vec![],
                 responsible,
-            }
+            })
         }
         BuiltinFunction::IntAdd => {
             let [a, b] = arguments else { unreachable!() };
             let a: BigInt = visible.get(*a).try_into().ok()?;
             let b: BigInt = visible.get(*b).try_into().ok()?;
-            Expression::Int(a + b)
+            Returns(Expression::Int(a + b))
         }
         BuiltinFunction::IntBitLength => {
             let [a] = arguments else { unreachable!() };
             let a: BigInt = visible.get(*a).try_into().ok()?;
-            Expression::Int(a.bits().into())
+            Returns(Expression::Int(a.bits().into()))
         }
         // TODO: Implement
         BuiltinFunction::IntBitwiseAnd => return None,
@@ -159,9 +172,9 @@ fn run_builtin(
             };
 
             let Some(value) = index.to_usize().and_then(|index| list.get(index)) else {
-                return Some(Err(format!("List access will panic because index {} is out of bounds.", index)));
+                return Some(Panics(format!("List access will panic because index {index} is out of bounds.")));
             };
-            Expression::Reference(*value)
+            Returns(Expression::Reference(*value))
         }
         BuiltinFunction::ListInsert => return None,
         BuiltinFunction::ListLength => {
@@ -173,7 +186,7 @@ fn run_builtin(
                 return None;
             };
 
-            Expression::Int(list.len().into())
+            Returns(Expression::Int(list.len().into()))
         }
         BuiltinFunction::ListRemoveAt => return None,
         BuiltinFunction::ListReplace => return None,
@@ -208,9 +221,9 @@ fn run_builtin(
                 .find(|(k, _)| k.semantically_equals(*key, visible).unwrap_or(false))
                 .map(|(_, value)| *value);
             if let Some(value) = value {
-                Expression::Reference(value)
+                Returns(Expression::Reference(value))
             } else {
-                return Some(Err(format!(
+                return Some(Panics(format!(
                     "Struct access will panic because key {} isn't in there.",
                     visible.get(*key).to_rich_ir(),
                 )));
@@ -243,16 +256,34 @@ fn run_builtin(
                 }
             }
 
-            is_contained?.into()
+            Returns(is_contained?.into())
         }
-        BuiltinFunction::TagGetValue => return None,
-        BuiltinFunction::TagHasValue => return None,
-        BuiltinFunction::TagWithoutValue => return None,
+        BuiltinFunction::TagGetValue => {
+            let [tag] = arguments else { unreachable!() };
+            let Expression::Tag { value: Some(value), .. } = visible.get(*tag) else { return None; };
+
+            Returns(Expression::Reference(*value))
+        }
+        BuiltinFunction::TagHasValue => {
+            let [tag] = arguments else { unreachable!() };
+            let Expression::Tag { value, .. } = visible.get(*tag) else { return None; };
+
+            Returns(value.is_some().into())
+        }
+        BuiltinFunction::TagWithoutValue => {
+            let [tag] = arguments else { unreachable!() };
+            let Expression::Tag { symbol, .. } = visible.get(*tag) else { return None; };
+
+            Returns(Expression::Tag {
+                symbol: symbol.clone(),
+                value: None,
+            })
+        }
         BuiltinFunction::TextCharacters => return None,
         BuiltinFunction::TextConcatenate => {
             let [a, b] = arguments else { unreachable!() };
 
-            match (visible.get(*a), visible.get(*b)) {
+            Returns(match (visible.get(*a), visible.get(*b)) {
                 (Expression::Text(text), other) | (other, Expression::Text(text))
                     if text.is_empty() =>
                 {
@@ -262,7 +293,7 @@ fn run_builtin(
                     Expression::Text(format!("{}{}", text_a, text_b))
                 }
                 _ => return None,
-            }
+            })
         }
         BuiltinFunction::TextContains => return None,
         BuiltinFunction::TextEndsWith => return None,
@@ -275,83 +306,85 @@ fn run_builtin(
         BuiltinFunction::TextTrimStart => return None,
         BuiltinFunction::ToDebugText => return None,
         BuiltinFunction::Try => return None,
-        BuiltinFunction::TypeOf => match visible.get(arguments[0]) {
-            Expression::Int(_) => Expression::Symbol("Int".to_string()),
-            Expression::Text(_) => Expression::Symbol("Text".to_string()),
-            Expression::Symbol(_) => Expression::Symbol("Tag".to_string()),
-            Expression::Builtin(_) => Expression::Symbol("Function".to_string()),
-            Expression::List(_) => Expression::Symbol("List".to_string()),
-            Expression::Struct(_) => Expression::Symbol("Struct".to_string()),
-            Expression::Reference(_) => return None,
-            Expression::HirId(_) => unreachable!(),
-            Expression::Function { .. } => Expression::Symbol("Function".to_string()),
-            Expression::Parameter => return None,
-            Expression::Call { function, .. } => {
-                let callee = visible.get(*function);
-                let Expression::Builtin(builtin) = callee else {
+        BuiltinFunction::TypeOf => Returns(Expression::tag(
+            match visible.get(arguments[0]) {
+                Expression::Int(_) => "Int",
+                Expression::Text(_) => "Text",
+                Expression::Tag { .. } => "Tag",
+                Expression::Builtin(_) => "Function",
+                Expression::List(_) => "List",
+                Expression::Struct(_) => "Struct",
+                Expression::Reference(_) => return None,
+                Expression::HirId(_) => unreachable!(),
+                Expression::Function { .. } => "Function",
+                Expression::Parameter => return None,
+                Expression::Call { function, .. } => {
+                    let callee = visible.get(*function);
+                    let Expression::Builtin(builtin) = callee else {
                         return None;
                     };
-                let return_type = match builtin {
-                    BuiltinFunction::ChannelCreate => "Struct",
-                    BuiltinFunction::ChannelSend => "Tag",
-                    BuiltinFunction::ChannelReceive => return None,
-                    BuiltinFunction::Equals => "Tag",
-                    BuiltinFunction::GetArgumentCount => "Int",
-                    BuiltinFunction::FunctionRun => return None,
-                    BuiltinFunction::IfElse => return None,
-                    BuiltinFunction::IntAdd => "Int",
-                    BuiltinFunction::IntBitLength => "Int",
-                    BuiltinFunction::IntBitwiseAnd => "Int",
-                    BuiltinFunction::IntBitwiseOr => "Int",
-                    BuiltinFunction::IntBitwiseXor => "Int",
-                    BuiltinFunction::IntCompareTo => "Tag",
-                    BuiltinFunction::IntDivideTruncating => "Int",
-                    BuiltinFunction::IntModulo => "Int",
-                    BuiltinFunction::IntMultiply => "Int",
-                    BuiltinFunction::IntParse => "Struct",
-                    BuiltinFunction::IntRemainder => "Int",
-                    BuiltinFunction::IntShiftLeft => "Int",
-                    BuiltinFunction::IntShiftRight => "Int",
-                    BuiltinFunction::IntSubtract => "Int",
-                    BuiltinFunction::ListFilled => "List",
-                    BuiltinFunction::ListGet => return None,
-                    BuiltinFunction::ListInsert => "List",
-                    BuiltinFunction::ListLength => "Int",
-                    BuiltinFunction::ListRemoveAt => "List",
-                    BuiltinFunction::ListReplace => "List",
-                    BuiltinFunction::Parallel => return None,
-                    BuiltinFunction::Print => "Tag",
-                    BuiltinFunction::StructGet => return None,
-                    BuiltinFunction::StructGetKeys => "List",
-                    BuiltinFunction::StructHasKey => "Tag",
-                    BuiltinFunction::TagGetValue => return None,
-                    BuiltinFunction::TagHasValue => "Tag",
-                    BuiltinFunction::TagWithoutValue => "Tag",
-                    BuiltinFunction::TextCharacters => "List",
-                    BuiltinFunction::TextConcatenate => "Text",
-                    BuiltinFunction::TextContains => "Tag",
-                    BuiltinFunction::TextEndsWith => "Tag",
-                    BuiltinFunction::TextFromUtf8 => "Struct",
-                    BuiltinFunction::TextGetRange => "Text",
-                    BuiltinFunction::TextIsEmpty => "Tag",
-                    BuiltinFunction::TextLength => "Int",
-                    BuiltinFunction::TextStartsWith => "Tag",
-                    BuiltinFunction::TextTrimEnd => "Text",
-                    BuiltinFunction::TextTrimStart => "Text",
-                    BuiltinFunction::ToDebugText => "Text",
-                    BuiltinFunction::Try => "Struct",
-                    BuiltinFunction::TypeOf => "Tag",
-                };
-                Expression::Symbol(return_type.to_string())
+                    match builtin {
+                        BuiltinFunction::ChannelCreate => "Struct",
+                        BuiltinFunction::ChannelSend => "Tag",
+                        BuiltinFunction::ChannelReceive => return None,
+                        BuiltinFunction::Equals => "Tag",
+                        BuiltinFunction::GetArgumentCount => "Int",
+                        BuiltinFunction::FunctionRun => return None,
+                        BuiltinFunction::IfElse => return None,
+                        BuiltinFunction::IntAdd => "Int",
+                        BuiltinFunction::IntBitLength => "Int",
+                        BuiltinFunction::IntBitwiseAnd => "Int",
+                        BuiltinFunction::IntBitwiseOr => "Int",
+                        BuiltinFunction::IntBitwiseXor => "Int",
+                        BuiltinFunction::IntCompareTo => "Tag",
+                        BuiltinFunction::IntDivideTruncating => "Int",
+                        BuiltinFunction::IntModulo => "Int",
+                        BuiltinFunction::IntMultiply => "Int",
+                        BuiltinFunction::IntParse => "Struct",
+                        BuiltinFunction::IntRemainder => "Int",
+                        BuiltinFunction::IntShiftLeft => "Int",
+                        BuiltinFunction::IntShiftRight => "Int",
+                        BuiltinFunction::IntSubtract => "Int",
+                        BuiltinFunction::ListFilled => "List",
+                        BuiltinFunction::ListGet => return None,
+                        BuiltinFunction::ListInsert => "List",
+                        BuiltinFunction::ListLength => "Int",
+                        BuiltinFunction::ListRemoveAt => "List",
+                        BuiltinFunction::ListReplace => "List",
+                        BuiltinFunction::Parallel => return None,
+                        BuiltinFunction::Print => "Tag",
+                        BuiltinFunction::StructGet => return None,
+                        BuiltinFunction::StructGetKeys => "List",
+                        BuiltinFunction::StructHasKey => "Tag",
+                        BuiltinFunction::TagGetValue => return None,
+                        BuiltinFunction::TagHasValue => "Tag",
+                        BuiltinFunction::TagWithoutValue => "Tag",
+                        BuiltinFunction::TextCharacters => "List",
+                        BuiltinFunction::TextConcatenate => "Text",
+                        BuiltinFunction::TextContains => "Tag",
+                        BuiltinFunction::TextEndsWith => "Tag",
+                        BuiltinFunction::TextFromUtf8 => "Struct",
+                        BuiltinFunction::TextGetRange => "Text",
+                        BuiltinFunction::TextIsEmpty => "Tag",
+                        BuiltinFunction::TextLength => "Int",
+                        BuiltinFunction::TextStartsWith => "Tag",
+                        BuiltinFunction::TextTrimEnd => "Text",
+                        BuiltinFunction::TextTrimStart => "Text",
+                        BuiltinFunction::ToDebugText => "Text",
+                        BuiltinFunction::Try => "Struct",
+                        BuiltinFunction::TypeOf => "Tag",
+                    }
+                }
+                Expression::UseModule { .. } => return None,
+                Expression::Panic { .. } => return None,
+                Expression::Multiple(_) => return None,
+                Expression::TraceCallStarts { .. }
+                | Expression::TraceCallEnds { .. }
+                | Expression::TraceExpressionEvaluated { .. }
+                | Expression::TraceFoundFuzzableFunction { .. } => unreachable!(),
             }
-            Expression::UseModule { .. } => return None,
-            Expression::Panic { .. } => return None,
-            Expression::Multiple(_) => return None,
-            Expression::TraceCallStarts { .. }
-            | Expression::TraceCallEnds { .. }
-            | Expression::TraceExpressionEvaluated { .. }
-            | Expression::TraceFoundFuzzableFunction { .. } => unreachable!(),
-        },
+            .to_string(),
+        )),
     };
-    Some(Ok(return_value))
+    Some(result)
 }

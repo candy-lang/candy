@@ -392,19 +392,6 @@ impl LoweringContext {
                 receiver,
                 arguments,
             } => {
-                match lowering_type {
-                    LoweringType::Expression => {}
-                    LoweringType::Pattern | LoweringType::PatternLiteralPart => {
-                        return self.create_ast(
-                            cst.data.id,
-                            AstKind::Error {
-                                child: None,
-                                errors: vec![self.create_error(cst, AstError::CallInPattern)],
-                            },
-                        )
-                    }
-                }
-
                 let mut receiver_kind = &receiver.kind;
                 loop {
                     receiver_kind = match receiver_kind {
@@ -903,7 +890,7 @@ impl LoweringContext {
     }
     fn create_next_id(&mut self, cst_id: cst::Id) -> ast::Id {
         let id = self.create_next_id_without_mapping();
-        assert!(matches!(self.id_mapping.insert(id.clone(), cst_id), None));
+        assert!(self.id_mapping.insert(id.clone(), cst_id).is_none());
         id
     }
     fn create_next_id_without_mapping(&mut self) -> ast::Id {
