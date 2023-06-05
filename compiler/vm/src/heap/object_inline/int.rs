@@ -7,8 +7,10 @@ use derive_more::Deref;
 use extension_trait::extension_trait;
 use num_bigint::BigInt;
 use num_integer::Integer;
+use num_traits::Signed;
 use rustc_hash::FxHashMap;
 use std::{
+    cmp::Ordering,
     fmt::{self, Formatter},
     num::NonZeroU64,
     ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Shl, Shr, Sub},
@@ -59,8 +61,18 @@ impl InlineInt {
             })
     }
 
-    pub fn compare_to(self, heap: &mut Heap, rhs: Self) -> Tag {
-        Tag::create_ordering(heap, self.get().cmp(&rhs.get()))
+    pub fn compare_to(self, heap: &mut Heap, rhs: Int) -> Tag {
+        let ordering = match rhs {
+            Int::Inline(rhs) => self.get().cmp(&rhs.get()),
+            Int::Heap(rhs) => {
+                if rhs.get().is_negative() {
+                    Ordering::Greater
+                } else {
+                    Ordering::Less
+                }
+            }
+        };
+        Tag::create_ordering(heap, ordering)
     }
 
     operator_fn!(shift_left, i64::checked_shl, Shl::shl);
