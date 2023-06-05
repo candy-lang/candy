@@ -26,12 +26,9 @@ impl<FT: FiberTracer> Fiber<FT> {
         let target = UsePath::parse(path.get())?;
         let module = target.resolve_relative_to(current_module)?;
 
-        let lir = use_provider.use_module(module.clone()).ok_or_else(|| {
-            format!(
-                "`use` couldn't import the module `{}`.",
-                module.to_rich_ir(),
-            )
-        })?;
+        let lir = use_provider
+            .use_module(module.clone())
+            .ok_or_else(|| format!("`use` couldn't import the module `{module}`."))?;
         let closure = Closure::create_from_module_lir(&mut self.heap, lir.as_ref().to_owned());
         let responsible = HirId::create(&mut self.heap, Id::dummy());
         self.call_closure(closure, &[], responsible);

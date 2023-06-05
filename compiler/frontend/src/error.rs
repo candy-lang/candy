@@ -162,18 +162,15 @@ impl Display for CompilerErrorPayload {
             CompilerErrorPayload::Mir(error) => match error {
                 MirError::UseWithInvalidPath { module, path } => {
                     format!(
-                        "{} tries to `use` {path:?}, but that's an invalid path.",
-                        module.to_rich_ir(),
+                        "{module} tries to `use` {path:?}, but that's an invalid path.",
                     )
                 }
-                MirError::UseHasTooManyParentNavigations { module, path } => format!("{} tries to `use` {path:?}, but that has too many parent navigations. You can't navigate out of the current package (the module that also contains a `_package.candy` file).", module.to_rich_ir()),
+                MirError::UseHasTooManyParentNavigations { module, path } => format!("{module} tries to `use` {path:?}, but that has too many parent navigations. You can't navigate out of the current package (the module that also contains a `_package.candy` file)."),
                 MirError::ModuleNotFound { module, path } => format!(
-                    "{} tries to use {path:?}, but that module is not found.",
-                    module.to_rich_ir(),
+                    "{module} tries to use {path:?}, but that module is not found.",
                 ),
                 MirError::UseNotStaticallyResolvable { containing_module } => format!(
-                    "A `use` in {} is not statically resolvable.",
-                    containing_module.to_rich_ir(),
+                    "A `use` in {containing_module} is not statically resolvable.",
                 ),
                 MirError::ModuleHasCycle { cycle } => {
                     format!(
@@ -213,9 +210,7 @@ impl ToRichIr for CompilerError {
         let range = builder.push(
             format!(
                 "{} (span: {} – {})",
-                self.module.to_rich_ir(),
-                *self.span.start,
-                *self.span.end,
+                self.module, *self.span.start, *self.span.end,
             ),
             None,
             EnumSet::empty(),

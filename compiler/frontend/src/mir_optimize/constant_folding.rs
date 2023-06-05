@@ -35,7 +35,6 @@ use crate::{
     builtin_functions::BuiltinFunction,
     id::IdGenerator,
     mir::{Body, Expression, Id, VisibleExpressions},
-    rich_ir::ToRichIr,
 };
 
 pub fn fold_constants(
@@ -225,7 +224,7 @@ fn run_builtin(
             } else {
                 return Some(Panics(format!(
                     "Struct access will panic because key {} isn't in there.",
-                    visible.get(*key).to_rich_ir(),
+                    visible.get(*key),
                 )));
             }
         }

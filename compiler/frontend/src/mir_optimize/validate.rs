@@ -1,7 +1,4 @@
-use crate::{
-    mir::{Body, Expression, Id, Mir, VisibleExpressions},
-    rich_ir::ToRichIr,
-};
+use crate::mir::{Body, Expression, Id, Mir, VisibleExpressions};
 use rustc_hash::FxHashSet;
 use tracing::error;
 
@@ -16,18 +13,14 @@ impl Body {
     pub fn validate(&self, defined_ids: &mut FxHashSet<Id>, mut visible: im::HashSet<Id>) {
         if self.expressions.is_empty() {
             error!("A body of a function is empty! Functions should have at least a return value.");
-            error!("This is the MIR:\n{}", self.to_rich_ir());
+            error!("This is the MIR:\n{self}");
             panic!("MIR is invalid!");
         }
         for (id, expression) in self.iter() {
             for captured in expression.captured_ids() {
                 if !visible.contains(&captured) {
-                    error!(
-                        "MIR is invalid! {} captures {}, but that's not visible.",
-                        id.to_rich_ir().text,
-                        captured.to_rich_ir().text,
-                    );
-                    error!("This is the MIR:\n{}", self.to_rich_ir());
+                    error!("MIR is invalid! {id} captures {captured}, but that's not visible.");
+                    error!("This is the MIR:\n{self}");
                     panic!("MIR is invalid!");
                 }
             }
@@ -48,8 +41,8 @@ impl Body {
             }
 
             if defined_ids.contains(&id) {
-                error!("ID {} exists twice.", id.to_rich_ir().text);
-                error!("This is the MIR:\n{}", self.to_rich_ir());
+                error!("ID {id} exists twice.");
+                error!("This is the MIR:\n{self}");
                 panic!("MIR is invalid!");
             }
             defined_ids.insert(id);
@@ -64,7 +57,7 @@ impl Expression {
         for id in self.captured_ids() {
             if !visible.contains(id) {
                 error!("Expression references ID {id:?}, but that ID is not visible:");
-                error!("{}", self.to_rich_ir());
+                error!("{self}");
                 panic!("Expression references ID that is not in its scope.");
             }
         }

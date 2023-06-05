@@ -11,10 +11,7 @@
 
 use self::hints_finder::HintsFinder;
 use crate::database::Database;
-use candy_frontend::{
-    module::{Module, MutableModuleProviderOwner, PackagesPath},
-    rich_ir::ToRichIr,
-};
+use candy_frontend::module::{Module, MutableModuleProviderOwner, PackagesPath};
 use extension_trait::extension_trait;
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position, Url};
@@ -142,7 +139,7 @@ impl OutgoingHints {
 
     async fn report_hints(&mut self, module: Module, hints: Vec<Hint>) {
         if self.last_sent.get(&module) != Some(&hints) {
-            debug!("Reporting hints for {}: {hints:?}", module.to_rich_ir());
+            debug!("Reporting hints for {module}: {hints:?}");
             self.last_sent.insert(module.clone(), hints.clone());
             self.sender.send((module, hints)).await.unwrap();
         }

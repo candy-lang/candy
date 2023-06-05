@@ -61,7 +61,6 @@ use crate::{
     id::IdGenerator,
     mir::{Body, Expression, Id, MirError, VisibleExpressions},
     module::Module,
-    rich_ir::ToRichIr,
 };
 use rustc_hash::{FxHashSet, FxHasher};
 use std::{
@@ -78,7 +77,7 @@ pub trait OptimizeMir: HirToMir {
 }
 
 fn optimized_mir(db: &dyn OptimizeMir, module: Module, tracing: TracingConfig) -> MirResult {
-    debug!("{}: Compiling.", module.to_rich_ir());
+    debug!("{module}: Compiling.");
     let (mir, errors) = db.mir(module.clone(), tracing.clone())?;
     let mut mir = (*mir).clone();
     let mut errors = (*errors).clone();
@@ -87,10 +86,7 @@ fn optimized_mir(db: &dyn OptimizeMir, module: Module, tracing: TracingConfig) -
     mir.optimize(db, &tracing, &mut errors);
     let complexity_after = mir.complexity();
 
-    debug!(
-        "{}: Done. Optimized from {complexity_before} to {complexity_after}",
-        module.to_rich_ir(),
-    );
+    debug!("{module}: Done. Optimized from {complexity_before} to {complexity_after}");
     Ok((Arc::new(mir), Arc::new(errors)))
 }
 
