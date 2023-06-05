@@ -1,5 +1,5 @@
 use candy_frontend::{
-    cst::{Cst, CstKind},
+    cst::{Cst, CstKind, UnwrapWhitespaceAndComment},
     module::{Module, ModuleDb},
     position::PositionConversionDb,
     rcst_to_cst::RcstToCst,
@@ -269,7 +269,13 @@ fn visit_cst(
                 visit_cst(builder, receiver, Some(SemanticTokenType::Function));
                 visit_csts(builder, arguments, Some(SemanticTokenType::Parameter));
             } else {
-                visit_cst(builder, left, Some(SemanticTokenType::Variable));
+                let token_type = if let [single] = body.as_slice()
+                    && matches!(single.unwrap_whitespace_and_comment().kind, CstKind::Function { .. }) {
+                    SemanticTokenType::Function
+                } else {
+                    SemanticTokenType::Variable
+                };
+                visit_cst(builder, left, Some(token_type));
             }
             visit_cst(builder, assignment_sign, None);
             visit_csts(builder, body, None);
