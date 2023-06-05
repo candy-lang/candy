@@ -267,18 +267,21 @@ impl LoweringContext {
                                     AstKind::Call(ast::Call {
                                         receiver,
                                         mut arguments,
+                                        ..
                                     }),
                                 ..
-                            } => {
+                            } if matches!(right.kind, CstKind::Call { .. }) => {
                                 arguments.insert(0, left);
                                 ast::Call {
                                     receiver,
                                     arguments,
+                                    is_from_pipe: true,
                                 }
                             }
                             call => ast::Call {
                                 receiver: Box::new(call),
                                 arguments: vec![left],
+                                is_from_pipe: true,
                             },
                         };
                         self.create_ast(cst.data.id, AstKind::Call(call))
@@ -425,6 +428,7 @@ impl LoweringContext {
                     AstKind::Call(ast::Call {
                         receiver: receiver.into(),
                         arguments,
+                        is_from_pipe: false,
                     }),
                 )
             }
