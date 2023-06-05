@@ -1907,6 +1907,15 @@ mod test {
             "foo = bar # looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongComment\n",
             "foo =\n  bar\n  # looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongComment\n",
         );
+        // foo :=
+        //   # loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongComment
+        //   Foo
+        //
+        //   Bar
+        test(
+            "foo :=\n  # looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongComment\n  Foo\n\n  Bar\n",
+            "foo :=\n  # looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongComment\n  Foo\n\n  Bar\n",
+        );
     }
 
     #[track_caller]
