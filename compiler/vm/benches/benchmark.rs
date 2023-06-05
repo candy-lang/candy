@@ -41,7 +41,7 @@ fn benchmark_vm_runtime<M: Measurement>(c: &mut Criterion<M>, prefix: &str) {
 
     benchmark!("hello_world", r#"main _ := "Hello, world!""#, 100);
     benchmark!("fibonacci", 15, create_fibonacci_code, 20);
-    benchmark!("PLB/binarytrees", 6, create_binary_trees_code, 4);
+    benchmark!("PLB/binarytrees", 6, create_binary_trees_code, 10);
 
     group.finish();
 }
