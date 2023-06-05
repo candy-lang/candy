@@ -69,9 +69,9 @@ impl<'a> ExistingWhitespace<'a> {
     pub fn empty(start_offset: Offset) -> Self {
         Self {
             start_offset,
-            adopted_whitespace_before: Cow::default(),
-            whitespace: Cow::default(),
-            adopted_whitespace_after: Cow::default(),
+            adopted_whitespace_before: Cow::Borrowed(&[]),
+            whitespace: Cow::Borrowed(&[]),
+            adopted_whitespace_after: Cow::Borrowed(&[]),
         }
     }
     pub fn new(start_offset: Offset, whitespace: impl Into<Cow<'a, [Cst]>>) -> Self {
@@ -82,9 +82,9 @@ impl<'a> ExistingWhitespace<'a> {
 
         Self {
             start_offset,
-            adopted_whitespace_before: Cow::default(),
+            adopted_whitespace_before: Cow::Borrowed(&[]),
             whitespace,
-            adopted_whitespace_after: Cow::default(),
+            adopted_whitespace_after: Cow::Borrowed(&[]),
         }
     }
 
@@ -442,7 +442,7 @@ impl<'a> ExistingWhitespace<'a> {
                             let (space, space_width) = if ensure_space_before_first_comment {
                                 (Cow::Borrowed(SPACE), SinglelineWidth::SPACE)
                             } else {
-                                (Cow::default(), SinglelineWidth::default())
+                                (Cow::Borrowed(""), SinglelineWidth::default())
                             };
                             if previous_width
                                 .last_line_fits(indentation, space_width + comment_width)
