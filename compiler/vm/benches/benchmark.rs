@@ -31,8 +31,11 @@ fn benchmark_vm_runtime<M: Measurement>(c: &mut Criterion<M>, prefix: &str) {
             group.bench_function($id, |b| b.run_vm($source_code));
         };
         ($id:expr, $parameter:expr, $source_code_factory:expr, $sample_size:expr $(,)?) => {
-            group.sample_size($sample_size);
-            group.bench_function($id, |b| b.run_vm(&$source_code_factory($parameter)));
+            benchmark!(
+                BenchmarkId::new($id, $parameter),
+                &$source_code_factory($parameter),
+                $sample_size,
+            );
         };
     }
 
