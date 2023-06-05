@@ -36,6 +36,13 @@ fn benchmark_vm_runtime<M: Measurement>(c: &mut Criterion<M>, prefix: &str) {
         b.run_vm(&fibonacci_code)
     });
 
+    group.sample_size(4);
+    let n = 6;
+    let binary_trees_code = create_binary_trees_code(n);
+    group.bench_function(BenchmarkId::new("PLB/binarytrees", n), |b| {
+        b.run_vm(&binary_trees_code)
+    });
+
     group.finish();
 }
 
@@ -54,6 +61,52 @@ fib n =
   fibRec fibRec n
 
 main _ := fib {n}"#,
+    )
+}
+/// https://programming-language-benchmarks.vercel.app/problem/binarytrees
+fn create_binary_trees_code(n: usize) -> String {
+    format!(
+        r#"
+[channel, equals, if, ifElse, int, iterable, recursive, result, struct, text] = use "Core"
+
+createTree n :=
+  needs (int.is n)
+  needs (int.isNonNegative n)
+
+  recursive n {{ recurse n ->
+    ifElse (n | equals 0) {{ [] }} {{
+      nextSize = n | int.subtract 1
+      [Left: recurse nextSize, Right: recurse nextSize]
+    }}
+  }}
+checkTree tree :=
+  needs (struct.is tree)
+
+  recursive tree {{ recurse tree ->
+    left = tree | struct.get Left | result.mapOr {{ it -> recurse it }} 0
+    right = tree | struct.get Right | result.mapOr {{ it -> recurse it }} 0
+    1 | int.add left | int.add right
+  }}
+
+main _ :=
+  n = {n}
+  minDepth = 4
+
+  maxDepth = n | int.coerceAtLeast (minDepth | int.add 2)
+  _ =
+    depth = maxDepth | int.add 1
+    tree = createTree depth
+
+  longLivedTree = createTree maxDepth
+
+  recursive minDepth {{ recurse depth ->
+    if (depth | int.isLessThanOrEqualTo maxDepth) {{
+      iterations = 1 | int.shiftLeft (maxDepth | int.subtract depth | int.add minDepth)
+      check = iterable.generate iterations {{ _ -> createTree depth | checkTree }} | iterable.sum
+      recurse (depth | int.add 2)
+    }}
+  }}
+"#,
     )
 }
 
@@ -97,4 +150,5 @@ fn run_time_benchmarks(c: &mut Criterion) {
 }
 criterion_group!(time_benchmarks, run_time_benchmarks);
 
-criterion_main!(cycle_benchmarks, time_benchmarks);
+// criterion_main!(cycle_benchmarks, time_benchmarks);
+criterion_main!(time_benchmarks);
