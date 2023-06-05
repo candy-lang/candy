@@ -542,7 +542,7 @@ impl Context<'_> {
     }
 
     fn lower_call(&mut self, id: Option<ast::Id>, call: &Call) -> hir::Id {
-        let (mut arguments, uncompiled_arguments) = if call.pipe {
+        let (mut arguments, uncompiled_arguments) = if call.is_from_pipe {
             let [first_argument, remaining @ ..] = &call.arguments[..] else {
                 panic!("Calls that are generated from the pipe operator must have at least one argument");
             };

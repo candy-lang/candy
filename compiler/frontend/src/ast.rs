@@ -110,7 +110,7 @@ pub struct Function {
 pub struct Call {
     pub receiver: Box<Ast>,
     pub arguments: Vec<Ast>,
-    pub pipe: bool,
+    pub is_from_pipe: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
