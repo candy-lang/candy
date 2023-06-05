@@ -24,24 +24,21 @@ fn benchmark_compiler<M: Measurement>(c: &mut Criterion<M>, prefix: &str) {
 fn benchmark_vm_runtime<M: Measurement>(c: &mut Criterion<M>, prefix: &str) {
     let mut group = c.benchmark_group(format!("{prefix}: VM Runtime"));
 
-    group.sample_size(100);
-    group.bench_function("hello_world", |b| {
-        b.run_vm(r#"main _ := "Hello, world!""#);
-    });
+    // This is a macro so that we can accept a string or `BenchmarkId`.
+    macro_rules! benchmark {
+        ($id:expr, $source_code:expr, $sample_size:expr $(,)?) => {
+            group.sample_size($sample_size);
+            group.bench_function($id, |b| b.run_vm($source_code));
+        };
+        ($id:expr, $parameter:expr, $source_code_factory:expr, $sample_size:expr $(,)?) => {
+            group.sample_size($sample_size);
+            group.bench_function($id, |b| b.run_vm(&$source_code_factory($parameter)));
+        };
+    }
 
-    group.sample_size(20);
-    let n = 15;
-    let fibonacci_code = create_fibonacci_code(n);
-    group.bench_function(BenchmarkId::new("fibonacci", n), |b| {
-        b.run_vm(&fibonacci_code)
-    });
-
-    group.sample_size(4);
-    let n = 6;
-    let binary_trees_code = create_binary_trees_code(n);
-    group.bench_function(BenchmarkId::new("PLB/binarytrees", n), |b| {
-        b.run_vm(&binary_trees_code)
-    });
+    benchmark!("hello_world", r#"main _ := "Hello, world!""#, 100);
+    benchmark!("fibonacci", 15, create_fibonacci_code, 20);
+    benchmark!("PLB/binarytrees", 6, create_binary_trees_code, 4);
 
     group.finish();
 }
