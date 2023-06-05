@@ -446,6 +446,13 @@ impl<'a> ExistingWhitespace<'a> {
                             };
                             if previous_width
                                 .last_line_fits(indentation, space_width + comment_width)
+                                || matches!(
+                                    config,
+                                    TrailingWithIndentationConfig::Body {
+                                        position: WhitespacePositionInBody::Start,
+                                        ..
+                                    },
+                                )
                             {
                                 width += Width::from(space_width);
                                 space
