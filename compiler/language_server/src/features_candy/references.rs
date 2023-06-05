@@ -40,29 +40,36 @@ where
             Some(ReferenceQuery::Needs(module))
         }
         CstKind::Identifier { .. } => {
-            let hir_id = db.cst_to_hir_id(module, origin_cst.data.id)?;
-            let target_id = if let Some(hir_expr) = db.find_expression(hir_id.clone()) {
+            let hir_id = db.cst_to_hir_id(module, origin_cst.data.id);
+            let [hir_id] = hir_id.as_slice() else {
+                panic!("The CST-Id of an Identifier should map to exactly one HIR-Id")
+            };
+            let hir_id = hir_id.to_owned();
+
+            let target_id: Option<hir::Id> = if let Some(hir_expr) =
+                db.find_expression(hir_id.clone())
+            {
                 let containing_body = db.containing_body_of(hir_id.clone());
                 if containing_body.identifiers.contains_key(&hir_id) {
                     // A local variable was declared. Find references to that variable.
-                    hir_id
+                    Some(hir_id)
                 } else {
                     // An intermediate reference. Find references to its target.
                     match hir_expr {
-                        Expression::Reference(target_id) => target_id,
+                        Expression::Reference(target_id) => Some(target_id),
                         Expression::Symbol(_) => {
                             // TODO: Handle struct access
-                            return None;
+                            None
                         }
-                        Expression::Error { .. } => return None,
+                        Expression::Error { .. } => None,
                         _ => panic!("Expected a reference, got {}.", hir_expr.to_rich_ir().text),
                     }
                 }
             } else {
                 // Parameter
-                hir_id
+                Some(hir_id)
             };
-            Some(ReferenceQuery::Id(target_id))
+            target_id.map(ReferenceQuery::Id)
         }
         CstKind::Symbol(symbol) => Some(ReferenceQuery::Symbol(module, symbol)),
         CstKind::Int { value, .. } => Some(ReferenceQuery::Int(module, value)),

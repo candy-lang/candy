@@ -25,8 +25,8 @@ pub trait AstToHir: CstDb + CstToAst {
     fn hir_id_to_span(&self, id: hir::Id) -> Option<Range<Offset>>;
     fn hir_id_to_display_span(&self, id: hir::Id) -> Option<Range<Offset>>;
 
-    fn ast_to_hir_id(&self, id: ast::Id) -> Option<hir::Id>;
-    fn cst_to_hir_id(&self, module: Module, id: cst::Id) -> Option<hir::Id>;
+    fn ast_to_hir_id(&self, id: ast::Id) -> Vec<hir::Id>;
+    fn cst_to_hir_id(&self, module: Module, id: cst::Id) -> Vec<hir::Id>;
 
     fn hir(&self, module: Module) -> HirResult;
 }
@@ -48,16 +48,22 @@ fn hir_id_to_display_span(db: &dyn AstToHir, id: hir::Id) -> Option<Range<Offset
     Some(db.find_cst(id.module, cst_id).display_span())
 }
 
-fn ast_to_hir_id(db: &dyn AstToHir, id: ast::Id) -> Option<hir::Id> {
-    let (_, hir_to_ast_id_mapping) = db.hir(id.module.clone()).ok()?;
-    hir_to_ast_id_mapping
-        .iter()
-        .find_map(|(key, value)| if value == &id { Some(key) } else { None })
-        .cloned()
+fn ast_to_hir_id(db: &dyn AstToHir, id: ast::Id) -> Vec<hir::Id> {
+    if let Ok((_, hir_to_ast_id_mapping)) = db.hir(id.module.clone()) {
+        hir_to_ast_id_mapping
+            .iter()
+            .filter_map(|(key, value)| if value == &id { Some(key) } else { None })
+            .cloned()
+            .collect_vec()
+    } else {
+        vec![]
+    }
 }
-fn cst_to_hir_id(db: &dyn AstToHir, module: Module, id: cst::Id) -> Option<hir::Id> {
-    let id = db.cst_to_ast_id(module, id)?;
-    db.ast_to_hir_id(id)
+fn cst_to_hir_id(db: &dyn AstToHir, module: Module, id: cst::Id) -> Vec<hir::Id> {
+    let ids = db.cst_to_ast_id(module, id);
+    ids.into_iter()
+        .flat_map(|id| db.ast_to_hir_id(id))
+        .collect_vec()
 }
 
 fn hir(db: &dyn AstToHir, module: Module) -> HirResult {
