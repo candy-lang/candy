@@ -3,6 +3,7 @@ use crate::{
     builtin_functions::BuiltinFunction,
     hir,
     id::{CountableId, IdGenerator},
+    impl_display_via_richir,
     rich_ir::{RichIrBuilder, ToRichIr, TokenType},
 };
 use derive_more::{Deref, DerefMut};
@@ -117,7 +118,7 @@ impl Debug for VisibleExpressions {
             self.expressions
                 .keys()
                 .sorted()
-                .map(|id| id.to_rich_ir().text)
+                .map(|id| id.to_string())
                 .join(", "),
         )
     }
@@ -402,6 +403,7 @@ impl BodyBuilder {
     }
 }
 
+impl_display_via_richir!(Body);
 impl ToRichIr for Body {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         fn push(builder: &mut RichIrBuilder, id: &Id, expression: &Expression) {

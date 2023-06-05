@@ -158,11 +158,8 @@ impl Int {
 
     pub fn compare_to(&self, heap: &mut Heap, rhs: &Int) -> Tag {
         match (self, rhs) {
-            (Int::Inline(lhs), Int::Inline(rhs)) => lhs.compare_to(heap, *rhs),
-            (Int::Heap(on_heap), Int::Inline(inline))
-            | (Int::Inline(inline), Int::Heap(on_heap)) => {
-                on_heap.compare_to(heap, &inline.get().into())
-            }
+            (Int::Inline(lhs), rhs) => lhs.compare_to(heap, *rhs),
+            (Int::Heap(lhs), Int::Inline(rhs)) => lhs.compare_to(heap, &rhs.get().into()),
             (Int::Heap(lhs), Int::Heap(rhs)) => lhs.compare_to(heap, rhs.get()),
         }
     }

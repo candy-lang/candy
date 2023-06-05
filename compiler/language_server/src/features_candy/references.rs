@@ -5,7 +5,6 @@ use candy_frontend::{
     hir::{self, Body, Expression, Function, HirDb},
     module::{Module, ModuleDb},
     position::{Offset, PositionConversionDb},
-    rich_ir::ToRichIr,
 };
 use num_bigint::BigUint;
 use rustc_hash::FxHashSet;
@@ -46,29 +45,28 @@ where
             };
             let hir_id = hir_id.to_owned();
 
-            let target_id: Option<hir::Id> = if let Some(hir_expr) =
-                db.find_expression(hir_id.clone())
-            {
-                let containing_body = db.containing_body_of(hir_id.clone());
-                if containing_body.identifiers.contains_key(&hir_id) {
-                    // A local variable was declared. Find references to that variable.
-                    Some(hir_id)
-                } else {
-                    // An intermediate reference. Find references to its target.
-                    match hir_expr {
-                        Expression::Reference(target_id) => Some(target_id),
-                        Expression::Symbol(_) => {
-                            // TODO: Handle struct access
-                            None
+            let target_id: Option<hir::Id> =
+                if let Some(hir_expr) = db.find_expression(hir_id.clone()) {
+                    let containing_body = db.containing_body_of(hir_id.clone());
+                    if containing_body.identifiers.contains_key(&hir_id) {
+                        // A local variable was declared. Find references to that variable.
+                        Some(hir_id)
+                    } else {
+                        // An intermediate reference. Find references to its target.
+                        match hir_expr {
+                            Expression::Reference(target_id) => Some(target_id),
+                            Expression::Symbol(_) => {
+                                // TODO: Handle struct access
+                                None
+                            }
+                            Expression::Error { .. } => None,
+                            _ => panic!("Expected a reference, got {hir_expr}."),
                         }
-                        Expression::Error { .. } => None,
-                        _ => panic!("Expected a reference, got {}.", hir_expr.to_rich_ir().text),
                     }
-                }
-            } else {
-                // Parameter
-                Some(hir_id)
-            };
+                } else {
+                    // Parameter
+                    Some(hir_id)
+                };
             target_id.map(ReferenceQuery::Id)
         }
         CstKind::Symbol(symbol) => Some(ReferenceQuery::Symbol(module, symbol)),

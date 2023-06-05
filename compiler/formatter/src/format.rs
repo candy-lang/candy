@@ -12,7 +12,7 @@ use crate::{
     width::{Indentation, SinglelineWidth, StringWidth, Width},
 };
 use candy_frontend::{
-    cst::{Cst, CstError, CstKind},
+    cst::{Cst, CstError, CstKind, UnwrapWhitespaceAndComment},
     position::Offset,
 };
 use extension_trait::extension_trait;
@@ -909,12 +909,18 @@ pub(crate) fn format_cst<'a>(
                 },
             );
 
-            let assignment_sign_trailing = if left_width.last_line_fits(
+            let contains_single_assignment = body.len() == 1
+                && matches!(
+                    body.first().unwrap().unwrap_whitespace_and_comment().kind,
+                    CstKind::Assignment { .. },
+                );
+            let assignment_sign_trailing = if !contains_single_assignment && left_width.last_line_fits(
                 info.indentation,
                 assignment_sign.min_width(info.indentation) + SinglelineWidth::SPACE + body_width + body_whitespace_width,
             ) {
                 TrailingWhitespace::Space
-            } else if !body_whitespace_has_comments
+            } else if !contains_single_assignment
+                && !body_whitespace_has_comments
                 && let Some(body_first_line_width) = body_width.first_line_width()
                 && left_width.last_line_fits(
                     info.indentation,
@@ -1834,6 +1840,9 @@ mod test {
             "foo = looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongExpression",
             "foo =\n  looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongExpression\n",
         );
+        // foo =
+        //   bar = baz
+        test("foo =\n  bar = baz", "foo =\n  bar = baz\n");
         // foo := {
         //   bar
         //   baz
@@ -1897,6 +1906,15 @@ mod test {
         test(
             "foo = bar # looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongComment\n",
             "foo =\n  bar\n  # looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongComment\n",
+        );
+        // foo :=
+        //   # loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongComment
+        //   Foo
+        //
+        //   Bar
+        test(
+            "foo :=\n  # looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongComment\n  Foo\n\n  Bar\n",
+            "foo :=\n  # looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongComment\n  Foo\n\n  Bar\n",
         );
     }
 
