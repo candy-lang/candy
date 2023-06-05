@@ -3,6 +3,7 @@ use crate::{
     builtin_functions::BuiltinFunction,
     error::CompilerError,
     id::CountableId,
+    impl_display_via_richir,
     module::{Module, ModuleKind, Package},
     rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr, TokenModifier, TokenType},
 };
@@ -214,12 +215,7 @@ impl Id {
 }
 impl Debug for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(
-            f,
-            "HirId({}:{})",
-            self.module.to_rich_ir(),
-            self.keys.iter().join(":"),
-        )
+        write!(f, "HirId({}:{})", self.module, self.keys.iter().join(":"),)
     }
 }
 impl Display for Id {
@@ -467,6 +463,7 @@ impl Body {
     }
 }
 
+impl_display_via_richir!(Expression);
 impl ToRichIr for Expression {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         match self {

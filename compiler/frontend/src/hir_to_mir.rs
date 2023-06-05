@@ -10,7 +10,6 @@ use crate::{
     builtin_functions::BuiltinFunction,
     module::{Module, ModuleKind, Package},
     position::PositionConversionDb,
-    rich_ir::ToRichIr,
     string_to_rcst::ModuleError,
 };
 use itertools::Itertools;
@@ -1018,7 +1017,7 @@ impl CompilerError {
         let range = db.range_to_positions(self.module.clone(), self.span.clone());
         format!(
             "{}:{}:{} – {}:{}: {}",
-            self.module.to_rich_ir(),
+            self.module,
             range.start.line,
             range.start.character,
             range.end.line,

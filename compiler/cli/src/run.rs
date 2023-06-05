@@ -4,7 +4,7 @@ use crate::{
     utils::{module_for_path, packages_path},
     Exit, ProgramResult,
 };
-use candy_frontend::{ast_to_hir::AstToHir, hir, rich_ir::ToRichIr, TracingConfig};
+use candy_frontend::{ast_to_hir::AstToHir, hir, TracingConfig};
 use candy_vm::{
     execution_controller::RunForever,
     fiber::EndedReason,
@@ -38,7 +38,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
 
     let tracing = TracingConfig::off();
 
-    debug!("Running {}.", module.to_rich_ir());
+    debug!("Running {module}.");
 
     let mut tracer = StackTracer::default();
     let lir = Rc::new(compile_lir(&db, module, tracing).0);

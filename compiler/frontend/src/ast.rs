@@ -36,7 +36,7 @@ impl Id {
 }
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "AstId({}:{})", &self.module.to_rich_ir(), self.local)
+        write!(f, "AstId({}:{})", self.module, self.local)
     }
 }
 

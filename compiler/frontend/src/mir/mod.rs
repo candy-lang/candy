@@ -1,9 +1,9 @@
 pub use self::{body::*, error::*, expression::*, id::*};
 use crate::{
     id::IdGenerator,
+    impl_debug_via_richir, impl_display_via_richir,
     rich_ir::{RichIrBuilder, ToRichIr},
 };
-use std::fmt::{self, Debug, Formatter};
 
 mod body;
 mod error;
@@ -26,11 +26,8 @@ impl Mir {
         Mir { id_generator, body }
     }
 }
-impl Debug for Mir {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.body.to_rich_ir())
-    }
-}
+impl_debug_via_richir!(Mir);
+impl_display_via_richir!(Mir);
 impl ToRichIr for Mir {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         self.body.build_rich_ir(builder);

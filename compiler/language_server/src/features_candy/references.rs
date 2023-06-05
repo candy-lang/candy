@@ -5,7 +5,6 @@ use candy_frontend::{
     hir::{self, Body, Expression, Function, HirDb},
     module::{Module, ModuleDb},
     position::{Offset, PositionConversionDb},
-    rich_ir::ToRichIr,
 };
 use num_bigint::BigUint;
 use rustc_hash::FxHashSet;
@@ -55,7 +54,7 @@ where
                             return None;
                         }
                         Expression::Error { .. } => return None,
-                        _ => panic!("Expected a reference, got {}.", hir_expr.to_rich_ir().text),
+                        _ => panic!("Expected a reference, got {hir_expr}."),
                     }
                 }
             } else {

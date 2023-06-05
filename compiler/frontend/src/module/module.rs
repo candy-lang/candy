@@ -1,5 +1,8 @@
 use super::package::{Package, PackagesPath};
-use crate::rich_ir::{RichIrBuilder, ToRichIr, TokenType};
+use crate::{
+    impl_display_via_richir,
+    rich_ir::{RichIrBuilder, ToRichIr, TokenType},
+};
 use itertools::Itertools;
 use std::{
     fmt::{self, Display, Formatter},
@@ -109,8 +112,7 @@ impl Module {
     fn try_to_path(&self, packages_path: &PackagesPath) -> Option<PathBuf> {
         let paths = self.to_possible_paths(packages_path).unwrap_or_else(|| {
             panic!(
-                "Tried to get content of anonymous module {} that is not cached by the language server.",
-                self.to_rich_ir(),
+                "Tried to get content of anonymous module {self} that is not cached by the language server.",
             )
         });
         for path in paths {
@@ -151,7 +153,7 @@ impl ToRichIr for Module {
                 self.path
                     .iter()
                     .map(|component| component.to_string())
-                    .join("/")
+                    .join("/"),
             ),
             TokenType::Module,
             Default::default(),
@@ -159,6 +161,7 @@ impl ToRichIr for Module {
         builder.push_reference(self.to_owned(), range);
     }
 }
+impl_display_via_richir!(Module);
 
 #[derive(Debug)]
 pub enum ModuleFromPathError {

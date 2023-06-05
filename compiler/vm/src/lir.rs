@@ -1,7 +1,7 @@
 use crate::heap::{Function, HirId, InlineData, InlineObject, Text};
 use crate::utils::DebugDisplay;
 use crate::{fiber::InstructionPointer, heap::Heap};
-use candy_frontend::hir;
+use candy_frontend::{hir, impl_display_via_richir};
 use candy_frontend::{
     mir::Id,
     module::Module,
@@ -13,7 +13,7 @@ use extension_trait::extension_trait;
 use itertools::Itertools;
 use pad::{Alignment, PadStr};
 use rustc_hash::FxHashSet;
-use std::fmt::{self, Display, Formatter};
+use std::fmt::{self, Formatter};
 use std::ops::Range;
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -385,15 +385,11 @@ impl DebugDisplay for Instruction {
         if is_debug {
             write!(f, "{:?}", self)
         } else {
-            write!(f, "{}", self.to_rich_ir().text)
+            write!(f, "{}", self)
         }
     }
 }
-impl Display for Instruction {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        DebugDisplay::fmt(self, f, false)
-    }
-}
+impl_display_via_richir!(Instruction);
 
 fn arguments_plural(num_args: usize) -> &'static str {
     if num_args == 1 {
@@ -408,7 +404,7 @@ pub impl RichIrForLir for RichIr {
     fn for_lir(module: &Module, lir: &Lir, tracing_config: &TracingConfig) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!("# LIR for module {}", module.to_rich_ir()),
+            format!("# LIR for module {module}"),
             TokenType::Comment,
             EnumSet::empty(),
         );

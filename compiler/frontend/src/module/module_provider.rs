@@ -1,5 +1,4 @@
 use super::{module::Module, package::PackagesPath};
-use crate::rich_ir::ToRichIr;
 use rustc_hash::FxHashMap;
 use std::{fs, io, sync::Arc};
 use tracing::error;
@@ -56,8 +55,7 @@ impl ModuleProvider for FileSystemModuleProvider {
     fn get_content(&self, module: &Module) -> Option<Arc<Vec<u8>>> {
         let paths = module.to_possible_paths(&self.packages_path).unwrap_or_else(|| {
             panic!(
-                "Tried to get content of anonymous module {} that is not cached by the language server.",
-                module.to_rich_ir(),
+                "Tried to get content of anonymous module {module} that is not cached by the language server.",
             )
         });
         for path in paths {
