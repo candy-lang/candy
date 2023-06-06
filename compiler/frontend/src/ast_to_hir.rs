@@ -7,7 +7,7 @@ use crate::{
     cst::{self, CstDb},
     cst_to_ast::CstToAst,
     error::{CompilerError, CompilerErrorPayload},
-    hir::{self, Body, Expression, Function, HirError, Pattern, PatternIdentifierId},
+    hir::{self, Body, Expression, Function, HirError, IdKey, Pattern, PatternIdentifierId},
     id::IdGenerator,
     module::Module,
     position::Offset,
@@ -16,7 +16,7 @@ use crate::{
 };
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
-use std::{mem, ops::Range, sync::Arc};
+use std::{collections::hash_map::Entry, mem, ops::Range, sync::Arc};
 
 #[salsa::query_group(AstToHirStorage)]
 pub trait AstToHir: CstDb + CstToAst {
@@ -73,12 +73,12 @@ fn compile_top_level(
     ast: &[Ast],
 ) -> (Body, FxHashMap<hir::Id, ast::Id>) {
     let mut context = Context {
-        module,
+        module: module.clone(),
         id_mapping: FxHashMap::default(),
         db,
         public_identifiers: FxHashMap::default(),
         body: Body::default(),
-        prefix_keys: vec![],
+        id_prefix: hir::Id::new(module, vec![]),
         identifiers: im::HashMap::new(),
         is_top_level: true,
     };
@@ -102,7 +102,7 @@ struct Context<'a> {
     db: &'a dyn AstToHir,
     public_identifiers: FxHashMap<String, hir::Id>,
     body: Body,
-    prefix_keys: Vec<String>,
+    id_prefix: hir::Id,
     identifiers: im::HashMap<String, hir::Id>,
     is_top_level: bool,
 }
@@ -122,7 +122,7 @@ impl Context<'_> {
     fn start_scope(&mut self) -> ScopeResetState {
         ScopeResetState {
             body: mem::take(&mut self.body),
-            prefix_keys: self.prefix_keys.clone(),
+            id_prefix: self.id_prefix.clone(),
             identifiers: self.identifiers.clone(),
             non_top_level_reset_state: self.start_non_top_level(),
         }
@@ -130,7 +130,7 @@ impl Context<'_> {
     #[must_use]
     fn end_scope(&mut self, reset_state: ScopeResetState) -> Body {
         let inner_body = mem::replace(&mut self.body, reset_state.body);
-        self.prefix_keys = reset_state.prefix_keys;
+        self.id_prefix = reset_state.id_prefix;
         self.identifiers = reset_state.identifiers;
         self.end_non_top_level(reset_state.non_top_level_reset_state);
         inner_body
@@ -138,7 +138,7 @@ impl Context<'_> {
 }
 struct ScopeResetState {
     body: Body,
-    prefix_keys: Vec<String>,
+    id_prefix: hir::Id,
     identifiers: im::HashMap<String, hir::Id>,
     non_top_level_reset_state: NonTopLevelResetState,
 }
@@ -309,7 +309,7 @@ impl Context<'_> {
 
                 let reset_state = self.start_scope();
                 let match_id = self.create_next_id(Some(ast.id.clone()), None);
-                self.prefix_keys = match_id.keys.clone();
+                self.id_prefix = match_id.clone();
 
                 let cases = cases
                     .iter()
@@ -417,7 +417,7 @@ impl Context<'_> {
 
                 let reset_state = self.start_scope();
                 let then_function_id = self.create_next_id(None, None);
-                self.prefix_keys = then_function_id.keys.clone();
+                self.id_prefix = then_function_id.clone();
                 self.push(None, Expression::Reference(hir.clone()), None);
                 let then_body = self.end_scope(reset_state);
                 let then_function = self.push_with_existing_id(
@@ -432,7 +432,7 @@ impl Context<'_> {
 
                 let reset_state = self.start_scope();
                 let else_function_id = self.create_next_id(None, None);
-                self.prefix_keys = else_function_id.keys.clone();
+                self.id_prefix = else_function_id.clone();
                 self.push(
                     None,
                     Expression::Call {
@@ -486,7 +486,7 @@ impl Context<'_> {
     ) -> hir::Id {
         let reset_state = self.start_scope();
         let function_id = self.create_next_id(Some(id), identifier);
-        self.prefix_keys = function_id.keys.clone();
+        self.id_prefix = function_id.clone();
 
         for parameter in function.parameters.iter() {
             let name = parameter.value.to_string();
@@ -505,12 +505,7 @@ impl Context<'_> {
                 parameters: function
                     .parameters
                     .iter()
-                    .map(|parameter| {
-                        hir::Id::new(
-                            self.module.clone(),
-                            add_keys(&function_id.keys[..], parameter.value.to_string()),
-                        )
-                    })
+                    .map(|parameter| function_id.child(parameter.value.clone()))
                     .collect(),
                 body: inner_body,
                 fuzzable: function.fuzzable,
@@ -670,16 +665,19 @@ impl Context<'_> {
         for disambiguator in 0.. {
             let last_part = if let Some(key) = &key {
                 if disambiguator == 0 {
-                    key.to_string()
+                    key.to_string().into()
                 } else {
-                    format!("{key}${}", disambiguator - 1)
+                    IdKey::Named {
+                        name: key.to_string(),
+                        disambiguator,
+                    }
                 }
             } else {
-                format!("{}", disambiguator)
+                disambiguator.into()
             };
-            let id = hir::Id::new(self.module.clone(), add_keys(&self.prefix_keys, last_part));
-            if !self.id_mapping.contains_key(&id) {
-                assert!(self.id_mapping.insert(id.to_owned(), ast_id).is_none());
+            let id = self.id_prefix.child(last_part);
+            if let Entry::Vacant(entry) = self.id_mapping.entry(id.clone()) {
+                entry.insert(ast_id);
                 return id;
             }
         }
@@ -712,11 +710,8 @@ impl Context<'_> {
 
         let reset_state = self.start_scope();
         let use_id = self.create_next_id(None, Some("use".to_string()));
-        self.prefix_keys = use_id.keys.clone();
-        let relative_path = hir::Id::new(
-            self.module.clone(),
-            add_keys(&self.prefix_keys[..], "relativePath".to_string()),
-        );
+        self.id_prefix = use_id.clone();
+        let relative_path = use_id.child("relativePath");
 
         self.push(
             None,
@@ -759,14 +754,6 @@ impl Context<'_> {
         }
         self.push(None, Expression::Struct(exports), None)
     }
-}
-
-fn add_keys(parents: &[String], id: String) -> Vec<String> {
-    parents
-        .iter()
-        .map(|it| it.to_string())
-        .chain(vec![id])
-        .collect()
 }
 
 /// The `ast::Id` is the ID of the first occurrence of this identifier in the
