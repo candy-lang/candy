@@ -276,7 +276,10 @@ impl DebugSession {
             Command::SetVariable(_) => todo!(),
             Command::Source(_) => todo!(),
             Command::StackTrace(args) => {
-                let stack_trace = self.state.require_paused_mut()?.stack_trace(args)?;
+                let stack_trace = self
+                    .state
+                    .require_paused_mut()?
+                    .stack_trace(&self.db, args)?;
                 self.send_response_ok(request.seq, ResponseBody::StackTrace(stack_trace))
                     .await;
                 Ok(())
