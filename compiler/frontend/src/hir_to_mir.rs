@@ -8,9 +8,10 @@ use super::{
 };
 use crate::{
     builtin_functions::BuiltinFunction,
+    hir::IdKey,
     module::{Module, ModuleKind, Package},
     position::PositionConversionDb,
-    string_to_rcst::ModuleError, hir::IdKey,
+    string_to_rcst::ModuleError,
 };
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
