@@ -48,7 +48,6 @@ impl PausedState {
                         "✨.{}",
                         format!("{:?}", builtin.get()).lowercase_first_letter(),
                     ),
-                    Data::Tag(tag) => tag.symbol().get().to_owned(),
                     it => panic!("Unexpected callee: {it}"),
                 };
                 dap::types::StackFrame {
