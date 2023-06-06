@@ -77,8 +77,7 @@ fn generate_value_with_complexity(
 
 pub fn generate_mutated_input(rng: &mut ThreadRng, input: &mut Input, symbols: &[Text]) {
     let mut heap = input.heap.borrow_mut();
-    let num_args = input.arguments.len();
-    let argument = input.arguments.get_mut(rng.gen_range(0..num_args)).unwrap();
+    let argument = input.arguments.choose_mut(rng).unwrap();
     *argument = generate_mutated_value(rng, &mut heap, *argument, symbols);
 }
 fn generate_mutated_value(
