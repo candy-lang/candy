@@ -2,6 +2,7 @@ use super::{utils::FiberIdExtension, PausedState};
 use crate::{
     database::Database,
     debug_adapter::{
+        session::StartAt1Config,
         tracer::{DebugTracer, StackFrame},
         utils::FiberIdThreadIdConversion,
     },
@@ -31,6 +32,7 @@ impl PausedState {
     pub fn stack_trace(
         &mut self,
         db: &Database,
+        start_at_1_config: StartAt1Config,
         args: StackTraceArguments,
     ) -> Result<StackTraceResponse, &'static str> {
         let fiber_id = FiberId::from_thread_id(args.thread_id);
@@ -60,7 +62,7 @@ impl PausedState {
                         index: index + 1,
                     })
                     .get();
-                Self::stack_frame(db, id, frame, self.vm_state.vm.lir())
+                Self::stack_frame(db, start_at_1_config, id, frame, self.vm_state.vm.lir())
             },
         ));
 
@@ -91,6 +93,7 @@ impl PausedState {
 
     fn stack_frame(
         db: &Database,
+        start_at_1_config: StartAt1Config,
         id: usize,
         frame: &StackFrame,
         lir: &Lir,
@@ -130,6 +133,7 @@ impl PausedState {
                 };
                 let range = db.hir_id_to_span(function.to_owned()).unwrap();
                 let range = db.range_to_lsp_range(function.module.to_owned(), range);
+                let range = start_at_1_config.range_to_dap(range);
                 (name, Some(source), Some(range))
             }
             Data::Builtin(builtin) => {

@@ -26,6 +26,7 @@ use dap::{
     },
     types::{Capabilities, StoppedEventReason},
 };
+use lsp_types::{Position, Range};
 use rustc_hash::FxHashMap;
 use std::{mem, num::NonZeroUsize, path::PathBuf, rc::Rc};
 use tokio::sync::mpsc;
@@ -276,10 +277,9 @@ impl DebugSession {
             Command::SetVariable(_) => todo!(),
             Command::Source(_) => todo!(),
             Command::StackTrace(args) => {
-                let stack_trace = self
-                    .state
-                    .require_paused_mut()?
-                    .stack_trace(&self.db, args)?;
+                let start_at_1_config = self.state.require_initialized()?.into();
+                let state = self.state.require_paused_mut()?;
+                let stack_trace = state.stack_trace(&self.db, start_at_1_config, args)?;
                 self.send_response_ok(request.seq, ResponseBody::StackTrace(stack_trace))
                     .await;
                 Ok(())
@@ -394,6 +394,40 @@ impl State {
                 ..
             } => Ok(state),
             _ => Err("not-paused"),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct StartAt1Config {
+    lines_start_at_1: bool,
+    columns_start_at_1: bool,
+}
+impl StartAt1Config {
+    pub fn range_to_dap(&self, range: Range) -> Range {
+        let start = self.position_to_dap(range.start);
+        let end = self.position_to_dap(range.end);
+        Range { start, end }
+    }
+    fn position_to_dap(&self, position: Position) -> Position {
+        fn apply(start_at_1: bool, value: u32) -> u32 {
+            if start_at_1 {
+                value + 1
+            } else {
+                value
+            }
+        }
+        Position {
+            line: apply(self.lines_start_at_1, position.line),
+            character: apply(self.columns_start_at_1, position.character),
+        }
+    }
+}
+impl From<&InitializeArguments> for StartAt1Config {
+    fn from(value: &InitializeArguments) -> Self {
+        Self {
+            lines_start_at_1: value.lines_start_at1.unwrap_or(true),
+            columns_start_at_1: value.columns_start_at1.unwrap_or(true),
         }
     }
 }
