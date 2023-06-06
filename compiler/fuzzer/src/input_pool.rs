@@ -19,7 +19,6 @@ impl InputPool {
     pub fn new(num_args: usize, symbols_in_heap: &FxHashSet<Text>) -> Self {
         let mut heap = Heap::default();
 
-        // TODO: This should support tags with values
         let mut symbols = symbols_in_heap
             .iter()
             .map(|symbol| symbol.clone_to_heap(&mut heap).try_into().unwrap())
