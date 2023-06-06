@@ -1851,7 +1851,7 @@ pub struct Variable {
     /// If `variablesReference` is > 0, the variable is structured and its children
     /// can be retrieved by passing `variablesReference` to the `variables`
     /// request.
-    pub variables_reference: Option<NonZeroUsize>,
+    pub variables_reference: usize,
     /// The usize of named child variables.
     /// The client can use this information to present the children in a paged UI
     /// and fetch them in chunks.

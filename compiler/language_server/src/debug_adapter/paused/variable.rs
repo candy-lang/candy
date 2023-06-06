@@ -131,7 +131,7 @@ impl PausedState {
                                     DataDiscriminants::Tag,
                                 )),
                                 evaluate_name: None,
-                                variables_reference: None,
+                                variables_reference: 0,
                                 named_variables: Some(0),
                                 indexed_variables: Some(0),
                                 memory_reference: None,
@@ -156,7 +156,7 @@ impl PausedState {
                                         DataDiscriminants::Tag,
                                     )),
                                     evaluate_name: None,
-                                    variables_reference: None,
+                                    variables_reference: 0,
                                     named_variables: Some(0),
                                     indexed_variables: Some(0),
                                     memory_reference: None,
@@ -229,7 +229,7 @@ impl PausedState {
             type_field: Self::type_field_for(DataDiscriminants::Int, supports_variable_type),
             presentation_hint: Some(Self::presentation_hint_for(DataDiscriminants::Int)),
             evaluate_name: None,
-            variables_reference: None,
+            variables_reference: 0,
             named_variables: Some(0),
             indexed_variables: Some(0),
             memory_reference: None,
@@ -251,10 +251,13 @@ impl PausedState {
             Data::Struct(struct_) => (Some(**struct_), struct_.len() + 1, 0),
             _ => (None, 0, 0),
         };
-        let variables_reference = inner_variables_object.map(|object| {
-            self.variables_ids
-                .key_to_id(VariablesKey::Inner(ObjectInHeap(object)))
-        });
+        let variables_reference = inner_variables_object
+            .map(|object| {
+                self.variables_ids
+                    .key_to_id(VariablesKey::Inner(ObjectInHeap(object)))
+                    .get()
+            })
+            .unwrap_or_default();
 
         Variable {
             name,
