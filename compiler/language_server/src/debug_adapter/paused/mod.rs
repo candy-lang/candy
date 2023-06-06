@@ -1,5 +1,5 @@
 use self::{stack_trace::StackFrameKey, utils::IdMapping, variable::VariablesKey};
-use super::session::VmState;
+use super::vm_state::VmState;
 
 mod scope;
 mod stack_trace;

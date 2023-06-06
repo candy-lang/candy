@@ -1,11 +1,10 @@
 use super::{
-    paused::PausedState, tracer::DebugTracer, utils::FiberIdThreadIdConversion, ServerToClient,
-    ServerToClientMessage, SessionId,
+    paused::PausedState, tracer::DebugTracer, utils::FiberIdThreadIdConversion, vm_state::VmState,
+    ServerToClient, ServerToClientMessage, SessionId,
 };
 use crate::database::Database;
 use candy_frontend::{
     hir::Id,
-    id::CountableId,
     module::{Module, ModuleKind, PackagesPath},
     TracingConfig, TracingMode,
 };
@@ -13,10 +12,9 @@ use candy_vm::{
     execution_controller::RunLimitedNumberOfInstructions,
     fiber::FiberId,
     heap::{HirId, Struct},
-    lir::Lir,
     mir_to_lir::compile_lir,
     tracer::DummyTracer,
-    vm::{FiberTree, Vm},
+    vm::Vm,
 };
 use dap::{
     events::StoppedEventBody,
@@ -25,7 +23,7 @@ use dap::{
     responses::{
         Response, ResponseBody, ResponseMessage, SetExceptionBreakpointsResponse, ThreadsResponse,
     },
-    types::{Capabilities, StoppedEventReason, Thread},
+    types::{Capabilities, StoppedEventReason},
 };
 use rustc_hash::FxHashMap;
 use std::{mem, path::PathBuf, rc::Rc};
@@ -84,10 +82,6 @@ enum ExecutionState {
     #[allow(dead_code)] // WIP
     Running(VmState),
     Paused(PausedState),
-}
-pub struct VmState {
-    pub vm: Vm<Rc<Lir>, DebugTracer>,
-    pub tracer: DebugTracer,
 }
 
 impl DebugSession {
@@ -294,38 +288,12 @@ impl DebugSession {
             Command::TerminateThreads(_) => todo!(),
             Command::Threads => {
                 let state = self.state.require_launched()?;
-
+                let threads = state.threads();
                 self.send_response_ok(
                     request.seq,
-                    ResponseBody::Threads(ThreadsResponse {
-                        threads: state
-                            .vm
-                            .fibers()
-                            .iter()
-                            .map(|(id, fiber)| Thread {
-                                // FIXME: Use data from tracer?
-                                id: id.to_thread_id(),
-                                // TODO: indicate hierarchy
-                                name: format!(
-                                    "Fiber {}{}{}",
-                                    id.to_usize(),
-                                    if *id == FiberId::root() {
-                                        " (root)"
-                                    } else {
-                                        ""
-                                    },
-                                    match fiber {
-                                        FiberTree::Single(_) => "",
-                                        FiberTree::Parallel(_) => " (in `parallel`)",
-                                        FiberTree::Try(_) => " (in `try`)",
-                                    },
-                                ),
-                            })
-                            .collect(),
-                    }),
+                    ResponseBody::Threads(ThreadsResponse { threads }),
                 )
                 .await;
-
                 Ok(())
             }
             Command::Variables(args) => {
