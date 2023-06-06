@@ -226,6 +226,9 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
         }
     }
 
+    pub fn lir(&self) -> &Lir {
+        self.lir.borrow()
+    }
     pub fn status(&self) -> Status {
         self.status_of(FiberId::root())
     }
