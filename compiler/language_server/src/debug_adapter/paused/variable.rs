@@ -1,6 +1,6 @@
 use super::{stack_trace::StackFrameKey, utils::FiberIdExtension, PausedState};
 use crate::database::Database;
-use candy_frontend::hir::HirDb;
+use candy_frontend::hir::{self, Expression, HirDb};
 use candy_vm::{
     fiber::FiberId,
     heap::{Data, DataDiscriminants, InlineObject, ObjectInHeap},
@@ -45,24 +45,55 @@ impl PausedState {
         let mut variables = vec![];
         match &key {
             VariablesKey::Arguments(stack_frame_key) => {
-                if should_include_named {
-                    let arguments = stack_frame_key
-                        .get(&self.vm_state.vm)
-                        .unwrap()
-                        .call
-                        .arguments
-                        .to_owned();
-                    variables.extend(arguments[start..].iter().take(count).enumerate().map(
-                        |(index, object)| {
-                            // TODO: resolve argument name
-                            self.create_variable(
-                                (start + index).to_string(),
-                                *object,
-                                supports_variable_type,
-                            )
-                        },
-                    ));
-                }
+                let call = &stack_frame_key.get(&self.vm_state.vm).unwrap().call;
+                match Data::from(call.callee) {
+                    Data::Function(function) => {
+                        if should_include_named {
+                            let functions =
+                                self.vm_state.vm.lir().functions_behind(function.body());
+                            assert_eq!(functions.len(), 1);
+                            let function = functions.iter().next().unwrap();
+
+                            let Expression::Function(hir::Function{parameters, ..}) = db.find_expression(function.to_owned()).unwrap() else {
+                                panic!("Function's HIR is not a function: {function}");
+                            };
+
+                            variables.extend(
+                                parameters
+                                    .iter()
+                                    .map(|it| it.keys.last().unwrap().to_string())
+                                    .zip_eq(call.arguments.to_owned())
+                                    .skip(start)
+                                    .take(count)
+                                    .map(|(parameter, argument)| {
+                                        self.create_variable(
+                                            parameter,
+                                            argument,
+                                            supports_variable_type,
+                                        )
+                                    }),
+                            );
+                        }
+                    }
+                    Data::Builtin(_) => {
+                        if should_include_indexed {
+                            let arguments = call.arguments.to_owned();
+                            variables.extend(
+                                arguments[start..].iter().take(count).enumerate().map(
+                                    |(index, object)| {
+                                        // TODO: resolve argument name
+                                        self.create_variable(
+                                            (start + index).to_string(),
+                                            *object,
+                                            supports_variable_type,
+                                        )
+                                    },
+                                ),
+                            );
+                        }
+                    }
+                    it => panic!("Unexpected callee: {it}"),
+                };
             }
             VariablesKey::Locals(stack_frame_key) => {
                 let locals = stack_frame_key.get_locals(&self.vm_state.vm);
@@ -222,6 +253,7 @@ impl PausedState {
 
         VariablesResponse { variables }
     }
+
     fn create_length_variable(length: usize, supports_variable_type: bool) -> Variable {
         Variable {
             name: "<length>".to_string(),
