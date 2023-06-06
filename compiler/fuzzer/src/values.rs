@@ -36,8 +36,19 @@ fn generate_value_with_complexity(
     match rng.gen_range(1..=5) {
         1 => Int::create_from_bigint(heap, rng.gen_bigint(10)).into(),
         2 => Text::create(heap, "test").into(),
-        // TODO: This should support tags with values
-        3 => Tag::create(heap, *symbols.choose(rng).unwrap(), None).into(),
+        3 => {
+            let value = if rng.gen_bool(0.8) {
+                Some(generate_value_with_complexity(
+                    heap,
+                    rng,
+                    complexity - 10.0,
+                    symbols,
+                ))
+            } else {
+                None
+            };
+            Tag::create(heap, *symbols.choose(rng).unwrap(), value).into()
+        }
         4 => {
             complexity -= 1.0;
             let mut items = vec![];
@@ -85,10 +96,21 @@ fn generate_mutated_value(
             Int::create_from_bigint(heap, int.get().as_ref() + rng.gen_range(-10..10)).into()
         }
         Data::Text(text) => mutate_string(rng, heap, text.get().to_string()).into(),
-        // TODO: This should support tags with values
-        Data::Tag(_) => {
+        Data::Tag(tag) => {
             assert!(!symbols.is_empty());
-            Tag::create(heap, *symbols.choose(rng).unwrap(), None).into()
+            if rng.gen_bool(0.5) {
+                Tag::create(heap, *symbols.choose(rng).unwrap(), tag.value()).into()
+            } else if let Some(value) = tag.value() {
+                if rng.gen_bool(0.9) {
+                    let value = generate_mutated_value(rng, heap, value, symbols);
+                    Tag::create(heap, tag.symbol(), Some(value)).into()
+                } else {
+                    tag.without_value(heap).into()
+                }
+            } else {
+                let value = generate_value_with_complexity(heap, rng, 100.0, symbols);
+                Tag::create(heap, tag.symbol(), Some(value)).into()
+            }
         }
         Data::List(list) => {
             let len = list.len();
@@ -160,8 +182,9 @@ fn complexity_of_value(object: InlineObject) -> usize {
             Int::Heap(int) => int.get().bits() as usize,
         },
         Data::Text(text) => text.len() + 1,
-        // TODO: This should support tags with values
-        Data::Tag(tag) => tag.symbol().get().len(),
+        Data::Tag(tag) => {
+            tag.symbol().get().len() + tag.value().map(complexity_of_value).unwrap_or_default()
+        }
         Data::List(list) => {
             list.items()
                 .iter()
