@@ -218,6 +218,16 @@ impl Id {
             && self.keys.len() < other.keys.len()
             && self.keys.iter().zip(&other.keys).all(|(a, b)| a == b)
     }
+
+    pub fn function_name(&self) -> String {
+        self.keys
+            .iter()
+            .map(|it| match it {
+                IdKey::Positional(index) => format!("<anonymous {index}>"),
+                it => it.to_string(),
+            })
+            .join(" → ")
+    }
 }
 impl Debug for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {

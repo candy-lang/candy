@@ -8,11 +8,7 @@ use crate::{
     },
     utils::{module_to_url, LspPositionConversion},
 };
-use candy_frontend::{
-    ast_to_hir::AstToHir,
-    hir::{Id, IdKey},
-    utils::AdjustCasingOfFirstLetter,
-};
+use candy_frontend::{ast_to_hir::AstToHir, hir::Id, utils::AdjustCasingOfFirstLetter};
 use candy_vm::{
     fiber::FiberId,
     heap::{Data, InlineObject},
@@ -25,7 +21,6 @@ use dap::{
     responses::StackTraceResponse,
     types::{PresentationHint, Source, StackFramePresentationhint},
 };
-use itertools::Itertools;
 use std::{borrow::Borrow, hash::Hash};
 
 impl PausedState {
@@ -98,21 +93,12 @@ impl PausedState {
         frame: &StackFrame,
         lir: &Lir,
     ) -> dap::types::StackFrame {
-        // TODO: format arguments
         let (name, source, range) = match Data::from(frame.call.callee) {
             Data::Function(function) => {
                 let functions = lir.functions_behind(function.body());
                 assert_eq!(functions.len(), 1);
                 let function = functions.iter().next().unwrap();
 
-                let name = function
-                    .keys
-                    .iter()
-                    .map(|it| match it {
-                        IdKey::Positional(index) => format!("<anonymous {index}>"),
-                        it => it.to_string(),
-                    })
-                    .join(" → ");
                 let source = Source {
                     name: Some(function.module.to_string()),
                     path: Some(
@@ -134,7 +120,7 @@ impl PausedState {
                 let range = db.hir_id_to_span(function.to_owned()).unwrap();
                 let range = db.range_to_lsp_range(function.module.to_owned(), range);
                 let range = start_at_1_config.range_to_dap(range);
-                (name, Some(source), Some(range))
+                (function.function_name(), Some(source), Some(range))
             }
             Data::Builtin(builtin) => {
                 let name = format!(
