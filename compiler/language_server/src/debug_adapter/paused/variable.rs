@@ -32,15 +32,15 @@ impl PausedState {
         let should_include_named =
             matches!(args.filter, (Some(VariablesArgumentsFilter::Named) | None));
 
-        let mut start = args.start.map(|it| it as usize).unwrap_or_default();
+        let mut start = args.start.unwrap_or_default();
         let mut count = args
             .count
-            .and_then(|it| if it == 0 { None } else { Some(it as usize) })
+            .and_then(|it| if it == 0 { None } else { Some(it) })
             .unwrap_or(usize::MAX);
 
         let key = self
             .variables_ids
-            .id_to_key(args.variables_reference)
+            .id_to_key(args.variables_reference.try_into().unwrap())
             .to_owned();
         let mut variables = vec![];
         match &key {
@@ -131,7 +131,7 @@ impl PausedState {
                                     DataDiscriminants::Tag,
                                 )),
                                 evaluate_name: None,
-                                variables_reference: 0,
+                                variables_reference: None,
                                 named_variables: Some(0),
                                 indexed_variables: Some(0),
                                 memory_reference: None,
@@ -156,7 +156,7 @@ impl PausedState {
                                         DataDiscriminants::Tag,
                                     )),
                                     evaluate_name: None,
-                                    variables_reference: 0,
+                                    variables_reference: None,
                                     named_variables: Some(0),
                                     indexed_variables: Some(0),
                                     memory_reference: None,
@@ -229,7 +229,7 @@ impl PausedState {
             type_field: Self::type_field_for(DataDiscriminants::Int, supports_variable_type),
             presentation_hint: Some(Self::presentation_hint_for(DataDiscriminants::Int)),
             evaluate_name: None,
-            variables_reference: 0,
+            variables_reference: None,
             named_variables: Some(0),
             indexed_variables: Some(0),
             memory_reference: None,
@@ -251,12 +251,10 @@ impl PausedState {
             Data::Struct(struct_) => (Some(**struct_), struct_.len() + 1, 0),
             _ => (None, 0, 0),
         };
-        let variables_reference = inner_variables_object
-            .map(|object| {
-                self.variables_ids
-                    .key_to_id(VariablesKey::Inner(ObjectInHeap(object)))
-            })
-            .unwrap_or_default();
+        let variables_reference = inner_variables_object.map(|object| {
+            self.variables_ids
+                .key_to_id(VariablesKey::Inner(ObjectInHeap(object)))
+        });
 
         Variable {
             name,
@@ -265,8 +263,8 @@ impl PausedState {
             presentation_hint: Some(Self::presentation_hint_for(data.into())),
             evaluate_name: None,
             variables_reference,
-            named_variables: Some(named_variables as i64),
-            indexed_variables: Some(indexed_variables as i64),
+            named_variables: Some(named_variables),
+            indexed_variables: Some(indexed_variables),
             memory_reference: None, // TODO: support memory reference
         }
     }

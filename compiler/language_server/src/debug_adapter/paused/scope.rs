@@ -7,7 +7,9 @@ use dap::{
 
 impl PausedState {
     pub fn scopes(&mut self, args: ScopesArguments) -> ScopesResponse {
-        let stack_frame_key = self.stack_frame_ids.id_to_key(args.frame_id);
+        let stack_frame_key = self
+            .stack_frame_ids
+            .id_to_key(args.frame_id.try_into().unwrap());
         let stack_frame = stack_frame_key.get(&self.vm_state.vm);
 
         let mut scopes = vec![];
@@ -18,7 +20,7 @@ impl PausedState {
                 variables_reference: self
                     .variables_ids
                     .key_to_id(VariablesKey::Arguments(stack_frame_key.to_owned())),
-                named_variables: Some(stack_frame.call.arguments.len() as i64),
+                named_variables: Some(stack_frame.call.arguments.len()),
                 indexed_variables: Some(0),
                 expensive: false,
                 // TODO: source information for function
@@ -36,7 +38,7 @@ impl PausedState {
             variables_reference: self
                 .variables_ids
                 .key_to_id(VariablesKey::Locals(stack_frame_key.to_owned())),
-            named_variables: Some(locals.len() as i64),
+            named_variables: Some(locals.len()),
             indexed_variables: Some(0),
             expensive: false,
             // TODO: source information for function
@@ -56,7 +58,7 @@ impl PausedState {
             variables_reference: self
                 .variables_ids
                 .key_to_id(VariablesKey::FiberHeap(stack_frame_key.fiber_id)),
-            named_variables: Some(fiber.heap.objects_len() as i64),
+            named_variables: Some(fiber.heap.objects_len()),
             indexed_variables: Some(0),
             expensive: false,
             source: None,

@@ -9,6 +9,7 @@ use crate::{
         Source, StackFrame, Thread, Variable, VariablePresentationHint,
     },
 };
+use std::num::NonZeroUsize;
 
 /// Represents a response messagte that is either a cancellation or a short error string.
 #[derive(Serialize, Debug, Clone)]
@@ -80,17 +81,17 @@ pub struct EvaluateResponse {
     /// children can be retrieved by passing `variablesReference` to the
     /// `variables` request.
     /// The value should be less than or equal to 2147483647 (2^31-1).
-    pub variables_reference: i64,
-    /// The i64 of named child variables.
+    pub variables_reference: usize,
+    /// The usize of named child variables.
     /// The client can use this information to present the variables in a paged
     /// UI and fetch them in chunks.
     /// The value should be less than or equal to 2147483647 (2^31-1).
-    pub named_variables: Option<i64>,
-    /// The i64 of indexed child variables.
+    pub named_variables: Option<usize>,
+    /// The usize of indexed child variables.
     /// The client can use this information to present the variables in a paged
     /// UI and fetch them in chunks.
     /// The value should be less than or equal to 2147483647 (2^31-1).
-    pub indexed_variables: Option<i64>,
+    pub indexed_variables: Option<usize>,
     /// A memory reference to a location appropriate for this result.
     /// For pointer type eval results, this is generally a reference to the
     /// memory address contained in the pointer.
@@ -131,8 +132,8 @@ pub struct LoadedSourcesResponse {
 pub struct ModulesResponse {
     /// All modules or range of modules.
     pub modules: Vec<Module>,
-    /// The total i64 of modules available.
-    pub total_modules: Option<i64>,
+    /// The total usize of modules available.
+    pub total_modules: Option<usize>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -142,11 +143,11 @@ pub struct ReadMemoryResponse {
     /// Treated as a hex value if prefixed with `0x`, or as a decimal value
     /// otherwise.
     pub address: String,
-    /// The i64 of unreadable bytes encountered after the last successfully
+    /// The usize of unreadable bytes encountered after the last successfully
     /// read byte.
-    /// This can be used to determine the i64 of bytes that should be skipped
+    /// This can be used to determine the usize of bytes that should be skipped
     /// before a subsequent `readMemory` request succeeds.
-    pub unreadable_bytes: Option<i64>,
+    pub unreadable_bytes: Option<usize>,
     /// The bytes read from memory, encoded using base64.
     pub data: Option<String>,
 }
@@ -218,17 +219,17 @@ pub struct SetVariableResponse {
     /// children can be retrieved by passing `variablesReference` to the
     /// `variables` request.
     /// The value should be less than or equal to 2147483647 (2^31-1).
-    pub variables_reference: Option<i64>,
-    /// The i64 of named child variables.
+    pub variables_reference: Option<usize>,
+    /// The usize of named child variables.
     /// The client can use this information to present the variables in a paged
     /// UI and fetch them in chunks.
     /// The value should be less than or equal to 2147483647 (2^31-1).
-    pub named_variables: Option<i64>,
-    /// The i64 of indexed child variables.
+    pub named_variables: Option<usize>,
+    /// The usize of indexed child variables.
     /// The client can use this information to present the variables in a paged
     /// UI and fetch them in chunks.
     /// The value should be less than or equal to 2147483647 (2^31-1).
-    pub indexed_variables: Option<i64>,
+    pub indexed_variables: Option<usize>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -257,17 +258,17 @@ pub struct SetExpressionResponse {
     /// can be retrieved by passing `variablesReference` to the `variables`
     /// request.
     /// The value should be less than or equal to 2147483647 (2^31-1).
-    pub variables_reference: Option<i64>,
-    /// The i64 of named child variables.
+    pub variables_reference: Option<usize>,
+    /// The usize of named child variables.
     /// The client can use this information to present the variables in a paged
     /// UI and fetch them in chunks.
     /// The value should be less than or equal to 2147483647 (2^31-1).
-    pub named_variables: Option<i64>,
-    /// The i64 of indexed child variables.
+    pub named_variables: Option<usize>,
+    /// The usize of indexed child variables.
     /// The client can use this information to present the variables in a paged
     /// UI and fetch them in chunks.
     /// The value should be less than or equal to 2147483647 (2^31-1).
-    pub indexed_variables: Option<i64>,
+    pub indexed_variables: Option<usize>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -277,13 +278,13 @@ pub struct StackTraceResponse {
     /// stackframes available.
     /// This means that there is no location information available.
     pub stack_frames: Vec<StackFrame>,
-    /// The total i64 of frames available in the stack. If omitted or if
+    /// The total usize of frames available in the stack. If omitted or if
     /// `totalFrames` is larger than the available frames, a client is expected
     /// to request frames until a request returns less frames than requested
     /// (which indicates the end of the stack). Returning monotonically
     /// increasing `totalFrames` values for subsequent requests can be used to
     /// enforce paging in the client.
-    pub total_frames: Option<i64>,
+    pub total_frames: Option<usize>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -306,10 +307,10 @@ pub struct WriteMemoryResponse {
     /// Property that should be returned when `allowPartial` is true to indicate
     /// the offset of the first byte of data successfully written. Can be
     /// negative.
-    pub offset: Option<i64>,
+    pub offset: Option<usize>,
     /// Property that should be returned when `allowPartial` is true to indicate
-    /// the i64 of bytes starting from address that were successfully written.
-    pub bytes_written: Option<i64>,
+    /// the usize of bytes starting from address that were successfully written.
+    pub bytes_written: Option<usize>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -529,7 +530,7 @@ pub enum ResponseBody {
 pub struct Response {
     /// Sequence number of the corresponding request.
     #[serde(rename = "request_seq")]
-    pub request_seq: i64,
+    pub request_seq: NonZeroUsize,
     /// Outcome of the request.
     /// If true, the request was successful and the `body` attribute may contain
     /// the result of the request.
@@ -690,15 +691,6 @@ impl Response {
             _ => Err(ServerError::ProtocolError {
                 reason: "can't prepare ack unknown command".to_string(),
             }),
-        }
-    }
-
-    pub fn empty() -> Self {
-        Self {
-            request_seq: 0,
-            success: false,
-            message: None,
-            body: Some(ResponseBody::Empty),
         }
     }
 }

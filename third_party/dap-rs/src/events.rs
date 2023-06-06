@@ -6,6 +6,7 @@ use crate::types::{
     Module, ModuleEventReason, OutputEventCategory, OutputEventGroup, ProcessEventStartMethod,
     Source, StoppedEventReason, ThreadEventReason,
 };
+use std::num::NonZeroUsize;
 
 //// Arguments for a Breakpoint event.
 #[derive(Serialize, Debug, Clone)]
@@ -31,7 +32,7 @@ pub struct CapabilitiesEventBody {
 #[serde(rename_all = "camelCase")]
 pub struct ContinuedEventBody {
     /// The thread which was continued.
-    pub thread_id: i64,
+    pub thread_id: usize,
     /// If `allThreadsContinued` is true, a debug adapter can announce that all threads have
     /// continued.
     pub all_threads_continued: Option<bool>,
@@ -42,7 +43,7 @@ pub struct ContinuedEventBody {
 #[serde(rename_all = "camelCase")]
 pub struct ExitedEventBody {
     /// The exit code returned from the debuggee.
-    pub exit_code: i64,
+    pub exit_code: usize,
 }
 
 //// Arguments for a Invalidated event
@@ -57,10 +58,10 @@ pub struct InvalidatedEventBody {
     pub areas: Option<Vec<InvalidatedAreas>>,
     /// If specified, the client only needs to refetch data related to this
     /// thread.
-    pub thread_id: Option<i64>,
+    pub thread_id: Option<usize>,
     /// If specified, the client only needs to refetch data related to this stack
     /// frame (and the `threadId` is ignored).
-    pub stack_frame_id: Option<i64>,
+    pub stack_frame_id: Option<usize>,
 }
 
 //// Arguments for a LoadedSource event.
@@ -81,9 +82,9 @@ pub struct MemoryEventBody {
     /// Memory reference of a memory range that has been updated.
     pub memory_reference: String,
     /// Starting offset in bytes where memory has been updated. Can be negative.
-    pub offset: i64,
+    pub offset: usize,
     /// Number of bytes updated.
-    pub count: i64,
+    pub count: usize,
 }
 
 //// Arguments for a Module event.
@@ -140,15 +141,15 @@ pub struct OutputEventBody {
     /// output contains objects which can be retrieved by passing
     /// `variablesReference` to the `variables` request. The value should be less
     /// than or equal to 2147483647 (2^31-1).
-    pub variables_reference: Option<i64>,
+    pub variables_reference: Option<NonZeroUsize>,
     /// The source location where the output was produced.
     pub source: Option<Source>,
     /// The source location's line where the output was produced.
-    pub line: Option<i64>,
+    pub line: Option<usize>,
     /// The position in `line` where the output was produced. It is measured in
     /// UTF-16 code units and the client capability `columnsStartAt1` determines
     /// whether it is 0- or 1-based.
-    pub column: Option<i64>,
+    pub column: Option<usize>,
     /// Additional data to report. For the `telemetry` category the data is sent
     /// to telemetry, for the other categories the data is shown in JSON format.
     pub data: Option<Value>,
@@ -163,7 +164,7 @@ pub struct ProcessEventBody {
     pub name: String,
     /// The system process id of the debugged process. This property is missing
     /// for non-system processes.
-    pub system_process_id: Option<i64>,
+    pub system_process_id: Option<usize>,
     /// If true, the process is running on the same computer as the debug
     /// adapter.
     pub is_local_process: Option<bool>,
@@ -176,7 +177,7 @@ pub struct ProcessEventBody {
     pub start_method: Option<ProcessEventStartMethod>,
     /// The size of a pointer or address for this process, in bits. This value
     /// may be used by clients when formatting addresses for display.
-    pub pointer_size: Option<i64>,
+    pub pointer_size: Option<usize>,
 }
 
 //// Arguments for a ProgressEnd event.
@@ -206,7 +207,7 @@ pub struct ProgressStartEventBody {
     /// request until the request has been either completed or cancelled.
     /// If the request ID is omitted, the progress report is assumed to be
     /// related to some general activity of the debug adapter.
-    pub request_id: Option<i64>,
+    pub request_id: Option<usize>,
     /// If true, the request that reports progress may be cancelled with a
     /// `cancel` request.
     /// So this property basically controls whether the client should use UX that
@@ -218,7 +219,7 @@ pub struct ProgressStartEventBody {
     pub message: Option<String>,
     /// Progress percentage to display (value range: 0 to 100). If omitted no
     /// percentage is shown.
-    pub percentage: Option<i64>,
+    pub percentage: Option<u8>,
 }
 
 //// Arguments for a ProgressUpdate event.
@@ -232,7 +233,7 @@ pub struct ProgressUpdateEventBody {
     pub message: Option<String>,
     /// Progress percentage to display (value range: 0 to 100). If omitted no
     /// percentage is shown.
-    pub percentage: Option<i64>,
+    pub percentage: Option<usize>,
 }
 
 //// Arguments for a Stopped event.
@@ -249,7 +250,7 @@ pub struct StoppedEventBody {
     /// shown in the UI as is and can be translated.
     pub description: Option<String>,
     /// The thread which was stopped.
-    pub thread_id: Option<i64>,
+    pub thread_id: Option<usize>,
     /// A value of true hints to the client that this event should not change the
     /// focus.
     pub preserve_focus_hint: Option<bool>,
@@ -271,7 +272,7 @@ pub struct StoppedEventBody {
     /// the compiler/runtime.
     /// - Multiple function breakpoints with different function names map to the
     /// same location.
-    pub hit_breakpoint_ids: Option<Vec<i64>>,
+    pub hit_breakpoint_ids: Option<Vec<usize>>,
 }
 
 //// Arguments for a Terminated event.
@@ -293,7 +294,7 @@ pub struct ThreadEventBody {
     /// Values: 'started', 'exited', etc.
     pub reason: ThreadEventReason,
     /// The identifier of the thread.
-    pub thread_id: i64,
+    pub thread_id: usize,
 }
 
 #[derive(Serialize, Debug, Clone)]

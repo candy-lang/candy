@@ -30,10 +30,10 @@ impl PausedState {
             .fiber_ref();
         let fiber_state = &fiber.tracer;
 
-        let start_frame = args.start_frame.map(|it| it as usize).unwrap_or_default();
+        let start_frame = args.start_frame.unwrap_or_default();
         let levels = args
             .levels
-            .and_then(|it| if it == 0 { None } else { Some(it as usize) })
+            .and_then(|it| if it == 0 { None } else { Some(it) })
             .unwrap_or(usize::MAX);
         let call_stack = &fiber_state.call_stack[..fiber_state.call_stack.len() - start_frame];
 
@@ -52,10 +52,13 @@ impl PausedState {
                     it => panic!("Unexpected callee: {it}"),
                 };
                 dap::types::StackFrame {
-                    id: self.stack_frame_ids.key_to_id(StackFrameKey {
-                        fiber_id,
-                        index: index + 1,
-                    }),
+                    id: self
+                        .stack_frame_ids
+                        .key_to_id(StackFrameKey {
+                            fiber_id,
+                            index: index + 1,
+                        })
+                        .get(),
                     name,
                     source: None,
                     line: 1,
@@ -74,7 +77,8 @@ impl PausedState {
             stack_frames.push(dap::types::StackFrame {
                 id: self
                     .stack_frame_ids
-                    .key_to_id(StackFrameKey { fiber_id, index: 0 }),
+                    .key_to_id(StackFrameKey { fiber_id, index: 0 })
+                    .get(),
                 name: "Spawn".to_string(),
                 source: None,
                 line: 1,
@@ -90,7 +94,7 @@ impl PausedState {
 
         Ok(StackTraceResponse {
             stack_frames,
-            total_frames: Some((fiber_state.call_stack.len() + 1) as i64),
+            total_frames: Some(fiber_state.call_stack.len() + 1),
         })
     }
 }

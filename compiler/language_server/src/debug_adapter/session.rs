@@ -1,10 +1,11 @@
 use super::{
-    paused::PausedState, tracer::DebugTracer, utils::FiberIdThreadIdConversion, vm_state::VmState,
-    ServerToClient, ServerToClientMessage, SessionId,
+    paused::PausedState, tracer::DebugTracer, vm_state::VmState, ServerToClient,
+    ServerToClientMessage, SessionId,
 };
 use crate::database::Database;
 use candy_frontend::{
     hir::Id,
+    id::CountableId,
     module::{Module, ModuleKind, PackagesPath},
     TracingConfig, TracingMode,
 };
@@ -26,7 +27,7 @@ use dap::{
     types::{Capabilities, StoppedEventReason},
 };
 use rustc_hash::FxHashMap;
-use std::{mem, path::PathBuf, rc::Rc};
+use std::{mem, num::NonZeroUsize, path::PathBuf, rc::Rc};
 use tokio::sync::mpsc;
 use tower_lsp::Client;
 use tracing::error;
@@ -233,7 +234,7 @@ impl DebugSession {
                 self.send(EventBody::Stopped(StoppedEventBody {
                     reason: StoppedEventReason::Entry,
                     description: Some("Paused on program start".to_string()),
-                    thread_id: Some(FiberId::root().to_thread_id()),
+                    thread_id: Some(FiberId::root().to_usize()),
                     preserve_focus_hint: Some(false),
                     text: None,
                     all_threads_stopped: Some(true),
@@ -332,7 +333,7 @@ impl DebugSession {
         })
     }
 
-    async fn send_response_ok(&self, seq: i64, body: ResponseBody) {
+    async fn send_response_ok(&self, seq: NonZeroUsize, body: ResponseBody) {
         self.send(Response {
             request_seq: seq,
             success: true,
@@ -341,7 +342,7 @@ impl DebugSession {
         })
         .await;
     }
-    async fn send_response_err(&self, seq: i64, message: ResponseMessage) {
+    async fn send_response_err(&self, seq: NonZeroUsize, message: ResponseMessage) {
         self.send(Response {
             request_seq: seq,
             success: false,
