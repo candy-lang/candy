@@ -168,6 +168,7 @@ dependencies = [
  "bitvec",
  "candy_frontend",
  "candy_vm",
+ "extension-trait",
  "itertools",
  "num-bigint",
  "rand",
