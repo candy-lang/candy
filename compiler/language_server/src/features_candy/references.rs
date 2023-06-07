@@ -39,11 +39,13 @@ where
             Some(ReferenceQuery::Needs(module))
         }
         CstKind::Identifier { .. } => {
-            let hir_id = db.cst_to_hir_id(module, origin_cst.data.id);
-            let [hir_id] = hir_id.as_slice() else {
-                panic!("The CST-Id of an Identifier should map to exactly one HIR-Id")
-            };
-            let hir_id = hir_id.to_owned();
+            let hir_ids = db.cst_to_hir_id(module, origin_cst.data.id);
+            assert_eq!(
+                hir_ids.len(),
+                1,
+                "The CST ID of an identifier should map to exactly one HIR ID.",
+            );
+            let hir_id = hir_ids.into_iter().next().unwrap();
 
             let target_id: Option<hir::Id> =
                 if let Some(hir_expr) = db.find_expression(hir_id.clone()) {
