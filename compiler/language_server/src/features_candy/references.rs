@@ -39,29 +39,37 @@ where
             Some(ReferenceQuery::Needs(module))
         }
         CstKind::Identifier { .. } => {
-            let hir_id = db.cst_to_hir_id(module, origin_cst.data.id)?;
-            let target_id = if let Some(hir_expr) = db.find_expression(hir_id.clone()) {
-                let containing_body = db.containing_body_of(hir_id.clone());
-                if containing_body.identifiers.contains_key(&hir_id) {
-                    // A local variable was declared. Find references to that variable.
-                    hir_id
-                } else {
-                    // An intermediate reference. Find references to its target.
-                    match hir_expr {
-                        Expression::Reference(target_id) => target_id,
-                        Expression::Symbol(_) => {
-                            // TODO: Handle struct access
-                            return None;
+            let hir_ids = db.cst_to_hir_id(module, origin_cst.data.id);
+            assert_eq!(
+                hir_ids.len(),
+                1,
+                "The CST ID of an identifier should map to exactly one HIR ID.",
+            );
+            let hir_id = hir_ids.into_iter().next().unwrap();
+
+            let target_id: Option<hir::Id> =
+                if let Some(hir_expr) = db.find_expression(hir_id.clone()) {
+                    let containing_body = db.containing_body_of(hir_id.clone());
+                    if containing_body.identifiers.contains_key(&hir_id) {
+                        // A local variable was declared. Find references to that variable.
+                        Some(hir_id)
+                    } else {
+                        // An intermediate reference. Find references to its target.
+                        match hir_expr {
+                            Expression::Reference(target_id) => Some(target_id),
+                            Expression::Symbol(_) => {
+                                // TODO: Handle struct access
+                                None
+                            }
+                            Expression::Error { .. } => None,
+                            _ => panic!("Expected a reference, got {hir_expr}."),
                         }
-                        Expression::Error { .. } => return None,
-                        _ => panic!("Expected a reference, got {hir_expr}."),
                     }
-                }
-            } else {
-                // Parameter
-                hir_id
-            };
-            Some(ReferenceQuery::Id(target_id))
+                } else {
+                    // Parameter
+                    Some(hir_id)
+                };
+            target_id.map(ReferenceQuery::Id)
         }
         CstKind::Symbol(symbol) => Some(ReferenceQuery::Symbol(module, symbol)),
         CstKind::Int { value, .. } => Some(ReferenceQuery::Int(module, value)),
