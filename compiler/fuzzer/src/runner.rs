@@ -2,10 +2,13 @@ use candy_frontend::hir::Id;
 use candy_vm::{
     self,
     execution_controller::{CountingExecutionController, ExecutionController},
-    fiber::{InstructionPointer, Panic},
+    fiber::{Fiber, InstructionPointer, Panic},
     heap::{Function, HirId, InlineObjectSliceCloneToHeap},
     lir::Lir,
-    tracer::stack_trace::StackTracer,
+    tracer::{
+        stack_trace::{FiberStackTracer, StackTracer},
+        FiberTracer,
+    },
     vm::{self, Vm},
 };
 
@@ -91,7 +94,7 @@ impl<L: Borrow<Lir>> Runner<L> {
         }
     }
 
-    pub fn run(&mut self, execution_controller: &mut impl ExecutionController) {
+    pub fn run(&mut self, execution_controller: &mut impl ExecutionController<FiberStackTracer>) {
         assert!(self.vm.is_some());
         assert!(self.result.is_none());
 
@@ -142,12 +145,12 @@ impl<L: Borrow<Lir>> Runner<L> {
 pub struct CoverageTrackingExecutionController<'a> {
     coverage: &'a mut Coverage,
 }
-impl<'a> ExecutionController for CoverageTrackingExecutionController<'a> {
+impl<'a, T: FiberTracer> ExecutionController<T> for CoverageTrackingExecutionController<'a> {
     fn should_continue_running(&self) -> bool {
         true
     }
 
-    fn instruction_executed(&mut self, ip: InstructionPointer) {
+    fn instruction_executed(&mut self, _fiber: &Fiber<T>, ip: InstructionPointer) {
         self.coverage.add(ip);
     }
 }

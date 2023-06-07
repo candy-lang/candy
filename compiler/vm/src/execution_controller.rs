@@ -1,17 +1,20 @@
-use crate::fiber::InstructionPointer;
+use crate::{
+    fiber::{Fiber, InstructionPointer},
+    tracer::FiberTracer,
+};
 
-pub trait ExecutionController {
+pub trait ExecutionController<T: FiberTracer> {
     fn should_continue_running(&self) -> bool;
-    fn instruction_executed(&mut self, ip: InstructionPointer);
+    fn instruction_executed(&mut self, fiber: &Fiber<T>, ip: InstructionPointer);
 }
 
 pub struct RunForever;
-impl ExecutionController for RunForever {
+impl<T: FiberTracer> ExecutionController<T> for RunForever {
     fn should_continue_running(&self) -> bool {
         true
     }
 
-    fn instruction_executed(&mut self, _: InstructionPointer) {}
+    fn instruction_executed(&mut self, _fiber: &Fiber<T>, _ip: InstructionPointer) {}
 }
 
 pub struct RunLimitedNumberOfInstructions {
@@ -24,12 +27,12 @@ impl RunLimitedNumberOfInstructions {
         }
     }
 }
-impl ExecutionController for RunLimitedNumberOfInstructions {
+impl<T: FiberTracer> ExecutionController<T> for RunLimitedNumberOfInstructions {
     fn should_continue_running(&self) -> bool {
         self.instructions_left > 0
     }
 
-    fn instruction_executed(&mut self, _: InstructionPointer) {
+    fn instruction_executed(&mut self, _fiber: &Fiber<T>, _ip: InstructionPointer) {
         if self.instructions_left == 0 {
             panic!();
         }
@@ -41,27 +44,27 @@ impl ExecutionController for RunLimitedNumberOfInstructions {
 pub struct CountingExecutionController {
     pub num_instructions: usize,
 }
-impl ExecutionController for CountingExecutionController {
+impl<T: FiberTracer> ExecutionController<T> for CountingExecutionController {
     fn should_continue_running(&self) -> bool {
         true
     }
 
-    fn instruction_executed(&mut self, _: InstructionPointer) {
+    fn instruction_executed(&mut self, _fiber: &Fiber<T>, _ip: InstructionPointer) {
         self.num_instructions += 1;
     }
 }
 
 macro_rules! impl_execution_controller_tuple {
     ($($name:ident: $type:ident),+) => {
-        impl<'c, $($type),+> ExecutionController for ($(&'c mut $type),+) where $($type: ExecutionController),+ {
+        impl<'c, $($type),+, T: FiberTracer> ExecutionController<T> for ($(&'c mut $type),+) where $($type: ExecutionController<T>),+ {
             fn should_continue_running(&self) -> bool {
                 let ($($name),+) = self;
                 $($name.should_continue_running())&&+
             }
 
-            fn instruction_executed(&mut self, ip: InstructionPointer) {
+            fn instruction_executed(&mut self, fiber: &Fiber<T>, ip: InstructionPointer) {
                 let ($($name),+) = self;
-                $($name.instruction_executed(ip);)+
+                $($name.instruction_executed(fiber, ip);)+
             }
         }
     };

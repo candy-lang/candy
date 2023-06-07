@@ -226,8 +226,8 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
         }
     }
 
-    pub fn lir(&self) -> &Lir {
-        self.lir.borrow()
+    pub fn lir(&self) -> &L {
+        &self.lir
     }
     pub fn status(&self) -> Status {
         self.status_of(FiberId::root())
@@ -309,9 +309,31 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
         self.unreferenced_channels.remove(&channel);
     }
 
-    pub fn run(&mut self, execution_controller: &mut impl ExecutionController, tracer: &mut T) {
+    pub fn run(
+        &mut self,
+        execution_controller: &mut impl ExecutionController<T::ForFiber>,
+        tracer: &mut T,
+    ) {
         while self.can_run() && execution_controller.should_continue_running() {
-            self.run_raw(
+            // Choose a random fiber to run.
+            let mut fiber_id = FiberId::root();
+            let fiber = loop {
+                match self.fibers.get(&fiber_id).unwrap() {
+                    FiberTree::Single(Single { fiber, .. }) => break fiber,
+                    FiberTree::Parallel(Parallel { children, .. }) => {
+                        let children_as_vec = children.iter().collect_vec();
+                        let random_child = children_as_vec.choose(&mut thread_rng()).unwrap();
+                        fiber_id = *random_child.0
+                    }
+                    FiberTree::Try(Try { child, .. }) => fiber_id = *child,
+                }
+            };
+            if !matches!(fiber.status(), fiber::Status::Running) {
+                continue;
+            }
+
+            self.run_fiber(
+                fiber_id,
                 &mut (
                     &mut *execution_controller,
                     &mut RunLimitedNumberOfInstructions::new(100),
@@ -320,28 +342,22 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
             );
         }
     }
-    fn run_raw(&mut self, execution_controller: &mut impl ExecutionController, tracer: &mut T) {
+    pub fn run_fiber(
+        &mut self,
+        fiber_id: FiberId,
+        execution_controller: &mut impl ExecutionController<T::ForFiber>,
+        tracer: &mut T,
+    ) {
         assert!(
             self.can_run(),
-            "Called `Vm::run(…)` on a VM that is not ready to run."
+            "Called `Vm::run_fiber(…)` on a VM that is not ready to run.",
         );
 
-        // Choose a random fiber to run.
-        let mut fiber_id = FiberId::root();
-        let fiber = loop {
-            match self.fibers.get_mut(&fiber_id).unwrap() {
-                FiberTree::Single(Single { fiber, .. }) => break fiber,
-                FiberTree::Parallel(Parallel { children, .. }) => {
-                    let children_as_vec = children.iter().collect_vec();
-                    let random_child = children_as_vec.choose(&mut thread_rng()).unwrap();
-                    fiber_id = *random_child.0
-                }
-                FiberTree::Try(Try { child, .. }) => fiber_id = *child,
-            }
-        };
-        if !matches!(fiber.status(), fiber::Status::Running) {
-            return;
-        }
+        let fiber = self.fibers.get_mut(&fiber_id).unwrap().fiber_mut();
+        assert!(
+            matches!(fiber.status(), fiber::Status::Running),
+            "Called `Vm::run_fiber(…)` with a fiber that is not ready to run.",
+        );
 
         tracer.fiber_execution_started(fiber_id);
         fiber.run(self.lir.borrow(), execution_controller);
