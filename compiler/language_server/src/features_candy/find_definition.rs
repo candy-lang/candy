@@ -20,10 +20,13 @@ pub fn find_definition(db: &Database, module: Module, offset: Offset) -> Option<
     }
 
     let origin_hir_ids = db.cst_to_hir_id(module.clone(), origin_cst.data.id);
-    let [origin_hir_id] = origin_hir_ids.as_slice() else {
-        panic!("The CST-Id of an Identifier should map to exactly one HIR-Id")
-    };
-    let origin_expression = db.find_expression(origin_hir_id.clone())?;
+    assert_eq!(
+        origin_hir_ids.len(),
+        1,
+        "The CST ID of an identifier should map to exactly one HIR ID.",
+    );
+    let origin_hir_id = origin_hir_ids.into_iter().next().unwrap();
+    let origin_expression = db.find_expression(origin_hir_id)?;
     let target_hir_id = match origin_expression {
         Expression::Reference(id) => id,
         _ => return None,
