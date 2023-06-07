@@ -2,6 +2,7 @@
     allocator_api,
     anonymous_lifetime_in_impl_trait,
     let_chains,
+    nonzero_ops,
     slice_ptr_get,
     step_trait,
     strict_provenance

@@ -1,4 +1,6 @@
-use super::{stack_trace::StackFrameKey, utils::FiberIdExtension, PausedState};
+use super::{
+    memory::MemoryReference, stack_trace::StackFrameKey, utils::FiberIdExtension, PausedState,
+};
 use crate::database::Database;
 use candy_frontend::hir::{self, Expression, HirDb};
 use candy_vm::{
@@ -67,6 +69,7 @@ impl PausedState {
                                     .take(count)
                                     .map(|(parameter, argument)| {
                                         self.create_variable(
+                                            stack_frame_key.fiber_id,
                                             parameter,
                                             argument,
                                             supports_variable_type,
@@ -83,6 +86,7 @@ impl PausedState {
                                     |(index, object)| {
                                         // TODO: resolve argument name
                                         self.create_variable(
+                                            stack_frame_key.fiber_id,
                                             (start + index).to_string(),
                                             *object,
                                             supports_variable_type,
@@ -121,6 +125,7 @@ impl PausedState {
                         .take(count)
                         .map(|(name, value, count)| {
                             self.create_variable(
+                                stack_frame_key.fiber_id,
                                 if count == *total_name_counts.get(name).unwrap() - 1 {
                                     name.to_owned()
                                 } else {
@@ -139,6 +144,7 @@ impl PausedState {
                     vars.sort_by_key(|it| it.address());
                     variables.extend(vars[start..].iter().take(count).map(|object| {
                         self.create_variable(
+                            *fiber_id,
                             format!("{:p}", object),
                             (*object).into(),
                             supports_variable_type,
@@ -146,7 +152,7 @@ impl PausedState {
                     }));
                 }
             }
-            VariablesKey::Inner(object) => match Data::from(**object) {
+            VariablesKey::Inner(fiber_id, object) => match Data::from(**object) {
                 Data::Tag(tag) => {
                     if should_include_named {
                         if start == 0 && count > 0 {
@@ -165,7 +171,9 @@ impl PausedState {
                                 variables_reference: 0,
                                 named_variables: Some(0),
                                 indexed_variables: Some(0),
-                                memory_reference: None,
+                                memory_reference: Some(
+                                    MemoryReference::new(*fiber_id, **tag.symbol()).to_dap(),
+                                ),
                             });
                         }
                         count = count.saturating_sub(1);
@@ -173,7 +181,7 @@ impl PausedState {
                         if count > 0 {
                             let name = "Value".to_string();
                             let value_variable = if let Some(value) = tag.value() {
-                                self.create_variable(name, value, supports_variable_type)
+                                self.create_variable(*fiber_id, name, value, supports_variable_type)
                             } else {
                                 Variable {
                                     name,
@@ -190,7 +198,10 @@ impl PausedState {
                                     variables_reference: 0,
                                     named_variables: Some(0),
                                     indexed_variables: Some(0),
-                                    memory_reference: None,
+                                    memory_reference: tag.value().and_then(|it| {
+                                        MemoryReference::maybe_new(*fiber_id, it)
+                                            .map(|it| it.to_dap())
+                                    }),
                                 }
                             };
                             variables.push(value_variable);
@@ -212,6 +223,7 @@ impl PausedState {
                         variables.extend(list.items()[start..].iter().take(count).enumerate().map(
                             |(index, object)| {
                                 self.create_variable(
+                                    *fiber_id,
                                     (start + index).to_string(),
                                     *object,
                                     supports_variable_type,
@@ -242,7 +254,12 @@ impl PausedState {
                         fields.sort();
                         variables.extend(fields.into_iter().skip(start).take(count).map(
                             |(key, value)| {
-                                self.create_variable(key.to_string(), value, supports_variable_type)
+                                self.create_variable(
+                                    *fiber_id,
+                                    key.to_string(),
+                                    value,
+                                    supports_variable_type,
+                                )
                             },
                         ));
                     }
@@ -269,6 +286,7 @@ impl PausedState {
     }
     fn create_variable(
         &mut self,
+        fiber_id: FiberId,
         name: String,
         object: InlineObject,
         supports_variable_type: bool,
@@ -286,7 +304,7 @@ impl PausedState {
         let variables_reference = inner_variables_object
             .map(|object| {
                 self.variables_ids
-                    .key_to_id(VariablesKey::Inner(ObjectInHeap(object)))
+                    .key_to_id(VariablesKey::Inner(fiber_id, ObjectInHeap(object)))
                     .get()
             })
             .unwrap_or_default();
@@ -300,7 +318,7 @@ impl PausedState {
             variables_reference,
             named_variables: Some(named_variables),
             indexed_variables: Some(indexed_variables),
-            memory_reference: None, // TODO: support memory reference
+            memory_reference: MemoryReference::maybe_new(fiber_id, object).map(|it| it.to_dap()),
         }
     }
     fn type_field_for(kind: DataDiscriminants, supports_variable_type: bool) -> Option<String> {
@@ -340,5 +358,5 @@ pub enum VariablesKey {
     Arguments(StackFrameKey),
     Locals(StackFrameKey),
     FiberHeap(FiberId),
-    Inner(ObjectInHeap),
+    Inner(FiberId, ObjectInHeap),
 }

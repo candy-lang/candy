@@ -58,7 +58,7 @@ impl PausedState {
             variables_reference: self
                 .variables_ids
                 .key_to_id(VariablesKey::FiberHeap(stack_frame_key.fiber_id)),
-            named_variables: Some(fiber.heap.objects_len()),
+            named_variables: Some(fiber.heap.objects().len()),
             indexed_variables: Some(0),
             expensive: false,
             source: None,
