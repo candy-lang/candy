@@ -227,6 +227,9 @@ impl<T: FiberTracer> Fiber<T> {
     pub fn status(&self) -> Status {
         self.status.clone()
     }
+    pub fn call_stack(&self) -> &[InstructionPointer] {
+        &self.call_stack
+    }
 
     // If the status of this fiber is something else than `Status::Running`
     // after running, then the VM that manages this fiber is expected to perform
