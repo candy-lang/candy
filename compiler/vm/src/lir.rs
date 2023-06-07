@@ -252,8 +252,20 @@ impl ToRichIr for Lir {
 
         builder.push("# Instructions", TokenType::Comment, EnumSet::empty());
         let instruction_index_width = (self.instructions.len() * 10 - 1).ilog10() as usize;
-        for (i, (instruction, origins)) in self.instructions.iter().zip(&self.origins).enumerate() {
+        let mut previous_origins = &FxHashSet::default();
+        for (i, instruction) in self.instructions.iter().enumerate() {
             builder.push_newline();
+
+            let origins = &self.origins[i];
+            if origins != previous_origins {
+                builder.push(
+                    format!("# {}", origins.iter().join(", ")),
+                    TokenType::Comment,
+                    EnumSet::empty(),
+                );
+                builder.push_newline();
+                previous_origins = origins;
+            }
 
             builder.push(
                 format!(
@@ -266,13 +278,6 @@ impl ToRichIr for Lir {
             );
 
             instruction.build_rich_ir(builder);
-
-            builder.push("  ", None, EnumSet::empty());
-            builder.push(
-                format!("# {}", origins.iter().join(", ")),
-                TokenType::Comment,
-                EnumSet::empty(),
-            );
         }
     }
 }
