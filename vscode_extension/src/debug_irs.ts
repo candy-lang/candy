@@ -51,19 +51,25 @@ export function registerDebugIrCommands(client: LanguageClient) {
     const tracingConfig = await pickTracingConfig({
       canSelectOnlyCurrent: false,
     });
-    if (tracingConfig === undefined) return undefined;
+    if (tracingConfig === undefined) {
+      return undefined;
+    }
 
     return { type: 'mir', tracingConfig };
   });
   registerDebugIrCommand('optimizedMir', 'viewOptimizedMir', async () => {
     const tracingConfig = await pickTracingConfig();
-    if (tracingConfig === undefined) return undefined;
+    if (tracingConfig === undefined) {
+      return undefined;
+    }
 
     return { type: 'optimizedMir', tracingConfig };
   });
   registerDebugIrCommand('lir', 'viewLir', async () => {
     const tracingConfig = await pickTracingConfig();
-    if (tracingConfig === undefined) return undefined;
+    if (tracingConfig === undefined) {
+      return undefined;
+    }
 
     return { type: 'lir', tracingConfig };
   });
@@ -113,7 +119,9 @@ async function registerDebugIrCommand(
     }
 
     const ir = await createIrConfig();
-    if (ir === undefined) return;
+    if (ir === undefined) {
+      return;
+    }
 
     const encodedUri = encodeUri(editor.document, ir);
     const irDocument = await vscode.workspace.openTextDocument(encodedUri);
@@ -137,16 +145,22 @@ async function pickTracingConfig(
     'Include tracing of fuzzable functions?',
     options
   );
-  if (registerFuzzables === undefined) return;
+  if (registerFuzzables === undefined) {
+    return;
+  }
 
   const calls = await pickTracingMode('Include tracing of calls?', options);
-  if (calls === undefined) return;
+  if (calls === undefined) {
+    return;
+  }
 
   const evaluatedExpressions = await pickTracingMode(
     'Include tracing of evaluated expressions?',
     options
   );
-  if (evaluatedExpressions === undefined) return;
+  if (evaluatedExpressions === undefined) {
+    return;
+  }
 
   return { registerFuzzables, calls, evaluatedExpressions };
 }
