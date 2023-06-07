@@ -105,14 +105,10 @@ impl<L: Borrow<Lir>> Runner<L> {
             &mut instruction_counter,
         );
 
-        while matches!(self.vm.as_ref().unwrap().status(), vm::Status::CanRun)
-            && execution_controller.should_continue_running()
-        {
-            self.vm
-                .as_mut()
-                .unwrap()
-                .run(&mut execution_controller, &mut self.tracer);
-        }
+        self.vm
+            .as_mut()
+            .unwrap()
+            .run(&mut execution_controller, &mut self.tracer);
 
         self.num_instructions += instruction_counter.num_instructions;
 
