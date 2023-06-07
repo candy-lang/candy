@@ -70,6 +70,8 @@ fn format_address(address: usize) -> String {
 
 #[derive(Clone, Copy, Debug)]
 pub struct MemoryReference {
+    // TODO: Support inline values
+    // TODO: View memory across all fibers
     fiber_id: FiberId,
     address: NonZeroUsize,
 }
