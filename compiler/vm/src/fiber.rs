@@ -301,7 +301,12 @@ impl<T: FiberTracer> Fiber<T> {
         self.status = Status::Panicked(panic);
     }
 
-    pub fn run(&mut self, lir: &Lir, execution_controller: &mut dyn ExecutionController<T>) {
+    pub fn run(
+        &mut self,
+        lir: &Lir,
+        execution_controller: &mut dyn ExecutionController<T>,
+        id: FiberId,
+    ) {
         assert!(
             matches!(self.status, Status::Running),
             "Called Fiber::run on a fiber that is not ready to run.",
@@ -326,7 +331,7 @@ impl<T: FiberTracer> Fiber<T> {
             self.next_instruction = Some(current_instruction.next());
 
             self.run_instruction(instruction);
-            execution_controller.instruction_executed(self, current_instruction);
+            execution_controller.instruction_executed(id, self, current_instruction);
         }
     }
     pub fn run_instruction(&mut self, instruction: Instruction) {

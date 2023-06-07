@@ -2,7 +2,7 @@ use candy_frontend::hir::Id;
 use candy_vm::{
     self,
     execution_controller::{CountingExecutionController, ExecutionController},
-    fiber::{Fiber, InstructionPointer, Panic},
+    fiber::{Fiber, FiberId, InstructionPointer, Panic},
     heap::{Function, HirId, InlineObjectSliceCloneToHeap},
     lir::Lir,
     tracer::{
@@ -150,7 +150,12 @@ impl<'a, T: FiberTracer> ExecutionController<T> for CoverageTrackingExecutionCon
         true
     }
 
-    fn instruction_executed(&mut self, _fiber: &Fiber<T>, ip: InstructionPointer) {
+    fn instruction_executed(
+        &mut self,
+        _fiber_id: FiberId,
+        _fiber: &Fiber<T>,
+        ip: InstructionPointer,
+    ) {
         self.coverage.add(ip);
     }
 }

@@ -162,7 +162,7 @@ impl DebugSession {
                     supports_stepping_granularity: None,
                     supports_instruction_breakpoints: None,
                     supports_exception_filter_options: None,
-                    supports_single_thread_execution_requests: None,
+                    supports_single_thread_execution_requests: Some(true),
                 };
                 self.send_response_ok(request.seq, ResponseBody::Initialize(Some(capabilities)))
                     .await;
@@ -248,7 +248,15 @@ impl DebugSession {
             }
             Command::LoadedSources => todo!(),
             Command::Modules(_) => todo!(),
-            Command::Next(args) => self.step(request.seq, StepKind::Next, args.thread_id).await,
+            Command::Next(args) => {
+                self.step(
+                    request.seq,
+                    StepKind::Next,
+                    args.thread_id,
+                    args.single_thread,
+                )
+                .await
+            }
             Command::Pause(_) => todo!(),
             Command::ReadMemory(_) => todo!(),
             Command::Restart(_) => todo!(),
@@ -286,9 +294,25 @@ impl DebugSession {
                 Ok(())
             }
             Command::StepBack(_) => todo!(),
-            Command::StepIn(args) => self.step(request.seq, StepKind::In, args.thread_id).await,
+            Command::StepIn(args) => {
+                self.step(
+                    request.seq,
+                    StepKind::In,
+                    args.thread_id,
+                    args.single_thread,
+                )
+                .await
+            }
             Command::StepInTargets(_) => todo!(),
-            Command::StepOut(args) => self.step(request.seq, StepKind::Out, args.thread_id).await,
+            Command::StepOut(args) => {
+                self.step(
+                    request.seq,
+                    StepKind::Out,
+                    args.thread_id,
+                    args.single_thread,
+                )
+                .await
+            }
             Command::Terminate(_) => todo!(),
             Command::TerminateThreads(_) => todo!(),
             Command::Threads => {
@@ -325,6 +349,7 @@ impl DebugSession {
         request_seq: NonZeroUsize,
         kind: StepKind,
         thread_id: usize,
+        single_thread: Option<bool>,
     ) -> Result<(), &'static str> {
         self.state.require_paused()?;
         let response_body = match kind {
@@ -337,17 +362,23 @@ impl DebugSession {
         let state = self.state.require_paused_mut().unwrap();
 
         let fiber_id = FiberId::from_usize(thread_id);
-        // TODO: honor `args.singleThread`
         // TODO: honor `args.granularity`
         let fiber = state.vm_state.vm.fiber(fiber_id).unwrap().fiber_ref();
         let lir = state.vm_state.vm.lir().to_owned();
         let mut execution_controller =
-            StepExecutionController::new(lir.as_ref(), fiber.call_stack().len(), kind);
-        state.vm_state.vm.run_fiber(
-            fiber_id,
-            &mut execution_controller,
-            &mut state.vm_state.tracer,
-        );
+            StepExecutionController::new(lir.as_ref(), fiber_id, fiber.call_stack().len(), kind);
+        if single_thread.unwrap_or_default() {
+            state.vm_state.vm.run_fiber(
+                fiber_id,
+                &mut execution_controller,
+                &mut state.vm_state.tracer,
+            );
+        } else {
+            state
+                .vm_state
+                .vm
+                .run(&mut execution_controller, &mut state.vm_state.tracer);
+        }
 
         self.send(EventBody::Stopped(StoppedEventBody {
             reason: StoppedEventReason::Step,
@@ -491,14 +522,16 @@ enum StepKind {
 }
 struct StepExecutionController<'a> {
     lir: &'a Lir,
+    fiber_id: FiberId,
     call_stack_size: usize,
     kind: StepKind,
     did_step: bool,
 }
 impl<'a> StepExecutionController<'a> {
-    fn new(lir: &'a Lir, call_stack_size: usize, kind: StepKind) -> Self {
+    fn new(lir: &'a Lir, fiber_id: FiberId, call_stack_size: usize, kind: StepKind) -> Self {
         Self {
             lir,
+            fiber_id,
             call_stack_size,
             kind,
             did_step: false,
@@ -510,11 +543,18 @@ impl<'a, T: FiberTracer> ExecutionController<T> for StepExecutionController<'a> 
         !self.did_step
     }
 
-    fn instruction_executed(&mut self, fiber: &Fiber<T>, ip: InstructionPointer) {
-        if !matches!(
-            self.lir.instructions[*ip],
-            Instruction::TraceCallEnds | Instruction::TraceExpressionEvaluated
-        ) {
+    fn instruction_executed(
+        &mut self,
+        fiber_id: FiberId,
+        fiber: &Fiber<T>,
+        ip: InstructionPointer,
+    ) {
+        if fiber_id != self.fiber_id
+            || !matches!(
+                self.lir.instructions[*ip],
+                Instruction::TraceCallEnds | Instruction::TraceExpressionEvaluated
+            )
+        {
             return;
         }
 

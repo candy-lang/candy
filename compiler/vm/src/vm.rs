@@ -360,7 +360,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
         );
 
         tracer.fiber_execution_started(fiber_id);
-        fiber.run(self.lir.borrow(), execution_controller);
+        fiber.run(self.lir.borrow(), execution_controller, fiber_id);
 
         let is_finished = match fiber.status() {
             fiber::Status::Running => false,

@@ -1,11 +1,11 @@
 use crate::{
-    fiber::{Fiber, InstructionPointer},
+    fiber::{Fiber, FiberId, InstructionPointer},
     tracer::FiberTracer,
 };
 
 pub trait ExecutionController<T: FiberTracer> {
     fn should_continue_running(&self) -> bool;
-    fn instruction_executed(&mut self, fiber: &Fiber<T>, ip: InstructionPointer);
+    fn instruction_executed(&mut self, fiber_id: FiberId, fiber: &Fiber<T>, ip: InstructionPointer);
 }
 
 pub struct RunForever;
@@ -14,7 +14,13 @@ impl<T: FiberTracer> ExecutionController<T> for RunForever {
         true
     }
 
-    fn instruction_executed(&mut self, _fiber: &Fiber<T>, _ip: InstructionPointer) {}
+    fn instruction_executed(
+        &mut self,
+        _fiber_id: FiberId,
+        _fiber: &Fiber<T>,
+        _ip: InstructionPointer,
+    ) {
+    }
 }
 
 pub struct RunLimitedNumberOfInstructions {
@@ -32,7 +38,12 @@ impl<T: FiberTracer> ExecutionController<T> for RunLimitedNumberOfInstructions {
         self.instructions_left > 0
     }
 
-    fn instruction_executed(&mut self, _fiber: &Fiber<T>, _ip: InstructionPointer) {
+    fn instruction_executed(
+        &mut self,
+        _fiber_id: FiberId,
+        _fiber: &Fiber<T>,
+        _ip: InstructionPointer,
+    ) {
         if self.instructions_left == 0 {
             panic!();
         }
@@ -49,7 +60,12 @@ impl<T: FiberTracer> ExecutionController<T> for CountingExecutionController {
         true
     }
 
-    fn instruction_executed(&mut self, _fiber: &Fiber<T>, _ip: InstructionPointer) {
+    fn instruction_executed(
+        &mut self,
+        _fiber_id: FiberId,
+        _fiber: &Fiber<T>,
+        _ip: InstructionPointer,
+    ) {
         self.num_instructions += 1;
     }
 }
@@ -62,9 +78,9 @@ macro_rules! impl_execution_controller_tuple {
                 $($name.should_continue_running())&&+
             }
 
-            fn instruction_executed(&mut self, fiber: &Fiber<T>, ip: InstructionPointer) {
+            fn instruction_executed(&mut self, fiber_id: FiberId, fiber: &Fiber<T>, ip: InstructionPointer) {
                 let ($($name),+) = self;
-                $($name.instruction_executed(fiber, ip);)+
+                $($name.instruction_executed(fiber_id, fiber, ip);)+
             }
         }
     };
