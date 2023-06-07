@@ -15,7 +15,7 @@ pub fn packages_path() -> PackagesPath {
         .find(|path| path.ends_with("target"))
         .unwrap();
     let candy_repo = target_dir.parent().unwrap();
-    PackagesPath::try_from(candy_repo.join("packages").join("Core").as_path()).unwrap()
+    PackagesPath::try_from(candy_repo.join("packages").as_path()).unwrap()
 }
 
 pub(crate) fn module_for_path(path: impl Into<Option<PathBuf>>) -> Result<Module, Exit> {
