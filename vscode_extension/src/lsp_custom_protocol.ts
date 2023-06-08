@@ -60,11 +60,9 @@ export interface Hint {
 export type HintKind = 'value' | 'panic' | 'fuzz';
 
 // Status
-export class PublishServerStatusNotification {
-  public static type = new NotificationType<ServerStatus>(
-    'candy/publishServerStatus'
-  );
-}
+export const publishServerStatusType = new NotificationType<ServerStatus>(
+  'candy/publishServerStatus'
+);
 export interface ServerStatus {
   text: string;
 }
