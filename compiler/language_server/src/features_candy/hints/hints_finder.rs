@@ -4,7 +4,7 @@ use super::{
 };
 use crate::{
     database::Database,
-    utils::{error_into_diagnostic, LspPositionConversion},
+    utils::{error_to_diagnostic, LspPositionConversion},
 };
 use candy_frontend::{
     ast::{Assignment, AssignmentBody, AstDb, AstKind},
@@ -240,7 +240,7 @@ impl HintsFinder {
                 diagnostics.extend(
                     errors
                         .iter()
-                        .map(|it| error_into_diagnostic(db, module.clone(), it)),
+                        .map(|it| error_to_diagnostic(db, module.clone(), it)),
                 );
             }
             State::Fuzz {
@@ -254,7 +254,7 @@ impl HintsFinder {
                 diagnostics.extend(
                     errors
                         .iter()
-                        .map(|it| error_into_diagnostic(db, module.clone(), it)),
+                        .map(|it| error_to_diagnostic(db, module.clone(), it)),
                 );
 
                 // TODO: Think about how to highlight the responsible piece of code.
@@ -359,10 +359,6 @@ impl HintsFinder {
                     });
                 }
             }
-        }
-
-        for hint in &mut hints {
-            hint.ensure_leading_spaces_visible();
         }
 
         (hints, diagnostics)

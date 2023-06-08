@@ -1,7 +1,19 @@
+use crate::{
+    database::Database,
+    debug_adapter::DebugSessionManager,
+    features::{LanguageFeatures, Reference, RenameError},
+    features_candy::{
+        hints::{hint::Hint, HintsNotification},
+        CandyFeatures, ServerStatusNotification,
+    },
+    features_ir::{IrFeatures, UpdateIrNotification},
+    semantic_tokens,
+    utils::{module_from_url, module_to_url},
+};
 use async_trait::async_trait;
-use candy_frontend::module::{ModuleKind, PackagesPath};
+use candy_frontend::module::{Module, ModuleKind, PackagesPath};
 use lsp_types::{
-    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentFilter, DocumentFormattingParams, DocumentHighlight, DocumentHighlightKind,
     DocumentHighlightParams, FoldingRange, FoldingRangeParams, GotoDefinitionParams,
     GotoDefinitionResponse, InitializeParams, InitializeResult, InitializedParams, Location,
@@ -15,19 +27,9 @@ use lsp_types::{
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::mem;
-use tokio::sync::{mpsc, Mutex, RwLock, RwLockMappedWriteGuard, RwLockReadGuard, RwLockWriteGuard};
+use tokio::sync::{Mutex, RwLock, RwLockMappedWriteGuard, RwLockReadGuard, RwLockWriteGuard};
 use tower_lsp::{jsonrpc, Client, ClientSocket, LanguageServer, LspService};
 use tracing::{debug, span, Level};
-
-use crate::{
-    database::Database,
-    debug_adapter::DebugSessionManager,
-    features::{LanguageFeatures, Reference, RenameError},
-    features_candy::{hints::HintsNotification, CandyFeatures, ServerStatusNotification},
-    features_ir::{IrFeatures, UpdateIrNotification},
-    semantic_tokens,
-    utils::{module_from_url, module_to_url},
-};
 
 pub struct Server {
     pub client: Client,
@@ -120,66 +122,56 @@ impl ServerFeatures {
     }
 }
 
+pub struct AnalyzerClient {
+    client: Client,
+    packages_path: PackagesPath,
+}
+impl AnalyzerClient {
+    pub async fn update_status(&self, status: Option<String>) {
+        self.client
+            .send_notification::<ServerStatusNotification>(ServerStatusNotification {
+                text: match status {
+                    Some(status) => format!("🍭 {status}"),
+                    None => "🍭".to_string(),
+                },
+            })
+            .await;
+    }
+    pub async fn update_diagnostics(&self, module: Module, diagnostics: Vec<Diagnostic>) {
+        self.client
+            .publish_diagnostics(
+                module_to_url(&module, &self.packages_path).unwrap(),
+                diagnostics,
+                None,
+            )
+            .await;
+    }
+    pub async fn update_hints(&self, module: Module, hints: Vec<Hint>) {
+        self.client
+            .send_notification::<HintsNotification>(HintsNotification {
+                uri: module_to_url(&module, &self.packages_path).unwrap(),
+                hints,
+            })
+            .await;
+    }
+}
+
 impl Server {
     pub fn create(packages_path: PackagesPath) -> (LspService<Self>, ClientSocket) {
-        let (diagnostics_sender, mut diagnostics_receiver) = mpsc::channel(8);
-        let (hints_sender, mut hints_receiver) = mpsc::channel(1024);
-        let (server_status_sender, mut server_status_receiver) = mpsc::channel(128);
-
         let (service, client) = LspService::build(|client| {
             let state = ServerState::Initial {
                 features: ServerFeatures {
                     candy: CandyFeatures::new(
                         packages_path.clone(),
-                        server_status_sender.clone(),
-                        diagnostics_sender.clone(),
-                        hints_sender.clone(),
+                        AnalyzerClient {
+                            client: client.clone(),
+                            packages_path: packages_path.clone(),
+                        },
                     ),
                     ir: IrFeatures::default(),
                 },
                 debug_session_manager: DebugSessionManager::default(),
             };
-
-            let client_for_closure = client.clone();
-            let packages_path_for_closure = packages_path.clone();
-            let diagnostics_reporter = async move || {
-                while let Some((module, diagnostics)) = diagnostics_receiver.recv().await {
-                    client_for_closure
-                        .publish_diagnostics(
-                            module_to_url(&module, &packages_path_for_closure).unwrap(),
-                            diagnostics,
-                            None,
-                        )
-                        .await;
-                }
-            };
-            tokio::spawn(diagnostics_reporter());
-
-            let client_for_closure = client.clone();
-            let packages_path_for_closure = packages_path.clone();
-            let hint_reporter = async move || {
-                while let Some((module, hints)) = hints_receiver.recv().await {
-                    client_for_closure
-                        .send_notification::<HintsNotification>(HintsNotification {
-                            uri: module_to_url(&module, &packages_path_for_closure).unwrap(),
-                            hints,
-                        })
-                        .await;
-                }
-            };
-            tokio::spawn(hint_reporter());
-
-            let client_for_closure = client.clone();
-            let server_status_reporter = async move || {
-                while let Some(status) = server_status_receiver.recv().await {
-                    client_for_closure
-                        .send_notification::<ServerStatusNotification>(ServerStatusNotification {
-                            text: status,
-                        })
-                        .await;
-                }
-            };
-            tokio::spawn(server_status_reporter());
 
             Self {
                 client,

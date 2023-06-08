@@ -1,32 +1,30 @@
+use self::{
+    find_definition::find_definition,
+    folding_ranges::folding_ranges,
+    references::{reference_query_for_offset, references, ReferenceQuery},
+    semantic_tokens::semantic_tokens,
+};
+use crate::{
+    database::Database,
+    features::{LanguageFeatures, Reference, RenameError},
+    server::AnalyzerClient,
+    utils::{lsp_range_to_range_raw, module_from_url, LspPositionConversion},
+};
 use async_trait::async_trait;
+use candy_formatter::Formatter;
 use candy_frontend::{
     module::{Module, ModuleDb, ModuleKind, MutableModuleProviderOwner, PackagesPath},
     rcst_to_cst::RcstToCst,
 };
 use lsp_types::{
-    self, notification::Notification, Diagnostic, FoldingRange, LocationLink, SemanticToken,
+    self, notification::Notification, FoldingRange, LocationLink, SemanticToken,
     TextDocumentContentChangeEvent, TextEdit, Url,
 };
+use regex::Regex;
 use rustc_hash::FxHashMap;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, thread};
 use tokio::sync::{mpsc::Sender, Mutex};
-
-use crate::{
-    database::Database,
-    features::{LanguageFeatures, Reference, RenameError},
-    utils::{lsp_range_to_range_raw, module_from_url, LspPositionConversion},
-};
-
-use self::{
-    find_definition::find_definition,
-    folding_ranges::folding_ranges,
-    hints::hint::Hint,
-    references::{reference_query_for_offset, references, ReferenceQuery},
-    semantic_tokens::semantic_tokens,
-};
-use candy_formatter::Formatter;
-use regex::Regex;
-use serde::{Deserialize, Serialize};
 
 pub mod find_definition;
 pub mod folding_ranges;
@@ -49,21 +47,10 @@ pub struct CandyFeatures {
     hints_events_sender: Sender<hints::Event>,
 }
 impl CandyFeatures {
-    pub fn new(
-        packages_path: PackagesPath,
-        status_sender: Sender<String>,
-        diagnostics_sender: Sender<(Module, Vec<Diagnostic>)>,
-        hints_sender: Sender<(Module, Vec<Hint>)>,
-    ) -> Self {
+    pub fn new(packages_path: PackagesPath, client: AnalyzerClient) -> Self {
         let (hints_events_sender, hints_events_receiver) = tokio::sync::mpsc::channel(1024);
-        thread::spawn(|| {
-            hints::run_server(
-                packages_path,
-                status_sender,
-                hints_events_receiver,
-                hints_sender,
-                diagnostics_sender,
-            );
+        thread::spawn(move || {
+            hints::run_server(packages_path, hints_events_receiver, client);
         });
         Self {
             hints_events_sender,

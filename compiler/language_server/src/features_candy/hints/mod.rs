@@ -10,21 +10,18 @@
 //! so that we don't occupy a single CPU at 100 %.
 
 use self::{hint::Hint, hints_finder::HintsFinder};
+use super::AnalyzerClient;
 use crate::database::Database;
 use candy_frontend::{
     module::{Module, MutableModuleProviderOwner, PackagesPath},
-    rich_ir::ToRichIr,
 };
-use lsp_types::{notification::Notification, Diagnostic, Url};
-use candy_frontend::module::{Module, MutableModuleProviderOwner, PackagesPath};
-use itertools::Itertools;
-use lsp_types::{notification::Notification, Position, Url};
+use lsp_types::{notification::Notification, Url};
 use rand::{seq::IteratorRandom, thread_rng};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::{fmt, time::Duration, vec};
+use std::{fmt, future::Future, time::Duration, vec};
 use tokio::{
-    sync::mpsc::{error::TryRecvError, Receiver, Sender},
+    sync::mpsc::{error::TryRecvError, Receiver},
     time::sleep,
 };
 use tracing::debug;
@@ -54,15 +51,17 @@ impl Notification for HintsNotification {
 #[allow(unused_must_use)]
 pub async fn run_server(
     packages_path: PackagesPath,
-    status_sender: Sender<String>,
     mut incoming_events: Receiver<Event>,
-    outgoing_hints: Sender<(Module, Vec<Hint>)>,
-    outgoing_diagnostics: Sender<(Module, Vec<Diagnostic>)>,
+    client: AnalyzerClient,
 ) {
     let mut db = Database::new_with_file_system_module_provider(packages_path);
     let mut hints_finders: FxHashMap<Module, HintsFinder> = FxHashMap::default();
-    let mut outgoing_hints = OutgoingCache::new(outgoing_hints);
-    let mut outgoing_diagnostics = OutgoingCache::new(outgoing_diagnostics);
+    let client_ref = &client;
+    let mut outgoing_diagnostics = OutgoingCache::new(move |module, diagnostics| {
+        client_ref.update_diagnostics(module, diagnostics)
+    });
+    let mut outgoing_hints =
+        OutgoingCache::new(move |module, hints| client_ref.update_hints(module, hints));
 
     'server_loop: loop {
         sleep(Duration::from_millis(100)).await;
@@ -93,26 +92,12 @@ pub async fn run_server(
         }
 
         let Some(module) = hints_finders.keys().choose(&mut thread_rng()).cloned() else { 
-            status_sender
-                .send(format!("🍭"))
-                .await
-                .unwrap();
+            client.update_status(None);
             continue;
         };
         let hints_finder = hints_finders.get_mut(&module).unwrap();
 
-        let status_sender_clone = status_sender.clone();
-        let set_status = move |status: Option<String>| {
-            let status_sender_clone = status_sender_clone.clone();
-            async move {
-                let status_string = match status {
-                    Some(status) => format!("🍭 {status}"),
-                    None => "🍭".to_string(),
-                };
-                status_sender_clone.send(status_string).await.unwrap()
-            }
-        };
-        hints_finder.run(&db, &set_status).await;
+        hints_finder.run(&db, &client).await;
 
         let (mut hints, diagnostics) = hints_finder.hints(&db, &module);
         hints.sort_by_key(|hint| hint.position);
@@ -122,12 +107,12 @@ pub async fn run_server(
     }
 }
 
-struct OutgoingCache<T> {
-    sender: Sender<(Module, T)>,
+struct OutgoingCache<T, R: Fn(Module, T) -> F, F: Future> {
+    sender: R,
     last_sent: FxHashMap<Module, T>,
 }
-impl<T: Clone + fmt::Debug + Eq> OutgoingCache<T> {
-    fn new(sender: Sender<(Module, T)>) -> Self {
+impl<T: Clone + fmt::Debug + Eq, R: Fn(Module, T) -> F, F: Future> OutgoingCache<T, R, F> {
+    fn new(sender: R) -> Self {
         Self {
             sender,
             last_sent: FxHashMap::default(),
@@ -138,7 +123,7 @@ impl<T: Clone + fmt::Debug + Eq> OutgoingCache<T> {
         if self.last_sent.get(&module) != Some(&value) {
             debug!("Reporting for {}: {value:?}", module);
             self.last_sent.insert(module.clone(), value.clone());
-            self.sender.send((module, value)).await.unwrap();
+            (self.sender)(module, value).await;
         }
     }
 }
