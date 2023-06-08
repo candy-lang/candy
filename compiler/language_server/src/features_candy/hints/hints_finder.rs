@@ -99,7 +99,7 @@ impl HintsFinder {
         match state {
             State::Initial => {
                 client
-                    .update_status(Some(format!("Compiling {}", self.module.to_rich_ir())))
+                    .update_status(Some(format!("Compiling {}", self.module)))
                     .await;
 
                 let (hir, _) = db.hir(self.module.clone()).unwrap();
