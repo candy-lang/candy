@@ -4,7 +4,7 @@ use crate::{
     input_pool::{InputPool, Score},
     runner::{RunResult, Runner},
     utils::collect_symbols_in_heap,
-    values::complexity_of_input,
+    values::InputGeneration,
 };
 use candy_frontend::hir::Id;
 use candy_vm::{
@@ -135,7 +135,7 @@ impl Fuzzer {
                 } else {
                     // We favor small inputs with good code coverage.
                     let score = {
-                        let complexity = complexity_of_input(&runner.input) as Score;
+                        let complexity = runner.input.complexity() as Score;
                         let new_function_coverage = runner.coverage.in_range(&function_range);
                         let score: Score = (0.2 * runner.num_instructions as f64)
                             + (0.1
