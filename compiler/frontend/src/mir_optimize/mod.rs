@@ -159,7 +159,7 @@ impl Body {
         }
 
         for (id, expression) in &mut self.expressions {
-            *expression = visible.expressions.remove(id).unwrap();
+            *expression = visible.remove(*id);
         }
 
         common_subtree_elimination::eliminate_common_subtrees(self);

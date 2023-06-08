@@ -89,7 +89,7 @@ pub enum VisitorResult {
 
 #[derive(Clone)]
 pub struct VisibleExpressions {
-    pub expressions: FxHashMap<Id, Expression>,
+    expressions: FxHashMap<Id, Expression>,
 }
 impl VisibleExpressions {
     pub fn none_visible() -> Self {
@@ -100,8 +100,8 @@ impl VisibleExpressions {
     pub fn insert(&mut self, id: Id, expression: Expression) {
         self.expressions.insert(id, expression);
     }
-    pub fn remove(&mut self, id: Id) {
-        self.expressions.remove(&id);
+    pub fn remove(&mut self, id: Id) -> Expression {
+        self.expressions.remove(&id).unwrap()
     }
     pub fn get(&self, id: Id) -> &Expression {
         self.expressions.get(&id).unwrap()
@@ -191,8 +191,7 @@ impl Body {
         }
 
         for (index, id) in expressions_in_this_body.iter().enumerate() {
-            *self.expressions.get_mut(index).unwrap() =
-                (*id, visible.expressions.remove(id).unwrap());
+            *self.expressions.get_mut(index).unwrap() = (*id, visible.remove(*id));
         }
     }
     fn visit_expression_with_visible(
@@ -215,9 +214,9 @@ impl Body {
             visible.insert(*responsible_parameter, Expression::Parameter);
             body.visit_with_visible_rec(visible, visitor);
             for parameter in parameters.iter() {
-                visible.expressions.remove(parameter);
+                visible.remove(*parameter);
             }
-            visible.expressions.remove(responsible_parameter);
+            visible.remove(*responsible_parameter);
         }
         if let Expression::Multiple(body) = expression {
             body.visit_with_visible_rec(visible, visitor);
