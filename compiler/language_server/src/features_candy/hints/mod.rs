@@ -12,9 +12,7 @@
 use self::{hint::Hint, hints_finder::HintsFinder};
 use super::AnalyzerClient;
 use crate::database::Database;
-use candy_frontend::{
-    module::{Module, MutableModuleProviderOwner, PackagesPath},
-};
+use candy_frontend::module::{Module, MutableModuleProviderOwner, PackagesPath};
 use lsp_types::{notification::Notification, Url};
 use rand::{seq::IteratorRandom, thread_rng};
 use rustc_hash::FxHashMap;
@@ -91,7 +89,7 @@ pub async fn run_server(
             }
         }
 
-        let Some(module) = hints_finders.keys().choose(&mut thread_rng()).cloned() else { 
+        let Some(module) = hints_finders.keys().choose(&mut thread_rng()).cloned() else {
             client.update_status(None);
             continue;
         };
