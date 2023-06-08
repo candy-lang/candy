@@ -1,10 +1,6 @@
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
-import {
-  updateIrNotification,
-  viewIr,
-  ViewIrParams,
-} from './lsp_custom_protocol';
+import { updateIrType, viewIr, ViewIrParams } from './lsp_custom_protocol';
 import { combineCancellationTokens } from './utils';
 
 type Ir =
@@ -40,7 +36,7 @@ function getModuleKind(languageId: string): ModuleKind {
 export function registerDebugIrCommands(client: LanguageClient) {
   const updateIrEmitter = new vscode.EventEmitter<vscode.Uri>();
   registerDocumentProvider(client, updateIrEmitter.event);
-  client.onNotification(updateIrNotification, (notification) => {
+  client.onNotification(updateIrType, (notification) => {
     updateIrEmitter.fire(vscode.Uri.parse(notification.uri));
   });
 

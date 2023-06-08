@@ -2,11 +2,7 @@
 // https://github.com/Dart-Code/Dart-Code/blob/075f71ca0336e94ebb480be35895b5b12314223b/src/extension/lsp/closing_labels_decorations.ts
 import * as vs from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
-import {
-  Hint,
-  HintKind,
-  PublishHintsNotification,
-} from './lsp_custom_protocol';
+import { Hint, HintKind, publishHintsType } from './lsp_custom_protocol';
 
 export class HintsDecorations implements vs.Disposable {
   private subscriptions: vs.Disposable[] = [];
@@ -40,23 +36,20 @@ export class HintsDecorations implements vs.Disposable {
   ]);
 
   constructor(private readonly client: LanguageClient) {
-    this.client.onNotification(
-      PublishHintsNotification.type,
-      (notification) => {
-        // We parse the URI so that it gets normalized.
-        const uri = vs.Uri.parse(notification.uri).toString();
+    this.client.onNotification(publishHintsType, (notification) => {
+      // We parse the URI so that it gets normalized.
+      const uri = vs.Uri.parse(notification.uri).toString();
 
-        this.hints.set(uri, notification.hints);
-        // Fire an update if it was for the active document.
-        if (
-          vs.window.activeTextEditor &&
-          vs.window.activeTextEditor.document &&
-          uri === vs.window.activeTextEditor.document.uri.toString()
-        ) {
-          this.update();
-        }
+      this.hints.set(uri, notification.hints);
+      // Fire an update if it was for the active document.
+      if (
+        vs.window.activeTextEditor &&
+        vs.window.activeTextEditor.document &&
+        uri === vs.window.activeTextEditor.document.uri.toString()
+      ) {
+        this.update();
       }
-    );
+    });
 
     this.subscriptions.push(
       vs.window.onDidChangeVisibleTextEditors(() => this.update())

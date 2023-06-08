@@ -35,7 +35,7 @@ export const viewIr = new RequestType<ViewIrParams, string, void>(
   'candy/viewIr'
 );
 
-export const updateIrNotification = new NotificationType<UpdateIrParams>(
+export const updateIrType = new NotificationType<UpdateIrParams>(
   'candy/updateIr'
 );
 export interface UpdateIrParams {
@@ -43,11 +43,9 @@ export interface UpdateIrParams {
 }
 
 // Hints
-export class PublishHintsNotification {
-  public static type = new NotificationType<HintsParams>(
-    'candy/textDocument/publishHints'
-  );
-}
+export const publishHintsType = new NotificationType<HintsParams>(
+  'candy/textDocument/publishHints'
+);
 export interface HintsParams {
   readonly uri: string;
   readonly hints: Hint[];

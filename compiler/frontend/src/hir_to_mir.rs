@@ -978,15 +978,11 @@ impl BodyBuilder {
         )
     }
 
-    fn compile_errors(&mut self, responsible: Id, errors: &Vec<CompilerError>) -> Id {
-        let reason = if errors.len() == 1 {
-            format!("{}", errors.iter().next().unwrap().payload)
-        } else {
-            errors
-                .iter()
-                .map(|error| format!("{}", error.payload))
-                .join("\n")
-        };
+    fn compile_errors(&mut self, responsible: Id, errors: &[CompilerError]) -> Id {
+        let reason = errors
+            .iter()
+            .map(|error| format!("{}", error.payload))
+            .join("\n");
         let reason = self.push_text(reason);
         self.push_panic(reason, responsible)
     }

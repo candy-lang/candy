@@ -15,7 +15,6 @@ use candy_frontend::{
     hir::{CollectErrors, Expression, HirDb},
     mir_optimize::OptimizeMir,
     module::Module,
-    rich_ir::ToRichIr,
     TracingConfig, TracingMode,
 };
 use candy_fuzzer::{FuzzablesFinder, Fuzzer, Status};
