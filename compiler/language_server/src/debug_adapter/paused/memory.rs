@@ -3,7 +3,7 @@ use base64::Engine;
 use candy_frontend::id::CountableId;
 use candy_vm::{
     fiber::FiberId,
-    heap::{Heap, HeapData, HeapObject, HeapObjectTrait, InlineObject, ObjectInHeap},
+    heap::{HeapData, HeapObject, HeapObjectTrait, InlineObject, ObjectInHeap},
 };
 use dap::{requests::ReadMemoryArguments, responses::ReadMemoryResponse};
 use extension_trait::extension_trait;
@@ -28,37 +28,36 @@ impl PausedState {
             .ok_or("fiber-not-found")?
             .fiber_ref();
 
-        let start_address = reference
-            .address
-            .get()
-            .saturating_sub(args.offset.unwrap_or_default());
-        let end_address = start_address + args.count;
-        let range = fiber
-            .heap
-            .first_contiguous_range_in(start_address..end_address);
-        let Some(range) = range else {
+        let object = HeapObject::new(NonNull::new(reference.address.get() as *mut u64).unwrap());
+        if !fiber.heap.objects().contains(&ObjectInHeap(object)) {
+            return Err("memory-reference-invalid");
+        }
+        let actual_range = HeapData::from(object).address_range();
+        let actual_range = actual_range.start.get()..actual_range.end.get();
+
+        let requested_start = reference.address.get() + args.offset.unwrap_or_default();
+        let requested_range = requested_start..requested_start + args.count;
+
+        let range = requested_range.intersection(&actual_range);
+        if range.start > requested_start {
             return Ok(ReadMemoryResponse {
-                address: format_address(start_address),
-                unreadable_bytes: Some(args.count),
+                address: format_address(requested_start),
+                unreadable_bytes: if range.is_empty() {
+                    None
+                } else {
+                    Some(range.start - requested_start)
+                },
                 data: None,
             });
         };
 
-        let data = slice_from_raw_parts(
-            range.start.get() as *const u8,
-            range.end.get().min(end_address) - range.start.get(),
-        );
+        let data = slice_from_raw_parts(range.start as *const u8, range.len());
         let data = unsafe { &*data };
         let data = base64::engine::general_purpose::STANDARD.encode(data);
 
-        let next_address = fiber
-            .heap
-            .first_object_range_in(range.end.get()..end_address)
-            .map(|it| it.start);
-
         Ok(ReadMemoryResponse {
-            address: format_address(range.start.get()),
-            unreadable_bytes: next_address.map(|it| it.get() - range.end.get()),
+            address: format_address(range.start),
+            unreadable_bytes: None,
             data: Some(data),
         })
     }
@@ -71,7 +70,6 @@ fn format_address(address: usize) -> String {
 #[derive(Clone, Copy, Debug)]
 pub struct MemoryReference {
     // TODO: Support inline values
-    // TODO: View memory across all fibers
     fiber_id: FiberId,
     address: NonZeroUsize,
 }
@@ -109,38 +107,8 @@ impl MemoryReference {
 }
 
 #[extension_trait]
-impl HeapExtension for Heap {
-    fn first_contiguous_range_in(
-        &self,
-        address_range: Range<usize>,
-    ) -> Option<Range<NonZeroUsize>> {
-        let mut range = self.first_object_range_in(address_range)?;
-        loop {
-            if range.end.get() % HeapObject::WORD_SIZE != 0 {
-                break;
-            }
-
-            let next_object = HeapObject::new(NonNull::new(range.end.get() as *mut u64).unwrap());
-            if !self.objects().contains(&ObjectInHeap(next_object)) {
-                break;
-            }
-
-            range.end = HeapData::from(next_object).address_range().end;
-        }
-        Some(range)
-    }
-    fn first_object_range_in(&self, address_range: Range<usize>) -> Option<Range<NonZeroUsize>> {
-        self.objects()
-            .iter()
-            .map(|&it| HeapData::from(*it).address_range())
-            .filter(|it| (it.start.get()..it.end.get()).overlaps(&address_range))
-            .min_by_key(|it| it.start)
-    }
-}
-
-#[extension_trait]
-impl<T: Ord> RangeExtension<T> for Range<T> {
-    fn overlaps(&self, other: &Range<T>) -> bool {
-        self.start < other.end && other.start < self.end
+impl<T: Copy + Ord> RangeExtension<T> for Range<T> {
+    fn intersection(&self, other: &Range<T>) -> Range<T> {
+        self.start.max(other.start)..self.end.min(other.end)
     }
 }
