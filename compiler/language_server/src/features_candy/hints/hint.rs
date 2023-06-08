@@ -22,10 +22,4 @@ impl Hint {
             position: end_of_line,
         }
     }
-
-    /// In editor decorations, VSCode trims multiple leading spaces to one.
-    /// That's why we use a blank Braille Pattern at the beginning of the hints.
-    pub fn ensure_leading_spaces_visible(&mut self) {
-        self.text = format!("⠀{}", self.text);
-    }
 }
