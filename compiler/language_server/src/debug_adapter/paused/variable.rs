@@ -172,7 +172,7 @@ impl PausedState {
                                 named_variables: Some(0),
                                 indexed_variables: Some(0),
                                 memory_reference: Some(
-                                    MemoryReference::new(*fiber_id, **tag.symbol()).to_dap(),
+                                    MemoryReference::heap(*fiber_id, **tag.symbol()).to_dap(),
                                 ),
                             });
                         }
@@ -198,10 +198,9 @@ impl PausedState {
                                     variables_reference: 0,
                                     named_variables: Some(0),
                                     indexed_variables: Some(0),
-                                    memory_reference: tag.value().and_then(|it| {
-                                        MemoryReference::maybe_new(*fiber_id, it)
-                                            .map(|it| it.to_dap())
-                                    }),
+                                    memory_reference: tag
+                                        .value()
+                                        .map(|it| MemoryReference::new(*fiber_id, it).to_dap()),
                                 }
                             };
                             variables.push(value_variable);
@@ -318,7 +317,7 @@ impl PausedState {
             variables_reference,
             named_variables: Some(named_variables),
             indexed_variables: Some(indexed_variables),
-            memory_reference: MemoryReference::maybe_new(fiber_id, object).map(|it| it.to_dap()),
+            memory_reference: Some(MemoryReference::new(fiber_id, object).to_dap()),
         }
     }
     fn type_field_for(kind: DataDiscriminants, supports_variable_type: bool) -> Option<String> {

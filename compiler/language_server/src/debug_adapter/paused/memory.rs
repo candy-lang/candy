@@ -8,6 +8,8 @@ use candy_vm::{
 use dap::{requests::ReadMemoryArguments, responses::ReadMemoryResponse};
 use extension_trait::extension_trait;
 use std::{
+    borrow::Cow,
+    mem::size_of,
     num::NonZeroUsize,
     ops::Range,
     ptr::{slice_from_raw_parts, NonNull},
@@ -21,21 +23,35 @@ impl PausedState {
         args: ReadMemoryArguments,
     ) -> Result<ReadMemoryResponse, &'static str> {
         let reference = MemoryReference::from_dap(args.memory_reference)?;
-        let fiber = self
-            .vm_state
-            .vm
-            .fiber(reference.fiber_id)
-            .ok_or("fiber-not-found")?
-            .fiber_ref();
+        let (base_offset, actual_range, data) = match reference {
+            MemoryReference::Inline { value } => {
+                let bytes = value.raw_word().get().to_ne_bytes();
+                let range = 0..bytes.len();
+                (0, range, Cow::Owned(bytes.to_vec()))
+            }
+            MemoryReference::Heap { fiber_id, address } => {
+                let fiber = self
+                    .vm_state
+                    .vm
+                    .fiber(fiber_id)
+                    .ok_or("fiber-not-found")?
+                    .fiber_ref();
 
-        let object = HeapObject::new(NonNull::new(reference.address.get() as *mut u64).unwrap());
-        if !fiber.heap.objects().contains(&ObjectInHeap(object)) {
-            return Err("memory-reference-invalid");
-        }
-        let actual_range = HeapData::from(object).address_range();
-        let actual_range = actual_range.start.get()..actual_range.end.get();
+                let object = HeapObject::new(NonNull::new(address.get() as *mut u64).unwrap());
+                if !fiber.heap.objects().contains(&ObjectInHeap(object)) {
+                    return Err("memory-reference-invalid");
+                }
+                let range = HeapData::from(object).address_range();
+                let range = range.start.get()..range.end.get();
 
-        let requested_start = reference.address.get() + args.offset.unwrap_or_default();
+                let data = slice_from_raw_parts(range.start as *const u8, range.len());
+                let data = unsafe { &*data };
+
+                (address.get(), range, Cow::Borrowed(data))
+            }
+        };
+
+        let requested_start = base_offset + args.offset.unwrap_or_default();
         let requested_range = requested_start..requested_start + args.count;
 
         let range = requested_range.intersection(&actual_range);
@@ -51,10 +67,7 @@ impl PausedState {
             });
         };
 
-        let data = slice_from_raw_parts(range.start as *const u8, range.len());
-        let data = unsafe { &*data };
         let data = base64::engine::general_purpose::STANDARD.encode(data);
-
         Ok(ReadMemoryResponse {
             address: format_address(range.start),
             unreadable_bytes: None,
@@ -68,41 +81,70 @@ fn format_address(address: usize) -> String {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct MemoryReference {
-    // TODO: Support inline values
-    fiber_id: FiberId,
-    address: NonZeroUsize,
+pub enum MemoryReference {
+    Inline {
+        value: InlineObject,
+    },
+    Heap {
+        fiber_id: FiberId,
+        address: NonZeroUsize,
+    },
 }
 impl MemoryReference {
-    pub fn new(fiber_id: FiberId, object: HeapObject) -> Self {
-        Self {
+    pub fn new(fiber_id: FiberId, value: InlineObject) -> Self {
+        match HeapObject::try_from(value) {
+            Ok(object) => Self::heap(fiber_id, object),
+            Err(_) => MemoryReference::Inline { value },
+        }
+    }
+    pub fn heap(fiber_id: FiberId, object: HeapObject) -> Self {
+        Self::Heap {
             fiber_id,
             address: object.address().addr(),
         }
-    }
-    pub fn maybe_new(fiber_id: FiberId, object: InlineObject) -> Option<Self> {
-        HeapObject::try_from(object)
-            .ok()
-            .map(|it| Self::new(fiber_id, it))
     }
 
     pub fn from_dap(value: String) -> Result<Self, &'static str> {
         let mut parts = value.split('-');
 
-        let fiber_id = parts.next().ok_or("fiber-id-missing")?;
-        let fiber_id = usize::from_str(fiber_id).map_err(|_| "fiber-id-invalid")?;
-        let fiber_id = FiberId::from_usize(fiber_id);
+        match parts.next().ok_or("heap-inline-disambiguator-missing")? {
+            "heap" => {
+                let fiber_id = parts.next().ok_or("fiber-id-missing")?;
+                let fiber_id = usize::from_str(fiber_id).map_err(|_| "fiber-id-invalid")?;
+                let fiber_id = FiberId::from_usize(fiber_id);
 
-        let address = parts.next().ok_or("memory-address-missing")?;
-        let address = usize::from_str_radix(address, 16)
-            .ok()
-            .and_then(|it| it.try_into().ok())
-            .ok_or("memory-address-invalid")?;
+                let address = parts.next().ok_or("memory-address-missing")?;
+                let address = usize::from_str_radix(address, 16)
+                    .ok()
+                    .and_then(|it| it.try_into().ok())
+                    .ok_or("memory-address-invalid")?;
 
-        Ok(Self { fiber_id, address })
+                Ok(Self::Heap { fiber_id, address })
+            }
+            "inline" => {
+                let value = parts.next().ok_or("value-missing")?;
+                let value = u64::from_str_radix(value, 16)
+                    .ok()
+                    .and_then(|it| it.try_into().ok())
+                    .map(InlineObject::new)
+                    .ok_or("memory-value-invalid")?;
+
+                Ok(Self::Inline { value })
+            }
+            _ => Err("heap-inline-disambiguator-invalid"),
+        }
     }
     pub fn to_dap(self) -> String {
-        format!("{}-{:X}", self.fiber_id.to_usize(), self.address)
+        match self {
+            MemoryReference::Inline { value } => format!(
+                "inline-{:0width$X}",
+                value.raw_word(),
+                width = 2 * size_of::<usize>(),
+            ),
+            MemoryReference::Heap { fiber_id, address } => {
+                format!("heap-{}-{address:016X}", fiber_id.to_usize())
+            }
+        }
     }
 }
 
