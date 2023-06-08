@@ -1,5 +1,5 @@
 use super::{
-    paused::PausedState, tracer::DebugTracer, utils::FiberIdThreadIdConversion, ServerToClient,
+    paused::PausedState, tracer::DebugTracer, vm_state::VmState, ServerToClient,
     ServerToClientMessage, SessionId,
 };
 use crate::database::Database;
@@ -13,10 +13,9 @@ use candy_vm::{
     execution_controller::RunLimitedNumberOfInstructions,
     fiber::FiberId,
     heap::{HirId, Struct},
-    lir::Lir,
     mir_to_lir::compile_lir,
     tracer::DummyTracer,
-    vm::{FiberTree, Vm},
+    vm::Vm,
 };
 use dap::{
     events::StoppedEventBody,
@@ -25,10 +24,11 @@ use dap::{
     responses::{
         Response, ResponseBody, ResponseMessage, SetExceptionBreakpointsResponse, ThreadsResponse,
     },
-    types::{Capabilities, StoppedEventReason, Thread},
+    types::{Capabilities, StoppedEventReason},
 };
+use lsp_types::{Position, Range};
 use rustc_hash::FxHashMap;
-use std::{mem, path::PathBuf, rc::Rc};
+use std::{mem, num::NonZeroUsize, path::PathBuf, rc::Rc};
 use tokio::sync::mpsc;
 use tower_lsp::Client;
 use tracing::error;
@@ -84,10 +84,6 @@ enum ExecutionState {
     #[allow(dead_code)] // WIP
     Running(VmState),
     Paused(PausedState),
-}
-pub struct VmState {
-    pub vm: Vm<Rc<Lir>, DebugTracer>,
-    pub tracer: DebugTracer,
 }
 
 impl DebugSession {
@@ -239,7 +235,7 @@ impl DebugSession {
                 self.send(EventBody::Stopped(StoppedEventBody {
                     reason: StoppedEventReason::Entry,
                     description: Some("Paused on program start".to_string()),
-                    thread_id: Some(FiberId::root().to_thread_id()),
+                    thread_id: Some(FiberId::root().to_usize()),
                     preserve_focus_hint: Some(false),
                     text: None,
                     all_threads_stopped: Some(true),
@@ -281,7 +277,9 @@ impl DebugSession {
             Command::SetVariable(_) => todo!(),
             Command::Source(_) => todo!(),
             Command::StackTrace(args) => {
-                let stack_trace = self.state.require_paused_mut()?.stack_trace(args)?;
+                let start_at_1_config = self.state.require_initialized()?.into();
+                let state = self.state.require_paused_mut()?;
+                let stack_trace = state.stack_trace(&self.db, start_at_1_config, args)?;
                 self.send_response_ok(request.seq, ResponseBody::StackTrace(stack_trace))
                     .await;
                 Ok(())
@@ -294,38 +292,12 @@ impl DebugSession {
             Command::TerminateThreads(_) => todo!(),
             Command::Threads => {
                 let state = self.state.require_launched()?;
-
+                let threads = state.threads();
                 self.send_response_ok(
                     request.seq,
-                    ResponseBody::Threads(ThreadsResponse {
-                        threads: state
-                            .vm
-                            .fibers()
-                            .iter()
-                            .map(|(id, fiber)| Thread {
-                                // FIXME: Use data from tracer?
-                                id: id.to_thread_id(),
-                                // TODO: indicate hierarchy
-                                name: format!(
-                                    "Fiber {}{}{}",
-                                    id.to_usize(),
-                                    if *id == FiberId::root() {
-                                        " (root)"
-                                    } else {
-                                        ""
-                                    },
-                                    match fiber {
-                                        FiberTree::Single(_) => "",
-                                        FiberTree::Parallel(_) => " (in `parallel`)",
-                                        FiberTree::Try(_) => " (in `try`)",
-                                    },
-                                ),
-                            })
-                            .collect(),
-                    }),
+                    ResponseBody::Threads(ThreadsResponse { threads }),
                 )
                 .await;
-
                 Ok(())
             }
             Command::Variables(args) => {
@@ -364,7 +336,7 @@ impl DebugSession {
         })
     }
 
-    async fn send_response_ok(&self, seq: i64, body: ResponseBody) {
+    async fn send_response_ok(&self, seq: NonZeroUsize, body: ResponseBody) {
         self.send(Response {
             request_seq: seq,
             success: true,
@@ -373,7 +345,7 @@ impl DebugSession {
         })
         .await;
     }
-    async fn send_response_err(&self, seq: i64, message: ResponseMessage) {
+    async fn send_response_err(&self, seq: NonZeroUsize, message: ResponseMessage) {
         self.send(Response {
             request_seq: seq,
             success: false,
@@ -422,6 +394,40 @@ impl State {
                 ..
             } => Ok(state),
             _ => Err("not-paused"),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct StartAt1Config {
+    lines_start_at_1: bool,
+    columns_start_at_1: bool,
+}
+impl StartAt1Config {
+    pub fn range_to_dap(&self, range: Range) -> Range {
+        let start = self.position_to_dap(range.start);
+        let end = self.position_to_dap(range.end);
+        Range { start, end }
+    }
+    fn position_to_dap(&self, position: Position) -> Position {
+        fn apply(start_at_1: bool, value: u32) -> u32 {
+            if start_at_1 {
+                value + 1
+            } else {
+                value
+            }
+        }
+        Position {
+            line: apply(self.lines_start_at_1, position.line),
+            character: apply(self.columns_start_at_1, position.character),
+        }
+    }
+}
+impl From<&InitializeArguments> for StartAt1Config {
+    fn from(value: &InitializeArguments) -> Self {
+        Self {
+            lines_start_at_1: value.lines_start_at1.unwrap_or(true),
+            columns_start_at_1: value.columns_start_at1.unwrap_or(true),
         }
     }
 }

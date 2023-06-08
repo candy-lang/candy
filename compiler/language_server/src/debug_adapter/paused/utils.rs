@@ -6,7 +6,7 @@ use candy_vm::{
 };
 use extension_trait::extension_trait;
 use rustc_hash::FxHashMap;
-use std::{borrow::Borrow, hash::Hash};
+use std::{borrow::Borrow, hash::Hash, num::NonZeroUsize};
 
 #[extension_trait]
 pub impl FiberIdExtension for FiberId {
@@ -20,17 +20,17 @@ pub impl FiberIdExtension for FiberId {
 // places.) Therefore, the ID is the index in `keys` plus one.
 pub struct IdMapping<T: Clone + Eq + Hash> {
     keys: Vec<T>,
-    key_to_id: FxHashMap<T, i64>, // FIXME: NonZeroI64
+    key_to_id: FxHashMap<T, NonZeroUsize>,
 }
 
 impl<T: Clone + Eq + Hash> IdMapping<T> {
-    pub fn id_to_key(&self, id: i64) -> &T {
-        &self.keys[(id - 1) as usize]
+    pub fn id_to_key(&self, id: NonZeroUsize) -> &T {
+        &self.keys[id.get() - 1]
     }
-    pub fn key_to_id(&mut self, key: T) -> i64 {
+    pub fn key_to_id(&mut self, key: T) -> NonZeroUsize {
         *self.key_to_id.entry(key.clone()).or_insert_with(|| {
             self.keys.push(key);
-            self.keys.len() as i64
+            self.keys.len().try_into().unwrap()
         })
     }
 }

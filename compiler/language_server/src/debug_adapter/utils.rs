@@ -4,11 +4,11 @@ use extension_trait::extension_trait;
 
 #[extension_trait]
 pub impl FiberIdThreadIdConversion for FiberId {
-    fn from_thread_id(id: i64) -> Self {
-        Self::from_usize(id as usize)
+    fn from_thread_id(id: usize) -> Self {
+        Self::from_usize(id)
     }
 
-    fn to_thread_id(self) -> i64 {
-        self.to_usize() as i64
+    fn to_thread_id(self) -> usize {
+        self.to_usize()
     }
 }

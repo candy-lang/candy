@@ -21,7 +21,7 @@ pub struct Lir {
     pub module: Module,
     pub constant_heap: Heap,
     pub instructions: Vec<Instruction>,
-    pub origins: Vec<FxHashSet<hir::Id>>,
+    pub(super) origins: Vec<FxHashSet<hir::Id>>,
     pub module_function: Function,
     pub responsible_module: HirId,
 }
@@ -209,6 +209,9 @@ impl StackExt for Vec<Id> {
 }
 
 impl Lir {
+    pub fn functions_behind(&self, ip: InstructionPointer) -> &FxHashSet<hir::Id> {
+        &self.origins[*ip]
+    }
     pub fn range_of_function(&self, function: &hir::Id) -> Range<InstructionPointer> {
         let start = self
             .origins
