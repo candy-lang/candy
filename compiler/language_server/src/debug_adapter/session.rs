@@ -10,11 +10,12 @@ use candy_frontend::{
     TracingConfig, TracingMode,
 };
 use candy_vm::{
-    execution_controller::RunLimitedNumberOfInstructions,
-    fiber::FiberId,
+    execution_controller::{ExecutionController, RunLimitedNumberOfInstructions},
+    fiber::{Fiber, FiberId, InstructionPointer},
     heap::{HirId, Struct},
+    lir::{Instruction, Lir},
     mir_to_lir::compile_lir,
-    tracer::DummyTracer,
+    tracer::{DummyTracer, FiberTracer},
     vm::Vm,
 };
 use dap::{
@@ -161,7 +162,7 @@ impl DebugSession {
                     supports_stepping_granularity: None,
                     supports_instruction_breakpoints: None,
                     supports_exception_filter_options: None,
-                    supports_single_thread_execution_requests: None,
+                    supports_single_thread_execution_requests: Some(true),
                 };
                 self.send_response_ok(request.seq, ResponseBody::Initialize(Some(capabilities)))
                     .await;
@@ -247,7 +248,15 @@ impl DebugSession {
             }
             Command::LoadedSources => todo!(),
             Command::Modules(_) => todo!(),
-            Command::Next(_) => todo!(),
+            Command::Next(args) => {
+                self.step(
+                    request.seq,
+                    StepKind::Next,
+                    args.thread_id,
+                    args.single_thread,
+                )
+                .await
+            }
             Command::Pause(_) => todo!(),
             Command::ReadMemory(_) => todo!(),
             Command::Restart(_) => todo!(),
@@ -285,9 +294,25 @@ impl DebugSession {
                 Ok(())
             }
             Command::StepBack(_) => todo!(),
-            Command::StepIn(_) => todo!(),
+            Command::StepIn(args) => {
+                self.step(
+                    request.seq,
+                    StepKind::In,
+                    args.thread_id,
+                    args.single_thread,
+                )
+                .await
+            }
             Command::StepInTargets(_) => todo!(),
-            Command::StepOut(_) => todo!(),
+            Command::StepOut(args) => {
+                self.step(
+                    request.seq,
+                    StepKind::Out,
+                    args.thread_id,
+                    args.single_thread,
+                )
+                .await
+            }
             Command::Terminate(_) => todo!(),
             Command::TerminateThreads(_) => todo!(),
             Command::Threads => {
@@ -318,6 +343,54 @@ impl DebugSession {
             Command::WriteMemory(_) => todo!(),
             Command::Cancel(_) => todo!(),
         }
+    }
+    async fn step(
+        &mut self,
+        request_seq: NonZeroUsize,
+        kind: StepKind,
+        thread_id: usize,
+        single_thread: Option<bool>,
+    ) -> Result<(), &'static str> {
+        self.state.require_paused()?;
+        let response_body = match kind {
+            StepKind::Next => ResponseBody::Next,
+            StepKind::In => ResponseBody::StepIn,
+            StepKind::Out => ResponseBody::StepOut,
+        };
+        self.send_response_ok(request_seq, response_body).await;
+
+        let state = self.state.require_paused_mut().unwrap();
+
+        let fiber_id = FiberId::from_usize(thread_id);
+        // TODO: honor `args.granularity`
+        let fiber = state.vm_state.vm.fiber(fiber_id).unwrap().fiber_ref();
+        let lir = state.vm_state.vm.lir().to_owned();
+        let mut execution_controller =
+            StepExecutionController::new(lir.as_ref(), fiber_id, fiber.call_stack().len(), kind);
+        if single_thread.unwrap_or_default() {
+            state.vm_state.vm.run_fiber(
+                fiber_id,
+                &mut execution_controller,
+                &mut state.vm_state.tracer,
+            );
+        } else {
+            state
+                .vm_state
+                .vm
+                .run(&mut execution_controller, &mut state.vm_state.tracer);
+        }
+
+        self.send(EventBody::Stopped(StoppedEventBody {
+            reason: StoppedEventReason::Step,
+            description: None,
+            thread_id: Some(thread_id),
+            preserve_focus_hint: Some(false),
+            text: None,
+            all_threads_stopped: Some(true),
+            hit_breakpoint_ids: Some(vec![]),
+        }))
+        .await;
+        Ok(())
     }
 
     fn parse_module(&self, path: Option<String>) -> Result<Module, &'static str> {
@@ -387,6 +460,15 @@ impl State {
             } => Ok(vm_state),
         }
     }
+    fn require_paused(&self) -> Result<&PausedState, &'static str> {
+        match self {
+            State::Launched {
+                execution_state: ExecutionState::Paused(state),
+                ..
+            } => Ok(state),
+            _ => Err("not-paused"),
+        }
+    }
     fn require_paused_mut(&mut self) -> Result<&mut PausedState, &'static str> {
         match self {
             State::Launched {
@@ -428,6 +510,58 @@ impl From<&InitializeArguments> for StartAt1Config {
         Self {
             lines_start_at_1: value.lines_start_at1.unwrap_or(true),
             columns_start_at_1: value.columns_start_at1.unwrap_or(true),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum StepKind {
+    Next,
+    In,
+    Out,
+}
+struct StepExecutionController<'a> {
+    lir: &'a Lir,
+    fiber_id: FiberId,
+    call_stack_size: usize,
+    kind: StepKind,
+    did_step: bool,
+}
+impl<'a> StepExecutionController<'a> {
+    fn new(lir: &'a Lir, fiber_id: FiberId, call_stack_size: usize, kind: StepKind) -> Self {
+        Self {
+            lir,
+            fiber_id,
+            call_stack_size,
+            kind,
+            did_step: false,
+        }
+    }
+}
+impl<'a, T: FiberTracer> ExecutionController<T> for StepExecutionController<'a> {
+    fn should_continue_running(&self) -> bool {
+        !self.did_step
+    }
+
+    fn instruction_executed(
+        &mut self,
+        fiber_id: FiberId,
+        fiber: &Fiber<T>,
+        ip: InstructionPointer,
+    ) {
+        if fiber_id != self.fiber_id
+            || !matches!(
+                self.lir.instructions[*ip],
+                Instruction::TraceCallEnds | Instruction::TraceExpressionEvaluated
+            )
+        {
+            return;
+        }
+
+        self.did_step = match self.kind {
+            StepKind::Next => fiber.call_stack().len() <= self.call_stack_size,
+            StepKind::In => true,
+            StepKind::Out => fiber.call_stack().len() < self.call_stack_size,
         }
     }
 }
