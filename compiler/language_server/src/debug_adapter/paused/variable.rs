@@ -17,7 +17,7 @@ use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use std::hash::Hash;
 
-impl PausedState {
+impl<'c: 'h, 'h> PausedState<'c, 'h> {
     #[allow(unused_parens)]
     pub fn variables(
         &mut self,
@@ -238,7 +238,7 @@ impl PausedState {
     fn create_variable(
         &mut self,
         name: String,
-        object: InlineObject,
+        object: InlineObject<'h>,
         supports_variable_type: bool,
     ) -> Variable {
         let data = Data::from(object);
@@ -303,9 +303,9 @@ impl PausedState {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum VariablesKey {
+pub enum VariablesKey<'h> {
     Arguments(StackFrameKey),
     Locals(StackFrameKey),
     FiberHeap(FiberId),
-    Inner(ObjectInHeap),
+    Inner(ObjectInHeap<'h>),
 }

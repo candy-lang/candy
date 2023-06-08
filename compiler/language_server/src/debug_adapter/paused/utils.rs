@@ -10,7 +10,10 @@ use std::{borrow::Borrow, hash::Hash};
 
 #[extension_trait]
 pub impl FiberIdExtension for FiberId {
-    fn get<L: Borrow<Lir>, T: Tracer>(self, vm: &Vm<L, T>) -> &Fiber<T::ForFiber> {
+    fn get<'a, 'c: 'h, 'h, L: Borrow<Lir<'c>>, T: Tracer<'h>>(
+        self,
+        vm: &'a Vm<'c, 'h, L, T>,
+    ) -> &'a Fiber<'c, 'h, T::ForFiber> {
         vm.fiber(self).unwrap().fiber_ref()
     }
 }

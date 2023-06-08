@@ -181,12 +181,12 @@ impl Hash for HeapObject<'_> {
         HeapData::from(*self).hash(state);
     }
 }
-impl Ord for HeapObject {
+impl Ord for HeapObject<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
         Data::from(*self).cmp(&Data::from(*other))
     }
 }
-impl PartialOrd for HeapObject {
+impl PartialOrd for HeapObject<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }

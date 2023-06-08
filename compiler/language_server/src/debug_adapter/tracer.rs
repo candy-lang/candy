@@ -8,54 +8,59 @@ use candy_vm::{
 #[derive(Debug, Default)]
 pub struct DebugTracer;
 
-impl Tracer for DebugTracer {
-    type ForFiber = FiberDebugTracer;
+impl<'h> Tracer<'h> for DebugTracer {
+    type ForFiber = FiberDebugTracer<'h>;
 
     fn root_fiber_created(&mut self) -> Self::ForFiber {
         FiberDebugTracer::default()
     }
-    fn root_fiber_ended(&mut self, ended: FiberEnded<Self::ForFiber>) {
+    fn root_fiber_ended<'a>(&mut self, ended: FiberEnded<'a, 'h, Self::ForFiber>) {
         ended.tracer.drop(ended.heap);
     }
 }
 
 #[derive(Debug)]
-pub struct StackFrame {
-    pub call: Call,
-    pub locals: Vec<(Id, InlineObject)>,
+pub struct StackFrame<'h> {
+    pub call: Call<'h>,
+    pub locals: Vec<(Id, InlineObject<'h>)>,
 }
-impl StackFrame {
-    fn new(call: Call) -> Self {
+impl<'h> StackFrame<'h> {
+    fn new(call: Call<'h>) -> Self {
         Self {
             call,
             locals: vec![],
         }
     }
 
-    fn dup(&self, heap: &mut Heap) {
+    fn dup(&self, heap: &mut Heap<'h>) {
         self.call.dup(heap);
         self.locals.iter().for_each(|(_, value)| value.dup(heap));
     }
-    fn drop(&self, heap: &mut Heap) {
+    fn drop(&self, heap: &mut Heap<'h>) {
         self.call.drop(heap);
         self.locals.iter().for_each(|(_, value)| value.drop(heap));
     }
 }
 
 #[derive(Debug, Default)]
-pub struct FiberDebugTracer {
-    pub root_locals: Vec<(Id, InlineObject)>,
-    pub call_stack: Vec<StackFrame>,
+pub struct FiberDebugTracer<'h> {
+    pub root_locals: Vec<(Id, InlineObject<'h>)>,
+    pub call_stack: Vec<StackFrame<'h>>,
 }
-impl FiberTracer for FiberDebugTracer {
+impl<'h> FiberTracer<'h> for FiberDebugTracer<'h> {
     fn child_fiber_created(&mut self, _child: FiberId) -> Self {
         FiberDebugTracer::default()
     }
-    fn child_fiber_ended(&mut self, ended: FiberEnded<Self>) {
+    fn child_fiber_ended<'a>(&mut self, ended: FiberEnded<'a, 'h, Self>) {
         ended.tracer.drop(ended.heap);
     }
 
-    fn value_evaluated(&mut self, heap: &mut Heap, expression: HirId, value: InlineObject) {
+    fn value_evaluated(
+        &mut self,
+        heap: &mut Heap<'h>,
+        expression: HirId<'h>,
+        value: InlineObject<'h>,
+    ) {
         value.dup(heap);
         self.call_stack
             .last_mut()
@@ -66,11 +71,11 @@ impl FiberTracer for FiberDebugTracer {
 
     fn call_started(
         &mut self,
-        heap: &mut Heap,
-        call_site: HirId,
-        callee: InlineObject,
-        arguments: Vec<InlineObject>,
-        responsible: HirId,
+        heap: &mut Heap<'h>,
+        call_site: HirId<'h>,
+        callee: InlineObject<'h>,
+        arguments: Vec<InlineObject<'h>>,
+        responsible: HirId<'h>,
     ) {
         let call = Call {
             call_site,
@@ -81,11 +86,11 @@ impl FiberTracer for FiberDebugTracer {
         call.dup(heap);
         self.call_stack.push(StackFrame::new(call));
     }
-    fn call_ended(&mut self, heap: &mut Heap, _return_value: InlineObject) {
+    fn call_ended(&mut self, heap: &mut Heap<'h>, _return_value: InlineObject<'h>) {
         self.call_stack.pop().unwrap().drop(heap);
     }
 
-    fn dup_all_stored_objects(&self, heap: &mut Heap) {
+    fn dup_all_stored_objects(&self, heap: &mut Heap<'h>) {
         self.root_locals
             .iter()
             .for_each(|(_, value)| value.dup(heap));
@@ -95,8 +100,8 @@ impl FiberTracer for FiberDebugTracer {
     }
 }
 
-impl FiberDebugTracer {
-    fn drop(self, heap: &mut Heap) {
+impl<'h> FiberDebugTracer<'h> {
+    fn drop(self, heap: &mut Heap<'h>) {
         self.root_locals
             .into_iter()
             .for_each(|(_, value)| value.drop(heap));

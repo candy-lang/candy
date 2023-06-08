@@ -102,7 +102,7 @@ impl<'h> HeapList<'h> {
         new_list
     }
     #[must_use]
-    pub fn replace(self, heap: &mut Heap<'h>, index: usize, value: InlineObject) -> Self {
+    pub fn replace(self, heap: &mut Heap<'h>, index: usize, value: InlineObject<'h>) -> Self {
         assert!(index < self.len());
 
         let new_list = Self::create(heap, self.items());
@@ -154,7 +154,7 @@ impl PartialOrd for HeapList<'_> {
     }
 }
 
-heap_object_impls!(HeapList<'_>);
+heap_object_impls!(HeapList<'h>);
 
 impl<'h> HeapObjectTrait<'h> for HeapList<'h> {
     fn content_size(self) -> usize {

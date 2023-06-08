@@ -124,12 +124,12 @@ impl Hash for InlineObject<'_> {
         InlineData::from(*self).hash(state)
     }
 }
-impl Ord for InlineObject {
+impl Ord for InlineObject<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
         Data::from(*self).cmp(&Data::from(*other))
     }
 }
-impl PartialOrd for InlineObject {
+impl PartialOrd for InlineObject<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }

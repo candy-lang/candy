@@ -22,7 +22,10 @@ impl<'h> HeapStruct<'h> {
     pub fn new_unchecked(object: HeapObject<'h>) -> Self {
         Self(object)
     }
-    pub fn create(heap: &mut Heap<'h>, value: &FxHashMap<InlineObject, InlineObject>) -> Self {
+    pub fn create(
+        heap: &mut Heap<'h>,
+        value: &FxHashMap<InlineObject<'h>, InlineObject<'h>>,
+    ) -> Self {
         let len = value.len();
         assert_eq!(
             (len << Self::LEN_SHIFT) >> Self::LEN_SHIFT,
@@ -175,7 +178,7 @@ impl<'h> HeapStruct<'h> {
             .ok_or(index_of_first_hash_occurrence)
     }
 
-    fn do_hash(key: InlineObject) -> u64 {
+    fn do_hash(key: InlineObject<'h>) -> u64 {
         let mut state = FxHasher::default();
         key.hash(&mut state);
         state.finish()
@@ -239,7 +242,7 @@ impl Hash for HeapStruct<'_> {
         self.values().hash(state);
     }
 }
-impl Ord for HeapStruct {
+impl Ord for HeapStruct<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
         let mut self_keys = self.keys().to_vec();
         self_keys.sort();
@@ -248,7 +251,7 @@ impl Ord for HeapStruct {
         self_keys.cmp(&other_keys)
     }
 }
-impl PartialOrd for HeapStruct {
+impl PartialOrd for HeapStruct<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }

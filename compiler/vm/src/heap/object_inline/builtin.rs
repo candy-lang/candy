@@ -49,12 +49,12 @@ impl Hash for InlineBuiltin<'_> {
         self.index().hash(state)
     }
 }
-impl Ord for InlineBuiltin {
+impl Ord for InlineBuiltin<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.index().cmp(&other.index())
     }
 }
-impl PartialOrd for InlineBuiltin {
+impl PartialOrd for InlineBuiltin<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }

@@ -251,10 +251,10 @@ impl<'c: 'h, 'h, L: Borrow<Lir<'c>>, T: Tracer<'h>> Vm<'c, 'h, L, T> {
         matches!(self.status(), Status::CanRun)
     }
 
-    pub fn fibers(&self) -> &HashMap<FiberId, FiberTree<T::ForFiber>> {
+    pub fn fibers(&self) -> &HashMap<FiberId, FiberTree<'c, 'h, T::ForFiber>> {
         &self.fibers
     }
-    pub fn fiber(&self, id: FiberId) -> Option<&FiberTree<T::ForFiber>> {
+    pub fn fiber(&self, id: FiberId) -> Option<&FiberTree<'c, 'h, T::ForFiber>> {
         self.fibers.get(&id)
     }
 

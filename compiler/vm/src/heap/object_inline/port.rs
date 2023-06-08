@@ -61,12 +61,12 @@ impl Hash for InlinePort<'_> {
         self.channel_id().hash(state)
     }
 }
-impl Ord for InlinePort {
+impl Ord for InlinePort<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.channel_id().cmp(&other.channel_id())
     }
 }
-impl PartialOrd for InlinePort {
+impl PartialOrd for InlinePort<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }

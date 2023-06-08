@@ -24,7 +24,7 @@ impl<'h> HeapTag<'h> {
     pub fn create(
         heap: &mut Heap<'h>,
         symbol: Text,
-        value: impl Into<Option<InlineObject>>,
+        value: impl Into<Option<InlineObject<'h>>>,
     ) -> Self {
         let value = value.into();
         let tag = Self(heap.allocate(HeapObject::KIND_TAG, 2 * HeapObject::WORD_SIZE));
@@ -99,7 +99,7 @@ impl PartialOrd for HeapTag<'_> {
     }
 }
 
-heap_object_impls!(HeapTag<'_>);
+heap_object_impls!(HeapTag<'h>);
 
 impl<'h> HeapObjectTrait<'h> for HeapTag<'h> {
     fn content_size(self) -> usize {

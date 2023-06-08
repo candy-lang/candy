@@ -346,7 +346,10 @@ impl_try_from_heap_object!(List, "Expected a list.");
 #[derive(Clone, Copy, Deref, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Struct<'h>(HeapStruct<'h>);
 impl<'h> Struct<'h> {
-    pub fn create(heap: &mut Heap<'h>) -> Self {
+    pub fn create(
+        heap: &mut Heap<'h>,
+        fields: &FxHashMap<InlineObject<'h>, InlineObject<'h>>,
+    ) -> Self {
         HeapStruct::create(heap, fields).into()
     }
     pub fn create_with_symbol_keys(

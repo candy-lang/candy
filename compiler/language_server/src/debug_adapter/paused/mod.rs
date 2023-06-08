@@ -6,13 +6,13 @@ mod stack_trace;
 mod utils;
 mod variable;
 
-pub struct PausedState {
-    pub vm_state: VmState,
+pub struct PausedState<'c: 'h, 'h> {
+    pub vm_state: VmState<'c, 'h>,
     stack_frame_ids: IdMapping<StackFrameKey>,
-    variables_ids: IdMapping<VariablesKey>,
+    variables_ids: IdMapping<VariablesKey<'h>>,
 }
-impl PausedState {
-    pub fn new(vm_state: VmState) -> Self {
+impl<'c: 'h, 'h> PausedState<'c, 'h> {
+    pub fn new(vm_state: VmState<'c, 'h>) -> Self {
         Self {
             vm_state,
             stack_frame_ids: IdMapping::default(),

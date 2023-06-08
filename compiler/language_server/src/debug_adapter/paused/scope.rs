@@ -5,7 +5,7 @@ use dap::{
     types::{Scope, ScopePresentationhint},
 };
 
-impl PausedState {
+impl<'c: 'h, 'h> PausedState<'c, 'h> {
     pub fn scopes(&mut self, args: ScopesArguments) -> ScopesResponse {
         let stack_frame_key = self.stack_frame_ids.id_to_key(args.frame_id);
         let stack_frame = stack_frame_key.get(&self.vm_state.vm);

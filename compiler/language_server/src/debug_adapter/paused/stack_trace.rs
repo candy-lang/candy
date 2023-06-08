@@ -16,7 +16,7 @@ use dap::{
 };
 use std::{borrow::Borrow, hash::Hash};
 
-impl PausedState {
+impl<'c: 'h, 'h> PausedState<'c, 'h> {
     pub fn stack_trace(
         &mut self,
         args: StackTraceArguments,
@@ -103,17 +103,20 @@ pub struct StackFrameKey {
     index: usize,
 }
 impl StackFrameKey {
-    pub fn get<'a, L: Borrow<Lir>>(&self, vm: &'a Vm<L, DebugTracer>) -> Option<&'a StackFrame> {
+    pub fn get<'a, 'c: 'h, 'h, L: Borrow<Lir<'c>>>(
+        &self,
+        vm: &'a Vm<'c, 'h, L, DebugTracer>,
+    ) -> Option<&'a StackFrame<'h>> {
         if self.index == 0 {
             return None;
         }
 
         Some(&self.fiber_id.get(vm).tracer.call_stack[self.index - 1])
     }
-    pub fn get_locals<'a, L: Borrow<Lir>>(
+    pub fn get_locals<'a, 'c: 'h, 'h, L: Borrow<Lir<'c>>>(
         &self,
-        vm: &'a Vm<L, DebugTracer>,
-    ) -> &'a Vec<(Id, InlineObject)> {
+        vm: &'a Vm<'c, 'h, L, DebugTracer>,
+    ) -> &'a Vec<(Id, InlineObject<'h>)> {
         let fiber_state = &self.fiber_id.get(vm).tracer;
         if self.index == 0 {
             &fiber_state.root_locals

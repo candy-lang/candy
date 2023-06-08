@@ -57,8 +57,8 @@ impl Clone for Packet<'_> {
         Self { heap, object }
     }
 }
-impl From<InlineObject<'_>> for Packet<'_> {
-    fn from(object: InlineObject) -> Self {
+impl<'h> From<InlineObject<'h>> for Packet<'h> {
+    fn from(object: InlineObject<'h>) -> Self {
         let mut heap = Heap::default();
         let object = object.clone_to_heap(&mut heap);
         Self { heap, object }

@@ -61,36 +61,36 @@ pub async fn run_debug_session(
     }
 }
 
-struct DebugSession {
+struct DebugSession<'c: 'h, 'h> {
     session_id: SessionId,
     client: Client,
     db: Database,
-    state: State,
+    state: State<'c, 'h>,
 }
 
 // `Launched` is much larger than `Initial` and `Initialized`, but it's also the
 // most common state while the others are only temporary during initialization.
 #[allow(clippy::large_enum_variant)]
-enum State {
+enum State<'c: 'h, 'h> {
     Initial,
     Initialized(InitializeArguments),
     Launched {
         initialize_arguments: InitializeArguments,
-        execution_state: ExecutionState,
+        execution_state: ExecutionState<'c, 'h>,
     },
 }
 
-enum ExecutionState {
+enum ExecutionState<'c: 'h, 'h> {
     #[allow(dead_code)] // WIP
-    Running(VmState),
-    Paused(PausedState),
+    Running(VmState<'c, 'h>),
+    Paused(PausedState<'c, 'h>),
 }
-pub struct VmState {
-    pub vm: Vm<Rc<Lir>, DebugTracer>,
+pub struct VmState<'c: 'h, 'h> {
+    pub vm: Vm<'c, 'h, Rc<Lir<'c>>, DebugTracer>,
     pub tracer: DebugTracer,
 }
 
-impl DebugSession {
+impl<'c: 'h, 'h> DebugSession<'c, 'h> {
     pub async fn handle(&mut self, request: Request) -> Result<(), &'static str> {
         match request.command {
             Command::Attach(_) => todo!(),
@@ -393,7 +393,7 @@ impl DebugSession {
     }
 }
 
-impl State {
+impl<'c: 'h, 'h> State<'c, 'h> {
     fn require_initialized(&self) -> Result<&InitializeArguments, &'static str> {
         match &self {
             State::Initial => Err("not-initialized"),
@@ -404,7 +404,7 @@ impl State {
             } => Ok(initialize_arguments),
         }
     }
-    fn require_launched(&self) -> Result<&VmState, &'static str> {
+    fn require_launched(&self) -> Result<&VmState<'c, 'h>, &'static str> {
         match &self {
             State::Initial | State::Initialized(_) => Err("not-launched"),
             State::Launched {
@@ -415,7 +415,7 @@ impl State {
             } => Ok(vm_state),
         }
     }
-    fn require_paused_mut(&mut self) -> Result<&mut PausedState, &'static str> {
+    fn require_paused_mut(&mut self) -> Result<&mut PausedState<'c, 'h>, &'static str> {
         match self {
             State::Launched {
                 execution_state: ExecutionState::Paused(state),

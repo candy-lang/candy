@@ -39,7 +39,7 @@ impl<'h> From<HeapObject<'h>> for InlinePointer<'h> {
     }
 }
 impl<'h> From<HeapObject<'h>> for InlineObject<'h> {
-    fn from(value: HeapObject) -> Self {
+    fn from(value: HeapObject<'h>) -> Self {
         let address = value.address().addr().get() as u64;
         debug_assert_eq!(address & Self::KIND_MASK, Self::KIND_POINTER);
         let address = unsafe { NonZeroU64::new_unchecked(address) };
