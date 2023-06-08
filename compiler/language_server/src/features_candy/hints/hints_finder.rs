@@ -127,7 +127,7 @@ impl HintsFinder {
                 mut vm,
             } => {
                 client
-                    .update_status(Some(format!("Evaluating {}", self.module.to_rich_ir())))
+                    .update_status(Some(format!("Evaluating {}", self.module)))
                     .await;
 
                 vm.run(&mut RunLimitedNumberOfInstructions::new(500), &mut tracer);
