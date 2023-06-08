@@ -37,6 +37,7 @@ impl Display for Indentation {
 pub struct SinglelineWidth(usize);
 impl SinglelineWidth {
     pub const SPACE: SinglelineWidth = SinglelineWidth(1);
+    pub const PERCENT: SinglelineWidth = SinglelineWidth(1);
 
     pub const fn new_const(width: usize) -> Self {
         SinglelineWidth(width)

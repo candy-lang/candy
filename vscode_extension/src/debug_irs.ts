@@ -51,19 +51,25 @@ export function registerDebugIrCommands(client: LanguageClient) {
     const tracingConfig = await pickTracingConfig({
       canSelectOnlyCurrent: false,
     });
-    if (tracingConfig === undefined) return undefined;
+    if (tracingConfig === undefined) {
+      return undefined;
+    }
 
     return { type: 'mir', tracingConfig };
   });
   registerDebugIrCommand('optimizedMir', 'viewOptimizedMir', async () => {
     const tracingConfig = await pickTracingConfig();
-    if (tracingConfig === undefined) return undefined;
+    if (tracingConfig === undefined) {
+      return undefined;
+    }
 
     return { type: 'optimizedMir', tracingConfig };
   });
   registerDebugIrCommand('lir', 'viewLir', async () => {
     const tracingConfig = await pickTracingConfig();
-    if (tracingConfig === undefined) return undefined;
+    if (tracingConfig === undefined) {
+      return undefined;
+    }
 
     return { type: 'lir', tracingConfig };
   });
@@ -113,7 +119,9 @@ async function registerDebugIrCommand(
     }
 
     const ir = await createIrConfig();
-    if (ir === undefined) return;
+    if (ir === undefined) {
+      return;
+    }
 
     const encodedUri = encodeUri(editor.document, ir);
     const irDocument = await vscode.workspace.openTextDocument(encodedUri);
@@ -137,16 +145,22 @@ async function pickTracingConfig(
     'Include tracing of fuzzable functions?',
     options
   );
-  if (registerFuzzables === undefined) return;
+  if (registerFuzzables === undefined) {
+    return;
+  }
 
   const calls = await pickTracingMode('Include tracing of calls?', options);
-  if (calls === undefined) return;
+  if (calls === undefined) {
+    return;
+  }
 
   const evaluatedExpressions = await pickTracingMode(
     'Include tracing of evaluated expressions?',
     options
   );
-  if (evaluatedExpressions === undefined) return;
+  if (evaluatedExpressions === undefined) {
+    return;
+  }
 
   return { registerFuzzables, calls, evaluatedExpressions };
 }
@@ -169,24 +183,37 @@ async function pickTracingMode(
 
 const irScheme = 'candy-ir';
 function encodeUri(document: vscode.TextDocument, ir: Ir): vscode.Uri {
+  let [uri, moduleKind] =
+    document.uri.scheme === irScheme
+      ? (() => {
+          const { originalUri, moduleKind } = decodeUri(document.uri);
+          return [originalUri, moduleKind];
+        })()
+      : [document.uri, getModuleKind(document.languageId)];
   const details: { [key: string]: any } = {
-    scheme: document.uri.scheme,
-    moduleKind: getModuleKind(document.languageId),
+    scheme: uri.scheme,
+    moduleKind,
     ...ir,
   };
   delete details.type;
 
   return vscode.Uri.from({
     scheme: irScheme,
-    path: `${document.uri.path}.${ir.type}`,
+    path: `${uri.path}.${ir.type}`,
     // TODO: Encode this in the query part once VS Code doesn't encode it again.
     fragment: JSON.stringify(details),
   });
 }
-function decodeUri(uri: vscode.Uri): { ir: Ir; originalUri: vscode.Uri } {
+function decodeUri(uri: vscode.Uri): {
+  ir: Ir;
+  originalUri: vscode.Uri;
+  moduleKind: ModuleKind;
+} {
   const details = JSON.parse(uri.fragment);
   const scheme = details.scheme as string;
   delete details.scheme;
+  const moduleKind = details.moduleKind as ModuleKind;
+  delete details.moduleKind;
 
   const separatorIndex = uri.path.lastIndexOf('.');
   const path = uri.path.slice(0, separatorIndex);
@@ -198,5 +225,6 @@ function decodeUri(uri: vscode.Uri): { ir: Ir; originalUri: vscode.Uri } {
   return {
     ir,
     originalUri: vscode.Uri.from({ scheme, path }),
+    moduleKind,
   };
 }

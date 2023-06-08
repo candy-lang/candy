@@ -12,10 +12,7 @@
 use self::{hint::Hint, hints_finder::HintsFinder};
 use super::AnalyzerClient;
 use crate::database::Database;
-use candy_frontend::{
-    module::{Module, MutableModuleProviderOwner, PackagesPath},
-    rich_ir::ToRichIr,
-};
+use candy_frontend::module::{Module, MutableModuleProviderOwner, PackagesPath};
 use lsp_types::{notification::Notification, Url};
 use rand::{seq::IteratorRandom, thread_rng};
 use rustc_hash::FxHashMap;
@@ -118,7 +115,7 @@ impl<T: Clone + fmt::Debug + Eq, R: Fn(Module, T) -> F, F: Future> OutgoingCache
 
     async fn send(&mut self, module: Module, value: T) {
         if self.last_sent.get(&module) != Some(&value) {
-            debug!("Reporting for {}: {value:?}", module.to_rich_ir());
+            debug!("Reporting for {}: {value:?}", module);
             self.last_sent.insert(module.clone(), value.clone());
             (self.sender)(module, value).await;
         }

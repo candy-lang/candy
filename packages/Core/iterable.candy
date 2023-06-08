@@ -33,8 +33,8 @@ generateWithState initialState mapper :=
   # Creates a new iterator from a state and mapper. The `mapper` receives the
   # current state and returns either one of these:
   #
-  # - an `Ok` of a struct containing the item to emit (`NewItem`) and the new
-  #   state (`NewState`)
+  # - an `Ok` of a struct containing the item to emit (`Item`) and the new
+  #   state (`State`)
   # - an `Error`, indicating that the iterator is done
   needs (function.is1 mapper)
   recursive initialState { recurse state ->
@@ -43,6 +43,20 @@ generateWithState initialState mapper :=
         [item, state] = result
         [item, Rest: recurse state]
       }
+    }
+  }
+generate length valueGetter :=
+  # Creates a new iterable of the given `length`, where each slot is filled by calling `valueGetter`
+  # with the index.
+  needs (int.is length)
+  needs (int.isNonNegative length)
+  needs (int.fitsInRustU32 length)
+  needs (function.is1 valueGetter)
+
+  generateWithState 0 { index ->
+    ifElse (index | equals length) { Error Empty } {
+      item = valueGetter index
+      Ok [item, State: index | int.add 1]
     }
   }
 

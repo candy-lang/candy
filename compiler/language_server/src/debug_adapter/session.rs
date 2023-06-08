@@ -1,5 +1,5 @@
 use super::{
-    paused::PausedState, tracer::DebugTracer, utils::FiberIdThreadIdConversion, ServerToClient,
+    paused::PausedState, tracer::DebugTracer, vm_state::VmState, ServerToClient,
     ServerToClientMessage, SessionId,
 };
 use crate::database::Database;
@@ -10,13 +10,13 @@ use candy_frontend::{
     TracingConfig, TracingMode,
 };
 use candy_vm::{
-    execution_controller::RunLimitedNumberOfInstructions,
-    fiber::FiberId,
+    execution_controller::{ExecutionController, RunLimitedNumberOfInstructions},
+    fiber::{Fiber, FiberId, InstructionPointer},
     heap::{HirId, Struct},
-    lir::Lir,
+    lir::{Instruction, Lir},
     mir_to_lir::compile_lir,
-    tracer::DummyTracer,
-    vm::{FiberTree, Vm},
+    tracer::{DummyTracer, FiberTracer},
+    vm::Vm,
 };
 use dap::{
     events::StoppedEventBody,
@@ -25,10 +25,11 @@ use dap::{
     responses::{
         Response, ResponseBody, ResponseMessage, SetExceptionBreakpointsResponse, ThreadsResponse,
     },
-    types::{Capabilities, StoppedEventReason, Thread},
+    types::{Capabilities, StoppedEventReason},
 };
+use lsp_types::{Position, Range};
 use rustc_hash::FxHashMap;
-use std::{mem, path::PathBuf, rc::Rc};
+use std::{mem, num::NonZeroUsize, path::PathBuf, rc::Rc};
 use tokio::sync::mpsc;
 use tower_lsp::Client;
 use tracing::error;
@@ -84,10 +85,6 @@ enum ExecutionState {
     #[allow(dead_code)] // WIP
     Running(VmState),
     Paused(PausedState),
-}
-pub struct VmState {
-    pub vm: Vm<Rc<Lir>, DebugTracer>,
-    pub tracer: DebugTracer,
 }
 
 impl DebugSession {
@@ -165,7 +162,7 @@ impl DebugSession {
                     supports_stepping_granularity: None,
                     supports_instruction_breakpoints: None,
                     supports_exception_filter_options: None,
-                    supports_single_thread_execution_requests: None,
+                    supports_single_thread_execution_requests: Some(true),
                 };
                 self.send_response_ok(request.seq, ResponseBody::Initialize(Some(capabilities)))
                     .await;
@@ -239,7 +236,7 @@ impl DebugSession {
                 self.send(EventBody::Stopped(StoppedEventBody {
                     reason: StoppedEventReason::Entry,
                     description: Some("Paused on program start".to_string()),
-                    thread_id: Some(FiberId::root().to_thread_id()),
+                    thread_id: Some(FiberId::root().to_usize()),
                     preserve_focus_hint: Some(false),
                     text: None,
                     all_threads_stopped: Some(true),
@@ -251,7 +248,15 @@ impl DebugSession {
             }
             Command::LoadedSources => todo!(),
             Command::Modules(_) => todo!(),
-            Command::Next(_) => todo!(),
+            Command::Next(args) => {
+                self.step(
+                    request.seq,
+                    StepKind::Next,
+                    args.thread_id,
+                    args.single_thread,
+                )
+                .await
+            }
             Command::Pause(_) => todo!(),
             Command::ReadMemory(_) => todo!(),
             Command::Restart(_) => todo!(),
@@ -281,51 +286,43 @@ impl DebugSession {
             Command::SetVariable(_) => todo!(),
             Command::Source(_) => todo!(),
             Command::StackTrace(args) => {
-                let stack_trace = self.state.require_paused_mut()?.stack_trace(args)?;
+                let start_at_1_config = self.state.require_initialized()?.into();
+                let state = self.state.require_paused_mut()?;
+                let stack_trace = state.stack_trace(&self.db, start_at_1_config, args)?;
                 self.send_response_ok(request.seq, ResponseBody::StackTrace(stack_trace))
                     .await;
                 Ok(())
             }
             Command::StepBack(_) => todo!(),
-            Command::StepIn(_) => todo!(),
+            Command::StepIn(args) => {
+                self.step(
+                    request.seq,
+                    StepKind::In,
+                    args.thread_id,
+                    args.single_thread,
+                )
+                .await
+            }
             Command::StepInTargets(_) => todo!(),
-            Command::StepOut(_) => todo!(),
+            Command::StepOut(args) => {
+                self.step(
+                    request.seq,
+                    StepKind::Out,
+                    args.thread_id,
+                    args.single_thread,
+                )
+                .await
+            }
             Command::Terminate(_) => todo!(),
             Command::TerminateThreads(_) => todo!(),
             Command::Threads => {
                 let state = self.state.require_launched()?;
-
+                let threads = state.threads();
                 self.send_response_ok(
                     request.seq,
-                    ResponseBody::Threads(ThreadsResponse {
-                        threads: state
-                            .vm
-                            .fibers()
-                            .iter()
-                            .map(|(id, fiber)| Thread {
-                                // FIXME: Use data from tracer?
-                                id: id.to_thread_id(),
-                                // TODO: indicate hierarchy
-                                name: format!(
-                                    "Fiber {}{}{}",
-                                    id.to_usize(),
-                                    if *id == FiberId::root() {
-                                        " (root)"
-                                    } else {
-                                        ""
-                                    },
-                                    match fiber {
-                                        FiberTree::Single(_) => "",
-                                        FiberTree::Parallel(_) => " (in `parallel`)",
-                                        FiberTree::Try(_) => " (in `try`)",
-                                    },
-                                ),
-                            })
-                            .collect(),
-                    }),
+                    ResponseBody::Threads(ThreadsResponse { threads }),
                 )
                 .await;
-
                 Ok(())
             }
             Command::Variables(args) => {
@@ -347,6 +344,54 @@ impl DebugSession {
             Command::Cancel(_) => todo!(),
         }
     }
+    async fn step(
+        &mut self,
+        request_seq: NonZeroUsize,
+        kind: StepKind,
+        thread_id: usize,
+        single_thread: Option<bool>,
+    ) -> Result<(), &'static str> {
+        self.state.require_paused()?;
+        let response_body = match kind {
+            StepKind::Next => ResponseBody::Next,
+            StepKind::In => ResponseBody::StepIn,
+            StepKind::Out => ResponseBody::StepOut,
+        };
+        self.send_response_ok(request_seq, response_body).await;
+
+        let state = self.state.require_paused_mut().unwrap();
+
+        let fiber_id = FiberId::from_usize(thread_id);
+        // TODO: honor `args.granularity`
+        let fiber = state.vm_state.vm.fiber(fiber_id).unwrap().fiber_ref();
+        let lir = state.vm_state.vm.lir().to_owned();
+        let mut execution_controller =
+            StepExecutionController::new(lir.as_ref(), fiber_id, fiber.call_stack().len(), kind);
+        if single_thread.unwrap_or_default() {
+            state.vm_state.vm.run_fiber(
+                fiber_id,
+                &mut execution_controller,
+                &mut state.vm_state.tracer,
+            );
+        } else {
+            state
+                .vm_state
+                .vm
+                .run(&mut execution_controller, &mut state.vm_state.tracer);
+        }
+
+        self.send(EventBody::Stopped(StoppedEventBody {
+            reason: StoppedEventReason::Step,
+            description: None,
+            thread_id: Some(thread_id),
+            preserve_focus_hint: Some(false),
+            text: None,
+            all_threads_stopped: Some(true),
+            hit_breakpoint_ids: Some(vec![]),
+        }))
+        .await;
+        Ok(())
+    }
 
     fn parse_module(&self, path: Option<String>) -> Result<Module, &'static str> {
         let Some(path) = path else {
@@ -364,7 +409,7 @@ impl DebugSession {
         })
     }
 
-    async fn send_response_ok(&self, seq: i64, body: ResponseBody) {
+    async fn send_response_ok(&self, seq: NonZeroUsize, body: ResponseBody) {
         self.send(Response {
             request_seq: seq,
             success: true,
@@ -373,7 +418,7 @@ impl DebugSession {
         })
         .await;
     }
-    async fn send_response_err(&self, seq: i64, message: ResponseMessage) {
+    async fn send_response_err(&self, seq: NonZeroUsize, message: ResponseMessage) {
         self.send(Response {
             request_seq: seq,
             success: false,
@@ -415,6 +460,15 @@ impl State {
             } => Ok(vm_state),
         }
     }
+    fn require_paused(&self) -> Result<&PausedState, &'static str> {
+        match self {
+            State::Launched {
+                execution_state: ExecutionState::Paused(state),
+                ..
+            } => Ok(state),
+            _ => Err("not-paused"),
+        }
+    }
     fn require_paused_mut(&mut self) -> Result<&mut PausedState, &'static str> {
         match self {
             State::Launched {
@@ -422,6 +476,92 @@ impl State {
                 ..
             } => Ok(state),
             _ => Err("not-paused"),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct StartAt1Config {
+    lines_start_at_1: bool,
+    columns_start_at_1: bool,
+}
+impl StartAt1Config {
+    pub fn range_to_dap(&self, range: Range) -> Range {
+        let start = self.position_to_dap(range.start);
+        let end = self.position_to_dap(range.end);
+        Range { start, end }
+    }
+    fn position_to_dap(&self, position: Position) -> Position {
+        fn apply(start_at_1: bool, value: u32) -> u32 {
+            if start_at_1 {
+                value + 1
+            } else {
+                value
+            }
+        }
+        Position {
+            line: apply(self.lines_start_at_1, position.line),
+            character: apply(self.columns_start_at_1, position.character),
+        }
+    }
+}
+impl From<&InitializeArguments> for StartAt1Config {
+    fn from(value: &InitializeArguments) -> Self {
+        Self {
+            lines_start_at_1: value.lines_start_at1.unwrap_or(true),
+            columns_start_at_1: value.columns_start_at1.unwrap_or(true),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum StepKind {
+    Next,
+    In,
+    Out,
+}
+struct StepExecutionController<'a> {
+    lir: &'a Lir,
+    fiber_id: FiberId,
+    call_stack_size: usize,
+    kind: StepKind,
+    did_step: bool,
+}
+impl<'a> StepExecutionController<'a> {
+    fn new(lir: &'a Lir, fiber_id: FiberId, call_stack_size: usize, kind: StepKind) -> Self {
+        Self {
+            lir,
+            fiber_id,
+            call_stack_size,
+            kind,
+            did_step: false,
+        }
+    }
+}
+impl<'a, T: FiberTracer> ExecutionController<T> for StepExecutionController<'a> {
+    fn should_continue_running(&self) -> bool {
+        !self.did_step
+    }
+
+    fn instruction_executed(
+        &mut self,
+        fiber_id: FiberId,
+        fiber: &Fiber<T>,
+        ip: InstructionPointer,
+    ) {
+        if fiber_id != self.fiber_id
+            || !matches!(
+                self.lir.instructions[*ip],
+                Instruction::TraceCallEnds | Instruction::TraceExpressionEvaluated
+            )
+        {
+            return;
+        }
+
+        self.did_step = match self.kind {
+            StepKind::Next => fiber.call_stack().len() <= self.call_stack_size,
+            StepKind::In => true,
+            StepKind::Out => fiber.call_stack().len() < self.call_stack_size,
         }
     }
 }

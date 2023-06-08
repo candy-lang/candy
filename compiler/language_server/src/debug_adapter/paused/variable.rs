@@ -1,6 +1,6 @@
 use super::{stack_trace::StackFrameKey, utils::FiberIdExtension, PausedState};
 use crate::database::Database;
-use candy_frontend::hir::HirDb;
+use candy_frontend::hir::{self, Expression, HirDb};
 use candy_vm::{
     fiber::FiberId,
     heap::{Data, DataDiscriminants, InlineObject, ObjectInHeap},
@@ -32,37 +32,68 @@ impl PausedState {
         let should_include_named =
             matches!(args.filter, (Some(VariablesArgumentsFilter::Named) | None));
 
-        let mut start = args.start.map(|it| it as usize).unwrap_or_default();
+        let mut start = args.start.unwrap_or_default();
         let mut count = args
             .count
-            .and_then(|it| if it == 0 { None } else { Some(it as usize) })
+            .and_then(|it| if it == 0 { None } else { Some(it) })
             .unwrap_or(usize::MAX);
 
         let key = self
             .variables_ids
-            .id_to_key(args.variables_reference)
+            .id_to_key(args.variables_reference.try_into().unwrap())
             .to_owned();
         let mut variables = vec![];
         match &key {
             VariablesKey::Arguments(stack_frame_key) => {
-                if should_include_named {
-                    let arguments = stack_frame_key
-                        .get(&self.vm_state.vm)
-                        .unwrap()
-                        .call
-                        .arguments
-                        .to_owned();
-                    variables.extend(arguments[start..].iter().take(count).enumerate().map(
-                        |(index, object)| {
-                            // TODO: resolve argument name
-                            self.create_variable(
-                                (start + index).to_string(),
-                                *object,
-                                supports_variable_type,
-                            )
-                        },
-                    ));
-                }
+                let call = &stack_frame_key.get(&self.vm_state.vm).unwrap().call;
+                match Data::from(call.callee) {
+                    Data::Function(function) => {
+                        if should_include_named {
+                            let functions =
+                                self.vm_state.vm.lir().functions_behind(function.body());
+                            assert_eq!(functions.len(), 1);
+                            let function = functions.iter().next().unwrap();
+
+                            let Expression::Function(hir::Function{parameters, ..}) = db.find_expression(function.to_owned()).unwrap() else {
+                                panic!("Function's HIR is not a function: {function}");
+                            };
+
+                            variables.extend(
+                                parameters
+                                    .iter()
+                                    .map(|it| it.keys.last().unwrap().to_string())
+                                    .zip_eq(call.arguments.to_owned())
+                                    .skip(start)
+                                    .take(count)
+                                    .map(|(parameter, argument)| {
+                                        self.create_variable(
+                                            parameter,
+                                            argument,
+                                            supports_variable_type,
+                                        )
+                                    }),
+                            );
+                        }
+                    }
+                    Data::Builtin(_) => {
+                        if should_include_indexed {
+                            let arguments = call.arguments.to_owned();
+                            variables.extend(
+                                arguments[start..].iter().take(count).enumerate().map(
+                                    |(index, object)| {
+                                        // TODO: resolve argument name
+                                        self.create_variable(
+                                            (start + index).to_string(),
+                                            *object,
+                                            supports_variable_type,
+                                        )
+                                    },
+                                ),
+                            );
+                        }
+                    }
+                    it => panic!("Unexpected callee: {it}"),
+                };
             }
             VariablesKey::Locals(stack_frame_key) => {
                 let locals = stack_frame_key.get_locals(&self.vm_state.vm);
@@ -222,6 +253,7 @@ impl PausedState {
 
         VariablesResponse { variables }
     }
+
     fn create_length_variable(length: usize, supports_variable_type: bool) -> Variable {
         Variable {
             name: "<length>".to_string(),
@@ -255,6 +287,7 @@ impl PausedState {
             .map(|object| {
                 self.variables_ids
                     .key_to_id(VariablesKey::Inner(ObjectInHeap(object)))
+                    .get()
             })
             .unwrap_or_default();
 
@@ -265,8 +298,8 @@ impl PausedState {
             presentation_hint: Some(Self::presentation_hint_for(data.into())),
             evaluate_name: None,
             variables_reference,
-            named_variables: Some(named_variables as i64),
-            indexed_variables: Some(indexed_variables as i64),
+            named_variables: Some(named_variables),
+            indexed_variables: Some(indexed_variables),
             memory_reference: None, // TODO: support memory reference
         }
     }

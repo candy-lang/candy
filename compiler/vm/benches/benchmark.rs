@@ -24,17 +24,24 @@ fn benchmark_compiler<M: Measurement>(c: &mut Criterion<M>, prefix: &str) {
 fn benchmark_vm_runtime<M: Measurement>(c: &mut Criterion<M>, prefix: &str) {
     let mut group = c.benchmark_group(format!("{prefix}: VM Runtime"));
 
-    group.sample_size(100);
-    group.bench_function("hello_world", |b| {
-        b.run_vm(r#"main _ := "Hello, world!""#);
-    });
+    // This is a macro so that we can accept a string or `BenchmarkId`.
+    macro_rules! benchmark {
+        ($id:expr, $source_code:expr, $sample_size:expr $(,)?) => {
+            group.sample_size($sample_size);
+            group.bench_function($id, |b| b.run_vm($source_code));
+        };
+        ($id:expr, $parameter:expr, $source_code_factory:expr, $sample_size:expr $(,)?) => {
+            benchmark!(
+                BenchmarkId::new($id, $parameter),
+                &$source_code_factory($parameter),
+                $sample_size,
+            );
+        };
+    }
 
-    group.sample_size(20);
-    let n = 15;
-    let fibonacci_code = create_fibonacci_code(n);
-    group.bench_function(BenchmarkId::new("fibonacci", n), |b| {
-        b.run_vm(&fibonacci_code)
-    });
+    benchmark!("hello_world", r#"main _ := "Hello, world!""#, 100);
+    benchmark!("fibonacci", 15, create_fibonacci_code, 20);
+    benchmark!("PLB/binarytrees", 6, create_binary_trees_code, 10);
 
     group.finish();
 }
@@ -54,6 +61,52 @@ fib n =
   fibRec fibRec n
 
 main _ := fib {n}"#,
+    )
+}
+/// https://programming-language-benchmarks.vercel.app/problem/binarytrees
+fn create_binary_trees_code(n: usize) -> String {
+    format!(
+        r#"
+[channel, equals, if, ifElse, int, iterable, recursive, result, struct, text] = use "Core"
+
+createTree n :=
+  needs (int.is n)
+  needs (int.isNonNegative n)
+
+  recursive n {{ recurse n ->
+    ifElse (n | equals 0) {{ [] }} {{
+      nextSize = n | int.subtract 1
+      [Left: recurse nextSize, Right: recurse nextSize]
+    }}
+  }}
+checkTree tree :=
+  needs (struct.is tree)
+
+  recursive tree {{ recurse tree ->
+    left = tree | struct.get Left | result.mapOr {{ it -> recurse it }} 0
+    right = tree | struct.get Right | result.mapOr {{ it -> recurse it }} 0
+    1 | int.add left | int.add right
+  }}
+
+main _ :=
+  n = {n}
+  minDepth = 4
+
+  maxDepth = n | int.coerceAtLeast (minDepth | int.add 2)
+  _ =
+    depth = maxDepth | int.add 1
+    tree = createTree depth
+
+  longLivedTree = createTree maxDepth
+
+  recursive minDepth {{ recurse depth ->
+    if (depth | int.isLessThanOrEqualTo maxDepth) {{
+      iterations = 1 | int.shiftLeft (maxDepth | int.subtract depth | int.add minDepth)
+      check = iterable.generate iterations {{ _ -> createTree depth | checkTree }} | iterable.sum
+      recurse (depth | int.add 2)
+    }}
+  }}
+"#,
     )
 }
 
@@ -97,4 +150,5 @@ fn run_time_benchmarks(c: &mut Criterion) {
 }
 criterion_group!(time_benchmarks, run_time_benchmarks);
 
-criterion_main!(cycle_benchmarks, time_benchmarks);
+// criterion_main!(cycle_benchmarks, time_benchmarks);
+criterion_main!(time_benchmarks);

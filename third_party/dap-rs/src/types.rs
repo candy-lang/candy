@@ -6,6 +6,7 @@ use serde_json::Value;
 
 use crate::errors::DeserializationError;
 use crate::{fromstr_deser, tostr_ser};
+use std::num::NonZeroUsize;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExceptionBreakpointsFilter {
@@ -71,7 +72,7 @@ pub struct ColumnDescriptor {
     #[serde(rename = "type")]
     pub column_descriptor_type: Option<ColumnDescriptorType>,
     /// Width of this column in characters (hint only).
-    pub width: Option<i64>,
+    pub width: Option<usize>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -287,11 +288,11 @@ pub struct Source {
 #[derive(Deserialize, Debug, Clone)]
 pub struct SourceBreakpoint {
     /// The source line of the breakpoint or logpoint.
-    pub line: i64,
+    pub line: usize,
     /// Start position within source line of the breakpoint or logpoint. It is
     /// measured in UTF-16 code units and the client capability `columnsStartAt1`
     /// determines whether it is 0- or 1-based.
-    pub column: Option<i64>,
+    pub column: Option<usize>,
     /// The expression for conditional breakpoints.
     /// It is only honored by a debug adapter if the corresponding capability
     /// `supportsConditionalBreakpoints` is true.
@@ -315,7 +316,7 @@ pub struct SourceBreakpoint {
 pub struct Breakpoint {
     /// The identifier for the breakpoint. It is needed if breakpoint events are
     /// used to update or remove breakpoints.
-    pub id: Option<i64>,
+    pub id: Option<usize>,
     /// If true, the breakpoint could be set (but not necessarily at the desired
     /// location).
     pub verified: bool,
@@ -326,24 +327,24 @@ pub struct Breakpoint {
     /// The source where the breakpoint is located.
     pub source: Option<Source>,
     /// The start line of the actual range covered by the breakpoint.
-    pub line: Option<i64>,
+    pub line: Option<usize>,
     /// Start position of the source range covered by the breakpoint. It is
     /// measured in UTF-16 code units and the client capability `columnsStartAt1`
     /// determines whether it is 0- or 1-based.
-    pub column: Option<i64>,
+    pub column: Option<usize>,
     /// The end line of the actual range covered by the breakpoint.
-    pub end_line: Option<i64>,
+    pub end_line: Option<usize>,
     /// End position of the source range covered by the breakpoint. It is measured
     /// in UTF-16 code units and the client capability `columnsStartAt1` determines
     /// whether it is 0- or 1-based.
     /// If no end line is given, then the end column is assumed to be in the start
     /// line.
-    pub end_column: Option<i64>,
+    pub end_column: Option<usize>,
     /// A memory reference to where the breakpoint is set.
     pub instruction_reference: Option<String>,
     /// The offset from the instruction reference.
     /// This can be negative.
-    pub offset: Option<i64>,
+    pub offset: Option<isize>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -953,7 +954,7 @@ pub struct StackFrameFormat {
     pub parameter_names: Option<bool>,
     /// Displays the values of parameters for the stack frame.
     pub parameter_values: Option<bool>,
-    /// Displays the line i64 of the stack frame.
+    /// Displays the line usize of the stack frame.
     pub line: Option<bool>,
     /// Displays the module of the stack frame.
     pub module: Option<bool>,
@@ -1106,7 +1107,7 @@ pub struct InstructionBreakpoint {
     pub instruction_reference: String,
     /// The offset from the instruction reference.
     /// This can be negative.
-    pub offset: Option<i64>,
+    pub offset: Option<isize>,
     /// An expression for conditional breakpoints.
     /// It is only honored by a debug adapter if the corresponding capability
     /// `supportsConditionalBreakpoints` is true.
@@ -1159,17 +1160,17 @@ tostr_ser! { VariablesArgumentsFilter }
 #[serde(rename_all = "camelCase")]
 pub struct BreakpointLocation {
     /// Start line of breakpoint location.
-    pub line: i64,
+    pub line: usize,
     /// The start position of a breakpoint location. Position is measured in UTF-16
     /// code units and the client capability `columnsStartAt1` determines whether
     /// it is 0- or 1-based.
-    pub column: Option<i64>,
+    pub column: Option<usize>,
     /// The end line of breakpoint location if the location covers a range.
-    pub end_line: Option<i64>,
+    pub end_line: Option<usize>,
     /// The end position of a breakpoint location (if the location covers a range).
     /// Position is measured in UTF-16 code units and the client capability
     /// `columnsStartAt1` determines whether it is 0- or 1-based.
-    pub end_column: Option<i64>,
+    pub end_column: Option<usize>,
 }
 
 /// Some predefined types for the CompletionItem. Please note that not all clients have specific
@@ -1288,21 +1289,21 @@ pub struct CompletionItem {
     /// units and the client capability `columnsStartAt1` determines whether it is
     /// 0- or 1-based. If the start position is omitted the text is added at the
     /// location specified by the `column` attribute of the `completions` request.
-    pub start: Option<i64>,
+    pub start: Option<usize>,
     /// Length determines how many characters are overwritten by the completion
     /// text and it is measured in UTF-16 code units. If missing the value 0 is
     /// assumed which results in the completion text being inserted.
-    pub length: Option<i64>,
+    pub length: Option<usize>,
     /// Determines the start of the new selection after the text has been inserted
     /// (or replaced). `selectionStart` is measured in UTF-16 code units and must
     /// be in the range 0 and length of the completion text. If omitted the
     /// selection starts at the end of the completion text.
-    pub selection_start: Option<i64>,
+    pub selection_start: Option<usize>,
     /// Determines the length of the new selection after the text has been inserted
     /// (or replaced) and it is measured in UTF-16 code units. The selection can
     /// not extend beyond the bounds of the completion text. If omitted the length
     /// is assumed to be 0.
-    pub selection_length: Option<i64>,
+    pub selection_length: Option<usize>,
 }
 
 /// Represents a single disassembled instruction.
@@ -1330,13 +1331,13 @@ pub struct DisassembledInstruction {
     pub location: Option<Source>,
     /// The line within the source location that corresponds to this instruction,
     /// if any.
-    pub line: Option<i64>,
+    pub line: Option<usize>,
     /// The column within the line that corresponds to this instruction, if any.
-    pub column: Option<i64>,
+    pub column: Option<usize>,
     /// The end line of the range that corresponds to this instruction, if any.
-    pub end_line: Option<i64>,
+    pub end_line: Option<usize>,
     /// The end column of the range that corresponds to this instruction, if any.
-    pub end_column: Option<i64>,
+    pub end_column: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -1575,17 +1576,17 @@ pub struct ExceptionDetails {
 #[serde(rename_all = "camelCase")]
 pub struct GotoTarget {
     /// Unique identifier for a goto target. This is used in the `goto` request.
-    pub id: i64,
+    pub id: usize,
     /// The name of the goto target (shown in the UI).
     pub label: String,
     /// The line of the goto target.
-    pub line: i64,
+    pub line: usize,
     /// The column of the goto target.
-    pub column: Option<i64>,
+    pub column: Option<usize>,
     /// The end line of the range covered by the goto target.
-    pub end_line: Option<i64>,
+    pub end_line: Option<usize>,
     /// The end column of the range covered by the goto target.
-    pub end_column: Option<i64>,
+    pub end_column: Option<usize>,
     /// A memory reference for the instruction pointer value represented by this
     /// target.
     pub instruction_pointer_reference: Option<String>,
@@ -1656,32 +1657,32 @@ pub struct Scope {
     pub presentation_hint: Option<ScopePresentationhint>,
     /// The variables of this scope can be retrieved by passing the value of
     /// `variablesReference` to the `variables` request.
-    pub variables_reference: i64,
-    /// The i64 of named variables in this scope.
+    pub variables_reference: NonZeroUsize,
+    /// The usize of named variables in this scope.
     /// The client can use this information to present the variables in a paged UI
     /// and fetch them in chunks.
-    pub named_variables: Option<i64>,
-    /// The i64 of indexed variables in this scope.
+    pub named_variables: Option<usize>,
+    /// The usize of indexed variables in this scope.
     /// The client can use this information to present the variables in a paged UI
     /// and fetch them in chunks.
-    pub indexed_variables: Option<i64>,
-    /// If true, the i64 of variables in this scope is large or expensive to
+    pub indexed_variables: Option<usize>,
+    /// If true, the usize of variables in this scope is large or expensive to
     /// retrieve.
     pub expensive: bool,
     /// The source for this scope.
     pub source: Option<Source>,
     /// The start line of the range covered by this scope.
-    pub line: Option<i64>,
+    pub line: Option<usize>,
     /// Start position of the range covered by the scope. It is measured in UTF-16
     /// code units and the client capability `columnsStartAt1` determines whether
     /// it is 0- or 1-based.
-    pub column: Option<i64>,
+    pub column: Option<usize>,
     /// The end line of the range covered by this scope.
-    pub end_line: Option<i64>,
+    pub end_line: Option<usize>,
     /// End position of the range covered by the scope. It is measured in UTF-16
     /// code units and the client capability `columnsStartAt1` determines whether
     /// it is 0- or 1-based.
-    pub end_column: Option<i64>,
+    pub end_column: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -1760,25 +1761,25 @@ pub struct StackFrame {
     /// An identifier for the stack frame. It must be unique across all threads.
     /// This id can be used to retrieve the scopes of the frame with the `scopes`
     /// request or to restart the execution of a stackframe.
-    pub id: i64,
+    pub id: usize,
     /// The name of the stack frame, typically a method name.
     pub name: String,
     /// The source of the frame.
     pub source: Option<Source>,
     /// The line within the source of the frame. If the source attribute is missing
     /// or doesn't exist, `line` is 0 and should be ignored by the client.
-    pub line: i64,
+    pub line: usize,
     /// Start position of the range covered by the stack frame. It is measured in
     /// UTF-16 code units and the client capability `columnsStartAt1` determines
     /// whether it is 0- or 1-based. If attribute `source` is missing or doesn't
     /// exist, `column` is 0 and should be ignored by the client.
-    pub column: i64,
+    pub column: usize,
     /// The end line of the range covered by the stack frame.
-    pub end_line: Option<i64>,
+    pub end_line: Option<usize>,
     /// End position of the range covered by the stack frame. It is measured in
     /// UTF-16 code units and the client capability `columnsStartAt1` determines
     /// whether it is 0- or 1-based.
-    pub end_column: Option<i64>,
+    pub end_column: Option<usize>,
     /// Indicates whether this frame can be restarted with the `restart` request.
     /// Clients should only use this if the debug adapter supports the `restart`
     /// request and the corresponding capability `supportsRestartRequest` is true.
@@ -1802,7 +1803,7 @@ pub struct StackFrame {
 #[serde(rename_all = "camelCase")]
 pub struct Thread {
     /// Unique identifier for the thread.
-    pub id: i64,
+    pub id: usize,
     /// The name of the thread.
     pub name: String,
 }
@@ -1850,15 +1851,15 @@ pub struct Variable {
     /// If `variablesReference` is > 0, the variable is structured and its children
     /// can be retrieved by passing `variablesReference` to the `variables`
     /// request.
-    pub variables_reference: i64,
-    /// The i64 of named child variables.
+    pub variables_reference: usize,
+    /// The usize of named child variables.
     /// The client can use this information to present the children in a paged UI
     /// and fetch them in chunks.
-    pub named_variables: Option<i64>,
-    /// The i64 of indexed child variables.
+    pub named_variables: Option<usize>,
+    /// The usize of indexed child variables.
     /// The client can use this information to present the children in a paged UI
     /// and fetch them in chunks.
-    pub indexed_variables: Option<i64>,
+    pub indexed_variables: Option<usize>,
     /// The memory reference for the variable if the variable represents executable
     /// code, such as a function pointer.
     /// This attribute is only required if the corresponding capability

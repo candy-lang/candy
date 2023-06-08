@@ -8,9 +8,9 @@ use super::{
 };
 use crate::{
     builtin_functions::BuiltinFunction,
+    hir::IdKey,
     module::{Module, ModuleKind, Package},
     position::PositionConversionDb,
-    rich_ir::ToRichIr,
     string_to_rcst::ModuleError,
 };
 use itertools::Itertools;
@@ -87,7 +87,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
             path: vec![],
             kind: ModuleKind::Code,
         },
-        vec!["needs".to_string()],
+        vec![IdKey::from("needs")],
     );
     body.push_function(needs_id.clone(), |body, responsible_for_call| {
         let condition = body.new_parameter();
@@ -474,7 +474,7 @@ impl<'a> LoweringContext<'a> {
 
                 let is_match = body.push_is_match(pattern_result, responsible_for_match);
 
-                let case_id = hir_id.child(&format!("case-{case_index}"));
+                let case_id = hir_id.child(format!("case-{case_index}"));
                 let builtin_if_else = body.push_builtin(BuiltinFunction::IfElse);
                 let then_function = body.push_function(case_id.child("matched"), |body, _| {
                     self.ongoing_destructuring = Some(OngoingDestructuring {
@@ -1018,7 +1018,7 @@ impl CompilerError {
         let range = db.range_to_positions(self.module.clone(), self.span.clone());
         format!(
             "{}:{}:{} – {}:{}: {}",
-            self.module.to_rich_ir(),
+            self.module,
             range.start.line,
             range.start.character,
             range.end.line,

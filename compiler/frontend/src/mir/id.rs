@@ -3,7 +3,7 @@ use crate::{
     rich_ir::{RichIrBuilder, ToRichIr, TokenType},
 };
 use enumset::EnumSet;
-use std::fmt::{self, Debug, Formatter};
+use std::fmt::{self, Debug, Display, Formatter};
 
 #[derive(Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Id(usize);
@@ -22,13 +22,13 @@ impl CountableId for Id {
     }
 }
 
-impl ToString for Id {
-    fn to_string(&self) -> String {
-        self.to_short_debug_string()
+impl Display for Id {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}", self.to_short_debug_string())
     }
 }
 impl Debug for Id {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}", self.to_short_debug_string())
     }
 }

@@ -4,7 +4,6 @@ use crate::{
     utils::{module_for_path, packages_path},
     Exit, ProgramResult,
 };
-use candy_frontend::rich_ir::ToRichIr;
 use clap::{Parser, ValueHint};
 use std::path::PathBuf;
 use tracing::{error, info};
@@ -28,7 +27,7 @@ pub(crate) fn fuzz(options: Options) -> ProgramResult {
     let db = Database::new_with_file_system_module_provider(packages_path());
     let module = module_for_path(options.path)?;
 
-    debug!("Fuzzing `{}`…", module.to_rich_ir());
+    debug!("Fuzzing `{module}`…");
     let failing_cases = candy_fuzzer::fuzz(&db, module);
 
     if failing_cases.is_empty() {

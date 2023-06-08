@@ -11,7 +11,6 @@ use candy_frontend::{
     mir::{Body, Expression, Id, Mir},
     mir_optimize::OptimizeMir,
     module::Module,
-    rich_ir::ToRichIr,
     tracing::TracingConfig,
 };
 use extension_trait::extension_trait;
@@ -381,9 +380,8 @@ impl StackExt for Vec<Id> {
             .position(|it| *it == id)
             .unwrap_or_else(|| {
                 panic!(
-                    "Id {} not found in stack: {}",
-                    id.to_rich_ir(),
-                    self.iter().map(|it| it.to_rich_ir()).join(" "),
+                    "Id {id} not found in stack: {}",
+                    self.iter().map(|it| it.to_string()).join(" "),
                 )
             })
     }
