@@ -18,7 +18,7 @@ use std::sync::Arc;
 use tracing::debug;
 
 pub struct Fuzzer {
-    lir: Arc<Lir>,
+    pub lir: Arc<Lir>,
     pub function_heap: Heap,
     pub function: Function,
     pub function_id: Id,

@@ -9,29 +9,35 @@
 //! While doing all that, we can pause regularly between executing instructions
 //! so that we don't occupy a single CPU at 100 %.
 
-use self::{hint::Hint, hints_finder::HintsFinder};
+use self::{hint::Hint, module_analyzer::ModuleAnalyzer};
 use super::AnalyzerClient;
 use crate::database::Database;
 use candy_frontend::module::{Module, MutableModuleProviderOwner, PackagesPath};
-use lsp_types::{notification::Notification, Url};
+use itertools::Itertools;
+use lsp_types::{notification::Notification, CodeLens, Url};
 use rand::{seq::IteratorRandom, thread_rng};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::{fmt, future::Future, time::Duration, vec};
 use tokio::{
-    sync::mpsc::{error::TryRecvError, Receiver},
+    sync::{
+        mpsc::{self, error::TryRecvError},
+        oneshot,
+    },
     time::sleep,
 };
 use tracing::debug;
 
+mod code_lens;
 pub mod hint;
-mod hints_finder;
+mod module_analyzer;
 mod utils;
 
-pub enum Event {
+pub enum Message {
     UpdateModule(Module, Vec<u8>),
     CloseModule(Module),
     Shutdown,
+    GetCodeLenses(Module, oneshot::Sender<Vec<CodeLens>>),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -49,11 +55,11 @@ impl Notification for HintsNotification {
 #[allow(unused_must_use)]
 pub async fn run_server(
     packages_path: PackagesPath,
-    mut incoming_events: Receiver<Event>,
+    mut incoming_events: mpsc::Receiver<Message>,
     client: AnalyzerClient,
 ) {
     let mut db = Database::new_with_file_system_module_provider(packages_path);
-    let mut hints_finders: FxHashMap<Module, HintsFinder> = FxHashMap::default();
+    let mut hints_finders: FxHashMap<Module, ModuleAnalyzer> = FxHashMap::default();
     let client_ref = &client;
     let mut outgoing_diagnostics = OutgoingCache::new(move |module, diagnostics| {
         client_ref.update_diagnostics(module, diagnostics)
@@ -71,20 +77,30 @@ pub async fn run_server(
                 Err(TryRecvError::Disconnected) => break 'server_loop,
             };
             match event {
-                Event::UpdateModule(module, content) => {
+                Message::UpdateModule(module, content) => {
                     db.did_change_module(&module, content);
                     outgoing_hints.send(module.clone(), vec![]).await;
                     hints_finders
                         .entry(module.clone())
                         .and_modify(|it| it.module_changed())
-                        .or_insert_with(|| HintsFinder::for_module(module.clone()));
+                        .or_insert_with(|| ModuleAnalyzer::for_module(module.clone()));
                 }
-                Event::CloseModule(module) => {
+                Message::CloseModule(module) => {
                     db.did_close_module(&module);
                     hints_finders.remove(&module);
                 }
-                Event::Shutdown => {
+                Message::Shutdown => {
                     incoming_events.close();
+                }
+                Message::GetCodeLenses(module, sender) => {
+                    let code_lenses = hints_finders
+                        .get(&module)
+                        .unwrap()
+                        .code_lenses(&db)
+                        .into_iter()
+                        .flat_map(|(id, lens)| lens.to_lsp_code_lenses(&db, id))
+                        .collect_vec();
+                    sender.send(code_lenses).unwrap();
                 }
             }
         }
@@ -97,11 +113,12 @@ pub async fn run_server(
 
         hints_finder.run(&db, &client).await;
 
-        let (mut hints, diagnostics) = hints_finder.hints(&db, &module);
+        let (mut hints, diagnostics) = hints_finder.hints(&db);
         hints.sort_by_key(|hint| hint.position);
 
         outgoing_diagnostics.send(module.clone(), diagnostics).await;
         outgoing_hints.send(module, hints).await;
+        client.code_lenses_updated().await;
     }
 }
 

@@ -1,7 +1,8 @@
 use crate::database::Database;
 use async_trait::async_trait;
 use lsp_types::{
-    self, FoldingRange, LocationLink, SemanticToken, TextDocumentContentChangeEvent, TextEdit, Url,
+    self, CodeLens, FoldingRange, LocationLink, SemanticToken, TextDocumentContentChangeEvent,
+    TextEdit, Url,
 };
 use rustc_hash::FxHashMap;
 use std::collections::HashMap;
@@ -14,6 +15,13 @@ pub trait LanguageFeatures: Send + Sync {
 
     async fn initialize(&self) {}
     async fn shutdown(&self) {}
+
+    fn supports_code_lens(&self) -> bool {
+        false
+    }
+    async fn code_lens(&self, _db: &Mutex<Database>, _uri: Url) -> Vec<CodeLens> {
+        unimplemented!()
+    }
 
     fn supports_did_open(&self) -> bool {
         false

@@ -3,7 +3,7 @@ use crate::{
     debug_adapter::DebugSessionManager,
     features::{LanguageFeatures, Reference, RenameError},
     features_candy::{
-        hints::{hint::Hint, HintsNotification},
+        analyzer::{hint::Hint, HintsNotification},
         CandyFeatures, ServerStatusNotification,
     },
     features_ir::{IrFeatures, UpdateIrNotification},
@@ -13,15 +13,15 @@ use crate::{
 use async_trait::async_trait;
 use candy_frontend::module::{Module, ModuleKind, PackagesPath};
 use lsp_types::{
-    Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentFilter, DocumentFormattingParams, DocumentHighlight, DocumentHighlightKind,
-    DocumentHighlightParams, FoldingRange, FoldingRangeParams, GotoDefinitionParams,
-    GotoDefinitionResponse, InitializeParams, InitializeResult, InitializedParams, Location,
-    MessageType, Position, PrepareRenameResponse, ReferenceParams, Registration, RenameOptions,
-    RenameParams, SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions,
-    SemanticTokensParams, SemanticTokensRegistrationOptions, SemanticTokensResult,
-    SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo, StaticRegistrationOptions,
-    TextDocumentChangeRegistrationOptions, TextDocumentPositionParams,
+    CodeLens, CodeLensParams, Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams, DocumentFilter, DocumentFormattingParams, DocumentHighlight,
+    DocumentHighlightKind, DocumentHighlightParams, FoldingRange, FoldingRangeParams,
+    GotoDefinitionParams, GotoDefinitionResponse, InitializeParams, InitializeResult,
+    InitializedParams, Location, MessageType, Position, PrepareRenameResponse, ReferenceParams,
+    Registration, RenameOptions, RenameParams, SemanticTokens, SemanticTokensFullOptions,
+    SemanticTokensOptions, SemanticTokensParams, SemanticTokensRegistrationOptions,
+    SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
+    StaticRegistrationOptions, TextDocumentChangeRegistrationOptions, TextDocumentPositionParams,
     TextDocumentRegistrationOptions, TextEdit, Url, WorkDoneProgressOptions, WorkspaceEdit,
 };
 use rustc_hash::FxHashMap;
@@ -153,6 +153,9 @@ impl AnalyzerClient {
                 hints,
             })
             .await;
+    }
+    pub async fn code_lenses_updated(&self) {
+        self.client.code_lens_refresh().await.unwrap();
     }
 }
 
@@ -294,6 +297,10 @@ impl LanguageServer for Server {
         self.client
             .register_capability(vec![
                 registration(
+                    "textDocument/codeLens",
+                    features.registration_options_where(|it| it.supports_code_lens()),
+                ),
+                registration(
                     "textDocument/didOpen",
                     features.registration_options_where(|it| it.supports_did_open()),
                 ),
@@ -379,6 +386,17 @@ impl LanguageServer for Server {
             features.shutdown().await;
         }
         Ok(())
+    }
+
+    async fn code_lens(&self, params: CodeLensParams) -> jsonrpc::Result<Option<Vec<CodeLens>>> {
+        let state = self.require_running_state().await;
+        let features = self
+            .features_from_url(&state.features, &params.text_document.uri)
+            .await;
+        assert!(features.supports_code_lens());
+        Ok(Some(
+            features.code_lens(&self.db, params.text_document.uri).await,
+        ))
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {

@@ -1,4 +1,5 @@
 use super::{
+    code_lens::{default_code_lenses, CodeLens},
     hint::{Hint, HintKind},
     utils::IdToEndOfLine,
 };
@@ -12,7 +13,7 @@ use candy_frontend::{
     ast_to_hir::AstToHir,
     cst::CstDb,
     error::CompilerError,
-    hir::{CollectErrors, Expression, HirDb},
+    hir::{CollectErrors, Expression, HirDb, Id},
     mir_optimize::OptimizeMir,
     module::Module,
     TracingConfig, TracingMode,
@@ -32,10 +33,11 @@ use candy_vm::{
 use itertools::Itertools;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Range};
 use rand::{prelude::SliceRandom, thread_rng};
+use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
 /// A hints finder is responsible for finding hints for a single module.
-pub struct HintsFinder {
+pub struct ModuleAnalyzer {
     module: Module,
     state: Option<State>, // only None during state transition
 }
@@ -72,7 +74,7 @@ enum State {
     },
 }
 
-impl HintsFinder {
+impl ModuleAnalyzer {
     pub fn for_module(module: Module) -> Self {
         Self {
             module,
@@ -233,7 +235,7 @@ impl HintsFinder {
         }
     }
 
-    pub fn hints(&self, db: &Database, module: &Module) -> (Vec<Hint>, Vec<Diagnostic>) {
+    pub fn hints(&self, db: &Database) -> (Vec<Hint>, Vec<Diagnostic>) {
         let mut hints = vec![];
         let mut diagnostics = vec![];
 
@@ -244,7 +246,7 @@ impl HintsFinder {
                 diagnostics.extend(
                     errors
                         .iter()
-                        .map(|it| error_to_diagnostic(db, module.clone(), it)),
+                        .map(|it| error_to_diagnostic(db, self.module.clone(), it)),
                 );
             }
             State::Fuzz {
@@ -258,12 +260,12 @@ impl HintsFinder {
                 diagnostics.extend(
                     errors
                         .iter()
-                        .map(|it| error_to_diagnostic(db, module.clone(), it)),
+                        .map(|it| error_to_diagnostic(db, self.module.clone(), it)),
                 );
 
                 // TODO: Think about how to highlight the responsible piece of code.
                 if let EndedReason::Panicked(panic) = &constants_ended.reason
-                    && let Some(hint) = panic_hint(db, module.clone(), stack_tracer, &panic.reason)
+                    && let Some(hint) = Self::panic_hint(db, self.module.clone(), stack_tracer, &panic.reason)
                 {
                     hints.push(hint);
                 }
@@ -340,8 +342,8 @@ impl HintsFinder {
                         .unwrap();
                     diagnostics.push(Diagnostic {
                         range: Range::new(
-                            db.offset_to_lsp_position(module.clone(), call_span.start),
-                            db.offset_to_lsp_position(module.clone(), call_span.end),
+                            db.offset_to_lsp_position(self.module.clone(), call_span.start),
+                            db.offset_to_lsp_position(self.module.clone(), call_span.end),
                         ),
                         severity: Some(DiagnosticSeverity::ERROR),
                         code: None,
@@ -367,37 +369,69 @@ impl HintsFinder {
 
         (hints, diagnostics)
     }
-}
+    fn panic_hint(
+        db: &Database,
+        module: Module,
+        tracer: &StackTracer,
+        reason: &str,
+    ) -> Option<Hint> {
+        // We want to show the hint at the last call site still inside the current
+        // module. If there is no call site in this module, then the panic results
+        // from a compiler error in a previous stage which is already reported.
+        let stack = tracer.panic_chain().unwrap();
 
-fn panic_hint(db: &Database, module: Module, tracer: &StackTracer, reason: &str) -> Option<Hint> {
-    // We want to show the hint at the last call site still inside the current
-    // module. If there is no call site in this module, then the panic results
-    // from a compiler error in a previous stage which is already reported.
-    let stack = tracer.panic_chain().unwrap();
+        // Find the last call in this module.
+        let (
+            Call {
+                callee, arguments, ..
+            },
+            call_site,
+        ) = stack
+            .iter()
+            .map(|call| (call, call.call_site.get().to_owned()))
+            .find(|(_, call_site)| {
+                // Make sure the entry comes from the same file and is not generated
+                // code.
+                call_site.module == module && db.hir_to_cst_id(call_site.to_owned()).is_some()
+            })?;
 
-    // Find the last call in this module.
-    let (
-        Call {
-            callee, arguments, ..
-        },
-        call_site,
-    ) = stack
-        .iter()
-        .map(|call| (call, call.call_site.get().to_owned()))
-        .find(|(_, call_site)| {
-            // Make sure the entry comes from the same file and is not generated
-            // code.
-            call_site.module == module && db.hir_to_cst_id(call_site.to_owned()).is_some()
-        })?;
+        let call_info = format!(
+            "{callee} {}",
+            arguments.iter().map(|it| it.to_string()).join(" "),
+        );
 
-    let call_info = format!(
-        "{callee} {}",
-        arguments.iter().map(|it| it.to_string()).join(" "),
-    );
+        Some(Hint::like_comment(
+            HintKind::Panic,
+            format!("Calling `{call_info}` panics: {reason}"),
+            db.id_to_end_of_line(call_site)?,
+        ))
+    }
 
-    Some(Hint::like_comment(
-        HintKind::Panic,
-        format!("Calling `{call_info}` panics: {reason}"),
-        db.id_to_end_of_line(call_site)?,
-    ))
+    pub fn code_lenses(&self, db: &Database) -> FxHashMap<Id, CodeLens> {
+        let mut lenses = default_code_lenses(db, self.module.clone());
+
+        if let State::Fuzz { fuzzers, .. } = self.state.as_ref().unwrap() {
+            for fuzzer in fuzzers {
+                let id = fuzzer.function_id.clone();
+                let lens = match fuzzer.status() {
+                    Status::StillFuzzing { total_coverage, .. } => {
+                        let function_range = fuzzer.lir.range_of_function(&id);
+                        let function_coverage = total_coverage.in_range(&function_range);
+                        CodeLens::Fuzzing {
+                            coverage: function_coverage.relative_coverage(),
+                            inputs: vec!["Ok".to_string()],
+                        }
+                    }
+                    Status::FoundPanic { input, .. } => CodeLens::FoundPanic {
+                        panicking_input: format!("{input}"),
+                        other_inputs: vec!["Test".to_string()],
+                    },
+                    Status::TotalCoverageButNoPanic => CodeLens::FuzzedCompletely,
+                };
+                lenses.insert(id, lens);
+            }
+        }
+
+        lenses
+    }
 }
