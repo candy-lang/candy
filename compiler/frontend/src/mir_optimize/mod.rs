@@ -209,6 +209,14 @@ impl Expression {
             constant_folding::fold_constants(self, visible, id_generator);
             inlining::inline_tiny_functions(self, visible, id_generator);
             inlining::inline_functions_containing_use(self, visible, id_generator);
+            inlining::inline_if_that_enables_further_optimizations(
+                self,
+                db,
+                tracing,
+                visible,
+                id_generator,
+                errors,
+            );
             constant_lifting::lift_constants(self, id_generator);
 
             if let Expression::Function {

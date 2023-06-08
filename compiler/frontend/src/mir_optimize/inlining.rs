@@ -34,14 +34,18 @@
 //! [module folding]: super::module_folding
 //! [tree shaking]: super::tree_shaking
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
+    error::CompilerError,
     id::IdGenerator,
     mir::{Expression, Id, VisibleExpressions},
+    rich_ir::ToRichIr,
+    TracingConfig,
 };
 
-use super::complexity::Complexity;
+use super::{complexity::Complexity, OptimizeMir};
+use tracing::info;
 
 pub fn inline_tiny_functions(
     expression: &mut Expression,
@@ -82,6 +86,53 @@ pub fn inline_functions_containing_use(
         && body.iter().any(|(_, expr)| matches!(expr, Expression::UseModule { .. })) {
         let _ = expression.inline_call(visible, id_generator);
     }
+}
+
+pub fn inline_if_that_enables_further_optimizations(
+    expression: &mut Expression,
+    db: &dyn OptimizeMir,
+    tracing: &TracingConfig,
+    visible: &mut VisibleExpressions,
+    id_generator: &mut IdGenerator<Id>,
+    errors: &mut FxHashSet<CompilerError>,
+) {
+    if !matches!(expression, Expression::Call { .. }) {
+        return;
+    }
+    let original_expression = expression.clone();
+
+    info!("Does inlining {} help?", expression.to_rich_ir());
+    if expression.inline_call(visible, id_generator).is_err() {
+        return;
+    }
+    info!("Inlined: {}", expression.to_rich_ir());
+
+    let original_visible = visible
+        .expressions
+        .keys()
+        .copied()
+        .collect::<FxHashSet<_>>();
+    let original_id_generator = id_generator.clone();
+
+    let complexity_before_more_optimizations = expression.complexity();
+    let mut new_errors = FxHashSet::default();
+    let Expression::Multiple(body) = expression else { unreachable!() };
+    body.optimize(visible, id_generator, db, tracing, &mut new_errors);
+    let complexity_after_optimizations = expression.complexity();
+    info!("Optimized: {}", expression.to_rich_ir());
+
+    if complexity_before_more_optimizations > complexity_after_optimizations {
+        // Nice! It benefitted from inlining!
+        errors.extend(new_errors.into_iter());
+        return;
+    }
+
+    // Revert to the old status.
+    *expression = original_expression;
+    visible
+        .expressions
+        .retain(|k, _| original_visible.contains(k));
+    *id_generator = original_id_generator;
 }
 
 impl Expression {
