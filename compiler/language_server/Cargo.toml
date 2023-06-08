@@ -8,6 +8,7 @@ rust-version = "1.56"
 
 [dependencies]
 async-trait = "0.1.64"
+base64 = "0.21.2"
 candy_formatter = { path = "../formatter" }
 candy_frontend = { path = "../frontend" }
 candy_fuzzer = { path = "../fuzzer" }

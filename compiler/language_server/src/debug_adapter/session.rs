@@ -153,7 +153,7 @@ impl DebugSession {
                     supports_set_expression: None,
                     supports_terminate_request: None,
                     supports_data_breakpoints: None,
-                    supports_read_memory_request: None,
+                    supports_read_memory_request: Some(true),
                     supports_write_memory_request: None,
                     supports_disassemble_request: None,
                     supports_cancel_request: None,
@@ -258,7 +258,13 @@ impl DebugSession {
                 .await
             }
             Command::Pause(_) => todo!(),
-            Command::ReadMemory(_) => todo!(),
+            Command::ReadMemory(args) => {
+                let state = self.state.require_paused_mut()?;
+                let response = state.read_memory(args)?;
+                self.send_response_ok(request.seq, ResponseBody::ReadMemory(Some(response)))
+                    .await;
+                Ok(())
+            }
             Command::Restart(_) => todo!(),
             Command::RestartFrame(_) => todo!(),
             Command::ReverseContinue(_) => todo!(),
