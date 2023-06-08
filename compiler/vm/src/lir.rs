@@ -16,20 +16,20 @@ use rustc_hash::FxHashSet;
 use std::fmt::{self, Display, Formatter};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-pub struct Lir<'h> {
+pub struct Lir<'c> {
     pub module: Module,
-    pub constant_heap: Heap<'h>,
-    pub instructions: Vec<Instruction<'h>>,
+    pub constant_heap: Heap<'c>,
+    pub instructions: Vec<Instruction<'c>>,
     pub origins: Vec<FxHashSet<hir::Id>>,
-    pub module_function: Function<'h>,
-    pub responsible_module: HirId<'h>,
+    pub module_function: Function<'c>,
+    pub responsible_module: HirId<'c>,
 }
 
 pub type StackOffset = usize; // 0 is the last item, 1 the one before that, etc.
 
 #[derive(Clone, Debug, EnumDiscriminants, Eq, Hash, IntoStaticStr, PartialEq)]
 #[strum_discriminants(derive(Hash, IntoStaticStr), strum(serialize_all = "camelCase"))]
-pub enum Instruction<'h> {
+pub enum Instruction<'c> {
     /// Pops num_items items, pushes a list.
     ///
     /// a, item, item, ..., item -> a, pointer to list
@@ -55,7 +55,7 @@ pub enum Instruction<'h> {
 
     /// Pushes a pointer onto the stack. MIR instructions that create
     /// compile-time known values are compiled to this instruction.
-    PushConstant(InlineObject<'h>),
+    PushConstant(InlineObject<'c>),
 
     /// Pushes an item from back in the stack on the stack again.
     PushFromStack(StackOffset),
