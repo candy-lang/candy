@@ -43,11 +43,9 @@ export interface UpdateIrParams {
 }
 
 // Hints
-export class PublishHintsNotification {
-  public static type = new NotificationType<HintsParams>(
-    'candy/textDocument/publishHints'
-  );
-}
+export const publishHintsNotification = new NotificationType<HintsParams>(
+  'candy/textDocument/publishHints'
+);
 export interface HintsParams {
   readonly uri: string;
   readonly hints: Hint[];
@@ -60,11 +58,7 @@ export interface Hint {
 export type HintKind = 'value' | 'panic' | 'fuzz';
 
 // Status
-export class PublishServerStatusNotification {
-  public static type = new NotificationType<ServerStatus>(
-    'candy/publishServerStatus'
-  );
-}
+export const publishServerStatusNotification = 'candy/publishServerStatus';
 export interface ServerStatus {
   text: string;
 }
