@@ -75,7 +75,7 @@ pub fn module_to_url(module: &Module, packages_path: &PackagesPath) -> Option<Ur
             )
             .unwrap(),
         ),
-        Package::Anonymous { url } => Some(Url::parse(&format!("untitled:{url}",)).unwrap()),
+        Package::Anonymous { url } => Some(Url::parse(&format!("untitled:{url}")).unwrap()),
         Package::Tooling(_) => None,
     }
 }

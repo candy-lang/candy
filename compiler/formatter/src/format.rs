@@ -12,7 +12,7 @@ use crate::{
     width::{Indentation, SinglelineWidth, StringWidth, Width},
 };
 use candy_frontend::{
-    cst::{Cst, CstError, CstKind},
+    cst::{Cst, CstError, CstKind, UnwrapWhitespaceAndComment},
     position::Offset,
 };
 use extension_trait::extension_trait;
@@ -56,10 +56,14 @@ impl FormattingInfo {
             is_single_expression_in_assignment_body: true,
         }
     }
-    pub fn resolve_for_sandwich_like(&self, previous_width: Width) -> Self {
+    pub fn resolve_for_expression_with_indented_lines(
+        &self,
+        previous_width: Width,
+        first_line_extra_width: Width,
+    ) -> Self {
         Self {
             indentation: if self.is_single_expression_in_assignment_body
-                && previous_width.last_line_fits(self.indentation, SinglelineWidth::PARENTHESIS)
+                && previous_width.last_line_fits(self.indentation, first_line_extra_width)
             {
                 self.indentation.with_dedent()
             } else {
@@ -630,30 +634,28 @@ pub(crate) fn format_cst<'a>(
                 (cases, last_case)
             } else {
                 let (percent_width, whitespace) = percent.split();
-                return FormattedCst::new(expression_width + percent_width, whitespace, );
+                return FormattedCst::new(expression_width + percent_width, whitespace);
             };
 
+            let case_info = info
+                .resolve_for_expression_with_indented_lines(
+                    previous_width,
+                    expression_width + SinglelineWidth::PERCENT,
+                )
+                .with_indent();
             let percent_width =
-                percent.into_trailing_with_indentation(edits, info.indentation.with_indent());
+                percent.into_trailing_with_indentation(edits, case_info.indentation);
 
-            let (last_case_width, whitespace) = format_cst(
-                edits,
-                previous_width_for_indented,
-                last_case,
-                &info.with_indent(),
-            )
-            .split();
+            let (last_case_width, whitespace) =
+                format_cst(edits, previous_width_for_indented, last_case, &case_info).split();
             return FormattedCst::new(
                 expression_width
                     + percent_width
                     + cases
                         .iter()
                         .map(|it| {
-                            format_cst(edits, previous_width_for_indented, it, &info.with_indent())
-                                .into_trailing_with_indentation(
-                                    edits,
-                                    info.indentation.with_indent(),
-                                )
+                            format_cst(edits, previous_width_for_indented, it, &case_info)
+                                .into_trailing_with_indentation(edits, case_info.indentation)
                         })
                         .sum::<Width>()
                     + last_case_width,
@@ -704,7 +706,10 @@ pub(crate) fn format_cst<'a>(
             body,
             closing_curly_brace,
         } => {
-            let info = info.resolve_for_sandwich_like(previous_width);
+            let info = info.resolve_for_expression_with_indented_lines(
+                previous_width,
+                SinglelineWidth::PARENTHESIS.into(),
+            );
 
             let opening_curly_brace = format_cst(edits, previous_width, opening_curly_brace, &info);
 
@@ -904,12 +909,18 @@ pub(crate) fn format_cst<'a>(
                 },
             );
 
-            let assignment_sign_trailing = if left_width.last_line_fits(
+            let contains_single_assignment = body.len() == 1
+                && matches!(
+                    body.first().unwrap().unwrap_whitespace_and_comment().kind,
+                    CstKind::Assignment { .. },
+                );
+            let assignment_sign_trailing = if !contains_single_assignment && left_width.last_line_fits(
                 info.indentation,
                 assignment_sign.min_width(info.indentation) + SinglelineWidth::SPACE + body_width + body_whitespace_width,
             ) {
                 TrailingWhitespace::Space
-            } else if !body_whitespace_has_comments
+            } else if !contains_single_assignment
+                && !body_whitespace_has_comments
                 && let Some(body_first_line_width) = body_width.first_line_width()
                 && left_width.last_line_fits(
                     info.indentation,
@@ -1686,6 +1697,12 @@ mod test {
             "foo%\n  Foo->Foo\n\n  Bar  ->  Bar",
             "foo %\n  Foo -> Foo\n  Bar -> Bar\n",
         );
+        // foo := bar %
+        //   Baz -> Blub
+        test(
+            "foo := bar %\n  Baz -> Blub\n",
+            "foo := bar %\n  Baz -> Blub\n",
+        );
 
         // Comments
         // foo % # abc
@@ -1823,6 +1840,9 @@ mod test {
             "foo = looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongExpression",
             "foo =\n  looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongExpression\n",
         );
+        // foo =
+        //   bar = baz
+        test("foo =\n  bar = baz", "foo =\n  bar = baz\n");
         // foo := {
         //   bar
         //   baz
@@ -1886,6 +1906,15 @@ mod test {
         test(
             "foo = bar # looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongComment\n",
             "foo =\n  bar\n  # looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongComment\n",
+        );
+        // foo :=
+        //   # loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongComment
+        //   Foo
+        //
+        //   Bar
+        test(
+            "foo :=\n  # looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongComment\n  Foo\n\n  Bar\n",
+            "foo :=\n  # looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooongComment\n  Foo\n\n  Bar\n",
         );
     }
 

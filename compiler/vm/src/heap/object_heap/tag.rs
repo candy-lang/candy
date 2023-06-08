@@ -1,6 +1,6 @@
 use super::{utils::heap_object_impls, HeapObjectTrait};
 use crate::{
-    heap::{object_heap::HeapObject, Heap, InlineObject, Text},
+    heap::{object_heap::HeapObject, Heap, InlineObject, Tag, Text},
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
 use derive_more::Deref;
@@ -48,6 +48,10 @@ impl HeapTag {
     pub fn value(self) -> Option<InlineObject> {
         let value = unsafe { *self.value_pointer().as_ref() };
         NonZeroU64::new(value).map(InlineObject::new)
+    }
+
+    pub fn without_value(self, heap: &mut Heap) -> Tag {
+        Tag::create(heap, self.symbol(), None)
     }
 }
 

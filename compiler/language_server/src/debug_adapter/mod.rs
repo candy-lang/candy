@@ -15,6 +15,7 @@ mod paused;
 mod session;
 mod tracer;
 mod utils;
+mod vm_state;
 
 #[derive(Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, Serialize)]
 #[serde(transparent)]

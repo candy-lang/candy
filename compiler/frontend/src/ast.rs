@@ -36,7 +36,7 @@ impl Id {
 }
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "AstId({}:{})", &self.module.to_rich_ir(), self.local)
+        write!(f, "AstId({}:{})", self.module, self.local)
     }
 }
 
@@ -110,6 +110,7 @@ pub struct Function {
 pub struct Call {
     pub receiver: Box<Ast>,
     pub arguments: Vec<Ast>,
+    pub is_from_pipe: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

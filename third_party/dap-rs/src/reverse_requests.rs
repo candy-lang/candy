@@ -102,7 +102,7 @@ pub struct ReverseRequest {
     /// associate requests with their corresponding responses. For protocol
     /// messages of type `request` the sequence number can be used to cancel the
     /// request.
-    pub seq: i64,
+    pub seq: usize,
     /// The command to execute.
     ///
     /// This is stringly typed in the specification, but represented as an enum for better

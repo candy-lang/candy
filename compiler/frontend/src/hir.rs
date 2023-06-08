@@ -3,10 +3,12 @@ use crate::{
     builtin_functions::BuiltinFunction,
     error::CompilerError,
     id::CountableId,
+    impl_display_via_richir,
     module::{Module, ModuleKind, Package},
     rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr, TokenModifier, TokenType},
 };
 
+use derive_more::From;
 use enumset::EnumSet;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
@@ -128,13 +130,18 @@ impl Body {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
+#[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Id {
     pub module: Module,
-    pub keys: Vec<String>,
+    pub keys: Vec<IdKey>,
+}
+#[derive(Clone, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
+pub enum IdKey {
+    Named { name: String, disambiguator: usize },
+    Positional(usize),
 }
 impl Id {
-    pub fn new(module: Module, keys: Vec<String>) -> Self {
+    pub fn new(module: Module, keys: Vec<IdKey>) -> Self {
         Self { module, keys }
     }
 
@@ -197,9 +204,9 @@ impl Id {
         }
     }
 
-    pub fn child(&self, key: &str) -> Self {
+    pub fn child(&self, key: impl Into<IdKey>) -> Self {
         let mut keys = self.keys.clone();
-        keys.push(key.to_string());
+        keys.push(key.into());
         Self {
             module: self.module.clone(),
             keys,
@@ -211,15 +218,20 @@ impl Id {
             && self.keys.len() < other.keys.len()
             && self.keys.iter().zip(&other.keys).all(|(a, b)| a == b)
     }
+
+    pub fn function_name(&self) -> String {
+        self.keys
+            .iter()
+            .map(|it| match it {
+                IdKey::Positional(index) => format!("<anonymous {index}>"),
+                it => it.to_string(),
+            })
+            .join(" → ")
+    }
 }
 impl Debug for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}:{}",
-            self.module.to_rich_ir(),
-            self.keys.iter().join(":"),
-        )
+        write!(f, "{}:{}", self.module, self.keys.iter().join(":"))
     }
 }
 impl Display for Id {
@@ -235,6 +247,41 @@ impl ToRichIr for Id {
             EnumSet::empty(),
         );
         builder.push_reference(self.to_owned(), range);
+    }
+}
+impl Debug for IdKey {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match &self {
+            IdKey::Named {
+                name,
+                disambiguator,
+            } => {
+                write!(f, "{name}")?;
+                if disambiguator > &0 {
+                    write!(f, "#{disambiguator}")?;
+                }
+                Ok(())
+            }
+            IdKey::Positional(index) => write!(f, "{index}"),
+        }
+    }
+}
+impl Display for IdKey {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+impl From<String> for IdKey {
+    fn from(value: String) -> Self {
+        IdKey::Named {
+            name: value,
+            disambiguator: 0,
+        }
+    }
+}
+impl From<&str> for IdKey {
+    fn from(value: &str) -> Self {
+        value.to_string().into()
     }
 }
 
@@ -467,6 +514,7 @@ impl Body {
     }
 }
 
+impl_display_via_richir!(Expression);
 impl ToRichIr for Expression {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         match self {

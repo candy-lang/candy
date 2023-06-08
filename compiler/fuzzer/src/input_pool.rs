@@ -1,7 +1,5 @@
-use super::{
-    input::Input,
-    values::{generate_input, generate_mutated_input},
-};
+use super::input::Input;
+use crate::values::InputGeneration;
 use candy_vm::heap::{Heap, Text};
 use itertools::Itertools;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
@@ -21,7 +19,6 @@ impl InputPool {
     pub fn new(num_args: usize, symbols_in_heap: &FxHashSet<Text>) -> Self {
         let mut heap = Heap::default();
 
-        // TODO: This should support tags with values
         let mut symbols = symbols_in_heap
             .iter()
             .map(|symbol| symbol.clone_to_heap(&mut heap).try_into().unwrap())
@@ -50,7 +47,7 @@ impl InputPool {
         let mut rng = ThreadRng::default();
 
         if rng.gen_bool(0.1) || self.input_scores.len() < 20 {
-            return generate_input(self.heap.clone(), self.num_args, &self.symbols);
+            return Input::generate(self.heap.clone(), self.num_args, &self.symbols);
         }
 
         let inputs_and_scores = self.input_scores.iter().collect_vec();
@@ -58,7 +55,7 @@ impl InputPool {
             .choose_weighted(&mut rng, |(_, score)| *score)
             .unwrap();
         let mut input = (**input).clone();
-        generate_mutated_input(&mut rng, &mut input, &self.symbols);
+        input.mutate(&mut rng, &self.symbols);
         input
     }
 

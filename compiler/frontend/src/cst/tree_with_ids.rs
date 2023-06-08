@@ -192,11 +192,27 @@ impl TreeWithIds for Cst {
             CstKind::Identifier { .. } | CstKind::Symbol { .. } | CstKind::Int { .. } => {
                 (None, true)
             }
-            CstKind::Text { .. }
-            | CstKind::OpeningText { .. }
-            | CstKind::ClosingText { .. }
-            | CstKind::TextPart(_)
-            | CstKind::TextInterpolation { .. } => (None, false),
+            CstKind::Text { parts, .. } => {
+                let interpolation_index = parts
+                    .binary_search_by_key(&offset, |it| it.first_offset().unwrap())
+                    .or_else(|err| if err == 0 { Err(()) } else { Ok(err - 1) })
+                    .ok();
+
+                if let Some(part) = interpolation_index.map(|index| &parts[index])
+                    && matches!(part.kind, CstKind::TextInterpolation { .. })
+                    && let Some(child) = part.find_by_offset(offset)
+                    && !matches!(child.kind, CstKind::TextInterpolation { .. }) {
+                    (Some(child), false)
+                } else {
+                    (None, false)
+                }
+            }
+            CstKind::OpeningText { .. } | CstKind::ClosingText { .. } | CstKind::TextPart(_) => {
+                (None, false)
+            }
+            CstKind::TextInterpolation { expression, .. } => {
+                (expression.find_by_offset(offset), false)
+            }
             CstKind::BinaryBar { left, bar, right } => (
                 left.find_by_offset(offset)
                     .or_else(|| bar.find_by_offset(offset))

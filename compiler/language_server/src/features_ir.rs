@@ -127,7 +127,7 @@ impl IrFeatures {
     fn rich_ir_for_rcst(module: &Module, rcst: RcstResult) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!("# RCST for module {}", module.to_rich_ir()),
+            format!("# RCST for module {module}"),
             TokenType::Comment,
             EnumSet::empty(),
         );
@@ -141,7 +141,7 @@ impl IrFeatures {
     fn rich_ir_for_ast(module: &Module, asts: AstResult) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!("# AST for module {}", module.to_rich_ir()),
+            format!("# AST for module {module}"),
             TokenType::Comment,
             EnumSet::empty(),
         );
@@ -155,7 +155,7 @@ impl IrFeatures {
     fn rich_ir_for_hir(module: &Module, hir: HirResult) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!("# HIR for module {}", module.to_rich_ir()),
+            format!("# HIR for module {module}"),
             TokenType::Comment,
             EnumSet::empty(),
         );
@@ -169,7 +169,7 @@ impl IrFeatures {
     fn rich_ir_for_mir(module: &Module, mir: MirResult, tracing_config: &TracingConfig) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!("# MIR for module {}", module.to_rich_ir()),
+            format!("# MIR for module {module}"),
             TokenType::Comment,
             EnumSet::empty(),
         );
@@ -189,7 +189,7 @@ impl IrFeatures {
     ) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!("# Optimized MIR for module {}", module.to_rich_ir()),
+            format!("# Optimized MIR for module {module}"),
             TokenType::Comment,
             EnumSet::empty(),
         );
@@ -205,7 +205,7 @@ impl IrFeatures {
     fn rich_ir_for_lir(module: &Module, lir: &Lir, tracing_config: &TracingConfig) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!("# LIR for module {}", module.to_rich_ir()),
+            format!("# LIR for module {module}"),
             TokenType::Comment,
             EnumSet::empty(),
         );
@@ -223,7 +223,7 @@ impl IrFeatures {
         match module_error {
             ModuleError::DoesNotExist => {
                 builder.push(
-                    format!("# Module {} does not exist", module.to_rich_ir()),
+                    format!("# Module {module} does not exist"),
                     TokenType::Comment,
                     EnumSet::empty(),
                 );
@@ -477,6 +477,8 @@ impl LanguageFeatures for IrFeatures {
     }
     async fn folding_ranges(&self, _db: &Mutex<Database>, uri: Url) -> Vec<FoldingRange> {
         let open_irs = self.open_irs.read().await;
+        dbg!(&uri);
+        dbg!(&open_irs.keys());
         let open_ir = open_irs.get(&uri).unwrap();
         open_ir.folding_ranges()
     }

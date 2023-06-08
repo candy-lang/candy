@@ -4,7 +4,7 @@ use crate::{
     input_pool::{InputPool, Score},
     runner::{RunResult, Runner},
     utils::collect_symbols_in_heap,
-    values::complexity_of_input,
+    values::InputGeneration,
 };
 use candy_frontend::hir::Id;
 use candy_vm::{
@@ -12,7 +12,7 @@ use candy_vm::{
     fiber::Panic,
     heap::{Data, Function, Heap},
     lir::Lir,
-    tracer::stack_trace::StackTracer,
+    tracer::stack_trace::{FiberStackTracer, StackTracer},
 };
 use std::sync::Arc;
 use tracing::debug;
@@ -74,7 +74,7 @@ impl Fuzzer {
         self.status.unwrap()
     }
 
-    pub fn run(&mut self, execution_controller: &mut impl ExecutionController) {
+    pub fn run(&mut self, execution_controller: &mut impl ExecutionController<FiberStackTracer>) {
         let mut status = self.status.take().unwrap();
         while matches!(status, Status::StillFuzzing { .. })
             && execution_controller.should_continue_running()
@@ -104,7 +104,7 @@ impl Fuzzer {
 
     fn continue_fuzzing(
         &self,
-        execution_controller: &mut impl ExecutionController,
+        execution_controller: &mut impl ExecutionController<FiberStackTracer>,
         mut pool: InputPool,
         total_coverage: Coverage,
         mut runner: Runner<Arc<Lir>>,
@@ -135,7 +135,7 @@ impl Fuzzer {
                 } else {
                     // We favor small inputs with good code coverage.
                     let score = {
-                        let complexity = complexity_of_input(&runner.input) as Score;
+                        let complexity = runner.input.complexity() as Score;
                         let new_function_coverage = runner.coverage.in_range(&function_range);
                         let score: Score = (0.2 * runner.num_instructions as f64)
                             + (0.1

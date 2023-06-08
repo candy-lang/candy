@@ -1,6 +1,6 @@
 use crate::{
     builtin_functions::BuiltinFunction,
-    hir,
+    hir, impl_display_via_richir,
     module::Module,
     rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr, TokenModifier, TokenType},
 };
@@ -8,9 +8,10 @@ use enumset::EnumSet;
 use itertools::Itertools;
 use num_bigint::BigInt;
 use rustc_hash::{FxHashSet, FxHasher};
-use std::hash::{self, Hasher};
+use std::hash::{Hash, Hasher};
 
 use super::{body::Body, id::Id};
+use core::mem;
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum Expression {
@@ -123,9 +124,9 @@ impl TryInto<BigInt> for &Expression {
 }
 
 #[allow(clippy::derived_hash_with_manual_eq)]
-impl hash::Hash for Expression {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        core::mem::discriminant(self).hash(state);
+impl Hash for Expression {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        mem::discriminant(self).hash(state);
         match self {
             Expression::Int(int) => int.hash(state),
             Expression::Text(text) => text.hash(state),
@@ -213,6 +214,7 @@ impl hash::Hash for Expression {
         }
     }
 }
+impl_display_via_richir!(Expression);
 impl ToRichIr for Expression {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         match self {

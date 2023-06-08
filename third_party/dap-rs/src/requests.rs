@@ -1,4 +1,4 @@
-use std::{convert::Infallible, str::FromStr};
+use std::{convert::Infallible, num::NonZeroUsize, str::FromStr};
 
 use serde::{de, Deserialize, Deserializer};
 use serde_json::Value;
@@ -85,7 +85,7 @@ pub struct SetBreakpointsArguments {
     pub breakpoints: Option<Vec<SourceBreakpoint>>,
     /// Deprecated: The code locations of the breakpoints.
     #[deprecated]
-    pub lines: Option<Vec<i64>>,
+    pub lines: Option<Vec<usize>>,
     /// A value of true indicates that the underlying source has been modified
     /// which results in new breakpoint locations.
     pub source_modified: Option<bool>,
@@ -97,7 +97,7 @@ pub struct CancelArguments {
     /// The ID (attribute `seq`) of the request to cancel. If missing no request is
     /// cancelled.
     /// Both a `requestId` and a `progressId` can be specified in one request.
-    pub request_id: Option<i64>,
+    pub request_id: Option<usize>,
     /// The ID (attribute `progressId`) of the progress to cancel. If missing no
     /// progress is cancelled.
     /// Both a `requestId` and a `progressId` can be specified in one request.
@@ -184,20 +184,20 @@ pub struct BreakpointLocationsArguments {
     pub source: Source,
     /// Start line of range to search possible breakpoint locations in. If only the
     /// line is specified, the request returns all possible locations in that line.
-    pub line: i64,
+    pub line: usize,
     /// Start position within `line` to search possible breakpoint locations in. It
     /// is measured in UTF-16 code units and the client capability
     /// `columnsStartAt1` determines whether it is 0- or 1-based. If no column is
     /// given, the first position in the start line is assumed.
-    pub column: Option<i64>,
+    pub column: Option<usize>,
     /// End line of range to search possible breakpoint locations in. If no end
     /// line is given, then the end line is assumed to be the start line.
-    pub end_line: Option<i64>,
+    pub end_line: Option<usize>,
     /// End position within `endLine` to search possible breakpoint locations in.
     /// It is measured in UTF-16 code units and the client capability
     /// `columnsStartAt1` determines whether it is 0- or 1-based. If no end column
     /// is given, the last position in the end line is assumed.
-    pub end_column: Option<i64>,
+    pub end_column: Option<usize>,
 }
 
 //// Arguments for a Completions request.
@@ -206,17 +206,17 @@ pub struct BreakpointLocationsArguments {
 pub struct CompletionsArguments {
     /// Returns completions in the scope of this stack frame. If not specified, the
     /// completions are returned for the global scope.
-    pub frame_id: Option<i64>,
+    pub frame_id: Option<usize>,
     /// One or more source lines. Typically this is the text users have typed into
     /// the debug console before they asked for completion.
     pub text: String,
     /// The position within `text` for which to determine the completion proposals.
     /// It is measured in UTF-16 code units and the client capability
     /// `columnsStartAt1` determines whether it is 0- or 1-based.
-    pub column: i64,
+    pub column: usize,
     /// A line for which to determine the completion proposals. If missing the
     /// first line of the text is assumed.
-    pub line: Option<i64>,
+    pub line: Option<usize>,
 }
 
 //// Arguments for a Continue request.
@@ -226,7 +226,7 @@ pub struct ContinueArguments {
     /// Specifies the active thread. If the debug adapter supports single thread
     /// execution (see `supportsSingleThreadExecutionRequests`) and the argument
     /// `singleThread` is true, only the thread with this ID is resumed.
-    pub thread_id: i64,
+    pub thread_id: usize,
     /// If this flag is true, execution is resumed only for the thread with given
     /// `threadId`.
     pub single_thread: Option<bool>,
@@ -238,7 +238,7 @@ pub struct ContinueArguments {
 pub struct DataBreakpointInfoArguments {
     /// Reference to the variable container if the data breakpoint is requested for
     /// a child of the container.
-    pub variables_reference: Option<i64>,
+    pub variables_reference: Option<usize>,
     /// The name of the variable's child to obtain data breakpoint information for.
     /// If `variablesReference` isn't specified, this can be an expression.
     pub name: String,
@@ -253,16 +253,16 @@ pub struct DisassembleArguments {
     pub memory_reference: String,
     /// Offset (in bytes) to be applied to the reference location before
     /// disassembling. Can be negative.
-    pub offset: Option<i64>,
+    pub offset: Option<usize>,
     /// Offset (in instructions) to be applied after the byte offset (if any)
     /// before disassembling. Can be negative.
-    pub instruction_offset: Option<i64>,
+    pub instruction_offset: Option<usize>,
     /// Number of instructions to disassemble starting at the specified location
     /// and offset.
-    /// An adapter must return exactly this i64 of instructions - any
+    /// An adapter must return exactly this usize of instructions - any
     /// unavailable instructions should be replaced with an implementation-defined
     /// 'invalid instruction' value.
-    pub instruction_count: i64,
+    pub instruction_count: usize,
     /// If true, the adapter should attempt to resolve memory addresses and other
     /// values to symbolic names.
     pub resolve_symbols: Option<bool>,
@@ -297,7 +297,7 @@ pub struct EvaluateArguments {
     pub expression: String,
     /// Evaluate the expression in the scope of this stack frame. If not specified,
     /// the expression is evaluated in the global scope.
-    pub frame_id: Option<i64>,
+    pub frame_id: Option<usize>,
     /// The context in which the evaluate request is used.
     /// Values:
     /// 'variables': evaluate is called from a variables view context.
@@ -322,7 +322,7 @@ pub struct EvaluateArguments {
 #[serde(rename_all(deserialize = "camelCase", serialize = "snake_case"))]
 pub struct ExceptionInfoArguments {
     /// Thread for which exception information should be retrieved.
-    pub thread_id: i64,
+    pub thread_id: usize,
 }
 
 /// Arguments for a Goto request.
@@ -330,9 +330,9 @@ pub struct ExceptionInfoArguments {
 #[serde(rename_all(deserialize = "camelCase", serialize = "snake_case"))]
 pub struct GotoArguments {
     /// Set the goto target for this thread.
-    pub thread_id: i64,
+    pub thread_id: usize,
     /// The location where the debuggee will continue to run.
-    pub target_id: i64,
+    pub target_id: usize,
 }
 
 /// Arguments for a GotoTargets request.
@@ -342,11 +342,11 @@ pub struct GotoTargetsArguments {
     /// The source location for which the goto targets are determined.
     pub source: Source,
     /// The line location for which the goto targets are determined.
-    pub line: i64,
+    pub line: usize,
     /// The position within `line` for which the goto targets are determined. It is
     /// measured in UTF-16 code units and the client capability `columnsStartAt1`
     /// determines whether it is 0- or 1-based.
-    pub column: Option<i64>,
+    pub column: Option<usize>,
 }
 
 /// Arguments for a Modules request.
@@ -354,10 +354,10 @@ pub struct GotoTargetsArguments {
 #[serde(rename_all(deserialize = "camelCase", serialize = "snake_case"))]
 pub struct ModulesArguments {
     /// The index of the first module to return, if omitted modules start at 0.
-    pub start_module: Option<i64>,
-    /// The i64 of modules to return. If `moduleCount` is not specified or 0,
+    pub start_module: Option<usize>,
+    /// The usize of modules to return. If `moduleCount` is not specified or 0,
     /// all modules are returned.
-    pub module_count: Option<i64>,
+    pub module_count: Option<usize>,
 }
 
 /// Arguments for a Next request.
@@ -366,7 +366,7 @@ pub struct ModulesArguments {
 pub struct NextArguments {
     /// Specifies the thread for which to resume execution for one step (of the
     /// given granularity).
-    pub thread_id: i64,
+    pub thread_id: usize,
     /// If this flag is true, all other suspended threads are not resumed.
     pub single_thread: Option<bool>,
     /// Stepping granularity. If no granularity is specified, a granularity of
@@ -379,7 +379,7 @@ pub struct NextArguments {
 #[serde(rename_all(deserialize = "camelCase", serialize = "snake_case"))]
 pub struct PauseArguments {
     /// Pause execution for this thread.
-    pub thread_id: i64,
+    pub thread_id: usize,
 }
 
 /// Arguments for a ReadMemory request.
@@ -390,9 +390,9 @@ pub struct ReadMemoryArguments {
     pub memory_reference: String,
     /// Offset (in bytes) to be applied to the reference location before reading
     /// data. Can be negative.
-    pub offset: Option<i64>,
+    pub offset: Option<usize>,
     /// Number of bytes to read at the specified location and offset.
-    pub count: i64,
+    pub count: usize,
 }
 
 /// Arguments for a ReadMemory request.
@@ -407,7 +407,7 @@ pub enum RestartArguments {
 #[serde(rename_all(deserialize = "camelCase", serialize = "snake_case"))]
 pub struct RestartFrameArguments {
     /// Restart this stackframe.
-    pub frame_id: i64,
+    pub frame_id: usize,
 }
 
 /// Arguments for a ReverseContinue request.
@@ -417,7 +417,7 @@ pub struct ReverseContinueArguments {
     /// Specifies the active thread. If the debug adapter supports single thread
     /// execution (see `supportsSingleThreadExecutionRequests`) and the
     /// `singleThread` argument is true, only the thread with this ID is resumed.
-    pub thread_id: i64,
+    pub thread_id: usize,
     /// If this flag is true, backward execution is resumed only for the thread
     /// with given `threadId`.
     pub single_thread: Option<bool>,
@@ -428,7 +428,7 @@ pub struct ReverseContinueArguments {
 #[serde(rename_all(deserialize = "camelCase", serialize = "snake_case"))]
 pub struct ScopesArguments {
     /// Retrieve the scopes for this stackframe.
-    pub frame_id: i64,
+    pub frame_id: usize,
 }
 
 /// Arguments for a SetDataBreakpoints request.
@@ -450,7 +450,7 @@ pub struct SetExpressionArguments {
     pub value: String,
     /// Evaluate the expressions in the scope of this stack frame. If not
     /// specified, the expressions are evaluated in the global scope.
-    pub frame_id: Option<i64>,
+    pub frame_id: Option<usize>,
     /// Specifies how the resulting value should be formatted.
     pub format: Option<ValueFormat>,
 }
@@ -468,7 +468,7 @@ pub struct SetInstructionBreakpointsArguments {
 #[serde(rename_all(deserialize = "camelCase", serialize = "snake_case"))]
 pub struct SetVariableArguments {
     /// The reference of the variable container.
-    pub variables_reference: i64,
+    pub variables_reference: usize,
     /// The name of the variable in the container.
     pub name: String,
     /// The value of the variable.
@@ -487,7 +487,7 @@ pub struct SourceArguments {
     /// The reference to the source. This is the same as `source.sourceReference`.
     /// This is provided for backward compatibility since old clients do not
     /// understand the `source` attribute.
-    pub source_reference: i64,
+    pub source_reference: usize,
 }
 
 /// Arguments for a StackTrace request.
@@ -495,12 +495,12 @@ pub struct SourceArguments {
 #[serde(rename_all(deserialize = "camelCase", serialize = "snake_case"))]
 pub struct StackTraceArguments {
     /// Retrieve the stacktrace for this thread.
-    pub thread_id: i64,
+    pub thread_id: usize,
     /// The index of the first frame to return, if omitted frames start at 0.
-    pub start_frame: Option<i64>,
-    /// The maximum i64 of frames to return. If levels is not specified or 0,
+    pub start_frame: Option<usize>,
+    /// The maximum usize of frames to return. If levels is not specified or 0,
     /// all frames are returned.
-    pub levels: Option<i64>,
+    pub levels: Option<usize>,
     /// Specifies details on how to format the stack frames.
     /// The attribute is only honored by a debug adapter if the corresponding
     /// capability `supportsValueFormattingOptions` is true.
@@ -513,7 +513,7 @@ pub struct StackTraceArguments {
 pub struct StepBackArguments {
     /// Specifies the thread for which to resume execution for one step backwards
     /// (of the given granularity).
-    pub thread_id: i64,
+    pub thread_id: usize,
     /// If this flag is true, all other suspended threads are not resumed.
     pub single_thread: Option<bool>,
     /// Stepping granularity to step. If no granularity is specified, a granularity
@@ -527,11 +527,11 @@ pub struct StepBackArguments {
 pub struct StepInArguments {
     /// Specifies the thread for which to resume execution for one step-into (of
     /// the given granularity).
-    pub thread_id: i64,
+    pub thread_id: usize,
     /// If this flag is true, all other suspended threads are not resumed.
     pub single_thread: Option<bool>,
     /// Id of the target to step into.
-    pub target_id: Option<i64>,
+    pub target_id: Option<usize>,
     /// Stepping granularity. If no granularity is specified, a granularity of
     /// `statement` is assumed.
     pub granularity: Option<SteppingGranularity>,
@@ -542,7 +542,7 @@ pub struct StepInArguments {
 #[serde(rename_all(deserialize = "camelCase", serialize = "snake_case"))]
 pub struct StepInTargetsArguments {
     /// The stack frame for which to retrieve the possible step-in targets.
-    pub frame_id: i64,
+    pub frame_id: usize,
 }
 
 /// Arguments for a StepOut request.
@@ -551,7 +551,7 @@ pub struct StepInTargetsArguments {
 pub struct StepOutArguments {
     /// Specifies the thread for which to resume execution for one step-out (of the
     /// given granularity).
-    pub thread_id: i64,
+    pub thread_id: usize,
     /// If this flag is true, all other suspended threads are not resumed.
     pub single_thread: Option<bool>,
     /// Stepping granularity. If no granularity is specified, a granularity of
@@ -573,7 +573,7 @@ pub struct TerminateArguments {
 #[serde(rename_all(deserialize = "camelCase", serialize = "snake_case"))]
 pub struct TerminateThreadsArguments {
     /// Ids of threads to be terminated.
-    pub thread_ids: Option<Vec<i64>>,
+    pub thread_ids: Option<Vec<usize>>,
 }
 
 /// Arguments for a Variables request.
@@ -581,16 +581,16 @@ pub struct TerminateThreadsArguments {
 #[serde(rename_all(deserialize = "camelCase", serialize = "snake_case"))]
 pub struct VariablesArguments {
     /// The Variable reference.
-    pub variables_reference: i64,
+    pub variables_reference: usize,
     /// Filter to limit the child variables to either named or indexed. If omitted,
     /// both types are fetched.
     /// Values: 'indexed', 'named'
     pub filter: Option<VariablesArgumentsFilter>,
     /// The index of the first variable to return, if omitted children start at 0.
-    pub start: Option<i64>,
-    /// The i64 of variables to return. If count is missing or 0, all variables
+    pub start: Option<usize>,
+    /// The usize of variables to return. If count is missing or 0, all variables
     /// are returned.
-    pub count: Option<i64>,
+    pub count: Option<usize>,
     /// Specifies details on how to format the Variable values.
     /// The attribute is only honored by a debug adapter if the corresponding
     /// capability `supportsValueFormattingOptions` is true.
@@ -605,11 +605,11 @@ pub struct WriteMemoryArguments {
     pub memory_reference: String,
     /// Offset (in bytes) to be applied to the reference location before writing
     /// data. Can be negative.
-    pub offset: Option<i64>,
+    pub offset: Option<usize>,
     /// Property to control partial writes. If true, the debug adapter should
     /// attempt to write memory even if the entire memory region is not writable.
     /// In such a case the debug adapter should stop after hitting the first byte
-    /// of memory that cannot be written and return the i64 of bytes written in
+    /// of memory that cannot be written and return the usize of bytes written in
     /// the response via the `offset` and `bytesWritten` properties.
     /// If false or missing, a debug adapter should attempt to verify the region is
     /// writable before writing, and fail the response if it is not.
@@ -961,7 +961,7 @@ pub struct Request {
     /// associate requests with their corresponding responses. For protocol
     /// messages of type `request` the sequence number can be used to cancel the
     /// request.
-    pub seq: i64,
+    pub seq: NonZeroUsize,
     /// The command to execute.
     ///
     /// This is stringly typed in the specification, but represented as an enum for better

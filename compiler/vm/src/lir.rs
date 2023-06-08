@@ -1,7 +1,7 @@
 use crate::heap::{Function, HirId, InlineData, InlineObject, Text};
 use crate::utils::DebugDisplay;
 use crate::{fiber::InstructionPointer, heap::Heap};
-use candy_frontend::hir;
+use candy_frontend::{hir, impl_display_via_richir};
 use candy_frontend::{
     mir::Id,
     module::Module,
@@ -13,7 +13,7 @@ use extension_trait::extension_trait;
 use itertools::Itertools;
 use pad::{Alignment, PadStr};
 use rustc_hash::FxHashSet;
-use std::fmt::{self, Display, Formatter};
+use std::fmt::{self, Formatter};
 use std::ops::Range;
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -21,7 +21,7 @@ pub struct Lir {
     pub module: Module,
     pub constant_heap: Heap,
     pub instructions: Vec<Instruction>,
-    pub origins: Vec<FxHashSet<hir::Id>>,
+    pub(super) origins: Vec<FxHashSet<hir::Id>>,
     pub module_function: Function,
     pub responsible_module: HirId,
 }
@@ -209,6 +209,9 @@ impl StackExt for Vec<Id> {
 }
 
 impl Lir {
+    pub fn functions_behind(&self, ip: InstructionPointer) -> &FxHashSet<hir::Id> {
+        &self.origins[*ip]
+    }
     pub fn range_of_function(&self, function: &hir::Id) -> Range<InstructionPointer> {
         let start = self
             .origins
@@ -249,8 +252,20 @@ impl ToRichIr for Lir {
 
         builder.push("# Instructions", TokenType::Comment, EnumSet::empty());
         let instruction_index_width = (self.instructions.len() * 10 - 1).ilog10() as usize;
-        for (i, (instruction, origins)) in self.instructions.iter().zip(&self.origins).enumerate() {
+        let mut previous_origins = &FxHashSet::default();
+        for (i, instruction) in self.instructions.iter().enumerate() {
             builder.push_newline();
+
+            let origins = &self.origins[i];
+            if origins != previous_origins {
+                builder.push(
+                    format!("# {}", origins.iter().join(", ")),
+                    TokenType::Comment,
+                    EnumSet::empty(),
+                );
+                builder.push_newline();
+                previous_origins = origins;
+            }
 
             builder.push(
                 format!(
@@ -263,13 +278,6 @@ impl ToRichIr for Lir {
             );
 
             instruction.build_rich_ir(builder);
-
-            builder.push("  ", None, EnumSet::empty());
-            builder.push(
-                format!("# {}", origins.iter().join(", ")),
-                TokenType::Comment,
-                EnumSet::empty(),
-            );
         }
     }
 }
@@ -385,15 +393,11 @@ impl DebugDisplay for Instruction {
         if is_debug {
             write!(f, "{:?}", self)
         } else {
-            write!(f, "{}", self.to_rich_ir().text)
+            write!(f, "{}", self)
         }
     }
 }
-impl Display for Instruction {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        DebugDisplay::fmt(self, f, false)
-    }
-}
+impl_display_via_richir!(Instruction);
 
 fn arguments_plural(num_args: usize) -> &'static str {
     if num_args == 1 {
@@ -408,7 +412,7 @@ pub impl RichIrForLir for RichIr {
     fn for_lir(module: &Module, lir: &Lir, tracing_config: &TracingConfig) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!("# LIR for module {}", module.to_rich_ir()),
+            format!("# LIR for module {module}"),
             TokenType::Comment,
             EnumSet::empty(),
         );

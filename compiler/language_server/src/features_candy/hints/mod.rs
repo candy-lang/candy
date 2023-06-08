@@ -16,6 +16,9 @@ use candy_frontend::{
     rich_ir::ToRichIr,
 };
 use lsp_types::{notification::Notification, Diagnostic, Url};
+use candy_frontend::module::{Module, MutableModuleProviderOwner, PackagesPath};
+use itertools::Itertools;
+use lsp_types::{notification::Notification, Position, Url};
 use rand::{seq::IteratorRandom, thread_rng};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -133,7 +136,7 @@ impl<T: Clone + fmt::Debug + Eq> OutgoingCache<T> {
 
     async fn send(&mut self, module: Module, value: T) {
         if self.last_sent.get(&module) != Some(&value) {
-            debug!("Reporting for {}: {value:?}", module.to_rich_ir());
+            debug!("Reporting for {}: {value:?}", module);
             self.last_sent.insert(module.clone(), value.clone());
             self.sender.send((module, value)).await.unwrap();
         }

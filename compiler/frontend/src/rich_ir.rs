@@ -83,6 +83,7 @@ pub trait ToRichIr {
     }
     fn build_rich_ir(&self, builder: &mut RichIrBuilder);
 }
+
 impl ToRichIr for str {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         builder.push(self, None, EnumSet::empty());
@@ -113,6 +114,27 @@ impl<T: ToRichIr> ToRichIr for [T] {
             }
         }
     }
+}
+
+#[macro_export]
+macro_rules! impl_debug_via_richir {
+    ($type:ty) => {
+        impl std::fmt::Debug for $type {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(f, "{}", self.to_rich_ir().text)
+            }
+        }
+    };
+}
+#[macro_export]
+macro_rules! impl_display_via_richir {
+    ($type:ty) => {
+        impl std::fmt::Display for $type {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(f, "{}", self.to_rich_ir().text)
+            }
+        }
+    };
 }
 
 #[derive(Debug, Default)]
@@ -277,7 +299,7 @@ impl RichIr {
     pub fn for_rcst(module: &Module, rcst: &RcstResult) -> Option<RichIr> {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!("# RCST for module {}", module.to_rich_ir()),
+            format!("# RCST for module {module}"),
             TokenType::Comment,
             EnumSet::empty(),
         );
@@ -305,7 +327,7 @@ impl RichIr {
     pub fn for_ast(module: &Module, asts: &[Ast]) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!("# AST for module {}", module.to_rich_ir()),
+            format!("# AST for module {module}"),
             TokenType::Comment,
             EnumSet::empty(),
         );
@@ -317,7 +339,7 @@ impl RichIr {
     pub fn for_hir(module: &Module, body: &hir::Body) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!("# HIR for module {}", module.to_rich_ir()),
+            format!("# HIR for module {module}"),
             TokenType::Comment,
             EnumSet::empty(),
         );
@@ -329,7 +351,7 @@ impl RichIr {
     pub fn for_mir(module: &Module, mir: &Mir, tracing_config: &TracingConfig) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!("# MIR for module {}", module.to_rich_ir()),
+            format!("# MIR for module {module}"),
             TokenType::Comment,
             EnumSet::empty(),
         );
@@ -343,7 +365,7 @@ impl RichIr {
     pub fn for_optimized_mir(module: &Module, mir: &Mir, tracing_config: &TracingConfig) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!("# Optimized MIR for module {}", module.to_rich_ir()),
+            format!("# Optimized MIR for module {module}"),
             TokenType::Comment,
             EnumSet::empty(),
         );

@@ -444,7 +444,7 @@ impl Heap {
     fn tag_without_value(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |tag: Tag| {
             tag.symbol().dup();
-            Return(Tag::create(self, tag.symbol(), None).into())
+            Return(tag.without_value(self).into())
         })
     }
 
