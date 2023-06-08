@@ -4,7 +4,7 @@ use crate::{
     features::{LanguageFeatures, Reference, RenameError},
     features_candy::{
         hints::{hint::Hint, HintsNotification},
-        CandyFeatures,
+        CandyFeatures, ServerStatusNotification,
     },
     features_ir::{IrFeatures, UpdateIrNotification},
     semantic_tokens,
@@ -127,6 +127,16 @@ pub struct AnalyzerClient {
     packages_path: PackagesPath,
 }
 impl AnalyzerClient {
+    pub async fn update_status(&self, status: Option<String>) {
+        self.client
+            .send_notification::<ServerStatusNotification>(ServerStatusNotification {
+                text: match status {
+                    Some(status) => format!("🍭 {status}"),
+                    None => "🍭".to_string(),
+                },
+            })
+            .await;
+    }
     pub async fn update_diagnostics(&self, module: Module, diagnostics: Vec<Diagnostic>) {
         self.client
             .publish_diagnostics(

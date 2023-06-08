@@ -89,10 +89,14 @@ pub async fn run_server(
             }
         }
 
-        let Some(module) = hints_finders.keys().choose(&mut thread_rng()).cloned() else { continue; };
+        let Some(module) = hints_finders.keys().choose(&mut thread_rng()).cloned() else {
+            client.update_status(None);
+            continue;
+        };
         let hints_finder = hints_finders.get_mut(&module).unwrap();
 
-        hints_finder.run(&db);
+        hints_finder.run(&db, &client).await;
+
         let (mut hints, diagnostics) = hints_finder.hints(&db, &module);
         hints.sort_by_key(|hint| hint.position);
 

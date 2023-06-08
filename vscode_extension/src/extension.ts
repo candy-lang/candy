@@ -9,6 +9,7 @@ import {
 import { registerDebugAdapter } from './debug_adapter';
 import { registerDebugIrCommands } from './debug_irs';
 import { HintsDecorations } from './hints';
+import { ServerStatusService } from './server_status';
 
 let client: LanguageClient;
 
@@ -45,6 +46,7 @@ export async function activate(context: vscode.ExtensionContext) {
   client.start();
 
   context.subscriptions.push(new HintsDecorations(client));
+  context.subscriptions.push(new ServerStatusService(client));
   registerDebugIrCommands(client);
   registerDebugAdapter(context, client);
 }

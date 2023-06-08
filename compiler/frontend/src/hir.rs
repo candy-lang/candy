@@ -231,7 +231,7 @@ impl Id {
 }
 impl Debug for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "HirId({}:{})", self.module, self.keys.iter().join(":"))
+        write!(f, "{}:{}", self.module, self.keys.iter().join(":"))
     }
 }
 impl Display for Id {
