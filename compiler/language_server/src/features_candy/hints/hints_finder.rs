@@ -4,6 +4,7 @@ use super::{
 };
 use crate::{
     database::Database,
+    server::AnalyzerClient,
     utils::{error_to_diagnostic, LspPositionConversion},
 };
 use candy_frontend::{
@@ -32,7 +33,7 @@ use candy_vm::{
 use itertools::Itertools;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Range};
 use rand::{prelude::SliceRandom, thread_rng};
-use std::{future::Future, sync::Arc};
+use std::sync::Arc;
 
 /// A hints finder is responsible for finding hints for a single module.
 pub struct HintsFinder {
@@ -84,24 +85,22 @@ impl HintsFinder {
         self.state = Some(State::Initial);
     }
 
-    pub async fn run<F: Future<Output = ()>>(
-        &mut self,
-        db: &(impl CstDb + OptimizeMir),
-        set_status: impl Fn(Option<String>) -> F,
-    ) {
+    pub async fn run(&mut self, db: &(impl CstDb + OptimizeMir), client: &AnalyzerClient) {
         let state = self.state.take().unwrap();
-        let state = self.update_state(db, set_status, state).await;
+        let state = self.update_state(db, client, state).await;
         self.state = Some(state);
     }
-    async fn update_state<F: Future<Output = ()>>(
+    async fn update_state(
         &self,
         db: &(impl CstDb + OptimizeMir),
-        set_status: impl Fn(Option<String>) -> F,
+        client: &AnalyzerClient,
         state: State,
     ) -> State {
         match state {
             State::Initial => {
-                set_status(Some(format!("Compiling {}", self.module.to_rich_ir()))).await;
+                client
+                    .update_status(Some(format!("Compiling {}", self.module.to_rich_ir())))
+                    .await;
 
                 let (hir, _) = db.hir(self.module.clone()).unwrap();
                 let mut errors = vec![];
@@ -127,7 +126,9 @@ impl HintsFinder {
                 mut tracer,
                 mut vm,
             } => {
-                set_status(Some(format!("Evaluating {}", self.module.to_rich_ir()))).await;
+                client
+                    .update_status(Some(format!("Evaluating {}", self.module.to_rich_ir())))
+                    .await;
 
                 vm.run(&mut RunLimitedNumberOfInstructions::new(500), &mut tracer);
                 if !matches!(vm.status(), vm::Status::Done | vm::Status::Panicked(_)) {
@@ -166,7 +167,9 @@ impl HintsFinder {
                 mut tracer,
                 mut vm,
             } => {
-                set_status(Some(format!("Evaluating {}", self.module.to_rich_ir()))).await;
+                client
+                    .update_status(Some(format!("Evaluating {}", self.module.to_rich_ir())))
+                    .await;
 
                 vm.run(&mut RunLimitedNumberOfInstructions::new(500), &mut tracer);
                 if !matches!(vm.status(), vm::Status::Done | vm::Status::Panicked(_)) {
@@ -209,11 +212,13 @@ impl HintsFinder {
                     .filter(|fuzzer| matches!(fuzzer.status(), Status::StillFuzzing { .. }))
                     .collect_vec();
                 let Some(fuzzer) = running_fuzzers.choose_mut(&mut thread_rng()) else {
-                    set_status(None).await;
+                    client.update_status(None).await;
                     return State::Fuzz { errors, constants_ended, stack_tracer, evaluated_values, fuzzable_finder_ended, fuzzers };
                 };
 
-                set_status(Some(format!("Fuzzing {}", fuzzer.function_id))).await;
+                client
+                    .update_status(Some(format!("Fuzzing {}", fuzzer.function_id)))
+                    .await;
 
                 fuzzer.run(&mut RunLimitedNumberOfInstructions::new(500));
 
