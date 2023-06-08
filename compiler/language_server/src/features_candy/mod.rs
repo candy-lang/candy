@@ -1,38 +1,28 @@
-use async_trait::async_trait;
-use candy_frontend::{
-    ast_to_hir::AstToHir,
-    hir::CollectErrors,
-    module::{Module, ModuleDb, ModuleKind, MutableModuleProviderOwner, PackagesPath},
-    rcst_to_cst::RcstToCst,
-    rich_ir::ToRichIr,
-};
-use itertools::Itertools;
-use lsp_types::{
-    self, Diagnostic, FoldingRange, LocationLink, SemanticToken, TextDocumentContentChangeEvent,
-    TextEdit, Url,
-};
-use rustc_hash::FxHashMap;
-use std::{collections::HashMap, thread};
-use tokio::sync::{mpsc::Sender, Mutex};
-use tracing::debug;
-
-use crate::{
-    database::Database,
-    features::{LanguageFeatures, Reference, RenameError},
-    utils::{
-        error_into_diagnostic, lsp_range_to_range_raw, module_from_url, LspPositionConversion,
-    },
-};
-
 use self::{
     find_definition::find_definition,
     folding_ranges::folding_ranges,
-    hints::Hint,
     references::{reference_query_for_offset, references, ReferenceQuery},
     semantic_tokens::semantic_tokens,
 };
+use crate::{
+    database::Database,
+    features::{LanguageFeatures, Reference, RenameError},
+    server::AnalyzerClient,
+    utils::{lsp_range_to_range_raw, module_from_url, LspPositionConversion},
+};
+use async_trait::async_trait;
 use candy_formatter::Formatter;
+use candy_frontend::{
+    module::{Module, ModuleDb, ModuleKind, MutableModuleProviderOwner, PackagesPath},
+    rcst_to_cst::RcstToCst,
+};
+use lsp_types::{
+    self, FoldingRange, LocationLink, SemanticToken, TextDocumentContentChangeEvent, TextEdit, Url,
+};
 use regex::Regex;
+use rustc_hash::FxHashMap;
+use std::{collections::HashMap, thread};
+use tokio::sync::{mpsc::Sender, Mutex};
 
 pub mod find_definition;
 pub mod folding_ranges;
@@ -42,53 +32,16 @@ pub mod semantic_tokens;
 
 #[derive(Debug)]
 pub struct CandyFeatures {
-    diagnostics_sender: Sender<(Module, Vec<Diagnostic>)>,
     hints_events_sender: Sender<hints::Event>,
 }
 impl CandyFeatures {
-    pub fn new(
-        packages_path: PackagesPath,
-        diagnostics_sender: Sender<(Module, Vec<Diagnostic>)>,
-        hints_sender: Sender<(Module, Vec<Hint>)>,
-    ) -> Self {
+    pub fn new(packages_path: PackagesPath, client: AnalyzerClient) -> Self {
         let (hints_events_sender, hints_events_receiver) = tokio::sync::mpsc::channel(1024);
-        thread::spawn(|| {
-            hints::run_server(packages_path, hints_events_receiver, hints_sender);
+        thread::spawn(move || {
+            hints::run_server(packages_path, hints_events_receiver, client);
         });
         Self {
-            diagnostics_sender,
             hints_events_sender,
-        }
-    }
-
-    async fn analyze_modules(&self, db: &Mutex<Database>, modules: impl AsRef<[Module]>) {
-        let modules = modules.as_ref();
-        debug!(
-            "Analyzing {} {}",
-            if modules.len() == 1 {
-                "module"
-            } else {
-                "modules"
-            },
-            modules.iter().map(Module::to_rich_ir).join(", "),
-        );
-
-        for module in modules {
-            let diagnostics = {
-                let db = db.lock().await;
-                let (hir, _mapping) = db.hir(module.clone()).unwrap();
-
-                let mut errors = vec![];
-                hir.collect_errors(&mut errors);
-                errors
-                    .into_iter()
-                    .map(|it| error_into_diagnostic(&db, module.clone(), it))
-                    .collect()
-            };
-            self.diagnostics_sender
-                .send((module.to_owned(), diagnostics))
-                .await
-                .expect("Diagnostics channel closed");
         }
     }
 
@@ -124,7 +77,6 @@ impl LanguageFeatures for CandyFeatures {
             db.did_open_module(&module, content.clone());
             module
         };
-        self.analyze_modules(db, [module.clone()]).await;
         self.send_to_hints_server(hints::Event::UpdateModule(module, content))
             .await;
     }
@@ -137,14 +89,13 @@ impl LanguageFeatures for CandyFeatures {
         uri: Url,
         changes: Vec<TextDocumentContentChangeEvent>,
     ) {
-        let (module, content, open_modules) = {
+        let (module, content) = {
             let mut db = db.lock().await;
             let module = decode_module(&uri, &db.packages_path);
             let content = apply_text_changes(&db, module.clone(), changes).into_bytes();
             db.did_change_module(&module, content.clone());
-            (module, content, db.get_open_modules())
+            (module, content)
         };
-        self.analyze_modules(db, open_modules).await;
         self.send_to_hints_server(hints::Event::UpdateModule(module, content))
             .await;
     }

@@ -9,22 +9,22 @@
 //! While doing all that, we can pause regularly between executing instructions
 //! so that we don't occupy a single CPU at 100 %.
 
-use self::hints_finder::HintsFinder;
+use self::{hint::Hint, hints_finder::HintsFinder};
+use super::AnalyzerClient;
 use crate::database::Database;
 use candy_frontend::module::{Module, MutableModuleProviderOwner, PackagesPath};
-use extension_trait::extension_trait;
-use itertools::Itertools;
-use lsp_types::{notification::Notification, Position, Url};
+use lsp_types::{notification::Notification, Url};
 use rand::{seq::IteratorRandom, thread_rng};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::{time::Duration, vec};
+use std::{fmt, future::Future, time::Duration, vec};
 use tokio::{
-    sync::mpsc::{error::TryRecvError, Receiver, Sender},
+    sync::mpsc::{error::TryRecvError, Receiver},
     time::sleep,
 };
 use tracing::debug;
 
+pub mod hint;
 mod hints_finder;
 mod utils;
 
@@ -32,20 +32,6 @@ pub enum Event {
     UpdateModule(Module, Vec<u8>),
     CloseModule(Module),
     Shutdown,
-}
-
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
-pub struct Hint {
-    kind: HintKind,
-    text: String,
-    position: Position,
-}
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, PartialOrd, Ord, Copy)]
-#[serde(rename_all = "camelCase")]
-pub enum HintKind {
-    Value,
-    Fuzz,
-    Panic,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -64,11 +50,16 @@ impl Notification for HintsNotification {
 pub async fn run_server(
     packages_path: PackagesPath,
     mut incoming_events: Receiver<Event>,
-    outgoing_hints: Sender<(Module, Vec<Hint>)>,
+    client: AnalyzerClient,
 ) {
     let mut db = Database::new_with_file_system_module_provider(packages_path);
     let mut hints_finders: FxHashMap<Module, HintsFinder> = FxHashMap::default();
-    let mut outgoing_hints = OutgoingHints::new(outgoing_hints);
+    let client_ref = &client;
+    let mut outgoing_diagnostics = OutgoingCache::new(move |module, diagnostics| {
+        client_ref.update_diagnostics(module, diagnostics)
+    });
+    let mut outgoing_hints =
+        OutgoingCache::new(move |module, hints| client_ref.update_hints(module, hints));
 
     'server_loop: loop {
         sleep(Duration::from_millis(100)).await;
@@ -82,7 +73,7 @@ pub async fn run_server(
             match event {
                 Event::UpdateModule(module, content) => {
                     db.did_change_module(&module, content);
-                    outgoing_hints.report_hints(module.clone(), vec![]).await;
+                    outgoing_hints.send(module.clone(), vec![]).await;
                     hints_finders
                         .entry(module.clone())
                         .and_modify(|it| it.module_changed())
@@ -102,69 +93,31 @@ pub async fn run_server(
         let hints_finder = hints_finders.get_mut(&module).unwrap();
 
         hints_finder.run(&db);
-        let hints = hints_finder
-            .hints(&db, &module)
-            .into_iter()
-            // Make hints look like comments.
-            .map(|mut hint_group| {
-                for hint in &mut hint_group {
-                    hint.text =
-                        format!("{}# {}", quasi_spaces(2), hint.text.replace('\n', r#"\n"#));
-                }
-                hint_group
-            })
-            // Show related hints at the same indentation.
-            .flat_map(|mut hint_group| {
-                hint_group.align_hint_columns();
-                hint_group
-            })
-            .sorted_by_key(|hint| hint.position)
-            .collect_vec();
+        let (mut hints, diagnostics) = hints_finder.hints(&db, &module);
+        hints.sort_by_key(|hint| hint.position);
 
-        outgoing_hints.report_hints(module, hints).await;
+        outgoing_diagnostics.send(module.clone(), diagnostics).await;
+        outgoing_hints.send(module, hints).await;
     }
 }
 
-struct OutgoingHints {
-    sender: Sender<(Module, Vec<Hint>)>,
-    last_sent: FxHashMap<Module, Vec<Hint>>,
+struct OutgoingCache<T, R: Fn(Module, T) -> F, F: Future> {
+    sender: R,
+    last_sent: FxHashMap<Module, T>,
 }
-impl OutgoingHints {
-    fn new(sender: Sender<(Module, Vec<Hint>)>) -> Self {
+impl<T: Clone + fmt::Debug + Eq, R: Fn(Module, T) -> F, F: Future> OutgoingCache<T, R, F> {
+    fn new(sender: R) -> Self {
         Self {
             sender,
             last_sent: FxHashMap::default(),
         }
     }
 
-    async fn report_hints(&mut self, module: Module, hints: Vec<Hint>) {
-        if self.last_sent.get(&module) != Some(&hints) {
-            debug!("Reporting hints for {module}: {hints:?}");
-            self.last_sent.insert(module.clone(), hints.clone());
-            self.sender.send((module, hints)).await.unwrap();
-        }
-    }
-}
-
-/// VSCode trims multiple leading spaces to one. That's why we use an
-/// [em quad](https://en.wikipedia.org/wiki/Quad_(typography)) instead, which
-/// seems to have the same width as a normal space in VSCode.
-fn quasi_spaces(n: usize) -> String {
-    format!(" {}", " ".repeat(n))
-}
-
-#[extension_trait]
-impl AlignHints for Vec<Hint> {
-    fn align_hint_columns(&mut self) {
-        assert!(!self.is_empty());
-        let max_indentation = self.iter().map(|it| it.position.character).max().unwrap();
-        for hint in self {
-            let additional_indentation = max_indentation - hint.position.character;
-            hint.text = format!(
-                "{}{}",
-                quasi_spaces(additional_indentation as usize),
-                hint.text
-            );
+    async fn send(&mut self, module: Module, value: T) {
+        if self.last_sent.get(&module) != Some(&value) {
+            debug!("Reporting for {}: {value:?}", module);
+            self.last_sent.insert(module.clone(), value.clone());
+            (self.sender)(module, value).await;
         }
     }
 }
