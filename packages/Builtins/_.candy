@@ -1,11 +1,10 @@
 typeIs value type =
   needs (type | ✨.typeOf | ✨.equals Tag)
   value | ✨.typeOf | ✨.equals type
-not bool =
-  bool %
-    True -> False
-    False -> True
-    _ -> needs False
+not bool = bool %
+  True -> False
+  False -> True
+  _ -> needs False
 isNonNegative int =
   needs (int | typeIs Int)
   int | ✨.intCompareTo 0 %
@@ -20,7 +19,7 @@ isLessThanOrEqualTo a b =
 
 channelCreate capacity :=
   # Creates a new channel with the specified `capacity`.
-  # 
+  #
   # This function returns a struct `[sendPort, receivePort]`.
   needs
     capacity | typeIs Int
@@ -29,15 +28,14 @@ channelCreate capacity :=
   ✨.channelCreate capacity
 channelSend sendPort packet :=
   # Sends the `packet` to the channel specified by the `sendPort`.
-  # 
+  #
   # If the channel is full, this function blocks until there is space available.
   needs (sendPort | typeIs SendPort)
   ✨.channelSend sendPort packet
 channelReceive receivePort :=
   # Receives a packet from the specified `receivePort`.
   #
-  # If the channel is empty, this function blocks until there is a packet
-  # available.
+  # If the channel is empty, this function blocks until there is a packet available.
   needs (receivePort | typeIs ReceivePort)
   ✨.channelReceive receivePort
 
@@ -51,7 +49,7 @@ getArgumentCount function :=
   ✨.getArgumentCount function
 functionRun function :=
   # Executes `function` and returns its result.
-  # 
+  #
   # `function` may not accept any arguments.
   needs (function | typeIs Function)
   needs (function | getArgumentCount | equals 0)
@@ -86,8 +84,7 @@ intAdd a b :=
   needs (b | typeIs Int)
   ✨.intAdd a b
 intBitLength value :=
-  # Determines the fewest bits necessary to express this integer, not including
-  # the sign.
+  # Determines the fewest bits necessary to express this integer, not including the sign.
   needs (value | typeIs Int)
   ✨.intBitLength value
 intBitwiseAnd a b :=
@@ -103,16 +100,15 @@ intBitwiseXor a b :=
   needs (b | typeIs Int)
   ✨.intBitwiseXor a b
 intCompareTo a b :=
-  # Returns `Less`, `Equal`, or `Greater` depending on whether `a` is less than,
-  # equal to, or greater than `b`.
+  # Returns `Less`, `Equal`, or `Greater` depending on whether `a` is less than, equal to, or
+  # greater than `b`.
   needs (a | typeIs Int)
   needs (b | typeIs Int)
   ✨.intCompareTo a b
 intDivideTruncating dividend divisor :=
   # Returns `dividend` ÷ `divisor`.
-  # 
-  # This operation rounds towards zero, truncating any fractional part of the
-  # exact result.
+  #
+  # This operation rounds towards zero, truncating any fractional part of the exact result.
   needs (dividend | typeIs Int)
   needs (divisor | typeIs Int)
   needs (divisor | equals 0 | not) "You can't divide by zero."
@@ -130,11 +126,10 @@ intMultiply factorA factorB :=
 intParse text :=
   # Parses `text` as an integer.
   #
-  # `text` must be a string of decimal digits, optionally preceded by a minus
-  # sign.
+  # `text` must be a string of decimal digits, optionally preceded by a minus sign.
   #
-  # This function returns `Ok integer` if `text` represents an integer and
-  # `Error errorMessage` otherwise.
+  # This function returns `Ok integer` if `text` represents an integer and `Error errorMessage`
+  # otherwise.
   needs (text | typeIs Text)
   ✨.intParse text
 intRemainder dividend divisor :=
@@ -199,17 +194,13 @@ listReplace list index newItem :=
   ✨.listReplace list index newItem
 
 parallel body :=
-  # Executes `body`, which accepts a nursery to spawn fibers that can run in
-  # parallel.
+  # Executes `body`, which accepts a nursery to spawn fibers that can run in parallel.
   #
-  # This call exits with `body`'s return value once all fibers spawned within
-  # body have exited.
-  ## TODO: Propagate the responsibility here. `body` may contain a `needs` that
-  ## always fails. That shouldn't be our fault, but our caller's.
+  # This call exits with `body`'s return value once all fibers spawned within body have exited.
+  ## TODO: Propagate the responsibility here. `body` may contain a `needs` that always fails. That
+  ## shouldn't be our fault, but our caller's.
   needs (body | typeIs Function)
-  needs
-    body | getArgumentCount | equals 1
-    "The `body` should be a function taking a nursery."
+  needs (body | getArgumentCount | equals 1) "The `body` should be a function taking a nursery."
   ✨.parallel body
 
 print message :=
@@ -233,7 +224,7 @@ structHasKey struct key :=
 
 tagGetValue tag :=
   needs (tag | typeIs Tag)
-  neesd (tag | ✨.tagHasValue)
+  needs (tag | ✨.tagHasValue)
   ✨.tagGetValue tag
 tagHasValue tag :=
   needs (tag | typeIs Tag)
@@ -297,16 +288,13 @@ textTrimStart text :=
   # text
   ✨.textTrimStart text
 
-toDebugText any :=
-  ✨.toDebugText any
+toDebugText any := ✨.toDebugText any
 
 try function :=
-  # Returns `Ok result` if `function` returns normally and `Error panicReason`
-  # if the `function` panics.
+  # Returns `Ok result` if `function` returns normally and `Error panicReason` if the `function`
+  # panics.
   needs (function | typeIs Function)
   needs (function | getArgumentCount | equals 0)
   ✨.try function
 
-typeOf any :=
-  # typeTag
-  ✨.typeOf any
+typeOf any := ✨.typeOf any
