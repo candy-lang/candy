@@ -9,7 +9,7 @@ use crate::{
     error::{CompilerError, CompilerErrorPayload},
     hir::{self, Body, Expression, Function, HirError, IdKey, Pattern, PatternIdentifierId},
     id::IdGenerator,
-    module::Module,
+    module::{Module, Package},
     position::Offset,
     string_to_rcst::ModuleError,
     utils::AdjustCasingOfFirstLetter,
@@ -84,12 +84,14 @@ fn compile_top_level(
         db,
         public_identifiers: FxHashMap::default(),
         body: Body::default(),
-        id_prefix: hir::Id::new(module, vec![]),
+        id_prefix: hir::Id::new(module.clone(), vec![]),
         identifiers: im::HashMap::new(),
         is_top_level: true,
     };
 
-    context.generate_sparkles();
+    if module.package == Package::Managed("Builtins".into()) {
+        context.generate_sparkles();
+    }
     context.generate_use();
     context.compile(ast);
     context.generate_exports_struct();

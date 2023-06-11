@@ -1,0 +1,312 @@
+typeIs value type =
+  needs (type | ✨.typeOf | ✨.equals Tag)
+  value | ✨.typeOf | ✨.equals type
+not bool =
+  bool %
+    True -> False
+    False -> True
+    _ -> needs False
+isNonNegative int =
+  needs (int | typeIs Int)
+  int | ✨.intCompareTo 0 %
+    Greater | Equal -> True
+    Less -> False
+isLessThanOrEqualTo a b =
+  needs (a | typeIs Int)
+  needs (b | typeIs Int)
+  a | ✨.intCompareTo b %
+    Less | Equal -> True
+    Greater -> False
+
+channelCreate capacity :=
+  # Creates a new channel with the specified `capacity`.
+  # 
+  # This function returns a struct `[sendPort, receivePort]`.
+  needs
+    capacity | typeIs Int
+    "`capacity` is not an integer. Channels need a capacity because otherwise, there would be no backpressure among fibers, and memory leaks would go unnoticed."
+  needs (capacity | isNonNegative)
+  ✨.channelCreate capacity
+channelSend sendPort packet :=
+  # Sends the `packet` to the channel specified by the `sendPort`.
+  # 
+  # If the channel is full, this function blocks until there is space available.
+  needs (sendPort | typeIs SendPort)
+  ✨.channelSend sendPort packet
+channelReceive receivePort :=
+  # Receives a packet from the specified `receivePort`.
+  #
+  # If the channel is empty, this function blocks until there is a packet
+  # available.
+  needs (receivePort | typeIs ReceivePort)
+  ✨.channelReceive receivePort
+
+equals a b :=
+  # Returns `True` or `False` depending on whether `a` and `b` are equal.
+  ✨.equals a b
+
+getArgumentCount function :=
+  # Returns the number of arguments that `function` expects.
+  needs (function | typeIs Function)
+  ✨.getArgumentCount function
+functionRun function :=
+  # Executes `function` and returns its result.
+  # 
+  # `function` may not accept any arguments.
+  needs (function | typeIs Function)
+  needs (function | getArgumentCount | equals 0)
+  ✨.functionRun function
+
+ifElse condition then else :=
+  conditionIsBool = condition %
+    True | False -> True
+    _ -> False
+  needs conditionIsBool
+  needs (then | typeIs Function)
+  needs (then | getArgumentCount | equals 0)
+  needs (else | typeIs Function)
+  needs (else | getArgumentCount | equals 0)
+  ✨.ifElse condition then else
+
+fitsInRustU32 value =
+  needs (value | typeIs Int)
+  needs (value | isNonNegative)
+  rustU32Max = 4294967295
+  # https://doc.rust-lang.org/std/primitive.u32.html#associatedconstant.MAX
+  value | isLessThanOrEqualTo rustU32Max
+fitsInRustU128 value =
+  needs (value | typeIs Int)
+  needs (value | isNonNegative)
+  rustU128Max = 340282366920938463463374607431768211455
+  # https://doc.rust-lang.org/std/primitive.u128.html#associatedconstant.MAX
+  value | isLessThanOrEqualTo rustU128Max
+
+intAdd a b :=
+  needs (a | typeIs Int)
+  needs (b | typeIs Int)
+  ✨.intAdd a b
+intBitLength value :=
+  # Determines the fewest bits necessary to express this integer, not including
+  # the sign.
+  needs (value | typeIs Int)
+  ✨.intBitLength value
+intBitwiseAnd a b :=
+  needs (a | typeIs Int)
+  needs (b | typeIs Int)
+  ✨.intBitwiseAnd a b
+intBitwiseOr a b :=
+  needs (a | typeIs Int)
+  needs (b | typeIs Int)
+  ✨.intBitwiseOr a b
+intBitwiseXor a b :=
+  needs (a | typeIs Int)
+  needs (b | typeIs Int)
+  ✨.intBitwiseXor a b
+intCompareTo a b :=
+  # Returns `Less`, `Equal`, or `Greater` depending on whether `a` is less than,
+  # equal to, or greater than `b`.
+  needs (a | typeIs Int)
+  needs (b | typeIs Int)
+  ✨.intCompareTo a b
+intDivideTruncating dividend divisor :=
+  # Returns `dividend` ÷ `divisor`.
+  # 
+  # This operation rounds towards zero, truncating any fractional part of the
+  # exact result.
+  needs (dividend | typeIs Int)
+  needs (divisor | typeIs Int)
+  needs (divisor | equals 0 | not) "You can't divide by zero."
+  ✨.intDivideTruncating dividend divisor
+intModulo dividend divisor :=
+  needs (dividend | typeIs Int)
+  needs (divisor | typeIs Int)
+  needs (divisor | equals 0 | not) "You can't divide by zero."
+  ✨.intModulo dividend divisor
+intMultiply factorA factorB :=
+  # Returns `factorA` × `factorB`.
+  needs (factorA | typeIs Int)
+  needs (factorB | typeIs Int)
+  ✨.intMultiply factorA factorB
+intParse text :=
+  # Parses `text` as an integer.
+  #
+  # `text` must be a string of decimal digits, optionally preceded by a minus
+  # sign.
+  #
+  # This function returns `Ok integer` if `text` represents an integer and
+  # `Error errorMessage` otherwise.
+  needs (text | typeIs Text)
+  ✨.intParse text
+intRemainder dividend divisor :=
+  needs (dividend | typeIs Int)
+  needs (divisor | typeIs Int)
+  needs (divisor | equals 0 | not) "You can't divide by zero."
+  ✨.intRemainder dividend divisor
+intShiftLeft value amount :=
+  needs (value | typeIs Int)
+  needs (amount | typeIs Int)
+  needs
+    amount | isNonNegative
+    "The shift `amount` is negative: {amount | ✨.toDebugText}. You might want to call `shiftRight` instead."
+  needs (amount | fitsInRustU128) "Shifts by that much are not yet supported."
+  ✨.intShiftLeft value amount
+intShiftRight value amount :=
+  needs (value | typeIs Int)
+  needs (amount | typeIs Int)
+  needs
+    amount | isNonNegative
+    "The shift `amount` is negative: {amount | ✨.toDebugText}. You might want to call `shiftLeft` instead."
+  needs (amount | fitsInRustU128) "Shifts by that much are not yet supported."
+  ✨.intShiftRight value amount
+intSubtract minuend subtrahend :=
+  # Returns `minuend` - `subtrahend`.
+  needs (minuend | typeIs Int)
+  needs (subtrahend | typeIs Int)
+  ✨.intSubtract minuend subtrahend
+
+listFilled length item :=
+  # Returns a list of `length` elements, each of which is `item`.
+  needs (length | typeIs Int)
+  needs (length | isNonNegative)
+  ✨.listFilled length item
+listGet list index :=
+  needs (list | typeIs List)
+  needs (index | typeIs Int)
+  needs (index | isNonNegative)
+  needs (index | intCompareTo (list | ✨.listLength) | equals Less)
+  ✨.listGet list index
+listInsert list index item :=
+  needs (list | typeIs List)
+  needs (index | typeIs Int)
+  needs (index | isNonNegative)
+  needs (index | isLessThanOrEqualTo (list | ✨.listLength))
+  ✨.listInsert list index item
+listLength list :=
+  needs (list | typeIs List)
+  ✨.listLength list
+listRemoveAt list index :=
+  # Returns `(listWithoutItemAtIndex, itemAtIndex)`.
+  needs (list | typeIs List)
+  needs (index | typeIs Int)
+  needs (index | isNonNegative)
+  needs (index | intCompareTo (list | listLength) | equals Less)
+  ✨.listRemoveAt list index
+listReplace list index newItem :=
+  needs (list | typeIs List)
+  needs (index | typeIs Int)
+  needs (index | isNonNegative)
+  needs (index | intCompareTo (list | listLength) | equals Less)
+  ✨.listReplace list index newItem
+
+parallel body :=
+  # Executes `body`, which accepts a nursery to spawn fibers that can run in
+  # parallel.
+  #
+  # This call exits with `body`'s return value once all fibers spawned within
+  # body have exited.
+  ## TODO: Propagate the responsibility here. `body` may contain a `needs` that
+  ## always fails. That shouldn't be our fault, but our caller's.
+  needs (body | typeIs Function)
+  needs
+    body | getArgumentCount | equals 1
+    "The `body` should be a function taking a nursery."
+  ✨.parallel body
+
+print message :=
+  needs (message | typeIs Text)
+  ✨.print message
+
+structGet struct key :=
+  needs (struct | typeIs Struct)
+  needs (struct | ✨.structHasKey key)
+  ✨.structGet struct key
+structGetKeys struct :=
+  # Returns a list of all keys inside `struct`.
+  #
+  # The order of the keys is unspecified.
+  needs (struct | typeIs Struct)
+  ✨.structGetKeys struct
+structHasKey struct key :=
+  # Returns whether `struct` contains the key `key`.
+  needs (struct | typeIs Struct)
+  ✨.structHasKey struct key
+
+tagGetValue tag :=
+  needs (tag | typeIs Tag)
+  neesd (tag | ✨.tagHasValue)
+  ✨.tagGetValue tag
+tagHasValue tag :=
+  needs (tag | typeIs Tag)
+  ✨.tagHasValue tag
+tagWithoutValue tag :=
+  needs (tag | typeIs Tag)
+  ✨.tagWithoutValue tag
+
+textCharacters text :=
+  # Returns a list of characters (Unicode grapheme clusters) in this text.
+  needs (text | typeIs Text)
+  ✨.textCharacters text
+textConcatenate a b :=
+  needs (a | typeIs Text)
+  needs (b | typeIs Text)
+  ✨.textConcatenate a b
+textContains text pattern :=
+  needs (text | typeIs Text)
+  needs (pattern | typeIs Text)
+  ✨.textContains text pattern
+textEndsWith text pattern :=
+  needs (text | typeIs Text)
+  needs (pattern | typeIs Text)
+  ✨.textEndsWith text pattern
+textFromUtf8 bytes :=
+  needs (bytes | typeIs List)
+  ## TODO: Add this when it runs faster.
+  ## needs (bytes | iterable.fromList | iterable.all { byte ->
+  ##   bool.lazyAnd (int.is byte) {
+  ##     bool.and (byte | int.isNonNegative) (byte | int.isLessThan 256)
+  ##   }
+  ## })
+  ✨.textFromUtf8 bytes
+textGetRange text startInclusive endExclusive :=
+  needs (text | typeIs Text)
+  needs (startInclusive | typeIs Int)
+  needs (startInclusive | isNonNegative)
+  needs (startInclusive | intCompareTo (text | ✨.textLength) | equals Less)
+  needs (endExclusive | typeIs Int)
+  needs (endExclusive | isNonNegative)
+  needs (endExclusive | isLessThanOrEqualTo (text | ✨.textLength))
+  needs (startInclusive | isLessThanOrEqualTo endExclusive)
+  ✨.textGetRange text startInclusive endExclusive
+textIsEmpty text :=
+  needs (text | typeIs Text)
+  ✨.textIsEmpty text
+textLength text :=
+  # Returns the number of characters (Unicode grapheme clusters) in this text.
+  needs (text | typeIs Text)
+  ✨.textLength text
+textStartsWith text pattern :=
+  needs (text | typeIs Text)
+  needs (pattern | typeIs Text)
+  ✨.textStartsWith text pattern
+textTrimEnd text :=
+  needs (text | typeIs Text)
+  # text
+  ✨.textTrimEnd text
+textTrimStart text :=
+  needs (text | typeIs Text)
+  # text
+  ✨.textTrimStart text
+
+toDebugText any :=
+  ✨.toDebugText any
+
+try function :=
+  # Returns `Ok result` if `function` returns normally and `Error panicReason`
+  # if the `function` panics.
+  needs (function | typeIs Function)
+  needs (function | getArgumentCount | equals 0)
+  ✨.try function
+
+typeOf any :=
+  # typeTag
+  ✨.typeOf any

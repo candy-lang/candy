@@ -1,3 +1,0 @@
-type = use "..type"
-
-is value := type.is value Symbol

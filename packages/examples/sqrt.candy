@@ -1,3 +1,4 @@
+builtins = use "Builtins"
 [equals, fixedDecimal, ifElse, recursive] = use "Core"
 
 sqrt x :=
@@ -15,4 +16,4 @@ sqrt x :=
 main _ :=
   input = 2
   result = input | fixedDecimal.fromInt | sqrt
-  ✨.print "The root of {input} is {result | fixedDecimal.toText}"
+  builtins.print "The root of {input} is {result | fixedDecimal.toText}"

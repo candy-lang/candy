@@ -2,23 +2,25 @@
 function = use "..function"
 type = use "..type"
 
-is value := ✨.ifElse (equals value True) { True } { equals value False }
+is value := value %
+  True | False -> True
+  _ -> False
 
-not a :=
-  needs (is a)
-  ✨.ifElse a { False } { True }
+not value :=
+  needs (is value)
+  value %
+    True -> False
+    False -> True
 
 lazyAnd a b :=
   needs (is a)
   needs (function.is0 b)
-  ✨.ifElse
-    a
-    {
-      result = b | ✨.functionRun
+  a %
+    True ->
+      result = b | function.run
       needs (is result) "`b` didn't return a bool."
       result
-    }
-    { False }
+    False -> False
 and a b :=
   needs (is a)
   needs (is b)
@@ -27,11 +29,12 @@ and a b :=
 lazyOr a b :=
   needs (is a)
   needs (function.is0 b)
-  ✨.ifElse a { True } {
-    result = b | ✨.functionRun
-    needs (is result) "`b` didn't return a bool."
-    result
-  }
+  a %
+    True -> True
+    False ->
+      result = b | function.run
+      needs (is result) "`b` didn't return a bool."
+      result
 or a b :=
   needs (is a)
   needs (is b)
@@ -40,9 +43,9 @@ or a b :=
 xor a b :=
   needs (is a)
   needs (is b)
-  equals a (not b)
+  a | equals (b | not)
 
 implies a b :=
   needs (is a)
   needs (is b)
-  ✨.ifElse a { b } { True }
+  a | not | or b

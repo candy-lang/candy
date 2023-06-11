@@ -1,24 +1,20 @@
+builtins = use "Builtins"
+bool = use "..bool"
 [ifElse] = use "..controlFlow"
 type = use "..type"
 
 is value := type.is value Tag
 
-hasValue tag :=
-  needs (is tag)
-  tag | ✨.tagHasValue
+hasValue := builtins.tagHasValue
 
-withoutValue tag :=
-  needs (is tag)
-  tag | ✨.tagWithoutValue
+withoutValue := builtins.tagWithoutValue
 
-getValue tag :=
-  needs (is tag)
-  needs (hasValue tag)
-  tag | ✨.tagGetValue
+getValue := builtins.tagGetValue
 
 withSymbol tag symbolTag :=
   needs (is tag)
   needs (is symbolTag)
+  needs (symbolTag | hasValue | bool.not)
   ifElse (tag | hasValue) { symbolTag (tag | getValue) } { symbolTag | withoutValue }
 
 withValue tag value :=
