@@ -15,7 +15,7 @@
   },
   "indentationRules": {
     "increaseIndentPattern": "^[^#]*(\\([^)#]*|\\[[^\\]#]*|\\{[^}#]*|=\\s*(#.*)?|\"[^\"]*)$",
-    "decreaseIndentPattern": "^[\\)\\]\\}\"].*$"
+    "decreaseIndentPattern": "^[\\)\\]\\}].*$"
   },
   "surroundingPairs": [
     ["(", ")"],
