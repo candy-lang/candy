@@ -164,14 +164,14 @@ where iterable tester :=
   needs (function.is1 tester)
   whereHelper whereHelper iterable tester
 
-takeWhile iterable tester = generateWithState iterable { iterable ->
+takeWhile iterable tester := generateWithState iterable { iterable ->
   iterable | next | result.flatMap { itemAndRest ->
     [item, rest] = itemAndRest
     ifElse (tester item) { Ok [item, State: rest] } { Error Empty }
   }
 }
 
-takeUntil iterable tester = iterable | takeWhile { item -> tester item | bool.not }
+takeUntil iterable tester := iterable | takeWhile { item -> tester item | bool.not }
 
 take iterable n :=
   needs (is iterable)
