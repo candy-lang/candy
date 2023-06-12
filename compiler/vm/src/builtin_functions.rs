@@ -287,7 +287,7 @@ impl Heap {
                 Ok(int) => Ok(Int::create_from_bigint(self, int).into()),
                 Err(err) => Err(Text::create(self, &err.to_string()).into()),
             };
-            Return(Struct::create_result(self, result).into())
+            Return(Tag::create_result(self, result).into())
         })
     }
     fn int_remainder(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -459,7 +459,7 @@ impl Heap {
             let result = str::from_utf8(&bytes)
                 .map(|it| Text::create(self, it).into())
                 .map_err(|_| Text::create(self, "Invalid UTF-8.").into());
-            Return(Struct::create_result(self, result).into())
+            Return(Tag::create_result(self, result).into())
         })
     }
     fn text_get_range(&mut self, args: &[InlineObject]) -> BuiltinResult {

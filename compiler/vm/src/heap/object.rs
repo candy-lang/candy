@@ -274,6 +274,13 @@ impl Tag {
         };
         Self::create_from_str(heap, value, None)
     }
+    pub fn create_result(heap: &mut Heap, value: Result<InlineObject, InlineObject>) -> Self {
+        let (symbol, value) = match value {
+            Ok(it) => ("Ok", it),
+            Err(it) => ("Error", it),
+        };
+        Self::create_from_str(heap, symbol, value)
+    }
 }
 
 impls_via_0!(Tag);
@@ -352,18 +359,6 @@ impl Struct {
             .map(|(key, value)| ((Tag::create_from_str(heap, key, None)).into(), value))
             .collect();
         Self::create(heap, &fields)
-    }
-    pub fn create_result(heap: &mut Heap, value: Result<InlineObject, InlineObject>) -> Self {
-        let (type_, value) = match value {
-            Ok(it) => ("Ok", it),
-            Err(it) => ("Error", it),
-        };
-        // PERF: Avoid allocating an intermediate map.
-        let fields = [
-            ("Type", Tag::create_from_str(heap, type_, None).into()),
-            ("Value", value),
-        ];
-        Self::create_with_symbol_keys(heap, fields)
     }
 }
 
