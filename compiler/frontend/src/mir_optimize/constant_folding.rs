@@ -28,20 +28,15 @@
 //!
 //! [tree shaking]: super::tree_shaking
 
-use num_bigint::BigInt;
-use num_traits::ToPrimitive;
-
 use crate::{
     builtin_functions::BuiltinFunction,
-    id::IdGenerator,
-    mir::{Body, Expression, Id, VisibleExpressions},
+    mir::{Expression, Id, VisibleExpressions},
 };
+use num_bigint::BigInt;
+use num_traits::ToPrimitive;
+use tracing::warn;
 
-pub fn fold_constants(
-    expression: &mut Expression,
-    visible: &VisibleExpressions,
-    id_generator: &mut IdGenerator<Id>,
-) {
+pub fn fold_constants(expression: &mut Expression, visible: &VisibleExpressions) {
     let Expression::Call {
         function,
         arguments,
@@ -54,51 +49,26 @@ pub fn fold_constants(
     }
 
     let Expression::Builtin(builtin) = visible.get(*function) else { return; };
-    let Some(result) = run_builtin(*builtin, arguments, *responsible, visible) else {
-        return;
-    };
-    let evaluated_call = match result {
-        BuiltinResult::Returns(expression) => expression,
-        BuiltinResult::Panics(reason) => {
-            let mut body = Body::default();
-            let reason = body.push_with_new_id(id_generator, Expression::Text(reason));
-            body.push_with_new_id(
-                id_generator,
-                Expression::Panic {
-                    reason,
-                    responsible: *responsible,
-                },
-            );
-            Expression::Multiple(body)
-        }
-    };
-    *expression = evaluated_call;
-}
-
-enum BuiltinResult {
-    Returns(Expression),
-    Panics(String),
+    let Some(result) = run_builtin(*builtin, arguments, *responsible, visible) else { return; };
+    *expression = result;
 }
 
 /// This function tries to run a builtin, requiring a minimal amount of static
-/// knowledge. For example, it can find out that the result of
-/// `builtinEquals $3 $3` is `True`, even if the value of `$3` is not known at
-/// compile-time.
+/// knowledge. For example, it can find out that the result of `✨.equals $3 $3`
+/// is `True`, even if the value of `$3` is not known at compile-time.
 ///
-/// Returns `None` if the call couldn't be evaluated statically. Returns
-/// `Some(Ok(expression))` if the call successfully completed with a return
-/// value. Returns `Some(Err(reason))` if the call panics.
+/// Returns `None` if the call couldn't be evaluated statically.
 fn run_builtin(
     builtin: BuiltinFunction,
     arguments: &[Id],
     responsible: Id,
     visible: &VisibleExpressions,
-) -> Option<BuiltinResult> {
-    use BuiltinResult::*;
-
-    if arguments.len() != builtin.num_parameters() {
-        return Panics("wrong number of arguments".to_string()).into();
-    }
+) -> Option<Expression> {
+    debug_assert_eq!(
+        arguments.len(),
+        builtin.num_parameters(),
+        "wrong number of arguments for calling builtin function {builtin:?}",
+    );
 
     let result = match builtin {
         BuiltinFunction::ChannelCreate
@@ -106,40 +76,40 @@ fn run_builtin(
         | BuiltinFunction::ChannelReceive => return None,
         BuiltinFunction::Equals => {
             let [a, b] = arguments else { unreachable!() };
-            Returns(a.semantically_equals(*b, visible)?.into())
+            a.semantically_equals(*b, visible)?.into()
         }
         BuiltinFunction::FunctionRun => {
             let [function] = arguments else { unreachable!() };
-            Returns(Expression::Call {
+            Expression::Call {
                 function: *function,
                 arguments: vec![],
                 responsible,
-            })
+            }
         }
         BuiltinFunction::GetArgumentCount => {
             let [function] = arguments else { unreachable!() };
             let Expression::Function { parameters, .. } = visible.get(*function) else { return None; };
-            Returns(Expression::Int(parameters.len().into()))
+            Expression::Int(parameters.len().into())
         }
         BuiltinFunction::IfElse => {
             let [condition, then_body, else_body] = arguments else { unreachable!() };
             let condition = visible.get(*condition).try_into().ok()?;
-            Returns(Expression::Call {
+            Expression::Call {
                 function: if condition { *then_body } else { *else_body },
                 arguments: vec![],
                 responsible,
-            })
+            }
         }
         BuiltinFunction::IntAdd => {
             let [a, b] = arguments else { unreachable!() };
             let a: BigInt = visible.get(*a).try_into().ok()?;
             let b: BigInt = visible.get(*b).try_into().ok()?;
-            Returns(Expression::Int(a + b))
+            Expression::Int(a + b)
         }
         BuiltinFunction::IntBitLength => {
             let [a] = arguments else { unreachable!() };
             let a: BigInt = visible.get(*a).try_into().ok()?;
-            Returns(Expression::Int(a.bits().into()))
+            Expression::Int(a.bits().into())
         }
         // TODO: Implement
         BuiltinFunction::IntBitwiseAnd => return None,
@@ -157,35 +127,15 @@ fn run_builtin(
         BuiltinFunction::ListFilled => return None,
         BuiltinFunction::ListGet => {
             let [list, index] = arguments else { unreachable!() };
-
-            // TODO: Also catch this being called on a non-list and
-            // statically panic in that case.
-            let Expression::List(list) = visible.get(*list) else {
-                return None;
-            };
-
-            // TODO: Also catch this being called on a non-int and
-            // statically panic in that case.
-            let Expression::Int(index) = visible.get(*index) else {
-                return None;
-            };
-
-            let Some(value) = index.to_usize().and_then(|index| list.get(index)) else {
-                return Some(Panics(format!("List access will panic because index {index} is out of bounds.")));
-            };
-            Returns(Expression::Reference(*value))
+            let Expression::List(list) = visible.get(*list) else { return None; };
+            let Expression::Int(index) = visible.get(*index) else { return None; };
+            Expression::Reference(*list.get(index.to_usize().unwrap()).unwrap())
         }
         BuiltinFunction::ListInsert => return None,
         BuiltinFunction::ListLength => {
             let [list_id] = arguments else { unreachable!() };
-
-            // TODO: Also catch this being called on a non-list and
-            // statically panic in that case.
-            let Expression::List(list) = visible.get(*list_id) else {
-                return None;
-            };
-
-            Returns(Expression::Int(list.len().into()))
+            let Expression::List(list) = visible.get(*list_id) else { return None; };
+            Expression::Int(list.len().into())
         }
         BuiltinFunction::ListRemoveAt => return None,
         BuiltinFunction::ListReplace => return None,
@@ -193,12 +143,7 @@ fn run_builtin(
         BuiltinFunction::Print => return None,
         BuiltinFunction::StructGet => {
             let [struct_, key] = arguments else { unreachable!() };
-
-            // TODO: Also catch this being called on a non-struct and
-            // statically panic in that case.
-            let Expression::Struct(fields) = visible.get(*struct_) else {
-                return None;
-            };
+            let Expression::Struct(fields) = visible.get(*struct_) else { return None; };
 
             // TODO: Relax this requirement. Even if not all keys are
             // constant, we may still conclude the result of the builtin:
@@ -220,23 +165,19 @@ fn run_builtin(
                 .find(|(k, _)| k.semantically_equals(*key, visible).unwrap_or(false))
                 .map(|(_, value)| *value);
             if let Some(value) = value {
-                Returns(Expression::Reference(value))
+                Expression::Reference(value)
             } else {
-                return Some(Panics(format!(
+                warn!(
                     "Struct access will panic because key {} isn't in there.",
                     visible.get(*key),
-                )));
+                );
+                return None;
             }
         }
         BuiltinFunction::StructGetKeys => return None,
         BuiltinFunction::StructHasKey => {
             let [struct_, key] = arguments else { unreachable!() };
-
-            // TODO: Also catch this being called on a non-struct and
-            // statically panic in that case.
-            let Expression::Struct(fields) = visible.get(*struct_) else {
-                return None;
-            };
+            let Expression::Struct(fields) = visible.get(*struct_) else { return None; };
 
             let mut is_contained = Some(false);
             for (k, _) in fields.iter() {
@@ -255,34 +196,30 @@ fn run_builtin(
                 }
             }
 
-            Returns(is_contained?.into())
+            is_contained?.into()
         }
         BuiltinFunction::TagGetValue => {
             let [tag] = arguments else { unreachable!() };
             let Expression::Tag { value: Some(value), .. } = visible.get(*tag) else { return None; };
-
-            Returns(Expression::Reference(*value))
+            Expression::Reference(*value)
         }
         BuiltinFunction::TagHasValue => {
             let [tag] = arguments else { unreachable!() };
             let Expression::Tag { value, .. } = visible.get(*tag) else { return None; };
-
-            Returns(value.is_some().into())
+            value.is_some().into()
         }
         BuiltinFunction::TagWithoutValue => {
             let [tag] = arguments else { unreachable!() };
             let Expression::Tag { symbol, .. } = visible.get(*tag) else { return None; };
-
-            Returns(Expression::Tag {
+            Expression::Tag {
                 symbol: symbol.clone(),
                 value: None,
-            })
+            }
         }
         BuiltinFunction::TextCharacters => return None,
         BuiltinFunction::TextConcatenate => {
             let [a, b] = arguments else { unreachable!() };
-
-            Returns(match (visible.get(*a), visible.get(*b)) {
+            match (visible.get(*a), visible.get(*b)) {
                 (Expression::Text(text), other) | (other, Expression::Text(text))
                     if text.is_empty() =>
                 {
@@ -292,7 +229,7 @@ fn run_builtin(
                     Expression::Text(format!("{}{}", text_a, text_b))
                 }
                 _ => return None,
-            })
+            }
         }
         BuiltinFunction::TextContains => return None,
         BuiltinFunction::TextEndsWith => return None,
@@ -305,7 +242,7 @@ fn run_builtin(
         BuiltinFunction::TextTrimStart => return None,
         BuiltinFunction::ToDebugText => return None,
         BuiltinFunction::Try => return None,
-        BuiltinFunction::TypeOf => Returns(Expression::tag(
+        BuiltinFunction::TypeOf => Expression::tag(
             match visible.get(arguments[0]) {
                 Expression::Int(_) => "Int",
                 Expression::Text(_) => "Text",
@@ -319,9 +256,7 @@ fn run_builtin(
                 Expression::Parameter => return None,
                 Expression::Call { function, .. } => {
                     let callee = visible.get(*function);
-                    let Expression::Builtin(builtin) = callee else {
-                        return None;
-                    };
+                    let Expression::Builtin(builtin) = callee else { return None; };
                     match builtin {
                         BuiltinFunction::ChannelCreate => "Struct",
                         BuiltinFunction::ChannelSend => "Tag",
@@ -383,7 +318,7 @@ fn run_builtin(
                 | Expression::TraceFoundFuzzableFunction { .. } => unreachable!(),
             }
             .to_string(),
-        )),
+        ),
     };
     Some(result)
 }

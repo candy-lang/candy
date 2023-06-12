@@ -129,14 +129,12 @@ macro_rules! unpack {
             let ( $( $arg, )+ ) = if let [$( $arg, )+] = $args {
                 ( $( *$arg, )+ )
             } else {
-                return Err(
-                    "A builtin function was called with the wrong number of arguments.".to_string(),
-                );
+                panic!("A builtin function was called with the wrong number of arguments.");
             };
             let ( $( $arg, )+ ): ( $( UnpackedData<$type>, )+ ) = ( $(
                 UnpackedData {
                     object: $arg,
-                    data: $arg.try_into()?,
+                    data: $arg.try_into().unwrap(),
                 },
             )+ );
 
@@ -150,14 +148,12 @@ macro_rules! unpack_and_later_drop {
             let ( $( $arg, )+ ) = if let [$( $arg, )+] = $args {
                 ( $( *$arg, )+ )
             } else {
-                return Err(
-                    "A builtin function was called with the wrong number of arguments.".to_string(),
-                );
+                panic!("A builtin function was called with the wrong number of arguments.");
             };
             let ( $( $arg, )+ ): ( $( UnpackedData<$type>, )+ ) = ( $(
                 UnpackedData {
                     object: $arg,
-                    data: $arg.try_into()?,
+                    data: $arg.try_into().unwrap(),
                 },
             )+ );
 
