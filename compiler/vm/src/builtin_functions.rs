@@ -173,10 +173,8 @@ macro_rules! unpack_and_later_drop {
 impl Heap {
     fn channel_create(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |capacity: Int| {
-            match capacity.try_get() {
-                Some(capacity) => CreateChannel { capacity },
-                None => return Err("You tried to create a channel with a capacity that is either negative or bigger than the maximum usize.".to_string()),
-            }
+            let capacity = capacity.try_get().unwrap();
+            CreateChannel { capacity }
         })
     }
 
@@ -207,7 +205,6 @@ impl Heap {
 
     fn function_run(&mut self, args: &[InlineObject], responsible: HirId) -> BuiltinResult {
         unpack!(self, args, |function: Function| {
-            function.should_take_no_arguments()?;
             DivergeControlFlow {
                 function: *function,
                 responsible,
@@ -271,17 +268,11 @@ impl Heap {
     }
     fn int_divide_truncating(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
-            if divisor.try_get::<u8>() == 0.into() {
-                return Err("Can't divide by zero.".to_string());
-            }
             Return(dividend.int_divide_truncating(self, &divisor).into())
         })
     }
     fn int_modulo(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
-            if divisor.try_get::<u8>() == 0.into() {
-                return Err("Can't divide by zero.".to_string());
-            }
             Return(dividend.modulo(self, &divisor).into())
         })
     }
@@ -301,9 +292,6 @@ impl Heap {
     }
     fn int_remainder(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
-            if divisor.try_get::<u8>() == 0.into() {
-                return Err("Can't divide by zero.".to_string());
-            }
             Return(dividend.remainder(self, &divisor).into())
         })
     }
@@ -381,9 +369,6 @@ impl Heap {
 
     fn parallel(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack!(self, args, |body_taking_nursery: Function| {
-            if body_taking_nursery.argument_count() != 1 {
-                return Err("`parallel` expects a function taking a nursery.".to_string());
-            }
             Parallel {
                 body: *body_taking_nursery,
             }
@@ -399,16 +384,9 @@ impl Heap {
 
     fn struct_get(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |struct_: Struct, key: Any| {
-            match struct_.get(key.object) {
-                Some(value) => {
-                    value.dup(self);
-                    Ok(Return(value))
-                }
-                None => Err(format!(
-                    "The struct does not contain the key {}.",
-                    key.object,
-                )),
-            }
+            let value = struct_.get(key.object).unwrap();
+            value.dup(self);
+            Return(value)
         })
     }
     fn struct_get_keys(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -424,12 +402,9 @@ impl Heap {
 
     fn tag_get_value(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |tag: Tag| {
-            tag.value()
-                .map(|value| {
-                    value.dup(self);
-                    Return(value)
-                })
-                .ok_or_else(|| "The tag doesn't have a value.".to_string())
+            let value = tag.value().unwrap();
+            value.dup(self);
+            Return(value)
         })
     }
     fn tag_has_value(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -564,15 +539,6 @@ impl Heap {
             };
             Return(Tag::create_from_str(self, type_name, None).into())
         })
-    }
-}
-
-impl Function {
-    fn should_take_no_arguments(&self) -> Result<(), String> {
-        match self.argument_count() {
-            0 => Ok(()),
-            n => Err(format!("A builtin function expected a function without arguments, but got one that takes {n} arguments.")),
-        }
     }
 }
 
