@@ -102,10 +102,10 @@ fn run_builtin(
             parameters.len().into()
         }
         BuiltinFunction::IfElse => {
-            let [condition, then_body, else_body] = arguments else { unreachable!() };
+            let [condition, then, else_] = arguments else { unreachable!() };
             let condition = visible.get(*condition).try_into().ok()?;
             Expression::Call {
-                function: if condition { *then_body } else { *else_body },
+                function: if condition { *then } else { *else_ },
                 arguments: vec![],
                 responsible,
             }

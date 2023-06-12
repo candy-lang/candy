@@ -177,7 +177,6 @@ impl Heap {
             CreateChannel { capacity }
         })
     }
-
     fn channel_send(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |port: SendPort, packet: Any| {
             let mut heap = Heap::default();
@@ -188,7 +187,6 @@ impl Heap {
             }
         })
     }
-
     fn channel_receive(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |port: ReceivePort| {
             Receive {
@@ -211,7 +209,6 @@ impl Heap {
             }
         })
     }
-
     fn get_argument_count(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |function: Function| {
             Return(Int::create(self, function.argument_count()).into())
@@ -430,8 +427,8 @@ impl Heap {
         })
     }
     fn text_concatenate(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |text_a: Text, text_b: Text| {
-            Return(Text::create(self, &format!("{}{}", text_a.get(), text_b.get())).into())
+        unpack_and_later_drop!(self, args, |a: Text, b: Text| {
+            Return(Text::create(self, &format!("{}{}", a.get(), b.get())).into())
         })
     }
     fn text_contains(&mut self, args: &[InlineObject]) -> BuiltinResult {
