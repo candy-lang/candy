@@ -95,9 +95,10 @@ pub fn setup() -> Database {
     db
 }
 fn load_package(package_name: impl Into<String>, module_provider: &mut InMemoryModuleProvider) {
+    let package_name = package_name.into();
     let packages_path = PackagesPath::try_from("../../packages").unwrap();
-    let package_path = packages_path.join(package_name.into());
-    let package = Package::core();
+    let package_path = packages_path.join(package_name.clone());
+    let package = Package::Managed(package_name.into());
 
     for file in WalkDir::new(&package_path)
         .into_iter()
