@@ -76,6 +76,7 @@ pub enum Expression {
     /// optimization.
     ///
     /// [multiple flattening]: crate::mir_optimize::multiple_flattening
+    #[from]
     Multiple(Body),
 
     TraceCallStarts {
@@ -134,6 +135,11 @@ impl<'a> TryInto<&'a BigInt> for &'a Expression {
     }
 }
 // Text
+impl<'a> From<&'a str> for Expression {
+    fn from(value: &'a str) -> Self {
+        Self::Text(value.to_string())
+    }
+}
 impl<'a> TryInto<&'a str> for &'a Expression {
     type Error = ();
 

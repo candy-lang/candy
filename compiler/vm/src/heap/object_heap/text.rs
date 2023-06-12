@@ -1,15 +1,17 @@
 use super::{utils::heap_object_impls, HeapObjectTrait};
 use crate::{
-    heap::{object_heap::HeapObject, Heap},
+    heap::{object_heap::HeapObject, Heap, List, Text},
     utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_ord_via_get, DebugDisplay},
 };
 use derive_more::Deref;
+use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Formatter},
     ptr::{self, NonNull},
     slice, str,
 };
+use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Clone, Copy, Deref)]
 pub struct HeapText(HeapObject);
@@ -44,6 +46,15 @@ impl HeapText {
     pub fn get<'a>(self) -> &'a str {
         let pointer = self.text_pointer().as_ptr();
         unsafe { str::from_utf8_unchecked(slice::from_raw_parts(pointer, self.len())) }
+    }
+
+    pub fn characters(self, heap: &mut Heap) -> List {
+        let characters = self
+            .get()
+            .graphemes(true)
+            .map(|it| Text::create(heap, it).into())
+            .collect_vec();
+        List::create(heap, &characters)
     }
 }
 

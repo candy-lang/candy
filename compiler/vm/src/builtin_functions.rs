@@ -418,12 +418,7 @@ impl Heap {
 
     fn text_characters(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text| {
-            let characters = text
-                .get()
-                .graphemes(true)
-                .map(|it| Text::create(self, it).into())
-                .collect_vec();
-            Return(List::create(self, &characters).into())
+            Return(text.characters(self).into())
         })
     }
     fn text_concatenate(&mut self, args: &[InlineObject]) -> BuiltinResult {

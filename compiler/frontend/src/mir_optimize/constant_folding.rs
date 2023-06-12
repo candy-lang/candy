@@ -33,11 +33,13 @@ use crate::{
     id::IdGenerator,
     mir::{Body, Expression, Id, VisibleExpressions},
 };
+use itertools::Itertools;
 use num_bigint::BigInt;
 use num_integer::Integer;
 use num_traits::ToPrimitive;
 use std::{cmp::Ordering, str::FromStr};
 use tracing::warn;
+use unicode_segmentation::UnicodeSegmentation;
 
 pub fn fold_constants(
     expression: &mut Expression,
@@ -340,7 +342,17 @@ fn run_builtin(
                 value: None,
             }
         }
-        BuiltinFunction::TextCharacters => return None,
+        BuiltinFunction::TextCharacters => {
+            let [text] = arguments else { unreachable!() };
+            let Expression::Text(text) = visible.get(*text) else { return None; };
+            let mut body = Body::default();
+            let characters = text
+                .graphemes(true)
+                .map(|it| body.push_with_new_id(id_generator, it.into()))
+                .collect_vec();
+            body.push_with_new_id(id_generator, characters.into());
+            body.into()
+        }
         BuiltinFunction::TextConcatenate => {
             let [a, b] = arguments else { unreachable!() };
             match (visible.get(*a), visible.get(*b)) {
