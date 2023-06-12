@@ -530,26 +530,32 @@ impl Context<'_> {
         struct_access: &StructAccess,
     ) -> hir::Id {
         // We forward struct accesses to `(use "Builtins").structGet` to reuse
-        // its validation logic.
-        let builtins = self.push(None, Expression::Text("Builtins".to_string()), None);
-        let builtins_id = self.push(
-            None,
-            Expression::Call {
-                function: self.use_id.clone().unwrap(),
-                arguments: vec![builtins],
-            },
-            None,
-        );
-        let struct_get_id = self.push(None, Expression::Builtin(BuiltinFunction::StructGet), None);
-        let struct_get = self.push(None, Expression::Text("StructGet".to_string()), None);
-        let struct_get_id = self.push(
-            None,
-            Expression::Call {
-                function: struct_get_id,
-                arguments: vec![builtins_id, struct_get],
-            },
-            None,
-        );
+        // its validation logic. However, this only works outside the Builtins
+        // package.
+        let struct_get_id = if self.module.package == Package::builtins() {
+            self.push(None, Expression::Builtin(BuiltinFunction::StructGet), None)
+        } else {
+            let builtins = self.push(None, Expression::Text("Builtins".to_string()), None);
+            let builtins_id = self.push(
+                None,
+                Expression::Call {
+                    function: self.use_id.clone().unwrap(),
+                    arguments: vec![builtins],
+                },
+                None,
+            );
+            let struct_get_id =
+                self.push(None, Expression::Builtin(BuiltinFunction::StructGet), None);
+            let struct_get = self.push(None, Expression::Text("StructGet".to_string()), None);
+            self.push(
+                None,
+                Expression::Call {
+                    function: struct_get_id,
+                    arguments: vec![builtins_id, struct_get],
+                },
+                None,
+            )
+        };
 
         let struct_ = self.compile_single(&struct_access.struct_);
         let key_id = self.push(
