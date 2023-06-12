@@ -1,31 +1,42 @@
+use super::{body::Body, id::Id};
 use crate::{
     builtin_functions::BuiltinFunction,
     hir, impl_display_via_richir,
     module::Module,
     rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr, TokenModifier, TokenType},
 };
+use core::mem;
+use derive_more::{From, TryInto};
 use enumset::EnumSet;
 use itertools::Itertools;
 use num_bigint::BigInt;
 use rustc_hash::{FxHashSet, FxHasher};
-use std::hash::{Hash, Hasher};
+use std::{
+    cmp::Ordering,
+    hash::{Hash, Hasher},
+};
 
-use super::{body::Body, id::Id};
-use core::mem;
-
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Eq, From, PartialEq, TryInto)]
 pub enum Expression {
+    #[from]
+    #[try_into]
     Int(BigInt),
+    #[from]
+    #[try_into]
     Text(String),
     Tag {
         symbol: String,
         value: Option<Id>,
     },
+    #[from]
     Builtin(BuiltinFunction),
+    #[from]
     List(Vec<Id>),
     Struct(Vec<(Id, Id)>),
+    #[from]
     Reference(Id),
     /// A HIR ID that can be used to refer to code in the HIR.
+    #[from]
     HirId(hir::Id),
     /// In the MIR, responsibilities are explicitly tracked. All functions take
     /// a responsible HIR ID as an extra parameter. Based on whether the
@@ -97,6 +108,41 @@ impl Expression {
         Self::tag("Nothing".to_string())
     }
 }
+
+// Int
+impl From<i32> for Expression {
+    fn from(value: i32) -> Self {
+        Self::Int(value.into())
+    }
+}
+impl From<u64> for Expression {
+    fn from(value: u64) -> Self {
+        Self::Int(value.into())
+    }
+}
+impl From<usize> for Expression {
+    fn from(value: usize) -> Self {
+        Self::Int(value.into())
+    }
+}
+impl<'a> TryInto<&'a BigInt> for &'a Expression {
+    type Error = ();
+
+    fn try_into(self) -> Result<&'a BigInt, ()> {
+        let Expression::Int(int) = self else { return Err(()); };
+        Ok(int)
+    }
+}
+// Text
+impl<'a> TryInto<&'a str> for &'a Expression {
+    type Error = ();
+
+    fn try_into(self) -> Result<&'a str, ()> {
+        let Expression::Text(text) = self else { return Err(()); };
+        Ok(text)
+    }
+}
+// Tag
 impl From<bool> for Expression {
     fn from(value: bool) -> Self {
         Self::tag(if value { "True" } else { "False" }.to_string())
@@ -114,12 +160,32 @@ impl TryInto<bool> for &Expression {
         }
     }
 }
-impl TryInto<BigInt> for &Expression {
-    type Error = ();
-
-    fn try_into(self) -> Result<BigInt, ()> {
-        let Expression::Int(int) = self else { return Err(()); };
-        Ok(int.clone())
+impl From<Ordering> for Expression {
+    fn from(value: Ordering) -> Self {
+        let symbol = match value {
+            Ordering::Less => "Less",
+            Ordering::Equal => "Equal",
+            Ordering::Greater => "Greater",
+        };
+        Self::tag(symbol.to_string())
+    }
+}
+impl From<Result<Id, Id>> for Expression {
+    fn from(value: Result<Id, Id>) -> Self {
+        let (symbol, value) = match value {
+            Ok(it) => ("Ok", it),
+            Err(it) => ("Error", it),
+        };
+        Expression::Tag {
+            symbol: symbol.to_string(),
+            value: Some(value),
+        }
+    }
+}
+// Referene
+impl From<&Id> for Expression {
+    fn from(value: &Id) -> Self {
+        Self::Reference(*value)
     }
 }
 

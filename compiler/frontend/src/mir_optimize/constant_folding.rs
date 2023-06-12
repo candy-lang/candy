@@ -30,13 +30,20 @@
 
 use crate::{
     builtin_functions::BuiltinFunction,
-    mir::{Expression, Id, VisibleExpressions},
+    id::IdGenerator,
+    mir::{Body, Expression, Id, VisibleExpressions},
 };
 use num_bigint::BigInt;
+use num_integer::Integer;
 use num_traits::ToPrimitive;
+use std::{cmp::Ordering, str::FromStr};
 use tracing::warn;
 
-pub fn fold_constants(expression: &mut Expression, visible: &VisibleExpressions) {
+pub fn fold_constants(
+    expression: &mut Expression,
+    visible: &VisibleExpressions,
+    id_generator: &mut IdGenerator<Id>,
+) {
     let Expression::Call {
         function,
         arguments,
@@ -49,7 +56,9 @@ pub fn fold_constants(expression: &mut Expression, visible: &VisibleExpressions)
     }
 
     let Expression::Builtin(builtin) = visible.get(*function) else { return; };
-    let Some(result) = run_builtin(*builtin, arguments, *responsible, visible) else { return; };
+    let Some(result) = run_builtin(*builtin, arguments, *responsible, visible, id_generator) else {
+        return;
+    };
     *expression = result;
 }
 
@@ -63,6 +72,7 @@ fn run_builtin(
     arguments: &[Id],
     responsible: Id,
     visible: &VisibleExpressions,
+    id_generator: &mut IdGenerator<Id>,
 ) -> Option<Expression> {
     debug_assert_eq!(
         arguments.len(),
@@ -89,7 +99,7 @@ fn run_builtin(
         BuiltinFunction::GetArgumentCount => {
             let [function] = arguments else { unreachable!() };
             let Expression::Function { parameters, .. } = visible.get(*function) else { return None; };
-            Expression::Int(parameters.len().into())
+            parameters.len().into()
         }
         BuiltinFunction::IfElse => {
             let [condition, then_body, else_body] = arguments else { unreachable!() };
@@ -102,40 +112,148 @@ fn run_builtin(
         }
         BuiltinFunction::IntAdd => {
             let [a, b] = arguments else { unreachable!() };
-            let a: BigInt = visible.get(*a).try_into().ok()?;
-            let b: BigInt = visible.get(*b).try_into().ok()?;
-            Expression::Int(a + b)
+            let a: &BigInt = visible.get(*a).try_into().ok()?;
+            let b: &BigInt = visible.get(*b).try_into().ok()?;
+            (a + b).into()
         }
         BuiltinFunction::IntBitLength => {
             let [a] = arguments else { unreachable!() };
-            let a: BigInt = visible.get(*a).try_into().ok()?;
-            Expression::Int(a.bits().into())
+            let a: &BigInt = visible.get(*a).try_into().ok()?;
+            a.bits().into()
         }
-        // TODO: Implement
-        BuiltinFunction::IntBitwiseAnd => return None,
-        BuiltinFunction::IntBitwiseOr => return None,
-        BuiltinFunction::IntBitwiseXor => return None,
-        BuiltinFunction::IntCompareTo => return None,
-        BuiltinFunction::IntDivideTruncating => return None,
-        BuiltinFunction::IntModulo => return None,
-        BuiltinFunction::IntMultiply => return None,
-        BuiltinFunction::IntParse => return None,
-        BuiltinFunction::IntRemainder => return None,
-        BuiltinFunction::IntShiftLeft => return None,
-        BuiltinFunction::IntShiftRight => return None,
-        BuiltinFunction::IntSubtract => return None,
+        BuiltinFunction::IntBitwiseAnd => {
+            let [a, b] = arguments else { unreachable!() };
+            if let Some(true) = a.semantically_equals(*b, visible) {
+                return Some(Expression::Reference(*a));
+            }
+
+            let a: &BigInt = visible.get(*a).try_into().ok()?;
+            let b: &BigInt = visible.get(*b).try_into().ok()?;
+            (a & b).into()
+        }
+        BuiltinFunction::IntBitwiseOr => {
+            let [a, b] = arguments else { unreachable!() };
+            if let Some(true) = a.semantically_equals(*b, visible) {
+                return Some(Expression::Reference(*a));
+            }
+
+            let a: &BigInt = visible.get(*a).try_into().ok()?;
+            let b: &BigInt = visible.get(*b).try_into().ok()?;
+            (a | b).into()
+        }
+        BuiltinFunction::IntBitwiseXor => {
+            let [a, b] = arguments else { unreachable!() };
+            if let Some(true) = a.semantically_equals(*b, visible) {
+                return Some(0.into());
+            }
+
+            let a: &BigInt = visible.get(*a).try_into().ok()?;
+            let b: &BigInt = visible.get(*b).try_into().ok()?;
+            (a ^ b).into()
+        }
+        BuiltinFunction::IntCompareTo => {
+            let [a, b] = arguments else { unreachable!() };
+            if let Some(true) = a.semantically_equals(*b, visible) {
+                return Some(Ordering::Equal.into());
+            }
+
+            let a: &BigInt = visible.get(*a).try_into().ok()?;
+            let b: &BigInt = visible.get(*b).try_into().ok()?;
+            a.cmp(b).into()
+        }
+        BuiltinFunction::IntDivideTruncating => {
+            let [dividend, divisor] = arguments else { unreachable!() };
+            if let Some(true) = dividend.semantically_equals(*divisor, visible) {
+                return Some(1.into());
+            }
+
+            let dividend: &BigInt = visible.get(*dividend).try_into().ok()?;
+            let divisor: &BigInt = visible.get(*divisor).try_into().ok()?;
+            (dividend / divisor).into()
+        }
+        BuiltinFunction::IntModulo => {
+            let [dividend, divisor] = arguments else { unreachable!() };
+            if let Some(true) = dividend.semantically_equals(*divisor, visible) {
+                return Some(0.into());
+            }
+
+            let dividend: &BigInt = visible.get(*dividend).try_into().ok()?;
+            let divisor: &BigInt = visible.get(*divisor).try_into().ok()?;
+            dividend.mod_floor(divisor).into()
+        }
+        BuiltinFunction::IntMultiply => {
+            let [factor_a, factor_b] = arguments else { unreachable!() };
+            let factor_a: &BigInt = visible.get(*factor_a).try_into().ok()?;
+            let factor_b: &BigInt = visible.get(*factor_b).try_into().ok()?;
+            (factor_a * factor_b).into()
+        }
+        BuiltinFunction::IntParse => {
+            let [text] = arguments else { unreachable!() };
+            let text: &str = visible.get(*text).try_into().ok()?;
+            let mut body = Body::default();
+            match BigInt::from_str(text) {
+                Ok(value) => Ok(body.push_with_new_id(id_generator, value.into())),
+                Err(err) => Err(body.push_with_new_id(id_generator, err.to_string().into())),
+            }
+            .into()
+        }
+        BuiltinFunction::IntRemainder => {
+            let [dividend, divisor] = arguments else { unreachable!() };
+            if let Some(true) = dividend.semantically_equals(*divisor, visible) {
+                return Some(0.into());
+            }
+
+            let dividend: &BigInt = visible.get(*dividend).try_into().ok()?;
+            let divisor: &BigInt = visible.get(*divisor).try_into().ok()?;
+            (dividend % divisor).into()
+        }
+        BuiltinFunction::IntShiftLeft => {
+            let [value, amount] = arguments else { unreachable!() };
+            let amount: &BigInt = visible.get(*amount).try_into().ok()?;
+            // TODO: Support larger shift amounts.
+            let amount: u128 = amount.try_into().unwrap();
+            if amount == 0 {
+                return Some(value.into());
+            }
+
+            let value: &BigInt = visible.get(*value).try_into().ok()?;
+            (value << amount).into()
+        }
+        BuiltinFunction::IntShiftRight => {
+            let [value, amount] = arguments else { unreachable!() };
+            let amount: &BigInt = visible.get(*amount).try_into().ok()?;
+            // TODO: Support larger shift amounts.
+            let amount: u128 = amount.try_into().unwrap();
+            if amount == 0 {
+                return Some(value.into());
+            }
+
+            let value: &BigInt = visible.get(*value).try_into().ok()?;
+            (value >> amount).into()
+        }
+        BuiltinFunction::IntSubtract => {
+            let [minuend, subtrahend] = arguments else { unreachable!() };
+            if let Some(true) = minuend.semantically_equals(*subtrahend, visible) {
+                return Some(Expression::Int(0.into()));
+            }
+
+            let minuend: &BigInt = visible.get(*minuend).try_into().ok()?;
+            let subtrahend: &BigInt = visible.get(*subtrahend).try_into().ok()?;
+            (minuend - subtrahend).into()
+        }
         BuiltinFunction::ListFilled => return None,
         BuiltinFunction::ListGet => {
             let [list, index] = arguments else { unreachable!() };
             let Expression::List(list) = visible.get(*list) else { return None; };
             let Expression::Int(index) = visible.get(*index) else { return None; };
-            Expression::Reference(*list.get(index.to_usize().unwrap()).unwrap())
+            // TODO: Support lists longer than `usize::MAX`.
+            list.get(index.to_usize().unwrap()).unwrap().into()
         }
         BuiltinFunction::ListInsert => return None,
         BuiltinFunction::ListLength => {
-            let [list_id] = arguments else { unreachable!() };
-            let Expression::List(list) = visible.get(*list_id) else { return None; };
-            Expression::Int(list.len().into())
+            let [list] = arguments else { unreachable!() };
+            let Expression::List(list) = visible.get(*list) else { return None; };
+            list.len().into()
         }
         BuiltinFunction::ListRemoveAt => return None,
         BuiltinFunction::ListReplace => return None,
@@ -201,7 +319,7 @@ fn run_builtin(
         BuiltinFunction::TagGetValue => {
             let [tag] = arguments else { unreachable!() };
             let Expression::Tag { value: Some(value), .. } = visible.get(*tag) else { return None; };
-            Expression::Reference(*value)
+            value.into()
         }
         BuiltinFunction::TagHasValue => {
             let [tag] = arguments else { unreachable!() };
