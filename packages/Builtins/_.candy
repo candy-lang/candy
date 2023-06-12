@@ -142,7 +142,7 @@ intShiftLeft value amount :=
   needs (amount | typeIs Int)
   needs
     amount | isNonNegative
-    "The shift `amount` is negative: {amount | ✨.toDebugText}. You might want to call `shiftRight` instead."
+    "The shift `amount` is negative: {amount}. You might want to call `shiftRight` instead."
   needs (amount | fitsInRustU128) "Shifts by that much are not yet supported."
   ✨.intShiftLeft value amount
 intShiftRight value amount :=
@@ -150,7 +150,7 @@ intShiftRight value amount :=
   needs (amount | typeIs Int)
   needs
     amount | isNonNegative
-    "The shift `amount` is negative: {amount | ✨.toDebugText}. You might want to call `shiftLeft` instead."
+    "The shift `amount` is negative: {amount}. You might want to call `shiftLeft` instead."
   needs (amount | fitsInRustU128) "Shifts by that much are not yet supported."
   ✨.intShiftRight value amount
 intSubtract minuend subtrahend :=
