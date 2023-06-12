@@ -238,9 +238,7 @@ windowed iterable size step allowPartialWindows :=
   generateWithState iterable { iterable ->
     items = iterable | take size | toList
     length = items | list.length
-    isLongEnough = ifElse allowPartialWindows { length | int.isPositive } {
-      length | int.equals size
-    }
+    isLongEnough = ifElse allowPartialWindows { length | int.isPositive } { length | equals size }
     ifElse isLongEnough { Ok [Item: items, State: iterable | skip step] } { Error Empty }
   }
 chunked iterable size :=
