@@ -191,11 +191,12 @@ fn run_builtin(
             let [text] = arguments else { unreachable!() };
             let text: &str = visible.get(*text).try_into().ok()?;
             let mut body = Body::default();
-            match BigInt::from_str(text) {
+            let result = match BigInt::from_str(text) {
                 Ok(value) => Ok(body.push_with_new_id(id_generator, value.into())),
                 Err(err) => Err(body.push_with_new_id(id_generator, err.to_string().into())),
-            }
-            .into()
+            };
+            body.push_with_new_id(id_generator, result.into());
+            body.into()
         }
         BuiltinFunction::IntRemainder => {
             let [dividend, divisor] = arguments else { unreachable!() };
