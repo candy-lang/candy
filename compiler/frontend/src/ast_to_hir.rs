@@ -87,6 +87,7 @@ fn compile_top_level(
         id_prefix: hir::Id::new(module.clone(), vec![]),
         identifiers: im::HashMap::new(),
         is_top_level: true,
+        use_id: None,
     };
 
     if module.package == Package::Managed("Builtins".into()) {
@@ -113,6 +114,7 @@ struct Context<'a> {
     id_prefix: hir::Id,
     identifiers: im::HashMap<String, hir::Id>,
     is_top_level: bool,
+    use_id: Option<hir::Id>,
 }
 
 impl Context<'_> {
@@ -527,13 +529,34 @@ impl Context<'_> {
         id: Option<ast::Id>,
         struct_access: &StructAccess,
     ) -> hir::Id {
+        // We forward struct accesses to `(use "Builtins").structGet` to reuse
+        // its validation logic.
+        let builtins = self.push(None, Expression::Text("Builtins".to_string()), None);
+        let builtins_id = self.push(
+            None,
+            Expression::Call {
+                function: self.use_id.clone().unwrap(),
+                arguments: vec![builtins],
+            },
+            None,
+        );
+        let struct_get_id = self.push(None, Expression::Builtin(BuiltinFunction::StructGet), None);
+        let struct_get = self.push(None, Expression::Text("StructGet".to_string()), None);
+        let struct_get_id = self.push(
+            None,
+            Expression::Call {
+                function: struct_get_id,
+                arguments: vec![builtins_id, struct_get],
+            },
+            None,
+        );
+
         let struct_ = self.compile_single(&struct_access.struct_);
         let key_id = self.push(
             Some(struct_access.key.id.clone()),
             Expression::Symbol(struct_access.key.value.uppercase_first_letter()),
             None,
         );
-        let struct_get_id = self.push(None, Expression::Builtin(BuiltinFunction::StructGet), None);
         self.push(
             id,
             Expression::Call {
@@ -716,6 +739,8 @@ impl Context<'_> {
         //     relative path: HirId(~:test.candy:use:relativePath)
         //  }
 
+        assert!(self.use_id.is_none());
+
         let reset_state = self.start_scope();
         let use_id = self.create_next_id(None, Some("use".to_string()));
         self.id_prefix = use_id.clone();
@@ -733,7 +758,7 @@ impl Context<'_> {
         let inner_body = self.end_scope(reset_state);
 
         self.push_with_existing_id(
-            use_id,
+            use_id.clone(),
             Expression::Function(Function {
                 parameters: vec![relative_path],
                 body: inner_body,
@@ -741,6 +766,7 @@ impl Context<'_> {
             }),
             Some("use".to_string()),
         );
+        self.use_id = Some(use_id);
     }
 
     fn generate_exports_struct(&mut self) -> hir::Id {
