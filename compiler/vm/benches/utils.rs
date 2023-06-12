@@ -96,7 +96,7 @@ pub fn setup() -> Database {
 fn load_core(module_provider: &mut InMemoryModuleProvider) {
     let packages_path = PackagesPath::try_from("../../packages").unwrap();
     let core_path = packages_path.join("Core");
-    let package = Package::Managed("Core".into());
+    let package = Package::core();
 
     for file in WalkDir::new(&core_path)
         .into_iter()

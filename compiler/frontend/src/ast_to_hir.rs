@@ -90,7 +90,7 @@ fn compile_top_level(
         use_id: None,
     };
 
-    if module.package == Package::Managed("Builtins".into()) {
+    if module.package == Package::builtins() {
         context.generate_sparkles();
     }
     context.generate_use();
