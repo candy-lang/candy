@@ -241,7 +241,12 @@ fn run_builtin(
             let subtrahend: &BigInt = visible.get(*subtrahend).try_into().ok()?;
             (minuend - subtrahend).into()
         }
-        BuiltinFunction::ListFilled => return None,
+        BuiltinFunction::ListFilled => {
+            let [length, item] = arguments else { unreachable!() };
+            let Expression::Int(length) = visible.get(*length) else { return None; };
+            // TODO: Support lists longer than `usize::MAX`.
+            vec![*item; length.to_usize().unwrap()].into()
+        }
         BuiltinFunction::ListGet => {
             let [list, index] = arguments else { unreachable!() };
             let Expression::List(list) = visible.get(*list) else { return None; };
