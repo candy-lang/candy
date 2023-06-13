@@ -5,4 +5,4 @@ todo message :=
   # Always panics with a todo message.
   needs (text.is message)
   ## There is no way to call `todo` correctly.
-  panic "TODO: {message}"
+  needs False "TODO: {message}"
