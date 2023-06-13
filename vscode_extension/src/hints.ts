@@ -69,7 +69,6 @@ export class HintsDecorations implements vs.Disposable {
       if (hints === undefined) {
         return;
       }
-
       type Item = vs.DecorationOptions & {
         renderOptions: { after: { contentText: string } };
       };
@@ -78,7 +77,6 @@ export class HintsDecorations implements vs.Disposable {
         const position = this.client.protocol2CodeConverter.asPosition(
           hint.position
         );
-
         // Ensure that the hint we got has a sensible position. Otherwise, the
         // hint might be stale (e.g., we sent two updates, and the hint from in
         // between them just arrived). In this case, we'll just bail and do
@@ -87,7 +85,6 @@ export class HintsDecorations implements vs.Disposable {
         if (position.character < 1) {
           return;
         }
-
         const existing = decorations.get(hint.kind) || [];
         existing.push({
           range: new vs.Range(position, position),
@@ -95,7 +92,6 @@ export class HintsDecorations implements vs.Disposable {
         });
         decorations.set(hint.kind, existing);
       }
-
       for (const [hintKind, decorationType] of this.decorationTypes.entries()) {
         editor.setDecorations(decorationType, decorations.get(hintKind) || []);
       }

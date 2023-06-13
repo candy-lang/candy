@@ -45,8 +45,9 @@ export async function activate(context: vscode.ExtensionContext) {
   );
   client.start();
 
-  context.subscriptions.push(new HintsDecorations(client));
+  // context.subscriptions.push(new HintsDecorations(client));
   context.subscriptions.push(new ServerStatusService(client));
+  context.subscriptions.push(new HintsDecorations(client));
   registerDebugIrCommands(client);
   registerDebugAdapter(context, client);
 }
@@ -64,9 +65,12 @@ async function spawnServer(): Promise<StreamInfo> {
   const process = safeSpawn();
   console.info(`PID: ${process.pid}`);
 
-  const reader = process.stdout.pipe(new LoggingTransform('<=='));
-  const writer = new LoggingTransform('==>');
-  writer.pipe(process.stdin);
+  const reader = process.stdout;
+  const writer = process.stdin;
+
+  // const reader = process.stdout.pipe(new LoggingTransform('<=='));
+  // const writer = new LoggingTransform('==>');
+  // writer.pipe(process.stdin);
 
   process.stderr.on('data', (data) => console.error(data.toString()));
 

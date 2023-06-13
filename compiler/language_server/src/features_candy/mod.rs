@@ -80,31 +80,6 @@ impl LanguageFeatures for CandyFeatures {
         self.send_to_analyzer(analyzer::Message::Shutdown).await;
     }
 
-    fn supports_code_lens(&self) -> bool {
-        true
-    }
-    async fn code_lens(&self, db: &Mutex<Database>, uri: Url) -> Vec<CodeLens> {
-        info!("Doing code lens stuff");
-        let module = {
-            let db = db.lock().await;
-            decode_module(&uri, &db.packages_path)
-        };
-        let (sender, receiver) = oneshot::channel();
-        self.send_to_analyzer(analyzer::Message::GetCodeLenses(module, sender))
-            .await;
-        receiver.await.unwrap()
-
-        // vec![CodeLens {
-        //     range,
-        //     command: Some(Command {
-        //         title: "Hello, world!".to_string(),
-        //         command: "command".to_string(),
-        //         arguments: None,
-        //     }),
-        //     data: None,
-        // }]
-    }
-
     fn supports_did_open(&self) -> bool {
         true
     }
