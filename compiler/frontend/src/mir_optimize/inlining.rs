@@ -52,7 +52,8 @@ pub fn inline_tiny_functions(
         expression,
         Complexity {
             is_self_contained: true,
-            expressions: 2,
+            // TODO: Reset this to 2 once we have data flow and inline `(use "Builtins").structGet` that way.
+            expressions: 7,
         },
         visible,
         id_generator,
