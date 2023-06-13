@@ -194,10 +194,10 @@ fn run_builtin(
             let text: &str = visible.get(*text).try_into().ok()?;
             let mut body = Body::default();
             let result = match BigInt::from_str(text) {
-                Ok(value) => Ok(body.push_with_new_id(id_generator, value.into())),
-                Err(err) => Err(body.push_with_new_id(id_generator, err.to_string().into())),
+                Ok(value) => Ok(body.push_with_new_id(id_generator, value)),
+                Err(err) => Err(body.push_with_new_id(id_generator, err.to_string())),
             };
-            body.push_with_new_id(id_generator, result.into());
+            body.push_with_new_id(id_generator, result);
             body.into()
         }
         BuiltinFunction::IntRemainder => {
@@ -348,9 +348,9 @@ fn run_builtin(
             let mut body = Body::default();
             let characters = text
                 .graphemes(true)
-                .map(|it| body.push_with_new_id(id_generator, it.into()))
+                .map(|it| body.push_with_new_id(id_generator, it))
                 .collect_vec();
-            body.push_with_new_id(id_generator, characters.into());
+            body.push_with_new_id(id_generator, characters);
             body.into()
         }
         BuiltinFunction::TextConcatenate => {
