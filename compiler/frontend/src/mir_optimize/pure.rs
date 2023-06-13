@@ -97,6 +97,19 @@ impl PurenessInsights {
         //     self.definition_constness.remove(local).unwrap();
         // }
     }
+    pub(super) fn on_normalize_ids(&mut self, mapping: &FxHashMap<Id, Id>) {
+        fn update(values: &mut FxHashMap<Id, bool>, mapping: &FxHashMap<Id, Id>) {
+            *values = values
+                .iter()
+                .filter_map(|(original_id, value)| {
+                    let new_id = mapping.get(original_id)?;
+                    Some((*new_id, *value))
+                })
+                .collect();
+        }
+        update(&mut self.definition_pureness, mapping);
+        update(&mut self.definition_constness, mapping);
+    }
     pub(super) fn include(&mut self, other: &PurenessInsights, mapping: &FxHashMap<Id, Id>) {
         fn insert(
             source: &FxHashMap<Id, bool>,

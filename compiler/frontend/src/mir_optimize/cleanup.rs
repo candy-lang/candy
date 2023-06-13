@@ -20,9 +20,9 @@ use crate::{
 use std::mem;
 
 impl Mir {
-    pub fn cleanup(&mut self, pureness: &PurenessInsights) {
+    pub fn cleanup(&mut self, pureness: &mut PurenessInsights) {
         self.sort_leading_constants(pureness);
-        self.normalize_ids();
+        self.normalize_ids(pureness);
     }
 
     /// Sorts the leading constants in the body. This wouldn't be super useful
@@ -81,7 +81,7 @@ impl Mir {
         });
     }
 
-    pub fn normalize_ids(&mut self) {
+    pub fn normalize_ids(&mut self, pureness: &mut PurenessInsights) {
         let mut generator = IdGenerator::start_at(1);
         let mapping: FxHashMap<Id, Id> = self
             .body
@@ -90,6 +90,7 @@ impl Mir {
             .map(|id| (id, generator.generate()))
             .collect();
 
-        self.body.replace_ids(&mut |id| *id = mapping[&*id])
+        self.body.replace_ids(&mut |id| *id = mapping[&*id]);
+        pureness.on_normalize_ids(&mapping);
     }
 }
