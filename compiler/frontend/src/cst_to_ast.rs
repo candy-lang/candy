@@ -18,10 +18,14 @@ use std::{ops::Range, sync::Arc};
 
 #[salsa::query_group(CstToAstStorage)]
 pub trait CstToAst: CstDb + RcstToCst {
+    #[salsa::transparent]
     fn ast_to_cst_id(&self, id: ast::Id) -> Option<cst::Id>;
+    #[salsa::transparent]
     fn ast_id_to_span(&self, id: ast::Id) -> Option<Range<Offset>>;
+    #[salsa::transparent]
     fn ast_id_to_display_span(&self, id: ast::Id) -> Option<Range<Offset>>;
 
+    #[salsa::transparent]
     fn cst_to_ast_id(&self, module: Module, id: cst::Id) -> Vec<ast::Id>;
 
     fn ast(&self, module: Module) -> AstResult;

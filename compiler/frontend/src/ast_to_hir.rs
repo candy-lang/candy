@@ -20,12 +20,18 @@ use std::{collections::hash_map::Entry, mem, ops::Range, sync::Arc};
 
 #[salsa::query_group(AstToHirStorage)]
 pub trait AstToHir: CstDb + CstToAst {
+    #[salsa::transparent]
     fn hir_to_ast_id(&self, id: hir::Id) -> Option<ast::Id>;
+    #[salsa::transparent]
     fn hir_to_cst_id(&self, id: hir::Id) -> Option<cst::Id>;
+    #[salsa::transparent]
     fn hir_id_to_span(&self, id: hir::Id) -> Option<Range<Offset>>;
+    #[salsa::transparent]
     fn hir_id_to_display_span(&self, id: hir::Id) -> Option<Range<Offset>>;
 
+    #[salsa::transparent]
     fn ast_to_hir_id(&self, id: ast::Id) -> Vec<hir::Id>;
+    #[salsa::transparent]
     fn cst_to_hir_id(&self, module: Module, id: cst::Id) -> Vec<hir::Id>;
 
     fn hir(&self, module: Module) -> HirResult;
