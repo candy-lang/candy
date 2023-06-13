@@ -1,3 +1,11 @@
+use clap::Parser;
+use tracing::{debug, Level, Metadata};
+use tracing_subscriber::{
+    filter,
+    fmt::{format::FmtSpan, writer::BoxMakeWriter},
+    prelude::*,
+};
+
 mod check;
 mod database;
 mod debug;
@@ -6,14 +14,6 @@ mod lsp;
 mod run;
 mod services;
 mod utils;
-
-use clap::Parser;
-use tracing::{debug, Level, Metadata};
-use tracing_subscriber::{
-    filter,
-    fmt::{format::FmtSpan, writer::BoxMakeWriter},
-    prelude::*,
-};
 
 #[derive(Parser, Debug)]
 #[command(name = "candy", about = "The 🍭 Candy CLI.")]
