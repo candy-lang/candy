@@ -64,6 +64,10 @@ async function spawnServer(): Promise<StreamInfo> {
   const process = safeSpawn();
   console.info(`PID: ${process.pid}`);
 
+  const reader = process.stdout.pipe(new LoggingTransform('<=='));
+  const writer = new LoggingTransform('==>');
+  writer.pipe(process.stdin);
+
   process.stderr.on('data', (data) => console.error(data.toString()));
 
   process.addListener('close', (exitCode) => {
@@ -90,7 +94,7 @@ async function spawnServer(): Promise<StreamInfo> {
     console.error('LSP server sent a message.');
   });
 
-  return { reader: process.stdout, writer: process.stdin };
+  return { reader, writer };
 }
 
 type SpawnedProcess = child_process.ChildProcess & {
@@ -115,4 +119,29 @@ function safeSpawn(): SpawnedProcess {
     env: { ...process.env, RUST_BACKTRACE: 'FULL' },
     shell: true,
   }) as SpawnedProcess;
+}
+
+class LoggingTransform extends stream.Transform {
+  constructor(private readonly prefix: string, opts?: stream.TransformOptions) {
+    super(opts);
+  }
+  public _transform(
+    chunk: any,
+    encoding: BufferEncoding,
+    callback: () => void
+  ): void {
+    let value = (chunk as Buffer).toString();
+    let toLog = value
+      .split('\r\n')
+      .filter(
+        (line) => line.trim().startsWith('{') || line.trim().startsWith('#')
+      )
+      .join('\r\n');
+    if (toLog.length > 0) {
+      console.info(`${this.prefix} ${toLog}`);
+    }
+
+    this.push(Buffer.from(value, 'utf8'), encoding);
+    callback();
+  }
 }
