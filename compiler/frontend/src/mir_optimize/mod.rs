@@ -104,7 +104,9 @@ impl Mir {
             tracing,
             errors,
         );
-        self.validate();
+        if cfg!(debug_assertions) {
+            self.validate();
+        }
         self.cleanup();
     }
 }
