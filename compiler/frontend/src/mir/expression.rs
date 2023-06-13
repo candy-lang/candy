@@ -33,7 +33,6 @@ pub enum Expression {
     #[from]
     List(Vec<Id>),
     Struct(Vec<(Id, Id)>),
-    #[from]
     Reference(Id),
     /// A HIR ID that can be used to refer to code in the HIR.
     #[from]
