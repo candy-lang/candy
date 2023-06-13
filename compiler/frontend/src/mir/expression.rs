@@ -16,7 +16,7 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-#[derive(Clone, Eq, From, PartialEq, TryInto)]
+#[derive(Clone, Debug, Eq, From, PartialEq, TryInto)]
 pub enum Expression {
     #[from]
     #[try_into]

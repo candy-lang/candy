@@ -17,7 +17,7 @@ use std::{
     mem, vec,
 };
 
-#[derive(Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Body {
     pub expressions: Vec<(Id, Expression)>,
 }
