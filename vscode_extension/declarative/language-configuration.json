@@ -19,6 +19,24 @@
   },
   "onEnterRules": [
     {
+      // Octothorpes without space when there's already an existing space after
+      // so we don't need to insert one.
+      "beforeText": "^\\s*##",
+      "afterText": "^ ",
+      "action": { "indent": "none", "appendText": "##" }
+    },
+    {
+      // Octothorpe with space when there's not already an existing space after.
+      "beforeText": "^\\s*## ",
+      "afterText": "[^ ]*$",
+      "action": { "indent": "none", "appendText": "## " }
+    },
+    {
+      // Octothorpe without space.
+      "beforeText": "^\\s*##",
+      "action": { "indent": "none", "appendText": "##" }
+    },
+    {
       // Octothorpe without space when there's already an existing space after
       // so we don't need to insert one.
       "beforeText": "^\\s*#",
