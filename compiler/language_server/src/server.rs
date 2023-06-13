@@ -12,21 +12,23 @@ use crate::{
 };
 use async_trait::async_trait;
 use candy_frontend::module::{Module, ModuleKind, PackagesPath};
+use debounce::EventDebouncer;
 use lsp_types::{
-    CodeLens, CodeLensParams, Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
-    DidOpenTextDocumentParams, DocumentFilter, DocumentFormattingParams, DocumentHighlight,
-    DocumentHighlightKind, DocumentHighlightParams, FoldingRange, FoldingRangeParams,
-    GotoDefinitionParams, GotoDefinitionResponse, InitializeParams, InitializeResult,
-    InitializedParams, Location, MessageType, Position, PrepareRenameResponse, ReferenceParams,
-    Registration, RenameOptions, RenameParams, SemanticTokens, SemanticTokensFullOptions,
-    SemanticTokensOptions, SemanticTokensParams, SemanticTokensRegistrationOptions,
-    SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
-    StaticRegistrationOptions, TextDocumentChangeRegistrationOptions, TextDocumentPositionParams,
+    notification::Notification, request::Request, CodeLens, CodeLensParams, Diagnostic,
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DocumentFilter, DocumentFormattingParams, DocumentHighlight, DocumentHighlightKind,
+    DocumentHighlightParams, FoldingRange, FoldingRangeParams, GotoDefinitionParams,
+    GotoDefinitionResponse, InitializeParams, InitializeResult, InitializedParams, Location,
+    MessageType, Position, PrepareRenameResponse, ReferenceParams, Registration, RenameOptions,
+    RenameParams, SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions,
+    SemanticTokensParams, SemanticTokensRegistrationOptions, SemanticTokensResult,
+    SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo, StaticRegistrationOptions,
+    TextDocumentChangeRegistrationOptions, TextDocumentPositionParams,
     TextDocumentRegistrationOptions, TextEdit, Url, WorkDoneProgressOptions, WorkspaceEdit,
 };
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::mem;
+use std::{mem, time::Duration};
 use tokio::sync::{Mutex, RwLock, RwLockMappedWriteGuard, RwLockReadGuard, RwLockWriteGuard};
 use tower_lsp::{jsonrpc, Client, ClientSocket, LanguageServer, LspService};
 use tracing::{debug, span, Level};
@@ -122,6 +124,7 @@ impl ServerFeatures {
     }
 }
 
+#[derive(Clone)]
 pub struct AnalyzerClient {
     client: Client,
     packages_path: PackagesPath,
@@ -155,8 +158,19 @@ impl AnalyzerClient {
             .await;
     }
     pub async fn code_lenses_updated(&self) {
-        self.client.code_lens_refresh().await.unwrap();
+        self.client
+            .send_request::<CodeLensRefresh>(CodeLensRefresh {})
+            .await
+            .unwrap();
     }
+}
+#[derive(Deserialize, Serialize)]
+struct CodeLensRefresh {}
+impl Request for CodeLensRefresh {
+    const METHOD: &'static str = "workspace/codeLens/refresh";
+
+    type Params = Self;
+    type Result = ();
 }
 
 impl Server {

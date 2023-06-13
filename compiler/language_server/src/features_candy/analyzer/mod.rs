@@ -26,7 +26,7 @@ use tokio::{
     },
     time::sleep,
 };
-use tracing::debug;
+use tracing::{debug, info};
 
 mod code_lens;
 pub mod hint;
@@ -58,6 +58,16 @@ pub async fn run_server(
     mut incoming_events: mpsc::Receiver<Message>,
     client: AnalyzerClient,
 ) {
+    // PERF: Stop this loop when we don't have any updates.
+    let client_clone = client.clone();
+    tokio::spawn(async move {
+        sleep(Duration::from_millis(1000)).await;
+        loop {
+            sleep(Duration::from_millis(500)).await;
+            client_clone.code_lenses_updated().await;
+        }
+    });
+
     let mut db = Database::new_with_file_system_module_provider(packages_path);
     let mut hints_finders: FxHashMap<Module, ModuleAnalyzer> = FxHashMap::default();
     let client_ref = &client;
@@ -93,6 +103,7 @@ pub async fn run_server(
                     incoming_events.close();
                 }
                 Message::GetCodeLenses(module, sender) => {
+                    info!("Getting code lenses");
                     let code_lenses = hints_finders
                         .get(&module)
                         .unwrap()
@@ -100,6 +111,7 @@ pub async fn run_server(
                         .into_iter()
                         .flat_map(|(id, lens)| lens.to_lsp_code_lenses(&db, id))
                         .collect_vec();
+                    info!("Sending lenses {code_lenses:?}");
                     sender.send(code_lenses).unwrap();
                 }
             }
@@ -118,7 +130,6 @@ pub async fn run_server(
 
         outgoing_diagnostics.send(module.clone(), diagnostics).await;
         outgoing_hints.send(module, hints).await;
-        client.code_lenses_updated().await;
     }
 }
 
