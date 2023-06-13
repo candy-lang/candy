@@ -194,8 +194,8 @@ impl Body {
         }
 
         common_subtree_elimination::eliminate_common_subtrees(self, pureness);
-        tree_shaking::tree_shake(self, pureness);
         reference_following::remove_redundant_return_references(self);
+        tree_shaking::tree_shake(self, pureness);
     }
 
     // If an `Expression::Multiple` was actually folded, this returns the index
