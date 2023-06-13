@@ -202,7 +202,7 @@ impl Expression {
             let hashcode_before = self.do_hash();
 
             reference_following::follow_references(self, visible);
-            constant_folding::fold_constants(self, visible, id_generator);
+            constant_folding::fold_constants(self, visible);
             inlining::inline_tiny_functions(self, visible, id_generator);
             inlining::inline_functions_containing_use(self, visible, id_generator);
             constant_lifting::lift_constants(self, id_generator);

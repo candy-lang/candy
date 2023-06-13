@@ -1,3 +1,4 @@
+builtins = use "Builtins"
 bool = use "..bool"
 [ifElse, recursive] = use "..controlFlow"
 [equals] = use "..equality"
@@ -8,9 +9,7 @@ type = use "..type"
 
 is value := type.is value List
 
-length list :=
-  needs (is list)
-  list | ✨.listLength
+length := builtins.listLength
 isEmpty list :=
   needs (is list)
   equals (length list) 0
@@ -31,11 +30,7 @@ isValidInsertIndex list index :=
   ifElse (list | isEmpty) { False } { index | int.isNonNegative }
   | bool.lazyAnd { index | int.isLessThanOrEqualTo (list | length) }
 
-get list index :=
-  needs (is list)
-  needs (int.is index)
-  needs (list | isValidIndex index)
-  list | ✨.listGet index
+get := builtins.listGet
 
 # TODO: add `single list` when we have pattern matching
 last list :=
@@ -43,13 +38,7 @@ last list :=
   list | lastIndex | result.mapError { _ -> "Can't get the last item of an empty list." }
   | result.map { index -> list | get index }
 
-insert list index item :=
-  needs (is list)
-
-  needs (int.is index)
-  needs (list | isValidInsertIndex index)
-
-  list | ✨.listInsert index item
+insert := builtins.listInsert
 
 prepend list item :=
   needs (is list)
@@ -58,11 +47,7 @@ append list item :=
   needs (is list)
   list | insert (length list) item
 
-replace list index newValue :=
-  needs (is list)
-  needs (int.is index)
-  needs (list | isValidIndex index)
-  list | ✨.listReplace index newValue
+replace := builtins.listReplace
 update list index updater :=
   needs (is list)
   needs (int.is index)
@@ -72,18 +57,9 @@ update list index updater :=
   newValue = updater oldValue
   list | replace index newValue
 
-removeAt list index :=
-  needs (is list)
-  needs (int.is index)
-  needs (list | isValidIndex index)
-  list | ✨.listRemoveAt index
+removeAt := builtins.listRemoveAt
 
-filled length item :=
-  # Creates a new list of the given `length`, where each slot is filled with the same item.
-  needs (int.is length)
-  needs (int.isNonNegative length)
-  needs (int.fitsInRustU32 length)
-  ✨.listFilled length item
+filled := builtins.listFilled
 generate length valueGetter :=
   # Creates a new list of the given `length`, where each slot is filled by calling `valueGetter`
   # with the index.

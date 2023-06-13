@@ -79,7 +79,8 @@ pub fn setup_and_compile(source_code: &str) -> Lir {
 
 pub fn setup() -> Database {
     let mut db = Database::default();
-    load_core(&mut db.module_provider);
+    load_package("Builtins", &mut db.module_provider);
+    load_package("Core", &mut db.module_provider);
     db.module_provider.add_str(&MODULE, r#"_ = use "Core""#);
 
     // Load `Core` into the cache.
@@ -93,12 +94,13 @@ pub fn setup() -> Database {
 
     db
 }
-fn load_core(module_provider: &mut InMemoryModuleProvider) {
+fn load_package(package_name: impl Into<String>, module_provider: &mut InMemoryModuleProvider) {
+    let package_name = package_name.into();
     let packages_path = PackagesPath::try_from("../../packages").unwrap();
-    let core_path = packages_path.join("Core");
-    let package = Package::Managed("Core".into());
+    let package_path = packages_path.join(package_name.clone());
+    let package = Package::Managed(package_name.into());
 
-    for file in WalkDir::new(&core_path)
+    for file in WalkDir::new(&package_path)
         .into_iter()
         .map(|it| it.unwrap())
         .filter(|it| it.file_type().is_file())

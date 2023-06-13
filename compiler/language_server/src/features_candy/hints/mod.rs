@@ -28,6 +28,7 @@ pub mod hint;
 mod hints_finder;
 mod utils;
 
+#[derive(Debug)]
 pub enum Event {
     UpdateModule(Module, Vec<u8>),
     CloseModule(Module),
