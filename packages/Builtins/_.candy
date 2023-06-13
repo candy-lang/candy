@@ -43,17 +43,17 @@ equals a b :=
   # Returns `True` or `False` depending on whether `a` and `b` are equal.
   ✨.equals a b
 
-getArgumentCount function :=
-  # Returns the number of arguments that `function` expects.
-  needs (function | typeIs Function)
-  ✨.getArgumentCount function
 functionRun function :=
   # Executes `function` and returns its result.
   #
   # `function` may not accept any arguments.
   needs (function | typeIs Function)
-  needs (function | getArgumentCount | equals 0)
+  needs (function | ✨.getArgumentCount | equals 0)
   ✨.functionRun function
+getArgumentCount function :=
+  # Returns the number of arguments that `function` expects.
+  needs (function | typeIs Function)
+  ✨.getArgumentCount function
 
 ifElse condition then else :=
   conditionIsBool = condition %
@@ -245,10 +245,10 @@ textContains text pattern :=
   needs (text | typeIs Text)
   needs (pattern | typeIs Text)
   ✨.textContains text pattern
-textEndsWith text pattern :=
+textEndsWith text suffix :=
   needs (text | typeIs Text)
-  needs (pattern | typeIs Text)
-  ✨.textEndsWith text pattern
+  needs (suffix | typeIs Text)
+  ✨.textEndsWith text suffix
 textFromUtf8 bytes :=
   needs (bytes | typeIs List)
   ## TODO: Add this when it runs faster.
@@ -275,10 +275,10 @@ textLength text :=
   # Returns the number of characters (Unicode grapheme clusters) in this text.
   needs (text | typeIs Text)
   ✨.textLength text
-textStartsWith text pattern :=
+textStartsWith text prefix :=
   needs (text | typeIs Text)
-  needs (pattern | typeIs Text)
-  ✨.textStartsWith text pattern
+  needs (prefix | typeIs Text)
+  ✨.textStartsWith text prefix
 textTrimEnd text :=
   needs (text | typeIs Text)
   # text

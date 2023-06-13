@@ -12,9 +12,8 @@ use candy_frontend::builtin_functions::BuiltinFunction;
 use itertools::Itertools;
 use num_bigint::BigInt;
 use paste::paste;
-use std::str::{self, FromStr};
+use std::str::FromStr;
 use tracing::{info, span, Level};
-use unicode_segmentation::UnicodeSegmentation;
 
 impl<FT: FiberTracer> Fiber<FT> {
     pub(super) fn run_builtin_function(
@@ -177,7 +176,6 @@ impl Heap {
             CreateChannel { capacity }
         })
     }
-
     fn channel_send(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |port: SendPort, packet: Any| {
             let mut heap = Heap::default();
@@ -188,7 +186,6 @@ impl Heap {
             }
         })
     }
-
     fn channel_receive(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |port: ReceivePort| {
             Receive {
@@ -211,7 +208,6 @@ impl Heap {
             }
         })
     }
-
     fn get_argument_count(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |function: Function| {
             Return(Int::create(self, function.argument_count()).into())
@@ -287,7 +283,7 @@ impl Heap {
                 Ok(int) => Ok(Int::create_from_bigint(self, int).into()),
                 Err(err) => Err(Text::create(self, &err.to_string()).into()),
             };
-            Return(Struct::create_result(self, result).into())
+            Return(Tag::create_result(self, result).into())
         })
     }
     fn int_remainder(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -421,31 +417,27 @@ impl Heap {
 
     fn text_characters(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text| {
-            let characters = text
-                .get()
-                .graphemes(true)
-                .map(|it| Text::create(self, it).into())
-                .collect_vec();
-            Return(List::create(self, &characters).into())
+            Return(text.characters(self).into())
         })
     }
     fn text_concatenate(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |text_a: Text, text_b: Text| {
-            Return(Text::create(self, &format!("{}{}", text_a.get(), text_b.get())).into())
+        unpack_and_later_drop!(self, args, |a: Text, b: Text| {
+            Return(a.concatenate(self, *b).into())
         })
     }
     fn text_contains(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text, pattern: Text| {
-            Return(Tag::create_bool(self, text.get().contains(pattern.get())).into())
+            Return(text.contains(self, *pattern).into())
         })
     }
     fn text_ends_with(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text, suffix: Text| {
-            Return(Tag::create_bool(self, text.get().ends_with(suffix.get())).into())
+            Return(text.ends_with(self, *suffix).into())
         })
     }
     fn text_from_utf8(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |bytes: List| {
+            // TODO: Remove `u8` checks once we have `needs` ensuring that the bytes are valid.
             let bytes: Vec<_> = bytes
                 .items()
                 .iter()
@@ -456,10 +448,7 @@ impl Heap {
                         .ok_or_else(|| format!("Value is not a byte: {it}."))
                 })
                 .try_collect()?;
-            let result = str::from_utf8(&bytes)
-                .map(|it| Text::create(self, it).into())
-                .map_err(|_| Text::create(self, "Invalid UTF-8.").into());
-            Return(Struct::create_result(self, result).into())
+            Return(Text::create_from_utf8(self, &bytes).into())
         })
     }
     fn text_get_range(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -467,46 +456,36 @@ impl Heap {
             self,
             args,
             |text: Text, start_inclusive: Int, end_exclusive: Int| {
-                let start_inclusive = start_inclusive.try_get().expect(
-                    "Tried to get a range from a text with an index that's too large for usize.",
-                );
-                let end_exclusive = end_exclusive.try_get::<usize>().expect(
-                    "Tried to get a range from a text with an index that's too large for usize.",
-                );
-                let text: String = text
-                    .get()
-                    .graphemes(true)
-                    .skip(start_inclusive)
-                    .take(end_exclusive - start_inclusive)
-                    .collect();
-                Return(Text::create(self, &text).into())
+                Return(
+                    text.get_range(self, *start_inclusive..*end_exclusive)
+                        .into(),
+                )
             }
         )
     }
     fn text_is_empty(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text| {
-            Return(Tag::create_bool(self, text.get().is_empty()).into())
+            Return(text.is_empty(self).into())
         })
     }
     fn text_length(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text| {
-            let length = text.get().graphemes(true).count();
-            Return(Int::create(self, length).into())
+            Return(text.length(self).into())
         })
     }
     fn text_starts_with(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text, prefix: Text| {
-            Return(Tag::create_bool(self, text.get().starts_with(prefix.get())).into())
+            Return(text.starts_with(self, *prefix).into())
         })
     }
     fn text_trim_end(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text| {
-            Return(Text::create(self, text.get().trim_end()).into())
+            Return(text.trim_end(self).into())
         })
     }
     fn text_trim_start(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text| {
-            Return(Text::create(self, text.get().trim_start()).into())
+            Return(text.trim_start(self).into())
         })
     }
 

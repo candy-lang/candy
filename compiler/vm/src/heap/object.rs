@@ -26,6 +26,7 @@ use std::{
     fmt::{self, Formatter},
     hash::Hash,
     ops::{Shl, Shr},
+    str,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -274,6 +275,13 @@ impl Tag {
         };
         Self::create_from_str(heap, value, None)
     }
+    pub fn create_result(heap: &mut Heap, value: Result<InlineObject, InlineObject>) -> Self {
+        let (symbol, value) = match value {
+            Ok(it) => ("Ok", it),
+            Err(it) => ("Error", it),
+        };
+        Self::create_from_str(heap, symbol, value)
+    }
 }
 
 impls_via_0!(Tag);
@@ -312,6 +320,12 @@ pub struct Text(HeapText);
 impl Text {
     pub fn create(heap: &mut Heap, value: &str) -> Self {
         HeapText::create(heap, value).into()
+    }
+    pub fn create_from_utf8(heap: &mut Heap, bytes: &[u8]) -> Tag {
+        let result = str::from_utf8(bytes)
+            .map(|it| Text::create(heap, it).into())
+            .map_err(|_| Text::create(heap, "Invalid UTF-8.").into());
+        Tag::create_result(heap, result)
     }
 }
 
@@ -352,18 +366,6 @@ impl Struct {
             .map(|(key, value)| ((Tag::create_from_str(heap, key, None)).into(), value))
             .collect();
         Self::create(heap, &fields)
-    }
-    pub fn create_result(heap: &mut Heap, value: Result<InlineObject, InlineObject>) -> Self {
-        let (type_, value) = match value {
-            Ok(it) => ("Ok", it),
-            Err(it) => ("Error", it),
-        };
-        // PERF: Avoid allocating an intermediate map.
-        let fields = [
-            ("Type", Tag::create_from_str(heap, type_, None).into()),
-            ("Value", value),
-        ];
-        Self::create_with_symbol_keys(heap, fields)
     }
 }
 

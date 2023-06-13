@@ -160,7 +160,7 @@ impl InlineObjectGeneration for InlineObject {
                 Int::Inline(int) => int.get().bit_length() as usize,
                 Int::Heap(int) => int.get().bits() as usize,
             },
-            Data::Text(text) => text.len() + 1,
+            Data::Text(text) => text.byte_len() + 1,
             Data::Tag(tag) => {
                 tag.symbol().get().len() + tag.value().map(|it| it.complexity()).unwrap_or_default()
             }

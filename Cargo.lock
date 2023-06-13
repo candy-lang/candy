@@ -155,6 +155,7 @@ dependencies = [
  "lazy_static",
  "linked-hash-map",
  "num-bigint",
+ "num-integer",
  "num-traits",
  "rustc-hash",
  "salsa",
