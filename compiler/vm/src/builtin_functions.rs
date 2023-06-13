@@ -12,9 +12,8 @@ use candy_frontend::builtin_functions::BuiltinFunction;
 use itertools::Itertools;
 use num_bigint::BigInt;
 use paste::paste;
-use std::str::{self, FromStr};
+use std::str::FromStr;
 use tracing::{info, span, Level};
-use unicode_segmentation::UnicodeSegmentation;
 
 impl<FT: FiberTracer> Fiber<FT> {
     pub(super) fn run_builtin_function(
