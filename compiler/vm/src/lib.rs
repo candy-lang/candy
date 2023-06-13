@@ -1,6 +1,7 @@
 #![feature(
     allocator_api,
     anonymous_lifetime_in_impl_trait,
+    iterator_try_collect,
     let_chains,
     nonzero_ops,
     slice_ptr_get,

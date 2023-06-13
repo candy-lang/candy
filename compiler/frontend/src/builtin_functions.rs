@@ -42,12 +42,12 @@ pub enum BuiltinFunction {
     TextCharacters,      // text -> (listOfText: list)
     TextConcatenate,     // (textA: text) (textB: text) -> (concatenated: text)
     TextContains,        // text (pattern: text) -> booleanTag
-    TextEndsWith,        // text (pattern: text) -> booleanTag
+    TextEndsWith,        // text (suffix: text) -> booleanTag
     TextFromUtf8,        // (bytes: listOfInteger) -> resultOfText
     TextGetRange,        // text (startInclusive: int) (endExclusive: int) -> (substring: text)
     TextIsEmpty,         // text -> (isEmpty: booleanTag)
     TextLength,          // text -> (length: int)
-    TextStartsWith,      // text (pattern: text) -> booleanTag
+    TextStartsWith,      // text (prefix: text) -> booleanTag
     TextTrimEnd,         // text -> text
     TextTrimStart,       // text -> text
     ToDebugText,         // any -> text

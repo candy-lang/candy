@@ -26,6 +26,7 @@ use std::{
     fmt::{self, Formatter},
     hash::Hash,
     ops::{Shl, Shr},
+    str,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -319,6 +320,12 @@ pub struct Text(HeapText);
 impl Text {
     pub fn create(heap: &mut Heap, value: &str) -> Self {
         HeapText::create(heap, value).into()
+    }
+    pub fn create_from_utf8(heap: &mut Heap, bytes: &[u8]) -> Tag {
+        let result = str::from_utf8(bytes)
+            .map(|it| Text::create(heap, it).into())
+            .map_err(|_| Text::create(heap, "Invalid UTF-8.").into());
+        Tag::create_result(heap, result)
     }
 }
 

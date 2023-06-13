@@ -245,9 +245,9 @@ textContains text pattern :=
   needs (text | typeIs Text)
   needs (pattern | typeIs Text)
   ✨.textContains text pattern
-textEndsWith text pattern :=
+textEndsWith text suffix :=
   needs (text | typeIs Text)
-  needs (pattern | typeIs Text)
+  needs (suffix | typeIs Text)
   ✨.textEndsWith text pattern
 textFromUtf8 bytes :=
   needs (bytes | typeIs List)
@@ -275,10 +275,10 @@ textLength text :=
   # Returns the number of characters (Unicode grapheme clusters) in this text.
   needs (text | typeIs Text)
   ✨.textLength text
-textStartsWith text pattern :=
+textStartsWith text prefix :=
   needs (text | typeIs Text)
-  needs (pattern | typeIs Text)
-  ✨.textStartsWith text pattern
+  needs (prefix | typeIs Text)
+  ✨.textStartsWith text prefix
 textTrimEnd text :=
   needs (text | typeIs Text)
   # text

@@ -36,8 +36,11 @@ use crate::{
 use itertools::Itertools;
 use num_bigint::BigInt;
 use num_integer::Integer;
-use num_traits::ToPrimitive;
-use std::{cmp::Ordering, str::FromStr};
+use num_traits::{ToPrimitive, Zero};
+use std::{
+    cmp::Ordering,
+    str::{self, FromStr},
+};
 use tracing::warn;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -367,15 +370,113 @@ fn run_builtin(
                 _ => return None,
             }
         }
-        BuiltinFunction::TextContains => return None,
-        BuiltinFunction::TextEndsWith => return None,
-        BuiltinFunction::TextFromUtf8 => return None,
-        BuiltinFunction::TextGetRange => return None,
-        BuiltinFunction::TextIsEmpty => return None,
-        BuiltinFunction::TextLength => return None,
-        BuiltinFunction::TextStartsWith => return None,
-        BuiltinFunction::TextTrimEnd => return None,
-        BuiltinFunction::TextTrimStart => return None,
+        BuiltinFunction::TextContains => {
+            let [text, pattern] = arguments else { unreachable!() };
+            let Expression::Text(pattern) = visible.get(*pattern) else { return None; };
+            if pattern.is_empty() {
+                return Some(true.into());
+            }
+
+            let Expression::Text(text) = visible.get(*text) else { return None; };
+            text.contains(pattern).into()
+        }
+        BuiltinFunction::TextEndsWith => {
+            let [text, suffix] = arguments else { unreachable!() };
+            let Expression::Text(suffix) = visible.get(*suffix) else { return None; };
+            if suffix.is_empty() {
+                return Some(true.into());
+            }
+
+            let Expression::Text(text) = visible.get(*text) else { return None; };
+            text.ends_with(suffix).into()
+        }
+        BuiltinFunction::TextFromUtf8 => {
+            let [bytes] = arguments else { unreachable!() };
+            let Expression::List(bytes) = visible.get(*bytes) else { return None; };
+
+            // TODO: Remove `u8` checks once we have `needs` ensuring that the bytes are valid.
+            let bytes = bytes
+                .iter()
+                .map(|it| {
+                    let Expression::Int(it) = visible.get(*it) else { return Err(()); };
+                    it.to_u8().ok_or(())
+                })
+                .try_collect();
+            let Ok(bytes) = bytes else { return None; };
+
+            let mut body = Body::default();
+            let result = String::from_utf8(bytes)
+                .map(|it| body.push_with_new_id(id_generator, it))
+                .map_err(|_| body.push_with_new_id(id_generator, "Invalid UTF-8."));
+            body.push_with_new_id(id_generator, result);
+            body.into()
+        }
+        BuiltinFunction::TextGetRange => {
+            let [text, start_inclusive, end_exclusive] = arguments else { unreachable!() };
+            if let Some(true) = start_inclusive.semantically_equals(*end_exclusive, visible) {
+                return Some("".into());
+            }
+
+            let end_exclusive = if let Expression::Int(end_exclusive) = visible.get(*end_exclusive)
+            {
+                Some(end_exclusive)
+            } else {
+                None
+            };
+            if let Some(end_exclusive) = end_exclusive && end_exclusive.is_zero() {
+                return Some("".into());
+            }
+
+            let Expression::Text(text) = visible.get(*text) else { return None; };
+            let Expression::Int(start_inclusive) = visible.get(*start_inclusive) else {
+                return None;
+            };
+            // TODO: Support indices larger than usize.
+            let start_inclusive = start_inclusive.to_usize().unwrap();
+
+            if text.graphemes(true).count() == start_inclusive.to_usize().unwrap() {
+                return Some("".into());
+            }
+
+            let Some(end_exclusive) = end_exclusive else { return None; };
+            let end_exclusive = end_exclusive.to_usize().unwrap();
+
+            text.graphemes(true)
+                .skip(start_inclusive)
+                .take(end_exclusive - start_inclusive)
+                .collect::<String>()
+                .into()
+        }
+        BuiltinFunction::TextIsEmpty => {
+            let [text] = arguments else { unreachable!() };
+            let Expression::Text(text) = visible.get(*text) else { return None; };
+            text.is_empty().into()
+        }
+        BuiltinFunction::TextLength => {
+            let [text] = arguments else { unreachable!() };
+            let Expression::Text(text) = visible.get(*text) else { return None; };
+            text.graphemes(true).count().into()
+        }
+        BuiltinFunction::TextStartsWith => {
+            let [text, suffix] = arguments else { unreachable!() };
+            let Expression::Text(suffix) = visible.get(*suffix) else { return None; };
+            if suffix.is_empty() {
+                return Some(true.into());
+            }
+
+            let Expression::Text(text) = visible.get(*text) else { return None; };
+            text.starts_with(suffix).into()
+        }
+        BuiltinFunction::TextTrimEnd => {
+            let [text] = arguments else { unreachable!() };
+            let Expression::Text(text) = visible.get(*text) else { return None; };
+            text.trim_end().into()
+        }
+        BuiltinFunction::TextTrimStart => {
+            let [text] = arguments else { unreachable!() };
+            let Expression::Text(text) = visible.get(*text) else { return None; };
+            text.trim_start().into()
+        }
         BuiltinFunction::ToDebugText => return None,
         BuiltinFunction::Try => return None,
         BuiltinFunction::TypeOf => Expression::tag(
