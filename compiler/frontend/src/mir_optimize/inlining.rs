@@ -52,7 +52,6 @@ pub fn inline_tiny_functions(
         expression,
         Complexity {
             is_self_contained: true,
-            // TODO: Reset this to 2 once we have data flow and inline `(use "Builtins").structGet` that way.
             expressions: 7,
         },
         visible,
@@ -98,6 +97,10 @@ impl Expression {
         } = self else {
             return Err("Tried to inline, but the expression is not a call.");
         };
+        if arguments.contains(function) {
+            return Err("Tried to inline, but the callee is used as an argument → recursion.");
+        }
+
         let Expression::Function {
             original_hirs: _,
             parameters,
