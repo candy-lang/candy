@@ -14,7 +14,12 @@ pub struct PackagesPath(PathBuf);
 
 impl PackagesPath {
     pub fn find_surrounding_package(&self, path: &Path) -> Option<Package> {
-        let mut candidate = dunce::canonicalize(path).unwrap();
+        let mut candidate = dunce::canonicalize(path).unwrap_or_else(|error| {
+            panic!(
+                "Couldn't `find_surrounding_package(\"{}\")`: `{error}`",
+                path.to_string_lossy(),
+            )
+        });
         if !candidate.is_dir() {
             candidate = candidate.parent().unwrap().to_path_buf();
         }
