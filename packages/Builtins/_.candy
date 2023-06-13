@@ -248,7 +248,7 @@ textContains text pattern :=
 textEndsWith text suffix :=
   needs (text | typeIs Text)
   needs (suffix | typeIs Text)
-  ✨.textEndsWith text pattern
+  ✨.textEndsWith text suffix
 textFromUtf8 bytes :=
   needs (bytes | typeIs List)
   ## TODO: Add this when it runs faster.
