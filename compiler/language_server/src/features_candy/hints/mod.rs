@@ -26,8 +26,10 @@ use tracing::debug;
 
 pub mod hint;
 mod hints_finder;
+mod static_panics;
 mod utils;
 
+#[derive(Debug)]
 pub enum Event {
     UpdateModule(Module, Vec<u8>),
     CloseModule(Module),

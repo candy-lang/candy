@@ -279,7 +279,7 @@ impl<T: FiberTracer> Fiber<T> {
             EndedReason::Finished(return_value) => Ok(*return_value),
             EndedReason::Panicked(panic) => Err(Text::create(&mut self.heap, &panic.reason).into()),
         };
-        let result = Struct::create_result(&mut self.heap, result);
+        let result = Tag::create_result(&mut self.heap, result);
         self.push_to_data_stack(result);
         self.status = Status::Running;
     }

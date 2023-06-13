@@ -109,6 +109,13 @@ pub enum Package {
 }
 
 impl Package {
+    pub fn builtins() -> Package {
+        Package::Managed(PathBuf::from("Builtins"))
+    }
+    pub fn core() -> Package {
+        Package::Managed(PathBuf::from("Core"))
+    }
+
     pub fn to_path(&self, packages_path: &PackagesPath) -> Option<PathBuf> {
         match self {
             Package::User(path) => Some(path.clone()),

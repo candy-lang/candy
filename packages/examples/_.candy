@@ -2,6 +2,7 @@
 # `cargo build --release -- run`
 # `cargo build --release && time target/release/candy run`
 
+builtins = use "Builtins"
 # [channel, text] = use "Core"
 # 
 # echo = use ".echo"
@@ -12,6 +13,6 @@ main := { environment ->
   #   needs (text.is message)
   #   environment.stdout | channel.send message
 
-  result = 1 | ✨.intAdd 2
-  result | ✨.toDebugText | ✨.print
+  result = 1 | builtins.intAdd 2
+  result | builtins.toDebugText | builtins.print
 }

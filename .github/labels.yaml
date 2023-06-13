@@ -1,3 +1,5 @@
+'P: Builtins':
+  - packages/Builtins/**/*
 'P: Compiler: CLI':
   - compiler/cli/**/*
 'P: Compiler: Formatter':

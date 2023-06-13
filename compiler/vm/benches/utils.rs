@@ -3,6 +3,7 @@ use candy_frontend::{
     ast_to_hir::AstToHirStorage,
     cst::CstDbStorage,
     cst_to_ast::CstToAstStorage,
+    error::CompilerError,
     hir::{self, HirDbStorage},
     hir_to_mir::HirToMirStorage,
     mir_optimize::OptimizeMirStorage,
@@ -10,7 +11,7 @@ use candy_frontend::{
         GetModuleContentQuery, InMemoryModuleProvider, Module, ModuleDbStorage, ModuleKind,
         ModuleProvider, ModuleProviderOwner, MutableModuleProviderOwner, Package, PackagesPath,
     },
-    position::PositionConversionStorage,
+    position::{PositionConversionDb, PositionConversionStorage},
     rcst_to_cst::RcstToCstStorage,
     string_to_rcst::StringToRcstStorage,
     TracingConfig,
@@ -27,6 +28,7 @@ use candy_vm::{
 use lazy_static::lazy_static;
 use rustc_hash::FxHashMap;
 use std::{borrow::Borrow, fs};
+use tracing::warn;
 use walkdir::WalkDir;
 
 const TRACING: TracingConfig = TracingConfig::off();
@@ -79,26 +81,28 @@ pub fn setup_and_compile(source_code: &str) -> Lir {
 
 pub fn setup() -> Database {
     let mut db = Database::default();
-    load_core(&mut db.module_provider);
+    load_package("Builtins", &mut db.module_provider);
+    load_package("Core", &mut db.module_provider);
     db.module_provider.add_str(&MODULE, r#"_ = use "Core""#);
 
     // Load `Core` into the cache.
     let errors = compile_lir(&db, MODULE.clone(), TRACING.clone()).1;
     if !errors.is_empty() {
         for error in errors.iter() {
-            println!("{error:?}");
+            warn!("{}", error.to_string_with_location(&db));
         }
         panic!("There are errors in the benchmarking code.");
     }
 
     db
 }
-fn load_core(module_provider: &mut InMemoryModuleProvider) {
+fn load_package(package_name: impl Into<String>, module_provider: &mut InMemoryModuleProvider) {
+    let package_name = package_name.into();
     let packages_path = PackagesPath::try_from("../../packages").unwrap();
-    let core_path = packages_path.join("Core");
-    let package = Package::Managed("Core".into());
+    let package_path = packages_path.join(package_name.clone());
+    let package = Package::Managed(package_name.into());
 
-    for file in WalkDir::new(&core_path)
+    for file in WalkDir::new(&package_path)
         .into_iter()
         .map(|it| it.unwrap())
         .filter(|it| it.file_type().is_file())

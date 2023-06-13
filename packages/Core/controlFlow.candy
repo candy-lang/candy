@@ -1,14 +1,10 @@
+builtins = use "Builtins"
 bool = use "..bool"
 [equals] = use "..equality"
 function = use "..function"
 [typeOf] = use "..type"
 
-ifElse condition then else :=
-  needs (bool.is condition)
-  needs (function.is0 then)
-  needs (function.is0 else)
-  ✨.ifElse condition then else
-
+ifElse := builtins.ifElse
 if condition then :=
   needs (bool.is condition)
   needs (function.is0 then)
@@ -39,11 +35,11 @@ loop body :=
 
 repeat times body :=
   needs (typeOf times | equals Int)
-  needs (times | ✨.intCompareTo 0 | equals Less | bool.not)
+  needs (times | builtins.intCompareTo 0 | equals Less | bool.not)
   needs (function.is0 body)
   recursive times { recurse times ->
-    if (times | ✨.intCompareTo 0 | equals Greater) {
+    if (times | builtins.intCompareTo 0 | equals Greater) {
       function.run body
-      recurse (✨.intSubtract times 1)
+      recurse (times | builtins.intSubtract 1)
     }
   }

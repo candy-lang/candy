@@ -50,16 +50,16 @@ impl Body {
         *id
     }
 
-    pub fn push(&mut self, id: Id, expression: Expression) {
-        self.expressions.push((id, expression));
+    pub fn push(&mut self, id: Id, expression: impl Into<Expression>) {
+        self.expressions.push((id, expression.into()));
     }
     pub fn push_with_new_id(
         &mut self,
         id_generator: &mut IdGenerator<Id>,
-        expression: Expression,
+        expression: impl Into<Expression>,
     ) -> Id {
         let id = id_generator.generate();
-        self.push(id, expression);
+        self.push(id, expression.into());
         id
     }
     pub fn insert_at_front(&mut self, mut expressions: Vec<(Id, Expression)>) {
