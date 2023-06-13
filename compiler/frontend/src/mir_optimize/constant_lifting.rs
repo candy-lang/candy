@@ -35,31 +35,28 @@
 //!
 //! [common subtree elimination]: super::common_subtree_elimination
 
-use rustc_hash::FxHashSet;
-
+use super::pure::PurenessInsights;
 use crate::{
     id::IdGenerator,
     mir::{Body, Expression, Id},
 };
 use std::mem;
 
-pub fn lift_constants(expression: &mut Expression, id_generator: &mut IdGenerator<Id>) {
+pub fn lift_constants(
+    expression: &mut Expression,
+    pureness: &PurenessInsights,
+    id_generator: &mut IdGenerator<Id>,
+) {
     let Expression::Function { body, .. } = expression else { return; };
 
     let mut constants = vec![];
-    let mut constant_ids = FxHashSet::default();
 
     let mut index = 0;
     while index < body.expressions.len() {
         let (id, expression) = &body.expressions[index];
         let id = *id;
 
-        let is_constant = expression.is_pure()
-            && expression
-                .captured_ids()
-                .iter()
-                .all(|captured| constant_ids.contains(captured));
-        if !is_constant {
+        if !pureness.is_definition_const(expression) {
             index += 1;
             continue;
         }
@@ -75,7 +72,6 @@ pub fn lift_constants(expression: &mut Expression, id_generator: &mut IdGenerato
         // This is a constant and should be lifted.
 
         constants.push(body.expressions.remove(index));
-        constant_ids.insert(id);
 
         if is_return_value {
             // The return value was removed. Add a reference to the lifted

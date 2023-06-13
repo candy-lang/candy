@@ -27,6 +27,7 @@
 //! [constant folding]: super::constant_folding
 //! [inlining]: super::inlining
 
+use super::pure::PurenessInsights;
 use crate::{
     error::{CompilerError, CompilerErrorPayload},
     id::IdGenerator,
@@ -44,6 +45,7 @@ pub fn apply(
     id_generator: &mut IdGenerator<Id>,
     db: &dyn OptimizeMir,
     tracing: &TracingConfig,
+    pureness: &mut PurenessInsights,
     errors: &mut FxHashSet<CompilerError>,
 ) {
     let Expression::UseModule { current_module, relative_path, responsible } = expression else { return; };
@@ -93,7 +95,7 @@ pub fn apply(
 
     let body_to_insert =
         match db.optimized_mir(module_to_import.clone(), tracing.for_child_module()) {
-            Ok((mir, more_errors)) => {
+            Ok((mir, other_pureness, more_errors)) => {
                 errors.extend(more_errors.iter().cloned());
 
                 let mut body = mir.body.clone();
@@ -107,6 +109,7 @@ pub fn apply(
                         *id = *new_id;
                     }
                 });
+                pureness.include(other_pureness.as_ref(), &mapping);
                 body
             }
             Err(error) => {
@@ -128,11 +131,11 @@ pub fn apply(
 
 fn resolve_module(current_module: &Module, path: &str) -> Result<Module, MirError> {
     let Ok(path) = UsePath::parse(path) else {
-            return Err(MirError::UseWithInvalidPath { module: current_module.clone(), path: path.to_string() });
-        };
+        return Err(MirError::UseWithInvalidPath { module: current_module.clone(), path: path.to_string() });
+    };
     let Ok(module) = path.resolve_relative_to(current_module.clone()) else {
-            return Err(MirError::UseHasTooManyParentNavigations { module: current_module.clone(), path: path.to_string() });
-        };
+        return Err(MirError::UseHasTooManyParentNavigations { module: current_module.clone(), path: path.to_string() });
+    };
     Ok(module)
 }
 

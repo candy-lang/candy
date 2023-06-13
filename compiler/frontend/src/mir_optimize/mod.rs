@@ -42,25 +42,14 @@
 //! both performance and code size. Whenever they can be applied, they should be
 //! applied.
 
-mod cleanup;
-mod common_subtree_elimination;
-mod complexity;
-mod constant_folding;
-mod constant_lifting;
-mod inlining;
-mod module_folding;
-mod reference_following;
-mod tree_shaking;
-mod utils;
-mod validate;
-
+use self::pure::PurenessInsights;
 use super::{hir, hir_to_mir::HirToMir, mir::Mir, tracing::TracingConfig};
 use crate::{
     error::CompilerError,
-    hir_to_mir::MirResult,
     id::IdGenerator,
     mir::{Body, Expression, Id, MirError, VisibleExpressions},
     module::Module,
+    string_to_rcst::ModuleError,
 };
 use rustc_hash::{FxHashSet, FxHasher};
 use std::{
@@ -70,24 +59,51 @@ use std::{
 };
 use tracing::debug;
 
+mod cleanup;
+mod common_subtree_elimination;
+mod complexity;
+mod constant_folding;
+mod constant_lifting;
+mod inlining;
+mod module_folding;
+mod pure;
+mod reference_following;
+mod tree_shaking;
+mod utils;
+mod validate;
+
 #[salsa::query_group(OptimizeMirStorage)]
 pub trait OptimizeMir: HirToMir {
     #[salsa::cycle(recover_from_cycle)]
-    fn optimized_mir(&self, module: Module, tracing: TracingConfig) -> MirResult;
+    fn optimized_mir(&self, module: Module, tracing: TracingConfig) -> OptimizedMirResult;
 }
 
-fn optimized_mir(db: &dyn OptimizeMir, module: Module, tracing: TracingConfig) -> MirResult {
+pub type OptimizedMirResult = Result<
+    (
+        Arc<Mir>,
+        Arc<PurenessInsights>,
+        Arc<FxHashSet<CompilerError>>,
+    ),
+    ModuleError,
+>;
+
+fn optimized_mir(
+    db: &dyn OptimizeMir,
+    module: Module,
+    tracing: TracingConfig,
+) -> OptimizedMirResult {
     debug!("{module}: Compiling.");
     let (mir, errors) = db.mir(module.clone(), tracing.clone())?;
     let mut mir = (*mir).clone();
+    let mut pureness = PurenessInsights::default();
     let mut errors = (*errors).clone();
 
     let complexity_before = mir.complexity();
-    mir.optimize(db, &tracing, &mut errors);
+    mir.optimize(db, &tracing, &mut pureness, &mut errors);
     let complexity_after = mir.complexity();
 
     debug!("{module}: Done. Optimized from {complexity_before} to {complexity_after}");
-    Ok((Arc::new(mir), Arc::new(errors)))
+    Ok((Arc::new(mir), Arc::new(pureness), Arc::new(errors)))
 }
 
 impl Mir {
@@ -95,6 +111,7 @@ impl Mir {
         &mut self,
         db: &dyn OptimizeMir,
         tracing: &TracingConfig,
+        pureness: &mut PurenessInsights,
         errors: &mut FxHashSet<CompilerError>,
     ) {
         self.body.optimize(
@@ -102,12 +119,13 @@ impl Mir {
             &mut self.id_generator,
             db,
             tracing,
+            pureness,
             errors,
         );
         if cfg!(debug_assertions) {
             self.validate();
         }
-        self.cleanup();
+        self.cleanup(pureness);
     }
 }
 
@@ -120,6 +138,7 @@ impl Body {
         id_generator: &mut IdGenerator<Id>,
         db: &dyn OptimizeMir,
         tracing: &TracingConfig,
+        pureness: &mut PurenessInsights,
         errors: &mut FxHashSet<CompilerError>,
     ) {
         let mut index = 0;
@@ -129,7 +148,7 @@ impl Body {
                 mem::replace(&mut self.expressions[index].1, Expression::Parameter);
 
             // Thoroughly optimize the expression.
-            expression.optimize(visible, id_generator, db, tracing, errors);
+            expression.optimize(visible, id_generator, db, tracing, pureness, errors);
             if cfg!(debug_assertions) {
                 expression.validate(visible);
             }
@@ -139,9 +158,19 @@ impl Body {
                 // of continuing to the next expression, we should try to
                 // optimize the newly inserted expressions next.
                 continue 'expression_loop;
+            } else {
+                pureness.visit_optimized(id, &expression);
             }
 
-            module_folding::apply(&mut expression, visible, id_generator, db, tracing, errors);
+            module_folding::apply(
+                &mut expression,
+                visible,
+                id_generator,
+                db,
+                tracing,
+                pureness,
+                errors,
+            );
             if let Some(index_after_module) = self.fold_multiple(id, &mut expression, index) {
                 // A module folding actually happened. Because the inserted
                 // module's MIR is already optimized and doesn't depend on any
@@ -164,8 +193,8 @@ impl Body {
             *expression = visible.remove(*id);
         }
 
-        common_subtree_elimination::eliminate_common_subtrees(self);
-        tree_shaking::tree_shake(self);
+        common_subtree_elimination::eliminate_common_subtrees(self, pureness);
+        tree_shaking::tree_shake(self, pureness);
         reference_following::remove_redundant_return_references(self);
     }
 
@@ -198,36 +227,39 @@ impl Expression {
         id_generator: &mut IdGenerator<Id>,
         db: &dyn OptimizeMir,
         tracing: &TracingConfig,
+        pureness: &mut PurenessInsights,
         errors: &mut FxHashSet<CompilerError>,
     ) {
+        if let Expression::Function {
+            parameters,
+            responsible_parameter,
+            body,
+            ..
+        } = self
+        {
+            for parameter in &*parameters {
+                visible.insert(*parameter, Expression::Parameter);
+            }
+            visible.insert(*responsible_parameter, Expression::Parameter);
+            pureness.enter_function(parameters, *responsible_parameter);
+
+            body.optimize(visible, id_generator, db, tracing, pureness, errors);
+
+            pureness.exit_function();
+            for parameter in &*parameters {
+                visible.remove(*parameter);
+            }
+            visible.remove(*responsible_parameter);
+        }
+
         loop {
             let hashcode_before = self.do_hash();
 
             reference_following::follow_references(self, visible);
-            constant_folding::fold_constants(self, visible, id_generator);
+            constant_folding::fold_constants(self, visible, pureness, id_generator);
             inlining::inline_tiny_functions(self, visible, id_generator);
             inlining::inline_functions_containing_use(self, visible, id_generator);
-            constant_lifting::lift_constants(self, id_generator);
-
-            if let Expression::Function {
-                parameters,
-                responsible_parameter,
-                body,
-                ..
-            } = self
-            {
-                for parameter in &*parameters {
-                    visible.insert(*parameter, Expression::Parameter);
-                }
-                visible.insert(*responsible_parameter, Expression::Parameter);
-
-                body.optimize(visible, id_generator, db, tracing, errors);
-
-                for parameter in &*parameters {
-                    visible.remove(*parameter);
-                }
-                visible.remove(*responsible_parameter);
-            }
+            constant_lifting::lift_constants(self, pureness, id_generator);
 
             if self.do_hash() == hashcode_before {
                 return;
@@ -247,7 +279,7 @@ fn recover_from_cycle(
     cycle: &[String],
     module: &Module,
     _tracing: &TracingConfig,
-) -> MirResult {
+) -> OptimizedMirResult {
     let error = CompilerError::for_whole_module(
         module.clone(),
         MirError::ModuleHasCycle {
@@ -261,5 +293,9 @@ fn recover_from_cycle(
         body.push_panic(reason, responsible);
     });
 
-    Ok((Arc::new(mir), Arc::new(FxHashSet::from_iter([error]))))
+    Ok((
+        Arc::new(mir),
+        Arc::default(),
+        Arc::new(FxHashSet::from_iter([error])),
+    ))
 }

@@ -3,7 +3,7 @@ use candy_frontend::{
     ast_to_hir::{AstToHir, HirResult},
     cst_to_ast::{AstResult, CstToAst},
     hir_to_mir::{HirToMir, MirResult},
-    mir_optimize::OptimizeMir,
+    mir_optimize::{OptimizeMir, OptimizedMirResult},
     module::{Module, ModuleKind, PackagesPath},
     position::{line_start_offsets_raw, Offset},
     rich_ir::{
@@ -184,7 +184,7 @@ impl IrFeatures {
     }
     fn rich_ir_for_optimized_mir(
         module: &Module,
-        mir: MirResult,
+        mir: OptimizedMirResult,
         tracing_config: &TracingConfig,
     ) -> RichIr {
         let mut builder = RichIrBuilder::default();
@@ -197,7 +197,7 @@ impl IrFeatures {
         builder.push_tracing_config(tracing_config);
         builder.push_newline();
         match mir {
-            Ok((mir, _)) => mir.build_rich_ir(&mut builder),
+            Ok((mir, _, _)) => mir.build_rich_ir(&mut builder),
             Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
         }
         builder.finish()

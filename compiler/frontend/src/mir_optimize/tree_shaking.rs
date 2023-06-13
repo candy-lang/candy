@@ -14,11 +14,12 @@
 //!
 //! [constant folding]: super::constant_folding
 
+use super::pure::PurenessInsights;
 use crate::mir::Body;
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
-pub fn tree_shake(body: &mut Body) {
+pub fn tree_shake(body: &mut Body, pureness: &PurenessInsights) {
     let expressions = body.iter().collect_vec();
     let mut keep = FxHashSet::default();
     let mut ids_to_remove = vec![];
@@ -27,8 +28,7 @@ pub fn tree_shake(body: &mut Body) {
     keep.insert(return_value_id);
 
     for (id, expression) in expressions.into_iter().rev() {
-        if !expression.is_pure() || keep.contains(&id) {
-            keep.insert(id);
+        if keep.remove(&id) || !pureness.is_definition_pure(expression) {
             keep.extend(expression.referenced_ids());
         } else {
             ids_to_remove.push(id);
