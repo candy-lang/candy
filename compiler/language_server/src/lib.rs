@@ -1,6 +1,4 @@
-#![feature(async_closure)]
-#![feature(box_patterns)]
-#![feature(let_chains)]
+#![feature(async_closure, box_patterns, let_chains, strict_provenance)]
 
 pub mod database;
 pub mod debug_adapter;

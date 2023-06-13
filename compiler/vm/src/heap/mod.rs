@@ -89,8 +89,8 @@ impl Heap {
         }
     }
 
-    pub fn objects_len(&self) -> usize {
-        self.objects.len()
+    pub fn objects(&self) -> &FxHashSet<ObjectInHeap> {
+        &self.objects
     }
     pub fn iter(&self) -> impl Iterator<Item = HeapObject> + '_ {
         self.objects.iter().map(|it| **it)

@@ -11,7 +11,8 @@ use std::{
     collections::hash_map,
     fmt::{self, Formatter, Pointer},
     hash::{Hash, Hasher},
-    ops::Deref,
+    num::NonZeroUsize,
+    ops::{Deref, Range},
     ptr::NonNull,
 };
 
@@ -186,9 +187,16 @@ impl PartialOrd for HeapObject {
 }
 
 #[enum_dispatch]
-pub trait HeapObjectTrait: Into<HeapObject> {
+pub trait HeapObjectTrait: Copy + Into<HeapObject> {
     // Number of content bytes following the header and reference count words.
     fn content_size(self) -> usize;
+    fn total_size(self) -> usize {
+        2 * HeapObject::WORD_SIZE + self.content_size()
+    }
+    fn address_range(self) -> Range<NonZeroUsize> {
+        let start = self.into().address().addr();
+        start..start.checked_add(self.total_size()).unwrap()
+    }
 
     fn clone_content_to_heap_with_mapping(
         self,
