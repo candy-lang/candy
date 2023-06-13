@@ -4,7 +4,7 @@ use super::{ast::AstError, cst, cst::CstError, hir::HirError};
 use crate::{
     mir::MirError,
     module::Module,
-    position::Offset,
+    position::{Offset, PositionConversionDb},
     rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr},
     string_to_rcst::ModuleError,
 };
@@ -34,6 +34,18 @@ impl CompilerError {
             span: Offset(0)..Offset(0),
             payload: payload.into(),
         }
+    }
+    pub fn to_string_with_location(&self, db: &impl PositionConversionDb) -> String {
+        let range = db.range_to_positions(self.module.clone(), self.span.to_owned());
+        format!(
+            "{}:{}:{} – {}:{}: {}",
+            self.module,
+            range.start.line,
+            range.start.character,
+            range.end.line,
+            range.end.character,
+            self.payload,
+        )
     }
 }
 impl Display for CompilerErrorPayload {
