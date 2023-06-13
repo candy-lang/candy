@@ -22,7 +22,7 @@ use rustc_hash::FxHashSet;
 pub fn tree_shake(body: &mut Body, pureness: &PurenessInsights) {
     let expressions = body.iter().collect_vec();
     let mut keep = FxHashSet::default();
-    let mut ids_to_remove = vec![];
+    let mut ids_to_remove = FxHashSet::default();
 
     let return_value_id = expressions.last().unwrap().0;
     keep.insert(return_value_id);
@@ -31,7 +31,7 @@ pub fn tree_shake(body: &mut Body, pureness: &PurenessInsights) {
         if keep.remove(&id) || !pureness.is_definition_pure(expression) {
             keep.extend(expression.referenced_ids());
         } else {
-            ids_to_remove.push(id);
+            ids_to_remove.insert(id);
         }
     }
 
