@@ -29,7 +29,7 @@ impl StaticPanicsOfBody for Body {
         }
 
         for (id, expression) in &mut self.expressions {
-            *expression = visible.expressions.remove(id).unwrap();
+            *expression = visible.remove(*id);
         }
     }
 }

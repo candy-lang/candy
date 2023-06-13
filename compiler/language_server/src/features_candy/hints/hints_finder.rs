@@ -91,7 +91,7 @@ impl HintsFinder {
                     .update_status(Some(format!("Compiling {}", self.module)))
                     .await;
 
-                let (mir, _) = db
+                let (mir, _, _) = db
                     .optimized_mir(
                         self.module.clone(),
                         TracingConfig {
