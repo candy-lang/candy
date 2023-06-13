@@ -158,9 +158,8 @@ impl Body {
                 // of continuing to the next expression, we should try to
                 // optimize the newly inserted expressions next.
                 continue 'expression_loop;
-            } else {
-                pureness.visit_optimized(id, &expression);
             }
+            pureness.visit_optimized(id, &expression);
 
             module_folding::apply(
                 &mut expression,
@@ -245,7 +244,6 @@ impl Expression {
 
             body.optimize(visible, id_generator, db, tracing, pureness, errors);
 
-            pureness.exit_function();
             for parameter in &*parameters {
                 visible.remove(*parameter);
             }

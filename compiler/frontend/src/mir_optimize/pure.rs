@@ -1,12 +1,11 @@
 use crate::mir::{Expression, Id};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct PurenessInsights {
     // TODO: Simplify to `FxHashSet<Id>`s.
     definition_pureness: FxHashMap<Id, bool>,
     definition_constness: FxHashMap<Id, bool>,
-    locals: Vec<FxHashSet<Id>>,
 }
 impl PurenessInsights {
     /// Whether the expression defined at the given ID is pure.
@@ -54,10 +53,6 @@ impl PurenessInsights {
 
     // Called after all optimizations are done for this `expression`.
     pub(super) fn visit_optimized(&mut self, id: Id, expression: &Expression) {
-        if let Some(locals) = self.locals.last_mut() {
-            assert!(locals.insert(id));
-        }
-
         let is_pure = self.is_definition_pure(expression);
         self.definition_pureness.insert(id, is_pure);
 
@@ -81,21 +76,6 @@ impl PurenessInsights {
             .insert(responsible_parameter, false);
         // TODO: Handle lifted constants properly.
         // assert!(existing.is_none());
-
-        let mut locals: FxHashSet<_> = parameters.iter().copied().collect();
-        locals.insert(responsible_parameter);
-        self.locals.push(locals);
-    }
-    pub(super) fn exit_function(&mut self) {
-        let _locals = self
-            .locals
-            .pop()
-            .expect("more `exit_function` calls than `enter_function` calls");
-        // TODO: Handle lifted constants properly.
-        // for local in &locals {
-        //     self.definition_pureness.remove(local).unwrap();
-        //     self.definition_constness.remove(local).unwrap();
-        // }
     }
     pub(super) fn on_normalize_ids(&mut self, mapping: &FxHashMap<Id, Id>) {
         fn update(values: &mut FxHashMap<Id, bool>, mapping: &FxHashMap<Id, Id>) {
