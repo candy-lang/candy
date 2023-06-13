@@ -1,4 +1,3 @@
-panic = use "..panic"
 text = use "..text"
 
 todo message :=
