@@ -48,7 +48,7 @@ impl Expression {
     /// also includes references to locally defined IDs. IDs are returned in the
     /// order that they are referenced, which means that the vector may contain
     /// the same ID multiple times.
-    // PERF: Maybe change this to accept a closure instead of collecting them to a `Vec`
+    // PERF: Maybe change this to accept a closure instead of collecting them to an `FxHashSet`
     pub fn referenced_ids(&self) -> FxHashSet<Id> {
         let mut referenced = FxHashSet::default();
         self.collect_referenced_ids(&mut referenced);
