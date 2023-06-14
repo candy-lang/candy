@@ -1,14 +1,16 @@
+use super::{Hint, HintKind};
 use crate::{database::Database, utils::LspPositionConversion};
 use candy_frontend::{
     ast::{AssignmentBody, AstDb, AstKind},
     ast_to_hir::AstToHir,
     cst_to_ast::CstToAst,
+    module::Module,
 };
 use candy_fuzzer::{Fuzzer, Status};
+use candy_vm::fiber::Panic;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
-use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Insight {
     Value {
         position: Position, // End of line.
@@ -19,7 +21,7 @@ pub enum Insight {
         message: String,
     },
     Panic {
-        callsite: Range, // The callsite that will panic.
+        call_site: Range, // The callsite that will panic.
         message: String,
     },
 }
@@ -39,7 +41,7 @@ impl Insight {
         let AstKind::Assignment(assignment) = ast.kind else { return None; };
         let AssignmentBody::Function { name, .. } = assignment.body else { return None; };
         let Some(range) = db.ast_id_to_display_span(name.id) else { return None; };
-        let range = db.range_to_lsp_range(fuzzer.function_id.module, range);
+        let range = db.range_to_lsp_range(fuzzer.function_id.module.clone(), range);
 
         let id = fuzzer.function_id.clone();
         let message = match fuzzer.status() {
@@ -49,22 +51,42 @@ impl Insight {
                 format!("Fuzzing… – {} %", function_coverage.relative_coverage())
             }
             Status::FoundPanic { input, .. } => format!("{input}"),
-            Status::TotalCoverageButNoPanic => format!("Fuzzed completely."),
+            Status::TotalCoverageButNoPanic => "Fuzzed completely.".to_string(),
         };
         Some(Insight::FuzzingStatus {
             position: range.end,
             message,
         })
     }
+
+    pub fn for_static_panic(db: &Database, module: Module, panic: &Panic) -> Self {
+        let call_span = db
+            .hir_id_to_display_span(panic.responsible.clone())
+            .unwrap();
+        let call_span = db.range_to_lsp_range(module, call_span);
+
+        Insight::Panic {
+            call_site: call_span,
+            message: panic.reason.to_string(),
+        }
+    }
 }
 
 impl Insight {
-    fn to_diagnostic(&self, db: &Database) -> Option<Diagnostic> {
+    pub fn to_lsp_type(&self) -> LspType {
         match self {
-            Insight::Value { position, text } => None,
-            Insight::FuzzingStatus { position, message } => None,
-            Insight::Panic { callsite, message } => Some(Diagnostic {
-                range: callsite.clone(),
+            Insight::Value { position, text } => LspType::Hint(Hint {
+                kind: HintKind::Value,
+                text: text.to_string(),
+                position: *position,
+            }),
+            Insight::FuzzingStatus { position, message } => LspType::Hint(Hint {
+                kind: HintKind::Value,
+                text: message.to_string(),
+                position: *position,
+            }),
+            Insight::Panic { call_site, message } => LspType::Diagnostic(Diagnostic {
+                range: *call_site,
                 severity: Some(DiagnosticSeverity::ERROR),
                 code: None,
                 code_description: None,
@@ -76,4 +98,8 @@ impl Insight {
             }),
         }
     }
+}
+pub enum LspType {
+    Diagnostic(Diagnostic),
+    Hint(Hint),
 }

@@ -17,15 +17,14 @@ use candy_frontend::{
     rcst_to_cst::RcstToCst,
 };
 use lsp_types::{
-    self, notification::Notification, CodeLens, FoldingRange, LocationLink, SemanticToken,
+    self, notification::Notification, FoldingRange, LocationLink, SemanticToken,
     TextDocumentContentChangeEvent, TextEdit, Url,
 };
 use regex::Regex;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, thread};
-use tokio::sync::{mpsc::Sender, oneshot, Mutex};
-use tracing::info;
+use tokio::sync::{mpsc::Sender, Mutex};
 
 pub mod analyzer;
 pub mod find_definition;

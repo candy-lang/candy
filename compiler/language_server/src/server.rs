@@ -3,7 +3,7 @@ use crate::{
     debug_adapter::DebugSessionManager,
     features::{LanguageFeatures, Reference, RenameError},
     features_candy::{
-        analyzer::{hint::Hint, HintsNotification},
+        analyzer::{Hint, HintsNotification},
         CandyFeatures, ServerStatusNotification,
     },
     features_ir::{IrFeatures, UpdateIrNotification},
@@ -13,15 +13,14 @@ use crate::{
 use async_trait::async_trait;
 use candy_frontend::module::{Module, ModuleKind, PackagesPath};
 use lsp_types::{
-    request::Request, CodeLens, CodeLensParams, Diagnostic, DidChangeTextDocumentParams,
-    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DocumentFilter,
-    DocumentFormattingParams, DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams,
-    FoldingRange, FoldingRangeParams, GotoDefinitionParams, GotoDefinitionResponse,
-    InitializeParams, InitializeResult, InitializedParams, Location, MessageType, Position,
-    PrepareRenameResponse, ReferenceParams, Registration, RenameOptions, RenameParams,
-    SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
-    SemanticTokensRegistrationOptions, SemanticTokensResult, SemanticTokensServerCapabilities,
-    ServerCapabilities, ServerInfo, StaticRegistrationOptions,
+    Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DocumentFilter, DocumentFormattingParams, DocumentHighlight, DocumentHighlightKind,
+    DocumentHighlightParams, FoldingRange, FoldingRangeParams, GotoDefinitionParams,
+    GotoDefinitionResponse, InitializeParams, InitializeResult, InitializedParams, Location,
+    MessageType, Position, PrepareRenameResponse, ReferenceParams, Registration, RenameOptions,
+    RenameParams, SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions,
+    SemanticTokensParams, SemanticTokensRegistrationOptions, SemanticTokensResult,
+    SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo, StaticRegistrationOptions,
     TextDocumentChangeRegistrationOptions, TextDocumentPositionParams,
     TextDocumentRegistrationOptions, TextEdit, Url, WorkDoneProgressOptions, WorkspaceEdit,
 };
@@ -156,20 +155,6 @@ impl AnalyzerClient {
             })
             .await;
     }
-    pub async fn code_lenses_updated(&self) {
-        // self.client
-        //     .send_request::<CodeLensRefresh>(CodeLensRefresh {})
-        //     .await
-        //     .unwrap();
-    }
-}
-#[derive(Deserialize, Serialize)]
-struct CodeLensRefresh {}
-impl Request for CodeLensRefresh {
-    const METHOD: &'static str = "workspace/codeLens/refresh";
-
-    type Params = Self;
-    type Result = ();
 }
 
 impl Server {
