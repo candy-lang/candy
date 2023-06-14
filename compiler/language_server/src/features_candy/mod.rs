@@ -61,7 +61,7 @@ impl CandyFeatures {
     async fn send_to_analyzer(&self, event: analyzer::Message) {
         match self.hints_events_sender.send(event).await {
             Ok(_) => {}
-            Err(_) => panic!("Couldn't send message to hints server."),
+            Err(error) => panic!("Couldn't send message to hints server: {error:?}."),
         }
     }
 }

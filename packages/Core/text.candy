@@ -1,3 +1,4 @@
+builtins = use "Builtins"
 bool = use "..bool"
 [ifElse] = use "..controlFlow"
 [equals] = use "..equality"
@@ -9,28 +10,12 @@ type = use "..type"
 
 is value := type.is value Text
 
-fromUtf8 bytes :=
-  needs (list.is bytes)
-  # TODO: Add this when it runs faster.
-  # needs (bytes | iterable.fromList | iterable.all { byte ->
-  #   bool.lazyAnd (int.is byte) {
-  #     bool.and (byte | int.isNonNegative) (byte | int.isLessThan 256)
-  #   }
-  # })
+fromUtf8 := builtins.textFromUtf8
 
-  bytes | ✨.textFromUtf8
+isEmpty := builtins.textIsEmpty
+length := builtins.textLength
 
-isEmpty text :=
-  needs (is text)
-  text | ✨.textIsEmpty
-length text :=
-  # Returns the number of Unicode grapheme clusters in this text.
-  needs (is text)
-  text | ✨.textLength
-
-characters text :=
-  needs (is text)
-  text | ✨.textCharacters
+characters := builtins.textCharacters
 characterAt text index :=
   needs (is text)
   needs (int.is index)
@@ -38,38 +23,14 @@ characterAt text index :=
   needs (int.isLessThan index (length text))
   text | characters | list.get index
 
-getRange text startInclusive endExclusive :=
-  needs (is text)
+# TODO: Support ranges when we have them.
+getRange := builtins.textGetRange
 
-  needs (int.is startInclusive)
-  needs (int.isNonNegative startInclusive)
+concatenate := builtins.textConcatenate
 
-  needs (int.is endExclusive)
-  needs (int.isNonNegative endExclusive)
-
-  needs (int.isLessThanOrEqualTo startInclusive endExclusive)
-  needs (int.isLessThanOrEqualTo endExclusive (length text))
-
-  # TODO: Support ranges when we have them.
-  text | ✨.textGetRange startInclusive endExclusive
-
-concatenate textA textB :=
-  needs (is textA)
-  needs (is textB)
-  textA | ✨.textConcatenate textB
-
-startsWith text pattern :=
-  needs (is text)
-  needs (is pattern)
-  text | ✨.textStartsWith pattern
-endsWith text pattern :=
-  needs (is text)
-  needs (is pattern)
-  text | ✨.textEndsWith pattern
-contains text pattern :=
-  needs (is text)
-  needs (is pattern)
-  text | ✨.textContains pattern
+startsWith := builtins.textStartsWith
+endsWith := builtins.textEndsWith
+contains := builtins.textContains
 
 removePrefix text prefix :=
   needs (is text)
@@ -84,12 +45,8 @@ removeSuffix text suffix :=
     { text | getRange (textLength | int.subtract (suffix | length)) textLength }
     { text }
 
-trimStart text :=
-  needs (is text)
-  text | ✨.textTrimStart
-trimEnd text :=
-  needs (is text)
-  text | ✨.textTrimEnd
+trimStart := builtins.textTrimStart
+trimEnd := builtins.textTrimEnd
 trim text :=
   needs (is text)
   text | trimStart | trimEnd

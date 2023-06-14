@@ -9,7 +9,7 @@
 //! While doing all that, we can pause regularly between executing instructions
 //! so that we don't occupy a single CPU at 100 %.
 
-use self::module_analyzer::ModuleAnalyzer;
+use self::{insights::LspType, module_analyzer::ModuleAnalyzer};
 use super::AnalyzerClient;
 use crate::database::Database;
 use candy_frontend::module::{Module, MutableModuleProviderOwner, PackagesPath};
@@ -24,11 +24,12 @@ use tokio::{
 };
 use tracing::debug;
 
-mod code_lens;
 pub mod insights;
 mod module_analyzer;
+mod static_panics;
 mod utils;
 
+#[derive(Debug)]
 pub enum Message {
     UpdateModule(Module, Vec<u8>),
     CloseModule(Module),
@@ -67,16 +68,6 @@ pub async fn run_server(
     mut incoming_events: mpsc::Receiver<Message>,
     client: AnalyzerClient,
 ) {
-    // PERF: Stop this loop when we don't have any updates.
-    let client_clone = client.clone();
-    tokio::spawn(async move {
-        sleep(Duration::from_millis(1000)).await;
-        loop {
-            sleep(Duration::from_millis(500)).await;
-            client_clone.code_lenses_updated().await;
-        }
-    });
-
     let mut db = Database::new_with_file_system_module_provider(packages_path);
     let mut analyzers: FxHashMap<Module, ModuleAnalyzer> = FxHashMap::default();
     let client_ref = &client;
@@ -122,7 +113,16 @@ pub async fn run_server(
 
         analyzer.run(&db, &client).await;
 
-        let (mut hints, diagnostics) = analyzer.insights(&db);
+        let insights = analyzer.insights(&db);
+        let mut diagnostics = vec![];
+        let mut hints = vec![];
+        for insight in insights {
+            match insight.to_lsp_type() {
+                LspType::Diagnostic(diagnostic) => diagnostics.push(diagnostic),
+                LspType::Hint(hint) => hints.push(hint),
+            }
+        }
+
         hints.sort_by_key(|hint| hint.position);
 
         outgoing_diagnostics.send(module.clone(), diagnostics).await;

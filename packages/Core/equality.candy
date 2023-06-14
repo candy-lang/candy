@@ -1,1 +1,3 @@
-equals a b := ✨.equals a b
+builtins = use "Builtins"
+
+equals := builtins.equals

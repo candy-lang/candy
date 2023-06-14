@@ -1,1 +1,3 @@
-toDebugText value := ✨.toDebugText value
+builtins = use "Builtins"
+
+toDebugText value := builtins.toDebugText value

@@ -1,3 +1,4 @@
+builtins = use "Builtins"
 # [ifElse, int, recursive] = use "Core"
 
 recursive initialArg body :=
@@ -13,20 +14,20 @@ recursive initialArg body :=
 compareTo valueA valueB :=
   # needs (is valueA)
   # needs (is valueB)
-  result = valueA | ✨.intCompareTo valueB
+  result = valueA | builtins.intCompareTo valueB
   # check (equals result Equal | bool.implies (equals valueA valueB))
   # check ((equals result Equal) | bool.implies (equals valueA valueB))
   result
 isLessThan valueA valueB :=
   # needs (is valueA)
   # needs (is valueB)
-  ✨.equals (compareTo valueA valueB) Less
+  builtins.equals (compareTo valueA valueB) Less
 
 fibonacci n =
   # needs (int.is n)
   recursive n { recurse n ->
-    ✨.ifElse (n | isLessThan 2) { n } {
-      recurse (n | ✨.intSubtract 1) | ✨.intAdd (recurse (n | ✨.intSubtract 2))
+    builtins.ifElse (n | isLessThan 2) { n } {
+      recurse (n | builtins.intSubtract 1) | builtins.intAdd (recurse (n | builtins.intSubtract 2))
     }
   }
 

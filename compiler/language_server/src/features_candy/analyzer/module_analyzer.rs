@@ -1,15 +1,9 @@
-use super::{code_lens::CodeLens, insights::Insight, utils::IdToEndOfLine};
-use crate::{
-    database::Database,
-    server::AnalyzerClient,
-    utils::{error_to_diagnostic, LspPositionConversion},
-};
+use super::{insights::Insight, static_panics::StaticPanicsOfMir, utils::IdToEndOfLine};
+use crate::{database::Database, server::AnalyzerClient, utils::LspPositionConversion};
 use candy_frontend::{
     ast::{Assignment, AssignmentBody, AstDb, AstKind},
     ast_to_hir::AstToHir,
-    cst::CstDb,
-    error::CompilerError,
-    hir::{CollectErrors, Expression, HirDb, Id},
+    hir::{Expression, HirDb},
     mir_optimize::OptimizeMir,
     module::Module,
     TracingConfig, TracingMode,
@@ -17,7 +11,7 @@ use candy_frontend::{
 use candy_fuzzer::{FuzzablesFinder, Fuzzer, Status};
 use candy_vm::{
     execution_controller::RunLimitedNumberOfInstructions,
-    fiber::{EndedReason, VmEnded},
+    fiber::{EndedReason, Panic, VmEnded},
     lir::Lir,
     mir_to_lir::compile_lir,
     tracer::{
@@ -26,10 +20,10 @@ use candy_vm::{
     },
     vm::{self, Vm},
 };
+use extension_trait::extension_trait;
 use itertools::Itertools;
-use lsp_types::{Diagnostic, DiagnosticSeverity, Range};
+use lsp_types::Range;
 use rand::{prelude::SliceRandom, thread_rng};
-use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
 /// A hints finder is responsible for finding hints for a single module.
@@ -42,7 +36,7 @@ enum State {
     /// First, we run the module with tracing of evaluated expressions enabled.
     /// This enables us to show hints for constants.
     EvaluateConstants {
-        errors: Vec<CompilerError>,
+        static_panics: Vec<Panic>,
         tracer: (StackTracer, EvaluatedValuesTracer),
         vm: Vm<Lir, (StackTracer, EvaluatedValuesTracer)>,
     },
@@ -51,7 +45,7 @@ enum State {
     /// fuzzable functions. Thus, the found functions to fuzz have the most
     /// efficient LIR possible.
     FindFuzzables {
-        errors: Vec<CompilerError>,
+        static_panics: Vec<Panic>,
         constants_ended: VmEnded,
         stack_tracer: StackTracer,
         evaluated_values: EvaluatedValuesTracer,
@@ -61,7 +55,7 @@ enum State {
     },
     /// Then, the functions are actually fuzzed.
     Fuzz {
-        errors: Vec<CompilerError>,
+        static_panics: Vec<Panic>,
         constants_ended: VmEnded,
         stack_tracer: StackTracer,
         evaluated_values: EvaluatedValuesTracer,
@@ -82,26 +76,31 @@ impl ModuleAnalyzer {
         self.state = Some(State::Initial);
     }
 
-    pub async fn run(&mut self, db: &(impl CstDb + OptimizeMir), client: &AnalyzerClient) {
+    pub async fn run(&mut self, db: &Database, client: &AnalyzerClient) {
         let state = self.state.take().unwrap();
         let state = self.update_state(db, client, state).await;
         self.state = Some(state);
     }
-    async fn update_state(
-        &self,
-        db: &(impl CstDb + OptimizeMir),
-        client: &AnalyzerClient,
-        state: State,
-    ) -> State {
+    async fn update_state(&self, db: &Database, client: &AnalyzerClient, state: State) -> State {
         match state {
             State::Initial => {
                 client
                     .update_status(Some(format!("Compiling {}", self.module)))
                     .await;
 
-                let (hir, _) = db.hir(self.module.clone()).unwrap();
-                let mut errors = vec![];
-                hir.collect_errors(&mut errors);
+                let (mir, _) = db
+                    .optimized_mir(
+                        self.module.clone(),
+                        TracingConfig {
+                            register_fuzzables: TracingMode::OnlyCurrent,
+                            calls: TracingMode::Off,
+                            evaluated_expressions: TracingMode::Off,
+                        },
+                    )
+                    .unwrap();
+                let mut mir = (*mir).clone();
+                let mut static_panics = mir.static_panics();
+                static_panics.retain(|panic| panic.responsible.module == self.module);
 
                 let tracing = TracingConfig {
                     register_fuzzables: TracingMode::Off,
@@ -116,10 +115,14 @@ impl ModuleAnalyzer {
                 );
                 let vm = Vm::for_module(lir, &mut tracer);
 
-                State::EvaluateConstants { errors, tracer, vm }
+                State::EvaluateConstants {
+                    static_panics,
+                    tracer,
+                    vm,
+                }
             }
             State::EvaluateConstants {
-                errors,
+                static_panics,
                 mut tracer,
                 mut vm,
             } => {
@@ -129,7 +132,11 @@ impl ModuleAnalyzer {
 
                 vm.run(&mut RunLimitedNumberOfInstructions::new(500), &mut tracer);
                 if !matches!(vm.status(), vm::Status::Done | vm::Status::Panicked(_)) {
-                    return State::EvaluateConstants { errors, tracer, vm };
+                    return State::EvaluateConstants {
+                        static_panics,
+                        tracer,
+                        vm,
+                    };
                 }
 
                 let constants_ended = vm.tear_down(&mut tracer);
@@ -146,7 +153,7 @@ impl ModuleAnalyzer {
                 let mut tracer = FuzzablesFinder::default();
                 let vm = Vm::for_module(lir.clone(), &mut tracer);
                 State::FindFuzzables {
-                    errors,
+                    static_panics,
                     constants_ended,
                     stack_tracer,
                     evaluated_values,
@@ -156,7 +163,7 @@ impl ModuleAnalyzer {
                 }
             }
             State::FindFuzzables {
-                errors,
+                static_panics,
                 constants_ended,
                 stack_tracer,
                 evaluated_values,
@@ -171,7 +178,7 @@ impl ModuleAnalyzer {
                 vm.run(&mut RunLimitedNumberOfInstructions::new(500), &mut tracer);
                 if !matches!(vm.status(), vm::Status::Done | vm::Status::Panicked(_)) {
                     return State::FindFuzzables {
-                        errors,
+                        static_panics,
                         constants_ended,
                         stack_tracer,
                         evaluated_values,
@@ -188,7 +195,7 @@ impl ModuleAnalyzer {
                     .map(|(id, function)| Fuzzer::new(lir.clone(), *function, id.clone()))
                     .collect();
                 State::Fuzz {
-                    errors,
+                    static_panics,
                     constants_ended,
                     stack_tracer,
                     evaluated_values,
@@ -197,7 +204,7 @@ impl ModuleAnalyzer {
                 }
             }
             State::Fuzz {
-                errors,
+                static_panics,
                 constants_ended,
                 stack_tracer,
                 evaluated_values,
@@ -210,7 +217,7 @@ impl ModuleAnalyzer {
                     .collect_vec();
                 let Some(fuzzer) = running_fuzzers.choose_mut(&mut thread_rng()) else {
                     client.update_status(None).await;
-                    return State::Fuzz { errors, constants_ended, stack_tracer, evaluated_values, fuzzable_finder_ended, fuzzers };
+                    return State::Fuzz { static_panics, constants_ended, stack_tracer, evaluated_values, fuzzable_finder_ended, fuzzers };
                 };
 
                 client
@@ -220,7 +227,7 @@ impl ModuleAnalyzer {
                 fuzzer.run(&mut RunLimitedNumberOfInstructions::new(500));
 
                 State::Fuzz {
-                    errors,
+                    static_panics,
                     constants_ended,
                     stack_tracer,
                     evaluated_values,
@@ -236,33 +243,26 @@ impl ModuleAnalyzer {
 
         match self.state.as_ref().unwrap() {
             State::Initial => {}
-            State::EvaluateConstants { errors, .. } | State::FindFuzzables { errors, .. } => {
+            State::EvaluateConstants { static_panics, .. }
+            | State::FindFuzzables { static_panics, .. } => {
                 // TODO: Show incremental constant evaluation hints.
-                insights.extend(
-                    errors
-                        .iter()
-                        .map(|it| error_to_diagnostic(db, self.module.clone(), it)),
-                );
+                insights.extend(static_panics.to_insights(db, &self.module));
             }
             State::Fuzz {
-                errors,
+                static_panics,
                 constants_ended,
                 stack_tracer,
                 evaluated_values,
                 fuzzers,
                 ..
             } => {
-                diagnostics.extend(
-                    errors
-                        .iter()
-                        .map(|it| error_to_diagnostic(db, self.module.clone(), it)),
-                );
+                insights.extend(static_panics.to_insights(db, &self.module));
 
                 // TODO: Think about how to highlight the responsible piece of code.
                 if let EndedReason::Panicked(panic) = &constants_ended.reason
-                    && let Some(hint) = Self::panic_hint(db, self.module.clone(), stack_tracer, &panic.reason)
+                    && let Some(insight) = Self::panic_hint(db, self.module.clone(), stack_tracer, &panic.reason)
                 {
-                    hints.push(hint);
+                    insights.push(insight);
                 }
 
                 for (id, value) in evaluated_values.values() {
@@ -283,27 +283,26 @@ impl ModuleAnalyzer {
                                 continue;
                             }
 
-                            hints.push(Hint::like_comment(
-                                HintKind::Value,
-                                value.to_string(),
-                                db.id_to_end_of_line(id.clone()).unwrap(),
-                            ));
+                            insights.push(Insight::Value {
+                                position: db.id_to_end_of_line(id.clone()).unwrap(),
+                                text: value.to_string(),
+                            });
                         }
                         Expression::PatternIdentifierReference { .. } => {
                             let body = db.containing_body_of(id.clone());
                             let name = body.identifiers.get(id).unwrap();
-                            hints.push(Hint::like_comment(
-                                HintKind::Value,
-                                format!("{name} = {value}"),
-                                db.id_to_end_of_line(id.clone()).unwrap(),
-                            ));
+                            insights.push(Insight::Value {
+                                position: db.id_to_end_of_line(id.clone()).unwrap(),
+                                text: format!("{name} = {value}"),
+                            });
                         }
                         _ => {}
                     }
                 }
 
                 for fuzzer in fuzzers {
-                    let status_hint = Hint::for_fuzzer_status(db, fuzzer);
+                    let Some(status_hint) = Insight::for_fuzzer_status(db, fuzzer) else { continue; };
+                    insights.push(status_hint);
 
                     let Status::FoundPanic {
                         input,
@@ -337,15 +336,11 @@ impl ModuleAnalyzer {
                     let call_span = db
                         .hir_id_to_display_span(panic.responsible.clone())
                         .unwrap();
-                    diagnostics.push(Diagnostic {
-                        range: Range::new(
+                    insights.push(Insight::Panic {
+                        call_site: Range::new(
                             db.offset_to_lsp_position(self.module.clone(), call_span.start),
                             db.offset_to_lsp_position(self.module.clone(), call_span.end),
                         ),
-                        severity: Some(DiagnosticSeverity::ERROR),
-                        code: None,
-                        code_description: None,
-                        source: None,
                         message: format!(
                             "For `{} {}`, this call panics: {}",
                             fuzzer.function_id.keys.last().unwrap(),
@@ -356,22 +351,19 @@ impl ModuleAnalyzer {
                                 .join(" "),
                             panic.reason
                         ),
-                        related_information: None,
-                        tags: None,
-                        data: None,
                     });
                 }
             }
         }
 
-        (hints, diagnostics)
+        insights
     }
     fn panic_hint(
         db: &Database,
         module: Module,
         tracer: &StackTracer,
         reason: &str,
-    ) -> Option<Hint> {
+    ) -> Option<Insight> {
         // We want to show the hint at the last call site still inside the current
         // module. If there is no call site in this module, then the panic results
         // from a compiler error in a previous stage which is already reported.
@@ -397,36 +389,20 @@ impl ModuleAnalyzer {
             arguments.iter().map(|it| it.to_string()).join(" "),
         );
 
-        Some(Hint::like_comment(
-            HintKind::Panic,
-            format!("Calling `{call_info}` panics: {reason}"),
-            db.id_to_end_of_line(call_site)?,
-        ))
+        let call_site = db.hir_id_to_display_span(call_site)?;
+        let call_site = db.range_to_lsp_range(module, call_site);
+        Some(Insight::Panic {
+            call_site,
+            message: format!("Calling `{call_info}` panics: {reason}"),
+        })
     }
+}
 
-    pub fn code_lenses(&self, db: &Database) -> FxHashMap<Id, CodeLens> {
-        if let State::Fuzz { fuzzers, .. } = self.state.as_ref().unwrap() {
-            for fuzzer in fuzzers {
-                let id = fuzzer.function_id.clone();
-                let lens = match fuzzer.status() {
-                    Status::StillFuzzing { total_coverage, .. } => {
-                        let function_range = fuzzer.lir.range_of_function(&id);
-                        let function_coverage = total_coverage.in_range(&function_range);
-                        CodeLens::Fuzzing {
-                            coverage: function_coverage.relative_coverage(),
-                            inputs: vec!["Ok".to_string()],
-                        }
-                    }
-                    Status::FoundPanic { input, .. } => CodeLens::FoundPanic {
-                        panicking_input: format!("{input}"),
-                        other_inputs: vec!["Test".to_string()],
-                    },
-                    Status::TotalCoverageButNoPanic => CodeLens::FuzzedCompletely,
-                };
-                lenses.insert(id, lens);
-            }
-        }
-
-        lenses
+#[extension_trait]
+pub impl StaticPanics for Vec<Panic> {
+    fn to_insights(&self, db: &Database, module: &Module) -> Vec<Insight> {
+        self.iter()
+            .map(|panic| Insight::for_static_panic(db, module.clone(), panic))
+            .collect_vec()
     }
 }
