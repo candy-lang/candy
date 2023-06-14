@@ -5,13 +5,13 @@
       "label": "Compiler: Build (debug)",
       "type": "shell",
       "command": "cargo",
-      "args": ["build", "--manifest-path=./compiler/Cargo.toml"]
+      "args": ["build"]
     },
     {
       "label": "Compiler: Build (release)",
       "type": "shell",
       "command": "cargo",
-      "args": ["build", "--manifest-path=./compiler/Cargo.toml", "--release"]
+      "args": ["build", "--release"]
     }
   ]
 }

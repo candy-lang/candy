@@ -28,6 +28,7 @@
 //!
 //! [tree shaking]: super::tree_shaking
 
+use super::pure::PurenessInsights;
 use crate::{
     builtin_functions::BuiltinFunction,
     id::IdGenerator,
@@ -47,6 +48,7 @@ use unicode_segmentation::UnicodeSegmentation;
 pub fn fold_constants(
     expression: &mut Expression,
     visible: &VisibleExpressions,
+    pureness: &PurenessInsights,
     id_generator: &mut IdGenerator<Id>,
 ) {
     let Expression::Call {
@@ -61,7 +63,7 @@ pub fn fold_constants(
     }
 
     let Expression::Builtin(builtin) = visible.get(*function) else { return; };
-    let Some(result) = run_builtin(*builtin, arguments, *responsible, visible, id_generator) else {
+    let Some(result) = run_builtin(*builtin, arguments, *responsible, visible, id_generator, pureness) else {
         return;
     };
     *expression = result;
@@ -78,6 +80,7 @@ fn run_builtin(
     responsible: Id,
     visible: &VisibleExpressions,
     id_generator: &mut IdGenerator<Id>,
+    pureness: &PurenessInsights,
 ) -> Option<Expression> {
     debug_assert_eq!(
         arguments.len(),
@@ -91,7 +94,7 @@ fn run_builtin(
         | BuiltinFunction::ChannelReceive => return None,
         BuiltinFunction::Equals => {
             let [a, b] = arguments else { unreachable!() };
-            a.semantically_equals(*b, visible)?.into()
+            a.semantically_equals(*b, visible, pureness)?.into()
         }
         BuiltinFunction::FunctionRun => {
             let [function] = arguments else { unreachable!() };
@@ -128,7 +131,7 @@ fn run_builtin(
         }
         BuiltinFunction::IntBitwiseAnd => {
             let [a, b] = arguments else { unreachable!() };
-            if let Some(true) = a.semantically_equals(*b, visible) {
+            if let Some(true) = a.semantically_equals(*b, visible, pureness) {
                 return Some(Expression::Reference(*a));
             }
 
@@ -138,7 +141,7 @@ fn run_builtin(
         }
         BuiltinFunction::IntBitwiseOr => {
             let [a, b] = arguments else { unreachable!() };
-            if let Some(true) = a.semantically_equals(*b, visible) {
+            if let Some(true) = a.semantically_equals(*b, visible, pureness) {
                 return Some(Expression::Reference(*a));
             }
 
@@ -148,7 +151,7 @@ fn run_builtin(
         }
         BuiltinFunction::IntBitwiseXor => {
             let [a, b] = arguments else { unreachable!() };
-            if let Some(true) = a.semantically_equals(*b, visible) {
+            if let Some(true) = a.semantically_equals(*b, visible, pureness) {
                 return Some(0.into());
             }
 
@@ -158,7 +161,7 @@ fn run_builtin(
         }
         BuiltinFunction::IntCompareTo => {
             let [a, b] = arguments else { unreachable!() };
-            if let Some(true) = a.semantically_equals(*b, visible) {
+            if let Some(true) = a.semantically_equals(*b, visible, pureness) {
                 return Some(Ordering::Equal.into());
             }
 
@@ -168,7 +171,7 @@ fn run_builtin(
         }
         BuiltinFunction::IntDivideTruncating => {
             let [dividend, divisor] = arguments else { unreachable!() };
-            if let Some(true) = dividend.semantically_equals(*divisor, visible) {
+            if let Some(true) = dividend.semantically_equals(*divisor, visible, pureness) {
                 return Some(1.into());
             }
 
@@ -178,7 +181,7 @@ fn run_builtin(
         }
         BuiltinFunction::IntModulo => {
             let [dividend, divisor] = arguments else { unreachable!() };
-            if let Some(true) = dividend.semantically_equals(*divisor, visible) {
+            if let Some(true) = dividend.semantically_equals(*divisor, visible, pureness) {
                 return Some(0.into());
             }
 
@@ -205,7 +208,7 @@ fn run_builtin(
         }
         BuiltinFunction::IntRemainder => {
             let [dividend, divisor] = arguments else { unreachable!() };
-            if let Some(true) = dividend.semantically_equals(*divisor, visible) {
+            if let Some(true) = dividend.semantically_equals(*divisor, visible, pureness) {
                 return Some(0.into());
             }
 
@@ -239,7 +242,7 @@ fn run_builtin(
         }
         BuiltinFunction::IntSubtract => {
             let [minuend, subtrahend] = arguments else { unreachable!() };
-            if let Some(true) = minuend.semantically_equals(*subtrahend, visible) {
+            if let Some(true) = minuend.semantically_equals(*subtrahend, visible, pureness) {
                 return Some(Expression::Int(0.into()));
             }
 
@@ -278,12 +281,12 @@ fn run_builtin(
             // constant, we may still conclude the result of the builtin:
             // If one key `semantically_equals` the requested one and all
             // others definitely not, then we can still resolve that.
-            if !visible.get(*key).is_constant(visible) {
+            if !pureness.is_definition_const(visible.get(*key)) {
                 return None;
             }
             if fields
                 .iter()
-                .any(|(key, _)| !visible.get(*key).is_constant(visible))
+                .any(|(id, _)| !pureness.is_definition_const(visible.get(*id)))
             {
                 return None;
             }
@@ -291,7 +294,10 @@ fn run_builtin(
             let value = fields
                 .iter()
                 .rev()
-                .find(|(k, _)| k.semantically_equals(*key, visible).unwrap_or(false))
+                .find(|(k, _)| {
+                    k.semantically_equals(*key, visible, pureness)
+                        .unwrap_or_default()
+                })
                 .map(|(_, value)| *value);
             if let Some(value) = value {
                 Expression::Reference(value)
@@ -310,7 +316,7 @@ fn run_builtin(
 
             let mut is_contained = Some(false);
             for (k, _) in fields.iter() {
-                match k.semantically_equals(*key, visible) {
+                match k.semantically_equals(*key, visible, pureness) {
                     Some(is_equal) => {
                         if is_equal {
                             is_contained = Some(true);
@@ -413,7 +419,9 @@ fn run_builtin(
         }
         BuiltinFunction::TextGetRange => {
             let [text, start_inclusive, end_exclusive] = arguments else { unreachable!() };
-            if let Some(true) = start_inclusive.semantically_equals(*end_exclusive, visible) {
+            if let Some(true) =
+                start_inclusive.semantically_equals(*end_exclusive, visible, pureness)
+            {
                 return Some("".into());
             }
 

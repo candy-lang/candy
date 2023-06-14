@@ -1,3 +1,4 @@
+use super::pure::PurenessInsights;
 use crate::mir::{Body, Expression, Id, VisibleExpressions};
 use rustc_hash::FxHashSet;
 use std::mem;
@@ -47,6 +48,7 @@ impl Expression {
     /// also includes references to locally defined IDs. IDs are returned in the
     /// order that they are referenced, which means that the vector may contain
     /// the same ID multiple times.
+    // PERF: Maybe change this to accept a closure instead of collecting them to an `FxHashSet`
     pub fn referenced_ids(&self) -> FxHashSet<Id> {
         let mut referenced = FxHashSet::default();
         self.collect_referenced_ids(&mut referenced);
@@ -153,50 +155,19 @@ impl Expression {
 
 impl Body {
     pub fn all_ids(&self) -> FxHashSet<Id> {
-        let mut ids = self.defined_ids().into_iter().collect::<FxHashSet<_>>();
+        let mut ids = self.defined_ids().into_iter().collect();
         self.collect_referenced_ids(&mut ids);
         ids
     }
 }
 
-impl Expression {
-    pub fn is_pure(&self) -> bool {
-        match self {
-            Expression::Int(_) => true,
-            Expression::Text(_) => true,
-            Expression::Reference(_) => true,
-            Expression::Tag { .. } => true,
-            Expression::List(_) => true,
-            Expression::Struct(_) => true,
-            Expression::Function { .. } => true,
-            Expression::Parameter => false,
-            Expression::Builtin(_) => true,
-            Expression::HirId(_) => true,
-            Expression::Call { .. } => false,
-            Expression::UseModule { .. } => false,
-            Expression::Panic { .. } => false,
-            Expression::Multiple(body) => body.iter().all(|(_, expr)| expr.is_pure()),
-            Expression::TraceCallStarts { .. }
-            | Expression::TraceCallEnds { .. }
-            | Expression::TraceExpressionEvaluated { .. }
-            | Expression::TraceFoundFuzzableFunction { .. } => false,
-        }
-    }
-
-    /// Whether the value of this expression is pure and known at compile-time.
-    /// This is useful for moving expressions around without changing the
-    /// semantics.
-    pub fn is_constant(&self, visible: &VisibleExpressions) -> bool {
-        self.is_pure()
-            && self
-                .captured_ids()
-                .iter()
-                .all(|captured| visible.get(*captured).is_constant(visible))
-    }
-}
-
 impl Id {
-    pub fn semantically_equals(self, other: Id, visible: &VisibleExpressions) -> Option<bool> {
+    pub fn semantically_equals(
+        self,
+        other: Id,
+        visible: &VisibleExpressions,
+        pureness: &PurenessInsights,
+    ) -> Option<bool> {
         if self == other {
             return Some(true);
         }
@@ -205,10 +176,10 @@ impl Id {
         let other_expr = visible.get(other);
 
         if let Expression::Reference(reference) = self_expr {
-            return reference.semantically_equals(other, visible);
+            return reference.semantically_equals(other, visible, pureness);
         }
         if let Expression::Reference(reference) = other_expr {
-            return self.semantically_equals(*reference, visible);
+            return self.semantically_equals(*reference, visible, pureness);
         }
 
         if matches!(self_expr, Expression::Parameter) || matches!(other_expr, Expression::Parameter)
@@ -220,7 +191,7 @@ impl Id {
             return Some(true);
         }
 
-        if !self_expr.is_constant(visible) || !other_expr.is_constant(visible) {
+        if !pureness.is_definition_const(self_expr) || !pureness.is_definition_const(other_expr) {
             return None;
         }
 

@@ -552,7 +552,7 @@ impl Context<'_> {
             );
             let struct_get_id =
                 self.push(None, Expression::Builtin(BuiltinFunction::StructGet), None);
-            let struct_get = self.push(None, Expression::Text("StructGet".to_string()), None);
+            let struct_get = self.push(None, Expression::Symbol("StructGet".to_string()), None);
             self.push(
                 None,
                 Expression::Call {
