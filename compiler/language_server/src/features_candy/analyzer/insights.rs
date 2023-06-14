@@ -1,13 +1,14 @@
-use super::{Hint, HintKind};
+use super::{utils::IdToEndOfLine, Hint, HintKind};
 use crate::{database::Database, utils::LspPositionConversion};
 use candy_frontend::{
-    ast::{AssignmentBody, AstDb, AstKind},
+    ast::{Assignment, AssignmentBody, AstDb, AstKind},
     ast_to_hir::AstToHir,
     cst_to_ast::CstToAst,
+    hir::{Expression, HirDb, Id},
     module::Module,
 };
 use candy_fuzzer::{Fuzzer, Status};
-use candy_vm::fiber::Panic;
+use candy_vm::{fiber::Panic, heap::InlineObject};
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -34,6 +35,41 @@ impl Insight {
     //         position: end_of_line,
     //     }
     // }
+
+    pub fn for_value(db: &Database, id: Id, value: InlineObject) -> Option<Self> {
+        let Some(hir) = db.find_expression(id.clone()) else { return None; };
+        match hir {
+            Expression::Reference(_) => {
+                // Could be an assignment.
+                let Some(ast_id) = db.hir_to_ast_id(id.clone()) else { return None; };
+                let Some(ast) = db.find_ast(ast_id) else { return None; };
+                let AstKind::Assignment(Assignment { body, .. }) = &ast.kind else { return None; };
+                let creates_hint = match body {
+                    AssignmentBody::Function { .. } => true,
+                    AssignmentBody::Body { pattern, .. } => {
+                        matches!(pattern.kind, AstKind::Identifier(_))
+                    }
+                };
+                if !creates_hint {
+                    return None;
+                }
+
+                Some(Insight::Value {
+                    position: db.id_to_end_of_line(id).unwrap(),
+                    text: value.to_string(),
+                })
+            }
+            Expression::PatternIdentifierReference { .. } => {
+                let body = db.containing_body_of(id.clone());
+                let name = body.identifiers.get(&id).unwrap();
+                Some(Insight::Value {
+                    position: db.id_to_end_of_line(id.clone()).unwrap(),
+                    text: format!("{name} = {value}"),
+                })
+            }
+            _ => None,
+        }
+    }
 
     pub fn for_fuzzer_status(db: &Database, fuzzer: &Fuzzer) -> Option<Self> {
         let Some(ast_id) = db.hir_to_ast_id(fuzzer.function_id.clone()) else { return None; };
@@ -77,7 +113,7 @@ impl Insight {
         match self {
             Insight::Value { position, text } => LspType::Hint(Hint {
                 kind: HintKind::Value,
-                text: text.to_string(),
+                text: format!("  # {text}"),
                 position: *position,
             }),
             Insight::FuzzingStatus { position, message } => LspType::Hint(Hint {

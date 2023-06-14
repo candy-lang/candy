@@ -1,12 +1,7 @@
-use super::{insights::Insight, static_panics::StaticPanicsOfMir, utils::IdToEndOfLine};
+use super::{insights::Insight, static_panics::StaticPanicsOfMir};
 use crate::{database::Database, server::AnalyzerClient, utils::LspPositionConversion};
 use candy_frontend::{
-    ast::{Assignment, AssignmentBody, AstDb, AstKind},
-    ast_to_hir::AstToHir,
-    hir::{Expression, HirDb},
-    mir_optimize::OptimizeMir,
-    module::Module,
-    TracingConfig, TracingMode,
+    ast_to_hir::AstToHir, mir_optimize::OptimizeMir, module::Module, TracingConfig, TracingMode,
 };
 use candy_fuzzer::{FuzzablesFinder, Fuzzer, Status};
 use candy_vm::{
@@ -25,6 +20,7 @@ use itertools::Itertools;
 use lsp_types::Range;
 use rand::{prelude::SliceRandom, thread_rng};
 use std::sync::Arc;
+use tracing::info;
 
 /// A hints finder is responsible for finding hints for a single module.
 pub struct ModuleAnalyzer {
@@ -243,10 +239,22 @@ impl ModuleAnalyzer {
 
         match self.state.as_ref().unwrap() {
             State::Initial => {}
-            State::EvaluateConstants { static_panics, .. }
-            | State::FindFuzzables { static_panics, .. } => {
+            State::EvaluateConstants { static_panics, .. } => {
                 // TODO: Show incremental constant evaluation hints.
                 insights.extend(static_panics.to_insights(db, &self.module));
+            }
+            State::FindFuzzables {
+                static_panics,
+                evaluated_values,
+                ..
+            } => {
+                insights.extend(static_panics.to_insights(db, &self.module));
+                insights.extend(
+                    evaluated_values
+                        .values()
+                        .iter()
+                        .flat_map(|(id, value)| Insight::for_value(db, id.clone(), *value)),
+                );
             }
             State::Fuzz {
                 static_panics,
@@ -257,47 +265,18 @@ impl ModuleAnalyzer {
                 ..
             } => {
                 insights.extend(static_panics.to_insights(db, &self.module));
+                insights.extend(
+                    evaluated_values
+                        .values()
+                        .iter()
+                        .flat_map(|(id, value)| Insight::for_value(db, id.clone(), *value)),
+                );
 
-                // TODO: Think about how to highlight the responsible piece of code.
+                // TODO: Unify this with static panics.
                 if let EndedReason::Panicked(panic) = &constants_ended.reason
                     && let Some(insight) = Self::panic_hint(db, self.module.clone(), stack_tracer, &panic.reason)
                 {
                     insights.push(insight);
-                }
-
-                for (id, value) in evaluated_values.values() {
-                    let Some(hir) = db.find_expression(id.clone()) else { continue; };
-                    match hir {
-                        Expression::Reference(_) => {
-                            // Could be an assignment.
-                            let Some(ast_id) = db.hir_to_ast_id(id.clone()) else { continue; };
-                            let Some(ast) = db.find_ast(ast_id) else { continue; };
-                            let AstKind::Assignment(Assignment { body, .. }) = &ast.kind else { continue; };
-                            let creates_hint = match body {
-                                AssignmentBody::Function { .. } => true,
-                                AssignmentBody::Body { pattern, .. } => {
-                                    matches!(pattern.kind, AstKind::Identifier(_))
-                                }
-                            };
-                            if !creates_hint {
-                                continue;
-                            }
-
-                            insights.push(Insight::Value {
-                                position: db.id_to_end_of_line(id.clone()).unwrap(),
-                                text: value.to_string(),
-                            });
-                        }
-                        Expression::PatternIdentifierReference { .. } => {
-                            let body = db.containing_body_of(id.clone());
-                            let name = body.identifiers.get(id).unwrap();
-                            insights.push(Insight::Value {
-                                position: db.id_to_end_of_line(id.clone()).unwrap(),
-                                text: format!("{name} = {value}"),
-                            });
-                        }
-                        _ => {}
-                    }
                 }
 
                 for fuzzer in fuzzers {
@@ -355,6 +334,8 @@ impl ModuleAnalyzer {
                 }
             }
         }
+
+        info!("Insights: {insights:?}");
 
         insights
     }
