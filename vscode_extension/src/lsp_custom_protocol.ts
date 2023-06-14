@@ -55,7 +55,7 @@ export interface Hint {
   readonly text: string;
   readonly position: Position;
 }
-export type HintKind = 'value' | 'panic' | 'fuzz';
+export type HintKind = 'value' | 'panic' | 'fuzzingStatus';
 
 // Status
 export const publishServerStatusType = new NotificationType<ServerStatus>(

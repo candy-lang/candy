@@ -9,27 +9,23 @@
 //! While doing all that, we can pause regularly between executing instructions
 //! so that we don't occupy a single CPU at 100 %.
 
-use self::{hint::Hint, module_analyzer::ModuleAnalyzer};
+use self::module_analyzer::ModuleAnalyzer;
 use super::AnalyzerClient;
 use crate::database::Database;
 use candy_frontend::module::{Module, MutableModuleProviderOwner, PackagesPath};
-use itertools::Itertools;
-use lsp_types::{notification::Notification, CodeLens, Url};
+use lsp_types::{notification::Notification, Position, Url};
 use rand::{seq::IteratorRandom, thread_rng};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::{fmt, future::Future, time::Duration, vec};
 use tokio::{
-    sync::{
-        mpsc::{self, error::TryRecvError},
-        oneshot,
-    },
+    sync::mpsc::{self, error::TryRecvError},
     time::sleep,
 };
-use tracing::{debug, info};
+use tracing::debug;
 
 mod code_lens;
-pub mod hint;
+pub mod insights;
 mod module_analyzer;
 mod utils;
 
@@ -37,7 +33,6 @@ pub enum Message {
     UpdateModule(Module, Vec<u8>),
     CloseModule(Module),
     Shutdown,
-    GetCodeLenses(Module, oneshot::Sender<Vec<CodeLens>>),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -49,6 +44,20 @@ impl Notification for HintsNotification {
     const METHOD: &'static str = "candy/textDocument/publishHints";
 
     type Params = Self;
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
+pub struct Hint {
+    pub kind: HintKind,
+    pub text: String,
+    pub position: Position,
+}
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, PartialOrd, Ord, Copy)]
+#[serde(rename_all = "camelCase")]
+pub enum HintKind {
+    Value,
+    Panic,
+    FuzzingStatus,
 }
 
 #[tokio::main(worker_threads = 1)]
@@ -69,7 +78,7 @@ pub async fn run_server(
     });
 
     let mut db = Database::new_with_file_system_module_provider(packages_path);
-    let mut hints_finders: FxHashMap<Module, ModuleAnalyzer> = FxHashMap::default();
+    let mut analyzers: FxHashMap<Module, ModuleAnalyzer> = FxHashMap::default();
     let client_ref = &client;
     let mut outgoing_diagnostics = OutgoingCache::new(move |module, diagnostics| {
         client_ref.update_diagnostics(module, diagnostics)
@@ -90,42 +99,30 @@ pub async fn run_server(
                 Message::UpdateModule(module, content) => {
                     db.did_change_module(&module, content);
                     outgoing_hints.send(module.clone(), vec![]).await;
-                    hints_finders
+                    analyzers
                         .entry(module.clone())
                         .and_modify(|it| it.module_changed())
                         .or_insert_with(|| ModuleAnalyzer::for_module(module.clone()));
                 }
                 Message::CloseModule(module) => {
                     db.did_close_module(&module);
-                    hints_finders.remove(&module);
+                    analyzers.remove(&module);
                 }
                 Message::Shutdown => {
                     incoming_events.close();
                 }
-                Message::GetCodeLenses(module, sender) => {
-                    info!("Getting code lenses");
-                    let code_lenses = hints_finders
-                        .get(&module)
-                        .unwrap()
-                        .code_lenses(&db)
-                        .into_iter()
-                        .flat_map(|(id, lens)| lens.to_lsp_code_lenses(&db, id))
-                        .collect_vec();
-                    info!("Sending lenses {code_lenses:?}");
-                    sender.send(code_lenses).unwrap();
-                }
             }
         }
 
-        let Some(module) = hints_finders.keys().choose(&mut thread_rng()).cloned() else {
+        let Some(module) = analyzers.keys().choose(&mut thread_rng()).cloned() else {
             client.update_status(None);
             continue;
         };
-        let hints_finder = hints_finders.get_mut(&module).unwrap();
+        let analyzer = analyzers.get_mut(&module).unwrap();
 
-        hints_finder.run(&db, &client).await;
+        analyzer.run(&db, &client).await;
 
-        let (mut hints, diagnostics) = hints_finder.hints(&db);
+        let (mut hints, diagnostics) = analyzer.insights(&db);
         hints.sort_by_key(|hint| hint.position);
 
         outgoing_diagnostics.send(module.clone(), diagnostics).await;

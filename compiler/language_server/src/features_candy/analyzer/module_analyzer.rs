@@ -1,8 +1,4 @@
-use super::{
-    code_lens::{default_code_lenses, CodeLens},
-    hint::{Hint, HintKind},
-    utils::IdToEndOfLine,
-};
+use super::{code_lens::CodeLens, insights::Insight, utils::IdToEndOfLine};
 use crate::{
     database::Database,
     server::AnalyzerClient,
@@ -235,15 +231,14 @@ impl ModuleAnalyzer {
         }
     }
 
-    pub fn hints(&self, db: &Database) -> (Vec<Hint>, Vec<Diagnostic>) {
-        let mut hints = vec![];
-        let mut diagnostics = vec![];
+    pub fn insights(&self, db: &Database) -> Vec<Insight> {
+        let mut insights = vec![];
 
         match self.state.as_ref().unwrap() {
             State::Initial => {}
             State::EvaluateConstants { errors, .. } | State::FindFuzzables { errors, .. } => {
                 // TODO: Show incremental constant evaluation hints.
-                diagnostics.extend(
+                insights.extend(
                     errors
                         .iter()
                         .map(|it| error_to_diagnostic(db, self.module.clone(), it)),
@@ -308,6 +303,8 @@ impl ModuleAnalyzer {
                 }
 
                 for fuzzer in fuzzers {
+                    let status_hint = Hint::for_fuzzer_status(db, fuzzer);
+
                     let Status::FoundPanic {
                         input,
                         panic,
@@ -408,8 +405,6 @@ impl ModuleAnalyzer {
     }
 
     pub fn code_lenses(&self, db: &Database) -> FxHashMap<Id, CodeLens> {
-        let mut lenses = default_code_lenses(db, self.module.clone());
-
         if let State::Fuzz { fuzzers, .. } = self.state.as_ref().unwrap() {
             for fuzzer in fuzzers {
                 let id = fuzzer.function_id.clone();

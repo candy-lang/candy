@@ -3,13 +3,10 @@ use candy_frontend::{
     ast::{AssignmentBody, AstDb, AstKind},
     ast_to_hir::AstToHir,
     cst_to_ast::CstToAst,
-    hir::{Body, Expression, Id},
-    module::Module,
+    hir::Id,
 };
-use extension_trait::extension_trait;
 use itertools::Itertools;
 use lsp_types::Command;
-use rustc_hash::FxHashMap;
 
 pub enum CodeLens {
     NotFuzzed,
@@ -88,33 +85,5 @@ impl CodeLens {
                 data: None,
             })
             .collect_vec()
-    }
-}
-
-pub fn default_code_lenses(db: &Database, module: Module) -> FxHashMap<Id, CodeLens> {
-    let (hir, _) = db.hir(module).unwrap();
-    let mut lenses = FxHashMap::default();
-    hir.collect_lenses(db, &mut lenses);
-    lenses
-}
-
-#[extension_trait]
-impl LensesFromExpression for Expression {
-    fn collect_lenses(&self, id: Id, db: &Database, lenses: &mut FxHashMap<Id, CodeLens>) {
-        let Expression::Function(function) = self else { return; };
-        if !function.fuzzable {
-            return;
-        }
-        lenses.insert(id, CodeLens::NotFuzzed);
-        function.body.collect_lenses(db, lenses);
-    }
-}
-
-#[extension_trait]
-impl LensesFromBody for Body {
-    fn collect_lenses(&self, db: &Database, lenses: &mut FxHashMap<Id, CodeLens>) {
-        for (id, expression) in &self.expressions {
-            expression.collect_lenses(id.clone(), db, lenses);
-        }
     }
 }
