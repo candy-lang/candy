@@ -12,6 +12,7 @@
 
 use rustc_hash::FxHashMap;
 
+use super::pure::PurenessInsights;
 use crate::{
     id::IdGenerator,
     mir::{Body, Expression, Id, Mir},
@@ -19,22 +20,23 @@ use crate::{
 use std::mem;
 
 impl Mir {
-    pub fn cleanup(&mut self) {
-        self.sort_leading_constants();
-        self.normalize_ids();
+    pub fn cleanup(&mut self, pureness: &mut PurenessInsights) {
+        self.sort_leading_constants(pureness);
+        self.normalize_ids(pureness);
     }
 
     /// Sorts the leading constants in the body. This wouldn't be super useful
     /// when applied to an unoptimized MIR, but because we optimize it using
-    /// [constant lifting], we can assume that all constants at the beginning
-    /// of the body.
+    /// [constant lifting], we can assume that all constants are at the
+    /// beginning of the body.
     ///
     /// [constant lifting]: super::constant_lifting
-    fn sort_leading_constants(&mut self) {
+    fn sort_leading_constants(&mut self, pureness: &PurenessInsights) {
+        // PERF: use `partition_point` instead of moving expressions to a new body
         let mut still_constants = true;
         let old_body = mem::take(&mut self.body);
         for (id, expression) in old_body.into_iter() {
-            if still_constants && !expression.is_pure() {
+            if still_constants && !pureness.is_definition_const(&expression) {
                 still_constants = false;
                 Self::sort_constants(&mut self.body);
             }
@@ -79,7 +81,7 @@ impl Mir {
         });
     }
 
-    pub fn normalize_ids(&mut self) {
+    pub fn normalize_ids(&mut self, pureness: &mut PurenessInsights) {
         let mut generator = IdGenerator::start_at(1);
         let mapping: FxHashMap<Id, Id> = self
             .body
@@ -88,6 +90,7 @@ impl Mir {
             .map(|id| (id, generator.generate()))
             .collect();
 
-        self.body.replace_ids(&mut |id| *id = mapping[&*id])
+        self.body.replace_ids(&mut |id| *id = mapping[&*id]);
+        pureness.on_normalize_ids(&mapping);
     }
 }

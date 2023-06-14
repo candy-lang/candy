@@ -18,16 +18,16 @@
 //! [constant lifting]: super::constant_lifting
 //! [module folding]: super::module_folding
 
-use rustc_hash::{FxHashMap, FxHashSet};
-
+use super::pure::PurenessInsights;
 use crate::{
     hir,
     id::{CountableId, IdGenerator},
     mir::{Body, Expression, Id, VisitorResult},
 };
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::hash_map::Entry;
 
-pub fn eliminate_common_subtrees(body: &mut Body) {
+pub fn eliminate_common_subtrees(body: &mut Body, pureness: &PurenessInsights) {
     let mut pure_expressions = FxHashMap::default();
     let mut inner_functions: FxHashMap<Id, Vec<Id>> = FxHashMap::default();
     let mut additional_function_hirs: FxHashMap<Id, FxHashSet<hir::Id>> = FxHashMap::default();
@@ -40,7 +40,7 @@ pub fn eliminate_common_subtrees(body: &mut Body) {
             }
         });
 
-        if !expression.is_pure() {
+        if !pureness.is_definition_pure(expression) {
             continue;
         }
 

@@ -52,7 +52,7 @@ pub fn inline_tiny_functions(
         expression,
         Complexity {
             is_self_contained: true,
-            expressions: 2,
+            expressions: 7,
         },
         visible,
         id_generator,
@@ -97,6 +97,10 @@ impl Expression {
         } = self else {
             return Err("Tried to inline, but the expression is not a call.");
         };
+        if arguments.contains(function) {
+            return Err("Tried to inline, but the callee is used as an argument → recursion.");
+        }
+
         let Expression::Function {
             original_hirs: _,
             parameters,

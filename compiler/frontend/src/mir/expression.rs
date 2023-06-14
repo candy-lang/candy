@@ -16,7 +16,7 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-#[derive(Clone, Eq, From, PartialEq, TryInto)]
+#[derive(Clone, Debug, Eq, From, PartialEq, TryInto)]
 pub enum Expression {
     #[from]
     #[try_into]
@@ -33,7 +33,6 @@ pub enum Expression {
     #[from]
     List(Vec<Id>),
     Struct(Vec<(Id, Id)>),
-    #[from]
     Reference(Id),
     /// A HIR ID that can be used to refer to code in the HIR.
     #[from]
