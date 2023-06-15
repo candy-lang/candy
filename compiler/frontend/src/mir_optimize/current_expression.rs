@@ -41,7 +41,6 @@ impl<'a> CurrentExpression<'a> {
         &mut self,
         expressions: impl IntoIterator<Item = (Id, Expression), IntoIter = I>,
     ) {
-        // FIXME: Update call sites.
         let mut expressions = expressions.into_iter();
         let (_, last_expression) = expressions.next_back().unwrap();
         self.body.expressions.splice(

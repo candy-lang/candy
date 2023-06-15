@@ -210,7 +210,7 @@ fn run_builtin(
                 Err(err) => Err(body.push_with_new_id(id_generator, err.to_string())),
             };
             body.push_with_new_id(id_generator, result);
-            expression.replace_with_multiple(body.expressions.into_iter());
+            expression.replace_with_multiple(body);
             return None;
         }
         BuiltinFunction::IntRemainder => {
@@ -367,7 +367,7 @@ fn run_builtin(
                 .map(|it| body.push_with_new_id(id_generator, it))
                 .collect_vec();
             body.push_with_new_id(id_generator, characters);
-            expression.replace_with_multiple(body.expressions.into_iter());
+            expression.replace_with_multiple(body);
             return None;
         }
         BuiltinFunction::TextConcatenate => {
@@ -423,7 +423,7 @@ fn run_builtin(
                 .map(|it| body.push_with_new_id(id_generator, it))
                 .map_err(|_| body.push_with_new_id(id_generator, "Invalid UTF-8."));
             body.push_with_new_id(id_generator, result);
-            expression.replace_with_multiple(body.expressions.into_iter());
+            expression.replace_with_multiple(body);
             return None;
         }
         BuiltinFunction::TextGetRange => {

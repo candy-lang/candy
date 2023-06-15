@@ -138,7 +138,7 @@ pub fn apply(
 
             let (inner_id_generator, body) = builder.finish();
             *id_generator = inner_id_generator;
-            context.expression.replace_with_multiple(body.expressions);
+            context.expression.replace_with_multiple(body);
         }
     };
 }
