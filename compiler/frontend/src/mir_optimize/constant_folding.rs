@@ -48,11 +48,7 @@ use std::{
 use tracing::warn;
 use unicode_segmentation::UnicodeSegmentation;
 
-pub fn fold_constants(
-    context: &mut ExpressionContext,
-    pureness: &PurenessInsights,
-    id_generator: &mut IdGenerator<Id>,
-) {
+pub fn fold_constants(context: &mut ExpressionContext, pureness: &PurenessInsights) {
     let Expression::Call {
         function,
         arguments,
@@ -69,7 +65,7 @@ pub fn fold_constants(
 
     let arguments = arguments.to_owned();
     let responsible = *responsible;
-    let Some(result) = run_builtin(&mut context.expression, *builtin, &arguments, responsible, context.visible, id_generator, pureness) else {
+    let Some(result) = run_builtin(&mut context.expression, *builtin, &arguments, responsible, context.visible, context.id_generator, pureness) else {
         return;
     };
     *context.expression = result;

@@ -41,7 +41,6 @@ use std::mem;
 
 pub fn apply(
     context: &mut ExpressionContext,
-    id_generator: &mut IdGenerator<Id>,
     db: &dyn OptimizeMir,
     tracing: &TracingConfig,
     pureness: &mut PurenessInsights,
@@ -73,7 +72,7 @@ pub fn apply(
             context
                 .expression
                 .replace_with_multiple(panicking_expression(
-                    id_generator,
+                    context.id_generator,
                     error.payload.to_string(),
                     responsible,
                 ));
@@ -84,7 +83,7 @@ pub fn apply(
             context
                 .expression
                 .replace_with_multiple(panicking_expression(
-                    id_generator,
+                    context.id_generator,
                     "`use` expects a text as a path.".to_string(),
                     responsible,
                 ));
@@ -99,7 +98,7 @@ pub fn apply(
             context
                 .expression
                 .replace_with_multiple(panicking_expression(
-                    id_generator,
+                    context.id_generator,
                     error.payload.to_string(),
                     responsible,
                 ));
@@ -116,7 +115,7 @@ pub fn apply(
                 .body
                 .all_ids()
                 .into_iter()
-                .map(|id| (id, id_generator.generate()))
+                .map(|id| (id, context.id_generator.generate()))
                 .collect();
 
             pureness.include(other_pureness.as_ref(), &mapping);
@@ -130,14 +129,14 @@ pub fn apply(
         Err(error) => {
             errors.insert(CompilerError::for_whole_module(module_to_import, error));
 
-            let inner_id_generator = mem::take(id_generator);
+            let inner_id_generator = mem::take(context.id_generator);
             let mut builder = BodyBuilder::new(inner_id_generator);
 
             let reason = builder.push_text(CompilerErrorPayload::Module(error).to_string());
             builder.push_panic(reason, responsible);
 
             let (inner_id_generator, body) = builder.finish();
-            *id_generator = inner_id_generator;
+            *context.id_generator = inner_id_generator;
             context.expression.replace_with_multiple(body);
         }
     };

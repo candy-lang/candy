@@ -34,51 +34,41 @@
 //! [module folding]: super::module_folding
 //! [tree shaking]: super::tree_shaking
 
+use super::{complexity::Complexity, current_expression::ExpressionContext};
+use crate::mir::{Expression, Id};
 use rustc_hash::FxHashMap;
 
-use crate::{
-    id::IdGenerator,
-    mir::{Expression, Id},
-};
-
-use super::{complexity::Complexity, current_expression::ExpressionContext};
-
-pub fn inline_tiny_functions(context: &mut ExpressionContext, id_generator: &mut IdGenerator<Id>) {
+pub fn inline_tiny_functions(context: &mut ExpressionContext) {
     inline_functions_of_maximum_complexity(
         context,
         Complexity {
             is_self_contained: true,
             expressions: 7,
         },
-        id_generator,
     );
 }
 
 pub fn inline_functions_of_maximum_complexity(
     context: &mut ExpressionContext,
     complexity: Complexity,
-    id_generator: &mut IdGenerator<Id>,
 ) {
     if let Expression::Call { function, .. } = *context.expression
         && let Expression::Function { body, .. } = context.visible.get(function)
         && body.complexity() <= complexity {
-        context.inline_call(id_generator);
+        context.inline_call();
     }
 }
 
-pub fn inline_functions_containing_use(
-    context: &mut ExpressionContext,
-    id_generator: &mut IdGenerator<Id>,
-) {
+pub fn inline_functions_containing_use(context: &mut ExpressionContext) {
     if let Expression::Call { function, .. } = *context.expression
         && let Expression::Function { body, .. } = context.visible.get(function)
         && body.iter().any(|(_, expr)| matches!(expr, Expression::UseModule { .. })) {
-        context.inline_call(id_generator);
+        context.inline_call();
     }
 }
 
 impl ExpressionContext<'_> {
-    pub fn inline_call(&mut self, id_generator: &mut IdGenerator<Id>) {
+    pub fn inline_call(&mut self) {
         let Expression::Call {
             function,
             arguments,
@@ -114,7 +104,7 @@ impl ExpressionContext<'_> {
             .chain(
                 body.defined_ids()
                     .into_iter()
-                    .map(|id| (id, id_generator.generate())),
+                    .map(|id| (id, self.id_generator.generate())),
             )
             .collect();
 

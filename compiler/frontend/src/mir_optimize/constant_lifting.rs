@@ -36,16 +36,9 @@
 //! [common subtree elimination]: super::common_subtree_elimination
 
 use super::{current_expression::ExpressionContext, pure::PurenessInsights};
-use crate::{
-    id::IdGenerator,
-    mir::{Expression, Id},
-};
+use crate::mir::Expression;
 
-pub fn lift_constants(
-    context: &mut ExpressionContext,
-    pureness: &PurenessInsights,
-    id_generator: &mut IdGenerator<Id>,
-) {
+pub fn lift_constants(context: &mut ExpressionContext, pureness: &PurenessInsights) {
     let Expression::Function { body, .. } = &mut *context.expression else { return; };
 
     let mut constants = vec![];
@@ -75,7 +68,7 @@ pub fn lift_constants(
         if is_return_value {
             // The return value was removed. Add a reference to the lifted
             // constant.
-            body.push(id_generator.generate(), Expression::Reference(id));
+            body.push(context.id_generator.generate(), Expression::Reference(id));
         }
     }
 
