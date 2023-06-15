@@ -34,13 +34,17 @@
 //! [module folding]: super::module_folding
 //! [tree shaking]: super::tree_shaking
 
-use super::{complexity::Complexity, current_expression::ExpressionContext};
+use super::{
+    complexity::Complexity,
+    current_expression::{Context, CurrentExpression},
+};
 use crate::mir::{Expression, Id};
 use rustc_hash::FxHashMap;
 
-pub fn inline_tiny_functions(context: &mut ExpressionContext) {
+pub fn inline_tiny_functions(context: &mut Context, expression: &mut CurrentExpression) {
     inline_functions_of_maximum_complexity(
         context,
+        expression,
         Complexity {
             is_self_contained: true,
             expressions: 7,
@@ -49,31 +53,32 @@ pub fn inline_tiny_functions(context: &mut ExpressionContext) {
 }
 
 pub fn inline_functions_of_maximum_complexity(
-    context: &mut ExpressionContext,
+    context: &mut Context,
+    expression: &mut CurrentExpression,
     complexity: Complexity,
 ) {
-    if let Expression::Call { function, .. } = *context.expression
+    if let Expression::Call { function, .. } = **expression
         && let Expression::Function { body, .. } = context.visible.get(function)
         && body.complexity() <= complexity {
-        context.inline_call();
+        context.inline_call(expression);
     }
 }
 
-pub fn inline_functions_containing_use(context: &mut ExpressionContext) {
-    if let Expression::Call { function, .. } = *context.expression
+pub fn inline_functions_containing_use(context: &mut Context, expression: &mut CurrentExpression) {
+    if let Expression::Call { function, .. } = **expression
         && let Expression::Function { body, .. } = context.visible.get(function)
         && body.iter().any(|(_, expr)| matches!(expr, Expression::UseModule { .. })) {
-        context.inline_call();
+        context.inline_call(expression);
     }
 }
 
-impl ExpressionContext<'_> {
-    pub fn inline_call(&mut self) {
+impl Context<'_> {
+    pub fn inline_call(&mut self, expression: &mut CurrentExpression) {
         let Expression::Call {
             function,
             arguments,
             responsible: responsible_argument,
-        } = &*self.expression else {
+        } = &**expression else {
             // Expression is not a call.
             return;
         };
@@ -108,11 +113,10 @@ impl ExpressionContext<'_> {
             )
             .collect();
 
-        self.expression
-            .replace_with_multiple(body.iter().map(|(id, expression)| {
-                let mut expression = expression.to_owned();
-                expression.replace_ids(&id_mapping);
-                (id_mapping[&id], expression)
-            }));
+        expression.replace_with_multiple(body.iter().map(|(id, expression)| {
+            let mut expression = expression.to_owned();
+            expression.replace_ids(&id_mapping);
+            (id_mapping[&id], expression)
+        }));
     }
 }

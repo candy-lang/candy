@@ -35,11 +35,11 @@
 //!
 //! [common subtree elimination]: super::common_subtree_elimination
 
-use super::current_expression::ExpressionContext;
+use super::current_expression::{Context, CurrentExpression};
 use crate::mir::Expression;
 
-pub fn lift_constants(context: &mut ExpressionContext) {
-    let Expression::Function { body, .. } = &mut *context.expression else { return; };
+pub fn lift_constants(context: &mut Context, expression: &mut CurrentExpression) {
+    let Expression::Function { body, .. } = &mut **expression else { return; };
 
     let mut constants = vec![];
 
@@ -72,5 +72,5 @@ pub fn lift_constants(context: &mut ExpressionContext) {
         }
     }
 
-    context.prepend_optimized(constants);
+    expression.prepend_optimized(context.visible, constants);
 }

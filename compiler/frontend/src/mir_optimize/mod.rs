@@ -43,24 +43,19 @@
 //! applied.
 
 use self::{
-    current_expression::{CurrentExpression, ExpressionContext},
+    current_expression::{Context, CurrentExpression},
     pure::PurenessInsights,
 };
 use super::{hir, hir_to_mir::HirToMir, mir::Mir, tracing::TracingConfig};
 use crate::{
     error::CompilerError,
-    id::IdGenerator,
-    mir::{Body, Expression, Id, MirError, VisibleExpressions},
+    mir::{Body, Expression, MirError, VisibleExpressions},
     module::Module,
     string_to_rcst::ModuleError,
     utils::DoHash,
 };
-use rustc_hash::{FxHashSet, FxHasher};
-use std::{
-    hash::{Hash, Hasher},
-    mem,
-    sync::Arc,
-};
+use rustc_hash::FxHashSet;
+use std::{mem, sync::Arc};
 use tracing::debug;
 
 mod cleanup;
@@ -119,14 +114,15 @@ impl Mir {
         pureness: &mut PurenessInsights,
         errors: &mut FxHashSet<CompilerError>,
     ) {
-        self.body.optimize(
-            &mut VisibleExpressions::none_visible(),
-            &mut self.id_generator,
+        let mut context = Context {
             db,
             tracing,
-            pureness,
             errors,
-        );
+            visible: &mut VisibleExpressions::none_visible(),
+            id_generator: &mut self.id_generator,
+            pureness,
+        };
+        context.optimize_body(&mut self.body);
         if cfg!(debug_assertions) {
             self.validate();
         }
@@ -134,64 +130,46 @@ impl Mir {
     }
 }
 
-impl Body {
-    // Even though visible is mut, this function guarantees that the value is
-    // the same after returning.
-    fn optimize(
-        &mut self,
-        visible: &mut VisibleExpressions,
-        id_generator: &mut IdGenerator<Id>,
-        db: &dyn OptimizeMir,
-        tracing: &TracingConfig,
-        pureness: &mut PurenessInsights,
-        errors: &mut FxHashSet<CompilerError>,
-    ) {
+impl Context<'_> {
+    fn optimize_body(&mut self, body: &mut Body) {
+        // Even though `self.visible` is mutable, this function guarantees that
+        // the value is the same after returning.
         let mut index = 0;
-        while index < self.expressions.len() {
+        while index < body.expressions.len() {
             // Thoroughly optimize the expression.
-            let mut context = ExpressionContext {
-                db,
-                tracing,
-                errors,
-                visible,
-                id_generator,
-                pureness,
-                expression: CurrentExpression::new(self, index),
-            };
-            context.optimize();
+            let mut expression = CurrentExpression::new(body, index);
+            self.optimize_expression(&mut expression);
             if cfg!(debug_assertions) {
-                context.expression.validate(context.visible);
+                expression.validate(self.visible);
             }
 
-            let id = context.expression.id();
-            context.pureness.visit_optimized(id, &context.expression);
+            let id = expression.id();
+            self.pureness.visit_optimized(id, &expression);
 
-            module_folding::apply(&mut context);
+            module_folding::apply(self, &mut expression);
 
-            index = context.expression.index() + 1;
-            let expression = mem::replace(&mut *context.expression, Expression::Parameter);
-            visible.insert(id, expression);
+            index = expression.index() + 1;
+            let expression = mem::replace(&mut *expression, Expression::Parameter);
+            self.visible.insert(id, expression);
         }
 
-        for (id, expression) in &mut self.expressions {
-            *expression = visible.remove(*id);
+        for (id, expression) in &mut body.expressions {
+            *expression = self.visible.remove(*id);
         }
 
-        common_subtree_elimination::eliminate_common_subtrees(self, pureness);
-        reference_following::remove_redundant_return_references(self);
-        tree_shaking::tree_shake(self, pureness);
+        common_subtree_elimination::eliminate_common_subtrees(body, self.pureness);
+        reference_following::remove_redundant_return_references(body);
+        tree_shaking::tree_shake(body, self.pureness);
     }
-}
 
-impl ExpressionContext<'_> {
-    fn optimize(&mut self) {
+    fn optimize_expression(&mut self, expression: &mut CurrentExpression) {
         'outer: loop {
             if let Expression::Function {
                 parameters,
                 responsible_parameter,
                 body,
                 ..
-            } = &mut *self.expression
+            } = &mut **expression
             {
                 for parameter in &*parameters {
                     self.visible.insert(*parameter, Expression::Parameter);
@@ -201,14 +179,7 @@ impl ExpressionContext<'_> {
                 self.pureness
                     .enter_function(parameters, *responsible_parameter);
 
-                body.optimize(
-                    self.visible,
-                    self.id_generator,
-                    self.db,
-                    self.tracing,
-                    self.pureness,
-                    self.errors,
-                );
+                self.optimize_body(body);
 
                 for parameter in &*parameters {
                     self.visible.remove(*parameter);
@@ -217,24 +188,24 @@ impl ExpressionContext<'_> {
             }
 
             loop {
-                let hashcode_before = self.do_hash();
+                let hashcode_before = expression.do_hash();
 
-                reference_following::follow_references(self);
-                constant_folding::fold_constants(self);
+                reference_following::follow_references(self, expression);
+                constant_folding::fold_constants(self, expression);
 
-                let is_call = matches!(*self.expression, Expression::Call { .. });
-                inlining::inline_tiny_functions(self);
-                inlining::inline_functions_containing_use(self);
-                if is_call && matches!(*self.expression, Expression::Function { .. }) {
+                let is_call = matches!(**expression, Expression::Call { .. });
+                inlining::inline_tiny_functions(self, expression);
+                inlining::inline_functions_containing_use(self, expression);
+                if is_call && matches!(**expression, Expression::Function { .. }) {
                     // We inlined a function call and the resulting code starts with
                     // a function definition. We need to visit that first before
                     // continuing the optimizations.
                     continue 'outer;
                 }
 
-                constant_lifting::lift_constants(self);
+                constant_lifting::lift_constants(self, expression);
 
-                if self.do_hash() == hashcode_before {
+                if expression.do_hash() == hashcode_before {
                     return;
                 }
             }

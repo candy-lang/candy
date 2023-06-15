@@ -6,7 +6,7 @@ use crate::{
 use candy_frontend::utils::DoHash;
 use derive_more::Deref;
 use itertools::{izip, Itertools};
-use rustc_hash::{FxHashMap, FxHasher};
+use rustc_hash::FxHashMap;
 use std::{
     cmp::Ordering,
     fmt::{self, Formatter},

@@ -8,29 +8,13 @@ use crate::{
 use rustc_hash::FxHashSet;
 use std::ops::{Deref, DerefMut};
 
-pub struct ExpressionContext<'a> {
+pub struct Context<'a> {
     pub db: &'a dyn OptimizeMir,
     pub tracing: &'a TracingConfig,
     pub errors: &'a mut FxHashSet<CompilerError>,
     pub visible: &'a mut VisibleExpressions,
     pub id_generator: &'a mut IdGenerator<Id>,
     pub pureness: &'a mut PurenessInsights,
-    pub expression: CurrentExpression<'a>,
-}
-impl<'a> ExpressionContext<'a> {
-    pub fn prepend_optimized(
-        &mut self,
-        optimized_expressions: impl IntoIterator<Item = (Id, Expression)>,
-    ) {
-        self.expression.body.expressions.splice(
-            self.expression.index..self.expression.index,
-            optimized_expressions.into_iter().map(|(id, expression)| {
-                self.visible.insert(id, expression);
-                self.expression.index += 1;
-                (id, Expression::Parameter)
-            }),
-        );
-    }
 }
 
 pub struct CurrentExpression<'a> {
@@ -49,6 +33,20 @@ impl<'a> CurrentExpression<'a> {
         self.body.expressions[self.index].0
     }
 
+    pub fn prepend_optimized(
+        &mut self,
+        visible: &mut VisibleExpressions,
+        optimized_expressions: impl IntoIterator<Item = (Id, Expression)>,
+    ) {
+        self.body.expressions.splice(
+            self.index..self.index,
+            optimized_expressions.into_iter().map(|(id, expression)| {
+                visible.insert(id, expression);
+                self.index += 1;
+                (id, Expression::Parameter)
+            }),
+        );
+    }
     pub fn replace_with_multiple<I: DoubleEndedIterator<Item = (Id, Expression)>>(
         &mut self,
         expressions: impl IntoIterator<Item = (Id, Expression), IntoIter = I>,

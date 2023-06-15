@@ -29,7 +29,7 @@
 //! [tree shaking]: super::tree_shaking
 
 use super::{
-    current_expression::{CurrentExpression, ExpressionContext},
+    current_expression::{Context, CurrentExpression},
     pure::PurenessInsights,
 };
 use crate::{
@@ -48,16 +48,16 @@ use std::{
 use tracing::warn;
 use unicode_segmentation::UnicodeSegmentation;
 
-pub fn fold_constants(context: &mut ExpressionContext) {
+pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression) {
     let Expression::Call {
         function,
         arguments,
         responsible,
-    } = &*context.expression else { return; };
+    } = &**expression else { return; };
 
     let function = context.visible.get(*function);
     if let Expression::Tag { symbol, value: None } = function && arguments.len() == 1 {
-        *context.expression = Expression::Tag { symbol: symbol.clone(), value: Some(arguments[0]) };
+        **expression = Expression::Tag { symbol: symbol.clone(), value: Some(arguments[0]) };
         return;
     }
 
@@ -65,10 +65,10 @@ pub fn fold_constants(context: &mut ExpressionContext) {
 
     let arguments = arguments.to_owned();
     let responsible = *responsible;
-    let Some(result) = run_builtin(&mut context.expression, *builtin, &arguments, responsible, context.visible, context.id_generator, context.pureness) else {
+    let Some(result) = run_builtin(&mut *expression, *builtin, &arguments, responsible, context.visible, context.id_generator, context.pureness) else {
         return;
     };
-    *context.expression = result;
+    **expression = result;
 }
 /// This function tries to run a builtin, requiring a minimal amount of static
 /// knowledge. For example, it can find out that the result of `✨.equals $3 $3`

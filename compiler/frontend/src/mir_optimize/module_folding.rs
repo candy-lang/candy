@@ -27,7 +27,7 @@
 //! [constant folding]: super::constant_folding
 //! [inlining]: super::inlining
 
-use super::current_expression::ExpressionContext;
+use super::current_expression::{Context, CurrentExpression};
 use crate::{
     error::{CompilerError, CompilerErrorPayload},
     id::IdGenerator,
@@ -37,8 +37,8 @@ use crate::{
 use rustc_hash::FxHashMap;
 use std::mem;
 
-pub fn apply(context: &mut ExpressionContext) {
-    let Expression::UseModule { current_module, relative_path, responsible } = &*context.expression else {
+pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
+    let Expression::UseModule { current_module, relative_path, responsible } = &**expression else {
         return;
     };
     let responsible = *responsible;
@@ -61,24 +61,20 @@ pub fn apply(context: &mut ExpressionContext) {
                     containing_module: current_module.clone(),
                 },
             );
-            context
-                .expression
-                .replace_with_multiple(panicking_expression(
-                    context.id_generator,
-                    error.payload.to_string(),
-                    responsible,
-                ));
+            expression.replace_with_multiple(panicking_expression(
+                context.id_generator,
+                error.payload.to_string(),
+                responsible,
+            ));
             context.errors.insert(error);
             return;
         }
         _ => {
-            context
-                .expression
-                .replace_with_multiple(panicking_expression(
-                    context.id_generator,
-                    "`use` expects a text as a path.".to_string(),
-                    responsible,
-                ));
+            expression.replace_with_multiple(panicking_expression(
+                context.id_generator,
+                "`use` expects a text as a path.".to_string(),
+                responsible,
+            ));
             return;
         }
     };
@@ -87,13 +83,11 @@ pub fn apply(context: &mut ExpressionContext) {
         Ok(module) => module,
         Err(error) => {
             let error = CompilerError::for_whole_module(current_module.clone(), error);
-            context
-                .expression
-                .replace_with_multiple(panicking_expression(
-                    context.id_generator,
-                    error.payload.to_string(),
-                    responsible,
-                ));
+            expression.replace_with_multiple(panicking_expression(
+                context.id_generator,
+                error.payload.to_string(),
+                responsible,
+            ));
             context.errors.insert(error);
             return;
         }
@@ -114,12 +108,15 @@ pub fn apply(context: &mut ExpressionContext) {
                 .collect();
 
             context.pureness.include(other_pureness.as_ref(), &mapping);
-            context.prepend_optimized(mir.body.iter().map(|(id, expression)| {
-                let mut expression = expression.to_owned();
-                expression.replace_ids(&mapping);
-                (mapping[&id], expression)
-            }));
-            *context.expression = Expression::Reference(mapping[&mir.body.return_value()]);
+            expression.prepend_optimized(
+                context.visible,
+                mir.body.iter().map(|(id, expression)| {
+                    let mut expression = expression.to_owned();
+                    expression.replace_ids(&mapping);
+                    (mapping[&id], expression)
+                }),
+            );
+            **expression = Expression::Reference(mapping[&mir.body.return_value()]);
         }
         Err(error) => {
             context
@@ -134,7 +131,7 @@ pub fn apply(context: &mut ExpressionContext) {
 
             let (inner_id_generator, body) = builder.finish();
             *context.id_generator = inner_id_generator;
-            context.expression.replace_with_multiple(body);
+            expression.replace_with_multiple(body);
         }
     };
 }
