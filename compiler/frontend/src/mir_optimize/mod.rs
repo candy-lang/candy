@@ -147,8 +147,6 @@ impl Body {
     ) {
         let mut index = 0;
         while index < self.expressions.len() {
-            let id = self.expressions[index].0;
-
             // Thoroughly optimize the expression.
             let mut expression_context = ExpressionContext {
                 visible,
@@ -159,6 +157,7 @@ impl Body {
                 expression_context.validate(expression_context.visible);
             }
 
+            let id = expression_context.expression.id();
             pureness.visit_optimized(id, &expression_context);
 
             module_folding::apply(
@@ -170,9 +169,9 @@ impl Body {
                 errors,
             );
 
+            index = expression_context.expression.index() + 1;
             let expression = mem::replace(&mut **expression_context, Expression::Parameter);
             visible.insert(id, expression);
-            index += 1;
         }
 
         for (id, expression) in &mut self.expressions {

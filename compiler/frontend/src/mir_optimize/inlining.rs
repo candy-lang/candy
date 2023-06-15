@@ -117,12 +117,6 @@ impl ExpressionContext<'_> {
                     .map(|id| (id, id_generator.generate())),
             )
             .collect();
-        let mut inlined_body = body.clone();
-        inlined_body.replace_ids(&mut |id| {
-            if let Some(replacement) = id_mapping.get(id) {
-                *id = *replacement;
-            }
-        });
 
         self.expression
             .replace_with_multiple(body.iter().map(|(id, expression)| {
@@ -132,7 +126,7 @@ impl ExpressionContext<'_> {
                         *id = *replacement;
                     }
                 });
-                (id, expression)
+                (id_mapping[&id], expression)
             }));
 
         Ok(())

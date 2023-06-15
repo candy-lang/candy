@@ -14,6 +14,7 @@ impl<'a> ExpressionContext<'a> {
             self.expression.index..self.expression.index,
             optimized_expressions.into_iter().map(|(id, expression)| {
                 self.visible.insert(id, expression);
+                self.expression.index += 1;
                 (id, Expression::Parameter)
             }),
         );
@@ -42,7 +43,10 @@ impl<'a> CurrentExpression<'a> {
         Self { body, index }
     }
 
-    fn id(&self) -> Id {
+    pub fn index(&self) -> usize {
+        self.index
+    }
+    pub fn id(&self) -> Id {
         self.body.expressions[self.index].0
     }
 
