@@ -104,7 +104,9 @@ impl VisibleExpressions {
         self.expressions.remove(&id).unwrap()
     }
     pub fn get(&self, id: Id) -> &Expression {
-        self.expressions.get(&id).unwrap()
+        self.expressions.get(&id).unwrap_or_else(|| {
+            panic!("Expression with ID {id} is not visible in this scope. Visible expressions: {self:?}")
+        })
     }
     pub fn contains(&self, id: Id) -> bool {
         self.expressions.contains_key(&id)
