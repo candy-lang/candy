@@ -202,7 +202,7 @@ impl Id {
 impl Expression {
     /// Replaces all referenced IDs. Does *not* replace IDs that are defined in
     /// this expression.
-    pub fn replace_id_references<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
+    pub fn replace_id_references(&mut self, replacer: &mut impl FnMut(&mut Id)) {
         match self {
             Expression::Int(_)
             | Expression::Text(_)
@@ -299,7 +299,7 @@ impl Expression {
     }
 }
 impl Body {
-    pub fn replace_id_references<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
+    pub fn replace_id_references(&mut self, replacer: &mut impl FnMut(&mut Id)) {
         for (_, expression) in self.iter_mut() {
             expression.replace_id_references(replacer);
         }
@@ -309,7 +309,7 @@ impl Body {
 impl Expression {
     /// Replaces all IDs in this expression using the replacer, including
     /// definitions.
-    pub fn replace_ids<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
+    pub fn replace_ids(&mut self, replacer: &mut impl FnMut(&mut Id)) {
         match self {
             Expression::Function {
                 original_hirs: _,
@@ -331,7 +331,7 @@ impl Expression {
     }
 }
 impl Body {
-    pub fn replace_ids<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
+    pub fn replace_ids(&mut self, replacer: &mut impl FnMut(&mut Id)) {
         let body = mem::take(self);
         for (mut id, mut expression) in body.into_iter() {
             replacer(&mut id);
