@@ -431,7 +431,7 @@ impl<T: FiberTracer> Fiber<T> {
                 let mut arguments = (0..num_args)
                     .map(|_| self.pop_from_data_stack())
                     .collect_vec();
-                // PERF: Built the reverse list in place
+                // PERF: Build the reverse list in place.
                 arguments.reverse();
                 let callee = self.pop_from_data_stack();
 
