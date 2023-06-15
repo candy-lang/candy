@@ -53,6 +53,7 @@ use crate::{
     mir::{Body, Expression, Id, MirError, VisibleExpressions},
     module::Module,
     string_to_rcst::ModuleError,
+    utils::DoHash,
 };
 use rustc_hash::{FxHashSet, FxHasher};
 use std::{
@@ -238,12 +239,6 @@ impl ExpressionContext<'_> {
                 }
             }
         }
-    }
-
-    fn do_hash(&self) -> u64 {
-        let mut hasher = FxHasher::default();
-        self.expression.hash(&mut hasher);
-        hasher.finish()
     }
 }
 
