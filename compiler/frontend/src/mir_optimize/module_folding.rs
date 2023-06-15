@@ -27,7 +27,7 @@
 //! [constant folding]: super::constant_folding
 //! [inlining]: super::inlining
 
-use super::{current_expression::ExpressionContext, pure::PurenessInsights};
+use super::current_expression::ExpressionContext;
 use crate::{
     error::{CompilerError, CompilerErrorPayload},
     id::IdGenerator,
@@ -43,7 +43,6 @@ pub fn apply(
     context: &mut ExpressionContext,
     db: &dyn OptimizeMir,
     tracing: &TracingConfig,
-    pureness: &mut PurenessInsights,
     errors: &mut FxHashSet<CompilerError>,
 ) {
     let Expression::UseModule { current_module, relative_path, responsible } = &*context.expression else {
@@ -118,7 +117,7 @@ pub fn apply(
                 .map(|id| (id, context.id_generator.generate()))
                 .collect();
 
-            pureness.include(other_pureness.as_ref(), &mapping);
+            context.pureness.include(other_pureness.as_ref(), &mapping);
             context.prepend_optimized(mir.body.iter().map(|(id, expression)| {
                 let mut expression = expression.to_owned();
                 expression.replace_ids(&mapping);

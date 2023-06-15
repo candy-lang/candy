@@ -151,17 +151,18 @@ impl Body {
             let mut context = ExpressionContext {
                 visible,
                 id_generator,
+                pureness,
                 expression: CurrentExpression::new(self, index),
             };
-            context.optimize(db, tracing, pureness, errors);
+            context.optimize(db, tracing, errors);
             if cfg!(debug_assertions) {
                 context.expression.validate(context.visible);
             }
 
             let id = context.expression.id();
-            pureness.visit_optimized(id, &context.expression);
+            context.pureness.visit_optimized(id, &context.expression);
 
-            module_folding::apply(&mut context, db, tracing, pureness, errors);
+            module_folding::apply(&mut context, db, tracing, errors);
 
             index = context.expression.index() + 1;
             let expression = mem::replace(&mut *context.expression, Expression::Parameter);
@@ -183,7 +184,6 @@ impl ExpressionContext<'_> {
         &mut self,
         db: &dyn OptimizeMir,
         tracing: &TracingConfig,
-        pureness: &mut PurenessInsights,
         errors: &mut FxHashSet<CompilerError>,
     ) {
         'outer: loop {
@@ -199,14 +199,15 @@ impl ExpressionContext<'_> {
                 }
                 self.visible
                     .insert(*responsible_parameter, Expression::Parameter);
-                pureness.enter_function(parameters, *responsible_parameter);
+                self.pureness
+                    .enter_function(parameters, *responsible_parameter);
 
                 body.optimize(
                     self.visible,
                     self.id_generator,
                     db,
                     tracing,
-                    pureness,
+                    self.pureness,
                     errors,
                 );
 
@@ -220,7 +221,7 @@ impl ExpressionContext<'_> {
                 let hashcode_before = self.do_hash();
 
                 reference_following::follow_references(self);
-                constant_folding::fold_constants(self, pureness);
+                constant_folding::fold_constants(self);
 
                 let is_call = matches!(*self.expression, Expression::Call { .. });
                 inlining::inline_tiny_functions(self);
@@ -232,7 +233,7 @@ impl ExpressionContext<'_> {
                     continue 'outer;
                 }
 
-                constant_lifting::lift_constants(self, pureness);
+                constant_lifting::lift_constants(self);
 
                 if self.do_hash() == hashcode_before {
                     return;

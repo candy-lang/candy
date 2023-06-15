@@ -35,10 +35,10 @@
 //!
 //! [common subtree elimination]: super::common_subtree_elimination
 
-use super::{current_expression::ExpressionContext, pure::PurenessInsights};
+use super::current_expression::ExpressionContext;
 use crate::mir::Expression;
 
-pub fn lift_constants(context: &mut ExpressionContext, pureness: &PurenessInsights) {
+pub fn lift_constants(context: &mut ExpressionContext) {
     let Expression::Function { body, .. } = &mut *context.expression else { return; };
 
     let mut constants = vec![];
@@ -48,7 +48,7 @@ pub fn lift_constants(context: &mut ExpressionContext, pureness: &PurenessInsigh
         let (id, expression) = &body.expressions[index];
         let id = *id;
 
-        if !pureness.is_definition_const(expression) {
+        if !context.pureness.is_definition_const(expression) {
             index += 1;
             continue;
         }

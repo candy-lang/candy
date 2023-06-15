@@ -1,3 +1,4 @@
+use super::pure::PurenessInsights;
 use crate::{
     id::IdGenerator,
     mir::{Body, Expression, Id, VisibleExpressions},
@@ -7,6 +8,7 @@ use std::ops::{Deref, DerefMut};
 pub struct ExpressionContext<'a> {
     pub visible: &'a mut VisibleExpressions,
     pub id_generator: &'a mut IdGenerator<Id>,
+    pub pureness: &'a mut PurenessInsights,
     pub expression: CurrentExpression<'a>,
 }
 impl<'a> ExpressionContext<'a> {
