@@ -111,7 +111,11 @@ impl Expression {
             .map(|id| (id, generator.generate()))
             .collect();
 
-        self.replace_ids(&mapping);
+        self.replace_ids(&mut |id| {
+            if let Some(replacement) = mapping.get(id) {
+                *id = *replacement;
+            }
+        });
         self.strip_original_hirs();
     }
     fn strip_original_hirs(&mut self) {

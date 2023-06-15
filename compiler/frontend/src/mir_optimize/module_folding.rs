@@ -112,7 +112,11 @@ pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
                 context.visible,
                 mir.body.iter().map(|(id, expression)| {
                     let mut expression = expression.to_owned();
-                    expression.replace_ids(&mapping);
+                    expression.replace_ids(&mut |id| {
+                        if let Some(new_id) = mapping.get(id) {
+                            *id = *new_id;
+                        }
+                    });
                     (mapping[&id], expression)
                 }),
             );

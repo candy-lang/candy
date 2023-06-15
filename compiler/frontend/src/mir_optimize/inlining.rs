@@ -115,7 +115,11 @@ impl Context<'_> {
 
         expression.replace_with_multiple(body.iter().map(|(id, expression)| {
             let mut expression = expression.to_owned();
-            expression.replace_ids(&id_mapping);
+            expression.replace_ids(&mut |id| {
+                if let Some(replacement) = id_mapping.get(id) {
+                    *id = *replacement;
+                }
+            });
             (id_mapping[&id], expression)
         }));
     }

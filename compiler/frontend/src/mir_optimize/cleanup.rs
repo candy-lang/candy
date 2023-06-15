@@ -90,7 +90,7 @@ impl Mir {
             .map(|id| (id, generator.generate()))
             .collect();
 
-        self.body.replace_ids(&mapping);
+        self.body.replace_ids(&mut |id| *id = mapping[&*id]);
         pureness.on_normalize_ids(&mapping);
     }
 }

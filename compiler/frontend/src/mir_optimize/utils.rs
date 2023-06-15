@@ -1,6 +1,6 @@
 use super::pure::PurenessInsights;
 use crate::mir::{Body, Expression, Id, VisibleExpressions};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 use std::mem;
 
 impl Expression {
@@ -304,7 +304,7 @@ impl Body {
 impl Expression {
     /// Replaces all IDs in this expression using the replacer, including
     /// definitions.
-    pub fn replace_ids(&mut self, mapping: &FxHashMap<Id, Id>) {
+    pub fn replace_ids(&mut self, replacer: &mut impl FnMut(&mut Id)) {
         match self {
             Expression::Function {
                 original_hirs: _,
@@ -313,23 +313,23 @@ impl Expression {
                 body,
             } => {
                 for parameter in parameters {
-                    *parameter = mapping[&*parameter];
+                    replacer(parameter);
                 }
-                *responsible_parameter = mapping[&*responsible_parameter];
-                body.replace_ids(mapping);
+                replacer(responsible_parameter);
+                body.replace_ids(replacer);
             }
             // All other expressions don't define IDs and instead only contain
             // references. Thus, the function above does the job.
-            _ => self.replace_id_references(&mut |id| *id = mapping[&*id]),
+            _ => self.replace_id_references(replacer),
         }
     }
 }
 impl Body {
-    pub fn replace_ids(&mut self, mapping: &FxHashMap<Id, Id>) {
+    pub fn replace_ids(&mut self, replacer: &mut impl FnMut(&mut Id)) {
         let body = mem::take(self);
         for (mut id, mut expression) in body.into_iter() {
-            id = mapping[&id];
-            expression.replace_ids(mapping);
+            replacer(&mut id);
+            expression.replace_ids(replacer);
             self.push(id, expression);
         }
     }
