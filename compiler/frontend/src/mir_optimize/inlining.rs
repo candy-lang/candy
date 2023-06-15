@@ -62,7 +62,7 @@ pub fn inline_functions_of_maximum_complexity(
     if let Expression::Call { function, .. } = *context.expression
         && let Expression::Function { body, .. } = context.visible.get(function)
         && body.complexity() <= complexity {
-        let _ = context.inline_call(id_generator);
+        context.inline_call(id_generator);
     }
 }
 
@@ -73,22 +73,23 @@ pub fn inline_functions_containing_use(
     if let Expression::Call { function, .. } = *context.expression
         && let Expression::Function { body, .. } = context.visible.get(function)
         && body.iter().any(|(_, expr)| matches!(expr, Expression::UseModule { .. })) {
-        let _ = context.inline_call(id_generator);
+        context.inline_call(id_generator);
     }
 }
 
 impl ExpressionContext<'_> {
-    pub fn inline_call(&mut self, id_generator: &mut IdGenerator<Id>) -> Result<(), &'static str> {
-        // FIXME: Remove return values as they're unused.
+    pub fn inline_call(&mut self, id_generator: &mut IdGenerator<Id>) {
         let Expression::Call {
             function,
             arguments,
             responsible: responsible_argument,
         } = &*self.expression else {
-            return Err("Tried to inline, but the expression is not a call.");
+            // Expression is not a call.
+            return;
         };
         if arguments.contains(function) {
-            return Err("Tried to inline, but the callee is used as an argument → recursion.");
+            // Callee is used as an argument → recursion
+            return;
         }
 
         let Expression::Function {
@@ -97,10 +98,12 @@ impl ExpressionContext<'_> {
             responsible_parameter,
             body,
         } = self.visible.get(*function) else {
-            return Err("Tried to inline, but the callee is not a function.");
+            // Callee is not a function.
+            return;
         };
         if arguments.len() != parameters.len() {
-            return Err("Tried to inline, but the number of arguments doesn't match the expected parameter count.");
+            // Number of arguments doesn't match the expected parameter count.
+            return;
         }
 
         let id_mapping: FxHashMap<Id, Id> = parameters
@@ -121,7 +124,5 @@ impl ExpressionContext<'_> {
                 expression.replace_ids(&id_mapping);
                 (id_mapping[&id], expression)
             }));
-
-        Ok(())
     }
 }
