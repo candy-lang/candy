@@ -148,29 +148,22 @@ impl Body {
         let mut index = 0;
         while index < self.expressions.len() {
             // Thoroughly optimize the expression.
-            let mut expression_context = ExpressionContext {
+            let mut context = ExpressionContext {
                 visible,
                 expression: CurrentExpression::new(self, index),
             };
-            expression_context.optimize(id_generator, db, tracing, pureness, errors);
+            context.optimize(id_generator, db, tracing, pureness, errors);
             if cfg!(debug_assertions) {
-                expression_context.validate(expression_context.visible);
+                context.expression.validate(context.visible);
             }
 
-            let id = expression_context.expression.id();
-            pureness.visit_optimized(id, &expression_context);
+            let id = context.expression.id();
+            pureness.visit_optimized(id, &context.expression);
 
-            module_folding::apply(
-                &mut expression_context,
-                id_generator,
-                db,
-                tracing,
-                pureness,
-                errors,
-            );
+            module_folding::apply(&mut context, id_generator, db, tracing, pureness, errors);
 
-            index = expression_context.expression.index() + 1;
-            let expression = mem::replace(&mut **expression_context, Expression::Parameter);
+            index = context.expression.index() + 1;
+            let expression = mem::replace(&mut *context.expression, Expression::Parameter);
             visible.insert(id, expression);
         }
 

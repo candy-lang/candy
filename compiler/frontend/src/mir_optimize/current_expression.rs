@@ -21,19 +21,6 @@ impl<'a> ExpressionContext<'a> {
     }
 }
 
-impl<'a> Deref for ExpressionContext<'a> {
-    type Target = CurrentExpression<'a>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.expression
-    }
-}
-impl DerefMut for ExpressionContext<'_> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.expression
-    }
-}
-
 pub struct CurrentExpression<'a> {
     body: &'a mut Body,
     index: usize,

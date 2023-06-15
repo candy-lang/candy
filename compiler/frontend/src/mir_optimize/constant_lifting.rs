@@ -42,11 +42,11 @@ use crate::{
 };
 
 pub fn lift_constants(
-    expression: &mut ExpressionContext,
+    context: &mut ExpressionContext,
     pureness: &PurenessInsights,
     id_generator: &mut IdGenerator<Id>,
 ) {
-    let Expression::Function { body, .. } = &mut ***expression else { return; };
+    let Expression::Function { body, .. } = &mut *context.expression else { return; };
 
     let mut constants = vec![];
 
@@ -79,5 +79,5 @@ pub fn lift_constants(
         }
     }
 
-    expression.prepend_optimized(constants);
+    context.prepend_optimized(constants);
 }

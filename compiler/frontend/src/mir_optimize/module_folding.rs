@@ -40,19 +40,19 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::mem;
 
 pub fn apply(
-    expression: &mut ExpressionContext,
+    context: &mut ExpressionContext,
     id_generator: &mut IdGenerator<Id>,
     db: &dyn OptimizeMir,
     tracing: &TracingConfig,
     pureness: &mut PurenessInsights,
     errors: &mut FxHashSet<CompilerError>,
 ) {
-    let Expression::UseModule { current_module, relative_path, responsible } = &***expression else {
+    let Expression::UseModule { current_module, relative_path, responsible } = &*context.expression else {
         return;
     };
     let responsible = *responsible;
 
-    let path = match expression.visible.get(*relative_path) {
+    let path = match context.visible.get(*relative_path) {
         Expression::Text(path) => path,
         Expression::Parameter => {
             // After optimizing, the MIR should no longer contain any `use`.
@@ -70,20 +70,24 @@ pub fn apply(
                     containing_module: current_module.clone(),
                 },
             );
-            expression.replace_with_multiple(panicking_expression(
-                id_generator,
-                error.payload.to_string(),
-                responsible,
-            ));
+            context
+                .expression
+                .replace_with_multiple(panicking_expression(
+                    id_generator,
+                    error.payload.to_string(),
+                    responsible,
+                ));
             errors.insert(error);
             return;
         }
         _ => {
-            expression.replace_with_multiple(panicking_expression(
-                id_generator,
-                "`use` expects a text as a path.".to_string(),
-                responsible,
-            ));
+            context
+                .expression
+                .replace_with_multiple(panicking_expression(
+                    id_generator,
+                    "`use` expects a text as a path.".to_string(),
+                    responsible,
+                ));
             return;
         }
     };
@@ -92,11 +96,13 @@ pub fn apply(
         Ok(module) => module,
         Err(error) => {
             let error = CompilerError::for_whole_module(current_module.clone(), error);
-            expression.replace_with_multiple(panicking_expression(
-                id_generator,
-                error.payload.to_string(),
-                responsible,
-            ));
+            context
+                .expression
+                .replace_with_multiple(panicking_expression(
+                    id_generator,
+                    error.payload.to_string(),
+                    responsible,
+                ));
             errors.insert(error);
             return;
         }
@@ -114,7 +120,7 @@ pub fn apply(
                 .collect();
 
             pureness.include(other_pureness.as_ref(), &mapping);
-            expression.prepend_optimized(mir.body.iter().map(|(id, expression)| {
+            context.prepend_optimized(mir.body.iter().map(|(id, expression)| {
                 let mut expression = expression.to_owned();
                 // FIXME: Create utility for replacing IDs through a mapping.
                 expression.replace_ids(&mut |id| {
@@ -124,7 +130,7 @@ pub fn apply(
                 });
                 (mapping[&id], expression)
             }));
-            ***expression = Expression::Reference(mapping[&mir.body.return_value()]);
+            *context.expression = Expression::Reference(mapping[&mir.body.return_value()]);
         }
         Err(error) => {
             errors.insert(CompilerError::for_whole_module(module_to_import, error));
@@ -137,7 +143,7 @@ pub fn apply(
 
             let (inner_id_generator, body) = builder.finish();
             *id_generator = inner_id_generator;
-            expression.replace_with_multiple(body.expressions);
+            context.expression.replace_with_multiple(body.expressions);
         }
     };
 }

@@ -43,12 +43,9 @@ use crate::{
 
 use super::{complexity::Complexity, current_expression::ExpressionContext};
 
-pub fn inline_tiny_functions(
-    expression: &mut ExpressionContext,
-    id_generator: &mut IdGenerator<Id>,
-) {
+pub fn inline_tiny_functions(context: &mut ExpressionContext, id_generator: &mut IdGenerator<Id>) {
     inline_functions_of_maximum_complexity(
-        expression,
+        context,
         Complexity {
             is_self_contained: true,
             expressions: 7,
@@ -58,25 +55,25 @@ pub fn inline_tiny_functions(
 }
 
 pub fn inline_functions_of_maximum_complexity(
-    expression: &mut ExpressionContext,
+    context: &mut ExpressionContext,
     complexity: Complexity,
     id_generator: &mut IdGenerator<Id>,
 ) {
-    if let Expression::Call { function, .. } = ***expression
-        && let Expression::Function { body, .. } = expression.visible.get(function)
+    if let Expression::Call { function, .. } = *context.expression
+        && let Expression::Function { body, .. } = context.visible.get(function)
         && body.complexity() <= complexity {
-        let _ = expression.inline_call(id_generator);
+        let _ = context.inline_call(id_generator);
     }
 }
 
 pub fn inline_functions_containing_use(
-    expression: &mut ExpressionContext,
+    context: &mut ExpressionContext,
     id_generator: &mut IdGenerator<Id>,
 ) {
-    if let Expression::Call { function, .. } = ***expression
-        && let Expression::Function { body, .. } = expression.visible.get(function)
+    if let Expression::Call { function, .. } = *context.expression
+        && let Expression::Function { body, .. } = context.visible.get(function)
         && body.iter().any(|(_, expr)| matches!(expr, Expression::UseModule { .. })) {
-        let _ = expression.inline_call(id_generator);
+        let _ = context.inline_call(id_generator);
     }
 }
 
@@ -87,7 +84,7 @@ impl ExpressionContext<'_> {
             function,
             arguments,
             responsible: responsible_argument,
-        } = &***self else {
+        } = &*self.expression else {
             return Err("Tried to inline, but the expression is not a call.");
         };
         if arguments.contains(function) {

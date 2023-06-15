@@ -49,7 +49,7 @@ use tracing::warn;
 use unicode_segmentation::UnicodeSegmentation;
 
 pub fn fold_constants(
-    expression: &mut ExpressionContext,
+    context: &mut ExpressionContext,
     pureness: &PurenessInsights,
     id_generator: &mut IdGenerator<Id>,
 ) {
@@ -57,11 +57,11 @@ pub fn fold_constants(
         function,
         arguments,
         responsible,
-    } = &***expression else { return; };
+    } = &*context.expression else { return; };
 
-    let function = expression.visible.get(*function);
+    let function = context.visible.get(*function);
     if let Expression::Tag { symbol, value: None } = function && arguments.len() == 1 {
-        ***expression = Expression::Tag { symbol: symbol.clone(), value: Some(arguments[0]) };
+        *context.expression = Expression::Tag { symbol: symbol.clone(), value: Some(arguments[0]) };
         return;
     }
 
@@ -69,10 +69,10 @@ pub fn fold_constants(
 
     let arguments = arguments.to_owned();
     let responsible = *responsible;
-    let Some(result) = run_builtin(&mut expression.expression, *builtin, &arguments, responsible, expression.visible, id_generator, pureness) else {
+    let Some(result) = run_builtin(&mut context.expression, *builtin, &arguments, responsible, context.visible, id_generator, pureness) else {
         return;
     };
-    ***expression = result;
+    *context.expression = result;
 }
 /// This function tries to run a builtin, requiring a minimal amount of static
 /// knowledge. For example, it can find out that the result of `✨.equals $3 $3`
