@@ -42,7 +42,10 @@
 //! both performance and code size. Whenever they can be applied, they should be
 //! applied.
 
-use self::pure::PurenessInsights;
+use self::{
+    current_expression::{CurrentExpression, ExpressionContext},
+    pure::PurenessInsights,
+};
 use super::{hir, hir_to_mir::HirToMir, mir::Mir, tracing::TracingConfig};
 use crate::{
     error::CompilerError,
@@ -64,6 +67,7 @@ mod common_subtree_elimination;
 mod complexity;
 mod constant_folding;
 mod constant_lifting;
+mod current_expression;
 mod inlining;
 mod module_folding;
 mod pure;
@@ -142,48 +146,31 @@ impl Body {
         errors: &mut FxHashSet<CompilerError>,
     ) {
         let mut index = 0;
-        'expression_loop: while index < self.expressions.len() {
+        while index < self.expressions.len() {
             let id = self.expressions[index].0;
-            let mut expression =
-                mem::replace(&mut self.expressions[index].1, Expression::Parameter);
 
             // Thoroughly optimize the expression.
-            expression.optimize(visible, id_generator, db, tracing, pureness, errors);
+            let mut expression_context = ExpressionContext {
+                visible,
+                expression: CurrentExpression::new(self, index),
+            };
+            expression_context.optimize(id_generator, db, tracing, pureness, errors);
             if cfg!(debug_assertions) {
-                expression.validate(visible);
+                expression_context.validate(expression_context.visible);
             }
 
-            if self.fold_multiple(id, &mut expression, index).is_some() {
-                // We replaced the expression with other expressions, so instead
-                // of continuing to the next expression, we should try to
-                // optimize the newly inserted expressions next.
-                continue 'expression_loop;
-            }
-            pureness.visit_optimized(id, &expression);
+            pureness.visit_optimized(id, &expression_context);
 
             module_folding::apply(
-                &mut expression,
-                visible,
+                &mut expression_context,
                 id_generator,
                 db,
                 tracing,
                 pureness,
                 errors,
             );
-            if let Some(index_after_module) = self.fold_multiple(id, &mut expression, index) {
-                // A module folding actually happened. Because the inserted
-                // module's MIR is already optimized and doesn't depend on any
-                // context outside of itself, we don't need to analyze it again.
-                while index < index_after_module {
-                    let id = self.expressions[index].0;
-                    let expression =
-                        mem::replace(&mut self.expressions[index].1, Expression::Parameter);
-                    visible.insert(id, expression);
-                    index += 1;
-                }
-                continue 'expression_loop;
-            }
 
+            let expression = mem::replace(&mut **expression_context, Expression::Parameter);
             visible.insert(id, expression);
             index += 1;
         }
@@ -196,33 +183,11 @@ impl Body {
         reference_following::remove_redundant_return_references(self);
         tree_shaking::tree_shake(self, pureness);
     }
-
-    // If an `Expression::Multiple` was actually folded, this returns the index
-    // of the expression after the newly inserted ones.
-    fn fold_multiple(
-        &mut self,
-        id: Id,
-        expression: &mut Expression,
-        index: usize,
-    ) -> Option<usize> {
-        let Expression::Multiple(expressions) = expression else { return None; };
-        let return_value = expressions.return_value();
-        let num_expressions = expressions.expressions.len();
-        self.expressions.splice(
-            index..(index + 1),
-            expressions
-                .expressions
-                .drain(..)
-                .chain([(id, Expression::Reference(return_value))]),
-        );
-        Some(index + num_expressions + 1)
-    }
 }
 
-impl Expression {
+impl ExpressionContext<'_> {
     fn optimize(
         &mut self,
-        visible: &mut VisibleExpressions,
         id_generator: &mut IdGenerator<Id>,
         db: &dyn OptimizeMir,
         tracing: &TracingConfig,
@@ -234,29 +199,30 @@ impl Expression {
             responsible_parameter,
             body,
             ..
-        } = self
+        } = &mut *self.expression
         {
             for parameter in &*parameters {
-                visible.insert(*parameter, Expression::Parameter);
+                self.visible.insert(*parameter, Expression::Parameter);
             }
-            visible.insert(*responsible_parameter, Expression::Parameter);
+            self.visible
+                .insert(*responsible_parameter, Expression::Parameter);
             pureness.enter_function(parameters, *responsible_parameter);
 
-            body.optimize(visible, id_generator, db, tracing, pureness, errors);
+            body.optimize(self.visible, id_generator, db, tracing, pureness, errors);
 
             for parameter in &*parameters {
-                visible.remove(*parameter);
+                self.visible.remove(*parameter);
             }
-            visible.remove(*responsible_parameter);
+            self.visible.remove(*responsible_parameter);
         }
 
         loop {
             let hashcode_before = self.do_hash();
 
-            reference_following::follow_references(self, visible);
-            constant_folding::fold_constants(self, visible, pureness, id_generator);
-            inlining::inline_tiny_functions(self, visible, id_generator);
-            inlining::inline_functions_containing_use(self, visible, id_generator);
+            reference_following::follow_references(self);
+            constant_folding::fold_constants(self, pureness, id_generator);
+            inlining::inline_tiny_functions(self, id_generator);
+            inlining::inline_functions_containing_use(self, id_generator);
             constant_lifting::lift_constants(self, pureness, id_generator);
 
             if self.do_hash() == hashcode_before {
@@ -267,7 +233,7 @@ impl Expression {
 
     fn do_hash(&self) -> u64 {
         let mut hasher = FxHasher::default();
-        self.hash(&mut hasher);
+        self.expression.hash(&mut hasher);
         hasher.finish()
     }
 }

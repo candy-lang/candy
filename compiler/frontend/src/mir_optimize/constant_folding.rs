@@ -28,7 +28,10 @@
 //!
 //! [tree shaking]: super::tree_shaking
 
-use super::pure::PurenessInsights;
+use super::{
+    current_expression::{CurrentExpression, ExpressionContext},
+    pure::PurenessInsights,
+};
 use crate::{
     builtin_functions::BuiltinFunction,
     id::IdGenerator,
@@ -46,8 +49,7 @@ use tracing::warn;
 use unicode_segmentation::UnicodeSegmentation;
 
 pub fn fold_constants(
-    expression: &mut Expression,
-    visible: &VisibleExpressions,
+    expression: &mut ExpressionContext,
     pureness: &PurenessInsights,
     id_generator: &mut IdGenerator<Id>,
 ) {
@@ -55,26 +57,30 @@ pub fn fold_constants(
         function,
         arguments,
         responsible,
-    } = expression else { return; };
+    } = &***expression else { return; };
 
-    if let Expression::Tag { symbol, value: None } = visible.get(*function) && arguments.len() == 1 {
-        *expression = Expression::Tag { symbol: symbol.clone(), value: Some(arguments[0]) };
+    let function = expression.visible.get(*function);
+    if let Expression::Tag { symbol, value: None } = function && arguments.len() == 1 {
+        ***expression = Expression::Tag { symbol: symbol.clone(), value: Some(arguments[0]) };
         return;
     }
 
-    let Expression::Builtin(builtin) = visible.get(*function) else { return; };
-    let Some(result) = run_builtin(*builtin, arguments, *responsible, visible, id_generator, pureness) else {
+    let Expression::Builtin(builtin) = function else { return; };
+
+    let arguments = arguments.to_owned();
+    let responsible = *responsible;
+    let Some(result) = run_builtin(&mut expression.expression, *builtin, &arguments, responsible, expression.visible, id_generator, pureness) else {
         return;
     };
-    *expression = result;
+    ***expression = result;
 }
-
 /// This function tries to run a builtin, requiring a minimal amount of static
 /// knowledge. For example, it can find out that the result of `✨.equals $3 $3`
 /// is `True`, even if the value of `$3` is not known at compile-time.
 ///
 /// Returns `None` if the call couldn't be evaluated statically.
 fn run_builtin(
+    expression: &mut CurrentExpression,
     builtin: BuiltinFunction,
     arguments: &[Id],
     responsible: Id,
@@ -204,7 +210,8 @@ fn run_builtin(
                 Err(err) => Err(body.push_with_new_id(id_generator, err.to_string())),
             };
             body.push_with_new_id(id_generator, result);
-            body.into()
+            expression.replace_with_multiple(body.expressions.into_iter());
+            return None;
         }
         BuiltinFunction::IntRemainder => {
             let [dividend, divisor] = arguments else { unreachable!() };
@@ -360,7 +367,8 @@ fn run_builtin(
                 .map(|it| body.push_with_new_id(id_generator, it))
                 .collect_vec();
             body.push_with_new_id(id_generator, characters);
-            body.into()
+            expression.replace_with_multiple(body.expressions.into_iter());
+            return None;
         }
         BuiltinFunction::TextConcatenate => {
             let [a, b] = arguments else { unreachable!() };
@@ -415,7 +423,8 @@ fn run_builtin(
                 .map(|it| body.push_with_new_id(id_generator, it))
                 .map_err(|_| body.push_with_new_id(id_generator, "Invalid UTF-8."));
             body.push_with_new_id(id_generator, result);
-            body.into()
+            expression.replace_with_multiple(body.expressions.into_iter());
+            return None;
         }
         BuiltinFunction::TextGetRange => {
             let [text, start_inclusive, end_exclusive] = arguments else { unreachable!() };
@@ -556,7 +565,6 @@ fn run_builtin(
                 }
                 Expression::UseModule { .. } => return None,
                 Expression::Panic { .. } => return None,
-                Expression::Multiple(_) => return None,
                 Expression::TraceCallStarts { .. }
                 | Expression::TraceCallEnds { .. }
                 | Expression::TraceExpressionEvaluated { .. }

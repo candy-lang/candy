@@ -28,9 +28,6 @@ impl PurenessInsights {
             Expression::Call { .. } | Expression::UseModule { .. } | Expression::Panic { .. } => {
                 false
             }
-            Expression::Multiple(_) => {
-                panic!("Called `is_definition_pure(…)` with `Expression::Multiple(…)`")
-            }
             Expression::TraceCallStarts { .. }
             | Expression::TraceCallEnds { .. }
             | Expression::TraceExpressionEvaluated { .. }

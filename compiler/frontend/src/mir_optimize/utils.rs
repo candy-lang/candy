@@ -13,19 +13,16 @@ impl Expression {
         defined
     }
     fn collect_defined_ids(&self, defined: &mut Vec<Id>) {
-        match self {
-            Expression::Function {
-                parameters,
-                responsible_parameter,
-                body,
-                ..
-            } => {
-                defined.extend(parameters);
-                defined.push(*responsible_parameter);
-                body.collect_defined_ids(defined);
-            }
-            Expression::Multiple(body) => body.collect_defined_ids(defined),
-            _ => {}
+        if let Expression::Function {
+            parameters,
+            responsible_parameter,
+            body,
+            ..
+        } = self
+        {
+            defined.extend(parameters);
+            defined.push(*responsible_parameter);
+            body.collect_defined_ids(defined);
         }
     }
 }
@@ -103,7 +100,6 @@ impl Expression {
                 referenced.insert(*reason);
                 referenced.insert(*responsible);
             }
-            Expression::Multiple(body) => body.collect_referenced_ids(referenced),
             Expression::TraceCallStarts {
                 hir_call,
                 function,
@@ -264,7 +260,6 @@ impl Expression {
                 replacer(reason);
                 replacer(responsible);
             }
-            Expression::Multiple(body) => body.replace_id_references(replacer),
             Expression::TraceCallStarts {
                 hir_call,
                 function,
@@ -323,7 +318,6 @@ impl Expression {
                 replacer(responsible_parameter);
                 body.replace_ids(replacer);
             }
-            Expression::Multiple(body) => body.replace_ids(replacer),
             // All other expressions don't define IDs and instead only contain
             // references. Thus, the function above does the job.
             _ => self.replace_id_references(replacer),

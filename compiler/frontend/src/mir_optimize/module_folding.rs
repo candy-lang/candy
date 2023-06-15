@@ -27,11 +27,11 @@
 //! [constant folding]: super::constant_folding
 //! [inlining]: super::inlining
 
-use super::pure::PurenessInsights;
+use super::{current_expression::ExpressionContext, pure::PurenessInsights};
 use crate::{
     error::{CompilerError, CompilerErrorPayload},
     id::IdGenerator,
-    mir::{Body, BodyBuilder, Expression, Id, MirError, VisibleExpressions},
+    mir::{Body, BodyBuilder, Expression, Id, MirError},
     mir_optimize::OptimizeMir,
     module::{Module, UsePath},
     tracing::TracingConfig,
@@ -40,16 +40,19 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::mem;
 
 pub fn apply(
-    expression: &mut Expression,
-    visible: &VisibleExpressions,
+    expression: &mut ExpressionContext,
     id_generator: &mut IdGenerator<Id>,
     db: &dyn OptimizeMir,
     tracing: &TracingConfig,
     pureness: &mut PurenessInsights,
     errors: &mut FxHashSet<CompilerError>,
 ) {
-    let Expression::UseModule { current_module, relative_path, responsible } = expression else { return; };
-    let path = match visible.get(*relative_path) {
+    let Expression::UseModule { current_module, relative_path, responsible } = &***expression else {
+        return;
+    };
+    let responsible = *responsible;
+
+    let path = match expression.visible.get(*relative_path) {
         Expression::Text(path) => path,
         Expression::Parameter => {
             // After optimizing, the MIR should no longer contain any `use`.
@@ -67,17 +70,20 @@ pub fn apply(
                     containing_module: current_module.clone(),
                 },
             );
-            *expression =
-                panicking_expression(id_generator, error.payload.to_string(), *responsible);
+            expression.replace_with_multiple(panicking_expression(
+                id_generator,
+                error.payload.to_string(),
+                responsible,
+            ));
             errors.insert(error);
             return;
         }
         _ => {
-            *expression = panicking_expression(
+            expression.replace_with_multiple(panicking_expression(
                 id_generator,
                 "`use` expects a text as a path.".to_string(),
-                *responsible,
-            );
+                responsible,
+            ));
             return;
         }
     };
@@ -86,47 +92,54 @@ pub fn apply(
         Ok(module) => module,
         Err(error) => {
             let error = CompilerError::for_whole_module(current_module.clone(), error);
-            *expression =
-                panicking_expression(id_generator, error.payload.to_string(), *responsible);
+            expression.replace_with_multiple(panicking_expression(
+                id_generator,
+                error.payload.to_string(),
+                responsible,
+            ));
             errors.insert(error);
             return;
         }
     };
 
-    let body_to_insert =
-        match db.optimized_mir(module_to_import.clone(), tracing.for_child_module()) {
-            Ok((mir, other_pureness, more_errors)) => {
-                errors.extend(more_errors.iter().cloned());
+    match db.optimized_mir(module_to_import.clone(), tracing.for_child_module()) {
+        Ok((mir, other_pureness, more_errors)) => {
+            errors.extend(more_errors.iter().cloned());
 
-                let mut body = mir.body.clone();
-                let mapping: FxHashMap<Id, Id> = body
-                    .all_ids()
-                    .into_iter()
-                    .map(|id| (id, id_generator.generate()))
-                    .collect();
-                body.replace_ids(&mut |id| {
+            let mapping: FxHashMap<Id, Id> = mir
+                .body
+                .all_ids()
+                .into_iter()
+                .map(|id| (id, id_generator.generate()))
+                .collect();
+
+            pureness.include(other_pureness.as_ref(), &mapping);
+            expression.prepend_optimized(mir.body.iter().map(|(id, expression)| {
+                let mut expression = expression.to_owned();
+                // FIXME: Create utility for replacing IDs through a mapping.
+                expression.replace_ids(&mut |id| {
                     if let Some(new_id) = mapping.get(id) {
                         *id = *new_id;
                     }
                 });
-                pureness.include(other_pureness.as_ref(), &mapping);
-                body
-            }
-            Err(error) => {
-                errors.insert(CompilerError::for_whole_module(module_to_import, error));
+                (mapping[&id], expression)
+            }));
+            ***expression = Expression::Reference(mapping[&mir.body.return_value()]);
+        }
+        Err(error) => {
+            errors.insert(CompilerError::for_whole_module(module_to_import, error));
 
-                let inner_id_generator = mem::take(id_generator);
-                let mut builder = BodyBuilder::new(inner_id_generator);
+            let inner_id_generator = mem::take(id_generator);
+            let mut builder = BodyBuilder::new(inner_id_generator);
 
-                let reason = builder.push_text(CompilerErrorPayload::Module(error).to_string());
-                builder.push_panic(reason, *responsible);
+            let reason = builder.push_text(CompilerErrorPayload::Module(error).to_string());
+            builder.push_panic(reason, responsible);
 
-                let (inner_id_generator, body) = builder.finish();
-                *id_generator = inner_id_generator;
-                body
-            }
-        };
-    *expression = Expression::Multiple(body_to_insert);
+            let (inner_id_generator, body) = builder.finish();
+            *id_generator = inner_id_generator;
+            expression.replace_with_multiple(body.expressions);
+        }
+    };
 }
 
 fn resolve_module(current_module: &Module, path: &str) -> Result<Module, MirError> {
@@ -143,7 +156,7 @@ fn panicking_expression(
     id_generator: &mut IdGenerator<Id>,
     reason: String,
     responsible: Id,
-) -> Expression {
+) -> Vec<(Id, Expression)> {
     let mut body = Body::default();
     let reason = body.push_with_new_id(id_generator, Expression::Text(reason));
     body.push_with_new_id(
@@ -153,6 +166,5 @@ fn panicking_expression(
             responsible,
         },
     );
-
-    Expression::Multiple(body)
+    body.expressions
 }

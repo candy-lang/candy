@@ -35,19 +35,18 @@
 //!
 //! [common subtree elimination]: super::common_subtree_elimination
 
-use super::pure::PurenessInsights;
+use super::{current_expression::ExpressionContext, pure::PurenessInsights};
 use crate::{
     id::IdGenerator,
-    mir::{Body, Expression, Id},
+    mir::{Expression, Id},
 };
-use std::mem;
 
 pub fn lift_constants(
-    expression: &mut Expression,
+    expression: &mut ExpressionContext,
     pureness: &PurenessInsights,
     id_generator: &mut IdGenerator<Id>,
 ) {
-    let Expression::Function { body, .. } = expression else { return; };
+    let Expression::Function { body, .. } = &mut ***expression else { return; };
 
     let mut constants = vec![];
 
@@ -80,11 +79,5 @@ pub fn lift_constants(
         }
     }
 
-    if constants.is_empty() {
-        return; // Nothing to lift.
-    }
-
-    let original_expression = mem::replace(expression, Expression::Parameter);
-    constants.push((id_generator.generate(), original_expression));
-    *expression = Expression::Multiple(Body::new(constants));
+    expression.prepend_optimized(constants);
 }

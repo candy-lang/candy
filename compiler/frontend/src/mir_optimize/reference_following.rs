@@ -16,11 +16,13 @@
 //!
 //! [constant folding]: super::constant_folding
 
-use crate::mir::{Body, Expression, VisibleExpressions};
+use super::current_expression::ExpressionContext;
+use crate::mir::{Body, Expression};
 
-pub fn follow_references(expression: &mut Expression, visible: &VisibleExpressions) {
-    expression.replace_id_references(&mut |id| {
-        if visible.contains(*id) && let Expression::Reference(referenced) = visible.get(*id) {
+pub fn follow_references(expression: &mut ExpressionContext) {
+    expression.expression.replace_id_references(&mut |id| {
+        // FIXME: Is `expression.visible().contains(*id)` necessary?
+        if let Expression::Reference(referenced) = expression.visible.get(*id) {
             *id = *referenced;
         }
     });
