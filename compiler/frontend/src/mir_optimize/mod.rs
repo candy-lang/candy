@@ -151,12 +151,13 @@ impl Body {
             let mut context = ExpressionContext {
                 db,
                 tracing,
+                errors,
                 visible,
                 id_generator,
                 pureness,
                 expression: CurrentExpression::new(self, index),
             };
-            context.optimize(errors);
+            context.optimize();
             if cfg!(debug_assertions) {
                 context.expression.validate(context.visible);
             }
@@ -164,7 +165,7 @@ impl Body {
             let id = context.expression.id();
             context.pureness.visit_optimized(id, &context.expression);
 
-            module_folding::apply(&mut context, errors);
+            module_folding::apply(&mut context);
 
             index = context.expression.index() + 1;
             let expression = mem::replace(&mut *context.expression, Expression::Parameter);
@@ -182,7 +183,7 @@ impl Body {
 }
 
 impl ExpressionContext<'_> {
-    fn optimize(&mut self, errors: &mut FxHashSet<CompilerError>) {
+    fn optimize(&mut self) {
         'outer: loop {
             if let Expression::Function {
                 parameters,
@@ -205,7 +206,7 @@ impl ExpressionContext<'_> {
                     self.db,
                     self.tracing,
                     self.pureness,
-                    errors,
+                    self.errors,
                 );
 
                 for parameter in &*parameters {

@@ -34,10 +34,10 @@ use crate::{
     mir::{Body, BodyBuilder, Expression, Id, MirError},
     module::{Module, UsePath},
 };
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use std::mem;
 
-pub fn apply(context: &mut ExpressionContext, errors: &mut FxHashSet<CompilerError>) {
+pub fn apply(context: &mut ExpressionContext) {
     let Expression::UseModule { current_module, relative_path, responsible } = &*context.expression else {
         return;
     };
@@ -68,7 +68,7 @@ pub fn apply(context: &mut ExpressionContext, errors: &mut FxHashSet<CompilerErr
                     error.payload.to_string(),
                     responsible,
                 ));
-            errors.insert(error);
+            context.errors.insert(error);
             return;
         }
         _ => {
@@ -94,7 +94,7 @@ pub fn apply(context: &mut ExpressionContext, errors: &mut FxHashSet<CompilerErr
                     error.payload.to_string(),
                     responsible,
                 ));
-            errors.insert(error);
+            context.errors.insert(error);
             return;
         }
     };
@@ -104,7 +104,7 @@ pub fn apply(context: &mut ExpressionContext, errors: &mut FxHashSet<CompilerErr
         .optimized_mir(module_to_import.clone(), context.tracing.for_child_module())
     {
         Ok((mir, other_pureness, more_errors)) => {
-            errors.extend(more_errors.iter().cloned());
+            context.errors.extend(more_errors.iter().cloned());
 
             let mapping: FxHashMap<Id, Id> = mir
                 .body
@@ -122,7 +122,9 @@ pub fn apply(context: &mut ExpressionContext, errors: &mut FxHashSet<CompilerErr
             *context.expression = Expression::Reference(mapping[&mir.body.return_value()]);
         }
         Err(error) => {
-            errors.insert(CompilerError::for_whole_module(module_to_import, error));
+            context
+                .errors
+                .insert(CompilerError::for_whole_module(module_to_import, error));
 
             let inner_id_generator = mem::take(context.id_generator);
             let mut builder = BodyBuilder::new(inner_id_generator);
