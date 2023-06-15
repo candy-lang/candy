@@ -193,39 +193,50 @@ impl ExpressionContext<'_> {
         pureness: &mut PurenessInsights,
         errors: &mut FxHashSet<CompilerError>,
     ) {
-        if let Expression::Function {
-            parameters,
-            responsible_parameter,
-            body,
-            ..
-        } = &mut *self.expression
-        {
-            for parameter in &*parameters {
-                self.visible.insert(*parameter, Expression::Parameter);
+        'outer: loop {
+            if let Expression::Function {
+                parameters,
+                responsible_parameter,
+                body,
+                ..
+            } = &mut *self.expression
+            {
+                for parameter in &*parameters {
+                    self.visible.insert(*parameter, Expression::Parameter);
+                }
+                self.visible
+                    .insert(*responsible_parameter, Expression::Parameter);
+                pureness.enter_function(parameters, *responsible_parameter);
+
+                body.optimize(self.visible, id_generator, db, tracing, pureness, errors);
+
+                for parameter in &*parameters {
+                    self.visible.remove(*parameter);
+                }
+                self.visible.remove(*responsible_parameter);
             }
-            self.visible
-                .insert(*responsible_parameter, Expression::Parameter);
-            pureness.enter_function(parameters, *responsible_parameter);
 
-            body.optimize(self.visible, id_generator, db, tracing, pureness, errors);
+            loop {
+                let hashcode_before = self.do_hash();
 
-            for parameter in &*parameters {
-                self.visible.remove(*parameter);
-            }
-            self.visible.remove(*responsible_parameter);
-        }
+                reference_following::follow_references(self);
+                constant_folding::fold_constants(self, pureness, id_generator);
 
-        loop {
-            let hashcode_before = self.do_hash();
+                let is_call = matches!(*self.expression, Expression::Call { .. });
+                inlining::inline_tiny_functions(self, id_generator);
+                inlining::inline_functions_containing_use(self, id_generator);
+                if is_call && matches!(*self.expression, Expression::Function { .. }) {
+                    // We inlined a function call and the resulting code starts with
+                    // a function definition. We need to visit that first before
+                    // continuing the optimizations.
+                    continue 'outer;
+                }
 
-            reference_following::follow_references(self);
-            constant_folding::fold_constants(self, pureness, id_generator);
-            inlining::inline_tiny_functions(self, id_generator);
-            inlining::inline_functions_containing_use(self, id_generator);
-            constant_lifting::lift_constants(self, pureness, id_generator);
+                constant_lifting::lift_constants(self, pureness, id_generator);
 
-            if self.do_hash() == hashcode_before {
-                return;
+                if self.do_hash() == hashcode_before {
+                    return;
+                }
             }
         }
     }
