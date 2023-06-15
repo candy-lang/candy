@@ -1,11 +1,14 @@
-use super::pure::PurenessInsights;
+use super::{pure::PurenessInsights, OptimizeMir};
 use crate::{
     id::IdGenerator,
     mir::{Body, Expression, Id, VisibleExpressions},
+    TracingConfig,
 };
 use std::ops::{Deref, DerefMut};
 
 pub struct ExpressionContext<'a> {
+    pub db: &'a dyn OptimizeMir,
+    pub tracing: &'a TracingConfig,
     pub visible: &'a mut VisibleExpressions,
     pub id_generator: &'a mut IdGenerator<Id>,
     pub pureness: &'a mut PurenessInsights,

@@ -32,19 +32,12 @@ use crate::{
     error::{CompilerError, CompilerErrorPayload},
     id::IdGenerator,
     mir::{Body, BodyBuilder, Expression, Id, MirError},
-    mir_optimize::OptimizeMir,
     module::{Module, UsePath},
-    tracing::TracingConfig,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::mem;
 
-pub fn apply(
-    context: &mut ExpressionContext,
-    db: &dyn OptimizeMir,
-    tracing: &TracingConfig,
-    errors: &mut FxHashSet<CompilerError>,
-) {
+pub fn apply(context: &mut ExpressionContext, errors: &mut FxHashSet<CompilerError>) {
     let Expression::UseModule { current_module, relative_path, responsible } = &*context.expression else {
         return;
     };
@@ -106,7 +99,10 @@ pub fn apply(
         }
     };
 
-    match db.optimized_mir(module_to_import.clone(), tracing.for_child_module()) {
+    match context
+        .db
+        .optimized_mir(module_to_import.clone(), context.tracing.for_child_module())
+    {
         Ok((mir, other_pureness, more_errors)) => {
             errors.extend(more_errors.iter().cloned());
 
