@@ -122,12 +122,7 @@ pub fn apply(
             pureness.include(other_pureness.as_ref(), &mapping);
             context.prepend_optimized(mir.body.iter().map(|(id, expression)| {
                 let mut expression = expression.to_owned();
-                // FIXME: Create utility for replacing IDs through a mapping.
-                expression.replace_ids(&mut |id| {
-                    if let Some(new_id) = mapping.get(id) {
-                        *id = *new_id;
-                    }
-                });
+                expression.replace_ids(&mapping);
                 (mapping[&id], expression)
             }));
             *context.expression = Expression::Reference(mapping[&mir.body.return_value()]);

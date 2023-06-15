@@ -118,11 +118,7 @@ impl ExpressionContext<'_> {
         self.expression
             .replace_with_multiple(body.iter().map(|(id, expression)| {
                 let mut expression = expression.to_owned();
-                expression.replace_ids(&mut |id| {
-                    if let Some(replacement) = id_mapping.get(id) {
-                        *id = *replacement;
-                    }
-                });
+                expression.replace_ids(&id_mapping);
                 (id_mapping[&id], expression)
             }));
 
