@@ -260,8 +260,21 @@ impl Expression {
             constant_lifting::lift_constants(self, pureness, id_generator);
 
             if self.do_hash() == hashcode_before {
-                return;
+                break;
             }
+        }
+
+        // TODO: If this is a call to the `needs` function with `True` as the
+        // first argument, optimize it away. This is not correct – calling
+        // `needs True 3 4` should panic instead. But we figured this is
+        // temporarily fine until we have data flow.
+        if let Expression::Call { function, arguments, .. } = self
+            && let Expression::Function { original_hirs, .. } = visible.get(*function)
+            && original_hirs.contains(&hir::Id::needs())
+            && arguments.len() == 3
+            && let Expression::Tag { symbol, value: None  } = visible.get(arguments[0])
+            && symbol == "True" {
+            *self = Expression::nothing();
         }
     }
 

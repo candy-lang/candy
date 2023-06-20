@@ -8,8 +8,7 @@ use super::{
 };
 use crate::{
     builtin_functions::BuiltinFunction,
-    hir::IdKey,
-    module::{Module, ModuleKind, Package},
+    module::{Module, ModuleKind},
     position::PositionConversionDb,
     string_to_rcst::ModuleError,
 };
@@ -79,16 +78,7 @@ fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> MirResult {
 /// }
 /// ```
 fn generate_needs_function(body: &mut BodyBuilder) -> Id {
-    let needs_id = hir::Id::new(
-        Module {
-            package: Package::Anonymous {
-                url: "$generated".to_string(),
-            },
-            path: vec![],
-            kind: ModuleKind::Code,
-        },
-        vec![IdKey::from("needs")],
-    );
+    let needs_id = hir::Id::needs();
     body.push_function(needs_id.clone(), |body, responsible_for_call| {
         let condition = body.new_parameter();
         let reason = body.new_parameter();
