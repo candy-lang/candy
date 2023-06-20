@@ -22,6 +22,7 @@ pub struct Fuzzer {
     pub function_heap: Heap,
     pub function: Function,
     pub function_id: Id,
+    pool: InputPool,
     status: Option<Status>, // only `None` during transitions
 }
 
@@ -29,7 +30,6 @@ pub struct Fuzzer {
 #[allow(clippy::large_enum_variant)]
 pub enum Status {
     StillFuzzing {
-        pool: InputPool,
         total_coverage: Coverage,
         runner: Runner<Arc<Lir>>,
     },
@@ -59,8 +59,8 @@ impl Fuzzer {
             function_heap: heap,
             function,
             function_id,
+            pool,
             status: Some(Status::StillFuzzing {
-                pool,
                 total_coverage: Coverage::none(num_instructions),
                 runner,
             }),
@@ -81,10 +81,9 @@ impl Fuzzer {
         {
             status = match status {
                 Status::StillFuzzing {
-                    pool,
                     total_coverage,
                     runner,
-                } => self.continue_fuzzing(execution_controller, pool, total_coverage, runner),
+                } => self.continue_fuzzing(execution_controller, total_coverage, runner),
                 // We already found some arguments that caused the function to panic,
                 // so there's nothing more to do.
                 Status::FoundPanic {
@@ -103,15 +102,14 @@ impl Fuzzer {
     }
 
     fn continue_fuzzing(
-        &self,
+        &mut self,
         execution_controller: &mut impl ExecutionController<FiberStackTracer>,
-        mut pool: InputPool,
         total_coverage: Coverage,
         mut runner: Runner<Arc<Lir>>,
     ) -> Status {
         runner.run(execution_controller);
         let Some(result) = runner.result else {
-            return Status::StillFuzzing { pool, total_coverage, runner };
+            return Status::StillFuzzing { total_coverage, runner };
         };
 
         let call_string = format!(
@@ -125,7 +123,7 @@ impl Fuzzer {
         );
         debug!("{}", result.to_string(&call_string));
         match result {
-            RunResult::Timeout => self.create_new_fuzzing_case(pool, total_coverage),
+            RunResult::Timeout => self.create_new_fuzzing_case(total_coverage),
             RunResult::Done { .. } | RunResult::NeedsUnfulfilled { .. } => {
                 let function_range = self.lir.range_of_function(&self.function_id);
                 let function_coverage = total_coverage.in_range(&function_range);
@@ -143,8 +141,8 @@ impl Fuzzer {
                             - 0.4 * complexity;
                         score.clamp(0.1, Score::MAX)
                     };
-                    pool.add(runner.input, score);
-                    self.create_new_fuzzing_case(pool, &total_coverage + &runner.coverage)
+                    self.pool.add(runner.input, score);
+                    self.create_new_fuzzing_case(&total_coverage + &runner.coverage)
                 }
             }
             RunResult::Panicked(panic) => Status::FoundPanic {
@@ -154,10 +152,13 @@ impl Fuzzer {
             },
         }
     }
-    fn create_new_fuzzing_case(&self, pool: InputPool, total_coverage: Coverage) -> Status {
-        let runner = Runner::new(self.lir.clone(), self.function, pool.generate_new_input());
+    fn create_new_fuzzing_case(&self, total_coverage: Coverage) -> Status {
+        let runner = Runner::new(
+            self.lir.clone(),
+            self.function,
+            self.pool.generate_new_input(),
+        );
         Status::StillFuzzing {
-            pool,
             total_coverage,
             runner,
         }
