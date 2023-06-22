@@ -1,8 +1,6 @@
 use super::{FiberId, FiberTracer, TracedFiberEnded, TracedFiberEndedReason, Tracer};
 use crate::heap::{Heap, HirId, InlineObject};
-use candy_frontend::{
-    ast_to_hir::AstToHir, cst::CstKind, module::Package, position::PositionConversionDb,
-};
+use candy_frontend::{ast_to_hir::AstToHir, cst::CstKind, position::PositionConversionDb};
 use itertools::Itertools;
 use pad::PadStr;
 use rustc_hash::FxHashMap;
@@ -95,8 +93,7 @@ impl StackTracer {
         {
             let hir_id = call_site.get();
             let module = hir_id.module.clone();
-            let is_tooling = matches!(module.package, Package::Tooling(_));
-            let cst_id = if is_tooling {
+            let cst_id = if module.package.is_tooling() {
                 None
             } else {
                 db.hir_to_cst_id(hir_id.clone())

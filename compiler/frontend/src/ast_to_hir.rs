@@ -403,7 +403,7 @@ impl Context<'_> {
             .iter()
             .map(|part| {
                 let hir = self.compile_single(part);
-                if matches!(part.kind, AstKind::TextPart { .. }) {
+                if part.kind.is_text_part() {
                     return hir;
                 }
 

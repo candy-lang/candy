@@ -157,9 +157,7 @@ impl LoweringContext {
                         }
                     } if opening_single_quotes
                         .iter()
-                        .all(|single_quote| -> bool {
-                            matches!(single_quote.kind, CstKind::SingleQuote)
-                        }) => opening_single_quotes.len(),
+                        .all(|single_quote| single_quote.kind.is_single_quote()) => opening_single_quotes.len(),
                     _ => panic!("Text needs to start with any number of single quotes followed by a double quote, but started with {}.", opening)
                 };
 
@@ -182,9 +180,9 @@ impl LoweringContext {
                             };
 
                             if opening_curly_braces.len() != (opening_single_quote_count + 1)
-                                || opening_curly_braces
+                                || !opening_curly_braces
                                     .iter()
-                                    .all(|opening_curly_brace| !matches!(opening_curly_brace.kind, CstKind::OpeningCurlyBrace))
+                                    .all(|opening_curly_brace| opening_curly_brace.kind.is_opening_curly_brace())
                             {
                                 panic!(
                                     "Text interpolation needs to start with {} opening curly braces, but started with {}.", 
@@ -198,7 +196,7 @@ impl LoweringContext {
                             if closing_curly_braces.len() == opening_single_quote_count + 1
                                 && closing_curly_braces
                                     .iter()
-                                    .all(|closing_curly_brace| matches!(closing_curly_brace.kind, CstKind::ClosingCurlyBrace))
+                                    .all(|closing_curly_brace| closing_curly_brace.kind.is_closing_curly_brace())
                             {
                                 lowered_parts.push(ast);
                             } else {
@@ -237,9 +235,8 @@ impl LoweringContext {
                         closing_single_quotes
                     } if closing_single_quotes
                         .iter()
-                        .all(|single_quote| -> bool {
-                            matches!(single_quote.kind, CstKind::SingleQuote)
-                        }) && opening_single_quote_count == closing_single_quotes.len()
+                        .all(|single_quote| single_quote.kind.is_single_quote())
+                        && opening_single_quote_count == closing_single_quotes.len()
                 ) {
                     errors.push(self.create_error(closing, AstError::TextMissesClosingQuote));
                 }
@@ -259,9 +256,8 @@ impl LoweringContext {
                         let left = self.lower_cst(left, LoweringType::Expression);
 
                         assert!(
-                            matches!(bar.kind, CstKind::Bar),
-                            "BinaryBar must contain a bar, but instead contained a {}.",
-                            bar,
+                            bar.kind.is_bar(),
+                            "BinaryBar must contain a bar, but instead contained a {bar}.",
                         );
 
                         let call = self.lower_cst(right, LoweringType::Expression);
@@ -274,7 +270,7 @@ impl LoweringContext {
                                         ..
                                     }),
                                 ..
-                            } if matches!(right.kind, CstKind::Call { .. }) => {
+                            } if right.kind.is_call() => {
                                 arguments.insert(0, left);
                                 ast::Call {
                                     receiver,
@@ -302,9 +298,8 @@ impl LoweringContext {
                         {
                             patterns.push(self.lower_cst(right, LoweringType::Pattern));
                             assert!(
-                                matches!(bar.kind, CstKind::Bar),
-                                "Expected a bar after the left side of an or pattern, but found {}.",
-                                bar,
+                                bar.kind.is_bar(),
+                                "Expected a bar after the left side of an or pattern, but found {bar}.",
                             );
                             cst = left;
                         }
@@ -376,11 +371,10 @@ impl LoweringContext {
                 let mut ast = self.lower_cst(inner, LoweringType::Expression);
 
                 assert!(
-                    matches!(opening_parenthesis.kind, CstKind::OpeningParenthesis),
-                    "Parenthesized needs to start with opening parenthesis, but started with {}.",
-                    opening_parenthesis,
+                    opening_parenthesis.kind.is_opening_parenthesis(),
+                    "Parenthesized needs to start with opening parenthesis, but started with {opening_parenthesis}.",
                 );
-                if !matches!(closing_parenthesis.kind, CstKind::ClosingParenthesis) {
+                if !closing_parenthesis.kind.is_closing_parenthesis() {
                     ast = self.create_ast(
                         closing_parenthesis.data.id,
                         AstKind::Error {
@@ -408,16 +402,12 @@ impl LoweringContext {
                             closing_parenthesis,
                         } => {
                             assert!(
-                                matches!(opening_parenthesis.kind, CstKind::OpeningParenthesis),
-                                "Parenthesized needs to start with opening parenthesis, but started with {}.",
-                                opening_parenthesis
+                                opening_parenthesis.kind.is_opening_parenthesis(),
+                                "Parenthesized needs to start with opening parenthesis, but started with {opening_parenthesis}.",
                             );
                             assert!(
-                                matches!(
-                                    closing_parenthesis.kind,
-                                    CstKind::ClosingParenthesis
-                                ),
-                                "Parenthesized for a call receiver needs to end with closing parenthesis, but ended with {}.", closing_parenthesis
+                                closing_parenthesis.kind.is_closing_parenthesis(),
+                                "Parenthesized for a call receiver needs to end with closing parenthesis, but ended with {closing_parenthesis}.",
                             );
                             &inner.kind
                         }
@@ -453,9 +443,8 @@ impl LoweringContext {
                 };
 
                 assert!(
-                    matches!(opening_parenthesis.kind, CstKind::OpeningParenthesis),
-                    "List should always have an opening parenthesis, but instead had {}.",
-                    opening_parenthesis
+                    opening_parenthesis.kind.is_opening_parenthesis(),
+                    "List should always have an opening parenthesis, but instead had {opening_parenthesis}.",
                 );
 
                 let mut ast_items = vec![];
@@ -473,23 +462,21 @@ impl LoweringContext {
 
                         let mut value = self.lower_cst(&value.clone(), lowering_type);
 
-                        if let Some(comma) = comma {
-                            if !matches!(comma.kind, CstKind::Comma) {
-                                value = self.create_ast(
-                                    comma.data.id,
-                                    AstKind::Error {
-                                        child: Some(Box::new(value)),
-                                        errors: vec![self.create_error(comma, AstError::ListItemMissesComma)],
-                                    },
-                                );
-                            }
+                        if let Some(comma) = comma && !comma.kind.is_comma() {
+                            value = self.create_ast(
+                                comma.data.id,
+                                AstKind::Error {
+                                    child: Some(Box::new(value)),
+                                    errors: vec![self.create_error(comma, AstError::ListItemMissesComma)],
+                                },
+                            );
                         }
 
                         ast_items.push(value);
                     }
                 }
 
-                if !matches!(closing_parenthesis.kind, CstKind::ClosingParenthesis) {
+                if !closing_parenthesis.kind.is_closing_parenthesis() {
                     errors.push(
                         self.create_error(
                             closing_parenthesis,
@@ -519,9 +506,8 @@ impl LoweringContext {
                 };
 
                 assert!(
-                    matches!(opening_bracket.kind, CstKind::OpeningBracket),
-                    "Struct should always have an opening bracket, but instead had {}.",
-                    opening_bracket
+                    opening_bracket.kind.is_opening_bracket(),
+                    "Struct should always have an opening bracket, but instead had {opening_bracket}.",
                 );
 
                 let fields = fields
@@ -547,7 +533,7 @@ impl LoweringContext {
                             };
                             let mut key = self.lower_cst(key, key_lowering_type);
 
-                            if !matches!(colon.kind, CstKind::Colon) {
+                            if !colon.kind.is_colon() {
                                 key = self.create_ast(
                                     colon.data.id,
                                     AstKind::Error {
@@ -560,26 +546,24 @@ impl LoweringContext {
 
                             let mut value = self.lower_cst(&value.clone(), lowering_type);
 
-                            if let Some(comma) = comma {
-                                if !matches!(comma.kind, CstKind::Comma) {
-                                    value = self.create_ast(
-                                        comma.data.id,
-                                        AstKind::Error {
-                                            child: Some(Box::new(value)),
-                                            errors: vec![self.create_error(
-                                                comma,
-                                                AstError::StructValueMissesComma,
-                                            )],
-                                        },
-                                    )
-                                }
+                            if let Some(comma) = comma && !comma.kind.is_comma() {
+                                value = self.create_ast(
+                                    comma.data.id,
+                                    AstKind::Error {
+                                        child: Some(Box::new(value)),
+                                        errors: vec![self.create_error(
+                                            comma,
+                                            AstError::StructValueMissesComma,
+                                        )],
+                                    },
+                                )
                             }
                             Some((Some(key), value))
                         } else {
                             // Shorthand syntax, e.g. `[foo]`.
                             let mut ast = self.lower_cst(&value.clone(), lowering_type);
 
-                            if !matches!(ast.kind, AstKind::Identifier(_)) {
+                            if !ast.kind.is_identifier() {
                                 ast = self.create_ast(
                                     value.data.id,
                                     AstKind::Error {
@@ -592,26 +576,24 @@ impl LoweringContext {
                                 )
                             }
 
-                            if let Some(comma) = comma {
-                                if !matches!(comma.kind, CstKind::Comma) {
-                                    ast = self.create_ast(
-                                        comma.data.id,
-                                        AstKind::Error {
-                                            child: Some(Box::new(ast)),
-                                            errors: vec![self.create_error(
-                                                comma,
-                                                AstError::StructValueMissesComma,
-                                            )],
-                                        },
-                                    )
-                                }
+                            if let Some(comma) = comma && !comma.kind.is_comma() {
+                                ast = self.create_ast(
+                                    comma.data.id,
+                                    AstKind::Error {
+                                        child: Some(Box::new(ast)),
+                                        errors: vec![self.create_error(
+                                            comma,
+                                            AstError::StructValueMissesComma,
+                                        )],
+                                    },
+                                )
                             }
                             Some((None, ast))
                         }
                     })
                     .collect();
 
-                if !matches!(closing_bracket.kind, CstKind::ClosingBracket) {
+                if !closing_bracket.kind.is_closing_bracket() {
                     errors.push(
                         self.create_error(closing_bracket, AstError::StructMissesClosingBrace),
                     );
@@ -640,9 +622,8 @@ impl LoweringContext {
                 let expression = self.lower_cst(expression, LoweringType::Expression);
 
                 assert!(
-                    matches!(percent.kind, CstKind::Percent),
-                    "Expected a percent sign after the expression to match over, but found {}.",
-                    percent,
+                    percent.kind.is_percent(),
+                    "Expected a percent sign after the expression to match over, but found {percent}.",
                 );
 
                 let cases = self.lower_csts(cases);
@@ -689,28 +670,27 @@ impl LoweringContext {
                 }
 
                 assert!(
-                    matches!(opening_curly_brace.kind, CstKind::OpeningCurlyBrace),
-                    "Expected an opening curly brace at the beginning of a function, but found {}.",
-                    opening_curly_brace,
+                    opening_curly_brace.kind.is_opening_curly_brace(),
+                    "Expected an opening curly brace at the beginning of a function, but found {opening_curly_brace}.",
                 );
 
                 let mut errors = vec![];
-                let (parameters, mut parameter_errors) =
-                    if let Some((parameters, arrow)) = parameters_and_arrow {
-                        assert!(
-                            matches!(arrow.kind, CstKind::Arrow),
-                            "Expected an arrow after the parameters in a function, but found `{}`.",
-                            arrow
+                let (parameters, mut parameter_errors) = if let Some((parameters, arrow)) =
+                    parameters_and_arrow
+                {
+                    assert!(
+                            arrow.kind.is_arrow(),
+                            "Expected an arrow after the parameters in a function, but found `{arrow}`.",
                         );
-                        self.lower_parameters(parameters)
-                    } else {
-                        (vec![], vec![])
-                    };
+                    self.lower_parameters(parameters)
+                } else {
+                    (vec![], vec![])
+                };
                 errors.append(&mut parameter_errors);
 
                 let body = self.lower_csts(body);
 
-                if !matches!(closing_curly_brace.kind, CstKind::ClosingCurlyBrace) {
+                if !closing_curly_brace.kind.is_closing_curly_brace() {
                     errors.push(self.create_error(
                         closing_curly_brace,
                         AstError::FunctionMissesClosingCurlyBrace,
@@ -800,7 +780,7 @@ impl LoweringContext {
                 let ast = self.create_ast(
                     cst.data.id,
                     AstKind::Assignment(ast::Assignment {
-                        is_public: matches!(assignment_sign.kind, CstKind::ColonEqualsSign),
+                        is_public: assignment_sign.kind.is_colon_equals_sign(),
                         body,
                     }),
                 );
@@ -824,9 +804,8 @@ impl LoweringContext {
         let struct_ = self.lower_cst(struct_, LoweringType::Expression);
 
         assert!(
-            matches!(dot.kind, CstKind::Dot),
-            "Struct access should always have a dot, but instead had {}.",
-            dot
+            dot.kind.is_dot(),
+            "Struct access should always have a dot, but instead had {dot}.",
         );
 
         match key.kind.clone() {
