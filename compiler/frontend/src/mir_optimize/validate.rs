@@ -36,9 +36,6 @@ impl Body {
                 inner_visible.insert(*responsible_parameter);
                 body.validate(defined_ids, inner_visible);
             }
-            if let Expression::Multiple(body) = expression {
-                body.validate(defined_ids, visible.clone());
-            }
 
             if defined_ids.contains(&id) {
                 error!("ID {id} exists twice.");

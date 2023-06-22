@@ -34,71 +34,57 @@
 //! [module folding]: super::module_folding
 //! [tree shaking]: super::tree_shaking
 
+use super::{
+    complexity::Complexity,
+    current_expression::{Context, CurrentExpression},
+};
+use crate::mir::{Expression, Id};
 use rustc_hash::FxHashMap;
 
-use crate::{
-    id::IdGenerator,
-    mir::{Expression, Id, VisibleExpressions},
-};
-
-use super::complexity::Complexity;
-
-pub fn inline_tiny_functions(
-    expression: &mut Expression,
-    visible: &VisibleExpressions,
-    id_generator: &mut IdGenerator<Id>,
-) {
+pub fn inline_tiny_functions(context: &mut Context, expression: &mut CurrentExpression) {
     inline_functions_of_maximum_complexity(
+        context,
         expression,
         Complexity {
             is_self_contained: true,
             expressions: 7,
         },
-        visible,
-        id_generator,
     );
 }
 
 pub fn inline_functions_of_maximum_complexity(
-    expression: &mut Expression,
+    context: &mut Context,
+    expression: &mut CurrentExpression,
     complexity: Complexity,
-    visible: &VisibleExpressions,
-    id_generator: &mut IdGenerator<Id>,
 ) {
-    if let Expression::Call { function, .. } = expression
-        && let Expression::Function { body, .. } = visible.get(*function)
+    if let Expression::Call { function, .. } = **expression
+        && let Expression::Function { body, .. } = context.visible.get(function)
         && body.complexity() <= complexity {
-        let _ = expression.inline_call(visible, id_generator);
+        context.inline_call(expression);
     }
 }
 
-pub fn inline_functions_containing_use(
-    expression: &mut Expression,
-    visible: &VisibleExpressions,
-    id_generator: &mut IdGenerator<Id>,
-) {
-    if let Expression::Call { function, .. } = expression
-        && let Expression::Function { body, .. } = visible.get(*function)
+pub fn inline_functions_containing_use(context: &mut Context, expression: &mut CurrentExpression) {
+    if let Expression::Call { function, .. } = **expression
+        && let Expression::Function { body, .. } = context.visible.get(function)
         && body.iter().any(|(_, expression)| expression.is_use_module()) {
-        let _ = expression.inline_call(visible, id_generator);
+        context.inline_call(expression);
     }
 }
 
-impl Expression {
-    pub fn inline_call(
-        &mut self,
-        visible: &VisibleExpressions,
-        id_generator: &mut IdGenerator<Id>,
-    ) -> Result<(), &'static str> {
+impl Context<'_> {
+    pub fn inline_call(&mut self, expression: &mut CurrentExpression) {
         let Expression::Call {
             function,
             arguments,
             responsible: responsible_argument,
-        } = self else {
-            return Err("Tried to inline, but the expression is not a call.");
+        } = &**expression else {
+            // Expression is not a call.
+            return;
         };
         if arguments.contains(function) {
-            return Err("Tried to inline, but the callee is used as an argument → recursion.");
+            // Callee is used as an argument → recursion
+            return;
         }
 
         let Expression::Function {
@@ -106,11 +92,13 @@ impl Expression {
             parameters,
             responsible_parameter,
             body,
-        } = visible.get(*function) else {
-            return Err("Tried to inline, but the callee is not a function.");
+        } = self.visible.get(*function) else {
+            // Callee is not a function.
+            return;
         };
         if arguments.len() != parameters.len() {
-            return Err("Tried to inline, but the number of arguments doesn't match the expected parameter count.");
+            // Number of arguments doesn't match the expected parameter count.
+            return;
         }
 
         let id_mapping: FxHashMap<Id, Id> = parameters
@@ -121,18 +109,18 @@ impl Expression {
             .chain(
                 body.defined_ids()
                     .into_iter()
-                    .map(|id| (id, id_generator.generate())),
+                    .map(|id| (id, self.id_generator.generate())),
             )
             .collect();
-        let mut inlined_body = body.clone();
-        inlined_body.replace_ids(&mut |id| {
-            if let Some(replacement) = id_mapping.get(id) {
-                *id = *replacement;
-            }
-        });
 
-        *self = Expression::Multiple(inlined_body);
-
-        Ok(())
+        expression.replace_with_multiple(body.iter().map(|(id, expression)| {
+            let mut expression = expression.to_owned();
+            expression.replace_ids(&mut |id| {
+                if let Some(replacement) = id_mapping.get(id) {
+                    *id = *replacement;
+                }
+            });
+            (id_mapping[&id], expression)
+        }));
     }
 }

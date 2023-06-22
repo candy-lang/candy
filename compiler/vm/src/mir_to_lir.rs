@@ -309,9 +309,6 @@ impl<'c> LoweringContext<'c> {
                 self.emit_reference_to(*responsible);
                 self.emit(id, Instruction::Panic);
             }
-            Expression::Multiple(_) => {
-                panic!("The MIR shouldn't contain multiple expressions anymore.");
-            }
             Expression::TraceCallStarts {
                 hir_call,
                 function,
