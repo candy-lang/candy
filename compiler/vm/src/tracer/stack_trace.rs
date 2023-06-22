@@ -95,8 +95,7 @@ impl StackTracer {
         {
             let hir_id = call_site.get();
             let module = hir_id.module.clone();
-            let is_tooling = matches!(module.package, Package::Tooling(_));
-            let cst_id = if is_tooling {
+            let cst_id = if module.package.is_tooling() {
                 None
             } else {
                 db.hir_to_cst_id(hir_id.clone())

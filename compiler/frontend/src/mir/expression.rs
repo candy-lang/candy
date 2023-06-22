@@ -15,8 +15,9 @@ use std::{
     cmp::Ordering,
     hash::{Hash, Hasher},
 };
+use strum_macros::EnumIs;
 
-#[derive(Clone, Debug, Eq, From, PartialEq, TryInto)]
+#[derive(Clone, Debug, EnumIs, Eq, From, PartialEq, TryInto)]
 pub enum Expression {
     #[from]
     #[try_into]

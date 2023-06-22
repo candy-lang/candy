@@ -79,7 +79,7 @@ pub fn inline_functions_containing_use(
 ) {
     if let Expression::Call { function, .. } = expression
         && let Expression::Function { body, .. } = visible.get(*function)
-        && body.iter().any(|(_, expr)| matches!(expr, Expression::UseModule { .. })) {
+        && body.iter().any(|(_, expression)| expression.is_use_module()) {
         let _ = expression.inline_call(visible, id_generator);
     }
 }

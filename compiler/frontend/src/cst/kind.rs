@@ -1,8 +1,9 @@
 use super::{Cst, CstData, CstError};
 use num_bigint::BigUint;
 use std::fmt::{self, Display, Formatter};
+use strum_macros::EnumIs;
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, EnumIs, Eq, Hash, PartialEq)]
 pub enum CstKind<D = CstData> {
     EqualsSign,         // =
     Comma,              // ,

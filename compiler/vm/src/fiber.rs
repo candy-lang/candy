@@ -22,6 +22,7 @@ use std::{
     fmt::{self, Debug},
     iter::Step,
 };
+use strum::EnumIs;
 use tracing::trace;
 
 const TRACE: bool = false;
@@ -59,7 +60,7 @@ pub struct Fiber<T: FiberTracer> {
     pub tracer: T,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, EnumIs)]
 pub enum Status {
     Running,
     CreatingChannel { capacity: Capacity },
@@ -237,7 +238,7 @@ impl<T: FiberTracer> Fiber<T> {
     // calling `run` again.
 
     pub fn complete_channel_create(&mut self, channel: ChannelId) {
-        assert!(matches!(self.status, Status::CreatingChannel { .. }));
+        assert!(self.status.is_creating_channel());
 
         let fields = [
             ("SendPort", SendPort::create(&mut self.heap, channel)),
@@ -248,21 +249,21 @@ impl<T: FiberTracer> Fiber<T> {
         self.status = Status::Running;
     }
     pub fn complete_send(&mut self) {
-        assert!(matches!(self.status, Status::Sending { .. }));
+        assert!(self.status.is_sending());
 
         let nothing = Tag::create_nothing(&mut self.heap);
         self.push_to_data_stack(nothing);
         self.status = Status::Running;
     }
     pub fn complete_receive(&mut self, packet: Packet) {
-        assert!(matches!(self.status, Status::Receiving { .. }));
+        assert!(self.status.is_receiving());
 
         let object = packet.object.clone_to_heap(&mut self.heap);
         self.push_to_data_stack(object);
         self.status = Status::Running;
     }
     pub fn complete_parallel_scope(&mut self, result: Result<InlineObject, Panic>) {
-        assert!(matches!(self.status, Status::InParallelScope { .. }));
+        assert!(self.status.is_in_parallel_scope());
 
         match result {
             Ok(object) => {
@@ -273,7 +274,7 @@ impl<T: FiberTracer> Fiber<T> {
         }
     }
     pub fn complete_try(&mut self, ended_reason: &EndedReason) {
-        assert!(matches!(self.status, Status::InTry { .. }));
+        assert!(self.status.is_in_try());
 
         let result = match ended_reason {
             EndedReason::Finished(return_value) => Ok(*return_value),
@@ -308,12 +309,10 @@ impl<T: FiberTracer> Fiber<T> {
         id: FiberId,
     ) {
         assert!(
-            matches!(self.status, Status::Running),
+            self.status.is_running(),
             "Called Fiber::run on a fiber that is not ready to run.",
         );
-        while matches!(self.status, Status::Running)
-            && execution_controller.should_continue_running()
-        {
+        while self.status.is_running() && execution_controller.should_continue_running() {
             let Some(current_instruction) = self.next_instruction else {
                 self.status = Status::Done;
                 self.tracer.call_ended(

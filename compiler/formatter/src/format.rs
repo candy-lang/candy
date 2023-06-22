@@ -1104,8 +1104,7 @@ pub enum PrecedenceCategory {
 #[extension_trait]
 pub impl<D> CstExtension for Cst<D> {
     fn has_comments(&self) -> bool {
-        dft_post_rev(self, |it| it.children().into_iter())
-            .any(|(_, it)| matches!(it.kind, CstKind::Comment { .. }))
+        dft_post_rev(self, |it| it.children().into_iter()).any(|(_, it)| it.kind.is_comment())
     }
 
     fn is_sandwich_like(&self) -> bool {

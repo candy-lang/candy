@@ -288,7 +288,7 @@ impl HintsFinder {
                             let creates_hint = match body {
                                 AssignmentBody::Function { .. } => true,
                                 AssignmentBody::Body { pattern, .. } => {
-                                    matches!(pattern.kind, AstKind::Identifier(_))
+                                    pattern.kind.is_identifier()
                                 }
                             };
                             if !creates_hint {
