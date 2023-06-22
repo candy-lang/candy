@@ -1,6 +1,8 @@
-# Only packages
+# Packages and Workspaces
 
-```
+## Only packages
+
+```text
 _package.candy
 _.candy
 common/
@@ -18,9 +20,9 @@ third_party_package/
 
 Packages are self-contained and can possibly be built and published.
 
-# Packages and workspaces
+## Packages and workspaces
 
-```
+```text
 _workspace.candy
 common/
   _package.candy
