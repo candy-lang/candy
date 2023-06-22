@@ -22,6 +22,7 @@ use crate::{
 };
 use extension_trait::extension_trait;
 use rustc_hash::FxHashMap;
+use strum::EnumIs;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct OperationId(usize);
@@ -98,7 +99,7 @@ pub struct Try<T: FiberTracer> {
     child: FiberId,
 }
 
-#[derive(Debug, EnumIs)]
+#[derive(EnumIs)]
 enum ChannelLike {
     Channel(Channel),
     Nursery(FiberId),
@@ -109,7 +110,7 @@ pub enum CompletedOperation {
     Received { packet: Packet },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, EnumIs)]
 pub enum Status {
     CanRun,
     WaitingForOperations,
