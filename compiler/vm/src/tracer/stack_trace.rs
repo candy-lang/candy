@@ -1,8 +1,6 @@
 use super::{FiberId, FiberTracer, TracedFiberEnded, TracedFiberEndedReason, Tracer};
 use crate::heap::{Heap, HirId, InlineObject};
-use candy_frontend::{
-    ast_to_hir::AstToHir, cst::CstKind, module::Package, position::PositionConversionDb,
-};
+use candy_frontend::{ast_to_hir::AstToHir, cst::CstKind, position::PositionConversionDb};
 use itertools::Itertools;
 use pad::PadStr;
 use rustc_hash::FxHashMap;
