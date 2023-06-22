@@ -42,12 +42,12 @@
         }
       },
       {
-        "id": "candy.hints.fuzzColor",
-        "description": "The text color of hints indicating that a function panics for a certain input. If not supplied, the color for `editorError.foreground` will be used.",
+        "id": "candy.hints.statusColor",
+        "description": "The text color of hints indicating the fuzzing status of a function.",
         "defaults": {
-          "dark": "editorError.foreground",
-          "light": "editorError.foreground",
-          "highContrast": "editorError.foreground"
+          "dark": "#7fae42",
+          "light": "#7fae42",
+          "highContrast": "#00ae00"
         }
       }
     ],
