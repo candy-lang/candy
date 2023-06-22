@@ -179,6 +179,7 @@ dependencies = [
  "itertools",
  "num-bigint",
  "rand",
+ "rand_chacha",
  "rustc-hash",
  "tracing",
 ]

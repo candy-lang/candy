@@ -22,7 +22,7 @@ pub struct Fuzzer {
     pub function_heap: Heap,
     pub function: Function,
     pub function_id: Id,
-    pool: InputPool,
+    pub pool: InputPool,
     status: Option<Status>, // only `None` during transitions
 }
 

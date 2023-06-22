@@ -2,7 +2,8 @@ use super::input::Input;
 use crate::values::InputGeneration;
 use candy_vm::heap::{Heap, Text};
 use itertools::Itertools;
-use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
+use rand::{rngs::ThreadRng, seq::SliceRandom, Rng, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{cell::RefCell, rc::Rc};
 
@@ -61,5 +62,15 @@ impl InputPool {
 
     pub fn add(&mut self, input: Input, score: Score) {
         self.input_scores.insert(input, score);
+    }
+
+    pub fn interesting_inputs(&self) -> Vec<Input> {
+        let mut rng = ChaCha20Rng::seed_from_u64(0);
+        let inputs_and_scores = self.input_scores.iter().collect_vec();
+        inputs_and_scores
+            .choose_multiple_weighted(&mut rng, 3, |(_, score)| **score)
+            .unwrap()
+            .map(|(input, _)| (*input).clone())
+            .collect_vec()
     }
 }

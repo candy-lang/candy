@@ -11,6 +11,7 @@ mod values;
 use self::input::Input;
 pub use self::{
     fuzzer::{Fuzzer, Status},
+    input_pool::InputPool,
     utils::FuzzablesFinder,
 };
 use candy_frontend::{

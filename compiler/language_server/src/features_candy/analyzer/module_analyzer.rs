@@ -280,8 +280,7 @@ impl ModuleAnalyzer {
                 }
 
                 for fuzzer in fuzzers {
-                    let Some(status_hint) = Insight::for_fuzzer_status(db, fuzzer) else { continue; };
-                    insights.push(status_hint);
+                    insights.push(Insight::for_fuzzer_status(db, fuzzer));
 
                     let Status::FoundPanic {
                         input,
