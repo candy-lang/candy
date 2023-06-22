@@ -13,19 +13,16 @@ impl Expression {
         defined
     }
     fn collect_defined_ids(&self, defined: &mut Vec<Id>) {
-        match self {
-            Expression::Function {
-                parameters,
-                responsible_parameter,
-                body,
-                ..
-            } => {
-                defined.extend(parameters);
-                defined.push(*responsible_parameter);
-                body.collect_defined_ids(defined);
-            }
-            Expression::Multiple(body) => body.collect_defined_ids(defined),
-            _ => {}
+        if let Expression::Function {
+            parameters,
+            responsible_parameter,
+            body,
+            ..
+        } = self
+        {
+            defined.extend(parameters);
+            defined.push(*responsible_parameter);
+            body.collect_defined_ids(defined);
         }
     }
 }
@@ -103,7 +100,6 @@ impl Expression {
                 referenced.insert(*reason);
                 referenced.insert(*responsible);
             }
-            Expression::Multiple(body) => body.collect_referenced_ids(referenced),
             Expression::TraceCallStarts {
                 hir_call,
                 function,
@@ -202,7 +198,7 @@ impl Id {
 impl Expression {
     /// Replaces all referenced IDs. Does *not* replace IDs that are defined in
     /// this expression.
-    pub fn replace_id_references<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
+    pub fn replace_id_references(&mut self, replacer: &mut impl FnMut(&mut Id)) {
         match self {
             Expression::Int(_)
             | Expression::Text(_)
@@ -264,7 +260,6 @@ impl Expression {
                 replacer(reason);
                 replacer(responsible);
             }
-            Expression::Multiple(body) => body.replace_id_references(replacer),
             Expression::TraceCallStarts {
                 hir_call,
                 function,
@@ -299,7 +294,7 @@ impl Expression {
     }
 }
 impl Body {
-    pub fn replace_id_references<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
+    pub fn replace_id_references(&mut self, replacer: &mut impl FnMut(&mut Id)) {
         for (_, expression) in self.iter_mut() {
             expression.replace_id_references(replacer);
         }
@@ -309,7 +304,7 @@ impl Body {
 impl Expression {
     /// Replaces all IDs in this expression using the replacer, including
     /// definitions.
-    pub fn replace_ids<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
+    pub fn replace_ids(&mut self, replacer: &mut impl FnMut(&mut Id)) {
         match self {
             Expression::Function {
                 original_hirs: _,
@@ -323,7 +318,6 @@ impl Expression {
                 replacer(responsible_parameter);
                 body.replace_ids(replacer);
             }
-            Expression::Multiple(body) => body.replace_ids(replacer),
             // All other expressions don't define IDs and instead only contain
             // references. Thus, the function above does the job.
             _ => self.replace_id_references(replacer),
@@ -331,7 +325,7 @@ impl Expression {
     }
 }
 impl Body {
-    pub fn replace_ids<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
+    pub fn replace_ids(&mut self, replacer: &mut impl FnMut(&mut Id)) {
         let body = mem::take(self);
         for (mut id, mut expression) in body.into_iter() {
             replacer(&mut id);

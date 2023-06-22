@@ -104,7 +104,9 @@ impl VisibleExpressions {
         self.expressions.remove(&id).unwrap()
     }
     pub fn get(&self, id: Id) -> &Expression {
-        self.expressions.get(&id).unwrap()
+        self.expressions.get(&id).unwrap_or_else(|| {
+            panic!("Expression with ID {id} is not visible in this scope. Visible expressions: {self:?}")
+        })
     }
     pub fn contains(&self, id: Id) -> bool {
         self.expressions.contains_key(&id)
@@ -145,7 +147,7 @@ impl Body {
         is_returned: bool,
         visitor: &mut dyn FnMut(Id, &mut Expression, bool) -> VisitorResult,
     ) -> VisitorResult {
-        if let Expression::Function { body, .. } | Expression::Multiple(body) = expression {
+        if let Expression::Function { body, .. } = expression {
             match body.visit(visitor) {
                 VisitorResult::Continue => {}
                 VisitorResult::Abort => return VisitorResult::Abort,
@@ -218,9 +220,6 @@ impl Body {
             }
             visible.remove(*responsible_parameter);
         }
-        if let Expression::Multiple(body) = expression {
-            body.visit_with_visible_rec(visible, visitor);
-        }
 
         visitor(id, expression, visible, is_returned);
     }
@@ -234,10 +233,8 @@ impl Body {
 }
 impl Expression {
     pub fn visit_bodies(&mut self, visitor: &mut dyn FnMut(&mut Body)) {
-        match self {
-            Expression::Function { body, .. } => body.visit_bodies(visitor),
-            Expression::Multiple(body) => body.visit_bodies(visitor),
-            _ => {}
+        if let Expression::Function { body, .. } = self {
+            body.visit_bodies(visitor)
         }
     }
 }
@@ -295,17 +292,6 @@ impl BodyBuilder {
     pub fn push(&mut self, expression: Expression) -> Id {
         self.body
             .push_with_new_id(&mut self.id_generator, expression)
-    }
-    #[cfg(test)]
-    pub fn push_multiple<F>(&mut self, function: F) -> Id
-    where
-        F: FnOnce(&mut BodyBuilder),
-    {
-        let mut body = BodyBuilder::new(mem::take(&mut self.id_generator));
-        function(&mut body);
-        let (id_generator, body) = body.finish();
-        self.id_generator = id_generator;
-        self.push(Expression::Multiple(body))
     }
 
     pub fn push_int(&mut self, value: BigInt) -> Id {

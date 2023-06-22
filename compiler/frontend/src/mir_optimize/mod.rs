@@ -42,21 +42,20 @@
 //! both performance and code size. Whenever they can be applied, they should be
 //! applied.
 
-use self::pure::PurenessInsights;
+use self::{
+    current_expression::{Context, CurrentExpression},
+    pure::PurenessInsights,
+};
 use super::{hir, hir_to_mir::HirToMir, mir::Mir, tracing::TracingConfig};
 use crate::{
     error::CompilerError,
-    id::IdGenerator,
-    mir::{Body, Expression, Id, MirError, VisibleExpressions},
+    mir::{Body, Expression, MirError, VisibleExpressions},
     module::Module,
     string_to_rcst::ModuleError,
+    utils::DoHash,
 };
-use rustc_hash::{FxHashSet, FxHasher};
-use std::{
-    hash::{Hash, Hasher},
-    mem,
-    sync::Arc,
-};
+use rustc_hash::FxHashSet;
+use std::{mem, sync::Arc};
 use tracing::debug;
 
 mod cleanup;
@@ -64,6 +63,7 @@ mod common_subtree_elimination;
 mod complexity;
 mod constant_folding;
 mod constant_lifting;
+mod current_expression;
 mod inlining;
 mod module_folding;
 mod pure;
@@ -114,14 +114,15 @@ impl Mir {
         pureness: &mut PurenessInsights,
         errors: &mut FxHashSet<CompilerError>,
     ) {
-        self.body.optimize(
-            &mut VisibleExpressions::none_visible(),
-            &mut self.id_generator,
+        let mut context = Context {
             db,
             tracing,
-            pureness,
             errors,
-        );
+            visible: &mut VisibleExpressions::none_visible(),
+            id_generator: &mut self.id_generator,
+            pureness,
+        };
+        context.optimize_body(&mut self.body);
         if cfg!(debug_assertions) {
             self.validate();
         }
@@ -129,146 +130,86 @@ impl Mir {
     }
 }
 
-impl Body {
-    // Even though visible is mut, this function guarantees that the value is
-    // the same after returning.
-    fn optimize(
-        &mut self,
-        visible: &mut VisibleExpressions,
-        id_generator: &mut IdGenerator<Id>,
-        db: &dyn OptimizeMir,
-        tracing: &TracingConfig,
-        pureness: &mut PurenessInsights,
-        errors: &mut FxHashSet<CompilerError>,
-    ) {
+impl Context<'_> {
+    fn optimize_body(&mut self, body: &mut Body) {
+        // Even though `self.visible` is mutable, this function guarantees that
+        // the value is the same after returning.
         let mut index = 0;
-        'expression_loop: while index < self.expressions.len() {
-            let id = self.expressions[index].0;
-            let mut expression =
-                mem::replace(&mut self.expressions[index].1, Expression::Parameter);
-
+        while index < body.expressions.len() {
             // Thoroughly optimize the expression.
-            expression.optimize(visible, id_generator, db, tracing, pureness, errors);
+            let mut expression = CurrentExpression::new(body, index);
+            self.optimize_expression(&mut expression);
             if cfg!(debug_assertions) {
-                expression.validate(visible);
+                expression.validate(self.visible);
             }
 
-            if self.fold_multiple(id, &mut expression, index).is_some() {
-                // We replaced the expression with other expressions, so instead
-                // of continuing to the next expression, we should try to
-                // optimize the newly inserted expressions next.
-                continue 'expression_loop;
-            }
-            pureness.visit_optimized(id, &expression);
+            let id = expression.id();
+            self.pureness.visit_optimized(id, &expression);
 
-            module_folding::apply(
-                &mut expression,
-                visible,
-                id_generator,
-                db,
-                tracing,
-                pureness,
-                errors,
-            );
-            if let Some(index_after_module) = self.fold_multiple(id, &mut expression, index) {
-                // A module folding actually happened. Because the inserted
-                // module's MIR is already optimized and doesn't depend on any
-                // context outside of itself, we don't need to analyze it again.
-                while index < index_after_module {
-                    let id = self.expressions[index].0;
-                    let expression =
-                        mem::replace(&mut self.expressions[index].1, Expression::Parameter);
-                    visible.insert(id, expression);
-                    index += 1;
+            module_folding::apply(self, &mut expression);
+
+            index = expression.index() + 1;
+            let expression = mem::replace(&mut *expression, Expression::Parameter);
+            self.visible.insert(id, expression);
+        }
+
+        for (id, expression) in &mut body.expressions {
+            *expression = self.visible.remove(*id);
+        }
+
+        common_subtree_elimination::eliminate_common_subtrees(body, self.pureness);
+        reference_following::remove_redundant_return_references(body);
+        tree_shaking::tree_shake(body, self.pureness);
+    }
+
+    fn optimize_expression(&mut self, expression: &mut CurrentExpression) {
+        'outer: loop {
+            if let Expression::Function {
+                parameters,
+                responsible_parameter,
+                body,
+                ..
+            } = &mut **expression
+            {
+                for parameter in &*parameters {
+                    self.visible.insert(*parameter, Expression::Parameter);
                 }
-                continue 'expression_loop;
+                self.visible
+                    .insert(*responsible_parameter, Expression::Parameter);
+                self.pureness
+                    .enter_function(parameters, *responsible_parameter);
+
+                self.optimize_body(body);
+
+                for parameter in &*parameters {
+                    self.visible.remove(*parameter);
+                }
+                self.visible.remove(*responsible_parameter);
             }
 
-            visible.insert(id, expression);
-            index += 1;
-        }
+            loop {
+                let hashcode_before = expression.do_hash();
 
-        for (id, expression) in &mut self.expressions {
-            *expression = visible.remove(*id);
-        }
+                reference_following::follow_references(self, expression);
+                constant_folding::fold_constants(self, expression);
 
-        common_subtree_elimination::eliminate_common_subtrees(self, pureness);
-        reference_following::remove_redundant_return_references(self);
-        tree_shaking::tree_shake(self, pureness);
-    }
+                let is_call = matches!(**expression, Expression::Call { .. });
+                inlining::inline_tiny_functions(self, expression);
+                inlining::inline_functions_containing_use(self, expression);
+                if is_call && matches!(**expression, Expression::Function { .. }) {
+                    // We inlined a function call and the resulting code starts with
+                    // a function definition. We need to visit that first before
+                    // continuing the optimizations.
+                    continue 'outer;
+                }
 
-    // If an `Expression::Multiple` was actually folded, this returns the index
-    // of the expression after the newly inserted ones.
-    fn fold_multiple(
-        &mut self,
-        id: Id,
-        expression: &mut Expression,
-        index: usize,
-    ) -> Option<usize> {
-        let Expression::Multiple(expressions) = expression else { return None; };
-        let return_value = expressions.return_value();
-        let num_expressions = expressions.expressions.len();
-        self.expressions.splice(
-            index..(index + 1),
-            expressions
-                .expressions
-                .drain(..)
-                .chain([(id, Expression::Reference(return_value))]),
-        );
-        Some(index + num_expressions + 1)
-    }
-}
+                constant_lifting::lift_constants(self, expression);
 
-impl Expression {
-    fn optimize(
-        &mut self,
-        visible: &mut VisibleExpressions,
-        id_generator: &mut IdGenerator<Id>,
-        db: &dyn OptimizeMir,
-        tracing: &TracingConfig,
-        pureness: &mut PurenessInsights,
-        errors: &mut FxHashSet<CompilerError>,
-    ) {
-        if let Expression::Function {
-            parameters,
-            responsible_parameter,
-            body,
-            ..
-        } = self
-        {
-            for parameter in &*parameters {
-                visible.insert(*parameter, Expression::Parameter);
-            }
-            visible.insert(*responsible_parameter, Expression::Parameter);
-            pureness.enter_function(parameters, *responsible_parameter);
-
-            body.optimize(visible, id_generator, db, tracing, pureness, errors);
-
-            for parameter in &*parameters {
-                visible.remove(*parameter);
-            }
-            visible.remove(*responsible_parameter);
-        }
-
-        loop {
-            let hashcode_before = self.do_hash();
-
-            reference_following::follow_references(self, visible);
-            constant_folding::fold_constants(self, visible, pureness, id_generator);
-            inlining::inline_tiny_functions(self, visible, id_generator);
-            inlining::inline_functions_containing_use(self, visible, id_generator);
-            constant_lifting::lift_constants(self, pureness, id_generator);
-
-            if self.do_hash() == hashcode_before {
-                return;
+                if expression.do_hash() == hashcode_before {
+                    return;
+                }
             }
         }
-    }
-
-    fn do_hash(&self) -> u64 {
-        let mut hasher = FxHasher::default();
-        self.hash(&mut hasher);
-        hasher.finish()
     }
 }
 
