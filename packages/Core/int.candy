@@ -1,3 +1,4 @@
+builtins = use "Builtins"
 bool = use "..bool"
 [check] = use "..check"
 [ifElse] = use "..controlFlow"
@@ -6,49 +7,30 @@ type = use "..type"
 
 is value := type.is value Int
 
-add summandA summandB :=
-  needs (is summandA)
-  needs (is summandB)
-  summandA | ✨.intAdd summandB
-subtract minuend subtrahend :=
-  needs (is minuend)
-  needs (is subtrahend)
-  minuend | ✨.intSubtract subtrahend
+add := builtins.intAdd
+subtract := builtins.intSubtract
 negate value :=
   needs (is value)
   subtract 0 value
-multiply factorA factorB :=
-  needs (is factorA)
-  needs (is factorB)
-  factorA | ✨.intMultiply factorB
-divideTruncating dividend divisor :=
-  needs (is dividend)
-  needs (is divisor)
-  dividend | ✨.intDivideTruncating divisor
-remainder dividend divisor :=
-  needs (is dividend)
-  needs (is divisor)
-  dividend | ✨.intRemainder divisor
-modulo dividend divisor :=
-  needs (is dividend)
-  needs (is divisor)
-  dividend | ✨.intModulo divisor
+multiply := builtins.intMultiply
+divideTruncating := builtins.intDivideTruncating
+remainder := builtins.intRemainder
+modulo := builtins.intModulo
 
 compareTo valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  result = valueA | ✨.intCompareTo valueB
-  check (equals result Equal | bool.implies (equals valueA valueB))
-  # check ((equals result Equal) | bool.implies (equals valueA valueB))
+  result = valueA | builtins.intCompareTo valueB
+  check (result | equals Equal | bool.implies (equals valueA valueB))
   result
 isLessThan valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  equals (compareTo valueA valueB) Less
+  valueA | compareTo valueB | equals Less
 isGreaterThan valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  equals (compareTo valueA valueB) Greater
+  valueA | compareTo valueB | equals Greater
 isLessThanOrEqualTo valueA valueB :=
   needs (is valueA)
   needs (is valueB)
@@ -89,63 +71,32 @@ fitsInRustU128 value :=
   # https://doc.rust-lang.org/std/primitive.u128.html#associatedconstant.MAX
   value | isLessThan rustU128Max
 
-shiftLeft value amount :=
-  needs (is value)
-  needs (is amount)
-  needs (isNonNegative amount) "The shift `amount` is negative. You might want to call `shiftRight` instead."
-  # TODO: Add the negated value in the error message as soon as we support string interpolation.
-  needs (fitsInRustU128 amount) "Shifts by that much are not yet supported."
-  value | ✨.intShiftLeft amount
-shiftRight value amount :=
-  needs (is value)
-  needs (is amount)
-  needs (isNonNegative amount) "The shift `amount` is negative. You might want to call `shiftLeft` instead."
-  # TODO: Add the negated value in the error message as soon as we support string interpolation.
-  needs (fitsInRustU128 amount) "Shifts by that much are not yet supported."
-  value | ✨.intShiftRight amount
+shiftLeft := builtins.intShiftLeft
+shiftRight := builtins.intShiftRight
 
-bitLength value :=
-  # Determines the fewest bits necessary to express this integer, not including
-  # the sign.
-  needs (is value)
-  value | ✨.intBitLength
+bitLength := builtins.intBitLength
 
-bitwiseAnd valueA valueB :=
-  needs (is valueA)
-  needs (is valueB)
-  valueA | ✨.intBitwiseAnd valueB
-bitwiseOr valueA valueB :=
-  needs (is valueA)
-  needs (is valueB)
-  valueA | ✨.intBitwiseOr valueB
-bitwiseXor valueA valueB :=
-  needs (is valueA)
-  needs (is valueB)
-  valueA | ✨.intBitwiseXor valueB
+bitwiseAnd := builtins.intBitwiseAnd
+bitwiseOr := builtins.intBitwiseOr
+bitwiseXor := builtins.intBitwiseXor
 
 isEven value :=
   needs (is value)
-  equals (bitwiseAnd value 1) 0
+  value | bitwiseAnd 1 | equals 0
 isOdd value :=
   needs (is value)
-  isOdd = equals (bitwiseAnd value 1) 1
+  isOdd = value | bitwiseAnd 1 | equals 1
   check (value | isEven | equals (isOdd | bool.not))
   isOdd
 
 min valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  ifElse
-    (valueA | isLessThanOrEqualTo valueB)
-    { valueA }
-    { valueB }
+  ifElse (valueA | isLessThanOrEqualTo valueB) { valueA } { valueB }
 max valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  ifElse
-    (valueA | isGreaterThanOrEqualTo valueB)
-    { valueA }
-    { valueB }
+  ifElse (valueA | isGreaterThanOrEqualTo valueB) { valueA } { valueB }
 coerceAtLeast value minimum :=
   needs (is value)
   needs (is minimum)
@@ -161,6 +112,4 @@ coerceIn value minimum maximum :=
   needs (minimum | isLessThanOrEqualTo maximum)
   value | coerceAtLeast minimum | coerceAtMost maximum
 
-parse text :=
-  needs (type.is text Text)
-  text | ✨.intParse
+parse := builtins.intParse

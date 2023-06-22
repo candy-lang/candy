@@ -1,16 +1,19 @@
+builtins = use "Builtins"
+[ifElse] = use "..controlFlow"
 type = use "..type"
 
 is value := type.is value Struct
 
 hasKey struct key :=
   needs (is struct)
-  struct | ✨.structHasKey key
+  struct | builtins.structHasKey key
 
-getUnwrap struct key :=
+get struct key :=
   needs (is struct)
-  needs (hasKey struct key)
-  struct | ✨.structGet key
+  ifElse (struct | hasKey key) { Ok (struct | builtins.structGet key) } {
+    Error "Key {key} not found in struct"
+  }
 
 getKeys struct :=
   needs (is struct)
-  struct | ✨.structGetKeys
+  struct | builtins.structGetKeys

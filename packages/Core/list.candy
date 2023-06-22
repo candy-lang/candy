@@ -1,63 +1,44 @@
+builtins = use "Builtins"
 bool = use "..bool"
-[ifElse] = use "..controlFlow"
+[ifElse, recursive] = use "..controlFlow"
 [equals] = use "..equality"
 function = use "..function"
 int = use "..int"
 result = use "..result"
 type = use "..type"
 
-filled length item :=
-  needs (int.is length)
-  needs (int.isNonNegative length)
-  needs (int.fitsInRustU32 length)
-  ✨.listFilled length item
-# TODO: `generate length valueGetter` when we have loops
-
 is value := type.is value List
 
-length list :=
-  needs (is list)
-  list | ✨.listLength
+length := builtins.listLength
 isEmpty list :=
   needs (is list)
   equals (length list) 0
 
 lastIndex list :=
   needs (is list)
-  ifElse
-    (list | isEmpty)
-    { result.error "Can't get the last index of an empty list." }
-    { list | length | int.subtract 1 | result.ok }
+  ifElse (list | isEmpty) { Error "Can't get the last index of an empty list." } {
+    Ok (list | length | int.subtract 1)
+  }
 isValidIndex list index :=
   needs (is list)
   needs (int.is index)
-  ifElse
-    (list | isEmpty)
-    { False }
-    { index | int.isNonNegative }
+  ifElse (list | isEmpty) { False } { index | int.isNonNegative }
   | bool.lazyAnd { index | int.isLessThanOrEqualTo (list | lastIndex | result.unwrap) }
-
-get list index :=
+isValidInsertIndex list index :=
   needs (is list)
   needs (int.is index)
-  needs (list | isValidIndex index)
-  list | ✨.listGet index
+  ifElse (list | isEmpty) { False } { index | int.isNonNegative }
+  | bool.lazyAnd { index | int.isLessThanOrEqualTo (list | length) }
+
+get := builtins.listGet
 
 # TODO: add `single list` when we have pattern matching
 last list :=
   needs (is list)
-  list | lastIndex
-  | result.mapError { _ -> "Can't get the last item of an empty list." }
+  list | lastIndex | result.mapError { _ -> "Can't get the last item of an empty list." }
   | result.map { index -> list | get index }
 
-insert list index item :=
-  needs (is list)
-
-  needs (int.is index)
-  needs (int.isNonNegative index)
-  needs (index | int.isLessThanOrEqualTo (length list))
-
-  list | ✨.listInsert index item
+insert := builtins.listInsert
 
 prepend list item :=
   needs (is list)
@@ -66,11 +47,7 @@ append list item :=
   needs (is list)
   list | insert (length list) item
 
-replace list index newValue :=
-  needs (is list)
-  needs (int.is index)
-  needs (list | isValidIndex index)
-  list | ✨.listReplace index newValue
+replace := builtins.listReplace
 update list index updater :=
   needs (is list)
   needs (int.is index)
@@ -80,8 +57,32 @@ update list index updater :=
   newValue = updater oldValue
   list | replace index newValue
 
-removeAt list index :=
-  needs (is list)
-  needs (int.is index)
-  needs (list | isValidIndex index)
-  list | ✨.listRemoveAt index
+removeAt := builtins.listRemoveAt
+
+filled := builtins.listFilled
+generate length valueGetter :=
+  # Creates a new list of the given `length`, where each slot is filled by calling `valueGetter`
+  # with the index.
+  needs (int.is length)
+  needs (int.isNonNegative length)
+  needs (int.fitsInRustU32 length)
+  needs (function.is1 valueGetter)
+
+  list = filled length Placeholder
+  recursive [list, Index: 0] { recurse state ->
+    [list, index] = state
+    ifElse (index | equals length) { list } {
+      item = valueGetter index
+      list = list | replace index item
+      recurse [list, Index: int.add index 1]
+    }
+  }
+
+concatenate listA listB :=
+  needs (is listA)
+  needs (is listB)
+  generate (listA | length | int.add (listB | length)) { index ->
+    ifElse (index | int.isLessThan (listA | length)) { listA | get index } {
+      listB | get (index | int.subtract (listA | length))
+    }
+  }

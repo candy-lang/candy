@@ -1,20 +1,40 @@
 import * as child_process from 'child_process';
 import * as stream from 'stream';
-import * as vs from 'vscode';
+import * as vscode from 'vscode';
 import {
   LanguageClient,
   LanguageClientOptions,
   StreamInfo,
 } from 'vscode-languageclient/node';
+import { registerDebugAdapter } from './debug_adapter';
+import { registerDebugIrCommands } from './debug_irs';
 import { HintsDecorations } from './hints';
+import { ServerStatusService } from './server_status';
 
 let client: LanguageClient;
 
-export async function activate(context: vs.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
   console.log('Activated 🍭 Candy extension!');
+
+  const configuration = vscode.workspace.getConfiguration('candy');
+  const packagesPath = configuration.get<string>('packagesPath');
+  if (!packagesPath) {
+    const result = await vscode.window.showErrorMessage(
+      'Please configure the setting `candy.packagesPath` and reload this window.',
+      'Open settings'
+    );
+    if (result) {
+      vscode.commands.executeCommand(
+        'workbench.action.openSettings',
+        'candy.packagesPath'
+      );
+    }
+    return;
+  }
 
   let clientOptions: LanguageClientOptions = {
     outputChannelName: '🍭 Candy Language Server',
+    initializationOptions: { packagesPath },
   };
 
   client = new LanguageClient(
@@ -26,12 +46,16 @@ export async function activate(context: vs.ExtensionContext) {
   client.start();
 
   context.subscriptions.push(new HintsDecorations(client));
+  context.subscriptions.push(new ServerStatusService(client));
+  registerDebugIrCommands(client);
+  registerDebugAdapter(context, client);
 }
 
 export function deactivate(): Thenable<void> | undefined {
   if (!client) {
     return undefined;
   }
+
   return client.stop();
 }
 
@@ -75,7 +99,7 @@ type SpawnedProcess = child_process.ChildProcess & {
   stderr: stream.Readable;
 };
 function safeSpawn(): SpawnedProcess {
-  const configuration = vs.workspace.getConfiguration('candy');
+  const configuration = vscode.workspace.getConfiguration('candy');
 
   let command: [string, string[]] = ['candy', ['lsp']];
   const languageServerCommand = configuration.get<string>(
@@ -88,7 +112,7 @@ function safeSpawn(): SpawnedProcess {
 
   return child_process.spawn(command[0], command[1], {
     // eslint-disable-next-line @typescript-eslint/naming-convention
-    env: { ...process.env, RUST_BACKTRACE: '1' },
+    env: { ...process.env, RUST_BACKTRACE: 'FULL' },
     shell: true,
   }) as SpawnedProcess;
 }

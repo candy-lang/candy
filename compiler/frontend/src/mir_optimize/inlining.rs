@@ -1,0 +1,126 @@
+//! Inlining means inserting a function's code at the caller site.
+//!
+//! Here's a before-and-after example of a `use "Core"` call being inlined:
+//!
+//! ```mir
+//! # before:
+//! $0 = { $1 ($2 responsible) ->
+//!   $3 = use $1 relative to here, $2 responsible
+//! }
+//! $4 = "Core"
+//! $5 = HirId(the `use "Core"` expression)
+//! $6 = call $0 with $4 ($5 is responsible)
+//!
+//! # after:
+//! $0 = { $1 ($2 responsible) ->
+//!   $3 = use $1 relative to here, $2 responsible
+//! }
+//! $4 = "Core"
+//! $5 = HirId(the `use "Core"` expression)
+//! $6 =
+//!   $7 = use $4 relative to here, $5 responsible
+//! ```
+//!
+//! Inlining makes lots of other optimizations more effective, in partiuclar
+//! [tree shaking] of functions that were inlined into all call sites. Because
+//! at the call sites, more information about arguments exist,
+//! [constant folding] and [module folding] can be more effective.
+//!
+//! TODO: When we have a metric for judging performance vs. code size, also
+//! speculatively inline more call sites, such as smallish functions and
+//! functions only used once.
+//!
+//! [constant folding]: super::constant_folding
+//! [module folding]: super::module_folding
+//! [tree shaking]: super::tree_shaking
+
+use super::{
+    complexity::Complexity,
+    current_expression::{Context, CurrentExpression},
+};
+use crate::mir::{Expression, Id};
+use rustc_hash::FxHashMap;
+
+pub fn inline_tiny_functions(context: &mut Context, expression: &mut CurrentExpression) {
+    inline_functions_of_maximum_complexity(
+        context,
+        expression,
+        Complexity {
+            is_self_contained: true,
+            expressions: 7,
+        },
+    );
+}
+
+pub fn inline_functions_of_maximum_complexity(
+    context: &mut Context,
+    expression: &mut CurrentExpression,
+    complexity: Complexity,
+) {
+    if let Expression::Call { function, .. } = **expression
+        && let Expression::Function { body, .. } = context.visible.get(function)
+        && body.complexity() <= complexity {
+        context.inline_call(expression);
+    }
+}
+
+pub fn inline_functions_containing_use(context: &mut Context, expression: &mut CurrentExpression) {
+    if let Expression::Call { function, .. } = **expression
+        && let Expression::Function { body, .. } = context.visible.get(function)
+        && body.iter().any(|(_, expr)| matches!(expr, Expression::UseModule { .. })) {
+        context.inline_call(expression);
+    }
+}
+
+impl Context<'_> {
+    pub fn inline_call(&mut self, expression: &mut CurrentExpression) {
+        let Expression::Call {
+            function,
+            arguments,
+            responsible: responsible_argument,
+        } = &**expression else {
+            // Expression is not a call.
+            return;
+        };
+        if arguments.contains(function) {
+            // Callee is used as an argument → recursion
+            return;
+        }
+
+        let Expression::Function {
+            original_hirs: _,
+            parameters,
+            responsible_parameter,
+            body,
+        } = self.visible.get(*function) else {
+            // Callee is not a function.
+            return;
+        };
+        if arguments.len() != parameters.len() {
+            // Number of arguments doesn't match the expected parameter count.
+            return;
+        }
+
+        let id_mapping: FxHashMap<Id, Id> = parameters
+            .iter()
+            .zip(arguments.iter())
+            .map(|(parameter, argument)| (*parameter, *argument))
+            .chain([(*responsible_parameter, *responsible_argument)])
+            .chain(
+                body.defined_ids()
+                    .into_iter()
+                    .map(|id| (id, self.id_generator.generate())),
+            )
+            .collect();
+
+        expression.replace_with_multiple(body.iter().map(|(id, expression)| {
+            let mut expression = expression.to_owned();
+            expression.replace_ids(&mut |id| {
+                if let Some(replacement) = id_mapping.get(id) {
+                    *id = *replacement;
+                }
+            });
+            (id_mapping[&id], expression)
+        }));
+    }
+}

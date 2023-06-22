@@ -1,4 +1,4 @@
-[async, await, channel, parallel, text] = use "..Core"
+[async, await, channel, parallel, text] = use "Core"
 
 main := { environment ->
   print message =
@@ -6,8 +6,7 @@ main := { environment ->
     environment.stdout | channel.send message
 
   parallel { nursery ->
-    nursery
-    | async {
+    nursery | async {
       print "Hello from fiber!"
       "Hello, async await!"
     }

@@ -2,16 +2,11 @@
 // https://github.com/Dart-Code/Dart-Code/blob/075f71ca0336e94ebb480be35895b5b12314223b/src/extension/lsp/closing_labels_decorations.ts
 import * as vs from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
-import {
-  Hint,
-  HintKind,
-  PublishHintsNotification,
-} from './lsp_custom_protocol';
+import { Hint, HintKind, publishHintsType } from './lsp_custom_protocol';
 
 export class HintsDecorations implements vs.Disposable {
   private subscriptions: vs.Disposable[] = [];
   private hints = new Map<String, Hint[]>();
-  private editors = new Map<String, vs.TextEditor>();
 
   private readonly decorationTypes = new Map<
     HintKind,
@@ -40,48 +35,36 @@ export class HintsDecorations implements vs.Disposable {
     ],
   ]);
 
-  constructor(private readonly analyzer: LanguageClient) {
-    // tslint:disable-next-line: no-floating-promises
-    analyzer.onReady().then(() => {
-      this.analyzer.onNotification(
-        PublishHintsNotification.type,
-        (notification) => {
-          // We parse the URI so that it gets normalized.
-          const uri = vs.Uri.parse(notification.uri).toString();
+  constructor(private readonly client: LanguageClient) {
+    this.client.onNotification(publishHintsType, (notification) => {
+      // We parse the URI so that it gets normalized.
+      const uri = vs.Uri.parse(notification.uri).toString();
 
-          this.hints.set(uri, notification.hints);
-          // Fire an update if it was for the active document.
-          if (
-            vs.window.activeTextEditor &&
-            vs.window.activeTextEditor.document &&
-            uri === vs.window.activeTextEditor.document.uri.toString()
-          ) {
-            this.update();
-          }
-        }
-      );
+      this.hints.set(uri, notification.hints);
+      // Fire an update if it was for the active document.
+      if (
+        vs.window.activeTextEditor &&
+        vs.window.activeTextEditor.document &&
+        uri === vs.window.activeTextEditor.document.uri.toString()
+      ) {
+        this.update();
+      }
     });
 
     this.subscriptions.push(
-      vs.window.onDidChangeActiveTextEditor(() => this.update())
+      vs.window.onDidChangeVisibleTextEditors(() => this.update())
     );
     this.subscriptions.push(
       vs.workspace.onDidCloseTextDocument((document) => {
         this.hints.delete(document.uri.toString());
       })
     );
-    if (vs.window.activeTextEditor) {
-      this.update();
-    }
+    this.update();
   }
 
   private update() {
-    const activeEditor = vs.window.activeTextEditor;
-    if (activeEditor && activeEditor.document) {
-      this.editors.set(activeEditor.document.uri.toString(), activeEditor);
-    }
-
-    for (const [uri, editor] of this.editors.entries()) {
+    for (const editor of vs.window.visibleTextEditors) {
+      const uri = editor.document.uri.toString();
       const hints = this.hints.get(uri);
       if (hints === undefined) {
         return;
@@ -92,7 +75,7 @@ export class HintsDecorations implements vs.Disposable {
       };
       const decorations = new Map<HintKind, Item[]>();
       for (const hint of hints) {
-        const position = this.analyzer.protocol2CodeConverter.asPosition(
+        const position = this.client.protocol2CodeConverter.asPosition(
           hint.position
         );
 
@@ -120,14 +103,9 @@ export class HintsDecorations implements vs.Disposable {
   }
 
   public dispose() {
-    for (const editor of this.editors.values()) {
-      try {
-        for (const decorationType of this.decorationTypes.values()) {
-          editor.setDecorations(decorationType, []);
-        }
-      } catch {
-        // It's possible the editor was closed, but there doesn't seem to be a
-        // way to tell.
+    for (const editor of vs.window.visibleTextEditors) {
+      for (const decorationType of this.decorationTypes.values()) {
+        editor.setDecorations(decorationType, []);
       }
     }
     this.subscriptions.forEach((s) => s.dispose());

@@ -1,10 +1,11 @@
 bool = use "..bool"
-[ifElse] = use "..controlFlow"
+[ifElse, recursive] = use "..controlFlow"
 [equals] = use "..equality"
 function = use "..function"
 int = use "..int"
 result = use "..result"
 list = use "..list"
+text = use "..text"
 
 # An iterable is a `() -> Result[[Item, Rest: Iterable[Item]], Any]`.
 # isWithItemType value checkItem :=
@@ -26,28 +27,38 @@ next iterable :=
   iterable | function.run
 isEmpty iterable :=
   needs (is iterable)
-  iterable | next | result.isOk
+  iterable | next | result.isError
 
-generateWithStateHelper = { generateWithStateHelper state mapper ->
-  {
-    mapper state | result.map { result ->
-      [newItem, newState] = result
-      [
-        Item: newItem,
-        Rest: generateWithStateHelper generateWithStateHelper newState mapper,
-      ]
-    }
-  }
-}
 generateWithState initialState mapper :=
   # Creates a new iterator from a state and mapper. The `mapper` receives the
   # current state and returns either one of these:
   #
-  # - a `result.ok` of a struct containing the item to emit (`NewItem`) and the
-  #   new state (`NewState`)
-  # - a `result.err`, indicating that the iterator is done
+  # - an `Ok` of a struct containing the item to emit (`Item`) and the new
+  #   state (`State`)
+  # - an `Error`, indicating that the iterator is done
   needs (function.is1 mapper)
-  generateWithStateHelper generateWithStateHelper initialState mapper
+  recursive initialState { recurse state ->
+    {
+      mapper state | result.map { result ->
+        [item, state] = result
+        [item, Rest: recurse state]
+      }
+    }
+  }
+generate length valueGetter :=
+  # Creates a new iterable of the given `length`, where each slot is filled by calling `valueGetter`
+  # with the index.
+  needs (int.is length)
+  needs (int.isNonNegative length)
+  needs (int.fitsInRustU32 length)
+  needs (function.is1 valueGetter)
+
+  generateWithState 0 { index ->
+    ifElse (index | equals length) { Error Empty } {
+      item = valueGetter index
+      Ok [item, State: index | int.add 1]
+    }
+  }
 
 ## Mapping Transformation
 ##
@@ -59,7 +70,7 @@ map iterable mapper :=
   generateWithState iterable { previousState ->
     previousState | next | result.map { itemAndRest ->
       [item, rest] = itemAndRest
-      [Item: mapper item, rest]
+      [Item: mapper item, State: rest]
     }
   }
 
@@ -69,7 +80,7 @@ withIndex iterable :=
     [iterable, index] = previousState
     iterable | next | result.map { itemAndRest ->
       [item, rest] = itemAndRest
-      [Item: [item, index], Rest: [Iterable: rest, Index: index | int.add 1]]
+      [Item: [item, index], State: [Iterable: rest, Index: index | int.add 1]]
     }
   }
 
@@ -77,9 +88,7 @@ withIndex iterable :=
 
 # TODO: ensure this works with tail recursion
 foldLeftHelper = { foldLeftHelper iterable value combine ->
-  iterable
-  | next
-  | result.map { it ->
+  iterable | next | result.map { it ->
     [item, rest] = it
     newValue = combine value item
     foldLeftHelper foldLeftHelper rest newValue combine
@@ -95,9 +104,7 @@ foldLeft iterable initialValue combine :=
 reduceLeft iterable combine :=
   needs (is iterable)
   needs (function.is2 combine)
-  iterable
-  | next
-  | result.mapError { _ -> "Can't `reduceLeft` an empty iterable" }
+  iterable | next | result.mapError { _ -> "Can't `reduceLeft` an empty iterable" }
   | result.map { it ->
     [item, rest] = it
     rest | foldLeft item combine
@@ -134,15 +141,21 @@ any iterable tester :=
   }
   # TODO: stop after the first `True`
 
+joinToText iterable :=
+  needs (is iterable)
+
+  iterable | foldLeft "" { result item ->
+    needs (text.is item)
+    result | text.concatenate item
+  }
+
 ## Filtering
 
 whereHelper = { whereHelper iterable tester ->
   generateWithState iterable { iterable ->
-    iterable
-    | next
-    | result.flatMap { itemAndRest ->
+    iterable | next | result.flatMap { itemAndRest ->
       [item, rest] = itemAndRest
-      ifElse (tester item) { result.ok itemAndRest } { whereHelper rest tester | next }
+      ifElse (tester item) { Ok [item, State: rest] } { whereHelper rest tester | next }
     }
   }
 }
@@ -151,22 +164,31 @@ where iterable tester :=
   needs (function.is1 tester)
   whereHelper whereHelper iterable tester
 
-takeWhile iterable tester = generateWithState iterable { iterable ->
-  iterable
-  | next
-  | result.flatMap { itemAndRest ->
-    ifElse (tester itemAndRest.item) {
-      result.ok itemAndRest
-    } {
-      result.error Empty
-    }
+takeWhile iterable tester := generateWithState iterable { iterable ->
+  iterable | next | result.flatMap { itemAndRest ->
+    [item, rest] = itemAndRest
+    ifElse (tester item) { Ok [item, State: rest] } { Error Empty }
   }
 }
 
-takeUntil iterable tester = iterable | takeWhile { item -> tester item | bool.not }
+takeUntil iterable tester := iterable | takeWhile { item -> tester item | bool.not }
+
+take iterable n :=
+  needs (is iterable)
+  needs (int.is n)
+  needs (int.isNonNegative n)
+
+  iterable | withIndex | takeWhile { it ->
+    [item, index] = it
+    index | int.isLessThan n
+  }
+  | map { it -> it.item }
 
 skipHelper = { skipHelper iterable n ->
-  ifElse (equals n 0) { iterable } { skipHelper iterable (n | int.subtract 1) }
+  ifElse (equals n 0) { iterable } {
+    remaining = iterable | next | result.map { it -> it.rest } | result.unwrapOr { }
+    skipHelper skipHelper remaining (n | int.subtract 1)
+  }
 }
 skip iterable n :=
   needs (is iterable)
@@ -193,13 +215,35 @@ fromList l :=
   # The state contains the list and an index.
   generateWithState [l, Index: 0] { state ->
     [l, index] = state
-    ifElse (l | list.isValidIndex index) {
-      result.ok (l | list.get index, [l, Index: index | int.add 1])
-    } {
-      result.error Empty
-    }
+    ifElse
+      l | list.isValidIndex index
+      { Ok [Item: l | list.get index, State: [l, Index: index | int.add 1]] }
+      { Error Empty }
   }
 
 toList iterable :=
   needs (is iterable)
   iterable | foldLeft (,) { result item -> result | list.append item }
+
+## Partitioning
+
+windowed iterable size step allowPartialWindows :=
+  needs (is iterable)
+  needs (int.is size)
+  needs (int.isPositive size)
+  needs (int.is step)
+  needs (int.isPositive step)
+  needs (bool.is allowPartialWindows)
+
+  generateWithState iterable { iterable ->
+    items = iterable | take size | toList
+    length = items | list.length
+    isLongEnough = ifElse allowPartialWindows { length | int.isPositive } { length | equals size }
+    ifElse isLongEnough { Ok [Item: items, State: iterable | skip step] } { Error Empty }
+  }
+chunked iterable size :=
+  needs (is iterable)
+  needs (int.is size)
+  needs (int.isPositive size)
+
+  iterable | windowed size size True

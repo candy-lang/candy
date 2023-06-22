@@ -1,7 +1,7 @@
 # Repeatedly asks you for a guess and tells you whether the secret number is
 # higher or lower. Exits once you found the secret number.
 
-[async, await, channel, equals, ifElse, int, loop, result, run, text] = use "...Core"
+[async, await, channel, equals, ifElse, int, loop, result, Function: [run], text] = use "Core"
 
 main := { environment ->
   print message =
@@ -20,18 +20,23 @@ main := { environment ->
   loop {
     print "What's your guess?"
     guess = run read | text.trim | int.parse
-    
-    guess | result.mapOrElse { guess ->
-      ifElse (equals guess correct) {
-        print "You did it!"
-        Break
-      } {
-        print (ifElse (int.isLessThan correct guess) { "Lower!" } { "Higher!" })
+
+    guess | result.mapOrElse
+      { guess ->
+        ifElse
+          equals guess correct
+          {
+            print "You did it!"
+            Break
+          }
+          {
+            print (ifElse (int.isLessThan correct guess) { "Lower!" } { "Higher!" })
+            Continue
+          }
+      }
+      { error ->
+        print "Your guess must be a number."
         Continue
       }
-    } { error ->
-      print "Your guess must be a number."
-      Continue
-    }
   }
 }

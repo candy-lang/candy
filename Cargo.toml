@@ -1,8 +1,13 @@
 [workspace]
 
 members = [
-    "compiler",
-    "compiler/fuzz",
+    "compiler/cli",
+    "compiler/frontend",
+    "compiler/fuzzer",
+    "compiler/formatter",
+    "compiler/language_server",
+    "compiler/vm",
+    "compiler/vm/fuzz",
 ]
 
 [profile.release]

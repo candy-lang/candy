@@ -1,20 +1,19 @@
+builtins = use "Builtins"
 bool = use "..bool"
 [equals] = use "..equality"
 function = use "..function"
+[typeOf] = use "..type"
 
-ifElse condition then else :=
-  needs (bool.is condition)
-  needs (function.is0 then)
-  needs (function.is0 else)
-  ✨.ifElse condition then else
-
+ifElse := builtins.ifElse
 if condition then :=
   needs (bool.is condition)
   needs (function.is0 then)
-  ifElse condition then {}
+  ifElse condition then { }
 
 recursive initialArg body :=
-  needs (function.is2 body) "The `body` should take the recursive function and the argument."
+  needs
+    function.is2 body
+    "The `body` should take the recursive function and the argument."
   recurse = { recurse arg ->
     rec = { arg -> recurse recurse arg }
     body rec arg
@@ -24,11 +23,23 @@ recursive initialArg body :=
 ## TODO: Support breaking with a value as soon as tags are supported.
 ## TODO: Support looping with a state.
 loop body :=
+  # Executes the body infinitely often.
   needs (function.is0 body)
   recursive Nothing { recurse arg ->
     result = function.run body
     needs
-      ((result | equals Continue) | bool.or (result | equals Break))
+      result | equals Continue | bool.or (result | equals Break)
       "The `body` has to return `Continue` or `Break`."
     if (result | equals Continue) { recurse Nothing }
+  }
+
+repeat times body :=
+  needs (typeOf times | equals Int)
+  needs (times | builtins.intCompareTo 0 | equals Less | bool.not)
+  needs (function.is0 body)
+  recursive times { recurse times ->
+    if (times | builtins.intCompareTo 0 | equals Greater) {
+      function.run body
+      recurse (times | builtins.intSubtract 1)
+    }
   }

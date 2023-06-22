@@ -22,14 +22,14 @@ Note that not all of the features described here are implemented or even finaliz
 - [Values](#values)
   - [Integers](#integers)
   - [Texts](#texts)
-  - [Symbols](#symbols)
+  - [Tags](#tags)
   - [Lists](#lists)
   - [Structs](#structs)
-  - [Closures](#closures)
+  - [Functions](#functions)
   - [Ports](#ports)
   - [More?](#more)
 - [Variables](#variables)
-- [Functions](#functions)
+- [Functions](#functions-1)
 - [Modules](#modules)
 - [Comments](#comments)
 - [Panics](#panics)
@@ -128,14 +128,21 @@ Finally, you can use curly braces (`{}`) containing a text value to insert it in
 '"In meta texts, {{interpolation}} requires more curly braces; otherwise, the values are {not interpolated}."'
 ```
 
-### Symbols
+### Tags
 
-Symbols are uppercase identifiers that can only be compared for equality.
+Tags are uppercase identifiers that can only be compared for equality.
 
 ```candy
 True
 Green
 Foo
+```
+
+A tag can also hold a value.
+
+```candy
+Result 5
+Error "Something went wrong"
 ```
 
 ### Lists
@@ -177,13 +184,13 @@ foo.name  # "Candy"
 
 TODO: Modifying structs. Original idea: `{ Name: "Marcel", Age: 21 }` copied using `{ original | Name: "Jonas" }`
 
-### Closures
+### Functions
 
-Closures are pieces of code that can be executed.
+Functions are pieces of code that can be executed.
 
 ```candy
 identityFunction = { argument -> argument }
-longClosure = { foo ->
+longFunction = { foo ->
   ...
 }
 ```
@@ -196,7 +203,7 @@ See the [Concurrency](#concurrency) section for more information.
 
 ### More?
 
-TODO: Tuples? Tags? Sets?
+TODO: Tuples? Sets?
 
 - sets: Clojure has `%{ value }`
   - or like Toit? `{hey, you, there}` for set, empty map is `{:}`
@@ -247,7 +254,7 @@ bar =
 
 ## Functions
 
-Functions can either be defined using closure literals or by writing them as parameterized variables with arguments in front of the `=` or `:=`.
+Functions can either be defined using function literals or by writing them as parameterized variables with arguments in front of the `=` or `:=`.
 Both representations are equivalent with respect to what they do during runtime.
 
 ```candy
@@ -411,9 +418,9 @@ bar = foo 5  # foo = 5
 bar = foo A  # error
 ```
 
-Note that there is a difference between functions written as parameterized variables (`foo a = a`) and functions written as closures (`foo = { a -> a }`).
+Note that there is a difference between functions written as parameterized variables (`foo a = a`) and functions written using curly braces (`foo = { a -> a }`).
 `needs` always refer to the surrounding _parameterized variable_.
-Consequently, closures can't reject inputs, but they also don't promise that they can handle every input correctly.
+Consequently, curly-braced functions can't reject inputs, but they also don't promise that they can handle every input correctly.
 
 ```candy
 foo a =
@@ -531,10 +538,12 @@ TODO: Have a way of destructuring so that the parent is at fault if it doesn't s
   - (IDE tooling)
 - (nominal typing)
 
+```candy
 metaWrapper (String value) [
   Doc: "documentation",
   ToText: { value -> ... },
 ]
+```
 
 TODO: Give the `ToText` a receive port to support progressive visualizations?
 

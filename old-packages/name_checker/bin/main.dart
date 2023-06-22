@@ -7,6 +7,7 @@ import 'package:retry/retry.dart';
 
 // ignore_for_file: avoid_print, avoid_dynamic_calls
 
+// ignore: unreachable_from_main
 const names = {
   //
   /* 'aaaaa', */ 'avocado',

@@ -1,18 +1,17 @@
+builtins = use "Builtins"
 [equals] = use "..equality"
 type = use "..type"
 
 is value := type.is value Function
 
-getArgumentCount function :=
-  needs (is function)
-  ✨.getArgumentCount function
+getArgumentCount := builtins.getArgumentCount
 
-is0 value := ✨.ifElse (is value) { equals (getArgumentCount value) 0 } { False }
-is1 value := ✨.ifElse (is value) { equals (getArgumentCount value) 1 } { False }
-is2 value := ✨.ifElse (is value) { equals (getArgumentCount value) 2 } { False }
-is3 value := ✨.ifElse (is value) { equals (getArgumentCount value) 3 } { False }
-is4 value := ✨.ifElse (is value) { equals (getArgumentCount value) 4 } { False }
-is5 value := ✨.ifElse (is value) { equals (getArgumentCount value) 5 } { False }
+is0 value := builtins.ifElse (is value) { equals (getArgumentCount value) 0 } { False }
+is1 value := builtins.ifElse (is value) { equals (getArgumentCount value) 1 } { False }
+is2 value := builtins.ifElse (is value) { equals (getArgumentCount value) 2 } { False }
+is3 value := builtins.ifElse (is value) { equals (getArgumentCount value) 3 } { False }
+is4 value := builtins.ifElse (is value) { equals (getArgumentCount value) 4 } { False }
+is5 value := builtins.ifElse (is value) { equals (getArgumentCount value) 5 } { False }
 
 run body :=
   # A function that runs the given `body` with no arguments and returns its result.
@@ -23,7 +22,7 @@ run body :=
   # }
   # ```
   needs (is0 body)
-  ✨.functionRun body
+  builtins.functionRun body
 
 doNotRun body :=
   # A function that doesn't run the given `body`.
@@ -33,10 +32,10 @@ doNotRun body :=
   #
   # These are some of the benefits over commenting code out:
   #
-  # * Refactorings, like renaming of functions, also affect the code.
-  # * Candy doesn't report linter warnings for fields and functions in the outer scope that are
+  # - Refactorings, like renaming of functions, also affect the code.
+  # - Candy doesn't report linter warnings for fields and functions in the outer scope that are
   #   only used in the code.
-  # * Making the code invalid (for example, by deleting needed functions) results in compiler
+  # - Making the code invalid (for example, by deleting needed functions) results in compiler
   #   errors.
   needs (is0 body)
   Nothing

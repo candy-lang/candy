@@ -1,5 +1,8 @@
+builtins = use "Builtins"
 [equals] = use "..equality"
 
-typeOf value := ✨.typeOf value
+typeOf := builtins.typeOf
 
-is value type := equals (typeOf value) type
+is value type :=
+  needs (typeOf type | equals Tag)
+  equals (typeOf value) type

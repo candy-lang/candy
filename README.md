@@ -17,7 +17,7 @@ Candy blurs the line between those stages, for example, by replacing compile-tim
   Green               # symbol
   (Foo, Bar)          # list
   [Name: "Candy"]     # struct
-  { it -> add it 2 }  # closure
+  { it -> add it 2 }  # function
   ```
 
 - **Minimalistic syntax.**
@@ -69,104 +69,6 @@ To get a more in-depth introduction, read the [language document](language.md).
 We are currently implementing a first version of Candy in Rust.
 We already have a language server that provides some tooling.
 
-## Long-term TODOs
-
-- Core
-  - io
-  - random
-  - timing
-  - environment variables
-  - HTTP, UDP
-- compiler
-  - make functions independent of their order in top-level scope
-  - patterns
-  - improve pattern match panic messages: `[Foo, 1, {a}] = [Foo, 2, {A: B]]` could generate a message like `` Expected `[_, 1, _]`, got `[_, 2, _]`. ``
-  - "type" proofs
-  - fuzzing of the compiler itself
-  - package root marker
-  - package path dependencies
-  - LLVM, WASM
-- VM
-  - multithreading
-  - object deduplication
-  - profiler
-  - memory representation
-    - inlining of ints/etc.
-    - size of an object
-    - heap management
-- IDE support:
-  - generate debug files
-  - DAP (debug adapter protocol)
-  - [ ] completion, completion resolve
-  - [ ] hover
-  - [ ] signatureHelp
-  - [x] ~~declaration~~, definition, ~~typeDefinition~~
-  - [ ] implementation
-  - [x] references
-  - [x] documentHighlight
-  - [ ] documentSymbol
-  - [ ] codeAction, codeAction resolve
-  - [ ] codeLens, codeLens resolve, codeLens refresh
-  - [ ] documentLink, documentLink resolve
-  - [x] ~~documentColor, colorPresentation~~
-  - [ ] formatting
-  - [ ] rangeFormatting
-  - [ ] onTypeFormatting
-  - [ ] rename, prepareRename
-  - [x] foldingRange
-  - [ ] selectionRange
-  - [ ] prepareCallHierarchy
-  - [ ] callHierarchy incoming, callHierarchy outgoing
-  - [x] semantic tokens
-  - [x] ~~linkedEditingRange~~
-  - [ ] moniker
-- packages
-  - stdin/out utilities such as a print method
-  - files
-  - logging
-  - HTTP Server
-  - Markdown
-  - custom binary serialization
-  - Cap'n Proto
-  - DateTime?
-  - SI?
-  - MongoDB?
-  - package manager
-- online playground
-- clean up repo (delete a bunch of stuff!)
-
-## Short-term TODOs
-
-- new name?
-- add caching while compile-time evaluating code
-- tags
-- pattern matching
-- add tests
-- add a more lightweight tracer that only tracks stack traces
-- minimize inputs found through fuzzing
-- fuzz parser
-- remove builtinPrint
-- tracing visualization
-- distinguish packages from normal modules
-- complain about comment lines with too much indentation
-- develop guidelines about how to format reasons
-- disallow passing named closures as parameters? or auto-propagate caller's fault to called parameters?
-- replace occurrences of `Id::complicated_responsibility()`
-- fix usage of pipes in indented code such as this:
-
-  ```candy
-  foo
-    bar | baz
-  ## Currently, this is parsed as `baz (foo bar)`.
-  ```
-
-- more efficient argument preparation in LIR function call (so we don't have to push references if the evaluation order doesn't change conceptually)
-- fix evaluation order of pipe expression by keeping it in the AST
-- shorter ID formatting for generated debug files
-- support destructuring in lambda parameters
-- find references in patterns
-- convert the readme todos into GitHub issues
-
 ## How to use Candy
 
 1. Install [<img height="16" src="https://rust-lang.org/static/images/favicon.svg"> Rust](https://rust-lang.org): https://www.rust-lang.org/tools/install.
@@ -174,7 +76,7 @@ We already have a language server that provides some tooling.
 3. Install Rust's Clippy (a linter): `rustup component add clippy`.
 4. Clone this repo.
 5. Open the workspace (`compiler.code-workspace`) in VS Code.
-6. In the VS Code settings (JSON), add the following: `"candy.languageServerCommand": "cargo run --manifest-path <path-to-the-candy-folder>/compiler/Cargo.toml -- lsp"`.  
+6. In the VS Code settings (JSON), add the following: `"candy.languageServerCommand": "cargo run --manifest-path <path-to-the-candy-folder>/compiler/cli/Cargo.toml -- lsp"`.  
    If you want to write code in 🍭 Candy (as opposed to working on the compiler), you should also add `--release` before the standalone `--`.
    This makes the IDE tooling faster, but startup will take longer.
 7. Run `npm install` inside `vscode_extension/`.
