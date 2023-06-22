@@ -3,9 +3,10 @@ use crate::{
     heap::{object_heap::HeapObject, Heap, InlineObject},
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
+use candy_frontend::utils::DoHash;
 use derive_more::Deref;
 use itertools::{izip, Itertools};
-use rustc_hash::{FxHashMap, FxHasher};
+use rustc_hash::FxHashMap;
 use std::{
     cmp::Ordering,
     fmt::{self, Formatter},
@@ -32,7 +33,7 @@ impl HeapStruct {
         let entries = value
             .iter()
             // PERF: Reuse hashes from the map.
-            .map(|(&key, &value)| (Self::do_hash(key), key, value))
+            .map(|(&key, &value)| (key.do_hash(), key, value))
             .sorted_by_key(|(hash, _, _)| *hash);
         let struct_ = Self::create_uninitialized(heap, len);
         unsafe {
@@ -89,17 +90,17 @@ impl HeapStruct {
     }
 
     pub fn contains(self, key: InlineObject) -> bool {
-        self.index_of_key(key, Self::do_hash(key)).is_ok()
+        self.index_of_key(key, key.do_hash()).is_ok()
     }
     pub fn get(self, key: impl Into<InlineObject>) -> Option<InlineObject> {
         let key = key.into();
-        self.index_of_key(key, Self::do_hash(key))
+        self.index_of_key(key, key.do_hash())
             .ok()
             .map(|index| self.values()[index])
     }
     #[must_use]
     pub fn insert(self, heap: &mut Heap, key: InlineObject, value: InlineObject) -> Self {
-        let hash = Self::do_hash(key);
+        let hash = key.do_hash();
         match self.index_of_key(key, hash) {
             Ok(index) => {
                 let struct_ = Self::create_uninitialized(heap, self.len());
@@ -166,12 +167,6 @@ impl HeapStruct {
             .find(|(_, existing_key)| *existing_key == key)
             .map(|(index, _)| index)
             .ok_or(index_of_first_hash_occurrence)
-    }
-
-    fn do_hash(key: InlineObject) -> u64 {
-        let mut state = FxHasher::default();
-        key.hash(&mut state);
-        state.finish()
     }
 }
 

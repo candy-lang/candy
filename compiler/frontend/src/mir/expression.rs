@@ -69,15 +69,6 @@ pub enum Expression {
         responsible: Id,
     },
 
-    /// For convenience when writing optimization passes, this expression allows
-    /// storing multiple inner expressions in a single expression. The expansion
-    /// back into multiple expressions happens in the [multiple flattening]
-    /// optimization.
-    ///
-    /// [multiple flattening]: crate::mir_optimize::multiple_flattening
-    #[from]
-    Multiple(Body),
-
     TraceCallStarts {
         hir_call: Id,
         function: Id,
@@ -255,7 +246,6 @@ impl Hash for Expression {
                 reason.hash(state);
                 responsible.hash(state);
             }
-            Expression::Multiple(body) => body.hash(state),
             Expression::TraceCallStarts {
                 hir_call,
                 function,
@@ -425,12 +415,6 @@ impl ToRichIr for Expression {
                 builder.push(" (", None, EnumSet::empty());
                 responsible.build_rich_ir(builder);
                 builder.push(" is at fault)", None, EnumSet::empty());
-            }
-            Expression::Multiple(body) => {
-                builder.indent();
-                builder.push_newline();
-                body.build_rich_ir(builder);
-                builder.dedent();
             }
             Expression::TraceCallStarts {
                 hir_call,

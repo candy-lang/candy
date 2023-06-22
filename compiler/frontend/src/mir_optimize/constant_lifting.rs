@@ -35,19 +35,11 @@
 //!
 //! [common subtree elimination]: super::common_subtree_elimination
 
-use super::pure::PurenessInsights;
-use crate::{
-    id::IdGenerator,
-    mir::{Body, Expression, Id},
-};
-use std::mem;
+use super::current_expression::{Context, CurrentExpression};
+use crate::mir::Expression;
 
-pub fn lift_constants(
-    expression: &mut Expression,
-    pureness: &PurenessInsights,
-    id_generator: &mut IdGenerator<Id>,
-) {
-    let Expression::Function { body, .. } = expression else { return; };
+pub fn lift_constants(context: &mut Context, expression: &mut CurrentExpression) {
+    let Expression::Function { body, .. } = &mut **expression else { return; };
 
     let mut constants = vec![];
 
@@ -56,7 +48,7 @@ pub fn lift_constants(
         let (id, expression) = &body.expressions[index];
         let id = *id;
 
-        if !pureness.is_definition_const(expression) {
+        if !context.pureness.is_definition_const(expression) {
             index += 1;
             continue;
         }
@@ -76,15 +68,9 @@ pub fn lift_constants(
         if is_return_value {
             // The return value was removed. Add a reference to the lifted
             // constant.
-            body.push(id_generator.generate(), Expression::Reference(id));
+            body.push(context.id_generator.generate(), Expression::Reference(id));
         }
     }
 
-    if constants.is_empty() {
-        return; // Nothing to lift.
-    }
-
-    let original_expression = mem::replace(expression, Expression::Parameter);
-    constants.push((id_generator.generate(), original_expression));
-    *expression = Expression::Multiple(Body::new(constants));
+    expression.prepend_optimized(context.visible, constants);
 }

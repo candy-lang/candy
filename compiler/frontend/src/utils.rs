@@ -1,8 +1,9 @@
-pub trait AdjustCasingOfFirstLetter {
-    fn lowercase_first_letter(&self) -> String;
-    fn uppercase_first_letter(&self) -> String;
-}
-impl AdjustCasingOfFirstLetter for str {
+use extension_trait::extension_trait;
+use rustc_hash::FxHasher;
+use std::hash::{Hash, Hasher};
+
+#[extension_trait]
+pub impl AdjustCasingOfFirstLetter for str {
     fn lowercase_first_letter(&self) -> String {
         let mut c = self.chars();
         match c.next() {
@@ -17,5 +18,14 @@ impl AdjustCasingOfFirstLetter for str {
             None => String::new(),
             Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
         }
+    }
+}
+
+#[extension_trait]
+pub impl<T: Hash> DoHash for T {
+    fn do_hash(&self) -> u64 {
+        let mut hasher = FxHasher::default();
+        self.hash(&mut hasher);
+        hasher.finish()
     }
 }
