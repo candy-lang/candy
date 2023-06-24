@@ -1,23 +1,23 @@
 use super::{insights::Insight, static_panics::StaticPanicsOfMir};
-use crate::{database::Database, server::AnalyzerClient, utils::LspPositionConversion};
+use crate::{
+    database::Database, features_candy::analyzer::insights::ErrorDiagnostic,
+    server::AnalyzerClient, utils::LspPositionConversion,
+};
 use candy_frontend::{
     ast_to_hir::AstToHir, mir_optimize::OptimizeMir, module::Module, TracingConfig, TracingMode,
 };
 use candy_fuzzer::{FuzzablesFinder, Fuzzer, Status};
 use candy_vm::{
     execution_controller::RunLimitedNumberOfInstructions,
-    fiber::{EndedReason, Panic, VmEnded},
+    fiber::{Panic, VmEnded},
     lir::Lir,
     mir_to_lir::compile_lir,
-    tracer::{
-        evaluated_values::EvaluatedValuesTracer,
-        stack_trace::{Call, StackTracer},
-    },
+    tracer::{evaluated_values::EvaluatedValuesTracer, stack_trace::StackTracer},
     vm::{self, Vm},
 };
 use extension_trait::extension_trait;
 use itertools::Itertools;
-use lsp_types::Range;
+use lsp_types::{Diagnostic, Range};
 use rand::{prelude::SliceRandom, thread_rng};
 use std::sync::Arc;
 use tracing::info;
@@ -258,8 +258,6 @@ impl ModuleAnalyzer {
             }
             State::Fuzz {
                 static_panics,
-                constants_ended,
-                stack_tracer,
                 evaluated_values,
                 fuzzers,
                 ..
@@ -272,15 +270,8 @@ impl ModuleAnalyzer {
                         .flat_map(|(id, value)| Insight::for_value(db, id.clone(), *value)),
                 );
 
-                // TODO: Unify this with static panics.
-                if let EndedReason::Panicked(panic) = &constants_ended.reason
-                    && let Some(insight) = Self::panic_hint(db, self.module.clone(), stack_tracer, &panic.reason)
-                {
-                    insights.push(insight);
-                }
-
                 for fuzzer in fuzzers {
-                    insights.push(Insight::for_fuzzer_status(db, fuzzer));
+                    insights.extend(Insight::for_fuzzer_status(db, fuzzer).into_iter());
 
                     let Status::FoundPanic {
                         input,
@@ -314,12 +305,12 @@ impl ModuleAnalyzer {
                     let call_span = db
                         .hir_id_to_display_span(panic.responsible.clone())
                         .unwrap();
-                    insights.push(Insight::Panic {
-                        call_site: Range::new(
+                    insights.push(Insight::Diagnostic(Diagnostic::error(
+                        Range::new(
                             db.offset_to_lsp_position(self.module.clone(), call_span.start),
                             db.offset_to_lsp_position(self.module.clone(), call_span.end),
                         ),
-                        message: format!(
+                        format!(
                             "For `{} {}`, this call panics: {}",
                             fuzzer.function_id.keys.last().unwrap(),
                             input
@@ -329,7 +320,7 @@ impl ModuleAnalyzer {
                                 .join(" "),
                             panic.reason
                         ),
-                    });
+                    )));
                 }
             }
         }
@@ -337,44 +328,6 @@ impl ModuleAnalyzer {
         info!("Insights: {insights:?}");
 
         insights
-    }
-    fn panic_hint(
-        db: &Database,
-        module: Module,
-        tracer: &StackTracer,
-        reason: &str,
-    ) -> Option<Insight> {
-        // We want to show the hint at the last call site still inside the current
-        // module. If there is no call site in this module, then the panic results
-        // from a compiler error in a previous stage which is already reported.
-        let stack = tracer.panic_chain().unwrap();
-
-        // Find the last call in this module.
-        let (
-            Call {
-                callee, arguments, ..
-            },
-            call_site,
-        ) = stack
-            .iter()
-            .map(|call| (call, call.call_site.get().to_owned()))
-            .find(|(_, call_site)| {
-                // Make sure the entry comes from the same file and is not generated
-                // code.
-                call_site.module == module && db.hir_to_cst_id(call_site.to_owned()).is_some()
-            })?;
-
-        let call_info = format!(
-            "{callee} {}",
-            arguments.iter().map(|it| it.to_string()).join(" "),
-        );
-
-        let call_site = db.hir_id_to_display_span(call_site)?;
-        let call_site = db.range_to_lsp_range(module, call_site);
-        Some(Insight::Panic {
-            call_site,
-            message: format!("Calling `{call_info}` panics: {reason}"),
-        })
     }
 }
 

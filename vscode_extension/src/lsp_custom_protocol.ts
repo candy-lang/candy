@@ -55,7 +55,13 @@ export interface Hint {
   readonly text: string;
   readonly position: Position;
 }
-export type HintKind = 'value' | 'panic' | 'fuzzingStatus';
+export type HintKind =
+  | 'value'
+  | 'panic'
+  | 'fuzzingStatus'
+  | 'sampleInputReturningNormally'
+  | 'sampleInputPanickingWithCallerResponsible'
+  | 'sampleInputPanickingWithInternalCodeResponsible';
 
 // Status
 export const publishServerStatusType = new NotificationType<ServerStatus>(

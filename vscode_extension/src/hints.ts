@@ -22,14 +22,70 @@ export class HintsDecorations implements vs.Disposable {
     [
       'panic',
       vs.window.createTextEditorDecorationType({
-        after: { color: new vs.ThemeColor('candy.hints.panicColor') },
+        after: {
+          color: new vs.ThemeColor('candy.hints.panicColor'),
+          backgroundColor: new vs.ThemeColor('candy.hints.panicColor'),
+        },
         rangeBehavior: vs.DecorationRangeBehavior.ClosedOpen,
       }),
     ],
     [
       'fuzzingStatus',
       vs.window.createTextEditorDecorationType({
-        after: { color: new vs.ThemeColor('candy.hints.statusColor') },
+        after: {
+          color: new vs.ThemeColor('candy.hints.statusColor'),
+          backgroundColor: new vs.ThemeColor('candy.hints.panicColor'),
+          margin: '0 0 0 16px',
+          textDecoration: 'padding:2px',
+        },
+        rangeBehavior: vs.DecorationRangeBehavior.ClosedOpen,
+      }),
+    ],
+    [
+      'sampleInputReturningNormally',
+      vs.window.createTextEditorDecorationType({
+        after: {
+          color: new vs.ThemeColor(
+            'candy.sampleInput.returningNormally.foreground'
+          ),
+          backgroundColor: new vs.ThemeColor(
+            'candy.sampleInput.returningNormally.background'
+          ),
+          margin: '0 0 0 16px',
+          textDecoration: 'padding:2px',
+        },
+        rangeBehavior: vs.DecorationRangeBehavior.ClosedOpen,
+      }),
+    ],
+    [
+      'sampleInputPanickingWithCallerResponsible',
+      vs.window.createTextEditorDecorationType({
+        after: {
+          color: new vs.ThemeColor(
+            'candy.sampleInput.panickingWithCallerResponsible.foreground'
+          ),
+          backgroundColor: new vs.ThemeColor(
+            'candy.sampleInput.panickingWithCallerResponsible.background'
+          ),
+          margin: '0 0 0 16px',
+          textDecoration: 'padding:2px',
+        },
+        rangeBehavior: vs.DecorationRangeBehavior.ClosedOpen,
+      }),
+    ],
+    [
+      'sampleInputPanickingWithInternalCodeResponsible',
+      vs.window.createTextEditorDecorationType({
+        after: {
+          color: new vs.ThemeColor(
+            'candy.sampleInput.panickingWithInternalCodeResponsible.foreground'
+          ),
+          backgroundColor: new vs.ThemeColor(
+            'candy.sampleInput.panickingWithInternalCodeResponsible.background'
+          ),
+          margin: '0 0 0 16px',
+          textDecoration: 'padding:2px',
+        },
         rangeBehavior: vs.DecorationRangeBehavior.ClosedOpen,
       }),
     ],

@@ -9,11 +9,14 @@
 //! While doing all that, we can pause regularly between executing instructions
 //! so that we don't occupy a single CPU at 100 %.
 
-use self::{insights::LspType, module_analyzer::ModuleAnalyzer};
+use self::{
+    insights::{Hint, Insight},
+    module_analyzer::ModuleAnalyzer,
+};
 use super::AnalyzerClient;
 use crate::database::Database;
 use candy_frontend::module::{Module, MutableModuleProviderOwner, PackagesPath};
-use lsp_types::{notification::Notification, Position, Url};
+use lsp_types::{notification::Notification, Url};
 use rand::{seq::IteratorRandom, thread_rng};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -45,20 +48,6 @@ impl Notification for HintsNotification {
     const METHOD: &'static str = "candy/textDocument/publishHints";
 
     type Params = Self;
-}
-
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
-pub struct Hint {
-    pub kind: HintKind,
-    pub text: String,
-    pub position: Position,
-}
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, PartialOrd, Ord, Copy)]
-#[serde(rename_all = "camelCase")]
-pub enum HintKind {
-    Value,
-    Panic,
-    FuzzingStatus,
 }
 
 #[tokio::main(worker_threads = 1)]
@@ -117,9 +106,9 @@ pub async fn run_server(
         let mut diagnostics = vec![];
         let mut hints = vec![];
         for insight in insights {
-            match insight.to_lsp_type() {
-                LspType::Diagnostic(diagnostic) => diagnostics.push(diagnostic),
-                LspType::Hint(hint) => hints.push(hint),
+            match insight {
+                Insight::Diagnostic(diagnostic) => diagnostics.push(diagnostic),
+                Insight::Hint(hint) => hints.push(hint),
             }
         }
 

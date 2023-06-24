@@ -3,7 +3,7 @@ use crate::{
     debug_adapter::DebugSessionManager,
     features::{LanguageFeatures, Reference, RenameError},
     features_candy::{
-        analyzer::{Hint, HintsNotification},
+        analyzer::{insights::Hint, HintsNotification},
         CandyFeatures, ServerStatusNotification,
     },
     features_ir::{IrFeatures, UpdateIrNotification},

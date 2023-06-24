@@ -49,6 +49,60 @@
           "light": "#7fae42",
           "highContrast": "#00ae00"
         }
+      },
+      {
+        "id": "candy.sampleInput.returningNormally.background",
+        "description": "The background color of hints showing a sample input.",
+        "defaults": {
+          "dark": "#a8d86a",
+          "light": "#a8d86a",
+          "highContrast": "#107810"
+        }
+      },
+      {
+        "id": "candy.sampleInput.returningNormally.foreground",
+        "description": "The text color of hints showing a sample input.",
+        "defaults": {
+          "dark": "#000000",
+          "light": "#000000",
+          "highContrast": "#ffffff"
+        }
+      },
+      {
+        "id": "candy.sampleInput.panickingWithCallerResponsible.background",
+        "description": "The background color of hints showing an input that fails a need.",
+        "defaults": {
+          "dark": "#f3d676",
+          "light": "#f3d676",
+          "highContrast": "#e5bb33"
+        }
+      },
+      {
+        "id": "candy.sampleInput.panickingWithCallerResponsible.foreground",
+        "description": "The text color of hints showing an input that fails a need.",
+        "defaults": {
+          "dark": "#000000",
+          "light": "#000000",
+          "highContrast": "#000000"
+        }
+      },
+      {
+        "id": "candy.sampleInput.panickingWithInternalCodeResponsible.background",
+        "description": "The background color of hints showing an input that causes the function to panic internally.",
+        "defaults": {
+          "dark": "#ff3f3f",
+          "light": "#ff3f3f",
+          "highContrast": "#ff3f3f"
+        }
+      },
+      {
+        "id": "candy.sampleInput.panickingWithInternalCodeResponsible.foreground",
+        "description": "The text color of hints showing an input that causes the function to panic internally.",
+        "defaults": {
+          "dark": "#ffffff",
+          "light": "#ffffff",
+          "highContrast": "#ffffff"
+        }
       }
     ],
     "commands": [
