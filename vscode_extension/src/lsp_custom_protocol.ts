@@ -57,7 +57,6 @@ export interface Hint {
 }
 export type HintKind =
   | 'value'
-  | 'panic'
   | 'fuzzingStatus'
   | 'sampleInputReturningNormally'
   | 'sampleInputPanickingWithCallerResponsible'

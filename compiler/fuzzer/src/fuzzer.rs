@@ -141,7 +141,7 @@ impl Fuzzer {
                             - 0.4 * complexity;
                         score.clamp(0.1, Score::MAX)
                     };
-                    self.pool.add(runner.input, score);
+                    self.pool.add(runner.input, result, score);
                     self.create_new_fuzzing_case(&total_coverage + &runner.coverage)
                 }
             }

@@ -1,5 +1,5 @@
 use super::input::Input;
-use crate::values::InputGeneration;
+use crate::{runner::RunResult, values::InputGeneration};
 use candy_vm::heap::{Heap, Text};
 use itertools::Itertools;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng, SeedableRng};
@@ -13,7 +13,7 @@ pub struct InputPool {
     heap: Rc<RefCell<Heap>>,
     num_args: usize,
     symbols: Vec<Text>,
-    input_scores: FxHashMap<Input, Score>,
+    results_and_scores: FxHashMap<Input, (RunResult, Score)>,
 }
 
 impl InputPool {
@@ -32,14 +32,14 @@ impl InputPool {
             heap: Rc::new(RefCell::new(heap)),
             num_args,
             symbols,
-            input_scores: FxHashMap::default(),
+            results_and_scores: FxHashMap::default(),
         }
     }
 
     pub fn generate_new_input(&self) -> Input {
         loop {
             let input = self.generate_input();
-            if !self.input_scores.contains_key(&input) {
+            if !self.results_and_scores.contains_key(&input) {
                 return input;
             }
         }
@@ -47,30 +47,34 @@ impl InputPool {
     pub fn generate_input(&self) -> Input {
         let mut rng = ThreadRng::default();
 
-        if rng.gen_bool(0.1) || self.input_scores.len() < 20 {
+        if rng.gen_bool(0.1) || self.results_and_scores.len() < 20 {
             return Input::generate(self.heap.clone(), self.num_args, &self.symbols);
         }
 
-        let inputs_and_scores = self.input_scores.iter().collect_vec();
+        let inputs_and_scores = self.results_and_scores.iter().collect_vec();
         let (input, _) = inputs_and_scores
-            .choose_weighted(&mut rng, |(_, score)| *score)
+            .choose_weighted(&mut rng, |(_, (_, score))| *score)
             .unwrap();
         let mut input = (**input).clone();
         input.mutate(&mut rng, &self.symbols);
         input
     }
 
-    pub fn add(&mut self, input: Input, score: Score) {
-        self.input_scores.insert(input, score);
+    pub fn add(&mut self, input: Input, result: RunResult, score: Score) {
+        self.results_and_scores.insert(input, (result, score));
     }
 
     pub fn interesting_inputs(&self) -> Vec<Input> {
         let mut rng = ChaCha20Rng::seed_from_u64(0);
-        let inputs_and_scores = self.input_scores.iter().collect_vec();
-        inputs_and_scores
-            .choose_multiple_weighted(&mut rng, 3, |(_, score)| **score)
+        let results_and_scores = self.results_and_scores.iter().collect_vec();
+        results_and_scores
+            .choose_multiple_weighted(&mut rng, 3, |(_, (_, score))| *score)
             .unwrap()
             .map(|(input, _)| (*input).clone())
             .collect_vec()
+    }
+
+    pub fn result_of(&self, input: &Input) -> &RunResult {
+        &self.results_and_scores.get(input).unwrap().0
     }
 }

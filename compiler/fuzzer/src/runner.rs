@@ -2,8 +2,8 @@ use candy_frontend::hir::Id;
 use candy_vm::{
     self,
     execution_controller::{CountingExecutionController, ExecutionController},
-    fiber::{Fiber, FiberId, InstructionPointer, Panic},
-    heap::{Function, HirId, InlineObjectSliceCloneToHeap},
+    fiber::{EndedReason, Fiber, FiberId, InstructionPointer, Panic, VmEnded},
+    heap::{Function, Heap, HirId, InlineObject, InlineObjectSliceCloneToHeap},
     lir::Lir,
     tracer::{
         stack_trace::{FiberStackTracer, StackTracer},
@@ -33,7 +33,10 @@ pub enum RunResult {
     Timeout,
 
     /// The execution finished successfully with a value.
-    Done,
+    Done {
+        heap: Heap,
+        return_value: InlineObject,
+    },
 
     /// The execution panicked and the caller of the function (aka the fuzzer)
     /// is at fault.
@@ -47,7 +50,7 @@ impl RunResult {
     pub fn to_string(&self, call: &str) -> String {
         match self {
             RunResult::Timeout => format!("{call} timed out."),
-            RunResult::Done => format!("{call} returned."),
+            RunResult::Done { return_value, .. } => format!("{call} returned {return_value}."),
             RunResult::NeedsUnfulfilled { reason } => {
                 format!("{call} panicked and it's our fault: {reason}")
             }
@@ -129,7 +132,12 @@ impl<L: Borrow<Lir>> Runner<L> {
             // it's of course valid to have a function that never returns. Thus,
             // this should be treated just like a regular timeout.
             vm::Status::WaitingForOperations => Some(RunResult::Timeout),
-            vm::Status::Done => Some(RunResult::Done),
+            vm::Status::Done => {
+                let VmEnded { heap, reason, .. } =
+                    self.vm.take().unwrap().tear_down(&mut self.tracer);
+                let EndedReason::Finished(return_value) = reason else { unreachable!(); };
+                Some(RunResult::Done { heap, return_value })
+            }
             vm::Status::Panicked(panic) => Some(if panic.responsible == Id::fuzzer() {
                 RunResult::NeedsUnfulfilled {
                     reason: panic.reason,

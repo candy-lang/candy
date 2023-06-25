@@ -24,30 +24,39 @@
   "contributes": {
     "colors": [
       {
-        "id": "candy.hints.valueColor",
-        "description": "The color of hints indicating the value of an expression. If not supplied, the color for `tab.inactiveForeground` will be used.",
+        "id": "candy.valueHint.background",
+        "description": "The color of hints indicating the value of an expression.",
         "defaults": {
-          "dark": "tab.inactiveForeground",
-          "light": "tab.inactiveForeground",
-          "highContrast": "tab.inactiveForeground"
+          "dark": "#656565",
+          "light": "#656565",
+          "highContrast": "#656565"
         }
       },
       {
-        "id": "candy.hints.panicColor",
-        "description": "The text color of hints indicating that the code panics. If not supplied, the color for `editorError.foreground` will be used.",
+        "id": "candy.valueHint.foreground",
+        "description": "The color of hints indicating the value of an expression.",
         "defaults": {
-          "dark": "editorError.foreground",
-          "light": "editorError.foreground",
-          "highContrast": "editorError.foreground"
+          "dark": "#000000",
+          "light": "#000000",
+          "highContrast": "#000000"
         }
       },
       {
-        "id": "candy.hints.statusColor",
+        "id": "candy.statusHint.background",
         "description": "The text color of hints indicating the fuzzing status of a function.",
         "defaults": {
-          "dark": "#7fae42",
-          "light": "#7fae42",
-          "highContrast": "#00ae00"
+          "dark": "#9d9d9d",
+          "light": "#9d9d9d",
+          "highContrast": "#9d9d9d"
+        }
+      },
+      {
+        "id": "candy.statusHint.foreground",
+        "description": "The text color of hints indicating the fuzzing status of a function.",
+        "defaults": {
+          "dark": "#000000",
+          "light": "#000000",
+          "highContrast": "#000000"
         }
       },
       {

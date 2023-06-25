@@ -12,6 +12,7 @@ use self::input::Input;
 pub use self::{
     fuzzer::{Fuzzer, Status},
     input_pool::InputPool,
+    runner::RunResult,
     utils::FuzzablesFinder,
 };
 use candy_frontend::{

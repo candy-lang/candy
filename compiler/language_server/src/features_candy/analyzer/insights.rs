@@ -6,7 +6,7 @@ use candy_frontend::{
     hir::{Expression, HirDb, Id},
     module::Module,
 };
-use candy_fuzzer::{Fuzzer, Status};
+use candy_fuzzer::{Fuzzer, RunResult, Status};
 use candy_vm::{fiber::Panic, heap::InlineObject};
 use extension_trait::extension_trait;
 use itertools::Itertools;
@@ -108,10 +108,23 @@ impl Insight {
         })]
         .into_iter()
         .chain(interesting_inputs.into_iter().map(|input| {
-            Insight::Hint(Hint {
-                kind: HintKind::SampleInputReturningNormally,
-                position: end_of_line,
-                text: format!("{function_name} {input}"),
+            Insight::Hint(match fuzzer.pool.result_of(&input) {
+                RunResult::Timeout => unreachable!(),
+                RunResult::Done { return_value, .. } => Hint {
+                    kind: HintKind::SampleInputReturningNormally,
+                    position: end_of_line,
+                    text: format!("{function_name} {input} = {return_value}"),
+                },
+                RunResult::NeedsUnfulfilled { reason } => Hint {
+                    kind: HintKind::SampleInputPanickingWithCallerResponsible,
+                    position: end_of_line,
+                    text: format!("{function_name} {input}"),
+                },
+                RunResult::Panicked(panic) => Hint {
+                    kind: HintKind::SampleInputPanickingWithInternalCodeResponsible,
+                    position: end_of_line,
+                    text: format!("{function_name} {input} => panics"),
+                },
             })
         }))
         .collect_vec()
