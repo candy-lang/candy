@@ -24,9 +24,8 @@ impl InputPool {
             .iter()
             .map(|symbol| symbol.clone_to_heap(&mut heap).try_into().unwrap())
             .collect_vec();
-        if symbols.is_empty() {
-            symbols.push(Text::create(&mut heap, "Nothing"));
-        }
+        symbols.push(Text::create(&mut heap, "True"));
+        symbols.push(Text::create(&mut heap, "False"));
 
         Self {
             heap: Rc::new(RefCell::new(heap)),
