@@ -9,7 +9,6 @@ use candy_frontend::{
 use candy_fuzzer::{Fuzzer, RunResult, Status};
 use candy_vm::{fiber::Panic, heap::InlineObject};
 use extension_trait::extension_trait;
-use itertools::Itertools;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
 use serde::{Deserialize, Serialize};
 
@@ -87,7 +86,6 @@ impl Insight {
                 function_coverage.relative_coverage()
             }
             Status::FoundPanic { .. } => 1., // TODO: not correct
-            Status::TotalCoverageButNoPanic => 1.,
         };
         let function_name = id.function_name();
         let interesting_inputs = fuzzer.pool.interesting_inputs();
@@ -113,12 +111,12 @@ impl Insight {
                     position: end_of_line,
                     text: format!("{function_name} {input} = {return_value}"),
                 },
-                RunResult::NeedsUnfulfilled { reason } => Hint {
+                RunResult::NeedsUnfulfilled { .. } => Hint {
                     kind: HintKind::SampleInputPanickingWithCallerResponsible,
                     position: end_of_line,
                     text: format!("{function_name} {input}"),
                 },
-                RunResult::Panicked(panic) => Hint {
+                RunResult::Panicked(_) => Hint {
                     kind: HintKind::SampleInputPanickingWithInternalCodeResponsible,
                     position: end_of_line,
                     text: format!("{function_name} {input}"),

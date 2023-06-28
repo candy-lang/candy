@@ -82,7 +82,6 @@ where
                 case.dump(db);
                 failing_cases.push(case);
             }
-            Status::TotalCoverageButNoPanic => {}
         }
     }
 

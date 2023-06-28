@@ -39,7 +39,6 @@ pub enum Status {
         panic: Panic,
         tracer: StackTracer,
     },
-    TotalCoverageButNoPanic,
 }
 
 impl Fuzzer {
@@ -95,7 +94,6 @@ impl Fuzzer {
                     panic,
                     tracer,
                 },
-                Status::TotalCoverageButNoPanic => Status::TotalCoverageButNoPanic,
             };
         }
         self.status = Some(status);
@@ -128,22 +126,17 @@ impl Fuzzer {
                 let function_range = self.lir.range_of_function(&self.function_id);
                 let function_coverage = total_coverage.in_range(&function_range);
 
-                if function_coverage.relative_coverage() == 1.0 {
-                    Status::TotalCoverageButNoPanic
-                } else {
-                    // We favor small inputs with good code coverage.
-                    let score = {
-                        let complexity = runner.input.complexity() as Score;
-                        let new_function_coverage = runner.coverage.in_range(&function_range);
-                        let score: Score = (1.5 * runner.num_instructions as f64)
-                            + (0.1
-                                * new_function_coverage.improvement_on(&function_coverage) as f64)
-                            - 0.4 * complexity;
-                        score.clamp(0.1, Score::MAX)
-                    };
-                    self.pool.add(runner.input, result, score);
-                    self.create_new_fuzzing_case(&total_coverage + &runner.coverage)
-                }
+                // We favor small inputs with good code coverage.
+                let score = {
+                    let complexity = runner.input.complexity() as Score;
+                    let new_function_coverage = runner.coverage.in_range(&function_range);
+                    let score: Score = (1.5 * runner.num_instructions as f64)
+                        + (0.1 * new_function_coverage.improvement_on(&function_coverage) as f64)
+                        - 0.4 * complexity;
+                    score.clamp(0.1, Score::MAX)
+                };
+                self.pool.add(runner.input, result, score);
+                self.create_new_fuzzing_case(&total_coverage + &runner.coverage)
             }
             RunResult::Panicked(panic) => Status::FoundPanic {
                 input: runner.input,
