@@ -75,39 +75,37 @@ impl Insight {
     }
 
     pub fn for_fuzzer_status(db: &Database, fuzzer: &Fuzzer) -> Vec<Self> {
-        let end_of_line = db.id_to_end_of_line(fuzzer.function_id.clone()).unwrap();
-
-        // The fuzzer status message consists of an optional fuzzing status and
-        // interesting inputs. Here are some examples:
-        // - 0 % fuzzed
-        // - 12 % fuzzed · True · False
-        // - 100 % fuzzed · Abc · 42
-        // - fuzzed · Abc · 42
+        let mut insights = vec![];
 
         let id = fuzzer.function_id.clone();
-        let front_message = match fuzzer.status() {
+        let end_of_line = db.id_to_end_of_line(id.clone()).unwrap();
+
+        let coverage = match fuzzer.status() {
             Status::StillFuzzing { total_coverage, .. } => {
                 let function_range = fuzzer.lir.range_of_function(&id);
                 let function_coverage = total_coverage.in_range(&function_range);
-                format!(
-                    "{:.0} % fuzzed",
-                    100. * function_coverage.relative_coverage()
-                )
+                function_coverage.relative_coverage()
             }
-            Status::FoundPanic { input, .. } => format!("fuzzed · {input}"),
-            Status::TotalCoverageButNoPanic => "100 % fuzzed".to_string(),
+            Status::FoundPanic { .. } => 1., // TODO: not correct
+            Status::TotalCoverageButNoPanic => 1.,
         };
-
-        let function_name = fuzzer.function_id.function_name();
+        let function_name = id.function_name();
         let interesting_inputs = fuzzer.pool.interesting_inputs();
-
-        [Insight::Hint(Hint {
+        insights.push(Insight::Hint(Hint {
             kind: HintKind::FuzzingStatus,
             position: end_of_line,
-            text: front_message,
-        })]
-        .into_iter()
-        .chain(interesting_inputs.into_iter().map(|input| {
+            text: format!("{:.0} % fuzzed", 100. * coverage),
+        }));
+
+        if let Status::FoundPanic { input, .. } = fuzzer.status() {
+            insights.push(Insight::Hint(Hint {
+                kind: HintKind::SampleInputPanickingWithInternalCodeResponsible,
+                position: end_of_line,
+                text: format!("{function_name} {input}"),
+            }));
+        }
+
+        insights.extend(interesting_inputs.into_iter().map(|input| {
             Insight::Hint(match fuzzer.pool.result_of(&input) {
                 RunResult::Timeout => unreachable!(),
                 RunResult::Done { return_value, .. } => Hint {
@@ -123,11 +121,12 @@ impl Insight {
                 RunResult::Panicked(panic) => Hint {
                     kind: HintKind::SampleInputPanickingWithInternalCodeResponsible,
                     position: end_of_line,
-                    text: format!("{function_name} {input} => panics"),
+                    text: format!("{function_name} {input}"),
                 },
             })
-        }))
-        .collect_vec()
+        }));
+
+        insights
     }
 
     pub fn for_static_panic(db: &Database, module: Module, panic: &Panic) -> Self {

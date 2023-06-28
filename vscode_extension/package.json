@@ -27,8 +27,8 @@
         "id": "candy.valueHint.background",
         "description": "The color of hints indicating the value of an expression.",
         "defaults": {
-          "dark": "#656565",
-          "light": "#656565",
+          "dark": "#65656522",
+          "light": "#65656522",
           "highContrast": "#656565"
         }
       },
@@ -36,8 +36,8 @@
         "id": "candy.valueHint.foreground",
         "description": "The color of hints indicating the value of an expression.",
         "defaults": {
-          "dark": "#000000",
-          "light": "#000000",
+          "dark": "#9a9a9a",
+          "light": "#9a9a9a",
           "highContrast": "#000000"
         }
       },
@@ -45,17 +45,17 @@
         "id": "candy.statusHint.background",
         "description": "The text color of hints indicating the fuzzing status of a function.",
         "defaults": {
-          "dark": "#9d9d9d",
-          "light": "#9d9d9d",
-          "highContrast": "#9d9d9d"
+          "dark": "#65656522",
+          "light": "#65656522",
+          "highContrast": "#656565"
         }
       },
       {
         "id": "candy.statusHint.foreground",
         "description": "The text color of hints indicating the fuzzing status of a function.",
         "defaults": {
-          "dark": "#000000",
-          "light": "#000000",
+          "dark": "#9a9a9a",
+          "light": "#9a9a9a",
           "highContrast": "#000000"
         }
       },
@@ -63,17 +63,17 @@
         "id": "candy.sampleInput.returningNormally.background",
         "description": "The background color of hints showing a sample input.",
         "defaults": {
-          "dark": "#a8d86a",
-          "light": "#a8d86a",
-          "highContrast": "#107810"
+          "dark": "#a8d86a22",
+          "light": "#a8d86a44",
+          "highContrast": "#61892d"
         }
       },
       {
         "id": "candy.sampleInput.returningNormally.foreground",
         "description": "The text color of hints showing a sample input.",
         "defaults": {
-          "dark": "#000000",
-          "light": "#000000",
+          "dark": "#a8d86a",
+          "light": "#61892d",
           "highContrast": "#ffffff"
         }
       },
@@ -81,17 +81,17 @@
         "id": "candy.sampleInput.panickingWithCallerResponsible.background",
         "description": "The background color of hints showing an input that fails a need.",
         "defaults": {
-          "dark": "#f3d676",
-          "light": "#f3d676",
-          "highContrast": "#e5bb33"
+          "dark": "#f3d67622",
+          "light": "#f3d67644",
+          "highContrast": "#f3d676"
         }
       },
       {
         "id": "candy.sampleInput.panickingWithCallerResponsible.foreground",
         "description": "The text color of hints showing an input that fails a need.",
         "defaults": {
-          "dark": "#000000",
-          "light": "#000000",
+          "dark": "#f3d676",
+          "light": "#a48930",
           "highContrast": "#000000"
         }
       },
@@ -99,8 +99,8 @@
         "id": "candy.sampleInput.panickingWithInternalCodeResponsible.background",
         "description": "The background color of hints showing an input that causes the function to panic internally.",
         "defaults": {
-          "dark": "#ff3f3f",
-          "light": "#ff3f3f",
+          "dark": "#ff3f3f22",
+          "light": "#ff3f3f22",
           "highContrast": "#ff3f3f"
         }
       },
@@ -108,8 +108,8 @@
         "id": "candy.sampleInput.panickingWithInternalCodeResponsible.foreground",
         "description": "The text color of hints showing an input that causes the function to panic internally.",
         "defaults": {
-          "dark": "#ffffff",
-          "light": "#ffffff",
+          "dark": "#ff3f3f",
+          "light": "#c02222",
           "highContrast": "#ffffff"
         }
       }
