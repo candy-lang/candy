@@ -52,7 +52,7 @@ impl InlineObjectGeneration for InlineObject {
             1 => Int::create_from_bigint(heap, rng.gen_bigint(10)).into(),
             2 => Text::create(heap, "test").into(),
             3 => {
-                let value = if rng.gen_bool(0.8) {
+                let value = if rng.gen_bool(0.2) {
                     Some(Self::generate(heap, rng, complexity - 10.0, symbols))
                 } else {
                     None
