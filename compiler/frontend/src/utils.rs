@@ -1,6 +1,9 @@
 use extension_trait::extension_trait;
 use rustc_hash::FxHasher;
-use std::hash::{Hash, Hasher};
+use std::hash::{BuildHasherDefault, Hash, Hasher};
+
+pub type ImHashSet<T> = im_rc::HashSet<T, BuildHasherDefault<FxHasher>>;
+pub type ImHashMap<K, V> = im_rc::HashMap<K, V, BuildHasherDefault<FxHasher>>;
 
 #[extension_trait]
 pub impl AdjustCasingOfFirstLetter for str {

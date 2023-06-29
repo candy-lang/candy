@@ -1,16 +1,19 @@
-use crate::mir::{Body, Expression, Id, Mir, VisibleExpressions};
+use crate::{
+    mir::{Body, Expression, Id, Mir, VisibleExpressions},
+    utils::ImHashSet,
+};
 use rustc_hash::FxHashSet;
 use tracing::error;
 
 impl Mir {
     pub fn validate(&self) {
         self.body
-            .validate(&mut FxHashSet::default(), im::HashSet::new());
+            .validate(&mut FxHashSet::default(), ImHashSet::default());
     }
 }
 
 impl Body {
-    pub fn validate(&self, defined_ids: &mut FxHashSet<Id>, mut visible: im::HashSet<Id>) {
+    pub fn validate(&self, defined_ids: &mut FxHashSet<Id>, mut visible: ImHashSet<Id>) {
         if self.expressions.is_empty() {
             error!("A body of a function is empty! Functions should have at least a return value.");
             error!("This is the MIR:\n{self}");
