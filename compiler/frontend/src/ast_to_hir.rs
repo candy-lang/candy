@@ -12,7 +12,7 @@ use crate::{
     module::{Module, Package},
     position::Offset,
     string_to_rcst::ModuleError,
-    utils::{AdjustCasingOfFirstLetter, ImHashMap},
+    utils::{AdjustCasingOfFirstLetter, RcImHashMap},
 };
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
@@ -85,7 +85,7 @@ fn compile_top_level(
         public_identifiers: FxHashMap::default(),
         body: Body::default(),
         id_prefix: hir::Id::new(module.clone(), vec![]),
-        identifiers: ImHashMap::default(),
+        identifiers: RcImHashMap::default(),
         is_top_level: true,
         use_id: None,
     };
@@ -112,7 +112,7 @@ struct Context<'a> {
     public_identifiers: FxHashMap<String, hir::Id>,
     body: Body,
     id_prefix: hir::Id,
-    identifiers: ImHashMap<String, hir::Id>,
+    identifiers: RcImHashMap<String, hir::Id>,
     is_top_level: bool,
     use_id: Option<hir::Id>,
 }
@@ -149,7 +149,7 @@ impl Context<'_> {
 struct ScopeResetState {
     body: Body,
     id_prefix: hir::Id,
-    identifiers: ImHashMap<String, hir::Id>,
+    identifiers: RcImHashMap<String, hir::Id>,
     non_top_level_reset_state: NonTopLevelResetState,
 }
 

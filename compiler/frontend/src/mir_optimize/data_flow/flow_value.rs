@@ -7,9 +7,10 @@ use derive_more::From;
 use enumset::EnumSet;
 use itertools::Itertools;
 use num_bigint::BigInt;
-use std::collections::BTreeSet;
+use rustc_hash::FxHashMap;
+use std::{collections::BTreeSet, mem};
 
-#[derive(Clone, Debug, Eq, From, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
 pub enum FlowValue {
     Any,
     Not(BTreeSet<FlowValue>),
@@ -38,6 +39,48 @@ pub enum FlowValue {
     AnyText,
     #[from]
     Text(String),
+}
+
+impl FlowValue {
+    pub fn map_ids(&mut self, mapping: &FxHashMap<Id, Id>) {
+        match self {
+            FlowValue::Any => {}
+            FlowValue::Not(variants) => {
+                *variants = mem::take(variants)
+                    .into_iter()
+                    .map(|mut it| {
+                        it.map_ids(mapping);
+                        it
+                    })
+                    .collect();
+            }
+            FlowValue::Builtin(_) => {}
+            FlowValue::AnyInt | FlowValue::Int(_) => {}
+            FlowValue::AnyFunction => {}
+            FlowValue::Function { return_value } => return_value.as_mut().map_ids(mapping),
+            FlowValue::AnyList => {}
+            FlowValue::List(items) => {
+                for item in items {
+                    item.map_ids(mapping);
+                }
+            }
+            FlowValue::Reference(id) => *id = mapping[&*id],
+            FlowValue::AnyStruct => {}
+            FlowValue::Struct(struct_) => {
+                for (key, value) in struct_ {
+                    key.map_ids(mapping);
+                    value.map_ids(mapping);
+                }
+            }
+            FlowValue::AnyTag => {}
+            FlowValue::Tag { symbol: _, value } => {
+                if let Some(value) = value {
+                    value.map_ids(mapping);
+                }
+            }
+            FlowValue::AnyText | FlowValue::Text(_) => {}
+        }
+    }
 }
 
 impl ToRichIr for FlowValue {

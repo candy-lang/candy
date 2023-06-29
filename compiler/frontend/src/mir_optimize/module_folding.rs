@@ -97,7 +97,7 @@ pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
         .db
         .optimized_mir(module_to_import.clone(), context.tracing.for_child_module())
     {
-        Ok((mir, other_pureness, more_errors)) => {
+        Ok((mir, other_pureness, other_data_flow, more_errors)) => {
             context.errors.extend(more_errors.iter().cloned());
 
             let mapping: FxHashMap<Id, Id> = mir
@@ -108,6 +108,9 @@ pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
                 .collect();
 
             context.pureness.include(other_pureness.as_ref(), &mapping);
+            context
+                .data_flow
+                .include(other_data_flow.as_ref(), &mapping);
             expression.prepend_optimized(
                 &mut context.visible,
                 mir.body.iter().map(|(id, expression)| {

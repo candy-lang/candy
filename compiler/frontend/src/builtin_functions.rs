@@ -8,7 +8,7 @@ use std::fmt::{self, Display, Formatter};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-#[derive(Clone, Copy, Debug, EnumIter, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, EnumIter, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum BuiltinFunction {
     ChannelCreate,       // capacity -> [sendPort, receivePort]
     ChannelSend,         // channel any -> Nothing

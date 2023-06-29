@@ -98,7 +98,7 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
             let tracing = options.to_tracing_config();
             let mir = db.optimized_mir(module.clone(), tracing.clone());
             mir.ok()
-                .map(|(mir, _, _)| RichIr::for_mir(&module, &mir, &tracing))
+                .map(|(mir, _, _, _)| RichIr::for_mir(&module, &mir, &tracing))
         }
         Options::Lir(options) => {
             let module = module_for_path(options.path.clone())?;

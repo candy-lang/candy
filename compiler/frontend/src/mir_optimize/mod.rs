@@ -44,6 +44,7 @@
 
 use self::{
     current_expression::{Context, CurrentExpression},
+    data_flow::DataFlowInsights,
     pure::PurenessInsights,
 };
 use super::{hir, hir_to_mir::HirToMir, mir::Mir, tracing::TracingConfig};
@@ -84,6 +85,7 @@ pub type OptimizedMirResult = Result<
     (
         Arc<Mir>,
         Arc<PurenessInsights>,
+        Arc<DataFlowInsights>,
         Arc<FxHashSet<CompilerError>>,
     ),
     ModuleError,
@@ -107,6 +109,7 @@ fn optimized_mir(
     context.optimize_body(&mut mir.body);
     let Context {
         mut pureness,
+        mut data_flow,
         errors,
         ..
     } = context;
@@ -114,11 +117,16 @@ fn optimized_mir(
     if cfg!(debug_assertions) {
         mir.validate();
     }
-    mir.cleanup(&mut pureness);
+    mir.cleanup(&mut pureness, &mut data_flow);
     let complexity_after = mir.complexity();
 
     debug!("{module}: Done. Optimized from {complexity_before} to {complexity_after}");
-    Ok((Arc::new(mir), Arc::new(pureness), Arc::new(errors)))
+    Ok((
+        Arc::new(mir),
+        Arc::new(pureness),
+        Arc::new(data_flow),
+        Arc::new(errors),
+    ))
 }
 
 impl Context<'_> {
@@ -137,6 +145,8 @@ impl Context<'_> {
             let id = expression.id();
             // TODO: Remove pureness when data flow takes care of it.
             self.pureness.visit_optimized(id, &expression);
+
+            module_folding::apply(self, &mut expression);
             self.data_flow.visit_optimized(id, &expression);
 
             {
@@ -146,8 +156,6 @@ impl Context<'_> {
                 self.data_flow.to_rich_ir().print_to_console();
                 println!();
             }
-
-            module_folding::apply(self, &mut expression);
 
             index = expression.index() + 1;
             let expression = mem::replace(&mut *expression, Expression::Parameter);
@@ -236,6 +244,7 @@ fn recover_from_cycle(
 
     Ok((
         Arc::new(mir),
+        Arc::default(),
         Arc::default(),
         Arc::new(FxHashSet::from_iter([error])),
     ))

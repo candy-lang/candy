@@ -2,8 +2,10 @@ use extension_trait::extension_trait;
 use rustc_hash::FxHasher;
 use std::hash::{BuildHasherDefault, Hash, Hasher};
 
-pub type ImHashSet<T> = im_rc::HashSet<T, BuildHasherDefault<FxHasher>>;
-pub type ImHashMap<K, V> = im_rc::HashMap<K, V, BuildHasherDefault<FxHasher>>;
+pub type RcImHashSet<T> = im_rc::HashSet<T, BuildHasherDefault<FxHasher>>;
+pub type RcImHashMap<K, V> = im_rc::HashMap<K, V, BuildHasherDefault<FxHasher>>;
+pub type ArcImHashSet<T> = im::HashSet<T, BuildHasherDefault<FxHasher>>;
+pub type ArcImHashMap<K, V> = im::HashMap<K, V, BuildHasherDefault<FxHasher>>;
 
 #[extension_trait]
 pub impl AdjustCasingOfFirstLetter for str {

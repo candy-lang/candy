@@ -6,12 +6,13 @@ use crate::{
     rich_ir::{RichIrBuilder, ToRichIr},
 };
 use enumset::EnumSet;
+use rustc_hash::FxHashMap;
 use std::fmt::Debug;
 
 mod flow_value;
 mod timeline;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Eq, PartialEq)]
 pub struct DataFlowInsights {
     panics: Vec<PanickingTimeline>,
     timeline: MainTimeline,
@@ -37,11 +38,18 @@ impl ToRichIr for DataFlowInsights {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PanickingTimeline {
     timeline: Timeline,
     reason: Id,
     responsible: Id,
+}
+impl PanickingTimeline {
+    pub fn map_ids(&mut self, mapping: &FxHashMap<Id, Id>) {
+        self.timeline.map_ids(mapping);
+        self.reason = mapping[&self.reason];
+        self.responsible = mapping[&self.responsible];
+    }
 }
 impl_display_via_richir!(PanickingTimeline);
 impl ToRichIr for PanickingTimeline {
@@ -58,10 +66,18 @@ impl ToRichIr for PanickingTimeline {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum MainTimeline {
     NoPanic(Timeline),
     Panic(PanickingTimeline),
+}
+impl MainTimeline {
+    pub fn map_ids(&mut self, mapping: &FxHashMap<Id, Id>) {
+        match self {
+            MainTimeline::NoPanic(timeline) => timeline.map_ids(mapping),
+            MainTimeline::Panic(timeline) => timeline.map_ids(mapping),
+        }
+    }
 }
 impl Default for MainTimeline {
     fn default() -> Self {
@@ -80,14 +96,9 @@ impl ToRichIr for MainTimeline {
 
 impl DataFlowInsights {
     pub fn visit_optimized(&mut self, id: Id, expression: &CurrentExpression) {
-        let timeline = match &mut self.timeline {
-            MainTimeline::NoPanic(timeline) => timeline,
-            MainTimeline::Panic(_) => {
-                // We already know that the code panics and all code after that
-                // can be ignored/removed since it never runs.
-                return;
-            }
-        };
+        // We already know that the code panics and all code after that can be
+        // ignored/removed since it never runs.
+        let timeline = self.require_no_panic_mut();
 
         let value = match &**expression {
             Expression::Int(int) => FlowValue::Int(int.to_owned()),
@@ -122,14 +133,13 @@ impl DataFlowInsights {
                 // TODO
             }
             Expression::UseModule { .. } => {
-                FlowValue::Any
-                // TODO
+                panic!("`Expression::UseModule` should have been inlined.")
             }
             Expression::Panic {
                 reason,
                 responsible,
             } => {
-                self.panics.push(PanickingTimeline {
+                self.timeline = MainTimeline::Panic(PanickingTimeline {
                     // TODO: Filter timeline to only include `reason`, `responsible`, and their dependencies.
                     timeline: timeline.to_owned(),
                     reason: *reason,
@@ -151,5 +161,42 @@ impl DataFlowInsights {
             }
         };
         *timeline &= Timeline::Value { id, value };
+    }
+
+    pub(super) fn enter_function(&mut self, parameters: &[Id], responsible_parameter: Id) {
+        // TODO
+    }
+    pub(super) fn on_normalize_ids(&mut self, mapping: &FxHashMap<Id, Id>) {
+        for timeline in self.panics.iter_mut() {
+            timeline.map_ids(mapping);
+        }
+        self.timeline.map_ids(mapping);
+    }
+    pub(super) fn include(&mut self, other: &DataFlowInsights, mapping: &FxHashMap<Id, Id>) {
+        assert!(
+            other.panics.is_empty(),
+            "Modules can't panic conditionally.",
+        );
+
+        match &other.timeline {
+            MainTimeline::NoPanic(timeline) => {
+                let mut timeline = timeline.to_owned();
+                timeline.map_ids(mapping);
+                *self.require_no_panic_mut() &= timeline;
+            }
+            MainTimeline::Panic(timeline) => {
+                assert!(matches!(self.timeline, MainTimeline::NoPanic(_)));
+                let mut timeline = timeline.to_owned();
+                timeline.map_ids(mapping);
+                self.timeline = MainTimeline::Panic(timeline);
+            }
+        }
+    }
+
+    fn require_no_panic_mut(&mut self) -> &mut Timeline {
+        match &mut self.timeline {
+            MainTimeline::NoPanic(timeline) => timeline,
+            MainTimeline::Panic(_) => panic!("Tried to continue data flow analysis after panic"),
+        }
     }
 }

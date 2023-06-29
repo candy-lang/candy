@@ -197,7 +197,7 @@ impl IrFeatures {
         builder.push_tracing_config(tracing_config);
         builder.push_newline();
         match mir {
-            Ok((mir, _, _)) => mir.build_rich_ir(&mut builder),
+            Ok((mir, _, _, _)) => mir.build_rich_ir(&mut builder),
             Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
         }
         builder.finish()

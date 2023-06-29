@@ -28,7 +28,7 @@ where
 {
     let (mir, errors) = db
         .optimized_mir(module.clone(), tracing)
-        .map(|(mir, _, errors)| (mir, errors))
+        .map(|(mir, _, _, errors)| (mir, errors))
         .unwrap_or_else(|error| {
             let payload = CompilerErrorPayload::Module(error);
             let mir = Mir::build(|body| {
