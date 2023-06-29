@@ -13,6 +13,7 @@ use crate::utils::range_to_lsp_range_raw;
 #[derive(Debug, EnumIter, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum SemanticTokenType {
     Module,
+    Type,
     Parameter,
     Variable,
     Symbol,
@@ -35,6 +36,7 @@ impl SemanticTokenType {
     pub fn as_lsp(&self) -> lsp_types::SemanticTokenType {
         match self {
             SemanticTokenType::Module => lsp_types::SemanticTokenType::NAMESPACE,
+            SemanticTokenType::Type => lsp_types::SemanticTokenType::TYPE,
             SemanticTokenType::Parameter => lsp_types::SemanticTokenType::PARAMETER,
             SemanticTokenType::Variable => lsp_types::SemanticTokenType::VARIABLE,
             SemanticTokenType::Symbol => lsp_types::SemanticTokenType::ENUM_MEMBER,

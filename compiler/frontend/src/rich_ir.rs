@@ -61,6 +61,7 @@ pub struct RichIrAnnotation {
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum TokenType {
     Module,
+    Type,
     Parameter,
     Variable,
     Symbol,
@@ -396,6 +397,7 @@ impl RichIr {
             if let Some(token_type) = token_type {
                 let color = match token_type {
                     TokenType::Module => Color::Yellow,
+                    TokenType::Type => Color::BrightMagenta,
                     TokenType::Parameter => Color::Red,
                     TokenType::Variable => Color::Yellow,
                     TokenType::Symbol => Color::Magenta,

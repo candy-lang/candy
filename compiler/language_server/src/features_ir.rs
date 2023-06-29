@@ -614,6 +614,7 @@ impl TokenTypeToSemantic for TokenType {
     fn to_semantic(&self) -> SemanticTokenType {
         match self {
             TokenType::Module => SemanticTokenType::Module,
+            TokenType::Type => SemanticTokenType::Type,
             TokenType::Parameter => SemanticTokenType::Parameter,
             TokenType::Variable => SemanticTokenType::Variable,
             TokenType::Function => SemanticTokenType::Function,
