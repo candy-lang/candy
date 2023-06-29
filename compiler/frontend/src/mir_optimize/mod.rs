@@ -51,6 +51,7 @@ use crate::{
     error::CompilerError,
     mir::{Body, Expression, MirError},
     module::Module,
+    rich_ir::ToRichIr,
     string_to_rcst::ModuleError,
     utils::DoHash,
 };
@@ -64,6 +65,7 @@ mod complexity;
 mod constant_folding;
 mod constant_lifting;
 mod current_expression;
+mod data_flow;
 mod inlining;
 mod module_folding;
 mod pure;
@@ -133,7 +135,17 @@ impl Context<'_> {
             }
 
             let id = expression.id();
+            // TODO: Remove pureness when data flow takes care of it.
             self.pureness.visit_optimized(id, &expression);
+            self.data_flow.visit_optimized(id, &expression);
+
+            {
+                let mut body = Body::default();
+                body.expressions.push((id, (*expression).to_owned()));
+                body.to_rich_ir().print_to_console();
+                self.data_flow.to_rich_ir().print_to_console();
+                println!();
+            }
 
             module_folding::apply(self, &mut expression);
 
@@ -180,6 +192,7 @@ impl Context<'_> {
                 let hashcode_before = expression.do_hash();
 
                 reference_following::follow_references(self, expression);
+                // TODO: Remove constant folding when data flow takes care of it.
                 constant_folding::fold_constants(self, expression);
 
                 let is_call = matches!(**expression, Expression::Call { .. });
