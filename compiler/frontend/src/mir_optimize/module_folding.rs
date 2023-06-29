@@ -109,7 +109,7 @@ pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
 
             context.pureness.include(other_pureness.as_ref(), &mapping);
             expression.prepend_optimized(
-                context.visible,
+                &mut context.visible,
                 mir.body.iter().map(|(id, expression)| {
                     let mut expression = expression.to_owned();
                     expression.replace_ids(&mut |id| {

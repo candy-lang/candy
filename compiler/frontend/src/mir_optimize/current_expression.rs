@@ -1,4 +1,4 @@
-use super::{pure::PurenessInsights, OptimizeMir};
+use super::{data_flow::DataFlowInsights, pure::PurenessInsights, OptimizeMir};
 use crate::{
     error::CompilerError,
     id::IdGenerator,
@@ -11,10 +11,29 @@ use std::ops::{Deref, DerefMut};
 pub struct Context<'a> {
     pub db: &'a dyn OptimizeMir,
     pub tracing: &'a TracingConfig,
-    pub errors: &'a mut FxHashSet<CompilerError>,
-    pub visible: &'a mut VisibleExpressions,
+    pub errors: FxHashSet<CompilerError>,
+    pub visible: VisibleExpressions,
     pub id_generator: &'a mut IdGenerator<Id>,
-    pub pureness: &'a mut PurenessInsights,
+    pub pureness: PurenessInsights,
+    pub data_flow: DataFlowInsights,
+}
+impl<'a> Context<'a> {
+    pub fn new(
+        db: &'a dyn OptimizeMir,
+        tracing: &'a TracingConfig,
+        errors: FxHashSet<CompilerError>,
+        id_generator: &'a mut IdGenerator<Id>,
+    ) -> Self {
+        Self {
+            db,
+            tracing,
+            errors,
+            visible: VisibleExpressions::none_visible(),
+            id_generator,
+            pureness: PurenessInsights::default(),
+            data_flow: DataFlowInsights::default(),
+        }
+    }
 }
 
 pub struct CurrentExpression<'a> {

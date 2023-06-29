@@ -49,7 +49,7 @@ use self::{
 use super::{hir, hir_to_mir::HirToMir, mir::Mir, tracing::TracingConfig};
 use crate::{
     error::CompilerError,
-    mir::{Body, Expression, MirError, VisibleExpressions},
+    mir::{Body, Expression, MirError},
     module::Module,
     string_to_rcst::ModuleError,
     utils::DoHash,
@@ -95,39 +95,28 @@ fn optimized_mir(
     debug!("{module}: Compiling.");
     let (mir, errors) = db.mir(module.clone(), tracing.clone())?;
     let mut mir = (*mir).clone();
-    let mut pureness = PurenessInsights::default();
-    let mut errors = (*errors).clone();
 
     let complexity_before = mir.complexity();
-    mir.optimize(db, &tracing, &mut pureness, &mut errors);
+    // TODO: Track references to current expressions in the remaining
+    // expressions as an `FxHashMap<Id, usize>` (from expression ID to number of
+    // occurrences). This can be used for tree-shaking directly after each
+    // expression.
+    let mut context = Context::new(db, &tracing, (*errors).clone(), &mut mir.id_generator);
+    context.optimize_body(&mut mir.body);
+    let Context {
+        mut pureness,
+        errors,
+        ..
+    } = context;
+
+    if cfg!(debug_assertions) {
+        mir.validate();
+    }
+    mir.cleanup(&mut pureness);
     let complexity_after = mir.complexity();
 
     debug!("{module}: Done. Optimized from {complexity_before} to {complexity_after}");
     Ok((Arc::new(mir), Arc::new(pureness), Arc::new(errors)))
-}
-
-impl Mir {
-    pub fn optimize(
-        &mut self,
-        db: &dyn OptimizeMir,
-        tracing: &TracingConfig,
-        pureness: &mut PurenessInsights,
-        errors: &mut FxHashSet<CompilerError>,
-    ) {
-        let mut context = Context {
-            db,
-            tracing,
-            errors,
-            visible: &mut VisibleExpressions::none_visible(),
-            id_generator: &mut self.id_generator,
-            pureness,
-        };
-        context.optimize_body(&mut self.body);
-        if cfg!(debug_assertions) {
-            self.validate();
-        }
-        self.cleanup(pureness);
-    }
 }
 
 impl Context<'_> {
@@ -140,7 +129,7 @@ impl Context<'_> {
             let mut expression = CurrentExpression::new(body, index);
             self.optimize_expression(&mut expression);
             if cfg!(debug_assertions) {
-                expression.validate(self.visible);
+                expression.validate(&self.visible);
             }
 
             let id = expression.id();
@@ -157,9 +146,9 @@ impl Context<'_> {
             *expression = self.visible.remove(*id);
         }
 
-        common_subtree_elimination::eliminate_common_subtrees(body, self.pureness);
+        common_subtree_elimination::eliminate_common_subtrees(body, &self.pureness);
         reference_following::remove_redundant_return_references(body);
-        tree_shaking::tree_shake(body, self.pureness);
+        tree_shaking::tree_shake(body, &self.pureness);
     }
 
     fn optimize_expression(&mut self, expression: &mut CurrentExpression) {

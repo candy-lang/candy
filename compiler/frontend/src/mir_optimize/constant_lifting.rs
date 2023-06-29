@@ -72,5 +72,5 @@ pub fn lift_constants(context: &mut Context, expression: &mut CurrentExpression)
         }
     }
 
-    expression.prepend_optimized(context.visible, constants);
+    expression.prepend_optimized(&mut context.visible, constants);
 }

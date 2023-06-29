@@ -65,7 +65,7 @@ pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression)
 
     let arguments = arguments.to_owned();
     let responsible = *responsible;
-    let Some(result) = run_builtin(&mut *expression, *builtin, &arguments, responsible, context.visible, context.id_generator, context.pureness) else {
+    let Some(result) = run_builtin(&mut *expression, *builtin, &arguments, responsible, &context.visible, context.id_generator, &context.pureness) else {
         return;
     };
     **expression = result;
