@@ -117,7 +117,6 @@ dependencies = [
  "candy_language_server",
  "candy_vm",
  "clap",
- "colored",
  "itertools",
  "notify",
  "notify-debouncer-mini",
@@ -146,6 +145,7 @@ dependencies = [
 name = "candy_frontend"
 version = "0.1.0"
 dependencies = [
+ "colored",
  "derive_more",
  "dunce",
  "enumset",

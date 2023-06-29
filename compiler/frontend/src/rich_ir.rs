@@ -8,6 +8,7 @@ use crate::{
     string_to_rcst::{ModuleError, RcstResult},
     TracingConfig, TracingMode,
 };
+use colored::{Color, Colorize};
 use derive_more::From;
 use enumset::{EnumSet, EnumSetType};
 use num_bigint::BigInt;
@@ -374,5 +375,45 @@ impl RichIr {
         builder.push_newline();
         mir.build_rich_ir(&mut builder);
         builder.finish()
+    }
+
+    pub fn print_to_console(&self) {
+        let bytes = self.text.as_bytes().to_vec();
+        let annotations = self.annotations.iter();
+        let mut displayed_byte = Offset(0);
+
+        for RichIrAnnotation {
+            range, token_type, ..
+        } in annotations
+        {
+            assert!(displayed_byte <= range.start);
+            let before_annotation =
+                std::str::from_utf8(&bytes[*displayed_byte..*range.start]).unwrap();
+            print!("{before_annotation}");
+
+            let in_annotation = std::str::from_utf8(&bytes[*range.start..*range.end]).unwrap();
+
+            if let Some(token_type) = token_type {
+                let color = match token_type {
+                    TokenType::Module => Color::Yellow,
+                    TokenType::Parameter => Color::Red,
+                    TokenType::Variable => Color::Yellow,
+                    TokenType::Symbol => Color::Magenta,
+                    TokenType::Function => Color::Blue,
+                    TokenType::Comment => Color::Green,
+                    TokenType::Text => Color::Cyan,
+                    TokenType::Int => Color::Red,
+                    TokenType::Address => Color::BrightGreen,
+                    TokenType::Constant => Color::Yellow,
+                };
+                print!("{}", in_annotation.color(color));
+            } else {
+                print!("{}", in_annotation)
+            }
+
+            displayed_byte = range.end;
+        }
+        let rest = std::str::from_utf8(&bytes[*displayed_byte..]).unwrap();
+        println!("{rest}");
     }
 }

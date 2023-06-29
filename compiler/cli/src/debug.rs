@@ -15,7 +15,6 @@ use candy_frontend::{
 };
 use candy_vm::{lir::RichIrForLir, mir_to_lir::compile_lir};
 use clap::{Parser, ValueHint};
-use colored::{Color, Colorize};
 use std::path::PathBuf;
 
 /// Debug the Candy compiler itself.
@@ -115,46 +114,7 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
         }
     };
 
-    let Some(rich_ir) = rich_ir else {
-        return Err(Exit::FileNotFound);
-    };
-
-    let bytes = rich_ir.text.as_bytes().to_vec();
-    let annotations = rich_ir.annotations.iter();
-    let mut displayed_byte = Offset(0);
-
-    for RichIrAnnotation {
-        range, token_type, ..
-    } in annotations
-    {
-        assert!(displayed_byte <= range.start);
-        let before_annotation = std::str::from_utf8(&bytes[*displayed_byte..*range.start]).unwrap();
-        print!("{before_annotation}");
-
-        let in_annotation = std::str::from_utf8(&bytes[*range.start..*range.end]).unwrap();
-
-        if let Some(token_type) = token_type {
-            let color = match token_type {
-                TokenType::Module => Color::Yellow,
-                TokenType::Parameter => Color::Red,
-                TokenType::Variable => Color::Yellow,
-                TokenType::Symbol => Color::Magenta,
-                TokenType::Function => Color::Blue,
-                TokenType::Comment => Color::Green,
-                TokenType::Text => Color::Cyan,
-                TokenType::Int => Color::Red,
-                TokenType::Address => Color::BrightGreen,
-                TokenType::Constant => Color::Yellow,
-            };
-            print!("{}", in_annotation.color(color));
-        } else {
-            print!("{}", in_annotation)
-        }
-
-        displayed_byte = range.end;
-    }
-    let rest = std::str::from_utf8(&bytes[*displayed_byte..]).unwrap();
-    println!("{rest}");
-
-    Ok(())
+    rich_ir
+        .map(|rich_ir| rich_ir.print_to_console())
+        .ok_or(Exit::FileNotFound)
 }
