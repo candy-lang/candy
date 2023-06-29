@@ -175,7 +175,7 @@
     "eslint": "^8.43.0",
     "glob": "^10.3.1",
     "mocha": "^10.2.0",
-    "typescript": "^5.1.5",
+    "typescript": "^5.1.6",
     "vscode-test": "^1.4.0"
   }
 }
