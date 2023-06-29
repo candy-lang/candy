@@ -8,7 +8,7 @@ use crate::{
     },
     utils::{module_to_url, LspPositionConversion},
 };
-use candy_frontend::{ast_to_hir::AstToHir, hir::Id, utils::AdjustCasingOfFirstLetter};
+use candy_frontend::{ast_to_hir::AstToHir, hir::Id};
 use candy_vm::{
     fiber::FiberId,
     heap::{Data, InlineObject},
@@ -122,13 +122,7 @@ impl PausedState {
                 let range = start_at_1_config.range_to_dap(range);
                 (function.function_name(), Some(source), Some(range))
             }
-            Data::Builtin(builtin) => {
-                let name = format!(
-                    "✨.{}",
-                    format!("{:?}", builtin.get()).lowercase_first_letter(),
-                );
-                (name, None, None)
-            }
+            Data::Builtin(builtin) => (builtin.to_string(), None, None),
             it => panic!("Unexpected callee: {it}"),
         };
         dap::types::StackFrame {

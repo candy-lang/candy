@@ -1,4 +1,10 @@
+use crate::{
+    rich_ir::{RichIrBuilder, ToRichIr, TokenModifier, TokenType},
+    utils::AdjustCasingOfFirstLetter,
+};
+use enumset::EnumSet;
 use lazy_static::lazy_static;
+use std::fmt::{self, Display, Formatter};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
@@ -165,5 +171,22 @@ impl BuiltinFunction {
             BuiltinFunction::Try => 1,
             BuiltinFunction::TypeOf => 1,
         }
+    }
+}
+
+impl Display for BuiltinFunction {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let name = format!("{self:?}").lowercase_first_letter();
+        write!(f, "✨.{name}")
+    }
+}
+impl ToRichIr for BuiltinFunction {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        let range = builder.push(
+            self.to_string(),
+            TokenType::Function,
+            EnumSet::only(TokenModifier::Builtin),
+        );
+        builder.push_reference(*self, range);
     }
 }

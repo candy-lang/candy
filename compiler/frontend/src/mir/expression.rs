@@ -3,7 +3,7 @@ use crate::{
     builtin_functions::BuiltinFunction,
     hir, impl_display_via_richir,
     module::Module,
-    rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr, TokenModifier, TokenType},
+    rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr, TokenType},
 };
 use core::mem;
 use derive_more::{From, TryInto};
@@ -297,12 +297,7 @@ impl ToRichIr for Expression {
                 }
             }
             Expression::Builtin(builtin) => {
-                let range = builder.push(
-                    format!("builtin{builtin:?}"),
-                    TokenType::Function,
-                    EnumSet::only(TokenModifier::Builtin),
-                );
-                builder.push_reference(*builtin, range);
+                builtin.build_rich_ir(builder);
             }
             Expression::List(items) => {
                 builder.push("(", None, EnumSet::empty());
