@@ -4,14 +4,8 @@ use crate::{
     Exit, ProgramResult,
 };
 use candy_frontend::{
-    ast_to_hir::AstToHir,
-    cst_to_ast::CstToAst,
-    hir_to_mir::HirToMir,
-    mir_optimize::OptimizeMir,
-    position::Offset,
-    rich_ir::{RichIr, RichIrAnnotation, TokenType},
-    string_to_rcst::StringToRcst,
-    TracingConfig, TracingMode,
+    ast_to_hir::AstToHir, cst_to_ast::CstToAst, hir_to_mir::HirToMir, mir_optimize::OptimizeMir,
+    rich_ir::RichIr, string_to_rcst::StringToRcst, TracingConfig, TracingMode,
 };
 use candy_vm::{lir::RichIrForLir, mir_to_lir::compile_lir};
 use clap::{Parser, ValueHint};
