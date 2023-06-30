@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
+    "compiler/backend_inkwell",
     "compiler/cli",
     "compiler/frontend",
     "compiler/fuzzer",

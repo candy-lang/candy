@@ -10,6 +10,7 @@ mod check;
 mod database;
 mod debug;
 mod fuzz;
+mod inkwell;
 mod lsp;
 mod run;
 mod services;
@@ -29,6 +30,8 @@ enum CandyOptions {
 
     /// Start a Language Server.
     Lsp,
+
+    Inkwell(inkwell::Options),
 }
 
 #[tokio::main]
@@ -44,6 +47,7 @@ async fn main() -> ProgramResult {
         CandyOptions::Run(options) => run::run(options),
         CandyOptions::Fuzz(options) => fuzz::fuzz(options),
         CandyOptions::Lsp => lsp::lsp().await,
+        CandyOptions::Inkwell(options) => inkwell::compile(options),
     }
 }
 
