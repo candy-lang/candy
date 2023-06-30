@@ -10,7 +10,7 @@ use clap::{Parser, ValueHint};
 
 use crate::database::Database;
 use crate::utils::{module_for_path, packages_path};
-use crate::ProgramResult;
+use crate::{Exit, ProgramResult};
 
 #[derive(Parser, Debug)]
 pub(crate) struct Options {
@@ -48,8 +48,31 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
     let context = backend_inkwell::inkwell::context::Context::create();
     let module = context.create_module(&path);
     let builder = context.create_builder();
-    let mut codegen = CodeGen::new(&context, module, builder, mir);
-    codegen.compile();
+    let codegen = CodeGen::new(&context, module, builder, mir);
+    let mut bc_path = PathBuf::new();
+    bc_path.push(&format!("{path}.bc"));
+    codegen
+        .compile(&bc_path)
+        .map_err(|e| Exit::LLVMError(e.to_string()))?;
+    std::process::Command::new("llc")
+        .arg(&bc_path)
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
+    let mut s_path = PathBuf::new();
+    s_path.push(&format!("{path}.s"));
+    std::process::Command::new("clang")
+        .args([
+            "compiler/backend_inkwell/candy_rt.c",
+            s_path.to_str().unwrap(),
+            "-o",
+            &s_path.to_str().unwrap().replace(".candy.s", ""),
+        ])
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
 
     ProgramResult::Ok(())
 }

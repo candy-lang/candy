@@ -1,16 +1,15 @@
 use candy_frontend::mir::{Body, Id, Mir};
 use inkwell::{
-    basic_block::BasicBlock,
     builder::Builder,
     context::Context,
     module::{Linkage, Module},
-    types::{PointerType, StructType},
-    values::{BasicValue, FunctionValue},
+    support::LLVMString,
+    values::GlobalValue,
     AddressSpace,
 };
 
 pub use inkwell;
-use std::{collections::HashMap, rc::Rc, sync::Arc};
+use std::{collections::HashMap, path::Path, rc::Rc, sync::Arc};
 
 pub struct CodeGen<'ctx> {
     context: &'ctx Context,
@@ -18,8 +17,7 @@ pub struct CodeGen<'ctx> {
     builder: Builder<'ctx>,
     mir: Arc<Mir>,
     tags: HashMap<String, Option<Id>>,
-    values: HashMap<Id, Rc<dyn BasicValue<'ctx> + 'ctx>>,
-    candy_type: Option<Rc<PointerType<'ctx>>>,
+    values: HashMap<Id, Rc<GlobalValue<'ctx>>>,
 }
 
 impl<'ctx> CodeGen<'ctx> {
@@ -36,20 +34,17 @@ impl<'ctx> CodeGen<'ctx> {
             mir,
             tags: HashMap::new(),
             values: HashMap::new(),
-            candy_type: None,
         }
     }
 
-    pub fn compile(mut self) {
+    pub fn compile(mut self, path: &Path) -> Result<(), LLVMString> {
         let i32_type = self.context.i32_type();
-        let i64_type = self.context.i64_type();
+        let i128_type = self.context.i128_type();
 
         let candy_type = self.context.opaque_struct_type("candy_type");
         let candy_type_ptr = candy_type.ptr_type(AddressSpace::default());
 
-        self.candy_type.replace(Rc::new(candy_type_ptr));
-
-        let make_int_fn_type = candy_type_ptr.fn_type(&[i32_type.into()], false);
+        let make_int_fn_type = candy_type_ptr.fn_type(&[i128_type.into()], false);
         self.module
             .add_function("make_candy_int", make_int_fn_type, Some(Linkage::External));
 
@@ -64,8 +59,9 @@ impl<'ctx> CodeGen<'ctx> {
         let ret_value = i32_type.const_int(0, false);
         self.builder.build_return(Some(&ret_value));
         self.module.print_to_stderr();
-        self.module
-            .write_bitcode_to_path(std::path::Path::new("module.bc"));
+        self.module.verify()?;
+        self.module.write_bitcode_to_path(path);
+        Ok(())
     }
 
     pub fn compile_mir(&mut self, mir: &Body) {
@@ -75,10 +71,21 @@ impl<'ctx> CodeGen<'ctx> {
                 candy_frontend::mir::Expression::Int(value) => {
                     let i128_type = self.context.i128_type();
                     let v = i128_type.const_int(value.try_into().unwrap(), false);
+                    let candy_type_ptr = self
+                        .module
+                        .get_struct_type("candy_type")
+                        .unwrap()
+                        .ptr_type(AddressSpace::default());
+                    let global = self.module.add_global(candy_type_ptr, None, "");
+                    global.set_initializer(&candy_type_ptr.const_null());
                     let make_candy_int = self.module.get_function("make_candy_int").unwrap();
-                    self.builder.build_call(make_candy_int, &[v.into()], "");
+                    let call = self.builder.build_call(make_candy_int, &[v.into()], "");
+                    self.builder.build_store(
+                        global.as_pointer_value(),
+                        call.try_as_basic_value().unwrap_left(),
+                    );
 
-                    //self.values.insert(*id, v);
+                    self.values.insert(*id, Rc::new(global));
                 }
                 candy_frontend::mir::Expression::Text(_) => todo!(),
                 candy_frontend::mir::Expression::Tag { symbol, value } => {
@@ -89,6 +96,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                     let tag = i32_type.const_int(self.tags.len().try_into().unwrap(), false);
                     global.set_initializer(&tag);
+                    self.values.insert(*id, Rc::new(global));
                 }
                 candy_frontend::mir::Expression::Builtin(_) => todo!(),
                 candy_frontend::mir::Expression::List(_) => todo!(),
@@ -99,8 +107,9 @@ impl<'ctx> CodeGen<'ctx> {
                     self.context.struct_type(&[], false);
                 }
                 candy_frontend::mir::Expression::Reference(id) => {
+                    println!("Reference to {id}");
                     if let Some(v) = self.values.get(id) {
-                        self.builder.build_return(Some(v.as_ref()));
+                        self.builder.build_return(Some(&v.as_pointer_value()));
                     }
                 }
                 candy_frontend::mir::Expression::HirId(_) => todo!(),

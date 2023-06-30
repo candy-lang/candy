@@ -59,6 +59,7 @@ enum Exit {
     FuzzingFoundFailingCases,
     NotInCandyPackage,
     CodeContainsErrors,
+    LLVMError(String),
 }
 
 fn init_logger(use_stdout: bool) {
