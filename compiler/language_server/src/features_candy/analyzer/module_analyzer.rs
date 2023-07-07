@@ -19,7 +19,7 @@ use extension_trait::extension_trait;
 use itertools::Itertools;
 use lsp_types::Diagnostic;
 use rand::{prelude::SliceRandom, thread_rng};
-use std::sync::Arc;
+use std::rc::Rc;
 use tracing::info;
 
 /// A hints finder is responsible for finding hints for a single module.
@@ -45,9 +45,9 @@ enum State {
         constants_ended: VmEnded,
         stack_tracer: StackTracer,
         evaluated_values: EvaluatedValuesTracer,
-        lir: Arc<Lir>,
+        lir: Rc<Lir>,
         tracer: FuzzablesFinder,
-        vm: Vm<Arc<Lir>, FuzzablesFinder>,
+        vm: Vm<Rc<Lir>, FuzzablesFinder>,
     },
     /// Then, the functions are actually fuzzed.
     Fuzz {
@@ -144,7 +144,7 @@ impl ModuleAnalyzer {
                     evaluated_expressions: TracingMode::Off,
                 };
                 let (lir, _) = compile_lir(db, self.module.clone(), tracing);
-                let lir = Arc::new(lir);
+                let lir = Rc::new(lir);
 
                 let mut tracer = FuzzablesFinder::default();
                 let vm = Vm::for_module(lir.clone(), &mut tracer);
