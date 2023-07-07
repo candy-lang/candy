@@ -16,6 +16,7 @@ use self::{
 use super::AnalyzerClient;
 use crate::database::Database;
 use candy_frontend::module::{Module, MutableModuleProviderOwner, PackagesPath};
+use itertools::{Either, Itertools};
 use lsp_types::{notification::Notification, Url};
 use rand::{seq::IteratorRandom, thread_rng};
 use rustc_hash::FxHashMap;
@@ -103,15 +104,11 @@ pub async fn run_server(
         analyzer.run(&db, &client).await;
 
         let insights = analyzer.insights(&db);
-        let mut diagnostics = vec![];
-        let mut hints = vec![];
-        for insight in insights {
-            match insight {
-                Insight::Diagnostic(diagnostic) => diagnostics.push(diagnostic),
-                Insight::Hint(hint) => hints.push(hint),
-            }
-        }
-
+        let (diagnostics, mut hints): (Vec<_>, Vec<_>) =
+            insights.into_iter().partition_map(|it| match it {
+                Insight::Diagnostic(diagnostic) => Either::Left(diagnostic),
+                Insight::Hint(hint) => Either::Right(hint),
+            });
         hints.sort_by_key(|hint| hint.position);
 
         outgoing_diagnostics.send(module.clone(), diagnostics).await;

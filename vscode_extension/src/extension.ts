@@ -45,7 +45,6 @@ export async function activate(context: vscode.ExtensionContext) {
   );
   client.start();
 
-  // context.subscriptions.push(new HintsDecorations(client));
   context.subscriptions.push(new ServerStatusService(client));
   context.subscriptions.push(new HintsDecorations(client));
   registerDebugIrCommands(client);

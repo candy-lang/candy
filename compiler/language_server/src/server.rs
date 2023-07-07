@@ -122,7 +122,6 @@ impl ServerFeatures {
     }
 }
 
-#[derive(Clone)]
 pub struct AnalyzerClient {
     client: Client,
     packages_path: PackagesPath,

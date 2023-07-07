@@ -22,7 +22,7 @@ pub struct Fuzzer {
     pub function_heap: Heap,
     pub function: Function,
     pub function_id: Id,
-    pub pool: InputPool,
+    pool: InputPool,
     status: Option<Status>, // only `None` during transitions
 }
 
@@ -72,6 +72,10 @@ impl Fuzzer {
     }
     pub fn into_status(self) -> Status {
         self.status.unwrap()
+    }
+
+    pub fn input_pool(&self) -> &InputPool {
+        &self.pool
     }
 
     pub fn run(&mut self, execution_controller: &mut impl ExecutionController<FiberStackTracer>) {

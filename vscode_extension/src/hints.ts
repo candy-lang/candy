@@ -90,16 +90,10 @@ export class HintsDecorations implements vs.Disposable {
           return;
         }
 
-        const hoverMessage = new vs.MarkdownString(
-          'some hover text',
-          undefined
-        );
-
         const existing = decorations.get(hint.kind) || [];
         existing.push({
           range: new vs.Range(position, position),
           renderOptions: { after: { contentText: hint.text } },
-          hoverMessage: hoverMessage,
         });
         decorations.set(hint.kind, existing);
       }
