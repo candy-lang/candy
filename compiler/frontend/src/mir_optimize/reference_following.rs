@@ -29,7 +29,9 @@ pub fn follow_references(context: &mut Context, expression: &mut CurrentExpressi
 
 pub fn remove_redundant_return_references(body: &mut Body) {
     while body.expressions.len() > 1 {
-        let [.., (second_last_id, _), (_, last_expression)] = &body.expressions[..] else { unreachable!() };
+        let [.., (second_last_id, _), (_, last_expression)] = &body.expressions[..] else {
+            unreachable!()
+        };
 
         if let Expression::Reference(referenced) = last_expression && referenced == second_last_id {
             body.expressions.pop();

@@ -67,7 +67,7 @@ pub fn inline_functions_of_maximum_complexity(
 pub fn inline_functions_containing_use(context: &mut Context, expression: &mut CurrentExpression) {
     if let Expression::Call { function, .. } = **expression
         && let Expression::Function { body, .. } = context.visible.get(function)
-        && body.iter().any(|(_, expr)| matches!(expr, Expression::UseModule { .. })) {
+        && body.iter().any(|(_, expression)| expression.is_use_module()) {
         context.inline_call(expression);
     }
 }
@@ -78,7 +78,8 @@ impl Context<'_> {
             function,
             arguments,
             responsible: responsible_argument,
-        } = &**expression else {
+        } = &**expression
+        else {
             // Expression is not a call.
             return;
         };
@@ -92,7 +93,8 @@ impl Context<'_> {
             parameters,
             responsible_parameter,
             body,
-        } = self.visible.get(*function) else {
+        } = self.visible.get(*function)
+        else {
             // Callee is not a function.
             return;
         };

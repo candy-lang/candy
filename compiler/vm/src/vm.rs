@@ -22,6 +22,7 @@ use crate::{
 };
 use extension_trait::extension_trait;
 use rustc_hash::FxHashMap;
+use strum::EnumIs;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct OperationId(usize);
@@ -98,6 +99,7 @@ pub struct Try<T: FiberTracer> {
     child: FiberId,
 }
 
+#[derive(EnumIs)]
 enum ChannelLike {
     Channel(Channel),
     Nursery(FiberId),
@@ -108,7 +110,7 @@ pub enum CompletedOperation {
     Received { packet: Packet },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, EnumIs)]
 pub enum Status {
     CanRun,
     WaitingForOperations,
@@ -262,7 +264,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
         }
     }
     fn can_run(&self) -> bool {
-        matches!(self.status(), Status::CanRun)
+        self.status().is_can_run()
     }
 
     pub fn fibers(&self) -> &HashMap<FiberId, FiberTree<T::ForFiber>> {
@@ -328,7 +330,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
                     FiberTree::Try(Try { child, .. }) => fiber_id = *child,
                 }
             };
-            if !matches!(fiber.status(), fiber::Status::Running) {
+            if !fiber.status().is_running() {
                 continue;
             }
 
@@ -355,7 +357,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
 
         let fiber = self.fibers.get_mut(&fiber_id).unwrap().fiber_mut();
         assert!(
-            matches!(fiber.status(), fiber::Status::Running),
+            fiber.status().is_running(),
             "Called `Vm::run_fiber(…)` with a fiber that is not ready to run.",
         );
 
@@ -555,7 +557,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
             .filter(|channel| {
                 // Note that nurseries are automatically removed when their
                 // parallel scope is exited.
-                matches!(self.channels.get(channel).unwrap(), ChannelLike::Channel(_))
+                self.channels.get(channel).unwrap().is_channel()
             })
             .copied()
             .collect();

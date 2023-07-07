@@ -14,15 +14,15 @@ use candy_vm::{
     lir::Lir,
     tracer::stack_trace::{FiberStackTracer, StackTracer},
 };
-use std::sync::Arc;
+use std::rc::Rc;
 use tracing::debug;
 
 pub struct Fuzzer {
-    pub lir: Arc<Lir>,
+    lir: Rc<Lir>,
     pub function_heap: Heap,
     pub function: Function,
     pub function_id: Id,
-    pub pool: InputPool,
+    pool: InputPool,
     status: Option<Status>, // only `None` during transitions
 }
 
@@ -31,7 +31,7 @@ pub struct Fuzzer {
 pub enum Status {
     StillFuzzing {
         total_coverage: Coverage,
-        runner: Runner<Arc<Lir>>,
+        runner: Runner<Rc<Lir>>,
     },
     // TODO: In the future, also add a state for trying to simplify the input.
     FoundPanic {
@@ -42,7 +42,7 @@ pub enum Status {
 }
 
 impl Fuzzer {
-    pub fn new(lir: Arc<Lir>, function: Function, function_id: Id) -> Self {
+    pub fn new(lir: Rc<Lir>, function: Function, function_id: Id) -> Self {
         let mut heap = Heap::default();
         let function: Function = Data::from(function.clone_to_heap(&mut heap))
             .try_into()
@@ -66,11 +66,19 @@ impl Fuzzer {
         }
     }
 
+    pub fn lir(&self) -> Rc<Lir> {
+        self.lir.clone()
+    }
+
     pub fn status(&self) -> &Status {
         self.status.as_ref().unwrap()
     }
     pub fn into_status(self) -> Status {
         self.status.unwrap()
+    }
+
+    pub fn input_pool(&self) -> &InputPool {
+        &self.pool
     }
 
     pub fn run(&mut self, execution_controller: &mut impl ExecutionController<FiberStackTracer>) {
@@ -103,11 +111,14 @@ impl Fuzzer {
         &mut self,
         execution_controller: &mut impl ExecutionController<FiberStackTracer>,
         total_coverage: Coverage,
-        mut runner: Runner<Arc<Lir>>,
+        mut runner: Runner<Rc<Lir>>,
     ) -> Status {
         runner.run(execution_controller);
         let Some(result) = runner.result else {
-            return Status::StillFuzzing { total_coverage, runner };
+            return Status::StillFuzzing {
+                total_coverage,
+                runner,
+            };
         };
 
         let call_string = format!(

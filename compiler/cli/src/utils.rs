@@ -36,10 +36,11 @@ pub(crate) fn module_for_path(path: impl Into<Option<PathBuf>>) -> Result<Module
             )
         }
         None => {
-            let Some(package) = packages_path.find_surrounding_package(&current_dir().unwrap()) else {
+            let Some(package) = packages_path.find_surrounding_package(&current_dir().unwrap())
+            else {
                 error!("You are not in a Candy package. Either navigate into a package or specify a Candy file.");
                 error!("Candy packages are folders that contain a `_package.candy` file. This file marks the root folder of a package. Relative imports can only happen within the package.");
-                return Err(Exit::NotInCandyPackage)
+                return Err(Exit::NotInCandyPackage);
             };
             Ok(Module {
                 package,

@@ -37,13 +37,21 @@ pub enum HintKind {
 
 impl Insight {
     pub fn for_value(db: &Database, id: Id, value: InlineObject) -> Option<Self> {
-        let Some(hir) = db.find_expression(id.clone()) else { return None; };
-        match hir {
+        let Some(hir) = db.find_expression(id.clone()) else {
+            return None;
+        };
+        let text = match hir {
             Expression::Reference(_) => {
                 // Could be an assignment.
-                let Some(ast_id) = db.hir_to_ast_id(id.clone()) else { return None; };
-                let Some(ast) = db.find_ast(ast_id) else { return None; };
-                let AstKind::Assignment(Assignment { body, .. }) = &ast.kind else { return None; };
+                let Some(ast_id) = db.hir_to_ast_id(id.clone()) else {
+                    return None;
+                };
+                let Some(ast) = db.find_ast(ast_id) else {
+                    return None;
+                };
+                let AstKind::Assignment(Assignment { body, .. }) = &ast.kind else {
+                    return None;
+                };
                 let creates_hint = match body {
                     AssignmentBody::Function { .. } => true,
                     AssignmentBody::Body { pattern, .. } => {
@@ -54,23 +62,20 @@ impl Insight {
                     return None;
                 }
 
-                Some(Insight::Hint(Hint {
-                    kind: HintKind::Value,
-                    position: db.id_to_end_of_line(id).unwrap(),
-                    text: value.to_string(),
-                }))
+                value.to_string()
             }
             Expression::PatternIdentifierReference { .. } => {
                 let body = db.containing_body_of(id.clone());
                 let name = body.identifiers.get(&id).unwrap();
-                Some(Insight::Hint(Hint {
-                    kind: HintKind::Value,
-                    position: db.id_to_end_of_line(id.clone()).unwrap(),
-                    text: format!("{name} = {value}"),
-                }))
+                format!("{name} = {value}")
             }
-            _ => None,
-        }
+            _ => return None,
+        };
+        Some(Insight::Hint(Hint {
+            kind: HintKind::Value,
+            position: db.id_to_end_of_line(id).unwrap(),
+            text,
+        }))
     }
 
     pub fn for_fuzzer_status(db: &Database, fuzzer: &Fuzzer) -> Vec<Self> {
@@ -81,14 +86,14 @@ impl Insight {
 
         let coverage = match fuzzer.status() {
             Status::StillFuzzing { total_coverage, .. } => {
-                let function_range = fuzzer.lir.range_of_function(&id);
+                let function_range = fuzzer.lir().range_of_function(&id);
                 let function_coverage = total_coverage.in_range(&function_range);
                 function_coverage.relative_coverage()
             }
             Status::FoundPanic { .. } => 1., // TODO: not correct
         };
         let function_name = id.function_name();
-        let interesting_inputs = fuzzer.pool.interesting_inputs();
+        let interesting_inputs = fuzzer.input_pool().interesting_inputs();
         insights.push(Insight::Hint(Hint {
             kind: HintKind::FuzzingStatus,
             position: end_of_line,
@@ -104,12 +109,12 @@ impl Insight {
         }
 
         insights.extend(interesting_inputs.into_iter().map(|input| {
-            Insight::Hint(match fuzzer.pool.result_of(&input) {
+            Insight::Hint(match fuzzer.input_pool().result_of(&input) {
                 RunResult::Timeout => unreachable!(),
-                RunResult::Done { return_value, .. } => Hint {
+                RunResult::Done(return_value) => Hint {
                     kind: HintKind::SampleInputReturningNormally,
                     position: end_of_line,
-                    text: format!("{function_name} {input} = {return_value}"),
+                    text: format!("{function_name} {input} = {}", return_value.object),
                 },
                 RunResult::NeedsUnfulfilled { .. } => Hint {
                     kind: HintKind::SampleInputPanickingWithCallerResponsible,

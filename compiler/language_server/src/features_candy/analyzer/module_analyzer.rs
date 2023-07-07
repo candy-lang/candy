@@ -17,9 +17,9 @@ use candy_vm::{
 };
 use extension_trait::extension_trait;
 use itertools::Itertools;
-use lsp_types::{Diagnostic, Range};
+use lsp_types::Diagnostic;
 use rand::{prelude::SliceRandom, thread_rng};
-use std::sync::Arc;
+use std::rc::Rc;
 use tracing::info;
 
 /// A hints finder is responsible for finding hints for a single module.
@@ -45,9 +45,9 @@ enum State {
         constants_ended: VmEnded,
         stack_tracer: StackTracer,
         evaluated_values: EvaluatedValuesTracer,
-        lir: Arc<Lir>,
+        lir: Rc<Lir>,
         tracer: FuzzablesFinder,
-        vm: Vm<Arc<Lir>, FuzzablesFinder>,
+        vm: Vm<Rc<Lir>, FuzzablesFinder>,
     },
     /// Then, the functions are actually fuzzed.
     Fuzz {
@@ -144,7 +144,7 @@ impl ModuleAnalyzer {
                     evaluated_expressions: TracingMode::Off,
                 };
                 let (lir, _) = compile_lir(db, self.module.clone(), tracing);
-                let lir = Arc::new(lir);
+                let lir = Rc::new(lir);
 
                 let mut tracer = FuzzablesFinder::default();
                 let vm = Vm::for_module(lir.clone(), &mut tracer);
@@ -213,7 +213,14 @@ impl ModuleAnalyzer {
                     .collect_vec();
                 let Some(fuzzer) = running_fuzzers.choose_mut(&mut thread_rng()) else {
                     client.update_status(None).await;
-                    return State::Fuzz { static_panics, constants_ended, stack_tracer, evaluated_values, fuzzable_finder_ended, fuzzers };
+                    return State::Fuzz {
+                        static_panics,
+                        constants_ended,
+                        stack_tracer,
+                        evaluated_values,
+                        fuzzable_finder_ended,
+                        fuzzers,
+                    };
                 };
 
                 client
@@ -271,13 +278,11 @@ impl ModuleAnalyzer {
                 );
 
                 for fuzzer in fuzzers {
-                    insights.extend(Insight::for_fuzzer_status(db, fuzzer).into_iter());
+                    insights.append(&mut Insight::for_fuzzer_status(db, fuzzer));
 
-                    let Status::FoundPanic {
-                        input,
-                        panic,
-                        ..
-                    } = fuzzer.status() else { continue; };
+                    let Status::FoundPanic { input, panic, .. } = fuzzer.status() else {
+                        continue;
+                    };
 
                     let id = fuzzer.function_id.clone();
                     if !id.is_same_module_and_any_parent_of(&panic.responsible) {
@@ -306,19 +311,16 @@ impl ModuleAnalyzer {
                         .hir_id_to_display_span(panic.responsible.clone())
                         .unwrap();
                     insights.push(Insight::Diagnostic(Diagnostic::error(
-                        Range::new(
-                            db.offset_to_lsp_position(self.module.clone(), call_span.start),
-                            db.offset_to_lsp_position(self.module.clone(), call_span.end),
-                        ),
+                        db.range_to_lsp_range(self.module.clone(), call_span),
                         format!(
                             "For `{} {}`, this call panics: {}",
-                            fuzzer.function_id.keys.last().unwrap(),
+                            fuzzer.function_id.function_name(),
                             input
                                 .arguments
                                 .iter()
                                 .map(|argument| format!("{argument}"))
                                 .join(" "),
-                            panic.reason
+                            panic.reason,
                         ),
                     )));
                 }

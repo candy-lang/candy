@@ -140,7 +140,9 @@ impl LanguageFeatures for CandyFeatures {
     async fn format(&self, db: &Mutex<Database>, uri: Url) -> Vec<TextEdit> {
         let db = db.lock().await;
         let module = decode_module(&uri, &db.packages_path);
-        let Ok(cst) = db.cst(module.clone()) else { return vec![]; };
+        let Ok(cst) = db.cst(module.clone()) else {
+            return vec![];
+        };
 
         cst.format_to_edits()
             .finish()

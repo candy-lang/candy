@@ -122,7 +122,6 @@ impl ServerFeatures {
     }
 }
 
-#[derive(Clone)]
 pub struct AnalyzerClient {
     client: Client,
     packages_path: PackagesPath,
@@ -259,7 +258,11 @@ impl LanguageServer for Server {
         {
             let mut state = self.state.write().await;
             let owned_state = mem::replace(&mut *state, ServerState::Shutdown);
-            let ServerState::Initial { features, debug_session_manager } = owned_state else {
+            let ServerState::Initial {
+                features,
+                debug_session_manager,
+            } = owned_state
+            else {
                 panic!("Server is already initialized.");
             };
             *state = ServerState::Running(RunningServerState {

@@ -27,7 +27,7 @@ use candy_vm::{
     execution_controller::RunLimitedNumberOfInstructions, fiber::Panic, mir_to_lir::compile_lir,
     tracer::stack_trace::StackTracer, vm::Vm,
 };
-use std::sync::Arc;
+use std::rc::Rc;
 use tracing::{debug, error, info};
 
 pub fn fuzz<DB>(db: &DB, module: Module) -> Vec<FailingFuzzCase>
@@ -40,7 +40,7 @@ where
         evaluated_expressions: TracingMode::Off,
     };
     let (lir, _) = compile_lir(db, module, tracing);
-    let lir = Arc::new(lir);
+    let lir = Rc::new(lir);
 
     let (_heap, fuzzables) = {
         let mut tracer = FuzzablesFinder::default();

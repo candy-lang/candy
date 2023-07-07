@@ -1,8 +1,6 @@
 use super::{FiberId, FiberTracer, TracedFiberEnded, TracedFiberEndedReason, Tracer};
 use crate::heap::{Heap, HirId, InlineObject};
-use candy_frontend::{
-    ast_to_hir::AstToHir, cst::CstKind, module::Package, position::PositionConversionDb,
-};
+use candy_frontend::{ast_to_hir::AstToHir, cst::CstKind, position::PositionConversionDb};
 use itertools::Itertools;
 use pad::PadStr;
 use rustc_hash::FxHashMap;
@@ -57,7 +55,9 @@ impl Tracer for StackTracer {
     fn root_fiber_ended(&mut self, mut ended: TracedFiberEnded<Self::ForFiber>) {
         assert!(self.panic_chain.is_none());
 
-        let TracedFiberEndedReason::Panicked(panic) = ended.reason else { return; };
+        let TracedFiberEndedReason::Panicked(panic) = ended.reason else {
+            return;
+        };
         ended.tracer.dup_all_stored_objects(ended.heap);
         self.panic_chain = Some(ended.tracer.take_panic_call_stack(panic.panicked_child));
         ended.tracer.drop(ended.heap);
@@ -95,8 +95,7 @@ impl StackTracer {
         {
             let hir_id = call_site.get();
             let module = hir_id.module.clone();
-            let is_tooling = matches!(module.package, Package::Tooling(_));
-            let cst_id = if is_tooling {
+            let cst_id = if module.package.is_tooling() {
                 None
             } else {
                 db.hir_to_cst_id(hir_id.clone())
@@ -159,7 +158,9 @@ impl FiberTracer for FiberStackTracer {
         FiberStackTracer::default()
     }
     fn child_fiber_ended(&mut self, mut ended: TracedFiberEnded<Self>) {
-        let TracedFiberEndedReason::Panicked(panic) = ended.reason else { return; };
+        let TracedFiberEndedReason::Panicked(panic) = ended.reason else {
+            return;
+        };
         self.panic_chains.insert(
             ended.id,
             ended.tracer.take_panic_call_stack(panic.panicked_child),

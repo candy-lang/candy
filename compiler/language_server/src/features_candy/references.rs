@@ -20,7 +20,9 @@ pub fn references<DB>(
 where
     DB: HirDb + ModuleDb + PositionConversionDb,
 {
-    let Some((query, _)) = reference_query_for_offset(db, module, offset) else { return vec![]; };
+    let Some((query, _)) = reference_query_for_offset(db, module, offset) else {
+        return vec![];
+    };
     find_references(db, query, include_declaration)
 }
 
