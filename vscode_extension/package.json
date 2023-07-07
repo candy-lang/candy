@@ -24,30 +24,93 @@
   "contributes": {
     "colors": [
       {
-        "id": "candy.hints.valueColor",
-        "description": "The color of hints indicating the value of an expression. If not supplied, the color for `tab.inactiveForeground` will be used.",
+        "id": "candy.valueHint.background",
+        "description": "The color of hints indicating the value of an expression.",
         "defaults": {
-          "dark": "tab.inactiveForeground",
-          "light": "tab.inactiveForeground",
-          "highContrast": "tab.inactiveForeground"
+          "dark": "#65656522",
+          "light": "#65656522",
+          "highContrast": "#656565"
         }
       },
       {
-        "id": "candy.hints.panicColor",
-        "description": "The text color of hints indicating that the code panics. If not supplied, the color for `editorError.foreground` will be used.",
+        "id": "candy.valueHint.foreground",
+        "description": "The color of hints indicating the value of an expression.",
         "defaults": {
-          "dark": "editorError.foreground",
-          "light": "editorError.foreground",
-          "highContrast": "editorError.foreground"
+          "dark": "#9a9a9a",
+          "light": "#9a9a9a",
+          "highContrast": "#000000"
         }
       },
       {
-        "id": "candy.hints.fuzzColor",
-        "description": "The text color of hints indicating that a function panics for a certain input. If not supplied, the color for `editorError.foreground` will be used.",
+        "id": "candy.statusHint.background",
+        "description": "The text color of hints indicating the fuzzing status of a function.",
         "defaults": {
-          "dark": "editorError.foreground",
-          "light": "editorError.foreground",
-          "highContrast": "editorError.foreground"
+          "dark": "#65656522",
+          "light": "#65656522",
+          "highContrast": "#656565"
+        }
+      },
+      {
+        "id": "candy.statusHint.foreground",
+        "description": "The text color of hints indicating the fuzzing status of a function.",
+        "defaults": {
+          "dark": "#9a9a9a",
+          "light": "#9a9a9a",
+          "highContrast": "#000000"
+        }
+      },
+      {
+        "id": "candy.sampleInput.returningNormally.background",
+        "description": "The background color of hints showing a sample input.",
+        "defaults": {
+          "dark": "#a8d86a22",
+          "light": "#a8d86a44",
+          "highContrast": "#61892d"
+        }
+      },
+      {
+        "id": "candy.sampleInput.returningNormally.foreground",
+        "description": "The text color of hints showing a sample input.",
+        "defaults": {
+          "dark": "#a8d86a",
+          "light": "#61892d",
+          "highContrast": "#ffffff"
+        }
+      },
+      {
+        "id": "candy.sampleInput.panickingWithCallerResponsible.background",
+        "description": "The background color of hints showing an input that fails a need.",
+        "defaults": {
+          "dark": "#f3d67622",
+          "light": "#f3d67644",
+          "highContrast": "#f3d676"
+        }
+      },
+      {
+        "id": "candy.sampleInput.panickingWithCallerResponsible.foreground",
+        "description": "The text color of hints showing an input that fails a need.",
+        "defaults": {
+          "dark": "#f3d676",
+          "light": "#a48930",
+          "highContrast": "#000000"
+        }
+      },
+      {
+        "id": "candy.sampleInput.panickingWithInternalCodeResponsible.background",
+        "description": "The background color of hints showing an input that causes the function to panic internally.",
+        "defaults": {
+          "dark": "#ff3f3f22",
+          "light": "#ff3f3f22",
+          "highContrast": "#ff3f3f"
+        }
+      },
+      {
+        "id": "candy.sampleInput.panickingWithInternalCodeResponsible.foreground",
+        "description": "The text color of hints showing an input that causes the function to panic internally.",
+        "defaults": {
+          "dark": "#ff3f3f",
+          "light": "#c02222",
+          "highContrast": "#ffffff"
         }
       }
     ],
@@ -168,11 +231,11 @@
   "devDependencies": {
     "@types/glob": "^8.0.1",
     "@types/mocha": "^10.0.1",
-    "@types/node": "^20.3.2",
+    "@types/node": "^20.4.0",
     "@types/vscode": "^1.79.1",
-    "@typescript-eslint/eslint-plugin": "^5.60.1",
-    "@typescript-eslint/parser": "^5.59.11",
-    "eslint": "^8.43.0",
+    "@typescript-eslint/eslint-plugin": "^5.61.0",
+    "@typescript-eslint/parser": "^5.61.0",
+    "eslint": "^8.44.0",
     "glob": "^10.3.1",
     "mocha": "^10.2.0",
     "typescript": "^5.1.6",

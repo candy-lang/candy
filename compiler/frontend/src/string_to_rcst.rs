@@ -1536,7 +1536,9 @@ mod parse {
 
         let mut cases = vec![];
         loop {
-            let Some((new_input, case)) = match_case(input, indentation + 1) else { break; };
+            let Some((new_input, case)) = match_case(input, indentation + 1) else {
+                break;
+            };
             let (new_input, whitespace) =
                 whitespaces_and_newlines(new_input, indentation + 1, true);
             input = new_input;
@@ -2283,7 +2285,9 @@ mod parse {
                 .wrap_in_whitespace(leading_whitespace);
 
             // Comma.
-            let Some((input, comma)) = comma(input) else { break 'handleEmptyList; };
+            let Some((input, comma)) = comma(input) else {
+                break 'handleEmptyList;
+            };
 
             // Whitespace after comma.
             let (input, trailing_whitespace) =

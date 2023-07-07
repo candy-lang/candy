@@ -93,7 +93,9 @@ pub fn format_csts<'a>(
         new_whitespace.into_empty_and_move_comments_to(edits, &mut formatted.whitespace);
 
         // Expression
-        let Some((expression, rest)) = csts.split_first() else { break; };
+        let Some((expression, rest)) = csts.split_first() else {
+            break;
+        };
         csts = rest;
 
         let is_at_start = offset == fallback_offset;
