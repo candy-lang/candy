@@ -213,7 +213,14 @@ impl ModuleAnalyzer {
                     .collect_vec();
                 let Some(fuzzer) = running_fuzzers.choose_mut(&mut thread_rng()) else {
                     client.update_status(None).await;
-                    return State::Fuzz { static_panics, constants_ended, stack_tracer, evaluated_values, fuzzable_finder_ended, fuzzers };
+                    return State::Fuzz {
+                        static_panics,
+                        constants_ended,
+                        stack_tracer,
+                        evaluated_values,
+                        fuzzable_finder_ended,
+                        fuzzers,
+                    };
                 };
 
                 client
@@ -273,11 +280,9 @@ impl ModuleAnalyzer {
                 for fuzzer in fuzzers {
                     insights.append(&mut Insight::for_fuzzer_status(db, fuzzer));
 
-                    let Status::FoundPanic {
-                        input,
-                        panic,
-                        ..
-                    } = fuzzer.status() else { continue; };
+                    let Status::FoundPanic { input, panic, .. } = fuzzer.status() else {
+                        continue;
+                    };
 
                     let id = fuzzer.function_id.clone();
                     if !id.is_same_module_and_any_parent_of(&panic.responsible) {

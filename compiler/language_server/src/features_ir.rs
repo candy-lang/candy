@@ -498,7 +498,9 @@ impl LanguageFeatures for IrFeatures {
         let open_ir = open_irs.get(&uri).unwrap();
 
         let offset = open_ir.lsp_position_to_offset(position);
-        let Some((reference_key, _)) = open_ir.find_references_entry(offset) else { return FxHashMap::default(); };
+        let Some((reference_key, _)) = open_ir.find_references_entry(offset) else {
+            return FxHashMap::default();
+        };
         if only_in_same_document {
             FxHashMap::from_iter([(
                 uri,
@@ -553,7 +555,9 @@ impl OpenIr {
         reference_key: &ReferenceKey,
         include_declaration: bool,
     ) -> Vec<Reference> {
-        let Some(result) = self.ir.references.get(reference_key) else { return vec![]; };
+        let Some(result) = self.ir.references.get(reference_key) else {
+            return vec![];
+        };
 
         let mut references = vec![];
         if include_declaration && let Some(definition) = &result.definition {
@@ -587,7 +591,9 @@ impl OpenIr {
     fn semantic_tokens(&self) -> Vec<SemanticToken> {
         let mut builder = SemanticTokensBuilder::new(&self.ir.text, &self.line_start_offsets);
         for annotation in &self.ir.annotations {
-            let Some(token_type) = annotation.token_type else { continue; };
+            let Some(token_type) = annotation.token_type else {
+                continue;
+            };
             builder.add(
                 annotation.range.clone(),
                 token_type.to_semantic(),

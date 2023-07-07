@@ -521,9 +521,10 @@ impl LoweringContext {
                             key_and_colon,
                             value,
                             comma,
-                        } = &field.kind else {
+                        } = &field.kind
+                        else {
                             errors.push(self.create_error(cst, AstError::StructWithNonStructField));
-                           return None;
+                            return None;
                         };
 
                         if let Some(box (key, colon)) = key_and_colon {

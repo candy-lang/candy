@@ -163,7 +163,9 @@ impl Width {
         }
     }
     pub fn last_line_fits(&self, indentation: Indentation, extra_width: impl Into<Width>) -> bool {
-        let Width::Singleline(extra_width) = extra_width.into() else { return false; };
+        let Width::Singleline(extra_width) = extra_width.into() else {
+            return false;
+        };
         match self {
             Width::Singleline(self_width) => {
                 indentation.width() + *self_width + extra_width <= Width::MAX
@@ -198,7 +200,9 @@ impl Add<Width> for Width {
             lhs: impl Into<Option<SinglelineWidth>>,
             rhs: impl Into<Option<SinglelineWidth>>,
         ) -> Option<SinglelineWidth> {
-            let (Some(lhs), Some(rhs)) = (lhs.into(), rhs.into()) else { return None; };
+            let (Some(lhs), Some(rhs)) = (lhs.into(), rhs.into()) else {
+                return None;
+            };
             let sum = lhs + rhs;
             if sum <= Width::MAX {
                 Some(sum)

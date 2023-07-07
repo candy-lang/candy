@@ -133,7 +133,9 @@ impl<L: Borrow<Lir>> Runner<L> {
             vm::Status::Done => {
                 let VmEnded { heap, reason, .. } =
                     self.vm.take().unwrap().tear_down(&mut self.tracer);
-                let EndedReason::Finished(return_value) = reason else { unreachable!(); };
+                let EndedReason::Finished(return_value) = reason else {
+                    unreachable!();
+                };
                 Some(RunResult::Done(Packet {
                     heap,
                     object: return_value,

@@ -117,7 +117,10 @@ impl Fuzzer {
     ) -> Status {
         runner.run(execution_controller);
         let Some(result) = runner.result else {
-            return Status::StillFuzzing { total_coverage, runner };
+            return Status::StillFuzzing {
+                total_coverage,
+                runner,
+            };
         };
 
         let call_string = format!(

@@ -132,7 +132,9 @@ impl Module {
         debug_type: &str,
         content: &str,
     ) {
-        let Some(mut path) = self.try_to_path(packages_path) else { return; };
+        let Some(mut path) = self.try_to_path(packages_path) else {
+            return;
+        };
 
         path.set_extension(format!("candy.{}", debug_type));
         fs::write(path.clone(), content).unwrap_or_else(|error| {

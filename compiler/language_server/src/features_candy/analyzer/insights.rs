@@ -37,13 +37,21 @@ pub enum HintKind {
 
 impl Insight {
     pub fn for_value(db: &Database, id: Id, value: InlineObject) -> Option<Self> {
-        let Some(hir) = db.find_expression(id.clone()) else { return None; };
+        let Some(hir) = db.find_expression(id.clone()) else {
+            return None;
+        };
         let text = match hir {
             Expression::Reference(_) => {
                 // Could be an assignment.
-                let Some(ast_id) = db.hir_to_ast_id(id.clone()) else { return None; };
-                let Some(ast) = db.find_ast(ast_id) else { return None; };
-                let AstKind::Assignment(Assignment { body, .. }) = &ast.kind else { return None; };
+                let Some(ast_id) = db.hir_to_ast_id(id.clone()) else {
+                    return None;
+                };
+                let Some(ast) = db.find_ast(ast_id) else {
+                    return None;
+                };
+                let AstKind::Assignment(Assignment { body, .. }) = &ast.kind else {
+                    return None;
+                };
                 let creates_hint = match body {
                     AssignmentBody::Function { .. } => true,
                     AssignmentBody::Body { pattern, .. } => {
