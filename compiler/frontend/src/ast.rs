@@ -11,6 +11,7 @@ use std::{
     fmt::{self, Display, Formatter},
     num::NonZeroUsize,
 };
+use strum_macros::EnumIs;
 
 #[salsa::query_group(AstDbStorage)]
 pub trait AstDb: CstToAst {
@@ -47,7 +48,7 @@ pub struct Ast {
     pub kind: AstKind,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Clone, Debug, EnumIs, Eq, Hash, PartialEq)]
 pub enum AstKind {
     Int(Int),
     Text(Text),

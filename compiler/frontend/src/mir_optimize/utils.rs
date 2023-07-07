@@ -178,8 +178,7 @@ impl Id {
             return self.semantically_equals(*reference, visible, pureness);
         }
 
-        if matches!(self_expr, Expression::Parameter) || matches!(other_expr, Expression::Parameter)
-        {
+        if self_expr.is_parameter() || other_expr.is_parameter() {
             return None;
         }
 

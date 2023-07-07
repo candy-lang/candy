@@ -191,7 +191,7 @@ impl<C: UnwrapWhitespaceAndComment> UnwrapWhitespaceAndComment for Box<C> {
 impl<D: Clone> UnwrapWhitespaceAndComment for Vec<Cst<D>> {
     fn unwrap_whitespace_and_comment(&self) -> Self {
         self.iter()
-            .filter(|it| !it.is_whitespace())
+            .filter(|it| !it.is_whitespace_or_comment())
             .map(|it| it.unwrap_whitespace_and_comment())
             .collect()
     }
