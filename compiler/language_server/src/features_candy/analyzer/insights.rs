@@ -78,7 +78,7 @@ impl Insight {
 
         let coverage = match fuzzer.status() {
             Status::StillFuzzing { total_coverage, .. } => {
-                let function_range = fuzzer.lir.range_of_function(&id);
+                let function_range = fuzzer.lir().range_of_function(&id);
                 let function_coverage = total_coverage.in_range(&function_range);
                 function_coverage.relative_coverage()
             }
@@ -104,10 +104,10 @@ impl Insight {
         insights.extend(interesting_inputs.into_iter().map(|input| {
             Insight::Hint(match fuzzer.input_pool().result_of(&input) {
                 RunResult::Timeout => unreachable!(),
-                RunResult::Done { return_value, .. } => Hint {
+                RunResult::Done(return_value) => Hint {
                     kind: HintKind::SampleInputReturningNormally,
                     position: end_of_line,
-                    text: format!("{function_name} {input} = {return_value}"),
+                    text: format!("{function_name} {input} = {}", return_value.object),
                 },
                 RunResult::NeedsUnfulfilled { .. } => Hint {
                     kind: HintKind::SampleInputPanickingWithCallerResponsible,

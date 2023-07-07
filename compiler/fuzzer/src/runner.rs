@@ -1,9 +1,10 @@
 use candy_frontend::hir::Id;
 use candy_vm::{
     self,
+    channel::Packet,
     execution_controller::{CountingExecutionController, ExecutionController},
     fiber::{EndedReason, Fiber, FiberId, InstructionPointer, Panic, VmEnded},
-    heap::{Function, Heap, HirId, InlineObject, InlineObjectSliceCloneToHeap},
+    heap::{Function, HirId, InlineObjectSliceCloneToHeap},
     lir::Lir,
     tracer::{
         stack_trace::{FiberStackTracer, StackTracer},
@@ -33,10 +34,7 @@ pub enum RunResult {
     Timeout,
 
     /// The execution finished successfully with a value.
-    Done {
-        heap: Heap,
-        return_value: InlineObject,
-    },
+    Done(Packet),
 
     /// The execution panicked and the caller of the function (aka the fuzzer)
     /// is at fault.
@@ -50,7 +48,7 @@ impl RunResult {
     pub fn to_string(&self, call: &str) -> String {
         match self {
             RunResult::Timeout => format!("{call} timed out."),
-            RunResult::Done { return_value, .. } => format!("{call} returned {return_value}."),
+            RunResult::Done(return_value) => format!("{call} returned {}.", return_value.object),
             RunResult::NeedsUnfulfilled { reason } => {
                 format!("{call} panicked and it's our fault: {reason}")
             }
@@ -136,7 +134,10 @@ impl<L: Borrow<Lir>> Runner<L> {
                 let VmEnded { heap, reason, .. } =
                     self.vm.take().unwrap().tear_down(&mut self.tracer);
                 let EndedReason::Finished(return_value) = reason else { unreachable!(); };
-                Some(RunResult::Done { heap, return_value })
+                Some(RunResult::Done(Packet {
+                    heap,
+                    object: return_value,
+                }))
             }
             vm::Status::Panicked(panic) => Some(if panic.responsible == Id::fuzzer() {
                 RunResult::NeedsUnfulfilled {

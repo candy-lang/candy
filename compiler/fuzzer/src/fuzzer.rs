@@ -18,7 +18,7 @@ use std::sync::Arc;
 use tracing::debug;
 
 pub struct Fuzzer {
-    pub lir: Arc<Lir>,
+    lir: Arc<Lir>,
     pub function_heap: Heap,
     pub function: Function,
     pub function_id: Id,
@@ -65,6 +65,10 @@ impl Fuzzer {
                 runner,
             }),
         }
+    }
+
+    pub fn lir(&self) -> Arc<Lir> {
+        self.lir.clone()
     }
 
     pub fn status(&self) -> &Status {
