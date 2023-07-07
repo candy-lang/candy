@@ -2,8 +2,7 @@ use super::input::Input;
 use crate::{runner::RunResult, values::InputGeneration};
 use candy_vm::heap::{Heap, Text};
 use itertools::Itertools;
-use rand::{rngs::ThreadRng, seq::SliceRandom, Rng, SeedableRng};
-use rand_chacha::ChaCha20Rng;
+use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{cell::RefCell, rc::Rc};
 
