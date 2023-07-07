@@ -60,10 +60,7 @@ impl DebugSessionManager {
     async fn handle_message(&self, request: RequestNotification) {
         let sessions = self.sessions.read().await;
         let Some(session) = sessions.get(&request.session_id) else {
-            error!(
-                "No debug session found with ID {}.",
-                request.session_id,
-            );
+            error!("No debug session found with ID {}.", request.session_id,);
             return;
         };
         session.send(request.message).await.unwrap();

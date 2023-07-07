@@ -676,7 +676,9 @@ mod parse {
         }
 
         loop {
-            let Some((new_input, whitespace)) =whitespaces_and_newlines(input.clone(), 0) else { break };
+            let Some((new_input, whitespace)) = whitespaces_and_newlines(input.clone(), 0) else {
+                break;
+            };
 
             if let Some((line, remaining)) = new_input.split_first()
                     && let Some((new_title_line, new_formatting_state)) = title_line(line, formatting_state) {
@@ -749,11 +751,17 @@ mod parse {
         }
 
         loop {
-            let Some((mut new_input, newline)) = newline(input.clone()) else { break };
+            let Some((mut new_input, newline)) = newline(input.clone()) else {
+                break;
+            };
             let mut whitespace = vec![newline];
 
             if indentation > 0 {
-                let Some((new_new_input, indentation)) = leading_indentation(new_input, indentation) else { break };
+                let Some((new_new_input, indentation)) =
+                    leading_indentation(new_input, indentation)
+                else {
+                    break;
+                };
                 new_input = new_new_input;
                 whitespace.push(indentation);
             };
@@ -865,7 +873,9 @@ mod parse {
         }
 
         loop {
-            let Some((new_input, whitespace)) = whitespaces_and_newlines(input.clone(), 0) else { break };
+            let Some((new_input, whitespace)) = whitespaces_and_newlines(input.clone(), 0) else {
+                break;
+            };
 
             if let Some((new_input, url)) = url_line(new_input) {
                 input = new_input;
@@ -1080,7 +1090,9 @@ mod parse {
         mut indentation: usize,
         list_type: Option<ListType>,
     ) -> Option<(Vec<&str>, Rcst, ListType)> {
-        let Some((line, remaining)) = input.split_first() else { return None };
+        let Some((line, remaining)) = input.split_first() else {
+            return None;
+        };
         let allows_unordered = list_type
             .map(|it| it == ListType::Unordered)
             .unwrap_or(true);
@@ -1104,13 +1116,23 @@ mod parse {
     fn list(input: Vec<&str>, indentation: usize) -> Option<(Vec<&str>, Rcst)> {
         let mut list_items = vec![];
 
-        let Some((mut input, first_item, list_type)) = list_item(input, indentation, None)  else { return None };
+        let Some((mut input, first_item, list_type)) = list_item(input, indentation, None) else {
+            return None;
+        };
         list_items.push(first_item);
 
         loop {
-            let Some((new_input, whitespace)) = whitespaces_and_newlines(input.clone(), indentation) else { break };
+            let Some((new_input, whitespace)) =
+                whitespaces_and_newlines(input.clone(), indentation)
+            else {
+                break;
+            };
 
-            let Some((new_input, new_list_item, new_list_type)) = list_item(new_input, indentation, Some(list_type)) else { break };
+            let Some((new_input, new_list_item, new_list_type)) =
+                list_item(new_input, indentation, Some(list_type))
+            else {
+                break;
+            };
             assert_eq!(list_type, new_list_type);
             input = new_input;
             let previous_item = list_items.pop().unwrap();

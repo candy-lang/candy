@@ -38,7 +38,12 @@ use rustc_hash::FxHashMap;
 use std::mem;
 
 pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
-    let Expression::UseModule { current_module, relative_path, responsible } = &**expression else {
+    let Expression::UseModule {
+        current_module,
+        relative_path,
+        responsible,
+    } = &**expression
+    else {
         return;
     };
     let responsible = *responsible;
@@ -142,10 +147,16 @@ pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
 
 fn resolve_module(current_module: &Module, path: &str) -> Result<Module, MirError> {
     let Ok(path) = UsePath::parse(path) else {
-        return Err(MirError::UseWithInvalidPath { module: current_module.clone(), path: path.to_string() });
+        return Err(MirError::UseWithInvalidPath {
+            module: current_module.clone(),
+            path: path.to_string(),
+        });
     };
     let Ok(module) = path.resolve_relative_to(current_module.clone()) else {
-        return Err(MirError::UseHasTooManyParentNavigations { module: current_module.clone(), path: path.to_string() });
+        return Err(MirError::UseHasTooManyParentNavigations {
+            module: current_module.clone(),
+            path: path.to_string(),
+        });
     };
     Ok(module)
 }

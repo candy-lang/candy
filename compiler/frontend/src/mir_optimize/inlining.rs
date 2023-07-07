@@ -78,7 +78,8 @@ impl Context<'_> {
             function,
             arguments,
             responsible: responsible_argument,
-        } = &**expression else {
+        } = &**expression
+        else {
             // Expression is not a call.
             return;
         };
@@ -92,7 +93,8 @@ impl Context<'_> {
             parameters,
             responsible_parameter,
             body,
-        } = self.visible.get(*function) else {
+        } = self.visible.get(*function)
+        else {
             // Callee is not a function.
             return;
         };

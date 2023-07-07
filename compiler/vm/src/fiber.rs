@@ -315,10 +315,8 @@ impl<T: FiberTracer> Fiber<T> {
         while self.status.is_running() && execution_controller.should_continue_running() {
             let Some(current_instruction) = self.next_instruction else {
                 self.status = Status::Done;
-                self.tracer.call_ended(
-                    &mut self.heap,
-                    *self.data_stack.last().unwrap(),
-                );
+                self.tracer
+                    .call_ended(&mut self.heap, *self.data_stack.last().unwrap());
                 break;
             };
 

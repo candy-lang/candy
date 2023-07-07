@@ -3,7 +3,7 @@ use crate::{
     debug_adapter::DebugSessionManager,
     features::{LanguageFeatures, Reference, RenameError},
     features_candy::{
-        hints::{hint::Hint, HintsNotification},
+        analyzer::{insights::Hint, HintsNotification},
         CandyFeatures, ServerStatusNotification,
     },
     features_ir::{IrFeatures, UpdateIrNotification},
@@ -258,7 +258,11 @@ impl LanguageServer for Server {
         {
             let mut state = self.state.write().await;
             let owned_state = mem::replace(&mut *state, ServerState::Shutdown);
-            let ServerState::Initial { features, debug_session_manager } = owned_state else {
+            let ServerState::Initial {
+                features,
+                debug_session_manager,
+            } = owned_state
+            else {
                 panic!("Server is already initialized.");
             };
             *state = ServerState::Running(RunningServerState {
