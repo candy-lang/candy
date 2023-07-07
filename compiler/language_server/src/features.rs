@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use tokio::sync::Mutex;
 
 #[async_trait]
+#[allow(clippy::diverging_sub_expression)]
 pub trait LanguageFeatures: Send + Sync {
     fn language_id(&self) -> Option<String>;
     fn supported_url_schemes(&self) -> Vec<&'static str>;
