@@ -2,9 +2,15 @@
 
 A sweet programming language that is robust, minimalistic, and expressive.
 
-Candy aims to have excellent tooling – most language features are designed with tooling in mind.
-Many languages have a strict separation between compile-time and runtime.
-Candy blurs the line between those stages, for example, by replacing compile-time types with edit-time fuzzing.
+Many programming languages have a strict separation between compile-time and runtime errors.
+Sometimes, this border can seem arbitrary:
+Dividing by a string fails during compilation with a type error, while dividing by zero only fails during runtime.
+In the mathematical sense, there's no fundamental difference between these cases – division is only defined for divisors that are non-zero numbers.
+That's why we eliminate the border between compile-time and runtime errors – all errors are runtime errors.
+By crafting high-quality tooling with dynamic analyses such as fuzzing, we try to still be able to show most errors while you're editing the code.
+In fact, we try to show more errors than typical statically typed languages.
+
+![Candy in VS Code](screenshot.png)
 
 ## Quick introduction
 
@@ -60,14 +66,14 @@ Candy blurs the line between those stages, for example, by replacing compile-tim
 
 To get a more in-depth introduction, read the [language document](language.md).
 
-## Discussion
-
-[Join our Discord server.](https://discord.gg/5Vr4eAJ7gU)
-
 ## The current state
 
 We are currently implementing a first version of Candy in Rust.
 We already have a language server that provides some tooling.
+
+## Discussion
+
+[Join our Discord server.](https://discord.gg/5Vr4eAJ7gU)
 
 ## How to use Candy
 
