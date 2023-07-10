@@ -3,7 +3,7 @@ use crate::{
     debug_adapter::DebugSessionManager,
     features::{LanguageFeatures, Reference, RenameError},
     features_candy::{
-        analyzer::{insights::Hint, HintsNotification},
+        analyzer::{insights::Hint, CoverageNotification, HintsNotification},
         CandyFeatures, ServerStatusNotification,
     },
     features_ir::{IrFeatures, UpdateIrNotification},
@@ -17,8 +17,8 @@ use lsp_types::{
     DocumentFilter, DocumentFormattingParams, DocumentHighlight, DocumentHighlightKind,
     DocumentHighlightParams, FoldingRange, FoldingRangeParams, GotoDefinitionParams,
     GotoDefinitionResponse, InitializeParams, InitializeResult, InitializedParams, Location,
-    MessageType, Position, PrepareRenameResponse, ReferenceParams, Registration, RenameOptions,
-    RenameParams, SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions,
+    MessageType, Position, PrepareRenameResponse, Range, ReferenceParams, Registration,
+    RenameOptions, RenameParams, SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions,
     SemanticTokensParams, SemanticTokensRegistrationOptions, SemanticTokensResult,
     SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo, StaticRegistrationOptions,
     TextDocumentChangeRegistrationOptions, TextDocumentPositionParams,
@@ -151,6 +151,14 @@ impl AnalyzerClient {
             .send_notification::<HintsNotification>(HintsNotification {
                 uri: module_to_url(&module, &self.packages_path).unwrap(),
                 hints,
+            })
+            .await;
+    }
+    pub async fn update_coverage(&self, module: Module, coverage: Vec<Range>) {
+        self.client
+            .send_notification::<CoverageNotification>(CoverageNotification {
+                uri: module_to_url(&module, &self.packages_path).unwrap(),
+                ranges: coverage,
             })
             .await;
     }

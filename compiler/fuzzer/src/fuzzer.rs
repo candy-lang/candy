@@ -1,8 +1,9 @@
 use crate::{
-    coverage::Coverage,
+    hir_coverage::HirCoverage,
     input::Input,
     input_pool::{InputPool, Score},
-    runner::{RunResult, Runner},
+    lir_coverage::LirCoverage,
+    runner::{HirCoverageTracer, RunResult, Runner},
     utils::collect_symbols_in_heap,
     values::InputGeneration,
 };
@@ -12,7 +13,6 @@ use candy_vm::{
     fiber::Panic,
     heap::{Data, Function, Heap},
     lir::Lir,
-    tracer::stack_trace::{FiberStackTracer, StackTracer},
 };
 use std::rc::Rc;
 use tracing::debug;
@@ -24,20 +24,21 @@ pub struct Fuzzer {
     pub function_id: Id,
     pool: InputPool,
     status: Option<Status>, // only `None` during transitions
+    hir_coverage: HirCoverage,
 }
 
 // TODO: Decrease enum variant sizes and size differences
 #[allow(clippy::large_enum_variant)]
 pub enum Status {
     StillFuzzing {
-        total_coverage: Coverage,
+        lir_coverage: LirCoverage,
         runner: Runner<Rc<Lir>>,
     },
     // TODO: In the future, also add a state for trying to simplify the input.
     FoundPanic {
         input: Input,
         panic: Panic,
-        tracer: StackTracer,
+        tracer: HirCoverageTracer,
     },
 }
 
@@ -60,9 +61,10 @@ impl Fuzzer {
             function_id,
             pool,
             status: Some(Status::StillFuzzing {
-                total_coverage: Coverage::none(num_instructions),
+                lir_coverage: LirCoverage::none(num_instructions),
                 runner,
             }),
+            hir_coverage: HirCoverage::none(),
         }
     }
 
@@ -81,14 +83,18 @@ impl Fuzzer {
         &self.pool
     }
 
-    pub fn run(&mut self, execution_controller: &mut impl ExecutionController<FiberStackTracer>) {
+    pub fn hir_coverage(&self) -> &HirCoverage {
+        &self.hir_coverage
+    }
+
+    pub fn run(&mut self, execution_controller: &mut impl ExecutionController<HirCoverageTracer>) {
         let mut status = self.status.take().unwrap();
         while matches!(status, Status::StillFuzzing { .. })
             && execution_controller.should_continue_running()
         {
             status = match status {
                 Status::StillFuzzing {
-                    total_coverage,
+                    lir_coverage: total_coverage,
                     runner,
                 } => self.continue_fuzzing(execution_controller, total_coverage, runner),
                 // We already found some arguments that caused the function to panic,
@@ -109,14 +115,14 @@ impl Fuzzer {
 
     fn continue_fuzzing(
         &mut self,
-        execution_controller: &mut impl ExecutionController<FiberStackTracer>,
-        total_coverage: Coverage,
+        execution_controller: &mut impl ExecutionController<HirCoverageTracer>,
+        total_coverage: LirCoverage,
         mut runner: Runner<Rc<Lir>>,
     ) -> Status {
         runner.run(execution_controller);
         let Some(result) = runner.result else {
             return Status::StillFuzzing {
-                total_coverage,
+                lir_coverage: total_coverage,
                 runner,
             };
         };
@@ -131,6 +137,11 @@ impl Fuzzer {
             runner.input,
         );
         debug!("{}", result.to_string(&call_string));
+
+        for id in runner.hir_coverage.read().unwrap().all_ids() {
+            self.hir_coverage.add(id.clone());
+        }
+
         match result {
             RunResult::Timeout => self.create_new_fuzzing_case(total_coverage),
             RunResult::Done { .. } | RunResult::NeedsUnfulfilled { .. } => {
@@ -140,14 +151,14 @@ impl Fuzzer {
                 // We favor small inputs with good code coverage.
                 let score = {
                     let complexity = runner.input.complexity() as Score;
-                    let new_function_coverage = runner.coverage.in_range(&function_range);
+                    let new_function_coverage = runner.lir_coverage.in_range(&function_range);
                     let score: Score = (1.5 * runner.num_instructions as f64)
                         + (0.1 * new_function_coverage.improvement_on(&function_coverage) as f64)
                         - 0.4 * complexity;
                     score.clamp(0.1, Score::MAX)
                 };
                 self.pool.add(runner.input, result, score);
-                self.create_new_fuzzing_case(&total_coverage + &runner.coverage)
+                self.create_new_fuzzing_case(&total_coverage + &runner.lir_coverage)
             }
             RunResult::Panicked(panic) => Status::FoundPanic {
                 input: runner.input,
@@ -156,14 +167,14 @@ impl Fuzzer {
             },
         }
     }
-    fn create_new_fuzzing_case(&self, total_coverage: Coverage) -> Status {
+    fn create_new_fuzzing_case(&self, total_coverage: LirCoverage) -> Status {
         let runner = Runner::new(
             self.lir.clone(),
             self.function,
             self.pool.generate_new_input(),
         );
         Status::StillFuzzing {
-            total_coverage,
+            lir_coverage: total_coverage,
             runner,
         }
     }

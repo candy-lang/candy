@@ -4,28 +4,27 @@ use candy_vm::{
     channel::Packet,
     execution_controller::{CountingExecutionController, ExecutionController},
     fiber::{EndedReason, Fiber, FiberId, InstructionPointer, Panic, VmEnded},
-    heap::{Function, HirId, InlineObjectSliceCloneToHeap},
+    heap::{Function, Heap, HirId, InlineObject, InlineObjectSliceCloneToHeap},
     lir::Lir,
-    tracer::{
-        stack_trace::{FiberStackTracer, StackTracer},
-        FiberTracer,
-    },
+    tracer::{FiberTracer, Tracer},
     vm::{self, Vm},
 };
 
 use super::input::Input;
-use crate::coverage::Coverage;
+use crate::{hir_coverage::HirCoverage, lir_coverage::LirCoverage};
 use rustc_hash::FxHashMap;
-use std::borrow::Borrow;
+use std::{borrow::Borrow, rc::Rc, sync::RwLock};
+use tracing::info;
 
 const MAX_INSTRUCTIONS: usize = 1000000;
 
 pub struct Runner<L: Borrow<Lir>> {
-    pub vm: Option<Vm<L, StackTracer>>, // Is consumed when the runner is finished.
+    pub vm: Option<Vm<L, HirCoverageTracer>>, // Is consumed when the runner is finished.
     pub input: Input,
-    pub tracer: StackTracer,
+    pub tracer: HirCoverageTracer,
     pub num_instructions: usize,
-    pub coverage: Coverage,
+    pub lir_coverage: LirCoverage,
+    pub hir_coverage: Rc<RwLock<HirCoverage>>,
     pub result: Option<RunResult>,
 }
 
@@ -74,7 +73,8 @@ impl<L: Borrow<Lir>> Runner<L> {
             .clone_to_heap_with_mapping(&mut heap, &mut mapping);
         let responsible = HirId::create(&mut heap, Id::fuzzer());
 
-        let mut tracer = StackTracer::default();
+        let hir_coverage = Rc::new(RwLock::new(HirCoverage::none()));
+        let mut tracer = HirCoverageTracer::new(hir_coverage.clone());
         let vm = Vm::for_function(
             lir,
             heap,
@@ -90,17 +90,18 @@ impl<L: Borrow<Lir>> Runner<L> {
             input,
             tracer,
             num_instructions: 0,
-            coverage: Coverage::none(num_instructions),
+            lir_coverage: LirCoverage::none(num_instructions),
+            hir_coverage,
             result: None,
         }
     }
 
-    pub fn run(&mut self, execution_controller: &mut impl ExecutionController<FiberStackTracer>) {
+    pub fn run(&mut self, execution_controller: &mut impl ExecutionController<HirCoverageTracer>) {
         assert!(self.vm.is_some());
         assert!(self.result.is_none());
 
-        let mut coverage_tracker = CoverageTrackingExecutionController {
-            coverage: &mut self.coverage,
+        let mut coverage_tracker = LirCoverageTrackingExecutionController {
+            coverage: &mut self.lir_coverage,
         };
         let mut instruction_counter = CountingExecutionController::default();
         let mut execution_controller = (
@@ -153,10 +154,10 @@ impl<L: Borrow<Lir>> Runner<L> {
     }
 }
 
-pub struct CoverageTrackingExecutionController<'a> {
-    coverage: &'a mut Coverage,
+pub struct LirCoverageTrackingExecutionController<'a> {
+    coverage: &'a mut LirCoverage,
 }
-impl<'a, T: FiberTracer> ExecutionController<T> for CoverageTrackingExecutionController<'a> {
+impl<'a, T: FiberTracer> ExecutionController<T> for LirCoverageTrackingExecutionController<'a> {
     fn should_continue_running(&self) -> bool {
         true
     }
@@ -168,5 +169,31 @@ impl<'a, T: FiberTracer> ExecutionController<T> for CoverageTrackingExecutionCon
         ip: InstructionPointer,
     ) {
         self.coverage.add(ip);
+    }
+}
+
+pub struct HirCoverageTracer(Rc<RwLock<HirCoverage>>);
+impl HirCoverageTracer {
+    fn new(coverage: Rc<RwLock<HirCoverage>>) -> Self {
+        Self(coverage)
+    }
+}
+impl Tracer for HirCoverageTracer {
+    type ForFiber = HirCoverageTracer;
+
+    fn root_fiber_created(&mut self) -> Self::ForFiber {
+        HirCoverageTracer(self.0.clone())
+    }
+}
+impl FiberTracer for HirCoverageTracer {
+    fn child_fiber_created(&mut self, _child: FiberId) -> Self {
+        HirCoverageTracer(self.0.clone())
+    }
+
+    fn dup_all_stored_objects(&self, _heap: &mut Heap) {}
+
+    fn value_evaluated(&mut self, _heap: &mut Heap, expression: HirId, _value: InlineObject) {
+        info!("Value evaluated: {expression}");
+        self.0.write().unwrap().add(expression.get().clone())
     }
 }

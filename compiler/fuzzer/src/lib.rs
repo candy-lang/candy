@@ -1,9 +1,10 @@
 #![feature(let_chains, round_char_boundary)]
 
-mod coverage;
 mod fuzzer;
+mod hir_coverage;
 mod input;
 mod input_pool;
+mod lir_coverage;
 mod runner;
 mod utils;
 mod values;
@@ -25,7 +26,7 @@ use candy_frontend::{
 };
 use candy_vm::{
     execution_controller::RunLimitedNumberOfInstructions, fiber::Panic, mir_to_lir::compile_lir,
-    tracer::stack_trace::StackTracer, vm::Vm,
+    vm::Vm,
 };
 use std::rc::Rc;
 use tracing::{debug, error, info};
@@ -61,23 +62,21 @@ where
         fuzzer.run(&mut RunLimitedNumberOfInstructions::new(100000));
 
         match fuzzer.into_status() {
-            Status::StillFuzzing { total_coverage, .. } => {
+            Status::StillFuzzing {
+                lir_coverage: total_coverage,
+                ..
+            } => {
                 let coverage = total_coverage
                     .in_range(&lir.range_of_function(&id))
                     .relative_coverage();
                 debug!("Achieved a coverage of {:.1} %.", coverage * 100.0);
             }
-            Status::FoundPanic {
-                input,
-                panic,
-                tracer,
-            } => {
+            Status::FoundPanic { input, panic, .. } => {
                 error!("The fuzzer discovered an input that crashes {id}:");
                 let case = FailingFuzzCase {
                     function: id,
                     input,
                     panic,
-                    tracer,
                 };
                 case.dump(db);
                 failing_cases.push(case);
@@ -92,8 +91,6 @@ pub struct FailingFuzzCase {
     function: Id,
     input: Input,
     panic: Panic,
-    #[allow(dead_code)]
-    tracer: StackTracer,
 }
 
 impl FailingFuzzCase {
@@ -107,10 +104,5 @@ impl FailingFuzzCase {
             self.function, self.input, self.panic.reason,
         );
         error!("{} is responsible.", self.panic.responsible);
-        // Segfaults: https://github.com/candy-lang/candy/issues/458
-        // error!(
-        //     "This is the stack trace:\n{}",
-        //     self.tracer.format_panic_stack_trace_to_root_fiber(db),
-        // );
     }
 }

@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 pub enum Insight {
     Diagnostic(Diagnostic),
     Hint(Hint),
+    Coverage(Range),
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
@@ -82,10 +83,14 @@ impl Insight {
         let mut insights = vec![];
 
         let id = fuzzer.function_id.clone();
+        let module = id.module.clone();
         let end_of_line = db.id_to_end_of_line(id.clone()).unwrap();
 
         let coverage = match fuzzer.status() {
-            Status::StillFuzzing { total_coverage, .. } => {
+            Status::StillFuzzing {
+                lir_coverage: total_coverage,
+                ..
+            } => {
                 let function_range = fuzzer.lir().range_of_function(&id);
                 let function_coverage = total_coverage.in_range(&function_range);
                 function_coverage.relative_coverage()
@@ -99,6 +104,13 @@ impl Insight {
             position: end_of_line,
             text: format!("{:.0} % fuzzed", 100. * coverage),
         }));
+        for id in fuzzer.hir_coverage().all_ids() {
+            if let Some(span) = db.hir_id_to_span(id.clone()) {
+                insights.push(Insight::Coverage(
+                    db.range_to_lsp_range(module.clone(), span),
+                ));
+            }
+        }
 
         if let Status::FoundPanic { input, .. } = fuzzer.status() {
             insights.push(Insight::Hint(Hint {

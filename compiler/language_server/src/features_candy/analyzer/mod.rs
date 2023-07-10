@@ -16,8 +16,7 @@ use self::{
 use super::AnalyzerClient;
 use crate::database::Database;
 use candy_frontend::module::{Module, MutableModuleProviderOwner, PackagesPath};
-use itertools::{Either, Itertools};
-use lsp_types::{notification::Notification, Url};
+use lsp_types::{notification::Notification, Range, Url};
 use rand::{seq::IteratorRandom, thread_rng};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -51,6 +50,17 @@ impl Notification for HintsNotification {
     type Params = Self;
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct CoverageNotification {
+    pub uri: Url,
+    pub ranges: Vec<Range>,
+}
+impl Notification for CoverageNotification {
+    const METHOD: &'static str = "candy/textDocument/publishCoverage";
+
+    type Params = Self;
+}
+
 #[tokio::main(worker_threads = 1)]
 #[allow(unused_must_use)]
 pub async fn run_server(
@@ -66,6 +76,8 @@ pub async fn run_server(
     });
     let mut outgoing_hints =
         OutgoingCache::new(move |module, hints| client_ref.update_hints(module, hints));
+    let mut outgoing_coverage =
+        OutgoingCache::new(move |module, coverage| client_ref.update_coverage(module, coverage));
 
     'server_loop: loop {
         sleep(Duration::from_millis(100)).await;
@@ -104,15 +116,21 @@ pub async fn run_server(
         analyzer.run(&db, &client).await;
 
         let insights = analyzer.insights(&db);
-        let (diagnostics, mut hints): (Vec<_>, Vec<_>) =
-            insights.into_iter().partition_map(|it| match it {
-                Insight::Diagnostic(diagnostic) => Either::Left(diagnostic),
-                Insight::Hint(hint) => Either::Right(hint),
-            });
+        let mut diagnostics = vec![];
+        let mut hints = vec![];
+        let mut coverage = vec![];
+        for insight in insights {
+            match insight {
+                Insight::Diagnostic(diagnostic) => diagnostics.push(diagnostic),
+                Insight::Hint(hint) => hints.push(hint),
+                Insight::Coverage(covered) => coverage.push(covered),
+            }
+        }
         hints.sort_by_key(|hint| hint.position);
 
         outgoing_diagnostics.send(module.clone(), diagnostics).await;
-        outgoing_hints.send(module, hints).await;
+        outgoing_hints.send(module.clone(), hints).await;
+        outgoing_coverage.send(module, coverage).await;
     }
 }
 

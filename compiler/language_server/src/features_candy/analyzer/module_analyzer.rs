@@ -141,7 +141,7 @@ impl ModuleAnalyzer {
                 let tracing = TracingConfig {
                     register_fuzzables: TracingMode::OnlyCurrent,
                     calls: TracingMode::Off,
-                    evaluated_expressions: TracingMode::Off,
+                    evaluated_expressions: TracingMode::OnlyCurrent,
                 };
                 let (lir, _) = compile_lir(db, self.module.clone(), tracing);
                 let lir = Rc::new(lir);

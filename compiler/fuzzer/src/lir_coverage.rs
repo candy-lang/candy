@@ -5,13 +5,13 @@ use std::{
     ops::{Add, Range},
 };
 
-pub struct Coverage(BitVec);
-pub struct RangeCoverage<'a> {
+pub struct LirCoverage(BitVec);
+pub struct RangeLirCoverage<'a> {
     offset: InstructionPointer,
     coverage: &'a BitSlice,
 }
 
-impl Coverage {
+impl LirCoverage {
     pub fn none(size: usize) -> Self {
         Self(BitVec::repeat(false, size))
     }
@@ -20,21 +20,21 @@ impl Coverage {
         self.0.set(*ip, true);
     }
 
-    pub fn in_range(&self, range: &Range<InstructionPointer>) -> RangeCoverage {
-        RangeCoverage {
+    pub fn in_range(&self, range: &Range<InstructionPointer>) -> RangeLirCoverage {
+        RangeLirCoverage {
             offset: range.start,
             coverage: &self.0[*range.start..*range.end],
         }
     }
-    pub fn all(&self) -> RangeCoverage {
-        RangeCoverage {
+    pub fn all(&self) -> RangeLirCoverage {
+        RangeLirCoverage {
             offset: 0.into(),
             coverage: &self.0[..],
         }
     }
 }
-impl Add for &Coverage {
-    type Output = Coverage;
+impl Add for &LirCoverage {
+    type Output = LirCoverage;
 
     fn add(self, rhs: Self) -> Self::Output {
         let covered = self
@@ -44,16 +44,16 @@ impl Add for &Coverage {
             .zip(rhs.0.iter().map(|bit| *bit))
             .map(|(a, b)| a | b)
             .collect();
-        Coverage(covered)
+        LirCoverage(covered)
     }
 }
 
-impl<'a> RangeCoverage<'a> {
+impl<'a> RangeLirCoverage<'a> {
     pub fn is_covered(&self, ip: InstructionPointer) -> bool {
         *self.coverage.get(*ip - *self.offset).unwrap()
     }
 
-    pub fn improvement_on(&self, other: &RangeCoverage) -> usize {
+    pub fn improvement_on(&self, other: &RangeLirCoverage) -> usize {
         assert_eq!(self.offset, other.offset);
         self.coverage
             .iter()
@@ -70,7 +70,7 @@ impl<'a> RangeCoverage<'a> {
     }
 }
 
-impl<'a> fmt::Debug for RangeCoverage<'a> {
+impl<'a> fmt::Debug for RangeLirCoverage<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "[")?;
         for bit in self.coverage {

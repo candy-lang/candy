@@ -3,6 +3,7 @@ import {
   DocumentUri,
   NotificationType,
   Position,
+  Range,
   RequestType,
 } from 'vscode-languageclient';
 
@@ -61,6 +62,15 @@ export type HintKind =
   | 'sampleInputReturningNormally'
   | 'sampleInputPanickingWithCallerResponsible'
   | 'sampleInputPanickingWithInternalCodeResponsible';
+
+// Coverage
+export const publishCoverageType = new NotificationType<CoverageParams>(
+  'candy/textDocument/publishCoverage'
+);
+export interface CoverageParams {
+  readonly uri: string;
+  readonly ranges: Range[];
+}
 
 // Status
 export const publishServerStatusType = new NotificationType<ServerStatus>(

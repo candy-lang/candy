@@ -112,6 +112,15 @@
           "light": "#c02222",
           "highContrast": "#ffffff"
         }
+      },
+      {
+        "id": "candy.coverage",
+        "description": "Background used for covered code.",
+        "defaults": {
+          "dark": "#a8d86a44",
+          "light": "#a8d86a66",
+          "highContrast": "#a8d86a"
+        }
       }
     ],
     "commands": [

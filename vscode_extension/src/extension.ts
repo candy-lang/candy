@@ -6,6 +6,7 @@ import {
   LanguageClientOptions,
   StreamInfo,
 } from 'vscode-languageclient/node';
+import { CoverageService } from './coverage';
 import { registerDebugAdapter } from './debug_adapter';
 import { registerDebugIrCommands } from './debug_irs';
 import { HintsDecorations } from './hints';
@@ -47,6 +48,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(new ServerStatusService(client));
   context.subscriptions.push(new HintsDecorations(client));
+  context.subscriptions.push(new CoverageService(client));
   registerDebugIrCommands(client);
   registerDebugAdapter(context, client);
 }
