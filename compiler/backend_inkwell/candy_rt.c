@@ -164,3 +164,11 @@ void candy_panic(candy_value_t *reason)
     printf("\n");
     abort();
 }
+
+void free_candy_value(candy_value_t *value)
+{
+    if (value != candy_environment)
+    {
+        free(value);
+    }
+}

@@ -73,6 +73,9 @@ impl<'ctx> CodeGen<'ctx> {
             false,
         );
         self.module.add_function("candy_panic", panic_fn_type, None);
+        let free_fn = self
+            .module
+            .add_function("free_candy_value", panic_fn_type, None);
 
         let main_type = i32_type.fn_type(&[], false);
         let main_fn = self.module.add_function("main", main_type, None);
@@ -88,6 +91,12 @@ impl<'ctx> CodeGen<'ctx> {
             &[environment.as_basic_value_enum().into()],
             "",
         );
+        for value in self.module.get_globals() {
+            let val = self
+                .builder
+                .build_load(candy_type_ptr, value.as_pointer_value(), "");
+            self.builder.build_call(free_fn, &[val.into()], "");
+        }
         let ret_value = i32_type.const_int(0, false);
         self.builder.build_return(Some(&ret_value));
         if print_llvm_ir {
