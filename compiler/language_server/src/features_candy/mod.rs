@@ -26,9 +26,9 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, thread};
 use tokio::sync::{mpsc::Sender, Mutex};
 
+pub mod analyzer;
 pub mod find_definition;
 pub mod folding_ranges;
-pub mod hints;
 pub mod references;
 pub mod semantic_tokens;
 
@@ -44,20 +44,20 @@ impl Notification for ServerStatusNotification {
 
 #[derive(Debug)]
 pub struct CandyFeatures {
-    hints_events_sender: Sender<hints::Event>,
+    hints_events_sender: Sender<analyzer::Message>,
 }
 impl CandyFeatures {
     pub fn new(packages_path: PackagesPath, client: AnalyzerClient) -> Self {
         let (hints_events_sender, hints_events_receiver) = tokio::sync::mpsc::channel(1024);
         thread::spawn(move || {
-            hints::run_server(packages_path, hints_events_receiver, client);
+            analyzer::run_server(packages_path, hints_events_receiver, client);
         });
         Self {
             hints_events_sender,
         }
     }
 
-    async fn send_to_hints_server(&self, event: hints::Event) {
+    async fn send_to_analyzer(&self, event: analyzer::Message) {
         match self.hints_events_sender.send(event).await {
             Ok(_) => {}
             Err(error) => panic!("Couldn't send message to hints server: {error:?}."),
@@ -76,7 +76,7 @@ impl LanguageFeatures for CandyFeatures {
 
     async fn initialize(&self) {}
     async fn shutdown(&self) {
-        self.send_to_hints_server(hints::Event::Shutdown).await;
+        self.send_to_analyzer(analyzer::Message::Shutdown).await;
     }
 
     fn supports_did_open(&self) -> bool {
@@ -89,7 +89,7 @@ impl LanguageFeatures for CandyFeatures {
             db.did_open_module(&module, content.clone());
             module
         };
-        self.send_to_hints_server(hints::Event::UpdateModule(module, content))
+        self.send_to_analyzer(analyzer::Message::UpdateModule(module, content))
             .await;
     }
     fn supports_did_change(&self) -> bool {
@@ -108,7 +108,7 @@ impl LanguageFeatures for CandyFeatures {
             db.did_change_module(&module, content.clone());
             (module, content)
         };
-        self.send_to_hints_server(hints::Event::UpdateModule(module, content))
+        self.send_to_analyzer(analyzer::Message::UpdateModule(module, content))
             .await;
     }
     fn supports_did_close(&self) -> bool {
@@ -121,7 +121,7 @@ impl LanguageFeatures for CandyFeatures {
             db.did_close_module(&module);
             module
         };
-        self.send_to_hints_server(hints::Event::CloseModule(module))
+        self.send_to_analyzer(analyzer::Message::CloseModule(module))
             .await;
     }
 
@@ -140,7 +140,9 @@ impl LanguageFeatures for CandyFeatures {
     async fn format(&self, db: &Mutex<Database>, uri: Url) -> Vec<TextEdit> {
         let db = db.lock().await;
         let module = decode_module(&uri, &db.packages_path);
-        let Ok(cst) = db.cst(module.clone()) else { return vec![]; };
+        let Ok(cst) = db.cst(module.clone()) else {
+            return vec![];
+        };
 
         cst.format_to_edits()
             .finish()

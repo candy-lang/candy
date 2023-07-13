@@ -39,7 +39,9 @@ use super::current_expression::{Context, CurrentExpression};
 use crate::mir::Expression;
 
 pub fn lift_constants(context: &mut Context, expression: &mut CurrentExpression) {
-    let Expression::Function { body, .. } = &mut **expression else { return; };
+    let Expression::Function { body, .. } = &mut **expression else {
+        return;
+    };
 
     let mut constants = vec![];
 

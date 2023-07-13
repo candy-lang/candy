@@ -1,8 +1,9 @@
 use candy_frontend::hir::Id;
 use candy_vm::{
     self,
+    channel::Packet,
     execution_controller::{CountingExecutionController, ExecutionController},
-    fiber::{Fiber, FiberId, InstructionPointer, Panic},
+    fiber::{EndedReason, Fiber, FiberId, InstructionPointer, Panic, VmEnded},
     heap::{Function, HirId, InlineObjectSliceCloneToHeap},
     lir::Lir,
     tracer::{
@@ -33,7 +34,7 @@ pub enum RunResult {
     Timeout,
 
     /// The execution finished successfully with a value.
-    Done,
+    Done(Packet),
 
     /// The execution panicked and the caller of the function (aka the fuzzer)
     /// is at fault.
@@ -47,7 +48,7 @@ impl RunResult {
     pub fn to_string(&self, call: &str) -> String {
         match self {
             RunResult::Timeout => format!("{call} timed out."),
-            RunResult::Done => format!("{call} returned."),
+            RunResult::Done(return_value) => format!("{call} returned {}.", return_value.object),
             RunResult::NeedsUnfulfilled { reason } => {
                 format!("{call} panicked and it's our fault: {reason}")
             }
@@ -129,7 +130,17 @@ impl<L: Borrow<Lir>> Runner<L> {
             // it's of course valid to have a function that never returns. Thus,
             // this should be treated just like a regular timeout.
             vm::Status::WaitingForOperations => Some(RunResult::Timeout),
-            vm::Status::Done => Some(RunResult::Done),
+            vm::Status::Done => {
+                let VmEnded { heap, reason, .. } =
+                    self.vm.take().unwrap().tear_down(&mut self.tracer);
+                let EndedReason::Finished(return_value) = reason else {
+                    unreachable!();
+                };
+                Some(RunResult::Done(Packet {
+                    heap,
+                    object: return_value,
+                }))
+            }
             vm::Status::Panicked(panic) => Some(if panic.responsible == Id::fuzzer() {
                 RunResult::NeedsUnfulfilled {
                     reason: panic.reason,
