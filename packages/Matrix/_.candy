@@ -1,0 +1,32 @@
+[print] = use "Builtins"
+[bool, equals, if, ifElse, int, iterable, recursive, list, result, text, struct] = use "Core"
+
+matrix = ((2, 3, 4), (5, 6, 7))
+
+is2dMatrix a = bool.lazyAnd (list.is a) {
+  bool.lazyAnd (list.length a | int.isPositive) {
+    bool.lazyAnd (a | iterable.fromList | iterable.all { row -> list.is row }) {
+      w = a | list.get 0 | list.length
+      a | iterable.fromList | iterable.all { row -> list.length row | equals w }
+    }
+  }
+}
+
+height a =
+  needs (is2dMatrix a)
+  list.length a
+width a =
+  needs (is2dMatrix a)
+  a | list.get 0 | list.length
+
+multiply a b =
+  needs (is2dMatrix a)
+  needs (is2dMatrix b)
+  needs (width a | equals (height b))
+  w = width b
+  h = height a
+  recursive list.filled h (list.filled w 0)
+
+main environment :=
+  is2dMatrix matrix
+  is2dMatrix ((1, 2), (2, 3, 4))
