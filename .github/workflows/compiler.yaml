@@ -21,15 +21,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2.5.1
 
       # Compiler
-      - name: "Compiler: clippy"
+      - name: 'Compiler: clippy'
         run: cargo clippy -- --deny warnings
-      - name: "Compiler: test"
+      - name: 'Compiler: test'
         run: cargo test --workspace
-      - name: "Compiler: fmt"
+      - name: 'Compiler: fmt'
         run: cargo fmt --check
 
       # Core
-      - name: "Core: run"
+      - name: 'Core: run'
         run: cargo run --release -- check packages/Core/_.candy
 
   # fuzzing:
@@ -105,5 +105,5 @@ jobs:
 
       - uses: github/codeql-action/upload-sarif@v2
         with:
-          sarif_file: eslint-results.sarif
+          sarif_file: vscode_extension/eslint-results.sarif
           wait-for-processing: true
