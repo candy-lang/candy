@@ -17,6 +17,9 @@ pub(crate) struct Options {
     /// If enabled, the compiler will print the generated LLVM IR to stderr.
     #[arg(long = "print-llvm-ir", default_value_t = false)]
     print_llvm_ir: bool,
+    /// If enabled, the program will print the output of the candy main function.
+    #[arg(long = "print-main-output", default_value_t = false)]
+    print_main_output: bool,
     /// The file or package to run. If none is provided, the package of your
     /// current working directory will be run.
     #[arg(value_hint = ValueHint::FilePath)]
@@ -62,7 +65,7 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
     let mut bc_path = PathBuf::new();
     bc_path.push(&format!("{path}.bc"));
     codegen
-        .compile(&bc_path, options.print_llvm_ir)
+        .compile(&bc_path, options.print_llvm_ir, options.print_main_output)
         .map_err(|e| Exit::LLVMError(e.to_string()))?;
     std::process::Command::new("llc")
         .arg(&bc_path)

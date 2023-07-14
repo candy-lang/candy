@@ -56,6 +56,18 @@ candy_value_t *to_candy_bool(int value)
     }
 }
 
+int candy_tag_to_bool(candy_value_t *value)
+{
+    if (strcmp(value->value.text, "True") == 0)
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
 void print_candy_value(candy_value_t *value)
 {
     switch (value->type)
@@ -86,7 +98,8 @@ candy_value_t *make_candy_int(int128_t value)
 candy_value_t *make_candy_text(char *text)
 {
     candy_value_t *candy_value = malloc(sizeof(candy_value_t));
-    candy_value->value.text = text;
+    candy_value->value.text = malloc(sizeof(char) * strlen(text));
+    strcpy(candy_value->value.text, text);
     candy_value->type = CANDY_TYPE_TEXT;
     return candy_value;
 }
@@ -94,7 +107,8 @@ candy_value_t *make_candy_text(char *text)
 candy_value_t *make_candy_tag(char *tag)
 {
     candy_value_t *candy_value = malloc(sizeof(candy_value_t));
-    candy_value->value.text = tag;
+    candy_value->value.text = malloc(sizeof(char) * strlen(tag));
+    strcpy(candy_value->value.text, tag);
     candy_value->type = CANDY_TYPE_TAG;
     return candy_value;
 }
@@ -126,9 +140,9 @@ candy_value_t *candy_builtin_equals(candy_value_t *left, candy_value_t *right)
     }
 }
 
-candy_value_t *candy_builtin_ifelse(candy_type_t *condition, candy_value_t *then, candy_value_t *otherwise)
+candy_value_t *candy_builtin_ifelse(candy_value_t *condition, candy_value_t *then, candy_value_t *otherwise)
 {
-    if (condition)
+    if (candy_tag_to_bool(condition))
     {
         return then->value.function();
     }
@@ -136,6 +150,32 @@ candy_value_t *candy_builtin_ifelse(candy_type_t *condition, candy_value_t *then
     {
         return otherwise->value.function();
     }
+}
+
+candy_value_t *candy_builtin_int_add(candy_value_t *left, candy_value_t *right)
+{
+    return make_candy_int(left->value.integer + right->value.integer);
+}
+
+candy_value_t *candy_builtin_int_bit_length(candy_value_t *value)
+{
+    // This is the max size in the VM. Unsure if it applies here.
+    return make_candy_int(62);
+}
+
+candy_value_t *candy_builtin_int_bitwise_and(candy_value_t *left, candy_value_t *right)
+{
+    return make_candy_int(left->value.integer & right->value.integer);
+}
+
+candy_value_t *candy_builtin_int_bitwise_or(candy_value_t *left, candy_value_t *right)
+{
+    return make_candy_int(left->value.integer | right->value.integer);
+}
+
+candy_value_t *candy_builtin_int_bitwise_xor(candy_value_t *left, candy_value_t *right)
+{
+    return make_candy_int(left->value.integer ^ right->value.integer);
 }
 
 candy_value_t *candy_builtin_typeof(candy_value_t *value)
@@ -169,6 +209,10 @@ void free_candy_value(candy_value_t *value)
 {
     if (value != candy_environment)
     {
+        if (value->type == CANDY_TYPE_TAG || value->type == CANDY_TYPE_TEXT)
+        {
+            free(value->value.text);
+        }
         free(value);
     }
 }
