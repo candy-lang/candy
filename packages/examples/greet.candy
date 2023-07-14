@@ -1,0 +1,16 @@
+# Asks for your name and then greets you.
+
+[async, await, channel, function, text, run] = use "Core"
+
+main := { environment ->
+  print message = environment.stdout | channel.send message
+  read = {
+    response = channel.create 1
+    environment.stdin | channel.send response.sendPort
+    await response.receivePort
+  }
+
+  print "What's your name?"
+  name = run read
+  print "Hello, {name}!"
+}
