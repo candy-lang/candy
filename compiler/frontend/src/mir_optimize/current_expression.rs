@@ -23,6 +23,7 @@ impl<'a> Context<'a> {
         tracing: &'a TracingConfig,
         errors: FxHashSet<CompilerError>,
         id_generator: &'a mut IdGenerator<Id>,
+        body: &Body,
     ) -> Self {
         Self {
             db,
@@ -31,7 +32,7 @@ impl<'a> Context<'a> {
             visible: VisibleExpressions::none_visible(),
             id_generator,
             pureness: PurenessInsights::default(),
-            data_flow: DataFlowInsights::default(),
+            data_flow: DataFlowInsights::new(body),
         }
     }
 }

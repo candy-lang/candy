@@ -1,178 +1,105 @@
-use self::{flow_value::FlowValue, timeline::Timeline};
-use super::current_expression::CurrentExpression;
+use self::{scope::DataFlowScope, timeline::Timeline};
+use super::utils::ReferenceCounts;
 use crate::{
-    impl_display_via_richir,
-    mir::{Expression, Id},
-    rich_ir::{RichIrBuilder, ToRichIr},
+    mir::{Body, Expression, Id},
+    mir_optimize::data_flow::scope::MainTimeline,
+    rich_ir::{RichIr, ToRichIr},
 };
-use enumset::EnumSet;
 use rustc_hash::FxHashMap;
-use std::fmt::Debug;
+use std::{collections::hash_map::Entry, fmt::Debug};
+use tracing::info;
 
 mod flow_value;
+mod scope;
 mod timeline;
 
+// TODO: Split off a struct for actual results after the whole module was visited.
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct DataFlowInsights {
-    panics: Vec<PanickingTimeline>,
-    timeline: MainTimeline,
-}
-impl_display_via_richir!(DataFlowInsights);
-impl ToRichIr for DataFlowInsights {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        if !self.panics.is_empty() {
-            builder.push("Panicking cases:", None, EnumSet::empty());
-            builder.push_children_multiline(&self.panics);
-            builder.push_newline();
-
-            builder.push("Otherwise:", None, EnumSet::empty());
-            builder.indent();
-            builder.push_newline();
-        }
-
-        self.timeline.build_rich_ir(builder);
-
-        if !self.panics.is_empty() {
-            builder.dedent();
-        }
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PanickingTimeline {
-    timeline: Timeline,
-    reason: Id,
-    responsible: Id,
-}
-impl PanickingTimeline {
-    pub fn map_ids(&mut self, mapping: &FxHashMap<Id, Id>) {
-        self.timeline.map_ids(mapping);
-        self.reason = mapping[&self.reason];
-        self.responsible = mapping[&self.responsible];
-    }
-}
-impl_display_via_richir!(PanickingTimeline);
-impl ToRichIr for PanickingTimeline {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        Expression::Panic {
-            reason: self.reason,
-            responsible: self.responsible,
-        }
-        .build_rich_ir(builder);
-        builder.indent();
-        builder.push_newline();
-        self.timeline.build_rich_ir(builder);
-        builder.dedent();
-    }
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub enum MainTimeline {
-    NoPanic(Timeline),
-    Panic(PanickingTimeline),
-}
-impl MainTimeline {
-    pub fn map_ids(&mut self, mapping: &FxHashMap<Id, Id>) {
-        match self {
-            MainTimeline::NoPanic(timeline) => timeline.map_ids(mapping),
-            MainTimeline::Panic(timeline) => timeline.map_ids(mapping),
-        }
-    }
-}
-impl Default for MainTimeline {
-    fn default() -> Self {
-        MainTimeline::NoPanic(Timeline::default())
-    }
-}
-impl_display_via_richir!(MainTimeline);
-impl ToRichIr for MainTimeline {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        match self {
-            MainTimeline::NoPanic(timeline) => timeline.build_rich_ir(builder),
-            MainTimeline::Panic(timeline) => timeline.build_rich_ir(builder),
-        }
-    }
+    reference_counts: FxHashMap<Id, usize>,
+    scopes: Vec<DataFlowScope>,
 }
 
 impl DataFlowInsights {
-    pub fn visit_optimized(&mut self, id: Id, expression: &CurrentExpression) {
-        // We already know that the code panics and all code after that can be
-        // ignored/removed since it never runs.
-        let timeline = self.require_no_panic_mut();
-
-        let value = match &**expression {
-            Expression::Int(int) => FlowValue::Int(int.to_owned()),
-            Expression::Text(text) => FlowValue::Text(text.to_owned()),
-            Expression::Tag { symbol, value } => FlowValue::Tag {
-                symbol: symbol.to_owned(),
-                value: value.map(|it| Box::new(FlowValue::Reference(it))),
-            },
-            Expression::Builtin(builtin) => FlowValue::Builtin(*builtin),
-            Expression::List(list) => {
-                FlowValue::List(list.iter().copied().map(FlowValue::Reference).collect())
-            }
-            Expression::Struct(struct_) => FlowValue::Struct(
-                struct_
-                    .iter()
-                    .map(|(key, value)| (FlowValue::Reference(*key), FlowValue::Reference(*value)))
-                    .collect(),
-            ),
-            Expression::Reference(id) => FlowValue::Reference(*id),
-            Expression::HirId(_) => {
-                // HIR IDs are not normal parameters (except for `needs`) and can't
-                // be accessed by the user.
-                return;
-            }
-            Expression::Function { .. } => {
-                // FIXME
-                FlowValue::AnyFunction
-            }
-            Expression::Parameter => FlowValue::Any,
-            Expression::Call { .. } => {
-                FlowValue::Any
-                // TODO
-            }
-            Expression::UseModule { .. } => {
-                panic!("`Expression::UseModule` should have been inlined.")
-            }
-            Expression::Panic {
-                reason,
-                responsible,
-            } => {
-                self.timeline = MainTimeline::Panic(PanickingTimeline {
-                    // TODO: Filter timeline to only include `reason`, `responsible`, and their dependencies.
-                    timeline: timeline.to_owned(),
-                    reason: *reason,
-                    responsible: *responsible,
-                });
-                return;
-            }
-            // These expressions are lowered to instructions that don't actually
-            // put anything on the stack. In the MIR, the result of these is
-            // guaranteed to never be used afterwards.
-            Expression::TraceCallStarts { .. }
-            | Expression::TraceCallEnds { .. }
-            | Expression::TraceExpressionEvaluated { .. }
-            | Expression::TraceFoundFuzzableFunction { .. } => {
-                // Tracing instructions are not referenced by anything else, so
-                // we don't have to keep track of their return value (which,
-                // conceptually, is `Nothing`).
-                return;
-            }
-        };
-        *timeline &= Timeline::Value { id, value };
+    pub(super) fn new(body: &Body) -> Self {
+        let mut reference_counts = body.reference_counts();
+        assert!(reference_counts.insert(body.return_value(), 1).is_none());
+        Self {
+            reference_counts,
+            scopes: vec![DataFlowScope::default()],
+        }
     }
 
-    pub(super) fn enter_function(&mut self, parameters: &[Id], responsible_parameter: Id) {
-        // TODO
+    pub(super) fn enter_function(&mut self, parameters: &[Id], return_value: Id) {
+        info!("Entering function {:?} -> {:?}", parameters, return_value);
+        let timeline: Timeline = self
+            .innermost_scope()
+            .timeline
+            .require_no_panic()
+            .to_owned();
+        self.scopes.push(DataFlowScope::new(timeline, parameters));
+
+        for parameter in parameters {
+            *self.reference_counts.entry(*parameter).or_default() += 1;
+        }
+        assert!(self.reference_counts.insert(return_value, 1).is_none());
+    }
+
+    pub(super) fn is_unconditional_panic(&self) -> bool {
+        self.innermost_scope().timeline.is_panic()
+    }
+
+    pub(super) fn visit_optimized(&mut self, id: Id, expression: &Expression) {
+        let scope = self.scopes.last_mut().unwrap();
+        scope.visit_optimized(id, expression, &mut self.reference_counts);
+        self.on_expression_deleted(expression);
+    }
+    pub(super) fn on_expression_deleted(&mut self, expression: &Expression) {
+        let scope = self.scopes.last_mut().unwrap();
+        for (id, reference_count) in expression.reference_counts() {
+            let Entry::Occupied(mut entry) = self.reference_counts.entry(id) else {
+                // The referenced ID was defined inside the body of the current
+                // expression.
+                continue;
+            };
+            if *entry.get() == reference_count {
+                entry.remove();
+                scope.timeline.timeline_mut().remove(id);
+            } else {
+                *entry.get_mut() -= reference_count;
+            }
+        }
+    }
+
+    pub(super) fn exit_function(&mut self, parameters: &[Id], return_value: Id) {
+        info!("Exiting function {:?} -> {:?}", parameters, return_value);
+        let mut scope = self.scopes.pop().unwrap();
+        scope.reduce(parameters, return_value);
+
+        for parameter in parameters {
+            // Might have been removed already if the reference count dropped to
+            // 0.
+            self.reference_counts.remove(parameter);
+        }
+        self.reference_counts.remove(&return_value).unwrap();
     }
     pub(super) fn on_normalize_ids(&mut self, mapping: &FxHashMap<Id, Id>) {
-        for timeline in self.panics.iter_mut() {
+        let root_scope = self.require_only_root_mut();
+        for timeline in root_scope.panics.iter_mut() {
             timeline.map_ids(mapping);
         }
-        self.timeline.map_ids(mapping);
+        root_scope.timeline.map_ids(mapping);
+    }
+    pub(super) fn on_constants_lifted(&mut self, lifted_constants: impl IntoIterator<Item = Id>) {
+        let [.., outer_scope, inner_scope] = self.scopes.as_mut_slice() else { panic!(); };
+        for constant in lifted_constants {
+            assert!(inner_scope.locals.remove(&constant));
+            assert!(outer_scope.locals.insert(constant));
+        }
     }
     pub(super) fn include(&mut self, other: &DataFlowInsights, mapping: &FxHashMap<Id, Id>) {
+        let this = self.require_only_root_mut();
+        let other = other.require_only_root();
         assert!(
             other.panics.is_empty(),
             "Modules can't panic conditionally.",
@@ -182,21 +109,34 @@ impl DataFlowInsights {
             MainTimeline::NoPanic(timeline) => {
                 let mut timeline = timeline.to_owned();
                 timeline.map_ids(mapping);
-                *self.require_no_panic_mut() &= timeline;
+                *this.require_no_panic_mut() &= timeline;
             }
             MainTimeline::Panic(timeline) => {
-                assert!(matches!(self.timeline, MainTimeline::NoPanic(_)));
+                assert!(matches!(this.timeline, MainTimeline::NoPanic(_)));
                 let mut timeline = timeline.to_owned();
                 timeline.map_ids(mapping);
-                self.timeline = MainTimeline::Panic(timeline);
+                this.timeline = MainTimeline::Panic(timeline);
             }
         }
     }
 
-    fn require_no_panic_mut(&mut self) -> &mut Timeline {
-        match &mut self.timeline {
-            MainTimeline::NoPanic(timeline) => timeline,
-            MainTimeline::Panic(_) => panic!("Tried to continue data flow analysis after panic"),
+    pub fn innermost_scope_to_rich_ir(&self) -> RichIr {
+        self.innermost_scope().to_rich_ir()
+    }
+    fn innermost_scope(&self) -> &DataFlowScope {
+        self.scopes.last().unwrap()
+    }
+
+    fn require_only_root(&self) -> &DataFlowScope {
+        match self.scopes.as_slice() {
+            [root_scope] => root_scope,
+            _ => panic!(),
+        }
+    }
+    fn require_only_root_mut(&mut self) -> &mut DataFlowScope {
+        match self.scopes.as_mut_slice() {
+            [root_scope] => root_scope,
+            _ => panic!(),
         }
     }
 }

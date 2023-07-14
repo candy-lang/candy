@@ -105,7 +105,13 @@ fn optimized_mir(
     // expressions as an `FxHashMap<Id, usize>` (from expression ID to number of
     // occurrences). This can be used for tree-shaking directly after each
     // expression.
-    let mut context = Context::new(db, &tracing, (*errors).clone(), &mut mir.id_generator);
+    let mut context = Context::new(
+        db,
+        &tracing,
+        (*errors).clone(),
+        &mut mir.id_generator,
+        &mir.body,
+    );
     context.optimize_body(&mut mir.body);
     let Context {
         mut pureness,
@@ -143,6 +149,12 @@ impl Context<'_> {
             }
 
             let id = expression.id();
+            {
+                let mut body = Body::default();
+                body.expressions.push((id, (*expression).to_owned()));
+                body.to_rich_ir().print_to_console();
+            }
+
             // TODO: Remove pureness when data flow takes care of it.
             self.pureness.visit_optimized(id, &expression);
 
@@ -150,16 +162,22 @@ impl Context<'_> {
             self.data_flow.visit_optimized(id, &expression);
 
             {
-                let mut body = Body::default();
-                body.expressions.push((id, (*expression).to_owned()));
-                body.to_rich_ir().print_to_console();
-                self.data_flow.to_rich_ir().print_to_console();
+                println!("Data Flow Insights:");
+                self.data_flow
+                    .innermost_scope_to_rich_ir()
+                    .print_to_console();
                 println!();
             }
 
             index = expression.index() + 1;
             let expression = mem::replace(&mut *expression, Expression::Parameter);
             self.visible.insert(id, expression);
+
+            if self.data_flow.is_unconditional_panic() {
+                for (_, expression) in body.expressions.drain(index..) {
+                    self.data_flow.on_expression_deleted(&expression);
+                }
+            }
         }
 
         for (id, expression) in &mut body.expressions {
@@ -187,13 +205,25 @@ impl Context<'_> {
                     .insert(*responsible_parameter, Expression::Parameter);
                 self.pureness
                     .enter_function(parameters, *responsible_parameter);
+                self.data_flow
+                    .enter_function(parameters, body.return_value());
 
                 self.optimize_body(body);
 
-                for parameter in &*parameters {
+                let parameters = parameters.to_owned();
+                let return_value = body.return_value();
+                for parameter in &parameters {
                     self.visible.remove(*parameter);
                 }
                 self.visible.remove(*responsible_parameter);
+
+                let constants = constant_lifting::lift_constants(self, body);
+                self.data_flow
+                    .on_constants_lifted(constants.iter().map(|(id, _)| *id));
+                expression.prepend_optimized(&mut self.visible, constants);
+                self.data_flow.exit_function(&parameters, return_value);
+
+                return;
             }
 
             loop {
@@ -213,25 +243,10 @@ impl Context<'_> {
                     continue 'outer;
                 }
 
-                constant_lifting::lift_constants(self, expression);
-
                 if expression.do_hash() == hashcode_before {
-                    break 'outer;
+                    return;
                 }
             }
-        }
-
-        // TODO: If this is a call to the `needs` function with `True` as the
-        // first argument, optimize it away. This is not correct – calling
-        // `needs True 3 4` should panic instead. But we figured this is
-        // temporarily fine until we have data flow.
-        if let Expression::Call { function, arguments, .. } = &**expression
-            && let Expression::Function { original_hirs, .. } = self.visible.get(*function)
-            && original_hirs.contains(&hir::Id::needs())
-            && arguments.len() == 3
-            && let Expression::Tag { symbol, value: None  } = self.visible.get(arguments[0])
-            && symbol == "True" {
-            **expression = Expression::nothing();
         }
     }
 }

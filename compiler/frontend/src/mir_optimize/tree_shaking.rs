@@ -14,7 +14,7 @@
 //!
 //! [constant folding]: super::constant_folding
 
-use super::pure::PurenessInsights;
+use super::{pure::PurenessInsights, utils::ReferenceCounts};
 use crate::mir::Body;
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
@@ -29,7 +29,7 @@ pub fn tree_shake(body: &mut Body, pureness: &PurenessInsights) {
 
     for (id, expression) in expressions.into_iter().rev() {
         if keep.remove(&id) || !pureness.is_definition_pure(expression) {
-            keep.extend(expression.referenced_ids());
+            keep.extend(expression.reference_counts().keys());
         } else {
             ids_to_remove.insert(id);
         }

@@ -29,20 +29,12 @@
 //! }                           |  }
 //! ```
 //!
-//! TODO: Have a separate constant heap directly in the LIR, so that
-//! instructions such as `Instruction::CreateInt` are never actually executed at
-//! runtime.
-//!
 //! [common subtree elimination]: super::common_subtree_elimination
 
-use super::current_expression::{Context, CurrentExpression};
-use crate::mir::Expression;
+use super::current_expression::Context;
+use crate::mir::{Body, Expression, Id};
 
-pub fn lift_constants(context: &mut Context, expression: &mut CurrentExpression) {
-    let Expression::Function { body, .. } = &mut **expression else {
-        return;
-    };
-
+pub fn lift_constants(context: &mut Context, body: &mut Body) -> Vec<(Id, Expression)> {
     let mut constants = vec![];
 
     let mut index = 0;
@@ -74,5 +66,5 @@ pub fn lift_constants(context: &mut Context, expression: &mut CurrentExpression)
         }
     }
 
-    expression.prepend_optimized(&mut context.visible, constants);
+    constants
 }

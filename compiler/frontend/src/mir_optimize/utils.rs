@@ -1,6 +1,6 @@
 use super::pure::PurenessInsights;
 use crate::mir::{Body, Expression, Id, VisibleExpressions};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::mem;
 
 impl Expression {
@@ -40,18 +40,28 @@ impl Body {
     }
 }
 
-impl Expression {
+pub trait ReferenceCounts {
     /// All IDs referenced inside this expression. If this is a function, this
-    /// also includes references to locally defined IDs. IDs are returned in the
-    /// order that they are referenced, which means that the vector may contain
-    /// the same ID multiple times.
-    // PERF: Maybe change this to accept a closure instead of collecting them to an `FxHashSet`
-    pub fn referenced_ids(&self) -> FxHashSet<Id> {
-        let mut referenced = FxHashSet::default();
-        self.collect_referenced_ids(&mut referenced);
-        referenced
+    /// also includes references to locally defined IDs.
+    fn reference_counts(&self) -> FxHashMap<Id, usize> {
+        let mut reference_counts = FxHashMap::default();
+        self.collect_reference_counts(&mut reference_counts);
+        reference_counts
     }
-    fn collect_referenced_ids(&self, referenced: &mut FxHashSet<Id>) {
+    fn collect_reference_counts(&self, reference_counts: &mut FxHashMap<Id, usize>);
+}
+
+impl ReferenceCounts for Expression {
+    fn collect_reference_counts(&self, reference_counts: &mut FxHashMap<Id, usize>) {
+        fn add(reference_counts: &mut FxHashMap<Id, usize>, id: Id) {
+            *reference_counts.entry(id).or_default() += 1;
+        }
+        fn add_all(reference_counts: &mut FxHashMap<Id, usize>, ids: impl IntoIterator<Item = Id>) {
+            for id in ids {
+                add(reference_counts, id);
+            }
+        }
+
         match self {
             Expression::Int(_)
             | Expression::Text(_)
@@ -59,46 +69,46 @@ impl Expression {
             | Expression::HirId(_) => {}
             Expression::Tag { value, .. } => {
                 if let Some(value) = value {
-                    referenced.insert(*value);
+                    add(reference_counts, *value);
                 }
             }
             Expression::List(items) => {
-                referenced.extend(items);
+                add_all(reference_counts, items.iter().copied());
             }
             Expression::Struct(fields) => {
                 for (key, value) in fields {
-                    referenced.insert(*key);
-                    referenced.insert(*value);
+                    add(reference_counts, *key);
+                    add(reference_counts, *value);
                 }
             }
             Expression::Reference(reference) => {
-                referenced.insert(*reference);
+                add(reference_counts, *reference);
             }
-            Expression::Function { body, .. } => body.collect_referenced_ids(referenced),
+            Expression::Function { body, .. } => body.collect_reference_counts(reference_counts),
             Expression::Parameter => {}
             Expression::Call {
                 function,
                 arguments,
                 responsible,
             } => {
-                referenced.insert(*function);
-                referenced.extend(arguments);
-                referenced.insert(*responsible);
+                add(reference_counts, *function);
+                add_all(reference_counts, arguments.iter().copied());
+                add(reference_counts, *responsible);
             }
             Expression::UseModule {
                 current_module: _,
                 relative_path,
                 responsible,
             } => {
-                referenced.insert(*relative_path);
-                referenced.insert(*responsible);
+                add(reference_counts, *relative_path);
+                add(reference_counts, *responsible);
             }
             Expression::Panic {
                 reason,
                 responsible,
             } => {
-                referenced.insert(*reason);
-                referenced.insert(*responsible);
+                add(reference_counts, *reason);
+                add(reference_counts, *responsible);
             }
             Expression::TraceCallStarts {
                 hir_call,
@@ -106,42 +116,42 @@ impl Expression {
                 arguments,
                 responsible,
             } => {
-                referenced.insert(*hir_call);
-                referenced.insert(*function);
-                referenced.extend(arguments);
-                referenced.insert(*responsible);
+                add(reference_counts, *hir_call);
+                add(reference_counts, *function);
+                add_all(reference_counts, arguments.iter().copied());
+                add(reference_counts, *responsible);
             }
             Expression::TraceCallEnds { return_value } => {
-                referenced.insert(*return_value);
+                add(reference_counts, *return_value);
             }
             Expression::TraceExpressionEvaluated {
                 hir_expression,
                 value,
             } => {
-                referenced.insert(*hir_expression);
-                referenced.insert(*value);
+                add(reference_counts, *hir_expression);
+                add(reference_counts, *value);
             }
             Expression::TraceFoundFuzzableFunction {
                 hir_definition,
                 function,
             } => {
-                referenced.insert(*hir_definition);
-                referenced.insert(*function);
+                add(reference_counts, *hir_definition);
+                add(reference_counts, *function);
             }
         }
     }
 }
-impl Body {
-    fn collect_referenced_ids(&self, referenced: &mut FxHashSet<Id>) {
+impl ReferenceCounts for Body {
+    fn collect_reference_counts(&self, reference_counts: &mut FxHashMap<Id, usize>) {
         for (_, expression) in self.iter() {
-            expression.collect_referenced_ids(referenced);
+            expression.collect_reference_counts(reference_counts);
         }
     }
 }
 
 impl Expression {
     pub fn captured_ids(&self) -> FxHashSet<Id> {
-        let mut ids = self.referenced_ids();
+        let mut ids: FxHashSet<_> = self.reference_counts().into_keys().collect();
         for id in self.defined_ids() {
             ids.remove(&id);
         }
@@ -151,9 +161,7 @@ impl Expression {
 
 impl Body {
     pub fn all_ids(&self) -> FxHashSet<Id> {
-        let mut ids = self.defined_ids().into_iter().collect();
-        self.collect_referenced_ids(&mut ids);
-        ids
+        self.reference_counts().into_keys().collect()
     }
 }
 

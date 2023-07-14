@@ -42,6 +42,41 @@ pub enum FlowValue {
 }
 
 impl FlowValue {
+    pub fn visit_referenced_ids(&self, visit: &mut impl FnMut(Id)) {
+        match self {
+            FlowValue::Any => {}
+            FlowValue::Not(variants) => {
+                for variant in variants {
+                    variant.visit_referenced_ids(visit);
+                }
+            }
+            FlowValue::Builtin(_) => {}
+            FlowValue::AnyInt | FlowValue::Int(_) => {}
+            FlowValue::AnyFunction => {}
+            FlowValue::Function { return_value } => return_value.visit_referenced_ids(visit),
+            FlowValue::AnyList => {}
+            FlowValue::List(items) => {
+                for item in items {
+                    item.visit_referenced_ids(visit);
+                }
+            }
+            FlowValue::Reference(id) => visit(*id),
+            FlowValue::AnyStruct => {}
+            FlowValue::Struct(struct_) => {
+                for (key, value) in struct_ {
+                    key.visit_referenced_ids(visit);
+                    value.visit_referenced_ids(visit);
+                }
+            }
+            FlowValue::AnyTag => {}
+            FlowValue::Tag { symbol: _, value } => {
+                if let Some(value) = value {
+                    value.visit_referenced_ids(visit);
+                }
+            }
+            FlowValue::AnyText | FlowValue::Text(_) => {}
+        }
+    }
     pub fn map_ids(&mut self, mapping: &FxHashMap<Id, Id>) {
         match self {
             FlowValue::Any => {}
