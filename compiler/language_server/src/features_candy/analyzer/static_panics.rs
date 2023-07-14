@@ -63,8 +63,12 @@ impl StaticPanicsOfExpression for Expression {
                 let reason = visible.get(*reason);
                 let responsible = visible.get(*responsible);
 
-                let Expression::Text(reason) = reason else { return; };
-                let Expression::HirId(responsible) = responsible else { return; };
+                let Expression::Text(reason) = reason else {
+                    return;
+                };
+                let Expression::HirId(responsible) = responsible else {
+                    return;
+                };
 
                 panics.push(Panic {
                     reason: reason.to_string(),

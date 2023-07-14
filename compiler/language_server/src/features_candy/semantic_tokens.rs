@@ -270,7 +270,7 @@ fn visit_cst(
                 visit_csts(builder, arguments, Some(SemanticTokenType::Parameter));
             } else {
                 let token_type = if let [single] = body.as_slice()
-                    && matches!(single.unwrap_whitespace_and_comment().kind, CstKind::Function { .. }) {
+                    && single.unwrap_whitespace_and_comment().kind.is_function() {
                     SemanticTokenType::Function
                 } else {
                     SemanticTokenType::Variable

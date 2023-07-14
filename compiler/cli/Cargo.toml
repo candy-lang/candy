@@ -15,7 +15,8 @@ candy_fuzzer = { path = "../fuzzer" }
 candy_language_server = { path = "../language_server" }
 candy_vm = { path = "../vm" }
 clap = { version = "4.1.8", features = ["derive"] }
-itertools = "0.10.0"
+colored = "2.0.0"
+itertools = "0.11.0"
 notify = "5.1.0"
 notify-debouncer-mini = { version = "0.2.1", default-features = false }
 rustc-hash = "1.1.0"

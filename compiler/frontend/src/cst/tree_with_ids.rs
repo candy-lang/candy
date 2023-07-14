@@ -199,9 +199,9 @@ impl TreeWithIds for Cst {
                     .ok();
 
                 if let Some(part) = interpolation_index.map(|index| &parts[index])
-                    && matches!(part.kind, CstKind::TextInterpolation { .. })
+                    && part.kind.is_text_interpolation()
                     && let Some(child) = part.find_by_offset(offset)
-                    && !matches!(child.kind, CstKind::TextInterpolation { .. }) {
+                    && !child.kind.is_text_interpolation() {
                     (Some(child), false)
                 } else {
                     (None, false)

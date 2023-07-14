@@ -119,7 +119,7 @@ impl<'a> ExistingWhitespace<'a> {
         edits: &mut TextEdits,
         other: &mut ExistingWhitespace<'a>,
     ) {
-        if let Some(whitespace) = self.whitespace.first() && matches!(whitespace.kind, CstKind::Whitespace(_)) {
+        if let Some(whitespace) = self.whitespace.first() && whitespace.kind.is_whitespace() {
             let span = match &mut self.whitespace {
                 Cow::Borrowed(whitespace) => {
                     let (first, remaining) = whitespace.split_first().unwrap();
@@ -212,9 +212,7 @@ impl<'a> ExistingWhitespace<'a> {
 
     pub fn has_comments(&self) -> bool {
         fn check(whitespace: &[Cst]) -> bool {
-            whitespace
-                .iter()
-                .any(|it| matches!(it.kind, CstKind::Comment { .. }))
+            whitespace.iter().any(|it| it.kind.is_comment())
         }
 
         check(&self.adopted_whitespace_before)
@@ -268,9 +266,7 @@ impl<'a> ExistingWhitespace<'a> {
             .collect_vec();
         // `.chain(…)` doesn't produce an `ExactSizeIterator`, so it's easier to collect everything
         // into a `Vec` first.
-        let last_comment_index = whitespace
-            .iter()
-            .rposition(|(it, _)| matches!(it.kind, CstKind::Comment { .. }));
+        let last_comment_index = whitespace.iter().rposition(|(it, _)| it.kind.is_comment());
         let split_index = last_comment_index.map(|it| it + 1).unwrap_or_default();
         let (comments_and_whitespace, final_whitespace) = whitespace.split_at(split_index);
 
@@ -307,7 +303,7 @@ impl<'a> ExistingWhitespace<'a> {
             } => {
                 let trailing_newline_count = final_whitespace
                     .iter()
-                    .filter(|(it, _)| matches!(it.kind, CstKind::Newline(_)))
+                    .filter(|(it, _)| it.kind.is_newline())
                     .count()
                     .clamp(1, 1 + MAX_CONSECUTIVE_EMPTY_LINES);
                 (indentation, trailing_newline_count)

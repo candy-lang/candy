@@ -15,8 +15,9 @@ use std::{
     cmp::Ordering,
     hash::{Hash, Hasher},
 };
+use strum_macros::EnumIs;
 
-#[derive(Clone, Debug, Eq, From, PartialEq, TryInto)]
+#[derive(Clone, Debug, EnumIs, Eq, From, PartialEq, TryInto)]
 pub enum Expression {
     #[from]
     #[try_into]
@@ -120,7 +121,9 @@ impl<'a> TryInto<&'a BigInt> for &'a Expression {
     type Error = ();
 
     fn try_into(self) -> Result<&'a BigInt, ()> {
-        let Expression::Int(int) = self else { return Err(()); };
+        let Expression::Int(int) = self else {
+            return Err(());
+        };
         Ok(int)
     }
 }
@@ -134,7 +137,9 @@ impl<'a> TryInto<&'a str> for &'a Expression {
     type Error = ();
 
     fn try_into(self) -> Result<&'a str, ()> {
-        let Expression::Text(text) = self else { return Err(()); };
+        let Expression::Text(text) = self else {
+            return Err(());
+        };
         Ok(text)
     }
 }
@@ -148,7 +153,9 @@ impl TryInto<bool> for &Expression {
     type Error = ();
 
     fn try_into(self) -> Result<bool, ()> {
-        let Expression::Tag { symbol, .. } = self else { return Err(()); };
+        let Expression::Tag { symbol, .. } = self else {
+            return Err(());
+        };
         match symbol.as_str() {
             "True" => Ok(true),
             "False" => Ok(false),

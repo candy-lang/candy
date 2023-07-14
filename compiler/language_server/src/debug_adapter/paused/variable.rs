@@ -56,7 +56,9 @@ impl PausedState {
                             assert_eq!(functions.len(), 1);
                             let function = functions.iter().next().unwrap();
 
-                            let Expression::Function(hir::Function{parameters, ..}) = db.find_expression(function.to_owned()).unwrap() else {
+                            let Expression::Function(hir::Function { parameters, .. }) =
+                                db.find_expression(function.to_owned()).unwrap()
+                            else {
                                 panic!("Function's HIR is not a function: {function}");
                             };
 

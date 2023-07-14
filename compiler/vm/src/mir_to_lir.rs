@@ -109,7 +109,9 @@ fn compile_function(
         context.instructions.last().unwrap(),
         Instruction::Call { .. },
     ) {
-        let Instruction::Call { num_args } = context.instructions.pop().unwrap() else { unreachable!() };
+        let Instruction::Call { num_args } = context.instructions.pop().unwrap() else {
+            unreachable!()
+        };
         context.instructions.push(Instruction::TailCall {
             num_locals_to_pop: context.stack.len() - 1,
             num_args,

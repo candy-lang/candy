@@ -8,34 +8,38 @@ export class HintsDecorations implements vs.Disposable {
   private subscriptions: vs.Disposable[] = [];
   private hints = new Map<String, Hint[]>();
 
-  private readonly decorationTypes = new Map<
-    HintKind,
-    vs.TextEditorDecorationType
-  >([
-    [
-      'value',
-      vs.window.createTextEditorDecorationType({
-        after: { color: new vs.ThemeColor('candy.hints.valueColor') },
-        rangeBehavior: vs.DecorationRangeBehavior.ClosedOpen,
-      }),
-    ],
-    [
-      'panic',
-      vs.window.createTextEditorDecorationType({
-        after: { color: new vs.ThemeColor('candy.hints.panicColor') },
-        rangeBehavior: vs.DecorationRangeBehavior.ClosedOpen,
-      }),
-    ],
-    [
-      'fuzz',
-      vs.window.createTextEditorDecorationType({
-        after: { color: new vs.ThemeColor('candy.hints.fuzzColor') },
-        rangeBehavior: vs.DecorationRangeBehavior.ClosedOpen,
-      }),
-    ],
-  ]);
+  private decorationTypes = new Map<HintKind, vs.TextEditorDecorationType>();
 
   constructor(private readonly client: LanguageClient) {
+    [
+      { kind: 'value', color: 'candy.valueHint' },
+      { kind: 'fuzzingStatus', color: 'candy.statusHint' },
+      {
+        kind: 'sampleInputReturningNormally',
+        color: 'candy.sampleInput.returningNormally',
+      },
+      {
+        kind: 'sampleInputPanickingWithCallerResponsible',
+        color: 'candy.sampleInput.panickingWithCallerResponsible',
+      },
+      {
+        kind: 'sampleInputPanickingWithInternalCodeResponsible',
+        color: 'candy.sampleInput.panickingWithInternalCodeResponsible',
+      },
+    ].forEach((value) =>
+      this.decorationTypes.set(
+        value.kind as HintKind,
+        vs.window.createTextEditorDecorationType({
+          after: {
+            color: new vs.ThemeColor(`${value.color}.foreground`),
+            backgroundColor: new vs.ThemeColor(`${value.color}.background`),
+            margin: '0 0 0 16px',
+          },
+          rangeBehavior: vs.DecorationRangeBehavior.ClosedOpen,
+        })
+      )
+    );
+
     this.client.onNotification(publishHintsType, (notification) => {
       // We parse the URI so that it gets normalized.
       const uri = vs.Uri.parse(notification.uri).toString();
@@ -69,7 +73,6 @@ export class HintsDecorations implements vs.Disposable {
       if (hints === undefined) {
         return;
       }
-
       type Item = vs.DecorationOptions & {
         renderOptions: { after: { contentText: string } };
       };
@@ -78,7 +81,6 @@ export class HintsDecorations implements vs.Disposable {
         const position = this.client.protocol2CodeConverter.asPosition(
           hint.position
         );
-
         // Ensure that the hint we got has a sensible position. Otherwise, the
         // hint might be stale (e.g., we sent two updates, and the hint from in
         // between them just arrived). In this case, we'll just bail and do
@@ -95,7 +97,6 @@ export class HintsDecorations implements vs.Disposable {
         });
         decorations.set(hint.kind, existing);
       }
-
       for (const [hintKind, decorationType] of this.decorationTypes.entries()) {
         editor.setDecorations(decorationType, decorations.get(hintKind) || []);
       }

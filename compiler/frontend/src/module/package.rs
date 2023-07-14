@@ -8,6 +8,7 @@ use std::{
     hash::Hash,
     path::{Path, PathBuf},
 };
+use strum_macros::EnumIs;
 
 #[derive(Clone, Debug, Deref, Eq, Hash, PartialEq)]
 pub struct PackagesPath(PathBuf);
@@ -89,7 +90,7 @@ impl TryFrom<&Path> for PackagesPath {
     }
 }
 
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, EnumIs, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Package {
     /// A package written by the user.
     User(PathBuf),

@@ -7,6 +7,8 @@ type = use "..type"
 
 is value := type.is value Int
 
+theAnswer := 42
+
 add := builtins.intAdd
 subtract := builtins.intSubtract
 negate value :=

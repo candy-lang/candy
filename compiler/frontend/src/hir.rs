@@ -186,6 +186,19 @@ impl Id {
         Self::tooling("complicated-responsibility".to_string())
     }
 
+    pub fn needs() -> Self {
+        Self {
+            module: Module {
+                package: Package::Anonymous {
+                    url: "$generated".to_string(),
+                },
+                path: vec![],
+                kind: ModuleKind::Code,
+            },
+            keys: vec![IdKey::from("needs")],
+        }
+    }
+
     pub fn to_short_debug_string(&self) -> String {
         format!("${}", self.keys.iter().join(":"))
     }
