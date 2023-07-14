@@ -7,4 +7,4 @@ check condition :=
   # This function is useful for ensuring that your mental model of the state of
   # your program matches its actual state.
   needs (bool.is condition)
-  needs condition "A check didn't succeed."
+  needs condition "This check didn't succeed."

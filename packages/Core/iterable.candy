@@ -1,5 +1,5 @@
 bool = use "..bool"
-[ifElse, recursive] = use "..controlFlow"
+[ifElse, recursive, run] = use "..controlFlow"
 [equals] = use "..equality"
 function = use "..function"
 int = use "..int"
@@ -25,7 +25,7 @@ is value := function.is0 value
 
 next iterable :=
   needs (is iterable)
-  iterable | function.run
+  iterable | run
 isEmpty iterable :=
   needs (is iterable)
   iterable | next | result.isError
@@ -214,7 +214,7 @@ forEach iterable action :=
 fromList l :=
   needs (list.is l)
   # () => Result[(Item, Iterable[Item]), Any]
-  # iterable | function.run | result.map { it -> it | list.get 0 }
+  # iterable | run | result.map { it -> it | list.get 0 }
   # The state contains the list and an index.
   generateWithState [l, Index: 0] { state ->
     [l, index] = state

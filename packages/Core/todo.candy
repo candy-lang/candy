@@ -3,5 +3,4 @@ text = use "..text"
 todo message :=
   # Always panics with a todo message.
   needs (text.is message)
-  ## There is no way to call `todo` correctly.
   needs False "TODO: {message}"

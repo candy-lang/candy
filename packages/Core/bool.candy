@@ -1,3 +1,8 @@
+# In Candy, boolean values are not built into the language itself. Instead, you
+# use the tags `True` and `False`. Various important functions such as `if`,
+# `check`, and `needs` expect bools.
+
+builtins = use "Builtins"
 [equals] = use "..equality"
 function = use "..function"
 type = use "..type"
@@ -7,6 +12,7 @@ is value := value %
   _ -> False
 
 not value :=
+  # Negates the `value`.
   needs (is value)
   value %
     True -> False
@@ -17,7 +23,7 @@ lazyAnd a b :=
   needs (function.is0 b)
   a %
     True ->
-      result = b | function.run
+      result = b | builtins.functionRun
       needs (is result) "`b` didn't return a bool."
       result
     False -> False
@@ -32,7 +38,7 @@ lazyOr a b :=
   a %
     True -> True
     False ->
-      result = b | function.run
+      result = b | builtins.functionRun
       needs (is result) "`b` didn't return a bool."
       result
 or a b :=
