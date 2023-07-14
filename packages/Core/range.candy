@@ -1,0 +1,13 @@
+[bool, int, iterable, struct] = use "..struct"
+
+is range = bool.and (range | struct.hasKey Start) (range | struct.hasKey End)
+
+to start end =
+  needs (int.is start)
+  needs (int.is end)
+  needs (int.isLessThanOrEqual start end)
+  [start, end]
+
+toIter range =
+  needs (is range)
+  iterable.generateWithState 0 { i -> }
