@@ -21,7 +21,7 @@ export function registerDebugAdapter(
   context.subscriptions.push(
     descriptorFactory,
     vscode.debug.registerDebugAdapterDescriptorFactory(
-      "candy",
+      'candy',
       descriptorFactory,
     ),
   );
