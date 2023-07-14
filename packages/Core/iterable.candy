@@ -41,6 +41,7 @@ generateWithState initialState mapper :=
   recursive initialState { recurse state ->
     {
       mapper state | result.map { result ->
+        needs (struct.is result)
         needs (result | struct.hasKey Item)
         needs (result | struct.hasKey State)
         [item, state] = result
