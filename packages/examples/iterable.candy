@@ -1,5 +1,5 @@
 builtins = use "Builtins"
-[bool, channel, equals, ifElse, iterable, list, result, text] = use "Core"
+[bool, channel, equals, ifElse, iterable, list, result, text, range] = use "Core"
 
 splitWhereFirst iter checker =
   # Splits the iterable into a list and an iterable of the remaining items. The
@@ -17,13 +17,14 @@ split iter delimeter = iterable.generateWithState iter { state ->
 main := { env ->
   print = { message -> channel.send env.stdout message }
 
-  foo =
-    "Hello, world! This is some long text. Bla bla blub." | text.characters | iterable.fromList
-  #| splitWhereFirst { c ->
-  #  builtins.print c
-  #  equals c ","
-  #}
-  #builtins.print "Hi"
-  #builtins.print foo
-  | iterable.forEach { item -> print item }
+  foo = "Hello, world! This is some long text. Bla bla blub." | text.characters | iterable.fromList
+    #| splitWhereFirst { c ->
+    #  builtins.print c
+    #  equals c ","
+    #}
+    #builtins.print "Hi"
+    #builtins.print foo
+    | iterable.forEach { item -> print item }
+
+  20 | range.to 50 | range.toIterable | iterable.forEach { item -> print item }
 }

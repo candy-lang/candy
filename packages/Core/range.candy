@@ -1,13 +1,23 @@
-[bool, int, iterable, struct] = use "..struct"
+struct = use "..struct"
+bool = use "..bool"
+int = use "..int"
+iterable = use "..iterable"
+[ifElse] = use "..controlFlow"
 
-is range = bool.and (range | struct.hasKey Start) (range | struct.hasKey End)
+is range := struct.is range | bool.lazyAnd { range | struct.hasKey Start }
+  | bool.lazyAnd { range | struct.hasKey End }
+  | bool.lazyAnd { int.is range.start }
+  | bool.lazyAnd { int.is range.end }
+  | bool.lazyAnd { range.start | int.isLessThanOrEqualTo range.end }
 
-to start end =
+to start end :=
   needs (int.is start)
   needs (int.is end)
-  needs (int.isLessThanOrEqual start end)
+  needs (int.isLessThanOrEqualTo start end)
   [start, end]
 
-toIter range =
+toIterable range :=
   needs (is range)
-  iterable.generateWithState 0 { i -> }
+  iterable.generateWithState range.start { i ->
+    ifElse (i | int.isLessThan range.end) { Ok [Item: i, State: i | int.add 1] } { Error Empty }
+  }
