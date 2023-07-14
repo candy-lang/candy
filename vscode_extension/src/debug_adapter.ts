@@ -1,29 +1,29 @@
-import * as path from 'path';
-import * as vscode from 'vscode';
-import { LanguageClient } from 'vscode-languageclient/node';
-import { CandyDebugAdapterLoggerFactory } from './debug_adapter/logger';
+import * as path from "path";
+import * as vscode from "vscode";
+import { LanguageClient } from "vscode-languageclient/node";
+import { CandyDebugAdapterLoggerFactory } from "./debug_adapter/logger";
 import {
   debugAdapterCreate,
   debugAdapterMessage,
   DebugSessionId,
-} from './lsp_custom_protocol';
+} from "./lsp_custom_protocol";
 
 export function registerDebugAdapter(
   context: vscode.ExtensionContext,
-  client: LanguageClient
+  client: LanguageClient,
 ) {
   const loggerFactory = new CandyDebugAdapterLoggerFactory();
   context.subscriptions.push(
-    vscode.debug.registerDebugAdapterTrackerFactory('candy', loggerFactory)
+    vscode.debug.registerDebugAdapterTrackerFactory("candy", loggerFactory),
   );
 
   const descriptorFactory = new CandyDebugAdapterDescriptorFactory(client);
   context.subscriptions.push(
     descriptorFactory,
     vscode.debug.registerDebugAdapterDescriptorFactory(
-      'candy',
-      descriptorFactory
-    )
+      "candy",
+      descriptorFactory,
+    ),
   );
 }
 
@@ -44,15 +44,15 @@ class CandyDebugAdapterDescriptorFactory
       }
 
       debugAdapter.sendMessage.fire(message.message);
-    }
+    },
   );
 
   async createDebugAdapterDescriptor(
-    session: vscode.DebugSession
+    session: vscode.DebugSession,
   ): Promise<vscode.DebugAdapterDescriptor | null | undefined> {
     const program = this.resolveProgram(
       session.configuration.program,
-      session.workspaceFolder
+      session.workspaceFolder,
     );
     if (!program) {
       return;
@@ -71,18 +71,18 @@ class CandyDebugAdapterDescriptorFactory
 
   private resolveProgram(
     program: unknown,
-    workspaceFolder: vscode.WorkspaceFolder | undefined
+    workspaceFolder: vscode.WorkspaceFolder | undefined,
   ): vscode.Uri | undefined {
     // TODO
     if (!program) {
       void vscode.window.showErrorMessage(
-        'No `program` specified in `launch.json`'
+        "No `program` specified in `launch.json`",
       );
       return;
     }
-    if (typeof program !== 'string') {
+    if (typeof program !== "string") {
       void vscode.window.showErrorMessage(
-        '`program` specified in `launch.json` must be a string.'
+        "`program` specified in `launch.json` must be a string.",
       );
       return;
     }
@@ -93,7 +93,7 @@ class CandyDebugAdapterDescriptorFactory
 
     if (!workspaceFolder) {
       void vscode.window.showErrorMessage(
-        '`program` specified in `launch.json` must be an absolute path when not in a workspace.'
+        "`program` specified in `launch.json` must be an absolute path when not in a workspace.",
       );
       return;
     }
@@ -110,7 +110,7 @@ class CandyDebugAdapterDescriptorFactory
 class CandyDebugAdapter implements vscode.DebugAdapter {
   constructor(
     private readonly sessionId: DebugSessionId,
-    private readonly client: LanguageClient
+    private readonly client: LanguageClient,
   ) {}
 
   // VS Code → Candy

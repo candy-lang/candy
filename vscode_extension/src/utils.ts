@@ -1,4 +1,4 @@
-import { CancellationToken, CancellationTokenSource } from 'vscode';
+import { CancellationToken, CancellationTokenSource } from "vscode";
 
 export type PromiseOr<T> = T | Promise<T>;
 
@@ -9,7 +9,7 @@ export function combineCancellationTokens(
   tokens.forEach((token) =>
     token.onCancellationRequested(() => {
       source.cancel();
-    })
+    }),
   );
   return source.token;
 }
