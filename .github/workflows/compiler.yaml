@@ -96,10 +96,10 @@ jobs:
       - run: npm install @microsoft/eslint-formatter-sarif@3.0.0
 
       - name: Run ESLint
-        run: >
-          npx eslint .
-            --ext .ts
-            --format @microsoft/eslint-formatter-sarif
+        run: |
+          npx eslint . \
+            --ext .ts \
+            --format @microsoft/eslint-formatter-sarif \
             --output-file eslint-results.sarif
         continue-on-error: true
 
