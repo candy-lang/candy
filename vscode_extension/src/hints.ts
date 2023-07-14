@@ -6,7 +6,7 @@ import { Hint, HintKind, publishHintsType } from './lsp_custom_protocol';
 
 export class HintsDecorations implements vs.Disposable {
   private subscriptions: vs.Disposable[] = [];
-  private hints = new Map<String, Hint[]>();
+  private hints = new Map<string, Hint[]>();
 
   private decorationTypes = new Map<HintKind, vs.TextEditorDecorationType>();
 
@@ -47,8 +47,7 @@ export class HintsDecorations implements vs.Disposable {
       this.hints.set(uri, notification.hints);
       // Fire an update if it was for the active document.
       if (
-        vs.window.activeTextEditor &&
-        vs.window.activeTextEditor.document &&
+        vs.window.activeTextEditor?.document &&
         uri === vs.window.activeTextEditor.document.uri.toString()
       ) {
         this.update();
@@ -56,7 +55,9 @@ export class HintsDecorations implements vs.Disposable {
     });
 
     this.subscriptions.push(
-      vs.window.onDidChangeVisibleTextEditors(() => this.update())
+      vs.window.onDidChangeVisibleTextEditors(() => {
+        this.update();
+      })
     );
     this.subscriptions.push(
       vs.workspace.onDidCloseTextDocument((document) => {
@@ -90,7 +91,7 @@ export class HintsDecorations implements vs.Disposable {
           return;
         }
 
-        const existing = decorations.get(hint.kind) || [];
+        const existing = decorations.get(hint.kind) ?? [];
         existing.push({
           range: new vs.Range(position, position),
           renderOptions: { after: { contentText: hint.text } },
@@ -98,7 +99,7 @@ export class HintsDecorations implements vs.Disposable {
         decorations.set(hint.kind, existing);
       }
       for (const [hintKind, decorationType] of this.decorationTypes.entries()) {
-        editor.setDecorations(decorationType, decorations.get(hintKind) || []);
+        editor.setDecorations(decorationType, decorations.get(hintKind) ?? []);
       }
     }
   }
@@ -109,6 +110,8 @@ export class HintsDecorations implements vs.Disposable {
         editor.setDecorations(decorationType, []);
       }
     }
-    this.subscriptions.forEach((s) => s.dispose());
+    for (const subscription of this.subscriptions) {
+      subscription.dispose();
+    }
   }
 }

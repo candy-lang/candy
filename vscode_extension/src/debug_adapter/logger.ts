@@ -17,11 +17,11 @@ class CandyDebugAdapterLogger implements vscode.DebugAdapterTracker {
     console.log(`Starting debug session ${this.session.id}`);
   }
 
-  public onWillReceiveMessage(message: any): void {
+  public onWillReceiveMessage(message: unknown): void {
     console.log(`==> ${JSON.stringify(message)}`);
   }
 
-  public onDidSendMessage(message: any): void {
+  public onDidSendMessage(message: unknown): void {
     console.log(`<== ${JSON.stringify(message)}`);
   }
 

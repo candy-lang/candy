@@ -22,7 +22,9 @@ export class ServerStatusService implements vs.Disposable {
   }
 
   public dispose() {
-    this.subscriptions.forEach((subscription) => subscription.dispose());
+    for (const subscription of this.subscriptions) {
+      subscription.dispose();
+    }
     this.item.dispose();
     this.item.hide();
   }

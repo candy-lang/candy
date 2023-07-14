@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
 import { updateIrType, viewIr, ViewIrParams } from './lsp_custom_protocol';
-import { combineCancellationTokens } from './utils';
+import { combineCancellationTokens, PromiseOr } from './utils';
 
 type Ir =
   | { type: 'rcst' }
@@ -40,9 +40,9 @@ export function registerDebugIrCommands(client: LanguageClient) {
     updateIrEmitter.fire(vscode.Uri.parse(notification.uri));
   });
 
-  registerDebugIrCommand('rcst', 'viewRcst', async () => ({ type: 'rcst' }));
-  registerDebugIrCommand('ast', 'viewAst', async () => ({ type: 'ast' }));
-  registerDebugIrCommand('hir', 'viewHir', async () => ({ type: 'hir' }));
+  registerDebugIrCommand('rcst', 'viewRcst', () => ({ type: 'rcst' }));
+  registerDebugIrCommand('ast', 'viewAst', () => ({ type: 'ast' }));
+  registerDebugIrCommand('hir', 'viewHir', () => ({ type: 'hir' }));
   registerDebugIrCommand('mir', 'viewMir', async () => {
     const tracingConfig = await pickTracingConfig({
       canSelectOnlyCurrent: false,
@@ -86,7 +86,7 @@ function registerDocumentProvider(
       return vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Window,
-          title: `Loading ${getIrTitle(ir.type)} of ${originalUri}…`,
+          title: `Loading ${getIrTitle(ir.type)} of ${originalUri.toString()}…`,
           cancellable: true,
         },
         (_progress, progressCancellationToken) =>
@@ -100,15 +100,15 @@ function registerDocumentProvider(
   })();
   vscode.workspace.registerTextDocumentContentProvider(irScheme, provider);
 }
-async function registerDebugIrCommand(
+function registerDebugIrCommand(
   irType: IrType,
   command: string,
-  createIrConfig: () => Promise<Ir | undefined>
+  createIrConfig: () => PromiseOr<Ir | undefined>
 ) {
   vscode.commands.registerCommand(`candy.debug.${command}`, async () => {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
-      vscode.window.showErrorMessage(
+      void vscode.window.showErrorMessage(
         `Can't show the ${getIrTitle(irType)} without an active editor.`
       );
       return;
@@ -179,14 +179,14 @@ async function pickTracingMode(
 
 const irScheme = 'candy-ir';
 function encodeUri(document: vscode.TextDocument, ir: Ir): vscode.Uri {
-  let [uri, moduleKind] =
+  const [uri, moduleKind] =
     document.uri.scheme === irScheme
       ? (() => {
           const { originalUri, moduleKind } = decodeUri(document.uri);
           return [originalUri, moduleKind];
         })()
       : [document.uri, getModuleKind(document.languageId)];
-  const details: { [key: string]: any } = {
+  const details: Record<string, unknown> = {
     scheme: uri.scheme,
     moduleKind,
     ...ir,
@@ -205,7 +205,7 @@ function decodeUri(uri: vscode.Uri): {
   originalUri: vscode.Uri;
   moduleKind: ModuleKind;
 } {
-  const details = JSON.parse(uri.fragment);
+  const details = JSON.parse(uri.fragment) as Record<string, unknown>;
   const scheme = details.scheme as string;
   delete details.scheme;
   const moduleKind = details.moduleKind as ModuleKind;
