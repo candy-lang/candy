@@ -21,15 +21,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2.5.1
 
       # Compiler
-      - name: 'Compiler: clippy'
+      - name: "Compiler: clippy"
         run: cargo clippy -- --deny warnings
-      - name: 'Compiler: test'
+      - name: "Compiler: test"
         run: cargo test --workspace
-      - name: 'Compiler: fmt'
+      - name: "Compiler: fmt"
         run: cargo fmt --check
 
       # Core
-      - name: 'Core: run'
+      - name: "Core: run"
         run: cargo run --release -- check packages/Core/_.candy
 
   # fuzzing:
@@ -79,3 +79,31 @@ jobs:
           alert-threshold: 200%
           # Benchmarks running on GitHub Actions have a very high variance.
           fail-on-alert: true
+
+  vscode-extension-check:
+    name: Check VS Code Extension
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    defaults:
+      run:
+        working-directory: vscode_extension/
+    steps:
+      - uses: actions/checkout@v3
+
+      - run: npm install
+      - run: npm install @microsoft/eslint-formatter-sarif@3.0.0
+
+      - name: Run ESLint
+        run: >
+          npx eslint .
+            --ext .ts
+            --format @microsoft/eslint-formatter-sarif
+            --output-file eslint-results.sarif
+        continue-on-error: true
+
+      - uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: eslint-results.sarif
+          wait-for-processing: true
