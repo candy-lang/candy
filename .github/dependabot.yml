@@ -38,3 +38,19 @@ updates:
     directory: /vscode_extension
     schedule:
       interval: daily
+    groups:
+      glob:
+        patterns:
+          - glob
+          - '@types/glob'
+      mocha:
+        patterns:
+          - mocha
+          - '@types/mocha'
+      prettier:
+        patterns:
+          - prettier
+          - '*-prettier'
+      typescript-eslint:
+        patterns:
+          - '@typescript-eslint/*'
