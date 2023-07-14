@@ -12,30 +12,3 @@ is2 value := builtins.ifElse (is value) { equals (getArgumentCount value) 2 } { 
 is3 value := builtins.ifElse (is value) { equals (getArgumentCount value) 3 } { False }
 is4 value := builtins.ifElse (is value) { equals (getArgumentCount value) 4 } { False }
 is5 value := builtins.ifElse (is value) { equals (getArgumentCount value) 5 } { False }
-
-run body :=
-  # A function that runs the given `body` with no arguments and returns its result.
-  #
-  # ```
-  # a = run {
-  #   ## Some code that can create local variables without cluttering the surrounding namespace.
-  # }
-  # ```
-  needs (is0 body)
-  builtins.functionRun body
-
-doNotRun body :=
-  # A function that doesn't run the given `body`.
-  #
-  # This function is useful during development to mark code that's not ready to run yet. In contrast
-  # to commenting out the code, the code is still part of the analyzed program.
-  #
-  # These are some of the benefits over commenting code out:
-  #
-  # - Refactorings, like renaming of functions, also affect the code.
-  # - Candy doesn't report linter warnings for fields and functions in the outer scope that are
-  #   only used in the code.
-  # - Making the code invalid (for example, by deleting needed functions) results in compiler
-  #   errors.
-  needs (is0 body)
-  Nothing

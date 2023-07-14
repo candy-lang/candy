@@ -630,7 +630,7 @@ fn run_builtin(
                         BuiltinFunction::IntDivideTruncating => "Int",
                         BuiltinFunction::IntModulo => "Int",
                         BuiltinFunction::IntMultiply => "Int",
-                        BuiltinFunction::IntParse => "Struct",
+                        BuiltinFunction::IntParse => "Tag",
                         BuiltinFunction::IntRemainder => "Int",
                         BuiltinFunction::IntShiftLeft => "Int",
                         BuiltinFunction::IntShiftRight => "Int",
@@ -653,7 +653,7 @@ fn run_builtin(
                         BuiltinFunction::TextConcatenate => "Text",
                         BuiltinFunction::TextContains => "Tag",
                         BuiltinFunction::TextEndsWith => "Tag",
-                        BuiltinFunction::TextFromUtf8 => "Struct",
+                        BuiltinFunction::TextFromUtf8 => "Tag",
                         BuiltinFunction::TextGetRange => "Text",
                         BuiltinFunction::TextIsEmpty => "Tag",
                         BuiltinFunction::TextLength => "Int",
@@ -661,7 +661,7 @@ fn run_builtin(
                         BuiltinFunction::TextTrimEnd => "Text",
                         BuiltinFunction::TextTrimStart => "Text",
                         BuiltinFunction::ToDebugText => "Text",
-                        BuiltinFunction::Try => "Struct",
+                        BuiltinFunction::Try => "Tag",
                         BuiltinFunction::TypeOf => "Tag",
                     }
                 }

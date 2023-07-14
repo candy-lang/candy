@@ -5,41 +5,97 @@ function = use "..function"
 [typeOf] = use "..type"
 
 ifElse := builtins.ifElse
+
 if condition then :=
+  # If the `condition` is `True`, executes the then body and returns its result.
+  # Otherwise, returns `Nothing`.
   needs (bool.is condition)
   needs (function.is0 then)
   ifElse condition then { }
 
 recursive initialArg body :=
-  needs
-    function.is2 body
-    "The `body` should take the recursive function and the argument."
+  # Allows implementing recursive functions. You can give it an initial argument
+  # and a body. The body should take two arguments: A function you can call to
+  # continue the recursion and an argument.
+  #
+  # ```
+  # fifthFibonacci = recursive 5 { recurse n ->
+  #   ifElse (n | int.isLessThan 2) { n } {
+  #     int.add
+  #       recurse (n | int.subtract 1)
+  #       recurse (n | int.subtract 2)
+  #   }
+  # }
+  # ```
+  needs (function.is2 body) "The `body` should take the recursive function and the argument."
   recurse = { recurse arg ->
     rec = { arg -> recurse recurse arg }
     body rec arg
   }
   recurse recurse initialArg
 
-## TODO: Support breaking with a value as soon as tags are supported.
-## TODO: Support looping with a state.
+
+run body :=
+  # Runs the given `body` and returns its result.
+  #
+  # ```
+  # a = run {
+  #   ## Some code that can create local variables without cluttering the
+  #   ## surrounding namespace.
+  # }
+  # ```
+  needs (function.is0 body)
+  builtins.functionRun body
+
+doNotRun body :=
+  # A function that doesn't run the given `body`.
+  #
+  # This function is useful during development to mark code that's not ready to
+  # run yet. In contrast to commenting out the code, the code is still part of
+  # the analyzed program.
+  #
+  # These are some of the benefits over commenting code out:
+  #
+  # - Refactorings, like renaming of functions, also affect the code.
+  # - Candy doesn't report linter warnings for fields and functions in the outer
+  #   scope that are only used in the code.
+  needs (function.is0 body)
+  Nothing
+
 loop body :=
-  # Executes the body infinitely often.
+  # Takes a body that returns either `Continue` or `Break` and runs it
+  # repeatedly until it returns `Break`. You can optionally break with a value,
+  # which causes `loop` to return that value.
+  #
+  # ```
+  # number = run {
+  #   print "Enter a number!"
+  #   loop {
+  #     readUserInput | int.parse %
+  #       Ok n -> Break n
+  #       Err _ ->
+  #         "Enter a valid number."
+  #         Continue
+  #   }
+  # }
+  # ```
   needs (function.is0 body)
   recursive Nothing { recurse arg ->
-    result = function.run body
-    needs
-      result | equals Continue | bool.or (result | equals Break)
-      "The `body` has to return `Continue` or `Break`."
-    if (result | equals Continue) { recurse Nothing }
+    run body %
+      Continue -> recurse Nothing
+      Break -> Nothing
+      Break value -> value
+      _ -> needs False "The `body` has to return `Continue` or `Break`."
   }
 
 repeat times body :=
+  # Runs the body `times` times.
   needs (typeOf times | equals Int)
   needs (times | builtins.intCompareTo 0 | equals Less | bool.not)
   needs (function.is0 body)
   recursive times { recurse times ->
     if (times | builtins.intCompareTo 0 | equals Greater) {
-      function.run body
+      run body
       recurse (times | builtins.intSubtract 1)
     }
   }

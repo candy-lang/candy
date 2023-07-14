@@ -1,14 +1,13 @@
 bool = use "..bool"
-[ifElse] = use "..controlFlow"
+[ifElse, run] = use "..controlFlow"
 [equals] = use "..equality"
 function = use "..function"
 struct = use "..struct"
 tag = use "..tag"
 
-is value :=
-  value %
-    Ok _ | Error _ -> True
-    _ -> False
+is value := value %
+  Ok _ | Error _ -> True
+  _ -> False
 
 isOk result :=
   needs (is result)
@@ -93,7 +92,7 @@ or resultA resultB :=
 
 unwrapOrElse result defaultGetter :=
   needs (is result)
-  result | mapOrElse { value -> value } { value -> function.run defaultGetter }
+  result | mapOrElse { value -> value } { value -> run defaultGetter }
 unwrapOr result default :=
   needs (is result)
   unwrapOrElse result { default }

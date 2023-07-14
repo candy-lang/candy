@@ -3,9 +3,8 @@
 
 bool = use "..bool"
 [check] = use "..check"
-[ifElse, recursive] = use "..controlFlow"
+[ifElse, recursive, run] = use "..controlFlow"
 [equals] = use "..equality"
-[run] = use "..function"
 int = use "..int"
 text = use "..text"
 [toDebugText] = use "..toDebugText"

@@ -1,6 +1,6 @@
 type = use "..type"
 
 panic reason :=
+  # Always panics with the given reason.
   needs (type.is reason Text)
-  ## There is no way to call `panic` correctly.
   needs False reason
