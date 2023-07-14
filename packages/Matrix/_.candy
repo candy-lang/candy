@@ -1,32 +1,59 @@
 [print] = use "Builtins"
-[bool, equals, if, ifElse, int, iterable, recursive, list, result, text, struct] = use "Core"
+[bool, equals, if, ifElse, int, iterable, recursive, list, range, result, text, struct] = use "Core"
 
-matrix = ((2, 3, 4), (5, 6, 7))
-
-is2dMatrix a = bool.lazyAnd (list.is a) {
-  bool.lazyAnd (list.length a | int.isPositive) {
-    bool.lazyAnd (a | iterable.fromList | iterable.all { row -> list.is row }) {
-      w = a | list.get 0 | list.length
-      a | iterable.fromList | iterable.all { row -> list.length row | equals w }
-    }
-  }
+is a = list.is a | bool.lazyAnd { list.length a | int.isPositive }
+  | bool.lazyAnd { a | iterable.fromList | iterable.all { row -> list.is row } }
+  | bool.lazyAnd {
+  w = a | list.get 0 | list.length
+  a | iterable.fromList | iterable.all { row -> row | list.length | equals w }
+}
+  | bool.lazyAnd {
+  a | iterable.fromList
+  | iterable.all { row -> row | iterable.fromList | iterable.all { item -> int.is item } }
 }
 
 height a =
-  needs (is2dMatrix a)
+  needs (is a)
   list.length a
 width a =
-  needs (is2dMatrix a)
+  needs (is a)
   a | list.get 0 | list.length
+get a i j =
+  needs (is a)
+  needs (int.is i)
+  needs (int.is j)
+  needs (int.isNonNegative i)
+  needs (int.isNonNegative j)
+  needs (i | int.isLessThan (a | height))
+  needs (j | int.isLessThan (a | width))
+  a | list.get i | list.get j
 
 multiply a b =
-  needs (is2dMatrix a)
-  needs (is2dMatrix b)
-  needs (width a | equals (height b))
+  needs (is a)
+  needs (is b)
+  needs
+    width a | equals (height b)
+    "The width of the first matrix ({width a}) must be the height of the second one ({height b})."
   w = width b
   h = height a
-  recursive list.filled h (list.filled w 0)
+  common = width a
+  list.generate h { i ->
+    list.generate w { j ->
+      0 | range.to common | range.toIterable | iterable.map { k ->
+        print "multiplying {i}:{k} ({a | get i k}) and {k}:{j} ({b | get k j})"
+        int.multiply (a | get i k) (b | get k j)
+      }
+      | iterable.sum
+      | result.map { a ->
+        print "Sum is {a}"
+        a
+      }
+      | result.unwrap
+    }
+  }
 
-main environment :=
-  is2dMatrix matrix
-  is2dMatrix ((1, 2), (2, 3, 4))
+a = ((1, 2, 1), (3, 4, 1))
+b = ((1, 2, 0), (0, 1, 1), (0, 7, 5))
+c = multiply a b
+
+main environment := multiply b a
