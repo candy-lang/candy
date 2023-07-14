@@ -9,6 +9,7 @@ members = [
     "compiler/vm",
     "compiler/vm/fuzz",
 ]
+resolver = "2"
 
 [profile.release]
 # https://github.com/flamegraph-rs/flamegraph#usage-with-benchmarks
