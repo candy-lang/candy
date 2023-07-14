@@ -6,6 +6,7 @@ int = use "..int"
 result = use "..result"
 list = use "..list"
 text = use "..text"
+struct = use "..struct"
 
 # An iterable is a `() -> Result[[Item, Rest: Iterable[Item]], Any]`.
 # isWithItemType value checkItem :=
@@ -40,6 +41,8 @@ generateWithState initialState mapper :=
   recursive initialState { recurse state ->
     {
       mapper state | result.map { result ->
+        needs (result | struct.hasKey Item)
+        needs (result | struct.hasKey State)
         [item, state] = result
         [item, Rest: recurse state]
       }
