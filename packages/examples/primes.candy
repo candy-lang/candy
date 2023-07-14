@@ -1,0 +1,34 @@
+builtins = use "Builtins"
+[await, ifElse, int, recursive, equals, list, text, channel, loop, run] = use "Core"
+
+factorize n =
+  needs (int.is n)
+  needs (int.isPositive n)
+
+  recursive [n, Factor: 2] { recurse state ->
+    [n, factor] = state
+    ifElse (factor | int.isGreaterThan n) { (,) } {
+      ifElse
+        n | int.divideTruncating factor | int.multiply factor | equals n
+        { (factor,) | list.concatenate (recurse [N: n | int.divideTruncating factor, factor]) }
+        { recurse [n, Factor: factor | int.add 1] }
+    }
+  }
+
+main := { environment ->
+  print message = environment.stdout | channel.send message
+  read = {
+    response = channel.create 1
+    environment.stdin | channel.send response.sendPort
+    await response.receivePort
+  }
+
+  number = loop {
+    print "Enter a number."
+    run read | text.trim | int.parse %
+      Ok n -> Break n
+      Error _ -> Continue
+  }
+
+  factorize number
+}
