@@ -219,7 +219,7 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
-    "lint": "eslint src --ext ts",
+    "lint": "eslint --ext ts .",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "test": "node ./out/test/runTest.js"
@@ -229,16 +229,42 @@
     "vscode-languageclient": "^8.1.0"
   },
   "devDependencies": {
-    "@types/glob": "^8.0.1",
+    "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.1",
     "@types/node": "^20.4.2",
     "@types/vscode": "^1.80.0",
-    "@typescript-eslint/eslint-plugin": "^5.61.0",
-    "@typescript-eslint/parser": "^5.62.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
     "eslint": "^8.44.0",
+    "eslint-config-prettier": "^8.8.0",
+    "eslint-plugin-prettier": "^5.0.0",
     "glob": "^10.3.3",
     "mocha": "^10.2.0",
+    "prettier": "^3.0.0",
     "typescript": "^5.1.6",
     "vscode-test": "^1.4.0"
-  }
+  },
+  "eslintConfig": {
+    "root": true,
+    "plugins": [
+      "@typescript-eslint",
+      "prettier"
+    ],
+    "extends": [
+      "eslint:recommended",
+      "plugin:@typescript-eslint/strict-type-checked",
+      "plugin:@typescript-eslint/stylistic-type-checked",
+      "prettier"
+    ],
+    "parser": "@typescript-eslint/parser",
+    "parserOptions": {
+      "ecmaVersion": 2020,
+      "project": true,
+      "sourceType": "module"
+    },
+    "rules": {
+      "prettier/prettier": "warn"
+    }
+  },
+  "prettier": {}
 }
