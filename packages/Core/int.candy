@@ -1,7 +1,7 @@
 builtins = use "Builtins"
 bool = use "..bool"
 [check] = use "..check"
-[ifElse] = use "..controlFlow"
+[ifElse, recursive] = use "..controlFlow"
 [equals] = use "..equality"
 type = use "..type"
 
@@ -115,3 +115,14 @@ coerceIn value minimum maximum :=
   value | coerceAtLeast minimum | coerceAtMost maximum
 
 parse := builtins.intParse
+
+pow base exponent :=
+  needs (is base)
+  needs (is exponent)
+  needs (isNonNegative exponent)
+  recursive exponent { recurse exponent ->
+    ifElse
+      (exponent | isPositive)
+      { base | multiply (recurse (exponent | subtract 1)) }
+      { 1 }
+  }
