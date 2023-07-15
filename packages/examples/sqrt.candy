@@ -1,19 +1,24 @@
 builtins = use "Builtins"
-[equals, fixedDecimal, ifElse, recursive] = use "Core"
+[equals, fixedDecimal, ifElse, int, recursive] = use "Core"
 
-sqrt x :=
+sqrt x precision :=
   needs (fixedDecimal.is x)
   needs (fixedDecimal.isNonNegative x)
+  needs (int.is precision)
+  needs (int.isNonNegative precision)
+
+  x = x | fixedDecimal.rescale precision
+  delta = 1 | fixedDecimal.fromIntScaled (precision | int.subtract 1)
 
   recursive (x | fixedDecimal.divide (2 | fixedDecimal.fromInt)) { recurse guess ->
     refinedGuess =
       fixedDecimal.divide
         guess | fixedDecimal.add (x | fixedDecimal.divide guess)
         2 | fixedDecimal.fromInt
-    ifElse (fixedDecimal.approxEquals guess refinedGuess (1 | fixedDecimal.fromIntScaled 6)) { guess } { recurse refinedGuess }
+    ifElse (fixedDecimal.approxEquals guess refinedGuess delta) { guess } { recurse refinedGuess }
   }
 
 main _ :=
   input = 2
-  result = input | fixedDecimal.fromInt | sqrt
+  result = input | fixedDecimal.fromInt | sqrt 10
   builtins.print "The root of {input} is {result | fixedDecimal.toText}"
