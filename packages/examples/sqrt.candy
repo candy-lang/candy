@@ -10,7 +10,7 @@ sqrt x :=
       fixedDecimal.divide
         guess | fixedDecimal.add (x | fixedDecimal.divide guess)
         2 | fixedDecimal.fromInt
-    ifElse (fixedDecimal.approxEquals guess refinedGuess 10) { guess } { recurse refinedGuess }
+    ifElse (fixedDecimal.approxEquals guess refinedGuess (1 | fixedDecimal.fromIntScaled 6)) { guess } { recurse refinedGuess }
   }
 
 main _ :=
