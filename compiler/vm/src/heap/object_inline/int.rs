@@ -1,4 +1,6 @@
 use super::{InlineObject, InlineObjectTrait};
+use crate::heap::Int::Heap as OnHeap;
+use crate::heap::Int::Inline as Inlined;
 use crate::{
     heap::{object_heap::HeapObject, Heap, Int, Tag},
     utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_ord_via_get, DebugDisplay},
@@ -75,8 +77,8 @@ impl InlineInt {
         Tag::create_ordering(heap, ordering)
     }
 
-    operator_fn!(shift_left, i64::checked_shl, Shl::shl);
-    operator_fn!(shift_right, i64::checked_shr, Shr::shr);
+    shift_fn!(shift_left, i64::checked_shl, Shl::shl);
+    shift_fn!(shift_right, i64::checked_shr, Shr::shr);
 
     pub fn bit_length(self) -> Self {
         // SAFETY: The `bit_length` can be at most 62 since that's how large an [InlineInt] can get.
@@ -90,7 +92,29 @@ impl InlineInt {
 
 macro_rules! operator_fn {
     ($name:ident, $inline_operation:expr, $bigint_operation:expr) => {
-        pub fn $name(self, heap: &mut Heap, rhs: Self) -> Int {
+        pub fn $name(self, heap: &mut Heap, rhs: Int) -> Int {
+            let lhs = self.get();
+            match rhs {
+                Inlined(rhs) => rhs
+                    .try_get()
+                    .and_then(|rhs| $inline_operation(lhs, rhs))
+                    .map(|it| Int::create(heap, it))
+                    .unwrap_or_else(|| {
+                        Int::create_from_bigint(
+                            heap,
+                            $bigint_operation(BigInt::from(lhs), rhs.get()),
+                        )
+                    }),
+                OnHeap(rhs) => {
+                    Int::create_from_bigint(heap, $bigint_operation(BigInt::from(lhs), rhs.get()))
+                }
+            }
+        }
+    };
+}
+macro_rules! shift_fn {
+    ($name:ident, $inline_operation:expr, $bigint_operation:expr) => {
+        pub fn $name(self, heap: &mut Heap, rhs: InlineInt) -> Int {
             let lhs = self.get();
             rhs.try_get()
                 .and_then(|rhs| $inline_operation(lhs, rhs))
@@ -109,7 +133,7 @@ macro_rules! operator_fn_closed {
         }
     };
 }
-use {operator_fn, operator_fn_closed};
+use {operator_fn, operator_fn_closed, shift_fn};
 
 impl DebugDisplay for InlineInt {
     fn fmt(&self, f: &mut Formatter, _is_debug: bool) -> fmt::Result {
