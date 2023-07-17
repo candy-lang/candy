@@ -170,11 +170,13 @@ coerceIn value minimum maximum :=
 toText a :=
   needs (is a)
   beforeDot = a | floorToInt | toDebugText
-  afterDot = run {
-    scaleFactor = a | scale | scaleFactor
-    tmp = a | minorUnits | int.remainder scaleFactor
-    ifElse (int.isNonNegative tmp) { tmp | int.add scaleFactor | toDebugText | text.removePrefix "1" } {
-      tmp | int.subtract scaleFactor | toDebugText | text.removePrefix "-1"
+  ifElse (a | scale | equals 0) { beforeDot } { 
+    afterDot = run {
+      scaleFactor = a | scale | scaleFactor
+      tmp = a | minorUnits | int.remainder scaleFactor
+      ifElse (int.isNonNegative tmp) { tmp | int.add scaleFactor | toDebugText | text.removePrefix "1" } {
+        tmp | int.subtract scaleFactor | toDebugText | text.removePrefix "-1"
+      }
     }
+    "{beforeDot}.{afterDot}" 
   }
-  "{beforeDot}.{afterDot}"
