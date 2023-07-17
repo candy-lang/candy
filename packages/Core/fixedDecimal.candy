@@ -83,12 +83,19 @@ multiply factorA factorB :=
     rescaledMinorUnits factorA targetScale | int.multiply (rescaledMinorUnits factorB targetScale)
     | int.divideTruncating (scaleFactor targetScale)
     targetScale
-divide dividend divisor :=
+divideTruncating dividend divisor :=
   needs (is dividend)
   needs (is divisor)
   needs (divisor | minorUnits | equals 0 | bool.not) "You can't divide by zero."
   [valueA, valueB, targetScale] = comparableMinorUnits dividend divisor
-  fromIntScaled (valueA | int.multiply (targetScale | scaleFactor) | int.divideTruncating (valueB)) targetScale
+  fromIntScaled (valueA | int.multiply (targetScale | scaleFactor) | int.divideTruncating valueB) targetScale
+divideTruncatingAtScale dividend divisor targetScale :=
+  needs (is dividend)
+  needs (is divisor)
+  needs (targetScale | isScale)
+  needs (divisor | minorUnits | equals 0 | bool.not) "You can't divide by zero."
+  [valueA, valueB] = comparableMinorUnits dividend divisor
+  fromIntScaled (valueA | int.multiply (targetScale | scaleFactor) | int.divideTruncating valueB) targetScale
 
 compareTo valueA valueB :=
   needs (is valueA)

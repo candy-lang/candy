@@ -7,18 +7,18 @@ sqrt x precision :=
   needs (int.is precision)
   needs (int.isNonNegative precision)
 
-  x = x | fixedDecimal.rescale precision
-  delta = 1 | fixedDecimal.fromIntScaled (precision | int.subtract 1)
+  delta = 10 | fixedDecimal.fromIntScaled precision
 
-  recursive (x | fixedDecimal.divide (2 | fixedDecimal.fromInt)) { recurse guess ->
+  recursive (x | fixedDecimal.divideTruncatingAtScale (2 | fixedDecimal.fromInt) precision) { recurse guess ->
     refinedGuess =
-      fixedDecimal.divide
-        guess | fixedDecimal.add (x | fixedDecimal.divide guess)
+      fixedDecimal.divideTruncatingAtScale
+        guess | fixedDecimal.add (x | fixedDecimal.divideTruncatingAtScale guess precision)
         2 | fixedDecimal.fromInt
+        precision
     ifElse (fixedDecimal.approxEquals guess refinedGuess delta) { guess } { recurse refinedGuess }
   }
 
 main _ :=
   input = 2
-  result = input | fixedDecimal.fromInt | sqrt 10
+  result = input | fixedDecimal.fromInt | sqrt 15
   builtins.print "The root of {input} is {result | fixedDecimal.toText}"
