@@ -55,7 +55,7 @@ rescale a targetScale :=
 comparableMinorUnits valueA valueB =
   needs (is valueA)
   needs (is valueB)
-  targetScale = int.max (valueA | scale) (valueA | scale)
+  targetScale = int.max (valueA | scale) (valueB | scale)
   [
     ValueA: rescaledMinorUnits valueA targetScale,
     ValueB: rescaledMinorUnits valueB targetScale,
