@@ -20,5 +20,5 @@ sqrt x precision :=
 
 main _ :=
   input = 2
-  result = input | fixedDecimal.fromInt | sqrt 15
+  result = input | fixedDecimal.fromInt | sqrt 65
   builtins.print "The root of {input} is {result | fixedDecimal.toText}"
