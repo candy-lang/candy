@@ -252,6 +252,6 @@ impl ToRichIr for FunctionFlowValue {
         build_rich_ir_for_timelines(builder, &self.panics, &self.timeline);
         builder.dedent();
         builder.push_newline();
-        builder.push(" }", None, EnumSet::empty());
+        builder.push("}", None, EnumSet::empty());
     }
 }
