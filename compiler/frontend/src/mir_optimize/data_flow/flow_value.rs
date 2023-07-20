@@ -1,3 +1,4 @@
+use super::scope::{build_rich_ir_for_timelines, MainTimeline, PanickingTimeline};
 use crate::{
     builtin_functions::BuiltinFunction,
     mir::Id,
@@ -20,9 +21,8 @@ pub enum FlowValue {
     #[from]
     Int(BigInt),
     AnyFunction,
-    Function {
-        return_value: Box<FlowValue>, // TODO
-    },
+    #[from]
+    Function(FunctionFlowValue),
     AnyList,
     #[from]
     List(Vec<FlowValue>),
@@ -53,7 +53,19 @@ impl FlowValue {
             FlowValue::Builtin(_) => {}
             FlowValue::AnyInt | FlowValue::Int(_) => {}
             FlowValue::AnyFunction => {}
-            FlowValue::Function { return_value } => return_value.visit_referenced_ids(visit),
+            FlowValue::Function(FunctionFlowValue {
+                parameters,
+                panics,
+                timeline,
+            }) => {
+                for parameter in parameters {
+                    visit(*parameter);
+                }
+                for timeline in panics {
+                    timeline.visit_referenced_ids(visit);
+                }
+                timeline.visit_referenced_ids(visit);
+            }
             FlowValue::AnyList => {}
             FlowValue::List(items) => {
                 for item in items {
@@ -92,7 +104,20 @@ impl FlowValue {
             FlowValue::Builtin(_) => {}
             FlowValue::AnyInt | FlowValue::Int(_) => {}
             FlowValue::AnyFunction => {}
-            FlowValue::Function { return_value } => return_value.as_mut().map_ids(mapping),
+            FlowValue::Function(FunctionFlowValue {
+                parameters,
+                panics,
+                timeline,
+            }) => {
+                *parameters = mem::take(parameters)
+                    .into_iter()
+                    .map(|it| mapping[&it])
+                    .collect();
+                for timeline in panics {
+                    timeline.map_ids(mapping);
+                }
+                timeline.map_ids(mapping);
+            }
             FlowValue::AnyList => {}
             FlowValue::List(items) => {
                 for item in items {
@@ -144,11 +169,7 @@ impl ToRichIr for FlowValue {
             FlowValue::AnyFunction => {
                 builder.push("<Function>", TokenType::Type, EnumSet::empty());
             }
-            FlowValue::Function { return_value } => {
-                builder.push("{ ", None, EnumSet::empty());
-                return_value.build_rich_ir(builder);
-                builder.push(" }", None, EnumSet::empty());
-            }
+            FlowValue::Function(function) => function.build_rich_ir(builder),
             FlowValue::AnyList => {
                 builder.push("<List>", TokenType::Type, EnumSet::empty());
             }
@@ -193,11 +214,44 @@ impl ToRichIr for FlowValue {
                     builder.push(format!(r#""{}""#, text), TokenType::Text, EnumSet::empty());
                 builder.push_reference(text.to_owned(), range);
             }
-            FlowValue::Text(text) => {
-                let range =
-                    builder.push(format!(r#""{}""#, text), TokenType::Text, EnumSet::empty());
-                builder.push_reference(text.to_owned(), range);
-            }
         }
+    }
+}
+
+#[derive(Clone, Debug, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
+pub struct FunctionFlowValue {
+    parameters: Vec<Id>,
+    panics: Vec<PanickingTimeline>,
+    timeline: MainTimeline,
+}
+
+impl FunctionFlowValue {
+    pub fn new(
+        parameters: Vec<Id>,
+        panics: Vec<PanickingTimeline>,
+        timeline: MainTimeline,
+    ) -> Self {
+        Self {
+            parameters,
+            panics,
+            timeline,
+        }
+    }
+}
+
+impl ToRichIr for FunctionFlowValue {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push("{ ", None, EnumSet::empty());
+        for parameter in &self.parameters {
+            parameter.build_rich_ir(builder);
+            builder.push(" ", None, EnumSet::empty());
+        }
+        builder.push("->", None, EnumSet::empty());
+        builder.indent();
+        builder.push_newline();
+        build_rich_ir_for_timelines(builder, &self.panics, &self.timeline);
+        builder.dedent();
+        builder.push_newline();
+        builder.push(" }", None, EnumSet::empty());
     }
 }

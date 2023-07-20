@@ -115,7 +115,7 @@ pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
             context.pureness.include(other_pureness.as_ref(), &mapping);
             context
                 .data_flow
-                .include(other_data_flow.as_ref(), &mapping);
+                .on_module_folded(expression.id(), other_data_flow.as_ref(), &mapping);
             expression.prepend_optimized(
                 &mut context.visible,
                 mir.body.iter().map(|(id, expression)| {

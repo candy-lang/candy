@@ -206,7 +206,7 @@ impl Context<'_> {
                 self.pureness
                     .enter_function(parameters, *responsible_parameter);
                 self.data_flow
-                    .enter_function(parameters.iter().copied().collect(), body.return_value());
+                    .enter_function(parameters.to_owned(), body.return_value());
 
                 self.optimize_body(body);
 
@@ -221,7 +221,8 @@ impl Context<'_> {
                 self.data_flow
                     .on_constants_lifted(constants.iter().map(|(id, _)| *id));
                 expression.prepend_optimized(&mut self.visible, constants);
-                self.data_flow.exit_function(&parameters, return_value);
+                self.data_flow
+                    .exit_function(expression.id(), &parameters, return_value);
 
                 return;
             }

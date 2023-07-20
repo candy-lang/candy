@@ -10,21 +10,41 @@ use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{fmt::Debug, mem, ops::BitAndAssign};
 
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Timeline {
     pub values: ArcImHashMap<Id, FlowValue>,
     pub variants: Vec<Vec<Timeline>>,
 }
 
 impl Timeline {
+    pub fn insert_value(&mut self, id: Id, value: impl Into<FlowValue>) {
+        assert!(self.values.insert(id, value.into()).is_none());
+    }
+    pub fn overwrite_value(&mut self, id: Id, value: impl Into<FlowValue>) {
+        assert!(self.values.insert(id, value.into()).is_some());
+    }
+
+    pub fn visit_referenced_ids(&self, visit: &mut impl FnMut(Id)) {
+        for value in self.values.values() {
+            value.visit_referenced_ids(visit);
+        }
+        for variants in &self.variants {
+            for variant in variants {
+                variant.visit_referenced_ids(visit);
+            }
+        }
+    }
     pub fn map_ids(&mut self, mapping: &FxHashMap<Id, Id>) {
         self.values = mem::take(&mut self.values)
             .into_iter()
-            .filter_map(|(id, mut value)| {
-                value.map_ids(mapping);
+            .filter_map(|(id, value)| {
                 // If the mapping doesn't contain `id`, it means that the
                 // corresponding expression got removed by tree shaking.
                 mapping.get(&id).map(|&new_id| (new_id, value))
+            })
+            .map(|(id, mut value)| {
+                value.map_ids(mapping);
+                (id, value)
             })
             .collect();
         for variant in &mut self.variants.iter_mut().flatten() {
