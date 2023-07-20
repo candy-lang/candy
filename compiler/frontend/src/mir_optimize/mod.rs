@@ -46,6 +46,7 @@ use self::{
     current_expression::{Context, CurrentExpression},
     data_flow::DataFlowInsights,
     pure::PurenessInsights,
+    utils::ReferenceCounts,
 };
 use super::{hir, hir_to_mir::HirToMir, mir::Mir, tracing::TracingConfig};
 use crate::{
@@ -143,6 +144,8 @@ impl Context<'_> {
         while index < body.expressions.len() {
             // Thoroughly optimize the expression.
             let mut expression = CurrentExpression::new(body, index);
+            let original_reference_counts = expression.reference_counts();
+
             self.optimize_expression(&mut expression);
             if cfg!(debug_assertions) {
                 expression.validate(&self.visible);
@@ -159,7 +162,8 @@ impl Context<'_> {
             self.pureness.visit_optimized(id, &expression);
 
             module_folding::apply(self, &mut expression);
-            self.data_flow.visit_optimized(id, &expression);
+            self.data_flow
+                .visit_optimized(id, &expression, &original_reference_counts);
 
             {
                 println!("Data Flow Insights:");
@@ -175,7 +179,8 @@ impl Context<'_> {
 
             if self.data_flow.is_unconditional_panic() {
                 for (_, expression) in body.expressions.drain(index..) {
-                    self.data_flow.on_expression_deleted(&expression);
+                    self.data_flow
+                        .on_expression_passed(&expression.reference_counts());
                 }
             }
         }

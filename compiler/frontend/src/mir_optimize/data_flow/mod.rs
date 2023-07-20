@@ -50,14 +50,28 @@ impl DataFlowInsights {
         self.innermost_scope().timeline.is_panic()
     }
 
-    pub(super) fn visit_optimized(&mut self, id: Id, expression: &Expression) {
+    pub(super) fn visit_optimized(
+        &mut self,
+        id: Id,
+        expression: &Expression,
+        original_reference_counts: &FxHashMap<Id, usize>,
+    ) {
         let scope = self.scopes.last_mut().unwrap();
         scope.visit_optimized(id, expression, &mut self.reference_counts);
-        self.on_expression_deleted(expression);
+        self.on_expression_passed(original_reference_counts);
     }
-    pub(super) fn on_expression_deleted(&mut self, expression: &Expression) {
+
+    /// Called after we're done optimizing an expression.
+    ///
+    /// Reduces our internal reference counts by what was initially referenced by the expression
+    /// (before it was optimized) so that we can drop information about values that are no longer
+    /// used.
+    pub(super) fn on_expression_passed(
+        &mut self,
+        original_reference_counts: &FxHashMap<Id, usize>,
+    ) {
         let scope = self.scopes.last_mut().unwrap();
-        for (id, reference_count) in expression.reference_counts() {
+        for (&id, &reference_count) in original_reference_counts {
             let Entry::Occupied(mut entry) = self.reference_counts.entry(id) else {
                 // The referenced ID was defined inside the body of the current
                 // expression.
