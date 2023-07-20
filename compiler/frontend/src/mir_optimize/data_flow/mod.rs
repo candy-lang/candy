@@ -92,7 +92,7 @@ impl DataFlow {
     pub(super) fn exit_function(&mut self, id: Id, parameters: &[Id], return_value: Id) {
         info!("Exiting function {:?} -> {:?}", parameters, return_value);
         let function = self.scopes.pop().unwrap().finalize();
-        self.innermost_scope_mut().insert_value(id, function);
+        self.innermost_scope_mut().insert(id, function);
 
         for parameter in parameters {
             // Might have been removed already if the reference count dropped to

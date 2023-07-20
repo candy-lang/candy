@@ -48,7 +48,7 @@ impl DataFlowScope {
     ) {
         // We already know that the code panics and all code after that can be
         // ignored/removed since it never runs.
-        // let timeline = self.require_no_panic_mut();
+        assert!(self.state.result.is_ok());
 
         let value = match expression {
             Expression::Int(int) => FlowValue::Int(int.to_owned()),
@@ -133,9 +133,9 @@ impl DataFlowScope {
                 return;
             }
         };
-        self.insert_value(id, value);
+        self.insert(id, value);
     }
-    pub(super) fn insert_value(&mut self, id: Id, value: impl Into<FlowValue>) {
+    pub(super) fn insert(&mut self, id: Id, value: impl Into<FlowValue>) {
         assert!(self.locals.insert(id));
         self.state.timeline.insert(id, value);
     }
