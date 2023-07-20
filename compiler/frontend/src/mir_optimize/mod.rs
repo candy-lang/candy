@@ -206,7 +206,7 @@ impl Context<'_> {
                 self.pureness
                     .enter_function(parameters, *responsible_parameter);
                 self.data_flow
-                    .enter_function(parameters, body.return_value());
+                    .enter_function(parameters.iter().copied().collect(), body.return_value());
 
                 self.optimize_body(body);
 

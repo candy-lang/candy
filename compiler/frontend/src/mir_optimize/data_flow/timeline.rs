@@ -38,9 +38,9 @@ impl Timeline {
             variant.remove(id);
         }
     }
-    pub fn reduce(&mut self, parameters: &[Id], return_value: Id) {
+    pub fn reduce(&mut self, parameters: FxHashSet<Id>, return_value: Id) {
         let mut to_visit = vec![return_value];
-        let mut referenced: FxHashSet<_> = parameters.iter().copied().collect();
+        let mut referenced = parameters;
         referenced.insert(return_value);
         while let Some(current) = to_visit.pop() {
             self.collect_referenced_for_reduction(current, &mut |id| {

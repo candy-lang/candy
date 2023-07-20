@@ -5,7 +5,7 @@ use crate::{
     mir_optimize::data_flow::scope::MainTimeline,
     rich_ir::{RichIr, ToRichIr},
 };
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::{collections::hash_map::Entry, fmt::Debug};
 use tracing::info;
 
@@ -30,19 +30,19 @@ impl DataFlowInsights {
         }
     }
 
-    pub(super) fn enter_function(&mut self, parameters: &[Id], return_value: Id) {
+    pub(super) fn enter_function(&mut self, parameters: FxHashSet<Id>, return_value: Id) {
         info!("Entering function {:?} -> {:?}", parameters, return_value);
+        for parameter in parameters.iter() {
+            *self.reference_counts.entry(*parameter).or_default() += 1;
+        }
+        assert!(self.reference_counts.insert(return_value, 1).is_none());
+
         let timeline: Timeline = self
             .innermost_scope()
             .timeline
             .require_no_panic()
             .to_owned();
         self.scopes.push(DataFlowScope::new(timeline, parameters));
-
-        for parameter in parameters {
-            *self.reference_counts.entry(*parameter).or_default() += 1;
-        }
-        assert!(self.reference_counts.insert(return_value, 1).is_none());
     }
 
     pub(super) fn is_unconditional_panic(&self) -> bool {
@@ -74,7 +74,7 @@ impl DataFlowInsights {
     pub(super) fn exit_function(&mut self, parameters: &[Id], return_value: Id) {
         info!("Exiting function {:?} -> {:?}", parameters, return_value);
         let mut scope = self.scopes.pop().unwrap();
-        scope.reduce(parameters, return_value);
+        scope.reduce(return_value);
 
         for parameter in parameters {
             // Might have been removed already if the reference count dropped to

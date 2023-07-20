@@ -11,6 +11,7 @@ use strum_macros::EnumIs;
 
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct DataFlowScope {
+    parameters: FxHashSet<Id>,
     pub locals: FxHashSet<Id>,
     pub panics: Vec<PanickingTimeline>,
     pub timeline: MainTimeline,
@@ -49,7 +50,7 @@ impl PanickingTimeline {
         self.responsible = mapping[&self.responsible];
     }
 
-    pub fn reduce(&mut self, parameters: &[Id]) {
+    pub fn reduce(&mut self, parameters: FxHashSet<Id>) {
         self.timeline.reduce(parameters, self.reason)
     }
 }
@@ -81,7 +82,7 @@ impl MainTimeline {
         }
     }
 
-    pub fn reduce(&mut self, parameters: &[Id], return_value: Id) {
+    pub fn reduce(&mut self, parameters: FxHashSet<Id>, return_value: Id) {
         match self {
             MainTimeline::NoPanic(timeline) => timeline.reduce(parameters, return_value),
             MainTimeline::Panic(timeline) => timeline.reduce(parameters),
@@ -118,11 +119,12 @@ impl ToRichIr for MainTimeline {
 }
 
 impl DataFlowScope {
-    pub fn new(mut timeline: Timeline, parameters: &[Id]) -> Self {
-        for parameter in parameters {
+    pub fn new(mut timeline: Timeline, parameters: FxHashSet<Id>) -> Self {
+        for parameter in parameters.iter() {
             assert!(timeline.values.insert(*parameter, FlowValue::Any).is_none());
         }
         Self {
+            parameters,
             locals: FxHashSet::default(),
             panics: vec![],
             timeline: MainTimeline::NoPanic(timeline),
@@ -198,12 +200,14 @@ impl DataFlowScope {
             } => {
                 *reference_counts.get_mut(reason).unwrap() += 1;
                 *reference_counts.get_mut(responsible).unwrap() += 1;
-                self.timeline = MainTimeline::Panic(PanickingTimeline {
-                    // TODO: Filter timeline to only include `reason`, `responsible`, and their dependencies.
+
+                let mut timeline = PanickingTimeline {
                     timeline: mem::take(timeline),
                     reason: *reason,
                     responsible: *responsible,
-                });
+                };
+                timeline.reduce(self.parameters.clone());
+                self.timeline = MainTimeline::Panic(timeline);
                 return;
             }
             // These expressions are lowered to instructions that don't actually
@@ -230,16 +234,8 @@ impl DataFlowScope {
         }
     }
 
-    pub fn reduce(&mut self, parameters: &[Id], return_value: Id) {
-        for panicking_timeline in &mut self.panics {
-            panicking_timeline.reduce(parameters);
-        }
-        self.timeline.reduce(parameters, return_value);
+    pub fn reduce(&mut self, return_value: Id) {
+        // TODO: Finalize this into a new struct, then avoid the clone here.
+        self.timeline.reduce(self.parameters.clone(), return_value);
     }
-    // pub fn tree_shake(&mut self, parameters: &[Id], return_value: Id) {
-    //     match self.timeline {
-    //         MainTimeline::NoPanic(timeline) => timeline.tree_shake(),
-    //         MainTimeline::Panic(_) => todo!(),
-    //     }
-    // }
 }
