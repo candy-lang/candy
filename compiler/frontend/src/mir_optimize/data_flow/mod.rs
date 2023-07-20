@@ -1,26 +1,28 @@
-use self::{scope::DataFlowScope, timeline::Timeline};
+use self::{insights::DataFlowInsights, scope::DataFlowScope};
 use super::utils::ReferenceCounts;
 use crate::{
     mir::{Body, Expression, Id},
-    mir_optimize::data_flow::scope::MainTimeline,
+    mir_optimize::data_flow::operation::OperationKind,
     rich_ir::{RichIr, ToRichIr},
 };
 use rustc_hash::FxHashMap;
 use std::{collections::hash_map::Entry, fmt::Debug};
 use tracing::info;
 
-mod flow_value;
+pub mod flow_value;
+pub mod insights;
+pub mod operation;
 mod scope;
-mod timeline;
+pub mod timeline;
 
 // TODO: Split off a struct for actual results after the whole module was visited.
 #[derive(Debug, Default, Eq, PartialEq)]
-pub struct DataFlowInsights {
+pub struct DataFlow {
     reference_counts: FxHashMap<Id, usize>,
     scopes: Vec<DataFlowScope>,
 }
 
-impl DataFlowInsights {
+impl DataFlow {
     pub(super) fn new(body: &Body) -> Self {
         let mut reference_counts = body.reference_counts();
         assert!(reference_counts.insert(body.return_value(), 1).is_none());
@@ -37,17 +39,13 @@ impl DataFlowInsights {
         }
         assert!(self.reference_counts.insert(return_value, 1).is_none());
 
-        let timeline: Timeline = self
-            .innermost_scope()
-            .timeline
-            .require_no_panic()
-            .to_owned();
+        let timeline = self.innermost_scope().state.timeline.to_owned();
         self.scopes
             .push(DataFlowScope::new(timeline, parameters, return_value));
     }
 
     pub(super) fn is_unconditional_panic(&self) -> bool {
-        self.innermost_scope().timeline.is_panic()
+        self.innermost_scope().state.result.is_err()
     }
 
     pub(super) fn visit_optimized(
@@ -80,14 +78,14 @@ impl DataFlowInsights {
             };
             if *entry.get() == reference_count {
                 entry.remove();
-                scope.timeline.timeline_mut().remove(id);
+                scope.state.timeline.remove(id);
             } else {
                 *entry.get_mut() -= reference_count;
             }
         }
 
         if !self.reference_counts.contains_key(&id) {
-            scope.timeline.timeline_mut().remove(id);
+            scope.state.timeline.remove(id);
         }
     }
 
@@ -103,12 +101,13 @@ impl DataFlowInsights {
         }
         self.reference_counts.remove(&return_value).unwrap();
     }
-    pub(super) fn on_normalize_ids(&mut self, mapping: &FxHashMap<Id, Id>) {
-        let root_scope = self.require_only_root_mut();
-        for timeline in root_scope.panics.iter_mut() {
-            timeline.map_ids(mapping);
-        }
-        root_scope.timeline.map_ids(mapping);
+    pub(super) fn finalize(mut self, mapping: &FxHashMap<Id, Id>) -> DataFlowInsights {
+        let root_scope = self.scopes.pop().unwrap();
+        assert!(self.scopes.is_empty());
+
+        let mut insights = root_scope.finalize();
+        insights.map_ids(mapping);
+        insights
     }
     pub(super) fn on_constants_lifted(&mut self, lifted_constants: impl IntoIterator<Item = Id>) {
         let [.., outer_scope, inner_scope] = self.scopes.as_mut_slice() else { panic!(); };
@@ -124,31 +123,29 @@ impl DataFlowInsights {
         mapping: &FxHashMap<Id, Id>,
     ) {
         let this = self.require_only_root_mut();
-        let other = other.require_only_root();
         assert!(
-            other.panics.is_empty(),
+            !other
+                .operations
+                .iter()
+                .any(|it| matches!(it.kind, OperationKind::Panic(_))),
             "Modules can't panic conditionally.",
         );
 
-        match &other.timeline {
-            MainTimeline::NoPanic {
-                timeline,
-                return_value,
-            } => {
-                let mut timeline = timeline.to_owned();
-                timeline.map_ids(mapping);
-                *this.require_no_panic_mut() &= timeline;
+        let mut timeline = other.timeline.to_owned();
+        timeline.map_ids(mapping);
+        match &other.result {
+            Ok(return_value) => {
+                this.state.timeline &= timeline;
 
                 self.innermost_scope_mut()
+                    .state
                     .timeline
-                    .require_no_panic_mut()
                     .overwrite_value(id, *return_value);
             }
-            MainTimeline::Panic(timeline) => {
-                assert!(matches!(this.timeline, MainTimeline::NoPanic { .. }));
-                let mut timeline = timeline.to_owned();
-                timeline.map_ids(mapping);
-                this.timeline = MainTimeline::Panic(timeline);
+            Err(panic) => {
+                assert!(this.state.result.is_ok());
+                this.state.timeline = timeline;
+                this.state.result = Err(panic.to_owned());
             }
         }
     }
@@ -163,12 +160,6 @@ impl DataFlowInsights {
         self.scopes.last_mut().unwrap()
     }
 
-    fn require_only_root(&self) -> &DataFlowScope {
-        match self.scopes.as_slice() {
-            [root_scope] => root_scope,
-            _ => panic!(),
-        }
-    }
     fn require_only_root_mut(&mut self) -> &mut DataFlowScope {
         match self.scopes.as_mut_slice() {
             [root_scope] => root_scope,

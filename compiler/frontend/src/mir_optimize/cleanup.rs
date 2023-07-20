@@ -12,7 +12,10 @@
 
 use rustc_hash::FxHashMap;
 
-use super::{data_flow::DataFlowInsights, pure::PurenessInsights};
+use super::{
+    data_flow::{insights::DataFlowInsights, DataFlow},
+    pure::PurenessInsights,
+};
 use crate::{
     id::IdGenerator,
     mir::{Body, Expression, Id, Mir},
@@ -20,9 +23,13 @@ use crate::{
 use std::mem;
 
 impl Mir {
-    pub fn cleanup(&mut self, pureness: &mut PurenessInsights, data_flow: &mut DataFlowInsights) {
+    pub fn cleanup(
+        &mut self,
+        pureness: &mut PurenessInsights,
+        data_flow: DataFlow,
+    ) -> DataFlowInsights {
         self.sort_leading_constants(pureness);
-        self.normalize_ids(pureness, data_flow);
+        self.normalize_ids(pureness, data_flow)
     }
 
     /// Sorts the leading constants in the body. This wouldn't be super useful
@@ -84,8 +91,8 @@ impl Mir {
     pub fn normalize_ids(
         &mut self,
         pureness: &mut PurenessInsights,
-        data_flow: &mut DataFlowInsights,
-    ) {
+        data_flow: DataFlow,
+    ) -> DataFlowInsights {
         let mut generator = IdGenerator::start_at(1);
         let mapping: FxHashMap<Id, Id> = self
             .body
@@ -96,6 +103,6 @@ impl Mir {
 
         self.body.replace_ids(&mut |id| *id = mapping[&*id]);
         pureness.on_normalize_ids(&mapping);
-        data_flow.on_normalize_ids(&mapping);
+        data_flow.finalize(&mapping)
     }
 }

@@ -1,4 +1,4 @@
-use super::{data_flow::DataFlowInsights, pure::PurenessInsights, OptimizeMir};
+use super::{data_flow::DataFlow, pure::PurenessInsights, OptimizeMir};
 use crate::{
     error::CompilerError,
     id::IdGenerator,
@@ -15,7 +15,7 @@ pub struct Context<'a> {
     pub visible: VisibleExpressions,
     pub id_generator: &'a mut IdGenerator<Id>,
     pub pureness: PurenessInsights,
-    pub data_flow: DataFlowInsights,
+    pub data_flow: DataFlow,
 }
 impl<'a> Context<'a> {
     pub fn new(
@@ -32,7 +32,7 @@ impl<'a> Context<'a> {
             visible: VisibleExpressions::none_visible(),
             id_generator,
             pureness: PurenessInsights::default(),
-            data_flow: DataFlowInsights::new(body),
+            data_flow: DataFlow::new(body),
         }
     }
 }

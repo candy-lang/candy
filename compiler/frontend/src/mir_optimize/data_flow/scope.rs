@@ -1,161 +1,23 @@
 use super::{
-    flow_value::{FlowValue, FunctionFlowValue},
-    timeline::Timeline,
+    flow_value::FlowValue, insights::DataFlowInsights, operation::Panic, timeline::Timeline,
 };
 use crate::{
     impl_display_via_richir,
     mir::{Expression, Id},
     rich_ir::{RichIrBuilder, ToRichIr},
 };
-use enumset::EnumSet;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{fmt::Debug, mem};
-use strum_macros::EnumIs;
+use std::fmt::Debug;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct DataFlowScope {
-    parameters: Vec<Id>,
     pub locals: FxHashSet<Id>,
-    pub panics: Vec<PanickingTimeline>,
-    pub timeline: MainTimeline,
+    pub(super) state: DataFlowInsights,
 }
 impl_display_via_richir!(DataFlowScope);
 impl ToRichIr for DataFlowScope {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        build_rich_ir_for_timelines(builder, &self.panics, &self.timeline)
-    }
-}
-
-pub(super) fn build_rich_ir_for_timelines(
-    builder: &mut RichIrBuilder,
-    panics: &[PanickingTimeline],
-    timeline: &MainTimeline,
-) {
-    if !panics.is_empty() {
-        builder.push("Panicking cases:", None, EnumSet::empty());
-        builder.push_children_multiline(panics);
-        builder.push_newline();
-
-        builder.push("Otherwise:", None, EnumSet::empty());
-        builder.indent();
-        builder.push_newline();
-    }
-
-    timeline.build_rich_ir(builder);
-
-    if !panics.is_empty() {
-        builder.dedent();
-    }
-}
-
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct PanickingTimeline {
-    timeline: Timeline,
-    reason: Id,
-    responsible: Id,
-}
-impl PanickingTimeline {
-    pub fn visit_referenced_ids(&self, visit: &mut impl FnMut(Id)) {
-        self.timeline.visit_referenced_ids(visit);
-        visit(self.reason);
-    }
-    pub fn map_ids(&mut self, mapping: &FxHashMap<Id, Id>) {
-        self.timeline.map_ids(mapping);
-        self.reason = mapping[&self.reason];
-        self.responsible = mapping[&self.responsible];
-    }
-
-    pub fn reduce(&mut self, parameters: FxHashSet<Id>) {
-        self.timeline.reduce(parameters, self.reason)
-    }
-}
-impl_display_via_richir!(PanickingTimeline);
-impl ToRichIr for PanickingTimeline {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        Expression::Panic {
-            reason: self.reason,
-            responsible: self.responsible,
-        }
-        .build_rich_ir(builder);
-        builder.indent();
-        builder.push_newline();
-        self.timeline.build_rich_ir(builder);
-        builder.dedent();
-    }
-}
-
-#[derive(Clone, Debug, EnumIs, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum MainTimeline {
-    NoPanic {
-        timeline: Timeline,
-        return_value: Id,
-    },
-    Panic(PanickingTimeline),
-}
-impl MainTimeline {
-    pub fn visit_referenced_ids(&self, visit: &mut impl FnMut(Id)) {
-        match self {
-            MainTimeline::NoPanic {
-                timeline,
-                return_value,
-            } => {
-                timeline.visit_referenced_ids(visit);
-                visit(*return_value);
-            }
-            MainTimeline::Panic(timeline) => timeline.visit_referenced_ids(visit),
-        }
-    }
-    pub fn map_ids(&mut self, mapping: &FxHashMap<Id, Id>) {
-        match self {
-            MainTimeline::NoPanic { timeline, .. } => timeline.map_ids(mapping),
-            MainTimeline::Panic(timeline) => timeline.map_ids(mapping),
-        }
-    }
-
-    pub fn reduce(&mut self, parameters: FxHashSet<Id>) {
-        match self {
-            MainTimeline::NoPanic {
-                timeline,
-                return_value,
-            } => timeline.reduce(parameters, *return_value),
-            MainTimeline::Panic(timeline) => timeline.reduce(parameters),
-        }
-    }
-
-    pub fn timeline_mut(&mut self) -> &mut Timeline {
-        match self {
-            MainTimeline::NoPanic { timeline, .. } => timeline,
-            MainTimeline::Panic(timeline) => &mut timeline.timeline,
-        }
-    }
-
-    pub fn require_no_panic(&self) -> &Timeline {
-        match self {
-            MainTimeline::NoPanic { timeline, .. } => timeline,
-            MainTimeline::Panic(_) => panic!("Main timeline panics!"),
-        }
-    }
-    pub fn require_no_panic_mut(&mut self) -> &mut Timeline {
-        match self {
-            MainTimeline::NoPanic { timeline, .. } => timeline,
-            MainTimeline::Panic(_) => panic!("Main timeline panics!"),
-        }
-    }
-}
-impl_display_via_richir!(MainTimeline);
-impl ToRichIr for MainTimeline {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        match self {
-            MainTimeline::NoPanic {
-                timeline,
-                return_value,
-            } => {
-                timeline.build_rich_ir(builder);
-                builder.push("returns ", None, EnumSet::empty());
-                return_value.build_rich_ir(builder);
-            }
-            MainTimeline::Panic(timeline) => timeline.build_rich_ir(builder),
-        }
+        self.state.build_rich_ir(builder);
     }
 }
 
@@ -168,12 +30,12 @@ impl DataFlowScope {
             assert!(timeline.values.insert(*parameter, FlowValue::Any).is_none());
         }
         Self {
-            parameters,
             locals: FxHashSet::default(),
-            panics: vec![],
-            timeline: MainTimeline::NoPanic {
+            state: DataFlowInsights {
+                parameters,
+                operations: vec![],
                 timeline,
-                return_value,
+                result: Ok(return_value),
             },
         }
     }
@@ -186,7 +48,7 @@ impl DataFlowScope {
     ) {
         // We already know that the code panics and all code after that can be
         // ignored/removed since it never runs.
-        let timeline = self.require_no_panic_mut();
+        // let timeline = self.require_no_panic_mut();
 
         let value = match expression {
             Expression::Int(int) => FlowValue::Int(int.to_owned()),
@@ -230,7 +92,7 @@ impl DataFlowScope {
             }
             Expression::Function { .. } => {
                 // Functions get added by [DataFlowInsights::exit_function].
-                assert!(self.timeline.require_no_panic().values.contains_key(&id));
+                assert!(self.state.timeline.values.contains_key(&id));
                 return;
             }
             Expression::Parameter => FlowValue::Any,
@@ -249,13 +111,13 @@ impl DataFlowScope {
                 *reference_counts.get_mut(reason).unwrap() += 1;
                 *reference_counts.get_mut(responsible).unwrap() += 1;
 
-                let mut timeline = PanickingTimeline {
-                    timeline: mem::take(timeline),
+                self.state
+                    .timeline
+                    .reduce(self.state.parameters.iter().copied().collect(), *reason);
+                self.state.result = Err(Panic {
                     reason: *reason,
                     responsible: *responsible,
-                };
-                timeline.reduce(self.parameters.iter().copied().collect());
-                self.timeline = MainTimeline::Panic(timeline);
+                });
                 return;
             }
             // These expressions are lowered to instructions that don't actually
@@ -274,20 +136,12 @@ impl DataFlowScope {
         self.insert_value(id, value);
     }
     pub(super) fn insert_value(&mut self, id: Id, value: impl Into<FlowValue>) {
-        self.require_no_panic_mut().insert_value(id, value);
         assert!(self.locals.insert(id));
+        self.state.timeline.insert_value(id, value);
     }
 
-    pub fn require_no_panic_mut(&mut self) -> &mut Timeline {
-        match &mut self.timeline {
-            MainTimeline::NoPanic { timeline, .. } => timeline,
-            MainTimeline::Panic(_) => panic!("Tried to continue data flow analysis after panic"),
-        }
-    }
-
-    pub fn finalize(mut self) -> FunctionFlowValue {
-        self.timeline
-            .reduce(self.parameters.iter().copied().collect());
-        FunctionFlowValue::new(self.parameters, self.panics, self.timeline)
+    pub fn finalize(mut self) -> DataFlowInsights {
+        self.state.reduce();
+        self.state
     }
 }

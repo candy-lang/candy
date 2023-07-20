@@ -23,6 +23,12 @@ impl Timeline {
     pub fn overwrite_value(&mut self, id: Id, value: impl Into<FlowValue>) {
         assert!(self.values.insert(id, value.into()).is_some());
     }
+    pub fn remove(&mut self, id: Id) {
+        self.values.remove(&id);
+        for variant in &mut self.variants.iter_mut().flatten() {
+            variant.remove(id);
+        }
+    }
 
     pub fn visit_referenced_ids(&self, visit: &mut impl FnMut(Id)) {
         for value in self.values.values() {
@@ -52,16 +58,14 @@ impl Timeline {
         }
     }
 
-    pub fn remove(&mut self, id: Id) {
-        self.values.remove(&id);
-        for variant in &mut self.variants.iter_mut().flatten() {
-            variant.remove(id);
-        }
-    }
-    pub fn reduce(&mut self, parameters: FxHashSet<Id>, return_value: Id) {
-        let mut to_visit = vec![return_value];
+    pub fn reduce(&mut self, parameters: FxHashSet<Id>, return_value: impl Into<Option<Id>>) {
+        let mut to_visit = vec![];
         let mut referenced = parameters;
-        referenced.insert(return_value);
+        if let Some(return_value) = return_value.into() {
+            to_visit.push(return_value);
+            referenced.insert(return_value);
+        }
+
         while let Some(current) = to_visit.pop() {
             self.collect_referenced_for_reduction(current, &mut |id| {
                 if referenced.insert(id) {
@@ -95,18 +99,6 @@ impl Timeline {
             variant.retain(to_retain);
         }
     }
-
-    // /// Tree shake within the current timeline and return whether it's still
-    // /// needed at all.
-    // pub fn tree_shake(
-    //     &mut self,
-    //     // all_referenced: &mut FxHashSet<Id>,
-    //     referenced: &mut FxHashSet<Id>,
-    // ) -> bool {
-    //     // Expand `referenced` with the transitive closure within `self.values`.
-
-    //     todo!()
-    // }
 }
 
 // impl BitAnd for Timeline {

@@ -44,14 +44,17 @@
 
 use self::{
     current_expression::{Context, CurrentExpression},
-    data_flow::DataFlowInsights,
+    data_flow::{
+        flow_value::FlowValue, insights::DataFlowInsights, operation::Panic, timeline::Timeline,
+    },
     pure::PurenessInsights,
     utils::ReferenceCounts,
 };
 use super::{hir, hir_to_mir::HirToMir, mir::Mir, tracing::TracingConfig};
 use crate::{
     error::CompilerError,
-    mir::{Body, Expression, MirError},
+    id::IdGenerator,
+    mir::{Body, BodyBuilder, Expression, MirError},
     module::Module,
     rich_ir::ToRichIr,
     string_to_rcst::ModuleError,
@@ -116,7 +119,7 @@ fn optimized_mir(
     context.optimize_body(&mut mir.body);
     let Context {
         mut pureness,
-        mut data_flow,
+        data_flow,
         errors,
         ..
     } = context;
@@ -124,14 +127,14 @@ fn optimized_mir(
     if cfg!(debug_assertions) {
         mir.validate();
     }
-    mir.cleanup(&mut pureness, &mut data_flow);
+    let data_flow_insights = mir.cleanup(&mut pureness, data_flow);
     let complexity_after = mir.complexity();
 
     debug!("{module}: Done. Optimized from {complexity_before} to {complexity_after}");
     Ok((
         Arc::new(mir),
         Arc::new(pureness),
-        Arc::new(data_flow),
+        Arc::new(data_flow_insights),
         Arc::new(errors),
     ))
 }
@@ -270,16 +273,28 @@ fn recover_from_cycle(
         },
     );
 
-    let mir = Mir::build(|body| {
-        let reason = body.push_text(error.payload.to_string());
-        let responsible = body.push_hir_id(hir::Id::new(module.clone(), vec![]));
-        body.push_panic(reason, responsible);
-    });
+    let mut builder = BodyBuilder::new(IdGenerator::start_at(1));
+    let mut timeline = Timeline::default();
+
+    let reason = builder.push_text(error.payload.to_string());
+    timeline.insert_value(reason, FlowValue::Text(error.payload.to_string()));
+
+    let responsible = builder.push_hir_id(hir::Id::new(module.clone(), vec![]));
+
+    builder.push_panic(reason, responsible);
+    let panic = Panic {
+        reason,
+        responsible,
+    };
+
+    let (id_generator, body) = builder.finish();
+    let mir = Mir { id_generator, body };
+    let data_flow_insights = DataFlowInsights::new(vec![], vec![], timeline, Err(panic));
 
     Ok((
         Arc::new(mir),
         Arc::default(),
-        Arc::default(),
+        Arc::new(data_flow_insights),
         Arc::new(FxHashSet::from_iter([error])),
     ))
 }
