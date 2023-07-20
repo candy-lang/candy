@@ -221,7 +221,7 @@ impl DebugSession {
                     &mut tracer,
                 );
 
-                let mut execution_controller = RunLimitedNumberOfInstructions::new(10000);
+                let mut execution_controller = RunLimitedNumberOfInstructions::new(10_000);
                 // TODO: remove when we support pause and continue
                 vm.run(&mut execution_controller, &mut tracer);
 

@@ -18,7 +18,7 @@ use crate::coverage::Coverage;
 use rustc_hash::FxHashMap;
 use std::borrow::Borrow;
 
-const MAX_INSTRUCTIONS: usize = 1000000;
+const MAX_INSTRUCTIONS: usize = 1_000_000;
 
 pub struct Runner<L: Borrow<Lir>> {
     pub vm: Option<Vm<L, StackTracer>>, // Is consumed when the runner is finished.
