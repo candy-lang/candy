@@ -17,10 +17,10 @@ pub struct Timeline {
 }
 
 impl Timeline {
-    pub fn insert_value(&mut self, id: Id, value: impl Into<FlowValue>) {
+    pub fn insert(&mut self, id: Id, value: impl Into<FlowValue>) {
         assert!(self.values.insert(id, value.into()).is_none());
     }
-    pub fn overwrite_value(&mut self, id: Id, value: impl Into<FlowValue>) {
+    pub fn replace(&mut self, id: Id, value: impl Into<FlowValue>) {
         assert!(self.values.insert(id, value.into()).is_some());
     }
     pub fn remove(&mut self, id: Id) {

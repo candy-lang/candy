@@ -277,7 +277,7 @@ fn recover_from_cycle(
     let mut timeline = Timeline::default();
 
     let reason = builder.push_text(error.payload.to_string());
-    timeline.insert_value(reason, FlowValue::Text(error.payload.to_string()));
+    timeline.insert(reason, FlowValue::Text(error.payload.to_string()));
 
     let responsible = builder.push_hir_id(hir::Id::new(module.clone(), vec![]));
 

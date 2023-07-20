@@ -140,7 +140,7 @@ impl DataFlow {
                 self.innermost_scope_mut()
                     .state
                     .timeline
-                    .overwrite_value(id, *return_value);
+                    .replace(id, *return_value);
             }
             Err(panic) => {
                 assert!(this.state.result.is_ok());

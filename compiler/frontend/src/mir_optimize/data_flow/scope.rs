@@ -137,7 +137,7 @@ impl DataFlowScope {
     }
     pub(super) fn insert_value(&mut self, id: Id, value: impl Into<FlowValue>) {
         assert!(self.locals.insert(id));
-        self.state.timeline.insert_value(id, value);
+        self.state.timeline.insert(id, value);
     }
 
     pub fn finalize(mut self) -> DataFlowInsights {
