@@ -20,6 +20,9 @@ pub(crate) struct Options {
     /// If enabled, the program will print the output of the candy main function.
     #[arg(long = "print-main-output", default_value_t = false)]
     print_main_output: bool,
+    /// If enabled, the LLVM bitcode will be compiled with debug information.
+    #[arg(short = 'g', default_value_t = false)]
+    debug: bool,
     /// The file or package to run. If none is provided, the package of your
     /// current working directory will be run.
     #[arg(value_hint = ValueHint::FilePath)]
@@ -79,6 +82,7 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
         .args([
             "compiler/backend_inkwell/candy_rt.c",
             s_path.to_str().unwrap(),
+            if options.debug { "-g" } else { "" },
             "-o",
             &s_path.to_str().unwrap().replace(".candy.s", ""),
         ])

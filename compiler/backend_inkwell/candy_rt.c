@@ -15,6 +15,12 @@ typedef enum
     CANDY_TYPE_FUNCTION,
 } candy_type_t;
 
+typedef struct
+{
+    struct candy_value *environemt;
+    struct candy_value *(*function)(struct candy_value *);
+} candy_function_t;
+
 typedef struct candy_value
 {
     union
@@ -22,12 +28,12 @@ typedef struct candy_value
         int128_t integer;
         char *text;
         struct candy_value *list;
-        struct candy_value *(*function)(void);
+        candy_function_t function;
     } value;
     candy_type_t type;
 } candy_value_t;
 
-typedef candy_value_t *(*candy_function)(void);
+typedef candy_value_t *(*candy_function)(candy_value_t *);
 
 candy_value_t __internal_true = {
     .value = {.text = "True"},
@@ -113,11 +119,12 @@ candy_value_t *make_candy_tag(char *tag)
     return candy_value;
 }
 
-candy_value_t *make_candy_function(candy_function function)
+candy_value_t *make_candy_function(candy_function function, candy_value_t *environment)
 {
     candy_value_t *candy_value = malloc(sizeof(candy_value_t));
     candy_value->type = CANDY_TYPE_FUNCTION;
-    candy_value->value.function = function;
+    candy_value->value.function.function = function;
+    candy_value->value.function.environemt = environment;
     return candy_value;
 }
 
@@ -144,11 +151,15 @@ candy_value_t *candy_builtin_ifelse(candy_value_t *condition, candy_value_t *the
 {
     if (candy_tag_to_bool(condition))
     {
-        return then->value.function();
+        candy_function then_function = (then->value).function.function;
+        candy_value_t *environment = (then->value).function.environemt;
+        return then_function(environment);
     }
     else
     {
-        return otherwise->value.function();
+        candy_function otherwise_function = (otherwise->value).function.function;
+        candy_value_t *environment = (otherwise->value).function.environemt;
+        return otherwise_function(environment);
     }
 }
 
@@ -202,7 +213,7 @@ void candy_panic(candy_value_t *reason)
     printf("The program panicked for the following reason: \n");
     print_candy_value(reason);
     printf("\n");
-    abort();
+    exit(-1);
 }
 
 void free_candy_value(candy_value_t *value)
