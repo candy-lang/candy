@@ -58,7 +58,7 @@ impl DataFlowInsights {
     ) {
         let scope = self.scopes.last_mut().unwrap();
         scope.visit_optimized(id, expression, &mut self.reference_counts);
-        self.on_expression_passed(original_reference_counts);
+        self.on_expression_passed(id, original_reference_counts);
     }
 
     /// Called after we're done optimizing an expression.
@@ -68,6 +68,7 @@ impl DataFlowInsights {
     /// used.
     pub(super) fn on_expression_passed(
         &mut self,
+        id: Id,
         original_reference_counts: &FxHashMap<Id, usize>,
     ) {
         let scope = self.scopes.last_mut().unwrap();
@@ -83,6 +84,10 @@ impl DataFlowInsights {
             } else {
                 *entry.get_mut() -= reference_count;
             }
+        }
+
+        if !self.reference_counts.contains_key(&id) {
+            scope.timeline.timeline_mut().remove(id);
         }
     }
 

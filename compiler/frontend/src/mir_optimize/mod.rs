@@ -180,7 +180,7 @@ impl Context<'_> {
             if self.data_flow.is_unconditional_panic() {
                 for (_, expression) in body.expressions.drain(index..) {
                     self.data_flow
-                        .on_expression_passed(&expression.reference_counts());
+                        .on_expression_passed(id, &expression.reference_counts());
                 }
             }
         }
