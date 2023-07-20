@@ -139,8 +139,7 @@ impl DataFlowInsights {
                 timeline.map_ids(mapping);
                 *this.require_no_panic_mut() &= timeline;
 
-                let scope = self.scopes.last_mut().unwrap();
-                scope
+                self.innermost_scope_mut()
                     .timeline
                     .require_no_panic_mut()
                     .overwrite_value(id, *return_value);
