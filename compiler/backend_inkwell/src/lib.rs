@@ -122,15 +122,11 @@ impl<'ctx> CodeGen<'ctx> {
             "",
         );
         if print_main_output {
-            let main_res = self.builder.build_load(
-                candy_type_ptr,
-                main_res_ptr
-                    .try_as_basic_value()
-                    .unwrap_left()
-                    .into_pointer_value(),
+            self.builder.build_call(
+                print_fn,
+                &[main_res_ptr.try_as_basic_value().unwrap_left().into()],
                 "",
             );
-            self.builder.build_call(print_fn, &[main_res.into()], "");
             for value in self.module.get_globals() {
                 let val = self
                     .builder
@@ -426,7 +422,30 @@ impl<'ctx> CodeGen<'ctx> {
                                 },
                             );
                         }
-                        candy_frontend::builtin_functions::BuiltinFunction::IntCompareTo => todo!(),
+                        candy_frontend::builtin_functions::BuiltinFunction::IntCompareTo => {
+                            let candy_type_ptr = self
+                                .module
+                                .get_struct_type("candy_type")
+                                .unwrap()
+                                .ptr_type(AddressSpace::default());
+
+                            let fn_type = candy_type_ptr
+                                .fn_type(&[candy_type_ptr.into(), candy_type_ptr.into()], false);
+                            let function = self.module.add_function(
+                                "candy_builtin_int_compareto",
+                                fn_type,
+                                None,
+                            );
+                            self.functions.insert(
+                                *id,
+                                FunctionInfo {
+                                    function_value: Rc::new(function),
+                                    parameters: vec![],
+                                    captured_ids: vec![],
+                                    env_type: None,
+                                },
+                            );
+                        }
                         candy_frontend::builtin_functions::BuiltinFunction::IntDivideTruncating => {
                             todo!()
                         }
@@ -438,7 +457,30 @@ impl<'ctx> CodeGen<'ctx> {
                         candy_frontend::builtin_functions::BuiltinFunction::IntShiftRight => {
                             todo!()
                         }
-                        candy_frontend::builtin_functions::BuiltinFunction::IntSubtract => todo!(),
+                        candy_frontend::builtin_functions::BuiltinFunction::IntSubtract => {
+                            let candy_type_ptr = self
+                                .module
+                                .get_struct_type("candy_type")
+                                .unwrap()
+                                .ptr_type(AddressSpace::default());
+
+                            let fn_type = candy_type_ptr
+                                .fn_type(&[candy_type_ptr.into(), candy_type_ptr.into()], false);
+                            let function = self.module.add_function(
+                                "candy_builtin_int_subtract",
+                                fn_type,
+                                None,
+                            );
+                            self.functions.insert(
+                                *id,
+                                FunctionInfo {
+                                    function_value: Rc::new(function),
+                                    parameters: vec![],
+                                    captured_ids: vec![],
+                                    env_type: None,
+                                },
+                            );
+                        }
                         candy_frontend::builtin_functions::BuiltinFunction::ListFilled => todo!(),
                         candy_frontend::builtin_functions::BuiltinFunction::ListGet => todo!(),
                         candy_frontend::builtin_functions::BuiltinFunction::ListInsert => todo!(),
@@ -508,7 +550,15 @@ impl<'ctx> CodeGen<'ctx> {
                 }
                 candy_frontend::mir::Expression::Reference(id) => {
                     if let Some(v) = self.values.get(id) {
-                        self.builder.build_return(Some(&v.as_pointer_value()));
+                        let candy_type_ptr = self
+                            .module
+                            .get_struct_type("candy_type")
+                            .unwrap()
+                            .ptr_type(AddressSpace::default());
+                        let value =
+                            self.builder
+                                .build_load(candy_type_ptr, v.as_pointer_value(), "");
+                        self.builder.build_return(Some(&value));
                     }
                 }
                 candy_frontend::mir::Expression::HirId(hir_id) => {
@@ -558,7 +608,36 @@ impl<'ctx> CodeGen<'ctx> {
                         &original_name
                     };
 
-                    self.unrepresented_ids.insert(*responsible_parameter);
+                    let i32_type = self.context.i32_type();
+                    let i8_type = self.context.i8_type();
+                    let candy_type_ptr = self
+                        .module
+                        .get_struct_type("candy_type")
+                        .unwrap()
+                        .ptr_type(AddressSpace::default());
+
+                    let text = format!("{responsible_parameter}");
+
+                    let global = self.module.add_global(candy_type_ptr, None, &text);
+                    let v = self.make_str_literal(&text);
+                    let len = i32_type.const_int(text.len() as u64, false);
+                    let arr_alloc = self.builder.build_array_alloca(i8_type, len, "");
+                    self.builder.build_store(arr_alloc, v);
+                    let cast = self.builder.build_bitcast(
+                        arr_alloc,
+                        i8_type.ptr_type(AddressSpace::default()),
+                        "",
+                    );
+                    let make_candy_text = self.module.get_function("make_candy_text").unwrap();
+                    let call = self.builder.build_call(make_candy_text, &[cast.into()], "");
+
+                    self.builder.build_store(
+                        global.as_pointer_value(),
+                        call.try_as_basic_value().unwrap_left(),
+                    );
+
+                    global.set_initializer(&candy_type_ptr.const_null());
+                    self.values.insert(*responsible_parameter, Rc::new(global));
 
                     let candy_type_ptr = self
                         .module
@@ -586,10 +665,21 @@ impl<'ctx> CodeGen<'ctx> {
 
                     let env_struct = self.builder.build_load(env_struct_type, env_ptr, "");
                     for (idx, cap_id) in captured_ids.iter().enumerate() {
-                        let value = self.locals.get(cap_id).unwrap();
+                        let mut value = self.locals.get(cap_id).map(|v| **v);
+
+                        if value.is_none() {
+                            value.replace(
+                                (self
+                                    .values
+                                    .get(cap_id)
+                                    .unwrap_or_else(|| panic!("{cap_id} is not a global")))
+                                .as_basic_value_enum(),
+                            );
+                        }
+
                         self.builder.build_insert_value(
                             env_struct.into_struct_value(),
-                            *(value.clone()),
+                            value.unwrap(),
                             idx as u32,
                             "",
                         );
@@ -604,6 +694,7 @@ impl<'ctx> CodeGen<'ctx> {
                     let fn_type = candy_type_ptr.fn_type(&params, false);
 
                     let function = self.module.add_function(name, fn_type, None);
+
                     let fun_info = FunctionInfo {
                         function_value: Rc::new(function),
                         parameters: parameters.clone(),
@@ -655,7 +746,10 @@ impl<'ctx> CodeGen<'ctx> {
                         parameters,
                         captured_ids: _,
                         env_type: _,
-                    } = self.functions.get(function).unwrap();
+                    } = self
+                        .functions
+                        .get(function)
+                        .unwrap_or_else(|| panic!("Cannot find function with ID {function}"));
 
                     let candy_type_ptr = self
                         .module
@@ -682,7 +776,6 @@ impl<'ctx> CodeGen<'ctx> {
                                     let env_ptr =
                                         function_ctx.function_value.get_last_param().unwrap();
 
-                                    dbg!(arg, i, env_ptr);
                                     let env_value = self.builder.build_struct_gep(
                                         function_ctx.env_type.unwrap(),
                                         env_ptr.into_pointer_value(),

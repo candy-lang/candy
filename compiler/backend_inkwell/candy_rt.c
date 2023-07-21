@@ -17,7 +17,7 @@ typedef enum
 
 typedef struct
 {
-    struct candy_value *environemt;
+    struct candy_value *environment;
     struct candy_value *(*function)(struct candy_value *);
 } candy_function_t;
 
@@ -50,6 +50,25 @@ candy_value_t _candy_environment = {
 // Not particularly elegant, but this is a temporary solution anyway...
 candy_value_t *candy_environment = &_candy_environment;
 
+void print_candy_value(candy_value_t *value)
+{
+    switch (value->type)
+    {
+    case CANDY_TYPE_INT:
+        printf("%lld", value->value.integer);
+        break;
+    case CANDY_TYPE_TEXT:
+        printf("%s", value->value.text);
+        break;
+    case CANDY_TYPE_TAG:
+        printf("%s", value->value.text);
+        break;
+    default:
+        printf("<unknown type %d>", value->type);
+        break;
+    }
+}
+
 candy_value_t *to_candy_bool(int value)
 {
     if (value)
@@ -68,28 +87,16 @@ int candy_tag_to_bool(candy_value_t *value)
     {
         return 1;
     }
-    else
+    else if (strcmp(value->value.text, "False") == 0)
     {
         return 0;
     }
-}
-
-void print_candy_value(candy_value_t *value)
-{
-    switch (value->type)
+    else
     {
-    case CANDY_TYPE_INT:
-        printf("%lld", value->value.integer);
-        break;
-    case CANDY_TYPE_TEXT:
-        printf("%s", value->value.text);
-        break;
-    case CANDY_TYPE_TAG:
-        printf("%s", value->value.text);
-        break;
-    default:
-        printf("<unknown type %d>", value->type);
-        break;
+        printf("Got invalid value ");
+        print_candy_value(value);
+        printf("\n");
+        exit(-1);
     }
 }
 
@@ -124,7 +131,7 @@ candy_value_t *make_candy_function(candy_function function, candy_value_t *envir
     candy_value_t *candy_value = malloc(sizeof(candy_value_t));
     candy_value->type = CANDY_TYPE_FUNCTION;
     candy_value->value.function.function = function;
-    candy_value->value.function.environemt = environment;
+    candy_value->value.function.environment = environment;
     return candy_value;
 }
 
@@ -152,13 +159,13 @@ candy_value_t *candy_builtin_ifelse(candy_value_t *condition, candy_value_t *the
     if (candy_tag_to_bool(condition))
     {
         candy_function then_function = (then->value).function.function;
-        candy_value_t *environment = (then->value).function.environemt;
+        candy_value_t *environment = (then->value).function.environment;
         return then_function(environment);
     }
     else
     {
         candy_function otherwise_function = (otherwise->value).function.function;
-        candy_value_t *environment = (otherwise->value).function.environemt;
+        candy_value_t *environment = (otherwise->value).function.environment;
         return otherwise_function(environment);
     }
 }
@@ -166,6 +173,11 @@ candy_value_t *candy_builtin_ifelse(candy_value_t *condition, candy_value_t *the
 candy_value_t *candy_builtin_int_add(candy_value_t *left, candy_value_t *right)
 {
     return make_candy_int(left->value.integer + right->value.integer);
+}
+
+candy_value_t *candy_builtin_int_subtract(candy_value_t *left, candy_value_t *right)
+{
+    return make_candy_int(left->value.integer - right->value.integer);
 }
 
 candy_value_t *candy_builtin_int_bit_length(candy_value_t *value)
@@ -189,22 +201,40 @@ candy_value_t *candy_builtin_int_bitwise_xor(candy_value_t *left, candy_value_t 
     return make_candy_int(left->value.integer ^ right->value.integer);
 }
 
+candy_value_t *candy_builtin_int_compareto(candy_value_t *left, candy_value_t *right)
+{
+    int128_t left_value = left->value.integer;
+    int128_t right_value = right->value.integer;
+    if (left_value < right_value)
+    {
+        return make_candy_tag("Less");
+    }
+    else if (left_value == right_value)
+    {
+        return make_candy_tag("Equal");
+    }
+    else
+    {
+        return make_candy_tag("Greater");
+    }
+}
+
 candy_value_t *candy_builtin_typeof(candy_value_t *value)
 {
     switch (value->type)
     {
     case CANDY_TYPE_INT:
-        return make_candy_tag("int");
+        return make_candy_tag("Int");
     case CANDY_TYPE_TEXT:
-        return make_candy_tag("text");
+        return make_candy_tag("Text");
     case CANDY_TYPE_TAG:
-        return make_candy_tag("tag");
+        return make_candy_tag("Tag");
     case CANDY_TYPE_LIST:
-        return make_candy_tag("list");
+        return make_candy_tag("List");
     case CANDY_TYPE_STRUCT:
-        return make_candy_tag("struct");
+        return make_candy_tag("Struct");
     case CANDY_TYPE_FUNCTION:
-        return make_candy_tag("function");
+        return make_candy_tag("Function");
     }
 }
 
