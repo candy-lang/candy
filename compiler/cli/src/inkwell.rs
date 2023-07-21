@@ -20,6 +20,9 @@ pub(crate) struct Options {
     /// If enabled, the program will print the output of the candy main function.
     #[arg(long = "print-main-output", default_value_t = false)]
     print_main_output: bool,
+    /// If enabled, the compiler will build the Candy runtime from scratch.
+    #[arg(long = "build-rt", default_value_t = false)]
+    build_rt: bool,
     /// If enabled, the LLVM bitcode will be compiled with debug information.
     #[arg(short = 'g', default_value_t = false)]
     debug: bool,
@@ -76,12 +79,27 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
         .unwrap()
         .wait()
         .unwrap();
+    if options.build_rt {
+        std::process::Command::new("make")
+            .args(&["-C", "compiler/backend_inkwell/candy_rt/", "clean"])
+            .spawn()
+            .unwrap()
+            .wait()
+            .unwrap();
+
+        std::process::Command::new("make")
+            .args(&["-C", "compiler/backend_inkwell/candy_rt/", "candy_rt.a"])
+            .spawn()
+            .unwrap()
+            .wait()
+            .unwrap();
+    }
     let mut s_path = PathBuf::new();
     s_path.push(&format!("{path}.s"));
     std::process::Command::new("clang")
         .args([
-            "compiler/backend_inkwell/candy_rt.c",
             s_path.to_str().unwrap(),
+            "compiler/backend_inkwell/candy_rt/candy_rt.a",
             if options.debug { "-g" } else { "" },
             "-o",
             &s_path.to_str().unwrap().replace(".candy.s", ""),

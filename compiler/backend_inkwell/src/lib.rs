@@ -5,7 +5,7 @@ use inkwell::{
     module::{Linkage, Module},
     support::LLVMString,
     types::{BasicType, StructType},
-    values::{ArrayValue, BasicValue, BasicValueEnum, FunctionValue, GlobalValue},
+    values::{ArrayValue, BasicValue, BasicValueEnum, FunctionValue, GlobalValue, PointerValue},
     AddressSpace,
 };
 
@@ -20,7 +20,6 @@ use std::{
 #[derive(Clone)]
 struct FunctionInfo<'ctx> {
     function_value: Rc<FunctionValue<'ctx>>,
-    parameters: Vec<Id>,
     captured_ids: Vec<Id>,
     env_type: Option<StructType<'ctx>>,
 }
@@ -35,6 +34,7 @@ pub struct CodeGen<'ctx> {
     locals: HashMap<Id, Rc<BasicValueEnum<'ctx>>>,
     functions: HashMap<Id, FunctionInfo<'ctx>>,
     unrepresented_ids: HashSet<Id>,
+    main_return: Option<PointerValue<'ctx>>,
 }
 
 impl<'ctx> CodeGen<'ctx> {
@@ -54,6 +54,7 @@ impl<'ctx> CodeGen<'ctx> {
             locals: HashMap::new(),
             functions: HashMap::new(),
             unrepresented_ids: HashSet::new(),
+            main_return: None,
         }
     }
 
@@ -76,8 +77,9 @@ impl<'ctx> CodeGen<'ctx> {
             .add_function("make_candy_int", make_int_fn_type, Some(Linkage::External));
         let make_tag_fn_type =
             candy_type_ptr.fn_type(&[i8_type.ptr_type(AddressSpace::default()).into()], false);
-        self.module
-            .add_function("make_candy_tag", make_tag_fn_type, Some(Linkage::External));
+        let make_candy_tag =
+            self.module
+                .add_function("make_candy_tag", make_tag_fn_type, Some(Linkage::External));
         self.module
             .add_function("make_candy_text", make_tag_fn_type, Some(Linkage::External));
         let make_function_fn_type =
@@ -87,6 +89,21 @@ impl<'ctx> CodeGen<'ctx> {
             make_function_fn_type,
             Some(Linkage::External),
         );
+
+        let make_struct_fn_type =
+            candy_type_ptr.fn_type(&[candy_type_ptr.into(), candy_type_ptr.into()], false);
+        self.module.add_function(
+            "make_candy_struct",
+            make_struct_fn_type,
+            Some(Linkage::External),
+        );
+
+        let struct_get_fn_type =
+            candy_type_ptr.fn_type(&[candy_type_ptr.into(), candy_type_ptr.into()], false);
+        let candy_builtin_struct_get =
+            self.module
+                .add_function("candy_builtin_struct_get", struct_get_fn_type, None);
+
         let panic_fn_type = void_type.fn_type(
             &[candy_type.ptr_type(AddressSpace::default()).into()],
             false,
@@ -103,9 +120,14 @@ impl<'ctx> CodeGen<'ctx> {
         let main_fn = self.module.add_function("main", main_type, None);
         let block = self.context.append_basic_block(main_fn, "entry");
 
+        let call_candy_function_type =
+            candy_type_ptr.fn_type(&[candy_type_ptr.into(), candy_type_ptr.into()], false);
+        let call_candy_function_with =
+            self.module
+                .add_function("call_candy_function_with", call_candy_function_type, None);
+
         let main_info = FunctionInfo {
             function_value: Rc::new(main_fn),
-            parameters: vec![],
             captured_ids: vec![],
             env_type: None,
         };
@@ -113,27 +135,56 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(block);
         self.compile_mir(&self.mir.body.clone(), &main_info);
         self.builder.position_at_end(block);
+
         let environment = self
             .module
             .add_global(candy_type_ptr, None, "candy_environment");
-        let main_res_ptr = self.builder.build_call(
-            self.module.get_function("candy_main").unwrap(),
-            &[environment.as_basic_value_enum().into()],
-            "",
-        );
-        if print_main_output {
-            self.builder.build_call(
-                print_fn,
-                &[main_res_ptr.try_as_basic_value().unwrap_left().into()],
+
+        if let Some(main_return) = self.main_return {
+            const MAIN_FN_NAME: &str = "Main";
+            let len = i32_type.const_int(MAIN_FN_NAME.len() as u64, false);
+            let main_text = self.builder.build_array_alloca(i8_type, len, "");
+            let main_text_array = self.make_str_literal(MAIN_FN_NAME);
+            self.builder.build_store(main_text, main_text_array);
+
+            let main_tag = self
+                .builder
+                .build_call(make_candy_tag, &[main_text.into()], "");
+
+            let main_fn = self
+                .builder
+                .build_call(
+                    candy_builtin_struct_get,
+                    &[
+                        main_return.into(),
+                        main_tag.try_as_basic_value().unwrap_left().into(),
+                    ],
+                    "",
+                )
+                .try_as_basic_value()
+                .unwrap_left();
+
+            let main_res_ptr = self.builder.build_call(
+                call_candy_function_with,
+                &[main_fn.into(), environment.as_basic_value_enum().into()],
                 "",
             );
-            for value in self.module.get_globals() {
-                let val = self
-                    .builder
-                    .build_load(candy_type_ptr, value.as_pointer_value(), "");
-                self.builder.build_call(free_fn, &[val.into()], "");
+
+            if print_main_output {
+                self.builder.build_call(
+                    print_fn,
+                    &[main_res_ptr.try_as_basic_value().unwrap_left().into()],
+                    "",
+                );
+                for value in self.module.get_globals() {
+                    let val = self
+                        .builder
+                        .build_load(candy_type_ptr, value.as_pointer_value(), "");
+                    self.builder.build_call(free_fn, &[val.into()], "");
+                }
             }
         }
+
         let ret_value = i32_type.const_int(0, false);
         self.builder.build_return(Some(&ret_value));
         if print_llvm_ir {
@@ -267,7 +318,6 @@ impl<'ctx> CodeGen<'ctx> {
                                 *id,
                                 FunctionInfo {
                                     function_value: Rc::new(function),
-                                    parameters: vec![],
                                     captured_ids: vec![],
                                     env_type: None,
                                 },
@@ -299,7 +349,6 @@ impl<'ctx> CodeGen<'ctx> {
                                 *id,
                                 FunctionInfo {
                                     function_value: Rc::new(function),
-                                    parameters: vec![],
                                     captured_ids: vec![],
                                     env_type: None,
                                 },
@@ -321,7 +370,6 @@ impl<'ctx> CodeGen<'ctx> {
                                 *id,
                                 FunctionInfo {
                                     function_value: Rc::new(function),
-                                    parameters: vec![],
                                     captured_ids: vec![],
                                     env_type: None,
                                 },
@@ -344,7 +392,6 @@ impl<'ctx> CodeGen<'ctx> {
                                 *id,
                                 FunctionInfo {
                                     function_value: Rc::new(function),
-                                    parameters: vec![],
                                     captured_ids: vec![],
                                     env_type: None,
                                 },
@@ -368,7 +415,6 @@ impl<'ctx> CodeGen<'ctx> {
                                 *id,
                                 FunctionInfo {
                                     function_value: Rc::new(function),
-                                    parameters: vec![],
                                     captured_ids: vec![],
                                     env_type: None,
                                 },
@@ -392,7 +438,6 @@ impl<'ctx> CodeGen<'ctx> {
                                 *id,
                                 FunctionInfo {
                                     function_value: Rc::new(function),
-                                    parameters: vec![],
                                     captured_ids: vec![],
                                     env_type: None,
                                 },
@@ -416,7 +461,6 @@ impl<'ctx> CodeGen<'ctx> {
                                 *id,
                                 FunctionInfo {
                                     function_value: Rc::new(function),
-                                    parameters: vec![],
                                     captured_ids: vec![],
                                     env_type: None,
                                 },
@@ -440,7 +484,6 @@ impl<'ctx> CodeGen<'ctx> {
                                 *id,
                                 FunctionInfo {
                                     function_value: Rc::new(function),
-                                    parameters: vec![],
                                     captured_ids: vec![],
                                     env_type: None,
                                 },
@@ -475,7 +518,6 @@ impl<'ctx> CodeGen<'ctx> {
                                 *id,
                                 FunctionInfo {
                                     function_value: Rc::new(function),
-                                    parameters: vec![],
                                     captured_ids: vec![],
                                     env_type: None,
                                 },
@@ -535,7 +577,6 @@ impl<'ctx> CodeGen<'ctx> {
                                 *id,
                                 FunctionInfo {
                                     function_value: Rc::new(function),
-                                    parameters: vec![],
                                     captured_ids: vec![],
                                     env_type: None,
                                 },
@@ -545,8 +586,99 @@ impl<'ctx> CodeGen<'ctx> {
                     self.unrepresented_ids.insert(*id);
                 }
                 candy_frontend::mir::Expression::List(_) => todo!(),
-                candy_frontend::mir::Expression::Struct(_s) => {
-                    // Not yet implemented, but not allowed to panic
+                candy_frontend::mir::Expression::Struct(s) => {
+                    let i32_type = self.context.i32_type();
+                    let candy_type_ptr = self
+                        .module
+                        .get_struct_type("candy_type")
+                        .unwrap()
+                        .ptr_type(AddressSpace::default());
+                    let make_candy_struct = self.module.get_function("make_candy_struct").unwrap();
+
+                    let keys_array = self.builder.build_array_alloca(
+                        candy_type_ptr,
+                        i32_type.const_int(s.len() as u64 + 1, false),
+                        "",
+                    );
+                    let values_array = self.builder.build_array_alloca(
+                        candy_type_ptr,
+                        i32_type.const_int(s.len() as u64 + 1, false),
+                        "",
+                    );
+                    for (idx, (key, value)) in s.iter().enumerate() {
+                        let key = self
+                            .get_value_with_id(function_ctx, key)
+                            .unwrap()
+                            .into_pointer_value();
+                        let value = self
+                            .get_value_with_id(function_ctx, value)
+                            .unwrap()
+                            .into_pointer_value();
+
+                        let key_ptr = unsafe {
+                            self.builder.build_gep(
+                                candy_type_ptr,
+                                keys_array,
+                                &[i32_type.const_int(idx as u64, false)],
+                                "",
+                            )
+                        };
+                        self.builder.build_store(key_ptr, key);
+                        let value_ptr = unsafe {
+                            self.builder.build_gep(
+                                candy_type_ptr,
+                                values_array,
+                                &[i32_type.const_int(idx as u64, false)],
+                                "",
+                            )
+                        };
+                        self.builder.build_store(value_ptr, value);
+                    }
+
+                    // Null-terminate key/value arrays
+                    let key_ptr = unsafe {
+                        self.builder.build_gep(
+                            candy_type_ptr,
+                            keys_array,
+                            &[i32_type.const_int(s.len() as u64, false)],
+                            "",
+                        )
+                    };
+                    self.builder
+                        .build_store(key_ptr, candy_type_ptr.const_null());
+                    let value_ptr = unsafe {
+                        self.builder.build_gep(
+                            candy_type_ptr,
+                            values_array,
+                            &[i32_type.const_int(s.len() as u64, false)],
+                            "",
+                        )
+                    };
+                    self.builder
+                        .build_store(value_ptr, candy_type_ptr.const_null());
+
+                    let struct_value = self
+                        .builder
+                        .build_call(
+                            make_candy_struct,
+                            &[keys_array.into(), values_array.into()],
+                            "",
+                        )
+                        .try_as_basic_value()
+                        .unwrap_left();
+
+                    self.locals.insert(*id, Rc::new(struct_value));
+
+                    let function_ctx_name =
+                        function_ctx.function_value.get_name().to_str().unwrap();
+                    if idx == mir.expressions.len() - 1 {
+                        if function_ctx_name != "main" {
+                            self.builder
+                                .build_return(Some(&struct_value.into_pointer_value()));
+                        } else {
+                            self.main_return.replace(struct_value.into_pointer_value());
+                        }
+                    }
                 }
                 candy_frontend::mir::Expression::Reference(id) => {
                     if let Some(v) = self.values.get(id) {
@@ -599,14 +731,9 @@ impl<'ctx> CodeGen<'ctx> {
                     body,
                     responsible_parameter,
                 } => {
-                    let original_name = format!("{original_hirs:?}")
+                    let name = format!("{original_hirs:?}")
                         .replace('{', "")
                         .replace('}', "");
-                    let name = if original_name.ends_with("main") {
-                        "candy_main"
-                    } else {
-                        &original_name
-                    };
 
                     let i32_type = self.context.i32_type();
                     let i8_type = self.context.i8_type();
@@ -693,11 +820,10 @@ impl<'ctx> CodeGen<'ctx> {
 
                     let fn_type = candy_type_ptr.fn_type(&params, false);
 
-                    let function = self.module.add_function(name, fn_type, None);
+                    let function = self.module.add_function(&name, fn_type, None);
 
                     let fun_info = FunctionInfo {
                         function_value: Rc::new(function),
-                        parameters: parameters.clone(),
                         captured_ids: captured_ids.clone(),
 
                         env_type: Some(env_struct_type),
@@ -719,7 +845,9 @@ impl<'ctx> CodeGen<'ctx> {
                         "",
                     );
 
-                    let global = self.module.add_global(candy_type_ptr, None, "");
+                    let global =
+                        self.module
+                            .add_global(candy_type_ptr, None, &format!("fun_{name}"));
                     global.set_initializer(&function_ptr.get_type().const_null());
 
                     self.builder.build_store(
@@ -729,7 +857,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                     self.values.insert(*id, Rc::new(global));
 
-                    let inner_block = self.context.append_basic_block(function, name);
+                    let inner_block = self.context.append_basic_block(function, &name);
                     self.builder.position_at_end(inner_block);
 
                     self.compile_mir(body, &fun_info);
@@ -743,7 +871,6 @@ impl<'ctx> CodeGen<'ctx> {
                 } => {
                     let FunctionInfo {
                         function_value,
-                        parameters,
                         captured_ids: _,
                         env_type: _,
                     } = self
@@ -751,51 +878,9 @@ impl<'ctx> CodeGen<'ctx> {
                         .get(function)
                         .unwrap_or_else(|| panic!("Cannot find function with ID {function}"));
 
-                    let candy_type_ptr = self
-                        .module
-                        .get_struct_type("candy_type")
-                        .unwrap()
-                        .ptr_type(AddressSpace::default());
-
                     let args: Vec<_> = arguments
                         .iter()
-                        .map(|arg| {
-                            let mut v = self.values.get(arg).map(|a| {
-                                self.builder
-                                    .build_load(candy_type_ptr, a.as_pointer_value(), "")
-                            });
-                            if v.is_none() {
-                                if let Some(i) = parameters.iter().position(|i| i == arg) {
-                                    v.replace(function_value.get_nth_param(i as u32).unwrap());
-                                }
-                            }
-                            if v.is_none() {
-                                if let Some(i) =
-                                    function_ctx.captured_ids.iter().position(|i| i == arg)
-                                {
-                                    let env_ptr =
-                                        function_ctx.function_value.get_last_param().unwrap();
-
-                                    let env_value = self.builder.build_struct_gep(
-                                        function_ctx.env_type.unwrap(),
-                                        env_ptr.into_pointer_value(),
-                                        i as u32,
-                                        "",
-                                    );
-
-                                    if let Ok(env_value) = env_value {
-                                        v.replace(env_value.as_basic_value_enum());
-                                    }
-                                }
-                            }
-                            if v.is_none() {
-                                if let Some(value) = self.locals.get(arg) {
-                                    v.replace(*value.clone());
-                                }
-                            }
-                            v.unwrap_or_else(|| panic!("{arg} should be a real ID"))
-                                .into()
-                        })
+                        .map(|arg| self.get_value_with_id(function_ctx, arg).unwrap().into())
                         .collect();
                     let call = self.builder.build_call(**function_value, &args, "");
                     let call_value = Rc::new(call.try_as_basic_value().unwrap_left());
@@ -851,5 +936,44 @@ impl<'ctx> CodeGen<'ctx> {
             .map(|c| i8_type.const_int(c as u64, false))
             .collect();
         i8_type.const_array(&content)
+    }
+
+    fn get_value_with_id(
+        &self,
+        function_ctx: &FunctionInfo<'ctx>,
+        id: &Id,
+    ) -> Option<BasicValueEnum<'ctx>> {
+        let candy_type_ptr = self
+            .module
+            .get_struct_type("candy_type")
+            .unwrap()
+            .ptr_type(AddressSpace::default());
+        let mut v = self.values.get(id).map(|a| {
+            self.builder
+                .build_load(candy_type_ptr, a.as_pointer_value(), "")
+        });
+        if v.is_none() {
+            if let Some(i) = function_ctx.captured_ids.iter().position(|i| i == id) {
+                let env_ptr = function_ctx.function_value.get_last_param().unwrap();
+
+                let env_value = self.builder.build_struct_gep(
+                    function_ctx.env_type.unwrap(),
+                    env_ptr.into_pointer_value(),
+                    i as u32,
+                    "",
+                );
+
+                if let Ok(env_value) = env_value {
+                    v.replace(env_value.as_basic_value_enum());
+                }
+            }
+        }
+        if v.is_none() {
+            if let Some(value) = self.locals.get(id) {
+                v.replace(*value.clone());
+            }
+        }
+        v.unwrap_or_else(|| panic!("{id} should be a real ID"))
+            .into()
     }
 }
