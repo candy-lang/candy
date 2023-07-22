@@ -323,15 +323,14 @@ impl<T: FiberTracer> Fiber<T> {
             let instruction = lir
                 .instructions
                 .get(*current_instruction)
-                .expect("invalid instruction pointer")
-                .clone(); // PERF: Can we avoid this clone?
+                .expect("invalid instruction pointer");
             self.next_instruction = Some(current_instruction.next());
 
             self.run_instruction(instruction);
             execution_controller.instruction_executed(id, self, current_instruction);
         }
     }
-    pub fn run_instruction(&mut self, instruction: Instruction) {
+    pub fn run_instruction(&mut self, instruction: &Instruction) {
         if TRACE {
             trace!("Running instruction: {instruction:?}");
             let current_instruction = self.next_instruction.unwrap();
@@ -365,12 +364,12 @@ impl<T: FiberTracer> Fiber<T> {
             Instruction::CreateTag { symbol } => {
                 let value = self.pop_from_data_stack();
                 symbol.dup();
-                let tag = Tag::create(&mut self.heap, symbol, value);
+                let tag = Tag::create(&mut self.heap, *symbol, value);
                 self.push_to_data_stack(tag);
             }
             Instruction::CreateList { num_items } => {
                 let mut item_addresses = vec![];
-                for _ in 0..num_items {
+                for _ in 0..*num_items {
                     item_addresses.push(self.pop_from_data_stack());
                 }
                 let items = item_addresses.into_iter().rev().collect_vec();
@@ -400,32 +399,32 @@ impl<T: FiberTracer> Fiber<T> {
                         object
                     })
                     .collect_vec();
-                let function = Function::create(&mut self.heap, &captured, num_args, body);
+                let function = Function::create(&mut self.heap, &captured, *num_args, *body);
                 self.push_to_data_stack(function);
             }
             Instruction::PushConstant(constant) => {
-                let constant = match HeapObject::try_from(constant) {
+                let constant = match HeapObject::try_from(*constant) {
                     Ok(heap_object) => self.constant_mapping[&heap_object].into(),
-                    Err(_) => constant,
+                    Err(_) => *constant,
                 };
                 constant.dup(&mut self.heap);
                 self.push_to_data_stack(constant);
             }
             Instruction::PushFromStack(offset) => {
-                let address = self.get_from_data_stack(offset);
+                let address = self.get_from_data_stack(*offset);
                 address.dup(&mut self.heap);
                 self.push_to_data_stack(address);
             }
             Instruction::PopMultipleBelowTop(n) => {
                 let top = self.pop_from_data_stack();
-                for _ in 0..n {
+                for _ in 0..*n {
                     self.pop_from_data_stack().drop(&mut self.heap);
                 }
                 self.push_to_data_stack(top);
             }
             Instruction::Call { num_args } => {
                 let responsible = self.pop_from_data_stack().try_into().unwrap();
-                let mut arguments = (0..num_args)
+                let mut arguments = (0..*num_args)
                     .map(|_| self.pop_from_data_stack())
                     .collect_vec();
                 // PERF: Build the reverse list in place.
@@ -439,13 +438,13 @@ impl<T: FiberTracer> Fiber<T> {
                 num_args,
             } => {
                 let responsible = self.pop_from_data_stack().try_into().unwrap();
-                let mut arguments = (0..num_args)
+                let mut arguments = (0..*num_args)
                     .map(|_| self.pop_from_data_stack())
                     .collect_vec();
                 // PERF: Built the reverse list in place
                 arguments.reverse();
                 let callee = self.pop_from_data_stack();
-                for _ in 0..num_locals_to_pop {
+                for _ in 0..*num_locals_to_pop {
                     self.pop_from_data_stack().drop(&mut self.heap);
                 }
 
@@ -478,7 +477,7 @@ impl<T: FiberTracer> Fiber<T> {
             Instruction::TraceCallStarts { num_args } => {
                 let responsible = self.pop_from_data_stack().try_into().unwrap();
                 let mut args = vec![];
-                for _ in 0..num_args {
+                for _ in 0..*num_args {
                     args.push(self.pop_from_data_stack());
                 }
                 let callee = self.pop_from_data_stack();
