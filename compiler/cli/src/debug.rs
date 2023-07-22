@@ -9,6 +9,7 @@ use candy_frontend::{
     hir_to_mir::HirToMir,
     mir_optimize::OptimizeMir,
     position::Offset,
+    rcst_to_cst::RcstToCst,
     rich_ir::{RichIr, RichIrAnnotation, TokenType},
     string_to_rcst::StringToRcst,
     TracingConfig, TracingMode,
@@ -24,6 +25,9 @@ use std::path::PathBuf;
 /// representation.
 #[derive(Parser, Debug)]
 pub(crate) enum Options {
+    /// Raw Concrete Syntax Tree
+    Rcst(OnlyPath),
+
     /// Concrete Syntax Tree
     Cst(OnlyPath),
 
@@ -78,10 +82,15 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
     let db = Database::new_with_file_system_module_provider(packages_path);
 
     let rich_ir = match options {
-        Options::Cst(options) => {
+        Options::Rcst(options) => {
             let module = module_for_path(options.path)?;
             let rcst = db.rcst(module.clone());
             RichIr::for_rcst(&module, &rcst)
+        }
+        Options::Cst(options) => {
+            let module = module_for_path(options.path)?;
+            let cst = db.cst(module.clone());
+            RichIr::for_cst(&module, &cst)
         }
         Options::Ast(options) => {
             let module = module_for_path(options.path)?;

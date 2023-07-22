@@ -5,17 +5,20 @@ use crate::{
     mir::{self, Mir},
     module::Module,
     position::Offset,
+    rcst_to_cst::CstResult,
     string_to_rcst::{ModuleError, RcstResult},
     TracingConfig, TracingMode,
 };
 use derive_more::From;
 use enumset::{EnumSet, EnumSetType};
+use itertools::Itertools;
 use num_bigint::BigInt;
 use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Display, Formatter},
     hash::Hash,
     ops::Range,
+    sync::Arc,
 };
 
 #[derive(Debug, Default)]
@@ -307,19 +310,30 @@ impl RichIr {
         match rcst {
             Ok(rcst) => rcst.build_rich_ir(&mut builder),
             Err(ModuleError::DoesNotExist) => return None,
-            Err(ModuleError::InvalidUtf8) => {
-                builder.push("# Invalid UTF-8", TokenType::Comment, EnumSet::empty());
-            }
-            Err(ModuleError::IsNotCandy) => {
-                builder.push("# Is not Candy code", TokenType::Comment, EnumSet::empty());
-            }
-            Err(ModuleError::IsToolingModule) => {
+            Err(error) => error.build_rich_ir(&mut builder),
+        }
+        Some(builder.finish())
+    }
+
+    pub fn for_cst(module: &Module, cst: &CstResult) -> Option<RichIr> {
+        let mut builder = RichIrBuilder::default();
+        builder.push(
+            format!("# CST for module {module}"),
+            TokenType::Comment,
+            EnumSet::empty(),
+        );
+        builder.push_newline();
+        match cst {
+            Ok(cst) => {
+                // TODO: `impl ToRichIr for Cst`
                 builder.push(
-                    "# Is a tooling module",
-                    TokenType::Comment,
+                    cst.iter().map(|it| it.to_string()).join("\n"),
+                    None,
                     EnumSet::empty(),
                 );
             }
+            Err(ModuleError::DoesNotExist) => return None,
+            Err(error) => error.build_rich_ir(&mut builder),
         }
         Some(builder.finish())
     }
