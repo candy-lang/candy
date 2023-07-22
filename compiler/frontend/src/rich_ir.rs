@@ -18,7 +18,6 @@ use std::{
     fmt::{self, Display, Formatter},
     hash::Hash,
     ops::Range,
-    sync::Arc,
 };
 
 #[derive(Debug, Default)]
