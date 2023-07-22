@@ -68,7 +68,7 @@ pub fn return_value_into_main_function(
     let exported_definitions: Struct = return_value.try_into().unwrap();
     debug!("The module exports these definitions: {exported_definitions}");
 
-    let main = Tag::create_from_str(heap, "Main", None);
+    let main = Tag::create_from_str(heap, true, "Main", None);
     exported_definitions
         .get(main)
         .ok_or("The module doesn't export a main function.")

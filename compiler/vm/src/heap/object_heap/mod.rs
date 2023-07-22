@@ -49,7 +49,7 @@ pub struct HeapObject(NonNull<u64>);
 impl HeapObject {
     pub const WORD_SIZE: usize = 8;
 
-    const KIND_MASK: u64 = 0b111;
+    pub const KIND_MASK: u64 = 0b111;
     const KIND_INT: u64 = 0b000;
     const KIND_LIST: u64 = 0b001;
     const KIND_STRUCT: u64 = 0b101;
@@ -57,6 +57,9 @@ impl HeapObject {
     const KIND_TEXT: u64 = 0b110;
     const KIND_FUNCTION: u64 = 0b011;
     const KIND_HIR_ID: u64 = 0b111;
+
+    pub const IS_REFERENCE_COUNTED_SHIFT: usize = 4;
+    pub const IS_REFERENCE_COUNTED_MASK: u64 = 0b1 << Self::IS_REFERENCE_COUNTED_SHIFT;
 
     pub fn new(address: NonNull<u64>) -> Self {
         Self(address)
@@ -80,26 +83,43 @@ impl HeapObject {
     }
 
     // Reference Counting
-    fn reference_count_pointer(self) -> NonNull<u64> {
-        self.word_pointer(1)
+    pub(super) fn is_reference_counted(self) -> bool {
+        self.header_word() & Self::IS_REFERENCE_COUNTED_MASK != 0
     }
-    pub fn reference_count(&self) -> usize {
-        unsafe { *self.reference_count_pointer().as_ref() as usize }
+    fn reference_count_pointer(self) -> Option<NonNull<u64>> {
+        if self.is_reference_counted() {
+            Some(self.word_pointer(1))
+        } else {
+            None
+        }
+    }
+    pub fn reference_count(&self) -> Option<usize> {
+        self.reference_count_pointer()
+            .map(|it| unsafe { *it.as_ref() as usize })
     }
     pub(super) fn set_reference_count(&self, value: usize) {
-        unsafe { *self.reference_count_pointer().as_mut() = value as u64 }
+        let mut pointer = self.reference_count_pointer().unwrap();
+        unsafe { *pointer.as_mut() = value as u64 }
     }
 
     pub fn dup(self) {
         self.dup_by(1);
     }
     pub fn dup_by(self, amount: usize) {
-        let new_reference_count = self.reference_count() + amount;
+        let Some(reference_count) = self.reference_count() else {
+            return;
+        };
+
+        let new_reference_count = reference_count + amount;
         self.set_reference_count(new_reference_count);
         trace!("RefCount of {self:p} increased to {new_reference_count}. Value: {self:?}");
     }
     pub fn drop(self, heap: &mut Heap) {
-        let new_reference_count = self.reference_count() - 1;
+        let Some(reference_count) = self.reference_count() else {
+            return;
+        };
+
+        let new_reference_count = reference_count - 1;
         trace!("RefCount of {self:p} reduced to {new_reference_count}. Value: {self:?}");
         self.set_reference_count(new_reference_count);
 
@@ -109,7 +129,7 @@ impl HeapObject {
     }
     pub(super) fn free(self, heap: &mut Heap) {
         trace!("Freeing object at {self:p}.");
-        assert_eq!(self.reference_count(), 0);
+        assert_eq!(self.reference_count().unwrap_or_default(), 0);
         let data = HeapData::from(self);
         data.drop_children(heap);
         heap.deallocate(data);
@@ -127,12 +147,14 @@ impl HeapObject {
         match address_map.entry(self) {
             hash_map::Entry::Occupied(entry) => {
                 let object = entry.get();
-                object.set_reference_count(object.reference_count() + 1);
+                if let Some(reference_count) = object.reference_count() {
+                    object.set_reference_count(reference_count + 1);
+                }
                 *object
             }
             hash_map::Entry::Vacant(entry) => {
                 let data = HeapData::from(self);
-                let new_object = heap.allocate(self.header_word(), data.content_size());
+                let new_object = heap.allocate_raw(self.header_word(), data.content_size());
                 entry.insert(new_object);
                 data.clone_content_to_heap_with_mapping(heap, new_object, address_map);
                 new_object
@@ -141,14 +163,19 @@ impl HeapObject {
     }
 
     // Content
+    pub fn content_word_pointer(self, offset: usize) -> NonNull<u64> {
+        let offset = if self.is_reference_counted() {
+            offset + 2
+        } else {
+            offset + 1
+        };
+        self.word_pointer(offset)
+    }
     pub fn unsafe_get_content_word(self, offset: usize) -> u64 {
         unsafe { *self.content_word_pointer(offset).as_ref() }
     }
     pub(self) fn unsafe_set_content_word(self, offset: usize, value: u64) {
         unsafe { *self.content_word_pointer(offset).as_mut() = value }
-    }
-    pub fn content_word_pointer(self, offset: usize) -> NonNull<u64> {
-        self.word_pointer(2 + offset)
     }
 }
 

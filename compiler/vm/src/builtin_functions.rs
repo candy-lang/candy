@@ -196,7 +196,7 @@ impl Heap {
 
     fn equals(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |a: Any, b: Any| {
-            Return(Tag::create_bool(self, **a == **b).into())
+            Return(Tag::create_bool(self, true, **a == **b).into())
         })
     }
 
@@ -210,7 +210,7 @@ impl Heap {
     }
     fn get_argument_count(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |function: Function| {
-            Return(Int::create(self, function.argument_count()).into())
+            Return(Int::create(self, true, function.argument_count()).into())
         })
     }
 
@@ -280,10 +280,10 @@ impl Heap {
     fn int_parse(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text| {
             let result = match BigInt::from_str(text.get()) {
-                Ok(int) => Ok(Int::create_from_bigint(self, int).into()),
-                Err(err) => Err(Text::create(self, &err.to_string()).into()),
+                Ok(int) => Ok(Int::create_from_bigint(self, true, int).into()),
+                Err(err) => Err(Text::create(self, true, &err.to_string()).into()),
             };
-            Return(Tag::create_result(self, result).into())
+            Return(Tag::create_result(self, true, result).into())
         })
     }
     fn int_remainder(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -319,7 +319,7 @@ impl Heap {
                 item.object.dup_by(self, length_usize - 1);
             }
 
-            Return(List::create(self, &vec![item_object; length_usize]).into())
+            Return(List::create(self, true, &vec![item_object; length_usize]).into())
         })
     }
     fn list_get(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -342,7 +342,7 @@ impl Heap {
     }
     fn list_length(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |list: List| {
-            Return(Int::create(self, list.len()).into())
+            Return(Int::create(self, true, list.len()).into())
         })
     }
     fn list_remove_at(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -374,7 +374,7 @@ impl Heap {
     fn print(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |message: Any| {
             info!("{}", message.object);
-            Return(Tag::create_nothing(self).into())
+            Return(Tag::create_nothing(self, true).into())
         })
     }
 
@@ -387,12 +387,12 @@ impl Heap {
     }
     fn struct_get_keys(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |struct_: Struct| {
-            Return(List::create(self, struct_.keys()).into())
+            Return(List::create(self, true, struct_.keys()).into())
         })
     }
     fn struct_has_key(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |struct_: Struct, key: Any| {
-            Return(Tag::create_bool(self, struct_.contains(key.object)).into())
+            Return(Tag::create_bool(self, true, struct_.contains(key.object)).into())
         })
     }
 
@@ -405,7 +405,7 @@ impl Heap {
     }
     fn tag_has_value(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |tag: Tag| {
-            Return(Tag::create_bool(self, tag.value().is_some()).into())
+            Return(Tag::create_bool(self, true, tag.value().is_some()).into())
         })
     }
     fn tag_without_value(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -448,7 +448,7 @@ impl Heap {
                         .ok_or_else(|| format!("Value is not a byte: {it}."))
                 })
                 .try_collect()?;
-            Return(Text::create_from_utf8(self, &bytes).into())
+            Return(Text::create_from_utf8(self, true, &bytes).into())
         })
     }
     fn text_get_range(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -492,7 +492,7 @@ impl Heap {
     #[allow(clippy::wrong_self_convention)]
     fn to_debug_text(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Any| {
-            Return(Text::create(self, &format!("{:?}", **value)).into())
+            Return(Text::create(self, true, &format!("{:?}", **value)).into())
         })
     }
 
@@ -516,7 +516,7 @@ impl Heap {
                 Data::SendPort(_) => "SendPort",
                 Data::ReceivePort(_) => "ReceivePort",
             };
-            Return(Tag::create_from_str(self, type_name, None).into())
+            Return(Tag::create_from_str(self, true, type_name, None).into())
         })
     }
 }

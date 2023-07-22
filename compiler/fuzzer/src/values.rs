@@ -49,15 +49,15 @@ impl InlineObjectGeneration for InlineObject {
         symbols: &[Text],
     ) -> InlineObject {
         match rng.gen_range(1..=5) {
-            1 => Int::create_from_bigint(heap, rng.gen_bigint(10)).into(),
-            2 => Text::create(heap, "test").into(),
+            1 => Int::create_from_bigint(heap, true, rng.gen_bigint(10)).into(),
+            2 => Text::create(heap, true, "test").into(),
             3 => {
                 let value = if rng.gen_bool(0.2) {
                     Some(Self::generate(heap, rng, complexity - 10.0, symbols))
                 } else {
                     None
                 };
-                Tag::create(heap, *symbols.choose(rng).unwrap(), value).into()
+                Tag::create(heap, true, *symbols.choose(rng).unwrap(), value).into()
             }
             4 => {
                 complexity -= 1.0;
@@ -67,7 +67,7 @@ impl InlineObjectGeneration for InlineObject {
                     items.push(item);
                     complexity -= 10.0;
                 }
-                List::create(heap, &items).into()
+                List::create(heap, true, &items).into()
             }
             5 => {
                 complexity -= 1.0;
@@ -78,7 +78,7 @@ impl InlineObjectGeneration for InlineObject {
                     fields.insert(key, value);
                     complexity -= 20.0;
                 }
-                Struct::create(heap, &fields).into()
+                Struct::create(heap, true, &fields).into()
             }
             6 => {
                 builtin_functions::VALUES[rng.gen_range(0..builtin_functions::VALUES.len())].into()
@@ -98,23 +98,24 @@ impl InlineObjectGeneration for InlineObject {
 
         match self.into() {
             Data::Int(int) => {
-                Int::create_from_bigint(heap, int.get().as_ref() + rng.gen_range(-10..10)).into()
+                Int::create_from_bigint(heap, true, int.get().as_ref() + rng.gen_range(-10..10))
+                    .into()
             }
             Data::Text(text) => mutate_string(rng, heap, text.get().to_string()).into(),
             Data::Tag(tag) => {
                 assert!(!symbols.is_empty());
                 if rng.gen_bool(0.5) {
-                    Tag::create(heap, *symbols.choose(rng).unwrap(), tag.value()).into()
+                    Tag::create(heap, true, *symbols.choose(rng).unwrap(), tag.value()).into()
                 } else if let Some(value) = tag.value() {
                     if rng.gen_bool(0.9) {
                         let value = value.generate_mutated(heap, rng, symbols);
-                        Tag::create(heap, tag.symbol(), Some(value)).into()
+                        Tag::create(heap, true, tag.symbol(), Some(value)).into()
                     } else {
                         tag.without_value(heap).into()
                     }
                 } else {
                     let value = Self::generate(heap, rng, 100.0, symbols);
-                    Tag::create(heap, tag.symbol(), Some(value)).into()
+                    Tag::create(heap, true, tag.symbol(), Some(value)).into()
                 }
             }
             Data::List(list) => {
@@ -204,5 +205,5 @@ fn mutate_string(rng: &mut ThreadRng, heap: &mut Heap, mut string: String) -> Te
             .join("");
         string.insert_str(insertion_point, &string_to_insert)
     }
-    Text::create(heap, &string)
+    Text::create(heap, true, &string)
 }

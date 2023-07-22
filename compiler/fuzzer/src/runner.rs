@@ -72,7 +72,7 @@ impl<L: Borrow<Lir>> Runner<L> {
         let arguments = input
             .arguments
             .clone_to_heap_with_mapping(&mut heap, &mut mapping);
-        let responsible = HirId::create(&mut heap, Id::fuzzer());
+        let responsible = HirId::create(&mut heap, true, Id::fuzzer());
 
         let mut tracer = StackTracer::default();
         let vm = Vm::for_function(

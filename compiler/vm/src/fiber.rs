@@ -162,7 +162,7 @@ impl<T: FiberTracer> Fiber<T> {
     ) -> Self {
         let mut fiber = Self::new_with_heap(heap, constant_mapping, tracer);
 
-        let platform_id = HirId::create(&mut fiber.heap, hir::Id::platform());
+        let platform_id = HirId::create(&mut fiber.heap, true, hir::Id::platform());
         fiber.tracer.call_started(
             &mut fiber.heap,
             platform_id,
@@ -194,7 +194,7 @@ impl<T: FiberTracer> Fiber<T> {
             0,
             "Function is not a module function (it has arguments).",
         );
-        let responsible = HirId::create(&mut heap, Id::new(module, vec![]));
+        let responsible = HirId::create(&mut heap, true, Id::new(module, vec![]));
         Self::for_function(heap, constant_mapping, function, &[], responsible, tracer)
     }
 
@@ -244,14 +244,14 @@ impl<T: FiberTracer> Fiber<T> {
             ("SendPort", SendPort::create(&mut self.heap, channel)),
             ("ReceivePort", ReceivePort::create(&mut self.heap, channel)),
         ];
-        let struct_ = Struct::create_with_symbol_keys(&mut self.heap, fields);
+        let struct_ = Struct::create_with_symbol_keys(&mut self.heap, true, fields);
         self.push_to_data_stack(struct_);
         self.status = Status::Running;
     }
     pub fn complete_send(&mut self) {
         assert!(self.status.is_sending());
 
-        let nothing = Tag::create_nothing(&mut self.heap);
+        let nothing = Tag::create_nothing(&mut self.heap, true);
         self.push_to_data_stack(nothing);
         self.status = Status::Running;
     }
@@ -278,9 +278,11 @@ impl<T: FiberTracer> Fiber<T> {
 
         let result = match ended_reason {
             EndedReason::Finished(return_value) => Ok(*return_value),
-            EndedReason::Panicked(panic) => Err(Text::create(&mut self.heap, &panic.reason).into()),
+            EndedReason::Panicked(panic) => {
+                Err(Text::create(&mut self.heap, true, &panic.reason).into())
+            }
         };
-        let result = Tag::create_result(&mut self.heap, result);
+        let result = Tag::create_result(&mut self.heap, true, result);
         self.push_to_data_stack(result);
         self.status = Status::Running;
     }
@@ -365,7 +367,7 @@ impl<T: FiberTracer> Fiber<T> {
             Instruction::CreateTag { symbol } => {
                 let value = self.pop_from_data_stack();
                 symbol.dup();
-                let tag = Tag::create(&mut self.heap, symbol, value);
+                let tag = Tag::create(&mut self.heap, true, symbol, value);
                 self.push_to_data_stack(tag);
             }
             Instruction::CreateList { num_items } => {
@@ -374,7 +376,7 @@ impl<T: FiberTracer> Fiber<T> {
                     item_addresses.push(self.pop_from_data_stack());
                 }
                 let items = item_addresses.into_iter().rev().collect_vec();
-                let list = List::create(&mut self.heap, &items);
+                let list = List::create(&mut self.heap, true, &items);
                 self.push_to_data_stack(list);
             }
             Instruction::CreateStruct { num_fields } => {
@@ -384,7 +386,7 @@ impl<T: FiberTracer> Fiber<T> {
                     key_value_addresses.push(self.pop_from_data_stack());
                 }
                 let entries = key_value_addresses.into_iter().rev().tuples().collect();
-                let struct_ = Struct::create(&mut self.heap, &entries);
+                let struct_ = Struct::create(&mut self.heap, true, &entries);
                 self.push_to_data_stack(struct_);
             }
             Instruction::CreateFunction {
@@ -400,7 +402,7 @@ impl<T: FiberTracer> Fiber<T> {
                         object
                     })
                     .collect_vec();
-                let function = Function::create(&mut self.heap, &captured, num_args, body);
+                let function = Function::create(&mut self.heap, true, &captured, num_args, body);
                 self.push_to_data_stack(function);
             }
             Instruction::PushConstant(constant) => {
@@ -527,7 +529,7 @@ impl<T: FiberTracer> Fiber<T> {
                 }
 
                 if let [value] = arguments {
-                    let tag = Tag::create(&mut self.heap, tag.symbol(), *value);
+                    let tag = Tag::create(&mut self.heap, true, tag.symbol(), *value);
                     self.push_to_data_stack(tag);
                     value.dup(&mut self.heap);
                 } else {

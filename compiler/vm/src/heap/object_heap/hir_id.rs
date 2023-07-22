@@ -19,8 +19,13 @@ impl HeapHirId {
     pub fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
-    pub fn create(heap: &mut Heap, value: Id) -> Self {
-        let id = HeapHirId(heap.allocate(HeapObject::KIND_HIR_ID, mem::size_of::<Id>()));
+    pub fn create(heap: &mut Heap, is_reference_counted: bool, value: Id) -> Self {
+        let id = HeapHirId(heap.allocate(
+            HeapObject::KIND_HIR_ID,
+            is_reference_counted,
+            0,
+            mem::size_of::<Id>(),
+        ));
         unsafe { ptr::write(id.id_pointer().as_ptr(), value) };
         id
     }

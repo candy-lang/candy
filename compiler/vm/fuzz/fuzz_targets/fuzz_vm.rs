@@ -77,8 +77,8 @@ fuzz_target!(|data: &[u8]| {
     };
 
     // Run the `main` function.
-    let environment = Struct::create(&mut heap, &Default::default());
-    let responsible = HirId::create(&mut heap, hir::Id::user());
+    let environment = Struct::create(&mut heap, true, &Default::default());
+    let responsible = HirId::create(&mut heap, true, hir::Id::user());
     match Vm::for_function(
         &lir,
         heap,

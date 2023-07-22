@@ -133,8 +133,8 @@ pub fn run(lir: impl Borrow<Lir>) -> Packet {
         .unwrap();
 
     // Run the `main` function.
-    let environment = Struct::create(&mut heap, &FxHashMap::default());
-    let responsible = HirId::create(&mut heap, hir::Id::user());
+    let environment = Struct::create(&mut heap, true, &FxHashMap::default());
+    let responsible = HirId::create(&mut heap, true, hir::Id::user());
     let ended = Vm::for_function(
         lir,
         heap,

@@ -395,7 +395,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
                         .try_into()
                         .unwrap();
                     let responsible =
-                        HirId::create(&mut fiber.heap, Id::complicated_responsibility());
+                        HirId::create(&mut fiber.heap, true, Id::complicated_responsibility());
                     let nursery_send_port = SendPort::create(&mut heap, nursery_id);
 
                     let child_tracer = fiber.tracer.child_fiber_created(id);
@@ -436,7 +436,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
                         .try_into()
                         .unwrap();
                     let responsible =
-                        HirId::create(&mut fiber.heap, Id::complicated_responsibility());
+                        HirId::create(&mut fiber.heap, true, Id::complicated_responsibility());
 
                     let child_tracer = fiber.tracer.child_fiber_created(id);
                     self.fibers.insert(
@@ -650,7 +650,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
                             .try_into()
                             .unwrap();
                         let responsible =
-                            HirId::create(&mut heap, Id::complicated_responsibility());
+                            HirId::create(&mut heap, true, Id::complicated_responsibility());
                         let child_id = self.fiber_id_generator.generate();
 
                         let parent = self
@@ -707,13 +707,13 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
         let Packet { mut heap, object } = packet;
         let arguments: Struct = object.try_into().ok()?;
 
-        let function_tag = Tag::create_from_str(&mut heap, "Function", None);
+        let function_tag = Tag::create_from_str(&mut heap, true, "Function", None);
         let function: Function = arguments.get(**function_tag)?.try_into().ok()?;
         if function.argument_count() > 0 {
             return None;
         }
 
-        let return_channel_tag = Tag::create_from_str(&mut heap, "ReturnChannel", None);
+        let return_channel_tag = Tag::create_from_str(&mut heap, true, "ReturnChannel", None);
         let return_channel: SendPort = arguments.get(**return_channel_tag)?.try_into().ok()?;
 
         Some((heap, function, return_channel.channel_id()))

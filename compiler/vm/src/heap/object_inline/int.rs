@@ -55,9 +55,9 @@ impl InlineInt {
         let lhs = self.get();
         let rhs = rhs.get();
         lhs.checked_rem_euclid(rhs)
-            .map(|it| Int::create(heap, it))
+            .map(|it| Int::create(heap, true, it))
             .unwrap_or_else(|| {
-                Int::create_from_bigint(heap, BigInt::from(lhs).mod_floor(&rhs.into()))
+                Int::create_from_bigint(heap, true, BigInt::from(lhs).mod_floor(&rhs.into()))
             })
     }
 
@@ -72,7 +72,7 @@ impl InlineInt {
                 }
             }
         };
-        Tag::create_ordering(heap, ordering)
+        Tag::create_ordering(heap, true, ordering)
     }
 
     operator_fn!(shift_left, i64::checked_shl, Shl::shl);
@@ -94,9 +94,13 @@ macro_rules! operator_fn {
             let lhs = self.get();
             rhs.try_get()
                 .and_then(|rhs| $inline_operation(lhs, rhs))
-                .map(|it| Int::create(heap, it))
+                .map(|it| Int::create(heap, true, it))
                 .unwrap_or_else(|| {
-                    Int::create_from_bigint(heap, $bigint_operation(BigInt::from(lhs), rhs.get()))
+                    Int::create_from_bigint(
+                        heap,
+                        true,
+                        $bigint_operation(BigInt::from(lhs), rhs.get()),
+                    )
                 })
         }
     };

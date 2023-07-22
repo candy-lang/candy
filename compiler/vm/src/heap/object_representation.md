@@ -41,7 +41,7 @@ For larger values, a pointer to a heap object containing an integer of (practica
 Each heap object has the following structure:
 
 - one header word
-- one word containing the reference count as an unsigned integer (`u64`)
+- one word containing the reference count as an unsigned integer (`u64`) iff `r == 1`
 - zero to many words containing the actual data
   - for now, there are some objects whose content data length isn't a multiple of the word size since they use Rust's representation for simplicity
 
@@ -49,13 +49,16 @@ The header word is a tagged union of different types of values:
 
 |                                                                     Value | Meaning  |
 | ------------------------------------------------------------------------: | :------- |
-| `00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000` | Int      |
-| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaa001` | List     |
-| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaa101` | Struct   |
-| `00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000010` | Tag      |
-| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaa110` | Text     |
-| `cccccccc cccccccc cccccccc cccccccc aaaaaaaa aaaaaaaa aaaaaaaa aaaaa011` | Function |
-| `00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000111` | HirId    |
+| `00000000 00000000 00000000 00000000 00000000 00000000 00000000 0000r000` | Int      |
+| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaar001` | List     |
+| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaar101` | Struct   |
+| `00000000 00000000 00000000 00000000 00000000 00000000 00000000 0000r010` | Tag      |
+| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaar110` | Text     |
+| `cccccccc cccccccc cccccccc cccccccc aaaaaaaa aaaaaaaa aaaaaaaa aaaar011` | Function |
+| `00000000 00000000 00000000 00000000 00000000 00000000 00000000 0000r111` | HirId    |
+
+`r` is set to one iff the object is a reference-counted object.
+(Constants are not reference-counted so that they can be shared across fibers without locks.)
 
 > The remaining patterns are invalid.
 
