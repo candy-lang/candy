@@ -143,6 +143,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "candy_formatter_fuzzer"
+version = "0.0.0"
+dependencies = [
+ "candy_formatter",
+ "candy_frontend",
+ "extension-trait",
+ "lazy_static",
+ "libfuzzer-sys",
+ "salsa",
+]
+
+[[package]]
 name = "candy_frontend"
 version = "0.1.0"
 dependencies = [
