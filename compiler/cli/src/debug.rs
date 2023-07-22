@@ -326,6 +326,8 @@ impl GoldPath {
                 .find_position(|&&it| it == "# Instructions")
                 .unwrap();
             lines[constants_start + 1..constants_end - 1].sort();
+            // Re-add the trailing newline
+            lines.push("");
 
             visit("LIR", lines.iter().join("\n"));
         }
