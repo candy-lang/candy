@@ -30,7 +30,7 @@ jobs:
 
       # Core
       - name: 'Core: run'
-        run: cargo run --release -- check packages/Core/_.candy
+        run: cargo run --release -- check ./packages/Core/_.candy
 
   # fuzzing:
   #   name: Fuzzing
@@ -42,7 +42,21 @@ jobs:
   #         toolchain: ${{ env.RUST_VERSION }}
   #     - uses: Swatinem/rust-cache@v2.5.1
 
-  #     - run: cargo run --release -- fuzz packages/Benchmark.candy
+  #     - run: cargo run --release -- fuzz ./packages/Benchmark.candy
+
+  check-goldens:
+    name: Check Golden IR Files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3.5.3
+      - uses: dtolnay/rust-toolchain@0e66bd3e6b38ec0ad5312288c83e47c143e6b09e
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2.5.1
+
+      - name: 'Core: run'
+        run: cargo run --release -- debug gold check ./packages/Examples/
 
   benchmark:
     name: Benchmark
