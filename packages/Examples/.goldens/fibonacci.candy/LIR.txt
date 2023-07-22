@@ -1,0 +1,1068 @@
+# LIR for module Examples:fibonacci
+
+#
+# Tracing Config:
+#
+# • Include tracing of fuzzable functions? No
+# • Include tracing of calls? No
+# • Include tracing of evaluated expressions? No
+
+# Constant heap
+:
+:compareTo:10
+:equals:6
+:fibonacci:2:13:11
+:fibonacci:2:13:12
+:fibonacci:2:13:32
+:fibonacci:2:13:33
+:fibonacci:2:13:34
+:fibonacci:2:14
+:getArgumentCount:11
+:getArgumentCount:5
+:ifElse:1
+:ifElse:12
+:ifElse:15
+:ifElse:20
+:ifElse:26
+:ifElse:29
+:ifElse:34
+:ifElse:42
+:ifElse:6
+:intAdd:11
+:intAdd:18
+:intAdd:5
+:intCompareTo:11
+:intCompareTo:18
+:intCompareTo:5
+:intSubtract:18
+:intSubtract:5
+:isLessThan:11
+:needs
+:recursive:0:0:3
+:recursive:0:6
+:recursive:6
+:typeIs:19
+:typeIs:25
+<removed address>: ", got "
+<removed address>: ", got `"
+<removed address>: "."
+<removed address>: "CompareTo"
+<removed address>: "Expected "
+<removed address>: "Expected a "
+<removed address>: "Expected tag to not have a value, but it has one: `"
+<removed address>: "False"
+<removed address>: "Function"
+<removed address>: "Int"
+<removed address>: "IsLessThan"
+<removed address>: "Less"
+<removed address>: "Main"
+<removed address>: "Match"
+<removed address>: "NoMatch"
+<removed address>: "Nothing"
+<removed address>: "Recursive"
+<removed address>: "Tag"
+<removed address>: "Text"
+<removed address>: "The `condition` must be either `True` or `False`."
+<removed address>: "The `reason` must be a text."
+<removed address>: "True"
+<removed address>: "`."
+<removed address>: "`a | typeIs Int` was not satisfied"
+<removed address>: "`b | typeIs Int` was not satisfied"
+<removed address>: "`conditionIsBool` was not satisfied"
+<removed address>: "`else | getArgumentCount | equals 0` was not satisfied"
+<removed address>: "`else | typeIs Function` was not satisfied"
+<removed address>: "`function | typeIs Function` was not satisfied"
+<removed address>: "`minuend | typeIs Int` was not satisfied"
+<removed address>: "`then | getArgumentCount | equals 0` was not satisfied"
+<removed address>: "`then | typeIs Function` was not satisfied"
+<removed address>: (Match)
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: CompareTo
+<removed address>: Examples:fibonacci
+<removed address>: Examples:fibonacci
+<removed address>: Examples:fibonacci
+<removed address>: Examples:fibonacci
+<removed address>: Examples:fibonacci
+<removed address>: Examples:fibonacci
+<removed address>: Examples:fibonacci
+<removed address>: Examples:fibonacci
+<removed address>: Examples:fibonacci
+<removed address>: Examples:fibonacci
+<removed address>: Examples:fibonacci
+<removed address>: Examples:fibonacci
+<removed address>: False
+<removed address>: Function
+<removed address>: Int
+<removed address>: IsLessThan
+<removed address>: Less
+<removed address>: Main
+<removed address>: Match
+<removed address>: NoMatch
+<removed address>: Nothing
+<removed address>: Recursive
+<removed address>: Tag
+<removed address>: Text
+<removed address>: True
+<removed address>: [8001BAA19C6708C0 → Main: { 1 argument (capturing nothing) → ip-720 }, 9CCC80FFCD1B19AB → Recursive: { 2 arguments (capturing nothing) → ip-545 }, E3654C93383E2D9A → CompareTo: { 2 arguments (capturing nothing) → ip-552 }, F5F713A2DD8D0641 → IsLessThan: { 2 arguments (capturing nothing) → ip-591 }]
+<removed address>: anonymous:$generated:
+<removed address>: { 0 arguments (capturing nothing) → ip-0 }
+<removed address>: { 0 arguments (capturing nothing) → ip-3 }
+<removed address>: { 0 arguments (capturing nothing) → ip-725 }
+<removed address>: { 0 arguments (capturing nothing) → ip-73 }
+<removed address>: { 1 argument (capturing nothing) → ip-720 }
+<removed address>: { 2 arguments (capturing nothing) → ip-545 }
+<removed address>: { 2 arguments (capturing nothing) → ip-552 }
+<removed address>: { 2 arguments (capturing nothing) → ip-591 }
+<removed address>: { 2 arguments (capturing nothing) → ip-687 }
+<removed address>: { 2 arguments (capturing nothing) → ip-713 }
+<removed address>: { 3 arguments (capturing nothing) → ip-26 }
+<removed address>: { 3 arguments (capturing nothing) → ip-374 }
+
+# Instructions
+# anonymous:$generated:
+:needs:isConditionTrue:then
+  0: pushConstant <removed address> True
+  1: popMultipleBelowTop 1
+  2: return
+# anonymous:$generated:
+:needs:isConditionBool:then
+  3: pushConstant <removed address> Nothing
+  4: popMultipleBelowTop 1
+  5: return
+# anonymous:$generated:
+:needs:isConditionTrue:else
+  6: pushConstant inline builtinEquals
+  7: pushFromStack 2
+  8: pushConstant <removed address> False
+  9: pushConstant <removed address> anonymous:$generated:
+:needs
+ 10: tailCall with 2 locals and 2 arguments
+# anonymous:$generated:
+:needs:isConditionBool:else
+ 11: pushConstant <removed address> "The `condition` must be either `True` or `False`."
+ 12: pushFromStack 2
+ 13: panic
+ 14: popMultipleBelowTop 2
+ 15: return
+# anonymous:$generated:
+:needs:isReasonText:else
+ 16: pushConstant <removed address> "The `reason` must be a text."
+ 17: pushFromStack 2
+ 18: panic
+ 19: popMultipleBelowTop 2
+ 20: return
+# anonymous:$generated:
+:needs:condition:else
+ 21: pushFromStack 2
+ 22: pushFromStack 2
+ 23: panic
+ 24: popMultipleBelowTop 3
+ 25: return
+# anonymous:$generated:
+:needs
+ 26: pushConstant inline builtinEquals
+ 27: pushFromStack 4
+ 28: pushConstant <removed address> True
+ 29: pushConstant <removed address> anonymous:$generated:
+:needs
+ 30: call with 2 arguments
+ 31: pushFromStack 4
+ 32: createFunction with 0 arguments capturing 0 starting at ip-6
+ 33: pushConstant inline builtinIfElse
+ 34: pushFromStack 3
+ 35: pushConstant <removed address> { 0 arguments (capturing nothing) → ip-0 }
+ 36: pushFromStack 3
+ 37: pushConstant <removed address> anonymous:$generated:
+:needs
+ 38: call with 3 arguments
+ 39: pushFromStack 4
+ 40: createFunction with 0 arguments capturing 0 starting at ip-11
+ 41: pushConstant inline builtinIfElse
+ 42: pushFromStack 3
+ 43: pushConstant <removed address> { 0 arguments (capturing nothing) → ip-3 }
+ 44: pushFromStack 3
+ 45: pushConstant <removed address> anonymous:$generated:
+:needs
+ 46: call with 3 arguments
+ 47: pushConstant inline builtinTypeOf
+ 48: pushFromStack 10
+ 49: pushFromStack 4
+ 50: call with 1 argument
+ 51: pushConstant inline builtinEquals
+ 52: pushFromStack 1
+ 53: pushConstant <removed address> Text
+ 54: pushFromStack 6
+ 55: call with 2 arguments
+ 56: pushFromStack 4
+ 57: createFunction with 0 arguments capturing 0 starting at ip-16
+ 58: pushConstant inline builtinIfElse
+ 59: pushFromStack 3
+ 60: pushConstant <removed address> { 0 arguments (capturing nothing) → ip-3 }
+ 61: pushFromStack 3
+ 62: pushConstant <removed address> anonymous:$generated:
+:needs
+ 63: call with 3 arguments
+ 64: pushFromStack 14
+ 65: pushFromStack 14
+ 66: createFunction with 0 arguments capturing 1, 0 starting at ip-21
+ 67: pushConstant inline builtinIfElse
+ 68: pushFromStack 14
+ 69: pushConstant <removed address> { 0 arguments (capturing nothing) → ip-3 }
+ 70: pushFromStack 3
+ 71: pushConstant <removed address> anonymous:$generated:
+:needs
+ 72: tailCall with 19 locals and 3 arguments
+# Builtins:
+:not:1:equals:then
+ 73: pushConstant <removed address> (Match)
+ 74: popMultipleBelowTop 1
+ 75: return
+# Builtins:
+:ifElse:1:equals:else
+ 76: pushConstant inline builtinToDebugText
+ 77: pushConstant <removed address> False
+ 78: pushConstant <removed address> Builtins:
+:ifElse:1
+ 79: call with 1 argument
+ 80: pushConstant inline builtinToDebugText
+ 81: pushFromStack 4
+ 82: pushConstant <removed address> Builtins:
+:ifElse:1
+ 83: call with 1 argument
+ 84: pushConstant inline builtinTagGetValue
+ 85: pushFromStack 4
+ 86: pushConstant <removed address> Builtins:
+:ifElse:1
+ 87: call with 1 argument
+ 88: pushConstant inline builtinToDebugText
+ 89: pushFromStack 1
+ 90: pushConstant <removed address> Builtins:
+:ifElse:1
+ 91: call with 1 argument
+ 92: pushConstant inline builtinTextConcatenate
+ 93: pushConstant <removed address> "Expected tag to not have a value, but it has one: `"
+ 94: pushFromStack 2
+ 95: pushConstant <removed address> Builtins:
+:ifElse:1
+ 96: call with 2 arguments
+ 97: pushConstant inline builtinTextConcatenate
+ 98: pushFromStack 1
+ 99: pushConstant <removed address> "`."
+100: pushConstant <removed address> Builtins:
+:ifElse:1
+101: call with 2 arguments
+102: pushConstant <removed address> NoMatch
+103: pushFromStack 1
+104: createList 2
+105: popMultipleBelowTop 9
+106: return
+# Builtins:
+:ifElse:1:equals:then
+107: pushConstant inline builtinTagHasValue
+108: pushFromStack 2
+109: pushConstant <removed address> Builtins:
+:ifElse:1
+110: call with 1 argument
+111: pushConstant inline builtinEquals
+112: pushConstant <removed address> False
+113: pushFromStack 2
+114: pushConstant <removed address> Builtins:
+:ifElse:1
+115: call with 2 arguments
+116: pushFromStack 1
+117: pushFromStack 4
+118: createFunction with 0 arguments capturing 1, 0 starting at ip-76
+119: pushConstant inline builtinIfElse
+120: pushFromStack 4
+121: pushConstant <removed address> { 0 arguments (capturing nothing) → ip-73 }
+122: pushFromStack 3
+123: pushConstant <removed address> Builtins:
+:ifElse:1
+124: tailCall with 7 locals and 3 arguments
+# Builtins:
+:ifElse:1:equals:else
+125: pushConstant inline builtinToDebugText
+126: pushConstant <removed address> True
+127: pushConstant <removed address> Builtins:
+:ifElse:1
+128: call with 1 argument
+129: pushConstant inline builtinToDebugText
+130: pushFromStack 3
+131: pushConstant <removed address> Builtins:
+:ifElse:1
+132: call with 1 argument
+133: pushConstant inline builtinTextConcatenate
+134: pushConstant <removed address> "Expected "
+135: pushFromStack 3
+136: pushConstant <removed address> Builtins:
+:ifElse:1
+137: call with 2 arguments
+138: pushConstant inline builtinTextConcatenate
+139: pushFromStack 1
+140: pushConstant <removed address> ", got "
+141: pushConstant <removed address> Builtins:
+:ifElse:1
+142: call with 2 arguments
+143: pushConstant inline builtinTextConcatenate
+144: pushFromStack 1
+145: pushFromStack 4
+146: pushConstant <removed address> Builtins:
+:ifElse:1
+147: call with 2 arguments
+148: pushConstant inline builtinTextConcatenate
+149: pushFromStack 1
+150: pushConstant <removed address> "."
+151: pushConstant <removed address> Builtins:
+:ifElse:1
+152: call with 2 arguments
+153: pushConstant <removed address> NoMatch
+154: pushFromStack 1
+155: createList 2
+156: popMultipleBelowTop 8
+157: return
+# Builtins:
+:ifElse:1:equals:then
+158: pushConstant inline builtinTagWithoutValue
+159: pushFromStack 2
+160: pushConstant <removed address> Builtins:
+:ifElse:1
+161: call with 1 argument
+162: pushConstant inline builtinEquals
+163: pushConstant <removed address> True
+164: pushFromStack 2
+165: pushConstant <removed address> Builtins:
+:ifElse:1
+166: call with 2 arguments
+167: pushFromStack 3
+168: createFunction with 0 arguments capturing 0 starting at ip-107
+169: pushFromStack 3
+170: createFunction with 0 arguments capturing 0 starting at ip-125
+171: pushConstant inline builtinIfElse
+172: pushFromStack 5
+173: pushFromStack 4
+174: pushFromStack 3
+175: pushConstant <removed address> Builtins:
+:ifElse:1
+176: tailCall with 8 locals and 3 arguments
+# Builtins:
+:ifElse:1:equals:else
+177: pushConstant inline builtinToDebugText
+178: pushConstant <removed address> Tag
+179: pushConstant <removed address> Builtins:
+:ifElse:1
+180: call with 1 argument
+181: pushConstant inline builtinToDebugText
+182: pushFromStack 3
+183: pushConstant <removed address> Builtins:
+:ifElse:1
+184: call with 1 argument
+185: pushConstant inline builtinTextConcatenate
+186: pushConstant <removed address> "Expected a "
+187: pushFromStack 3
+188: pushConstant <removed address> Builtins:
+:ifElse:1
+189: call with 2 arguments
+190: pushConstant inline builtinTextConcatenate
+191: pushFromStack 1
+192: pushConstant <removed address> ", got `"
+193: pushConstant <removed address> Builtins:
+:ifElse:1
+194: call with 2 arguments
+195: pushConstant inline builtinTextConcatenate
+196: pushFromStack 1
+197: pushFromStack 4
+198: pushConstant <removed address> Builtins:
+:ifElse:1
+199: call with 2 arguments
+200: pushConstant inline builtinTextConcatenate
+201: pushFromStack 1
+202: pushConstant <removed address> "`."
+203: pushConstant <removed address> Builtins:
+:ifElse:1
+204: call with 2 arguments
+205: pushConstant <removed address> NoMatch
+206: pushFromStack 1
+207: createList 2
+208: popMultipleBelowTop 8
+209: return
+# Builtins:
+:ifElse:1:isMatch:then
+210: pushFromStack 1
+211: popMultipleBelowTop 2
+212: return
+# Builtins:
+:ifElse:1:equals:else
+213: pushConstant inline builtinToDebugText
+214: pushConstant <removed address> False
+215: pushConstant <removed address> Builtins:
+:ifElse:1
+216: call with 1 argument
+217: pushConstant inline builtinToDebugText
+218: pushFromStack 4
+219: pushConstant <removed address> Builtins:
+:ifElse:1
+220: call with 1 argument
+221: pushConstant inline builtinTagGetValue
+222: pushFromStack 4
+223: pushConstant <removed address> Builtins:
+:ifElse:1
+224: call with 1 argument
+225: pushConstant inline builtinToDebugText
+226: pushFromStack 1
+227: pushConstant <removed address> Builtins:
+:ifElse:1
+228: call with 1 argument
+229: pushConstant inline builtinTextConcatenate
+230: pushConstant <removed address> "Expected tag to not have a value, but it has one: `"
+231: pushFromStack 2
+232: pushConstant <removed address> Builtins:
+:ifElse:1
+233: call with 2 arguments
+234: pushConstant inline builtinTextConcatenate
+235: pushFromStack 1
+236: pushConstant <removed address> "`."
+237: pushConstant <removed address> Builtins:
+:ifElse:1
+238: call with 2 arguments
+239: pushConstant <removed address> NoMatch
+240: pushFromStack 1
+241: createList 2
+242: popMultipleBelowTop 9
+243: return
+# Builtins:
+:ifElse:1:equals:then
+244: pushConstant inline builtinTagHasValue
+245: pushFromStack 2
+246: pushConstant <removed address> Builtins:
+:ifElse:1
+247: call with 1 argument
+248: pushConstant inline builtinEquals
+249: pushConstant <removed address> False
+250: pushFromStack 2
+251: pushConstant <removed address> Builtins:
+:ifElse:1
+252: call with 2 arguments
+253: pushFromStack 1
+254: pushFromStack 4
+255: createFunction with 0 arguments capturing 1, 0 starting at ip-213
+256: pushConstant inline builtinIfElse
+257: pushFromStack 4
+258: pushConstant <removed address> { 0 arguments (capturing nothing) → ip-73 }
+259: pushFromStack 3
+260: pushConstant <removed address> Builtins:
+:ifElse:1
+261: tailCall with 7 locals and 3 arguments
+# Builtins:
+:ifElse:1:equals:else
+262: pushConstant inline builtinToDebugText
+263: pushConstant <removed address> False
+264: pushConstant <removed address> Builtins:
+:ifElse:1
+265: call with 1 argument
+266: pushConstant inline builtinToDebugText
+267: pushFromStack 3
+268: pushConstant <removed address> Builtins:
+:ifElse:1
+269: call with 1 argument
+270: pushConstant inline builtinTextConcatenate
+271: pushConstant <removed address> "Expected "
+272: pushFromStack 3
+273: pushConstant <removed address> Builtins:
+:ifElse:1
+274: call with 2 arguments
+275: pushConstant inline builtinTextConcatenate
+276: pushFromStack 1
+277: pushConstant <removed address> ", got "
+278: pushConstant <removed address> Builtins:
+:ifElse:1
+279: call with 2 arguments
+280: pushConstant inline builtinTextConcatenate
+281: pushFromStack 1
+282: pushFromStack 4
+283: pushConstant <removed address> Builtins:
+:ifElse:1
+284: call with 2 arguments
+285: pushConstant inline builtinTextConcatenate
+286: pushFromStack 1
+287: pushConstant <removed address> "."
+288: pushConstant <removed address> Builtins:
+:ifElse:1
+289: call with 2 arguments
+290: pushConstant <removed address> NoMatch
+291: pushFromStack 1
+292: createList 2
+293: popMultipleBelowTop 8
+294: return
+# Builtins:
+:ifElse:1:equals:then
+295: pushConstant inline builtinTagWithoutValue
+296: pushFromStack 2
+297: pushConstant <removed address> Builtins:
+:ifElse:1
+298: call with 1 argument
+299: pushConstant inline builtinEquals
+300: pushConstant <removed address> False
+301: pushFromStack 2
+302: pushConstant <removed address> Builtins:
+:ifElse:1
+303: call with 2 arguments
+304: pushFromStack 3
+305: createFunction with 0 arguments capturing 0 starting at ip-244
+306: pushFromStack 3
+307: createFunction with 0 arguments capturing 0 starting at ip-262
+308: pushConstant inline builtinIfElse
+309: pushFromStack 5
+310: pushFromStack 4
+311: pushFromStack 3
+312: pushConstant <removed address> Builtins:
+:ifElse:1
+313: tailCall with 8 locals and 3 arguments
+# Builtins:
+:ifElse:1:equals:else
+314: pushConstant inline builtinToDebugText
+315: pushConstant <removed address> Tag
+316: pushConstant <removed address> Builtins:
+:ifElse:1
+317: call with 1 argument
+318: pushConstant inline builtinToDebugText
+319: pushFromStack 3
+320: pushConstant <removed address> Builtins:
+:ifElse:1
+321: call with 1 argument
+322: pushConstant inline builtinTextConcatenate
+323: pushConstant <removed address> "Expected a "
+324: pushFromStack 3
+325: pushConstant <removed address> Builtins:
+:ifElse:1
+326: call with 2 arguments
+327: pushConstant inline builtinTextConcatenate
+328: pushFromStack 1
+329: pushConstant <removed address> ", got `"
+330: pushConstant <removed address> Builtins:
+:ifElse:1
+331: call with 2 arguments
+332: pushConstant inline builtinTextConcatenate
+333: pushFromStack 1
+334: pushFromStack 4
+335: pushConstant <removed address> Builtins:
+:ifElse:1
+336: call with 2 arguments
+337: pushConstant inline builtinTextConcatenate
+338: pushFromStack 1
+339: pushConstant <removed address> "`."
+340: pushConstant <removed address> Builtins:
+:ifElse:1
+341: call with 2 arguments
+342: pushConstant <removed address> NoMatch
+343: pushFromStack 1
+344: createList 2
+345: popMultipleBelowTop 8
+346: return
+# Builtins:
+:ifElse:1:isMatch:else
+347: pushConstant inline builtinTypeOf
+348: pushFromStack 2
+349: pushConstant <removed address> Builtins:
+:ifElse:1
+350: call with 1 argument
+351: pushConstant inline builtinEquals
+352: pushConstant <removed address> Tag
+353: pushFromStack 2
+354: pushConstant <removed address> Builtins:
+:ifElse:1
+355: call with 2 arguments
+356: pushFromStack 3
+357: createFunction with 0 arguments capturing 0 starting at ip-295
+358: pushFromStack 3
+359: createFunction with 0 arguments capturing 0 starting at ip-314
+360: pushConstant inline builtinIfElse
+361: pushFromStack 5
+362: pushFromStack 4
+363: pushFromStack 3
+364: pushConstant <removed address> Builtins:
+:ifElse:1
+365: tailCall with 8 locals and 3 arguments
+# Builtins:
+:ifElse:1:case-0:didNotMatch
+366: pushConstant inline builtinListGet
+367: pushFromStack 2
+368: pushConstant inline 1
+369: pushConstant <removed address> Builtins:
+:ifElse:1
+370: call with 2 arguments
+371: pushConstant <removed address> False
+372: popMultipleBelowTop 3
+373: return
+# Builtins:
+:ifElse
+374: pushConstant inline builtinTypeOf
+375: pushFromStack 4
+376: pushConstant <removed address> Builtins:
+:ifElse:1
+377: call with 1 argument
+378: pushConstant inline builtinEquals
+379: pushConstant <removed address> Tag
+380: pushFromStack 2
+381: pushConstant <removed address> Builtins:
+:ifElse:1
+382: call with 2 arguments
+383: pushFromStack 5
+384: createFunction with 0 arguments capturing 0 starting at ip-158
+385: pushFromStack 3
+386: createFunction with 0 arguments capturing 0 starting at ip-177
+387: pushConstant inline builtinIfElse
+388: pushFromStack 5
+389: pushFromStack 4
+390: pushFromStack 3
+391: pushConstant <removed address> Builtins:
+:ifElse:1
+392: call with 3 arguments
+393: pushConstant inline builtinListGet
+394: pushFromStack 1
+395: pushConstant inline 0
+396: pushConstant <removed address> Builtins:
+:ifElse:1
+397: call with 2 arguments
+398: pushConstant inline builtinEquals
+399: pushFromStack 1
+400: pushConstant <removed address> Match
+401: pushConstant <removed address> Builtins:
+:ifElse:1
+402: call with 2 arguments
+403: pushFromStack 2
+404: createFunction with 0 arguments capturing 0 starting at ip-210
+405: pushFromStack 8
+406: createFunction with 0 arguments capturing 0 starting at ip-347
+407: pushConstant inline builtinIfElse
+408: pushFromStack 5
+409: pushFromStack 4
+410: pushFromStack 3
+411: pushConstant <removed address> Builtins:
+:ifElse:1
+412: call with 3 arguments
+413: pushConstant inline builtinListGet
+414: pushFromStack 1
+415: pushConstant inline 0
+416: pushConstant <removed address> Builtins:
+:ifElse:1
+417: call with 2 arguments
+418: pushConstant inline builtinEquals
+419: pushFromStack 1
+420: pushConstant <removed address> Match
+421: pushConstant <removed address> Builtins:
+:ifElse:1
+422: call with 2 arguments
+423: pushFromStack 2
+424: createFunction with 0 arguments capturing 0 starting at ip-366
+425: pushConstant inline builtinIfElse
+426: pushFromStack 3
+427: pushConstant <removed address> { 0 arguments (capturing nothing) → ip-0 }
+428: pushFromStack 3
+429: pushConstant <removed address> Builtins:
+:ifElse:1
+430: call with 3 arguments
+431: pushConstant <removed address> { 3 arguments (capturing nothing) → ip-26 }
+432: pushFromStack 1
+433: pushConstant <removed address> "`conditionIsBool` was not satisfied"
+434: pushFromStack 22
+435: pushConstant <removed address> Builtins:
+:ifElse:6
+436: call with 3 arguments
+437: pushConstant inline builtinTypeOf
+438: pushFromStack 23
+439: pushConstant <removed address> Builtins:
+:typeIs:19
+440: call with 1 argument
+441: pushConstant inline builtinEquals
+442: pushFromStack 1
+443: pushConstant <removed address> Function
+444: pushConstant <removed address> Builtins:
+:typeIs:25
+445: call with 2 arguments
+446: pushConstant <removed address> { 3 arguments (capturing nothing) → ip-26 }
+447: pushFromStack 1
+448: pushConstant <removed address> "`then | typeIs Function` was not satisfied"
+449: pushFromStack 25
+450: pushConstant <removed address> Builtins:
+:ifElse:12
+451: call with 3 arguments
+452: pushConstant inline builtinTypeOf
+453: pushFromStack 26
+454: pushConstant <removed address> Builtins:
+:typeIs:19
+455: call with 1 argument
+456: pushConstant inline builtinEquals
+457: pushFromStack 1
+458: pushConstant <removed address> Function
+459: pushConstant <removed address> Builtins:
+:typeIs:25
+460: call with 2 arguments
+461: pushConstant <removed address> { 3 arguments (capturing nothing) → ip-26 }
+462: pushFromStack 1
+463: pushConstant <removed address> "`function | typeIs Function` was not satisfied"
+464: pushConstant <removed address> Builtins:
+:ifElse:15
+465: pushConstant <removed address> Builtins:
+:getArgumentCount:5
+466: call with 3 arguments
+467: pushConstant inline builtinGetArgumentCount
+468: pushFromStack 29
+469: pushConstant <removed address> Builtins:
+:getArgumentCount:11
+470: call with 1 argument
+471: pushConstant inline builtinEquals
+472: pushFromStack 1
+473: pushConstant inline 0
+474: pushConstant <removed address> Builtins:
+:equals:6
+475: call with 2 arguments
+476: pushConstant <removed address> { 3 arguments (capturing nothing) → ip-26 }
+477: pushFromStack 1
+478: pushConstant <removed address> "`then | getArgumentCount | equals 0` was not satisfied"
+479: pushFromStack 31
+480: pushConstant <removed address> Builtins:
+:ifElse:20
+481: call with 3 arguments
+482: pushConstant inline builtinTypeOf
+483: pushFromStack 31
+484: pushConstant <removed address> Builtins:
+:typeIs:19
+485: call with 1 argument
+486: pushConstant inline builtinEquals
+487: pushFromStack 1
+488: pushConstant <removed address> Function
+489: pushConstant <removed address> Builtins:
+:typeIs:25
+490: call with 2 arguments
+491: pushConstant <removed address> { 3 arguments (capturing nothing) → ip-26 }
+492: pushFromStack 1
+493: pushConstant <removed address> "`else | typeIs Function` was not satisfied"
+494: pushFromStack 34
+495: pushConstant <removed address> Builtins:
+:ifElse:26
+496: call with 3 arguments
+497: pushConstant inline builtinTypeOf
+498: pushFromStack 34
+499: pushConstant <removed address> Builtins:
+:typeIs:19
+500: call with 1 argument
+501: pushConstant inline builtinEquals
+502: pushFromStack 1
+503: pushConstant <removed address> Function
+504: pushConstant <removed address> Builtins:
+:typeIs:25
+505: call with 2 arguments
+506: pushConstant <removed address> { 3 arguments (capturing nothing) → ip-26 }
+507: pushFromStack 1
+508: pushConstant <removed address> "`function | typeIs Function` was not satisfied"
+509: pushConstant <removed address> Builtins:
+:ifElse:29
+510: pushConstant <removed address> Builtins:
+:getArgumentCount:5
+511: call with 3 arguments
+512: pushConstant inline builtinGetArgumentCount
+513: pushFromStack 37
+514: pushConstant <removed address> Builtins:
+:getArgumentCount:11
+515: call with 1 argument
+516: pushConstant inline builtinEquals
+517: pushFromStack 1
+518: pushConstant inline 0
+519: pushConstant <removed address> Builtins:
+:equals:6
+520: call with 2 arguments
+521: pushConstant <removed address> { 3 arguments (capturing nothing) → ip-26 }
+522: pushFromStack 1
+523: pushConstant <removed address> "`else | getArgumentCount | equals 0` was not satisfied"
+524: pushFromStack 40
+525: pushConstant <removed address> Builtins:
+:ifElse:34
+526: call with 3 arguments
+527: pushConstant inline builtinIfElse
+528: pushFromStack 27
+529: pushFromStack 42
+530: pushFromStack 42
+531: pushConstant <removed address> Builtins:
+:ifElse:42
+532: tailCall with 42 locals and 3 arguments
+# Examples:fibonacci
+:recursive:0:0
+533: pushFromStack 2
+534: pushFromStack 0
+535: pushFromStack 3
+536: pushConstant <removed address> Examples:fibonacci
+:recursive:0:0:3
+537: tailCall with 3 locals and 2 arguments
+# Examples:fibonacci
+:recursive:0
+538: pushFromStack 2
+539: createFunction with 1 argument capturing 0 starting at ip-533
+540: pushFromStack 5
+541: pushFromStack 1
+542: pushFromStack 5
+543: pushConstant <removed address> Examples:fibonacci
+:recursive:0:6
+544: tailCall with 6 locals and 2 arguments
+# Examples:fibonacci
+:recursive
+545: pushFromStack 1
+546: createFunction with 2 arguments capturing 0 starting at ip-538
+547: pushFromStack 0
+548: pushFromStack 0
+549: pushFromStack 6
+550: pushConstant <removed address> Examples:fibonacci
+:recursive:6
+551: tailCall with 5 locals and 2 arguments
+# Examples:fibonacci
+:compareTo
+552: pushConstant inline builtinTypeOf
+553: pushFromStack 3
+554: pushConstant <removed address> Builtins:
+:typeIs:19
+555: call with 1 argument
+556: pushConstant inline builtinEquals
+557: pushFromStack 1
+558: pushConstant <removed address> Int
+559: pushConstant <removed address> Builtins:
+:typeIs:25
+560: call with 2 arguments
+561: pushConstant <removed address> { 3 arguments (capturing nothing) → ip-26 }
+562: pushFromStack 1
+563: pushConstant <removed address> "`a | typeIs Int` was not satisfied"
+564: pushConstant <removed address> Examples:fibonacci
+:compareTo:10
+565: pushConstant <removed address> Builtins:
+:intCompareTo:5
+566: call with 3 arguments
+567: pushConstant inline builtinTypeOf
+568: pushFromStack 5
+569: pushConstant <removed address> Builtins:
+:typeIs:19
+570: call with 1 argument
+571: pushConstant inline builtinEquals
+572: pushFromStack 1
+573: pushConstant <removed address> Int
+574: pushConstant <removed address> Builtins:
+:typeIs:25
+575: call with 2 arguments
+576: pushConstant <removed address> { 3 arguments (capturing nothing) → ip-26 }
+577: pushFromStack 1
+578: pushConstant <removed address> "`b | typeIs Int` was not satisfied"
+579: pushConstant <removed address> Examples:fibonacci
+:compareTo:10
+580: pushConstant <removed address> Builtins:
+:intCompareTo:11
+581: call with 3 arguments
+582: pushConstant inline builtinIntCompareTo
+583: pushFromStack 9
+584: pushFromStack 9
+585: pushConstant <removed address> Builtins:
+:intCompareTo:18
+586: call with 2 arguments
+587: pushFromStack 0
+588: pushFromStack 0
+589: popMultipleBelowTop 11
+590: return
+# Examples:fibonacci
+:isLessThan
+591: pushConstant <removed address> { 2 arguments (capturing nothing) → ip-552 }
+592: pushFromStack 3
+593: pushFromStack 3
+594: pushConstant <removed address> Examples:fibonacci
+:isLessThan:11
+595: call with 2 arguments
+596: pushConstant inline builtinEquals
+597: pushFromStack 1
+598: pushConstant <removed address> Less
+599: pushConstant <removed address> Builtins:
+:equals:6
+600: tailCall with 4 locals and 2 arguments
+# Examples:fibonacci
+:fibonacci:2:12
+601: pushFromStack 1
+602: popMultipleBelowTop 2
+603: return
+# Examples:fibonacci
+:fibonacci:2:13
+604: pushConstant inline builtinTypeOf
+605: pushFromStack 2
+606: pushConstant <removed address> Builtins:
+:typeIs:19
+607: call with 1 argument
+608: pushConstant inline builtinEquals
+609: pushFromStack 1
+610: pushConstant <removed address> Int
+611: pushConstant <removed address> Builtins:
+:typeIs:25
+612: call with 2 arguments
+613: pushConstant <removed address> { 3 arguments (capturing nothing) → ip-26 }
+614: pushFromStack 1
+615: pushConstant <removed address> "`minuend | typeIs Int` was not satisfied"
+616: pushConstant <removed address> Examples:fibonacci
+:fibonacci:2:13:11
+617: pushConstant <removed address> Builtins:
+:intSubtract:5
+618: call with 3 arguments
+619: pushConstant inline builtinIntSubtract
+620: pushFromStack 5
+621: pushConstant inline 1
+622: pushConstant <removed address> Builtins:
+:intSubtract:18
+623: call with 2 arguments
+624: pushFromStack 6
+625: pushFromStack 1
+626: pushConstant <removed address> Examples:fibonacci
+:fibonacci:2:13:12
+627: call with 1 argument
+628: pushConstant inline builtinTypeOf
+629: pushFromStack 7
+630: pushConstant <removed address> Builtins:
+:typeIs:19
+631: call with 1 argument
+632: pushConstant inline builtinEquals
+633: pushFromStack 1
+634: pushConstant <removed address> Int
+635: pushConstant <removed address> Builtins:
+:typeIs:25
+636: call with 2 arguments
+637: pushConstant <removed address> { 3 arguments (capturing nothing) → ip-26 }
+638: pushFromStack 1
+639: pushConstant <removed address> "`minuend | typeIs Int` was not satisfied"
+640: pushConstant <removed address> Examples:fibonacci
+:fibonacci:2:13:32
+641: pushConstant <removed address> Builtins:
+:intSubtract:5
+642: call with 3 arguments
+643: pushConstant inline builtinIntSubtract
+644: pushFromStack 10
+645: pushConstant inline 2
+646: pushConstant <removed address> Builtins:
+:intSubtract:18
+647: call with 2 arguments
+648: pushFromStack 11
+649: pushFromStack 1
+650: pushConstant <removed address> Examples:fibonacci
+:fibonacci:2:13:33
+651: call with 1 argument
+652: pushConstant inline builtinTypeOf
+653: pushFromStack 6
+654: pushConstant <removed address> Builtins:
+:typeIs:19
+655: call with 1 argument
+656: pushConstant inline builtinEquals
+657: pushFromStack 1
+658: pushConstant <removed address> Int
+659: pushConstant <removed address> Builtins:
+:typeIs:25
+660: call with 2 arguments
+661: pushConstant <removed address> { 3 arguments (capturing nothing) → ip-26 }
+662: pushFromStack 1
+663: pushConstant <removed address> "`a | typeIs Int` was not satisfied"
+664: pushConstant <removed address> Examples:fibonacci
+:fibonacci:2:13:34
+665: pushConstant <removed address> Builtins:
+:intAdd:5
+666: call with 3 arguments
+667: pushConstant inline builtinTypeOf
+668: pushFromStack 4
+669: pushConstant <removed address> Builtins:
+:typeIs:19
+670: call with 1 argument
+671: pushConstant inline builtinEquals
+672: pushFromStack 1
+673: pushConstant <removed address> Int
+674: pushConstant <removed address> Builtins:
+:typeIs:25
+675: call with 2 arguments
+676: pushConstant <removed address> { 3 arguments (capturing nothing) → ip-26 }
+677: pushFromStack 1
+678: pushConstant <removed address> "`b | typeIs Int` was not satisfied"
+679: pushConstant <removed address> Examples:fibonacci
+:fibonacci:2:13:34
+680: pushConstant <removed address> Builtins:
+:intAdd:11
+681: call with 3 arguments
+682: pushConstant inline builtinIntAdd
+683: pushFromStack 12
+684: pushFromStack 8
+685: pushConstant <removed address> Builtins:
+:intAdd:18
+686: tailCall with 19 locals and 2 arguments
+# Examples:fibonacci
+:fibonacci:2
+687: pushConstant <removed address> { 2 arguments (capturing nothing) → ip-552 }
+688: pushFromStack 2
+689: pushConstant inline 2
+690: pushConstant <removed address> Examples:fibonacci
+:isLessThan:11
+691: call with 2 arguments
+692: pushConstant inline builtinEquals
+693: pushFromStack 1
+694: pushConstant <removed address> Less
+695: pushConstant <removed address> Builtins:
+:equals:6
+696: call with 2 arguments
+697: pushFromStack 3
+698: createFunction with 0 arguments capturing 0 starting at ip-601
+699: pushFromStack 6
+700: pushFromStack 2
+701: createFunction with 0 arguments capturing 1, 0 starting at ip-604
+702: pushConstant <removed address> { 3 arguments (capturing nothing) → ip-374 }
+703: pushFromStack 6
+704: pushFromStack 5
+705: pushFromStack 3
+706: pushConstant <removed address> Examples:fibonacci
+:fibonacci:2:14
+707: tailCall with 10 locals and 3 arguments
+# Examples:fibonacci
+:recursive:0:0
+708: pushFromStack 2
+709: pushFromStack 0
+710: pushFromStack 3
+711: pushConstant <removed address> Examples:fibonacci
+:recursive:0:0:3
+712: tailCall with 3 locals and 2 arguments
+# Examples:fibonacci
+:recursive:0
+713: pushFromStack 2
+714: createFunction with 1 argument capturing 0 starting at ip-708
+715: pushConstant <removed address> { 2 arguments (capturing nothing) → ip-687 }
+716: pushFromStack 1
+717: pushFromStack 5
+718: pushConstant <removed address> Examples:fibonacci
+:recursive:0:6
+719: tailCall with 5 locals and 2 arguments
+# Examples:fibonacci
+:main
+720: pushConstant <removed address> { 2 arguments (capturing nothing) → ip-713 }
+721: pushConstant <removed address> { 2 arguments (capturing nothing) → ip-713 }
+722: pushConstant inline 15
+723: pushConstant <removed address> Examples:fibonacci
+:recursive:6
+724: tailCall with 2 locals and 2 arguments
+# Examples:fibonacci
+:
+725: pushConstant <removed address> [8001BAA19C6708C0 → Main: { 1 argument (capturing nothing) → ip-720 }, 9CCC80FFCD1B19AB → Recursive: { 2 arguments (capturing nothing) → ip-545 }, E3654C93383E2D9A → CompareTo: { 2 arguments (capturing nothing) → ip-552 }, F5F713A2DD8D0641 → IsLessThan: { 2 arguments (capturing nothing) → ip-591 }]
+726: popMultipleBelowTop 1
+727: return

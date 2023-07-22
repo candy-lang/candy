@@ -1,0 +1,228 @@
+# LIR for module Examples:helloWorld
+
+#
+# Tracing Config:
+#
+# • Include tracing of fuzzable functions? No
+# • Include tracing of calls? No
+# • Include tracing of evaluated expressions? No
+
+# Constant heap
+:
+:11:23
+:11:7
+:channelSend:12
+:channelSend:5
+:needs
+:structGet:12
+:structGet:14
+:structGet:21
+:structGet:5
+:typeIs:19
+:typeIs:25
+<removed address>: "False"
+<removed address>: "Hello, world!"
+<removed address>: "Main"
+<removed address>: "Nothing"
+<removed address>: "SendPort"
+<removed address>: "Stdout"
+<removed address>: "Struct"
+<removed address>: "Text"
+<removed address>: "The `condition` must be either `True` or `False`."
+<removed address>: "The `reason` must be a text."
+<removed address>: "True"
+<removed address>: "`sendPort | typeIs SendPort` was not satisfied"
+<removed address>: "`struct | typeIs Struct` was not satisfied"
+<removed address>: "`struct | ✨.structHasKey key` was not satisfied"
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Examples:helloWorld
+<removed address>: Examples:helloWorld
+<removed address>: Examples:helloWorld
+<removed address>: False
+<removed address>: Main
+<removed address>: Nothing
+<removed address>: SendPort
+<removed address>: Stdout
+<removed address>: Struct
+<removed address>: Text
+<removed address>: True
+<removed address>: [8001BAA19C6708C0 → Main: { 1 argument (capturing nothing) → ip-73 }]
+<removed address>: anonymous:$generated:
+<removed address>: { 0 arguments (capturing nothing) → ip-0 }
+<removed address>: { 0 arguments (capturing nothing) → ip-124 }
+<removed address>: { 0 arguments (capturing nothing) → ip-3 }
+<removed address>: { 1 argument (capturing nothing) → ip-73 }
+<removed address>: { 3 arguments (capturing nothing) → ip-26 }
+
+# Instructions
+# anonymous:$generated:
+:needs:isConditionTrue:then
+  0: pushConstant <removed address> True
+  1: popMultipleBelowTop 1
+  2: return
+# anonymous:$generated:
+:needs:isConditionBool:then
+  3: pushConstant <removed address> Nothing
+  4: popMultipleBelowTop 1
+  5: return
+# anonymous:$generated:
+:needs:isConditionTrue:else
+  6: pushConstant inline builtinEquals
+  7: pushFromStack 2
+  8: pushConstant <removed address> False
+  9: pushConstant <removed address> anonymous:$generated:
+:needs
+ 10: tailCall with 2 locals and 2 arguments
+# anonymous:$generated:
+:needs:isConditionBool:else
+ 11: pushConstant <removed address> "The `condition` must be either `True` or `False`."
+ 12: pushFromStack 2
+ 13: panic
+ 14: popMultipleBelowTop 2
+ 15: return
+# anonymous:$generated:
+:needs:isReasonText:else
+ 16: pushConstant <removed address> "The `reason` must be a text."
+ 17: pushFromStack 2
+ 18: panic
+ 19: popMultipleBelowTop 2
+ 20: return
+# anonymous:$generated:
+:needs:condition:else
+ 21: pushFromStack 2
+ 22: pushFromStack 2
+ 23: panic
+ 24: popMultipleBelowTop 3
+ 25: return
+# anonymous:$generated:
+:needs
+ 26: pushConstant inline builtinEquals
+ 27: pushFromStack 4
+ 28: pushConstant <removed address> True
+ 29: pushConstant <removed address> anonymous:$generated:
+:needs
+ 30: call with 2 arguments
+ 31: pushFromStack 4
+ 32: createFunction with 0 arguments capturing 0 starting at ip-6
+ 33: pushConstant inline builtinIfElse
+ 34: pushFromStack 3
+ 35: pushConstant <removed address> { 0 arguments (capturing nothing) → ip-0 }
+ 36: pushFromStack 3
+ 37: pushConstant <removed address> anonymous:$generated:
+:needs
+ 38: call with 3 arguments
+ 39: pushFromStack 4
+ 40: createFunction with 0 arguments capturing 0 starting at ip-11
+ 41: pushConstant inline builtinIfElse
+ 42: pushFromStack 3
+ 43: pushConstant <removed address> { 0 arguments (capturing nothing) → ip-3 }
+ 44: pushFromStack 3
+ 45: pushConstant <removed address> anonymous:$generated:
+:needs
+ 46: call with 3 arguments
+ 47: pushConstant inline builtinTypeOf
+ 48: pushFromStack 10
+ 49: pushFromStack 4
+ 50: call with 1 argument
+ 51: pushConstant inline builtinEquals
+ 52: pushFromStack 1
+ 53: pushConstant <removed address> Text
+ 54: pushFromStack 6
+ 55: call with 2 arguments
+ 56: pushFromStack 4
+ 57: createFunction with 0 arguments capturing 0 starting at ip-16
+ 58: pushConstant inline builtinIfElse
+ 59: pushFromStack 3
+ 60: pushConstant <removed address> { 0 arguments (capturing nothing) → ip-3 }
+ 61: pushFromStack 3
+ 62: pushConstant <removed address> anonymous:$generated:
+:needs
+ 63: call with 3 arguments
+ 64: pushFromStack 14
+ 65: pushFromStack 14
+ 66: createFunction with 0 arguments capturing 1, 0 starting at ip-21
+ 67: pushConstant inline builtinIfElse
+ 68: pushFromStack 14
+ 69: pushConstant <removed address> { 0 arguments (capturing nothing) → ip-3 }
+ 70: pushFromStack 3
+ 71: pushConstant <removed address> anonymous:$generated:
+:needs
+ 72: tailCall with 19 locals and 3 arguments
+# Examples:helloWorld
+:11
+ 73: pushConstant inline builtinTypeOf
+ 74: pushFromStack 2
+ 75: pushConstant <removed address> Builtins:
+:typeIs:19
+ 76: call with 1 argument
+ 77: pushConstant inline builtinEquals
+ 78: pushFromStack 1
+ 79: pushConstant <removed address> Struct
+ 80: pushConstant <removed address> Builtins:
+:typeIs:25
+ 81: call with 2 arguments
+ 82: pushConstant <removed address> { 3 arguments (capturing nothing) → ip-26 }
+ 83: pushFromStack 1
+ 84: pushConstant <removed address> "`struct | typeIs Struct` was not satisfied"
+ 85: pushConstant <removed address> Examples:helloWorld
+:11:7
+ 86: pushConstant <removed address> Builtins:
+:structGet:5
+ 87: call with 3 arguments
+ 88: pushConstant inline builtinStructHasKey
+ 89: pushFromStack 5
+ 90: pushConstant <removed address> Stdout
+ 91: pushConstant <removed address> Builtins:
+:structGet:12
+ 92: call with 2 arguments
+ 93: pushConstant <removed address> { 3 arguments (capturing nothing) → ip-26 }
+ 94: pushFromStack 1
+ 95: pushConstant <removed address> "`struct | ✨.structHasKey key` was not satisfied"
+ 96: pushConstant <removed address> Examples:helloWorld
+:11:7
+ 97: pushConstant <removed address> Builtins:
+:structGet:14
+ 98: call with 3 arguments
+ 99: pushConstant inline builtinStructGet
+100: pushFromStack 7
+101: pushConstant <removed address> Stdout
+102: pushConstant <removed address> Builtins:
+:structGet:21
+103: call with 2 arguments
+104: pushConstant inline builtinTypeOf
+105: pushFromStack 1
+106: pushConstant <removed address> Builtins:
+:typeIs:19
+107: call with 1 argument
+108: pushConstant inline builtinEquals
+109: pushFromStack 1
+110: pushConstant <removed address> SendPort
+111: pushConstant <removed address> Builtins:
+:typeIs:25
+112: call with 2 arguments
+113: pushConstant <removed address> { 3 arguments (capturing nothing) → ip-26 }
+114: pushFromStack 1
+115: pushConstant <removed address> "`sendPort | typeIs SendPort` was not satisfied"
+116: pushConstant <removed address> Examples:helloWorld
+:11:23
+117: pushConstant <removed address> Builtins:
+:channelSend:5
+118: call with 3 arguments
+119: pushConstant inline builtinChannelSend
+120: pushFromStack 4
+121: pushConstant <removed address> "Hello, world!"
+122: pushConstant <removed address> Builtins:
+:channelSend:12
+123: tailCall with 11 locals and 2 arguments
+# Examples:helloWorld
+:
+124: pushConstant <removed address> [8001BAA19C6708C0 → Main: { 1 argument (capturing nothing) → ip-73 }]
+125: popMultipleBelowTop 1
+126: return

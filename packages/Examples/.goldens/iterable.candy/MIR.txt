@@ -1,0 +1,932 @@
+# MIR for module Examples:iterable
+
+#
+# Tracing Config:
+#
+# • Include tracing of fuzzable functions? No
+# • Include tracing of calls? No
+# • Include tracing of evaluated expressions? No
+
+# anonymous:$generated:
+:needs
+$49 = { $2 $3 $4 (+ responsible $1) ->
+  $5 = anonymous:$generated:
+:needs
+  $6 = builtinEquals
+  $7 = Nothing
+  $8 = True
+  $9 = False
+  $10 = call $6 with $2 $8 ($5 is responsible)
+  $11 = builtinIfElse
+  # anonymous:$generated:
+:needs:isConditionTrue:then
+  $14 = { (responsible $12) ->
+    $13 = $8
+  }
+  # anonymous:$generated:
+:needs:isConditionTrue:else
+  $17 = { (responsible $15) ->
+    $16 = call $6 with $2 $9 ($5 is responsible)
+  }
+  $18 = call $11 with $10 $14 $17 ($5 is responsible)
+  $19 = builtinIfElse
+  # anonymous:$generated:
+:needs:isConditionBool:then
+  $22 = { (responsible $20) ->
+    $21 = $7
+  }
+  # anonymous:$generated:
+:needs:isConditionBool:else
+  $26 = { (responsible $23) ->
+    $24 = "The `condition` must be either `True` or `False`."
+    $25 = panicking because $24 ($1 is at fault)
+  }
+  $27 = call $19 with $18 $22 $26 ($5 is responsible)
+  $28 = builtinTypeOf
+  $29 = call $28 with $3 ($1 is responsible)
+  $30 = Text
+  $31 = call $6 with $29 $30 ($1 is responsible)
+  $32 = builtinIfElse
+  # anonymous:$generated:
+:needs:isReasonText:then
+  $35 = { (responsible $33) ->
+    $34 = $7
+  }
+  # anonymous:$generated:
+:needs:isReasonText:else
+  $39 = { (responsible $36) ->
+    $37 = "The `reason` must be a text."
+    $38 = panicking because $37 ($1 is at fault)
+  }
+  $40 = call $32 with $31 $35 $39 ($5 is responsible)
+  $41 = builtinIfElse
+  # anonymous:$generated:
+:needs:condition:then
+  $44 = { (responsible $42) ->
+    $43 = $7
+  }
+  # anonymous:$generated:
+:needs:condition:else
+  $47 = { (responsible $45) ->
+    $46 = panicking because $3 ($4 is at fault)
+  }
+  $48 = call $41 with $2 $44 $47 ($5 is responsible)
+}
+$50 = Examples:iterable
+:
+# Examples:iterable
+:use
+$54 = { $52 (+ responsible $51) ->
+  $53 = use $52 (relative to Examples:iterable; $50 is responsible)
+}
+$55 = $54
+$56 = builtinTextConcatenate
+$57 = builtinTypeOf
+$58 = Text
+$59 = builtinEquals
+$60 = builtinIfElse
+$61 = builtinToDebugText
+$62 = "Builtins"
+$63 = Examples:iterable
+:8
+$64 = call $55 with $62 ($63 is responsible)
+$65 = Examples:iterable
+:9
+$66 = $64
+$67 = $66
+$68 = Nothing
+$69 = $54
+$70 = builtinTextConcatenate
+$71 = builtinTypeOf
+$72 = Text
+$73 = builtinEquals
+$74 = builtinIfElse
+$75 = builtinToDebugText
+$76 = "Core"
+$77 = Examples:iterable
+:19
+$78 = call $69 with $76 ($77 is responsible)
+$79 = Examples:iterable
+:20
+$80 = Match
+$81 = NoMatch
+$82 = Struct
+$83 = builtinTypeOf
+$84 = call $83 with $78 ($79 is responsible)
+$85 = builtinEquals
+$86 = call $85 with $82 $84 ($79 is responsible)
+$87 = builtinIfElse
+# Examples:iterable
+:20:equals:then
+$396 = { (responsible $88) ->
+  $89 = builtinStructHasKey
+  $90 = builtinStructGet
+  $91 = Bool
+  $92 = call $89 with $78 $91 ($79 is responsible)
+  $93 = builtinIfElse
+  # Examples:iterable
+:20:hasKey:then
+  $97 = { (responsible $94) ->
+    $95 = call $90 with $78 $91 ($79 is responsible)
+    $96 = ($80, $95)
+  }
+  # Examples:iterable
+:20:hasKey:else
+  $111 = { (responsible $98) ->
+    $99 = builtinToDebugText
+    $100 = call $99 with $91 ($79 is responsible)
+    $101 = call $99 with $78 ($79 is responsible)
+    $102 = "Struct doesn't contain key `"
+    $103 = "`: `"
+    $104 = "`."
+    $105 = builtinTextConcatenate
+    $106 = call $105 with $102 $100 ($79 is responsible)
+    $107 = call $105 with $106 $103 ($79 is responsible)
+    $108 = call $105 with $107 $101 ($79 is responsible)
+    $109 = call $105 with $108 $104 ($79 is responsible)
+    $110 = ($81, $109)
+  }
+  $112 = call $93 with $92 $97 $111 ($79 is responsible)
+  $113 = builtinListGet
+  $114 = 0
+  $115 = call $113 with $112 $114 ($79 is responsible)
+  $116 = builtinEquals
+  $117 = Match
+  $118 = call $116 with $115 $117 ($79 is responsible)
+  $119 = builtinIfElse
+  # Examples:iterable
+:20:isMatch:then
+  $391 = { (responsible $120) ->
+    $121 = builtinListGet
+    $122 = 1
+    $123 = call $121 with $112 $122 ($79 is responsible)
+    $124 = Channel
+    $125 = call $89 with $78 $124 ($79 is responsible)
+    $126 = builtinIfElse
+    # Examples:iterable
+:20:hasKey:then
+    $130 = { (responsible $127) ->
+      $128 = call $90 with $78 $124 ($79 is responsible)
+      $129 = ($80, $128)
+    }
+    # Examples:iterable
+:20:hasKey:else
+    $144 = { (responsible $131) ->
+      $132 = builtinToDebugText
+      $133 = call $132 with $124 ($79 is responsible)
+      $134 = call $132 with $78 ($79 is responsible)
+      $135 = "Struct doesn't contain key `"
+      $136 = "`: `"
+      $137 = "`."
+      $138 = builtinTextConcatenate
+      $139 = call $138 with $135 $133 ($79 is responsible)
+      $140 = call $138 with $139 $136 ($79 is responsible)
+      $141 = call $138 with $140 $134 ($79 is responsible)
+      $142 = call $138 with $141 $137 ($79 is responsible)
+      $143 = ($81, $142)
+    }
+    $145 = call $126 with $125 $130 $144 ($79 is responsible)
+    $146 = builtinListGet
+    $147 = 0
+    $148 = call $146 with $145 $147 ($79 is responsible)
+    $149 = builtinEquals
+    $150 = Match
+    $151 = call $149 with $148 $150 ($79 is responsible)
+    $152 = builtinIfElse
+    # Examples:iterable
+:20:isMatch:then
+    $386 = { (responsible $153) ->
+      $154 = builtinListGet
+      $155 = 1
+      $156 = call $154 with $145 $155 ($79 is responsible)
+      $157 = Equals
+      $158 = call $89 with $78 $157 ($79 is responsible)
+      $159 = builtinIfElse
+      # Examples:iterable
+:20:hasKey:then
+      $163 = { (responsible $160) ->
+        $161 = call $90 with $78 $157 ($79 is responsible)
+        $162 = ($80, $161)
+      }
+      # Examples:iterable
+:20:hasKey:else
+      $177 = { (responsible $164) ->
+        $165 = builtinToDebugText
+        $166 = call $165 with $157 ($79 is responsible)
+        $167 = call $165 with $78 ($79 is responsible)
+        $168 = "Struct doesn't contain key `"
+        $169 = "`: `"
+        $170 = "`."
+        $171 = builtinTextConcatenate
+        $172 = call $171 with $168 $166 ($79 is responsible)
+        $173 = call $171 with $172 $169 ($79 is responsible)
+        $174 = call $171 with $173 $167 ($79 is responsible)
+        $175 = call $171 with $174 $170 ($79 is responsible)
+        $176 = ($81, $175)
+      }
+      $178 = call $159 with $158 $163 $177 ($79 is responsible)
+      $179 = builtinListGet
+      $180 = 0
+      $181 = call $179 with $178 $180 ($79 is responsible)
+      $182 = builtinEquals
+      $183 = Match
+      $184 = call $182 with $181 $183 ($79 is responsible)
+      $185 = builtinIfElse
+      # Examples:iterable
+:20:isMatch:then
+      $381 = { (responsible $186) ->
+        $187 = builtinListGet
+        $188 = 1
+        $189 = call $187 with $178 $188 ($79 is responsible)
+        $190 = IfElse
+        $191 = call $89 with $78 $190 ($79 is responsible)
+        $192 = builtinIfElse
+        # Examples:iterable
+:20:hasKey:then
+        $196 = { (responsible $193) ->
+          $194 = call $90 with $78 $190 ($79 is responsible)
+          $195 = ($80, $194)
+        }
+        # Examples:iterable
+:20:hasKey:else
+        $210 = { (responsible $197) ->
+          $198 = builtinToDebugText
+          $199 = call $198 with $190 ($79 is responsible)
+          $200 = call $198 with $78 ($79 is responsible)
+          $201 = "Struct doesn't contain key `"
+          $202 = "`: `"
+          $203 = "`."
+          $204 = builtinTextConcatenate
+          $205 = call $204 with $201 $199 ($79 is responsible)
+          $206 = call $204 with $205 $202 ($79 is responsible)
+          $207 = call $204 with $206 $200 ($79 is responsible)
+          $208 = call $204 with $207 $203 ($79 is responsible)
+          $209 = ($81, $208)
+        }
+        $211 = call $192 with $191 $196 $210 ($79 is responsible)
+        $212 = builtinListGet
+        $213 = 0
+        $214 = call $212 with $211 $213 ($79 is responsible)
+        $215 = builtinEquals
+        $216 = Match
+        $217 = call $215 with $214 $216 ($79 is responsible)
+        $218 = builtinIfElse
+        # Examples:iterable
+:20:isMatch:then
+        $376 = { (responsible $219) ->
+          $220 = builtinListGet
+          $221 = 1
+          $222 = call $220 with $211 $221 ($79 is responsible)
+          $223 = Iterable
+          $224 = call $89 with $78 $223 ($79 is responsible)
+          $225 = builtinIfElse
+          # Examples:iterable
+:20:hasKey:then
+          $229 = { (responsible $226) ->
+            $227 = call $90 with $78 $223 ($79 is responsible)
+            $228 = ($80, $227)
+          }
+          # Examples:iterable
+:20:hasKey:else
+          $243 = { (responsible $230) ->
+            $231 = builtinToDebugText
+            $232 = call $231 with $223 ($79 is responsible)
+            $233 = call $231 with $78 ($79 is responsible)
+            $234 = "Struct doesn't contain key `"
+            $235 = "`: `"
+            $236 = "`."
+            $237 = builtinTextConcatenate
+            $238 = call $237 with $234 $232 ($79 is responsible)
+            $239 = call $237 with $238 $235 ($79 is responsible)
+            $240 = call $237 with $239 $233 ($79 is responsible)
+            $241 = call $237 with $240 $236 ($79 is responsible)
+            $242 = ($81, $241)
+          }
+          $244 = call $225 with $224 $229 $243 ($79 is responsible)
+          $245 = builtinListGet
+          $246 = 0
+          $247 = call $245 with $244 $246 ($79 is responsible)
+          $248 = builtinEquals
+          $249 = Match
+          $250 = call $248 with $247 $249 ($79 is responsible)
+          $251 = builtinIfElse
+          # Examples:iterable
+:20:isMatch:then
+          $371 = { (responsible $252) ->
+            $253 = builtinListGet
+            $254 = 1
+            $255 = call $253 with $244 $254 ($79 is responsible)
+            $256 = List
+            $257 = call $89 with $78 $256 ($79 is responsible)
+            $258 = builtinIfElse
+            # Examples:iterable
+:20:hasKey:then
+            $262 = { (responsible $259) ->
+              $260 = call $90 with $78 $256 ($79 is responsible)
+              $261 = ($80, $260)
+            }
+            # Examples:iterable
+:20:hasKey:else
+            $276 = { (responsible $263) ->
+              $264 = builtinToDebugText
+              $265 = call $264 with $256 ($79 is responsible)
+              $266 = call $264 with $78 ($79 is responsible)
+              $267 = "Struct doesn't contain key `"
+              $268 = "`: `"
+              $269 = "`."
+              $270 = builtinTextConcatenate
+              $271 = call $270 with $267 $265 ($79 is responsible)
+              $272 = call $270 with $271 $268 ($79 is responsible)
+              $273 = call $270 with $272 $266 ($79 is responsible)
+              $274 = call $270 with $273 $269 ($79 is responsible)
+              $275 = ($81, $274)
+            }
+            $277 = call $258 with $257 $262 $276 ($79 is responsible)
+            $278 = builtinListGet
+            $279 = 0
+            $280 = call $278 with $277 $279 ($79 is responsible)
+            $281 = builtinEquals
+            $282 = Match
+            $283 = call $281 with $280 $282 ($79 is responsible)
+            $284 = builtinIfElse
+            # Examples:iterable
+:20:isMatch:then
+            $366 = { (responsible $285) ->
+              $286 = builtinListGet
+              $287 = 1
+              $288 = call $286 with $277 $287 ($79 is responsible)
+              $289 = Result
+              $290 = call $89 with $78 $289 ($79 is responsible)
+              $291 = builtinIfElse
+              # Examples:iterable
+:20:hasKey:then
+              $295 = { (responsible $292) ->
+                $293 = call $90 with $78 $289 ($79 is responsible)
+                $294 = ($80, $293)
+              }
+              # Examples:iterable
+:20:hasKey:else
+              $309 = { (responsible $296) ->
+                $297 = builtinToDebugText
+                $298 = call $297 with $289 ($79 is responsible)
+                $299 = call $297 with $78 ($79 is responsible)
+                $300 = "Struct doesn't contain key `"
+                $301 = "`: `"
+                $302 = "`."
+                $303 = builtinTextConcatenate
+                $304 = call $303 with $300 $298 ($79 is responsible)
+                $305 = call $303 with $304 $301 ($79 is responsible)
+                $306 = call $303 with $305 $299 ($79 is responsible)
+                $307 = call $303 with $306 $302 ($79 is responsible)
+                $308 = ($81, $307)
+              }
+              $310 = call $291 with $290 $295 $309 ($79 is responsible)
+              $311 = builtinListGet
+              $312 = 0
+              $313 = call $311 with $310 $312 ($79 is responsible)
+              $314 = builtinEquals
+              $315 = Match
+              $316 = call $314 with $313 $315 ($79 is responsible)
+              $317 = builtinIfElse
+              # Examples:iterable
+:20:isMatch:then
+              $361 = { (responsible $318) ->
+                $319 = builtinListGet
+                $320 = 1
+                $321 = call $319 with $310 $320 ($79 is responsible)
+                $322 = Text
+                $323 = call $89 with $78 $322 ($79 is responsible)
+                $324 = builtinIfElse
+                # Examples:iterable
+:20:hasKey:then
+                $328 = { (responsible $325) ->
+                  $326 = call $90 with $78 $322 ($79 is responsible)
+                  $327 = ($80, $326)
+                }
+                # Examples:iterable
+:20:hasKey:else
+                $342 = { (responsible $329) ->
+                  $330 = builtinToDebugText
+                  $331 = call $330 with $322 ($79 is responsible)
+                  $332 = call $330 with $78 ($79 is responsible)
+                  $333 = "Struct doesn't contain key `"
+                  $334 = "`: `"
+                  $335 = "`."
+                  $336 = builtinTextConcatenate
+                  $337 = call $336 with $333 $331 ($79 is responsible)
+                  $338 = call $336 with $337 $334 ($79 is responsible)
+                  $339 = call $336 with $338 $332 ($79 is responsible)
+                  $340 = call $336 with $339 $335 ($79 is responsible)
+                  $341 = ($81, $340)
+                }
+                $343 = call $324 with $323 $328 $342 ($79 is responsible)
+                $344 = builtinListGet
+                $345 = 0
+                $346 = call $344 with $343 $345 ($79 is responsible)
+                $347 = builtinEquals
+                $348 = Match
+                $349 = call $347 with $346 $348 ($79 is responsible)
+                $350 = builtinIfElse
+                # Examples:iterable
+:20:isMatch:then
+                $356 = { (responsible $351) ->
+                  $352 = builtinListGet
+                  $353 = 1
+                  $354 = call $352 with $343 $353 ($79 is responsible)
+                  $355 = ($80, $123, $156, $189, $222, $255, $288, $321, $354)
+                }
+                # Examples:iterable
+:20:isMatch:else
+                $359 = { (responsible $357) ->
+                  $358 = $343
+                }
+                $360 = call $350 with $349 $356 $359 ($79 is responsible)
+              }
+              # Examples:iterable
+:20:isMatch:else
+              $364 = { (responsible $362) ->
+                $363 = $310
+              }
+              $365 = call $317 with $316 $361 $364 ($79 is responsible)
+            }
+            # Examples:iterable
+:20:isMatch:else
+            $369 = { (responsible $367) ->
+              $368 = $277
+            }
+            $370 = call $284 with $283 $366 $369 ($79 is responsible)
+          }
+          # Examples:iterable
+:20:isMatch:else
+          $374 = { (responsible $372) ->
+            $373 = $244
+          }
+          $375 = call $251 with $250 $371 $374 ($79 is responsible)
+        }
+        # Examples:iterable
+:20:isMatch:else
+        $379 = { (responsible $377) ->
+          $378 = $211
+        }
+        $380 = call $218 with $217 $376 $379 ($79 is responsible)
+      }
+      # Examples:iterable
+:20:isMatch:else
+      $384 = { (responsible $382) ->
+        $383 = $178
+      }
+      $385 = call $185 with $184 $381 $384 ($79 is responsible)
+    }
+    # Examples:iterable
+:20:isMatch:else
+    $389 = { (responsible $387) ->
+      $388 = $145
+    }
+    $390 = call $152 with $151 $386 $389 ($79 is responsible)
+  }
+  # Examples:iterable
+:20:isMatch:else
+  $394 = { (responsible $392) ->
+    $393 = $112
+  }
+  $395 = call $119 with $118 $391 $394 ($79 is responsible)
+}
+# Examples:iterable
+:20:equals:else
+$410 = { (responsible $397) ->
+  $398 = builtinToDebugText
+  $399 = call $398 with $82 ($79 is responsible)
+  $400 = call $398 with $84 ($79 is responsible)
+  $401 = "Expected a "
+  $402 = ", got `"
+  $403 = "`."
+  $404 = builtinTextConcatenate
+  $405 = call $404 with $401 $399 ($79 is responsible)
+  $406 = call $404 with $405 $402 ($79 is responsible)
+  $407 = call $404 with $406 $400 ($79 is responsible)
+  $408 = call $404 with $407 $403 ($79 is responsible)
+  $409 = ($81, $408)
+}
+$411 = call $87 with $86 $396 $410 ($79 is responsible)
+$412 = Nothing
+$413 = builtinListGet
+$414 = 0
+$415 = call $413 with $411 $414 ($79 is responsible)
+$416 = builtinEquals
+$417 = Match
+$418 = call $416 with $415 $417 ($79 is responsible)
+$419 = builtinIfElse
+# Examples:iterable
+:20:isMatch:then
+$422 = { (responsible $420) ->
+  $421 = $412
+}
+# Examples:iterable
+:20:isMatch:else
+$428 = { (responsible $423) ->
+  $424 = builtinListGet
+  $425 = 1
+  $426 = call $424 with $411 $425 ($79 is responsible)
+  $427 = panicking because $426 ($79 is at fault)
+}
+$429 = call $419 with $418 $422 $428 ($79 is responsible)
+$430 = builtinListGet
+$431 = 1
+$432 = Examples:iterable
+:bool
+$433 = call $430 with $411 $431 ($432 is responsible)
+$434 = builtinListGet
+$435 = 2
+$436 = Examples:iterable
+:channel
+$437 = call $434 with $411 $435 ($436 is responsible)
+$438 = builtinListGet
+$439 = 3
+$440 = Examples:iterable
+:equals
+$441 = call $438 with $411 $439 ($440 is responsible)
+$442 = builtinListGet
+$443 = 4
+$444 = Examples:iterable
+:ifElse
+$445 = call $442 with $411 $443 ($444 is responsible)
+$446 = builtinListGet
+$447 = 5
+$448 = Examples:iterable
+:iterable
+$449 = call $446 with $411 $447 ($448 is responsible)
+$450 = builtinListGet
+$451 = 6
+$452 = Examples:iterable
+:list
+$453 = call $450 with $411 $451 ($452 is responsible)
+$454 = builtinListGet
+$455 = 7
+$456 = Examples:iterable
+:result
+$457 = call $454 with $411 $455 ($456 is responsible)
+$458 = builtinListGet
+$459 = 8
+$460 = Examples:iterable
+:text
+$461 = call $458 with $411 $459 ($460 is responsible)
+$462 = Nothing
+# Examples:iterable
+:splitWhereFirst
+$574 = { $464 $465 (+ responsible $463) ->
+  $466 = "Builtins"
+  $467 = Examples:iterable
+:splitWhereFirst:1
+  $468 = call $54 with $466 ($467 is responsible)
+  $469 = builtinStructGet
+  $470 = StructGet
+  $471 = Examples:iterable
+:splitWhereFirst:4
+  $472 = call $469 with $468 $470 ($471 is responsible)
+  $473 = $67
+  $474 = Print
+  $475 = Examples:iterable
+:splitWhereFirst:7
+  $476 = call $472 with $473 $474 ($475 is responsible)
+  $477 = builtinTextConcatenate
+  $478 = builtinTypeOf
+  $479 = Text
+  $480 = builtinEquals
+  $481 = builtinIfElse
+  $482 = builtinToDebugText
+  $483 = "Getting leading items"
+  $484 = Examples:iterable
+:splitWhereFirst:15
+  $485 = call $476 with $483 ($484 is responsible)
+  $486 = $464
+  $487 = "Builtins"
+  $488 = Examples:iterable
+:splitWhereFirst:18
+  $489 = call $54 with $487 ($488 is responsible)
+  $490 = builtinStructGet
+  $491 = StructGet
+  $492 = Examples:iterable
+:splitWhereFirst:21
+  $493 = call $490 with $489 $491 ($492 is responsible)
+  $494 = $449
+  $495 = TakeUntil
+  $496 = Examples:iterable
+:splitWhereFirst:24
+  $497 = call $493 with $494 $495 ($496 is responsible)
+  # Examples:iterable
+:splitWhereFirst:25
+  $504 = { $499 (+ responsible $498) ->
+    $500 = $465
+    $501 = $499
+    $502 = Examples:iterable
+:splitWhereFirst:25:2
+    $503 = call $500 with $501 ($502 is responsible)
+  }
+  $505 = Examples:iterable
+:splitWhereFirst:26
+  $506 = call $497 with $486 $504 ($505 is responsible)
+  $507 = "Builtins"
+  $508 = Examples:iterable
+:splitWhereFirst:28
+  $509 = call $54 with $507 ($508 is responsible)
+  $510 = builtinStructGet
+  $511 = StructGet
+  $512 = Examples:iterable
+:splitWhereFirst:31
+  $513 = call $510 with $509 $511 ($512 is responsible)
+  $514 = $449
+  $515 = ToList
+  $516 = Examples:iterable
+:splitWhereFirst:34
+  $517 = call $513 with $514 $515 ($516 is responsible)
+  $518 = Examples:iterable
+:splitWhereFirst:35
+  $519 = call $517 with $506 ($518 is responsible)
+  $520 = Examples:iterable
+:splitWhereFirst:36
+  $521 = $519
+  $522 = $521
+  $523 = Nothing
+  $524 = "Builtins"
+  $525 = Examples:iterable
+:splitWhereFirst:39
+  $526 = call $54 with $524 ($525 is responsible)
+  $527 = builtinStructGet
+  $528 = StructGet
+  $529 = Examples:iterable
+:splitWhereFirst:42
+  $530 = call $527 with $526 $528 ($529 is responsible)
+  $531 = $67
+  $532 = Print
+  $533 = Examples:iterable
+:splitWhereFirst:45
+  $534 = call $530 with $531 $532 ($533 is responsible)
+  $535 = builtinTextConcatenate
+  $536 = builtinTypeOf
+  $537 = Text
+  $538 = builtinEquals
+  $539 = builtinIfElse
+  $540 = builtinToDebugText
+  $541 = "Turned into list"
+  $542 = Examples:iterable
+:splitWhereFirst:53
+  $543 = call $534 with $541 ($542 is responsible)
+  $544 = $522
+  $545 = $464
+  $546 = "Builtins"
+  $547 = Examples:iterable
+:splitWhereFirst:57
+  $548 = call $54 with $546 ($547 is responsible)
+  $549 = builtinStructGet
+  $550 = StructGet
+  $551 = Examples:iterable
+:splitWhereFirst:60
+  $552 = call $549 with $548 $550 ($551 is responsible)
+  $553 = $449
+  $554 = Skip
+  $555 = Examples:iterable
+:splitWhereFirst:63
+  $556 = call $552 with $553 $554 ($555 is responsible)
+  $557 = $522
+  $558 = "Builtins"
+  $559 = Examples:iterable
+:splitWhereFirst:66
+  $560 = call $54 with $558 ($559 is responsible)
+  $561 = builtinStructGet
+  $562 = StructGet
+  $563 = Examples:iterable
+:splitWhereFirst:69
+  $564 = call $561 with $560 $562 ($563 is responsible)
+  $565 = $453
+  $566 = Length
+  $567 = Examples:iterable
+:splitWhereFirst:72
+  $568 = call $564 with $565 $566 ($567 is responsible)
+  $569 = Examples:iterable
+:splitWhereFirst:73
+  $570 = call $568 with $557 ($569 is responsible)
+  $571 = Examples:iterable
+:splitWhereFirst:74
+  $572 = call $556 with $545 $570 ($571 is responsible)
+  $573 = ($544, $572)
+}
+$575 = $574
+# Examples:iterable
+:split
+$648 = { $577 $578 (+ responsible $576) ->
+  $579 = "Builtins"
+  $580 = Examples:iterable
+:split:1
+  $581 = call $54 with $579 ($580 is responsible)
+  $582 = builtinStructGet
+  $583 = StructGet
+  $584 = Examples:iterable
+:split:4
+  $585 = call $582 with $581 $583 ($584 is responsible)
+  $586 = $449
+  $587 = GenerateWithState
+  $588 = Examples:iterable
+:split:7
+  $589 = call $585 with $586 $587 ($588 is responsible)
+  $590 = $577
+  # Examples:iterable
+:split:9
+  $645 = { $592 (+ responsible $591) ->
+    $593 = $592
+    $594 = "Builtins"
+    $595 = Examples:iterable
+:split:9:2
+    $596 = call $54 with $594 ($595 is responsible)
+    $597 = builtinStructGet
+    $598 = StructGet
+    $599 = Examples:iterable
+:split:9:5
+    $600 = call $597 with $596 $598 ($599 is responsible)
+    $601 = $449
+    $602 = TakeUntil
+    $603 = Examples:iterable
+:split:9:8
+    $604 = call $600 with $601 $602 ($603 is responsible)
+    # Examples:iterable
+:split:9:9
+    $612 = { $606 (+ responsible $605) ->
+      $607 = $441
+      $608 = $606
+      $609 = $578
+      $610 = Examples:iterable
+:split:9:9:3
+      $611 = call $607 with $608 $609 ($610 is responsible)
+    }
+    $613 = Examples:iterable
+:split:9:10
+    $614 = call $604 with $593 $612 ($613 is responsible)
+    $615 = $592
+    $616 = "Builtins"
+    $617 = Examples:iterable
+:split:9:13
+    $618 = call $54 with $616 ($617 is responsible)
+    $619 = builtinStructGet
+    $620 = StructGet
+    $621 = Examples:iterable
+:split:9:16
+    $622 = call $619 with $618 $620 ($621 is responsible)
+    $623 = $449
+    $624 = Next
+    $625 = Examples:iterable
+:split:9:19
+    $626 = call $622 with $623 $624 ($625 is responsible)
+    $627 = Examples:iterable
+:split:9:20
+    $628 = call $626 with $615 ($627 is responsible)
+    $629 = "Builtins"
+    $630 = Examples:iterable
+:split:9:22
+    $631 = call $54 with $629 ($630 is responsible)
+    $632 = builtinStructGet
+    $633 = StructGet
+    $634 = Examples:iterable
+:split:9:25
+    $635 = call $632 with $631 $633 ($634 is responsible)
+    $636 = $457
+    $637 = Map
+    $638 = Examples:iterable
+:split:9:28
+    $639 = call $635 with $636 $637 ($638 is responsible)
+    # Examples:iterable
+:split:9:29
+    $642 = { (responsible $640) ->
+      $641 = Nothing
+    }
+    $643 = Examples:iterable
+:split:9:30
+    $644 = call $639 with $628 $642 ($643 is responsible)
+  }
+  $646 = Examples:iterable
+:split:10
+  $647 = call $589 with $590 $645 ($646 is responsible)
+}
+$649 = $648
+# Examples:iterable
+:22
+$741 = { $651 (+ responsible $650) ->
+  # Examples:iterable
+:22:0
+  $679 = { $653 (+ responsible $652) ->
+    $654 = "Builtins"
+    $655 = Examples:iterable
+:22:0:1
+    $656 = call $54 with $654 ($655 is responsible)
+    $657 = builtinStructGet
+    $658 = StructGet
+    $659 = Examples:iterable
+:22:0:4
+    $660 = call $657 with $656 $658 ($659 is responsible)
+    $661 = $437
+    $662 = Send
+    $663 = Examples:iterable
+:22:0:7
+    $664 = call $660 with $661 $662 ($663 is responsible)
+    $665 = "Builtins"
+    $666 = Examples:iterable
+:22:0:9
+    $667 = call $54 with $665 ($666 is responsible)
+    $668 = builtinStructGet
+    $669 = StructGet
+    $670 = Examples:iterable
+:22:0:12
+    $671 = call $668 with $667 $669 ($670 is responsible)
+    $672 = $651
+    $673 = Stdout
+    $674 = Examples:iterable
+:22:0:15
+    $675 = call $671 with $672 $673 ($674 is responsible)
+    $676 = $653
+    $677 = Examples:iterable
+:22:0:17
+    $678 = call $664 with $675 $676 ($677 is responsible)
+  }
+  $680 = Examples:iterable
+:22:1
+  $681 = $679
+  $682 = $681
+  $683 = Nothing
+  $684 = builtinTextConcatenate
+  $685 = builtinTypeOf
+  $686 = Text
+  $687 = builtinEquals
+  $688 = builtinIfElse
+  $689 = builtinToDebugText
+  $690 = "Hello, world! This is some long text. Bla bla blub."
+  $691 = "Builtins"
+  $692 = Examples:iterable
+:22:11
+  $693 = call $54 with $691 ($692 is responsible)
+  $694 = builtinStructGet
+  $695 = StructGet
+  $696 = Examples:iterable
+:22:14
+  $697 = call $694 with $693 $695 ($696 is responsible)
+  $698 = $461
+  $699 = Characters
+  $700 = Examples:iterable
+:22:17
+  $701 = call $697 with $698 $699 ($700 is responsible)
+  $702 = Examples:iterable
+:22:18
+  $703 = call $701 with $690 ($702 is responsible)
+  $704 = "Builtins"
+  $705 = Examples:iterable
+:22:20
+  $706 = call $54 with $704 ($705 is responsible)
+  $707 = builtinStructGet
+  $708 = StructGet
+  $709 = Examples:iterable
+:22:23
+  $710 = call $707 with $706 $708 ($709 is responsible)
+  $711 = $449
+  $712 = FromList
+  $713 = Examples:iterable
+:22:26
+  $714 = call $710 with $711 $712 ($713 is responsible)
+  $715 = Examples:iterable
+:22:27
+  $716 = call $714 with $703 ($715 is responsible)
+  $717 = Examples:iterable
+:22:28
+  $718 = $716
+  $719 = $718
+  $720 = Nothing
+  $721 = "Builtins"
+  $722 = Examples:iterable
+:22:31
+  $723 = call $54 with $721 ($722 is responsible)
+  $724 = builtinStructGet
+  $725 = StructGet
+  $726 = Examples:iterable
+:22:34
+  $727 = call $724 with $723 $725 ($726 is responsible)
+  $728 = $449
+  $729 = ForEach
+  $730 = Examples:iterable
+:22:37
+  $731 = call $727 with $728 $729 ($730 is responsible)
+  # Examples:iterable
+:22:38
+  $738 = { $733 (+ responsible $732) ->
+    $734 = $682
+    $735 = $733
+    $736 = Examples:iterable
+:22:38:2
+    $737 = call $734 with $735 ($736 is responsible)
+  }
+  $739 = Examples:iterable
+:22:39
+  $740 = call $731 with $718 $738 ($739 is responsible)
+}
+$742 = Examples:iterable
+:23
+$743 = $741
+$744 = $743
+$745 = Nothing
+$746 = Main
+$747 = [$746: $744]

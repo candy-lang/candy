@@ -1,0 +1,16 @@
+# AST for module Examples:
+
+assignment: identifier $6@"builtins" = 
+  call identifier $0@"use" with these arguments:
+    text
+      textPart $2@"Builtins"
+assignment: identifier $34@"main" := 
+  function (non-fuzzable) { $9@"environment" ->
+    assignment: identifier $18@"result" = 
+      call struct access identifier $11@"builtins".$13@"IntAdd" with these arguments:
+        int 1
+        int 2
+    call struct access identifier $28@"builtins".$30@"Print" with these arguments:
+      call struct access identifier $23@"builtins".$25@"ToDebugText" with these arguments:
+        identifier $21@"result"
+  }

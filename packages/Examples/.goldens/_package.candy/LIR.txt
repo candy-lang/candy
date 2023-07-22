@@ -1,0 +1,21 @@
+# LIR for module Examples:_package
+
+#
+# Tracing Config:
+#
+# • Include tracing of fuzzable functions? No
+# • Include tracing of calls? No
+# • Include tracing of evaluated expressions? No
+
+# Constant heap
+:
+<removed address>: Examples:_package
+<removed address>: []
+<removed address>: { 0 arguments (capturing nothing) → ip-0 }
+
+# Instructions
+# Examples:_package
+:
+0: pushConstant <removed address> []
+1: popMultipleBelowTop 1
+2: return

@@ -1,0 +1,65 @@
+# AST for module Examples:sqrt
+
+assignment: identifier $6@"builtins" = 
+  call identifier $0@"use" with these arguments:
+    text
+      textPart $2@"Builtins"
+assignment: struct
+  identifier $15@"equals"
+  identifier $17@"fixedDecimal"
+  identifier $19@"ifElse"
+  identifier $21@"recursive" = 
+  call identifier $9@"use" with these arguments:
+    text
+      textPart $11@"Core"
+assignment: $119@"sqrt" := function (fuzzable) { $120@"x" ->
+  call identifier $25@"needs" with these arguments:
+    call struct access identifier $27@"fixedDecimal".$29@"Is" with these arguments:
+      identifier $31@"x"
+  call identifier $35@"needs" with these arguments:
+    call struct access identifier $37@"fixedDecimal".$39@"IsNonNegative" with these arguments:
+      identifier $41@"x"
+  call identifier $45@"recursive" with these arguments:
+    call struct access identifier $49@"fixedDecimal".$51@"Divide" with these arguments:
+      identifier $47@"x"
+      call struct access identifier $54@"fixedDecimal".$56@"FromInt" with these arguments:
+        int 2
+    function (non-fuzzable) { $61@"recurse" $62@"guess" ->
+      assignment: identifier $92@"refinedGuess" = 
+        call struct access identifier $63@"fixedDecimal".$65@"Divide" with these arguments:
+          call struct access identifier $69@"fixedDecimal".$71@"Add" with these arguments:
+            identifier $67@"guess"
+            call struct access identifier $75@"fixedDecimal".$77@"Divide" with these arguments:
+              identifier $73@"x"
+              identifier $79@"guess"
+          call struct access identifier $86@"fixedDecimal".$88@"FromInt" with these arguments:
+            int 2
+      call identifier $95@"ifElse" with these arguments:
+        call struct access identifier $97@"fixedDecimal".$99@"ApproxEquals" with these arguments:
+          identifier $101@"guess"
+          identifier $103@"refinedGuess"
+          int 10
+        function (non-fuzzable) {
+          identifier $107@"guess"
+        }
+        function (non-fuzzable) {
+          call identifier $110@"recurse" with these arguments:
+            identifier $112@"refinedGuess"
+        }
+    }
+}
+assignment: $158@"main" := function (fuzzable) { $159@"_" ->
+  assignment: identifier $123@"input" = 
+    int 2
+  assignment: identifier $136@"result" = 
+    call identifier $133@"sqrt" with these arguments:
+      call struct access identifier $128@"fixedDecimal".$130@"FromInt" with these arguments:
+        identifier $126@"input"
+  call struct access identifier $139@"builtins".$141@"Print" with these arguments:
+    text
+      textPart $143@"The root of "
+      identifier $145@"input"
+      textPart $147@" is "
+      call struct access identifier $151@"fixedDecimal".$153@"ToText" with these arguments:
+        identifier $149@"result"
+}

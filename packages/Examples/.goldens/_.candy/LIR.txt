@@ -1,0 +1,40 @@
+# LIR for module Examples:
+
+#
+# Tracing Config:
+#
+# • Include tracing of fuzzable functions? No
+# • Include tracing of calls? No
+# • Include tracing of evaluated expressions? No
+
+# Constant heap
+:
+:print:11
+:toDebugText:5
+<removed address>: "Main"
+<removed address>: Builtins:
+<removed address>: Builtins:
+<removed address>: Examples:
+<removed address>: Main
+<removed address>: [8001BAA19C6708C0 → Main: { 1 argument (capturing nothing) → ip-0 }]
+<removed address>: { 0 arguments (capturing nothing) → ip-8 }
+<removed address>: { 1 argument (capturing nothing) → ip-0 }
+
+# Instructions
+# Examples:
+:11
+ 0: pushConstant inline builtinToDebugText
+ 1: pushConstant inline 3
+ 2: pushConstant <removed address> Builtins:
+:toDebugText:5
+ 3: call with 1 argument
+ 4: pushConstant inline builtinPrint
+ 5: pushFromStack 1
+ 6: pushConstant <removed address> Builtins:
+:print:11
+ 7: tailCall with 3 locals and 1 argument
+# Examples:
+:
+ 8: pushConstant <removed address> [8001BAA19C6708C0 → Main: { 1 argument (capturing nothing) → ip-0 }]
+ 9: popMultipleBelowTop 1
+10: return
