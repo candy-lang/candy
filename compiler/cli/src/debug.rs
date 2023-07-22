@@ -234,8 +234,10 @@ impl GoldOptions {
                     }
                 })?;
                 if did_change {
+                    error!("❌ Some goldens are outdated");
                     Err(Exit::GoldOutdated)
                 } else {
+                    info!("✅ All goldens are up-to-date");
                     Ok(())
                 }
             }
