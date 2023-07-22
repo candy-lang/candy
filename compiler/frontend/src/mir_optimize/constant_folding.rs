@@ -310,7 +310,7 @@ fn run_builtin(
                 return None;
             };
             // TODO: Support lists longer than `usize::MAX`.
-            list.get(index.to_usize().unwrap()).unwrap().into()
+            list.get(index.to_usize().unwrap())?.into()
         }
         BuiltinFunction::ListInsert => return None,
         BuiltinFunction::ListLength => {
