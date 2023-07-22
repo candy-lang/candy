@@ -209,7 +209,7 @@ impl GoldOptions {
                     let old_ir = match fs::read_to_string(ir_file) {
                         Ok(old_ir) => old_ir,
                         Err(error) if error.kind() == io::ErrorKind::NotFound => {
-                            info!("{ir_name} of {} doesn't exist yet", file.display());
+                            println!("{ir_name} of {} doesn't exist yet", file.display());
                             did_change = true;
                             return;
                         }
@@ -219,7 +219,7 @@ impl GoldOptions {
                     let patch = create_patch(&old_ir, &ir);
                     if !patch.hunks().is_empty() {
                         did_change = true;
-                        info!("{ir_name} of {} changed:", file.display());
+                        println!("{ir_name} of {} changed:", file.display());
                         // The first two lines contain “--- original” and
                         // “+++ modified”, which we don't want to print.
                         println!(
@@ -231,13 +231,14 @@ impl GoldOptions {
                                 .skip(2)
                                 .join("\n"),
                         );
+                        println!();
                     }
                 })?;
                 if did_change {
-                    error!("❌ Some goldens are outdated");
+                    println!("❌ Some goldens are outdated");
                     Err(Exit::GoldOutdated)
                 } else {
-                    info!("✅ All goldens are up-to-date");
+                    println!("✅ All goldens are up-to-date");
                     Ok(())
                 }
             }
