@@ -6,7 +6,7 @@ use super::{
 };
 use crate::{
     channel::ChannelId,
-    heap::{HeapObject, HirId, InlineObject, List, Pointer, ReceivePort, SendPort, Struct, Tag},
+    heap::{HirId, InlineObject, List, Pointer, ReceivePort, SendPort, Struct, Tag},
     tracer::{FiberTracer, TracedFiberEnded, TracedFiberEndedReason},
     Lir,
 };
@@ -17,7 +17,6 @@ use candy_frontend::{
 };
 use derive_more::{Deref, From};
 use itertools::Itertools;
-use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Debug},
     iter::Step,
@@ -51,12 +50,6 @@ pub struct Fiber<T: FiberTracer> {
     pub data_stack: Vec<InlineObject>,
     pub call_stack: Vec<InstructionPointer>,
     pub heap: Heap,
-
-    // TODO: Remove this as soon as refcounting can be optional for objects.
-    // Then, refcounting for all constant objects could be made optional and
-    // they could really be shared among all fibers.
-    constant_mapping: FxHashMap<HeapObject, HeapObject>,
-
     pub tracer: T,
 }
 
@@ -103,12 +96,10 @@ impl Debug for InstructionPointer {
 
 pub struct VmEnded {
     pub heap: Heap,
-    pub constant_mapping: FxHashMap<HeapObject, HeapObject>,
     pub reason: EndedReason,
 }
 pub struct FiberEnded<T: FiberTracer> {
     pub heap: Heap,
-    pub constant_mapping: FxHashMap<HeapObject, HeapObject>,
     pub tracer: T,
     pub reason: EndedReason,
 }
@@ -137,30 +128,24 @@ impl Panic {
 }
 
 impl<T: FiberTracer> Fiber<T> {
-    fn new_with_heap(
-        heap: Heap,
-        constant_mapping: FxHashMap<HeapObject, HeapObject>,
-        tracer: T,
-    ) -> Self {
+    fn new_with_heap(heap: Heap, tracer: T) -> Self {
         Self {
             status: Status::Done,
             next_instruction: None,
             data_stack: vec![],
             call_stack: vec![],
             heap,
-            constant_mapping,
             tracer,
         }
     }
     pub fn for_function(
         heap: Heap,
-        constant_mapping: FxHashMap<HeapObject, HeapObject>,
         function: Function,
         arguments: &[InlineObject],
         responsible: HirId,
         tracer: T,
     ) -> Self {
-        let mut fiber = Self::new_with_heap(heap, constant_mapping, tracer);
+        let mut fiber = Self::new_with_heap(heap, tracer);
 
         let platform_id = HirId::create(&mut fiber.heap, true, hir::Id::platform());
         fiber.tracer.call_started(
@@ -179,7 +164,6 @@ impl<T: FiberTracer> Fiber<T> {
     }
     pub fn for_module_function(
         mut heap: Heap,
-        constant_mapping: FxHashMap<HeapObject, HeapObject>,
         module: Module,
         function: Function,
         tracer: T,
@@ -195,7 +179,7 @@ impl<T: FiberTracer> Fiber<T> {
             "Function is not a module function (it has arguments).",
         );
         let responsible = HirId::create(&mut heap, true, Id::new(module, vec![]));
-        Self::for_function(heap, constant_mapping, function, &[], responsible, tracer)
+        Self::for_function(heap, function, &[], responsible, tracer)
     }
 
     pub fn tear_down(mut self) -> FiberEnded<T> {
@@ -206,7 +190,6 @@ impl<T: FiberTracer> Fiber<T> {
         };
         FiberEnded {
             heap: self.heap,
-            constant_mapping: self.constant_mapping,
             tracer: self.tracer,
             reason,
         }
@@ -406,11 +389,6 @@ impl<T: FiberTracer> Fiber<T> {
                 self.push_to_data_stack(function);
             }
             Instruction::PushConstant(constant) => {
-                let constant = match HeapObject::try_from(constant) {
-                    Ok(heap_object) => self.constant_mapping[&heap_object].into(),
-                    Err(_) => constant,
-                };
-                constant.dup(&mut self.heap);
                 self.push_to_data_stack(constant);
             }
             Instruction::PushFromStack(offset) => {

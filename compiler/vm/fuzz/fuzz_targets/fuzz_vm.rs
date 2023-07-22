@@ -71,7 +71,7 @@ fuzz_target!(|data: &[u8]| {
 
     let result = Vm::for_module(&lir, &mut DummyTracer).run_until_completion(&mut DummyTracer);
 
-    let Ok((mut heap, main, constant_mapping)) = result.into_main_function() else {
+    let Ok((mut heap, main)) = result.into_main_function() else {
         println!("The module doesn't export a main function.");
         return;
     };
@@ -82,7 +82,6 @@ fuzz_target!(|data: &[u8]| {
     match Vm::for_function(
         &lir,
         heap,
-        constant_mapping,
         main,
         &[environment.into()],
         responsible,

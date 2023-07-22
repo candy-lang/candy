@@ -1,10 +1,12 @@
+use super::input::Input;
+use crate::coverage::Coverage;
 use candy_frontend::hir::Id;
 use candy_vm::{
     self,
     channel::Packet,
     execution_controller::{CountingExecutionController, ExecutionController},
     fiber::{EndedReason, Fiber, FiberId, InstructionPointer, Panic, VmEnded},
-    heap::{Function, HirId, InlineObjectSliceCloneToHeap},
+    heap::{Function, Heap, HirId, InlineObjectSliceCloneToHeap},
     lir::Lir,
     tracer::{
         stack_trace::{FiberStackTracer, StackTracer},
@@ -12,9 +14,6 @@ use candy_vm::{
     },
     vm::{self, Vm},
 };
-
-use super::input::Input;
-use crate::coverage::Coverage;
 use rustc_hash::FxHashMap;
 use std::borrow::Borrow;
 
@@ -61,7 +60,7 @@ impl RunResult {
 
 impl<L: Borrow<Lir>> Runner<L> {
     pub fn new(lir: L, function: Function, input: Input) -> Self {
-        let (mut heap, constant_mapping) = lir.borrow().constant_heap.clone();
+        let mut heap = Heap::default();
         let num_instructions = lir.borrow().instructions.len();
 
         let mut mapping = FxHashMap::default();
@@ -75,15 +74,7 @@ impl<L: Borrow<Lir>> Runner<L> {
         let responsible = HirId::create(&mut heap, true, Id::fuzzer());
 
         let mut tracer = StackTracer::default();
-        let vm = Vm::for_function(
-            lir,
-            heap,
-            constant_mapping,
-            function,
-            &arguments,
-            responsible,
-            &mut tracer,
-        );
+        let vm = Vm::for_function(lir, heap, function, &arguments, responsible, &mut tracer);
 
         Runner {
             vm: Some(vm),

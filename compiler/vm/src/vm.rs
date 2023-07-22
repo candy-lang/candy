@@ -1,27 +1,24 @@
+use crate::{
+    channel::{Channel, ChannelId, Completer, Packet, Performer},
+    execution_controller::{ExecutionController, RunLimitedNumberOfInstructions},
+    fiber::{self, EndedReason, Fiber, FiberId, Panic, VmEnded},
+    heap::{Data, Function, Heap, HirId, InlineObject, SendPort, Struct, Tag},
+    lir::Lir,
+    tracer::{FiberTracer, TracedFiberEnded, TracedFiberEndedReason, Tracer},
+};
+use candy_frontend::{
+    hir::Id,
+    id::{CountableId, IdGenerator},
+};
+use extension_trait::extension_trait;
+use itertools::Itertools;
+use rand::{seq::SliceRandom, thread_rng};
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
     fmt::{self, Debug, Formatter},
     hash::Hash,
 };
-
-use candy_frontend::{
-    hir::Id,
-    id::{CountableId, IdGenerator},
-};
-use itertools::Itertools;
-use rand::{seq::SliceRandom, thread_rng};
-
-use crate::{
-    channel::{Channel, ChannelId, Completer, Packet, Performer},
-    execution_controller::{ExecutionController, RunLimitedNumberOfInstructions},
-    fiber::{self, EndedReason, Fiber, FiberId, Panic, VmEnded},
-    heap::{Data, Function, Heap, HeapObject, HirId, InlineObject, SendPort, Struct, Tag},
-    lir::Lir,
-    tracer::{FiberTracer, TracedFiberEnded, TracedFiberEndedReason, Tracer},
-};
-use extension_trait::extension_trait;
-use rustc_hash::FxHashMap;
 use strum::EnumIs;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -140,7 +137,6 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
     pub fn initialize_for_function(
         &mut self,
         heap: Heap,
-        constant_mapping: FxHashMap<HeapObject, HeapObject>,
         function: Function,
         arguments: &[InlineObject],
         responsible: HirId,
@@ -150,7 +146,6 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
 
         let fiber = Fiber::for_function(
             heap,
-            constant_mapping,
             function,
             arguments,
             responsible,
@@ -168,44 +163,21 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
     pub fn for_function(
         lir: L,
         heap: Heap,
-        constant_mapping: FxHashMap<HeapObject, HeapObject>,
         function: Function,
         arguments: &[InlineObject],
         responsible: HirId,
         tracer: &mut T,
     ) -> Self {
         let mut this = Self::uninitialized(lir);
-        this.initialize_for_function(
-            heap,
-            constant_mapping,
-            function,
-            arguments,
-            responsible,
-            tracer,
-        );
+        this.initialize_for_function(heap, function, arguments, responsible, tracer);
         this
     }
 
     pub fn for_module(lir: L, tracer: &mut T) -> Self {
         let actual_lir = lir.borrow();
-        let (heap, constant_mapping) = actual_lir.constant_heap.clone();
-
-        let function = constant_mapping[&actual_lir.module_function]
-            .try_into()
-            .unwrap();
-        let responsible = constant_mapping[&actual_lir.responsible_module]
-            .try_into()
-            .unwrap();
-
-        Self::for_function(
-            lir,
-            heap,
-            constant_mapping,
-            function,
-            &[],
-            responsible,
-            tracer,
-        )
+        let function = actual_lir.module_function;
+        let responsible = actual_lir.responsible_module;
+        Self::for_function(lir, Heap::default(), function, &[], responsible, tracer)
     }
 
     pub fn tear_down(mut self, tracer: &mut T) -> VmEnded {
@@ -223,7 +195,6 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
         });
         VmEnded {
             heap: ended.heap,
-            constant_mapping: ended.constant_mapping,
             reason: ended.reason,
         }
     }
@@ -390,7 +361,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
                 let first_child_id = {
                     let id = self.fiber_id_generator.generate();
 
-                    let (mut heap, mapping) = self.lir.borrow().constant_heap.clone();
+                    let mut heap = Heap::default();
                     let body = Data::from(body.clone_to_heap(&mut heap))
                         .try_into()
                         .unwrap();
@@ -404,7 +375,6 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
                         FiberTree::Single(Single {
                             fiber: Fiber::for_function(
                                 heap,
-                                mapping,
                                 body,
                                 &[nursery_send_port],
                                 responsible,
@@ -431,7 +401,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
             fiber::Status::InTry { body } => {
                 let child_id = {
                     let id = self.fiber_id_generator.generate();
-                    let (mut heap, mapping) = self.lir.borrow().constant_heap.clone();
+                    let mut heap = Heap::default();
                     let body = Data::from(body.clone_to_heap(&mut heap))
                         .try_into()
                         .unwrap();
@@ -442,14 +412,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
                     self.fibers.insert(
                         id,
                         FiberTree::Single(Single {
-                            fiber: Fiber::for_function(
-                                heap,
-                                mapping,
-                                body,
-                                &[],
-                                responsible,
-                                child_tracer,
-                            ),
+                            fiber: Fiber::for_function(heap, body, &[], responsible, child_tracer),
                             parent: Some(fiber_id),
                         }),
                     );
@@ -644,7 +607,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
 
                 match Self::parse_spawn_packet(packet) {
                     Some((_packet_heap, function_to_spawn, return_channel)) => {
-                        let (mut heap, constant_mapping) = self.lir.borrow().constant_heap.clone();
+                        let mut heap = Heap::default();
                         let function_to_spawn: Function = function_to_spawn
                             .clone_to_heap(&mut heap)
                             .try_into()
@@ -669,7 +632,6 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
                             FiberTree::Single(Single {
                                 fiber: Fiber::for_function(
                                     heap,
-                                    constant_mapping,
                                     function_to_spawn,
                                     &[],
                                     responsible,

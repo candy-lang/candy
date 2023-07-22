@@ -127,7 +127,7 @@ pub fn compile(db: &mut Database, source_code: &str) -> Lir {
 
 pub fn run(lir: impl Borrow<Lir>) -> Packet {
     let mut tracer = DummyTracer;
-    let (mut heap, main, constant_mapping) = Vm::for_module(lir.borrow(), &mut tracer)
+    let (mut heap, main) = Vm::for_module(lir.borrow(), &mut tracer)
         .run_until_completion(&mut tracer)
         .into_main_function()
         .unwrap();
@@ -138,7 +138,6 @@ pub fn run(lir: impl Borrow<Lir>) -> Packet {
     let ended = Vm::for_function(
         lir,
         heap,
-        constant_mapping,
         main,
         &[environment.into()],
         responsible,
