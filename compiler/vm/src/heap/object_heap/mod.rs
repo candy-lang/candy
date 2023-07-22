@@ -58,7 +58,7 @@ impl HeapObject {
     const KIND_FUNCTION: u64 = 0b011;
     const KIND_HIR_ID: u64 = 0b111;
 
-    pub const IS_REFERENCE_COUNTED_SHIFT: usize = 4;
+    pub const IS_REFERENCE_COUNTED_SHIFT: usize = 3;
     pub const IS_REFERENCE_COUNTED_MASK: u64 = 0b1 << Self::IS_REFERENCE_COUNTED_SHIFT;
 
     pub fn new(address: NonNull<u64>) -> Self {
@@ -276,7 +276,10 @@ impl From<HeapObject> for HeapData {
         let header_word = object.header_word();
         match header_word & HeapObject::KIND_MASK {
             HeapObject::KIND_INT => {
-                assert_eq!(header_word, HeapObject::KIND_INT);
+                assert_eq!(
+                    header_word & !HeapObject::IS_REFERENCE_COUNTED_MASK,
+                    HeapObject::KIND_INT,
+                );
                 HeapData::Int(HeapInt::new_unchecked(object))
             }
             HeapObject::KIND_LIST => HeapData::List(HeapList::new_unchecked(object)),
@@ -285,7 +288,10 @@ impl From<HeapObject> for HeapData {
             HeapObject::KIND_TEXT => HeapData::Text(HeapText::new_unchecked(object)),
             HeapObject::KIND_FUNCTION => HeapData::Function(HeapFunction::new_unchecked(object)),
             HeapObject::KIND_HIR_ID => {
-                assert_eq!(header_word, HeapObject::KIND_HIR_ID);
+                assert_eq!(
+                    header_word & !HeapObject::IS_REFERENCE_COUNTED_MASK,
+                    HeapObject::KIND_HIR_ID,
+                );
                 HeapData::HirId(HeapHirId::new_unchecked(object))
             }
             tag => panic!("Invalid tag: {tag:b}"),
