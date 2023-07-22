@@ -273,39 +273,39 @@ impl GoldPath {
             let path = file.path();
             info!("Visiting {}", path.display());
             let module = module_for_path(path.to_owned())?;
-            let output_file = output_directory.join(path.strip_prefix(&directory).unwrap());
-            fs::create_dir_all(output_file.parent().unwrap()).unwrap();
+            let directory = output_directory.join(path.strip_prefix(&directory).unwrap());
+            fs::create_dir_all(&directory).unwrap();
 
-            let mut visit = |ir_name: &str, extension: &str, ir: String| {
-                let ir_file = output_file.with_extension(format!("candy.{extension}"));
+            let mut visit = |ir_name: &str, ir: String| {
+                let ir_file = directory.join(format!("{ir_name}.txt"));
                 visitor(path, ir_name, &ir_file, ir)
             };
 
             let rcst = db.rcst(module.clone());
             let rcst = RichIr::for_rcst(&module, &rcst).unwrap();
-            visit("RCST", "rcst", rcst.text);
+            visit("RCST", rcst.text);
 
             let cst = db.cst(module.clone());
             let cst = RichIr::for_cst(&module, &cst).unwrap();
-            visit("CST", "cst", cst.text);
+            visit("CST", cst.text);
 
             let (ast, _) = db.ast(module.clone()).unwrap();
             let ast = RichIr::for_ast(&module, &ast);
-            visit("AST", "ast", ast.text);
+            visit("AST", ast.text);
 
             let (hir, _) = db.hir(module.clone()).unwrap();
             let hir = RichIr::for_hir(&module, &hir);
-            visit("HIR", "hir", hir.text);
+            visit("HIR", hir.text);
 
             let (mir, _) = db.mir(module.clone(), tracing_config.clone()).unwrap();
             let mir = RichIr::for_mir(&module, &mir, &tracing_config);
-            visit("MIR", "mir", mir.text);
+            visit("MIR", mir.text);
 
             let (optimized_mir, _, _) = db
                 .optimized_mir(module.clone(), tracing_config.clone())
                 .unwrap();
             let optimized_mir = RichIr::for_optimized_mir(&module, &optimized_mir, &tracing_config);
-            visit("Optimized MIR", "optimizedMir", optimized_mir.text);
+            visit("Optimized MIR", optimized_mir.text);
 
             // LIR
             let (lir, _) = compile_lir(db, module.clone(), tracing_config.clone());
@@ -328,7 +328,7 @@ impl GoldPath {
                 .unwrap();
             lines[constants_start + 1..constants_end - 1].sort();
 
-            visit("LIR", "lir", lines.iter().join("\n"));
+            visit("LIR", lines.iter().join("\n"));
         }
         Ok(())
     }
