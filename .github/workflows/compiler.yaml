@@ -55,7 +55,7 @@ jobs:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2.5.1
 
-      - name: 'Core: run'
+      - name: Check Goldens
         run: cargo run --release -- debug gold check ./packages/Examples/
 
   benchmark:
