@@ -148,7 +148,6 @@ version = "0.0.0"
 dependencies = [
  "candy_formatter",
  "candy_frontend",
- "extension-trait",
  "lazy_static",
  "libfuzzer-sys",
  "salsa",

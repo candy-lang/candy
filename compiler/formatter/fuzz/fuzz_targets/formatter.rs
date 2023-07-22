@@ -16,7 +16,6 @@ use candy_frontend::{
     rcst_to_cst::{RcstToCst, RcstToCstStorage},
     string_to_rcst::StringToRcstStorage,
 };
-use extension_trait::extension_trait;
 use lazy_static::lazy_static;
 use libfuzzer_sys::fuzz_target;
 
@@ -56,7 +55,9 @@ fuzz_target!(|data: &[u8]| {
     let Ok(old_cst) = db.cst(MODULE.clone()) else {
         return;
     };
-    let old_ast = db.ast(MODULE.clone()).unwrap();
+    let (old_ast, _) = db.ast(MODULE.clone()).unwrap();
+    let mut old_ast = old_ast.as_ref().to_owned();
+    old_ast.normalize_spans();
 
     let formatted_source = old_cst.format_to_string();
     db.module_provider.add_str(&MODULE, &formatted_source);
@@ -65,26 +66,29 @@ fuzz_target!(|data: &[u8]| {
     let new_cst = db.cst(MODULE.clone()).unwrap();
     assert!(!new_cst.format_to_edits().has_edits());
 
-    let new_ast = db.ast(MODULE.clone()).unwrap();
+    let (new_ast, _) = db.ast(MODULE.clone()).unwrap();
+    let mut new_ast = new_ast.as_ref().to_owned();
+    new_ast.normalize_spans();
     assert_eq!(old_ast, new_ast);
 });
 
-#[extension_trait]
-impl NormalizeAstSpans for Ast {
+trait NormalizeSpans {
+    fn normalize_spans(&mut self);
+}
+impl<T: NormalizeSpans> NormalizeSpans for [T] {
+    fn normalize_spans(&mut self) {
+        for item in self {
+            item.normalize_spans();
+        }
+    }
+}
+impl NormalizeSpans for Ast {
     fn normalize_spans(&mut self) {
         match &mut self.kind {
             AstKind::Int(_) => todo!(),
-            AstKind::Text(Text(parts)) => {
-                for part in parts {
-                    part.normalize_spans();
-                }
-            }
+            AstKind::Text(Text(parts)) => parts.normalize_spans(),
             AstKind::TextPart(_) | AstKind::Identifier(_) | AstKind::Symbol(_) => {}
-            AstKind::List(List(items)) => {
-                for item in items {
-                    item.normalize_spans();
-                }
-            }
+            AstKind::List(List(items)) => items.normalize_spans(),
             AstKind::Struct(Struct { fields }) => {
                 for (key, value) in fields {
                     if let Some(key) = key {
@@ -93,9 +97,7 @@ impl NormalizeAstSpans for Ast {
                     value.normalize_spans();
                 }
             }
-            AstKind::StructAccess(StructAccess { struct_, key: _ }) => {
-                struct_.normalize_spans();
-            }
+            AstKind::StructAccess(StructAccess { struct_, key: _ }) => struct_.normalize_spans(),
             AstKind::Function(function) => function.normalize_spans(),
             AstKind::Call(Call {
                 receiver,
@@ -103,36 +105,24 @@ impl NormalizeAstSpans for Ast {
                 is_from_pipe: _,
             }) => {
                 receiver.normalize_spans();
-                for argument in arguments {
-                    argument.normalize_spans();
-                }
+                arguments.normalize_spans();
             }
             AstKind::Assignment(Assignment { is_public: _, body }) => match body {
                 AssignmentBody::Function { name: _, function } => function.normalize_spans(),
                 AssignmentBody::Body { pattern, body } => {
                     pattern.normalize_spans();
-                    for ast in body {
-                        ast.normalize_spans();
-                    }
+                    body.normalize_spans();
                 }
             },
             AstKind::Match(Match { expression, cases }) => {
                 expression.normalize_spans();
-                for case in cases {
-                    case.normalize_spans();
-                }
+                cases.normalize_spans();
             }
             AstKind::MatchCase(MatchCase { pattern, body }) => {
                 pattern.normalize_spans();
-                for ast in body {
-                    ast.normalize_spans();
-                }
+                body.normalize_spans();
             }
-            AstKind::OrPattern(OrPattern(patterns)) => {
-                for pattern in patterns {
-                    pattern.normalize_spans();
-                }
-            }
+            AstKind::OrPattern(OrPattern(patterns)) => patterns.normalize_spans(),
             AstKind::Error { child, errors } => {
                 if let Some(child) = child {
                     child.normalize_spans();
@@ -144,12 +134,8 @@ impl NormalizeAstSpans for Ast {
         }
     }
 }
-
-#[extension_trait]
-impl NormalizeFunctionSpans for Function {
+impl NormalizeSpans for Function {
     fn normalize_spans(&mut self) {
-        for ast in &mut self.body {
-            ast.normalize_spans();
-        }
+        self.body.normalize_spans();
     }
 }
