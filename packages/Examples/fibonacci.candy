@@ -12,7 +12,7 @@ recursive initialArg body :=
   recurse recurse initialArg
 
 compareTo valueA valueB :=
-  needs (is valueA)
+  # needs (is valueA)
   # needs (is valueB)
   result = valueA | builtins.intCompareTo valueB
   # check (equals result Equal | bool.implies (equals valueA valueB))
