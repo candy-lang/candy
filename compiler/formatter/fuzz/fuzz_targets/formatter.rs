@@ -53,7 +53,9 @@ fuzz_target!(|data: &[u8]| {
     let mut db = Database::default();
     db.module_provider.add(&MODULE, data.to_vec());
 
-    let old_cst = db.cst(MODULE.clone()).unwrap();
+    let Ok(old_cst) = db.cst(MODULE.clone()) else {
+        return;
+    };
     let old_ast = db.ast(MODULE.clone()).unwrap();
 
     let formatted_source = old_cst.format_to_string();
