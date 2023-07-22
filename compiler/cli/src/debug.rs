@@ -271,7 +271,6 @@ impl GoldPath {
             .filter(|it| it.file_name().to_string_lossy().ends_with(".candy"))
         {
             let path = file.path();
-            info!("Visiting {}", path.display());
             let module = module_for_path(path.to_owned())?;
             let directory = output_directory.join(path.strip_prefix(&directory).unwrap());
             fs::create_dir_all(&directory).unwrap();
