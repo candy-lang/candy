@@ -24,7 +24,6 @@ use std::{
     env, fs, io,
     path::{Path, PathBuf},
 };
-use tracing::{error, info};
 use walkdir::WalkDir;
 
 /// Debug the Candy compiler itself.
@@ -256,7 +255,7 @@ impl GoldPath {
             .to_owned()
             .unwrap_or_else(|| env::current_dir().unwrap());
         if !directory.is_dir() {
-            error!("{} is not a directory", directory.display());
+            print!("{} is not a directory", directory.display());
             return Err(Exit::DirectoryNotFound);
         }
 
