@@ -17,7 +17,14 @@ use candy_frontend::{
 use candy_vm::{lir::RichIrForLir, mir_to_lir::compile_lir};
 use clap::{Parser, ValueHint};
 use colored::{Color, Colorize};
-use std::path::PathBuf;
+use diffy::{create_patch, PatchFormatter};
+use itertools::Itertools;
+use std::{
+    env, fs, io,
+    path::{Path, PathBuf},
+};
+use tracing::{error, info};
+use walkdir::WalkDir;
 
 /// Debug the Candy compiler itself.
 ///
@@ -45,6 +52,9 @@ pub(crate) enum Options {
 
     /// Low-Level Intermediate Representation
     Lir(PathAndTracing),
+
+    #[command(subcommand)]
+    Gold(GoldOptions),
 }
 #[derive(Parser, Debug)]
 pub(crate) struct OnlyPath {
@@ -122,6 +132,7 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
             let (lir, _) = compile_lir(&db, module.clone(), tracing.clone());
             Some(RichIr::for_lir(&module, &lir, &tracing))
         }
+        Options::Gold(options) => return options.run(&db),
     };
 
     let Some(rich_ir) = rich_ir else {
@@ -166,4 +177,136 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
     println!("{rest}");
 
     Ok(())
+}
+
+/// Dump IRs next to the original files to compare outputs of different compiler
+/// versions.
+#[derive(Parser, Debug)]
+pub(crate) enum GoldOptions {
+    /// For each Candy file, generate the IRs next to the file.
+    Generate(GoldPath),
+
+    /// For each Candy file, check if the IRs next to the file are up-to-date.
+    Check(GoldPath),
+}
+#[derive(Parser, Debug)]
+pub(crate) struct GoldPath {
+    #[arg(value_hint = ValueHint::DirPath)]
+    directory: Option<PathBuf>,
+}
+impl GoldOptions {
+    fn run(&self, db: &Database) -> ProgramResult {
+        match &self {
+            GoldOptions::Generate(options) => options
+                .visit_irs(db, |_file, _ir_namee, ir_file, ir| {
+                    fs::write(ir_file, ir).unwrap()
+                }),
+            GoldOptions::Check(options) => {
+                let mut did_change = false;
+                let formatter = PatchFormatter::new().with_color();
+                options.visit_irs(db, |file, ir_name, ir_file, ir| {
+                    let old_ir = match fs::read_to_string(ir_file) {
+                        Ok(old_ir) => old_ir,
+                        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                            info!("{ir_name} of {} doesn't exist yet", file.display());
+                            did_change = true;
+                            return;
+                        }
+                        Err(err) => panic!("{err}"),
+                    };
+
+                    let patch = create_patch(&old_ir, &ir);
+                    if !patch.hunks().is_empty() {
+                        did_change = true;
+                        info!("{ir_name} of {} changed:", file.display());
+                        // The first two lines contain “--- original” and
+                        // “+++ modified”, which we don't want to print.
+                        println!(
+                            "{}",
+                            formatter
+                                .fmt_patch(&patch)
+                                .to_string()
+                                .lines()
+                                .skip(2)
+                                .join("\n"),
+                        );
+                    }
+                })?;
+                if did_change {
+                    Err(Exit::GoldOutdated)
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    }
+}
+impl GoldPath {
+    fn visit_irs(
+        &self,
+        db: &Database,
+        mut visitor: impl FnMut(&Path, &str, &Path, String),
+    ) -> ProgramResult {
+        let directory = self
+            .directory
+            .to_owned()
+            .unwrap_or_else(|| env::current_dir().unwrap());
+        if !directory.is_dir() {
+            error!("{} is not a directory", directory.display());
+            return Err(Exit::DirectoryNotFound);
+        }
+
+        let output_directory = directory.join(".goldens");
+        fs::create_dir_all(&output_directory).unwrap();
+
+        let tracing_config = TracingConfig::off();
+        for file in WalkDir::new(&directory)
+            .into_iter()
+            .map(|it| it.unwrap())
+            .filter(|it| it.file_type().is_file())
+            .filter(|it| it.file_name().to_string_lossy().ends_with(".candy"))
+        {
+            let path = file.path();
+            info!("Visiting {}", path.display());
+            let module = module_for_path(path.to_owned())?;
+            let output_file = output_directory.join(path.strip_prefix(&directory).unwrap());
+            fs::create_dir_all(output_file.parent().unwrap()).unwrap();
+
+            let mut visit = |ir_name: &str, extension: &str, ir: String| {
+                let ir_file = output_file.with_extension(format!("candy.{extension}"));
+                visitor(path, ir_name, &ir_file, ir)
+            };
+
+            let rcst = db.rcst(module.clone());
+            let rcst = RichIr::for_rcst(&module, &rcst).unwrap();
+            visit("RCST", "rcst", rcst.text);
+
+            let cst = db.cst(module.clone());
+            let cst = RichIr::for_cst(&module, &cst).unwrap();
+            visit("CST", "cst", cst.text);
+
+            let (ast, _) = db.ast(module.clone()).unwrap();
+            let ast = RichIr::for_ast(&module, &ast);
+            visit("AST", "ast", ast.text);
+
+            let (hir, _) = db.hir(module.clone()).unwrap();
+            let hir = RichIr::for_hir(&module, &hir);
+            visit("HIR", "hir", hir.text);
+
+            let (mir, _) = db.mir(module.clone(), tracing_config.clone()).unwrap();
+            let mir = RichIr::for_mir(&module, &mir, &tracing_config);
+            visit("MIR", "mir", mir.text);
+
+            let (optimized_mir, _, _) = db
+                .optimized_mir(module.clone(), tracing_config.clone())
+                .unwrap();
+            let optimized_mir = RichIr::for_optimized_mir(&module, &optimized_mir, &tracing_config);
+            visit("Optimized MIR", "optimizedMir", optimized_mir.text);
+
+            let (lir, _) = compile_lir(db, module.clone(), tracing_config.clone());
+            let lir = RichIr::for_lir(&module, &lir, &tracing_config);
+            visit("LIR", "lir", lir.text);
+        }
+        Ok(())
+    }
 }
