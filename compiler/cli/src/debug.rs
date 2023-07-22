@@ -19,6 +19,7 @@ use clap::{Parser, ValueHint};
 use colored::{Color, Colorize};
 use diffy::{create_patch, PatchFormatter};
 use itertools::Itertools;
+use regex::Regex;
 use std::{
     env, fs, io,
     path::{Path, PathBuf},
@@ -260,6 +261,7 @@ impl GoldPath {
         fs::create_dir_all(&output_directory).unwrap();
 
         let tracing_config = TracingConfig::off();
+        let address_regex = Regex::new(r"0x[0-9a-f]{1,16}").unwrap();
         for file in WalkDir::new(&directory)
             .into_iter()
             .map(|it| it.unwrap())
@@ -303,9 +305,28 @@ impl GoldPath {
             let optimized_mir = RichIr::for_optimized_mir(&module, &optimized_mir, &tracing_config);
             visit("Optimized MIR", "optimizedMir", optimized_mir.text);
 
+            // LIR
             let (lir, _) = compile_lir(db, module.clone(), tracing_config.clone());
             let lir = RichIr::for_lir(&module, &lir, &tracing_config);
-            visit("LIR", "lir", lir.text);
+
+            // Remove addresses of constants them from the output since they are
+            // random.
+            let lir = address_regex.replace_all(&lir.text, "<removed address>");
+
+            // Sort the constant heap alphabetically to make the output more
+            // stable.
+            let mut lines = lir.lines().collect_vec();
+            let (constants_start, _) = lines
+                .iter()
+                .find_position(|&&it| it == "# Constant heap")
+                .unwrap();
+            let (constants_end, _) = lines
+                .iter()
+                .find_position(|&&it| it == "# Instructions")
+                .unwrap();
+            lines[constants_start + 1..constants_end - 1].sort();
+
+            visit("LIR", "lir", lines.iter().join("\n"));
         }
         Ok(())
     }
