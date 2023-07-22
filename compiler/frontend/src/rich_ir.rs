@@ -292,7 +292,10 @@ impl RichIrBuilder {
         );
     }
 
-    pub fn finish(self) -> RichIr {
+    pub fn finish(mut self) -> RichIr {
+        if !self.ir.text.is_empty() && !self.ir.text.ends_with('\n') {
+            self.ir.text.push('\n');
+        }
         self.ir
     }
 }
