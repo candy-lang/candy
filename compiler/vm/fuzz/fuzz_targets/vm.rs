@@ -46,6 +46,7 @@ lazy_static! {
     HirToMirStorage,
     ModuleDbStorage,
     OptimizeMirStorage,
+    PositionConversionStorage,
     RcstToCstStorage,
     StringToRcstStorage
 )]
