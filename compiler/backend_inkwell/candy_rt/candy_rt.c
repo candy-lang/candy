@@ -33,6 +33,22 @@ void print_candy_value(candy_value_t *value)
     case CANDY_TYPE_TAG:
         printf("%s", value->value.text);
         break;
+    case CANDY_TYPE_LIST:
+        printf("(");
+        candy_value_t *length = candy_builtin_list_length(value);
+        size_t list_length = length->value.integer;
+        free_candy_value(length);
+        size_t index = 0;
+        for (size_t index = 0; index < list_length; index++)
+        {
+            print_candy_value(value->value.list[index]);
+            if (index != list_length - 1)
+            {
+                printf(", ");
+            }
+        }
+        printf(")");
+        break;
     case CANDY_TYPE_FUNCTION:
         printf("Function %p", value->value.function.function);
         break;
@@ -99,6 +115,14 @@ candy_value_t *make_candy_tag(char *tag)
     return candy_value;
 }
 
+candy_value_t *make_candy_list(candy_value_t **values)
+{
+    candy_value_t *candy_value = malloc(sizeof(candy_value_t));
+    candy_value->value.list = values;
+    candy_value->type = CANDY_TYPE_LIST;
+    return candy_value;
+}
+
 candy_value_t *make_candy_function(candy_function function, candy_value_t *environment)
 {
     candy_value_t *candy_value = malloc(sizeof(candy_value_t));
@@ -138,6 +162,9 @@ void free_candy_value(candy_value_t *value)
         {
             free(value->value.text);
         }
+        // List and struct entries may not be freed as part of freeing
+        // the list/struct, because they will be freed on their own
+        // at the end of the main function.
         free(value);
     }
 }

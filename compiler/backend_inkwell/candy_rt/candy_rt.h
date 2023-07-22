@@ -31,7 +31,7 @@ typedef struct candy_value
     {
         int128_t integer;
         char *text;
-        struct candy_value *list;
+        struct candy_value **list;
         candy_function_t function;
         candy_struct_t structure;
     } value;
@@ -51,6 +51,7 @@ int candy_tag_to_bool(candy_value_t *value);
 candy_value_t *make_candy_int(int128_t value);
 candy_value_t *make_candy_text(char *text);
 candy_value_t *make_candy_tag(char *tag);
+candy_value_t *make_candy_list(candy_value_t **values);
 candy_value_t *make_candy_function(candy_function function, candy_value_t *environment);
 void candy_panic(candy_value_t *reason);
 void free_candy_value(candy_value_t *value);

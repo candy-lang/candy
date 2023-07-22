@@ -48,8 +48,7 @@ candy_value_t *candy_builtin_int_subtract(candy_value_t *left, candy_value_t *ri
 
 candy_value_t *candy_builtin_int_bit_length(candy_value_t *value)
 {
-    // This is the max size in the VM. Unsure if it applies here.
-    return make_candy_int(62);
+    return make_candy_int(64);
 }
 
 candy_value_t *candy_builtin_int_bitwise_and(candy_value_t *left, candy_value_t *right)
@@ -85,6 +84,16 @@ candy_value_t *candy_builtin_int_compareto(candy_value_t *left, candy_value_t *r
     }
 }
 
+candy_value_t *candy_builtin_list_length(candy_value_t *list)
+{
+    size_t index = 0;
+    while (list->value.list[index] != NULL)
+    {
+        index++;
+    }
+    return make_candy_int(index);
+}
+
 candy_value_t *candy_builtin_struct_get(candy_value_t *structure, candy_value_t *key)
 {
     size_t index = 0;
@@ -97,6 +106,25 @@ candy_value_t *candy_builtin_struct_get(candy_value_t *structure, candy_value_t 
         index++;
     }
     return structure->value.structure.values[index];
+}
+
+candy_value_t *candy_builtin_struct_get_keys(candy_value_t *structure)
+{
+    return make_candy_list(structure->value.structure.keys);
+}
+
+candy_value_t *candy_builtin_struct_has_key(candy_value_t *structure, candy_value_t *key)
+{
+
+    size_t index = 0;
+    while (structure->value.structure.keys[index] != NULL)
+    {
+        if (candy_tag_to_bool(candy_builtin_equals(structure->value.structure.keys[index], key)))
+        {
+            return &__internal_true;
+        }
+    }
+    return &__internal_false;
 }
 
 candy_value_t *candy_builtin_typeof(candy_value_t *value)

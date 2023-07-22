@@ -82,6 +82,8 @@ impl<'ctx> CodeGen<'ctx> {
                 .add_function("make_candy_tag", make_tag_fn_type, Some(Linkage::External));
         self.module
             .add_function("make_candy_text", make_tag_fn_type, Some(Linkage::External));
+        self.module
+            .add_function("make_candy_list", make_tag_fn_type, Some(Linkage::External));
         let make_function_fn_type =
             candy_type_ptr.fn_type(&[candy_type_ptr.into(), candy_type_ptr.into()], false);
         self.module.add_function(
@@ -585,7 +587,58 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                     self.unrepresented_ids.insert(*id);
                 }
-                candy_frontend::mir::Expression::List(_) => todo!(),
+                candy_frontend::mir::Expression::List(list) => {
+                    let i32_type = self.context.i32_type();
+                    let candy_type_ptr = self
+                        .module
+                        .get_struct_type("candy_type")
+                        .unwrap()
+                        .ptr_type(AddressSpace::default());
+                    let list_array = self.builder.build_array_alloca(
+                        candy_type_ptr,
+                        i32_type.const_int(list.len() as u64 + 1, false),
+                        "",
+                    );
+                    let values = list.iter().map(|v| {
+                        self.get_value_with_id(function_ctx, v)
+                            .unwrap()
+                            .into_pointer_value()
+                    });
+                    for (idx, value) in values.enumerate() {
+                        let value_position = unsafe {
+                            self.builder.build_gep(
+                                candy_type_ptr,
+                                list_array,
+                                &[i32_type.const_int(idx as u64, false)],
+                                "",
+                            )
+                        };
+                        self.builder.build_store(value_position, value);
+                    }
+                    let end_position = unsafe {
+                        self.builder.build_gep(
+                            candy_type_ptr,
+                            list_array,
+                            &[i32_type.const_int(list.len() as u64, false)],
+                            "",
+                        )
+                    };
+                    self.builder
+                        .build_store(end_position, candy_type_ptr.const_null());
+
+                    let global = self.module.add_global(candy_type_ptr, None, "");
+                    global.set_initializer(&candy_type_ptr.const_null());
+
+                    let make_candy_list = self.module.get_function("make_candy_list").unwrap();
+                    let candy_list =
+                        self.builder
+                            .build_call(make_candy_list, &[list_array.into()], "");
+                    self.builder.build_store(
+                        global.as_pointer_value(),
+                        candy_list.try_as_basic_value().unwrap_left(),
+                    );
+                    self.values.insert(*id, Rc::new(global));
+                }
                 candy_frontend::mir::Expression::Struct(s) => {
                     let i32_type = self.context.i32_type();
                     let candy_type_ptr = self
