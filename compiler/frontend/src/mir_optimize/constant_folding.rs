@@ -36,6 +36,7 @@ use crate::{
     builtin_functions::BuiltinFunction,
     id::IdGenerator,
     mir::{Body, Expression, Id, VisibleExpressions},
+    print::{print, MaxLength, Precedence, PrintValue},
 };
 use itertools::Itertools;
 use num_bigint::BigInt;
@@ -594,7 +595,27 @@ fn run_builtin(
             };
             text.trim_start().into()
         }
-        BuiltinFunction::ToDebugText => return None,
+        BuiltinFunction::ToDebugText => {
+            let [argument] = arguments else {
+                unreachable!()
+            };
+            let formatted = print(*argument, Precedence::High, MaxLength::Unlimited, &|id| {
+                Some(match visible.get(id) {
+                    Expression::Int(int) => PrintValue::Int(int.clone()),
+                    Expression::Text(text) => PrintValue::Text(text.clone()),
+                    Expression::Tag { symbol, value } => PrintValue::Tag {
+                        symbol: symbol.clone(),
+                        value: *value,
+                    },
+                    Expression::Builtin(_) => PrintValue::Function,
+                    Expression::List(items) => PrintValue::List(items.clone()),
+                    Expression::Struct(entries) => PrintValue::Struct(entries.clone()),
+                    Expression::Function { .. } => PrintValue::Function,
+                    _ => return None,
+                })
+            })?;
+            formatted.into()
+        }
         BuiltinFunction::Try => return None,
         BuiltinFunction::TypeOf => Expression::tag(
             match visible.get(arguments[0]) {
