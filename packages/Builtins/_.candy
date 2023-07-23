@@ -209,7 +209,7 @@ print message :=
 
 structGet struct key :=
   needs (struct | typeIs Struct)
-  needs (struct | ✨.structHasKey key)
+  needs (struct | ✨.structHasKey key) "Struct doesn't contain key {key}."
   ✨.structGet struct key
 structGetKeys struct :=
   # Returns a list of all keys inside `struct`.
