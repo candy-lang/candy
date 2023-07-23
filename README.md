@@ -78,13 +78,11 @@ We already have a language server that provides some tooling.
 ## How to use Candy
 
 1. Install [<img height="16" src="https://rust-lang.org/static/images/favicon.svg"> Rust](https://rust-lang.org): https://www.rust-lang.org/tools/install.
-2. Configure Rust to use the nightly toolchain: `rustup default nightly`.
-3. Install Rust's Clippy (a linter): `rustup component add clippy`.
-4. Clone this repo.
-5. Open the workspace (`compiler.code-workspace`) in VS Code.
-6. In the VS Code settings (JSON), add the following: `"candy.languageServerCommand": "cargo run --manifest-path <path-to-the-candy-folder>/compiler/cli/Cargo.toml -- lsp"`.  
+2. Clone this repo.
+3. Open the workspace (`compiler.code-workspace`) in VS Code.
+4. In the VS Code settings (JSON), add the following: `"candy.languageServerCommand": "cargo run --manifest-path <path-to-the-candy-folder>/compiler/cli/Cargo.toml -- lsp"`.  
    If you want to write code in 🍭 Candy (as opposed to working on the compiler), you should also add `--release` before the standalone `--`.
    This makes the IDE tooling faster, but startup will take longer.
-7. Run `npm install` inside `vscode_extension/`.
-8. Run the launch config “Run Extension (VS Code Extension)”.
-9. In the new VS Code window that opens, you can enjoy 🍭 Candy :)
+5. Run `npm install` inside `vscode_extension/`.
+6. Run the launch config “Run Extension (VS Code Extension)”.
+7. In the new VS Code window that opens, you can enjoy 🍭 Candy :)

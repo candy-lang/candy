@@ -37,7 +37,6 @@ lazy_static! {
     };
 }
 
-#[derive()]
 #[salsa::database(
     AstDbStorage,
     AstToHirStorage,
