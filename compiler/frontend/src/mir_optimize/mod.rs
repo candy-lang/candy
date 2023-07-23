@@ -68,6 +68,7 @@ mod inlining;
 mod module_folding;
 mod pure;
 mod reference_following;
+mod after_panic;
 mod tree_shaking;
 mod utils;
 mod validate;
@@ -159,6 +160,7 @@ impl Context<'_> {
             *expression = self.visible.remove(*id);
         }
 
+        after_panic::remove_expressions_after_panic(body);
         common_subtree_elimination::eliminate_common_subtrees(body, self.pureness);
         tree_shaking::tree_shake(body, self.pureness);
         reference_following::remove_redundant_return_references(body);
