@@ -1,5 +1,4 @@
 # CST for module Examples:echo
-
 # Echoes whatever you send to it on stdin.
 
 

@@ -1,5 +1,4 @@
 # Optimized MIR for module Examples:echo
-
 #
 # Tracing Config:
 #
@@ -7,114 +6,60 @@
 # • Include tracing of calls? No
 # • Include tracing of evaluated expressions? No
 
-$1 = Builtins:
-:channelCreate:14
-$2 = Builtins:
-:channelCreate:16
-$3 = Builtins:
-:channelCreate:22
-$4 = Builtins:
-:channelReceive:11
-$5 = Builtins:
-:channelReceive:5
-$6 = Builtins:
-:channelSend:12
-$7 = Builtins:
-:channelSend:5
-$8 = Builtins:
-:equals:6
-$9 = Builtins:
-:functionRun:11
-$10 = Builtins:
-:functionRun:16
-$11 = Builtins:
-:functionRun:22
-$12 = Builtins:
-:functionRun:5
-$13 = Builtins:
-:getArgumentCount:11
-$14 = Builtins:
-:getArgumentCount:5
-$15 = Builtins:
-:ifElse:1
-$16 = Builtins:
-:ifElse:12
-$17 = Builtins:
-:ifElse:15
-$18 = Builtins:
-:ifElse:20
-$19 = Builtins:
-:ifElse:26
-$20 = Builtins:
-:ifElse:29
-$21 = Builtins:
-:ifElse:34
-$22 = Builtins:
-:ifElse:42
-$23 = Builtins:
-:ifElse:6
-$24 = Builtins:
-:isNonNegative:12
-$25 = Builtins:
-:isNonNegative:13
-$26 = Builtins:
-:isNonNegative:5
-$27 = Builtins:
-:structGet:12
-$28 = Builtins:
-:structGet:14
-$29 = Builtins:
-:structGet:21
-$30 = Builtins:
-:structGet:5
-$31 = Builtins:
-:typeIs:19
-$32 = Builtins:
-:typeIs:25
-$33 = Builtins:
-:typeOf:5
-$34 = Core:concurrency
-:await:17
-$35 = Core:concurrency
-:await:27
-$36 = Core:function
-:is0:11:3
-$37 = Core:function
-:is0:13
-$38 = Core:function
-:run:14
-$39 = Core:function
-:run:2
-$40 = Core:function
-:run:4
-$41 = Examples:echo
-:11:0:19
-$42 = Examples:echo
-:11:0:35
-$43 = Examples:echo
-:11:0:36
-$44 = Examples:echo
-:11:0:45
-$45 = Examples:echo
-:11:0:46
-$46 = Examples:echo
-:11:0:9
-$47 = Examples:echo
-:11:11
-$48 = Examples:echo
-:11:21
-$49 = Examples:echo
-:11:32
-$50 = Examples:echo
-:11:35
-$51 = Examples:echo
-:11:print:11
-$52 = Examples:echo
-:11:print:19
-$53 = Examples:echo
-:11:print:29
-$54 = anonymous:$generated:
-:needs
+$1 = Builtins::channelCreate:14
+$2 = Builtins::channelCreate:16
+$3 = Builtins::channelCreate:22
+$4 = Builtins::channelReceive:11
+$5 = Builtins::channelReceive:5
+$6 = Builtins::channelSend:12
+$7 = Builtins::channelSend:5
+$8 = Builtins::equals:6
+$9 = Builtins::functionRun:11
+$10 = Builtins::functionRun:16
+$11 = Builtins::functionRun:22
+$12 = Builtins::functionRun:5
+$13 = Builtins::getArgumentCount:11
+$14 = Builtins::getArgumentCount:5
+$15 = Builtins::ifElse:1
+$16 = Builtins::ifElse:12
+$17 = Builtins::ifElse:15
+$18 = Builtins::ifElse:20
+$19 = Builtins::ifElse:26
+$20 = Builtins::ifElse:29
+$21 = Builtins::ifElse:34
+$22 = Builtins::ifElse:42
+$23 = Builtins::ifElse:6
+$24 = Builtins::isNonNegative:12
+$25 = Builtins::isNonNegative:13
+$26 = Builtins::isNonNegative:5
+$27 = Builtins::structGet:12
+$28 = Builtins::structGet:14
+$29 = Builtins::structGet:21
+$30 = Builtins::structGet:5
+$31 = Builtins::typeIs:19
+$32 = Builtins::typeIs:25
+$33 = Builtins::typeOf:5
+$34 = Core:concurrency:await:17
+$35 = Core:concurrency:await:27
+$36 = Core:function:is0:11:3
+$37 = Core:function:is0:13
+$38 = Core:function:run:14
+$39 = Core:function:run:2
+$40 = Core:function:run:4
+$41 = Examples:echo:11:0:19
+$42 = Examples:echo:11:0:35
+$43 = Examples:echo:11:0:36
+$44 = Examples:echo:11:0:45
+$45 = Examples:echo:11:0:46
+$46 = Examples:echo:11:0:9
+$47 = Examples:echo:11:11
+$48 = Examples:echo:11:21
+$49 = Examples:echo:11:32
+$50 = Examples:echo:11:35
+$51 = Examples:echo:11:print:11
+$52 = Examples:echo:11:print:19
+$53 = Examples:echo:11:print:29
+$54 = anonymous:$generated::needs
 $55 = builtinChannelCreate
 $56 = builtinChannelReceive
 $57 = builtinChannelSend
@@ -179,75 +124,62 @@ $115 = "`struct | ✨.structHasKey key` was not satisfied"
 $116 = "`text.is message` was not satisfied"
 $117 = "`then | getArgumentCount | equals 0` was not satisfied"
 $118 = "`then | typeIs Function` was not satisfied"
-# anonymous:$generated:
-:needs:isConditionTrue:then
+# anonymous:$generated::needs:isConditionTrue:then
 $119 = { (responsible $120) ->
   $121 = $88
 }
-# anonymous:$generated:
-:needs:isConditionBool:then
+# anonymous:$generated::needs:isConditionBool:then
 $122 = { (responsible $123) ->
   $124 = $80
 }
-# anonymous:$generated:
-:needs
+# anonymous:$generated::needs
 $125 = { $126 $127 $128 (+ responsible $129) ->
   $130 = call $58 with $126 $88 ($54 is responsible)
-  # anonymous:$generated:
-:needs:isConditionTrue:else
+  # anonymous:$generated::needs:isConditionTrue:else
   $131 = { (responsible $132) ->
     $133 = call $58 with $126 $72 ($54 is responsible)
   }
   $134 = call $60 with $130 $119 $131 ($54 is responsible)
-  # anonymous:$generated:
-:needs:isConditionBool:else
+  # anonymous:$generated::needs:isConditionBool:else
   $135 = { (responsible $136) ->
     $137 = panicking because $100 ($129 is at fault)
   }
   $138 = call $60 with $134 $122 $135 ($54 is responsible)
   $139 = call $70 with $127 ($129 is responsible)
   $140 = call $58 with $139 $87 ($129 is responsible)
-  # anonymous:$generated:
-:needs:isReasonText:else
+  # anonymous:$generated::needs:isReasonText:else
   $141 = { (responsible $142) ->
     $143 = panicking because $101 ($129 is at fault)
   }
   $144 = call $60 with $140 $122 $141 ($54 is responsible)
-  # anonymous:$generated:
-:needs:condition:else
+  # anonymous:$generated::needs:condition:else
   $145 = { (responsible $146) ->
     $147 = panicking because $127 ($128 is at fault)
   }
   $148 = call $60 with $126 $122 $145 ($54 is responsible)
 }
 $149 = ($78)
-# Builtins:
-:not:1:equals:then
+# Builtins::not:1:equals:then
 $150 = { (responsible $151) ->
   $152 = $149
 }
-# Builtins:
-:not:1:case-0:matched
+# Builtins::not:1:case-0:matched
 $153 = { (responsible $154) ->
   $155 = $72
 }
-# Builtins:
-:ifElse
+# Builtins::ifElse
 $156 = { $157 $158 $159 (+ responsible $160) ->
   $161 = call $70 with $157 ($15 is responsible)
   $162 = call $58 with $86 $161 ($15 is responsible)
-  # Builtins:
-:ifElse:1:equals:then
+  # Builtins::ifElse:1:equals:then
   $163 = { (responsible $164) ->
     $165 = call $67 with $157 ($15 is responsible)
     $166 = call $58 with $88 $165 ($15 is responsible)
-    # Builtins:
-:ifElse:1:equals:then
+    # Builtins::ifElse:1:equals:then
     $167 = { (responsible $168) ->
       $169 = call $66 with $157 ($15 is responsible)
       $170 = call $58 with $72 $169 ($15 is responsible)
-      # Builtins:
-:ifElse:1:equals:else
+      # Builtins::ifElse:1:equals:else
       $171 = { (responsible $172) ->
         $173 = call $69 with $72 ($15 is responsible)
         $174 = call $69 with $169 ($15 is responsible)
@@ -259,8 +191,7 @@ $156 = { $157 $158 $159 (+ responsible $160) ->
       }
       $180 = call $60 with $170 $150 $171 ($15 is responsible)
     }
-    # Builtins:
-:ifElse:1:equals:else
+    # Builtins::ifElse:1:equals:else
     $181 = { (responsible $182) ->
       $183 = call $69 with $88 ($15 is responsible)
       $184 = call $69 with $165 ($15 is responsible)
@@ -272,8 +203,7 @@ $156 = { $157 $158 $159 (+ responsible $160) ->
     }
     $190 = call $60 with $166 $167 $181 ($15 is responsible)
   }
-  # Builtins:
-:ifElse:1:equals:else
+  # Builtins::ifElse:1:equals:else
   $191 = { (responsible $192) ->
     $193 = call $69 with $86 ($15 is responsible)
     $194 = call $69 with $161 ($15 is responsible)
@@ -286,28 +216,23 @@ $156 = { $157 $158 $159 (+ responsible $160) ->
   $200 = call $60 with $162 $163 $191 ($15 is responsible)
   $201 = call $62 with $200 $89 ($15 is responsible)
   $202 = call $58 with $201 $78 ($15 is responsible)
-  # Builtins:
-:ifElse:1:isMatch:then
+  # Builtins::ifElse:1:isMatch:then
   $203 = { (responsible $204) ->
     $205 = $200
   }
-  # Builtins:
-:ifElse:1:isMatch:else
+  # Builtins::ifElse:1:isMatch:else
   $206 = { (responsible $207) ->
     $208 = call $70 with $157 ($15 is responsible)
     $209 = call $58 with $86 $208 ($15 is responsible)
-    # Builtins:
-:ifElse:1:equals:then
+    # Builtins::ifElse:1:equals:then
     $210 = { (responsible $211) ->
       $212 = call $67 with $157 ($15 is responsible)
       $213 = call $58 with $72 $212 ($15 is responsible)
-      # Builtins:
-:ifElse:1:equals:then
+      # Builtins::ifElse:1:equals:then
       $214 = { (responsible $215) ->
         $216 = call $66 with $157 ($15 is responsible)
         $217 = call $58 with $72 $216 ($15 is responsible)
-        # Builtins:
-:ifElse:1:equals:else
+        # Builtins::ifElse:1:equals:else
         $218 = { (responsible $219) ->
           $220 = call $69 with $72 ($15 is responsible)
           $221 = call $69 with $216 ($15 is responsible)
@@ -319,8 +244,7 @@ $156 = { $157 $158 $159 (+ responsible $160) ->
         }
         $227 = call $60 with $217 $150 $218 ($15 is responsible)
       }
-      # Builtins:
-:ifElse:1:equals:else
+      # Builtins::ifElse:1:equals:else
       $228 = { (responsible $229) ->
         $230 = call $69 with $72 ($15 is responsible)
         $231 = call $69 with $212 ($15 is responsible)
@@ -332,8 +256,7 @@ $156 = { $157 $158 $159 (+ responsible $160) ->
       }
       $237 = call $60 with $213 $214 $228 ($15 is responsible)
     }
-    # Builtins:
-:ifElse:1:equals:else
+    # Builtins::ifElse:1:equals:else
     $238 = { (responsible $239) ->
       $240 = call $69 with $86 ($15 is responsible)
       $241 = call $69 with $208 ($15 is responsible)
@@ -348,8 +271,7 @@ $156 = { $157 $158 $159 (+ responsible $160) ->
   $248 = call $60 with $202 $203 $206 ($15 is responsible)
   $249 = call $62 with $248 $89 ($15 is responsible)
   $250 = call $58 with $249 $78 ($15 is responsible)
-  # Builtins:
-:ifElse:1:case-0:didNotMatch
+  # Builtins::ifElse:1:case-0:didNotMatch
   $251 = { (responsible $252) ->
     $253 = call $62 with $248 $90 ($15 is responsible)
     $254 = $72
@@ -376,13 +298,11 @@ $156 = { $157 $158 $159 (+ responsible $160) ->
   $274 = call $125 with $273 $105 $160 ($21 is responsible)
   $275 = call $60 with $157 $158 $159 ($22 is responsible)
 }
-# Core:function
-:is0
+# Core:function:is0
 $276 = { $277 (+ responsible $278) ->
   $279 = call $70 with $277 ($33 is responsible)
   $280 = call $58 with $279 $73 ($8 is responsible)
-  # Core:function
-:is0:11
+  # Core:function:is0:11
   $281 = { (responsible $282) ->
     $283 = call $70 with $277 ($31 is responsible)
     $284 = call $58 with $283 $73 ($32 is responsible)
@@ -392,8 +312,7 @@ $276 = { $277 (+ responsible $278) ->
   }
   $288 = call $156 with $280 $281 $153 ($37 is responsible)
 }
-# Core:function
-:run
+# Core:function:run
 $289 = { $290 (+ responsible $291) ->
   $292 = call $276 with $290 ($39 is responsible)
   $293 = call $125 with $292 $111 $291 ($40 is responsible)
@@ -405,25 +324,21 @@ $289 = { $290 (+ responsible $291) ->
   $299 = call $125 with $298 $109 $38 ($10 is responsible)
   $300 = call $290 with no arguments ($11 is responsible)
 }
-# Builtins:
-:isNonNegative
+# Builtins::isNonNegative
 $301 = { $302 (+ responsible $303) ->
   $304 = call $70 with $302 ($31 is responsible)
   $305 = call $58 with $304 $75 ($32 is responsible)
   $306 = call $125 with $305 $110 $303 ($26 is responsible)
   $307 = call $61 with $302 $89 ($24 is responsible)
-  # Builtins:
-:isNonNegative:13:equals:then
+  # Builtins::isNonNegative:13:equals:then
   $308 = { (responsible $309) ->
     $310 = call $67 with $307 ($25 is responsible)
     $311 = call $58 with $74 $310 ($25 is responsible)
-    # Builtins:
-:isNonNegative:13:equals:then
+    # Builtins::isNonNegative:13:equals:then
     $312 = { (responsible $313) ->
       $314 = call $66 with $307 ($25 is responsible)
       $315 = call $58 with $72 $314 ($25 is responsible)
-      # Builtins:
-:isNonNegative:13:equals:else
+      # Builtins::isNonNegative:13:equals:else
       $316 = { (responsible $317) ->
         $318 = call $69 with $72 ($25 is responsible)
         $319 = call $69 with $314 ($25 is responsible)
@@ -435,8 +350,7 @@ $301 = { $302 (+ responsible $303) ->
       }
       $325 = call $60 with $315 $150 $316 ($25 is responsible)
     }
-    # Builtins:
-:isNonNegative:13:equals:else
+    # Builtins::isNonNegative:13:equals:else
     $326 = { (responsible $327) ->
       $328 = call $69 with $74 ($25 is responsible)
       $329 = call $69 with $310 ($25 is responsible)
@@ -451,26 +365,21 @@ $301 = { $302 (+ responsible $303) ->
   $336 = call $308 with no arguments ($25 is responsible)
   $337 = call $62 with $336 $89 ($25 is responsible)
   $338 = call $58 with $337 $78 ($25 is responsible)
-  # Builtins:
-:isNonNegative:13:isMatch:then
+  # Builtins::isNonNegative:13:isMatch:then
   $339 = { (responsible $340) ->
     $341 = $336
   }
-  # Builtins:
-:isNonNegative:13:isMatch:else
+  # Builtins::isNonNegative:13:isMatch:else
   $342 = { (responsible $343) ->
-    # Builtins:
-:isNonNegative:13:equals:then
+    # Builtins::isNonNegative:13:equals:then
     $344 = { (responsible $345) ->
       $346 = call $67 with $307 ($25 is responsible)
       $347 = call $58 with $71 $346 ($25 is responsible)
-      # Builtins:
-:isNonNegative:13:equals:then
+      # Builtins::isNonNegative:13:equals:then
       $348 = { (responsible $349) ->
         $350 = call $66 with $307 ($25 is responsible)
         $351 = call $58 with $72 $350 ($25 is responsible)
-        # Builtins:
-:isNonNegative:13:equals:else
+        # Builtins::isNonNegative:13:equals:else
         $352 = { (responsible $353) ->
           $354 = call $69 with $72 ($25 is responsible)
           $355 = call $69 with $350 ($25 is responsible)
@@ -482,8 +391,7 @@ $301 = { $302 (+ responsible $303) ->
         }
         $361 = call $60 with $351 $150 $352 ($25 is responsible)
       }
-      # Builtins:
-:isNonNegative:13:equals:else
+      # Builtins::isNonNegative:13:equals:else
       $362 = { (responsible $363) ->
         $364 = call $69 with $71 ($25 is responsible)
         $365 = call $69 with $346 ($25 is responsible)
@@ -500,22 +408,18 @@ $301 = { $302 (+ responsible $303) ->
   $373 = call $60 with $338 $339 $342 ($25 is responsible)
   $374 = call $62 with $373 $89 ($25 is responsible)
   $375 = call $58 with $374 $78 ($25 is responsible)
-  # Builtins:
-:isNonNegative:13:case-0:didNotMatch
+  # Builtins::isNonNegative:13:case-0:didNotMatch
   $376 = { (responsible $377) ->
     $378 = call $62 with $373 $90 ($25 is responsible)
-    # Builtins:
-:isNonNegative:13:equals:then
+    # Builtins::isNonNegative:13:equals:then
     $379 = { (responsible $380) ->
       $381 = call $67 with $307 ($25 is responsible)
       $382 = call $58 with $76 $381 ($25 is responsible)
-      # Builtins:
-:isNonNegative:13:equals:then
+      # Builtins::isNonNegative:13:equals:then
       $383 = { (responsible $384) ->
         $385 = call $66 with $307 ($25 is responsible)
         $386 = call $58 with $72 $385 ($25 is responsible)
-        # Builtins:
-:isNonNegative:13:equals:else
+        # Builtins::isNonNegative:13:equals:else
         $387 = { (responsible $388) ->
           $389 = call $69 with $72 ($25 is responsible)
           $390 = call $69 with $385 ($25 is responsible)
@@ -527,8 +431,7 @@ $301 = { $302 (+ responsible $303) ->
         }
         $396 = call $60 with $386 $150 $387 ($25 is responsible)
       }
-      # Builtins:
-:isNonNegative:13:equals:else
+      # Builtins::isNonNegative:13:equals:else
       $397 = { (responsible $398) ->
         $399 = call $69 with $76 ($25 is responsible)
         $400 = call $69 with $381 ($25 is responsible)
@@ -543,8 +446,7 @@ $301 = { $302 (+ responsible $303) ->
     $407 = call $379 with no arguments ($25 is responsible)
     $408 = call $62 with $407 $89 ($25 is responsible)
     $409 = call $58 with $408 $78 ($25 is responsible)
-    # Builtins:
-:isNonNegative:13:case-1:didNotMatch
+    # Builtins::isNonNegative:13:case-1:didNotMatch
     $410 = { (responsible $411) ->
       $412 = call $62 with $407 $90 ($25 is responsible)
       $413 = panicking because $99 ($25 is at fault)
@@ -553,11 +455,9 @@ $301 = { $302 (+ responsible $303) ->
   }
   $415 = call $60 with $375 $119 $376 ($25 is responsible)
 }
-# Examples:echo
-:11
+# Examples:echo:11
 $416 = { $417 (+ responsible $418) ->
-  # Examples:echo
-:11:print
+  # Examples:echo:11:print
   $419 = { $420 (+ responsible $421) ->
     $422 = call $70 with $420 ($33 is responsible)
     $423 = call $58 with $422 $87 ($8 is responsible)
@@ -573,8 +473,7 @@ $416 = { $417 (+ responsible $418) ->
     $433 = call $125 with $432 $113 $53 ($7 is responsible)
     $434 = call $57 with $430 $420 ($6 is responsible)
   }
-  # Examples:echo
-:11:0
+  # Examples:echo:11:0
   $435 = { (responsible $436) ->
     $437 = call $301 with $90 ($1 is responsible)
     $438 = call $125 with $437 $103 $46 ($2 is responsible)

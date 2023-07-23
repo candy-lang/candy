@@ -1,5 +1,4 @@
 # Optimized MIR for module Examples:fibonacci
-
 #
 # Tracing Config:
 #
@@ -7,74 +6,40 @@
 # • Include tracing of calls? No
 # • Include tracing of evaluated expressions? No
 
-$1 = Builtins:
-:equals:6
-$2 = Builtins:
-:getArgumentCount:11
-$3 = Builtins:
-:getArgumentCount:5
-$4 = Builtins:
-:ifElse:1
-$5 = Builtins:
-:ifElse:12
-$6 = Builtins:
-:ifElse:15
-$7 = Builtins:
-:ifElse:20
-$8 = Builtins:
-:ifElse:26
-$9 = Builtins:
-:ifElse:29
-$10 = Builtins:
-:ifElse:34
-$11 = Builtins:
-:ifElse:42
-$12 = Builtins:
-:ifElse:6
-$13 = Builtins:
-:intAdd:11
-$14 = Builtins:
-:intAdd:18
-$15 = Builtins:
-:intAdd:5
-$16 = Builtins:
-:intCompareTo:11
-$17 = Builtins:
-:intCompareTo:18
-$18 = Builtins:
-:intCompareTo:5
-$19 = Builtins:
-:intSubtract:18
-$20 = Builtins:
-:intSubtract:5
-$21 = Builtins:
-:typeIs:19
-$22 = Builtins:
-:typeIs:25
-$23 = Examples:fibonacci
-:compareTo:10
-$24 = Examples:fibonacci
-:fibonacci:2:13:11
-$25 = Examples:fibonacci
-:fibonacci:2:13:12
-$26 = Examples:fibonacci
-:fibonacci:2:13:32
-$27 = Examples:fibonacci
-:fibonacci:2:13:33
-$28 = Examples:fibonacci
-:fibonacci:2:13:34
-$29 = Examples:fibonacci
-:fibonacci:2:14
-$30 = Examples:fibonacci
-:isLessThan:11
-$31 = Examples:fibonacci
-:recursive:0:0:3
-$32 = Examples:fibonacci
-:recursive:0:6
-$33 = Examples:fibonacci
-:recursive:6
-$34 = anonymous:$generated:
-:needs
+$1 = Builtins::equals:6
+$2 = Builtins::getArgumentCount:11
+$3 = Builtins::getArgumentCount:5
+$4 = Builtins::ifElse:1
+$5 = Builtins::ifElse:12
+$6 = Builtins::ifElse:15
+$7 = Builtins::ifElse:20
+$8 = Builtins::ifElse:26
+$9 = Builtins::ifElse:29
+$10 = Builtins::ifElse:34
+$11 = Builtins::ifElse:42
+$12 = Builtins::ifElse:6
+$13 = Builtins::intAdd:11
+$14 = Builtins::intAdd:18
+$15 = Builtins::intAdd:5
+$16 = Builtins::intCompareTo:11
+$17 = Builtins::intCompareTo:18
+$18 = Builtins::intCompareTo:5
+$19 = Builtins::intSubtract:18
+$20 = Builtins::intSubtract:5
+$21 = Builtins::typeIs:19
+$22 = Builtins::typeIs:25
+$23 = Examples:fibonacci:compareTo:10
+$24 = Examples:fibonacci:fibonacci:2:13:11
+$25 = Examples:fibonacci:fibonacci:2:13:12
+$26 = Examples:fibonacci:fibonacci:2:13:32
+$27 = Examples:fibonacci:fibonacci:2:13:33
+$28 = Examples:fibonacci:fibonacci:2:13:34
+$29 = Examples:fibonacci:fibonacci:2:14
+$30 = Examples:fibonacci:isLessThan:11
+$31 = Examples:fibonacci:recursive:0:0:3
+$32 = Examples:fibonacci:recursive:0:6
+$33 = Examples:fibonacci:recursive:6
+$34 = anonymous:$generated::needs
 $35 = builtinEquals
 $36 = builtinGetArgumentCount
 $37 = builtinIfElse
@@ -124,70 +89,58 @@ $80 = "`function | typeIs Function` was not satisfied"
 $81 = "`minuend | typeIs Int` was not satisfied"
 $82 = "`then | getArgumentCount | equals 0` was not satisfied"
 $83 = "`then | typeIs Function` was not satisfied"
-# anonymous:$generated:
-:needs:isConditionTrue:then
+# anonymous:$generated::needs:isConditionTrue:then
 $84 = { (responsible $85) ->
   $86 = $61
 }
-# anonymous:$generated:
-:needs:isConditionBool:then
+# anonymous:$generated::needs:isConditionBool:then
 $87 = { (responsible $88) ->
   $89 = $57
 }
-# anonymous:$generated:
-:needs
+# anonymous:$generated::needs
 $90 = { $91 $92 $93 (+ responsible $94) ->
   $95 = call $35 with $91 $61 ($34 is responsible)
-  # anonymous:$generated:
-:needs:isConditionTrue:else
+  # anonymous:$generated::needs:isConditionTrue:else
   $96 = { (responsible $97) ->
     $98 = call $35 with $91 $49 ($34 is responsible)
   }
   $99 = call $37 with $95 $84 $96 ($34 is responsible)
-  # anonymous:$generated:
-:needs:isConditionBool:else
+  # anonymous:$generated::needs:isConditionBool:else
   $100 = { (responsible $101) ->
     $102 = panicking because $72 ($94 is at fault)
   }
   $103 = call $37 with $99 $87 $100 ($34 is responsible)
   $104 = call $47 with $92 ($94 is responsible)
   $105 = call $35 with $104 $60 ($94 is responsible)
-  # anonymous:$generated:
-:needs:isReasonText:else
+  # anonymous:$generated::needs:isReasonText:else
   $106 = { (responsible $107) ->
     $108 = panicking because $73 ($94 is at fault)
   }
   $109 = call $37 with $105 $87 $106 ($34 is responsible)
-  # anonymous:$generated:
-:needs:condition:else
+  # anonymous:$generated::needs:condition:else
   $110 = { (responsible $111) ->
     $112 = panicking because $92 ($93 is at fault)
   }
   $113 = call $37 with $91 $87 $110 ($34 is responsible)
 }
 $114 = ($55)
-# Builtins:
-:not:1:equals:then
+# Builtins::not:1:equals:then
 $115 = { (responsible $116) ->
   $117 = $114
 }
-# Builtins:
-:ifElse
+# Builtins::ifElse
 $118 = { $119 $120 $121 (+ responsible $122) ->
   $123 = call $47 with $119 ($4 is responsible)
   $124 = call $35 with $59 $123 ($4 is responsible)
-  # Builtins:
-:ifElse:1:equals:then
+  # Builtins::ifElse:1:equals:then
   $125 = { (responsible $126) ->
     $127 = call $44 with $119 ($4 is responsible)
     $128 = call $35 with $61 $127 ($4 is responsible)
-    # Builtins:
-:ifElse:1:equals:then
+    # Builtins::ifElse:1:equals:then
     $129 = { (responsible $130) ->
       $131 = call $43 with $119 ($4 is responsible)
       $132 = call $35 with $49 $131 ($4 is responsible)
-      # Builtins:
-:ifElse:1:equals:else
+      # Builtins::ifElse:1:equals:else
       $133 = { (responsible $134) ->
         $135 = call $46 with $49 ($4 is responsible)
         $136 = call $46 with $131 ($4 is responsible)
@@ -199,8 +152,7 @@ $118 = { $119 $120 $121 (+ responsible $122) ->
       }
       $142 = call $37 with $132 $115 $133 ($4 is responsible)
     }
-    # Builtins:
-:ifElse:1:equals:else
+    # Builtins::ifElse:1:equals:else
     $143 = { (responsible $144) ->
       $145 = call $46 with $61 ($4 is responsible)
       $146 = call $46 with $127 ($4 is responsible)
@@ -212,8 +164,7 @@ $118 = { $119 $120 $121 (+ responsible $122) ->
     }
     $152 = call $37 with $128 $129 $143 ($4 is responsible)
   }
-  # Builtins:
-:ifElse:1:equals:else
+  # Builtins::ifElse:1:equals:else
   $153 = { (responsible $154) ->
     $155 = call $46 with $59 ($4 is responsible)
     $156 = call $46 with $123 ($4 is responsible)
@@ -226,28 +177,23 @@ $118 = { $119 $120 $121 (+ responsible $122) ->
   $162 = call $37 with $124 $125 $153 ($4 is responsible)
   $163 = call $41 with $162 $62 ($4 is responsible)
   $164 = call $35 with $163 $55 ($4 is responsible)
-  # Builtins:
-:ifElse:1:isMatch:then
+  # Builtins::ifElse:1:isMatch:then
   $165 = { (responsible $166) ->
     $167 = $162
   }
-  # Builtins:
-:ifElse:1:isMatch:else
+  # Builtins::ifElse:1:isMatch:else
   $168 = { (responsible $169) ->
     $170 = call $47 with $119 ($4 is responsible)
     $171 = call $35 with $59 $170 ($4 is responsible)
-    # Builtins:
-:ifElse:1:equals:then
+    # Builtins::ifElse:1:equals:then
     $172 = { (responsible $173) ->
       $174 = call $44 with $119 ($4 is responsible)
       $175 = call $35 with $49 $174 ($4 is responsible)
-      # Builtins:
-:ifElse:1:equals:then
+      # Builtins::ifElse:1:equals:then
       $176 = { (responsible $177) ->
         $178 = call $43 with $119 ($4 is responsible)
         $179 = call $35 with $49 $178 ($4 is responsible)
-        # Builtins:
-:ifElse:1:equals:else
+        # Builtins::ifElse:1:equals:else
         $180 = { (responsible $181) ->
           $182 = call $46 with $49 ($4 is responsible)
           $183 = call $46 with $178 ($4 is responsible)
@@ -259,8 +205,7 @@ $118 = { $119 $120 $121 (+ responsible $122) ->
         }
         $189 = call $37 with $179 $115 $180 ($4 is responsible)
       }
-      # Builtins:
-:ifElse:1:equals:else
+      # Builtins::ifElse:1:equals:else
       $190 = { (responsible $191) ->
         $192 = call $46 with $49 ($4 is responsible)
         $193 = call $46 with $174 ($4 is responsible)
@@ -272,8 +217,7 @@ $118 = { $119 $120 $121 (+ responsible $122) ->
       }
       $199 = call $37 with $175 $176 $190 ($4 is responsible)
     }
-    # Builtins:
-:ifElse:1:equals:else
+    # Builtins::ifElse:1:equals:else
     $200 = { (responsible $201) ->
       $202 = call $46 with $59 ($4 is responsible)
       $203 = call $46 with $170 ($4 is responsible)
@@ -288,8 +232,7 @@ $118 = { $119 $120 $121 (+ responsible $122) ->
   $210 = call $37 with $164 $165 $168 ($4 is responsible)
   $211 = call $41 with $210 $62 ($4 is responsible)
   $212 = call $35 with $211 $55 ($4 is responsible)
-  # Builtins:
-:ifElse:1:case-0:didNotMatch
+  # Builtins::ifElse:1:case-0:didNotMatch
   $213 = { (responsible $214) ->
     $215 = call $41 with $210 $63 ($4 is responsible)
     $216 = $49
@@ -316,14 +259,11 @@ $118 = { $119 $120 $121 (+ responsible $122) ->
   $236 = call $90 with $235 $78 $122 ($10 is responsible)
   $237 = call $37 with $119 $120 $121 ($11 is responsible)
 }
-# Examples:fibonacci
-:recursive
+# Examples:fibonacci:recursive
 $238 = { $239 $240 (+ responsible $241) ->
-  # Examples:fibonacci
-:recursive:0
+  # Examples:fibonacci:recursive:0
   $242 = { $243 $244 (+ responsible $245) ->
-    # Examples:fibonacci
-:recursive:0:0
+    # Examples:fibonacci:recursive:0:0
     $246 = { $247 (+ responsible $248) ->
       $249 = call $243 with $243 $247 ($31 is responsible)
     }
@@ -331,8 +271,7 @@ $238 = { $239 $240 (+ responsible $241) ->
   }
   $251 = call $242 with $242 $239 ($33 is responsible)
 }
-# Examples:fibonacci
-:compareTo
+# Examples:fibonacci:compareTo
 $252 = { $253 $254 (+ responsible $255) ->
   $256 = call $47 with $253 ($21 is responsible)
   $257 = call $35 with $256 $51 ($22 is responsible)
@@ -344,24 +283,20 @@ $252 = { $253 $254 (+ responsible $255) ->
   $263 = $262
   $264 = $263
 }
-# Examples:fibonacci
-:isLessThan
+# Examples:fibonacci:isLessThan
 $265 = { $266 $267 (+ responsible $268) ->
   $269 = call $252 with $266 $267 ($30 is responsible)
   $270 = call $35 with $269 $53 ($1 is responsible)
 }
-# Examples:fibonacci
-:fibonacci:2
+# Examples:fibonacci:fibonacci:2
 $271 = { $272 $273 (+ responsible $274) ->
   $275 = call $252 with $273 $64 ($30 is responsible)
   $276 = call $35 with $275 $53 ($1 is responsible)
-  # Examples:fibonacci
-:fibonacci:2:12
+  # Examples:fibonacci:fibonacci:2:12
   $277 = { (responsible $278) ->
     $279 = $273
   }
-  # Examples:fibonacci
-:fibonacci:2:13
+  # Examples:fibonacci:fibonacci:2:13
   $280 = { (responsible $281) ->
     $282 = call $47 with $273 ($21 is responsible)
     $283 = call $35 with $282 $51 ($22 is responsible)
@@ -383,18 +318,15 @@ $271 = { $272 $273 (+ responsible $274) ->
   }
   $299 = call $118 with $276 $277 $280 ($29 is responsible)
 }
-# Examples:fibonacci
-:recursive:0
+# Examples:fibonacci:recursive:0
 $300 = { $301 $302 (+ responsible $303) ->
-  # Examples:fibonacci
-:recursive:0:0
+  # Examples:fibonacci:recursive:0:0
   $304 = { $305 (+ responsible $306) ->
     $307 = call $301 with $301 $305 ($31 is responsible)
   }
   $308 = call $271 with $304 $302 ($32 is responsible)
 }
-# Examples:fibonacci
-:main
+# Examples:fibonacci:main
 $309 = { $310 (+ responsible $311) ->
   $312 = call $300 with $300 $65 ($33 is responsible)
 }

@@ -420,6 +420,6 @@ pub impl RichIrForLir for RichIr {
         builder.push_tracing_config(tracing_config);
         builder.push_newline();
         lir.build_rich_ir(&mut builder);
-        builder.finish()
+        builder.finish(true)
     }
 }

@@ -1,5 +1,4 @@
 # CST for module Examples:fibonacci
-
 builtins = use "Builtins"
 
 

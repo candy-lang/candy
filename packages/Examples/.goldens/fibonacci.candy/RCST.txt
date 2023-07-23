@@ -1,5 +1,4 @@
 # RCST for module Examples:fibonacci
-
 Cst { data: (), kind: Assignment { left: Cst { data: (), kind: TrailingWhitespace { child: Cst { data: (), kind: Identifier("builtins") }, whitespace: [Cst { data: (), kind: Whitespace(" ") }] } }, assignment_sign: Cst { data: (), kind: TrailingWhitespace { child: Cst { data: (), kind: EqualsSign }, whitespace: [Cst { data: (), kind: Whitespace(" ") }] } }, body: [Cst { data: (), kind: Call { receiver: Cst { data: (), kind: TrailingWhitespace { child: Cst { data: (), kind: Identifier("use") }, whitespace: [Cst { data: (), kind: Whitespace(" ") }] } }, arguments: [Cst { data: (), kind: Text { opening: Cst { data: (), kind: OpeningText { opening_single_quotes: [], opening_double_quote: Cst { data: (), kind: DoubleQuote } } }, parts: [Cst { data: (), kind: TextPart("Builtins") }], closing: Cst { data: (), kind: ClosingText { closing_double_quote: Cst { data: (), kind: DoubleQuote }, closing_single_quotes: [] } } } }] } }] } }
 Cst { data: (), kind: Newline("\n") }
 Cst { data: (), kind: Comment { octothorpe: Cst { data: (), kind: Octothorpe }, comment: " [ifElse, int, recursive] = use \"Core\"" } }

@@ -1,5 +1,4 @@
 # HIR for module Examples:parallel
-
 $use = { (non-fuzzable) $use:relativePath ->
   $use:importedModule = relative to module Examples:parallel, use $use:relativePath
 }

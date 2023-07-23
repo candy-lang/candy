@@ -1,5 +1,4 @@
 # HIR for module Examples:fibonacci
-
 $use = { (non-fuzzable) $use:relativePath ->
   $use:importedModule = relative to module Examples:fibonacci, use $use:relativePath
 }

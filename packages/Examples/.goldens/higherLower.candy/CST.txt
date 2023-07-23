@@ -1,5 +1,4 @@
 # CST for module Examples:higherLower
-
 # Repeatedly asks you for a guess and tells you whether the secret number is
 
 

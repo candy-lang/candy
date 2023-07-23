@@ -1,5 +1,4 @@
 # HIR for module Examples:iterable
-
 $use = { (non-fuzzable) $use:relativePath ->
   $use:importedModule = relative to module Examples:iterable, use $use:relativePath
 }

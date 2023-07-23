@@ -1,5 +1,4 @@
 # CST for module Examples:parallel
-
 [async, await, channel, parallel, text] = use "Core"
 
 

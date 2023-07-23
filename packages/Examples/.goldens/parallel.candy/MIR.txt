@@ -1,5 +1,4 @@
 # MIR for module Examples:parallel
-
 #
 # Tracing Config:
 #
@@ -7,36 +6,30 @@
 # • Include tracing of calls? No
 # • Include tracing of evaluated expressions? No
 
-# anonymous:$generated:
-:needs
+# anonymous:$generated::needs
 $49 = { $2 $3 $4 (+ responsible $1) ->
-  $5 = anonymous:$generated:
-:needs
+  $5 = anonymous:$generated::needs
   $6 = builtinEquals
   $7 = Nothing
   $8 = True
   $9 = False
   $10 = call $6 with $2 $8 ($5 is responsible)
   $11 = builtinIfElse
-  # anonymous:$generated:
-:needs:isConditionTrue:then
+  # anonymous:$generated::needs:isConditionTrue:then
   $14 = { (responsible $12) ->
     $13 = $8
   }
-  # anonymous:$generated:
-:needs:isConditionTrue:else
+  # anonymous:$generated::needs:isConditionTrue:else
   $17 = { (responsible $15) ->
     $16 = call $6 with $2 $9 ($5 is responsible)
   }
   $18 = call $11 with $10 $14 $17 ($5 is responsible)
   $19 = builtinIfElse
-  # anonymous:$generated:
-:needs:isConditionBool:then
+  # anonymous:$generated::needs:isConditionBool:then
   $22 = { (responsible $20) ->
     $21 = $7
   }
-  # anonymous:$generated:
-:needs:isConditionBool:else
+  # anonymous:$generated::needs:isConditionBool:else
   $26 = { (responsible $23) ->
     $24 = "The `condition` must be either `True` or `False`."
     $25 = panicking because $24 ($1 is at fault)
@@ -47,35 +40,29 @@ $49 = { $2 $3 $4 (+ responsible $1) ->
   $30 = Text
   $31 = call $6 with $29 $30 ($1 is responsible)
   $32 = builtinIfElse
-  # anonymous:$generated:
-:needs:isReasonText:then
+  # anonymous:$generated::needs:isReasonText:then
   $35 = { (responsible $33) ->
     $34 = $7
   }
-  # anonymous:$generated:
-:needs:isReasonText:else
+  # anonymous:$generated::needs:isReasonText:else
   $39 = { (responsible $36) ->
     $37 = "The `reason` must be a text."
     $38 = panicking because $37 ($1 is at fault)
   }
   $40 = call $32 with $31 $35 $39 ($5 is responsible)
   $41 = builtinIfElse
-  # anonymous:$generated:
-:needs:condition:then
+  # anonymous:$generated::needs:condition:then
   $44 = { (responsible $42) ->
     $43 = $7
   }
-  # anonymous:$generated:
-:needs:condition:else
+  # anonymous:$generated::needs:condition:else
   $47 = { (responsible $45) ->
     $46 = panicking because $3 ($4 is at fault)
   }
   $48 = call $41 with $2 $44 $47 ($5 is responsible)
 }
-$50 = Examples:parallel
-:
-# Examples:parallel
-:use
+$50 = Examples:parallel:
+# Examples:parallel:use
 $54 = { $52 (+ responsible $51) ->
   $53 = use $52 (relative to Examples:parallel; $50 is responsible)
 }
@@ -87,11 +74,9 @@ $59 = builtinEquals
 $60 = builtinIfElse
 $61 = builtinToDebugText
 $62 = "Core"
-$63 = Examples:parallel
-:8
+$63 = Examples:parallel:8
 $64 = call $55 with $62 ($63 is responsible)
-$65 = Examples:parallel
-:9
+$65 = Examples:parallel:9
 $66 = Match
 $67 = NoMatch
 $68 = Struct
@@ -100,22 +85,19 @@ $70 = call $69 with $64 ($65 is responsible)
 $71 = builtinEquals
 $72 = call $71 with $68 $70 ($65 is responsible)
 $73 = builtinIfElse
-# Examples:parallel
-:9:equals:then
+# Examples:parallel:9:equals:then
 $268 = { (responsible $74) ->
   $75 = builtinStructHasKey
   $76 = builtinStructGet
   $77 = Async
   $78 = call $75 with $64 $77 ($65 is responsible)
   $79 = builtinIfElse
-  # Examples:parallel
-:9:hasKey:then
+  # Examples:parallel:9:hasKey:then
   $83 = { (responsible $80) ->
     $81 = call $76 with $64 $77 ($65 is responsible)
     $82 = ($66, $81)
   }
-  # Examples:parallel
-:9:hasKey:else
+  # Examples:parallel:9:hasKey:else
   $97 = { (responsible $84) ->
     $85 = builtinToDebugText
     $86 = call $85 with $77 ($65 is responsible)
@@ -138,8 +120,7 @@ $268 = { (responsible $74) ->
   $103 = Match
   $104 = call $102 with $101 $103 ($65 is responsible)
   $105 = builtinIfElse
-  # Examples:parallel
-:9:isMatch:then
+  # Examples:parallel:9:isMatch:then
   $263 = { (responsible $106) ->
     $107 = builtinListGet
     $108 = 1
@@ -147,14 +128,12 @@ $268 = { (responsible $74) ->
     $110 = Await
     $111 = call $75 with $64 $110 ($65 is responsible)
     $112 = builtinIfElse
-    # Examples:parallel
-:9:hasKey:then
+    # Examples:parallel:9:hasKey:then
     $116 = { (responsible $113) ->
       $114 = call $76 with $64 $110 ($65 is responsible)
       $115 = ($66, $114)
     }
-    # Examples:parallel
-:9:hasKey:else
+    # Examples:parallel:9:hasKey:else
     $130 = { (responsible $117) ->
       $118 = builtinToDebugText
       $119 = call $118 with $110 ($65 is responsible)
@@ -177,8 +156,7 @@ $268 = { (responsible $74) ->
     $136 = Match
     $137 = call $135 with $134 $136 ($65 is responsible)
     $138 = builtinIfElse
-    # Examples:parallel
-:9:isMatch:then
+    # Examples:parallel:9:isMatch:then
     $258 = { (responsible $139) ->
       $140 = builtinListGet
       $141 = 1
@@ -186,14 +164,12 @@ $268 = { (responsible $74) ->
       $143 = Channel
       $144 = call $75 with $64 $143 ($65 is responsible)
       $145 = builtinIfElse
-      # Examples:parallel
-:9:hasKey:then
+      # Examples:parallel:9:hasKey:then
       $149 = { (responsible $146) ->
         $147 = call $76 with $64 $143 ($65 is responsible)
         $148 = ($66, $147)
       }
-      # Examples:parallel
-:9:hasKey:else
+      # Examples:parallel:9:hasKey:else
       $163 = { (responsible $150) ->
         $151 = builtinToDebugText
         $152 = call $151 with $143 ($65 is responsible)
@@ -216,8 +192,7 @@ $268 = { (responsible $74) ->
       $169 = Match
       $170 = call $168 with $167 $169 ($65 is responsible)
       $171 = builtinIfElse
-      # Examples:parallel
-:9:isMatch:then
+      # Examples:parallel:9:isMatch:then
       $253 = { (responsible $172) ->
         $173 = builtinListGet
         $174 = 1
@@ -225,14 +200,12 @@ $268 = { (responsible $74) ->
         $176 = Parallel
         $177 = call $75 with $64 $176 ($65 is responsible)
         $178 = builtinIfElse
-        # Examples:parallel
-:9:hasKey:then
+        # Examples:parallel:9:hasKey:then
         $182 = { (responsible $179) ->
           $180 = call $76 with $64 $176 ($65 is responsible)
           $181 = ($66, $180)
         }
-        # Examples:parallel
-:9:hasKey:else
+        # Examples:parallel:9:hasKey:else
         $196 = { (responsible $183) ->
           $184 = builtinToDebugText
           $185 = call $184 with $176 ($65 is responsible)
@@ -255,8 +228,7 @@ $268 = { (responsible $74) ->
         $202 = Match
         $203 = call $201 with $200 $202 ($65 is responsible)
         $204 = builtinIfElse
-        # Examples:parallel
-:9:isMatch:then
+        # Examples:parallel:9:isMatch:then
         $248 = { (responsible $205) ->
           $206 = builtinListGet
           $207 = 1
@@ -264,14 +236,12 @@ $268 = { (responsible $74) ->
           $209 = Text
           $210 = call $75 with $64 $209 ($65 is responsible)
           $211 = builtinIfElse
-          # Examples:parallel
-:9:hasKey:then
+          # Examples:parallel:9:hasKey:then
           $215 = { (responsible $212) ->
             $213 = call $76 with $64 $209 ($65 is responsible)
             $214 = ($66, $213)
           }
-          # Examples:parallel
-:9:hasKey:else
+          # Examples:parallel:9:hasKey:else
           $229 = { (responsible $216) ->
             $217 = builtinToDebugText
             $218 = call $217 with $209 ($65 is responsible)
@@ -294,51 +264,44 @@ $268 = { (responsible $74) ->
           $235 = Match
           $236 = call $234 with $233 $235 ($65 is responsible)
           $237 = builtinIfElse
-          # Examples:parallel
-:9:isMatch:then
+          # Examples:parallel:9:isMatch:then
           $243 = { (responsible $238) ->
             $239 = builtinListGet
             $240 = 1
             $241 = call $239 with $230 $240 ($65 is responsible)
             $242 = ($66, $109, $142, $175, $208, $241)
           }
-          # Examples:parallel
-:9:isMatch:else
+          # Examples:parallel:9:isMatch:else
           $246 = { (responsible $244) ->
             $245 = $230
           }
           $247 = call $237 with $236 $243 $246 ($65 is responsible)
         }
-        # Examples:parallel
-:9:isMatch:else
+        # Examples:parallel:9:isMatch:else
         $251 = { (responsible $249) ->
           $250 = $197
         }
         $252 = call $204 with $203 $248 $251 ($65 is responsible)
       }
-      # Examples:parallel
-:9:isMatch:else
+      # Examples:parallel:9:isMatch:else
       $256 = { (responsible $254) ->
         $255 = $164
       }
       $257 = call $171 with $170 $253 $256 ($65 is responsible)
     }
-    # Examples:parallel
-:9:isMatch:else
+    # Examples:parallel:9:isMatch:else
     $261 = { (responsible $259) ->
       $260 = $131
     }
     $262 = call $138 with $137 $258 $261 ($65 is responsible)
   }
-  # Examples:parallel
-:9:isMatch:else
+  # Examples:parallel:9:isMatch:else
   $266 = { (responsible $264) ->
     $265 = $98
   }
   $267 = call $105 with $104 $263 $266 ($65 is responsible)
 }
-# Examples:parallel
-:9:equals:else
+# Examples:parallel:9:equals:else
 $282 = { (responsible $269) ->
   $270 = builtinToDebugText
   $271 = call $270 with $68 ($65 is responsible)
@@ -362,13 +325,11 @@ $288 = builtinEquals
 $289 = Match
 $290 = call $288 with $287 $289 ($65 is responsible)
 $291 = builtinIfElse
-# Examples:parallel
-:9:isMatch:then
+# Examples:parallel:9:isMatch:then
 $294 = { (responsible $292) ->
   $293 = $284
 }
-# Examples:parallel
-:9:isMatch:else
+# Examples:parallel:9:isMatch:else
 $300 = { (responsible $295) ->
   $296 = builtinListGet
   $297 = 1
@@ -378,100 +339,79 @@ $300 = { (responsible $295) ->
 $301 = call $291 with $290 $294 $300 ($65 is responsible)
 $302 = builtinListGet
 $303 = 1
-$304 = Examples:parallel
-:async
+$304 = Examples:parallel:async
 $305 = call $302 with $283 $303 ($304 is responsible)
 $306 = builtinListGet
 $307 = 2
-$308 = Examples:parallel
-:await
+$308 = Examples:parallel:await
 $309 = call $306 with $283 $307 ($308 is responsible)
 $310 = builtinListGet
 $311 = 3
-$312 = Examples:parallel
-:channel
+$312 = Examples:parallel:channel
 $313 = call $310 with $283 $311 ($312 is responsible)
 $314 = builtinListGet
 $315 = 4
-$316 = Examples:parallel
-:parallel
+$316 = Examples:parallel:parallel
 $317 = call $314 with $283 $315 ($316 is responsible)
 $318 = builtinListGet
 $319 = 5
-$320 = Examples:parallel
-:text
+$320 = Examples:parallel:text
 $321 = call $318 with $283 $319 ($320 is responsible)
 $322 = Nothing
-# Examples:parallel
-:11
+# Examples:parallel:11
 $448 = { $324 (+ responsible $323) ->
-  # Examples:parallel
-:11:print
+  # Examples:parallel:11:print
   $369 = { $326 (+ responsible $325) ->
     $327 = "Builtins"
-    $328 = Examples:parallel
-:11:print:1
+    $328 = Examples:parallel:11:print:1
     $329 = call $54 with $327 ($328 is responsible)
     $330 = builtinStructGet
     $331 = StructGet
-    $332 = Examples:parallel
-:11:print:4
+    $332 = Examples:parallel:11:print:4
     $333 = call $330 with $329 $331 ($332 is responsible)
     $334 = $321
     $335 = Is
-    $336 = Examples:parallel
-:11:print:7
+    $336 = Examples:parallel:11:print:7
     $337 = call $333 with $334 $335 ($336 is responsible)
     $338 = $326
-    $339 = Examples:parallel
-:11:print:9
+    $339 = Examples:parallel:11:print:9
     $340 = call $337 with $338 ($339 is responsible)
     $341 = "`text.is message` was not satisfied"
-    $342 = Examples:parallel
-:11:print:11
+    $342 = Examples:parallel:11:print:11
     $343 = call $49 with $340 $341 $325 ($342 is responsible)
     $344 = "Builtins"
-    $345 = Examples:parallel
-:11:print:13
+    $345 = Examples:parallel:11:print:13
     $346 = call $54 with $344 ($345 is responsible)
     $347 = builtinStructGet
     $348 = StructGet
-    $349 = Examples:parallel
-:11:print:16
+    $349 = Examples:parallel:11:print:16
     $350 = call $347 with $346 $348 ($349 is responsible)
     $351 = $324
     $352 = Stdout
-    $353 = Examples:parallel
-:11:print:19
+    $353 = Examples:parallel:11:print:19
     $354 = call $350 with $351 $352 ($353 is responsible)
     $355 = "Builtins"
-    $356 = Examples:parallel
-:11:print:21
+    $356 = Examples:parallel:11:print:21
     $357 = call $54 with $355 ($356 is responsible)
     $358 = builtinStructGet
     $359 = StructGet
-    $360 = Examples:parallel
-:11:print:24
+    $360 = Examples:parallel:11:print:24
     $361 = call $358 with $357 $359 ($360 is responsible)
     $362 = $313
     $363 = Send
-    $364 = Examples:parallel
-:11:print:27
+    $364 = Examples:parallel:11:print:27
     $365 = call $361 with $362 $363 ($364 is responsible)
     $366 = $326
-    $367 = Examples:parallel
-:11:print:29
+    $367 = Examples:parallel:11:print:29
     $368 = call $365 with $354 $366 ($367 is responsible)
   }
   $370 = $369
   $371 = $317
-  # Examples:parallel
-:11:1
+  # Examples:parallel:11:1
   $445 = { $373 (+ responsible $372) ->
     $374 = $373
     $375 = $305
-    # Examples:parallel
-:11:1:2
+    # Examples:parallel:11:1:2
     $394 = { (responsible $376) ->
       $377 = $370
       $378 = builtinTextConcatenate
@@ -481,8 +421,7 @@ $448 = { $324 (+ responsible $323) ->
       $382 = builtinIfElse
       $383 = builtinToDebugText
       $384 = "Hello from fiber!"
-      $385 = Examples:parallel
-:11:1:2:8
+      $385 = Examples:parallel:11:1:2:8
       $386 = call $377 with $384 ($385 is responsible)
       $387 = builtinTextConcatenate
       $388 = builtinTypeOf
@@ -492,21 +431,17 @@ $448 = { $324 (+ responsible $323) ->
       $392 = builtinToDebugText
       $393 = "Hello, async await!"
     }
-    $395 = Examples:parallel
-:11:1:3
+    $395 = Examples:parallel:11:1:3
     $396 = call $375 with $374 $394 ($395 is responsible)
     $397 = $309
-    $398 = Examples:parallel
-:11:1:5
+    $398 = Examples:parallel:11:1:5
     $399 = call $397 with $396 ($398 is responsible)
     $400 = $370
-    $401 = Examples:parallel
-:11:1:7
+    $401 = Examples:parallel:11:1:7
     $402 = call $400 with $399 ($401 is responsible)
     $403 = $373
     $404 = $305
-    # Examples:parallel
-:11:1:10
+    # Examples:parallel:11:1:10
     $416 = { (responsible $405) ->
       $406 = $370
       $407 = builtinTextConcatenate
@@ -516,17 +451,14 @@ $448 = { $324 (+ responsible $323) ->
       $411 = builtinIfElse
       $412 = builtinToDebugText
       $413 = "Kiwi"
-      $414 = Examples:parallel
-:11:1:10:8
+      $414 = Examples:parallel:11:1:10:8
       $415 = call $406 with $413 ($414 is responsible)
     }
-    $417 = Examples:parallel
-:11:1:11
+    $417 = Examples:parallel:11:1:11
     $418 = call $404 with $403 $416 ($417 is responsible)
     $419 = $373
     $420 = $305
-    # Examples:parallel
-:11:1:14
+    # Examples:parallel:11:1:14
     $432 = { (responsible $421) ->
       $422 = $370
       $423 = builtinTextConcatenate
@@ -536,12 +468,10 @@ $448 = { $324 (+ responsible $323) ->
       $427 = builtinIfElse
       $428 = builtinToDebugText
       $429 = "Banana"
-      $430 = Examples:parallel
-:11:1:14:8
+      $430 = Examples:parallel:11:1:14:8
       $431 = call $422 with $429 ($430 is responsible)
     }
-    $433 = Examples:parallel
-:11:1:15
+    $433 = Examples:parallel:11:1:15
     $434 = call $420 with $419 $432 ($433 is responsible)
     $435 = $370
     $436 = builtinTextConcatenate
@@ -551,16 +481,13 @@ $448 = { $324 (+ responsible $323) ->
     $440 = builtinIfElse
     $441 = builtinToDebugText
     $442 = "Hi"
-    $443 = Examples:parallel
-:11:1:24
+    $443 = Examples:parallel:11:1:24
     $444 = call $435 with $442 ($443 is responsible)
   }
-  $446 = Examples:parallel
-:11:2
+  $446 = Examples:parallel:11:2
   $447 = call $371 with $445 ($446 is responsible)
 }
-$449 = Examples:parallel
-:12
+$449 = Examples:parallel:12
 $450 = $448
 $451 = $450
 $452 = Nothing

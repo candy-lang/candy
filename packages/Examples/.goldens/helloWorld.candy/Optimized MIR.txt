@@ -1,5 +1,4 @@
 # Optimized MIR for module Examples:helloWorld
-
 #
 # Tracing Config:
 #
@@ -7,28 +6,17 @@
 # • Include tracing of calls? No
 # • Include tracing of evaluated expressions? No
 
-$1 = Builtins:
-:channelSend:12
-$2 = Builtins:
-:channelSend:5
-$3 = Builtins:
-:structGet:12
-$4 = Builtins:
-:structGet:14
-$5 = Builtins:
-:structGet:21
-$6 = Builtins:
-:structGet:5
-$7 = Builtins:
-:typeIs:19
-$8 = Builtins:
-:typeIs:25
-$9 = Examples:helloWorld
-:11:23
-$10 = Examples:helloWorld
-:11:7
-$11 = anonymous:$generated:
-:needs
+$1 = Builtins::channelSend:12
+$2 = Builtins::channelSend:5
+$3 = Builtins::structGet:12
+$4 = Builtins::structGet:14
+$5 = Builtins::structGet:21
+$6 = Builtins::structGet:5
+$7 = Builtins::typeIs:19
+$8 = Builtins::typeIs:25
+$9 = Examples:helloWorld:11:23
+$10 = Examples:helloWorld:11:7
+$11 = anonymous:$generated::needs
 $12 = builtinChannelSend
 $13 = builtinEquals
 $14 = builtinIfElse
@@ -49,49 +37,41 @@ $28 = "The `reason` must be a text."
 $29 = "`sendPort | typeIs SendPort` was not satisfied"
 $30 = "`struct | typeIs Struct` was not satisfied"
 $31 = "`struct | ✨.structHasKey key` was not satisfied"
-# anonymous:$generated:
-:needs:isConditionTrue:then
+# anonymous:$generated::needs:isConditionTrue:then
 $32 = { (responsible $33) ->
   $34 = $25
 }
-# anonymous:$generated:
-:needs:isConditionBool:then
+# anonymous:$generated::needs:isConditionBool:then
 $35 = { (responsible $36) ->
   $37 = $20
 }
-# anonymous:$generated:
-:needs
+# anonymous:$generated::needs
 $38 = { $39 $40 $41 (+ responsible $42) ->
   $43 = call $13 with $39 $25 ($11 is responsible)
-  # anonymous:$generated:
-:needs:isConditionTrue:else
+  # anonymous:$generated::needs:isConditionTrue:else
   $44 = { (responsible $45) ->
     $46 = call $13 with $39 $18 ($11 is responsible)
   }
   $47 = call $14 with $43 $32 $44 ($11 is responsible)
-  # anonymous:$generated:
-:needs:isConditionBool:else
+  # anonymous:$generated::needs:isConditionBool:else
   $48 = { (responsible $49) ->
     $50 = panicking because $27 ($42 is at fault)
   }
   $51 = call $14 with $47 $35 $48 ($11 is responsible)
   $52 = call $17 with $40 ($42 is responsible)
   $53 = call $13 with $52 $24 ($42 is responsible)
-  # anonymous:$generated:
-:needs:isReasonText:else
+  # anonymous:$generated::needs:isReasonText:else
   $54 = { (responsible $55) ->
     $56 = panicking because $28 ($42 is at fault)
   }
   $57 = call $14 with $53 $35 $54 ($11 is responsible)
-  # anonymous:$generated:
-:needs:condition:else
+  # anonymous:$generated::needs:condition:else
   $58 = { (responsible $59) ->
     $60 = panicking because $40 ($41 is at fault)
   }
   $61 = call $14 with $39 $35 $58 ($11 is responsible)
 }
-# Examples:helloWorld
-:11
+# Examples:helloWorld:11
 $62 = { $63 (+ responsible $64) ->
   $65 = call $17 with $63 ($7 is responsible)
   $66 = call $13 with $65 $23 ($8 is responsible)

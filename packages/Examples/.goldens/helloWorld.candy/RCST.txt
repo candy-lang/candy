@@ -1,5 +1,4 @@
 # RCST for module Examples:helloWorld
-
 Cst { data: (), kind: Comment { octothorpe: Cst { data: (), kind: Octothorpe }, comment: " A self-contained hello world example that doesn't even use the Core library." } }
 Cst { data: (), kind: Newline("\n") }
 Cst { data: (), kind: Newline("\n") }

@@ -1,5 +1,4 @@
 # RCST for module Examples:echo
-
 Cst { data: (), kind: Comment { octothorpe: Cst { data: (), kind: Octothorpe }, comment: " Echoes whatever you send to it on stdin." } }
 Cst { data: (), kind: Newline("\n") }
 Cst { data: (), kind: Newline("\n") }

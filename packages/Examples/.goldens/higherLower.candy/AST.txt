@@ -1,5 +1,4 @@
 # AST for module Examples:higherLower
-
 assignment: struct
   identifier $6@"async"
   identifier $8@"await"
