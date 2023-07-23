@@ -198,6 +198,7 @@ impl Context<'_> {
                 let is_call = matches!(**expression, Expression::Call { .. });
                 inlining::inline_tiny_functions(self, expression);
                 inlining::inline_functions_containing_use(self, expression);
+                inlining::inline_calls_with_constant_arguments(self, expression);
                 if is_call && matches!(**expression, Expression::Function { .. }) {
                     // We inlined a function call and the resulting code starts with
                     // a function definition. We need to visit that first before

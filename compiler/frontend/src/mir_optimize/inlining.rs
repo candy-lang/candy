@@ -71,6 +71,15 @@ pub fn inline_functions_containing_use(context: &mut Context, expression: &mut C
         context.inline_call(expression);
     }
 }
+pub fn inline_calls_with_constant_arguments(
+    context: &mut Context,
+    expression: &mut CurrentExpression,
+) {
+    if let Expression::Call { arguments, .. } = &**expression
+        && arguments.iter().all(|arg| context.pureness.is_definition_const(context.visible.get(*arg))) {
+        context.inline_call(expression);
+    }
+}
 
 impl Context<'_> {
     pub fn inline_call(&mut self, expression: &mut CurrentExpression) {
