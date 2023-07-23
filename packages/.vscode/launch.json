@@ -4,7 +4,7 @@
       "type": "candy",
       "name": "🍭 Candy",
       "request": "launch",
-      "program": "${workspaceFolder}/Cxamples/fibonacci.candy"
+      "program": "${workspaceFolder}/Examples/fibonacci.candy"
     }
   ]
 }

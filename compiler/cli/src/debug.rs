@@ -198,7 +198,7 @@ impl GoldOptions {
     fn run(&self, db: &Database) -> ProgramResult {
         match &self {
             GoldOptions::Generate(options) => options
-                .visit_irs(db, |_file, _ir_namee, ir_file, ir| {
+                .visit_irs(db, |_file, _ir_name, ir_file, ir| {
                     fs::write(ir_file, ir).unwrap()
                 }),
             GoldOptions::Check(options) => {
