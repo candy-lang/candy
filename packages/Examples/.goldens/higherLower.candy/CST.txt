@@ -1,16 +1,8 @@
 # CST for module Examples:higherLower
 # Repeatedly asks you for a guess and tells you whether the secret number is
-
-
 # higher or lower. Exits once you found the secret number.
 
-
-
-
 [async, await, channel, equals, ifElse, int, loop, result, Function: [run], text] = use "Core"
-
-
-
 
 main := { environment ->
   print message =
@@ -49,4 +41,3 @@ main := { environment ->
       }
   }
 }
-

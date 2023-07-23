@@ -1,11 +1,6 @@
 # CST for module Examples:sqrt
 builtins = use "Builtins"
-
-
 [equals, fixedDecimal, ifElse, recursive] = use "Core"
-
-
-
 
 sqrt x :=
   needs (fixedDecimal.is x)
@@ -19,11 +14,7 @@ sqrt x :=
     ifElse (fixedDecimal.approxEquals guess refinedGuess 10) { guess } { recurse refinedGuess }
   }
 
-
-
-
 main _ :=
   input = 2
   result = input | fixedDecimal.fromInt | sqrt
   builtins.print "The root of {input} is {result | fixedDecimal.toText}"
-

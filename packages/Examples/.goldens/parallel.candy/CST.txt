@@ -1,9 +1,6 @@
 # CST for module Examples:parallel
 [async, await, channel, parallel, text] = use "Core"
 
-
-
-
 main := { environment ->
   print message =
     needs (text.is message)
@@ -22,4 +19,3 @@ main := { environment ->
     print "Hi"
   }
 }
-

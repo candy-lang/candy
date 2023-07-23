@@ -1,13 +1,7 @@
 # CST for module Examples:echo
 # Echoes whatever you send to it on stdin.
 
-
-
-
 [async, await, channel, function, text] = use "Core"
-
-
-
 
 main := { environment ->
   print message =
@@ -25,4 +19,3 @@ main := { environment ->
   print "Echo:"
   print foo
 }
-

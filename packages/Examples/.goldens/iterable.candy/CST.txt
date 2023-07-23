@@ -1,11 +1,6 @@
 # CST for module Examples:iterable
 builtins = use "Builtins"
-
-
 [bool, channel, equals, ifElse, iterable, list, result, text] = use "Core"
-
-
-
 
 splitWhereFirst iter checker =
   # Splits the iterable into a list and an iterable of the remaining items. The
@@ -15,16 +10,10 @@ splitWhereFirst iter checker =
   builtins.print "Turned into list"
   (firstPart, iter | iterable.skip (firstPart | list.length))
 
-
-
-
 split iter delimeter = iterable.generateWithState iter { state ->
   state | iterable.takeUntil { item -> equals item delimeter }
   state | iterable.next | result.map { }
 }
-
-
-
 
 main := { env ->
   print = { message -> channel.send env.stdout message }
@@ -39,4 +28,3 @@ main := { env ->
   #builtins.print foo
   | iterable.forEach { item -> print item }
 }
-
