@@ -38,6 +38,9 @@ impl TextEdits {
     pub fn source(&self) -> &str {
         &self.source
     }
+    pub fn has_edits(&self) -> bool {
+        !self.edits.is_empty()
+    }
     pub fn has_edit_at(&self, offset: Offset) -> bool {
         self.edits
             .binary_search_by_key(&offset, |it| it.range.start)

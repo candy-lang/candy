@@ -32,8 +32,19 @@ fn rcst(db: &dyn StringToRcst, module: Module) -> RcstResult {
     Ok(Arc::new(parse_rcst(source)))
 }
 pub fn parse_rcst(source: &str) -> Vec<Rcst> {
-    let (rest, mut rcsts) = parse::body(source, 0);
+    let (mut rest, mut rcsts) = parse::body(source, 0);
     if !rest.is_empty() {
+        let trailing_newline = if rest.len() >= 2
+                && let Some((newline_rest, newline)) = parse::newline(&rest[rest.len() - 2..])
+                && newline_rest.is_empty() {
+            rest = &rest[..rest.len() - 2];
+            Some(newline)
+        } else if let Some((_, newline)) = parse::newline(&rest[rest.len() - 1..]) {
+            rest = &rest[..rest.len() - 1];
+            Some(newline)
+        } else {
+            None
+        };
         rcsts.push(
             CstKind::Error {
                 unparsable_input: rest.to_string(),
@@ -41,6 +52,9 @@ pub fn parse_rcst(source: &str) -> Vec<Rcst> {
             }
             .into(),
         );
+        if let Some(trailing_newline) = trailing_newline {
+            rcsts.push(trailing_newline);
+        }
     }
     rcsts
 }
@@ -192,7 +206,7 @@ mod parse {
         literal(input, "#").map(|it| (it, CstKind::Octothorpe.into()))
     }
     #[instrument(level = "trace")]
-    fn newline(input: &str) -> Option<(&str, Rcst)> {
+    pub(super) fn newline(input: &str) -> Option<(&str, Rcst)> {
         let newlines = vec!["\n", "\r\n"];
         for newline in newlines {
             if let Some(input) = literal(input, newline) {
