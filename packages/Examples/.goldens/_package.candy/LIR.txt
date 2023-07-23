@@ -9,13 +9,13 @@
 
 # Constant heap
 :
-<removed address>: Examples:_package
-<removed address>: []
-<removed address>: { 0 arguments (capturing nothing) → ip-0 }
+<replaced address 2ded061b072e15be>: { 0 arguments (capturing nothing) → ip-0 }
+<replaced address 7ffec549f096563f>: []
+<replaced address a0b14ec6761df9bc>: Examples:_package
 
 # Instructions
 # Examples:_package
 :
-0: pushConstant <removed address> []
+0: pushConstant <replaced address 7ffec549f096563f> []
 1: popMultipleBelowTop 1
 2: return

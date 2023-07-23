@@ -1,3 +1,5 @@
+#![feature(lazy_cell)]
+
 use clap::Parser;
 use tracing::{debug, Level, Metadata};
 use tracing_subscriber::{

@@ -235,7 +235,7 @@ impl ToRichIr for Lir {
         for constant in self.constant_heap.iter() {
             builder.push_newline();
             builder.push(
-                format!("{:?}", constant.address()),
+                format!("{:p}", constant.address()),
                 TokenType::Address,
                 EnumSet::empty(),
             );

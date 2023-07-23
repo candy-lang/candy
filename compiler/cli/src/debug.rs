@@ -12,15 +12,22 @@ use candy_frontend::{
     rcst_to_cst::RcstToCst,
     rich_ir::{RichIr, RichIrAnnotation, TokenType},
     string_to_rcst::StringToRcst,
+    utils::DoHash,
     TracingConfig, TracingMode,
 };
-use candy_vm::{lir::RichIrForLir, mir_to_lir::compile_lir};
+use candy_vm::{
+    heap::HeapData,
+    lir::{Lir, RichIrForLir},
+    mir_to_lir::compile_lir,
+};
 use clap::{Parser, ValueHint};
 use colored::{Color, Colorize};
 use diffy::{create_patch, PatchFormatter};
 use itertools::Itertools;
-use regex::Regex;
+use regex::{Captures, Regex, RegexBuilder};
+use rustc_hash::FxHashMap;
 use std::{
+    cell::LazyCell,
     env, fs, io,
     path::{Path, PathBuf},
 };
@@ -245,6 +252,7 @@ impl GoldOptions {
     }
 }
 impl GoldPath {
+    const TRACING_CONFIG: TracingConfig = TracingConfig::off();
     fn visit_irs(
         &self,
         db: &Database,
@@ -262,8 +270,6 @@ impl GoldPath {
         let output_directory = directory.join(".goldens");
         fs::create_dir_all(&output_directory).unwrap();
 
-        let tracing_config = TracingConfig::off();
-        let address_regex = Regex::new(r"0x[0-9a-f]{1,16}").unwrap();
         for file in WalkDir::new(&directory)
             .into_iter()
             .map(|it| it.unwrap())
@@ -296,41 +302,84 @@ impl GoldPath {
             let hir = RichIr::for_hir(&module, &hir);
             visit("HIR", hir.text);
 
-            let (mir, _) = db.mir(module.clone(), tracing_config.clone()).unwrap();
-            let mir = RichIr::for_mir(&module, &mir, &tracing_config);
+            let (mir, _) = db
+                .mir(module.clone(), Self::TRACING_CONFIG.clone())
+                .unwrap();
+            let mir = RichIr::for_mir(&module, &mir, &Self::TRACING_CONFIG);
             visit("MIR", mir.text);
 
             let (optimized_mir, _, _) = db
-                .optimized_mir(module.clone(), tracing_config.clone())
+                .optimized_mir(module.clone(), Self::TRACING_CONFIG.clone())
                 .unwrap();
-            let optimized_mir = RichIr::for_optimized_mir(&module, &optimized_mir, &tracing_config);
+            let optimized_mir =
+                RichIr::for_optimized_mir(&module, &optimized_mir, &Self::TRACING_CONFIG);
             visit("Optimized MIR", optimized_mir.text);
 
             // LIR
-            let (lir, _) = compile_lir(db, module.clone(), tracing_config.clone());
-            let lir = RichIr::for_lir(&module, &lir, &tracing_config);
-
-            // Remove addresses of constants them from the output since they are
-            // random.
-            let lir = address_regex.replace_all(&lir.text, "<removed address>");
-
-            // Sort the constant heap alphabetically to make the output more
-            // stable.
-            let mut lines = lir.lines().collect_vec();
-            let (constants_start, _) = lines
-                .iter()
-                .find_position(|&&it| it == "# Constant heap")
-                .unwrap();
-            let (constants_end, _) = lines
-                .iter()
-                .find_position(|&&it| it == "# Instructions")
-                .unwrap();
-            lines[constants_start + 1..constants_end - 1].sort();
-            // Re-add the trailing newline
-            lines.push("");
-
-            visit("LIR", lines.iter().join("\n"));
+            let (lir, _) = compile_lir(db, module.clone(), Self::TRACING_CONFIG.clone());
+            let lir_rich_ir = RichIr::for_lir(&module, &lir, &Self::TRACING_CONFIG);
+            visit("LIR", Self::format_lir(&lir, &lir_rich_ir));
         }
         Ok(())
+    }
+
+    const ADDRESS_REGEX: LazyCell<Regex> = LazyCell::new(|| {
+        const ADDRESS_REGEX: &str = "0x[0-9a-f]{1,16}";
+        // Addresses of constants in the constant heap.
+        let constant_heap_regex = format!(r"^({}): ", ADDRESS_REGEX);
+        // Addresses of constants in pushConstant instructions.
+        let push_constant_regex = format!(r"^ *\d+: pushConstant ({}) ", ADDRESS_REGEX);
+
+        RegexBuilder::new(&format!("{constant_heap_regex}|{push_constant_regex}"))
+            .multi_line(true)
+            .build()
+            .unwrap()
+    });
+
+    fn format_lir(lir: &Lir, rich_ir: &RichIr) -> String {
+        let address_replacements: FxHashMap<_, _> = lir
+            .constant_heap
+            .iter()
+            .map(|constant| {
+                (
+                    format!("{:p}", constant.address()),
+                    format!(
+                        "<replaced address {:016x}>",
+                        HeapData::from(constant).do_hash(),
+                    ),
+                )
+            })
+            .collect();
+
+        // Replace addresses of constants with content hashes since addresses
+        // are random.
+        let lir = Self::ADDRESS_REGEX.replace_all(&rich_ir.text, |captures: &Captures| {
+            let full_match = captures.get(0).unwrap();
+            let full_match_str = full_match.as_str();
+            let address = captures.iter().skip(1).find_map(|it| it).unwrap();
+            format!(
+                "{}{}{}",
+                &full_match_str[..address.start() - full_match.start()],
+                address_replacements[address.as_str()],
+                &full_match_str[address.end() - full_match.start()..],
+            )
+        });
+
+        // Sort the constant heap alphabetically to make the output more
+        // stable.
+        let mut lines = lir.lines().collect_vec();
+        let (constants_start, _) = lines
+            .iter()
+            .find_position(|&&it| it == "# Constant heap")
+            .unwrap();
+        let (constants_end, _) = lines
+            .iter()
+            .find_position(|&&it| it == "# Instructions")
+            .unwrap();
+        lines[constants_start + 1..constants_end - 1].sort();
+        // Re-add the trailing newline
+        lines.push("");
+
+        lines.iter().join("\n")
     }
 }
