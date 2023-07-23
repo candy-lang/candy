@@ -118,6 +118,7 @@ sum iterableOfInt :=
     needs (int.is b)
     a | int.add b
   }
+  | result.unwrapOr 0
 length iterable :=
   needs (is iterable)
   iterable | map { _ -> 1 } | sum | result.unwrapOr 0
