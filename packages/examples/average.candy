@@ -1,0 +1,10 @@
+[int, iterable, list, result] = use "Core"
+[divideTruncating] = int
+
+average a =
+  needs (list.is a)
+  needs (list.length a | int.isPositive)
+  needs (a | iterable.fromList | iterable.all { a -> int.is a })
+  divideTruncating (a | iterable.fromList | iterable.sum | result.unwrapOr 0) (a | list.length)
+
+main environment := average (1, 2, 3)
