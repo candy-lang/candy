@@ -261,8 +261,13 @@ impl PurenessInsights {
         // Then, we can also add asserts here about not visiting them twice.
     }
     pub(super) fn enter_function(&mut self, parameters: &[Id], responsible_parameter: Id) {
+        self.deterministic_definitions
+            .extend(parameters.iter().copied());
+        self.deterministic_definitions.insert(responsible_parameter);
+
         self.pure_definitions.extend(parameters.iter().copied());
-        let _existing = self.pure_definitions.insert(responsible_parameter);
+        self.pure_definitions.insert(responsible_parameter);
+
         // TODO: Handle lifted constants properly.
         // assert!(existing.is_none());
 
@@ -279,7 +284,10 @@ impl PurenessInsights {
                 })
                 .collect();
         }
+        update(&mut self.deterministic_definitions, mapping);
+        update(&mut self.deterministic_functions, mapping);
         update(&mut self.pure_definitions, mapping);
+        update(&mut self.pure_functions, mapping);
         update(&mut self.const_definitions, mapping);
     }
     pub(super) fn include(&mut self, other: &PurenessInsights, mapping: &FxHashMap<Id, Id>) {
@@ -290,7 +298,18 @@ impl PurenessInsights {
         }
 
         // TODO: Can we avoid some of the cloning?
+        insert(
+            &other.deterministic_definitions,
+            mapping,
+            &mut self.deterministic_definitions,
+        );
+        insert(
+            &other.deterministic_functions,
+            mapping,
+            &mut self.deterministic_functions,
+        );
         insert(&other.pure_definitions, mapping, &mut self.pure_definitions);
+        insert(&other.pure_functions, mapping, &mut self.pure_functions);
         insert(
             &other.const_definitions,
             mapping,
