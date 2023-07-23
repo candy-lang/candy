@@ -41,10 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3.5.3
-      - uses: dtolnay/rust-toolchain@0e66bd3e6b38ec0ad5312288c83e47c143e6b09e
-        with:
-          toolchain: ${{ env.RUST_VERSION }}
-          components: clippy, rustfmt
+      - uses: dsherret/rust-toolchain-file@v1
       - uses: Swatinem/rust-cache@v2.5.1
 
       - name: Check Goldens
