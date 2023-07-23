@@ -42,10 +42,9 @@
 
 use crate::{
     builtin_functions::BuiltinFunction,
-    mir::{Expression, Id, VisibleExpressions},
+    mir::{Expression, Id},
 };
 use rustc_hash::{FxHashMap, FxHashSet};
-use tracing::info;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct PurenessInsights {
@@ -130,12 +129,7 @@ impl PurenessInsights {
                 | BuiltinFunction::Print
                 | BuiltinFunction::Try => false,
             },
-            Expression::Function {
-                original_hirs,
-                parameters,
-                responsible_parameter,
-                body,
-            } => body
+            Expression::Function { body, .. } => body
                 .iter()
                 .all(|(_, expression)| self.is_definition_deterministic(expression)),
             Expression::Tag { .. } => true, // either works or panics
@@ -228,12 +222,7 @@ impl PurenessInsights {
                 | BuiltinFunction::Print
                 | BuiltinFunction::Try => false,
             },
-            Expression::Function {
-                original_hirs,
-                parameters,
-                responsible_parameter,
-                body,
-            } => body
+            Expression::Function { body, .. } => body
                 .iter()
                 .all(|(_, expression)| self.is_definition_pure(expression)),
             Expression::Tag { value: None, .. } => true,
