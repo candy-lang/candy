@@ -18,7 +18,7 @@ main := { env ->
   print = { message -> channel.send env.stdout message }
 
   foo =
-    "Hello, world! This is some long text. Bla bla blub.Hello, world! This is some long text. Bla bla blub.Hello, world! This is some long text. Bla bla blub.Hello, world! This is some long text. Bla bla blub.Hello, world! This is some long text. Bla bla blub." | text.characters | iterable.fromList
+    "Hello, world! This is some long text. Bla bla blub." | text.characters | iterable.fromList
   #| splitWhereFirst { c ->
   #  builtins.print c
   #  equals c ","
