@@ -28,7 +28,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::hash_map::Entry;
 
 pub fn eliminate_common_subtrees(body: &mut Body, pureness: &PurenessInsights) {
-    let mut pure_expressions = FxHashMap::default();
+    let mut deterministic_expressions = FxHashMap::default();
     let mut inner_functions: FxHashMap<Id, Vec<Id>> = FxHashMap::default();
     let mut additional_function_hirs: FxHashMap<Id, FxHashSet<hir::Id>> = FxHashMap::default();
     let mut updated_references: FxHashMap<Id, Id> = FxHashMap::default();
@@ -40,7 +40,7 @@ pub fn eliminate_common_subtrees(body: &mut Body, pureness: &PurenessInsights) {
             }
         });
 
-        if !pureness.is_definition_pure(expression) {
+        if !pureness.is_definition_deterministic(expression) {
             continue;
         }
 
@@ -54,7 +54,7 @@ pub fn eliminate_common_subtrees(body: &mut Body, pureness: &PurenessInsights) {
             );
         }
 
-        let existing_entry = pure_expressions.entry(normalized);
+        let existing_entry = deterministic_expressions.entry(normalized);
         match existing_entry {
             Entry::Occupied(canonical_id) => {
                 let canonical_id = *canonical_id.get();
