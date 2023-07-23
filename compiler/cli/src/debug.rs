@@ -24,10 +24,10 @@ use clap::{Parser, ValueHint};
 use colored::{Color, Colorize};
 use diffy::{create_patch, PatchFormatter};
 use itertools::Itertools;
+use lazy_static::lazy_static;
 use regex::{Captures, Regex, RegexBuilder};
 use rustc_hash::FxHashMap;
 use std::{
-    cell::LazyCell,
     env, fs, io,
     path::{Path, PathBuf},
 };
@@ -340,19 +340,7 @@ impl GoldPath {
 
         // Replace addresses of constants with content hashes since addresses
         // are random.
-        static address_regex: LazyCell<Regex> = LazyCell::new(|| {
-            const ADDRESS_REGEX: &str = "0x[0-9a-f]{1,16}";
-            // Addresses of constants in the constant heap.
-            let constant_heap_regex = format!(r"^({}): ", ADDRESS_REGEX);
-            // Addresses of constants in pushConstant instructions.
-            let push_constant_regex = format!(r"^ *\d+: pushConstant ({}) ", ADDRESS_REGEX);
-
-            RegexBuilder::new(&format!("{constant_heap_regex}|{push_constant_regex}"))
-                .multi_line(true)
-                .build()
-                .unwrap()
-        });
-        let lir = address_regex.replace_all(&rich_ir.text, |captures: &Captures| {
+        let lir = ADDRESS_REGEX.replace_all(&rich_ir.text, |captures: &Captures| {
             let full_match = captures.get(0).unwrap();
             let full_match_str = full_match.as_str();
             let address = captures.iter().skip(1).find_map(|it| it).unwrap();
@@ -381,4 +369,18 @@ impl GoldPath {
 
         lines.iter().join("\n")
     }
+}
+
+lazy_static! {
+    static ref ADDRESS_REGEX: Regex = {
+        const ADDRESS: &str = "0x[0-9a-f]{1,16}";
+        // Addresses of constants in the constant heap.
+        let constant_heap = format!(r"^({ADDRESS}): ");
+        // Addresses of constants in pushConstant instructions.
+        let push_constant = format!(r"^ *\d+: pushConstant ({ADDRESS}) ");
+        RegexBuilder::new(&format!("{constant_heap}|{push_constant}"))
+            .multi_line(true)
+            .build()
+            .unwrap()
+    };
 }
