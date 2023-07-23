@@ -2,8 +2,7 @@ use super::input::Input;
 use crate::{runner::RunResult, values::InputGeneration};
 use candy_vm::heap::{Heap, Text};
 use itertools::Itertools;
-use rand::{rngs::ThreadRng, seq::SliceRandom, Rng, SeedableRng};
-use rand_chacha::ChaCha20Rng;
+use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{cell::RefCell, rc::Rc};
 
@@ -24,9 +23,8 @@ impl InputPool {
             .iter()
             .map(|symbol| symbol.clone_to_heap(&mut heap).try_into().unwrap())
             .collect_vec();
-        if symbols.is_empty() {
-            symbols.push(Text::create(&mut heap, "Nothing"));
-        }
+        symbols.push(Text::create(&mut heap, "True"));
+        symbols.push(Text::create(&mut heap, "False"));
 
         Self {
             heap: Rc::new(RefCell::new(heap)),
@@ -65,12 +63,22 @@ impl InputPool {
     }
 
     pub fn interesting_inputs(&self) -> Vec<Input> {
-        let mut rng = ChaCha20Rng::seed_from_u64(0);
-        let results_and_scores = self.results_and_scores.iter().collect_vec();
-        results_and_scores
-            .choose_multiple_weighted(&mut rng, 3, |(_, (_, score))| *score)
-            .unwrap()
-            .map(|(input, _)| (*input).clone())
+        self.results_and_scores
+            .iter()
+            .sorted_by(
+                |(_, (result_a, mut score_a)), (_, (result_b, mut score_b))| {
+                    if matches!(result_a, RunResult::Done { .. }) {
+                        score_a += 50.;
+                    }
+                    if matches!(result_b, RunResult::Done { .. }) {
+                        score_b += 50.;
+                    }
+                    score_a.partial_cmp(&score_b).unwrap()
+                },
+            )
+            .rev()
+            .take(3)
+            .map(|(input, _)| input.clone())
             .collect_vec()
     }
 
