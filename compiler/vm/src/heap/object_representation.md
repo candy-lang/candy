@@ -41,7 +41,7 @@ For larger values, a pointer to a heap object containing an integer of (practica
 Each heap object has the following structure:
 
 - one header word
-- one word containing the reference count as an unsigned integer (`u64`) iff `r == 1`
+- iff `r == 1`: one word containing the reference count as an unsigned integer (`u64`)
 - zero to many words containing the actual data
   - for now, there are some objects whose content data length isn't a multiple of the word size since they use Rust's representation for simplicity
 
