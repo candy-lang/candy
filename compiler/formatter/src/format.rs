@@ -1185,6 +1185,7 @@ mod test {
         test(" ", "");
         test("foo", "foo\n");
         test("foo\n", "foo\n");
+        test("'\x04\n", "'\x04\n");
 
         // Consecutive newlines
 

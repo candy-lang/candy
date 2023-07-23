@@ -143,6 +143,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "candy_formatter_fuzzer"
+version = "0.0.0"
+dependencies = [
+ "candy_formatter",
+ "candy_frontend",
+ "lazy_static",
+ "libfuzzer-sys",
+ "salsa",
+]
+
+[[package]]
 name = "candy_frontend"
 version = "0.1.0"
 dependencies = [
@@ -179,7 +190,6 @@ dependencies = [
  "itertools 0.11.0",
  "num-bigint",
  "rand",
- "rand_chacha",
  "rustc-hash",
  "tracing",
 ]

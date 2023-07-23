@@ -1,7 +1,6 @@
-use derive_more::{From, Sub};
+use derive_more::{Add, From, Sub};
 use extension_trait::extension_trait;
 use std::{
-    cmp::Ordering,
     fmt::{self, Display, Formatter},
     iter::Sum,
     ops::{Add, AddAssign},
@@ -33,7 +32,7 @@ impl Display for Indentation {
 
 // SinglelineWidth
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Sub)]
+#[derive(Add, Clone, Copy, Debug, Default, Eq, From, Ord, PartialEq, PartialOrd, Sub)]
 pub struct SinglelineWidth(usize);
 impl SinglelineWidth {
     pub const SPACE: SinglelineWidth = SinglelineWidth(1);
@@ -47,37 +46,10 @@ impl SinglelineWidth {
         self == 0.into()
     }
 }
-impl From<usize> for SinglelineWidth {
-    fn from(width: usize) -> Self {
-        SinglelineWidth(width)
-    }
-}
-impl Add<SinglelineWidth> for SinglelineWidth {
-    type Output = SinglelineWidth;
-    fn add(self, rhs: SinglelineWidth) -> Self::Output {
-        SinglelineWidth(self.0 + rhs.0)
-    }
-}
 impl Add<Width> for SinglelineWidth {
     type Output = Width;
     fn add(self, rhs: Width) -> Self::Output {
         Width::from(self) + rhs
-    }
-}
-#[allow(clippy::derivable_impls)] // The derived impl is not const
-impl Default for SinglelineWidth {
-    fn default() -> Self {
-        Self(Default::default())
-    }
-}
-impl Ord for SinglelineWidth {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.0.cmp(&other.0)
-    }
-}
-impl PartialOrd for SinglelineWidth {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.0.partial_cmp(&other.0)
     }
 }
 

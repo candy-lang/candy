@@ -91,7 +91,6 @@ impl Insight {
                 function_coverage.relative_coverage()
             }
             Status::FoundPanic { .. } => 1., // TODO: not correct
-            Status::TotalCoverageButNoPanic => 1.,
         };
         let function_name = id.function_name();
         let interesting_inputs = fuzzer.input_pool().interesting_inputs();
