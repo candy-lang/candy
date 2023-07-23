@@ -349,7 +349,7 @@ impl<T: FiberTracer> Fiber<T> {
             Instruction::CreateTag { symbol } => {
                 let value = self.pop_from_data_stack();
                 symbol.dup();
-                let tag = Tag::create(&mut self.heap, true, *symbol, *value);
+                let tag = Tag::create(&mut self.heap, true, *symbol, value);
                 self.push_to_data_stack(tag);
             }
             Instruction::CreateList { num_items } => {
@@ -388,7 +388,7 @@ impl<T: FiberTracer> Fiber<T> {
                 self.push_to_data_stack(function);
             }
             Instruction::PushConstant(constant) => {
-                self.push_to_data_stack(constant);
+                self.push_to_data_stack(*constant);
             }
             Instruction::PushFromStack(offset) => {
                 let address = self.get_from_data_stack(*offset);
