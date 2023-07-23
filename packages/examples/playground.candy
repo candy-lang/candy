@@ -1,0 +1,7 @@
+[int, bool] = use "Core"
+
+not a =
+  needs (bool.is a)
+  a %
+    True -> False
+    False -> True

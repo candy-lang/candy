@@ -98,6 +98,15 @@ impl Expression {
     /// considered equal. This method normalizes expressions by replacing all
     /// locally defined IDs.
     fn normalize(&mut self) {
+        // The responsible parameter can't change the control flow of the
+        // function, only who's responsible for panics. Because calls to
+        // deterministic either both produce the same result or both panic in
+        // the same way, we can only keep the first and consider the result
+        // equal.
+        if let Expression::Call { responsible, .. } = self {
+            *responsible = Id::from_usize(0);
+        }
+
         let mut generator = IdGenerator::start_at(
             self.captured_ids()
                 .into_iter()
