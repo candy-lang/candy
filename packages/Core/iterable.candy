@@ -121,7 +121,7 @@ sum iterableOfInt :=
   | result.unwrapOr 0
 length iterable :=
   needs (is iterable)
-  iterable | map { _ -> 1 } | sum | result.unwrapOr 0
+  iterable | map { _ -> 1 } | sum
 
 all iterable tester :=
   needs (is iterable)
