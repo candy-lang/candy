@@ -176,7 +176,6 @@ pub fn print<T>(
                 "…".to_string()
             }
         }
-        // TODO: structs ignore the max_length for now.
         PrintValue::Struct(entries) => {
             // - all entries: `[Foo: Bar, Baz: 2]`
             // - all keys, some values: `[Foo: Bar, Baz: …, Quz: …]`
@@ -184,27 +183,112 @@ pub fn print<T>(
             // - no items shown: `[struct with 2 entries]`
             // - `…`
 
-            let mut entries = entries
-                .into_iter()
-                .map(|(key, value)| {
-                    print(key, Precedence::Low, max_length, visitor)
-                        .map(|stringified_key| (stringified_key, value))
-                })
-                .collect::<Option<Vec<_>>>()?;
-            entries.sort_by(|(a, _), (b, _)| a.cmp(b));
-            let len = entries.len();
+            if !max_length.fits(2) {
+                return Some("…".to_string());
+            }
 
-            let mut string = "[".to_string();
-            for (i, (key, value)) in entries.into_iter().enumerate() {
-                string.push_str(&key);
-                string.push_str(": ");
-                string.push_str(&print(value, Precedence::Low, max_length, visitor)?);
-                if i < len - 1 {
-                    string.push_str(", ");
+            if entries.is_empty() {
+                return Some("[]".to_string());
+            }
+
+            let num_entries = entries.len();
+            let mut keys = vec![];
+            let mut values = vec![];
+            for (key, value) in entries {
+                keys.push(key);
+                values.push(value);
+            }
+
+            let mut texted_keys = vec![];
+            let mut total_keys_length = 0;
+            for key in keys {
+                let key = print(key, Precedence::Low, MaxLength::Unlimited, visitor)?;
+                total_keys_length += key.len();
+                texted_keys.push(key);
+
+                // surrounding brackets, keys, and for each key colon + space + dots + comma + space
+                if !max_length.fits(total_keys_length + texted_keys.len() * 5) {
+                    break;
                 }
             }
-            string.push(']');
-            string
+
+            if texted_keys.len() < num_entries
+                || !max_length.fits(total_keys_length + texted_keys.len() * 5)
+            {
+                // Not all keys fit. Try to remove the back ones, showing "+ X more" instead.
+                while let Some(popped) = texted_keys.pop() {
+                    total_keys_length -= popped.len();
+                    let extra_text = format!("+ {} more", num_entries - texted_keys.len());
+                    if max_length.fits(total_keys_length + texted_keys.len() * 5 + extra_text.len())
+                    {
+                        return Some(format!(
+                            "[{}, {}]",
+                            texted_keys
+                                .into_iter()
+                                .map(|key| format!("{key}: …"))
+                                .join(", "),
+                            extra_text
+                        ));
+                    }
+                }
+
+                let summary = format!("[struct with {} entries]", num_entries);
+                return Some(if max_length.fits(summary.len()) {
+                    summary
+                } else {
+                    "…".to_string()
+                });
+            }
+
+            let mut texted_values = vec![];
+            let mut total_values_length = num_entries; // dots for every value
+            for value in values {
+                let value = print(value, Precedence::Low, MaxLength::Unlimited, visitor)?;
+                total_values_length += value.len() - 1; // remove the dots, add the value
+                texted_values.push(value);
+
+                if !max_length.fits(total_keys_length + texted_keys.len() * 4 + total_values_length)
+                {
+                    break;
+                }
+            }
+
+            if texted_values.len() == num_entries
+                && max_length.fits(total_keys_length + texted_keys.len() * 4 + total_values_length)
+            {
+                // Everything fits!
+                return Some(format!(
+                    "[{}]",
+                    texted_keys
+                        .into_iter()
+                        .zip(texted_values)
+                        .map(|(key, value)| format!("{key}: {value}"))
+                        .join(", ")
+                ));
+            }
+
+            // Not all values fit. Try to remove the back ones.
+            while let Some(popped) = texted_values.pop() {
+                total_values_length -= popped.len() - 1; // replace with dots
+                if max_length.fits(total_keys_length + total_values_length + num_entries * 4) {
+                    return Some(format!(
+                        "[{}]",
+                        texted_keys
+                            .into_iter()
+                            .zip_longest(texted_values)
+                            .map(|zipped| match zipped {
+                                itertools::EitherOrBoth::Both(key, value) =>
+                                    format!("{key}: {value}"),
+                                itertools::EitherOrBoth::Left(key) => format!("{key}: …"),
+                                itertools::EitherOrBoth::Right(_) => unreachable!(),
+                            })
+                            .join(", "),
+                    ));
+                }
+            }
+
+            // We know that at least the version fits where all values are just dots.
+            unreachable!()
         }
         PrintValue::SendPort => match precedence {
             Precedence::High => "(send port)",
