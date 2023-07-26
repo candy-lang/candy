@@ -5,6 +5,7 @@ use candy_frontend::{
     ast_to_hir::AstToHir,
     hir::{Expression, HirDb, Id},
     module::Module,
+    position::Offset,
     print::{MaxLength, Precedence},
 };
 use candy_fuzzer::{Fuzzer, RunResult, Status};
@@ -66,12 +67,15 @@ impl Insight {
                     return None;
                 }
 
-                value.to_debug_text(Precedence::Low, MaxLength::Limited(20))
+                value.to_debug_text(Precedence::Low, MaxLength::Limited(60))
             }
             Expression::PatternIdentifierReference { .. } => {
                 let body = db.containing_body_of(id.clone());
                 let name = body.identifiers.get(&id).unwrap();
-                format!("{name} = {value}")
+                format!(
+                    "{name} = {}",
+                    value.to_debug_text(Precedence::Low, MaxLength::Limited(60))
+                )
             }
             _ => return None,
         };
