@@ -5,9 +5,13 @@ use candy_frontend::{
     ast_to_hir::AstToHir,
     hir::{Expression, HirDb, Id},
     module::Module,
+    print::{MaxLength, Precedence},
 };
 use candy_fuzzer::{Fuzzer, RunResult, Status};
-use candy_vm::{fiber::Panic, heap::InlineObject};
+use candy_vm::{
+    fiber::Panic,
+    heap::{InlineObject, ToDebugText},
+};
 use extension_trait::extension_trait;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
 use serde::{Deserialize, Serialize};
@@ -62,7 +66,7 @@ impl Insight {
                     return None;
                 }
 
-                value.to_string()
+                value.to_debug_text(Precedence::Low, MaxLength::Limited(20))
             }
             Expression::PatternIdentifierReference { .. } => {
                 let body = db.containing_body_of(id.clone());

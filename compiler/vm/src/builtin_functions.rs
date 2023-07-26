@@ -4,13 +4,13 @@ use crate::{
     fiber::{Fiber, Panic, Status},
     heap::{
         Data, Function, Heap, HirId, InlineObject, Int, List, ReceivePort, SendPort, Struct, Tag,
-        Text,
+        Text, ToDebugText,
     },
     tracer::FiberTracer,
 };
 use candy_frontend::{
     builtin_functions::BuiltinFunction,
-    print::{print, MaxLength, Precedence, PrintValue},
+    print::{MaxLength, Precedence},
 };
 use itertools::Itertools;
 use num_bigint::BigInt;
@@ -495,40 +495,10 @@ impl Heap {
     #[allow(clippy::wrong_self_convention)]
     fn to_debug_text(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Any| {
-            let formatted = print(
-                value.object,
-                Precedence::Low,
-                MaxLength::Unlimited,
-                &|value| {
-                    Some(match value.into() {
-                        Data::Int(int) => PrintValue::Int((*int.get()).clone()),
-                        Data::Tag(tag) => PrintValue::Tag {
-                            symbol: tag.symbol().get().to_string(),
-                            value: tag.value(),
-                        },
-                        Data::Text(text) => PrintValue::Text(text.get().to_string()),
-                        Data::List(list) => {
-                            let mut items = vec![];
-                            for i in 0..list.len() {
-                                items.push(list.get(i));
-                            }
-                            PrintValue::List(items)
-                        }
-                        Data::Struct(struct_) => PrintValue::Struct(
-                            struct_
-                                .iter()
-                                .map(|(_, key, value)| (key, value))
-                                .collect_vec(),
-                        ),
-                        Data::HirId(_) => unreachable!(),
-                        Data::Function(_) => PrintValue::Function,
-                        Data::Builtin(_) => PrintValue::Function,
-                        Data::SendPort(_) => PrintValue::SendPort,
-                        Data::ReceivePort(_) => PrintValue::ReceivePort,
-                    })
-                },
-            );
-            Return(Text::create(self, &formatted.unwrap()).into())
+            let formatted = value
+                .object
+                .to_debug_text(Precedence::Low, MaxLength::Unlimited);
+            Return(Text::create(self, &formatted).into())
         })
     }
 
