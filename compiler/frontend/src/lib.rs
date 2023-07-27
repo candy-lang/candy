@@ -1,7 +1,10 @@
-#![feature(box_patterns)]
-#![feature(entry_insert)]
-#![feature(io_error_more)]
-#![feature(let_chains)]
+#![feature(
+    box_patterns,
+    entry_insert,
+    hasher_prefixfree_extras,
+    io_error_more,
+    let_chains
+)]
 
 pub mod ast;
 pub mod ast_to_hir;
