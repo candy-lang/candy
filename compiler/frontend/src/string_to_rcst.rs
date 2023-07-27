@@ -116,7 +116,7 @@ mod parse {
     // mid-writing after putting the opening bracket of a struct.
 
     use crate::{
-        cst::{CstError, CstKind, IsMultiline},
+        cst::{Cst, CstError, CstKind, IsMultiline},
         rcst::{Rcst, SplitOuterTrailingWhitespace},
     };
     use itertools::Itertools;
@@ -728,17 +728,38 @@ mod parse {
         let mut parts = vec![];
         let closing = loop {
             if let Some((input_after_newline, newline)) = newline(input) {
+                input = input_after_newline;
                 push_line_to_parts(&mut line, &mut parts);
-                let (i, mut whitespace) = whitespaces_and_newlines(input, indentation + 1, false);
-                input = i;
-                parts.append(&mut whitespace);
-                if let Some('\n') = input.chars().next() {
-                    break CstKind::Error {
-                        unparsable_input: "".to_string(),
-                        error: CstError::TextNotSufficientlyIndented,
-                    };
+                parts.push(newline);
+                if let Some((i, indentation)) = leading_indentation(input, indentation + 1) {
+                    input = i;
+                    parts.push(indentation);
+                    continue;
+                } else if let Some((
+                    i,
+                    Cst {
+                        kind: CstKind::Whitespace(whitespace),
+                        ..
+                    },
+                )) = single_line_whitespace(input)
+                {
+                    input = i;
+                    parts.push(
+                        CstKind::Error {
+                            unparsable_input: whitespace,
+                            error: CstError::TextNotSufficientlyIndented,
+                        }
+                        .into(),
+                    );
+                } else {
+                    parts.push(
+                        CstKind::Error {
+                            unparsable_input: "".to_string(),
+                            error: CstError::TextNotSufficientlyIndented,
+                        }
+                        .into(),
+                    );
                 }
-                continue;
             }
 
             match input.chars().next() {
@@ -752,6 +773,23 @@ mod parse {
                         Some((input_after_single_quotes, closing_single_quotes)) => {
                             input = input_after_single_quotes;
                             push_line_to_parts(&mut line, &mut parts);
+                            // Allow closing brackets to be indented one step less then the text
+                            match parts.pop() {
+                                Some(Cst {
+                                    kind:
+                                        CstKind::Error {
+                                            unparsable_input,
+                                            error: CstError::TextNotSufficientlyIndented,
+                                        },
+                                    ..
+                                }) if whitespace_indentation_score(unparsable_input.as_str())
+                                    == indentation =>
+                                {
+                                    parts.push(CstKind::Whitespace(unparsable_input).into())
+                                }
+                                Some(cst) => parts.push(cst),
+                                _ => {}
+                            };
                             break CstKind::ClosingText {
                                 closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
                                 closing_single_quotes,
