@@ -53,7 +53,13 @@ impl<D: Clone> UnwrapWhitespaceAndComment for Cst<D> {
                 closing,
             } => CstKind::Text {
                 opening: opening.unwrap_whitespace_and_comment(),
-                parts: parts.unwrap_whitespace_and_comment(),
+                parts: parts
+                    .iter()
+                    .filter(|it| {
+                        !it.is_whitespace_or_comment() || matches!(it.kind, CstKind::Newline(_))
+                    })
+                    .map(|it| it.unwrap_whitespace_and_comment())
+                    .collect(),
                 closing: closing.unwrap_whitespace_and_comment(),
             },
             kind @ CstKind::TextPart(_) => kind.clone(),

@@ -166,13 +166,22 @@ impl LoweringContext {
                 };
 
                 let mut lowered_parts = vec![];
-                for part in parts {
+
+                for (i, part) in parts.iter().enumerate() {
                     match &part.kind {
                         CstKind::TextPart(text) => {
                             let string = self.create_string(part.data.id, text.clone());
                             let text_part =
                                 self.create_ast(part.data.id, AstKind::TextPart(TextPart(string)));
                             lowered_parts.push(text_part);
+                        },
+                        CstKind::Newline(_) => {
+                            if 0 < i && i < parts.len() - 1 {
+                                let string = self.create_string(part.data.id, "\n".to_string());
+                                let text_part =
+                                    self.create_ast(part.data.id, AstKind::TextPart(TextPart(string)));
+                                lowered_parts.push(text_part);
+                            }
                         },
                         CstKind::TextInterpolation {
                             opening_curly_braces,
