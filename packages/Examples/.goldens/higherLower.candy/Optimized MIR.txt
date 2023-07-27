@@ -246,11 +246,11 @@ $237 = "`text | typeIs Text` was not satisfied"
 $238 = "`text.is message` was not satisfied"
 $239 = "`then | getArgumentCount | equals 0` was not satisfied"
 $240 = "`then | typeIs Function` was not satisfied"
-# anonymous:$generated::needs:isConditionTrue:then
+# Builtins::ifElse:1:case-0:matched, Builtins::isLessThanOrEqualTo:19:case-0:matched, Builtins::isNonNegative:13:case-0:matched, Builtins::not:1:case-1:matched, Core:bool:is:1:case-0:matched, Core:bool:lazyOr:18:case-0:matched, Core:bool:not:6:case-1:matched, anonymous:$generated::needs:isConditionTrue:then
 $241 = { (responsible $242) ->
   $243 = $183
 }
-# anonymous:$generated::needs:isConditionBool:then
+# Core::31:isMatch:then, Core::42:isMatch:then, Core::53:isMatch:then, Core::64:isMatch:then, Core::141:isMatch:then, Core::196:isMatch:then, Core::207:isMatch:then, Core:bool:9:isMatch:then, Core:channel:31:isMatch:then, Core:channel:42:isMatch:then, Core:check:20:isMatch:then, Core:concurrency:42:isMatch:then, Core:controlFlow:if:27, Core:controlFlow:31:isMatch:then, Core:controlFlow:53:isMatch:then, Core:fixedDecimal:20:isMatch:then, Core:fixedDecimal:31:isMatch:then, Core:fixedDecimal:42:isMatch:then, Core:fixedDecimal:53:isMatch:then, Core:fixedDecimal:86:isMatch:then, Core:function:20:isMatch:then, Core:int:31:isMatch:then, Core:int:42:isMatch:then, Core:int:53:isMatch:then, Core:iterable:fromList:18:1:isMatch:then, Core:iterable:generateWithState:14:0:11:1:isMatch:then, Core:iterable:map:19:11:1:isMatch:then, Core:iterable:reduceLeft:38:1:isMatch:then, Core:iterable:take:33:1:isMatch:then, Core:iterable:takeWhile:2:11:1:isMatch:then, Core:iterable:withIndex:11:1:isMatch:then, Core:iterable:withIndex:11:14:1:isMatch:then, Core:iterable:20:isMatch:then, Core:iterable:31:isMatch:then, Core:iterable:88:11:1:isMatch:then, Core:iterable:91:2:11:1:isMatch:then, Core:iterable:94:6:21, Core:list:generate:60:1:isMatch:then, Core:list:31:isMatch:then, Core:list:42:isMatch:then, Core:mutable:20:isMatch:then, Core:mutable:31:isMatch:then, Core:result:20:isMatch:then, Core:result:31:isMatch:then, Core:struct:20:isMatch:then, Core:tag:31:isMatch:then, Core:text:31:isMatch:then, Core:text:42:isMatch:then, Core:type:20:isMatch:then, Examples:higherLower:9:isMatch:then, anonymous:$generated::needs:condition:then, anonymous:$generated::needs:isConditionBool:then, anonymous:$generated::needs:isReasonText:then
 $244 = { (responsible $245) ->
   $246 = $174
 }
@@ -281,11 +281,11 @@ $247 = { $248 $249 $250 (+ responsible $251) ->
   $270 = call $148 with $248 $244 $267 ($142 is responsible)
 }
 $271 = ($172)
-# Builtins::not:1:equals:then
+# Builtins::ifElse:1:equals:then, Builtins::isLessThanOrEqualTo:19:equals:then, Builtins::isNonNegative:13:equals:then, Builtins::not:1:equals:then, Core:bool:is:1:equals:then, Core:bool:lazyAnd:18:equals:then, Core:bool:lazyOr:18:equals:then, Core:bool:not:6:equals:then, Core:mutable:inScope:13:18:17:equals:then
 $272 = { (responsible $273) ->
   $274 = $271
 }
-# Builtins::not:1:case-0:matched
+# Builtins::isLessThanOrEqualTo:19:case-1:matched, Builtins::isNonNegative:13:case-1:matched, Builtins::not:1:case-0:matched, Core:bool:lazyAnd:18:case-1:matched, Core:bool:not:6:case-0:matched, Core:function:is0:12, Core:function:is1:12, Core:function:is2:12, Core:function:is3:12, Core:function:is4:12, Core:function:is5:12, Core:list:isValidIndex:21, Core:list:isValidInsertIndex:21
 $275 = { (responsible $276) ->
   $277 = $166
 }

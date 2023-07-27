@@ -89,11 +89,11 @@ $80 = "`function | typeIs Function` was not satisfied"
 $81 = "`minuend | typeIs Int` was not satisfied"
 $82 = "`then | getArgumentCount | equals 0` was not satisfied"
 $83 = "`then | typeIs Function` was not satisfied"
-# anonymous:$generated::needs:isConditionTrue:then
+# Builtins::ifElse:1:case-0:matched, Builtins::isLessThanOrEqualTo:19:case-0:matched, Builtins::isNonNegative:13:case-0:matched, Builtins::not:1:case-1:matched, anonymous:$generated::needs:isConditionTrue:then
 $84 = { (responsible $85) ->
   $86 = $61
 }
-# anonymous:$generated::needs:isConditionBool:then
+# anonymous:$generated::needs:condition:then, anonymous:$generated::needs:isConditionBool:then, anonymous:$generated::needs:isReasonText:then
 $87 = { (responsible $88) ->
   $89 = $57
 }
@@ -124,7 +124,7 @@ $90 = { $91 $92 $93 (+ responsible $94) ->
   $113 = call $37 with $91 $87 $110 ($34 is responsible)
 }
 $114 = ($55)
-# Builtins::not:1:equals:then
+# Builtins::ifElse:1:equals:then, Builtins::isLessThanOrEqualTo:19:equals:then, Builtins::isNonNegative:13:equals:then, Builtins::not:1:equals:then
 $115 = { (responsible $116) ->
   $117 = $114
 }

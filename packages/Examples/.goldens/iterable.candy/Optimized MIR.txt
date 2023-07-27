@@ -348,11 +348,11 @@ $339 = "t"
 $340 = "u"
 $341 = "w"
 $342 = "x"
-# anonymous:$generated::needs:isConditionTrue:then
+# Builtins::ifElse:1:case-0:matched, Builtins::isLessThanOrEqualTo:19:case-0:matched, Builtins::isNonNegative:13:case-0:matched, Builtins::not:1:case-1:matched, Core:bool:is:1:case-0:matched, Core:bool:lazyOr:18:case-0:matched, Core:bool:not:6:case-1:matched, anonymous:$generated::needs:isConditionTrue:then
 $343 = { (responsible $344) ->
   $345 = $262
 }
-# anonymous:$generated::needs:isConditionBool:then
+# Core::31:isMatch:then, Core::42:isMatch:then, Core::53:isMatch:then, Core::64:isMatch:then, Core::141:isMatch:then, Core::196:isMatch:then, Core::207:isMatch:then, Core:bool:9:isMatch:then, Core:channel:31:isMatch:then, Core:channel:42:isMatch:then, Core:check:20:isMatch:then, Core:concurrency:42:isMatch:then, Core:controlFlow:if:27, Core:controlFlow:31:isMatch:then, Core:controlFlow:53:isMatch:then, Core:fixedDecimal:20:isMatch:then, Core:fixedDecimal:31:isMatch:then, Core:fixedDecimal:42:isMatch:then, Core:fixedDecimal:53:isMatch:then, Core:fixedDecimal:86:isMatch:then, Core:function:20:isMatch:then, Core:int:31:isMatch:then, Core:int:42:isMatch:then, Core:int:53:isMatch:then, Core:iterable:fromList:18:1:isMatch:then, Core:iterable:generateWithState:14:0:11:1:isMatch:then, Core:iterable:map:19:11:1:isMatch:then, Core:iterable:reduceLeft:38:1:isMatch:then, Core:iterable:take:33:1:isMatch:then, Core:iterable:takeWhile:2:11:1:isMatch:then, Core:iterable:withIndex:11:1:isMatch:then, Core:iterable:withIndex:11:14:1:isMatch:then, Core:iterable:20:isMatch:then, Core:iterable:31:isMatch:then, Core:iterable:88:11:1:isMatch:then, Core:iterable:91:2:11:1:isMatch:then, Core:iterable:94:6:21, Core:list:generate:60:1:isMatch:then, Core:list:31:isMatch:then, Core:list:42:isMatch:then, Core:mutable:20:isMatch:then, Core:mutable:31:isMatch:then, Core:result:20:isMatch:then, Core:result:31:isMatch:then, Core:struct:20:isMatch:then, Core:tag:31:isMatch:then, Core:text:31:isMatch:then, Core:text:42:isMatch:then, Core:type:20:isMatch:then, Examples:iterable:split:9:29, Examples:iterable:20:isMatch:then, anonymous:$generated::needs:condition:then, anonymous:$generated::needs:isConditionBool:then, anonymous:$generated::needs:isReasonText:then
 $346 = { (responsible $347) ->
   $348 = $253
 }
@@ -383,11 +383,11 @@ $349 = { $350 $351 $352 (+ responsible $353) ->
   $372 = call $224 with $350 $346 $369 ($220 is responsible)
 }
 $373 = ($251)
-# Builtins::not:1:equals:then
+# Builtins::ifElse:1:equals:then, Builtins::isLessThanOrEqualTo:19:equals:then, Builtins::isNonNegative:13:equals:then, Builtins::not:1:equals:then, Core:bool:is:1:equals:then, Core:bool:lazyAnd:18:equals:then, Core:bool:lazyOr:18:equals:then, Core:bool:not:6:equals:then, Core:mutable:inScope:13:18:17:equals:then
 $374 = { (responsible $375) ->
   $376 = $373
 }
-# Builtins::not:1:case-0:matched
+# Builtins::isLessThanOrEqualTo:19:case-1:matched, Builtins::isNonNegative:13:case-1:matched, Builtins::not:1:case-0:matched, Core:bool:lazyAnd:18:case-1:matched, Core:bool:not:6:case-0:matched, Core:function:is0:12, Core:function:is1:12, Core:function:is2:12, Core:function:is3:12, Core:function:is4:12, Core:function:is5:12, Core:list:isValidIndex:21, Core:list:isValidInsertIndex:21
 $377 = { (responsible $378) ->
   $379 = $241
 }
@@ -1757,7 +1757,7 @@ $1528 = { $1529 $1530 (+ responsible $1531) ->
   $1630 = call $1621 with $1621 $1529 ($88 is responsible)
 }
 $1631 = Error $238
-# Core:iterable:generate:50:5
+# Core:iterable:fromList:18:16, Core:iterable:generate:50:5, Core:iterable:takeWhile:2:11:8, Core:iterable:windowed:67:30
 $1632 = { (responsible $1633) ->
   $1634 = $1631
 }

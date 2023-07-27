@@ -101,6 +101,15 @@ pub fn eliminate_common_subtrees(body: &mut Body, pureness: &PurenessInsights) {
             }
         }
     }
+
+
+    body.visit_mut(&mut |id, expression, _| {
+        if let Expression::Function { original_hirs, .. } = expression 
+                && let Some(additional_hirs) = additional_function_hirs.remove(&id) {
+            original_hirs.extend(additional_hirs);
+        }
+        VisitorResult::Continue
+    });
 }
 
 impl Expression {

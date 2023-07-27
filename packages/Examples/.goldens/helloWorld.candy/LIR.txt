@@ -49,11 +49,11 @@
 <replaced address f0ef39785fcb0b9b>: Text
 
 # Instructions
-# anonymous:$generated::needs:isConditionTrue:then
+# Builtins::ifElse:1:case-0:matched, anonymous:$generated::needs:isConditionTrue:then, Builtins::isLessThanOrEqualTo:19:case-0:matched, Builtins::isNonNegative:13:case-0:matched, Builtins::not:1:case-1:matched
   0: pushConstant <replaced address 4b5b166fed08cc5e> True
   1: popMultipleBelowTop 1
   2: return
-# anonymous:$generated::needs:isConditionBool:then
+# anonymous:$generated::needs:isReasonText:then, anonymous:$generated::needs:isConditionBool:then, anonymous:$generated::needs:condition:then
   3: pushConstant <replaced address 5ec09bb09e481dad> Nothing
   4: popMultipleBelowTop 1
   5: return
