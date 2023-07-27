@@ -6,7 +6,10 @@ use super::{
 };
 use crate::{
     channel::ChannelId,
-    heap::{HirId, InlineObject, List, Pointer, ReceivePort, SendPort, Struct, Tag},
+    heap::{
+        DisplayWithSymbolTable, HirId, InlineObject, List, Pointer, ReceivePort, SendPort, Struct,
+        SymbolId, SymbolTable, Tag,
+    },
     tracer::{FiberTracer, TracedFiberEnded, TracedFiberEndedReason},
     Lir,
 };
@@ -224,8 +227,14 @@ impl<T: FiberTracer> Fiber<T> {
         assert!(self.status.is_creating_channel());
 
         let fields = [
-            ("SendPort", SendPort::create(&mut self.heap, channel)),
-            ("ReceivePort", ReceivePort::create(&mut self.heap, channel)),
+            (
+                SymbolId::SEND_PORT,
+                SendPort::create(&mut self.heap, channel),
+            ),
+            (
+                SymbolId::RECEIVE_PORT,
+                ReceivePort::create(&mut self.heap, channel),
+            ),
         ];
         let struct_ = Struct::create_with_symbol_keys(&mut self.heap, true, fields);
         self.push_to_data_stack(struct_);
@@ -311,11 +320,11 @@ impl<T: FiberTracer> Fiber<T> {
                 .expect("invalid instruction pointer");
             self.next_instruction = Some(current_instruction.next());
 
-            self.run_instruction(instruction);
+            self.run_instruction(&lir.symbol_table, instruction);
             execution_controller.instruction_executed(id, self, current_instruction);
         }
     }
-    pub fn run_instruction(&mut self, instruction: &Instruction) {
+    pub fn run_instruction(&mut self, symbol_table: &SymbolTable, instruction: &Instruction) {
         if TRACE {
             trace!("Running instruction: {instruction:?}");
             let current_instruction = self.next_instruction.unwrap();
@@ -346,10 +355,9 @@ impl<T: FiberTracer> Fiber<T> {
         }
 
         match instruction {
-            Instruction::CreateTag { symbol } => {
+            Instruction::CreateTag { symbol_id } => {
                 let value = self.pop_from_data_stack();
-                symbol.dup();
-                let tag = Tag::create(&mut self.heap, true, *symbol, value);
+                let tag = Tag::create(&mut self.heap, true, *symbol_id, value);
                 self.push_to_data_stack(tag);
             }
             Instruction::CreateList { num_items } => {
@@ -411,7 +419,7 @@ impl<T: FiberTracer> Fiber<T> {
                 arguments.reverse();
                 let callee = self.pop_from_data_stack();
 
-                self.call(callee, &arguments, responsible);
+                self.call(symbol_table, callee, &arguments, responsible);
             }
             Instruction::TailCall {
                 num_locals_to_pop,
@@ -431,7 +439,7 @@ impl<T: FiberTracer> Fiber<T> {
                 // Tail calling a function is basically just a normal call, but
                 // pretending we are our caller.
                 self.next_instruction = self.call_stack.pop();
-                self.call(callee, &arguments, responsible);
+                self.call(symbol_table, callee, &arguments, responsible);
             }
             Instruction::Return => {
                 self.next_instruction = self.call_stack.pop();
@@ -489,12 +497,18 @@ impl<T: FiberTracer> Fiber<T> {
         }
     }
 
-    pub fn call(&mut self, callee: InlineObject, arguments: &[InlineObject], responsible: HirId) {
+    pub fn call(
+        &mut self,
+        symbol_table: &SymbolTable,
+        callee: InlineObject,
+        arguments: &[InlineObject],
+        responsible: HirId,
+    ) {
         match callee.into() {
             Data::Function(function) => self.call_function(function, arguments, responsible),
             Data::Builtin(builtin) => {
                 callee.drop(&mut self.heap);
-                self.run_builtin_function(builtin.get(), arguments, responsible);
+                self.run_builtin_function(symbol_table, builtin.get(), arguments, responsible);
             }
             Data::Tag(tag) => {
                 if tag.has_value() {
@@ -506,7 +520,7 @@ impl<T: FiberTracer> Fiber<T> {
                 }
 
                 if let [value] = arguments {
-                    let tag = Tag::create(&mut self.heap, true, tag.symbol(), *value);
+                    let tag = Tag::create(&mut self.heap, true, tag.symbol_id(), *value);
                     self.push_to_data_stack(tag);
                     value.dup(&mut self.heap);
                 } else {
@@ -522,7 +536,8 @@ impl<T: FiberTracer> Fiber<T> {
             _ => {
                 self.panic(Panic::new(
                     format!(
-                        "You can only call functions, builtins and tags, but you tried to call {callee}.",
+                        "You can only call functions, builtins and tags, but you tried to call {}.",
+                        DisplayWithSymbolTable::to_string(&callee, symbol_table),
                     ),
                     responsible.get().to_owned(),
                 ));

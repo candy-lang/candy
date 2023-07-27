@@ -129,7 +129,7 @@ pub fn run(lir: impl Borrow<Lir>) -> Packet {
     let mut tracer = DummyTracer;
     let (mut heap, main) = Vm::for_module(lir.borrow(), &mut tracer)
         .run_until_completion(&mut tracer)
-        .into_main_function()
+        .into_main_function(&lir.borrow().symbol_table)
         .unwrap();
 
     // Run the `main` function.

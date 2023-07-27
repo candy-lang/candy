@@ -1,6 +1,8 @@
 use crate::{
     fiber::InstructionPointer,
-    heap::{Builtin, Function, Heap, HirId, InlineObject, Int, List, Struct, Tag, Text},
+    heap::{
+        Builtin, Function, Heap, HirId, InlineObject, Int, List, Struct, SymbolTable, Tag, Text,
+    },
     lir::{Instruction, Lir, StackOffset},
 };
 use candy_frontend::{
@@ -56,6 +58,7 @@ where
     let mut lir = Lir {
         module: module.clone(),
         constant_heap,
+        symbol_table: SymbolTable::default(),
         instructions: vec![],
         origins: vec![],
         module_function,
@@ -163,18 +166,19 @@ impl<'c> LoweringContext<'c> {
                 }
             }
             Expression::Tag { symbol, value } => {
-                let symbol = Text::create(&mut self.lir.constant_heap, false, symbol);
+                let symbol_id = self.lir.symbol_table.find_or_add(symbol);
 
                 if let Some(value) = value {
                     if let Some(value) = self.constants.get(value) {
-                        let tag = Tag::create(&mut self.lir.constant_heap, false, symbol, *value);
+                        let tag =
+                            Tag::create(&mut self.lir.constant_heap, false, symbol_id, *value);
                         self.constants.insert(id, tag.into());
                     } else {
                         self.emit_reference_to(*value);
-                        self.emit(id, Instruction::CreateTag { symbol });
+                        self.emit(id, Instruction::CreateTag { symbol_id });
                     }
                 } else {
-                    let tag = Tag::create(&mut self.lir.constant_heap, false, symbol, None);
+                    let tag = Tag::create(&mut self.lir.constant_heap, false, symbol_id, None);
                     self.constants.insert(id, tag.into());
                 }
             }

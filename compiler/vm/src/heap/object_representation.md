@@ -50,7 +50,7 @@ The header word is a tagged union of different types of values:
 |                                                                     Value | Meaning  |
 | ------------------------------------------------------------------------: | :------- |
 | `00000000 00000000 00000000 00000000 00000000 00000000 00000000 0000r000` | Int      |
-| `00000000 00000000 00000000 00000000 00000000 00000000 00000000 0000r001` | Tag      |
+| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaar001` | Tag      |
 | `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaar010` | Text     |
 | `cccccccc cccccccc cccccccc cccccccc aaaaaaaa aaaaaaaa aaaaaaaa aaaar011` | Function |
 | `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaar100` | List     |
@@ -69,12 +69,14 @@ Values that fit into an inline word _must_ be stored inline.
 
 ### Tag
 
-| Word                                           |
-| :--------------------------------------------- |
-| Header Word (tag)                              |
-| Reference count                                |
-| InlineWord pointing to symbol (stored as text) |
-| InlineWord with value or 0                     |
+`a` stores the symbol ID that can be resolved via the symbol table.
+The symbol table is currently generated when creating the LIR and no longer changed after that.
+
+| Word                       |
+| :------------------------- |
+| Header Word (tag)          |
+| Reference count            |
+| InlineWord with value or 0 |
 
 ### Text
 

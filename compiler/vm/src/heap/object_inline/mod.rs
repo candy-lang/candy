@@ -4,17 +4,16 @@ use self::{
     pointer::InlinePointer,
     port::{InlineReceivePort, InlineSendPort},
 };
-use super::{object_heap::HeapObject, Data, Heap};
-use crate::{
-    channel::ChannelId,
-    utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
+use super::{
+    object_heap::HeapObject, Data, DisplayWithSymbolTable, Heap, OrdWithSymbolTable, SymbolTable,
 };
+use crate::channel::ChannelId;
 use enum_dispatch::enum_dispatch;
 use extension_trait::extension_trait;
 use rustc_hash::FxHashMap;
 use std::{
     cmp::Ordering,
-    fmt::{self, Formatter},
+    fmt::{self, Debug, Display, Formatter},
     hash::{Hash, Hasher},
     num::NonZeroU64,
     ops::Deref,
@@ -99,12 +98,16 @@ impl InlineObject {
     }
 }
 
-impl DebugDisplay for InlineObject {
-    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
-        InlineData::from(*self).fmt(f, is_debug)
+impl Debug for InlineObject {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        Debug::fmt(&InlineData::from(*self), f)
     }
 }
-impl_debug_display_via_debugdisplay!(InlineObject);
+impl DisplayWithSymbolTable for InlineObject {
+    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
+        DisplayWithSymbolTable::fmt(&InlineData::from(*self), f, symbol_table)
+    }
+}
 
 impl Eq for InlineObject {}
 impl PartialEq for InlineObject {
@@ -117,14 +120,9 @@ impl Hash for InlineObject {
         InlineData::from(*self).hash(state)
     }
 }
-impl Ord for InlineObject {
-    fn cmp(&self, other: &Self) -> Ordering {
-        Data::from(*self).cmp(&Data::from(*other))
-    }
-}
-impl PartialOrd for InlineObject {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+impl OrdWithSymbolTable for InlineObject {
+    fn cmp(&self, symbol_table: &SymbolTable, other: &Self) -> Ordering {
+        OrdWithSymbolTable::cmp(&Data::from(*self), symbol_table, &Data::from(*other))
     }
 }
 
@@ -140,7 +138,7 @@ impl TryFrom<InlineObject> for HeapObject {
 }
 
 #[enum_dispatch]
-pub trait InlineObjectTrait: Copy + DebugDisplay + Eq + Hash {
+pub trait InlineObjectTrait: Copy + Debug + DisplayWithSymbolTable + Eq + Hash {
     fn clone_to_heap_with_mapping(
         self,
         heap: &mut Heap,
@@ -191,18 +189,28 @@ impl From<InlineObject> for InlineData {
     }
 }
 
-impl DebugDisplay for InlineData {
-    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
+impl Debug for InlineData {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            InlineData::Pointer(value) => value.fmt(f, is_debug),
-            InlineData::Int(value) => value.fmt(f, is_debug),
-            InlineData::SendPort(value) => value.fmt(f, is_debug),
-            InlineData::ReceivePort(value) => value.fmt(f, is_debug),
-            InlineData::Builtin(value) => value.fmt(f, is_debug),
+            InlineData::Pointer(value) => Debug::fmt(value, f),
+            InlineData::Int(value) => Debug::fmt(value, f),
+            InlineData::SendPort(value) => Debug::fmt(value, f),
+            InlineData::ReceivePort(value) => Debug::fmt(value, f),
+            InlineData::Builtin(value) => Debug::fmt(value, f),
         }
     }
 }
-impl_debug_display_via_debugdisplay!(InlineData);
+impl DisplayWithSymbolTable for InlineData {
+    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
+        match self {
+            InlineData::Pointer(value) => DisplayWithSymbolTable::fmt(value, f, symbol_table),
+            InlineData::Int(value) => Display::fmt(value, f),
+            InlineData::SendPort(value) => Display::fmt(value, f),
+            InlineData::ReceivePort(value) => Display::fmt(value, f),
+            InlineData::Builtin(value) => Display::fmt(value, f),
+        }
+    }
+}
 
 impl Deref for InlineData {
     type Target = InlineObject;

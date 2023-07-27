@@ -1,14 +1,14 @@
 use super::{utils::heap_object_impls, HeapObjectTrait};
-use crate::{
-    heap::{object_heap::HeapObject, Heap, InlineObject},
-    utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
+use crate::heap::{
+    object_heap::HeapObject, DisplayWithSymbolTable, Heap, InlineObject, OrdWithSymbolTable,
+    SymbolTable,
 };
 use derive_more::Deref;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use std::{
     cmp::Ordering,
-    fmt::{self, Formatter},
+    fmt::{self, Debug, Formatter},
     hash::{Hash, Hasher},
     num::NonZeroU64,
     ptr::{self, NonNull},
@@ -113,8 +113,22 @@ impl HeapList {
     }
 }
 
-impl DebugDisplay for HeapList {
-    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
+impl Debug for HeapList {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let items = self.items();
+        write!(
+            f,
+            "({})",
+            if items.is_empty() {
+                ",".to_owned()
+            } else {
+                items.iter().map(|item| format!("{:?}", item)).join(", ")
+            },
+        )
+    }
+}
+impl DisplayWithSymbolTable for HeapList {
+    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
         let items = self.items();
         write!(
             f,
@@ -124,13 +138,12 @@ impl DebugDisplay for HeapList {
             } else {
                 items
                     .iter()
-                    .map(|item| DebugDisplay::to_string(item, is_debug))
+                    .map(|item| DisplayWithSymbolTable::to_string(item, symbol_table))
                     .join(", ")
             },
         )
     }
 }
-impl_debug_display_via_debugdisplay!(HeapList);
 
 impl Eq for HeapList {}
 impl PartialEq for HeapList {
@@ -145,14 +158,9 @@ impl Hash for HeapList {
     }
 }
 
-impl Ord for HeapList {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.items().cmp(other.items())
-    }
-}
-impl PartialOrd for HeapList {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+impl OrdWithSymbolTable for HeapList {
+    fn cmp(&self, symbol_table: &SymbolTable, other: &Self) -> Ordering {
+        OrdWithSymbolTable::cmp(self.items(), symbol_table, other.items())
     }
 }
 

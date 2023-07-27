@@ -70,7 +70,7 @@ fuzz_target!(|data: &[u8]| {
 
     let result = Vm::for_module(&lir, &mut DummyTracer).run_until_completion(&mut DummyTracer);
 
-    let Ok((mut heap, main)) = result.into_main_function() else {
+    let Ok((mut heap, main)) = result.into_main_function(&lir.symbol_table) else {
         println!("The module doesn't export a main function.");
         return;
     };
