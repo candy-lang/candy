@@ -727,6 +727,20 @@ mod parse {
         let mut line = vec![];
         let mut parts = vec![];
         let closing = loop {
+            if let Some((input_after_newline, newline)) = newline(input) {
+                push_line_to_parts(&mut line, &mut parts);
+                let (i, mut whitespace) = whitespaces_and_newlines(input, indentation + 1, false);
+                input = i;
+                parts.append(&mut whitespace);
+                if let Some('\n') = input.chars().next() {
+                    break CstKind::Error {
+                        unparsable_input: "".to_string(),
+                        error: CstError::TextNotSufficientlyIndented,
+                    };
+                }
+                continue;
+            }
+
             match input.chars().next() {
                 Some('"') => {
                     input = &input[1..];
@@ -765,19 +779,6 @@ mod parse {
                         unparsable_input: "".to_string(),
                         error: CstError::TextNotClosed,
                     };
-                }
-                Some('\n') => {
-                    push_line_to_parts(&mut line, &mut parts);
-                    let (i, mut whitespace) =
-                        whitespaces_and_newlines(input, indentation + 1, false);
-                    input = i;
-                    parts.append(&mut whitespace);
-                    if let Some('\n') = input.chars().next() {
-                        break CstKind::Error {
-                            unparsable_input: "".to_string(),
-                            error: CstError::TextNotSufficientlyIndented,
-                        };
-                    }
                 }
                 Some(c) => {
                     input = &input[c.len_utf8()..];
