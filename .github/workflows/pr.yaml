@@ -20,9 +20,7 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      - uses: samspills/assign-pr-to-author@v1.0.2
-        with:
-          repo-token: ${{ secrets.BOT_TOKEN }}
+      - uses: technote-space/assign-author@v1.6.2
 
   automerge-pr:
     if: github.event.action == 'opened'

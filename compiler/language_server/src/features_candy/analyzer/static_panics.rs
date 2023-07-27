@@ -14,17 +14,22 @@ pub impl StaticPanicsOfMir for Mir {
     fn static_panics(&mut self) -> Vec<Panic> {
         let mut errors = vec![];
         self.body
-            .collect_static_panics(&mut VisibleExpressions::none_visible(), &mut errors);
+            .collect_static_panics(&mut VisibleExpressions::none_visible(), &mut errors, true);
         errors
     }
 }
 
 #[extension_trait]
 impl StaticPanicsOfBody for Body {
-    fn collect_static_panics(&mut self, visible: &mut VisibleExpressions, panics: &mut Vec<Panic>) {
+    fn collect_static_panics(
+        &mut self,
+        visible: &mut VisibleExpressions,
+        panics: &mut Vec<Panic>,
+        is_fuzzable: bool,
+    ) {
         for (id, expression) in &mut self.expressions {
             let mut expression = mem::replace(expression, Expression::Parameter);
-            expression.collect_static_panics(visible, panics);
+            expression.collect_static_panics(visible, panics, is_fuzzable);
             visible.insert(*id, expression);
         }
 
@@ -36,7 +41,13 @@ impl StaticPanicsOfBody for Body {
 
 #[extension_trait]
 impl StaticPanicsOfExpression for Expression {
-    fn collect_static_panics(&mut self, visible: &mut VisibleExpressions, panics: &mut Vec<Panic>) {
+    fn collect_static_panics(
+        &mut self,
+        visible: &mut VisibleExpressions,
+        panics: &mut Vec<Panic>,
+        is_fuzzable: bool,
+    ) {
+        let referenced = self.referenced_ids();
         match self {
             Expression::Function {
                 parameters,
@@ -44,12 +55,14 @@ impl StaticPanicsOfExpression for Expression {
                 body,
                 ..
             } => {
+                let is_fuzzable = referenced.contains(responsible_parameter);
+
                 for parameter in parameters.iter() {
                     visible.insert(*parameter, Expression::Parameter);
                 }
                 visible.insert(*responsible_parameter, Expression::Parameter);
 
-                body.collect_static_panics(visible, panics);
+                body.collect_static_panics(visible, panics, is_fuzzable);
 
                 for parameter in parameters {
                     visible.remove(*parameter);
@@ -59,7 +72,7 @@ impl StaticPanicsOfExpression for Expression {
             Expression::Panic {
                 reason,
                 responsible,
-            } => {
+            } if is_fuzzable => {
                 let reason = visible.get(*reason);
                 let responsible = visible.get(*responsible);
 
