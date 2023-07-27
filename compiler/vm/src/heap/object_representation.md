@@ -50,12 +50,12 @@ The header word is a tagged union of different types of values:
 |                                                                     Value | Meaning  |
 | ------------------------------------------------------------------------: | :------- |
 | `00000000 00000000 00000000 00000000 00000000 00000000 00000000 0000r000` | Int      |
-| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaar001` | List     |
-| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaar101` | Struct   |
-| `00000000 00000000 00000000 00000000 00000000 00000000 00000000 0000r010` | Tag      |
-| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaar110` | Text     |
+| `00000000 00000000 00000000 00000000 00000000 00000000 00000000 0000r001` | Tag      |
+| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaar010` | Text     |
 | `cccccccc cccccccc cccccccc cccccccc aaaaaaaa aaaaaaaa aaaaaaaa aaaar011` | Function |
-| `00000000 00000000 00000000 00000000 00000000 00000000 00000000 0000r111` | HirId    |
+| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaar100` | List     |
+| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaar101` | Struct   |
+| `00000000 00000000 00000000 00000000 00000000 00000000 00000000 0000r110` | HirId    |
 
 `r` is set to one iff the object is a reference-counted object.
 (Constants are not reference-counted so that they can be shared across fibers without locks.)
@@ -66,36 +66,6 @@ The header word is a tagged union of different types of values:
 
 Uses Rust's `BigInt` representation after the header word and reference count.
 Values that fit into an inline word _must_ be stored inline.
-
-### List
-
-`a` stores the number of list elements.
-
-| Word               |
-| :----------------- |
-| Header Word (list) |
-| Reference count    |
-| Item 0             |
-| …                  |
-| Item a-1           |
-
-### Struct
-
-`a` stores the number of struct fields.
-
-| Word                 |
-| :------------------- |
-| Header Word (struct) |
-| Reference count      |
-| Hash of key 0        |
-| …                    |
-| Hash of key a-1      |
-| Key 0                |
-| …                    |
-| Key a-1              |
-| Value 0              |
-| …                    |
-| Value a-1            |
 
 ### Tag
 
@@ -136,6 +106,36 @@ A function capturing `c` values, taking `a` arguments, and with a body starting 
 
 > Instructions are stored in Rust's representation.
 > They may take up multiple words and might not align to word boundaries.
+
+### List
+
+`a` stores the number of list elements.
+
+| Word               |
+| :----------------- |
+| Header Word (list) |
+| Reference count    |
+| Item 0             |
+| …                  |
+| Item a-1           |
+
+### Struct
+
+`a` stores the number of struct fields.
+
+| Word                 |
+| :------------------- |
+| Header Word (struct) |
+| Reference count      |
+| Hash of key 0        |
+| …                    |
+| Hash of key a-1      |
+| Key 0                |
+| …                    |
+| Key a-1              |
+| Value 0              |
+| …                    |
+| Value a-1            |
 
 ### HirId
 

@@ -51,12 +51,12 @@ impl HeapObject {
 
     pub const KIND_MASK: u64 = 0b111;
     const KIND_INT: u64 = 0b000;
-    const KIND_LIST: u64 = 0b001;
-    const KIND_STRUCT: u64 = 0b101;
-    const KIND_TAG: u64 = 0b010;
-    const KIND_TEXT: u64 = 0b110;
+    const KIND_TAG: u64 = 0b001;
+    const KIND_TEXT: u64 = 0b010;
     const KIND_FUNCTION: u64 = 0b011;
-    const KIND_HIR_ID: u64 = 0b111;
+    const KIND_LIST: u64 = 0b100;
+    const KIND_STRUCT: u64 = 0b101;
+    const KIND_HIR_ID: u64 = 0b110;
 
     pub const IS_REFERENCE_COUNTED_SHIFT: usize = 3;
     pub const IS_REFERENCE_COUNTED_MASK: u64 = 0b1 << Self::IS_REFERENCE_COUNTED_SHIFT;
