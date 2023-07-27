@@ -24,46 +24,56 @@ use crate::{
     id::{CountableId, IdGenerator},
     mir::{Body, Expression, Id, VisitorResult},
 };
+use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::hash_map::Entry;
 
 pub fn eliminate_common_subtrees(body: &mut Body, pureness: &PurenessInsights) {
     let mut pure_expressions = FxHashMap::default();
-    let mut inner_functions: FxHashMap<Id, Vec<Id>> = FxHashMap::default();
+    let mut inner_function_ids: FxHashMap<Id, Vec<Id>> = FxHashMap::default();
     let mut additional_function_hirs: FxHashMap<Id, FxHashSet<hir::Id>> = FxHashMap::default();
     let mut updated_references: FxHashMap<Id, Id> = FxHashMap::default();
 
-    for (id, expression) in &mut body.expressions {
-        expression.replace_id_references(&mut |id| {
-            if let Some(update) = updated_references.get(id) {
-                *id = *update;
+    for index in 0..body.expressions.len() {
+        let id = body.expressions[index].0;
+
+        let normalized = {
+            let expression = &mut body.expressions[index].1;
+            expression.replace_id_references(&mut |id| {
+                if let Some(update) = updated_references.get(id) {
+                    *id = *update;
+                }
+            });
+
+            if !pureness.is_definition_pure(expression) {
+                continue;
             }
-        });
 
-        if !pureness.is_definition_pure(expression) {
-            continue;
-        }
+            if let Expression::Function { body, .. } = &expression {
+                inner_function_ids.insert(
+                    id,
+                    body.all_functions().into_iter().map(|(id, _)| id).collect(),
+                );
+            }
 
-        let mut normalized = expression.clone();
-        normalized.normalize();
-
-        if let Expression::Function { body, .. } = expression {
-            inner_functions.insert(
-                *id,
-                body.all_functions().into_iter().map(|(id, _)| id).collect(),
-            );
-        }
+            let mut normalized = expression.clone();
+            normalized.normalize();
+            normalized
+        };
 
         let existing_entry = pure_expressions.entry(normalized);
         match existing_entry {
-            Entry::Occupied(canonical_id) => {
-                let canonical_id = *canonical_id.get();
-                let old_expression =
-                    std::mem::replace(expression, Expression::Reference(canonical_id));
-                updated_references.insert(*id, canonical_id);
+            Entry::Occupied(canonical_index) => {
+                let (canonical_id, _) = body.expressions[*canonical_index.get()];
+
+                let old_expression = std::mem::replace(
+                    &mut body.expressions[index].1,
+                    Expression::Reference(canonical_id),
+                );
+                updated_references.insert(id, canonical_id);
 
                 if let Expression::Function {
-                    mut body,
+                    body,
                     original_hirs,
                     ..
                 } = old_expression
@@ -73,11 +83,11 @@ pub fn eliminate_common_subtrees(body: &mut Body, pureness: &PurenessInsights) {
                         .or_default()
                         .extend(original_hirs);
 
-                    let canonical_child_functions = inner_functions.get(&canonical_id).unwrap();
+                    let canonical_child_functions = inner_function_ids.get(&canonical_id).unwrap();
                     for ((_, child_hirs), canonical_child_id) in body
                         .all_functions()
                         .into_iter()
-                        .zip(canonical_child_functions)
+                        .zip_eq(canonical_child_functions)
                     {
                         additional_function_hirs
                             .entry(*canonical_child_id)
@@ -87,7 +97,7 @@ pub fn eliminate_common_subtrees(body: &mut Body, pureness: &PurenessInsights) {
                 }
             }
             _ => {
-                existing_entry.insert_entry(*id);
+                existing_entry.insert_entry(index);
             }
         }
     }
@@ -134,7 +144,7 @@ impl Expression {
 }
 
 impl Body {
-    fn all_functions(&mut self) -> Vec<(Id, FxHashSet<hir::Id>)> {
+    fn all_functions(&self) -> Vec<(Id, FxHashSet<hir::Id>)> {
         let mut ids_and_expressions = vec![];
         self.visit(&mut |id, expression, _| {
             if let Expression::Function { original_hirs, .. } = expression {
