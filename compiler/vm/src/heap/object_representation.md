@@ -57,10 +57,10 @@ The header word is a tagged union of different types of values:
 | `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaar101` | Struct   |
 | `00000000 00000000 00000000 00000000 00000000 00000000 00000000 0000r110` | HirId    |
 
+> The remaining patterns are invalid.
+
 `r` is set to one iff the object is a reference-counted object.
 (Constants are not reference-counted so that they can be shared across fibers without locks.)
-
-> The remaining patterns are invalid.
 
 ### Int
 
