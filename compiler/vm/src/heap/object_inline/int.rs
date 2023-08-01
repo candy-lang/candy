@@ -1,6 +1,4 @@
 use super::{InlineObject, InlineObjectTrait};
-use crate::heap::Int::Heap as OnHeap;
-use crate::heap::Int::Inline as Inlined;
 use crate::{
     heap::{object_heap::HeapObject, Heap, Int, Tag},
     utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_ord_via_get, DebugDisplay},
@@ -95,7 +93,7 @@ macro_rules! operator_fn {
         pub fn $name(self, heap: &mut Heap, rhs: Int) -> Int {
             let lhs = self.get();
             match rhs {
-                Inlined(rhs) => rhs
+                Int::Inline(rhs) => rhs
                     .try_get()
                     .and_then(|rhs| $inline_operation(lhs, rhs))
                     .map(|it| Int::create(heap, it))
@@ -105,7 +103,7 @@ macro_rules! operator_fn {
                             $bigint_operation(BigInt::from(lhs), rhs.get()),
                         )
                     }),
-                OnHeap(rhs) => {
+                Int::Heap(rhs) => {
                     Int::create_from_bigint(heap, $bigint_operation(BigInt::from(lhs), rhs.get()))
                 }
             }
