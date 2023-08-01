@@ -73,11 +73,9 @@ negate value :=
 multiply factorA factorB :=
   needs (is factorA)
   needs (is factorB)
-  targetScale = factorA | scale | int.add (factorB | scale)
   fromIntScaled
-    rescaledMinorUnits factorA targetScale | int.multiply (rescaledMinorUnits factorB targetScale)
-    | int.divideTruncating (scaleFactor targetScale)
-    targetScale
+    factorA | minorUnits | int.multiply (factorB | minorUnits)
+    factorA | scale | int.add (factorB | scale)
 divideTruncating dividend divisor :=
   needs (is dividend)
   needs (is divisor)
