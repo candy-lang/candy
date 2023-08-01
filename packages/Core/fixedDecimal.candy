@@ -11,7 +11,7 @@ text = use "..text"
 
 isScale scale = int.is scale | bool.lazyAnd { int.isNonNegative scale }
 scaleFactor scale =
-  needs (scale | isScale)
+  needs (isScale scale)
   10 | int.pow scale
 
 is a := 
@@ -20,7 +20,7 @@ is a :=
     struct.is value | bool.lazyAnd { value | struct.hasKey MinorUnits }
     | bool.lazyAnd { int.is value.minorUnits }
     | bool.lazyAnd { value | struct.hasKey Scale }
-    | bool.lazyAnd { value.scale | isScale }
+    | bool.lazyAnd { isScale value.scale }
   }
 
 minorUnits a :=
@@ -35,7 +35,7 @@ fromInt a :=
   FixedDecimal [MinorUnits: a, Scale: 0]
 fromIntScaled minorUnits scale :=
   needs (int.is minorUnits)
-  needs (scale | isScale)
+  needs (isScale scale)
   FixedDecimal [minorUnits, scale]
 floorToInt a :=
   needs (is a)
@@ -43,14 +43,14 @@ floorToInt a :=
 
 rescaledMinorUnits a targetScale =
   needs (is a)
-  needs (targetScale | isScale)
+  needs (isScale targetScale)
   ifElse
     a | scale | int.isGreaterThan targetScale
     { a | minorUnits | int.divideTruncating (scaleFactor (a | scale | int.subtract targetScale)) }
     { a | minorUnits | int.multiply (scaleFactor (targetScale | int.subtract (a | scale))) }
 rescale a targetScale :=
   needs (is a)
-  needs (targetScale | isScale)
+  needs (isScale targetScale)
   fromIntScaled (rescaledMinorUnits a targetScale) targetScale
 comparableMinorUnits valueA valueB =
   needs (is valueA)
@@ -92,7 +92,7 @@ divideTruncating dividend divisor :=
 divideTruncatingAtScale dividend divisor targetScale :=
   needs (is dividend)
   needs (is divisor)
-  needs (targetScale | isScale)
+  needs (isScale targetScale)
   needs (divisor | minorUnits | equals 0 | bool.not) "You can't divide by zero."
   [valueA, valueB] = comparableMinorUnits dividend divisor
   fromIntScaled (valueA | int.multiply (targetScale | scaleFactor) | int.divideTruncating valueB) targetScale
