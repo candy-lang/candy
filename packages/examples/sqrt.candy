@@ -9,7 +9,8 @@ sqrt x precision :=
 
   delta = 10 | fixedDecimal.fromIntScaled precision
 
-  recursive (x | fixedDecimal.divideTruncatingAtScale (2 | fixedDecimal.fromInt) precision) { recurse guess ->
+  recursive (x | fixedDecimal.divideTruncatingAtScale (2 | fixedDecimal.fromInt) precision) {
+    recurse guess ->
     refinedGuess =
       fixedDecimal.divideTruncatingAtScale
         guess | fixedDecimal.add (x | fixedDecimal.divideTruncatingAtScale guess precision)
