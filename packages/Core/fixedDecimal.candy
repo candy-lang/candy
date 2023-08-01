@@ -51,7 +51,7 @@ rescaledMinorUnits a targetScale =
 rescale a targetScale :=
   needs (is a)
   needs (isScale targetScale)
-  fromIntScaled (rescaledMinorUnits a targetScale) targetScale
+  fromIntScaled (a | rescaledMinorUnits targetScale) targetScale
 comparableMinorUnits valueA valueB =
   needs (is valueA)
   needs (is valueB)
