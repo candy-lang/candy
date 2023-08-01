@@ -122,13 +122,15 @@ pow base exponent :=
   needs (isNonNegative exponent)
   recursive [base, exponent] { recurse params ->
     [base, exponent] = params
-    ifElse
-      (exponent | equals 0)
-      { 1 }
-      { 
+    exponent %
+      0 -> 1
+      _ ->
         ifElse
-          (exponent | isEven)
+          exponent | isEven
           { recurse [Base: base | multiply base, Exponent: exponent | shiftRight 1] }
-          { base | multiply (recurse [Base: base | multiply base, Exponent: exponent | subtract 1 | shiftRight 1]) }
-      }
+          {
+            base
+            | multiply
+              recurse [Base: base | multiply base, Exponent: exponent | subtract 1 | shiftRight 1]
+          }
   }
