@@ -30,13 +30,13 @@ scale a :=
   needs (is a)
   (a | tag.getValue).scale
 
-fromInt a :=
-  needs (int.is a)
-  FixedDecimal [MinorUnits: a, Scale: 0]
 fromIntScaled minorUnits scale :=
   needs (int.is minorUnits)
   needs (isScale scale)
   FixedDecimal [minorUnits, scale]
+fromInt a :=
+  needs (int.is a)
+  fromIntScaled a 0
 floorToInt a :=
   needs (is a)
   a | minorUnits | int.divideTruncating (a | scale | scaleFactor)
