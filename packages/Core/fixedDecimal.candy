@@ -14,14 +14,9 @@ scaleFactor scale =
   needs (isScale scale)
   10 | int.pow scale
 
-is a := 
-  tag.is a | bool.lazyAnd { a | tag.withoutValue | equals FixedDecimal } | bool.lazyAnd {
-    value = a | tag.getValue
-    struct.is value | bool.lazyAnd { value | struct.hasKey MinorUnits }
-    | bool.lazyAnd { int.is value.minorUnits }
-    | bool.lazyAnd { value | struct.hasKey Scale }
-    | bool.lazyAnd { isScale value.scale }
-  }
+is a := a %
+  FixedDecimal [minorUnits, scale] -> int.is minorUnits | bool.lazyAnd { isScale scale}
+  _ -> False
 
 minorUnits a :=
   needs (is a)
