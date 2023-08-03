@@ -77,11 +77,11 @@ Values that fit into an inline word _must_ be stored inline.
 
 `a` stores the symbol ID that can be resolved via the symbol table.
 
-| Word                       |
-| :------------------------- |
-| Header Word (tag)          |
-| Reference count            |
-| InlineWord with value or 0 |
+| Word                  |
+| :-------------------- |
+| Header Word (tag)     |
+| Reference count       |
+| InlineWord with value |
 
 ### Text
 

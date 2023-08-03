@@ -63,7 +63,7 @@ impl InlineInt {
             })
     }
 
-    pub fn compare_to(self, heap: &mut Heap, rhs: Int) -> Tag {
+    pub fn compare_to(self, rhs: Int) -> Tag {
         let ordering = match rhs {
             Int::Inline(rhs) => self.get().cmp(&rhs.get()),
             Int::Heap(rhs) => {
@@ -74,7 +74,7 @@ impl InlineInt {
                 }
             }
         };
-        Tag::create_ordering(heap, true, ordering)
+        Tag::create_ordering(ordering)
     }
 
     shift_fn!(shift_left, i64::checked_shl, Shl::shl);

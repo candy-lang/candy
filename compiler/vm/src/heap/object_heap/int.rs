@@ -52,9 +52,9 @@ impl HeapInt {
         Int::create_from_bigint(heap, true, self.get().mod_floor(rhs))
     }
 
-    pub fn compare_to(self, heap: &mut Heap, rhs: &BigInt) -> Tag {
+    pub fn compare_to(self, rhs: &BigInt) -> Tag {
         // PERF: Add manual check if the `rhs` is an [InlineInt]?
-        Tag::create_ordering(heap, true, self.get().cmp(rhs))
+        Tag::create_ordering(self.get().cmp(rhs))
     }
 
     operator_fn!(shift_left, Shl, shl);

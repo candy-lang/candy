@@ -174,6 +174,7 @@ impl From<InlineObject> for InlineData {
             InlineObject::KIND_POINTER => InlineData::Pointer(InlinePointer::new_unchecked(object)),
             InlineObject::KIND_INT => InlineData::Int(InlineInt::new_unchecked(object)),
             InlineObject::KIND_BUILTIN => InlineData::Builtin(InlineBuiltin::new_unchecked(object)),
+            InlineObject::KIND_TAG => InlineData::Tag(InlineTag::new_unchecked(object)),
             InlineObject::KIND_SEND_PORT => {
                 InlineData::SendPort(InlineSendPort::new_unchecked(object))
             }

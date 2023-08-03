@@ -243,8 +243,7 @@ impl<T: FiberTracer> Fiber<T> {
     pub fn complete_send(&mut self) {
         assert!(self.status.is_sending());
 
-        let nothing = Tag::create_nothing(&mut self.heap, true);
-        self.push_to_data_stack(nothing);
+        self.push_to_data_stack(Tag::create_nothing());
         self.status = Status::Running;
     }
     pub fn complete_receive(&mut self, packet: Packet) {
@@ -357,7 +356,7 @@ impl<T: FiberTracer> Fiber<T> {
         match instruction {
             Instruction::CreateTag { symbol_id } => {
                 let value = self.pop_from_data_stack();
-                let tag = Tag::create(&mut self.heap, true, *symbol_id, value);
+                let tag = Tag::create_with_value(&mut self.heap, true, *symbol_id, value);
                 self.push_to_data_stack(tag);
             }
             Instruction::CreateList { num_items } => {
@@ -514,13 +513,13 @@ impl<T: FiberTracer> Fiber<T> {
                 if tag.has_value() {
                     self.panic(Panic::new(
                         "A tag's value cannot be overwritten by calling it. Use `tag.withValue` instead.".to_string(),
-                        responsible.get().to_owned(),)
-                    );
+                        responsible.get().to_owned(),
+                    ));
                     return;
                 }
 
                 if let [value] = arguments {
-                    let tag = Tag::create(&mut self.heap, true, tag.symbol_id(), *value);
+                    let tag = Tag::create_with_value(&mut self.heap, true, tag.symbol_id(), *value);
                     self.push_to_data_stack(tag);
                     value.dup(&mut self.heap);
                 } else {

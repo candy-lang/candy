@@ -190,30 +190,12 @@ impl PausedState {
 
                         if count > 0 {
                             let name = "Value".to_string();
-                            let value_variable = if let Some(value) = tag.value() {
-                                self.create_variable(*fiber_id, name, value, supports_variable_type)
-                            } else {
-                                Variable {
-                                    name,
-                                    value: "<empty>".to_string(),
-                                    type_field: if supports_variable_type {
-                                        Some("<empty>".to_string())
-                                    } else {
-                                        None
-                                    },
-                                    presentation_hint: Some(Self::presentation_hint_for(
-                                        DataDiscriminants::Tag,
-                                    )),
-                                    evaluate_name: None,
-                                    variables_reference: 0,
-                                    named_variables: Some(0),
-                                    indexed_variables: Some(0),
-                                    memory_reference: tag
-                                        .value()
-                                        .map(|it| MemoryReference::new(*fiber_id, it).to_dap()),
-                                }
-                            };
-                            variables.push(value_variable);
+                            variables.push(self.create_variable(
+                                *fiber_id,
+                                name,
+                                tag.value(),
+                                supports_variable_type,
+                            ));
                         }
                     }
                 }

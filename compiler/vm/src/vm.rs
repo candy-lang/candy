@@ -666,16 +666,16 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
         }
     }
     fn parse_spawn_packet(packet: Packet) -> Option<(Heap, Function, ChannelId)> {
-        let Packet { mut heap, object } = packet;
+        let Packet { heap, object } = packet;
         let arguments: Struct = object.try_into().ok()?;
 
-        let function_tag = Tag::create(&mut heap, true, SymbolId::FUNCTION, None);
+        let function_tag = Tag::create(SymbolId::FUNCTION);
         let function: Function = arguments.get(function_tag)?.try_into().ok()?;
         if function.argument_count() > 0 {
             return None;
         }
 
-        let return_channel_tag = Tag::create(&mut heap, true, SymbolId::RETURN_CHANNEL, None);
+        let return_channel_tag = Tag::create(SymbolId::RETURN_CHANNEL);
         let return_channel: SendPort = arguments.get(return_channel_tag)?.try_into().ok()?;
 
         Some((heap, function, return_channel.channel_id()))

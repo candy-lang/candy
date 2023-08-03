@@ -55,8 +55,7 @@ impl From<SymbolId> for InlineTag {
             symbol_id,
             "Symbol ID is too large.",
         );
-        let header_word =
-            InlineObject::KIND_BUILTIN | ((symbol_id as u64) << Self::SYMBOL_ID_SHIFT);
+        let header_word = InlineObject::KIND_TAG | ((symbol_id as u64) << Self::SYMBOL_ID_SHIFT);
         let header_word = unsafe { NonZeroU64::new_unchecked(header_word) };
         Self(InlineObject::new(header_word))
     }

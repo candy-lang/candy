@@ -204,11 +204,11 @@ impl Int {
         }
     }
 
-    pub fn compare_to(&self, heap: &mut Heap, rhs: &Int) -> Tag {
+    pub fn compare_to(&self, rhs: &Int) -> Tag {
         match (self, rhs) {
-            (Int::Inline(lhs), rhs) => lhs.compare_to(heap, *rhs),
-            (Int::Heap(lhs), Int::Inline(rhs)) => lhs.compare_to(heap, &rhs.get().into()),
-            (Int::Heap(lhs), Int::Heap(rhs)) => lhs.compare_to(heap, rhs.get()),
+            (Int::Inline(lhs), rhs) => lhs.compare_to(*rhs),
+            (Int::Heap(lhs), Int::Inline(rhs)) => lhs.compare_to(&rhs.get().into()),
+            (Int::Heap(lhs), Int::Heap(rhs)) => lhs.compare_to(rhs.get()),
         }
     }
 
@@ -301,37 +301,46 @@ pub enum Tag {
 }
 
 impl Tag {
-    pub fn create(
+    pub fn create(symbol_id: SymbolId) -> Self {
+        Tag::Inline(symbol_id.into())
+    }
+    pub fn create_with_value(
+        heap: &mut Heap,
+        is_reference_counted: bool,
+        symbol_id: SymbolId,
+        value: impl Into<InlineObject>,
+    ) -> Self {
+        HeapTag::create(heap, is_reference_counted, symbol_id, value).into()
+    }
+    pub fn create_with_value_option(
         heap: &mut Heap,
         is_reference_counted: bool,
         symbol_id: SymbolId,
         value: impl Into<Option<InlineObject>>,
     ) -> Self {
-        // FIXME: Version without `Heap`
-        HeapTag::create(heap, is_reference_counted, symbol_id, value).into()
+        match value.into() {
+            Some(value) => Self::create_with_value(heap, is_reference_counted, symbol_id, value),
+            None => Self::create(symbol_id),
+        }
     }
-    pub fn create_nothing(heap: &mut Heap, is_reference_counted: bool) -> Self {
-        Self::create(heap, is_reference_counted, SymbolId::NOTHING, None)
+    pub fn create_nothing() -> Self {
+        Self::create(SymbolId::NOTHING)
     }
-    pub fn create_bool(heap: &mut Heap, is_reference_counted: bool, value: bool) -> Self {
-        Self::create(
-            heap,
-            is_reference_counted,
-            if value {
-                SymbolId::TRUE
-            } else {
-                SymbolId::FALSE
-            },
-            None,
-        )
+    pub fn create_bool(value: bool) -> Self {
+        let symbol_id = if value {
+            SymbolId::TRUE
+        } else {
+            SymbolId::FALSE
+        };
+        Self::create(symbol_id)
     }
-    pub fn create_ordering(heap: &mut Heap, is_reference_counted: bool, value: Ordering) -> Self {
+    pub fn create_ordering(value: Ordering) -> Self {
         let value = match value {
             Ordering::Less => SymbolId::LESS,
             Ordering::Equal => SymbolId::EQUAL,
             Ordering::Greater => SymbolId::GREATER,
         };
-        Self::create(heap, is_reference_counted, value, None)
+        Self::create(value)
     }
     pub fn create_result(
         heap: &mut Heap,
@@ -342,7 +351,7 @@ impl Tag {
             Ok(it) => (SymbolId::OK, it),
             Err(it) => (SymbolId::ERROR, it),
         };
-        Self::create(heap, is_reference_counted, symbol, value)
+        Self::create_with_value(heap, is_reference_counted, symbol, value)
     }
 
     pub fn symbol_id(&self) -> SymbolId {
@@ -354,18 +363,18 @@ impl Tag {
     pub fn has_value(&self) -> bool {
         match self {
             Tag::Inline(_) => false,
-            Tag::Heap(tag) => tag.has_value(),
+            Tag::Heap(_) => true,
         }
     }
     pub fn value(&self) -> Option<InlineObject> {
         match self {
             Tag::Inline(_) => None,
-            Tag::Heap(tag) => tag.value(),
+            Tag::Heap(tag) => Some(tag.value()),
         }
     }
 
-    pub fn without_value(self, heap: &mut Heap) -> Tag {
-        Tag::create(heap, true, self.symbol_id(), None)
+    pub fn without_value(self) -> Tag {
+        Tag::create(self.symbol_id())
     }
 }
 
@@ -424,7 +433,7 @@ impl TryFrom<Data> for bool {
                 SymbolId::FALSE => Ok(false),
                 _ => Err("Expected `True` or `False`."),
             },
-            _ => Err("Expected a tag without a value."),
+            _ => Err("Expected a tag without a value, found {value:?}."),
         }
     }
 }
@@ -486,12 +495,7 @@ impl Struct {
     ) -> Self {
         let fields = fields
             .into_iter()
-            .map(|(key, value)| {
-                (
-                    (Tag::create(heap, is_reference_counted, key, None)).into(),
-                    value,
-                )
-            })
+            .map(|(key, value)| ((Tag::create(key)).into(), value))
             .collect();
         Self::create(heap, is_reference_counted, &fields)
     }
