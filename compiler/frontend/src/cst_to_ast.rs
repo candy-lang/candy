@@ -630,18 +630,15 @@ impl LoweringContext {
                 );
 
                 let mut errors = vec![];
-                let (parameters, mut parameter_errors) = if let Some((parameters, arrow)) =
-                    parameters_and_arrow
-                {
+                let parameters = if let Some((parameters, arrow)) = parameters_and_arrow {
                     assert!(
-                            arrow.kind.is_arrow(),
-                            "Expected an arrow after the parameters in a function, but found `{arrow}`.",
-                        );
-                    self.lower_parameters(parameters)
+                        arrow.kind.is_arrow(),
+                        "Expected an arrow after the parameters in a function, but found `{arrow}`.",
+                    );
+                    self.lower_parameters(parameters, false)
                 } else {
-                    (vec![], vec![])
+                    vec![]
                 };
-                errors.append(&mut parameter_errors);
 
                 let body = self.lower_csts(body);
 
@@ -677,7 +674,7 @@ impl LoweringContext {
                 );
 
                 let body = self.lower_csts(body);
-                let (body, errors) = if let CstKind::Call {
+                let body = if let CstKind::Call {
                     receiver: name,
                     arguments: parameters,
                 } = &left.kind
@@ -698,32 +695,29 @@ impl LoweringContext {
                         }
                     };
 
-                    let (parameters, errors) = self.lower_parameters(parameters);
-                    let body = AssignmentBody::Function {
+                    let parameters = self.lower_parameters(parameters, true);
+                    AssignmentBody::Function {
                         name,
                         function: Function {
                             parameters,
                             body,
                             fuzzable: true,
                         },
-                    };
-                    (body, errors)
+                    }
                 } else {
-                    let body = AssignmentBody::Body {
+                    AssignmentBody::Body {
                         pattern: Box::new(self.lower_cst(left, LoweringType::Pattern)),
                         body,
-                    };
-                    (body, vec![])
+                    }
                 };
 
-                let ast = self.create_ast(
+                self.create_ast(
                     cst.data.id,
                     Assignment {
                         is_public: assignment_sign.kind.is_colon_equals_sign(),
                         body,
                     },
-                );
-                self.wrap_in_errors(cst.data.id, ast, errors)
+                )
             }
             CstKind::Error { error, .. } => self.create_error_ast(cst, None, *error),
         }
@@ -757,28 +751,25 @@ impl LoweringContext {
         }
     }
 
-    fn lower_parameters(&mut self, csts: &[Cst]) -> (Vec<AstString>, Vec<CompilerError>) {
-        let mut errors = vec![];
-        let parameters = csts
-            .iter()
+    fn lower_parameters(&mut self, csts: &[Cst], is_fuzzable: bool) -> Vec<Ast> {
+        csts.iter()
             .enumerate()
-            .map(|(index, it)| match self.lower_parameter(it) {
-                Ok(parameter) => parameter,
-                Err(box error) => {
-                    errors.push(error);
-                    self.create_string(it.data.id, format!("<invalid#{index}>"))
-                }
-            })
-            .collect();
-        (parameters, errors)
+            .map(|(index, it)| self.lower_parameter(index, it, is_fuzzable))
+            .collect()
     }
-    fn lower_parameter(&mut self, cst: &Cst) -> Result<AstString, Box<CompilerError>> {
+    fn lower_parameter(&mut self, index: usize, cst: &Cst, is_fuzzable: bool) -> Ast {
+        if !is_fuzzable {
+            return self.lower_cst(cst, LoweringType::Pattern);
+        }
+
         if let CstKind::Identifier(identifier) = &cst.kind {
-            Ok(self.create_string(cst.data.id.to_owned(), identifier.clone()))
+            let identifier = self.create_string(cst.data.id.to_owned(), identifier.clone());
+            self.create_ast(cst.data.id.to_owned(), Identifier(identifier))
         } else {
-            Err(Box::new(
-                self.create_error(cst, AstError::ExpectedParameter),
-            ))
+            let identifier =
+                self.create_string(cst.data.id.to_owned(), format!("<invalid#{index}>"));
+            let ast = self.create_ast(cst.data.id.to_owned(), Identifier(identifier));
+            self.create_error_ast(cst, ast, AstError::ExpectedParameter)
         }
     }
 

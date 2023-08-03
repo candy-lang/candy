@@ -504,11 +504,41 @@ impl Context<'_> {
         let function_id = self.create_next_id(Some(id), identifier);
         self.id_prefix = function_id.clone();
 
-        for parameter in function.parameters.iter() {
-            let name = parameter.value.to_string();
-            let id = self.create_next_id(Some(parameter.id.clone()), Some(name.clone()));
-            self.body.identifiers.insert(id.clone(), name.clone());
-            self.identifiers.insert(name, id);
+        // TODO: Error on parameters with same name
+        let mut parameters = Vec::with_capacity(function.parameters.len());
+        for parameter in &function.parameters {
+            if let AstKind::Identifier(Identifier(parameter)) = &parameter.kind {
+                let name = parameter.value.to_string();
+                parameters.push(function_id.child(name.clone()));
+
+                let id = self.create_next_id(Some(parameter.id.clone()), Some(name.clone()));
+                self.body.identifiers.insert(id.clone(), name.clone());
+                self.identifiers.insert(name, id);
+            } else {
+                let parameter_id = self.create_next_id(parameter.id.clone(), None);
+                parameters.push(parameter_id.clone());
+
+                let (pattern, identifier_ids) = self.lower_pattern(parameter);
+                self.push(
+                    None,
+                    Expression::Destructure {
+                        expression: parameter_id,
+                        pattern,
+                    },
+                    None,
+                );
+
+                for (name, (ast_id, identifier_id)) in identifier_ids
+                    .into_iter()
+                    .sorted_by_key(|(_, (_, identifier_id))| identifier_id.0)
+                {
+                    self.push(
+                        Some(ast_id),
+                        Expression::PatternIdentifierReference(identifier_id),
+                        Some(name.to_owned()),
+                    );
+                }
+            }
         }
 
         self.compile(&function.body);
@@ -518,11 +548,7 @@ impl Context<'_> {
         self.push_with_existing_id(
             function_id.clone(),
             Expression::Function(Function {
-                parameters: function
-                    .parameters
-                    .iter()
-                    .map(|parameter| function_id.child(parameter.value.clone()))
-                    .collect(),
+                parameters,
                 body: inner_body,
                 fuzzable: function.fuzzable,
             }),
@@ -704,7 +730,11 @@ impl Context<'_> {
         )
     }
 
-    fn create_next_id(&mut self, ast_id: Option<ast::Id>, key: Option<String>) -> hir::Id {
+    fn create_next_id(
+        &mut self,
+        ast_id: impl Into<Option<ast::Id>>,
+        key: Option<String>,
+    ) -> hir::Id {
         for disambiguator in 0.. {
             let last_part = if let Some(key) = &key {
                 if disambiguator == 0 {
@@ -720,7 +750,7 @@ impl Context<'_> {
             };
             let id = self.id_prefix.child(last_part);
             if let Entry::Vacant(entry) = self.id_mapping.entry(id.clone()) {
-                entry.insert(ast_id);
+                entry.insert(ast_id.into());
                 return id;
             }
         }
