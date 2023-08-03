@@ -21,6 +21,7 @@ use crate::{
 use candy_frontend::{builtin_functions::BuiltinFunction, hir::Id};
 use derive_more::{Deref, From};
 use num_bigint::BigInt;
+use num_traits::Signed;
 use rustc_hash::FxHashMap;
 use std::{
     borrow::Cow,
@@ -146,7 +147,7 @@ impl OrdWithSymbolTable for Data {
 // Int
 
 // FIXME: Custom Ord, PartialOrd impl
-#[derive(Clone, Copy, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Eq, From, Hash, PartialEq)]
 pub enum Int {
     Inline(InlineInt),
     Heap(HeapInt),
@@ -290,6 +291,36 @@ impl From<Int> for InlineObject {
 }
 impl_try_froms!(Int, "Expected an int.");
 impl_try_from_heap_object!(Int, "Expected an int.");
+
+impl Ord for Int {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Int::Inline(this), Int::Inline(other)) => Ord::cmp(this, other),
+            (Int::Inline(_), Int::Heap(other)) => {
+                if other.get().is_positive() {
+                    Ordering::Less
+                } else {
+                    Ordering::Greater
+                }
+            }
+            (Int::Heap(this), Int::Heap(other)) => Ord::cmp(this, other),
+            (Int::Heap(this), Int::Inline(_)) => {
+                if this.get().is_positive() {
+                    Ordering::Greater
+                } else {
+                    Ordering::Less
+                }
+            }
+        }
+    }
+}
+#[allow(clippy::incorrect_partial_ord_impl_on_ord_type)]
+impl PartialOrd for Int {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(Ord::cmp(self, other))
+    }
+}
+
 impl_ops_with_symbol_table_via_ops!(Int);
 
 // Tag
