@@ -106,7 +106,7 @@ pub enum Int {
 }
 
 impl Int {
-    pub fn create<T>(heap: &mut Heap, value: T) -> Self
+    pub fn create<T>(heap: &mut Heap, is_reference_counted: bool, value: T) -> Self
     where
         T: Copy + TryInto<i64> + Into<BigInt>,
     {
@@ -115,14 +115,14 @@ impl Int {
             .map_err(|_| ())
             .and_then(InlineInt::try_from)
             .map(|it| it.into())
-            .unwrap_or_else(|_| HeapInt::create(heap, value.into()).into())
+            .unwrap_or_else(|_| HeapInt::create(heap, is_reference_counted, value.into()).into())
     }
-    pub fn create_from_bigint(heap: &mut Heap, value: BigInt) -> Self {
+    pub fn create_from_bigint(heap: &mut Heap, is_reference_counted: bool, value: BigInt) -> Self {
         i64::try_from(&value)
             .map_err(|_| ())
             .and_then(InlineInt::try_from)
             .map(|it| it.into())
-            .unwrap_or_else(|_| HeapInt::create(heap, value).into())
+            .unwrap_or_else(|_| HeapInt::create(heap, is_reference_counted, value).into())
     }
 
     pub fn get(&self) -> Cow<BigInt> {
@@ -198,9 +198,8 @@ macro_rules! operator_fn {
     ($name:ident) => {
         pub fn $name(&self, heap: &mut Heap, rhs: &Int) -> Self {
             match (self, rhs) {
-                (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(heap, *rhs),
-                (Int::Heap(on_heap), Int::Inline(inline))
-                | (Int::Inline(inline), Int::Heap(on_heap)) => on_heap.$name(heap, inline.get()),
+                (Int::Inline(lhs), _) => lhs.$name(heap, *rhs),
+                (Int::Heap(lhs), Int::Inline(rhs)) => lhs.$name(heap, rhs.get()),
                 (Int::Heap(lhs), Int::Heap(rhs)) => lhs.$name(heap, rhs.get()),
             }
         }
@@ -214,6 +213,7 @@ macro_rules! shift_fn {
                 // TODO: Support shifting by larger numbers
                 (Int::Inline(lhs), rhs) => Int::create_from_bigint(
                     heap,
+                    true,
                     BigInt::from(lhs.get()).$function(rhs.try_get::<i128>().unwrap()),
                 ),
                 (Int::Heap(lhs), rhs) => lhs.$name(heap, rhs.try_get::<i128>().unwrap()),
@@ -250,37 +250,52 @@ impl_try_from_heap_object!(Int, "Expected an int.");
 pub struct Tag(HeapTag);
 
 impl Tag {
-    pub fn create(heap: &mut Heap, symbol: Text, value: impl Into<Option<InlineObject>>) -> Self {
-        HeapTag::create(heap, symbol, value).into()
+    pub fn create(
+        heap: &mut Heap,
+        is_reference_counted: bool,
+        symbol: Text,
+        value: impl Into<Option<InlineObject>>,
+    ) -> Self {
+        HeapTag::create(heap, is_reference_counted, symbol, value).into()
     }
     pub fn create_from_str(
         heap: &mut Heap,
+        is_reference_counted: bool,
         symbol: &str,
         value: impl Into<Option<InlineObject>>,
     ) -> Self {
-        let symbol = Text::create(heap, symbol);
-        Self::create(heap, symbol, value)
+        let symbol = Text::create(heap, is_reference_counted, symbol);
+        Self::create(heap, is_reference_counted, symbol, value)
     }
-    pub fn create_nothing(heap: &mut Heap) -> Self {
-        Self::create_from_str(heap, "Nothing", None)
+    pub fn create_nothing(heap: &mut Heap, is_reference_counted: bool) -> Self {
+        Self::create_from_str(heap, is_reference_counted, "Nothing", None)
     }
-    pub fn create_bool(heap: &mut Heap, value: bool) -> Self {
-        Self::create_from_str(heap, if value { "True" } else { "False" }, None)
+    pub fn create_bool(heap: &mut Heap, is_reference_counted: bool, value: bool) -> Self {
+        Self::create_from_str(
+            heap,
+            is_reference_counted,
+            if value { "True" } else { "False" },
+            None,
+        )
     }
-    pub fn create_ordering(heap: &mut Heap, value: Ordering) -> Self {
+    pub fn create_ordering(heap: &mut Heap, is_reference_counted: bool, value: Ordering) -> Self {
         let value = match value {
             Ordering::Less => "Less",
             Ordering::Equal => "Equal",
             Ordering::Greater => "Greater",
         };
-        Self::create_from_str(heap, value, None)
+        Self::create_from_str(heap, is_reference_counted, value, None)
     }
-    pub fn create_result(heap: &mut Heap, value: Result<InlineObject, InlineObject>) -> Self {
+    pub fn create_result(
+        heap: &mut Heap,
+        is_reference_counted: bool,
+        value: Result<InlineObject, InlineObject>,
+    ) -> Self {
         let (symbol, value) = match value {
             Ok(it) => ("Ok", it),
             Err(it) => ("Error", it),
         };
-        Self::create_from_str(heap, symbol, value)
+        Self::create_from_str(heap, is_reference_counted, symbol, value)
     }
 }
 
@@ -318,14 +333,14 @@ impl TryFrom<Data> for bool {
 pub struct Text(HeapText);
 
 impl Text {
-    pub fn create(heap: &mut Heap, value: &str) -> Self {
-        HeapText::create(heap, value).into()
+    pub fn create(heap: &mut Heap, is_reference_counted: bool, value: &str) -> Self {
+        HeapText::create(heap, is_reference_counted, value).into()
     }
-    pub fn create_from_utf8(heap: &mut Heap, bytes: &[u8]) -> Tag {
+    pub fn create_from_utf8(heap: &mut Heap, is_reference_counted: bool, bytes: &[u8]) -> Tag {
         let result = str::from_utf8(bytes)
-            .map(|it| Text::create(heap, it).into())
-            .map_err(|_| Text::create(heap, "Invalid UTF-8.").into());
-        Tag::create_result(heap, result)
+            .map(|it| Text::create(heap, is_reference_counted, it).into())
+            .map_err(|_| Text::create(heap, is_reference_counted, "Invalid UTF-8.").into());
+        Tag::create_result(heap, is_reference_counted, result)
     }
 }
 
@@ -339,8 +354,8 @@ impl_try_from_heap_object!(Text, "Expected a text.");
 pub struct List(HeapList);
 
 impl List {
-    pub fn create(heap: &mut Heap, items: &[InlineObject]) -> Self {
-        HeapList::create(heap, items).into()
+    pub fn create(heap: &mut Heap, is_reference_counted: bool, items: &[InlineObject]) -> Self {
+        HeapList::create(heap, is_reference_counted, items).into()
     }
 }
 
@@ -354,18 +369,28 @@ impl_try_from_heap_object!(List, "Expected a list.");
 pub struct Struct(HeapStruct);
 
 impl Struct {
-    pub fn create(heap: &mut Heap, fields: &FxHashMap<InlineObject, InlineObject>) -> Self {
-        HeapStruct::create(heap, fields).into()
+    pub fn create(
+        heap: &mut Heap,
+        is_reference_counted: bool,
+        fields: &FxHashMap<InlineObject, InlineObject>,
+    ) -> Self {
+        HeapStruct::create(heap, is_reference_counted, fields).into()
     }
     pub fn create_with_symbol_keys(
         heap: &mut Heap,
+        is_reference_counted: bool,
         fields: impl IntoIterator<Item = (&str, InlineObject)>,
     ) -> Self {
         let fields = fields
             .into_iter()
-            .map(|(key, value)| ((Tag::create_from_str(heap, key, None)).into(), value))
+            .map(|(key, value)| {
+                (
+                    (Tag::create_from_str(heap, is_reference_counted, key, None)).into(),
+                    value,
+                )
+            })
             .collect();
-        Self::create(heap, &fields)
+        Self::create(heap, is_reference_counted, &fields)
     }
 }
 
@@ -381,11 +406,12 @@ pub struct Function(HeapFunction);
 impl Function {
     pub fn create(
         heap: &mut Heap,
+        is_reference_counted: bool,
         captured: &[InlineObject],
         argument_count: usize,
         body: InstructionPointer,
     ) -> Self {
-        HeapFunction::create(heap, captured, argument_count, body).into()
+        HeapFunction::create(heap, is_reference_counted, captured, argument_count, body).into()
     }
 }
 
@@ -400,8 +426,8 @@ impl_try_from_heap_object!(Function, "Expected a function.");
 pub struct HirId(HeapHirId);
 
 impl HirId {
-    pub fn create(heap: &mut Heap, id: Id) -> HirId {
-        HeapHirId::create(heap, id).into()
+    pub fn create(heap: &mut Heap, is_reference_counted: bool, id: Id) -> HirId {
+        HeapHirId::create(heap, is_reference_counted, id).into()
     }
 }
 

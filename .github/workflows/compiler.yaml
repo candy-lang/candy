@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3.5.3
       - uses: dsherret/rust-toolchain-file@v1
-      - uses: Swatinem/rust-cache@v2.5.1
+      - uses: Swatinem/rust-cache@v2.6.0
 
       # Compiler
       - name: 'Compiler: clippy'
@@ -32,7 +32,7 @@ jobs:
   #   steps:
   #     - uses: actions/checkout@v3.5.3
   #     - uses: dsherret/rust-toolchain-file@v1
-  #     - uses: Swatinem/rust-cache@v2.5.1
+  #     - uses: Swatinem/rust-cache@v2.6.0
 
   #     - run: cargo run --release -- fuzz ./packages/Benchmark.candy
 
@@ -53,7 +53,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3.5.3
       - uses: dsherret/rust-toolchain-file@v1
-      - uses: Swatinem/rust-cache@v2.5.1
+      - uses: Swatinem/rust-cache@v2.6.0
 
       - name: Run benchmark
         working-directory: compiler/vm/

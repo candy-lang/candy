@@ -21,9 +21,19 @@ impl HeapTag {
     pub fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
-    pub fn create(heap: &mut Heap, symbol: Text, value: impl Into<Option<InlineObject>>) -> Self {
+    pub fn create(
+        heap: &mut Heap,
+        is_reference_counted: bool,
+        symbol: Text,
+        value: impl Into<Option<InlineObject>>,
+    ) -> Self {
         let value = value.into();
-        let tag = Self(heap.allocate(HeapObject::KIND_TAG, 2 * HeapObject::WORD_SIZE));
+        let tag = Self(heap.allocate(
+            HeapObject::KIND_TAG,
+            is_reference_counted,
+            0,
+            2 * HeapObject::WORD_SIZE,
+        ));
         unsafe {
             *tag.symbol_pointer().as_mut() = symbol.into();
             *tag.value_pointer().as_mut() = value.map_or(0, |value| value.raw_word().get());
@@ -51,7 +61,7 @@ impl HeapTag {
     }
 
     pub fn without_value(self, heap: &mut Heap) -> Tag {
-        Tag::create(heap, self.symbol(), None)
+        Tag::create(heap, true, self.symbol(), None)
     }
 }
 

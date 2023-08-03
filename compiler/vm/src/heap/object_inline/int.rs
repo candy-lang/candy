@@ -55,9 +55,9 @@ impl InlineInt {
         let lhs = self.get();
         let rhs = rhs.get();
         lhs.checked_rem_euclid(rhs)
-            .map(|it| Int::create(heap, it))
+            .map(|it| Int::create(heap, true, it))
             .unwrap_or_else(|| {
-                Int::create_from_bigint(heap, BigInt::from(lhs).mod_floor(&rhs.into()))
+                Int::create_from_bigint(heap, true, BigInt::from(lhs).mod_floor(&rhs.into()))
             })
     }
 
@@ -72,11 +72,11 @@ impl InlineInt {
                 }
             }
         };
-        Tag::create_ordering(heap, ordering)
+        Tag::create_ordering(heap, true, ordering)
     }
 
-    operator_fn!(shift_left, i64::checked_shl, Shl::shl);
-    operator_fn!(shift_right, i64::checked_shr, Shr::shr);
+    shift_fn!(shift_left, i64::checked_shl, Shl::shl);
+    shift_fn!(shift_right, i64::checked_shr, Shr::shr);
 
     pub fn bit_length(self) -> Self {
         // SAFETY: The `bit_length` can be at most 62 since that's how large an [InlineInt] can get.
@@ -90,13 +90,39 @@ impl InlineInt {
 
 macro_rules! operator_fn {
     ($name:ident, $inline_operation:expr, $bigint_operation:expr) => {
-        pub fn $name(self, heap: &mut Heap, rhs: Self) -> Int {
+        pub fn $name(self, heap: &mut Heap, rhs: Int) -> Int {
+            let lhs = self.get();
+            match rhs {
+                Int::Inline(rhs) => rhs
+                    .try_get()
+                    .and_then(|rhs| $inline_operation(lhs, rhs))
+                    .map(|it| Int::create(heap, it))
+                    .unwrap_or_else(|| {
+                        Int::create_from_bigint(
+                            heap,
+                            $bigint_operation(BigInt::from(lhs), rhs.get()),
+                        )
+                    }),
+                Int::Heap(rhs) => {
+                    Int::create_from_bigint(heap, $bigint_operation(BigInt::from(lhs), rhs.get()))
+                }
+            }
+        }
+    };
+}
+macro_rules! shift_fn {
+    ($name:ident, $inline_operation:expr, $bigint_operation:expr) => {
+        pub fn $name(self, heap: &mut Heap, rhs: InlineInt) -> Int {
             let lhs = self.get();
             rhs.try_get()
                 .and_then(|rhs| $inline_operation(lhs, rhs))
-                .map(|it| Int::create(heap, it))
+                .map(|it| Int::create(heap, true, it))
                 .unwrap_or_else(|| {
-                    Int::create_from_bigint(heap, $bigint_operation(BigInt::from(lhs), rhs.get()))
+                    Int::create_from_bigint(
+                        heap,
+                        true,
+                        $bigint_operation(BigInt::from(lhs), rhs.get()),
+                    )
                 })
         }
     };
@@ -109,7 +135,7 @@ macro_rules! operator_fn_closed {
         }
     };
 }
-use {operator_fn, operator_fn_closed};
+use {operator_fn, operator_fn_closed, shift_fn};
 
 impl DebugDisplay for InlineInt {
     fn fmt(&self, f: &mut Formatter, _is_debug: bool) -> fmt::Result {

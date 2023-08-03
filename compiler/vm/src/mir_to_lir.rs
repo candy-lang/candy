@@ -46,9 +46,12 @@ where
 
     // The body instruction pointer of the module function will be changed from
     // zero to the correct one once the instructions are compiled.
-    let module_function = Function::create(&mut constant_heap, &[], 0, 0.into());
-    let responsible_module =
-        HirId::create(&mut constant_heap, hir::Id::new(module.clone(), vec![]));
+    let module_function = Function::create(&mut constant_heap, false, &[], 0, 0.into());
+    let responsible_module = HirId::create(
+        &mut constant_heap,
+        false,
+        hir::Id::new(module.clone(), vec![]),
+    );
 
     let mut lir = Lir {
         module: module.clone(),
@@ -144,11 +147,11 @@ impl<'c> LoweringContext<'c> {
     fn compile_expression(&mut self, id: Id, expression: &Expression) {
         match expression {
             Expression::Int(int) => {
-                let int = Int::create_from_bigint(&mut self.lir.constant_heap, int.clone());
+                let int = Int::create_from_bigint(&mut self.lir.constant_heap, false, int.clone());
                 self.constants.insert(id, int.into());
             }
             Expression::Text(text) => {
-                let text = Text::create(&mut self.lir.constant_heap, text);
+                let text = Text::create(&mut self.lir.constant_heap, false, text);
                 self.constants.insert(id, text.into());
             }
             Expression::Reference(referenced) => {
@@ -160,18 +163,18 @@ impl<'c> LoweringContext<'c> {
                 }
             }
             Expression::Tag { symbol, value } => {
-                let symbol = Text::create(&mut self.lir.constant_heap, symbol);
+                let symbol = Text::create(&mut self.lir.constant_heap, false, symbol);
 
                 if let Some(value) = value {
                     if let Some(value) = self.constants.get(value) {
-                        let tag = Tag::create(&mut self.lir.constant_heap, symbol, *value);
+                        let tag = Tag::create(&mut self.lir.constant_heap, false, symbol, *value);
                         self.constants.insert(id, tag.into());
                     } else {
                         self.emit_reference_to(*value);
                         self.emit(id, Instruction::CreateTag { symbol });
                     }
                 } else {
-                    let tag = Tag::create(&mut self.lir.constant_heap, symbol, None);
+                    let tag = Tag::create(&mut self.lir.constant_heap, false, symbol, None);
                     self.constants.insert(id, tag.into());
                 }
             }
@@ -185,7 +188,7 @@ impl<'c> LoweringContext<'c> {
                     .map(|item| self.constants.get(item).copied())
                     .collect::<Option<Vec<_>>>()
                 {
-                    let list = List::create(&mut self.lir.constant_heap, &items);
+                    let list = List::create(&mut self.lir.constant_heap, false, &items);
                     self.constants.insert(id, list.into());
                 } else {
                     for item in items {
@@ -207,7 +210,7 @@ impl<'c> LoweringContext<'c> {
                     .collect::<Option<Vec<_>>>()
                 {
                     let fields = fields.into_iter().tuples().collect();
-                    let struct_ = Struct::create(&mut self.lir.constant_heap, &fields);
+                    let struct_ = Struct::create(&mut self.lir.constant_heap, false, &fields);
                     self.constants.insert(id, struct_.into());
                 } else {
                     for (key, value) in fields {
@@ -223,7 +226,7 @@ impl<'c> LoweringContext<'c> {
                 }
             }
             Expression::HirId(hir_id) => {
-                let hir_id = HirId::create(&mut self.lir.constant_heap, hir_id.clone());
+                let hir_id = HirId::create(&mut self.lir.constant_heap, false, hir_id.clone());
                 self.constants.insert(id, hir_id.into());
             }
             Expression::Function {
@@ -251,6 +254,7 @@ impl<'c> LoweringContext<'c> {
                 if captured.is_empty() {
                     let list = Function::create(
                         &mut self.lir.constant_heap,
+                        false,
                         &[],
                         parameters.len(),
                         instructions,

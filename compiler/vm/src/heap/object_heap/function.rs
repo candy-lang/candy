@@ -20,13 +20,14 @@ pub struct HeapFunction(HeapObject);
 
 impl HeapFunction {
     const CAPTURED_LEN_SHIFT: usize = 32;
-    const ARGUMENT_COUNT_SHIFT: usize = 3;
+    const ARGUMENT_COUNT_SHIFT: usize = 4;
 
     pub fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
     pub fn create(
         heap: &mut Heap,
+        is_reference_counted: bool,
         captured: &[InlineObject],
         argument_count: usize,
         body: InstructionPointer,
@@ -48,8 +49,9 @@ impl HeapFunction {
         );
 
         let function = Self(heap.allocate(
-            HeapObject::KIND_FUNCTION
-                | ((captured_len as u64) << Self::CAPTURED_LEN_SHIFT)
+            HeapObject::KIND_FUNCTION,
+            is_reference_counted,
+            ((captured_len as u64) << Self::CAPTURED_LEN_SHIFT)
                 | ((argument_count as u64) << Self::ARGUMENT_COUNT_SHIFT),
             (1 + captured_len) * HeapObject::WORD_SIZE,
         ));
