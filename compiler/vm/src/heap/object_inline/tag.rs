@@ -1,7 +1,7 @@
 use super::InlineObjectTrait;
 use crate::{
     heap::{
-        object_heap::HeapObject, symbol_table::impl_ops_with_symbol_table_via_ops,
+        object_heap::HeapObject, symbol_table::impl_ord_with_symbol_table_via_ord,
         DisplayWithSymbolTable, Heap, InlineObject, SymbolId, SymbolTable,
     },
     utils::impl_eq_hash_ord_via_get,
@@ -71,4 +71,4 @@ impl InlineObjectTrait for InlineTag {
     }
 }
 
-impl_ops_with_symbol_table_via_ops!(InlineTag);
+impl_ord_with_symbol_table_via_ord!(InlineTag);
