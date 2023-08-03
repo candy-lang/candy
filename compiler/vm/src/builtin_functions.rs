@@ -10,7 +10,7 @@ use crate::{
 };
 use candy_frontend::{
     builtin_functions::BuiltinFunction,
-    print::{MaxLength, Precedence},
+    format::{MaxLength, Precedence},
 };
 use itertools::Itertools;
 use num_bigint::BigInt;
@@ -239,7 +239,7 @@ impl Heap {
 
     fn int_add(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |a: Int, b: Int| {
-            Return(a.add(self, &b).into())
+            Return(a.add(self, *b).into())
         })
     }
     fn int_bit_length(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -247,37 +247,37 @@ impl Heap {
     }
     fn int_bitwise_and(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |a: Int, b: Int| {
-            Return(a.bitwise_and(self, &b).into())
+            Return(a.bitwise_and(self, *b).into())
         })
     }
     fn int_bitwise_or(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |a: Int, b: Int| {
-            Return(a.bitwise_or(self, &b).into())
+            Return(a.bitwise_or(self, *b).into())
         })
     }
     fn int_bitwise_xor(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |a: Int, b: Int| {
-            Return(a.bitwise_xor(self, &b).into())
+            Return(a.bitwise_xor(self, *b).into())
         })
     }
     fn int_compare_to(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |a: Int, b: Int| {
-            Return(a.compare_to(self, &b).into())
+            Return(a.compare_to(self, *b).into())
         })
     }
     fn int_divide_truncating(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
-            Return(dividend.int_divide_truncating(self, &divisor).into())
+            Return(dividend.int_divide_truncating(self, *divisor).into())
         })
     }
     fn int_modulo(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
-            Return(dividend.modulo(self, &divisor).into())
+            Return(dividend.modulo(self, *divisor).into())
         })
     }
     fn int_multiply(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |factor_a: Int, factor_b: Int| {
-            Return(factor_a.multiply(self, &factor_b).into())
+            Return(factor_a.multiply(self, *factor_b).into())
         })
     }
     fn int_parse(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -291,22 +291,22 @@ impl Heap {
     }
     fn int_remainder(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
-            Return(dividend.remainder(self, &divisor).into())
+            Return(dividend.remainder(self, *divisor).into())
         })
     }
     fn int_shift_left(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Int, amount: Int| {
-            Return(value.shift_left(self, &amount).into())
+            Return(value.shift_left(self, *amount).into())
         })
     }
     fn int_shift_right(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Int, amount: Int| {
-            Return(value.shift_right(self, &amount).into())
+            Return(value.shift_right(self, *amount).into())
         })
     }
     fn int_subtract(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |minuend: Int, subtrahend: Int| {
-            Return(minuend.subtract(self, &subtrahend).into())
+            Return(minuend.subtract(self, *subtrahend).into())
         })
     }
 

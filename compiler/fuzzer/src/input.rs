@@ -1,4 +1,4 @@
-use candy_frontend::print::{MaxLength, Precedence};
+use candy_frontend::format::{MaxLength, Precedence};
 use candy_vm::heap::{Heap, InlineObject, ToDebugText};
 use itertools::Itertools;
 use std::{

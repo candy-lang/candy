@@ -3,10 +3,10 @@ use crate::{database::Database, utils::LspPositionConversion};
 use candy_frontend::{
     ast::{Assignment, AssignmentBody, AstDb, AstKind},
     ast_to_hir::AstToHir,
+    format::{MaxLength, Precedence},
     hir::{Expression, HirDb, Id},
     module::Module,
     position::Offset,
-    print::{MaxLength, Precedence},
 };
 use candy_fuzzer::{Fuzzer, RunResult, Status};
 use candy_vm::{

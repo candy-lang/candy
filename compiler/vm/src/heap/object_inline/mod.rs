@@ -9,7 +9,7 @@ use crate::{
     channel::ChannelId,
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
-use candy_frontend::print::{print, MaxLength, Precedence, PrintValue};
+use candy_frontend::format::{format_value, FormatValue, MaxLength, Precedence};
 use enum_dispatch::enum_dispatch;
 use extension_trait::extension_trait;
 use itertools::Itertools;
@@ -223,32 +223,26 @@ impl Deref for InlineData {
 #[extension_trait]
 pub impl ToDebugText for InlineObject {
     fn to_debug_text(self, precendence: Precedence, max_length: MaxLength) -> String {
-        print(self, precendence, max_length, &|value| {
+        format_value(self, precendence, max_length, &|value| {
             Some(match value.into() {
-                Data::Int(int) => PrintValue::Int((*int.get()).clone()),
-                Data::Tag(tag) => PrintValue::Tag {
-                    symbol: tag.symbol().get().to_string(),
+                Data::Int(int) => FormatValue::Int(int.get()),
+                Data::Tag(tag) => FormatValue::Tag {
+                    symbol: tag.symbol().get(),
                     value: tag.value(),
                 },
-                Data::Text(text) => PrintValue::Text(text.get().to_string()),
-                Data::List(list) => {
-                    let mut items = vec![];
-                    for i in 0..list.len() {
-                        items.push(list.get(i));
-                    }
-                    PrintValue::List(items)
-                }
-                Data::Struct(struct_) => PrintValue::Struct(
+                Data::Text(text) => FormatValue::Text(text.get()),
+                Data::List(list) => FormatValue::List(list.items()),
+                Data::Struct(struct_) => FormatValue::Struct(
                     struct_
                         .iter()
                         .map(|(_, key, value)| (key, value))
                         .collect_vec(),
                 ),
                 Data::HirId(_) => unreachable!(),
-                Data::Function(_) => PrintValue::Function,
-                Data::Builtin(_) => PrintValue::Function,
-                Data::SendPort(_) => PrintValue::SendPort,
-                Data::ReceivePort(_) => PrintValue::ReceivePort,
+                Data::Function(_) => FormatValue::Function,
+                Data::Builtin(_) => FormatValue::Function,
+                Data::SendPort(_) => FormatValue::SendPort,
+                Data::ReceivePort(_) => FormatValue::ReceivePort,
             })
         })
         .unwrap()

@@ -34,15 +34,16 @@ use super::{
 };
 use crate::{
     builtin_functions::BuiltinFunction,
+    format::{format_value, FormatValue, MaxLength, Precedence},
     id::IdGenerator,
     mir::{Body, Expression, Id, VisibleExpressions},
-    print::{print, MaxLength, Precedence, PrintValue},
 };
 use itertools::Itertools;
 use num_bigint::BigInt;
 use num_integer::Integer;
 use num_traits::{ToPrimitive, Zero};
 use std::{
+    borrow::Cow,
     cmp::Ordering,
     str::{self, FromStr},
 };
@@ -599,21 +600,22 @@ fn run_builtin(
             let [argument] = arguments else {
                 unreachable!()
             };
-            let formatted = print(*argument, Precedence::High, MaxLength::Unlimited, &|id| {
-                Some(match visible.get(id) {
-                    Expression::Int(int) => PrintValue::Int(int.clone()),
-                    Expression::Text(text) => PrintValue::Text(text.clone()),
-                    Expression::Tag { symbol, value } => PrintValue::Tag {
-                        symbol: symbol.clone(),
-                        value: *value,
-                    },
-                    Expression::Builtin(_) => PrintValue::Function,
-                    Expression::List(items) => PrintValue::List(items.clone()),
-                    Expression::Struct(entries) => PrintValue::Struct(entries.clone()),
-                    Expression::Function { .. } => PrintValue::Function,
-                    _ => return None,
-                })
-            })?;
+            let formatted =
+                format_value(*argument, Precedence::High, MaxLength::Unlimited, &|id| {
+                    Some(match visible.get(id) {
+                        Expression::Int(int) => FormatValue::Int(Cow::Borrowed(int)),
+                        Expression::Text(text) => FormatValue::Text(text),
+                        Expression::Tag { symbol, value } => FormatValue::Tag {
+                            symbol,
+                            value: *value,
+                        },
+                        Expression::Builtin(_) => FormatValue::Function,
+                        Expression::List(items) => FormatValue::List(items),
+                        Expression::Struct(entries) => FormatValue::Struct(entries.clone()),
+                        Expression::Function { .. } => FormatValue::Function,
+                        _ => return None,
+                    })
+                })?;
             formatted.into()
         }
         BuiltinFunction::Try => return None,

@@ -2,12 +2,13 @@
 
 use itertools::{EitherOrBoth, Itertools};
 use num_bigint::BigInt;
+use std::{borrow::Cow, ops::Sub};
 
-pub enum PrintValue<T> {
-    Int(BigInt),
-    Tag { symbol: String, value: Option<T> },
-    Text(String),
-    List(Vec<T>),
+pub enum FormatValue<'a, T> {
+    Int(Cow<'a, BigInt>),
+    Tag { symbol: &'a str, value: Option<T> },
+    Text(&'a str),
+    List(&'a [T]),
     Struct(Vec<(T, T)>),
     Function,
     SendPort,
@@ -36,18 +37,31 @@ impl MaxLength {
         }
     }
 }
+impl Sub<usize> for MaxLength {
+    type Output = MaxLength;
 
-/// Prints the value, using the visitor to match across possible values.
-pub fn print<T>(
+    fn sub(self, rhs: usize) -> Self::Output {
+        match self {
+            MaxLength::Unlimited => MaxLength::Unlimited,
+            MaxLength::Limited(n) => {
+                assert!(n >= rhs);
+                MaxLength::Limited(n - rhs)
+            }
+        }
+    }
+}
+
+/// Formats the value, using the visitor to match across possible values.
+pub fn format_value<'a, T: 'a + Copy>(
     value: T,
     precedence: Precedence,
     max_length: MaxLength,
-    visitor: &impl Fn(T) -> Option<PrintValue<T>>,
+    visitor: &impl Fn(T) -> Option<FormatValue<'a, T>>,
 ) -> Option<String> {
     // For each case, the different alternatives of printing are listed.
     // Depending on the available space, the best is chosen.
     Some(match visitor(value)? {
-        PrintValue::Int(int) => {
+        FormatValue::Int(int) => {
             // - int
             // - `…`
 
@@ -58,7 +72,7 @@ pub fn print<T>(
                 "…".to_string()
             }
         }
-        PrintValue::Tag { symbol, value } => {
+        FormatValue::Tag { symbol, value } => {
             // - full: `Tag Value` or `(Tag Value)` or `Tag`
             // - only symbol: `Tag …` or `(Tag …)` or `Tag`
             // - only structure: `… …` or `(… …)` or `…`
@@ -91,10 +105,10 @@ pub fn print<T>(
             if let Some(value) = value {
                 string.push(' ');
                 if symbol_fits {
-                    string.push_str(&print(
+                    string.push_str(&format_value(
                         value,
                         Precedence::High,
-                        length_needed_for_structure - 2 + symbol.len(),
+                        max_length - (length_needed_for_structure - 2 + symbol.len()),
                         visitor,
                     )?);
                 } else {
@@ -106,7 +120,7 @@ pub fn print<T>(
             }
             string
         }
-        PrintValue::Text(text) => {
+        FormatValue::Text(text) => {
             // - full text
             // - `…`
 
@@ -116,13 +130,13 @@ pub fn print<T>(
                 "…".to_string()
             }
         }
-        PrintValue::Function => {
+        FormatValue::Function => {
             // - `{ … }`
             // - `…`
 
             if max_length.fits(5) { "{ … }" } else { "…" }.to_string()
         }
-        PrintValue::List(list) => {
+        FormatValue::List(list) => {
             // - all items: `(Foo, Bar, Baz)`
             // - some items: `(Foo, Bar, + 2 more)`
             // - no items shown: `(list of 2 items)`
@@ -142,7 +156,8 @@ pub fn print<T>(
 
             let list_len = list.len();
             if list_len == 1 {
-                let item = print(item, Precedence::Low, MaxLength::Unlimited, visitor)?;
+                let item = list[0];
+                let item = format_value(item, Precedence::Low, MaxLength::Unlimited, visitor)?;
                 return if max_length.fits(item.len() + 3) {
                     Some(format!("({item},)"))
                 } else {
@@ -159,7 +174,7 @@ pub fn print<T>(
                     break;
                 }
 
-                let item = print(item, Precedence::Low, MaxLength::Unlimited, visitor)?;
+                let item = format_value(*item, Precedence::Low, MaxLength::Unlimited, visitor)?;
                 total_item_length += item.len();
                 items.push(item);
             }
@@ -187,7 +202,7 @@ pub fn print<T>(
                 "…".to_string()
             }
         }
-        PrintValue::Struct(entries) => {
+        FormatValue::Struct(entries) => {
             // - all entries: `[Foo: Bar, Baz: 2]`
             // - all keys, some values: `[Foo: Bar, Baz: …, Quz: …]`
             // - some keys: `[Foo: …, Bar: …, + 2 more]`
@@ -218,7 +233,7 @@ pub fn print<T>(
                     break;
                 }
 
-                let key = print(key, Precedence::Low, MaxLength::Unlimited, visitor)?;
+                let key = format_value(key, Precedence::Low, MaxLength::Unlimited, visitor)?;
                 total_keys_length += key.len();
                 texted_keys.push(key);
             }
@@ -254,7 +269,7 @@ pub fn print<T>(
             let mut texted_values = Vec::with_capacity(num_entries);
             let mut total_values_length = num_entries; // dots for every value
             for value in values {
-                let value = print(value, Precedence::Low, MaxLength::Unlimited, visitor)?;
+                let value = format_value(value, Precedence::Low, MaxLength::Unlimited, visitor)?;
                 total_values_length += value.len() - 1; // remove the dots, add the value
                 texted_values.push(value);
 
@@ -286,7 +301,7 @@ pub fn print<T>(
                 }
             }
 
-            Some(format!(
+            format!(
                 "[{}]",
                 texted_keys
                     .into_iter()
@@ -297,14 +312,14 @@ pub fn print<T>(
                         EitherOrBoth::Right(_) => unreachable!(),
                     })
                     .join(", "),
-            ))
+            )
         }
-        PrintValue::SendPort => match precedence {
+        FormatValue::SendPort => match precedence {
             Precedence::High => "(send port)",
             Precedence::Low => "send port",
         }
         .to_string(),
-        PrintValue::ReceivePort => match precedence {
+        FormatValue::ReceivePort => match precedence {
             Precedence::High => "(receive port)",
             Precedence::Low => "receive port",
         }
