@@ -112,7 +112,7 @@ impl StackTracer {
                     "{}:{} – {}:{}",
                     it.start.line, it.start.character, it.end.line, it.end.character,
                 ))
-                .unwrap_or_else(|| "<no location>".to_string())
+                .unwrap_or_else(|| "<no location>".to_owned()),
             );
             let call_string = format!(
                 "{} {}",

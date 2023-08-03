@@ -3,6 +3,7 @@ use self::{
     int::InlineInt,
     pointer::InlinePointer,
     port::{InlineReceivePort, InlineSendPort},
+    tag::InlineTag,
 };
 use super::{
     object_heap::HeapObject, Data, DisplayWithSymbolTable, Heap, OrdWithSymbolTable, SymbolTable,
@@ -23,6 +24,7 @@ pub(super) mod builtin;
 pub(super) mod int;
 pub(super) mod pointer;
 pub(super) mod port;
+pub(super) mod tag;
 
 #[extension_trait]
 pub impl InlineObjectSliceCloneToHeap for [InlineObject] {
@@ -45,15 +47,14 @@ pub impl InlineObjectSliceCloneToHeap for [InlineObject] {
 pub struct InlineObject(NonZeroU64);
 
 impl InlineObject {
-    pub const KIND_WIDTH: usize = 2;
-    pub const KIND_MASK: u64 = 0b11;
-    pub const KIND_POINTER: u64 = 0b00;
-    pub const KIND_INT: u64 = 0b01;
-    pub const KIND_PORT: u64 = 0b10;
-    pub const KIND_PORT_SUBKIND_MASK: u64 = 0b100;
-    pub const KIND_PORT_SUBKIND_SEND: u64 = 0b000;
-    pub const KIND_PORT_SUBKIND_RECEIVE: u64 = 0b100;
-    pub const KIND_BUILTIN: u64 = 0b11;
+    pub const KIND_WIDTH: usize = 3;
+    pub const KIND_MASK: u64 = 0b111;
+    pub const KIND_POINTER: u64 = 0b000;
+    pub const KIND_INT: u64 = 0b001;
+    pub const KIND_BUILTIN: u64 = 0b010;
+    pub const KIND_TAG: u64 = 0b011;
+    pub const KIND_SEND_PORT: u64 = 0b100;
+    pub const KIND_RECEIVE_PORT: u64 = 0b101;
 
     pub fn new(value: NonZeroU64) -> Self {
         Self(value)
@@ -151,9 +152,10 @@ pub trait InlineObjectTrait: Copy + Debug + DisplayWithSymbolTable + Eq + Hash {
 pub enum InlineData {
     Pointer(InlinePointer),
     Int(InlineInt),
+    Builtin(InlineBuiltin),
+    Tag(InlineTag),
     SendPort(InlineSendPort),
     ReceivePort(InlineReceivePort),
-    Builtin(InlineBuiltin),
 }
 impl InlineData {
     fn channel_id(&self) -> Option<ChannelId> {
@@ -167,24 +169,19 @@ impl InlineData {
 
 impl From<InlineObject> for InlineData {
     fn from(object: InlineObject) -> Self {
-        let value = object.0;
-        match value.get() & InlineObject::KIND_MASK {
-            InlineObject::KIND_POINTER => {
-                debug_assert_eq!(value.get() & 0b100, 0);
-                InlineData::Pointer(InlinePointer::new_unchecked(object))
-            }
+        let value = object.0.get();
+        match value & InlineObject::KIND_MASK {
+            InlineObject::KIND_POINTER => InlineData::Pointer(InlinePointer::new_unchecked(object)),
             InlineObject::KIND_INT => InlineData::Int(InlineInt::new_unchecked(object)),
-            InlineObject::KIND_PORT => match value.get() & InlineObject::KIND_PORT_SUBKIND_MASK {
-                InlineObject::KIND_PORT_SUBKIND_SEND => {
-                    InlineData::SendPort(InlineSendPort::new_unchecked(object))
-                }
-                InlineObject::KIND_PORT_SUBKIND_RECEIVE => {
-                    InlineData::ReceivePort(InlineReceivePort::new_unchecked(object))
-                }
-                _ => unreachable!(),
-            },
             InlineObject::KIND_BUILTIN => InlineData::Builtin(InlineBuiltin::new_unchecked(object)),
-            _ => unreachable!(),
+            InlineObject::KIND_TAG => InlineData::Tag(InlineTag::new_unchecked(object)),
+            InlineObject::KIND_SEND_PORT => {
+                InlineData::SendPort(InlineSendPort::new_unchecked(object))
+            }
+            InlineObject::KIND_RECEIVE_PORT => {
+                InlineData::ReceivePort(InlineReceivePort::new_unchecked(object))
+            }
+            _ => panic!("Unknown inline value type: {value:016x}"),
         }
     }
 }
@@ -194,9 +191,10 @@ impl Debug for InlineData {
         match self {
             InlineData::Pointer(value) => Debug::fmt(value, f),
             InlineData::Int(value) => Debug::fmt(value, f),
+            InlineData::Builtin(value) => Debug::fmt(value, f),
+            InlineData::Tag(value) => Debug::fmt(value, f),
             InlineData::SendPort(value) => Debug::fmt(value, f),
             InlineData::ReceivePort(value) => Debug::fmt(value, f),
-            InlineData::Builtin(value) => Debug::fmt(value, f),
         }
     }
 }
@@ -205,9 +203,10 @@ impl DisplayWithSymbolTable for InlineData {
         match self {
             InlineData::Pointer(value) => DisplayWithSymbolTable::fmt(value, f, symbol_table),
             InlineData::Int(value) => Display::fmt(value, f),
+            InlineData::Builtin(value) => Display::fmt(value, f),
+            InlineData::Tag(value) => DisplayWithSymbolTable::fmt(value, f, symbol_table),
             InlineData::SendPort(value) => Display::fmt(value, f),
             InlineData::ReceivePort(value) => Display::fmt(value, f),
-            InlineData::Builtin(value) => Display::fmt(value, f),
         }
     }
 }
@@ -219,9 +218,10 @@ impl Deref for InlineData {
         match self {
             InlineData::Pointer(value) => value,
             InlineData::Int(value) => value,
+            InlineData::Builtin(value) => value,
+            InlineData::Tag(value) => value,
             InlineData::SendPort(value) => value,
             InlineData::ReceivePort(value) => value,
-            InlineData::Builtin(value) => value,
         }
     }
 }

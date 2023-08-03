@@ -45,12 +45,12 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
 
 impl VmEnded {
     pub fn into_main_function(
-        mut self,
+        self,
         symbol_table: &SymbolTable,
     ) -> Result<(Heap, Function), String> {
         match self.reason {
             EndedReason::Finished(return_value) => {
-                match return_value_into_main_function(&mut self.heap, symbol_table, return_value) {
+                match return_value_into_main_function(symbol_table, return_value) {
                     Ok(main) => Ok((self.heap, main)),
                     Err(err) => Err(err.to_string()),
                 }
@@ -64,7 +64,6 @@ impl VmEnded {
 }
 
 pub fn return_value_into_main_function(
-    heap: &mut Heap,
     symbol_table: &SymbolTable,
     return_value: InlineObject,
 ) -> Result<Function, &'static str> {
@@ -74,9 +73,8 @@ pub fn return_value_into_main_function(
         DisplayWithSymbolTable::to_string(&exported_definitions, symbol_table),
     );
 
-    let main = Tag::create(heap, true, SymbolId::MAIN, None);
     exported_definitions
-        .get(main)
+        .get(Tag::create(SymbolId::MAIN))
         .ok_or("The module doesn't export a main function.")
         .and_then(|main| {
             main.try_into()

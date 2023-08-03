@@ -47,8 +47,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
 
     let main = match ended.reason {
         EndedReason::Finished(return_value) => {
-            return_value_into_main_function(&mut ended.heap, &lir.symbol_table, return_value)
-                .unwrap()
+            return_value_into_main_function(&lir.symbol_table, return_value).unwrap()
         }
         EndedReason::Panicked(panic) => {
             error!("The module panicked: {}", panic.reason);

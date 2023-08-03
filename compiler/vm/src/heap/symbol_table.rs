@@ -77,7 +77,7 @@ impl Default for SymbolTable {
     }
 }
 
-#[derive(Copy, Clone, Eq, From, Hash, PartialEq)]
+#[derive(Copy, Clone, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SymbolId(usize);
 impl SymbolId {
     // These symbols are created by built-in functions or used for starting the

@@ -54,12 +54,12 @@ impl InlineObjectGeneration for InlineObject {
             1 => Int::create_from_bigint(heap, true, rng.gen_bigint(10)).into(),
             2 => Text::create(heap, true, "test").into(),
             3 => {
-                let value = if rng.gen_bool(0.2) {
-                    Some(Self::generate(heap, rng, complexity - 10.0, symbol_table))
+                if rng.gen_bool(0.2) {
+                    let value = Self::generate(heap, rng, complexity - 10.0, symbol_table);
+                    Tag::create_with_value(heap, true, symbol_table.choose(rng), value).into()
                 } else {
-                    None
-                };
-                Tag::create(heap, true, symbol_table.choose(rng), value).into()
+                    Tag::create(symbol_table.choose(rng)).into()
+                }
             }
             4 => {
                 complexity -= 1.0;
@@ -106,17 +106,18 @@ impl InlineObjectGeneration for InlineObject {
             Data::Text(text) => mutate_string(rng, heap, text.get().to_string()).into(),
             Data::Tag(tag) => {
                 if rng.gen_bool(0.5) {
-                    Tag::create(heap, true, symbol_table.choose(rng), tag.value()).into()
+                    Tag::create_with_value_option(heap, true, symbol_table.choose(rng), tag.value())
+                        .into()
                 } else if let Some(value) = tag.value() {
                     if rng.gen_bool(0.9) {
                         let value = value.generate_mutated(heap, rng, symbol_table);
-                        Tag::create(heap, true, tag.symbol_id(), Some(value)).into()
+                        Tag::create_with_value(heap, true, tag.symbol_id(), value).into()
                     } else {
-                        tag.without_value(heap).into()
+                        tag.without_value().into()
                     }
                 } else {
                     let value = Self::generate(heap, rng, 100.0, symbol_table);
-                    Tag::create(heap, true, tag.symbol_id(), Some(value)).into()
+                    Tag::create_with_value(heap, true, tag.symbol_id(), value).into()
                 }
             }
             Data::List(list) => {

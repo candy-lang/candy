@@ -20,7 +20,7 @@ use std::{
 pub struct InlineBuiltin(InlineObject);
 
 impl InlineBuiltin {
-    const INDEX_SHIFT: usize = 2;
+    const INDEX_SHIFT: usize = 3;
 
     pub fn new_unchecked(object: InlineObject) -> Self {
         Self(object)

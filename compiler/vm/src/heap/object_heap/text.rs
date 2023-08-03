@@ -51,8 +51,8 @@ impl HeapText {
         unsafe { str::from_utf8_unchecked(slice::from_raw_parts(pointer, self.byte_len())) }
     }
 
-    pub fn is_empty(self, heap: &mut Heap) -> Tag {
-        Tag::create_bool(heap, true, self.get().is_empty())
+    pub fn is_empty(self) -> Tag {
+        Tag::create_bool(self.get().is_empty())
     }
     pub fn length(self, heap: &mut Heap) -> Int {
         Int::create(heap, true, self.get().graphemes(true).count())
@@ -65,14 +65,14 @@ impl HeapText {
             .collect_vec();
         List::create(heap, true, &characters)
     }
-    pub fn contains(self, heap: &mut Heap, pattern: Text) -> Tag {
-        Tag::create_bool(heap, true, self.get().contains(pattern.get()))
+    pub fn contains(self, pattern: Text) -> Tag {
+        Tag::create_bool(self.get().contains(pattern.get()))
     }
-    pub fn starts_with(self, heap: &mut Heap, prefix: Text) -> Tag {
-        Tag::create_bool(heap, true, self.get().starts_with(prefix.get()))
+    pub fn starts_with(self, prefix: Text) -> Tag {
+        Tag::create_bool(self.get().starts_with(prefix.get()))
     }
-    pub fn ends_with(self, heap: &mut Heap, suffix: Text) -> Tag {
-        Tag::create_bool(heap, true, self.get().ends_with(suffix.get()))
+    pub fn ends_with(self, suffix: Text) -> Tag {
+        Tag::create_bool(self.get().ends_with(suffix.get()))
     }
     pub fn get_range(self, heap: &mut Heap, range: Range<Int>) -> Text {
         // TODO: Support indices larger than usize.

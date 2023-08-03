@@ -170,15 +170,19 @@ impl<'c> LoweringContext<'c> {
 
                 if let Some(value) = value {
                     if let Some(value) = self.constants.get(value) {
-                        let tag =
-                            Tag::create(&mut self.lir.constant_heap, false, symbol_id, *value);
+                        let tag = Tag::create_with_value(
+                            &mut self.lir.constant_heap,
+                            false,
+                            symbol_id,
+                            *value,
+                        );
                         self.constants.insert(id, tag.into());
                     } else {
                         self.emit_reference_to(*value);
                         self.emit(id, Instruction::CreateTag { symbol_id });
                     }
                 } else {
-                    let tag = Tag::create(&mut self.lir.constant_heap, false, symbol_id, None);
+                    let tag = Tag::create(symbol_id);
                     self.constants.insert(id, tag.into());
                 }
             }

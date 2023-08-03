@@ -7,7 +7,7 @@ use candy_vm::{
     fiber::FiberId,
     heap::{
         Data, DataDiscriminants, DisplayWithSymbolTable, InlineObject, ObjectInHeap,
-        OrdWithSymbolTable,
+        OrdWithSymbolTable, Tag,
     },
 };
 use dap::{
@@ -164,7 +164,7 @@ impl PausedState {
                 }
             }
             VariablesKey::Inner(fiber_id, object) => match Data::from(**object) {
-                Data::Tag(tag) => {
+                Data::Tag(Tag::Heap(tag)) => {
                     if should_include_named {
                         if start == 0 && count > 0 {
                             let symbol_table = &self.vm_state.vm.lir().symbol_table;
@@ -190,30 +190,12 @@ impl PausedState {
 
                         if count > 0 {
                             let name = "Value".to_string();
-                            let value_variable = if let Some(value) = tag.value() {
-                                self.create_variable(*fiber_id, name, value, supports_variable_type)
-                            } else {
-                                Variable {
-                                    name,
-                                    value: "<empty>".to_string(),
-                                    type_field: if supports_variable_type {
-                                        Some("<empty>".to_string())
-                                    } else {
-                                        None
-                                    },
-                                    presentation_hint: Some(Self::presentation_hint_for(
-                                        DataDiscriminants::Tag,
-                                    )),
-                                    evaluate_name: None,
-                                    variables_reference: 0,
-                                    named_variables: Some(0),
-                                    indexed_variables: Some(0),
-                                    memory_reference: tag
-                                        .value()
-                                        .map(|it| MemoryReference::new(*fiber_id, it).to_dap()),
-                                }
-                            };
-                            variables.push(value_variable);
+                            variables.push(self.create_variable(
+                                *fiber_id,
+                                name,
+                                tag.value(),
+                                supports_variable_type,
+                            ));
                         }
                     }
                 }
@@ -309,7 +291,7 @@ impl PausedState {
 
         let (inner_variables_object, named_variables, indexed_variables) = match data {
             // TODO: support closure and ports
-            Data::Tag(tag) => (Some(**tag), 2, 0),
+            Data::Tag(Tag::Heap(tag)) => (Some(*tag), 2, 0),
             // One more field than the length since we add the “<length>” entry.
             Data::List(list) => (Some(**list), 1, list.len()),
             Data::Struct(struct_) => (Some(**struct_), struct_.len() + 1, 0),
