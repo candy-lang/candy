@@ -1,4 +1,5 @@
 use derive_more::From;
+use rand::Rng;
 use std::{
     borrow::Cow,
     cmp::{self, Ordering},
@@ -157,7 +158,7 @@ impl<T: OrdWithSymbolTable> OrdWithSymbolTable for [T] {
     }
 }
 
-macro_rules! impl_ops_with_symbol_table_via_ops {
+macro_rules! impl_ord_with_symbol_table_via_ord {
     ($type:ty) => {
         impl crate::heap::OrdWithSymbolTable for $type {
             fn cmp(
@@ -170,5 +171,4 @@ macro_rules! impl_ops_with_symbol_table_via_ops {
         }
     };
 }
-pub(crate) use impl_ops_with_symbol_table_via_ops;
-use rand::Rng;
+pub(crate) use impl_ord_with_symbol_table_via_ord;

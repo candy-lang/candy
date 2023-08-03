@@ -9,7 +9,7 @@ use super::{
         port::{InlineReceivePort, InlineSendPort},
         InlineData, InlineObject,
     },
-    symbol_table::{impl_ops_with_symbol_table_via_ops, DisplayWithSymbolTable},
+    symbol_table::{impl_ord_with_symbol_table_via_ord, DisplayWithSymbolTable},
     Heap, OrdWithSymbolTable, SymbolId, SymbolTable,
 };
 use crate::{
@@ -287,7 +287,7 @@ impl From<Int> for InlineObject {
 }
 impl_try_froms!(Int, "Expected an int.");
 impl_try_from_heap_object!(Int, "Expected an int.");
-impl_ops_with_symbol_table_via_ops!(Int);
+impl_ord_with_symbol_table_via_ord!(Int);
 
 // Tag
 
@@ -387,7 +387,7 @@ impl Text {
 impls_via_0!(Text);
 impl_try_froms!(Text, "Expected a text.");
 impl_try_from_heap_object!(Text, "Expected a text.");
-impl_ops_with_symbol_table_via_ops!(Text);
+impl_ord_with_symbol_table_via_ord!(Text);
 
 // List
 
@@ -459,7 +459,7 @@ impl Function {
 impls_via_0!(Function);
 impl_try_froms!(Function, "Expected a function.");
 impl_try_from_heap_object!(Function, "Expected a function.");
-impl_ops_with_symbol_table_via_ops!(Function);
+impl_ord_with_symbol_table_via_ord!(Function);
 
 // HIR ID
 
@@ -476,7 +476,7 @@ impl HirId {
 impls_via_0!(HirId);
 impl_try_froms!(HirId, "Expected a HIR ID.");
 impl_try_from_heap_object!(HirId, "Expected a HIR ID.");
-impl_ops_with_symbol_table_via_ops!(HirId);
+impl_ord_with_symbol_table_via_ord!(HirId);
 
 // Builtin
 
@@ -490,7 +490,7 @@ impl Builtin {
 }
 
 impls_via_0!(Builtin);
-impl_ops_with_symbol_table_via_ops!(Builtin);
+impl_ord_with_symbol_table_via_ord!(Builtin);
 
 // Send Port
 
@@ -504,7 +504,7 @@ impl SendPort {
 }
 
 impls_via_0!(SendPort);
-impl_ops_with_symbol_table_via_ops!(SendPort);
+impl_ord_with_symbol_table_via_ord!(SendPort);
 impl_try_froms!(SendPort, "Expected a send port.");
 
 // Receive Port
@@ -519,7 +519,7 @@ impl ReceivePort {
 }
 
 impls_via_0!(ReceivePort);
-impl_ops_with_symbol_table_via_ops!(ReceivePort);
+impl_ord_with_symbol_table_via_ord!(ReceivePort);
 impl_try_froms!(ReceivePort, "Expected a receive port.");
 
 // Utils

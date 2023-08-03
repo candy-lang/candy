@@ -1,7 +1,7 @@
 use super::InlineObjectTrait;
 use crate::{
     heap::{
-        object_heap::HeapObject, symbol_table::impl_ops_with_symbol_table_via_ops, Heap,
+        object_heap::HeapObject, symbol_table::impl_ord_with_symbol_table_via_ord, Heap,
         InlineObject,
     },
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
@@ -92,4 +92,4 @@ impl InlineObjectTrait for InlineBuiltin {
     }
 }
 
-impl_ops_with_symbol_table_via_ops!(InlineBuiltin);
+impl_ord_with_symbol_table_via_ord!(InlineBuiltin);

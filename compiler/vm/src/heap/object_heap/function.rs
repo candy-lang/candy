@@ -2,7 +2,7 @@ use super::{utils::heap_object_impls, HeapObjectTrait};
 use crate::{
     fiber::InstructionPointer,
     heap::{
-        object_heap::HeapObject, symbol_table::impl_ops_with_symbol_table_via_ops, Heap,
+        object_heap::HeapObject, symbol_table::impl_ord_with_symbol_table_via_ord, Heap,
         InlineObject,
     },
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
@@ -188,4 +188,4 @@ impl HeapObjectTrait for HeapFunction {
     fn deallocate_external_stuff(self) {}
 }
 
-impl_ops_with_symbol_table_via_ops!(HeapFunction);
+impl_ord_with_symbol_table_via_ord!(HeapFunction);
