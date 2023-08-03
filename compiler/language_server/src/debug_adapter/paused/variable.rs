@@ -68,7 +68,7 @@ impl PausedState {
                             variables.extend(
                                 parameters
                                     .iter()
-                                    .map(|it| it.keys.last().unwrap().to_string())
+                                    .map(|it| ToString::to_string(&it.keys.last().unwrap()))
                                     .zip_eq(call.arguments.to_owned())
                                     .skip(start)
                                     .take(count)
@@ -92,7 +92,7 @@ impl PausedState {
                                         // TODO: resolve argument name
                                         self.create_variable(
                                             stack_frame_key.fiber_id,
-                                            (start + index).to_string(),
+                                            ToString::to_string(&(start + index)),
                                             *object,
                                             supports_variable_type,
                                         )
@@ -233,7 +233,7 @@ impl PausedState {
                             |(index, object)| {
                                 self.create_variable(
                                     *fiber_id,
-                                    (start + index).to_string(),
+                                    ToString::to_string(&(start + index)),
                                     *object,
                                     supports_variable_type,
                                 )
@@ -288,7 +288,7 @@ impl PausedState {
     fn create_length_variable(length: usize, supports_variable_type: bool) -> Variable {
         Variable {
             name: "<length>".to_string(),
-            value: length.to_string(),
+            value: ToString::to_string(&length),
             type_field: Self::type_field_for(DataDiscriminants::Int, supports_variable_type),
             presentation_hint: Some(Self::presentation_hint_for(DataDiscriminants::Int)),
             evaluate_name: None,

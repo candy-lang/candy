@@ -282,7 +282,7 @@ impl Heap {
         unpack_and_later_drop!(self, args, |text: Text| {
             let result = match BigInt::from_str(text.get()) {
                 Ok(int) => Ok(Int::create_from_bigint(self, true, int).into()),
-                Err(err) => Err(Text::create(self, true, &err.to_string()).into()),
+                Err(err) => Err(Text::create(self, true, &ToString::to_string(&err)).into()),
             };
             Return(Tag::create_result(self, true, result).into())
         })

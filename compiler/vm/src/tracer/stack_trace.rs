@@ -146,7 +146,7 @@ impl StackTracer {
 fn extract_receiver_name(cst_kind: &CstKind) -> Option<String> {
     match cst_kind {
         CstKind::TrailingWhitespace { child, .. } => extract_receiver_name(child),
-        CstKind::Identifier(identifier) => Some(identifier.to_string()),
+        CstKind::Identifier(identifier) => Some(ToString::to_string(identifier)),
         CstKind::Parenthesized { inner, .. } => extract_receiver_name(inner),
         CstKind::StructAccess { struct_, key, .. } => {
             let struct_string = extract_receiver_name(struct_)?;

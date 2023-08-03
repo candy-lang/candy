@@ -100,12 +100,10 @@ impl PausedState {
                 let function = functions.iter().next().unwrap();
 
                 let source = Source {
-                    name: Some(function.module.to_string()),
-                    path: Some(
-                        module_to_url(&function.module, &db.packages_path)
-                            .unwrap()
-                            .to_string(),
-                    ),
+                    name: Some(ToString::to_string(&function.module)),
+                    path: Some(ToString::to_string(
+                        &module_to_url(&function.module, &db.packages_path).unwrap(),
+                    )),
                     source_reference: None,
                     presentation_hint: if lir.module.package == function.module.package {
                         PresentationHint::Emphasize
