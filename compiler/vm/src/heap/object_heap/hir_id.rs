@@ -1,6 +1,6 @@
 use super::{utils::heap_object_impls, HeapObjectTrait};
 use crate::{
-    heap::{object_heap::HeapObject, symbol_table::impl_ops_with_symbol_table_via_ops, Heap},
+    heap::{object_heap::HeapObject, symbol_table::impl_ord_with_symbol_table_via_ord, Heap},
     utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_ord_via_get, DebugDisplay},
 };
 use candy_frontend::hir::Id;
@@ -72,4 +72,4 @@ impl HeapObjectTrait for HeapHirId {
     }
 }
 
-impl_ops_with_symbol_table_via_ops!(HeapHirId);
+impl_ord_with_symbol_table_via_ord!(HeapHirId);
