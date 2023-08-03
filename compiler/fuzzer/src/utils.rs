@@ -1,16 +1,10 @@
 use candy_frontend::hir::Id;
 use candy_vm::{
     fiber::FiberId,
-    heap::{Function, Heap, Tag, Text},
+    heap::{Function, Heap},
     tracer::{FiberTracer, TracedFiberEnded, Tracer},
 };
-use rustc_hash::{FxHashMap, FxHashSet};
-
-pub fn collect_symbols_in_heap(heap: &Heap) -> FxHashSet<Text> {
-    heap.iter()
-        .filter_map(|object| Tag::try_from(object).ok().map(|it| it.symbol()))
-        .collect()
-}
+use rustc_hash::FxHashMap;
 
 #[derive(Default)]
 pub struct FuzzablesFinder {

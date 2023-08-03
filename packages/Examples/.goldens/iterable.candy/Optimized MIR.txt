@@ -1236,17 +1236,18 @@ $1139 = { $1140 $1141 (+ responsible $1142) ->
   $1149 = call $1102 with $1140 $1141 ($104 is responsible)
   $1150 = call $222 with $1149 $243 ($3 is responsible)
 }
-# Core:int:isLessThanOrEqualTo
-$1151 = { $1152 $1153 (+ responsible $1154) ->
-  $1155 = call $237 with $1152 ($50 is responsible)
-  $1156 = call $222 with $1155 $245 ($3 is responsible)
-  $1157 = call $349 with $1156 $313 $1154 ($112 is responsible)
-  $1158 = call $237 with $1153 ($50 is responsible)
-  $1159 = call $222 with $1158 $245 ($3 is responsible)
-  $1160 = call $349 with $1159 $314 $1154 ($113 is responsible)
-  $1161 = call $1139 with $1152 $1153 ($110 is responsible)
-  $1162 = call $758 with $1161 ($111 is responsible)
+# Core:int:isNonNegative
+$1151 = { $1152 (+ responsible $1153) ->
+  $1154 = call $237 with $1152 ($50 is responsible)
+  $1155 = call $222 with $1154 $245 ($3 is responsible)
+  $1156 = call $349 with $1155 $315 $1153 ($117 is responsible)
+  $1157 = call $237 with $1152 ($50 is responsible)
+  $1158 = call $222 with $1157 $245 ($3 is responsible)
+  $1159 = call $349 with $1158 $315 $118 ($114 is responsible)
+  $1160 = call $1127 with $1152 $263 ($115 is responsible)
+  $1161 = call $758 with $1160 ($116 is responsible)
 }
+$1162 = ($252, $277)
 # Core:function:is1
 $1163 = { $1164 (+ responsible $1165) ->
   $1166 = call $237 with $1164 ($50 is responsible)
@@ -1261,18 +1262,17 @@ $1163 = { $1164 (+ responsible $1165) ->
   }
   $1175 = call $495 with $1167 $1168 $377 ($93 is responsible)
 }
-# Core:int:isNonNegative
-$1176 = { $1177 (+ responsible $1178) ->
-  $1179 = call $237 with $1177 ($50 is responsible)
-  $1180 = call $222 with $1179 $245 ($3 is responsible)
-  $1181 = call $349 with $1180 $315 $1178 ($117 is responsible)
-  $1182 = call $237 with $1177 ($50 is responsible)
-  $1183 = call $222 with $1182 $245 ($3 is responsible)
-  $1184 = call $349 with $1183 $315 $118 ($114 is responsible)
-  $1185 = call $1127 with $1177 $263 ($115 is responsible)
-  $1186 = call $758 with $1185 ($116 is responsible)
+# Core:int:isLessThanOrEqualTo
+$1176 = { $1177 $1178 (+ responsible $1179) ->
+  $1180 = call $237 with $1177 ($50 is responsible)
+  $1181 = call $222 with $1180 $245 ($3 is responsible)
+  $1182 = call $349 with $1181 $313 $1179 ($112 is responsible)
+  $1183 = call $237 with $1178 ($50 is responsible)
+  $1184 = call $222 with $1183 $245 ($3 is responsible)
+  $1185 = call $349 with $1184 $314 $1179 ($113 is responsible)
+  $1186 = call $1139 with $1177 $1178 ($110 is responsible)
+  $1187 = call $758 with $1186 ($111 is responsible)
 }
-$1187 = ($252, $277)
 # Core:result:is
 $1188 = { $1189 (+ responsible $1190) ->
   $1191 = call $237 with $1189 ($177 is responsible)
@@ -1294,7 +1294,7 @@ $1188 = { $1189 (+ responsible $1190) ->
       $1205 = { (responsible $1206) ->
         $1207 = call $236 with $262 ($177 is responsible)
         $1208 = call $236 with $1199 ($177 is responsible)
-        $1209 = $1187
+        $1209 = $1162
       }
       $1210 = call $224 with $1200 $1201 $1205 ($177 is responsible)
     }
@@ -1348,7 +1348,7 @@ $1188 = { $1189 (+ responsible $1190) ->
         $1252 = { (responsible $1253) ->
           $1254 = call $236 with $262 ($177 is responsible)
           $1255 = call $236 with $1246 ($177 is responsible)
-          $1256 = $1187
+          $1256 = $1162
         }
         $1257 = call $224 with $1247 $1248 $1252 ($177 is responsible)
       }
@@ -1437,7 +1437,7 @@ $1309 = { $1310 $1311 $1312 (+ responsible $1313) ->
       $1334 = { (responsible $1335) ->
         $1336 = call $236 with $262 ($198 is responsible)
         $1337 = call $236 with $1328 ($198 is responsible)
-        $1338 = $1187
+        $1338 = $1162
       }
       $1339 = call $224 with $1329 $1330 $1334 ($198 is responsible)
     }
@@ -1493,7 +1493,7 @@ $1309 = { $1310 $1311 $1312 (+ responsible $1313) ->
         $1383 = { (responsible $1384) ->
           $1385 = call $236 with $262 ($198 is responsible)
           $1386 = call $236 with $1377 ($198 is responsible)
-          $1387 = $1187
+          $1387 = $1162
         }
         $1388 = call $224 with $1378 $1379 $1383 ($198 is responsible)
       }
@@ -1633,14 +1633,14 @@ $1507 = { $1508 $1509 (+ responsible $1510) ->
   $1517 = call $1476 with $1508 ($159 is responsible)
   # Core:list:isValidIndex:22
   $1518 = { (responsible $1519) ->
-    $1520 = call $1176 with $1509 ($160 is responsible)
+    $1520 = call $1151 with $1509 ($160 is responsible)
   }
   $1521 = call $495 with $1517 $377 $1518 ($161 is responsible)
   # Core:list:isValidIndex:32
   $1522 = { (responsible $1523) ->
     $1524 = call $1491 with $1508 ($162 is responsible)
     $1525 = call $1290 with $1524 ($163 is responsible)
-    $1526 = call $1151 with $1509 $1525 ($164 is responsible)
+    $1526 = call $1176 with $1509 $1525 ($164 is responsible)
   }
   $1527 = call $856 with $1521 $1522 ($165 is responsible)
 }

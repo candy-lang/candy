@@ -192,34 +192,26 @@ impl DebugSession {
                     evaluated_expressions: TracingMode::All,
                 };
                 let lir = compile_lir(&self.db, module.clone(), tracing.clone()).0;
-                let (mut heap, main, constant_mapping) =
-                    match Vm::for_module(&lir, &mut DummyTracer)
-                        .run_until_completion(&mut DummyTracer)
-                        .into_main_function()
-                    {
-                        Ok(result) => result,
-                        Err(error) => {
-                            error!("Failed to find main function: {error}");
-                            return Err("program-invalid");
-                        }
-                    };
+                let (mut heap, main) = match Vm::for_module(&lir, &mut DummyTracer)
+                    .run_until_completion(&mut DummyTracer)
+                    .into_main_function(&lir.symbol_table)
+                {
+                    Ok(result) => result,
+                    Err(error) => {
+                        error!("Failed to find main function: {error}");
+                        return Err("program-invalid");
+                    }
+                };
 
                 let mut vm = Vm::uninitialized(Rc::new(lir));
                 self.send_response_ok(request.seq, ResponseBody::Launch)
                     .await;
 
                 // Run the `main` function.
-                let environment = Struct::create(&mut heap, &FxHashMap::default()).into();
-                let platform = HirId::create(&mut heap, Id::platform());
+                let environment = Struct::create(&mut heap, true, &FxHashMap::default()).into();
+                let platform = HirId::create(&mut heap, true, Id::platform());
                 let mut tracer = DebugTracer;
-                vm.initialize_for_function(
-                    heap,
-                    constant_mapping,
-                    main,
-                    &[environment],
-                    platform,
-                    &mut tracer,
-                );
+                vm.initialize_for_function(heap, main, &[environment], platform, &mut tracer);
 
                 let mut execution_controller = RunLimitedNumberOfInstructions::new(10000);
                 // TODO: remove when we support pause and continue

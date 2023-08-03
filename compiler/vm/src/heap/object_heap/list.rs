@@ -1,14 +1,14 @@
 use super::{utils::heap_object_impls, HeapObjectTrait};
-use crate::{
-    heap::{object_heap::HeapObject, Heap, InlineObject},
-    utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
+use crate::heap::{
+    object_heap::HeapObject, DisplayWithSymbolTable, Heap, InlineObject, OrdWithSymbolTable,
+    SymbolTable,
 };
 use derive_more::Deref;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use std::{
     cmp::Ordering,
-    fmt::{self, Formatter},
+    fmt::{self, Debug, Formatter},
     hash::{Hash, Hasher},
     num::NonZeroU64,
     ptr::{self, NonNull},
@@ -19,25 +19,27 @@ use std::{
 pub struct HeapList(HeapObject);
 
 impl HeapList {
-    const LEN_SHIFT: usize = 3;
+    const LEN_SHIFT: usize = 4;
 
     pub fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
-    pub fn create(heap: &mut Heap, value: &[InlineObject]) -> Self {
+    pub fn create(heap: &mut Heap, is_reference_counted: bool, value: &[InlineObject]) -> Self {
         let len = value.len();
-        let list = Self::create_uninitialized(heap, len);
+        let list = Self::create_uninitialized(heap, is_reference_counted, len);
         unsafe { ptr::copy_nonoverlapping(value.as_ptr(), list.items_pointer().as_ptr(), len) };
         list
     }
-    fn create_uninitialized(heap: &mut Heap, len: usize) -> Self {
+    fn create_uninitialized(heap: &mut Heap, is_reference_counted: bool, len: usize) -> Self {
         assert_eq!(
             (len << Self::LEN_SHIFT) >> Self::LEN_SHIFT,
             len,
             "List is too long.",
         );
         Self(heap.allocate(
-            HeapObject::KIND_LIST | ((len as u64) << Self::LEN_SHIFT),
+            HeapObject::KIND_LIST,
+            is_reference_counted,
+            (len as u64) << Self::LEN_SHIFT,
             len * HeapObject::WORD_SIZE,
         ))
     }
@@ -65,7 +67,7 @@ impl HeapList {
         assert!(index <= self.len());
 
         let len = self.len() + 1;
-        let new_list = Self::create_uninitialized(heap, len);
+        let new_list = Self::create_uninitialized(heap, true, len);
         unsafe {
             ptr::copy_nonoverlapping(
                 self.content_word_pointer(0).as_ptr(),
@@ -86,7 +88,7 @@ impl HeapList {
         assert!(index < self.len());
 
         let len = self.len() - 1;
-        let new_list = Self::create_uninitialized(heap, len);
+        let new_list = Self::create_uninitialized(heap, true, len);
         unsafe {
             ptr::copy_nonoverlapping(
                 self.content_word_pointer(0).as_ptr(),
@@ -105,14 +107,28 @@ impl HeapList {
     pub fn replace(self, heap: &mut Heap, index: usize, value: InlineObject) -> Self {
         assert!(index < self.len());
 
-        let new_list = Self::create(heap, self.items());
+        let new_list = Self::create(heap, true, self.items());
         unsafe { ptr::write(new_list.content_word_pointer(index).cast().as_ptr(), value) };
         new_list
     }
 }
 
-impl DebugDisplay for HeapList {
-    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
+impl Debug for HeapList {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let items = self.items();
+        write!(
+            f,
+            "({})",
+            if items.is_empty() {
+                ",".to_owned()
+            } else {
+                items.iter().map(|item| format!("{:?}", item)).join(", ")
+            },
+        )
+    }
+}
+impl DisplayWithSymbolTable for HeapList {
+    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
         let items = self.items();
         write!(
             f,
@@ -122,13 +138,12 @@ impl DebugDisplay for HeapList {
             } else {
                 items
                     .iter()
-                    .map(|item| DebugDisplay::to_string(item, is_debug))
+                    .map(|item| DisplayWithSymbolTable::to_string(item, symbol_table))
                     .join(", ")
             },
         )
     }
 }
-impl_debug_display_via_debugdisplay!(HeapList);
 
 impl Eq for HeapList {}
 impl PartialEq for HeapList {
@@ -143,14 +158,9 @@ impl Hash for HeapList {
     }
 }
 
-impl Ord for HeapList {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.items().cmp(other.items())
-    }
-}
-impl PartialOrd for HeapList {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+impl OrdWithSymbolTable for HeapList {
+    fn cmp(&self, symbol_table: &SymbolTable, other: &Self) -> Ordering {
+        OrdWithSymbolTable::cmp(self.items(), symbol_table, other.items())
     }
 }
 

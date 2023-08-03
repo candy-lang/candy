@@ -8,7 +8,7 @@ use candy_frontend::{ast_to_hir::AstToHir, hir, TracingConfig};
 use candy_vm::{
     execution_controller::RunForever,
     fiber::EndedReason,
-    heap::{HirId, SendPort, Struct},
+    heap::{HirId, SendPort, Struct, SymbolId},
     mir_to_lir::compile_lir,
     return_value_into_main_function,
     tracer::stack_trace::StackTracer,
@@ -47,7 +47,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
 
     let main = match ended.reason {
         EndedReason::Finished(return_value) => {
-            return_value_into_main_function(&mut ended.heap, return_value).unwrap()
+            return_value_into_main_function(&lir.symbol_table, return_value).unwrap()
         }
         EndedReason::Panicked(panic) => {
             error!("The module panicked: {}", panic.reason);
@@ -57,7 +57,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
             }
             error!(
                 "This is the stack trace:\n{}",
-                tracer.format_panic_stack_trace_to_root_fiber(&db),
+                tracer.format_panic_stack_trace_to_root_fiber(&db, &lir.as_ref().symbol_table),
             );
             return Err(Exit::CodePanicked);
         }
@@ -69,20 +69,19 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     let mut stdout = StdoutService::new(&mut vm);
     let mut stdin = StdinService::new(&mut vm);
     let fields = [
-        ("Stdout", SendPort::create(&mut ended.heap, stdout.channel)),
-        ("Stdin", SendPort::create(&mut ended.heap, stdin.channel)),
+        (
+            SymbolId::STDOUT,
+            SendPort::create(&mut ended.heap, stdout.channel),
+        ),
+        (
+            SymbolId::STDIN,
+            SendPort::create(&mut ended.heap, stdin.channel),
+        ),
     ];
-    let environment = Struct::create_with_symbol_keys(&mut ended.heap, fields).into();
+    let environment = Struct::create_with_symbol_keys(&mut ended.heap, true, fields).into();
     let mut tracer = StackTracer::default();
-    let platform = HirId::create(&mut ended.heap, hir::Id::platform());
-    vm.initialize_for_function(
-        ended.heap,
-        ended.constant_mapping,
-        main,
-        &[environment],
-        platform,
-        &mut tracer,
-    );
+    let platform = HirId::create(&mut ended.heap, true, hir::Id::platform());
+    vm.initialize_for_function(ended.heap, main, &[environment], platform, &mut tracer);
     loop {
         match vm.status() {
             Status::CanRun => {
@@ -106,7 +105,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
             error!("{} is responsible.", panic.responsible);
             error!(
                 "This is the stack trace:\n{}",
-                tracer.format_panic_stack_trace_to_root_fiber(&db),
+                tracer.format_panic_stack_trace_to_root_fiber(&db, &lir.as_ref().symbol_table),
             );
             Err(Exit::CodePanicked)
         }

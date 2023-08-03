@@ -1,6 +1,8 @@
 use super::{InlineObject, InlineObjectTrait};
 use crate::{
-    heap::{object_heap::HeapObject, Heap, Int, Tag},
+    heap::{
+        object_heap::HeapObject, symbol_table::impl_ord_with_symbol_table_via_ord, Heap, Int, Tag,
+    },
     utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_ord_via_get, DebugDisplay},
 };
 use derive_more::Deref;
@@ -19,7 +21,7 @@ use std::{
 #[derive(Clone, Copy, Deref)]
 pub struct InlineInt(InlineObject);
 impl InlineInt {
-    const VALUE_SHIFT: usize = 2;
+    const VALUE_SHIFT: usize = 3;
 
     pub fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
@@ -55,13 +57,13 @@ impl InlineInt {
         let lhs = self.get();
         let rhs = rhs.get();
         lhs.checked_rem_euclid(rhs)
-            .map(|it| Int::create(heap, it))
+            .map(|it| Int::create(heap, true, it))
             .unwrap_or_else(|| {
-                Int::create_from_bigint(heap, BigInt::from(lhs).mod_floor(&rhs.into()))
+                Int::create_from_bigint(heap, true, BigInt::from(lhs).mod_floor(&rhs.into()))
             })
     }
 
-    pub fn compare_to(self, heap: &mut Heap, rhs: Int) -> Tag {
+    pub fn compare_to(self, rhs: Int) -> Tag {
         let ordering = match rhs {
             Int::Inline(rhs) => self.get().cmp(&rhs.get()),
             Int::Heap(rhs) => {
@@ -72,14 +74,14 @@ impl InlineInt {
                 }
             }
         };
-        Tag::create_ordering(heap, ordering)
+        Tag::create_ordering(ordering)
     }
 
-    operator_fn!(shift_left, i64::checked_shl, Shl::shl);
-    operator_fn!(shift_right, i64::checked_shr, Shr::shr);
+    shift_fn!(shift_left, i64::checked_shl, Shl::shl);
+    shift_fn!(shift_right, i64::checked_shr, Shr::shr);
 
     pub fn bit_length(self) -> Self {
-        // SAFETY: The `bit_length` can be at most 62 since that's how large an [InlineInt] can get.
+        // SAFETY: The `bit_length` can be at most 61 since that's how large an [InlineInt] can get.
         Self::from_unchecked(self.get().bit_length().into())
     }
 
@@ -90,13 +92,42 @@ impl InlineInt {
 
 macro_rules! operator_fn {
     ($name:ident, $inline_operation:expr, $bigint_operation:expr) => {
-        pub fn $name(self, heap: &mut Heap, rhs: Self) -> Int {
+        pub fn $name(self, heap: &mut Heap, rhs: Int) -> Int {
+            let lhs = self.get();
+            match rhs {
+                Int::Inline(rhs) => rhs
+                    .try_get()
+                    .and_then(|rhs| $inline_operation(lhs, rhs))
+                    .map(|it| Int::create(heap, true, it))
+                    .unwrap_or_else(|| {
+                        Int::create_from_bigint(
+                            heap,
+                            true,
+                            $bigint_operation(BigInt::from(lhs), rhs.get()),
+                        )
+                    }),
+                Int::Heap(rhs) => Int::create_from_bigint(
+                    heap,
+                    true,
+                    $bigint_operation(BigInt::from(lhs), rhs.get()),
+                ),
+            }
+        }
+    };
+}
+macro_rules! shift_fn {
+    ($name:ident, $inline_operation:expr, $bigint_operation:expr) => {
+        pub fn $name(self, heap: &mut Heap, rhs: InlineInt) -> Int {
             let lhs = self.get();
             rhs.try_get()
                 .and_then(|rhs| $inline_operation(lhs, rhs))
-                .map(|it| Int::create(heap, it))
+                .map(|it| Int::create(heap, true, it))
                 .unwrap_or_else(|| {
-                    Int::create_from_bigint(heap, $bigint_operation(BigInt::from(lhs), rhs.get()))
+                    Int::create_from_bigint(
+                        heap,
+                        true,
+                        $bigint_operation(BigInt::from(lhs), rhs.get()),
+                    )
                 })
         }
     };
@@ -109,7 +140,7 @@ macro_rules! operator_fn_closed {
         }
     };
 }
-use {operator_fn, operator_fn_closed};
+use {operator_fn, operator_fn_closed, shift_fn};
 
 impl DebugDisplay for InlineInt {
     fn fmt(&self, f: &mut Formatter, _is_debug: bool) -> fmt::Result {
@@ -150,6 +181,7 @@ impl InlineObjectTrait for InlineInt {
         self
     }
 }
+impl_ord_with_symbol_table_via_ord!(InlineInt);
 
 #[extension_trait]
 pub impl I64BitLength for i64 {
