@@ -88,7 +88,7 @@
 <replaced address 1f7f425104eb027d>: Core:int:isLessThanOrEqualTo:22
 <replaced address 1f92019f89733a43>: Builtins::structGet:12
 <replaced address 1ffd3ce5d39e6737>: Core:bool:implies:15
-<replaced address 20e1ceab206d71d7>: Core:iterable:fromList:18:14
+<replaced address 202928edc3808909>: Core:iterable:fromList:18:16
 <replaced address 2139dc2c20fbaa1b>: Core:function:run:14
 <replaced address 216d199efe6cdff8>: Builtins::intAdd:18
 <replaced address 216fe28efc28719a>: "T"
@@ -107,6 +107,7 @@
 <replaced address 2a49f90398e279ec>: Core:int:isGreaterThan:9
 <replaced address 2ace5f047eecfe6e>: Builtins::ifElse:1
 <replaced address 2b86f7c05e384778>: Core:bool:implies:12
+<replaced address 2c6b8985ab075218>: Core:iterable:fromList:18:13
 <replaced address 2d7b1f5b83d52eb9>: Core:iterable:next:4
 <replaced address 2ded061b072e15be>: { 0 arguments (capturing nothing) → ip-0 }
 <replaced address 2e3261d9e8e8bfdb>: { 1 argument (capturing nothing) → ip-2911 }
@@ -204,6 +205,7 @@
 <replaced address 7363e3c30c346d69>: "`is value` was not satisfied"
 <replaced address 73eaa23646acedf5>: ", got `"
 <replaced address 76845d10d5032c42>: Core:iterable:fromList:18:l
+<replaced address 769d4ba24a77db09>: Core:iterable:fromList:18:14:12
 <replaced address 7755b34ecc5f0823>: ", got "
 <replaced address 775a8fa4d727f34d>: Core:result:mapOrElse:30:5
 <replaced address 777626645553ab83>: Core:list:isValidIndex:32:11
@@ -249,13 +251,13 @@
 <replaced address 9467827b874a1a94>: Builtins::functionRun:5
 <replaced address 94de2b63568838d2>: Core:function:is1:11:3
 <replaced address 957eb8ad35ecdba0>: "`else | getArgumentCount | equals 0` was not satisfied"
-<replaced address 95a7813bcb61ba69>: Core:iterable:fromList:18:15:12
 <replaced address 95b819d0185b1449>: Core:result:unwrap:2
 <replaced address 981e31bca969e352>: Builtins::listGet:11
 <replaced address 98ae198b488e0614>: { 0 arguments (capturing nothing) → ip-4482 }
 <replaced address 98fa7969bea08801>: Core:bool:not:6
 <replaced address 996cc5f08093ac25>: "`struct | typeIs Struct` was not satisfied"
 <replaced address 998b33832a916631>: Core:result:map:20
+<replaced address 99f321ef4732649a>: Core:iterable:fromList:18:14:27
 <replaced address 9a411ed2de02bbfd>: "`else | typeIs Function` was not satisfied"
 <replaced address 9a873ad1d21541fd>: Core:result:mapOrElse:26
 <replaced address 9d49365893dd0ffa>: Core:controlFlow:recursive:18:6
@@ -299,7 +301,6 @@
 <replaced address b7bd58c88404a425>: Builtins::functionRun:16
 <replaced address b7d5083e90b08e9b>: Builtins::getArgumentCount:11
 <replaced address b8b69173b8bcca28>: Core:int:isLessThan:9
-<replaced address b8fd5788c81c43fa>: Core:iterable:fromList:18:15:27
 <replaced address ba8faee21655e5cb>: Core:result:mapOrElse:30:value
 <replaced address bb8b9dffa870ebfc>: { 1 argument (capturing nothing) → ip-1788 }
 <replaced address bc3f0fb63b05190e>: Core:result:mapOr:16
@@ -326,7 +327,6 @@
 <replaced address cce05d6723c81e42>: Core:bool:lazyOr:2
 <replaced address cdc7e272cd311398>: Builtins::ifElse:15
 <replaced address cdd9df6917689dc5>: "`function.is1 mapper` was not satisfied"
-<replaced address ceac67369c5e7e74>: Core:iterable:fromList:18:17
 <replaced address d0344ef34ae9af75>: "b"
 <replaced address d2877dbebb582d65>: Builtins::listGet:16
 <replaced address d37a1b85f6d3863d>: "`is list` was not satisfied"
@@ -5662,11 +5662,11 @@
 5071: panic
 5072: popMultipleBelowTop 3
 5073: return
-# Core:iterable:fromList:18:15
+# Core:iterable:fromList:18:14
 5074: pushConstant <replaced address 26dc4e3288b7ce33> { 2 arguments (capturing nothing) → ip-949 }
 5075: pushFromStack 2
 5076: pushFromStack 4
-5077: pushConstant <replaced address 95a7813bcb61ba69> Core:iterable:fromList:18:15:12
+5077: pushConstant <replaced address 769d4ba24a77db09> Core:iterable:fromList:18:14:12
 5078: call with 2 arguments
 5079: pushConstant inline builtinTypeOf
 5080: pushFromStack 4
@@ -5680,7 +5680,7 @@
 5088: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
 5089: pushFromStack 1
 5090: pushConstant <replaced address 65869b7b7c4defee> "`a | typeIs Int` was not satisfied"
-5091: pushConstant <replaced address b8fd5788c81c43fa> Core:iterable:fromList:18:15:27
+5091: pushConstant <replaced address 99f321ef4732649a> Core:iterable:fromList:18:14:27
 5092: pushConstant <replaced address 440a4a2e9e3a80bb> Builtins::intAdd:5
 5093: call with 3 arguments
 5094: pushConstant inline builtinIntAdd
@@ -5753,7 +5753,7 @@
 5160: pushConstant <replaced address 1eebed190220741b> { 2 arguments (capturing nothing) → ip-4093 }
 5161: pushFromStack 2
 5162: pushFromStack 2
-5163: pushConstant <replaced address 20e1ceab206d71d7> Core:iterable:fromList:18:14
+5163: pushConstant <replaced address 2c6b8985ab075218> Core:iterable:fromList:18:13
 5164: call with 2 arguments
 5165: pushFromStack 1
 5166: pushFromStack 3
@@ -5762,7 +5762,7 @@
 5169: pushFromStack 4
 5170: pushFromStack 2
 5171: pushConstant <replaced address 98ae198b488e0614> { 0 arguments (capturing nothing) → ip-4482 }
-5172: pushConstant <replaced address ceac67369c5e7e74> Core:iterable:fromList:18:17
+5172: pushConstant <replaced address 202928edc3808909> Core:iterable:fromList:18:16
 5173: tailCall with 20 locals and 3 arguments
 # Examples:iterable:22:0
 5174: pushConstant inline builtinTypeOf

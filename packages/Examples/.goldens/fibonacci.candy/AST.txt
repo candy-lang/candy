@@ -3,62 +3,62 @@ assignment: identifier $6@"builtins" =
   call identifier $0@"use" with these arguments:
     text
       textPart $2@"Builtins"
-assignment: $41@"recursive" := function (fuzzable) { $42@"initialArg" $43@"body" ->
-  assignment: identifier $31@"recurse" = 
-    function (non-fuzzable) { $9@"recurse" $10@"arg" ->
-      assignment: identifier $20@"rec" = 
-        function (non-fuzzable) { $11@"arg" ->
-          call identifier $12@"recurse" with these arguments:
-            identifier $14@"recurse"
-            identifier $16@"arg"
+assignment: $44@"recursive" := function (fuzzable) { identifier $45@"initialArg" identifier $47@"body" ->
+  assignment: identifier $34@"recurse" = 
+    function (non-fuzzable) { identifier $9@"recurse" identifier $11@"arg" ->
+      assignment: identifier $23@"rec" = 
+        function (non-fuzzable) { identifier $13@"arg" ->
+          call identifier $15@"recurse" with these arguments:
+            identifier $17@"recurse"
+            identifier $19@"arg"
         }
-      call identifier $23@"body" with these arguments:
-        identifier $25@"rec"
-        identifier $27@"arg"
+      call identifier $26@"body" with these arguments:
+        identifier $28@"rec"
+        identifier $30@"arg"
     }
-  call identifier $34@"recurse" with these arguments:
-    identifier $36@"recurse"
-    identifier $38@"initialArg"
+  call identifier $37@"recurse" with these arguments:
+    identifier $39@"recurse"
+    identifier $41@"initialArg"
 }
-assignment: $60@"compareTo" := function (fuzzable) { $61@"valueA" $62@"valueB" ->
-  assignment: identifier $55@"result" = 
-    call struct access identifier $47@"builtins".$49@"IntCompareTo" with these arguments:
-      identifier $45@"valueA"
-      identifier $51@"valueB"
-  identifier $58@"result"
+assignment: $65@"compareTo" := function (fuzzable) { identifier $66@"valueA" identifier $68@"valueB" ->
+  assignment: identifier $60@"result" = 
+    call struct access identifier $52@"builtins".$54@"IntCompareTo" with these arguments:
+      identifier $50@"valueA"
+      identifier $56@"valueB"
+  identifier $63@"result"
 }
-assignment: $78@"isLessThan" := function (fuzzable) { $79@"valueA" $80@"valueB" ->
-  call struct access identifier $64@"builtins".$66@"Equals" with these arguments:
-    call identifier $68@"compareTo" with these arguments:
-      identifier $70@"valueA"
-      identifier $72@"valueB"
-    symbol $75@"Less"
+assignment: $85@"isLessThan" := function (fuzzable) { identifier $86@"valueA" identifier $88@"valueB" ->
+  call struct access identifier $71@"builtins".$73@"Equals" with these arguments:
+    call identifier $75@"compareTo" with these arguments:
+      identifier $77@"valueA"
+      identifier $79@"valueB"
+    symbol $82@"Less"
 }
-assignment: $136@"fibonacci" = function (fuzzable) { $137@"n" ->
-  call identifier $82@"recursive" with these arguments:
-    identifier $84@"n"
-    function (non-fuzzable) { $86@"recurse" $87@"n" ->
-      call struct access identifier $88@"builtins".$90@"IfElse" with these arguments:
-        call identifier $94@"isLessThan" with these arguments:
-          identifier $92@"n"
+assignment: $147@"fibonacci" = function (fuzzable) { identifier $148@"n" ->
+  call identifier $91@"recursive" with these arguments:
+    identifier $93@"n"
+    function (non-fuzzable) { identifier $95@"recurse" identifier $97@"n" ->
+      call struct access identifier $99@"builtins".$101@"IfElse" with these arguments:
+        call identifier $105@"isLessThan" with these arguments:
+          identifier $103@"n"
           int 2
         function (non-fuzzable) {
-          identifier $99@"n"
+          identifier $110@"n"
         }
         function (non-fuzzable) {
-          call struct access identifier $114@"builtins".$116@"IntAdd" with these arguments:
-            call identifier $102@"recurse" with these arguments:
-              call struct access identifier $106@"builtins".$108@"IntSubtract" with these arguments:
-                identifier $104@"n"
+          call struct access identifier $125@"builtins".$127@"IntAdd" with these arguments:
+            call identifier $113@"recurse" with these arguments:
+              call struct access identifier $117@"builtins".$119@"IntSubtract" with these arguments:
+                identifier $115@"n"
                 int 1
-            call identifier $118@"recurse" with these arguments:
-              call struct access identifier $122@"builtins".$124@"IntSubtract" with these arguments:
-                identifier $120@"n"
+            call identifier $129@"recurse" with these arguments:
+              call struct access identifier $133@"builtins".$135@"IntSubtract" with these arguments:
+                identifier $131@"n"
                 int 2
         }
     }
 }
-assignment: $143@"main" := function (fuzzable) { $144@"environment" ->
-  call identifier $139@"fibonacci" with these arguments:
+assignment: $155@"main" := function (fuzzable) { identifier $156@"environment" ->
+  call identifier $151@"fibonacci" with these arguments:
     int 15
 }
