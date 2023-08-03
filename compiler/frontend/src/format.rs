@@ -4,12 +4,12 @@ use itertools::{EitherOrBoth, Itertools};
 use num_bigint::BigInt;
 use std::{borrow::Cow, ops::Sub};
 
-pub enum FormatValue<'a, T> {
+pub enum FormatValue<'a, T: Copy> {
     Int(Cow<'a, BigInt>),
     Tag { symbol: &'a str, value: Option<T> },
     Text(&'a str),
     List(&'a [T]),
-    Struct(Vec<(T, T)>),
+    Struct(Cow<'a, Vec<(T, T)>>),
     Function,
     SendPort,
     ReceivePort,
@@ -221,7 +221,7 @@ pub fn format_value<'a, T: 'a + Copy>(
 
             let mut keys = Vec::with_capacity(num_entries);
             let mut total_keys_length = 0;
-            for (key, _) in &entries {
+            for (key, _) in &*entries {
                 // surrounding brackets, keys, and for each key colon + space + dots + comma + space
                 if !max_length.fits(total_keys_length + keys.len() * 5) {
                     break;
@@ -256,8 +256,8 @@ pub fn format_value<'a, T: 'a + Copy>(
 
             let mut values = Vec::with_capacity(num_entries);
             let mut total_values_length = num_entries; // dots for every value
-            for (_, value) in entries {
-                let value = format_value(value, Precedence::Low, MaxLength::Unlimited, visitor)?;
+            for (_, value) in &*entries {
+                let value = format_value(*value, Precedence::Low, MaxLength::Unlimited, visitor)?;
                 total_values_length += value.len() - 1; // remove the dots, add the value
                 values.push(value);
 

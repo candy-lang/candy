@@ -144,7 +144,6 @@ impl Insight {
         let call_span = db
             .hir_id_to_display_span(panic.responsible.clone())
             .unwrap();
-            // .unwrap_or_else(|| Offset(0)..Offset(0));
         let call_span = db.range_to_lsp_range(module, call_span);
 
         Insight::Diagnostic(Diagnostic::error(call_span, panic.reason.to_string()))

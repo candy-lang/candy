@@ -611,7 +611,7 @@ fn run_builtin(
                         },
                         Expression::Builtin(_) => FormatValue::Function,
                         Expression::List(items) => FormatValue::List(items),
-                        Expression::Struct(entries) => FormatValue::Struct(entries.clone()),
+                        Expression::Struct(entries) => FormatValue::Struct(Cow::Borrowed(entries)),
                         Expression::Function { .. } => FormatValue::Function,
                         _ => return None,
                     })

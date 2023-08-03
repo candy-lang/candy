@@ -15,6 +15,7 @@ use extension_trait::extension_trait;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use std::{
+    borrow::Cow,
     cmp::Ordering,
     fmt::{self, Formatter},
     hash::{Hash, Hasher},
@@ -232,12 +233,12 @@ pub impl ToDebugText for InlineObject {
                 },
                 Data::Text(text) => FormatValue::Text(text.get()),
                 Data::List(list) => FormatValue::List(list.items()),
-                Data::Struct(struct_) => FormatValue::Struct(
+                Data::Struct(struct_) => FormatValue::Struct(Cow::Owned(
                     struct_
                         .iter()
                         .map(|(_, key, value)| (key, value))
                         .collect_vec(),
-                ),
+                )),
                 Data::HirId(_) => unreachable!(),
                 Data::Function(_) => FormatValue::Function,
                 Data::Builtin(_) => FormatValue::Function,
