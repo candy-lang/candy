@@ -30,7 +30,7 @@ impl InlineTag {
 
 impl Debug for InlineTag {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "<symbol-id {}>", self.get().value())
+        write!(f, "{:?}", self.get())
     }
 }
 impl DisplayWithSymbolTable for InlineTag {
