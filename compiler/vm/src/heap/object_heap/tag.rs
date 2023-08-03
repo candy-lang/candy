@@ -1,13 +1,14 @@
 use super::{utils::heap_object_impls, HeapObjectTrait};
-use crate::{
-    heap::{object_heap::HeapObject, Heap, InlineObject, Tag, Text},
-    utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
+use crate::heap::{
+    object_heap::HeapObject,
+    symbol_table::{DisplayWithSymbolTable, OrdWithSymbolTable},
+    Heap, InlineObject, SymbolId, SymbolTable,
 };
 use derive_more::Deref;
 use rustc_hash::FxHashMap;
 use std::{
     cmp::Ordering,
-    fmt::{self, Formatter},
+    fmt::{self, Debug, Formatter},
     hash::{Hash, Hasher},
     num::NonZeroU64,
     ptr::NonNull,
@@ -18,84 +19,91 @@ use std::{
 pub struct HeapTag(HeapObject);
 
 impl HeapTag {
+    const SYMBOL_ID_SHIFT: usize = 4;
+
     pub fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
-    pub fn create(heap: &mut Heap, symbol: Text, value: impl Into<Option<InlineObject>>) -> Self {
+    pub fn create(
+        heap: &mut Heap,
+        is_reference_counted: bool,
+        symbol_id: SymbolId,
+        value: impl Into<InlineObject>,
+    ) -> Self {
+        let symbol_id = symbol_id.value();
+        debug_assert_eq!(
+            (symbol_id << Self::SYMBOL_ID_SHIFT) >> Self::SYMBOL_ID_SHIFT,
+            symbol_id,
+            "Symbol ID is too large.",
+        );
+
         let value = value.into();
-        let tag = Self(heap.allocate(HeapObject::KIND_TAG, 2 * HeapObject::WORD_SIZE));
+        let tag = Self(heap.allocate(
+            HeapObject::KIND_TAG,
+            is_reference_counted,
+            (symbol_id as u64) << Self::SYMBOL_ID_SHIFT,
+            2 * HeapObject::WORD_SIZE,
+        ));
         unsafe {
-            *tag.symbol_pointer().as_mut() = symbol.into();
-            *tag.value_pointer().as_mut() = value.map_or(0, |value| value.raw_word().get());
+            *tag.value_pointer().as_mut() = value.raw_word().get();
         };
         tag
     }
 
-    fn symbol_pointer(self) -> NonNull<InlineObject> {
-        self.content_word_pointer(0).cast()
-    }
-    pub fn symbol(self) -> Text {
-        let symbol = unsafe { *self.symbol_pointer().as_ref() };
-        symbol.try_into().unwrap()
+    pub fn symbol_id(self) -> SymbolId {
+        let header_word = self.header_word();
+        SymbolId::from((header_word >> Self::SYMBOL_ID_SHIFT) as usize)
     }
 
     fn value_pointer(self) -> NonNull<u64> {
-        self.content_word_pointer(1)
+        self.content_word_pointer(0)
     }
-    pub fn has_value(self) -> bool {
-        unsafe { *self.value_pointer().as_ref() != 0 }
-    }
-    pub fn value(self) -> Option<InlineObject> {
+    pub fn value(self) -> InlineObject {
         let value = unsafe { *self.value_pointer().as_ref() };
-        NonZeroU64::new(value).map(InlineObject::new)
-    }
-
-    pub fn without_value(self, heap: &mut Heap) -> Tag {
-        Tag::create(heap, self.symbol(), None)
+        InlineObject::new(NonZeroU64::new(value).unwrap())
     }
 }
 
-impl DebugDisplay for HeapTag {
-    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
+impl Debug for HeapTag {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.symbol_id())?;
+
+        write!(f, " ({:?})", self.value())
+    }
+}
+impl DisplayWithSymbolTable for HeapTag {
+    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
         // We can always use the display formatter since the symbol has a constrained charset.
-        write!(f, "{}", self.symbol().get())?;
+        write!(f, "{}", symbol_table.get(self.symbol_id()))?;
 
-        if let Some(value) = self.value() {
-            write!(f, " (")?;
-            DebugDisplay::fmt(&value, f, is_debug)?;
-            write!(f, ")")?;
-        }
-        Ok(())
+        write!(
+            f,
+            " ({})",
+            DisplayWithSymbolTable::to_string(&self.value(), symbol_table),
+        )
     }
 }
-impl_debug_display_via_debugdisplay!(HeapTag);
 
 impl Eq for HeapTag {}
 impl PartialEq for HeapTag {
     fn eq(&self, other: &Self) -> bool {
-        self.symbol() == other.symbol() && self.value() == other.value()
+        self.symbol_id() == other.symbol_id() && self.value() == other.value()
     }
 }
 
 impl Hash for HeapTag {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.symbol().hash(state);
-        if let Some(value) = self.value() {
-            value.hash(state);
-        }
+        self.symbol_id().hash(state);
+        self.value().hash(state);
     }
 }
 
-impl Ord for HeapTag {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.symbol()
-            .cmp(&other.symbol())
-            .then_with(|| self.value().cmp(&other.value()))
-    }
-}
-impl PartialOrd for HeapTag {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+impl OrdWithSymbolTable for HeapTag {
+    fn cmp(&self, symbol_table: &SymbolTable, other: &Self) -> Ordering {
+        symbol_table
+            .get(self.symbol_id())
+            .cmp(symbol_table.get(other.symbol_id()))
+            .then_with(|| self.value().cmp(symbol_table, &other.value()))
     }
 }
 
@@ -112,22 +120,15 @@ impl HeapObjectTrait for HeapTag {
         clone: HeapObject,
         address_map: &mut FxHashMap<HeapObject, HeapObject>,
     ) {
-        let symbol = self.symbol().clone_to_heap_with_mapping(heap, address_map);
-        let value = self
-            .value()
-            .map(|it| it.clone_to_heap_with_mapping(heap, address_map));
+        let value = self.value().clone_to_heap_with_mapping(heap, address_map);
         let clone = Self(clone);
         unsafe {
-            *clone.symbol_pointer().as_mut() = symbol.into();
-            *clone.value_pointer().as_mut() = value.map_or(0, |it| it.raw_word().get());
+            *clone.value_pointer().as_mut() = value.raw_word().get();
         };
     }
 
     fn drop_children(self, heap: &mut Heap) {
-        self.symbol().drop(heap);
-        if let Some(value) = self.value() {
-            value.drop(heap);
-        }
+        self.value().drop(heap);
     }
 
     fn deallocate_external_stuff(self) {}

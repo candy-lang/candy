@@ -2,7 +2,9 @@ use crate::{
     cst::{CstError, CstKind},
     module::{Module, ModuleDb, ModuleKind, Package},
     rcst::Rcst,
+    rich_ir::{RichIrBuilder, ToRichIr, TokenType},
 };
+use enumset::EnumSet;
 use std::{str, sync::Arc};
 
 #[salsa::query_group(StringToRcstStorage)]
@@ -32,8 +34,19 @@ fn rcst(db: &dyn StringToRcst, module: Module) -> RcstResult {
     Ok(Arc::new(parse_rcst(source)))
 }
 pub fn parse_rcst(source: &str) -> Vec<Rcst> {
-    let (rest, mut rcsts) = parse::body(source, 0);
+    let (mut rest, mut rcsts) = parse::body(source, 0);
     if !rest.is_empty() {
+        let trailing_newline = if rest.len() >= 2
+                && let Some((newline_rest, newline)) = parse::newline(&rest[rest.len() - 2..])
+                && newline_rest.is_empty() {
+            rest = &rest[..rest.len() - 2];
+            Some(newline)
+        } else if let Some((_, newline)) = parse::newline(&rest[rest.len() - 1..]) {
+            rest = &rest[..rest.len() - 1];
+            Some(newline)
+        } else {
+            None
+        };
         rcsts.push(
             CstKind::Error {
                 unparsable_input: rest.to_string(),
@@ -41,6 +54,9 @@ pub fn parse_rcst(source: &str) -> Vec<Rcst> {
             }
             .into(),
         );
+        if let Some(trailing_newline) = trailing_newline {
+            rcsts.push(trailing_newline);
+        }
     }
     rcsts
 }
@@ -51,6 +67,17 @@ pub enum ModuleError {
     InvalidUtf8,
     IsNotCandy,
     IsToolingModule,
+}
+impl ToRichIr for ModuleError {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        let text = match self {
+            ModuleError::DoesNotExist => return,
+            ModuleError::InvalidUtf8 => "# Invalid UTF-8",
+            ModuleError::IsNotCandy => "# Is not Candy code",
+            ModuleError::IsToolingModule => "# Is a tooling module",
+        };
+        builder.push(text, TokenType::Comment, EnumSet::empty());
+    }
 }
 
 impl CstKind<()> {
@@ -192,7 +219,7 @@ mod parse {
         literal(input, "#").map(|it| (it, CstKind::Octothorpe.into()))
     }
     #[instrument(level = "trace")]
-    fn newline(input: &str) -> Option<(&str, Rcst)> {
+    pub(super) fn newline(input: &str) -> Option<(&str, Rcst)> {
         let newlines = vec!["\n", "\r\n"];
         for newline in newlines {
             if let Some(input) = literal(input, newline) {

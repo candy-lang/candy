@@ -7,7 +7,10 @@ use candy_frontend::{
     module::Module,
 };
 use candy_fuzzer::{Fuzzer, RunResult, Status};
-use candy_vm::{fiber::Panic, heap::InlineObject};
+use candy_vm::{
+    fiber::Panic,
+    heap::{DisplayWithSymbolTable, InlineObject, SymbolTable},
+};
 use extension_trait::extension_trait;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
 use serde::{Deserialize, Serialize};
@@ -36,7 +39,12 @@ pub enum HintKind {
 }
 
 impl Insight {
-    pub fn for_value(db: &Database, id: Id, value: InlineObject) -> Option<Self> {
+    pub fn for_value(
+        db: &Database,
+        symbol_table: &SymbolTable,
+        id: Id,
+        value: InlineObject,
+    ) -> Option<Self> {
         let Some(hir) = db.find_expression(id.clone()) else {
             return None;
         };
@@ -62,12 +70,15 @@ impl Insight {
                     return None;
                 }
 
-                value.to_string()
+                DisplayWithSymbolTable::to_string(&value, symbol_table)
             }
             Expression::PatternIdentifierReference { .. } => {
                 let body = db.containing_body_of(id.clone());
                 let name = body.identifiers.get(&id).unwrap();
-                format!("{name} = {value}")
+                format!(
+                    "{name} = {}",
+                    DisplayWithSymbolTable::to_string(&value, symbol_table)
+                )
             }
             _ => return None,
         };
@@ -91,7 +102,6 @@ impl Insight {
                 function_coverage.relative_coverage()
             }
             Status::FoundPanic { .. } => 1., // TODO: not correct
-            Status::TotalCoverageButNoPanic => 1.,
         };
         let function_name = id.function_name();
         let interesting_inputs = fuzzer.input_pool().interesting_inputs();
@@ -115,7 +125,13 @@ impl Insight {
                 RunResult::Done(return_value) => Hint {
                     kind: HintKind::SampleInputReturningNormally,
                     position: end_of_line,
-                    text: format!("{function_name} {input} = {}", return_value.object),
+                    text: format!(
+                        "{function_name} {input} = {}",
+                        DisplayWithSymbolTable::to_string(
+                            &return_value.object,
+                            &fuzzer.lir().symbol_table,
+                        ),
+                    ),
                 },
                 RunResult::NeedsUnfulfilled { .. } => Hint {
                     kind: HintKind::SampleInputPanickingWithCallerResponsible,
@@ -139,7 +155,10 @@ impl Insight {
             .unwrap();
         let call_span = db.range_to_lsp_range(module, call_span);
 
-        Insight::Diagnostic(Diagnostic::error(call_span, panic.reason.to_string()))
+        Insight::Diagnostic(Diagnostic::error(
+            call_span,
+            ToString::to_string(&panic.reason),
+        ))
     }
 }
 

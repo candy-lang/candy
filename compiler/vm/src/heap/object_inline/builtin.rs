@@ -1,6 +1,9 @@
 use super::InlineObjectTrait;
 use crate::{
-    heap::{object_heap::HeapObject, Heap, InlineObject},
+    heap::{
+        object_heap::HeapObject, symbol_table::impl_ord_with_symbol_table_via_ord, Heap,
+        InlineObject,
+    },
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
 use candy_frontend::builtin_functions::{self, BuiltinFunction};
@@ -17,7 +20,7 @@ use std::{
 pub struct InlineBuiltin(InlineObject);
 
 impl InlineBuiltin {
-    const INDEX_SHIFT: usize = 2;
+    const INDEX_SHIFT: usize = 3;
 
     pub fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
@@ -88,3 +91,5 @@ impl InlineObjectTrait for InlineBuiltin {
         self
     }
 }
+
+impl_ord_with_symbol_table_via_ord!(InlineBuiltin);

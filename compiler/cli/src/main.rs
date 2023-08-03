@@ -1,3 +1,5 @@
+#![feature(lazy_cell)]
+
 use clap::Parser;
 use tracing::{debug, Level, Metadata};
 use tracing_subscriber::{
@@ -42,10 +44,10 @@ async fn main() -> ProgramResult {
     init_logger(should_log_to_stdout);
 
     match options {
-        CandyOptions::Debug(options) => debug::debug(options),
-        CandyOptions::Check(options) => check::check(options),
         CandyOptions::Run(options) => run::run(options),
+        CandyOptions::Check(options) => check::check(options),
         CandyOptions::Fuzz(options) => fuzz::fuzz(options),
+        CandyOptions::Debug(options) => debug::debug(options),
         CandyOptions::Lsp => lsp::lsp().await,
         CandyOptions::Inkwell(options) => inkwell::compile(options),
     }
@@ -55,11 +57,13 @@ type ProgramResult = Result<(), Exit>;
 #[derive(Debug)]
 enum Exit {
     CodePanicked,
+    DirectoryNotFound,
     FileNotFound,
     FuzzingFoundFailingCases,
     NotInCandyPackage,
     CodeContainsErrors,
     LLVMError(String),
+    GoldOutdated,
 }
 
 fn init_logger(use_stdout: bool) {

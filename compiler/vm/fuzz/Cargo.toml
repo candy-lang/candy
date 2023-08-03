@@ -15,7 +15,7 @@ libfuzzer-sys = "0.4"
 salsa = "0.16.1"
 
 [[bin]]
-name = "fuzz_vm"
-path = "fuzz_targets/fuzz_vm.rs"
+name = "vm"
+path = "fuzz_targets/vm.rs"
 test = false
 doc = false

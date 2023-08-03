@@ -131,7 +131,7 @@ pub fn format_csts<'a>(
 }
 
 fn split_leading_whitespace(start_offset: Offset, csts: &[Cst]) -> (ExistingWhitespace, &[Cst]) {
-    let first_expression_index = csts.iter().find_position(|cst| {
+    let first_expression_index = csts.iter().position(|cst| {
         !matches!(
             cst.kind,
             CstKind::Whitespace(_)
@@ -143,12 +143,11 @@ fn split_leading_whitespace(start_offset: Offset, csts: &[Cst]) -> (ExistingWhit
                 | CstKind::Comment { .. },
         )
     });
-    let (leading_whitespace, rest) =
-        if let Some((first_expression_index, _)) = first_expression_index {
-            csts.split_at(first_expression_index)
-        } else {
-            (csts, [].as_slice())
-        };
+    let (leading_whitespace, rest) = if let Some(first_expression_index) = first_expression_index {
+        csts.split_at(first_expression_index)
+    } else {
+        (csts, [].as_slice())
+    };
     let leading_whitespace = ExistingWhitespace::new(start_offset, leading_whitespace);
     (leading_whitespace, rest)
 }
@@ -1185,6 +1184,7 @@ mod test {
         test(" ", "");
         test("foo", "foo\n");
         test("foo\n", "foo\n");
+        test("'\x04\n", "'\x04\n");
 
         // Consecutive newlines
 

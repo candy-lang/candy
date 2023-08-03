@@ -1,0 +1,9 @@
+# Optimized MIR for module Examples:_package
+#
+# Tracing Config:
+#
+# • Include tracing of fuzzable functions? No
+# • Include tracing of calls? No
+# • Include tracing of evaluated expressions? No
+
+$1 = []

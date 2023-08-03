@@ -3,8 +3,8 @@ use crate::{
     channel::{Capacity, Packet},
     fiber::{Fiber, Panic, Status},
     heap::{
-        Data, Function, Heap, HirId, InlineObject, Int, List, ReceivePort, SendPort, Struct, Tag,
-        Text,
+        Data, DisplayWithSymbolTable, Function, Heap, HirId, InlineObject, Int, List, ReceivePort,
+        SendPort, Struct, SymbolId, SymbolTable, Tag, Text,
     },
     tracer::FiberTracer,
 };
@@ -18,6 +18,7 @@ use tracing::{info, span, Level};
 impl<FT: FiberTracer> Fiber<FT> {
     pub(super) fn run_builtin_function(
         &mut self,
+        symbol_table: &SymbolTable,
         builtin_function: BuiltinFunction,
         args: &[InlineObject],
         responsible: HirId,
@@ -62,7 +63,7 @@ impl<FT: FiberTracer> Fiber<FT> {
             BuiltinFunction::TextConcatenate => self.heap.text_concatenate(args),
             BuiltinFunction::TextContains => self.heap.text_contains(args),
             BuiltinFunction::TextEndsWith => self.heap.text_ends_with(args),
-            BuiltinFunction::TextFromUtf8 => self.heap.text_from_utf8(args),
+            BuiltinFunction::TextFromUtf8 => self.heap.text_from_utf8(symbol_table, args),
             BuiltinFunction::TextGetRange => self.heap.text_get_range(args),
             BuiltinFunction::TextIsEmpty => self.heap.text_is_empty(args),
             BuiltinFunction::TextLength => self.heap.text_length(args),
@@ -196,7 +197,7 @@ impl Heap {
 
     fn equals(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |a: Any, b: Any| {
-            Return(Tag::create_bool(self, **a == **b).into())
+            Return(Tag::create_bool(**a == **b).into())
         })
     }
 
@@ -210,7 +211,7 @@ impl Heap {
     }
     fn get_argument_count(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |function: Function| {
-            Return(Int::create(self, function.argument_count()).into())
+            Return(Int::create(self, true, function.argument_count()).into())
         })
     }
 
@@ -259,7 +260,7 @@ impl Heap {
     }
     fn int_compare_to(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |a: Int, b: Int| {
-            Return(a.compare_to(self, &b).into())
+            Return(a.compare_to(&b).into())
         })
     }
     fn int_divide_truncating(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -280,10 +281,10 @@ impl Heap {
     fn int_parse(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text| {
             let result = match BigInt::from_str(text.get()) {
-                Ok(int) => Ok(Int::create_from_bigint(self, int).into()),
-                Err(err) => Err(Text::create(self, &err.to_string()).into()),
+                Ok(int) => Ok(Int::create_from_bigint(self, true, int).into()),
+                Err(err) => Err(Text::create(self, true, &ToString::to_string(&err)).into()),
             };
-            Return(Tag::create_result(self, result).into())
+            Return(Tag::create_result(self, true, result).into())
         })
     }
     fn int_remainder(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -319,7 +320,7 @@ impl Heap {
                 item.object.dup_by(self, length_usize - 1);
             }
 
-            Return(List::create(self, &vec![item_object; length_usize]).into())
+            Return(List::create(self, true, &vec![item_object; length_usize]).into())
         })
     }
     fn list_get(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -342,7 +343,7 @@ impl Heap {
     }
     fn list_length(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |list: List| {
-            Return(Int::create(self, list.len()).into())
+            Return(Int::create(self, true, list.len()).into())
         })
     }
     fn list_remove_at(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -372,9 +373,9 @@ impl Heap {
     }
 
     fn print(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |message: Any| {
-            info!("{}", message.object);
-            Return(Tag::create_nothing(self).into())
+        unpack_and_later_drop!(self, args, |message: Text| {
+            info!("{}", message.get());
+            Return(Tag::create_nothing().into())
         })
     }
 
@@ -387,12 +388,12 @@ impl Heap {
     }
     fn struct_get_keys(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |struct_: Struct| {
-            Return(List::create(self, struct_.keys()).into())
+            Return(List::create(self, true, struct_.keys()).into())
         })
     }
     fn struct_has_key(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |struct_: Struct, key: Any| {
-            Return(Tag::create_bool(self, struct_.contains(key.object)).into())
+            Return(Tag::create_bool(struct_.contains(key.object)).into())
         })
     }
 
@@ -405,13 +406,12 @@ impl Heap {
     }
     fn tag_has_value(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |tag: Tag| {
-            Return(Tag::create_bool(self, tag.value().is_some()).into())
+            Return(Tag::create_bool(tag.value().is_some()).into())
         })
     }
     fn tag_without_value(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |tag: Tag| {
-            tag.symbol().dup();
-            Return(tag.without_value(self).into())
+            Return(tag.without_value().into())
         })
     }
 
@@ -427,15 +427,19 @@ impl Heap {
     }
     fn text_contains(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text, pattern: Text| {
-            Return(text.contains(self, *pattern).into())
+            Return(text.contains(*pattern).into())
         })
     }
     fn text_ends_with(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text, suffix: Text| {
-            Return(text.ends_with(self, *suffix).into())
+            Return(text.ends_with(*suffix).into())
         })
     }
-    fn text_from_utf8(&mut self, args: &[InlineObject]) -> BuiltinResult {
+    fn text_from_utf8(
+        &mut self,
+        symbol_table: &SymbolTable,
+        args: &[InlineObject],
+    ) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |bytes: List| {
             // TODO: Remove `u8` checks once we have `needs` ensuring that the bytes are valid.
             let bytes: Vec<_> = bytes
@@ -445,10 +449,15 @@ impl Heap {
                     Int::try_from(it)
                         .ok()
                         .and_then(|it| it.try_get())
-                        .ok_or_else(|| format!("Value is not a byte: {it}."))
+                        .ok_or_else(|| {
+                            format!(
+                                "Value is not a byte: {}.",
+                                DisplayWithSymbolTable::to_string(&it, symbol_table),
+                            )
+                        })
                 })
                 .try_collect()?;
-            Return(Text::create_from_utf8(self, &bytes).into())
+            Return(Text::create_from_utf8(self, true, &bytes).into())
         })
     }
     fn text_get_range(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -464,9 +473,7 @@ impl Heap {
         )
     }
     fn text_is_empty(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |text: Text| {
-            Return(text.is_empty(self).into())
-        })
+        unpack_and_later_drop!(self, args, |text: Text| { Return(text.is_empty().into()) })
     }
     fn text_length(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text| {
@@ -475,7 +482,7 @@ impl Heap {
     }
     fn text_starts_with(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text, prefix: Text| {
-            Return(text.starts_with(self, *prefix).into())
+            Return(text.starts_with(*prefix).into())
         })
     }
     fn text_trim_end(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -492,7 +499,7 @@ impl Heap {
     #[allow(clippy::wrong_self_convention)]
     fn to_debug_text(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Any| {
-            Return(Text::create(self, &format!("{:?}", **value)).into())
+            Return(Text::create(self, true, &format!("{:?}", **value)).into())
         })
     }
 
@@ -502,21 +509,21 @@ impl Heap {
 
     fn type_of(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Any| {
-            let type_name = match **value {
-                Data::Int(_) => "Int",
-                Data::Text(_) => "Text",
-                Data::Tag(_) => "Tag",
-                Data::List(_) => "List",
-                Data::Struct(_) => "Struct",
+            let type_symbol_id = match **value {
+                Data::Int(_) => SymbolId::INT,
+                Data::Text(_) => SymbolId::TEXT,
+                Data::Tag(_) => SymbolId::TAG,
+                Data::List(_) => SymbolId::LIST,
+                Data::Struct(_) => SymbolId::STRUCT,
                 Data::HirId(_) => panic!(
                     "HIR ID shouldn't occurr in Candy programs except in VM-controlled places."
                 ),
-                Data::Function(_) => "Function",
-                Data::Builtin(_) => "Builtin",
-                Data::SendPort(_) => "SendPort",
-                Data::ReceivePort(_) => "ReceivePort",
+                Data::Function(_) => SymbolId::FUNCTION,
+                Data::Builtin(_) => SymbolId::BUILTIN,
+                Data::SendPort(_) => SymbolId::SEND_PORT,
+                Data::ReceivePort(_) => SymbolId::RECEIVE_PORT,
             };
-            Return(Tag::create_from_str(self, type_name, None).into())
+            Return(Tag::create(type_symbol_id).into())
         })
     }
 }

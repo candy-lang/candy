@@ -1,30 +1,30 @@
 // Lots of this code are taken from Dart-Code:
 // https://github.com/Dart-Code/Dart-Code/blob/075f71ca0336e94ebb480be35895b5b12314223b/src/extension/lsp/closing_labels_decorations.ts
-import * as vs from 'vscode';
-import { LanguageClient } from 'vscode-languageclient/node';
-import { Hint, HintKind, publishHintsType } from './lsp_custom_protocol';
+import * as vs from "vscode";
+import { LanguageClient } from "vscode-languageclient/node";
+import { Hint, HintKind, publishHintsType } from "./lsp_custom_protocol";
 
 export class HintsDecorations implements vs.Disposable {
   private subscriptions: vs.Disposable[] = [];
-  private hints = new Map<String, Hint[]>();
+  private hints = new Map<string, Hint[]>();
 
   private decorationTypes = new Map<HintKind, vs.TextEditorDecorationType>();
 
   constructor(private readonly client: LanguageClient) {
     [
-      { kind: 'value', color: 'candy.valueHint' },
-      { kind: 'fuzzingStatus', color: 'candy.statusHint' },
+      { kind: "value", color: "candy.valueHint" },
+      { kind: "fuzzingStatus", color: "candy.statusHint" },
       {
-        kind: 'sampleInputReturningNormally',
-        color: 'candy.sampleInput.returningNormally',
+        kind: "sampleInputReturningNormally",
+        color: "candy.sampleInput.returningNormally",
       },
       {
-        kind: 'sampleInputPanickingWithCallerResponsible',
-        color: 'candy.sampleInput.panickingWithCallerResponsible',
+        kind: "sampleInputPanickingWithCallerResponsible",
+        color: "candy.sampleInput.panickingWithCallerResponsible",
       },
       {
-        kind: 'sampleInputPanickingWithInternalCodeResponsible',
-        color: 'candy.sampleInput.panickingWithInternalCodeResponsible',
+        kind: "sampleInputPanickingWithInternalCodeResponsible",
+        color: "candy.sampleInput.panickingWithInternalCodeResponsible",
       },
     ].forEach((value) =>
       this.decorationTypes.set(
@@ -33,11 +33,11 @@ export class HintsDecorations implements vs.Disposable {
           after: {
             color: new vs.ThemeColor(`${value.color}.foreground`),
             backgroundColor: new vs.ThemeColor(`${value.color}.background`),
-            margin: '0 0 0 16px',
+            margin: "0 0 0 16px",
           },
           rangeBehavior: vs.DecorationRangeBehavior.ClosedOpen,
-        })
-      )
+        }),
+      ),
     );
 
     this.client.onNotification(publishHintsType, (notification) => {
@@ -47,8 +47,7 @@ export class HintsDecorations implements vs.Disposable {
       this.hints.set(uri, notification.hints);
       // Fire an update if it was for the active document.
       if (
-        vs.window.activeTextEditor &&
-        vs.window.activeTextEditor.document &&
+        vs.window.activeTextEditor?.document &&
         uri === vs.window.activeTextEditor.document.uri.toString()
       ) {
         this.update();
@@ -56,12 +55,14 @@ export class HintsDecorations implements vs.Disposable {
     });
 
     this.subscriptions.push(
-      vs.window.onDidChangeVisibleTextEditors(() => this.update())
+      vs.window.onDidChangeVisibleTextEditors(() => {
+        this.update();
+      }),
     );
     this.subscriptions.push(
       vs.workspace.onDidCloseTextDocument((document) => {
         this.hints.delete(document.uri.toString());
-      })
+      }),
     );
     this.update();
   }
@@ -79,7 +80,7 @@ export class HintsDecorations implements vs.Disposable {
       const decorations = new Map<HintKind, Item[]>();
       for (const hint of hints) {
         const position = this.client.protocol2CodeConverter.asPosition(
-          hint.position
+          hint.position,
         );
         // Ensure that the hint we got has a sensible position. Otherwise, the
         // hint might be stale (e.g., we sent two updates, and the hint from in
@@ -90,7 +91,7 @@ export class HintsDecorations implements vs.Disposable {
           return;
         }
 
-        const existing = decorations.get(hint.kind) || [];
+        const existing = decorations.get(hint.kind) ?? [];
         existing.push({
           range: new vs.Range(position, position),
           renderOptions: { after: { contentText: hint.text } },
@@ -98,7 +99,7 @@ export class HintsDecorations implements vs.Disposable {
         decorations.set(hint.kind, existing);
       }
       for (const [hintKind, decorationType] of this.decorationTypes.entries()) {
-        editor.setDecorations(decorationType, decorations.get(hintKind) || []);
+        editor.setDecorations(decorationType, decorations.get(hintKind) ?? []);
       }
     }
   }
@@ -109,6 +110,8 @@ export class HintsDecorations implements vs.Disposable {
         editor.setDecorations(decorationType, []);
       }
     }
-    this.subscriptions.forEach((s) => s.dispose());
+    for (const subscription of this.subscriptions) {
+      subscription.dispose();
+    }
   }
 }

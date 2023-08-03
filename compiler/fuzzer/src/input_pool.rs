@@ -1,10 +1,9 @@
 use super::input::Input;
 use crate::{runner::RunResult, values::InputGeneration};
-use candy_vm::heap::{Heap, Text};
+use candy_vm::heap::{Heap, SymbolTable};
 use itertools::Itertools;
-use rand::{rngs::ThreadRng, seq::SliceRandom, Rng, SeedableRng};
-use rand_chacha::ChaCha20Rng;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
+use rustc_hash::FxHashMap;
 use std::{cell::RefCell, rc::Rc};
 
 pub type Score = f64;
@@ -12,26 +11,16 @@ pub type Score = f64;
 pub struct InputPool {
     heap: Rc<RefCell<Heap>>,
     num_args: usize,
-    symbols: Vec<Text>,
+    symbol_table: SymbolTable,
     results_and_scores: FxHashMap<Input, (RunResult, Score)>,
 }
 
 impl InputPool {
-    pub fn new(num_args: usize, symbols_in_heap: &FxHashSet<Text>) -> Self {
-        let mut heap = Heap::default();
-
-        let mut symbols = symbols_in_heap
-            .iter()
-            .map(|symbol| symbol.clone_to_heap(&mut heap).try_into().unwrap())
-            .collect_vec();
-        if symbols.is_empty() {
-            symbols.push(Text::create(&mut heap, "Nothing"));
-        }
-
+    pub fn new(num_args: usize, symbol_table: SymbolTable) -> Self {
         Self {
-            heap: Rc::new(RefCell::new(heap)),
+            heap: Rc::default(),
             num_args,
-            symbols,
+            symbol_table,
             results_and_scores: FxHashMap::default(),
         }
     }
@@ -48,7 +37,7 @@ impl InputPool {
         let mut rng = ThreadRng::default();
 
         if rng.gen_bool(0.1) || self.results_and_scores.len() < 20 {
-            return Input::generate(self.heap.clone(), self.num_args, &self.symbols);
+            return Input::generate(self.heap.clone(), self.num_args, &self.symbol_table);
         }
 
         let inputs_and_scores = self.results_and_scores.iter().collect_vec();
@@ -56,7 +45,7 @@ impl InputPool {
             .choose_weighted(&mut rng, |(_, (_, score))| *score)
             .unwrap();
         let mut input = (**input).clone();
-        input.mutate(&mut rng, &self.symbols);
+        input.mutate(&mut rng, &self.symbol_table);
         input
     }
 
@@ -65,12 +54,22 @@ impl InputPool {
     }
 
     pub fn interesting_inputs(&self) -> Vec<Input> {
-        let mut rng = ChaCha20Rng::seed_from_u64(0);
-        let results_and_scores = self.results_and_scores.iter().collect_vec();
-        results_and_scores
-            .choose_multiple_weighted(&mut rng, 3, |(_, (_, score))| *score)
-            .unwrap()
-            .map(|(input, _)| (*input).clone())
+        self.results_and_scores
+            .iter()
+            .sorted_by(
+                |(_, (result_a, mut score_a)), (_, (result_b, mut score_b))| {
+                    if matches!(result_a, RunResult::Done { .. }) {
+                        score_a += 50.;
+                    }
+                    if matches!(result_b, RunResult::Done { .. }) {
+                        score_b += 50.;
+                    }
+                    score_a.partial_cmp(&score_b).unwrap()
+                },
+            )
+            .rev()
+            .take(3)
+            .map(|(input, _)| input.clone())
             .collect_vec()
     }
 

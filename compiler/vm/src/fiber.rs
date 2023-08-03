@@ -6,7 +6,10 @@ use super::{
 };
 use crate::{
     channel::ChannelId,
-    heap::{HeapObject, HirId, InlineObject, List, Pointer, ReceivePort, SendPort, Struct, Tag},
+    heap::{
+        DisplayWithSymbolTable, HirId, InlineObject, List, Pointer, ReceivePort, SendPort, Struct,
+        SymbolId, SymbolTable, Tag,
+    },
     tracer::{FiberTracer, TracedFiberEnded, TracedFiberEndedReason},
     Lir,
 };
@@ -17,7 +20,6 @@ use candy_frontend::{
 };
 use derive_more::{Deref, From};
 use itertools::Itertools;
-use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Debug},
     iter::Step,
@@ -51,12 +53,6 @@ pub struct Fiber<T: FiberTracer> {
     pub data_stack: Vec<InlineObject>,
     pub call_stack: Vec<InstructionPointer>,
     pub heap: Heap,
-
-    // TODO: Remove this as soon as refcounting can be optional for objects.
-    // Then, refcounting for all constant objects could be made optional and
-    // they could really be shared among all fibers.
-    constant_mapping: FxHashMap<HeapObject, HeapObject>,
-
     pub tracer: T,
 }
 
@@ -103,12 +99,10 @@ impl Debug for InstructionPointer {
 
 pub struct VmEnded {
     pub heap: Heap,
-    pub constant_mapping: FxHashMap<HeapObject, HeapObject>,
     pub reason: EndedReason,
 }
 pub struct FiberEnded<T: FiberTracer> {
     pub heap: Heap,
-    pub constant_mapping: FxHashMap<HeapObject, HeapObject>,
     pub tracer: T,
     pub reason: EndedReason,
 }
@@ -137,32 +131,26 @@ impl Panic {
 }
 
 impl<T: FiberTracer> Fiber<T> {
-    fn new_with_heap(
-        heap: Heap,
-        constant_mapping: FxHashMap<HeapObject, HeapObject>,
-        tracer: T,
-    ) -> Self {
+    fn new_with_heap(heap: Heap, tracer: T) -> Self {
         Self {
             status: Status::Done,
             next_instruction: None,
             data_stack: vec![],
             call_stack: vec![],
             heap,
-            constant_mapping,
             tracer,
         }
     }
     pub fn for_function(
         heap: Heap,
-        constant_mapping: FxHashMap<HeapObject, HeapObject>,
         function: Function,
         arguments: &[InlineObject],
         responsible: HirId,
         tracer: T,
     ) -> Self {
-        let mut fiber = Self::new_with_heap(heap, constant_mapping, tracer);
+        let mut fiber = Self::new_with_heap(heap, tracer);
 
-        let platform_id = HirId::create(&mut fiber.heap, hir::Id::platform());
+        let platform_id = HirId::create(&mut fiber.heap, true, hir::Id::platform());
         fiber.tracer.call_started(
             &mut fiber.heap,
             platform_id,
@@ -179,7 +167,6 @@ impl<T: FiberTracer> Fiber<T> {
     }
     pub fn for_module_function(
         mut heap: Heap,
-        constant_mapping: FxHashMap<HeapObject, HeapObject>,
         module: Module,
         function: Function,
         tracer: T,
@@ -194,8 +181,8 @@ impl<T: FiberTracer> Fiber<T> {
             0,
             "Function is not a module function (it has arguments).",
         );
-        let responsible = HirId::create(&mut heap, Id::new(module, vec![]));
-        Self::for_function(heap, constant_mapping, function, &[], responsible, tracer)
+        let responsible = HirId::create(&mut heap, true, Id::new(module, vec![]));
+        Self::for_function(heap, function, &[], responsible, tracer)
     }
 
     pub fn tear_down(mut self) -> FiberEnded<T> {
@@ -206,7 +193,6 @@ impl<T: FiberTracer> Fiber<T> {
         };
         FiberEnded {
             heap: self.heap,
-            constant_mapping: self.constant_mapping,
             tracer: self.tracer,
             reason,
         }
@@ -241,18 +227,23 @@ impl<T: FiberTracer> Fiber<T> {
         assert!(self.status.is_creating_channel());
 
         let fields = [
-            ("SendPort", SendPort::create(&mut self.heap, channel)),
-            ("ReceivePort", ReceivePort::create(&mut self.heap, channel)),
+            (
+                SymbolId::SEND_PORT,
+                SendPort::create(&mut self.heap, channel),
+            ),
+            (
+                SymbolId::RECEIVE_PORT,
+                ReceivePort::create(&mut self.heap, channel),
+            ),
         ];
-        let struct_ = Struct::create_with_symbol_keys(&mut self.heap, fields);
+        let struct_ = Struct::create_with_symbol_keys(&mut self.heap, true, fields);
         self.push_to_data_stack(struct_);
         self.status = Status::Running;
     }
     pub fn complete_send(&mut self) {
         assert!(self.status.is_sending());
 
-        let nothing = Tag::create_nothing(&mut self.heap);
-        self.push_to_data_stack(nothing);
+        self.push_to_data_stack(Tag::create_nothing());
         self.status = Status::Running;
     }
     pub fn complete_receive(&mut self, packet: Packet) {
@@ -278,9 +269,11 @@ impl<T: FiberTracer> Fiber<T> {
 
         let result = match ended_reason {
             EndedReason::Finished(return_value) => Ok(*return_value),
-            EndedReason::Panicked(panic) => Err(Text::create(&mut self.heap, &panic.reason).into()),
+            EndedReason::Panicked(panic) => {
+                Err(Text::create(&mut self.heap, true, &panic.reason).into())
+            }
         };
-        let result = Tag::create_result(&mut self.heap, result);
+        let result = Tag::create_result(&mut self.heap, true, result);
         self.push_to_data_stack(result);
         self.status = Status::Running;
     }
@@ -323,15 +316,14 @@ impl<T: FiberTracer> Fiber<T> {
             let instruction = lir
                 .instructions
                 .get(*current_instruction)
-                .expect("invalid instruction pointer")
-                .clone(); // PERF: Can we avoid this clone?
+                .expect("invalid instruction pointer");
             self.next_instruction = Some(current_instruction.next());
 
-            self.run_instruction(instruction);
+            self.run_instruction(&lir.symbol_table, instruction);
             execution_controller.instruction_executed(id, self, current_instruction);
         }
     }
-    pub fn run_instruction(&mut self, instruction: Instruction) {
+    pub fn run_instruction(&mut self, symbol_table: &SymbolTable, instruction: &Instruction) {
         if TRACE {
             trace!("Running instruction: {instruction:?}");
             let current_instruction = self.next_instruction.unwrap();
@@ -362,19 +354,18 @@ impl<T: FiberTracer> Fiber<T> {
         }
 
         match instruction {
-            Instruction::CreateTag { symbol } => {
+            Instruction::CreateTag { symbol_id } => {
                 let value = self.pop_from_data_stack();
-                symbol.dup();
-                let tag = Tag::create(&mut self.heap, symbol, value);
+                let tag = Tag::create_with_value(&mut self.heap, true, *symbol_id, value);
                 self.push_to_data_stack(tag);
             }
             Instruction::CreateList { num_items } => {
                 let mut item_addresses = vec![];
-                for _ in 0..num_items {
+                for _ in 0..*num_items {
                     item_addresses.push(self.pop_from_data_stack());
                 }
                 let items = item_addresses.into_iter().rev().collect_vec();
-                let list = List::create(&mut self.heap, &items);
+                let list = List::create(&mut self.heap, true, &items);
                 self.push_to_data_stack(list);
             }
             Instruction::CreateStruct { num_fields } => {
@@ -384,7 +375,7 @@ impl<T: FiberTracer> Fiber<T> {
                     key_value_addresses.push(self.pop_from_data_stack());
                 }
                 let entries = key_value_addresses.into_iter().rev().tuples().collect();
-                let struct_ = Struct::create(&mut self.heap, &entries);
+                let struct_ = Struct::create(&mut self.heap, true, &entries);
                 self.push_to_data_stack(struct_);
             }
             Instruction::CreateFunction {
@@ -400,59 +391,54 @@ impl<T: FiberTracer> Fiber<T> {
                         object
                     })
                     .collect_vec();
-                let function = Function::create(&mut self.heap, &captured, num_args, body);
+                let function = Function::create(&mut self.heap, true, &captured, *num_args, *body);
                 self.push_to_data_stack(function);
             }
             Instruction::PushConstant(constant) => {
-                let constant = match HeapObject::try_from(constant) {
-                    Ok(heap_object) => self.constant_mapping[&heap_object].into(),
-                    Err(_) => constant,
-                };
-                constant.dup(&mut self.heap);
-                self.push_to_data_stack(constant);
+                self.push_to_data_stack(*constant);
             }
             Instruction::PushFromStack(offset) => {
-                let address = self.get_from_data_stack(offset);
+                let address = self.get_from_data_stack(*offset);
                 address.dup(&mut self.heap);
                 self.push_to_data_stack(address);
             }
             Instruction::PopMultipleBelowTop(n) => {
                 let top = self.pop_from_data_stack();
-                for _ in 0..n {
+                for _ in 0..*n {
                     self.pop_from_data_stack().drop(&mut self.heap);
                 }
                 self.push_to_data_stack(top);
             }
             Instruction::Call { num_args } => {
                 let responsible = self.pop_from_data_stack().try_into().unwrap();
-                let mut arguments = (0..num_args)
+                let mut arguments = (0..*num_args)
                     .map(|_| self.pop_from_data_stack())
                     .collect_vec();
                 // PERF: Build the reverse list in place.
                 arguments.reverse();
                 let callee = self.pop_from_data_stack();
 
-                self.call(callee, &arguments, responsible);
+                self.call(symbol_table, callee, &arguments, responsible);
             }
             Instruction::TailCall {
                 num_locals_to_pop,
                 num_args,
             } => {
                 let responsible = self.pop_from_data_stack().try_into().unwrap();
-                let mut arguments = (0..num_args)
+                let mut arguments = (0..*num_args)
                     .map(|_| self.pop_from_data_stack())
                     .collect_vec();
                 // PERF: Built the reverse list in place
                 arguments.reverse();
                 let callee = self.pop_from_data_stack();
-                for _ in 0..num_locals_to_pop {
+                for _ in 0..*num_locals_to_pop {
                     self.pop_from_data_stack().drop(&mut self.heap);
                 }
 
                 // Tail calling a function is basically just a normal call, but
                 // pretending we are our caller.
                 self.next_instruction = self.call_stack.pop();
-                self.call(callee, &arguments, responsible);
+                self.call(symbol_table, callee, &arguments, responsible);
             }
             Instruction::Return => {
                 self.next_instruction = self.call_stack.pop();
@@ -478,7 +464,7 @@ impl<T: FiberTracer> Fiber<T> {
             Instruction::TraceCallStarts { num_args } => {
                 let responsible = self.pop_from_data_stack().try_into().unwrap();
                 let mut args = vec![];
-                for _ in 0..num_args {
+                for _ in 0..*num_args {
                     args.push(self.pop_from_data_stack());
                 }
                 let callee = self.pop_from_data_stack();
@@ -510,24 +496,30 @@ impl<T: FiberTracer> Fiber<T> {
         }
     }
 
-    pub fn call(&mut self, callee: InlineObject, arguments: &[InlineObject], responsible: HirId) {
+    pub fn call(
+        &mut self,
+        symbol_table: &SymbolTable,
+        callee: InlineObject,
+        arguments: &[InlineObject],
+        responsible: HirId,
+    ) {
         match callee.into() {
             Data::Function(function) => self.call_function(function, arguments, responsible),
             Data::Builtin(builtin) => {
                 callee.drop(&mut self.heap);
-                self.run_builtin_function(builtin.get(), arguments, responsible);
+                self.run_builtin_function(symbol_table, builtin.get(), arguments, responsible);
             }
             Data::Tag(tag) => {
                 if tag.has_value() {
                     self.panic(Panic::new(
                         "A tag's value cannot be overwritten by calling it. Use `tag.withValue` instead.".to_string(),
-                        responsible.get().to_owned(),)
-                    );
+                        responsible.get().to_owned(),
+                    ));
                     return;
                 }
 
                 if let [value] = arguments {
-                    let tag = Tag::create(&mut self.heap, tag.symbol(), *value);
+                    let tag = Tag::create_with_value(&mut self.heap, true, tag.symbol_id(), *value);
                     self.push_to_data_stack(tag);
                     value.dup(&mut self.heap);
                 } else {
@@ -543,7 +535,8 @@ impl<T: FiberTracer> Fiber<T> {
             _ => {
                 self.panic(Panic::new(
                     format!(
-                        "You can only call functions, builtins and tags, but you tried to call {callee}.",
+                        "You can only call functions, builtins and tags, but you tried to call {}.",
+                        DisplayWithSymbolTable::to_string(&callee, symbol_table),
                     ),
                     responsible.get().to_owned(),
                 ));

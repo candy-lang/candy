@@ -3,7 +3,6 @@ use crate::{
     input::Input,
     input_pool::{InputPool, Score},
     runner::{RunResult, Runner},
-    utils::collect_symbols_in_heap,
     values::InputGeneration,
 };
 use candy_frontend::hir::Id;
@@ -39,7 +38,6 @@ pub enum Status {
         panic: Panic,
         tracer: StackTracer,
     },
-    TotalCoverageButNoPanic,
 }
 
 impl Fuzzer {
@@ -50,7 +48,7 @@ impl Fuzzer {
             .unwrap();
 
         // PERF: Avoid collecting the symbols into a hash set of owned strings that we then copy again.
-        let pool = InputPool::new(function.argument_count(), &collect_symbols_in_heap(&heap));
+        let pool = InputPool::new(function.argument_count(), lir.symbol_table.clone());
         let runner = Runner::new(lir.clone(), function, pool.generate_new_input());
 
         let num_instructions = lir.instructions.len();
@@ -103,7 +101,6 @@ impl Fuzzer {
                     panic,
                     tracer,
                 },
-                Status::TotalCoverageButNoPanic => Status::TotalCoverageButNoPanic,
             };
         }
         self.status = Some(status);
@@ -132,29 +129,27 @@ impl Fuzzer {
                 .unwrap_or_else(|| "{…}".to_string()),
             runner.input,
         );
-        debug!("{}", result.to_string(&call_string));
+        debug!(
+            "{}",
+            result.to_string(&runner.lir.symbol_table, &call_string)
+        );
         match result {
             RunResult::Timeout => self.create_new_fuzzing_case(total_coverage),
             RunResult::Done { .. } | RunResult::NeedsUnfulfilled { .. } => {
                 let function_range = self.lir.range_of_function(&self.function_id);
                 let function_coverage = total_coverage.in_range(&function_range);
 
-                if function_coverage.relative_coverage() == 1.0 {
-                    Status::TotalCoverageButNoPanic
-                } else {
-                    // We favor small inputs with good code coverage.
-                    let score = {
-                        let complexity = runner.input.complexity() as Score;
-                        let new_function_coverage = runner.coverage.in_range(&function_range);
-                        let score: Score = (1.5 * runner.num_instructions as f64)
-                            + (0.1
-                                * new_function_coverage.improvement_on(&function_coverage) as f64)
-                            - 0.4 * complexity;
-                        score.clamp(0.1, Score::MAX)
-                    };
-                    self.pool.add(runner.input, result, score);
-                    self.create_new_fuzzing_case(&total_coverage + &runner.coverage)
-                }
+                // We favor small inputs with good code coverage.
+                let score = {
+                    let complexity = runner.input.complexity() as Score;
+                    let new_function_coverage = runner.coverage.in_range(&function_range);
+                    let score: Score = (1.5 * runner.num_instructions as f64)
+                        + (0.1 * new_function_coverage.improvement_on(&function_coverage) as f64)
+                        - 0.4 * complexity;
+                    score.clamp(0.1, Score::MAX)
+                };
+                self.pool.add(runner.input, result, score);
+                self.create_new_fuzzing_case(&total_coverage + &runner.coverage)
             }
             RunResult::Panicked(panic) => Status::FoundPanic {
                 input: runner.input,

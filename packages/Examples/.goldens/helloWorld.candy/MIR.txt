@@ -1,0 +1,122 @@
+# MIR for module Examples:helloWorld
+#
+# Tracing Config:
+#
+# • Include tracing of fuzzable functions? No
+# • Include tracing of calls? No
+# • Include tracing of evaluated expressions? No
+
+# anonymous:$generated::needs
+$49 = { $2 $3 $4 (+ responsible $1) ->
+  $5 = anonymous:$generated::needs
+  $6 = builtinEquals
+  $7 = Nothing
+  $8 = True
+  $9 = False
+  $10 = call $6 with $2 $8 ($5 is responsible)
+  $11 = builtinIfElse
+  # anonymous:$generated::needs:isConditionTrue:then
+  $14 = { (responsible $12) ->
+    $13 = $8
+  }
+  # anonymous:$generated::needs:isConditionTrue:else
+  $17 = { (responsible $15) ->
+    $16 = call $6 with $2 $9 ($5 is responsible)
+  }
+  $18 = call $11 with $10 $14 $17 ($5 is responsible)
+  $19 = builtinIfElse
+  # anonymous:$generated::needs:isConditionBool:then
+  $22 = { (responsible $20) ->
+    $21 = $7
+  }
+  # anonymous:$generated::needs:isConditionBool:else
+  $26 = { (responsible $23) ->
+    $24 = "The `condition` must be either `True` or `False`."
+    $25 = panicking because $24 ($1 is at fault)
+  }
+  $27 = call $19 with $18 $22 $26 ($5 is responsible)
+  $28 = builtinTypeOf
+  $29 = call $28 with $3 ($1 is responsible)
+  $30 = Text
+  $31 = call $6 with $29 $30 ($1 is responsible)
+  $32 = builtinIfElse
+  # anonymous:$generated::needs:isReasonText:then
+  $35 = { (responsible $33) ->
+    $34 = $7
+  }
+  # anonymous:$generated::needs:isReasonText:else
+  $39 = { (responsible $36) ->
+    $37 = "The `reason` must be a text."
+    $38 = panicking because $37 ($1 is at fault)
+  }
+  $40 = call $32 with $31 $35 $39 ($5 is responsible)
+  $41 = builtinIfElse
+  # anonymous:$generated::needs:condition:then
+  $44 = { (responsible $42) ->
+    $43 = $7
+  }
+  # anonymous:$generated::needs:condition:else
+  $47 = { (responsible $45) ->
+    $46 = panicking because $3 ($4 is at fault)
+  }
+  $48 = call $41 with $2 $44 $47 ($5 is responsible)
+}
+$50 = Examples:helloWorld:
+# Examples:helloWorld:use
+$54 = { $52 (+ responsible $51) ->
+  $53 = use $52 (relative to Examples:helloWorld; $50 is responsible)
+}
+$55 = $54
+$56 = builtinTextConcatenate
+$57 = builtinTypeOf
+$58 = Text
+$59 = builtinEquals
+$60 = builtinIfElse
+$61 = builtinToDebugText
+$62 = "Builtins"
+$63 = Examples:helloWorld:8
+$64 = call $55 with $62 ($63 is responsible)
+$65 = Examples:helloWorld:9
+$66 = $64
+$67 = $66
+$68 = Nothing
+# Examples:helloWorld:11
+$102 = { $70 (+ responsible $69) ->
+  $71 = "Builtins"
+  $72 = Examples:helloWorld:11:1
+  $73 = call $54 with $71 ($72 is responsible)
+  $74 = builtinStructGet
+  $75 = StructGet
+  $76 = Examples:helloWorld:11:4
+  $77 = call $74 with $73 $75 ($76 is responsible)
+  $78 = $70
+  $79 = Stdout
+  $80 = Examples:helloWorld:11:7
+  $81 = call $77 with $78 $79 ($80 is responsible)
+  $82 = "Builtins"
+  $83 = Examples:helloWorld:11:9
+  $84 = call $54 with $82 ($83 is responsible)
+  $85 = builtinStructGet
+  $86 = StructGet
+  $87 = Examples:helloWorld:11:12
+  $88 = call $85 with $84 $86 ($87 is responsible)
+  $89 = $67
+  $90 = ChannelSend
+  $91 = Examples:helloWorld:11:15
+  $92 = call $88 with $89 $90 ($91 is responsible)
+  $93 = builtinTextConcatenate
+  $94 = builtinTypeOf
+  $95 = Text
+  $96 = builtinEquals
+  $97 = builtinIfElse
+  $98 = builtinToDebugText
+  $99 = "Hello, world!"
+  $100 = Examples:helloWorld:11:23
+  $101 = call $92 with $81 $99 ($100 is responsible)
+}
+$103 = Examples:helloWorld:12
+$104 = $102
+$105 = $104
+$106 = Nothing
+$107 = Main
+$108 = [$107: $105]

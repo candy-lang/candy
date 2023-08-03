@@ -8,14 +8,18 @@ use candy_frontend::{ast_to_hir::AstToHir, hir, TracingConfig};
 use candy_vm::{
     execution_controller::RunForever,
     fiber::EndedReason,
-    heap::{HirId, SendPort, Struct},
+    heap::{HirId, SendPort, Struct, SymbolId},
     mir_to_lir::compile_lir,
     return_value_into_main_function,
     tracer::stack_trace::StackTracer,
     vm::{Status, Vm},
 };
 use clap::{Parser, ValueHint};
-use std::{path::PathBuf, rc::Rc};
+use std::{
+    path::PathBuf,
+    rc::Rc,
+    time::{Duration, Instant},
+};
 use tracing::{debug, error};
 
 /// Run a Candy program.
@@ -40,14 +44,20 @@ pub(crate) fn run(options: Options) -> ProgramResult {
 
     debug!("Running {module}.");
 
+    let compilation_start = Instant::now();
     let mut tracer = StackTracer::default();
     let lir = Rc::new(compile_lir(&db, module, tracing).0);
 
-    let mut ended = Vm::for_module(&*lir, &mut tracer).run_until_completion(&mut tracer);
+    let compilation_end = Instant::now();
+    debug!(
+        "Compilation took {}.",
+        format_duration(compilation_end - compilation_start),
+    );
 
+    let mut ended = Vm::for_module(&*lir, &mut tracer).run_until_completion(&mut tracer);
     let main = match ended.reason {
         EndedReason::Finished(return_value) => {
-            return_value_into_main_function(&mut ended.heap, return_value).unwrap()
+            return_value_into_main_function(&lir.symbol_table, return_value).unwrap()
         }
         EndedReason::Panicked(panic) => {
             error!("The module panicked: {}", panic.reason);
@@ -57,11 +67,16 @@ pub(crate) fn run(options: Options) -> ProgramResult {
             }
             error!(
                 "This is the stack trace:\n{}",
-                tracer.format_panic_stack_trace_to_root_fiber(&db),
+                tracer.format_panic_stack_trace_to_root_fiber(&db, &lir.as_ref().symbol_table),
             );
             return Err(Exit::CodePanicked);
         }
     };
+    let discovery_end = Instant::now();
+    debug!(
+        "main function discovery took {}.",
+        format_duration(discovery_end - compilation_end),
+    );
 
     debug!("Running main function.");
     // TODO: Add more environment stuff.
@@ -69,20 +84,19 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     let mut stdout = StdoutService::new(&mut vm);
     let mut stdin = StdinService::new(&mut vm);
     let fields = [
-        ("Stdout", SendPort::create(&mut ended.heap, stdout.channel)),
-        ("Stdin", SendPort::create(&mut ended.heap, stdin.channel)),
+        (
+            SymbolId::STDOUT,
+            SendPort::create(&mut ended.heap, stdout.channel),
+        ),
+        (
+            SymbolId::STDIN,
+            SendPort::create(&mut ended.heap, stdin.channel),
+        ),
     ];
-    let environment = Struct::create_with_symbol_keys(&mut ended.heap, fields).into();
+    let environment = Struct::create_with_symbol_keys(&mut ended.heap, true, fields).into();
     let mut tracer = StackTracer::default();
-    let platform = HirId::create(&mut ended.heap, hir::Id::platform());
-    vm.initialize_for_function(
-        ended.heap,
-        ended.constant_mapping,
-        main,
-        &[environment],
-        platform,
-        &mut tracer,
-    );
+    let platform = HirId::create(&mut ended.heap, true, hir::Id::platform());
+    vm.initialize_for_function(ended.heap, main, &[environment], platform, &mut tracer);
     loop {
         match vm.status() {
             Status::CanRun => {
@@ -106,11 +120,25 @@ pub(crate) fn run(options: Options) -> ProgramResult {
             error!("{} is responsible.", panic.responsible);
             error!(
                 "This is the stack trace:\n{}",
-                tracer.format_panic_stack_trace_to_root_fiber(&db),
+                tracer.format_panic_stack_trace_to_root_fiber(&db, &lir.as_ref().symbol_table),
             );
             Err(Exit::CodePanicked)
         }
     };
+    let execution_end = Instant::now();
+    debug!(
+        "Execution took {}.",
+        format_duration(execution_end - discovery_end),
+    );
+
     drop(lir); // Make sure the LIR is kept around until here.
     result
+}
+
+fn format_duration(duration: Duration) -> String {
+    if duration < Duration::from_millis(1) {
+        format!("{} µs", duration.as_micros())
+    } else {
+        format!("{} ms", duration.as_millis())
+    }
 }
