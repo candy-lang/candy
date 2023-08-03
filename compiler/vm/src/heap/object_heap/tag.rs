@@ -73,7 +73,6 @@ impl HeapTag {
 
 impl Debug for HeapTag {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        // We can always use the display formatter since the symbol has a constrained charset.
         write!(f, "<symbol-id {}>", self.symbol_id().value())?;
 
         if let Some(value) = self.value() {

@@ -2,7 +2,7 @@ use derive_more::From;
 use std::{
     borrow::Cow,
     cmp::{self, Ordering},
-    fmt::{self, Formatter},
+    fmt::{self, Display, Formatter},
     intrinsics,
 };
 
@@ -112,6 +112,11 @@ pub trait DisplayWithSymbolTable {
     }
     fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result;
 }
+impl<T: Display> DisplayWithSymbolTable for T {
+    fn fmt(&self, f: &mut Formatter, _symbol_table: &SymbolTable) -> fmt::Result {
+        Display::fmt(&self, f)
+    }
+}
 
 pub trait OrdWithSymbolTable {
     fn cmp(&self, symbol_table: &SymbolTable, other: &Self) -> Ordering;
@@ -161,15 +166,6 @@ macro_rules! impl_ops_with_symbol_table_via_ops {
                 other: &Self,
             ) -> std::cmp::Ordering {
                 Ord::cmp(self, other)
-            }
-        }
-        impl crate::heap::DisplayWithSymbolTable for $type {
-            fn fmt(
-                &self,
-                f: &mut Formatter,
-                _symbol_table: &crate::heap::SymbolTable,
-            ) -> fmt::Result {
-                std::fmt::Display::fmt(self, f)
             }
         }
     };

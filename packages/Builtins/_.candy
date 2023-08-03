@@ -262,7 +262,7 @@ textGetRange text startInclusive endExclusive :=
   needs (text | typeIs Text)
   needs (startInclusive | typeIs Int)
   needs (startInclusive | isNonNegative)
-  needs (startInclusive | intCompareTo (text | ✨.textLength) | equals Less)
+  needs (startInclusive | isLessThanOrEqualTo (text | ✨.textLength))
   needs (endExclusive | typeIs Int)
   needs (endExclusive | isNonNegative)
   needs (endExclusive | isLessThanOrEqualTo (text | ✨.textLength))

@@ -155,7 +155,10 @@ impl Insight {
             .unwrap();
         let call_span = db.range_to_lsp_range(module, call_span);
 
-        Insight::Diagnostic(Diagnostic::error(call_span, panic.reason.to_string()))
+        Insight::Diagnostic(Diagnostic::error(
+            call_span,
+            ToString::to_string(&panic.reason),
+        ))
     }
 }
 

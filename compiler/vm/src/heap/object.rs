@@ -242,9 +242,8 @@ macro_rules! operator_fn {
     ($name:ident) => {
         pub fn $name(&self, heap: &mut Heap, rhs: &Int) -> Self {
             match (self, rhs) {
-                (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(heap, *rhs),
-                (Int::Heap(on_heap), Int::Inline(inline))
-                | (Int::Inline(inline), Int::Heap(on_heap)) => on_heap.$name(heap, inline.get()),
+                (Int::Inline(lhs), _) => lhs.$name(heap, *rhs),
+                (Int::Heap(lhs), Int::Inline(rhs)) => lhs.$name(heap, rhs.get()),
                 (Int::Heap(lhs), Int::Heap(rhs)) => lhs.$name(heap, rhs.get()),
             }
         }
