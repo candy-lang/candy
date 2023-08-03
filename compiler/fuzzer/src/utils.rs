@@ -44,17 +44,17 @@ impl FiberTracer for FiberFuzzablesFinder {
 
     fn found_fuzzable_function(
         &mut self,
-        _heap: &mut Heap,
+        heap: &mut Heap,
         definition: candy_vm::heap::HirId,
         function: Function,
     ) {
-        function.dup();
+        function.dup(heap);
         self.fuzzables.insert(definition.get().to_owned(), function);
     }
 
-    fn dup_all_stored_objects(&self, _heap: &mut Heap) {
+    fn dup_all_stored_objects(&self, heap: &mut Heap) {
         for function in self.fuzzables.values() {
-            function.dup();
+            function.dup(heap);
         }
     }
 }
