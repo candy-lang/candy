@@ -96,16 +96,19 @@ macro_rules! operator_fn {
                 Int::Inline(rhs) => rhs
                     .try_get()
                     .and_then(|rhs| $inline_operation(lhs, rhs))
-                    .map(|it| Int::create(heap, it))
+                    .map(|it| Int::create(heap, true, it))
                     .unwrap_or_else(|| {
                         Int::create_from_bigint(
                             heap,
+                            true,
                             $bigint_operation(BigInt::from(lhs), rhs.get()),
                         )
                     }),
-                Int::Heap(rhs) => {
-                    Int::create_from_bigint(heap, $bigint_operation(BigInt::from(lhs), rhs.get()))
-                }
+                Int::Heap(rhs) => Int::create_from_bigint(
+                    heap,
+                    true,
+                    $bigint_operation(BigInt::from(lhs), rhs.get()),
+                ),
             }
         }
     };

@@ -1,6 +1,11 @@
 name: PR
 
-on: pull_request_target
+on:
+  pull_request_target:
+    types:
+      - opened
+      - ready_for_review
+      - synchronize
 
 jobs:
   add-labels:
@@ -23,7 +28,7 @@ jobs:
       - uses: technote-space/assign-author@v1.6.2
 
   automerge-pr:
-    if: github.event.action == 'opened'
+    if: (github.event.action == 'opened' && !github.event.pull_request.draft) || github.event.action == 'ready_for_review'
     runs-on: ubuntu-latest
     permissions:
       contents: write
