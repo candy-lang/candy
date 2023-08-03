@@ -7,13 +7,14 @@ An object is stored as an _inline object_:
 
 An inline object is a single word containing a tagged union of different types of values:
 
-|                                                                     Value | Meaning     |
-| ------------------------------------------------------------------------: | :---------- |
-| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx000` | Pointer     |
-| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx001` | Int         |
-| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx010` | Builtin     |
-| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx100` | SendPort    |
-| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx101` | ReceivePort |
+|                                                                     Value | Meaning           |
+| ------------------------------------------------------------------------: | :---------------- |
+| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx000` | Pointer           |
+| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx001` | Int               |
+| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx010` | Builtin           |
+| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx011` | Tag without value |
+| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx100` | SendPort          |
+| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx101` | ReceivePort       |
 
 > The remaining patterns are invalid.
 
@@ -31,6 +32,11 @@ For larger values, a pointer to a heap object containing an integer of (practica
 ### Builtin
 
 `x` stores the builtin function index as an unsigned integer.
+
+### Tag without Value
+
+`x` stores the symbol ID that can be resolved via the symbol table.
+The symbol table is currently generated when creating the LIR and no longer changed after that.
 
 ### SendPort, ReceivePort
 
@@ -70,7 +76,6 @@ Values that fit into an inline word _must_ be stored inline.
 ### Tag
 
 `a` stores the symbol ID that can be resolved via the symbol table.
-The symbol table is currently generated when creating the LIR and no longer changed after that.
 
 | Word                       |
 | :------------------------- |

@@ -7,6 +7,7 @@ use super::{
         builtin::InlineBuiltin,
         int::InlineInt,
         port::{InlineReceivePort, InlineSendPort},
+        tag::InlineTag,
         InlineData, InlineObject,
     },
     symbol_table::{impl_ops_with_symbol_table_via_ops, DisplayWithSymbolTable},
@@ -61,9 +62,10 @@ impl From<InlineObject> for Data {
         match object.into() {
             InlineData::Pointer(pointer) => pointer.get().into(),
             InlineData::Int(int) => Data::Int(Int::Inline(int)),
+            InlineData::Builtin(builtin) => Data::Builtin(Builtin(builtin)),
+            InlineData::Tag(symbol_id) => Data::Tag(Tag::Inline(symbol_id)),
             InlineData::SendPort(send_port) => Data::SendPort(SendPort(send_port)),
             InlineData::ReceivePort(receive_port) => Data::ReceivePort(ReceivePort(receive_port)),
-            InlineData::Builtin(builtin) => Data::Builtin(Builtin(builtin)),
         }
     }
 }
@@ -73,7 +75,7 @@ impl From<HeapObject> for Data {
             HeapData::Int(int) => Data::Int(Int::Heap(int)),
             HeapData::List(list) => Data::List(List(list)),
             HeapData::Struct(struct_) => Data::Struct(Struct(struct_)),
-            HeapData::Tag(tag) => Data::Tag(Tag(tag)),
+            HeapData::Tag(tag) => Data::Tag(Tag::Heap(tag)),
             HeapData::Text(text) => Data::Text(Text(text)),
             HeapData::Function(function) => Data::Function(Function(function)),
             HeapData::HirId(hir_id) => Data::HirId(HirId(hir_id)),
@@ -143,6 +145,7 @@ impl OrdWithSymbolTable for Data {
 
 // Int
 
+// FIXME: Custom Ord, PartialOrd impl
 #[derive(Clone, Copy, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Int {
     Inline(InlineInt),
@@ -278,8 +281,8 @@ impl DebugDisplay for Int {
 impl_debug_display_via_debugdisplay!(Int);
 
 impl From<Int> for InlineObject {
-    fn from(int: Int) -> Self {
-        match int {
+    fn from(value: Int) -> Self {
+        match value {
             Int::Inline(int) => *int,
             Int::Heap(int) => (*int).into(),
         }
@@ -291,8 +294,11 @@ impl_ops_with_symbol_table_via_ops!(Int);
 
 // Tag
 
-#[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
-pub struct Tag(HeapTag);
+#[derive(Clone, Copy, Eq, From, Hash, PartialEq)]
+pub enum Tag {
+    Inline(InlineTag),
+    Heap(HeapTag),
+}
 
 impl Tag {
     pub fn create(
@@ -301,6 +307,7 @@ impl Tag {
         symbol_id: SymbolId,
         value: impl Into<Option<InlineObject>>,
     ) -> Self {
+        // FIXME: Version without `Heap`
         HeapTag::create(heap, is_reference_counted, symbol_id, value).into()
     }
     pub fn create_nothing(heap: &mut Heap, is_reference_counted: bool) -> Self {
@@ -337,9 +344,66 @@ impl Tag {
         };
         Self::create(heap, is_reference_counted, symbol, value)
     }
+
+    pub fn symbol_id(&self) -> SymbolId {
+        match self {
+            Tag::Inline(tag) => tag.get(),
+            Tag::Heap(tag) => tag.symbol_id(),
+        }
+    }
+    pub fn has_value(&self) -> bool {
+        match self {
+            Tag::Inline(_) => false,
+            Tag::Heap(tag) => tag.has_value(),
+        }
+    }
+    pub fn value(&self) -> Option<InlineObject> {
+        match self {
+            Tag::Inline(_) => None,
+            Tag::Heap(tag) => tag.value(),
+        }
+    }
+
+    pub fn without_value(self, heap: &mut Heap) -> Tag {
+        Tag::create(heap, true, self.symbol_id(), None)
+    }
 }
 
-impls_via_0_with_symbol_table!(Tag);
+impl Debug for Tag {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            Tag::Inline(tag) => Debug::fmt(tag, f),
+            Tag::Heap(tag) => Debug::fmt(tag, f),
+        }
+    }
+}
+impl DisplayWithSymbolTable for Tag {
+    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
+        match self {
+            Tag::Inline(tag) => DisplayWithSymbolTable::fmt(tag, f, symbol_table),
+            Tag::Heap(tag) => DisplayWithSymbolTable::fmt(tag, f, symbol_table),
+        }
+    }
+}
+
+impl From<Tag> for InlineObject {
+    fn from(value: Tag) -> Self {
+        match value {
+            Tag::Inline(value) => *value,
+            Tag::Heap(value) => (*value).into(),
+        }
+    }
+}
+
+impl OrdWithSymbolTable for Tag {
+    fn cmp(&self, symbol_table: &SymbolTable, other: &Self) -> Ordering {
+        symbol_table
+            .get(self.symbol_id())
+            .cmp(symbol_table.get(other.symbol_id()))
+            .then_with(|| self.value().cmp(symbol_table, &other.value()))
+    }
+}
+
 impl_try_froms!(Tag, "Expected a tag.");
 impl_try_from_heap_object!(Tag, "Expected a tag.");
 
@@ -354,15 +418,13 @@ impl TryFrom<Data> for bool {
     type Error = &'static str;
 
     fn try_from(value: Data) -> Result<Self, Self::Error> {
-        let tag: Tag = value.try_into()?;
-        if tag.value().is_some() {
-            return Err("Expected a tag without a value.");
-        }
-
-        match tag.symbol_id() {
-            SymbolId::TRUE => Ok(true),
-            SymbolId::FALSE => Ok(false),
-            _ => Err("Expected `True` or `False`."),
+        match value {
+            Data::Tag(Tag::Inline(tag)) => match tag.get() {
+                SymbolId::TRUE => Ok(true),
+                SymbolId::FALSE => Ok(false),
+                _ => Err("Expected `True` or `False`."),
+            },
+            _ => Err("Expected a tag without a value."),
         }
     }
 }

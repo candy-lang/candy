@@ -2,7 +2,7 @@ use super::{utils::heap_object_impls, HeapObjectTrait};
 use crate::heap::{
     object_heap::HeapObject,
     symbol_table::{DisplayWithSymbolTable, OrdWithSymbolTable},
-    Heap, InlineObject, SymbolId, SymbolTable, Tag,
+    Heap, InlineObject, SymbolId, SymbolTable,
 };
 use derive_more::Deref;
 use rustc_hash::FxHashMap;
@@ -64,10 +64,6 @@ impl HeapTag {
     pub fn value(self) -> Option<InlineObject> {
         let value = unsafe { *self.value_pointer().as_ref() };
         NonZeroU64::new(value).map(InlineObject::new)
-    }
-
-    pub fn without_value(self, heap: &mut Heap) -> Tag {
-        Tag::create(heap, true, self.symbol_id(), None)
     }
 }
 

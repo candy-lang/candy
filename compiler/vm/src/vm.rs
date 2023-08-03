@@ -670,13 +670,13 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
         let arguments: Struct = object.try_into().ok()?;
 
         let function_tag = Tag::create(&mut heap, true, SymbolId::FUNCTION, None);
-        let function: Function = arguments.get(**function_tag)?.try_into().ok()?;
+        let function: Function = arguments.get(function_tag)?.try_into().ok()?;
         if function.argument_count() > 0 {
             return None;
         }
 
         let return_channel_tag = Tag::create(&mut heap, true, SymbolId::RETURN_CHANNEL, None);
-        let return_channel: SendPort = arguments.get(**return_channel_tag)?.try_into().ok()?;
+        let return_channel: SendPort = arguments.get(return_channel_tag)?.try_into().ok()?;
 
         Some((heap, function, return_channel.channel_id()))
     }

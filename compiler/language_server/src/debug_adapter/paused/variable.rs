@@ -7,7 +7,7 @@ use candy_vm::{
     fiber::FiberId,
     heap::{
         Data, DataDiscriminants, DisplayWithSymbolTable, InlineObject, ObjectInHeap,
-        OrdWithSymbolTable,
+        OrdWithSymbolTable, Tag,
     },
 };
 use dap::{
@@ -164,7 +164,7 @@ impl PausedState {
                 }
             }
             VariablesKey::Inner(fiber_id, object) => match Data::from(**object) {
-                Data::Tag(tag) => {
+                Data::Tag(Tag::Heap(tag)) => {
                     if should_include_named {
                         if start == 0 && count > 0 {
                             let symbol_table = &self.vm_state.vm.lir().symbol_table;
@@ -309,7 +309,7 @@ impl PausedState {
 
         let (inner_variables_object, named_variables, indexed_variables) = match data {
             // TODO: support closure and ports
-            Data::Tag(tag) => (Some(**tag), 2, 0),
+            Data::Tag(Tag::Heap(tag)) => (Some(*tag), 2, 0),
             // One more field than the length since we add the “<length>” entry.
             Data::List(list) => (Some(**list), 1, list.len()),
             Data::Struct(struct_) => (Some(**struct_), struct_.len() + 1, 0),
