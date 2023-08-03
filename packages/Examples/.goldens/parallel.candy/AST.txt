@@ -1,0 +1,52 @@
+# AST for module Examples:parallel
+assignment: struct
+  identifier $6@"async"
+  identifier $8@"await"
+  identifier $10@"channel"
+  identifier $12@"parallel"
+  identifier $14@"text" = 
+  call identifier $0@"use" with these arguments:
+    text
+      textPart $2@"Core"
+assignment: identifier $104@"main" := 
+  function (non-fuzzable) { $18@"environment" ->
+    assignment: $41@"print" = function (fuzzable) { $42@"message" ->
+      call identifier $19@"needs" with these arguments:
+        call struct access identifier $21@"text".$23@"Is" with these arguments:
+          identifier $25@"message"
+      call struct access identifier $33@"channel".$35@"Send" with these arguments:
+        struct access identifier $29@"environment".$31@"Stdout"
+        identifier $37@"message"
+    }
+    call identifier $44@"parallel" with these arguments:
+      function (non-fuzzable) { $46@"nursery" ->
+        call identifier $66@"print" with these arguments:
+          call identifier $63@"await" with these arguments:
+            call identifier $49@"async" with these arguments:
+              identifier $47@"nursery"
+              function (non-fuzzable) {
+                call identifier $51@"print" with these arguments:
+                  text
+                    textPart $53@"Hello from fiber!"
+                text
+                  textPart $57@"Hello, async await!"
+              }
+        call identifier $71@"async" with these arguments:
+          identifier $69@"nursery"
+          function (non-fuzzable) {
+            call identifier $73@"print" with these arguments:
+              text
+                textPart $75@"Kiwi"
+          }
+        call identifier $84@"async" with these arguments:
+          identifier $82@"nursery"
+          function (non-fuzzable) {
+            call identifier $86@"print" with these arguments:
+              text
+                textPart $88@"Banana"
+          }
+        call identifier $95@"print" with these arguments:
+          text
+            textPart $97@"Hi"
+      }
+  }

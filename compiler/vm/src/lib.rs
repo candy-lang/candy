@@ -1,6 +1,8 @@
 #![feature(
     allocator_api,
     anonymous_lifetime_in_impl_trait,
+    core_intrinsics,
+    fmt_internals,
     iterator_try_collect,
     let_chains,
     nonzero_ops,
@@ -9,12 +11,11 @@
     strict_provenance
 )]
 
-use crate::heap::{Struct, Tag};
+use crate::heap::{DisplayWithSymbolTable, Struct, SymbolId, Tag};
 use execution_controller::RunForever;
 use fiber::{EndedReason, VmEnded};
-use heap::{Function, Heap, HeapObject, InlineObject};
+use heap::{Function, Heap, InlineObject, SymbolTable};
 use lir::Lir;
-use rustc_hash::FxHashMap;
 use std::borrow::Borrow;
 use tracer::Tracer;
 use tracing::{debug, error};
@@ -44,12 +45,13 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
 
 impl VmEnded {
     pub fn into_main_function(
-        mut self,
-    ) -> Result<(Heap, Function, FxHashMap<HeapObject, HeapObject>), String> {
+        self,
+        symbol_table: &SymbolTable,
+    ) -> Result<(Heap, Function), String> {
         match self.reason {
             EndedReason::Finished(return_value) => {
-                match return_value_into_main_function(&mut self.heap, return_value) {
-                    Ok(main) => Ok((self.heap, main, self.constant_mapping)),
+                match return_value_into_main_function(symbol_table, return_value) {
+                    Ok(main) => Ok((self.heap, main)),
                     Err(err) => Err(err.to_string()),
                 }
             }
@@ -62,15 +64,17 @@ impl VmEnded {
 }
 
 pub fn return_value_into_main_function(
-    heap: &mut Heap,
+    symbol_table: &SymbolTable,
     return_value: InlineObject,
 ) -> Result<Function, &'static str> {
     let exported_definitions: Struct = return_value.try_into().unwrap();
-    debug!("The module exports these definitions: {exported_definitions}");
+    debug!(
+        "The module exports these definitions: {}",
+        DisplayWithSymbolTable::to_string(&exported_definitions, symbol_table),
+    );
 
-    let main = Tag::create_from_str(heap, "Main", None);
     exported_definitions
-        .get(main)
+        .get(Tag::create(SymbolId::MAIN))
         .ok_or("The module doesn't export a main function.")
         .and_then(|main| {
             main.try_into()

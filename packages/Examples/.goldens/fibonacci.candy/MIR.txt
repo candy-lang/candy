@@ -1,0 +1,260 @@
+# MIR for module Examples:fibonacci
+#
+# Tracing Config:
+#
+# • Include tracing of fuzzable functions? No
+# • Include tracing of calls? No
+# • Include tracing of evaluated expressions? No
+
+# anonymous:$generated::needs
+$49 = { $2 $3 $4 (+ responsible $1) ->
+  $5 = anonymous:$generated::needs
+  $6 = builtinEquals
+  $7 = Nothing
+  $8 = True
+  $9 = False
+  $10 = call $6 with $2 $8 ($5 is responsible)
+  $11 = builtinIfElse
+  # anonymous:$generated::needs:isConditionTrue:then
+  $14 = { (responsible $12) ->
+    $13 = $8
+  }
+  # anonymous:$generated::needs:isConditionTrue:else
+  $17 = { (responsible $15) ->
+    $16 = call $6 with $2 $9 ($5 is responsible)
+  }
+  $18 = call $11 with $10 $14 $17 ($5 is responsible)
+  $19 = builtinIfElse
+  # anonymous:$generated::needs:isConditionBool:then
+  $22 = { (responsible $20) ->
+    $21 = $7
+  }
+  # anonymous:$generated::needs:isConditionBool:else
+  $26 = { (responsible $23) ->
+    $24 = "The `condition` must be either `True` or `False`."
+    $25 = panicking because $24 ($1 is at fault)
+  }
+  $27 = call $19 with $18 $22 $26 ($5 is responsible)
+  $28 = builtinTypeOf
+  $29 = call $28 with $3 ($1 is responsible)
+  $30 = Text
+  $31 = call $6 with $29 $30 ($1 is responsible)
+  $32 = builtinIfElse
+  # anonymous:$generated::needs:isReasonText:then
+  $35 = { (responsible $33) ->
+    $34 = $7
+  }
+  # anonymous:$generated::needs:isReasonText:else
+  $39 = { (responsible $36) ->
+    $37 = "The `reason` must be a text."
+    $38 = panicking because $37 ($1 is at fault)
+  }
+  $40 = call $32 with $31 $35 $39 ($5 is responsible)
+  $41 = builtinIfElse
+  # anonymous:$generated::needs:condition:then
+  $44 = { (responsible $42) ->
+    $43 = $7
+  }
+  # anonymous:$generated::needs:condition:else
+  $47 = { (responsible $45) ->
+    $46 = panicking because $3 ($4 is at fault)
+  }
+  $48 = call $41 with $2 $44 $47 ($5 is responsible)
+}
+$50 = Examples:fibonacci:
+# Examples:fibonacci:use
+$54 = { $52 (+ responsible $51) ->
+  $53 = use $52 (relative to Examples:fibonacci; $50 is responsible)
+}
+$55 = $54
+$56 = builtinTextConcatenate
+$57 = builtinTypeOf
+$58 = Text
+$59 = builtinEquals
+$60 = builtinIfElse
+$61 = builtinToDebugText
+$62 = "Builtins"
+$63 = Examples:fibonacci:8
+$64 = call $55 with $62 ($63 is responsible)
+$65 = Examples:fibonacci:9
+$66 = $64
+$67 = $66
+$68 = Nothing
+# Examples:fibonacci:recursive
+$102 = { $70 $71 (+ responsible $69) ->
+  # Examples:fibonacci:recursive:0
+  $92 = { $73 $74 (+ responsible $72) ->
+    # Examples:fibonacci:recursive:0:0
+    $82 = { $76 (+ responsible $75) ->
+      $77 = $73
+      $78 = $73
+      $79 = $76
+      $80 = Examples:fibonacci:recursive:0:0:3
+      $81 = call $77 with $78 $79 ($80 is responsible)
+    }
+    $83 = Examples:fibonacci:recursive:0:1
+    $84 = $82
+    $85 = $84
+    $86 = Nothing
+    $87 = $71
+    $88 = $85
+    $89 = $74
+    $90 = Examples:fibonacci:recursive:0:6
+    $91 = call $87 with $88 $89 ($90 is responsible)
+  }
+  $93 = Examples:fibonacci:recursive:1
+  $94 = $92
+  $95 = $94
+  $96 = Nothing
+  $97 = $95
+  $98 = $95
+  $99 = $70
+  $100 = Examples:fibonacci:recursive:6
+  $101 = call $97 with $98 $99 ($100 is responsible)
+}
+$103 = $102
+# Examples:fibonacci:compareTo
+$127 = { $105 $106 (+ responsible $104) ->
+  $107 = $105
+  $108 = "Builtins"
+  $109 = Examples:fibonacci:compareTo:2
+  $110 = call $54 with $108 ($109 is responsible)
+  $111 = builtinStructGet
+  $112 = StructGet
+  $113 = Examples:fibonacci:compareTo:5
+  $114 = call $111 with $110 $112 ($113 is responsible)
+  $115 = $67
+  $116 = IntCompareTo
+  $117 = Examples:fibonacci:compareTo:8
+  $118 = call $114 with $115 $116 ($117 is responsible)
+  $119 = $106
+  $120 = Examples:fibonacci:compareTo:10
+  $121 = call $118 with $107 $119 ($120 is responsible)
+  $122 = Examples:fibonacci:compareTo:11
+  $123 = $121
+  $124 = $123
+  $125 = Nothing
+  $126 = $124
+}
+$128 = $127
+# Examples:fibonacci:isLessThan
+$151 = { $130 $131 (+ responsible $129) ->
+  $132 = "Builtins"
+  $133 = Examples:fibonacci:isLessThan:1
+  $134 = call $54 with $132 ($133 is responsible)
+  $135 = builtinStructGet
+  $136 = StructGet
+  $137 = Examples:fibonacci:isLessThan:4
+  $138 = call $135 with $134 $136 ($137 is responsible)
+  $139 = $67
+  $140 = Equals
+  $141 = Examples:fibonacci:isLessThan:7
+  $142 = call $138 with $139 $140 ($141 is responsible)
+  $143 = $128
+  $144 = $130
+  $145 = $131
+  $146 = Examples:fibonacci:isLessThan:11
+  $147 = call $143 with $144 $145 ($146 is responsible)
+  $148 = Less
+  $149 = Examples:fibonacci:isLessThan:13
+  $150 = call $142 with $147 $148 ($149 is responsible)
+}
+$152 = $151
+# Examples:fibonacci:fibonacci
+$235 = { $154 (+ responsible $153) ->
+  $155 = $103
+  $156 = $154
+  # Examples:fibonacci:fibonacci:2
+  $232 = { $158 $159 (+ responsible $157) ->
+    $160 = "Builtins"
+    $161 = Examples:fibonacci:fibonacci:2:1
+    $162 = call $54 with $160 ($161 is responsible)
+    $163 = builtinStructGet
+    $164 = StructGet
+    $165 = Examples:fibonacci:fibonacci:2:4
+    $166 = call $163 with $162 $164 ($165 is responsible)
+    $167 = $67
+    $168 = IfElse
+    $169 = Examples:fibonacci:fibonacci:2:7
+    $170 = call $166 with $167 $168 ($169 is responsible)
+    $171 = $159
+    $172 = $152
+    $173 = 2
+    $174 = Examples:fibonacci:fibonacci:2:11
+    $175 = call $172 with $171 $173 ($174 is responsible)
+    # Examples:fibonacci:fibonacci:2:12
+    $178 = { (responsible $176) ->
+      $177 = $159
+    }
+    # Examples:fibonacci:fibonacci:2:13
+    $229 = { (responsible $179) ->
+      $180 = $158
+      $181 = $159
+      $182 = "Builtins"
+      $183 = Examples:fibonacci:fibonacci:2:13:3
+      $184 = call $54 with $182 ($183 is responsible)
+      $185 = builtinStructGet
+      $186 = StructGet
+      $187 = Examples:fibonacci:fibonacci:2:13:6
+      $188 = call $185 with $184 $186 ($187 is responsible)
+      $189 = $67
+      $190 = IntSubtract
+      $191 = Examples:fibonacci:fibonacci:2:13:9
+      $192 = call $188 with $189 $190 ($191 is responsible)
+      $193 = 1
+      $194 = Examples:fibonacci:fibonacci:2:13:11
+      $195 = call $192 with $181 $193 ($194 is responsible)
+      $196 = Examples:fibonacci:fibonacci:2:13:12
+      $197 = call $180 with $195 ($196 is responsible)
+      $198 = "Builtins"
+      $199 = Examples:fibonacci:fibonacci:2:13:14
+      $200 = call $54 with $198 ($199 is responsible)
+      $201 = builtinStructGet
+      $202 = StructGet
+      $203 = Examples:fibonacci:fibonacci:2:13:17
+      $204 = call $201 with $200 $202 ($203 is responsible)
+      $205 = $67
+      $206 = IntAdd
+      $207 = Examples:fibonacci:fibonacci:2:13:20
+      $208 = call $204 with $205 $206 ($207 is responsible)
+      $209 = $158
+      $210 = $159
+      $211 = "Builtins"
+      $212 = Examples:fibonacci:fibonacci:2:13:24
+      $213 = call $54 with $211 ($212 is responsible)
+      $214 = builtinStructGet
+      $215 = StructGet
+      $216 = Examples:fibonacci:fibonacci:2:13:27
+      $217 = call $214 with $213 $215 ($216 is responsible)
+      $218 = $67
+      $219 = IntSubtract
+      $220 = Examples:fibonacci:fibonacci:2:13:30
+      $221 = call $217 with $218 $219 ($220 is responsible)
+      $222 = 2
+      $223 = Examples:fibonacci:fibonacci:2:13:32
+      $224 = call $221 with $210 $222 ($223 is responsible)
+      $225 = Examples:fibonacci:fibonacci:2:13:33
+      $226 = call $209 with $224 ($225 is responsible)
+      $227 = Examples:fibonacci:fibonacci:2:13:34
+      $228 = call $208 with $197 $226 ($227 is responsible)
+    }
+    $230 = Examples:fibonacci:fibonacci:2:14
+    $231 = call $170 with $175 $178 $229 ($230 is responsible)
+  }
+  $233 = Examples:fibonacci:fibonacci:3
+  $234 = call $155 with $156 $232 ($233 is responsible)
+}
+$236 = $235
+# Examples:fibonacci:main
+$243 = { $238 (+ responsible $237) ->
+  $239 = $236
+  $240 = 15
+  $241 = Examples:fibonacci:main:2
+  $242 = call $239 with $240 ($241 is responsible)
+}
+$244 = $243
+$245 = Recursive
+$246 = CompareTo
+$247 = IsLessThan
+$248 = Main
+$249 = [$247: $152, $248: $244, $245: $103, $246: $128]

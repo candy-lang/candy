@@ -1,0 +1,76 @@
+# AST for module Examples:iterable
+assignment: identifier $6@"builtins" = 
+  call identifier $0@"use" with these arguments:
+    text
+      textPart $2@"Builtins"
+assignment: struct
+  identifier $15@"bool"
+  identifier $17@"channel"
+  identifier $19@"equals"
+  identifier $21@"ifElse"
+  identifier $23@"iterable"
+  identifier $25@"list"
+  identifier $27@"result"
+  identifier $29@"text" = 
+  call identifier $9@"use" with these arguments:
+    text
+      textPart $11@"Core"
+assignment: $90@"splitWhereFirst" = function (fuzzable) { $91@"iter" $92@"checker" ->
+  call struct access identifier $33@"builtins".$35@"Print" with these arguments:
+    text
+      textPart $37@"Getting leading items"
+  assignment: identifier $61@"firstPart" = 
+    call struct access identifier $56@"iterable".$58@"ToList" with these arguments:
+      call struct access identifier $43@"iterable".$45@"TakeUntil" with these arguments:
+        identifier $41@"iter"
+        function (non-fuzzable) { $47@"item" ->
+          call identifier $48@"checker" with these arguments:
+            identifier $50@"item"
+        }
+  call struct access identifier $64@"builtins".$66@"Print" with these arguments:
+    text
+      textPart $68@"Turned into list"
+  list
+    identifier $72@"firstPart"
+    call struct access identifier $76@"iterable".$78@"Skip" with these arguments:
+      identifier $74@"iter"
+      call struct access identifier $82@"list".$84@"Length" with these arguments:
+        identifier $80@"firstPart"
+}
+assignment: $134@"split" = function (fuzzable) { $135@"iter" $136@"delimeter" ->
+  call struct access identifier $94@"iterable".$96@"GenerateWithState" with these arguments:
+    identifier $98@"iter"
+    function (non-fuzzable) { $100@"state" ->
+      call struct access identifier $103@"iterable".$105@"TakeUntil" with these arguments:
+        identifier $101@"state"
+        function (non-fuzzable) { $107@"item" ->
+          call identifier $108@"equals" with these arguments:
+            identifier $110@"item"
+            identifier $112@"delimeter"
+        }
+      call struct access identifier $125@"result".$127@"Map" with these arguments:
+        call struct access identifier $120@"iterable".$122@"Next" with these arguments:
+          identifier $118@"state"
+        function (non-fuzzable) {
+        }
+    }
+}
+assignment: identifier $185@"main" := 
+  function (non-fuzzable) { $138@"env" ->
+    assignment: identifier $152@"print" = 
+      function (non-fuzzable) { $139@"message" ->
+        call struct access identifier $140@"channel".$142@"Send" with these arguments:
+          struct access identifier $144@"env".$146@"Stdout"
+          identifier $148@"message"
+      }
+    call struct access identifier $171@"iterable".$173@"ForEach" with these arguments:
+      assignment: identifier $168@"foo" = 
+        call struct access identifier $163@"iterable".$165@"FromList" with these arguments:
+          call struct access identifier $158@"text".$160@"Characters" with these arguments:
+            text
+              textPart $155@"Hello, world! This is some long text. Bla bla blub."
+      function (non-fuzzable) { $175@"item" ->
+        call identifier $176@"print" with these arguments:
+          identifier $178@"item"
+      }
+  }

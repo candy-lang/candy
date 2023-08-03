@@ -136,7 +136,7 @@ impl IrFeatures {
             Ok(rcst) => rcst.build_rich_ir(&mut builder),
             Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
         }
-        builder.finish()
+        builder.finish(true)
     }
     fn rich_ir_for_ast(module: &Module, asts: AstResult) -> RichIr {
         let mut builder = RichIrBuilder::default();
@@ -150,7 +150,7 @@ impl IrFeatures {
             Ok((asts, _)) => asts.build_rich_ir(&mut builder),
             Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
         }
-        builder.finish()
+        builder.finish(true)
     }
     fn rich_ir_for_hir(module: &Module, hir: HirResult) -> RichIr {
         let mut builder = RichIrBuilder::default();
@@ -164,7 +164,7 @@ impl IrFeatures {
             Ok((hir, _)) => hir.build_rich_ir(&mut builder),
             Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
         }
-        builder.finish()
+        builder.finish(true)
     }
     fn rich_ir_for_mir(module: &Module, mir: MirResult, tracing_config: &TracingConfig) -> RichIr {
         let mut builder = RichIrBuilder::default();
@@ -180,7 +180,7 @@ impl IrFeatures {
             Ok((mir, _)) => mir.build_rich_ir(&mut builder),
             Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
         }
-        builder.finish()
+        builder.finish(true)
     }
     fn rich_ir_for_optimized_mir(
         module: &Module,
@@ -200,7 +200,7 @@ impl IrFeatures {
             Ok((mir, _, _)) => mir.build_rich_ir(&mut builder),
             Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
         }
-        builder.finish()
+        builder.finish(true)
     }
     fn rich_ir_for_lir(module: &Module, lir: &Lir, tracing_config: &TracingConfig) -> RichIr {
         let mut builder = RichIrBuilder::default();
@@ -213,7 +213,7 @@ impl IrFeatures {
         builder.push_tracing_config(tracing_config);
         builder.push_newline();
         lir.build_rich_ir(&mut builder);
-        builder.finish()
+        builder.finish(true)
     }
     fn build_rich_ir_for_module_error(
         builder: &mut RichIrBuilder,

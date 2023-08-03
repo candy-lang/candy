@@ -3,18 +3,18 @@ use self::{
     int::InlineInt,
     pointer::InlinePointer,
     port::{InlineReceivePort, InlineSendPort},
+    tag::InlineTag,
 };
-use super::{object_heap::HeapObject, Data, Heap};
-use crate::{
-    channel::ChannelId,
-    utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
+use super::{
+    object_heap::HeapObject, Data, DisplayWithSymbolTable, Heap, OrdWithSymbolTable, SymbolTable,
 };
+use crate::channel::ChannelId;
 use enum_dispatch::enum_dispatch;
 use extension_trait::extension_trait;
 use rustc_hash::FxHashMap;
 use std::{
     cmp::Ordering,
-    fmt::{self, Formatter},
+    fmt::{self, Debug, Display, Formatter},
     hash::{Hash, Hasher},
     num::NonZeroU64,
     ops::Deref,
@@ -24,6 +24,7 @@ pub(super) mod builtin;
 pub(super) mod int;
 pub(super) mod pointer;
 pub(super) mod port;
+pub(super) mod tag;
 
 #[extension_trait]
 pub impl InlineObjectSliceCloneToHeap for [InlineObject] {
@@ -46,15 +47,14 @@ pub impl InlineObjectSliceCloneToHeap for [InlineObject] {
 pub struct InlineObject(NonZeroU64);
 
 impl InlineObject {
-    pub const KIND_WIDTH: usize = 2;
-    pub const KIND_MASK: u64 = 0b11;
-    pub const KIND_POINTER: u64 = 0b00;
-    pub const KIND_INT: u64 = 0b01;
-    pub const KIND_PORT: u64 = 0b10;
-    pub const KIND_PORT_SUBKIND_MASK: u64 = 0b100;
-    pub const KIND_PORT_SUBKIND_SEND: u64 = 0b000;
-    pub const KIND_PORT_SUBKIND_RECEIVE: u64 = 0b100;
-    pub const KIND_BUILTIN: u64 = 0b11;
+    pub const KIND_WIDTH: usize = 3;
+    pub const KIND_MASK: u64 = 0b111;
+    pub const KIND_POINTER: u64 = 0b000;
+    pub const KIND_INT: u64 = 0b001;
+    pub const KIND_BUILTIN: u64 = 0b010;
+    pub const KIND_TAG: u64 = 0b011;
+    pub const KIND_SEND_PORT: u64 = 0b100;
+    pub const KIND_RECEIVE_PORT: u64 = 0b101;
 
     pub fn new(value: NonZeroU64) -> Self {
         Self(value)
@@ -99,12 +99,16 @@ impl InlineObject {
     }
 }
 
-impl DebugDisplay for InlineObject {
-    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
-        InlineData::from(*self).fmt(f, is_debug)
+impl Debug for InlineObject {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        Debug::fmt(&InlineData::from(*self), f)
     }
 }
-impl_debug_display_via_debugdisplay!(InlineObject);
+impl DisplayWithSymbolTable for InlineObject {
+    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
+        DisplayWithSymbolTable::fmt(&InlineData::from(*self), f, symbol_table)
+    }
+}
 
 impl Eq for InlineObject {}
 impl PartialEq for InlineObject {
@@ -117,14 +121,9 @@ impl Hash for InlineObject {
         InlineData::from(*self).hash(state)
     }
 }
-impl Ord for InlineObject {
-    fn cmp(&self, other: &Self) -> Ordering {
-        Data::from(*self).cmp(&Data::from(*other))
-    }
-}
-impl PartialOrd for InlineObject {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+impl OrdWithSymbolTable for InlineObject {
+    fn cmp(&self, symbol_table: &SymbolTable, other: &Self) -> Ordering {
+        OrdWithSymbolTable::cmp(&Data::from(*self), symbol_table, &Data::from(*other))
     }
 }
 
@@ -140,7 +139,7 @@ impl TryFrom<InlineObject> for HeapObject {
 }
 
 #[enum_dispatch]
-pub trait InlineObjectTrait: Copy + DebugDisplay + Eq + Hash {
+pub trait InlineObjectTrait: Copy + Debug + DisplayWithSymbolTable + Eq + Hash {
     fn clone_to_heap_with_mapping(
         self,
         heap: &mut Heap,
@@ -153,9 +152,10 @@ pub trait InlineObjectTrait: Copy + DebugDisplay + Eq + Hash {
 pub enum InlineData {
     Pointer(InlinePointer),
     Int(InlineInt),
+    Builtin(InlineBuiltin),
+    Tag(InlineTag),
     SendPort(InlineSendPort),
     ReceivePort(InlineReceivePort),
-    Builtin(InlineBuiltin),
 }
 impl InlineData {
     fn channel_id(&self) -> Option<ChannelId> {
@@ -169,40 +169,47 @@ impl InlineData {
 
 impl From<InlineObject> for InlineData {
     fn from(object: InlineObject) -> Self {
-        let value = object.0;
-        match value.get() & InlineObject::KIND_MASK {
-            InlineObject::KIND_POINTER => {
-                debug_assert_eq!(value.get() & 0b100, 0);
-                InlineData::Pointer(InlinePointer::new_unchecked(object))
-            }
+        let value = object.0.get();
+        match value & InlineObject::KIND_MASK {
+            InlineObject::KIND_POINTER => InlineData::Pointer(InlinePointer::new_unchecked(object)),
             InlineObject::KIND_INT => InlineData::Int(InlineInt::new_unchecked(object)),
-            InlineObject::KIND_PORT => match value.get() & InlineObject::KIND_PORT_SUBKIND_MASK {
-                InlineObject::KIND_PORT_SUBKIND_SEND => {
-                    InlineData::SendPort(InlineSendPort::new_unchecked(object))
-                }
-                InlineObject::KIND_PORT_SUBKIND_RECEIVE => {
-                    InlineData::ReceivePort(InlineReceivePort::new_unchecked(object))
-                }
-                _ => unreachable!(),
-            },
             InlineObject::KIND_BUILTIN => InlineData::Builtin(InlineBuiltin::new_unchecked(object)),
-            _ => unreachable!(),
+            InlineObject::KIND_TAG => InlineData::Tag(InlineTag::new_unchecked(object)),
+            InlineObject::KIND_SEND_PORT => {
+                InlineData::SendPort(InlineSendPort::new_unchecked(object))
+            }
+            InlineObject::KIND_RECEIVE_PORT => {
+                InlineData::ReceivePort(InlineReceivePort::new_unchecked(object))
+            }
+            _ => panic!("Unknown inline value type: {value:016x}"),
         }
     }
 }
 
-impl DebugDisplay for InlineData {
-    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
+impl Debug for InlineData {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            InlineData::Pointer(value) => value.fmt(f, is_debug),
-            InlineData::Int(value) => value.fmt(f, is_debug),
-            InlineData::SendPort(value) => value.fmt(f, is_debug),
-            InlineData::ReceivePort(value) => value.fmt(f, is_debug),
-            InlineData::Builtin(value) => value.fmt(f, is_debug),
+            InlineData::Pointer(value) => Debug::fmt(value, f),
+            InlineData::Int(value) => Debug::fmt(value, f),
+            InlineData::Builtin(value) => Debug::fmt(value, f),
+            InlineData::Tag(value) => Debug::fmt(value, f),
+            InlineData::SendPort(value) => Debug::fmt(value, f),
+            InlineData::ReceivePort(value) => Debug::fmt(value, f),
         }
     }
 }
-impl_debug_display_via_debugdisplay!(InlineData);
+impl DisplayWithSymbolTable for InlineData {
+    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
+        match self {
+            InlineData::Pointer(value) => DisplayWithSymbolTable::fmt(value, f, symbol_table),
+            InlineData::Int(value) => Display::fmt(value, f),
+            InlineData::Builtin(value) => Display::fmt(value, f),
+            InlineData::Tag(value) => DisplayWithSymbolTable::fmt(value, f, symbol_table),
+            InlineData::SendPort(value) => Display::fmt(value, f),
+            InlineData::ReceivePort(value) => Display::fmt(value, f),
+        }
+    }
+}
 
 impl Deref for InlineData {
     type Target = InlineObject;
@@ -211,9 +218,10 @@ impl Deref for InlineData {
         match self {
             InlineData::Pointer(value) => value,
             InlineData::Int(value) => value,
+            InlineData::Builtin(value) => value,
+            InlineData::Tag(value) => value,
             InlineData::SendPort(value) => value,
             InlineData::ReceivePort(value) => value,
-            InlineData::Builtin(value) => value,
         }
     }
 }

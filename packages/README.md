@@ -9,4 +9,4 @@ cargo run -- run <file>
 cargo run --release -- run <file>
 ```
 
-`<file>` is the file you want to run, e.g., `./examples/echo.candy`.
+`<file>` is the file you want to run, e.g., `./Examples/echo.candy`.

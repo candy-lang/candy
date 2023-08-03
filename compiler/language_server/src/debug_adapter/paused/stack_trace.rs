@@ -11,7 +11,7 @@ use crate::{
 use candy_frontend::{ast_to_hir::AstToHir, hir::Id, utils::AdjustCasingOfFirstLetter};
 use candy_vm::{
     fiber::FiberId,
-    heap::{Data, InlineObject},
+    heap::{Data, DisplayWithSymbolTable, InlineObject},
     lir::Lir,
     vm::Vm,
 };
@@ -100,12 +100,10 @@ impl PausedState {
                 let function = functions.iter().next().unwrap();
 
                 let source = Source {
-                    name: Some(function.module.to_string()),
-                    path: Some(
-                        module_to_url(&function.module, &db.packages_path)
-                            .unwrap()
-                            .to_string(),
-                    ),
+                    name: Some(ToString::to_string(&function.module)),
+                    path: Some(ToString::to_string(
+                        &module_to_url(&function.module, &db.packages_path).unwrap(),
+                    )),
                     source_reference: None,
                     presentation_hint: if lir.module.package == function.module.package {
                         PresentationHint::Emphasize
@@ -129,7 +127,10 @@ impl PausedState {
                 );
                 (name, None, None)
             }
-            it => panic!("Unexpected callee: {it}"),
+            it => panic!(
+                "Unexpected callee: {}",
+                DisplayWithSymbolTable::to_string(&it, &lir.symbol_table),
+            ),
         };
         dap::types::StackFrame {
             id,
