@@ -175,11 +175,11 @@ impl Context<'_> {
     fn compile_single(&mut self, ast: &Ast) -> hir::Id {
         match &ast.kind {
             AstKind::Int(Int(int)) => {
-                self.push(Some(ast.id.clone()), Expression::Int(int.to_owned()), None)
+                self.push(ast.id.clone(), Expression::Int(int.to_owned()), None)
             }
             AstKind::Text(text) => self.lower_text(Some(ast.id.clone()), text),
             AstKind::TextPart(TextPart(string)) => self.push(
-                Some(ast.id.clone()),
+                ast.id.clone(),
                 Expression::Text(string.value.to_owned()),
                 None,
             ),
@@ -188,7 +188,7 @@ impl Context<'_> {
                     Some(reference) => reference.to_owned(),
                     None => {
                         return self.push_error(
-                            Some(name.id.clone()),
+                            name.id.clone(),
                             self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
                             HirError::UnknownReference {
                                 name: name.value.clone(),
@@ -196,10 +196,10 @@ impl Context<'_> {
                         );
                     }
                 };
-                self.push(Some(ast.id.clone()), Expression::Reference(reference), None)
+                self.push(ast.id.clone(), Expression::Reference(reference), None)
             }
             AstKind::Symbol(Symbol(symbol)) => self.push(
-                Some(ast.id.clone()),
+                ast.id.clone(),
                 Expression::Symbol(symbol.value.to_owned()),
                 None,
             ),
@@ -208,7 +208,7 @@ impl Context<'_> {
                     .iter()
                     .map(|item| self.compile_single(item))
                     .collect_vec();
-                self.push(Some(ast.id.clone()), Expression::List(hir_items), None)
+                self.push(ast.id.clone(), Expression::List(hir_items), None)
             }
             AstKind::Struct(Struct { fields }) => {
                 let fields = fields
@@ -219,12 +219,12 @@ impl Context<'_> {
                             .map(|key| self.compile_single(key))
                             .unwrap_or_else(|| match &value.kind {
                                 AstKind::Identifier(Identifier(name)) => self.push(
-                                    Some(value.id.clone()),
+                                    value.id.clone(),
                                     Expression::Symbol(name.value.uppercase_first_letter()),
                                     None,
                                 ),
                                 AstKind::Error { errors, .. } => self.push(
-                                    Some(ast.id.clone()),
+                                    ast.id.clone(),
                                     Expression::Error {
                                         child: None,
                                         // TODO: These errors are already reported for the value itself.
@@ -239,7 +239,7 @@ impl Context<'_> {
                         (key, self.compile_single(value))
                     })
                     .collect();
-                self.push(Some(ast.id.clone()), Expression::Struct(fields), None)
+                self.push(ast.id.clone(), Expression::Struct(fields), None)
             }
             AstKind::StructAccess(struct_access) => {
                 self.lower_struct_access(Some(ast.id.clone()), struct_access)
@@ -253,9 +253,9 @@ impl Context<'_> {
                         let body =
                             self.compile_function(ast.id.clone(), function, Some(name_string));
                         let name_id = self.push(
-                            Some(name.id.clone()),
+                            name.id.clone(),
                             Expression::Reference(body.clone()),
-                            Some(name.value.to_owned()),
+                            name.value.to_owned(),
                         );
                         (vec![(name.value.to_owned(), name_id)], body)
                     }
@@ -279,16 +279,16 @@ impl Context<'_> {
                             .sorted_by_key(|(_, (_, identifier_id))| identifier_id.0)
                             .map(|(name, (ast_id, identifier_id))| {
                                 let id = self.push(
-                                    Some(ast_id),
+                                    ast_id,
                                     Expression::PatternIdentifierReference(identifier_id),
-                                    Some(name.to_owned()),
+                                    name.to_owned(),
                                 );
                                 (name, id)
                             })
                             .collect_vec();
 
                         self.push(
-                            Some(ast.id.clone()),
+                            ast.id.clone(),
                             Expression::Symbol("Nothing".to_string()),
                             None,
                         );
@@ -324,7 +324,7 @@ impl Context<'_> {
                 let expression = self.compile_single(expression);
 
                 let reset_state = self.start_scope();
-                let match_id = self.create_next_id(Some(ast.id.clone()), None);
+                let match_id = self.create_next_id(ast.id.clone(), None);
                 self.id_prefix = match_id.clone();
 
                 let cases = cases
@@ -336,9 +336,9 @@ impl Context<'_> {
                             let reset_state = self.start_scope();
                             for (name, (ast_id, identifier_id)) in pattern_identifiers {
                                 self.push(
-                                    Some(ast_id),
+                                    ast_id,
                                     Expression::PatternIdentifierReference(identifier_id),
-                                    Some(name.to_owned()),
+                                    name.to_owned(),
                                 );
                             }
                             self.compile(body.as_ref());
@@ -377,7 +377,7 @@ impl Context<'_> {
             AstKind::Error { child, errors } => {
                 let child = child.as_ref().map(|child| self.compile_single(child));
                 self.push(
-                    Some(ast.id.clone()),
+                    ast.id.clone(),
                     Expression::Error {
                         child,
                         errors: errors.clone(),
@@ -501,7 +501,7 @@ impl Context<'_> {
         identifier: Option<String>,
     ) -> hir::Id {
         let reset_state = self.start_scope();
-        let function_id = self.create_next_id(Some(id), identifier);
+        let function_id = self.create_next_id(id, identifier);
         self.id_prefix = function_id.clone();
 
         // TODO: Error on parameters with same name
@@ -511,7 +511,7 @@ impl Context<'_> {
                 let name = parameter.value.to_string();
                 parameters.push(function_id.child(name.clone()));
 
-                let id = self.create_next_id(Some(parameter.id.clone()), Some(name.clone()));
+                let id = self.create_next_id(parameter.id.clone(), name.clone());
                 self.body.identifiers.insert(id.clone(), name.clone());
                 self.identifiers.insert(name, id);
             } else {
@@ -533,9 +533,9 @@ impl Context<'_> {
                     .sorted_by_key(|(_, (_, identifier_id))| identifier_id.0)
                 {
                     self.push(
-                        Some(ast_id),
+                        ast_id,
                         Expression::PatternIdentifierReference(identifier_id),
-                        Some(name.to_owned()),
+                        name.to_owned(),
                     );
                 }
             }
@@ -591,7 +591,7 @@ impl Context<'_> {
 
         let struct_ = self.compile_single(&struct_access.struct_);
         let key_id = self.push(
-            Some(struct_access.key.id.clone()),
+            struct_access.key.id.clone(),
             Expression::Symbol(struct_access.key.value.uppercase_first_letter()),
             None,
         );
@@ -690,10 +690,11 @@ impl Context<'_> {
 
     fn push(
         &mut self,
-        ast_id: Option<ast::Id>,
+        ast_id: impl Into<Option<ast::Id>>,
         expression: Expression,
-        identifier: Option<String>,
+        identifier: impl Into<Option<String>>,
     ) -> hir::Id {
+        let identifier = identifier.into();
         let id = self.create_next_id(ast_id, identifier.clone());
         self.push_with_existing_id(id, expression, identifier)
     }
@@ -701,8 +702,9 @@ impl Context<'_> {
         &mut self,
         id: hir::Id,
         expression: Expression,
-        identifier: Option<String>,
+        identifier: impl Into<Option<String>>,
     ) -> hir::Id {
+        let identifier = identifier.into();
         self.body
             .push(id.to_owned(), expression, identifier.clone());
         if let Some(identifier) = identifier {
@@ -712,7 +714,7 @@ impl Context<'_> {
     }
     fn push_error(
         &mut self,
-        ast_id: Option<ast::Id>,
+        ast_id: impl Into<Option<ast::Id>>,
         span: Range<Offset>,
         error: HirError,
     ) -> hir::Id {
@@ -733,8 +735,9 @@ impl Context<'_> {
     fn create_next_id(
         &mut self,
         ast_id: impl Into<Option<ast::Id>>,
-        key: Option<String>,
+        key: impl Into<Option<String>>,
     ) -> hir::Id {
+        let key = key.into();
         for disambiguator in 0.. {
             let last_part = if let Some(key) = &key {
                 if disambiguator == 0 {
@@ -771,7 +774,7 @@ impl Context<'_> {
         }
 
         let sparkles_map = Expression::Struct(sparkles_map);
-        self.push(None, sparkles_map, Some("✨".to_string()));
+        self.push(None, sparkles_map, "✨".to_string());
     }
 
     fn generate_use(&mut self) {
@@ -784,7 +787,7 @@ impl Context<'_> {
         assert!(self.use_id.is_none());
 
         let reset_state = self.start_scope();
-        let use_id = self.create_next_id(None, Some("use".to_string()));
+        let use_id = self.create_next_id(None, "use".to_string());
         self.id_prefix = use_id.clone();
         let relative_path = use_id.child("relativePath");
 
@@ -794,7 +797,7 @@ impl Context<'_> {
                 current_module: self.module.clone(),
                 relative_path: relative_path.clone(),
             },
-            Some("importedModule".to_string()),
+            "importedModule".to_string(),
         );
 
         let inner_body = self.end_scope(reset_state);
@@ -806,7 +809,7 @@ impl Context<'_> {
                 body: inner_body,
                 fuzzable: false,
             }),
-            Some("use".to_string()),
+            "use".to_string(),
         );
         self.use_id = Some(use_id);
     }
