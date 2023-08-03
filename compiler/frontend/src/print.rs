@@ -137,18 +137,32 @@ pub fn print<T>(
                 return Some("(,)".to_string());
             }
 
+            if !max_length.fits(4) {
+                return Some("…".to_string());
+            }
+
             let list_len = list.len();
+            if list_len == 1 {
+                let item = print(item, Precedence::Low, MaxLength::Unlimited, visitor)?;
+                return if max_length.fits(item.len() + 3) {
+                    Some(format!("({item},)"))
+                } else {
+                    Some("(…,)".to_string())
+                };
+            }
+
             let mut items = Vec::with_capacity(list_len);
             let mut total_item_length = 0;
             for item in list {
+                // Would an additional item fit?
+                // surrounding parentheses, items, and for each item comma + space, new item
+                if !max_length.fits(2 + total_item_length + items.len() * 2 + 1) {
+                    break;
+                }
+
                 let item = print(item, Precedence::Low, MaxLength::Unlimited, visitor)?;
                 total_item_length += item.len();
                 items.push(item);
-
-                // surrounding parentheses, items, and for each item comma + space
-                if !max_length.fits(2 + total_item_length + items.len() * 2) {
-                    break;
-                }
             }
             if items.len() == list_len && max_length.fits(total_item_length + items.len() * 2) {
                 return Some(format!("({})", items.into_iter().join(", ")));
