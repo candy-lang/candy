@@ -391,7 +391,7 @@ impl BodyBuilder {
 impl_display_via_richir!(Body);
 impl ToRichIr for Body {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        fn push(builder: &mut RichIrBuilder, id: &Id, expression: &Expression) {
+        fn push(builder: &mut RichIrBuilder, id: Id, expression: &Expression) {
             if let Expression::Function { original_hirs, .. } = expression {
                 builder.push("# ", TokenType::Comment, EnumSet::empty());
                 builder.push_children_custom(
@@ -419,11 +419,11 @@ impl ToRichIr for Body {
 
         let mut iterator = self.expressions.iter();
         if let Some((id, expression)) = iterator.next() {
-            push(builder, id, expression);
+            push(builder, *id, expression);
         }
         for (id, expression) in iterator {
             builder.push_newline();
-            push(builder, id, expression);
+            push(builder, *id, expression);
         }
     }
 }

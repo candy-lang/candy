@@ -19,7 +19,7 @@ pub fn find_definition(db: &Database, module: Module, offset: Offset) -> Option<
         _ => return None,
     }
 
-    let origin_hir_ids = db.cst_to_hir_id(module.clone(), &origin_cst.data.id);
+    let origin_hir_ids = db.cst_to_hir_id(module.clone(), origin_cst.data.id);
     assert_eq!(
         origin_hir_ids.len(),
         1,

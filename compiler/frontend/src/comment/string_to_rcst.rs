@@ -343,7 +343,7 @@ mod parse {
         );
     }
 
-    #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
     enum InlineFormatting {
         Emphasized,
         Link,
@@ -351,7 +351,7 @@ mod parse {
     }
     impl InlineFormatting {
         fn as_rcst(
-            &self,
+            self,
             has_opening_char: bool,
             inner_parts: Vec<Rcst>,
             has_closing_char: bool,

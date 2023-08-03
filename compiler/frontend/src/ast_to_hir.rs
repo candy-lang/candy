@@ -32,7 +32,7 @@ pub trait AstToHir: CstDb + CstToAst {
     #[salsa::transparent]
     fn ast_to_hir_id(&self, id: &ast::Id) -> Vec<hir::Id>;
     #[salsa::transparent]
-    fn cst_to_hir_id(&self, module: Module, id: &cst::Id) -> Vec<hir::Id>;
+    fn cst_to_hir_id(&self, module: Module, id: cst::Id) -> Vec<hir::Id>;
 
     fn hir(&self, module: Module) -> HirResult;
 }
@@ -65,7 +65,7 @@ fn ast_to_hir_id(db: &dyn AstToHir, id: &ast::Id) -> Vec<hir::Id> {
         vec![]
     }
 }
-fn cst_to_hir_id(db: &dyn AstToHir, module: Module, id: &cst::Id) -> Vec<hir::Id> {
+fn cst_to_hir_id(db: &dyn AstToHir, module: Module, id: cst::Id) -> Vec<hir::Id> {
     let ids = db.cst_to_ast_id(module, id);
     ids.into_iter()
         .flat_map(|id| db.ast_to_hir_id(&id))

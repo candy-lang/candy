@@ -57,7 +57,7 @@ pub trait CstDb: RcstToCst {
 }
 
 fn find_cst(db: &dyn CstDb, module: Module, id: Id) -> Cst {
-    db.cst(module).unwrap().find(&id).unwrap().clone()
+    db.cst(module).unwrap().find(id).unwrap().clone()
 }
 fn find_cst_by_offset(db: &dyn CstDb, module: Module, offset: Offset) -> Cst {
     db.cst(module)

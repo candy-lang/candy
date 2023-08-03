@@ -41,7 +41,7 @@ where
             Some(ReferenceQuery::Needs(module))
         }
         CstKind::Identifier { .. } => {
-            let hir_ids = db.cst_to_hir_id(module, &origin_cst.data.id);
+            let hir_ids = db.cst_to_hir_id(module, origin_cst.data.id);
             assert_eq!(
                 hir_ids.len(),
                 1,

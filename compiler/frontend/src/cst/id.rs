@@ -1,7 +1,7 @@
 use crate::id::CountableId;
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Id(pub usize);
 
 impl CountableId for Id {
