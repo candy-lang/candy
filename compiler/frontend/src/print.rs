@@ -38,7 +38,6 @@ impl MaxLength {
 }
 
 /// Prints the value, using the visitor to match across possible values.
-///
 pub fn print<T>(
     value: T,
     precedence: Precedence,
@@ -112,9 +111,8 @@ pub fn print<T>(
             // - full text
             // - `…`
 
-            let text = format!("\"{text}\"");
-            if max_length.fits(text.len()) {
-                text
+            if max_length.fits(1 + text.len() + 1) {
+                format!("\"{text}\"")
             } else {
                 "…".to_string()
             }
@@ -140,7 +138,7 @@ pub fn print<T>(
             }
 
             let list_len = list.len();
-            let mut items = vec![];
+            let mut items = Vec::with_capacity(list_len);
             let mut total_item_length = 0;
             for item in list {
                 let item = print(item, Precedence::Low, MaxLength::Unlimited, visitor)?;
@@ -164,7 +162,7 @@ pub fn print<T>(
                     return Some(format!(
                         "({}, {})",
                         items.into_iter().join(", "),
-                        extra_text
+                        extra_text,
                     ));
                 }
             }
@@ -199,7 +197,7 @@ pub fn print<T>(
                 values.push(value);
             }
 
-            let mut texted_keys = vec![];
+            let mut texted_keys = Vec::with_capacity(num_entries);
             let mut total_keys_length = 0;
             for key in keys {
                 let key = print(key, Precedence::Low, MaxLength::Unlimited, visitor)?;
@@ -227,7 +225,7 @@ pub fn print<T>(
                                 .into_iter()
                                 .map(|key| format!("{key}: …"))
                                 .join(", "),
-                            extra_text
+                            extra_text,
                         ));
                     }
                 }
@@ -240,7 +238,7 @@ pub fn print<T>(
                 });
             }
 
-            let mut texted_values = vec![];
+            let mut texted_values = Vec::with_capacity(num_entries);
             let mut total_values_length = num_entries; // dots for every value
             for value in values {
                 let value = print(value, Precedence::Low, MaxLength::Unlimited, visitor)?;
@@ -263,7 +261,7 @@ pub fn print<T>(
                         .into_iter()
                         .zip(texted_values)
                         .map(|(key, value)| format!("{key}: {value}"))
-                        .join(", ")
+                        .join(", "),
                 ));
             }
 

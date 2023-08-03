@@ -74,7 +74,7 @@ impl Insight {
                 let name = body.identifiers.get(&id).unwrap();
                 format!(
                     "{name} = {}",
-                    value.to_debug_text(Precedence::Low, MaxLength::Limited(60))
+                    value.to_debug_text(Precedence::Low, MaxLength::Limited(60)),
                 )
             }
             _ => return None,
