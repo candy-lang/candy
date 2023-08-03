@@ -1,5 +1,5 @@
 use super::{FiberId, FiberTracer, TracedFiberEnded, TracedFiberEndedReason, Tracer};
-use crate::heap::{Heap, HirId, InlineObject};
+use crate::heap::{DisplayWithSymbolTable, Heap, HirId, InlineObject, SymbolTable};
 use candy_frontend::{ast_to_hir::AstToHir, cst::CstKind, position::PositionConversionDb};
 use itertools::Itertools;
 use pad::PadStr;
@@ -72,15 +72,19 @@ impl StackTracer {
     /// When a VM panics, some child fiber might be responsible for that. This
     /// function returns a formatted stack trace spanning all fibers in the
     /// chain from the panicking root fiber until the concrete failing needs.
-    pub fn format_panic_stack_trace_to_root_fiber<DB>(&self, db: &DB) -> String
+    pub fn format_panic_stack_trace_to_root_fiber<DB>(
+        &self,
+        db: &DB,
+        symbol_table: &SymbolTable,
+    ) -> String
     where
         DB: AstToHir + PositionConversionDb,
     {
         let panic_chain = self.panic_chain.as_ref().expect("VM didn't panic (yet)");
-        self.format_stack_trace(db, panic_chain)
+        self.format_stack_trace(db, symbol_table, panic_chain)
     }
 
-    fn format_stack_trace<DB>(&self, db: &DB, stack: &[Call]) -> String
+    fn format_stack_trace<DB>(&self, db: &DB, symbol_table: &SymbolTable, stack: &[Call]) -> String
     where
         DB: AstToHir + PositionConversionDb,
     {
@@ -120,7 +124,7 @@ impl StackTracer {
                             _ => None,
                         }
                     })
-                    .unwrap_or_else(|| format!("{callee}")),
+                    .unwrap_or_else(|| DisplayWithSymbolTable::to_string(callee, symbol_table)),
                 arguments.iter().map(|arg| format!("{arg:?}")).join(" "),
             );
             caller_locations_and_calls.push((caller_location_string, call_string));
@@ -142,7 +146,7 @@ impl StackTracer {
 fn extract_receiver_name(cst_kind: &CstKind) -> Option<String> {
     match cst_kind {
         CstKind::TrailingWhitespace { child, .. } => extract_receiver_name(child),
-        CstKind::Identifier(identifier) => Some(identifier.to_string()),
+        CstKind::Identifier(identifier) => Some(ToString::to_string(identifier)),
         CstKind::Parenthesized { inner, .. } => extract_receiver_name(inner),
         CstKind::StructAccess { struct_, key, .. } => {
             let struct_string = extract_receiver_name(struct_)?;

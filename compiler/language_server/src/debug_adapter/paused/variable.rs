@@ -5,7 +5,10 @@ use crate::database::Database;
 use candy_frontend::hir::{self, Expression, HirDb};
 use candy_vm::{
     fiber::FiberId,
-    heap::{Data, DataDiscriminants, InlineObject, ObjectInHeap},
+    heap::{
+        Data, DataDiscriminants, DisplayWithSymbolTable, InlineObject, ObjectInHeap,
+        OrdWithSymbolTable,
+    },
 };
 use dap::{
     requests::VariablesArguments,
@@ -65,7 +68,7 @@ impl PausedState {
                             variables.extend(
                                 parameters
                                     .iter()
-                                    .map(|it| it.keys.last().unwrap().to_string())
+                                    .map(|it| ToString::to_string(&it.keys.last().unwrap()))
                                     .zip_eq(call.arguments.to_owned())
                                     .skip(start)
                                     .take(count)
@@ -89,7 +92,7 @@ impl PausedState {
                                         // TODO: resolve argument name
                                         self.create_variable(
                                             stack_frame_key.fiber_id,
-                                            (start + index).to_string(),
+                                            ToString::to_string(&(start + index)),
                                             *object,
                                             supports_variable_type,
                                         )
@@ -98,7 +101,13 @@ impl PausedState {
                             );
                         }
                     }
-                    it => panic!("Unexpected callee: {it}"),
+                    it => panic!(
+                        "Unexpected callee: {}",
+                        DisplayWithSymbolTable::to_string(
+                            &it,
+                            &self.vm_state.vm.lir().symbol_table,
+                        ),
+                    ),
                 };
             }
             VariablesKey::Locals(stack_frame_key) => {
@@ -158,9 +167,10 @@ impl PausedState {
                 Data::Tag(tag) => {
                     if should_include_named {
                         if start == 0 && count > 0 {
+                            let symbol_table = &self.vm_state.vm.lir().symbol_table;
                             variables.push(Variable {
                                 name: "Symbol".to_string(),
-                                value: tag.symbol().get().to_string(),
+                                value: symbol_table.get(tag.symbol_id()).to_string(),
                                 type_field: if supports_variable_type {
                                     Some("Symbol".to_string())
                                 } else {
@@ -173,9 +183,7 @@ impl PausedState {
                                 variables_reference: 0,
                                 named_variables: Some(0),
                                 indexed_variables: Some(0),
-                                memory_reference: Some(
-                                    MemoryReference::heap(*fiber_id, **tag.symbol()).to_dap(),
-                                ),
+                                memory_reference: None,
                             });
                         }
                         count = count.saturating_sub(1);
@@ -225,7 +233,7 @@ impl PausedState {
                             |(index, object)| {
                                 self.create_variable(
                                     *fiber_id,
-                                    (start + index).to_string(),
+                                    ToString::to_string(&(start + index)),
                                     *object,
                                     supports_variable_type,
                                 )
@@ -252,12 +260,14 @@ impl PausedState {
                             .copied()
                             .zip_eq(struct_.values().iter().copied())
                             .collect_vec();
-                        fields.sort();
+                        let symbol_table = &self.vm_state.vm.lir().symbol_table;
+                        fields.sort_by(|a, b| OrdWithSymbolTable::cmp(a, symbol_table, b));
                         variables.extend(fields.into_iter().skip(start).take(count).map(
                             |(key, value)| {
+                                let symbol_table = &self.vm_state.vm.lir().symbol_table;
                                 self.create_variable(
                                     *fiber_id,
-                                    key.to_string(),
+                                    DisplayWithSymbolTable::to_string(&key, symbol_table),
                                     value,
                                     supports_variable_type,
                                 )
@@ -265,7 +275,10 @@ impl PausedState {
                         ));
                     }
                 }
-                it => panic!("Tried to get inner variables of {it}."),
+                it => panic!(
+                    "Tried to get inner variables of {}.",
+                    DisplayWithSymbolTable::to_string(&it, &self.vm_state.vm.lir().symbol_table),
+                ),
             },
         }
 
@@ -275,7 +288,7 @@ impl PausedState {
     fn create_length_variable(length: usize, supports_variable_type: bool) -> Variable {
         Variable {
             name: "<length>".to_string(),
-            value: length.to_string(),
+            value: ToString::to_string(&length),
             type_field: Self::type_field_for(DataDiscriminants::Int, supports_variable_type),
             presentation_hint: Some(Self::presentation_hint_for(DataDiscriminants::Int)),
             evaluate_name: None,
@@ -312,7 +325,7 @@ impl PausedState {
 
         Variable {
             name,
-            value: object.to_string(),
+            value: DisplayWithSymbolTable::to_string(&object, &self.vm_state.vm.lir().symbol_table),
             type_field: Self::type_field_for(data.into(), supports_variable_type),
             presentation_hint: Some(Self::presentation_hint_for(data.into())),
             evaluate_name: None,

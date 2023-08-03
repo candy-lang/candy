@@ -9,7 +9,8 @@ use super::{
         port::{InlineReceivePort, InlineSendPort},
         InlineData, InlineObject,
     },
-    Heap,
+    symbol_table::{impl_ord_with_symbol_table_via_ord, DisplayWithSymbolTable},
+    Heap, OrdWithSymbolTable, SymbolId, SymbolTable,
 };
 use crate::{
     channel::ChannelId,
@@ -23,14 +24,15 @@ use rustc_hash::FxHashMap;
 use std::{
     borrow::Cow,
     cmp::Ordering,
-    fmt::{self, Formatter},
+    fmt::{self, Debug, Formatter},
     hash::Hash,
+    intrinsics,
     ops::{Shl, Shr},
     str,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-#[derive(Clone, Copy, EnumDiscriminants, Eq, Hash, IntoStaticStr, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, EnumDiscriminants, Eq, Hash, IntoStaticStr, PartialEq)]
 #[strum_discriminants(derive(IntoStaticStr))]
 pub enum Data {
     Int(Int),
@@ -79,23 +81,65 @@ impl From<HeapObject> for Data {
     }
 }
 
-impl DebugDisplay for Data {
-    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
+impl Debug for Data {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Data::Int(int) => DebugDisplay::fmt(int, f, is_debug),
-            Data::Tag(tag) => DebugDisplay::fmt(tag, f, is_debug),
-            Data::Text(text) => DebugDisplay::fmt(text, f, is_debug),
-            Data::List(list) => DebugDisplay::fmt(list, f, is_debug),
-            Data::Struct(struct_) => DebugDisplay::fmt(struct_, f, is_debug),
-            Data::HirId(hir_id) => DebugDisplay::fmt(hir_id, f, is_debug),
-            Data::Function(function) => DebugDisplay::fmt(function, f, is_debug),
-            Data::Builtin(builtin) => DebugDisplay::fmt(builtin, f, is_debug),
-            Data::SendPort(send_port) => DebugDisplay::fmt(send_port, f, is_debug),
-            Data::ReceivePort(receive_port) => DebugDisplay::fmt(receive_port, f, is_debug),
+            Data::Int(int) => Debug::fmt(int, f),
+            Data::Tag(tag) => Debug::fmt(tag, f),
+            Data::Text(text) => Debug::fmt(text, f),
+            Data::List(list) => Debug::fmt(list, f),
+            Data::Struct(struct_) => Debug::fmt(struct_, f),
+            Data::HirId(hir_id) => Debug::fmt(hir_id, f),
+            Data::Function(function) => Debug::fmt(function, f),
+            Data::Builtin(builtin) => Debug::fmt(builtin, f),
+            Data::SendPort(send_port) => Debug::fmt(send_port, f),
+            Data::ReceivePort(receive_port) => Debug::fmt(receive_port, f),
         }
     }
 }
-impl_debug_display_via_debugdisplay!(Data);
+
+impl DisplayWithSymbolTable for Data {
+    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
+        match self {
+            Data::Int(int) => DisplayWithSymbolTable::fmt(int, f, symbol_table),
+            Data::Tag(tag) => DisplayWithSymbolTable::fmt(tag, f, symbol_table),
+            Data::Text(text) => DisplayWithSymbolTable::fmt(text, f, symbol_table),
+            Data::List(list) => DisplayWithSymbolTable::fmt(list, f, symbol_table),
+            Data::Struct(struct_) => DisplayWithSymbolTable::fmt(struct_, f, symbol_table),
+            Data::HirId(hir_id) => DisplayWithSymbolTable::fmt(hir_id, f, symbol_table),
+            Data::Function(function) => DisplayWithSymbolTable::fmt(function, f, symbol_table),
+            Data::Builtin(builtin) => DisplayWithSymbolTable::fmt(builtin, f, symbol_table),
+            Data::SendPort(send_port) => DisplayWithSymbolTable::fmt(send_port, f, symbol_table),
+            Data::ReceivePort(receive_port) => {
+                DisplayWithSymbolTable::fmt(receive_port, f, symbol_table)
+            }
+        }
+    }
+}
+
+impl OrdWithSymbolTable for Data {
+    fn cmp(&self, symbol_table: &SymbolTable, other: &Self) -> Ordering {
+        match (self, other) {
+            (Data::Int(this), Data::Int(other)) => Ord::cmp(this, other),
+            (Data::Tag(this), Data::Tag(other)) => {
+                OrdWithSymbolTable::cmp(this, symbol_table, other)
+            }
+            (Data::Text(this), Data::Text(other)) => Ord::cmp(this, other),
+            (Data::List(this), Data::List(other)) => {
+                OrdWithSymbolTable::cmp(this, symbol_table, other)
+            }
+            (Data::Struct(this), Data::Struct(other)) => {
+                OrdWithSymbolTable::cmp(this, symbol_table, other)
+            }
+            (Data::HirId(this), Data::HirId(other)) => Ord::cmp(this, other),
+            (Data::Function(this), Data::Function(other)) => Ord::cmp(this, other),
+            (Data::Builtin(this), Data::Builtin(other)) => Ord::cmp(this, other),
+            (Data::SendPort(this), Data::SendPort(other)) => Ord::cmp(this, other),
+            (Data::ReceivePort(this), Data::ReceivePort(other)) => Ord::cmp(this, other),
+            _ => intrinsics::discriminant_value(self).cmp(&intrinsics::discriminant_value(other)),
+        }
+    }
+}
 
 // Int
 
@@ -243,48 +287,44 @@ impl From<Int> for InlineObject {
 }
 impl_try_froms!(Int, "Expected an int.");
 impl_try_from_heap_object!(Int, "Expected an int.");
+impl_ord_with_symbol_table_via_ord!(Int);
 
 // Tag
 
-#[derive(Clone, Copy, Deref, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
 pub struct Tag(HeapTag);
 
 impl Tag {
     pub fn create(
         heap: &mut Heap,
         is_reference_counted: bool,
-        symbol: Text,
+        symbol_id: SymbolId,
         value: impl Into<Option<InlineObject>>,
     ) -> Self {
-        HeapTag::create(heap, is_reference_counted, symbol, value).into()
-    }
-    pub fn create_from_str(
-        heap: &mut Heap,
-        is_reference_counted: bool,
-        symbol: &str,
-        value: impl Into<Option<InlineObject>>,
-    ) -> Self {
-        let symbol = Text::create(heap, is_reference_counted, symbol);
-        Self::create(heap, is_reference_counted, symbol, value)
+        HeapTag::create(heap, is_reference_counted, symbol_id, value).into()
     }
     pub fn create_nothing(heap: &mut Heap, is_reference_counted: bool) -> Self {
-        Self::create_from_str(heap, is_reference_counted, "Nothing", None)
+        Self::create(heap, is_reference_counted, SymbolId::NOTHING, None)
     }
     pub fn create_bool(heap: &mut Heap, is_reference_counted: bool, value: bool) -> Self {
-        Self::create_from_str(
+        Self::create(
             heap,
             is_reference_counted,
-            if value { "True" } else { "False" },
+            if value {
+                SymbolId::TRUE
+            } else {
+                SymbolId::FALSE
+            },
             None,
         )
     }
     pub fn create_ordering(heap: &mut Heap, is_reference_counted: bool, value: Ordering) -> Self {
         let value = match value {
-            Ordering::Less => "Less",
-            Ordering::Equal => "Equal",
-            Ordering::Greater => "Greater",
+            Ordering::Less => SymbolId::LESS,
+            Ordering::Equal => SymbolId::EQUAL,
+            Ordering::Greater => SymbolId::GREATER,
         };
-        Self::create_from_str(heap, is_reference_counted, value, None)
+        Self::create(heap, is_reference_counted, value, None)
     }
     pub fn create_result(
         heap: &mut Heap,
@@ -292,14 +332,14 @@ impl Tag {
         value: Result<InlineObject, InlineObject>,
     ) -> Self {
         let (symbol, value) = match value {
-            Ok(it) => ("Ok", it),
-            Err(it) => ("Error", it),
+            Ok(it) => (SymbolId::OK, it),
+            Err(it) => (SymbolId::ERROR, it),
         };
-        Self::create_from_str(heap, is_reference_counted, symbol, value)
+        Self::create(heap, is_reference_counted, symbol, value)
     }
 }
 
-impls_via_0!(Tag);
+impls_via_0_with_symbol_table!(Tag);
 impl_try_froms!(Tag, "Expected a tag.");
 impl_try_from_heap_object!(Tag, "Expected a tag.");
 
@@ -319,9 +359,9 @@ impl TryFrom<Data> for bool {
             return Err("Expected a tag without a value.");
         }
 
-        match tag.symbol().get() {
-            "True" => Ok(true),
-            "False" => Ok(false),
+        match tag.symbol_id() {
+            SymbolId::TRUE => Ok(true),
+            SymbolId::FALSE => Ok(false),
             _ => Err("Expected `True` or `False`."),
         }
     }
@@ -347,10 +387,11 @@ impl Text {
 impls_via_0!(Text);
 impl_try_froms!(Text, "Expected a text.");
 impl_try_from_heap_object!(Text, "Expected a text.");
+impl_ord_with_symbol_table_via_ord!(Text);
 
 // List
 
-#[derive(Clone, Copy, Deref, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
 pub struct List(HeapList);
 
 impl List {
@@ -359,13 +400,13 @@ impl List {
     }
 }
 
-impls_via_0!(List);
+impls_via_0_with_symbol_table!(List);
 impl_try_froms!(List, "Expected a list.");
 impl_try_from_heap_object!(List, "Expected a list.");
 
 // Struct
 
-#[derive(Clone, Copy, Deref, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Deref, Eq, From, Hash, PartialEq)]
 pub struct Struct(HeapStruct);
 
 impl Struct {
@@ -379,13 +420,13 @@ impl Struct {
     pub fn create_with_symbol_keys(
         heap: &mut Heap,
         is_reference_counted: bool,
-        fields: impl IntoIterator<Item = (&str, InlineObject)>,
+        fields: impl IntoIterator<Item = (SymbolId, InlineObject)>,
     ) -> Self {
         let fields = fields
             .into_iter()
             .map(|(key, value)| {
                 (
-                    (Tag::create_from_str(heap, is_reference_counted, key, None)).into(),
+                    (Tag::create(heap, is_reference_counted, key, None)).into(),
                     value,
                 )
             })
@@ -394,7 +435,7 @@ impl Struct {
     }
 }
 
-impls_via_0!(Struct);
+impls_via_0_with_symbol_table!(Struct);
 impl_try_froms!(Struct, "Expected a struct.");
 impl_try_from_heap_object!(Struct, "Expected a struct.");
 
@@ -418,6 +459,7 @@ impl Function {
 impls_via_0!(Function);
 impl_try_froms!(Function, "Expected a function.");
 impl_try_from_heap_object!(Function, "Expected a function.");
+impl_ord_with_symbol_table_via_ord!(Function);
 
 // HIR ID
 
@@ -434,6 +476,7 @@ impl HirId {
 impls_via_0!(HirId);
 impl_try_froms!(HirId, "Expected a HIR ID.");
 impl_try_from_heap_object!(HirId, "Expected a HIR ID.");
+impl_ord_with_symbol_table_via_ord!(HirId);
 
 // Builtin
 
@@ -447,6 +490,7 @@ impl Builtin {
 }
 
 impls_via_0!(Builtin);
+impl_ord_with_symbol_table_via_ord!(Builtin);
 
 // Send Port
 
@@ -460,6 +504,7 @@ impl SendPort {
 }
 
 impls_via_0!(SendPort);
+impl_ord_with_symbol_table_via_ord!(SendPort);
 impl_try_froms!(SendPort, "Expected a send port.");
 
 // Receive Port
@@ -474,6 +519,7 @@ impl ReceivePort {
 }
 
 impls_via_0!(ReceivePort);
+impl_ord_with_symbol_table_via_ord!(ReceivePort);
 impl_try_froms!(ReceivePort, "Expected a receive port.");
 
 // Utils
@@ -481,7 +527,7 @@ impl_try_froms!(ReceivePort, "Expected a receive port.");
 macro_rules! impls_via_0 {
     ($type:ty) => {
         impl DebugDisplay for $type {
-            fn fmt(&self, f: &mut std::fmt::Formatter, is_debug: bool) -> std::fmt::Result {
+            fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
                 DebugDisplay::fmt(&self.0, f, is_debug)
             }
         }
@@ -490,6 +536,32 @@ macro_rules! impls_via_0 {
         impl From<$type> for InlineObject {
             fn from(value: $type) -> Self {
                 (**value).into()
+            }
+        }
+    };
+}
+macro_rules! impls_via_0_with_symbol_table {
+    ($type:ty) => {
+        impl Debug for $type {
+            fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+                Debug::fmt(&self.0, f)
+            }
+        }
+        impl DisplayWithSymbolTable for $type {
+            fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
+                DisplayWithSymbolTable::fmt(&self.0, f, symbol_table)
+            }
+        }
+
+        impl From<$type> for InlineObject {
+            fn from(value: $type) -> Self {
+                (**value).into()
+            }
+        }
+
+        impl OrdWithSymbolTable for $type {
+            fn cmp(&self, symbol_table: &SymbolTable, other: &Self) -> Ordering {
+                OrdWithSymbolTable::cmp(&self.0, symbol_table, &other.0)
             }
         }
     };
@@ -537,4 +609,4 @@ macro_rules! impl_try_from_heap_object {
         }
     };
 }
-use {impl_try_from_heap_object, impl_try_froms, impls_via_0};
+use {impl_try_from_heap_object, impl_try_froms, impls_via_0, impls_via_0_with_symbol_table};

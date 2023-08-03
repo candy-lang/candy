@@ -7,58 +7,73 @@ assignment: struct
   identifier $15@"equals"
   identifier $17@"fixedDecimal"
   identifier $19@"ifElse"
-  identifier $21@"recursive" = 
+  identifier $21@"int"
+  identifier $23@"recursive" = 
   call identifier $9@"use" with these arguments:
     text
       textPart $11@"Core"
-assignment: $119@"sqrt" := function (fuzzable) { $120@"x" ->
-  call identifier $25@"needs" with these arguments:
-    call struct access identifier $27@"fixedDecimal".$29@"Is" with these arguments:
-      identifier $31@"x"
-  call identifier $35@"needs" with these arguments:
-    call struct access identifier $37@"fixedDecimal".$39@"IsNonNegative" with these arguments:
-      identifier $41@"x"
-  call identifier $45@"recursive" with these arguments:
-    call struct access identifier $49@"fixedDecimal".$51@"Divide" with these arguments:
-      identifier $47@"x"
-      call struct access identifier $54@"fixedDecimal".$56@"FromInt" with these arguments:
+assignment: $160@"sqrt" := function (fuzzable) { $161@"x" $162@"precision" ->
+  call identifier $27@"needs" with these arguments:
+    call struct access identifier $29@"fixedDecimal".$31@"Is" with these arguments:
+      identifier $33@"x"
+  call identifier $37@"needs" with these arguments:
+    call struct access identifier $39@"fixedDecimal".$41@"IsNonNegative" with these arguments:
+      identifier $43@"x"
+  call identifier $47@"needs" with these arguments:
+    call struct access identifier $49@"int".$51@"Is" with these arguments:
+      identifier $53@"precision"
+  call identifier $57@"needs" with these arguments:
+    call struct access identifier $59@"int".$61@"IsNonNegative" with these arguments:
+      identifier $63@"precision"
+  assignment: identifier $76@"delta" = 
+    call struct access identifier $68@"fixedDecimal".$70@"FromIntScaled" with these arguments:
+      int 10
+      identifier $72@"precision"
+  call identifier $79@"recursive" with these arguments:
+    call struct access identifier $83@"fixedDecimal".$85@"DivideTruncatingAtScale" with these arguments:
+      identifier $81@"x"
+      call struct access identifier $88@"fixedDecimal".$90@"FromInt" with these arguments:
         int 2
-    function (non-fuzzable) { $61@"recurse" $62@"guess" ->
-      assignment: identifier $92@"refinedGuess" = 
-        call struct access identifier $63@"fixedDecimal".$65@"Divide" with these arguments:
-          call struct access identifier $69@"fixedDecimal".$71@"Add" with these arguments:
-            identifier $67@"guess"
-            call struct access identifier $75@"fixedDecimal".$77@"Divide" with these arguments:
-              identifier $73@"x"
-              identifier $79@"guess"
-          call struct access identifier $86@"fixedDecimal".$88@"FromInt" with these arguments:
+      identifier $93@"precision"
+    function (non-fuzzable) { $97@"recurse" $98@"guess" ->
+      assignment: identifier $132@"refinedGuess" = 
+        call struct access identifier $99@"fixedDecimal".$101@"DivideTruncatingAtScale" with these arguments:
+          call struct access identifier $105@"fixedDecimal".$107@"Add" with these arguments:
+            identifier $103@"guess"
+            call struct access identifier $111@"fixedDecimal".$113@"DivideTruncatingAtScale" with these arguments:
+              identifier $109@"x"
+              identifier $115@"guess"
+              identifier $117@"precision"
+          call struct access identifier $124@"fixedDecimal".$126@"FromInt" with these arguments:
             int 2
-      call identifier $95@"ifElse" with these arguments:
-        call struct access identifier $97@"fixedDecimal".$99@"ApproxEquals" with these arguments:
-          identifier $101@"guess"
-          identifier $103@"refinedGuess"
-          int 10
+          identifier $129@"precision"
+      call identifier $135@"ifElse" with these arguments:
+        call struct access identifier $137@"fixedDecimal".$139@"ApproxEquals" with these arguments:
+          identifier $141@"guess"
+          identifier $143@"refinedGuess"
+          identifier $145@"delta"
         function (non-fuzzable) {
-          identifier $107@"guess"
+          identifier $148@"guess"
         }
         function (non-fuzzable) {
-          call identifier $110@"recurse" with these arguments:
-            identifier $112@"refinedGuess"
+          call identifier $151@"recurse" with these arguments:
+            identifier $153@"refinedGuess"
         }
     }
 }
-assignment: $158@"main" := function (fuzzable) { $159@"_" ->
-  assignment: identifier $123@"input" = 
+assignment: $202@"main" := function (fuzzable) { $203@"_" ->
+  assignment: identifier $165@"input" = 
     int 2
-  assignment: identifier $136@"result" = 
-    call identifier $133@"sqrt" with these arguments:
-      call struct access identifier $128@"fixedDecimal".$130@"FromInt" with these arguments:
-        identifier $126@"input"
-  call struct access identifier $139@"builtins".$141@"Print" with these arguments:
+  assignment: identifier $180@"result" = 
+    call identifier $175@"sqrt" with these arguments:
+      call struct access identifier $170@"fixedDecimal".$172@"FromInt" with these arguments:
+        identifier $168@"input"
+      int 65
+  call struct access identifier $183@"builtins".$185@"Print" with these arguments:
     text
-      textPart $143@"The root of "
-      identifier $145@"input"
-      textPart $147@" is "
-      call struct access identifier $151@"fixedDecimal".$153@"ToText" with these arguments:
-        identifier $149@"result"
+      textPart $187@"The root of "
+      identifier $189@"input"
+      textPart $191@" is "
+      call struct access identifier $195@"fixedDecimal".$197@"ToText" with these arguments:
+        identifier $193@"result"
 }

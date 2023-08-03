@@ -1,6 +1,8 @@
 use super::{InlineObject, InlineObjectTrait};
 use crate::{
-    heap::{object_heap::HeapObject, Heap, Int, Tag},
+    heap::{
+        object_heap::HeapObject, symbol_table::impl_ord_with_symbol_table_via_ord, Heap, Int, Tag,
+    },
     utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_ord_via_get, DebugDisplay},
 };
 use derive_more::Deref;
@@ -179,6 +181,7 @@ impl InlineObjectTrait for InlineInt {
         self
     }
 }
+impl_ord_with_symbol_table_via_ord!(InlineInt);
 
 #[extension_trait]
 pub impl I64BitLength for i64 {

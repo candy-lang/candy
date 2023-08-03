@@ -1,7 +1,7 @@
 use super::{InlineObject, InlineObjectTrait};
 use crate::{
     channel::ChannelId,
-    heap::{object_heap::HeapObject, Heap},
+    heap::{object_heap::HeapObject, symbol_table::impl_ord_with_symbol_table_via_ord, Heap},
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
 use candy_frontend::id::CountableId;
@@ -104,6 +104,8 @@ impl InlineObjectTrait for InlineSendPort {
     }
 }
 
+impl_ord_with_symbol_table_via_ord!(InlineSendPort);
+
 // Receive Port
 
 #[derive(Clone, Copy, Deref, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -135,3 +137,5 @@ impl InlineObjectTrait for InlineReceivePort {
         self
     }
 }
+
+impl_ord_with_symbol_table_via_ord!(InlineReceivePort);

@@ -3,7 +3,6 @@ use crate::{
     input::Input,
     input_pool::{InputPool, Score},
     runner::{RunResult, Runner},
-    utils::collect_symbols_in_heap,
     values::InputGeneration,
 };
 use candy_frontend::hir::Id;
@@ -49,7 +48,7 @@ impl Fuzzer {
             .unwrap();
 
         // PERF: Avoid collecting the symbols into a hash set of owned strings that we then copy again.
-        let pool = InputPool::new(function.argument_count(), &collect_symbols_in_heap(&heap));
+        let pool = InputPool::new(function.argument_count(), lir.symbol_table.clone());
         let runner = Runner::new(lir.clone(), function, pool.generate_new_input());
 
         let num_instructions = lir.instructions.len();
@@ -130,7 +129,10 @@ impl Fuzzer {
                 .unwrap_or_else(|| "{…}".to_string()),
             runner.input,
         );
-        debug!("{}", result.to_string(&call_string));
+        debug!(
+            "{}",
+            result.to_string(&runner.lir.symbol_table, &call_string)
+        );
         match result {
             RunResult::Timeout => self.create_new_fuzzing_case(total_coverage),
             RunResult::Done { .. } | RunResult::NeedsUnfulfilled { .. } => {

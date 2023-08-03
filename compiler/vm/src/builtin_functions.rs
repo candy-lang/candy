@@ -3,8 +3,8 @@ use crate::{
     channel::{Capacity, Packet},
     fiber::{Fiber, Panic, Status},
     heap::{
-        Data, Function, Heap, HirId, InlineObject, Int, List, ReceivePort, SendPort, Struct, Tag,
-        Text,
+        Data, DisplayWithSymbolTable, Function, Heap, HirId, InlineObject, Int, List, ReceivePort,
+        SendPort, Struct, SymbolId, SymbolTable, Tag, Text,
     },
     tracer::FiberTracer,
 };
@@ -18,6 +18,7 @@ use tracing::{info, span, Level};
 impl<FT: FiberTracer> Fiber<FT> {
     pub(super) fn run_builtin_function(
         &mut self,
+        symbol_table: &SymbolTable,
         builtin_function: BuiltinFunction,
         args: &[InlineObject],
         responsible: HirId,
@@ -62,7 +63,7 @@ impl<FT: FiberTracer> Fiber<FT> {
             BuiltinFunction::TextConcatenate => self.heap.text_concatenate(args),
             BuiltinFunction::TextContains => self.heap.text_contains(args),
             BuiltinFunction::TextEndsWith => self.heap.text_ends_with(args),
-            BuiltinFunction::TextFromUtf8 => self.heap.text_from_utf8(args),
+            BuiltinFunction::TextFromUtf8 => self.heap.text_from_utf8(symbol_table, args),
             BuiltinFunction::TextGetRange => self.heap.text_get_range(args),
             BuiltinFunction::TextIsEmpty => self.heap.text_is_empty(args),
             BuiltinFunction::TextLength => self.heap.text_length(args),
@@ -281,7 +282,7 @@ impl Heap {
         unpack_and_later_drop!(self, args, |text: Text| {
             let result = match BigInt::from_str(text.get()) {
                 Ok(int) => Ok(Int::create_from_bigint(self, true, int).into()),
-                Err(err) => Err(Text::create(self, true, &err.to_string()).into()),
+                Err(err) => Err(Text::create(self, true, &ToString::to_string(&err)).into()),
             };
             Return(Tag::create_result(self, true, result).into())
         })
@@ -372,8 +373,8 @@ impl Heap {
     }
 
     fn print(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |message: Any| {
-            info!("{}", message.object);
+        unpack_and_later_drop!(self, args, |message: Text| {
+            info!("{}", message.get());
             Return(Tag::create_nothing(self, true).into())
         })
     }
@@ -410,7 +411,6 @@ impl Heap {
     }
     fn tag_without_value(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |tag: Tag| {
-            tag.symbol().dup();
             Return(tag.without_value(self).into())
         })
     }
@@ -435,7 +435,11 @@ impl Heap {
             Return(text.ends_with(self, *suffix).into())
         })
     }
-    fn text_from_utf8(&mut self, args: &[InlineObject]) -> BuiltinResult {
+    fn text_from_utf8(
+        &mut self,
+        symbol_table: &SymbolTable,
+        args: &[InlineObject],
+    ) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |bytes: List| {
             // TODO: Remove `u8` checks once we have `needs` ensuring that the bytes are valid.
             let bytes: Vec<_> = bytes
@@ -445,7 +449,12 @@ impl Heap {
                     Int::try_from(it)
                         .ok()
                         .and_then(|it| it.try_get())
-                        .ok_or_else(|| format!("Value is not a byte: {it}."))
+                        .ok_or_else(|| {
+                            format!(
+                                "Value is not a byte: {}.",
+                                DisplayWithSymbolTable::to_string(&it, symbol_table),
+                            )
+                        })
                 })
                 .try_collect()?;
             Return(Text::create_from_utf8(self, true, &bytes).into())
@@ -502,21 +511,21 @@ impl Heap {
 
     fn type_of(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Any| {
-            let type_name = match **value {
-                Data::Int(_) => "Int",
-                Data::Text(_) => "Text",
-                Data::Tag(_) => "Tag",
-                Data::List(_) => "List",
-                Data::Struct(_) => "Struct",
+            let type_symbol_id = match **value {
+                Data::Int(_) => SymbolId::INT,
+                Data::Text(_) => SymbolId::TEXT,
+                Data::Tag(_) => SymbolId::TAG,
+                Data::List(_) => SymbolId::LIST,
+                Data::Struct(_) => SymbolId::STRUCT,
                 Data::HirId(_) => panic!(
                     "HIR ID shouldn't occurr in Candy programs except in VM-controlled places."
                 ),
-                Data::Function(_) => "Function",
-                Data::Builtin(_) => "Builtin",
-                Data::SendPort(_) => "SendPort",
-                Data::ReceivePort(_) => "ReceivePort",
+                Data::Function(_) => SymbolId::FUNCTION,
+                Data::Builtin(_) => SymbolId::BUILTIN,
+                Data::SendPort(_) => SymbolId::SEND_PORT,
+                Data::ReceivePort(_) => SymbolId::RECEIVE_PORT,
             };
-            Return(Tag::create_from_str(self, true, type_name, None).into())
+            Return(Tag::create(self, true, type_symbol_id, None).into())
         })
     }
 }

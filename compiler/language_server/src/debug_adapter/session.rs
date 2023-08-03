@@ -194,7 +194,7 @@ impl DebugSession {
                 let lir = compile_lir(&self.db, module.clone(), tracing.clone()).0;
                 let (mut heap, main) = match Vm::for_module(&lir, &mut DummyTracer)
                     .run_until_completion(&mut DummyTracer)
-                    .into_main_function()
+                    .into_main_function(&lir.symbol_table)
                 {
                     Ok(result) => result,
                     Err(error) => {

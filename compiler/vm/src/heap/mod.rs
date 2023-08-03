@@ -9,6 +9,7 @@ pub use self::{
         InlineObjectTrait,
     },
     pointer::Pointer,
+    symbol_table::{DisplayWithSymbolTable, OrdWithSymbolTable, SymbolId, SymbolTable},
 };
 use crate::channel::ChannelId;
 use derive_more::{DebugCustom, Deref, Pointer};
@@ -25,6 +26,7 @@ mod object;
 mod object_heap;
 mod object_inline;
 mod pointer;
+mod symbol_table;
 
 #[derive(Default)]
 pub struct Heap {

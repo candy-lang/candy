@@ -8,7 +8,7 @@ use candy_frontend::{ast_to_hir::AstToHir, hir, TracingConfig};
 use candy_vm::{
     execution_controller::RunForever,
     fiber::EndedReason,
-    heap::{HirId, SendPort, Struct},
+    heap::{HirId, SendPort, Struct, SymbolId},
     mir_to_lir::compile_lir,
     return_value_into_main_function,
     tracer::stack_trace::StackTracer,
@@ -47,7 +47,8 @@ pub(crate) fn run(options: Options) -> ProgramResult {
 
     let main = match ended.reason {
         EndedReason::Finished(return_value) => {
-            return_value_into_main_function(&mut ended.heap, return_value).unwrap()
+            return_value_into_main_function(&mut ended.heap, &lir.symbol_table, return_value)
+                .unwrap()
         }
         EndedReason::Panicked(panic) => {
             error!("The module panicked: {}", panic.reason);
@@ -57,7 +58,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
             }
             error!(
                 "This is the stack trace:\n{}",
-                tracer.format_panic_stack_trace_to_root_fiber(&db),
+                tracer.format_panic_stack_trace_to_root_fiber(&db, &lir.as_ref().symbol_table),
             );
             return Err(Exit::CodePanicked);
         }
@@ -69,8 +70,14 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     let mut stdout = StdoutService::new(&mut vm);
     let mut stdin = StdinService::new(&mut vm);
     let fields = [
-        ("Stdout", SendPort::create(&mut ended.heap, stdout.channel)),
-        ("Stdin", SendPort::create(&mut ended.heap, stdin.channel)),
+        (
+            SymbolId::STDOUT,
+            SendPort::create(&mut ended.heap, stdout.channel),
+        ),
+        (
+            SymbolId::STDIN,
+            SendPort::create(&mut ended.heap, stdin.channel),
+        ),
     ];
     let environment = Struct::create_with_symbol_keys(&mut ended.heap, true, fields).into();
     let mut tracer = StackTracer::default();
@@ -99,7 +106,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
             error!("{} is responsible.", panic.responsible);
             error!(
                 "This is the stack trace:\n{}",
-                tracer.format_panic_stack_trace_to_root_fiber(&db),
+                tracer.format_panic_stack_trace_to_root_fiber(&db, &lir.as_ref().symbol_table),
             );
             Err(Exit::CodePanicked)
         }

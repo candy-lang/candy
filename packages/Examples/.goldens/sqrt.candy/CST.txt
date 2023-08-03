@@ -1,20 +1,26 @@
 # CST for module Examples:sqrt
 builtins = use "Builtins"
-[equals, fixedDecimal, ifElse, recursive] = use "Core"
+[equals, fixedDecimal, ifElse, int, recursive] = use "Core"
 
-sqrt x :=
+sqrt x precision :=
   needs (fixedDecimal.is x)
   needs (fixedDecimal.isNonNegative x)
+  needs (int.is precision)
+  needs (int.isNonNegative precision)
 
-  recursive (x | fixedDecimal.divide (2 | fixedDecimal.fromInt)) { recurse guess ->
+  delta = 10 | fixedDecimal.fromIntScaled precision
+
+  recursive (x | fixedDecimal.divideTruncatingAtScale (2 | fixedDecimal.fromInt) precision) {
+    recurse guess ->
     refinedGuess =
-      fixedDecimal.divide
-        guess | fixedDecimal.add (x | fixedDecimal.divide guess)
+      fixedDecimal.divideTruncatingAtScale
+        guess | fixedDecimal.add (x | fixedDecimal.divideTruncatingAtScale guess precision)
         2 | fixedDecimal.fromInt
-    ifElse (fixedDecimal.approxEquals guess refinedGuess 10) { guess } { recurse refinedGuess }
+        precision
+    ifElse (fixedDecimal.approxEquals guess refinedGuess delta) { guess } { recurse refinedGuess }
   }
 
 main _ :=
   input = 2
-  result = input | fixedDecimal.fromInt | sqrt
+  result = input | fixedDecimal.fromInt | sqrt 65
   builtins.print "The root of {input} is {result | fixedDecimal.toText}"

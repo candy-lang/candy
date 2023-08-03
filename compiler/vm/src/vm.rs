@@ -2,7 +2,7 @@ use crate::{
     channel::{Channel, ChannelId, Completer, Packet, Performer},
     execution_controller::{ExecutionController, RunLimitedNumberOfInstructions},
     fiber::{self, EndedReason, Fiber, FiberId, Panic, VmEnded},
-    heap::{Data, Function, Heap, HirId, InlineObject, SendPort, Struct, Tag},
+    heap::{Data, Function, Heap, HirId, InlineObject, SendPort, Struct, SymbolId, Tag},
     lir::Lir,
     tracer::{FiberTracer, TracedFiberEnded, TracedFiberEndedReason, Tracer},
 };
@@ -669,13 +669,13 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
         let Packet { mut heap, object } = packet;
         let arguments: Struct = object.try_into().ok()?;
 
-        let function_tag = Tag::create_from_str(&mut heap, true, "Function", None);
+        let function_tag = Tag::create(&mut heap, true, SymbolId::FUNCTION, None);
         let function: Function = arguments.get(**function_tag)?.try_into().ok()?;
         if function.argument_count() > 0 {
             return None;
         }
 
-        let return_channel_tag = Tag::create_from_str(&mut heap, true, "ReturnChannel", None);
+        let return_channel_tag = Tag::create(&mut heap, true, SymbolId::RETURN_CHANNEL, None);
         let return_channel: SendPort = arguments.get(**return_channel_tag)?.try_into().ok()?;
 
         Some((heap, function, return_channel.channel_id()))

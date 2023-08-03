@@ -1,7 +1,10 @@
 use super::{utils::heap_object_impls, HeapObjectTrait};
 use crate::{
     fiber::InstructionPointer,
-    heap::{object_heap::HeapObject, Heap, InlineObject},
+    heap::{
+        object_heap::HeapObject, symbol_table::impl_ord_with_symbol_table_via_ord, Heap,
+        InlineObject,
+    },
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
 use derive_more::Deref;
@@ -111,10 +114,7 @@ impl DebugDisplay for HeapFunction {
                 if captured.is_empty() {
                     "nothing".to_string()
                 } else {
-                    captured
-                        .iter()
-                        .map(|it| DebugDisplay::to_string(it, false))
-                        .join(", ")
+                    captured.iter().map(|it| format!("{:?}", it)).join(", ")
                 },
                 self.body(),
             )
@@ -187,3 +187,5 @@ impl HeapObjectTrait for HeapFunction {
 
     fn deallocate_external_stuff(self) {}
 }
+
+impl_ord_with_symbol_table_via_ord!(HeapFunction);

@@ -6,7 +6,9 @@ use candy_vm::{
     channel::Packet,
     execution_controller::{CountingExecutionController, ExecutionController},
     fiber::{EndedReason, Fiber, FiberId, InstructionPointer, Panic, VmEnded},
-    heap::{Function, Heap, HirId, InlineObjectSliceCloneToHeap},
+    heap::{
+        DisplayWithSymbolTable, Function, Heap, HirId, InlineObjectSliceCloneToHeap, SymbolTable,
+    },
     lir::Lir,
     tracer::{
         stack_trace::{FiberStackTracer, StackTracer},
@@ -20,6 +22,7 @@ use std::borrow::Borrow;
 const MAX_INSTRUCTIONS: usize = 1000000;
 
 pub struct Runner<L: Borrow<Lir>> {
+    pub lir: L,
     pub vm: Option<Vm<L, StackTracer>>, // Is consumed when the runner is finished.
     pub input: Input,
     pub tracer: StackTracer,
@@ -44,10 +47,13 @@ pub enum RunResult {
     Panicked(Panic),
 }
 impl RunResult {
-    pub fn to_string(&self, call: &str) -> String {
+    pub fn to_string(&self, symbol_table: &SymbolTable, call: &str) -> String {
         match self {
             RunResult::Timeout => format!("{call} timed out."),
-            RunResult::Done(return_value) => format!("{call} returned {}.", return_value.object),
+            RunResult::Done(return_value) => format!(
+                "{call} returned {}.",
+                DisplayWithSymbolTable::to_string(&return_value.object, symbol_table),
+            ),
             RunResult::NeedsUnfulfilled { reason } => {
                 format!("{call} panicked and it's our fault: {reason}")
             }
@@ -58,7 +64,7 @@ impl RunResult {
     }
 }
 
-impl<L: Borrow<Lir>> Runner<L> {
+impl<L: Borrow<Lir> + Clone> Runner<L> {
     pub fn new(lir: L, function: Function, input: Input) -> Self {
         let mut heap = Heap::default();
         let num_instructions = lir.borrow().instructions.len();
@@ -74,9 +80,17 @@ impl<L: Borrow<Lir>> Runner<L> {
         let responsible = HirId::create(&mut heap, true, Id::fuzzer());
 
         let mut tracer = StackTracer::default();
-        let vm = Vm::for_function(lir, heap, function, &arguments, responsible, &mut tracer);
+        let vm = Vm::for_function(
+            lir.clone(),
+            heap,
+            function,
+            &arguments,
+            responsible,
+            &mut tracer,
+        );
 
         Runner {
+            lir,
             vm: Some(vm),
             input,
             tracer,
