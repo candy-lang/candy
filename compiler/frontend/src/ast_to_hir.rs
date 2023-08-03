@@ -21,54 +21,54 @@ use std::{collections::hash_map::Entry, mem, ops::Range, sync::Arc};
 #[salsa::query_group(AstToHirStorage)]
 pub trait AstToHir: CstDb + CstToAst {
     #[salsa::transparent]
-    fn hir_to_ast_id(&self, id: hir::Id) -> Option<ast::Id>;
+    fn hir_to_ast_id(&self, id: &hir::Id) -> Option<ast::Id>;
     #[salsa::transparent]
-    fn hir_to_cst_id(&self, id: hir::Id) -> Option<cst::Id>;
+    fn hir_to_cst_id(&self, id: &hir::Id) -> Option<cst::Id>;
     #[salsa::transparent]
-    fn hir_id_to_span(&self, id: hir::Id) -> Option<Range<Offset>>;
+    fn hir_id_to_span(&self, id: &hir::Id) -> Option<Range<Offset>>;
     #[salsa::transparent]
-    fn hir_id_to_display_span(&self, id: hir::Id) -> Option<Range<Offset>>;
+    fn hir_id_to_display_span(&self, id: &hir::Id) -> Option<Range<Offset>>;
 
     #[salsa::transparent]
-    fn ast_to_hir_id(&self, id: ast::Id) -> Vec<hir::Id>;
+    fn ast_to_hir_id(&self, id: &ast::Id) -> Vec<hir::Id>;
     #[salsa::transparent]
-    fn cst_to_hir_id(&self, module: Module, id: cst::Id) -> Vec<hir::Id>;
+    fn cst_to_hir_id(&self, module: Module, id: &cst::Id) -> Vec<hir::Id>;
 
     fn hir(&self, module: Module) -> HirResult;
 }
 
 pub type HirResult = Result<(Arc<Body>, Arc<FxHashMap<hir::Id, ast::Id>>), ModuleError>;
 
-fn hir_to_ast_id(db: &dyn AstToHir, id: hir::Id) -> Option<ast::Id> {
+fn hir_to_ast_id(db: &dyn AstToHir, id: &hir::Id) -> Option<ast::Id> {
     let (_, hir_to_ast_id_mapping) = db.hir(id.module.clone()).ok()?;
-    hir_to_ast_id_mapping.get(&id).cloned()
+    hir_to_ast_id_mapping.get(id).cloned()
 }
-fn hir_to_cst_id(db: &dyn AstToHir, id: hir::Id) -> Option<cst::Id> {
-    db.ast_to_cst_id(db.hir_to_ast_id(id)?)
+fn hir_to_cst_id(db: &dyn AstToHir, id: &hir::Id) -> Option<cst::Id> {
+    db.ast_to_cst_id(&db.hir_to_ast_id(id)?)
 }
-fn hir_id_to_span(db: &dyn AstToHir, id: hir::Id) -> Option<Range<Offset>> {
-    db.ast_id_to_span(db.hir_to_ast_id(id)?)
+fn hir_id_to_span(db: &dyn AstToHir, id: &hir::Id) -> Option<Range<Offset>> {
+    db.ast_id_to_span(&db.hir_to_ast_id(id)?)
 }
-fn hir_id_to_display_span(db: &dyn AstToHir, id: hir::Id) -> Option<Range<Offset>> {
-    let cst_id = db.hir_to_cst_id(id.clone())?;
-    Some(db.find_cst(id.module, cst_id).display_span())
+fn hir_id_to_display_span(db: &dyn AstToHir, id: &hir::Id) -> Option<Range<Offset>> {
+    let cst_id = db.hir_to_cst_id(id)?;
+    Some(db.find_cst(id.module.to_owned(), cst_id).display_span())
 }
 
-fn ast_to_hir_id(db: &dyn AstToHir, id: ast::Id) -> Vec<hir::Id> {
+fn ast_to_hir_id(db: &dyn AstToHir, id: &ast::Id) -> Vec<hir::Id> {
     if let Ok((_, hir_to_ast_id_mapping)) = db.hir(id.module.clone()) {
         hir_to_ast_id_mapping
             .iter()
-            .filter_map(|(key, value)| if value == &id { Some(key) } else { None })
+            .filter_map(|(key, value)| if value == id { Some(key) } else { None })
             .cloned()
             .collect_vec()
     } else {
         vec![]
     }
 }
-fn cst_to_hir_id(db: &dyn AstToHir, module: Module, id: cst::Id) -> Vec<hir::Id> {
+fn cst_to_hir_id(db: &dyn AstToHir, module: Module, id: &cst::Id) -> Vec<hir::Id> {
     let ids = db.cst_to_ast_id(module, id);
     ids.into_iter()
-        .flat_map(|id| db.ast_to_hir_id(id))
+        .flat_map(|id| db.ast_to_hir_id(&id))
         .collect_vec()
 }
 
@@ -84,19 +84,20 @@ fn compile_top_level(
     module: Module,
     ast: &[Ast],
 ) -> (Body, FxHashMap<hir::Id, ast::Id>) {
+    let is_builtins_package = module.package == Package::builtins();
     let mut context = Context {
         module: module.clone(),
         id_mapping: FxHashMap::default(),
         db,
         public_identifiers: FxHashMap::default(),
         body: Body::default(),
-        id_prefix: hir::Id::new(module.clone(), vec![]),
+        id_prefix: hir::Id::new(module, vec![]),
         identifiers: im::HashMap::new(),
         is_top_level: true,
         use_id: None,
     };
 
-    if module.package == Package::builtins() {
+    if is_builtins_package {
         context.generate_sparkles();
     }
     context.generate_use();
@@ -189,7 +190,7 @@ impl Context<'_> {
                     None => {
                         return self.push_error(
                             Some(name.id.clone()),
-                            self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
+                            self.db.ast_id_to_display_span(&ast.id).unwrap(),
                             HirError::UnknownReference {
                                 name: name.value.clone(),
                             },
@@ -302,7 +303,7 @@ impl Context<'_> {
                             if self.public_identifiers.contains_key(&name) {
                                 self.push_error(
                                     None,
-                                    self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
+                                    self.db.ast_id_to_display_span(&ast.id).unwrap(),
                                     HirError::PublicAssignmentWithSameName {
                                         name: name.to_owned(),
                                     },
@@ -313,7 +314,7 @@ impl Context<'_> {
                     } else {
                         self.push_error(
                             None,
-                            self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
+                            self.db.ast_id_to_display_span(&ast.id).unwrap(),
                             HirError::PublicAssignmentInNotTopLevel,
                         );
                     }
@@ -602,28 +603,25 @@ impl Context<'_> {
                         condition: condition.clone(),
                         reason: self.push(
                             None,
-                            Expression::Text(
-                                match self.db.ast_id_to_span(call.arguments[0].id.clone()) {
-                                    Some(span) => format!(
-                                        "`{}` was not satisfied",
-                                        &self
-                                            .db
-                                            .get_module_content_as_string(
-                                                call.arguments[0].id.module.clone()
-                                            )
-                                            .unwrap()
-                                            [*span.start..*span.end],
-                                    ),
-                                    None => "the needs of a function were not met".to_string(),
-                                },
-                            ),
+                            Expression::Text(match self.db.ast_id_to_span(&call.arguments[0].id) {
+                                Some(span) => format!(
+                                    "`{}` was not satisfied",
+                                    &self
+                                        .db
+                                        .get_module_content_as_string(
+                                            call.arguments[0].id.module.clone()
+                                        )
+                                        .unwrap()[*span.start..*span.end],
+                                ),
+                                None => "the needs of a function were not met".to_string(),
+                            }),
                             None,
                         ),
                     },
                     _ => {
                         return self.push_error(
                             id,
-                            self.db.ast_id_to_span(name_id.to_owned()).unwrap(),
+                            self.db.ast_id_to_span(name_id).unwrap(),
                             HirError::NeedsWithWrongNumberOfArguments {
                                 num_args: call.arguments.len(),
                             },
@@ -921,7 +919,7 @@ impl<'a> PatternContext<'a> {
             child: None,
             errors: vec![CompilerError {
                 module: self.module.clone(),
-                span: self.db.ast_id_to_span(ast.id.clone()).unwrap(),
+                span: self.db.ast_id_to_span(&ast.id).unwrap(),
                 payload: CompilerErrorPayload::Hir(error),
             }],
         }

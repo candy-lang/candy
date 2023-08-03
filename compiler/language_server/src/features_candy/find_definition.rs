@@ -19,7 +19,7 @@ pub fn find_definition(db: &Database, module: Module, offset: Offset) -> Option<
         _ => return None,
     }
 
-    let origin_hir_ids = db.cst_to_hir_id(module.clone(), origin_cst.data.id);
+    let origin_hir_ids = db.cst_to_hir_id(module.clone(), &origin_cst.data.id);
     assert_eq!(
         origin_hir_ids.len(),
         1,
@@ -31,7 +31,7 @@ pub fn find_definition(db: &Database, module: Module, offset: Offset) -> Option<
         Expression::Reference(id) => id,
         _ => return None,
     };
-    let target_cst_id = db.hir_to_cst_id(target_hir_id)?;
+    let target_cst_id = db.hir_to_cst_id(&target_hir_id)?;
     let target_cst = db.find_cst(module.clone(), target_cst_id);
 
     Some(LocationLink {

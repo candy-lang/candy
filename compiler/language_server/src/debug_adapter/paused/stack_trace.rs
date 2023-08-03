@@ -115,7 +115,7 @@ impl PausedState {
                     adapter_data: None,
                     checksums: None,
                 };
-                let range = db.hir_id_to_span(function.to_owned()).unwrap();
+                let range = db.hir_id_to_span(function).unwrap();
                 let range = db.range_to_lsp_range(function.module.to_owned(), range);
                 let range = start_at_1_config.range_to_dap(range);
                 (function.function_name(), Some(source), Some(range))

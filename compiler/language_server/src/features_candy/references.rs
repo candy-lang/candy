@@ -41,7 +41,7 @@ where
             Some(ReferenceQuery::Needs(module))
         }
         CstKind::Identifier { .. } => {
-            let hir_ids = db.cst_to_hir_id(module, origin_cst.data.id);
+            let hir_ids = db.cst_to_hir_id(module, &origin_cst.data.id);
             assert_eq!(
                 hir_ids.len(),
                 1,
@@ -219,7 +219,7 @@ where
         }
         self.discovered_references.insert(id.clone());
 
-        if let Some(span) = self.db.hir_id_to_span(id.clone()) {
+        if let Some(span) = self.db.hir_id_to_span(&id) {
             self.references.push(Reference {
                 range: self.db.range_to_lsp_range(id.module, span),
                 is_write,

@@ -352,7 +352,7 @@ impl BodyBuilder {
     }
     pub fn push_if_else<T, E>(
         &mut self,
-        hir_id: hir::Id,
+        hir_id: &hir::Id,
         condition: Id,
         then_builder: T,
         else_builder: E,

@@ -97,7 +97,7 @@ impl StaticPanicsOfExpression for Expression {
 #[extension_trait]
 pub impl StaticPanicToDiagnostic for Panic {
     fn to_diagnostic(&self, db: &Database, module: &Module) -> Diagnostic {
-        let call_span = db.hir_id_to_display_span(self.responsible.clone()).unwrap();
+        let call_span = db.hir_id_to_display_span(&self.responsible).unwrap();
         let call_span = db.range_to_lsp_range(module.clone(), call_span);
 
         Diagnostic {

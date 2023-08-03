@@ -27,6 +27,7 @@ pub trait HirDb: AstToHir {
     fn containing_body_of(&self, id: Id) -> Arc<Body>;
     fn all_hir_ids(&self, module: Module) -> Vec<Id>;
 }
+#[allow(clippy::needless_pass_by_value)]
 fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
     let (hir, _) = db.hir(id.module.clone()).ok()?;
     if id.is_root() {

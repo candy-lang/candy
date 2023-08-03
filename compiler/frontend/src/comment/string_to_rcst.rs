@@ -27,7 +27,7 @@ fn comment_rcst(db: &dyn CommentStringToRcst, id: hir::Id) -> Arc<Vec<Rcst>> {
             .cloned()
             .collect_vec()
     } else {
-        let cst_id = db.hir_to_cst_id(id.clone()).unwrap();
+        let cst_id = db.hir_to_cst_id(&id).unwrap();
         match db.find_cst(id.module, cst_id).kind {
             cst::CstKind::Assignment {
                 box assignment_sign,

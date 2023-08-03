@@ -19,38 +19,38 @@ use std::{ops::Range, sync::Arc};
 #[salsa::query_group(CstToAstStorage)]
 pub trait CstToAst: CstDb + RcstToCst {
     #[salsa::transparent]
-    fn ast_to_cst_id(&self, id: ast::Id) -> Option<cst::Id>;
+    fn ast_to_cst_id(&self, id: &ast::Id) -> Option<cst::Id>;
     #[salsa::transparent]
-    fn ast_id_to_span(&self, id: ast::Id) -> Option<Range<Offset>>;
+    fn ast_id_to_span(&self, id: &ast::Id) -> Option<Range<Offset>>;
     #[salsa::transparent]
-    fn ast_id_to_display_span(&self, id: ast::Id) -> Option<Range<Offset>>;
+    fn ast_id_to_display_span(&self, id: &ast::Id) -> Option<Range<Offset>>;
 
     #[salsa::transparent]
-    fn cst_to_ast_id(&self, module: Module, id: cst::Id) -> Vec<ast::Id>;
+    fn cst_to_ast_id(&self, module: Module, id: &cst::Id) -> Vec<ast::Id>;
 
     fn ast(&self, module: Module) -> AstResult;
 }
 
 pub type AstResult = Result<(Arc<Vec<Ast>>, Arc<FxHashMap<ast::Id, cst::Id>>), ModuleError>;
 
-fn ast_to_cst_id(db: &dyn CstToAst, id: ast::Id) -> Option<cst::Id> {
+fn ast_to_cst_id(db: &dyn CstToAst, id: &ast::Id) -> Option<cst::Id> {
     let (_, ast_to_cst_id_mapping) = db.ast(id.module.clone()).ok()?;
-    ast_to_cst_id_mapping.get(&id).cloned()
+    ast_to_cst_id_mapping.get(id).cloned()
 }
-fn ast_id_to_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<Offset>> {
-    let cst_id = db.ast_to_cst_id(id.clone())?;
-    Some(db.find_cst(id.module, cst_id).data.span)
+fn ast_id_to_span(db: &dyn CstToAst, id: &ast::Id) -> Option<Range<Offset>> {
+    let cst_id = db.ast_to_cst_id(id)?;
+    Some(db.find_cst(id.module.clone(), cst_id).data.span)
 }
-fn ast_id_to_display_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<Offset>> {
-    let cst_id = db.ast_to_cst_id(id.clone())?;
-    Some(db.find_cst(id.module, cst_id).display_span())
+fn ast_id_to_display_span(db: &dyn CstToAst, id: &ast::Id) -> Option<Range<Offset>> {
+    let cst_id = db.ast_to_cst_id(id)?;
+    Some(db.find_cst(id.module.clone(), cst_id).display_span())
 }
 
-fn cst_to_ast_id(db: &dyn CstToAst, module: Module, id: cst::Id) -> Vec<ast::Id> {
+fn cst_to_ast_id(db: &dyn CstToAst, module: Module, id: &cst::Id) -> Vec<ast::Id> {
     if let Ok((_, ast_to_cst_id_mapping)) = db.ast(module) {
         ast_to_cst_id_mapping
             .iter()
-            .filter_map(|(key, &value)| if value == id { Some(key) } else { None })
+            .filter_map(|(key, value)| if value == id { Some(key) } else { None })
             .cloned()
             .collect_vec()
     } else {

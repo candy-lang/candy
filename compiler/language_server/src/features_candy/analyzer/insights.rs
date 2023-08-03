@@ -51,7 +51,7 @@ impl Insight {
         let text = match hir {
             Expression::Reference(_) => {
                 // Could be an assignment.
-                let Some(ast_id) = db.hir_to_ast_id(id.clone()) else {
+                let Some(ast_id) = db.hir_to_ast_id(&id) else {
                     return None;
                 };
                 let Some(ast) = db.find_ast(ast_id) else {
@@ -150,9 +150,7 @@ impl Insight {
     }
 
     pub fn for_static_panic(db: &Database, module: Module, panic: &Panic) -> Self {
-        let call_span = db
-            .hir_id_to_display_span(panic.responsible.clone())
-            .unwrap();
+        let call_span = db.hir_id_to_display_span(&panic.responsible).unwrap();
         let call_span = db.range_to_lsp_range(module, call_span);
 
         Insight::Diagnostic(Diagnostic::error(

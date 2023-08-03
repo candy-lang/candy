@@ -24,6 +24,7 @@ pub trait HirToMir: PositionConversionDb + CstDb + AstToHir {
 
 pub type MirResult = Result<(Arc<Mir>, Arc<FxHashSet<CompilerError>>), ModuleError>;
 
+#[allow(clippy::needless_pass_by_value)]
 fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> MirResult {
     let (mir, errors) = match module.kind {
         ModuleKind::Code => {
@@ -95,7 +96,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
         let is_condition_true =
             body.push_call(builtin_equals, vec![condition, true_tag], needs_code);
         let is_condition_bool = body.push_if_else(
-            needs_id.child("isConditionTrue"),
+            &needs_id.child("isConditionTrue"),
             is_condition_true,
             |body| {
                 body.push_reference(true_tag);
@@ -106,7 +107,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
             needs_code,
         );
         body.push_if_else(
-            needs_id.child("isConditionBool"),
+            &needs_id.child("isConditionBool"),
             is_condition_bool,
             |body| {
                 body.push_reference(nothing_tag);
@@ -129,7 +130,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
             responsible_for_call,
         );
         body.push_if_else(
-            needs_id.child("isReasonText"),
+            &needs_id.child("isReasonText"),
             is_reason_text,
             |body| {
                 body.push_reference(nothing_tag);
@@ -143,7 +144,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
 
         // The core logic of the needs.
         body.push_if_else(
-            needs_id.child("condition"),
+            &needs_id.child("condition"),
             condition,
             |body| {
                 body.push_reference(nothing_tag);
@@ -259,7 +260,7 @@ impl<'a> LoweringContext<'a> {
                     let nothing = body.push_nothing();
                     let is_match = body.push_is_match(pattern_result, responsible);
                     body.push_if_else(
-                        hir_id.child("isMatch"),
+                        &hir_id.child("isMatch"),
                         is_match,
                         |body| {
                             body.push_reference(nothing);
@@ -655,7 +656,7 @@ impl PatternLoweringContext {
                                 );
 
                                 let result = body.push_if_else(
-                                    self.hir_id.child("hasKey"),
+                                    &self.hir_id.child("hasKey"),
                                     has_key,
                                     |body| {
                                         let value = body.push_call(
@@ -717,7 +718,7 @@ impl PatternLoweringContext {
                 for pattern in rest_patterns {
                     let is_match = body.push_is_match(result, self.responsible);
                     result = body.push_if_else(
-                        self.hir_id.child("isMatch"),
+                        &self.hir_id.child("isMatch"),
                         is_match,
                         |body| {
                             let captured_identifiers = pattern.captured_identifiers();
@@ -829,7 +830,7 @@ impl PatternLoweringContext {
         let equals = body.push_call(builtin_equals, vec![expected, actual], self.responsible);
 
         body.push_if_else(
-            self.hir_id.child("equals"),
+            &self.hir_id.child("equals"),
             equals,
             then_builder,
             |body| {
@@ -892,7 +893,7 @@ impl PatternLoweringContext {
 
         let is_match = body.push_is_match(return_value, self.responsible);
         body.push_if_else(
-            self.hir_id.child("isMatch"),
+            &self.hir_id.child("isMatch"),
             is_match,
             |body| {
                 let list_get_function = body.push_builtin(BuiltinFunction::ListGet);
