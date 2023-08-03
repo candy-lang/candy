@@ -411,7 +411,7 @@ impl ToRichIr for Body {
                 TokenType::Variable,
                 EnumSet::empty(),
             );
-            builder.push_definition(id.to_owned(), range);
+            builder.push_definition(id.clone(), range);
 
             builder.push(" = ", None, EnumSet::empty());
             expression.build_rich_ir(builder);

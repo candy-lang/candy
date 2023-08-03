@@ -68,7 +68,7 @@ pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression)
         return;
     };
 
-    let arguments = arguments.to_owned();
+    let arguments = arguments.clone();
     let responsible = *responsible;
     let Some(result) = run_builtin(
         &mut *expression,

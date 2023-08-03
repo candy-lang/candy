@@ -2,6 +2,7 @@ use crate::mir::{Body, Expression, Mir};
 use core::fmt;
 use std::{cmp::Ordering, ops::Add};
 
+#[derive(Clone, Copy, Debug)]
 pub struct Complexity {
     pub is_self_contained: bool,
     pub expressions: usize,

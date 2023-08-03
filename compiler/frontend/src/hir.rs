@@ -34,7 +34,7 @@ fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
         panic!("You can't get the root because that got lowered into multiple IDs.");
     }
 
-    hir.find(&id).map(|it| it.to_owned())
+    hir.find(&id).map(|it| it.clone())
 }
 fn containing_body_of(db: &dyn HirDb, id: Id) -> Arc<Body> {
     let parent_id = id.parent().expect("The root scope has no parent.");
@@ -80,17 +80,17 @@ impl Expression {
             }
             Expression::Struct(entries) => {
                 for (key_id, value_id) in entries.iter() {
-                    ids.push(key_id.to_owned());
-                    ids.push(value_id.to_owned());
+                    ids.push(key_id.clone());
+                    ids.push(value_id.clone());
                 }
             }
             Expression::Destructure {
                 expression,
                 pattern: _,
-            } => ids.push(expression.to_owned()),
+            } => ids.push(expression.clone()),
             Expression::PatternIdentifierReference(_) => {}
             Expression::Match { expression, cases } => {
-                ids.push(expression.to_owned());
+                ids.push(expression.clone());
                 for (_, body) in cases {
                     body.collect_all_ids(ids);
                 }
@@ -260,7 +260,7 @@ impl ToRichIr for Id {
             TokenType::Variable,
             EnumSet::empty(),
         );
-        builder.push_reference(self.to_owned(), range);
+        builder.push_reference(self.clone(), range);
     }
 }
 impl Debug for IdKey {
@@ -521,7 +521,7 @@ pub enum HirError {
 
 impl Body {
     pub fn push(&mut self, id: Id, expression: Expression, identifier: Option<String>) {
-        self.expressions.insert(id.to_owned(), expression);
+        self.expressions.insert(id.clone(), expression);
         if let Some(identifier) = identifier {
             self.identifiers.insert(id, identifier);
         }
@@ -534,19 +534,19 @@ impl ToRichIr for Expression {
         match self {
             Expression::Int(int) => {
                 let range = builder.push(int.to_string(), TokenType::Int, EnumSet::empty());
-                builder.push_reference(ReferenceKey::Int(int.to_owned().into()), range);
+                builder.push_reference(ReferenceKey::Int(int.clone().into()), range);
             }
             Expression::Text(text) => {
                 let range =
                     builder.push(format!(r#""{}""#, text), TokenType::Text, EnumSet::empty());
-                builder.push_reference(text.to_owned(), range);
+                builder.push_reference(text.clone(), range);
             }
             Expression::Reference(reference) => {
                 reference.build_rich_ir(builder);
             }
             Expression::Symbol(symbol) => {
                 let range = builder.push(symbol, TokenType::Symbol, EnumSet::empty());
-                builder.push_reference(ReferenceKey::Symbol(symbol.to_owned()), range);
+                builder.push_reference(ReferenceKey::Symbol(symbol.clone()), range);
             }
             Expression::List(items) => {
                 builder.push("(", None, EnumSet::empty());
@@ -724,7 +724,7 @@ impl ToRichIr for Function {
                 TokenType::Parameter,
                 EnumSet::empty(),
             );
-            builder.push_definition(parameter.to_owned(), range);
+            builder.push_definition(parameter.clone(), range);
             builder.push(" ", None, EnumSet::empty());
         }
         builder.push("->", None, EnumSet::empty());
@@ -745,7 +745,7 @@ impl ToRichIr for Body {
                 TokenType::Variable,
                 EnumSet::empty(),
             );
-            builder.push_definition(id.to_owned(), range);
+            builder.push_definition(id.clone(), range);
 
             builder.push(" = ", None, EnumSet::empty());
             expression.build_rich_ir(builder);
@@ -792,7 +792,7 @@ impl Body {
             self.expressions
                 .iter()
                 .filter(|(it, _)| it <= &id)
-                .max_by_key(|(id, _)| id.keys.to_owned())?
+                .max_by_key(|(id, _)| id.keys.clone())?
                 .1
                 .find(id)
         }

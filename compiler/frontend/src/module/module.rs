@@ -160,7 +160,7 @@ impl ToRichIr for Module {
             TokenType::Module,
             Default::default(),
         );
-        builder.push_reference(self.to_owned(), range);
+        builder.push_reference(self.clone(), range);
     }
 }
 impl_display_via_richir!(Module);

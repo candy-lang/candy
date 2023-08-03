@@ -531,11 +531,11 @@ impl PatternLoweringContext {
         match pattern {
             hir::Pattern::NewIdentifier(_) => self.push_match(body, vec![expression]),
             hir::Pattern::Int(int) => {
-                let expected = body.push_int(int.to_owned().into());
+                let expected = body.push_int(int.clone().into());
                 self.compile_exact_value(body, expression, expected)
             }
             hir::Pattern::Text(text) => {
-                let expected = body.push_text(text.to_owned());
+                let expected = body.push_text(text.clone());
                 self.compile_exact_value(body, expression, expected)
             }
             hir::Pattern::Tag { symbol, value } => {
@@ -547,7 +547,7 @@ impl PatternLoweringContext {
                         vec![expression],
                         self.responsible,
                     );
-                    let expected_symbol = body.push_tag(symbol.to_owned(), None);
+                    let expected_symbol = body.push_tag(symbol.clone(), None);
                     self.compile_equals(body, expected_symbol, actual_symbol, |body| {
                         let builtin_tag_has_value = body.push_builtin(BuiltinFunction::TagHasValue);
                         let actual_has_value = body.push_call(builtin_tag_has_value, vec![expression], self.responsible);
@@ -854,8 +854,8 @@ impl PatternLoweringContext {
             hir::Pattern::NewIdentifier(_) => {
                 panic!("New identifiers can't be used in this part of a pattern.")
             }
-            hir::Pattern::Int(int) => body.push_int(int.to_owned().into()),
-            hir::Pattern::Text(text) => body.push_text(text.to_owned()),
+            hir::Pattern::Int(int) => body.push_int(int.clone().into()),
+            hir::Pattern::Text(text) => body.push_text(text.clone()),
             hir::Pattern::Tag { symbol, value } => {
                 let value = value
                     .as_ref()

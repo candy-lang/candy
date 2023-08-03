@@ -33,7 +33,7 @@ fn comment_rcst(db: &dyn CommentStringToRcst, id: hir::Id) -> Arc<Vec<Rcst>> {
                 box assignment_sign,
                 ..
             } => match assignment_sign.kind {
-                cst::CstKind::TrailingWhitespace { whitespace, .. } => whitespace.to_vec(),
+                cst::CstKind::TrailingWhitespace { whitespace, .. } => whitespace.clone(),
                 _ => vec![],
             },
             _ => panic!(

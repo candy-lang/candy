@@ -51,7 +51,7 @@ fn hir_id_to_span(db: &dyn AstToHir, id: &hir::Id) -> Option<Range<Offset>> {
 }
 fn hir_id_to_display_span(db: &dyn AstToHir, id: &hir::Id) -> Option<Range<Offset>> {
     let cst_id = db.hir_to_cst_id(id)?;
-    Some(db.find_cst(id.module.to_owned(), cst_id).display_span())
+    Some(db.find_cst(id.module.clone(), cst_id).display_span())
 }
 
 fn ast_to_hir_id(db: &dyn AstToHir, id: &ast::Id) -> Vec<hir::Id> {
@@ -176,17 +176,17 @@ impl Context<'_> {
     fn compile_single(&mut self, ast: &Ast) -> hir::Id {
         match &ast.kind {
             AstKind::Int(Int(int)) => {
-                self.push(Some(ast.id.clone()), Expression::Int(int.to_owned()), None)
+                self.push(Some(ast.id.clone()), Expression::Int(int.clone()), None)
             }
             AstKind::Text(text) => self.lower_text(Some(ast.id.clone()), text),
             AstKind::TextPart(TextPart(string)) => self.push(
                 Some(ast.id.clone()),
-                Expression::Text(string.value.to_owned()),
+                Expression::Text(string.value.clone()),
                 None,
             ),
             AstKind::Identifier(Identifier(name)) => {
                 let reference = match self.identifiers.get(&name.value) {
-                    Some(reference) => reference.to_owned(),
+                    Some(reference) => reference.clone(),
                     None => {
                         return self.push_error(
                             Some(name.id.clone()),
@@ -201,7 +201,7 @@ impl Context<'_> {
             }
             AstKind::Symbol(Symbol(symbol)) => self.push(
                 Some(ast.id.clone()),
-                Expression::Symbol(symbol.value.to_owned()),
+                Expression::Symbol(symbol.value.clone()),
                 None,
             ),
             AstKind::List(List(items)) => {
@@ -250,15 +250,15 @@ impl Context<'_> {
             AstKind::Assignment(Assignment { is_public, body }) => {
                 let (names, body) = match body {
                     ast::AssignmentBody::Function { name, function } => {
-                        let name_string = name.value.to_owned();
+                        let name_string = name.value.clone();
                         let body =
                             self.compile_function(ast.id.clone(), function, Some(name_string));
                         let name_id = self.push(
                             Some(name.id.clone()),
                             Expression::Reference(body.clone()),
-                            Some(name.value.to_owned()),
+                            Some(name.value.clone()),
                         );
-                        (vec![(name.value.to_owned(), name_id)], body)
+                        (vec![(name.value.clone(), name_id)], body)
                     }
                     ast::AssignmentBody::Body { pattern, body } => {
                         let reset_state = self.start_non_top_level();
@@ -282,7 +282,7 @@ impl Context<'_> {
                                 let id = self.push(
                                     Some(ast_id),
                                     Expression::PatternIdentifierReference(identifier_id),
-                                    Some(name.to_owned()),
+                                    Some(name.clone()),
                                 );
                                 (name, id)
                             })
@@ -304,9 +304,7 @@ impl Context<'_> {
                                 self.push_error(
                                     None,
                                     self.db.ast_id_to_display_span(&ast.id).unwrap(),
-                                    HirError::PublicAssignmentWithSameName {
-                                        name: name.to_owned(),
-                                    },
+                                    HirError::PublicAssignmentWithSameName { name: name.clone() },
                                 );
                             }
                             self.public_identifiers.insert(name, id);
@@ -339,7 +337,7 @@ impl Context<'_> {
                                 self.push(
                                     Some(ast_id),
                                     Expression::PatternIdentifierReference(identifier_id),
-                                    Some(name.to_owned()),
+                                    Some(name.clone()),
                                 );
                             }
                             self.compile(body.as_ref());
@@ -350,7 +348,7 @@ impl Context<'_> {
                         AstKind::Error { errors, .. } => {
                             let pattern = Pattern::Error {
                                 child: None,
-                                errors: errors.to_owned(),
+                                errors: errors.clone(),
                             };
 
                             let reset_state = self.start_scope();
@@ -675,8 +673,7 @@ impl Context<'_> {
         expression: Expression,
         identifier: Option<String>,
     ) -> hir::Id {
-        self.body
-            .push(id.to_owned(), expression, identifier.clone());
+        self.body.push(id.clone(), expression, identifier.clone());
         if let Some(identifier) = identifier {
             self.identifiers.insert(identifier, id.clone());
         }
@@ -813,11 +810,11 @@ struct PatternContext<'a> {
 impl<'a> PatternContext<'a> {
     fn compile_pattern(&mut self, ast: &Ast) -> Pattern {
         match &ast.kind {
-            AstKind::Int(Int(int)) => Pattern::Int(int.to_owned()),
+            AstKind::Int(Int(int)) => Pattern::Int(int.clone()),
             AstKind::Text(Text(text)) => Pattern::Text(
                 text.iter()
                     .map(|part| match &part.kind {
-                        AstKind::TextPart(TextPart(string)) => string.value.to_owned(),
+                        AstKind::TextPart(TextPart(string)) => string.value.clone(),
                         _ => panic!("AST pattern can't contain text interpolations."),
                     })
                     .join(""),
@@ -826,14 +823,12 @@ impl<'a> PatternContext<'a> {
             AstKind::Identifier(Identifier(name)) => {
                 let (_, pattern_id) = self
                     .identifier_ids
-                    .entry(name.value.to_owned())
-                    .or_insert_with(|| {
-                        (ast.id.to_owned(), self.identifier_id_generator.generate())
-                    });
-                Pattern::NewIdentifier(pattern_id.to_owned())
+                    .entry(name.value.clone())
+                    .or_insert_with(|| (ast.id.clone(), self.identifier_id_generator.generate()));
+                Pattern::NewIdentifier(pattern_id.clone())
             }
             AstKind::Symbol(Symbol(symbol)) => Pattern::Tag {
-                symbol: symbol.value.to_owned(),
+                symbol: symbol.value.clone(),
                 value: None,
             },
             AstKind::List(List(items)) => {
@@ -858,7 +853,7 @@ impl<'a> PatternContext<'a> {
                                 AstKind::Error { errors, .. } => Pattern::Error {
                                     child: None,
                                     // TODO: These errors are already reported for the value itself.
-                                    errors: errors.to_owned(),
+                                    errors: errors.clone(),
                                 },
                                 _ => panic!(
                                     "Expected identifier in struct shorthand, got {value:?}."
@@ -908,7 +903,7 @@ impl<'a> PatternContext<'a> {
                     .map(|child| Box::new(self.compile_pattern(child)));
                 Pattern::Error {
                     child,
-                    errors: errors.to_owned(),
+                    errors: errors.clone(),
                 }
             }
         }

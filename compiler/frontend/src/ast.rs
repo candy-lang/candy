@@ -20,7 +20,7 @@ pub trait AstDb: CstToAst {
 #[allow(clippy::needless_pass_by_value)]
 fn find_ast(db: &dyn AstDb, id: Id) -> Option<Ast> {
     let (ast, _) = db.ast(id.module.clone()).ok()?;
-    ast.find(&id).map(|it| it.to_owned())
+    ast.find(&id).cloned()
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -278,7 +278,7 @@ impl AstKind {
                 let entry = captured_identifiers
                     .entry(identifier.value.clone())
                     .or_insert_with(Vec::new);
-                entry.push(identifier.id.to_owned())
+                entry.push(identifier.id.clone())
             }
             AstKind::Symbol(_) => {}
             AstKind::List(List(list)) => {

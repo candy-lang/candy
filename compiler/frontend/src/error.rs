@@ -36,7 +36,7 @@ impl CompilerError {
         }
     }
     pub fn to_string_with_location(&self, db: &impl PositionConversionDb) -> String {
-        let range = db.range_to_positions(self.module.clone(), self.span.to_owned());
+        let range = db.range_to_positions(self.module.clone(), self.span.clone());
         format!(
             "{}:{}:{} – {}:{}: {}",
             self.module,
@@ -207,7 +207,7 @@ impl CompilerError {
                 .map(|capture| {
                     (
                         self.module.clone(),
-                        capture.to_owned(),
+                        capture.clone(),
                         "The identifier is bound here.".to_string(),
                     )
                 })
@@ -228,7 +228,7 @@ impl ToRichIr for CompilerError {
             EnumSet::empty(),
         );
         builder.push_reference(
-            ReferenceKey::ModuleWithSpan(self.module.clone(), self.span.to_owned()),
+            ReferenceKey::ModuleWithSpan(self.module.clone(), self.span.clone()),
             range,
         );
         builder.push(format!(": {}", self.payload), None, EnumSet::empty());

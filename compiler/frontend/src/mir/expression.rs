@@ -288,16 +288,16 @@ impl ToRichIr for Expression {
         match self {
             Expression::Int(int) => {
                 let range = builder.push(int.to_string(), TokenType::Int, EnumSet::empty());
-                builder.push_reference(int.to_owned(), range);
+                builder.push_reference(int.clone(), range);
             }
             Expression::Text(text) => {
                 let range =
                     builder.push(format!(r#""{}""#, text), TokenType::Text, EnumSet::empty());
-                builder.push_reference(text.to_owned(), range);
+                builder.push_reference(text.clone(), range);
             }
             Expression::Tag { symbol, value } => {
                 let range = builder.push(symbol, TokenType::Symbol, EnumSet::empty());
-                builder.push_reference(ReferenceKey::Symbol(symbol.to_owned()), range);
+                builder.push_reference(ReferenceKey::Symbol(symbol.clone()), range);
                 if let Some(value) = value {
                     builder.push(" ", None, EnumSet::empty());
                     value.build_rich_ir(builder);
@@ -332,7 +332,7 @@ impl ToRichIr for Expression {
             Expression::Reference(id) => id.build_rich_ir(builder),
             Expression::HirId(id) => {
                 let range = builder.push(id.to_string(), TokenType::Symbol, EnumSet::empty());
-                builder.push_reference(id.to_owned(), range);
+                builder.push_reference(id.clone(), range);
             }
             Expression::Function {
                 // IDs are displayed by the body before the entire expression

@@ -338,7 +338,7 @@ impl LoweringContext {
                             errors.push(self.create_error(
                                 left,
                                 AstError::OrPatternIsMissingIdentifiers {
-                                    identifier: identifier.to_owned(),
+                                    identifier: identifier.clone(),
                                     number_of_missing_captures:
                                         number_of_missing_captures.try_into().unwrap(),
                                     all_captures,
@@ -734,7 +734,7 @@ impl LoweringContext {
                 {
                     let name = match &name.kind {
                         CstKind::Identifier(identifier) => {
-                            self.create_string(name.data.id.to_owned(), identifier.to_owned())
+                            self.create_string(name.data.id.clone(), identifier.clone())
                         }
                         CstKind::Error { error, .. } => {
                             return self.create_ast(
@@ -816,7 +816,7 @@ impl LoweringContext {
         match key.kind.clone() {
             CstKind::Identifier(identifier) => {
                 let key =
-                    self.create_string(key.data.id.to_owned(), identifier.uppercase_first_letter());
+                    self.create_string(key.data.id.clone(), identifier.uppercase_first_letter());
                 self.create_ast(
                     id,
                     AstKind::StructAccess(ast::StructAccess {
@@ -826,7 +826,7 @@ impl LoweringContext {
                 )
             }
             CstKind::Error { error, .. } => self.create_ast(
-                id.to_owned(),
+                id.clone(),
                 AstKind::Error {
                     child: None,
                     errors: vec![CompilerError {
@@ -860,7 +860,7 @@ impl LoweringContext {
     }
     fn lower_parameter(&mut self, cst: &Cst) -> Result<AstString, Box<CompilerError>> {
         if let CstKind::Identifier(identifier) = &cst.kind {
-            Ok(self.create_string(cst.data.id.to_owned(), identifier.clone()))
+            Ok(self.create_string(cst.data.id.clone(), identifier.clone()))
         } else {
             Err(Box::new(
                 self.create_error(cst, AstError::ExpectedParameter),

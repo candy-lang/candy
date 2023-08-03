@@ -97,7 +97,7 @@ mod test {
             "123",
         );
         assert_eq!(
-            db.rcst(module.clone()).unwrap().as_ref().to_owned(),
+            db.rcst(module.clone()).unwrap().as_ref().clone(),
             vec![CstKind::Int {
                 value: 123u8.into(),
                 string: "123".to_string(),
@@ -110,11 +110,11 @@ mod test {
             db.get_module_content_as_string(module.clone())
                 .unwrap()
                 .as_ref()
-                .to_owned(),
+                .clone(),
             "456",
         );
         assert_eq!(
-            db.rcst(module.clone()).unwrap().as_ref().to_owned(),
+            db.rcst(module.clone()).unwrap().as_ref().clone(),
             vec![CstKind::Int {
                 value: 456u16.into(),
                 string: "456".to_string(),
