@@ -73,7 +73,7 @@ impl HeapTag {
 
 impl Debug for HeapTag {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "<symbol-id {}>", self.symbol_id().value())?;
+        write!(f, "{:?}", self.symbol_id())?;
 
         if let Some(value) = self.value() {
             write!(f, " ({value:?})")?;

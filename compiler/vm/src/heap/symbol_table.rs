@@ -3,7 +3,7 @@ use rand::Rng;
 use std::{
     borrow::Cow,
     cmp::{self, Ordering},
-    fmt::{self, Display, Formatter},
+    fmt::{self, Debug, Display, Formatter},
     intrinsics,
 };
 
@@ -26,6 +26,15 @@ impl SymbolTable {
         id
     }
 
+    pub fn symbols(&self) -> &[String] {
+        &self.symbols
+    }
+    pub fn ids_and_symbols(&self) -> impl Iterator<Item = (SymbolId, &str)> {
+        self.symbols
+            .iter()
+            .enumerate()
+            .map(|(index, it)| (SymbolId(index), it.as_str()))
+    }
     pub fn choose(&self, rng: &mut impl Rng) -> SymbolId {
         SymbolId(rng.gen_range(0..self.symbols.len()))
     }
@@ -68,7 +77,7 @@ impl Default for SymbolTable {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, From, Hash, PartialEq)]
+#[derive(Copy, Clone, Eq, From, Hash, PartialEq)]
 pub struct SymbolId(usize);
 impl SymbolId {
     // These symbols are created by built-in functions or used for starting the
@@ -101,6 +110,17 @@ impl SymbolId {
 
     pub fn value(self) -> usize {
         self.0
+    }
+}
+
+impl Debug for SymbolId {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "<symbol-id {}>", self.0)
+    }
+}
+impl DisplayWithSymbolTable for SymbolId {
+    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
+        write!(f, "{}", symbol_table.get(*self))
     }
 }
 
