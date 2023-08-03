@@ -15,7 +15,11 @@ use candy_vm::{
     vm::{Status, Vm},
 };
 use clap::{Parser, ValueHint};
-use std::{path::PathBuf, rc::Rc};
+use std::{
+    path::PathBuf,
+    rc::Rc,
+    time::{Duration, Instant},
+};
 use tracing::{debug, error};
 
 /// Run a Candy program.
@@ -40,11 +44,17 @@ pub(crate) fn run(options: Options) -> ProgramResult {
 
     debug!("Running {module}.");
 
+    let compilation_start = Instant::now();
     let mut tracer = StackTracer::default();
     let lir = Rc::new(compile_lir(&db, module, tracing).0);
 
-    let mut ended = Vm::for_module(&*lir, &mut tracer).run_until_completion(&mut tracer);
+    let compilation_end = Instant::now();
+    debug!(
+        "Compilation took {}.",
+        format_duration(compilation_end - compilation_start),
+    );
 
+    let mut ended = Vm::for_module(&*lir, &mut tracer).run_until_completion(&mut tracer);
     let main = match ended.reason {
         EndedReason::Finished(return_value) => {
             return_value_into_main_function(&mut ended.heap, return_value).unwrap()
@@ -62,6 +72,11 @@ pub(crate) fn run(options: Options) -> ProgramResult {
             return Err(Exit::CodePanicked);
         }
     };
+    let discovery_end = Instant::now();
+    debug!(
+        "main function discovery took {}.",
+        format_duration(discovery_end - compilation_end),
+    );
 
     debug!("Running main function.");
     // TODO: Add more environment stuff.
@@ -111,6 +126,20 @@ pub(crate) fn run(options: Options) -> ProgramResult {
             Err(Exit::CodePanicked)
         }
     };
+    let execution_end = Instant::now();
+    debug!(
+        "Execution took {}.",
+        format_duration(execution_end - discovery_end),
+    );
+
     drop(lir); // Make sure the LIR is kept around until here.
     result
+}
+
+fn format_duration(duration: Duration) -> String {
+    if duration < Duration::from_millis(1) {
+        format!("{} µs", duration.as_micros())
+    } else {
+        format!("{} ms", duration.as_millis())
+    }
 }
