@@ -3,7 +3,7 @@ use crate::{
     module::Module,
     rich_ir::{RichIrBuilder, ToRichIr, TokenType},
 };
-use derive_more::Deref;
+use derive_more::{Deref, From};
 use enumset::EnumSet;
 use num_bigint::BigUint;
 use rustc_hash::FxHashMap;
@@ -48,7 +48,7 @@ pub struct Ast {
     pub kind: AstKind,
 }
 
-#[derive(Clone, Debug, EnumIs, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, EnumIs, Eq, From, Hash, PartialEq)]
 pub enum AstKind {
     Int(Int),
     Text(Text),

@@ -3,8 +3,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
     ast::{
-        self, AssignmentBody, Ast, AstError, AstKind, AstString, Function, Identifier, Int, List,
-        Match, MatchCase, OrPattern, Struct, Symbol, Text, TextPart,
+        self, Assignment, AssignmentBody, Ast, AstError, AstKind, AstString, Call, Function,
+        Identifier, Int, List, Match, MatchCase, OrPattern, Struct, StructAccess, Symbol, Text,
+        TextPart,
     },
     cst::{self, Cst, CstDb, CstKind, UnwrapWhitespaceAndComment},
     error::CompilerError,
@@ -140,11 +141,9 @@ impl LoweringContext {
             }
             CstKind::Symbol(symbol) => {
                 let string = self.create_string(cst.data.id, symbol.to_string());
-                self.create_ast(cst.data.id, AstKind::Symbol(Symbol(string)))
+                self.create_ast(cst.data.id, Symbol(string))
             }
-            CstKind::Int { value, .. } => {
-                self.create_ast(cst.data.id, AstKind::Int(Int(value.clone())))
-            }
+            CstKind::Int { value, .. } => self.create_ast(cst.data.id, Int(value.clone())),
             CstKind::Text {
                 opening,
                 parts,
@@ -171,7 +170,7 @@ impl LoweringContext {
                         CstKind::TextPart(text) => {
                             let string = self.create_string(part.data.id, text.clone());
                             let text_part =
-                                self.create_ast(part.data.id, AstKind::TextPart(TextPart(string)));
+                                self.create_ast(part.data.id, TextPart(string));
                             lowered_parts.push(text_part);
                         },
                         CstKind::TextInterpolation {
@@ -227,7 +226,7 @@ impl LoweringContext {
                         _ => panic!("Text contains non-TextPart. Whitespaces should have been removed already."),
                     }
                 }
-                let text = self.create_ast(cst.data.id, AstKind::Text(Text(lowered_parts)));
+                let text = self.create_ast(cst.data.id, Text(lowered_parts));
 
                 if !matches!(
                     &closing.kind,
@@ -268,7 +267,7 @@ impl LoweringContext {
                         let call = match call {
                             Ast {
                                 kind:
-                                    AstKind::Call(ast::Call {
+                                    AstKind::Call(Call {
                                         receiver,
                                         mut arguments,
                                         ..
@@ -276,19 +275,19 @@ impl LoweringContext {
                                 ..
                             } if right.kind.is_call() => {
                                 arguments.insert(0, left);
-                                ast::Call {
+                                Call {
                                     receiver,
                                     arguments,
                                     is_from_pipe: true,
                                 }
                             }
-                            call => ast::Call {
+                            call => Call {
                                 receiver: Box::new(call),
                                 arguments: vec![left],
                                 is_from_pipe: true,
                             },
                         };
-                        self.create_ast(cst.data.id, AstKind::Call(call))
+                        self.create_ast(cst.data.id, call)
                     }
                     // In a pattern context, a bar represents an or pattern.
                     LoweringType::Pattern | LoweringType::PatternLiteralPart => {
@@ -346,8 +345,7 @@ impl LoweringContext {
                             ))
                         }
 
-                        let ast =
-                            self.create_ast(cst.data.id, AstKind::OrPattern(OrPattern(patterns)));
+                        let ast = self.create_ast(cst.data.id, OrPattern(patterns));
                         self.wrap_in_errors(cst.data.id, ast, errors)
                     }
                 }
@@ -423,11 +421,11 @@ impl LoweringContext {
 
                 self.create_ast(
                     cst.data.id,
-                    AstKind::Call(ast::Call {
+                    Call {
                         receiver: receiver.into(),
                         arguments,
                         is_from_pipe: false,
-                    }),
+                    },
                 )
             }
             CstKind::List {
@@ -489,7 +487,7 @@ impl LoweringContext {
                     );
                 }
 
-                let ast = self.create_ast(cst.data.id, AstKind::List(List(ast_items)));
+                let ast = self.create_ast(cst.data.id, List(ast_items));
                 self.wrap_in_errors(cst.data.id, ast, errors)
             }
             CstKind::ListItem { .. } => panic!("ListItem should only appear in List."),
@@ -604,7 +602,7 @@ impl LoweringContext {
                     );
                 }
 
-                let ast = self.create_ast(cst.data.id, AstKind::Struct(Struct { fields }));
+                let ast = self.create_ast(cst.data.id, Struct { fields });
                 self.wrap_in_errors(cst.data.id, ast, errors)
             }
             CstKind::StructField { .. } => panic!("StructField should only appear in Struct."),
@@ -635,10 +633,10 @@ impl LoweringContext {
 
                 self.create_ast(
                     cst.data.id,
-                    AstKind::Match(Match {
+                    Match {
                         expression: Box::new(expression),
                         cases,
-                    }),
+                    },
                 )
             }
             CstKind::MatchCase {
@@ -658,10 +656,10 @@ impl LoweringContext {
 
                 self.create_ast(
                     cst.data.id,
-                    AstKind::MatchCase(MatchCase {
+                    MatchCase {
                         pattern: Box::new(pattern),
                         body,
-                    }),
+                    },
                 )
             }
             CstKind::Function {
@@ -704,11 +702,11 @@ impl LoweringContext {
 
                 let ast = self.create_ast(
                     cst.data.id,
-                    AstKind::Function(Function {
+                    Function {
                         parameters,
                         body,
                         fuzzable: false,
-                    }),
+                    },
                 );
                 self.wrap_in_errors(cst.data.id, ast, errors)
             }
@@ -784,10 +782,10 @@ impl LoweringContext {
 
                 let ast = self.create_ast(
                     cst.data.id,
-                    AstKind::Assignment(ast::Assignment {
+                    Assignment {
                         is_public: assignment_sign.kind.is_colon_equals_sign(),
                         body,
-                    }),
+                    },
                 );
                 self.wrap_in_errors(cst.data.id, ast, errors)
             }
@@ -819,10 +817,10 @@ impl LoweringContext {
                     self.create_string(key.data.id.to_owned(), identifier.uppercase_first_letter());
                 self.create_ast(
                     id,
-                    AstKind::StructAccess(ast::StructAccess {
+                    StructAccess {
                         struct_: Box::new(struct_),
                         key,
-                    }),
+                    },
                 )
             }
             CstKind::Error { error, .. } => self.create_ast(
@@ -868,10 +866,10 @@ impl LoweringContext {
         }
     }
 
-    fn create_ast(&mut self, cst_id: cst::Id, kind: AstKind) -> Ast {
+    fn create_ast(&mut self, cst_id: cst::Id, kind: impl Into<AstKind>) -> Ast {
         Ast {
             id: self.create_next_id(cst_id),
-            kind,
+            kind: kind.into(),
         }
     }
     fn create_string(&mut self, cst_id: cst::Id, value: String) -> AstString {
