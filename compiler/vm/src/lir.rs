@@ -234,7 +234,7 @@ impl ToRichIr for Lir {
         for constant in self.constant_heap.iter() {
             builder.push_newline();
             builder.push(
-                format!("{:?}", constant.address()),
+                format!("{:p}", constant.address()),
                 TokenType::Address,
                 EnumSet::empty(),
             );
@@ -404,6 +404,6 @@ pub impl RichIrForLir for RichIr {
         builder.push_tracing_config(tracing_config);
         builder.push_newline();
         lir.build_rich_ir(&mut builder);
-        builder.finish()
+        builder.finish(true)
     }
 }
