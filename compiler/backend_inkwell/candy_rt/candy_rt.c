@@ -5,17 +5,37 @@
 #include "candy_rt.h"
 #include "candy_builtin.h"
 
-candy_value_t __internal_true = {
+const candy_value_t __internal_true = {
     .value = {.text = "True"},
     .type = CANDY_TYPE_TAG};
 
-candy_value_t __internal_false = {
+const candy_value_t __internal_false = {
     .value = {.text = "False"},
     .type = CANDY_TYPE_TAG};
 
-candy_value_t __internal_nothing = {
+const candy_value_t __internal_nothing = {
     .value = {.text = "Nothing"},
     .type = CANDY_TYPE_TAG};
+
+const candy_value_t __internal_less = {
+    .value = {.text = "Less"},
+    .type = CANDY_TYPE_TAG};
+
+const candy_value_t __internal_greater = {
+    .value = {.text = "Greater"},
+    .type = CANDY_TYPE_TAG};
+
+const candy_value_t __internal_equal = {
+    .value = {.text = "Equal"},
+    .type = CANDY_TYPE_TAG};
+
+const candy_value_t __internal_int = {.value = {.text = "Int"}, .type = CANDY_TYPE_TAG};
+const candy_value_t __internal_text = {.value = {.text = "Text"}, .type = CANDY_TYPE_TAG};
+const candy_value_t __internal_tag = {.value = {.text = "Tag"}, .type = CANDY_TYPE_TAG};
+const candy_value_t __internal_list = {.value = {.text = "List"}, .type = CANDY_TYPE_TAG};
+const candy_value_t __internal_struct = {.value = {.text = "Struct"}, .type = CANDY_TYPE_TAG};
+const candy_value_t __internal_function = {.value = {.text = "Function"}, .type = CANDY_TYPE_TAG};
+const candy_value_t __internal_unknown = {.value = {.text = "Unknown type"}, .type = CANDY_TYPE_TAG};
 
 candy_value_t _candy_environment = {
     .value = {.text = "Environment"},
@@ -24,7 +44,7 @@ candy_value_t _candy_environment = {
 // Not particularly elegant, but this is a temporary solution anyway...
 candy_value_t *candy_environment = &_candy_environment;
 
-void print_candy_value(candy_value_t *value)
+void print_candy_value(const candy_value_t *value)
 {
     switch (value->type)
     {
@@ -62,7 +82,7 @@ void print_candy_value(candy_value_t *value)
     }
 }
 
-candy_value_t *to_candy_bool(int value)
+const candy_value_t *to_candy_bool(int value)
 {
     if (value)
     {
@@ -74,7 +94,7 @@ candy_value_t *to_candy_bool(int value)
     }
 }
 
-int candy_tag_to_bool(candy_value_t *value)
+int candy_tag_to_bool(const candy_value_t *value)
 {
     if (strcmp(value->value.text, "True") == 0)
     {
@@ -160,7 +180,7 @@ void *get_candy_function_environment(candy_value_t *function)
     return function->value.function.environment;
 }
 
-void candy_panic(candy_value_t *reason)
+void candy_panic(const candy_value_t *reason)
 {
     printf("The program panicked for the following reason: \n");
     print_candy_value(reason);

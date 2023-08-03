@@ -2,7 +2,7 @@
 #include <string.h>
 #include "candy_rt.h"
 
-candy_value_t *candy_builtin_equals(candy_value_t *left, candy_value_t *right)
+const candy_value_t *candy_builtin_equals(candy_value_t *left, candy_value_t *right)
 {
     if (left
             ->type != right->type)
@@ -21,7 +21,7 @@ candy_value_t *candy_builtin_equals(candy_value_t *left, candy_value_t *right)
     }
 }
 
-candy_value_t *candy_builtin_ifelse(candy_value_t *condition, candy_value_t *then, candy_value_t *otherwise)
+const candy_value_t *candy_builtin_ifelse(candy_value_t *condition, candy_value_t *then, candy_value_t *otherwise)
 {
     if (candy_tag_to_bool(condition))
     {
@@ -67,25 +67,25 @@ candy_value_t *candy_builtin_int_bitwise_xor(candy_value_t *left, candy_value_t 
     return make_candy_int(left->value.integer ^ right->value.integer);
 }
 
-candy_value_t *candy_builtin_int_compareto(candy_value_t *left, candy_value_t *right)
+const candy_value_t *candy_builtin_int_compareto(candy_value_t *left, candy_value_t *right)
 {
     int128_t left_value = left->value.integer;
     int128_t right_value = right->value.integer;
     if (left_value < right_value)
     {
-        return make_candy_tag("Less");
+        return &__internal_less;
     }
     else if (left_value == right_value)
     {
-        return make_candy_tag("Equal");
+        return &__internal_equal;
     }
     else
     {
-        return make_candy_tag("Greater");
+        return &__internal_greater;
     }
 }
 
-candy_value_t *candy_builtin_list_length(candy_value_t *list)
+candy_value_t *candy_builtin_list_length(const candy_value_t *list)
 {
     size_t index = 0;
     while (list->value.list[index] != NULL)
@@ -95,7 +95,7 @@ candy_value_t *candy_builtin_list_length(candy_value_t *list)
     return make_candy_int(index);
 }
 
-candy_value_t *candy_builtin_print(candy_value_t *value)
+const candy_value_t *candy_builtin_print(candy_value_t *value)
 {
     print_candy_value(value);
     printf("\n");
@@ -121,7 +121,7 @@ candy_value_t *candy_builtin_struct_get_keys(candy_value_t *structure)
     return make_candy_list(structure->value.structure.keys);
 }
 
-candy_value_t *candy_builtin_struct_has_key(candy_value_t *structure, candy_value_t *key)
+const candy_value_t *candy_builtin_struct_has_key(candy_value_t *structure, candy_value_t *key)
 {
 
     size_t index = 0;
@@ -135,23 +135,23 @@ candy_value_t *candy_builtin_struct_has_key(candy_value_t *structure, candy_valu
     return &__internal_false;
 }
 
-candy_value_t *candy_builtin_typeof(candy_value_t *value)
+const candy_value_t *candy_builtin_typeof(candy_value_t *value)
 {
     switch (value->type)
     {
     case CANDY_TYPE_INT:
-        return make_candy_tag("Int");
+        return &__internal_int;
     case CANDY_TYPE_TEXT:
-        return make_candy_tag("Text");
+        return &__internal_text;
     case CANDY_TYPE_TAG:
-        return make_candy_tag("Tag");
+        return &__internal_tag;
     case CANDY_TYPE_LIST:
-        return make_candy_tag("List");
+        return &__internal_list;
     case CANDY_TYPE_STRUCT:
-        return make_candy_tag("Struct");
+        return &__internal_struct;
     case CANDY_TYPE_FUNCTION:
-        return make_candy_tag("Function");
+        return &__internal_function;
     default:
-        candy_panic(make_candy_text("Unknown type"));
+        candy_panic(&__internal_unknown);
     }
 }

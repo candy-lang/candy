@@ -75,20 +75,21 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
         .map_err(|e| Exit::LLVMError(e.to_string()))?;
     std::process::Command::new("llc")
         .arg(&bc_path)
+        .args(["-O3"])
         .spawn()
         .unwrap()
         .wait()
         .unwrap();
     if options.build_rt {
         std::process::Command::new("make")
-            .args(&["-C", "compiler/backend_inkwell/candy_rt/", "clean"])
+            .args(["-C", "compiler/backend_inkwell/candy_rt/", "clean"])
             .spawn()
             .unwrap()
             .wait()
             .unwrap();
 
         std::process::Command::new("make")
-            .args(&["-C", "compiler/backend_inkwell/candy_rt/", "candy_rt.a"])
+            .args(["-C", "compiler/backend_inkwell/candy_rt/", "candy_rt.a"])
             .spawn()
             .unwrap()
             .wait()
@@ -101,6 +102,8 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
             s_path.to_str().unwrap(),
             "compiler/backend_inkwell/candy_rt/candy_rt.a",
             if options.debug { "-g" } else { "" },
+            "-O3",
+            "-flto",
             "-o",
             &s_path.to_str().unwrap().replace(".candy.s", ""),
         ])

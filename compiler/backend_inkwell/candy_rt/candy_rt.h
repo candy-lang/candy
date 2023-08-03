@@ -40,15 +40,25 @@ typedef struct candy_value
 
 typedef candy_value_t *(*candy_function)(candy_value_t *);
 
-extern candy_value_t __internal_true;
-extern candy_value_t __internal_false;
-extern candy_value_t __internal_nothing;
+const extern candy_value_t __internal_true;
+const extern candy_value_t __internal_false;
+const extern candy_value_t __internal_nothing;
+const extern candy_value_t __internal_less;
+const extern candy_value_t __internal_equal;
+const extern candy_value_t __internal_greater;
+const extern candy_value_t __internal_int;
+const extern candy_value_t __internal_text;
+const extern candy_value_t __internal_tag;
+const extern candy_value_t __internal_list;
+const extern candy_value_t __internal_struct;
+const extern candy_value_t __internal_function;
+const extern candy_value_t __internal_unknown;
 extern candy_value_t _candy_environment;
 extern candy_value_t *candy_environment;
 
-void print_candy_value(candy_value_t *value);
-candy_value_t *to_candy_bool(int value);
-int candy_tag_to_bool(candy_value_t *value);
+void print_candy_value(const candy_value_t *value);
+const candy_value_t *to_candy_bool(int value);
+int candy_tag_to_bool(const candy_value_t *value);
 candy_value_t *make_candy_int(int128_t value);
 candy_value_t *make_candy_text(char *text);
 candy_value_t *make_candy_tag(char *tag);
@@ -57,6 +67,6 @@ candy_value_t *make_candy_function(candy_function function, void *environment, i
 candy_value_t *call_candy_function_with(candy_value_t *function, candy_value_t *arg);
 candy_function get_candy_function_pointer(candy_value_t *function);
 void *get_candy_function_environment(candy_value_t *function);
-void candy_panic(candy_value_t *reason);
+void candy_panic(const candy_value_t *reason);
 void free_candy_value(candy_value_t *value);
 #endif
