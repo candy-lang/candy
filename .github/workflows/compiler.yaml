@@ -24,7 +24,7 @@ jobs:
 
       # Core
       - name: 'Core: run'
-        run: cargo run --release -- check packages/Core/_.candy
+        run: cargo run --release -- check ./packages/Core/_.candy
 
   # fuzzing:
   #   name: Fuzzing
@@ -34,7 +34,18 @@ jobs:
   #     - uses: dsherret/rust-toolchain-file@v1
   #     - uses: Swatinem/rust-cache@v2.6.0
 
-  #     - run: cargo run --release -- fuzz packages/Benchmark.candy
+  #     - run: cargo run --release -- fuzz ./packages/Benchmark.candy
+
+  check-goldens:
+    name: Check Golden IR Files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3.5.3
+      - uses: dsherret/rust-toolchain-file@v1
+      - uses: Swatinem/rust-cache@v2.5.1
+
+      - name: Check Goldens
+        run: cargo run --release -- debug gold check ./packages/Examples/
 
   benchmark:
     name: Benchmark
