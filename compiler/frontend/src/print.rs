@@ -213,14 +213,14 @@ pub fn print<T>(
             let mut texted_keys = Vec::with_capacity(num_entries);
             let mut total_keys_length = 0;
             for key in keys {
-                let key = print(key, Precedence::Low, MaxLength::Unlimited, visitor)?;
-                total_keys_length += key.len();
-                texted_keys.push(key);
-
                 // surrounding brackets, keys, and for each key colon + space + dots + comma + space
                 if !max_length.fits(total_keys_length + texted_keys.len() * 5) {
                     break;
                 }
+
+                let key = print(key, Precedence::Low, MaxLength::Unlimited, visitor)?;
+                total_keys_length += key.len();
+                texted_keys.push(key);
             }
 
             if texted_keys.len() < num_entries
