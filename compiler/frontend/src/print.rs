@@ -1,6 +1,6 @@
 // Builder for printing Candy values.
 
-use itertools::Itertools;
+use itertools::{EitherOrBoth, Itertools};
 use num_bigint::BigInt;
 
 pub enum PrintValue<T> {
@@ -91,13 +91,12 @@ pub fn print<T>(
             if let Some(value) = value {
                 string.push(' ');
                 if symbol_fits {
-                    let value = print(value, Precedence::High, max_length, visitor)?;
-                    if max_length.fits(length_needed_for_structure - 2 + symbol.len() + value.len())
-                    {
-                        string.push_str(&value);
-                    } else {
-                        string.push('…');
-                    }
+                    string.push_str(&print(
+                        value,
+                        Precedence::High,
+                        length_needed_for_structure - 2 + symbol.len(),
+                        visitor,
+                    )?);
                 } else {
                     string.push('…');
                 }
@@ -283,24 +282,22 @@ pub fn print<T>(
             while let Some(popped) = texted_values.pop() {
                 total_values_length -= popped.len() - 1; // replace with dots
                 if max_length.fits(total_keys_length + total_values_length + num_entries * 4) {
-                    return Some(format!(
-                        "[{}]",
-                        texted_keys
-                            .into_iter()
-                            .zip_longest(texted_values)
-                            .map(|zipped| match zipped {
-                                itertools::EitherOrBoth::Both(key, value) =>
-                                    format!("{key}: {value}"),
-                                itertools::EitherOrBoth::Left(key) => format!("{key}: …"),
-                                itertools::EitherOrBoth::Right(_) => unreachable!(),
-                            })
-                            .join(", "),
-                    ));
+                    break;
                 }
             }
 
-            // We know that at least the version fits where all values are just dots.
-            unreachable!()
+            Some(format!(
+                "[{}]",
+                texted_keys
+                    .into_iter()
+                    .zip_longest(texted_values)
+                    .map(|zipped| match zipped {
+                        EitherOrBoth::Both(key, value) => format!("{key}: {value}"),
+                        EitherOrBoth::Left(key) => format!("{key}: …"),
+                        EitherOrBoth::Right(_) => unreachable!(),
+                    })
+                    .join(", "),
+            ))
         }
         PrintValue::SendPort => match precedence {
             Precedence::High => "(send port)",
