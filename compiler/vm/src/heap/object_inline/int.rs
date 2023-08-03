@@ -21,7 +21,7 @@ use std::{
 #[derive(Clone, Copy, Deref)]
 pub struct InlineInt(InlineObject);
 impl InlineInt {
-    const VALUE_SHIFT: usize = 2;
+    const VALUE_SHIFT: usize = 3;
 
     pub fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
@@ -81,7 +81,7 @@ impl InlineInt {
     operator_fn!(shift_right, i64::checked_shr, Shr::shr);
 
     pub fn bit_length(self) -> Self {
-        // SAFETY: The `bit_length` can be at most 62 since that's how large an [InlineInt] can get.
+        // SAFETY: The `bit_length` can be at most 61 since that's how large an [InlineInt] can get.
         Self::from_unchecked(self.get().bit_length().into())
     }
 

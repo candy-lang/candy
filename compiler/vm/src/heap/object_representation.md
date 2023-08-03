@@ -10,10 +10,10 @@ An inline object is a single word containing a tagged union of different types o
 |                                                                     Value | Meaning     |
 | ------------------------------------------------------------------------: | :---------- |
 | `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx000` | Pointer     |
-| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx01` | Int         |
-| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx010` | SendPort    |
-| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx110` | ReceivePort |
-| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx11` | Builtin     |
+| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx001` | Int         |
+| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx010` | Builtin     |
+| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx100` | SendPort    |
+| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx101` | ReceivePort |
 
 > The remaining patterns are invalid.
 
@@ -28,13 +28,13 @@ Each pointer points to the _header word_ of a heap object.
 `x` stores the signed integer value.
 For larger values, a pointer to a heap object containing an integer of (practically) unlimited size is used.
 
-### SendPort, ReceivePort
-
-`x` stores the channel ID as an unsigned integer.
-
 ### Builtin
 
 `x` stores the builtin function index as an unsigned integer.
+
+### SendPort, ReceivePort
+
+`x` stores the channel ID as an unsigned integer.
 
 ## Heap Object
 

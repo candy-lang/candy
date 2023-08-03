@@ -29,13 +29,12 @@ impl InlinePort {
             "Channel ID is too large.",
         );
 
-        let subkind = if is_send {
-            InlineObject::KIND_PORT_SUBKIND_SEND
+        let kind = if is_send {
+            InlineObject::KIND_SEND_PORT
         } else {
-            InlineObject::KIND_PORT_SUBKIND_RECEIVE
+            InlineObject::KIND_RECEIVE_PORT
         };
-        let header_word =
-            InlineObject::KIND_PORT | subkind | ((channel_id as u64) << Self::CHANNEL_ID_SHIFT);
+        let header_word = kind | ((channel_id as u64) << Self::CHANNEL_ID_SHIFT);
         let header_word = unsafe { NonZeroU64::new_unchecked(header_word) };
         InlineObject(header_word)
     }

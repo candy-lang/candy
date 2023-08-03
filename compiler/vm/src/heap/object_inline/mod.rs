@@ -45,15 +45,13 @@ pub impl InlineObjectSliceCloneToHeap for [InlineObject] {
 pub struct InlineObject(NonZeroU64);
 
 impl InlineObject {
-    pub const KIND_WIDTH: usize = 2;
-    pub const KIND_MASK: u64 = 0b11;
-    pub const KIND_POINTER: u64 = 0b00;
-    pub const KIND_INT: u64 = 0b01;
-    pub const KIND_PORT: u64 = 0b10;
-    pub const KIND_PORT_SUBKIND_MASK: u64 = 0b100;
-    pub const KIND_PORT_SUBKIND_SEND: u64 = 0b000;
-    pub const KIND_PORT_SUBKIND_RECEIVE: u64 = 0b100;
-    pub const KIND_BUILTIN: u64 = 0b11;
+    pub const KIND_WIDTH: usize = 3;
+    pub const KIND_MASK: u64 = 0b111;
+    pub const KIND_POINTER: u64 = 0b000;
+    pub const KIND_INT: u64 = 0b001;
+    pub const KIND_BUILTIN: u64 = 0b010;
+    pub const KIND_SEND_PORT: u64 = 0b100;
+    pub const KIND_RECEIVE_PORT: u64 = 0b101;
 
     pub fn new(value: NonZeroU64) -> Self {
         Self(value)
@@ -169,22 +167,16 @@ impl From<InlineObject> for InlineData {
     fn from(object: InlineObject) -> Self {
         let value = object.0;
         match value.get() & InlineObject::KIND_MASK {
-            InlineObject::KIND_POINTER => {
-                debug_assert_eq!(value.get() & 0b100, 0);
-                InlineData::Pointer(InlinePointer::new_unchecked(object))
-            }
+            InlineObject::KIND_POINTER => InlineData::Pointer(InlinePointer::new_unchecked(object)),
             InlineObject::KIND_INT => InlineData::Int(InlineInt::new_unchecked(object)),
-            InlineObject::KIND_PORT => match value.get() & InlineObject::KIND_PORT_SUBKIND_MASK {
-                InlineObject::KIND_PORT_SUBKIND_SEND => {
-                    InlineData::SendPort(InlineSendPort::new_unchecked(object))
-                }
-                InlineObject::KIND_PORT_SUBKIND_RECEIVE => {
-                    InlineData::ReceivePort(InlineReceivePort::new_unchecked(object))
-                }
-                _ => unreachable!(),
-            },
             InlineObject::KIND_BUILTIN => InlineData::Builtin(InlineBuiltin::new_unchecked(object)),
-            _ => unreachable!(),
+            InlineObject::KIND_SEND_PORT => {
+                InlineData::SendPort(InlineSendPort::new_unchecked(object))
+            }
+            InlineObject::KIND_RECEIVE_PORT => {
+                InlineData::ReceivePort(InlineReceivePort::new_unchecked(object))
+            }
+            _ => panic!("Unknown inline value type: {:016x}", value.get()),
         }
     }
 }
