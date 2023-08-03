@@ -15,7 +15,7 @@ typedef enum
 
 typedef struct
 {
-    struct candy_value *environment;
+    void *environment;
     struct candy_value *(*function)(struct candy_value *);
 } candy_function_t;
 
@@ -42,6 +42,7 @@ typedef candy_value_t *(*candy_function)(candy_value_t *);
 
 extern candy_value_t __internal_true;
 extern candy_value_t __internal_false;
+extern candy_value_t __internal_nothing;
 extern candy_value_t _candy_environment;
 extern candy_value_t *candy_environment;
 
@@ -52,7 +53,10 @@ candy_value_t *make_candy_int(int128_t value);
 candy_value_t *make_candy_text(char *text);
 candy_value_t *make_candy_tag(char *tag);
 candy_value_t *make_candy_list(candy_value_t **values);
-candy_value_t *make_candy_function(candy_function function, candy_value_t *environment);
+candy_value_t *make_candy_function(candy_function function, void *environment, int env_size);
+candy_value_t *call_candy_function_with(candy_value_t *function, candy_value_t *arg);
+candy_function get_candy_function_pointer(candy_value_t *function);
+void *get_candy_function_environment(candy_value_t *function);
 void candy_panic(candy_value_t *reason);
 void free_candy_value(candy_value_t *value);
 #endif

@@ -13,6 +13,10 @@ candy_value_t __internal_false = {
     .value = {.text = "False"},
     .type = CANDY_TYPE_TAG};
 
+candy_value_t __internal_nothing = {
+    .value = {.text = "Nothing"},
+    .type = CANDY_TYPE_TAG};
+
 candy_value_t _candy_environment = {
     .value = {.text = "Environment"},
     .type = CANDY_TYPE_TAG};
@@ -100,7 +104,7 @@ candy_value_t *make_candy_int(int128_t value)
 candy_value_t *make_candy_text(char *text)
 {
     candy_value_t *candy_value = malloc(sizeof(candy_value_t));
-    candy_value->value.text = malloc(sizeof(char) * strlen(text));
+    candy_value->value.text = malloc(sizeof(char) * (strlen(text) + 1));
     strcpy(candy_value->value.text, text);
     candy_value->type = CANDY_TYPE_TEXT;
     return candy_value;
@@ -109,7 +113,7 @@ candy_value_t *make_candy_text(char *text)
 candy_value_t *make_candy_tag(char *tag)
 {
     candy_value_t *candy_value = malloc(sizeof(candy_value_t));
-    candy_value->value.text = malloc(sizeof(char) * strlen(tag));
+    candy_value->value.text = malloc(sizeof(char) * (strlen(tag) + 1));
     strcpy(candy_value->value.text, tag);
     candy_value->type = CANDY_TYPE_TAG;
     return candy_value;
@@ -123,7 +127,7 @@ candy_value_t *make_candy_list(candy_value_t **values)
     return candy_value;
 }
 
-candy_value_t *make_candy_function(candy_function function, candy_value_t *environment)
+candy_value_t *make_candy_function(candy_function function, void *environment, int env_size)
 {
     candy_value_t *candy_value = malloc(sizeof(candy_value_t));
     candy_value->type = CANDY_TYPE_FUNCTION;
@@ -146,6 +150,16 @@ candy_value_t *call_candy_function_with(candy_value_t *function, candy_value_t *
     return function->value.function.function(arg);
 }
 
+candy_function get_candy_function_pointer(candy_value_t *function)
+{
+    return function->value.function.function;
+}
+
+void *get_candy_function_environment(candy_value_t *function)
+{
+    return function->value.function.environment;
+}
+
 void candy_panic(candy_value_t *reason)
 {
     printf("The program panicked for the following reason: \n");
@@ -156,7 +170,7 @@ void candy_panic(candy_value_t *reason)
 
 void free_candy_value(candy_value_t *value)
 {
-    if (value != candy_environment)
+    if (value != candy_environment && value != NULL)
     {
         if (value->type == CANDY_TYPE_TAG || value->type == CANDY_TYPE_TEXT)
         {

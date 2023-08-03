@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 #include "candy_rt.h"
 
@@ -94,6 +95,13 @@ candy_value_t *candy_builtin_list_length(candy_value_t *list)
     return make_candy_int(index);
 }
 
+candy_value_t *candy_builtin_print(candy_value_t *value)
+{
+    print_candy_value(value);
+    printf("\n");
+    return &__internal_nothing;
+}
+
 candy_value_t *candy_builtin_struct_get(candy_value_t *structure, candy_value_t *key)
 {
     size_t index = 0;
@@ -143,5 +151,7 @@ candy_value_t *candy_builtin_typeof(candy_value_t *value)
         return make_candy_tag("Struct");
     case CANDY_TYPE_FUNCTION:
         return make_candy_tag("Function");
+    default:
+        candy_panic(make_candy_text("Unknown type"));
     }
 }
