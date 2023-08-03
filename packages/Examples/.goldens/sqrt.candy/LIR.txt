@@ -50,7 +50,6 @@
 <replaced address 059957cbdfcba66e>: "`factorB | typeIs Int` was not satisfied"
 <replaced address 05d3cc4d9e508578>: Core:fixedDecimal:comparableMinorUnits:9
 <replaced address 0615de2d9d251f28>: "`is text` was not satisfied"
-<replaced address 0636169197fa99f6>: <symbol-id 22>
 <replaced address 0687672636376838>: { 1 argument (capturing nothing) → ip-3752 }
 <replaced address 06d9853e299db679>: Core:int:pow:21:4
 <replaced address 0725cc71c45424eb>: Core:fixedDecimal:compareTo:9
@@ -74,7 +73,6 @@
 <replaced address 0f1d21def6404396>: Core:fixedDecimal:minorUnits:21
 <replaced address 0fea7d5fa5afcc30>: Builtins::typeIs:25
 <replaced address 115d872828ea65b9>: Core:fixedDecimal:comparableMinorUnits:4
-<replaced address 11bfd16c22947a37>: <symbol-id 19>
 <replaced address 11f17ace09f50fcf>: "`is summandA` was not satisfied"
 <replaced address 11f821dd28c02830>: Core:function:is2:13
 <replaced address 121abe8663635fc8>: Core:bool:lazyOr:16
@@ -101,14 +99,12 @@
 <replaced address 18e997b92c441dbc>: Core:fixedDecimal:divideTruncatingAtScale:41
 <replaced address 1979ea3d3da06556>: "The shift `amount` is negative: "
 <replaced address 19a23d768931068a>: Core:fixedDecimal:divideTruncatingAtScale:7
-<replaced address 1a5308383c99f99b>: [CB1424D2291F6715 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-8055 }, D756856A10A63024 → <symbol-id 28>: { 2 arguments (capturing nothing) → ip-7937 }]
 <replaced address 1a5ae333e61def58>: Core:fixedDecimal:divideTruncatingAtScale:29
 <replaced address 1b4007a5fefdbb0d>: Core:int:pow:21:4:4
 <replaced address 1b606dbb6ca1f0eb>: "`endExclusive | typeIs Int` was not satisfied"
 <replaced address 1bd83d2d0fe17cd9>: Core:fixedDecimal:isGreaterThan:2
 <replaced address 1c230afe2bbb7a57>: Core:int:pow:21:4:6:7
 <replaced address 1c8f1e8d1f711791>: Builtins::fitsInRustU128:17
-<replaced address 1c90e689504171aa>: <symbol-id 10>
 <replaced address 1cb871fbb0b438ee>: Core:int:compareTo:4
 <replaced address 1d79b0b7792c20d5>: "`amount | typeIs Int` was not satisfied"
 <replaced address 1dcde547a3c79a92>: Core:fixedDecimal:isLessThanOrEqualTo:13
@@ -126,13 +122,11 @@
 <replaced address 263097940b740418>: Core:fixedDecimal:minorUnits:19
 <replaced address 26a73fd6175be5f5>: Core:int:max:9
 <replaced address 2749496cbbd972e7>: "`b | typeIs Int` was not satisfied"
-<replaced address 28d3472137c83ab9>: <symbol-id 29>
 <replaced address 28e809b4af2bcf90>: { 0 arguments (capturing nothing) → ip-4118 }
 <replaced address 297d7f26141c60f3>: "`divisor | typeIs Int` was not satisfied"
 <replaced address 29db2fde3579cc9c>: "`is subtrahend` was not satisfied"
 <replaced address 2a47ec53df8f0315>: Core:fixedDecimal:fromInt:15
 <replaced address 2a49f90398e279ec>: Core:int:isGreaterThan:9
-<replaced address 2ab338d6fdd9c122>: (<symbol-id 24>)
 <replaced address 2ace5f047eecfe6e>: Builtins::ifElse:1
 <replaced address 2b86f7c05e384778>: Core:bool:implies:12
 <replaced address 2be4c61e6449c71f>: Core:fixedDecimal:approxEquals:4
@@ -154,7 +148,6 @@
 <replaced address 32642689bd6f102b>: "Expected a "
 <replaced address 32b371dabd9b4d2b>: Builtins::isLessThanOrEqualTo:5
 <replaced address 331341f368fb10a2>: Core:int:compareTo:40
-<replaced address 345d01fbc2621afa>: <symbol-id 26>
 <replaced address 359f7421ac99f5e1>: Builtins::ifElse:42
 <replaced address 35a4c54ad5b43964>: Core:text:removePrefix:9
 <replaced address 360287b66c5b93b8>: { 2 arguments (capturing nothing) → ip-1738 }
@@ -174,11 +167,11 @@
 <replaced address 3abddaf95eef3b14>: Core:fixedDecimal:subtract:27
 <replaced address 3b1417be187b5652>: { 2 arguments (capturing nothing) → ip-4760 }
 <replaced address 3bf3fcd80ce49d2b>: Core:bool:not:4
+<replaced address 3cc13d18269c7827>: [3E2B0DC28FC21A8A → <symbol-id 28>: { 2 arguments (capturing nothing) → ip-7937 }, ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-8055 }]
 <replaced address 3eca0e872d043602>: Builtins::typeIs:19
 <replaced address 3f1dcd30453d2689>: "`subtrahend | typeIs Int` was not satisfied"
 <replaced address 3f8472925351e6bd>: Core:fixedDecimal:comparableMinorUnits:24
 <replaced address 3fa1c371bc20fc26>: "`endExclusive | isLessThanOrEqualTo (text | ✨.textLength)` was not satisfied"
-<replaced address 3fe6bcd64cfbfb3b>: <symbol-id 7>
 <replaced address 4016c0af9773e5bb>: Core:function:is0:13
 <replaced address 40f5be0d0d2bb859>: Core:fixedDecimal:comparableMinorUnits:36
 <replaced address 418894b3d9709b65>: Core:fixedDecimal:rescaledMinorUnits:13
@@ -210,7 +203,6 @@
 <replaced address 4ab911e692a44580>: "`function.is0 b` was not satisfied"
 <replaced address 4afe2ad4b5d602ba>: Core:bool:or:9
 <replaced address 4b0e2d6cddebc6fe>: Core:fixedDecimal:comparableMinorUnits:23
-<replaced address 4b7077b0d795db7c>: <symbol-id 4>
 <replaced address 4ba1f413d127b8a4>: Core:fixedDecimal:toText:11:19
 <replaced address 4d0e1b712b4c661d>: "`is minuend` was not satisfied"
 <replaced address 4d25326d1514a0ad>: "`value | typeIs Int` was not satisfied"
@@ -229,9 +221,7 @@
 <replaced address 53b7d71be4c8caeb>: Core:fixedDecimal:rescaledMinorUnits:24:26
 <replaced address 55043490d5f24695>: Builtins::print:11
 <replaced address 56f86a8f315f61a4>: Builtins::fitsInRustU128:8
-<replaced address 56fa328b622fbbbd>: <symbol-id 1>
 <replaced address 5753a7d40ff7c4be>: Core:fixedDecimal:isScale:19
-<replaced address 57b2d848bf1ca48b>: <symbol-id 23>
 <replaced address 57e454abb8ae81b3>: Core:fixedDecimal:toText:11:32
 <replaced address 58373149b5b5e4a5>: Core:fixedDecimal:isLessThanOrEqualTo:22
 <replaced address 589c0a68eea45be7>: Core:fixedDecimal:rescaledMinorUnits:23
@@ -265,7 +255,6 @@
 <replaced address 628a2598ee35e0d9>: "`b` didn't return a bool."
 <replaced address 62b569c8e65b7926>: Core:fixedDecimal:toText:11:9
 <replaced address 62da48df500c704e>: Core:fixedDecimal:comparableMinorUnits:7
-<replaced address 633c932349b684cc>: <symbol-id 20>
 <replaced address 636e0f86434861f4>: Core:fixedDecimal:toText:11:35
 <replaced address 63c0ec24404fc4e6>: Core:fixedDecimal:isLessThanOrEqualTo:9
 <replaced address 63caf0bdeeb84e97>: "You can't divide by zero."
@@ -288,7 +277,6 @@
 <replaced address 6e540121b2908c4b>: Core:bool:or:4
 <replaced address 6e6403b9daa6508f>: Core:fixedDecimal:comparableMinorUnits:2
 <replaced address 6ea72ba8acb78ed9>: " is "
-<replaced address 6ec64dfdd450650d>: <symbol-id 17>
 <replaced address 6edffe9188974ec3>: Core:fixedDecimal:subtract:valueA
 <replaced address 6f69bcaa65f38190>: Core:int:pow:21:1
 <replaced address 6fd9e0d5720c336c>: Core:bool:lazyOr:4
@@ -309,7 +297,6 @@
 <replaced address 78572cf7e33bd2eb>: { 2 arguments (capturing nothing) → ip-3949 }
 <replaced address 78deb9bec19d67af>: Core:fixedDecimal:isGreaterThan:4
 <replaced address 79ddbbfc3d2a6c8c>: Core:bool:or:7
-<replaced address 7a5008d85eea454e>: <symbol-id 30>
 <replaced address 7b5c0ed7f870b37f>: "`conditionIsBool` was not satisfied"
 <replaced address 7bc3f9c7bacdabce>: Core:fixedDecimal:is:1:scale
 <replaced address 7bf1e0b5eb5ee578>: Core:fixedDecimal:rescaledMinorUnits:4
@@ -339,7 +326,6 @@
 <replaced address 85529a58862919e9>: Core:fixedDecimal:toText:11:2
 <replaced address 856776d6c7c44ccd>: Core:bool:or:2
 <replaced address 8569f4e46fac8013>: "Expected tag to have a value, but it doesn't have any."
-<replaced address 85d9c3b2e984258f>: <symbol-id 27>
 <replaced address 865e1cb3e01d65a9>: Core:fixedDecimal:isLessThanOrEqualTo:2
 <replaced address 86c9799315ddb084>: Core:fixedDecimal:compareTo:2
 <replaced address 86ed568a873ff3ee>: Core:bool:lazyOr:14
@@ -359,7 +345,6 @@
 <replaced address 8fadd3b7804ecbea>: "`is valueA` was not satisfied"
 <replaced address 903cfd44f2ab25af>: Core:int:pow:21:4:6:15
 <replaced address 90f131b1525e2d0e>: Core:bool:or:13
-<replaced address 91637e8d741e05d0>: <symbol-id 24>
 <replaced address 919cc0a785e311ea>: { 2 arguments (capturing nothing) → ip-4560 }
 <replaced address 91ccd4b75c545de9>: "The `condition` must be either `True` or `False`."
 <replaced address 9253346da07790c5>: Core:fixedDecimal:compareTo:7
@@ -390,9 +375,7 @@
 <replaced address 997c172e2260e62b>: Core:fixedDecimal:rescaledMinorUnits:25:24
 <replaced address 9a411ed2de02bbfd>: "`else | typeIs Function` was not satisfied"
 <replaced address 9a6aee7be6d84b4b>: "`is delta` was not satisfied"
-<replaced address 9baf713a013687f1>: (<symbol-id 26>, "Expected tag to have a value, but it doesn't have any.")
 <replaced address 9bc6b81f7d4505f0>: Core:int:pow:21:4:6:12
-<replaced address 9ced3967feb7e611>: <symbol-id 5>
 <replaced address 9d24498ace248838>: Core:fixedDecimal:compareTo:46
 <replaced address 9d49365893dd0ffa>: Core:controlFlow:recursive:18:6
 <replaced address 9e34e4f0d7d85134>: Builtins::tagGetValue:19
@@ -442,7 +425,6 @@
 <replaced address b4283a8f745e6dd7>: Core:int:compareTo:9
 <replaced address b43123796acf41fb>: { 2 arguments (capturing nothing) → ip-3677 }
 <replaced address b4a5a1c866dba8c8>: "`int.is minorUnits` was not satisfied"
-<replaced address b4b954da70d88f61>: <symbol-id 21>
 <replaced address b51441f4b1a774f2>: Core:bool:lazyOr:18
 <replaced address b59d36dc3238780b>: Core:fixedDecimal:absolute:4
 <replaced address b6bcfe4212b6d524>: Core:text:removePrefix:15:8
@@ -468,7 +450,6 @@
 <replaced address be33b1bb1a2b5e83>: Core:fixedDecimal:isNonNegative:4
 <replaced address bf48589ec7f95521>: "Expected `"
 <replaced address bfde1b4bffe0bd11>: Core:int:isNegative:8
-<replaced address c0430fb4fb726fa2>: <symbol-id 18>
 <replaced address c0a889f31ab3fd1e>: Builtins::intShiftRight:26:0
 <replaced address c12c41d52afa26fe>: Core:fixedDecimal:rescaledMinorUnits:26
 <replaced address c132c59527cbfa97>: Core:fixedDecimal:compareTo:13
@@ -491,8 +472,6 @@
 <replaced address c9bd6c95a4c53ec4>: Core:fixedDecimal:isNonNegative:7
 <replaced address c9ef2211ebdcfec3>: { 1 argument (capturing nothing) → ip-6663 }
 <replaced address ca596901c28ce3ed>: Core:int:max:17
-<replaced address cb1424d2291f6715>: <symbol-id 9>
-<replaced address cbccca8f860c4fe3>: <symbol-id 31>
 <replaced address ccb0ac91476c388d>: Core:fixedDecimal:absolute:2
 <replaced address ccbc806fb265dad8>: Core:fixedDecimal:compareTo:14
 <replaced address cce05d6723c81e42>: Core:bool:lazyOr:2
@@ -527,12 +506,13 @@
 <replaced address d54727702f5f1f05>: Core:fixedDecimal:isNonNegative:2
 <replaced address d644dcd381962727>: Examples:sqrt:
 <replaced address d6f43b2616fc1ba6>: Core:fixedDecimal:comparableMinorUnits:31
-<replaced address d756856a10a63024>: <symbol-id 28>
+<replaced address d7adea8e03818926>: (<symbol-id 24>)
 <replaced address db288049e23915c8>: { 2 arguments (capturing nothing) → ip-7354 }
 <replaced address db2b0436f30bc844>: { 2 arguments (capturing nothing) → ip-4646 }
 <replaced address dbbd921a9bcb850a>: "`startInclusive | isLessThanOrEqualTo endExclusive` was not satisfied"
 <replaced address dc339b3c15b224e5>: Builtins::intShiftRight:24
 <replaced address dc704463e00c0b29>: { 0 arguments (capturing nothing) → ip-3 }
+<replaced address ddb88ec575fa202f>: (<symbol-id 26>, "Expected tag to have a value, but it doesn't have any.")
 <replaced address df99790ebde3b1bc>: { 1 argument (capturing nothing) → ip-2108 }
 <replaced address dfaca8d380de1ddd>: Builtins::not:1:4
 <replaced address dfc1b26f5a233358>: Core:fixedDecimal:toText:32:0
@@ -542,7 +522,6 @@
 <replaced address e148ba3a1a0c04f8>: Core:fixedDecimal:toText:11:34:10
 <replaced address e1d6728501bc6b89>: Builtins::equals:6
 <replaced address e25916ea37e504bf>: Core:fixedDecimal:toText:11:4
-<replaced address e2e040449b401065>: <symbol-id 25>
 <replaced address e364994591d9507f>: Core:fixedDecimal:isLessThanOrEqualTo:4
 <replaced address e3c422465c9ff90f>: Core:fixedDecimal:absolute:8
 <replaced address e3cff624c7999b5a>: Core:fixedDecimal:compareTo:4
@@ -560,7 +539,6 @@
 <replaced address ec8f9927d581abf3>: Core:fixedDecimal:is:1:19
 <replaced address ee0506b62a483e15>: Core:int:isNegative:4
 <replaced address ee683322f509968d>: Builtins::fitsInRustU128:5
-<replaced address ee69fb1f25d9f0a6>: <symbol-id 6>
 <replaced address ee78a67daaae8b1b>: "."
 <replaced address eea10b41f54692cd>: Core:fixedDecimal:compareTo:47
 <replaced address eeee54201c7330c0>: Core:fixedDecimal:isLessThanOrEqualTo:7
@@ -588,7 +566,6 @@
 <replaced address f9916bb5b6c9bc69>: Core:fixedDecimal:comparableMinorUnits:20
 <replaced address f99ca902de27deee>: "`isNonNegative delta` was not satisfied"
 <replaced address f9f1edfd7fa376ce>: Builtins::fitsInRustU128:10
-<replaced address f9f3b5f9b073d0e7>: <symbol-id 3>
 <replaced address fae36bd9dccd5bdc>: Core:fixedDecimal:compareTo:26
 <replaced address fc4eaadba1b759e3>: "`factorA | typeIs Int` was not satisfied"
 <replaced address fcb0051eaf3eff78>: Core:text:removePrefix:15:4
@@ -602,17 +579,17 @@
 
 # Instructions
 # anonymous:$generated::needs:isConditionTrue:then
-   0: pushConstant <replaced address 633c932349b684cc> <symbol-id 20>
+   0: pushConstant inline <symbol-id 20>
    1: popMultipleBelowTop 1
    2: return
 # anonymous:$generated::needs:isConditionBool:then
-   3: pushConstant <replaced address 1c90e689504171aa> <symbol-id 10>
+   3: pushConstant inline <symbol-id 10>
    4: popMultipleBelowTop 1
    5: return
 # anonymous:$generated::needs:isConditionTrue:else
    6: pushConstant inline builtinEquals
    7: pushFromStack 2
-   8: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+   8: pushConstant inline <symbol-id 3>
    9: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
   10: tailCall with 2 locals and 2 arguments
 # anonymous:$generated::needs:isConditionBool:else
@@ -636,7 +613,7 @@
 # anonymous:$generated::needs
   26: pushConstant inline builtinEquals
   27: pushFromStack 4
-  28: pushConstant <replaced address 633c932349b684cc> <symbol-id 20>
+  28: pushConstant inline <symbol-id 20>
   29: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
   30: call with 2 arguments
   31: pushFromStack 4
@@ -661,7 +638,7 @@
   50: call with 1 argument
   51: pushConstant inline builtinEquals
   52: pushFromStack 1
-  53: pushConstant <replaced address 11bfd16c22947a37> <symbol-id 19>
+  53: pushConstant inline <symbol-id 19>
   54: pushFromStack 6
   55: call with 2 arguments
   56: pushFromStack 4
@@ -682,16 +659,16 @@
   71: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
   72: tailCall with 19 locals and 3 arguments
 # Builtins::not:1:equals:then
-  73: pushConstant <replaced address 2ab338d6fdd9c122> (<symbol-id 24>)
+  73: pushConstant <replaced address d7adea8e03818926> (<symbol-id 24>)
   74: popMultipleBelowTop 1
   75: return
 # Builtins::not:1:case-0:matched
-  76: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+  76: pushConstant inline <symbol-id 3>
   77: popMultipleBelowTop 1
   78: return
 # Builtins::not:1:equals:else
   79: pushConstant inline builtinToDebugText
-  80: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+  80: pushConstant inline <symbol-id 3>
   81: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
   82: call with 1 argument
   83: pushConstant inline builtinToDebugText
@@ -716,7 +693,7 @@
  102: pushConstant <replaced address 8dbb18a7278b48a0> "`."
  103: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  104: call with 2 arguments
- 105: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+ 105: pushConstant inline <symbol-id 26>
  106: pushFromStack 1
  107: createList 2
  108: popMultipleBelowTop 9
@@ -727,7 +704,7 @@
  112: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  113: call with 1 argument
  114: pushConstant inline builtinEquals
- 115: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+ 115: pushConstant inline <symbol-id 3>
  116: pushFromStack 2
  117: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  118: call with 2 arguments
@@ -742,7 +719,7 @@
  127: tailCall with 7 locals and 3 arguments
 # Builtins::not:1:equals:else
  128: pushConstant inline builtinToDebugText
- 129: pushConstant <replaced address 633c932349b684cc> <symbol-id 20>
+ 129: pushConstant inline <symbol-id 20>
  130: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  131: call with 1 argument
  132: pushConstant inline builtinToDebugText
@@ -769,7 +746,7 @@
  153: pushConstant <replaced address ee78a67daaae8b1b> "."
  154: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  155: call with 2 arguments
- 156: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+ 156: pushConstant inline <symbol-id 26>
  157: pushFromStack 1
  158: createList 2
  159: popMultipleBelowTop 8
@@ -780,7 +757,7 @@
  163: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  164: call with 1 argument
  165: pushConstant inline builtinEquals
- 166: pushConstant <replaced address 633c932349b684cc> <symbol-id 20>
+ 166: pushConstant inline <symbol-id 20>
  167: pushFromStack 2
  168: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  169: call with 2 arguments
@@ -796,7 +773,7 @@
  179: tailCall with 8 locals and 3 arguments
 # Builtins::not:1:equals:else
  180: pushConstant inline builtinToDebugText
- 181: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+ 181: pushConstant inline <symbol-id 18>
  182: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  183: call with 1 argument
  184: pushConstant inline builtinToDebugText
@@ -823,13 +800,13 @@
  205: pushConstant <replaced address 8dbb18a7278b48a0> "`."
  206: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  207: call with 2 arguments
- 208: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+ 208: pushConstant inline <symbol-id 26>
  209: pushFromStack 1
  210: createList 2
  211: popMultipleBelowTop 8
  212: return
  213: pushConstant inline builtinToDebugText
- 214: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+ 214: pushConstant inline <symbol-id 3>
  215: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  216: call with 1 argument
  217: pushConstant inline builtinToDebugText
@@ -854,7 +831,7 @@
  236: pushConstant <replaced address 8dbb18a7278b48a0> "`."
  237: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  238: call with 2 arguments
- 239: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+ 239: pushConstant inline <symbol-id 26>
  240: pushFromStack 1
  241: createList 2
  242: popMultipleBelowTop 9
@@ -865,7 +842,7 @@
  246: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  247: call with 1 argument
  248: pushConstant inline builtinEquals
- 249: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+ 249: pushConstant inline <symbol-id 3>
  250: pushFromStack 2
  251: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  252: call with 2 arguments
@@ -880,7 +857,7 @@
  261: tailCall with 7 locals and 3 arguments
 # Builtins::not:1:equals:else
  262: pushConstant inline builtinToDebugText
- 263: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+ 263: pushConstant inline <symbol-id 3>
  264: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  265: call with 1 argument
  266: pushConstant inline builtinToDebugText
@@ -907,7 +884,7 @@
  287: pushConstant <replaced address ee78a67daaae8b1b> "."
  288: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  289: call with 2 arguments
- 290: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+ 290: pushConstant inline <symbol-id 26>
  291: pushFromStack 1
  292: createList 2
  293: popMultipleBelowTop 8
@@ -918,7 +895,7 @@
  297: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  298: call with 1 argument
  299: pushConstant inline builtinEquals
- 300: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+ 300: pushConstant inline <symbol-id 3>
  301: pushFromStack 2
  302: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  303: call with 2 arguments
@@ -934,7 +911,7 @@
  313: tailCall with 8 locals and 3 arguments
 # Builtins::not:1:equals:else
  314: pushConstant inline builtinToDebugText
- 315: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+ 315: pushConstant inline <symbol-id 18>
  316: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  317: call with 1 argument
  318: pushConstant inline builtinToDebugText
@@ -961,7 +938,7 @@
  339: pushConstant <replaced address 8dbb18a7278b48a0> "`."
  340: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  341: call with 2 arguments
- 342: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+ 342: pushConstant inline <symbol-id 26>
  343: pushFromStack 1
  344: createList 2
  345: popMultipleBelowTop 8
@@ -973,7 +950,7 @@
  350: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  351: call with 2 arguments
  352: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
- 353: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+ 353: pushConstant inline <symbol-id 3>
  354: pushConstant <replaced address 2f05589715c04274> "`False` was not satisfied"
  355: pushFromStack 6
  356: pushConstant <replaced address dfaca8d380de1ddd> Builtins::not:1:4
@@ -989,7 +966,7 @@
  365: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  366: call with 1 argument
  367: pushConstant inline builtinEquals
- 368: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+ 368: pushConstant inline <symbol-id 18>
  369: pushFromStack 2
  370: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  371: call with 2 arguments
@@ -1010,7 +987,7 @@
  386: call with 2 arguments
  387: pushConstant inline builtinEquals
  388: pushFromStack 1
- 389: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+ 389: pushConstant inline <symbol-id 24>
  390: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  391: call with 2 arguments
  392: pushFromStack 12
@@ -1028,7 +1005,7 @@
  403: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  404: call with 1 argument
  405: pushConstant inline builtinEquals
- 406: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+ 406: pushConstant inline <symbol-id 18>
  407: pushFromStack 2
  408: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  409: call with 2 arguments
@@ -1049,7 +1026,7 @@
  424: call with 2 arguments
  425: pushConstant inline builtinEquals
  426: pushFromStack 1
- 427: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+ 427: pushConstant inline <symbol-id 24>
  428: pushConstant <replaced address f65a980ad670ac36> Builtins::not:1
  429: call with 2 arguments
  430: pushFromStack 2
@@ -1064,7 +1041,7 @@
  439: tailCall with 15 locals and 3 arguments
 # Builtins::isNonNegative:13:equals:else
  440: pushConstant inline builtinToDebugText
- 441: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+ 441: pushConstant inline <symbol-id 3>
  442: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  443: call with 1 argument
  444: pushConstant inline builtinToDebugText
@@ -1089,7 +1066,7 @@
  463: pushConstant <replaced address 8dbb18a7278b48a0> "`."
  464: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  465: call with 2 arguments
- 466: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+ 466: pushConstant inline <symbol-id 26>
  467: pushFromStack 1
  468: createList 2
  469: popMultipleBelowTop 9
@@ -1100,7 +1077,7 @@
  473: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  474: call with 1 argument
  475: pushConstant inline builtinEquals
- 476: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+ 476: pushConstant inline <symbol-id 3>
  477: pushFromStack 2
  478: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  479: call with 2 arguments
@@ -1115,7 +1092,7 @@
  488: tailCall with 7 locals and 3 arguments
 # Builtins::isNonNegative:13:equals:else
  489: pushConstant inline builtinToDebugText
- 490: pushConstant <replaced address 9ced3967feb7e611> <symbol-id 5>
+ 490: pushConstant inline <symbol-id 5>
  491: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  492: call with 1 argument
  493: pushConstant inline builtinToDebugText
@@ -1142,7 +1119,7 @@
  514: pushConstant <replaced address ee78a67daaae8b1b> "."
  515: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  516: call with 2 arguments
- 517: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+ 517: pushConstant inline <symbol-id 26>
  518: pushFromStack 1
  519: createList 2
  520: popMultipleBelowTop 8
@@ -1153,7 +1130,7 @@
  524: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  525: call with 1 argument
  526: pushConstant inline builtinEquals
- 527: pushConstant <replaced address 9ced3967feb7e611> <symbol-id 5>
+ 527: pushConstant inline <symbol-id 5>
  528: pushFromStack 2
  529: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  530: call with 2 arguments
@@ -1173,7 +1150,7 @@
  543: return
 # Builtins::isNonNegative:13:equals:else
  544: pushConstant inline builtinToDebugText
- 545: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+ 545: pushConstant inline <symbol-id 3>
  546: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  547: call with 1 argument
  548: pushConstant inline builtinToDebugText
@@ -1198,7 +1175,7 @@
  567: pushConstant <replaced address 8dbb18a7278b48a0> "`."
  568: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  569: call with 2 arguments
- 570: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+ 570: pushConstant inline <symbol-id 26>
  571: pushFromStack 1
  572: createList 2
  573: popMultipleBelowTop 9
@@ -1209,7 +1186,7 @@
  577: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  578: call with 1 argument
  579: pushConstant inline builtinEquals
- 580: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+ 580: pushConstant inline <symbol-id 3>
  581: pushFromStack 2
  582: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  583: call with 2 arguments
@@ -1224,7 +1201,7 @@
  592: tailCall with 7 locals and 3 arguments
 # Builtins::isNonNegative:13:equals:else
  593: pushConstant inline builtinToDebugText
- 594: pushConstant <replaced address 56fa328b622fbbbd> <symbol-id 1>
+ 594: pushConstant inline <symbol-id 1>
  595: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  596: call with 1 argument
  597: pushConstant inline builtinToDebugText
@@ -1251,7 +1228,7 @@
  618: pushConstant <replaced address ee78a67daaae8b1b> "."
  619: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  620: call with 2 arguments
- 621: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+ 621: pushConstant inline <symbol-id 26>
  622: pushFromStack 1
  623: createList 2
  624: popMultipleBelowTop 8
@@ -1262,7 +1239,7 @@
  628: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  629: call with 1 argument
  630: pushConstant inline builtinEquals
- 631: pushConstant <replaced address 56fa328b622fbbbd> <symbol-id 1>
+ 631: pushConstant inline <symbol-id 1>
  632: pushFromStack 2
  633: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  634: call with 2 arguments
@@ -1284,7 +1261,7 @@
  649: tailCall with 4 locals and 0 arguments
 # Builtins::isNonNegative:13:equals:else
  650: pushConstant inline builtinToDebugText
- 651: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+ 651: pushConstant inline <symbol-id 3>
  652: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  653: call with 1 argument
  654: pushConstant inline builtinToDebugText
@@ -1309,7 +1286,7 @@
  673: pushConstant <replaced address 8dbb18a7278b48a0> "`."
  674: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  675: call with 2 arguments
- 676: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+ 676: pushConstant inline <symbol-id 26>
  677: pushFromStack 1
  678: createList 2
  679: popMultipleBelowTop 9
@@ -1320,7 +1297,7 @@
  683: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  684: call with 1 argument
  685: pushConstant inline builtinEquals
- 686: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+ 686: pushConstant inline <symbol-id 3>
  687: pushFromStack 2
  688: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  689: call with 2 arguments
@@ -1335,7 +1312,7 @@
  698: tailCall with 7 locals and 3 arguments
 # Builtins::isNonNegative:13:equals:else
  699: pushConstant inline builtinToDebugText
- 700: pushConstant <replaced address 3fe6bcd64cfbfb3b> <symbol-id 7>
+ 700: pushConstant inline <symbol-id 7>
  701: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  702: call with 1 argument
  703: pushConstant inline builtinToDebugText
@@ -1362,7 +1339,7 @@
  724: pushConstant <replaced address ee78a67daaae8b1b> "."
  725: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  726: call with 2 arguments
- 727: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+ 727: pushConstant inline <symbol-id 26>
  728: pushFromStack 1
  729: createList 2
  730: popMultipleBelowTop 8
@@ -1373,7 +1350,7 @@
  734: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  735: call with 1 argument
  736: pushConstant inline builtinEquals
- 737: pushConstant <replaced address 3fe6bcd64cfbfb3b> <symbol-id 7>
+ 737: pushConstant inline <symbol-id 7>
  738: pushFromStack 2
  739: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  740: call with 2 arguments
@@ -1416,7 +1393,7 @@
  775: call with 2 arguments
  776: pushConstant inline builtinEquals
  777: pushFromStack 1
- 778: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+ 778: pushConstant inline <symbol-id 24>
  779: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  780: call with 2 arguments
  781: pushFromStack 2
@@ -1434,7 +1411,7 @@
  792: call with 1 argument
  793: pushConstant inline builtinEquals
  794: pushFromStack 1
- 795: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+ 795: pushConstant inline <symbol-id 6>
  796: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
  797: call with 2 arguments
  798: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -1460,7 +1437,7 @@
  818: call with 2 arguments
  819: pushConstant inline builtinEquals
  820: pushFromStack 1
- 821: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+ 821: pushConstant inline <symbol-id 24>
  822: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  823: call with 2 arguments
  824: pushFromStack 2
@@ -1480,7 +1457,7 @@
  838: call with 2 arguments
  839: pushConstant inline builtinEquals
  840: pushFromStack 1
- 841: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+ 841: pushConstant inline <symbol-id 24>
  842: pushConstant <replaced address 2f25a55c6b55cd6c> Builtins::isNonNegative:13
  843: call with 2 arguments
  844: pushFromStack 4
@@ -1494,7 +1471,7 @@
  852: tailCall with 21 locals and 3 arguments
 # Builtins::isLessThanOrEqualTo:19:equals:else
  853: pushConstant inline builtinToDebugText
- 854: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+ 854: pushConstant inline <symbol-id 3>
  855: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
  856: call with 1 argument
  857: pushConstant inline builtinToDebugText
@@ -1519,7 +1496,7 @@
  876: pushConstant <replaced address 8dbb18a7278b48a0> "`."
  877: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
  878: call with 2 arguments
- 879: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+ 879: pushConstant inline <symbol-id 26>
  880: pushFromStack 1
  881: createList 2
  882: popMultipleBelowTop 9
@@ -1530,7 +1507,7 @@
  886: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
  887: call with 1 argument
  888: pushConstant inline builtinEquals
- 889: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+ 889: pushConstant inline <symbol-id 3>
  890: pushFromStack 2
  891: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
  892: call with 2 arguments
@@ -1545,7 +1522,7 @@
  901: tailCall with 7 locals and 3 arguments
 # Builtins::isLessThanOrEqualTo:19:equals:else
  902: pushConstant inline builtinToDebugText
- 903: pushConstant <replaced address 3fe6bcd64cfbfb3b> <symbol-id 7>
+ 903: pushConstant inline <symbol-id 7>
  904: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
  905: call with 1 argument
  906: pushConstant inline builtinToDebugText
@@ -1572,7 +1549,7 @@
  927: pushConstant <replaced address ee78a67daaae8b1b> "."
  928: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
  929: call with 2 arguments
- 930: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+ 930: pushConstant inline <symbol-id 26>
  931: pushFromStack 1
  932: createList 2
  933: popMultipleBelowTop 8
@@ -1583,7 +1560,7 @@
  937: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
  938: call with 1 argument
  939: pushConstant inline builtinEquals
- 940: pushConstant <replaced address 3fe6bcd64cfbfb3b> <symbol-id 7>
+ 940: pushConstant inline <symbol-id 7>
  941: pushFromStack 2
  942: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
  943: call with 2 arguments
@@ -1603,7 +1580,7 @@
  956: return
 # Builtins::isLessThanOrEqualTo:19:equals:else
  957: pushConstant inline builtinToDebugText
- 958: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+ 958: pushConstant inline <symbol-id 3>
  959: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
  960: call with 1 argument
  961: pushConstant inline builtinToDebugText
@@ -1628,7 +1605,7 @@
  980: pushConstant <replaced address 8dbb18a7278b48a0> "`."
  981: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
  982: call with 2 arguments
- 983: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+ 983: pushConstant inline <symbol-id 26>
  984: pushFromStack 1
  985: createList 2
  986: popMultipleBelowTop 9
@@ -1639,7 +1616,7 @@
  990: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
  991: call with 1 argument
  992: pushConstant inline builtinEquals
- 993: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+ 993: pushConstant inline <symbol-id 3>
  994: pushFromStack 2
  995: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
  996: call with 2 arguments
@@ -1654,7 +1631,7 @@
 1005: tailCall with 7 locals and 3 arguments
 # Builtins::isLessThanOrEqualTo:19:equals:else
 1006: pushConstant inline builtinToDebugText
-1007: pushConstant <replaced address 56fa328b622fbbbd> <symbol-id 1>
+1007: pushConstant inline <symbol-id 1>
 1008: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
 1009: call with 1 argument
 1010: pushConstant inline builtinToDebugText
@@ -1681,7 +1658,7 @@
 1031: pushConstant <replaced address ee78a67daaae8b1b> "."
 1032: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
 1033: call with 2 arguments
-1034: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+1034: pushConstant inline <symbol-id 26>
 1035: pushFromStack 1
 1036: createList 2
 1037: popMultipleBelowTop 8
@@ -1692,7 +1669,7 @@
 1041: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
 1042: call with 1 argument
 1043: pushConstant inline builtinEquals
-1044: pushConstant <replaced address 56fa328b622fbbbd> <symbol-id 1>
+1044: pushConstant inline <symbol-id 1>
 1045: pushFromStack 2
 1046: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
 1047: call with 2 arguments
@@ -1714,7 +1691,7 @@
 1062: tailCall with 4 locals and 0 arguments
 # Builtins::isLessThanOrEqualTo:19:equals:else
 1063: pushConstant inline builtinToDebugText
-1064: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+1064: pushConstant inline <symbol-id 3>
 1065: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
 1066: call with 1 argument
 1067: pushConstant inline builtinToDebugText
@@ -1739,7 +1716,7 @@
 1086: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 1087: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
 1088: call with 2 arguments
-1089: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+1089: pushConstant inline <symbol-id 26>
 1090: pushFromStack 1
 1091: createList 2
 1092: popMultipleBelowTop 9
@@ -1750,7 +1727,7 @@
 1096: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
 1097: call with 1 argument
 1098: pushConstant inline builtinEquals
-1099: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+1099: pushConstant inline <symbol-id 3>
 1100: pushFromStack 2
 1101: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
 1102: call with 2 arguments
@@ -1765,7 +1742,7 @@
 1111: tailCall with 7 locals and 3 arguments
 # Builtins::isLessThanOrEqualTo:19:equals:else
 1112: pushConstant inline builtinToDebugText
-1113: pushConstant <replaced address 9ced3967feb7e611> <symbol-id 5>
+1113: pushConstant inline <symbol-id 5>
 1114: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
 1115: call with 1 argument
 1116: pushConstant inline builtinToDebugText
@@ -1792,7 +1769,7 @@
 1137: pushConstant <replaced address ee78a67daaae8b1b> "."
 1138: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
 1139: call with 2 arguments
-1140: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+1140: pushConstant inline <symbol-id 26>
 1141: pushFromStack 1
 1142: createList 2
 1143: popMultipleBelowTop 8
@@ -1803,7 +1780,7 @@
 1147: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
 1148: call with 1 argument
 1149: pushConstant inline builtinEquals
-1150: pushConstant <replaced address 9ced3967feb7e611> <symbol-id 5>
+1150: pushConstant inline <symbol-id 5>
 1151: pushFromStack 2
 1152: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
 1153: call with 2 arguments
@@ -1846,7 +1823,7 @@
 1188: call with 2 arguments
 1189: pushConstant inline builtinEquals
 1190: pushFromStack 1
-1191: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+1191: pushConstant inline <symbol-id 24>
 1192: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
 1193: call with 2 arguments
 1194: pushFromStack 2
@@ -1864,7 +1841,7 @@
 1205: call with 1 argument
 1206: pushConstant inline builtinEquals
 1207: pushFromStack 1
-1208: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+1208: pushConstant inline <symbol-id 6>
 1209: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 1210: call with 2 arguments
 1211: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -1879,7 +1856,7 @@
 1220: call with 1 argument
 1221: pushConstant inline builtinEquals
 1222: pushFromStack 1
-1223: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+1223: pushConstant inline <symbol-id 6>
 1224: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 1225: call with 2 arguments
 1226: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -1905,7 +1882,7 @@
 1246: call with 2 arguments
 1247: pushConstant inline builtinEquals
 1248: pushFromStack 1
-1249: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+1249: pushConstant inline <symbol-id 24>
 1250: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
 1251: call with 2 arguments
 1252: pushFromStack 2
@@ -1925,7 +1902,7 @@
 1266: call with 2 arguments
 1267: pushConstant inline builtinEquals
 1268: pushFromStack 1
-1269: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+1269: pushConstant inline <symbol-id 24>
 1270: pushConstant <replaced address 31facc1d60ae645d> Builtins::isLessThanOrEqualTo:19
 1271: call with 2 arguments
 1272: pushFromStack 2
@@ -1939,7 +1916,7 @@
 1280: tailCall with 25 locals and 3 arguments
 # Builtins::ifElse:1:equals:else
 1281: pushConstant inline builtinToDebugText
-1282: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+1282: pushConstant inline <symbol-id 3>
 1283: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1284: call with 1 argument
 1285: pushConstant inline builtinToDebugText
@@ -1964,7 +1941,7 @@
 1304: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 1305: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1306: call with 2 arguments
-1307: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+1307: pushConstant inline <symbol-id 26>
 1308: pushFromStack 1
 1309: createList 2
 1310: popMultipleBelowTop 9
@@ -1975,7 +1952,7 @@
 1314: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1315: call with 1 argument
 1316: pushConstant inline builtinEquals
-1317: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+1317: pushConstant inline <symbol-id 3>
 1318: pushFromStack 2
 1319: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1320: call with 2 arguments
@@ -1990,7 +1967,7 @@
 1329: tailCall with 7 locals and 3 arguments
 # Builtins::ifElse:1:equals:else
 1330: pushConstant inline builtinToDebugText
-1331: pushConstant <replaced address 633c932349b684cc> <symbol-id 20>
+1331: pushConstant inline <symbol-id 20>
 1332: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1333: call with 1 argument
 1334: pushConstant inline builtinToDebugText
@@ -2017,7 +1994,7 @@
 1355: pushConstant <replaced address ee78a67daaae8b1b> "."
 1356: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1357: call with 2 arguments
-1358: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+1358: pushConstant inline <symbol-id 26>
 1359: pushFromStack 1
 1360: createList 2
 1361: popMultipleBelowTop 8
@@ -2028,7 +2005,7 @@
 1365: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1366: call with 1 argument
 1367: pushConstant inline builtinEquals
-1368: pushConstant <replaced address 633c932349b684cc> <symbol-id 20>
+1368: pushConstant inline <symbol-id 20>
 1369: pushFromStack 2
 1370: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1371: call with 2 arguments
@@ -2044,7 +2021,7 @@
 1381: tailCall with 8 locals and 3 arguments
 # Builtins::ifElse:1:equals:else
 1382: pushConstant inline builtinToDebugText
-1383: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+1383: pushConstant inline <symbol-id 18>
 1384: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1385: call with 1 argument
 1386: pushConstant inline builtinToDebugText
@@ -2071,7 +2048,7 @@
 1407: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 1408: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1409: call with 2 arguments
-1410: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+1410: pushConstant inline <symbol-id 26>
 1411: pushFromStack 1
 1412: createList 2
 1413: popMultipleBelowTop 8
@@ -2082,7 +2059,7 @@
 1417: return
 # Builtins::ifElse:1:equals:else
 1418: pushConstant inline builtinToDebugText
-1419: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+1419: pushConstant inline <symbol-id 3>
 1420: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1421: call with 1 argument
 1422: pushConstant inline builtinToDebugText
@@ -2107,7 +2084,7 @@
 1441: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 1442: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1443: call with 2 arguments
-1444: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+1444: pushConstant inline <symbol-id 26>
 1445: pushFromStack 1
 1446: createList 2
 1447: popMultipleBelowTop 9
@@ -2118,7 +2095,7 @@
 1451: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1452: call with 1 argument
 1453: pushConstant inline builtinEquals
-1454: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+1454: pushConstant inline <symbol-id 3>
 1455: pushFromStack 2
 1456: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1457: call with 2 arguments
@@ -2133,7 +2110,7 @@
 1466: tailCall with 7 locals and 3 arguments
 # Builtins::ifElse:1:equals:else
 1467: pushConstant inline builtinToDebugText
-1468: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+1468: pushConstant inline <symbol-id 3>
 1469: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1470: call with 1 argument
 1471: pushConstant inline builtinToDebugText
@@ -2160,7 +2137,7 @@
 1492: pushConstant <replaced address ee78a67daaae8b1b> "."
 1493: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1494: call with 2 arguments
-1495: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+1495: pushConstant inline <symbol-id 26>
 1496: pushFromStack 1
 1497: createList 2
 1498: popMultipleBelowTop 8
@@ -2171,7 +2148,7 @@
 1502: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1503: call with 1 argument
 1504: pushConstant inline builtinEquals
-1505: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+1505: pushConstant inline <symbol-id 3>
 1506: pushFromStack 2
 1507: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1508: call with 2 arguments
@@ -2187,7 +2164,7 @@
 1518: tailCall with 8 locals and 3 arguments
 # Builtins::ifElse:1:equals:else
 1519: pushConstant inline builtinToDebugText
-1520: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+1520: pushConstant inline <symbol-id 18>
 1521: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1522: call with 1 argument
 1523: pushConstant inline builtinToDebugText
@@ -2214,7 +2191,7 @@
 1544: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 1545: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1546: call with 2 arguments
-1547: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+1547: pushConstant inline <symbol-id 26>
 1548: pushFromStack 1
 1549: createList 2
 1550: popMultipleBelowTop 8
@@ -2225,7 +2202,7 @@
 1554: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1555: call with 1 argument
 1556: pushConstant inline builtinEquals
-1557: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+1557: pushConstant inline <symbol-id 18>
 1558: pushFromStack 2
 1559: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1560: call with 2 arguments
@@ -2245,7 +2222,7 @@
 1573: pushConstant inline 1
 1574: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1575: call with 2 arguments
-1576: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+1576: pushConstant inline <symbol-id 3>
 1577: popMultipleBelowTop 3
 1578: return
 # Builtins::ifElse
@@ -2254,7 +2231,7 @@
 1581: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1582: call with 1 argument
 1583: pushConstant inline builtinEquals
-1584: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+1584: pushConstant inline <symbol-id 18>
 1585: pushFromStack 2
 1586: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1587: call with 2 arguments
@@ -2275,7 +2252,7 @@
 1602: call with 2 arguments
 1603: pushConstant inline builtinEquals
 1604: pushFromStack 1
-1605: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+1605: pushConstant inline <symbol-id 24>
 1606: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1607: call with 2 arguments
 1608: pushFromStack 2
@@ -2295,7 +2272,7 @@
 1622: call with 2 arguments
 1623: pushConstant inline builtinEquals
 1624: pushFromStack 1
-1625: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+1625: pushConstant inline <symbol-id 24>
 1626: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 1627: call with 2 arguments
 1628: pushFromStack 2
@@ -2318,7 +2295,7 @@
 1645: call with 1 argument
 1646: pushConstant inline builtinEquals
 1647: pushFromStack 1
-1648: pushConstant <replaced address 4b7077b0d795db7c> <symbol-id 4>
+1648: pushConstant inline <symbol-id 4>
 1649: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 1650: call with 2 arguments
 1651: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -2333,7 +2310,7 @@
 1660: call with 1 argument
 1661: pushConstant inline builtinEquals
 1662: pushFromStack 1
-1663: pushConstant <replaced address 4b7077b0d795db7c> <symbol-id 4>
+1663: pushConstant inline <symbol-id 4>
 1664: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 1665: call with 2 arguments
 1666: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -2363,7 +2340,7 @@
 1690: call with 1 argument
 1691: pushConstant inline builtinEquals
 1692: pushFromStack 1
-1693: pushConstant <replaced address 4b7077b0d795db7c> <symbol-id 4>
+1693: pushConstant inline <symbol-id 4>
 1694: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 1695: call with 2 arguments
 1696: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -2378,7 +2355,7 @@
 1705: call with 1 argument
 1706: pushConstant inline builtinEquals
 1707: pushFromStack 1
-1708: pushConstant <replaced address 4b7077b0d795db7c> <symbol-id 4>
+1708: pushConstant inline <symbol-id 4>
 1709: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 1710: call with 2 arguments
 1711: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -2415,7 +2392,7 @@
 1741: call with 1 argument
 1742: pushConstant inline builtinEquals
 1743: pushFromStack 1
-1744: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+1744: pushConstant inline <symbol-id 6>
 1745: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 1746: call with 2 arguments
 1747: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -2430,7 +2407,7 @@
 1756: call with 1 argument
 1757: pushConstant inline builtinEquals
 1758: pushFromStack 1
-1759: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+1759: pushConstant inline <symbol-id 6>
 1760: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 1761: call with 2 arguments
 1762: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -2466,7 +2443,7 @@
 1791: call with 1 argument
 1792: pushConstant inline builtinEquals
 1793: pushFromStack 1
-1794: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+1794: pushConstant inline <symbol-id 6>
 1795: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 1796: call with 2 arguments
 1797: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -2481,7 +2458,7 @@
 1806: call with 1 argument
 1807: pushConstant inline builtinEquals
 1808: pushFromStack 1
-1809: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+1809: pushConstant inline <symbol-id 6>
 1810: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 1811: call with 2 arguments
 1812: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -2526,7 +2503,7 @@
 1848: call with 1 argument
 1849: pushConstant inline builtinEquals
 1850: pushFromStack 1
-1851: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+1851: pushConstant inline <symbol-id 6>
 1852: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 1853: call with 2 arguments
 1854: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -2541,7 +2518,7 @@
 1863: call with 1 argument
 1864: pushConstant inline builtinEquals
 1865: pushFromStack 1
-1866: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+1866: pushConstant inline <symbol-id 6>
 1867: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 1868: call with 2 arguments
 1869: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -2560,7 +2537,7 @@
 1882: call with 1 argument
 1883: pushConstant inline builtinEquals
 1884: pushFromStack 1
-1885: pushConstant <replaced address 11bfd16c22947a37> <symbol-id 19>
+1885: pushConstant inline <symbol-id 19>
 1886: pushConstant <replaced address dc339b3c15b224e5> Builtins::intShiftRight:24
 1887: call with 2 arguments
 1888: pushFromStack 10
@@ -2595,7 +2572,7 @@
 1917: call with 1 argument
 1918: pushConstant inline builtinEquals
 1919: pushFromStack 1
-1920: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+1920: pushConstant inline <symbol-id 6>
 1921: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 1922: call with 2 arguments
 1923: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -2637,7 +2614,7 @@
 1958: call with 1 argument
 1959: pushConstant inline builtinEquals
 1960: pushFromStack 1
-1961: pushConstant <replaced address 11bfd16c22947a37> <symbol-id 19>
+1961: pushConstant inline <symbol-id 19>
 1962: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 1963: call with 2 arguments
 1964: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -2652,7 +2629,7 @@
 1973: call with 1 argument
 1974: pushConstant inline builtinEquals
 1975: pushFromStack 1
-1976: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+1976: pushConstant inline <symbol-id 6>
 1977: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 1978: call with 2 arguments
 1979: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -2692,7 +2669,7 @@
 2013: call with 1 argument
 2014: pushConstant inline builtinEquals
 2015: pushFromStack 1
-2016: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+2016: pushConstant inline <symbol-id 6>
 2017: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 2018: call with 2 arguments
 2019: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -2750,7 +2727,7 @@
 2070: call with 1 argument
 2071: pushConstant inline builtinEquals
 2072: pushFromStack 1
-2073: pushConstant <replaced address 4b7077b0d795db7c> <symbol-id 4>
+2073: pushConstant inline <symbol-id 4>
 2074: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 2075: call with 2 arguments
 2076: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -2775,7 +2752,7 @@
 2094: call with 1 argument
 2095: pushConstant inline builtinEquals
 2096: pushFromStack 1
-2097: pushConstant <replaced address 4b7077b0d795db7c> <symbol-id 4>
+2097: pushConstant inline <symbol-id 4>
 2098: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 2099: call with 2 arguments
 2100: pushFromStack 3
@@ -2803,7 +2780,7 @@
 2121: call with 1 argument
 2122: pushConstant inline builtinEquals
 2123: pushFromStack 1
-2124: pushConstant <replaced address 4b7077b0d795db7c> <symbol-id 4>
+2124: pushConstant inline <symbol-id 4>
 2125: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 2126: call with 2 arguments
 2127: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -2832,7 +2809,7 @@
 2150: tailCall with 10 locals and 0 arguments
 # Core:bool:is:1:equals:else
 2151: pushConstant inline builtinToDebugText
-2152: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+2152: pushConstant inline <symbol-id 3>
 2153: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2154: call with 1 argument
 2155: pushConstant inline builtinToDebugText
@@ -2857,7 +2834,7 @@
 2174: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 2175: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2176: call with 2 arguments
-2177: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+2177: pushConstant inline <symbol-id 26>
 2178: pushFromStack 1
 2179: createList 2
 2180: popMultipleBelowTop 9
@@ -2868,7 +2845,7 @@
 2184: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2185: call with 1 argument
 2186: pushConstant inline builtinEquals
-2187: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+2187: pushConstant inline <symbol-id 3>
 2188: pushFromStack 2
 2189: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2190: call with 2 arguments
@@ -2883,7 +2860,7 @@
 2199: tailCall with 7 locals and 3 arguments
 # Core:bool:is:1:equals:else
 2200: pushConstant inline builtinToDebugText
-2201: pushConstant <replaced address 633c932349b684cc> <symbol-id 20>
+2201: pushConstant inline <symbol-id 20>
 2202: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2203: call with 1 argument
 2204: pushConstant inline builtinToDebugText
@@ -2910,7 +2887,7 @@
 2225: pushConstant <replaced address ee78a67daaae8b1b> "."
 2226: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2227: call with 2 arguments
-2228: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+2228: pushConstant inline <symbol-id 26>
 2229: pushFromStack 1
 2230: createList 2
 2231: popMultipleBelowTop 8
@@ -2921,7 +2898,7 @@
 2235: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2236: call with 1 argument
 2237: pushConstant inline builtinEquals
-2238: pushConstant <replaced address 633c932349b684cc> <symbol-id 20>
+2238: pushConstant inline <symbol-id 20>
 2239: pushFromStack 2
 2240: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2241: call with 2 arguments
@@ -2937,7 +2914,7 @@
 2251: tailCall with 8 locals and 3 arguments
 # Core:bool:is:1:equals:else
 2252: pushConstant inline builtinToDebugText
-2253: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+2253: pushConstant inline <symbol-id 18>
 2254: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2255: call with 1 argument
 2256: pushConstant inline builtinToDebugText
@@ -2964,7 +2941,7 @@
 2277: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 2278: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2279: call with 2 arguments
-2280: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+2280: pushConstant inline <symbol-id 26>
 2281: pushFromStack 1
 2282: createList 2
 2283: popMultipleBelowTop 8
@@ -2975,7 +2952,7 @@
 2287: return
 # Core:bool:is:1:equals:else
 2288: pushConstant inline builtinToDebugText
-2289: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+2289: pushConstant inline <symbol-id 3>
 2290: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2291: call with 1 argument
 2292: pushConstant inline builtinToDebugText
@@ -3000,7 +2977,7 @@
 2311: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 2312: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2313: call with 2 arguments
-2314: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+2314: pushConstant inline <symbol-id 26>
 2315: pushFromStack 1
 2316: createList 2
 2317: popMultipleBelowTop 9
@@ -3011,7 +2988,7 @@
 2321: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2322: call with 1 argument
 2323: pushConstant inline builtinEquals
-2324: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+2324: pushConstant inline <symbol-id 3>
 2325: pushFromStack 2
 2326: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2327: call with 2 arguments
@@ -3026,7 +3003,7 @@
 2336: tailCall with 7 locals and 3 arguments
 # Core:bool:is:1:equals:else
 2337: pushConstant inline builtinToDebugText
-2338: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+2338: pushConstant inline <symbol-id 3>
 2339: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2340: call with 1 argument
 2341: pushConstant inline builtinToDebugText
@@ -3053,7 +3030,7 @@
 2362: pushConstant <replaced address ee78a67daaae8b1b> "."
 2363: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2364: call with 2 arguments
-2365: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+2365: pushConstant inline <symbol-id 26>
 2366: pushFromStack 1
 2367: createList 2
 2368: popMultipleBelowTop 8
@@ -3064,7 +3041,7 @@
 2372: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2373: call with 1 argument
 2374: pushConstant inline builtinEquals
-2375: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+2375: pushConstant inline <symbol-id 3>
 2376: pushFromStack 2
 2377: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2378: call with 2 arguments
@@ -3080,7 +3057,7 @@
 2388: tailCall with 8 locals and 3 arguments
 # Core:bool:is:1:equals:else
 2389: pushConstant inline builtinToDebugText
-2390: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+2390: pushConstant inline <symbol-id 18>
 2391: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2392: call with 1 argument
 2393: pushConstant inline builtinToDebugText
@@ -3107,7 +3084,7 @@
 2414: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 2415: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2416: call with 2 arguments
-2417: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+2417: pushConstant inline <symbol-id 26>
 2418: pushFromStack 1
 2419: createList 2
 2420: popMultipleBelowTop 8
@@ -3118,7 +3095,7 @@
 2424: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2425: call with 1 argument
 2426: pushConstant inline builtinEquals
-2427: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+2427: pushConstant inline <symbol-id 18>
 2428: pushFromStack 2
 2429: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2430: call with 2 arguments
@@ -3138,7 +3115,7 @@
 2443: pushConstant inline 1
 2444: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2445: call with 2 arguments
-2446: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+2446: pushConstant inline <symbol-id 3>
 2447: popMultipleBelowTop 3
 2448: return
 # Core:bool:is
@@ -3147,7 +3124,7 @@
 2451: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2452: call with 1 argument
 2453: pushConstant inline builtinEquals
-2454: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+2454: pushConstant inline <symbol-id 18>
 2455: pushFromStack 2
 2456: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2457: call with 2 arguments
@@ -3168,7 +3145,7 @@
 2472: call with 2 arguments
 2473: pushConstant inline builtinEquals
 2474: pushFromStack 1
-2475: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+2475: pushConstant inline <symbol-id 24>
 2476: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2477: call with 2 arguments
 2478: pushFromStack 2
@@ -3188,7 +3165,7 @@
 2492: call with 2 arguments
 2493: pushConstant inline builtinEquals
 2494: pushFromStack 1
-2495: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+2495: pushConstant inline <symbol-id 24>
 2496: pushConstant <replaced address d533f07bf6f049e8> Core:bool:is:1
 2497: call with 2 arguments
 2498: pushFromStack 2
@@ -3201,7 +3178,7 @@
 2505: tailCall with 20 locals and 3 arguments
 # Core:bool:not:6:equals:else
 2506: pushConstant inline builtinToDebugText
-2507: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+2507: pushConstant inline <symbol-id 3>
 2508: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2509: call with 1 argument
 2510: pushConstant inline builtinToDebugText
@@ -3226,7 +3203,7 @@
 2529: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 2530: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2531: call with 2 arguments
-2532: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+2532: pushConstant inline <symbol-id 26>
 2533: pushFromStack 1
 2534: createList 2
 2535: popMultipleBelowTop 9
@@ -3237,7 +3214,7 @@
 2539: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2540: call with 1 argument
 2541: pushConstant inline builtinEquals
-2542: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+2542: pushConstant inline <symbol-id 3>
 2543: pushFromStack 2
 2544: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2545: call with 2 arguments
@@ -3252,7 +3229,7 @@
 2554: tailCall with 7 locals and 3 arguments
 # Core:bool:not:6:equals:else
 2555: pushConstant inline builtinToDebugText
-2556: pushConstant <replaced address 633c932349b684cc> <symbol-id 20>
+2556: pushConstant inline <symbol-id 20>
 2557: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2558: call with 1 argument
 2559: pushConstant inline builtinToDebugText
@@ -3279,7 +3256,7 @@
 2580: pushConstant <replaced address ee78a67daaae8b1b> "."
 2581: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2582: call with 2 arguments
-2583: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+2583: pushConstant inline <symbol-id 26>
 2584: pushFromStack 1
 2585: createList 2
 2586: popMultipleBelowTop 8
@@ -3290,7 +3267,7 @@
 2590: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2591: call with 1 argument
 2592: pushConstant inline builtinEquals
-2593: pushConstant <replaced address 633c932349b684cc> <symbol-id 20>
+2593: pushConstant inline <symbol-id 20>
 2594: pushFromStack 2
 2595: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2596: call with 2 arguments
@@ -3306,7 +3283,7 @@
 2606: tailCall with 8 locals and 3 arguments
 # Core:bool:not:6:equals:else
 2607: pushConstant inline builtinToDebugText
-2608: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+2608: pushConstant inline <symbol-id 18>
 2609: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2610: call with 1 argument
 2611: pushConstant inline builtinToDebugText
@@ -3333,13 +3310,13 @@
 2632: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 2633: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2634: call with 2 arguments
-2635: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+2635: pushConstant inline <symbol-id 26>
 2636: pushFromStack 1
 2637: createList 2
 2638: popMultipleBelowTop 8
 2639: return
 2640: pushConstant inline builtinToDebugText
-2641: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+2641: pushConstant inline <symbol-id 3>
 2642: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2643: call with 1 argument
 2644: pushConstant inline builtinToDebugText
@@ -3364,7 +3341,7 @@
 2663: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 2664: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2665: call with 2 arguments
-2666: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+2666: pushConstant inline <symbol-id 26>
 2667: pushFromStack 1
 2668: createList 2
 2669: popMultipleBelowTop 9
@@ -3375,7 +3352,7 @@
 2673: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2674: call with 1 argument
 2675: pushConstant inline builtinEquals
-2676: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+2676: pushConstant inline <symbol-id 3>
 2677: pushFromStack 2
 2678: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2679: call with 2 arguments
@@ -3390,7 +3367,7 @@
 2688: tailCall with 7 locals and 3 arguments
 # Core:bool:not:6:equals:else
 2689: pushConstant inline builtinToDebugText
-2690: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+2690: pushConstant inline <symbol-id 3>
 2691: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2692: call with 1 argument
 2693: pushConstant inline builtinToDebugText
@@ -3417,7 +3394,7 @@
 2714: pushConstant <replaced address ee78a67daaae8b1b> "."
 2715: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2716: call with 2 arguments
-2717: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+2717: pushConstant inline <symbol-id 26>
 2718: pushFromStack 1
 2719: createList 2
 2720: popMultipleBelowTop 8
@@ -3428,7 +3405,7 @@
 2724: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2725: call with 1 argument
 2726: pushConstant inline builtinEquals
-2727: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+2727: pushConstant inline <symbol-id 3>
 2728: pushFromStack 2
 2729: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2730: call with 2 arguments
@@ -3444,7 +3421,7 @@
 2740: tailCall with 8 locals and 3 arguments
 # Core:bool:not:6:equals:else
 2741: pushConstant inline builtinToDebugText
-2742: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+2742: pushConstant inline <symbol-id 18>
 2743: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2744: call with 1 argument
 2745: pushConstant inline builtinToDebugText
@@ -3471,7 +3448,7 @@
 2766: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 2767: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2768: call with 2 arguments
-2769: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+2769: pushConstant inline <symbol-id 26>
 2770: pushFromStack 1
 2771: createList 2
 2772: popMultipleBelowTop 8
@@ -3498,7 +3475,7 @@
 2791: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2792: call with 1 argument
 2793: pushConstant inline builtinEquals
-2794: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+2794: pushConstant inline <symbol-id 18>
 2795: pushFromStack 2
 2796: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2797: call with 2 arguments
@@ -3519,7 +3496,7 @@
 2812: call with 2 arguments
 2813: pushConstant inline builtinEquals
 2814: pushFromStack 1
-2815: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+2815: pushConstant inline <symbol-id 24>
 2816: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2817: call with 2 arguments
 2818: pushFromStack 2
@@ -3546,7 +3523,7 @@
 2838: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2839: call with 1 argument
 2840: pushConstant inline builtinEquals
-2841: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+2841: pushConstant inline <symbol-id 18>
 2842: pushFromStack 2
 2843: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2844: call with 2 arguments
@@ -3567,7 +3544,7 @@
 2859: call with 2 arguments
 2860: pushConstant inline builtinEquals
 2861: pushFromStack 1
-2862: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+2862: pushConstant inline <symbol-id 24>
 2863: pushConstant <replaced address 98fa7969bea08801> Core:bool:not:6
 2864: call with 2 arguments
 2865: pushFromStack 2
@@ -3581,7 +3558,7 @@
 2873: tailCall with 16 locals and 3 arguments
 # Core:bool:lazyAnd:18:equals:else
 2874: pushConstant inline builtinToDebugText
-2875: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+2875: pushConstant inline <symbol-id 3>
 2876: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 2877: call with 1 argument
 2878: pushConstant inline builtinToDebugText
@@ -3606,7 +3583,7 @@
 2897: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 2898: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 2899: call with 2 arguments
-2900: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+2900: pushConstant inline <symbol-id 26>
 2901: pushFromStack 1
 2902: createList 2
 2903: popMultipleBelowTop 9
@@ -3617,7 +3594,7 @@
 2907: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 2908: call with 1 argument
 2909: pushConstant inline builtinEquals
-2910: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+2910: pushConstant inline <symbol-id 3>
 2911: pushFromStack 2
 2912: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 2913: call with 2 arguments
@@ -3632,7 +3609,7 @@
 2922: tailCall with 7 locals and 3 arguments
 # Core:bool:lazyAnd:18:equals:else
 2923: pushConstant inline builtinToDebugText
-2924: pushConstant <replaced address 633c932349b684cc> <symbol-id 20>
+2924: pushConstant inline <symbol-id 20>
 2925: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 2926: call with 1 argument
 2927: pushConstant inline builtinToDebugText
@@ -3659,7 +3636,7 @@
 2948: pushConstant <replaced address ee78a67daaae8b1b> "."
 2949: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 2950: call with 2 arguments
-2951: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+2951: pushConstant inline <symbol-id 26>
 2952: pushFromStack 1
 2953: createList 2
 2954: popMultipleBelowTop 8
@@ -3670,7 +3647,7 @@
 2958: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 2959: call with 1 argument
 2960: pushConstant inline builtinEquals
-2961: pushConstant <replaced address 633c932349b684cc> <symbol-id 20>
+2961: pushConstant inline <symbol-id 20>
 2962: pushFromStack 2
 2963: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 2964: call with 2 arguments
@@ -3686,7 +3663,7 @@
 2974: tailCall with 8 locals and 3 arguments
 # Core:bool:lazyAnd:18:equals:else
 2975: pushConstant inline builtinToDebugText
-2976: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+2976: pushConstant inline <symbol-id 18>
 2977: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 2978: call with 1 argument
 2979: pushConstant inline builtinToDebugText
@@ -3713,7 +3690,7 @@
 3000: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 3001: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 3002: call with 2 arguments
-3003: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+3003: pushConstant inline <symbol-id 26>
 3004: pushFromStack 1
 3005: createList 2
 3006: popMultipleBelowTop 8
@@ -3739,7 +3716,7 @@
 3025: return
 # Core:bool:lazyAnd:18:equals:else
 3026: pushConstant inline builtinToDebugText
-3027: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+3027: pushConstant inline <symbol-id 3>
 3028: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 3029: call with 1 argument
 3030: pushConstant inline builtinToDebugText
@@ -3764,7 +3741,7 @@
 3049: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 3050: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 3051: call with 2 arguments
-3052: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+3052: pushConstant inline <symbol-id 26>
 3053: pushFromStack 1
 3054: createList 2
 3055: popMultipleBelowTop 9
@@ -3775,7 +3752,7 @@
 3059: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 3060: call with 1 argument
 3061: pushConstant inline builtinEquals
-3062: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+3062: pushConstant inline <symbol-id 3>
 3063: pushFromStack 2
 3064: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 3065: call with 2 arguments
@@ -3790,7 +3767,7 @@
 3074: tailCall with 7 locals and 3 arguments
 # Core:bool:lazyAnd:18:equals:else
 3075: pushConstant inline builtinToDebugText
-3076: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+3076: pushConstant inline <symbol-id 3>
 3077: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 3078: call with 1 argument
 3079: pushConstant inline builtinToDebugText
@@ -3817,7 +3794,7 @@
 3100: pushConstant <replaced address ee78a67daaae8b1b> "."
 3101: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 3102: call with 2 arguments
-3103: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+3103: pushConstant inline <symbol-id 26>
 3104: pushFromStack 1
 3105: createList 2
 3106: popMultipleBelowTop 8
@@ -3828,7 +3805,7 @@
 3110: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 3111: call with 1 argument
 3112: pushConstant inline builtinEquals
-3113: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+3113: pushConstant inline <symbol-id 3>
 3114: pushFromStack 2
 3115: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 3116: call with 2 arguments
@@ -3844,7 +3821,7 @@
 3126: tailCall with 8 locals and 3 arguments
 # Core:bool:lazyAnd:18:equals:else
 3127: pushConstant inline builtinToDebugText
-3128: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+3128: pushConstant inline <symbol-id 18>
 3129: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 3130: call with 1 argument
 3131: pushConstant inline builtinToDebugText
@@ -3871,7 +3848,7 @@
 3152: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 3153: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 3154: call with 2 arguments
-3155: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+3155: pushConstant inline <symbol-id 26>
 3156: pushFromStack 1
 3157: createList 2
 3158: popMultipleBelowTop 8
@@ -3898,7 +3875,7 @@
 3177: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 3178: call with 1 argument
 3179: pushConstant inline builtinEquals
-3180: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+3180: pushConstant inline <symbol-id 18>
 3181: pushFromStack 2
 3182: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 3183: call with 2 arguments
@@ -3919,7 +3896,7 @@
 3198: call with 2 arguments
 3199: pushConstant inline builtinEquals
 3200: pushFromStack 1
-3201: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+3201: pushConstant inline <symbol-id 24>
 3202: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 3203: call with 2 arguments
 3204: pushFromStack 2
@@ -3956,7 +3933,7 @@
 3234: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 3235: call with 1 argument
 3236: pushConstant inline builtinEquals
-3237: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+3237: pushConstant inline <symbol-id 18>
 3238: pushFromStack 2
 3239: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 3240: call with 2 arguments
@@ -3977,7 +3954,7 @@
 3255: call with 2 arguments
 3256: pushConstant inline builtinEquals
 3257: pushFromStack 1
-3258: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+3258: pushConstant inline <symbol-id 24>
 3259: pushConstant <replaced address 778a8321d5960bca> Core:bool:lazyAnd:18
 3260: call with 2 arguments
 3261: pushFromStack 14
@@ -3994,7 +3971,7 @@
 3272: tailCall with 22 locals and 3 arguments
 # Core:bool:lazyOr:18:equals:else
 3273: pushConstant inline builtinToDebugText
-3274: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+3274: pushConstant inline <symbol-id 3>
 3275: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3276: call with 1 argument
 3277: pushConstant inline builtinToDebugText
@@ -4019,7 +3996,7 @@
 3296: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 3297: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3298: call with 2 arguments
-3299: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+3299: pushConstant inline <symbol-id 26>
 3300: pushFromStack 1
 3301: createList 2
 3302: popMultipleBelowTop 9
@@ -4030,7 +4007,7 @@
 3306: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3307: call with 1 argument
 3308: pushConstant inline builtinEquals
-3309: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+3309: pushConstant inline <symbol-id 3>
 3310: pushFromStack 2
 3311: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3312: call with 2 arguments
@@ -4045,7 +4022,7 @@
 3321: tailCall with 7 locals and 3 arguments
 # Core:bool:lazyOr:18:equals:else
 3322: pushConstant inline builtinToDebugText
-3323: pushConstant <replaced address 633c932349b684cc> <symbol-id 20>
+3323: pushConstant inline <symbol-id 20>
 3324: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3325: call with 1 argument
 3326: pushConstant inline builtinToDebugText
@@ -4072,7 +4049,7 @@
 3347: pushConstant <replaced address ee78a67daaae8b1b> "."
 3348: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3349: call with 2 arguments
-3350: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+3350: pushConstant inline <symbol-id 26>
 3351: pushFromStack 1
 3352: createList 2
 3353: popMultipleBelowTop 8
@@ -4083,7 +4060,7 @@
 3357: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3358: call with 1 argument
 3359: pushConstant inline builtinEquals
-3360: pushConstant <replaced address 633c932349b684cc> <symbol-id 20>
+3360: pushConstant inline <symbol-id 20>
 3361: pushFromStack 2
 3362: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3363: call with 2 arguments
@@ -4099,7 +4076,7 @@
 3373: tailCall with 8 locals and 3 arguments
 # Core:bool:lazyOr:18:equals:else
 3374: pushConstant inline builtinToDebugText
-3375: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+3375: pushConstant inline <symbol-id 18>
 3376: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3377: call with 1 argument
 3378: pushConstant inline builtinToDebugText
@@ -4126,13 +4103,13 @@
 3399: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 3400: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3401: call with 2 arguments
-3402: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+3402: pushConstant inline <symbol-id 26>
 3403: pushFromStack 1
 3404: createList 2
 3405: popMultipleBelowTop 8
 3406: return
 3407: pushConstant inline builtinToDebugText
-3408: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+3408: pushConstant inline <symbol-id 3>
 3409: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3410: call with 1 argument
 3411: pushConstant inline builtinToDebugText
@@ -4157,7 +4134,7 @@
 3430: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 3431: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3432: call with 2 arguments
-3433: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+3433: pushConstant inline <symbol-id 26>
 3434: pushFromStack 1
 3435: createList 2
 3436: popMultipleBelowTop 9
@@ -4168,7 +4145,7 @@
 3440: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3441: call with 1 argument
 3442: pushConstant inline builtinEquals
-3443: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+3443: pushConstant inline <symbol-id 3>
 3444: pushFromStack 2
 3445: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3446: call with 2 arguments
@@ -4183,7 +4160,7 @@
 3455: tailCall with 7 locals and 3 arguments
 # Core:bool:lazyOr:18:equals:else
 3456: pushConstant inline builtinToDebugText
-3457: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+3457: pushConstant inline <symbol-id 3>
 3458: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3459: call with 1 argument
 3460: pushConstant inline builtinToDebugText
@@ -4210,7 +4187,7 @@
 3481: pushConstant <replaced address ee78a67daaae8b1b> "."
 3482: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3483: call with 2 arguments
-3484: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+3484: pushConstant inline <symbol-id 26>
 3485: pushFromStack 1
 3486: createList 2
 3487: popMultipleBelowTop 8
@@ -4221,7 +4198,7 @@
 3491: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3492: call with 1 argument
 3493: pushConstant inline builtinEquals
-3494: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+3494: pushConstant inline <symbol-id 3>
 3495: pushFromStack 2
 3496: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3497: call with 2 arguments
@@ -4237,7 +4214,7 @@
 3507: tailCall with 8 locals and 3 arguments
 # Core:bool:lazyOr:18:equals:else
 3508: pushConstant inline builtinToDebugText
-3509: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+3509: pushConstant inline <symbol-id 18>
 3510: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3511: call with 1 argument
 3512: pushConstant inline builtinToDebugText
@@ -4264,7 +4241,7 @@
 3533: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 3534: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3535: call with 2 arguments
-3536: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+3536: pushConstant inline <symbol-id 26>
 3537: pushFromStack 1
 3538: createList 2
 3539: popMultipleBelowTop 8
@@ -4310,7 +4287,7 @@
 3576: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3577: call with 1 argument
 3578: pushConstant inline builtinEquals
-3579: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+3579: pushConstant inline <symbol-id 18>
 3580: pushFromStack 2
 3581: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3582: call with 2 arguments
@@ -4331,7 +4308,7 @@
 3597: call with 2 arguments
 3598: pushConstant inline builtinEquals
 3599: pushFromStack 1
-3600: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+3600: pushConstant inline <symbol-id 24>
 3601: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3602: call with 2 arguments
 3603: pushFromStack 14
@@ -4371,7 +4348,7 @@
 3636: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3637: call with 1 argument
 3638: pushConstant inline builtinEquals
-3639: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+3639: pushConstant inline <symbol-id 18>
 3640: pushFromStack 2
 3641: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3642: call with 2 arguments
@@ -4392,7 +4369,7 @@
 3657: call with 2 arguments
 3658: pushConstant inline builtinEquals
 3659: pushFromStack 1
-3660: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+3660: pushConstant inline <symbol-id 24>
 3661: pushConstant <replaced address b51441f4b1a774f2> Core:bool:lazyOr:18
 3662: call with 2 arguments
 3663: pushFromStack 14
@@ -4469,7 +4446,7 @@
 3731: call with 1 argument
 3732: pushConstant inline builtinEquals
 3733: pushFromStack 1
-3734: pushConstant <replaced address 4b7077b0d795db7c> <symbol-id 4>
+3734: pushConstant inline <symbol-id 4>
 3735: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 3736: call with 2 arguments
 3737: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -4494,7 +4471,7 @@
 3755: call with 1 argument
 3756: pushConstant inline builtinEquals
 3757: pushFromStack 1
-3758: pushConstant <replaced address 4b7077b0d795db7c> <symbol-id 4>
+3758: pushConstant inline <symbol-id 4>
 3759: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 3760: call with 2 arguments
 3761: pushFromStack 3
@@ -4512,7 +4489,7 @@
 3772: call with 1 argument
 3773: pushConstant inline builtinEquals
 3774: pushFromStack 1
-3775: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+3775: pushConstant inline <symbol-id 6>
 3776: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 3777: call with 2 arguments
 3778: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -4527,7 +4504,7 @@
 3787: call with 1 argument
 3788: pushConstant inline builtinEquals
 3789: pushFromStack 1
-3790: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+3790: pushConstant inline <symbol-id 6>
 3791: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 3792: call with 2 arguments
 3793: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -4542,7 +4519,7 @@
 3802: call with 1 argument
 3803: pushConstant inline builtinEquals
 3804: pushFromStack 1
-3805: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+3805: pushConstant inline <symbol-id 6>
 3806: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 3807: call with 2 arguments
 3808: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -4557,7 +4534,7 @@
 3817: call with 1 argument
 3818: pushConstant inline builtinEquals
 3819: pushFromStack 1
-3820: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+3820: pushConstant inline <symbol-id 6>
 3821: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 3822: call with 2 arguments
 3823: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -4574,7 +4551,7 @@
 3834: pushFromStack 0
 3835: pushConstant inline builtinEquals
 3836: pushFromStack 2
-3837: pushConstant <replaced address 56fa328b622fbbbd> <symbol-id 1>
+3837: pushConstant inline <symbol-id 1>
 3838: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 3839: call with 2 arguments
 3840: pushConstant inline builtinEquals
@@ -4613,7 +4590,7 @@
 3872: call with 1 argument
 3873: pushConstant inline builtinEquals
 3874: pushFromStack 1
-3875: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+3875: pushConstant inline <symbol-id 6>
 3876: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 3877: call with 2 arguments
 3878: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -4628,7 +4605,7 @@
 3887: call with 1 argument
 3888: pushConstant inline builtinEquals
 3889: pushFromStack 1
-3890: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+3890: pushConstant inline <symbol-id 6>
 3891: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 3892: call with 2 arguments
 3893: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -4644,7 +4621,7 @@
 3903: call with 2 arguments
 3904: pushConstant inline builtinEquals
 3905: pushFromStack 1
-3906: pushConstant <replaced address 3fe6bcd64cfbfb3b> <symbol-id 7>
+3906: pushConstant inline <symbol-id 7>
 3907: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 3908: tailCall with 10 locals and 2 arguments
 # Core:int:isGreaterThan
@@ -4654,7 +4631,7 @@
 3912: call with 1 argument
 3913: pushConstant inline builtinEquals
 3914: pushFromStack 1
-3915: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+3915: pushConstant inline <symbol-id 6>
 3916: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 3917: call with 2 arguments
 3918: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -4669,7 +4646,7 @@
 3927: call with 1 argument
 3928: pushConstant inline builtinEquals
 3929: pushFromStack 1
-3930: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+3930: pushConstant inline <symbol-id 6>
 3931: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 3932: call with 2 arguments
 3933: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -4685,7 +4662,7 @@
 3943: call with 2 arguments
 3944: pushConstant inline builtinEquals
 3945: pushFromStack 1
-3946: pushConstant <replaced address 9ced3967feb7e611> <symbol-id 5>
+3946: pushConstant inline <symbol-id 5>
 3947: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 3948: tailCall with 10 locals and 2 arguments
 # Core:int:isGreaterThanOrEqualTo
@@ -4695,7 +4672,7 @@
 3952: call with 1 argument
 3953: pushConstant inline builtinEquals
 3954: pushFromStack 1
-3955: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+3955: pushConstant inline <symbol-id 6>
 3956: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 3957: call with 2 arguments
 3958: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -4710,7 +4687,7 @@
 3967: call with 1 argument
 3968: pushConstant inline builtinEquals
 3969: pushFromStack 1
-3970: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+3970: pushConstant inline <symbol-id 6>
 3971: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 3972: call with 2 arguments
 3973: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -4735,7 +4712,7 @@
 3991: call with 1 argument
 3992: pushConstant inline builtinEquals
 3993: pushFromStack 1
-3994: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+3994: pushConstant inline <symbol-id 6>
 3995: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 3996: call with 2 arguments
 3997: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -4750,7 +4727,7 @@
 4006: call with 1 argument
 4007: pushConstant inline builtinEquals
 4008: pushFromStack 1
-4009: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+4009: pushConstant inline <symbol-id 6>
 4010: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 4011: call with 2 arguments
 4012: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -4775,7 +4752,7 @@
 4030: call with 1 argument
 4031: pushConstant inline builtinEquals
 4032: pushFromStack 1
-4033: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+4033: pushConstant inline <symbol-id 6>
 4034: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 4035: call with 2 arguments
 4036: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -4790,7 +4767,7 @@
 4045: call with 1 argument
 4046: pushConstant inline builtinEquals
 4047: pushFromStack 1
-4048: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+4048: pushConstant inline <symbol-id 6>
 4049: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 4050: call with 2 arguments
 4051: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -4824,7 +4801,7 @@
 4076: call with 1 argument
 4077: pushConstant inline builtinEquals
 4078: pushFromStack 1
-4079: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+4079: pushConstant inline <symbol-id 6>
 4080: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 4081: call with 2 arguments
 4082: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -4839,7 +4816,7 @@
 4091: call with 1 argument
 4092: pushConstant inline builtinEquals
 4093: pushFromStack 1
-4094: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+4094: pushConstant inline <symbol-id 6>
 4095: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 4096: call with 2 arguments
 4097: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -4870,17 +4847,17 @@
 # Core:int:pow:21:1:hasKey:then
 4121: pushConstant inline builtinStructGet
 4122: pushFromStack 2
-4123: pushConstant <replaced address b4b954da70d88f61> <symbol-id 21>
+4123: pushConstant inline <symbol-id 21>
 4124: pushConstant <replaced address 6f69bcaa65f38190> Core:int:pow:21:1
 4125: call with 2 arguments
-4126: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+4126: pushConstant inline <symbol-id 24>
 4127: pushFromStack 1
 4128: createList 2
 4129: popMultipleBelowTop 3
 4130: return
 # Core:int:pow:21:1:hasKey:else
 4131: pushConstant inline builtinToDebugText
-4132: pushConstant <replaced address b4b954da70d88f61> <symbol-id 21>
+4132: pushConstant inline <symbol-id 21>
 4133: pushConstant <replaced address 6f69bcaa65f38190> Core:int:pow:21:1
 4134: call with 1 argument
 4135: pushConstant inline builtinToDebugText
@@ -4907,7 +4884,7 @@
 4156: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 4157: pushConstant <replaced address 6f69bcaa65f38190> Core:int:pow:21:1
 4158: call with 2 arguments
-4159: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+4159: pushConstant inline <symbol-id 26>
 4160: pushFromStack 1
 4161: createList 2
 4162: popMultipleBelowTop 8
@@ -4915,17 +4892,17 @@
 # Core:int:pow:21:1:hasKey:then
 4164: pushConstant inline builtinStructGet
 4165: pushFromStack 2
-4166: pushConstant <replaced address 0636169197fa99f6> <symbol-id 22>
+4166: pushConstant inline <symbol-id 22>
 4167: pushConstant <replaced address 6f69bcaa65f38190> Core:int:pow:21:1
 4168: call with 2 arguments
-4169: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+4169: pushConstant inline <symbol-id 24>
 4170: pushFromStack 1
 4171: createList 2
 4172: popMultipleBelowTop 3
 4173: return
 # Core:int:pow:21:1:hasKey:else
 4174: pushConstant inline builtinToDebugText
-4175: pushConstant <replaced address 0636169197fa99f6> <symbol-id 22>
+4175: pushConstant inline <symbol-id 22>
 4176: pushConstant <replaced address 6f69bcaa65f38190> Core:int:pow:21:1
 4177: call with 1 argument
 4178: pushConstant inline builtinToDebugText
@@ -4952,7 +4929,7 @@
 4199: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 4200: pushConstant <replaced address 6f69bcaa65f38190> Core:int:pow:21:1
 4201: call with 2 arguments
-4202: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+4202: pushConstant inline <symbol-id 26>
 4203: pushFromStack 1
 4204: createList 2
 4205: popMultipleBelowTop 8
@@ -4963,7 +4940,7 @@
 4209: pushConstant inline 1
 4210: pushConstant <replaced address 6f69bcaa65f38190> Core:int:pow:21:1
 4211: call with 2 arguments
-4212: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+4212: pushConstant inline <symbol-id 24>
 4213: pushFromStack 4
 4214: pushFromStack 2
 4215: createList 3
@@ -4981,7 +4958,7 @@
 4225: call with 2 arguments
 4226: pushConstant inline builtinStructHasKey
 4227: pushFromStack 4
-4228: pushConstant <replaced address 0636169197fa99f6> <symbol-id 22>
+4228: pushConstant inline <symbol-id 22>
 4229: pushConstant <replaced address 6f69bcaa65f38190> Core:int:pow:21:1
 4230: call with 2 arguments
 4231: pushFromStack 4
@@ -5001,7 +4978,7 @@
 4245: call with 2 arguments
 4246: pushConstant inline builtinEquals
 4247: pushFromStack 1
-4248: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+4248: pushConstant inline <symbol-id 24>
 4249: pushConstant <replaced address 6f69bcaa65f38190> Core:int:pow:21:1
 4250: call with 2 arguments
 4251: pushFromStack 8
@@ -5022,7 +4999,7 @@
 # Core:int:pow:21:1:equals:then
 4265: pushConstant inline builtinStructHasKey
 4266: pushFromStack 2
-4267: pushConstant <replaced address b4b954da70d88f61> <symbol-id 21>
+4267: pushConstant inline <symbol-id 21>
 4268: pushConstant <replaced address 6f69bcaa65f38190> Core:int:pow:21:1
 4269: call with 2 arguments
 4270: pushFromStack 2
@@ -5042,7 +5019,7 @@
 4284: call with 2 arguments
 4285: pushConstant inline builtinEquals
 4286: pushFromStack 1
-4287: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+4287: pushConstant inline <symbol-id 24>
 4288: pushConstant <replaced address 6f69bcaa65f38190> Core:int:pow:21:1
 4289: call with 2 arguments
 4290: pushFromStack 4
@@ -5058,7 +5035,7 @@
 4300: tailCall with 15 locals and 3 arguments
 # Core:int:pow:21:1:equals:else
 4301: pushConstant inline builtinToDebugText
-4302: pushConstant <replaced address 6ec64dfdd450650d> <symbol-id 17>
+4302: pushConstant inline <symbol-id 17>
 4303: pushConstant <replaced address 6f69bcaa65f38190> Core:int:pow:21:1
 4304: call with 1 argument
 4305: pushConstant inline builtinToDebugText
@@ -5085,7 +5062,7 @@
 4326: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 4327: pushConstant <replaced address 6f69bcaa65f38190> Core:int:pow:21:1
 4328: call with 2 arguments
-4329: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+4329: pushConstant inline <symbol-id 26>
 4330: pushFromStack 1
 4331: createList 2
 4332: popMultipleBelowTop 8
@@ -5130,7 +5107,7 @@
 4369: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 4370: pushConstant <replaced address 06d9853e299db679> Core:int:pow:21:4
 4371: call with 2 arguments
-4372: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+4372: pushConstant inline <symbol-id 26>
 4373: pushFromStack 1
 4374: createList 2
 4375: popMultipleBelowTop 8
@@ -5142,7 +5119,7 @@
 4380: call with 1 argument
 4381: pushConstant inline builtinEquals
 4382: pushFromStack 1
-4383: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+4383: pushConstant inline <symbol-id 6>
 4384: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 4385: call with 2 arguments
 4386: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -5157,7 +5134,7 @@
 4395: call with 1 argument
 4396: pushConstant inline builtinEquals
 4397: pushFromStack 1
-4398: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+4398: pushConstant inline <symbol-id 6>
 4399: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 4400: call with 2 arguments
 4401: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -5176,9 +5153,9 @@
 4414: pushConstant inline 1
 4415: pushConstant <replaced address 424ed996141990f7> Core:int:pow:21:4:5:10
 4416: call with 2 arguments
-4417: pushConstant <replaced address 0636169197fa99f6> <symbol-id 22>
+4417: pushConstant inline <symbol-id 22>
 4418: pushFromStack 1
-4419: pushConstant <replaced address b4b954da70d88f61> <symbol-id 21>
+4419: pushConstant inline <symbol-id 21>
 4420: pushFromStack 4
 4421: createStruct 2
 4422: pushFromStack 11
@@ -5192,7 +5169,7 @@
 4429: call with 1 argument
 4430: pushConstant inline builtinEquals
 4431: pushFromStack 1
-4432: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+4432: pushConstant inline <symbol-id 6>
 4433: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 4434: call with 2 arguments
 4435: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -5207,7 +5184,7 @@
 4444: call with 1 argument
 4445: pushConstant inline builtinEquals
 4446: pushFromStack 1
-4447: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+4447: pushConstant inline <symbol-id 6>
 4448: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 4449: call with 2 arguments
 4450: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -5227,7 +5204,7 @@
 4464: call with 1 argument
 4465: pushConstant inline builtinEquals
 4466: pushFromStack 1
-4467: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+4467: pushConstant inline <symbol-id 6>
 4468: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 4469: call with 2 arguments
 4470: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -5246,9 +5223,9 @@
 4483: pushConstant inline 1
 4484: pushConstant <replaced address 903cfd44f2ab25af> Core:int:pow:21:4:6:15
 4485: call with 2 arguments
-4486: pushConstant <replaced address b4b954da70d88f61> <symbol-id 21>
+4486: pushConstant inline <symbol-id 21>
 4487: pushFromStack 6
-4488: pushConstant <replaced address 0636169197fa99f6> <symbol-id 22>
+4488: pushConstant inline <symbol-id 22>
 4489: pushFromStack 3
 4490: createStruct 2
 4491: pushFromStack 15
@@ -5261,7 +5238,7 @@
 4498: call with 1 argument
 4499: pushConstant inline builtinEquals
 4500: pushFromStack 1
-4501: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+4501: pushConstant inline <symbol-id 6>
 4502: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 4503: call with 2 arguments
 4504: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -5276,7 +5253,7 @@
 4513: call with 1 argument
 4514: pushConstant inline builtinEquals
 4515: pushFromStack 1
-4516: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+4516: pushConstant inline <symbol-id 6>
 4517: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 4518: call with 2 arguments
 4519: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -5328,7 +5305,7 @@
 4562: pushConstant <replaced address 6f69bcaa65f38190> Core:int:pow:21:1
 4563: call with 1 argument
 4564: pushConstant inline builtinEquals
-4565: pushConstant <replaced address 6ec64dfdd450650d> <symbol-id 17>
+4565: pushConstant inline <symbol-id 17>
 4566: pushFromStack 2
 4567: pushConstant <replaced address 6f69bcaa65f38190> Core:int:pow:21:1
 4568: call with 2 arguments
@@ -5349,7 +5326,7 @@
 4583: call with 2 arguments
 4584: pushConstant inline builtinEquals
 4585: pushFromStack 1
-4586: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+4586: pushConstant inline <symbol-id 24>
 4587: pushConstant <replaced address 6f69bcaa65f38190> Core:int:pow:21:1
 4588: call with 2 arguments
 4589: pushFromStack 2
@@ -5390,7 +5367,7 @@
 4624: call with 2 arguments
 4625: pushConstant inline builtinEquals
 4626: pushFromStack 1
-4627: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+4627: pushConstant inline <symbol-id 24>
 4628: pushConstant <replaced address 06d9853e299db679> Core:int:pow:21:4
 4629: call with 2 arguments
 4630: pushFromStack 4
@@ -5425,7 +5402,7 @@
 4656: call with 1 argument
 4657: pushConstant inline builtinEquals
 4658: pushFromStack 1
-4659: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+4659: pushConstant inline <symbol-id 6>
 4660: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 4661: call with 2 arguments
 4662: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -5440,7 +5417,7 @@
 4671: call with 1 argument
 4672: pushConstant inline builtinEquals
 4673: pushFromStack 1
-4674: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+4674: pushConstant inline <symbol-id 6>
 4675: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 4676: call with 2 arguments
 4677: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -5459,9 +5436,9 @@
 4690: pushFromStack 10
 4691: pushConstant <replaced address 487f7971617bff90> Core:int:pow:14
 4692: call with 3 arguments
-4693: pushConstant <replaced address 0636169197fa99f6> <symbol-id 22>
+4693: pushConstant inline <symbol-id 22>
 4694: pushFromStack 10
-4695: pushConstant <replaced address b4b954da70d88f61> <symbol-id 21>
+4695: pushConstant inline <symbol-id 21>
 4696: pushFromStack 13
 4697: createStruct 2
 4698: pushConstant <replaced address 0687672636376838> { 1 argument (capturing nothing) → ip-3752 }
@@ -5486,7 +5463,7 @@
 4716: call with 1 argument
 4717: pushConstant inline builtinEquals
 4718: pushFromStack 1
-4719: pushConstant <replaced address 11bfd16c22947a37> <symbol-id 19>
+4719: pushConstant inline <symbol-id 19>
 4720: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 4721: call with 2 arguments
 4722: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -5505,7 +5482,7 @@
 4735: call with 1 argument
 4736: pushConstant inline builtinEquals
 4737: pushFromStack 1
-4738: pushConstant <replaced address 11bfd16c22947a37> <symbol-id 19>
+4738: pushConstant inline <symbol-id 19>
 4739: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 4740: call with 2 arguments
 4741: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -5535,7 +5512,7 @@
 4763: call with 1 argument
 4764: pushConstant inline builtinEquals
 4765: pushFromStack 1
-4766: pushConstant <replaced address 11bfd16c22947a37> <symbol-id 19>
+4766: pushConstant inline <symbol-id 19>
 4767: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 4768: call with 2 arguments
 4769: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -5550,7 +5527,7 @@
 4778: call with 1 argument
 4779: pushConstant inline builtinEquals
 4780: pushFromStack 1
-4781: pushConstant <replaced address 11bfd16c22947a37> <symbol-id 19>
+4781: pushConstant inline <symbol-id 19>
 4782: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 4783: call with 2 arguments
 4784: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -5565,7 +5542,7 @@
 4793: call with 1 argument
 4794: pushConstant inline builtinEquals
 4795: pushFromStack 1
-4796: pushConstant <replaced address 11bfd16c22947a37> <symbol-id 19>
+4796: pushConstant inline <symbol-id 19>
 4797: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 4798: call with 2 arguments
 4799: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -5580,7 +5557,7 @@
 4808: call with 1 argument
 4809: pushConstant inline builtinEquals
 4810: pushFromStack 1
-4811: pushConstant <replaced address 11bfd16c22947a37> <symbol-id 19>
+4811: pushConstant inline <symbol-id 19>
 4812: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 4813: call with 2 arguments
 4814: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -5608,17 +5585,17 @@
 # Core:fixedDecimal:is:1:hasKey:then
 4836: pushConstant inline builtinStructGet
 4837: pushFromStack 2
-4838: pushConstant <replaced address e2e040449b401065> <symbol-id 25>
+4838: pushConstant inline <symbol-id 25>
 4839: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 4840: call with 2 arguments
-4841: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+4841: pushConstant inline <symbol-id 24>
 4842: pushFromStack 1
 4843: createList 2
 4844: popMultipleBelowTop 3
 4845: return
 # Core:fixedDecimal:is:1:hasKey:else
 4846: pushConstant inline builtinToDebugText
-4847: pushConstant <replaced address e2e040449b401065> <symbol-id 25>
+4847: pushConstant inline <symbol-id 25>
 4848: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 4849: call with 1 argument
 4850: pushConstant inline builtinToDebugText
@@ -5645,7 +5622,7 @@
 4871: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 4872: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 4873: call with 2 arguments
-4874: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+4874: pushConstant inline <symbol-id 26>
 4875: pushFromStack 1
 4876: createList 2
 4877: popMultipleBelowTop 8
@@ -5653,17 +5630,17 @@
 # Core:fixedDecimal:is:1:hasKey:then
 4879: pushConstant inline builtinStructGet
 4880: pushFromStack 2
-4881: pushConstant <replaced address 85d9c3b2e984258f> <symbol-id 27>
+4881: pushConstant inline <symbol-id 27>
 4882: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 4883: call with 2 arguments
-4884: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+4884: pushConstant inline <symbol-id 24>
 4885: pushFromStack 1
 4886: createList 2
 4887: popMultipleBelowTop 3
 4888: return
 # Core:fixedDecimal:is:1:hasKey:else
 4889: pushConstant inline builtinToDebugText
-4890: pushConstant <replaced address 85d9c3b2e984258f> <symbol-id 27>
+4890: pushConstant inline <symbol-id 27>
 4891: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 4892: call with 1 argument
 4893: pushConstant inline builtinToDebugText
@@ -5690,7 +5667,7 @@
 4914: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 4915: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 4916: call with 2 arguments
-4917: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+4917: pushConstant inline <symbol-id 26>
 4918: pushFromStack 1
 4919: createList 2
 4920: popMultipleBelowTop 8
@@ -5701,7 +5678,7 @@
 4924: pushConstant inline 1
 4925: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 4926: call with 2 arguments
-4927: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+4927: pushConstant inline <symbol-id 24>
 4928: pushFromStack 3
 4929: pushFromStack 2
 4930: createList 3
@@ -5719,7 +5696,7 @@
 4940: call with 2 arguments
 4941: pushConstant inline builtinStructHasKey
 4942: pushFromStack 3
-4943: pushConstant <replaced address 85d9c3b2e984258f> <symbol-id 27>
+4943: pushConstant inline <symbol-id 27>
 4944: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 4945: call with 2 arguments
 4946: pushFromStack 3
@@ -5739,7 +5716,7 @@
 4960: call with 2 arguments
 4961: pushConstant inline builtinEquals
 4962: pushFromStack 1
-4963: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+4963: pushConstant inline <symbol-id 24>
 4964: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 4965: call with 2 arguments
 4966: pushFromStack 2
@@ -5760,7 +5737,7 @@
 # Core:fixedDecimal:is:1:equals:then
 4980: pushConstant inline builtinStructHasKey
 4981: pushFromStack 2
-4982: pushConstant <replaced address e2e040449b401065> <symbol-id 25>
+4982: pushConstant inline <symbol-id 25>
 4983: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 4984: call with 2 arguments
 4985: pushFromStack 2
@@ -5780,7 +5757,7 @@
 4999: call with 2 arguments
 5000: pushConstant inline builtinEquals
 5001: pushFromStack 1
-5002: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+5002: pushConstant inline <symbol-id 24>
 5003: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 5004: call with 2 arguments
 5005: pushFromStack 2
@@ -5796,7 +5773,7 @@
 5015: tailCall with 15 locals and 3 arguments
 # Core:fixedDecimal:is:1:equals:else
 5016: pushConstant inline builtinToDebugText
-5017: pushConstant <replaced address 6ec64dfdd450650d> <symbol-id 17>
+5017: pushConstant inline <symbol-id 17>
 5018: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 5019: call with 1 argument
 5020: pushConstant inline builtinToDebugText
@@ -5823,7 +5800,7 @@
 5041: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 5042: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 5043: call with 2 arguments
-5044: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+5044: pushConstant inline <symbol-id 26>
 5045: pushFromStack 1
 5046: createList 2
 5047: popMultipleBelowTop 8
@@ -5838,7 +5815,7 @@
 5055: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 5056: call with 1 argument
 5057: pushConstant inline builtinEquals
-5058: pushConstant <replaced address 6ec64dfdd450650d> <symbol-id 17>
+5058: pushConstant inline <symbol-id 17>
 5059: pushFromStack 2
 5060: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 5061: call with 2 arguments
@@ -5854,14 +5831,14 @@
 5071: tailCall with 9 locals and 3 arguments
 # Core:fixedDecimal:is:1:equals:else
 5072: pushConstant inline builtinToDebugText
-5073: pushConstant <replaced address 633c932349b684cc> <symbol-id 20>
+5073: pushConstant inline <symbol-id 20>
 5074: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 5075: call with 1 argument
 5076: pushConstant inline builtinToDebugText
 5077: pushFromStack 3
 5078: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 5079: call with 1 argument
-5080: pushConstant <replaced address 9baf713a013687f1> (<symbol-id 26>, "Expected tag to have a value, but it doesn't have any.")
+5080: pushConstant <replaced address ddb88ec575fa202f> (<symbol-id 26>, "Expected tag to have a value, but it doesn't have any.")
 5081: popMultipleBelowTop 4
 5082: return
 # Core:fixedDecimal:is:1:equals:then
@@ -5870,7 +5847,7 @@
 5085: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 5086: call with 1 argument
 5087: pushConstant inline builtinEquals
-5088: pushConstant <replaced address 633c932349b684cc> <symbol-id 20>
+5088: pushConstant inline <symbol-id 20>
 5089: pushFromStack 2
 5090: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 5091: call with 2 arguments
@@ -5886,7 +5863,7 @@
 5101: tailCall with 8 locals and 3 arguments
 # Core:fixedDecimal:is:1:equals:else
 5102: pushConstant inline builtinToDebugText
-5103: pushConstant <replaced address 57b2d848bf1ca48b> <symbol-id 23>
+5103: pushConstant inline <symbol-id 23>
 5104: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 5105: call with 1 argument
 5106: pushConstant inline builtinToDebugText
@@ -5913,7 +5890,7 @@
 5127: pushConstant <replaced address ee78a67daaae8b1b> "."
 5128: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 5129: call with 2 arguments
-5130: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+5130: pushConstant inline <symbol-id 26>
 5131: pushFromStack 1
 5132: createList 2
 5133: popMultipleBelowTop 8
@@ -5924,7 +5901,7 @@
 5137: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 5138: call with 1 argument
 5139: pushConstant inline builtinEquals
-5140: pushConstant <replaced address 57b2d848bf1ca48b> <symbol-id 23>
+5140: pushConstant inline <symbol-id 23>
 5141: pushFromStack 2
 5142: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 5143: call with 2 arguments
@@ -5940,7 +5917,7 @@
 5153: tailCall with 8 locals and 3 arguments
 # Core:fixedDecimal:is:1:equals:else
 5154: pushConstant inline builtinToDebugText
-5155: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+5155: pushConstant inline <symbol-id 18>
 5156: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 5157: call with 1 argument
 5158: pushConstant inline builtinToDebugText
@@ -5967,7 +5944,7 @@
 5179: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 5180: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 5181: call with 2 arguments
-5182: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+5182: pushConstant inline <symbol-id 26>
 5183: pushFromStack 1
 5184: createList 2
 5185: popMultipleBelowTop 8
@@ -5984,7 +5961,7 @@
 5194: call with 1 argument
 5195: pushConstant inline builtinEquals
 5196: pushFromStack 1
-5197: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+5197: pushConstant inline <symbol-id 6>
 5198: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 5199: call with 2 arguments
 5200: pushFromStack 3
@@ -6011,7 +5988,7 @@
 5220: call with 1 argument
 5221: pushConstant inline builtinEquals
 5222: pushFromStack 1
-5223: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+5223: pushConstant inline <symbol-id 6>
 5224: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 5225: call with 2 arguments
 5226: pushFromStack 2
@@ -6027,7 +6004,7 @@
 5235: pushConstant inline 1
 5236: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 5237: call with 2 arguments
-5238: pushConstant <replaced address f9f3b5f9b073d0e7> <symbol-id 3>
+5238: pushConstant inline <symbol-id 3>
 5239: popMultipleBelowTop 3
 5240: return
 # Core:fixedDecimal:is
@@ -6036,7 +6013,7 @@
 5243: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 5244: call with 1 argument
 5245: pushConstant inline builtinEquals
-5246: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+5246: pushConstant inline <symbol-id 18>
 5247: pushFromStack 2
 5248: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 5249: call with 2 arguments
@@ -6057,7 +6034,7 @@
 5264: call with 2 arguments
 5265: pushConstant inline builtinEquals
 5266: pushFromStack 1
-5267: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+5267: pushConstant inline <symbol-id 24>
 5268: pushConstant <replaced address ce96a9860cb39c98> Core:fixedDecimal:is:1
 5269: call with 2 arguments
 5270: pushFromStack 2
@@ -6087,7 +6064,7 @@
 5293: call with 1 argument
 5294: pushConstant inline builtinEquals
 5295: pushFromStack 1
-5296: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+5296: pushConstant inline <symbol-id 18>
 5297: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 5298: call with 2 arguments
 5299: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -6116,7 +6093,7 @@
 5322: call with 1 argument
 5323: pushConstant inline builtinEquals
 5324: pushFromStack 1
-5325: pushConstant <replaced address 6ec64dfdd450650d> <symbol-id 17>
+5325: pushConstant inline <symbol-id 17>
 5326: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 5327: call with 2 arguments
 5328: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -6127,7 +6104,7 @@
 5333: call with 3 arguments
 5334: pushConstant inline builtinStructHasKey
 5335: pushFromStack 4
-5336: pushConstant <replaced address e2e040449b401065> <symbol-id 25>
+5336: pushConstant inline <symbol-id 25>
 5337: pushConstant <replaced address 1f92019f89733a43> Builtins::structGet:12
 5338: call with 2 arguments
 5339: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -6138,7 +6115,7 @@
 5344: call with 3 arguments
 5345: pushConstant inline builtinStructGet
 5346: pushFromStack 6
-5347: pushConstant <replaced address e2e040449b401065> <symbol-id 25>
+5347: pushConstant inline <symbol-id 25>
 5348: pushConstant <replaced address 422f322f2940db06> Builtins::structGet:21
 5349: tailCall with 15 locals and 2 arguments
 # Core:fixedDecimal:scale
@@ -6158,7 +6135,7 @@
 5363: call with 1 argument
 5364: pushConstant inline builtinEquals
 5365: pushFromStack 1
-5366: pushConstant <replaced address c0430fb4fb726fa2> <symbol-id 18>
+5366: pushConstant inline <symbol-id 18>
 5367: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 5368: call with 2 arguments
 5369: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -6187,7 +6164,7 @@
 5392: call with 1 argument
 5393: pushConstant inline builtinEquals
 5394: pushFromStack 1
-5395: pushConstant <replaced address 6ec64dfdd450650d> <symbol-id 17>
+5395: pushConstant inline <symbol-id 17>
 5396: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 5397: call with 2 arguments
 5398: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -6198,7 +6175,7 @@
 5403: call with 3 arguments
 5404: pushConstant inline builtinStructHasKey
 5405: pushFromStack 4
-5406: pushConstant <replaced address 85d9c3b2e984258f> <symbol-id 27>
+5406: pushConstant inline <symbol-id 27>
 5407: pushConstant <replaced address 1f92019f89733a43> Builtins::structGet:12
 5408: call with 2 arguments
 5409: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -6209,7 +6186,7 @@
 5414: call with 3 arguments
 5415: pushConstant inline builtinStructGet
 5416: pushFromStack 6
-5417: pushConstant <replaced address 85d9c3b2e984258f> <symbol-id 27>
+5417: pushConstant inline <symbol-id 27>
 5418: pushConstant <replaced address 422f322f2940db06> Builtins::structGet:21
 5419: tailCall with 15 locals and 2 arguments
 # Core:fixedDecimal:isScale:18
@@ -6224,7 +6201,7 @@
 5427: call with 1 argument
 5428: pushConstant inline builtinEquals
 5429: pushFromStack 1
-5430: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+5430: pushConstant inline <symbol-id 6>
 5431: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 5432: call with 2 arguments
 5433: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -6239,7 +6216,7 @@
 5442: call with 1 argument
 5443: pushConstant inline builtinEquals
 5444: pushFromStack 1
-5445: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+5445: pushConstant inline <symbol-id 6>
 5446: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 5447: call with 2 arguments
 5448: pushFromStack 6
@@ -6255,9 +6232,9 @@
 5458: pushFromStack 11
 5459: pushConstant <replaced address 9e3829a26778c84c> Core:fixedDecimal:fromIntScaled:16
 5460: call with 3 arguments
-5461: pushConstant <replaced address 85d9c3b2e984258f> <symbol-id 27>
+5461: pushConstant inline <symbol-id 27>
 5462: pushFromStack 4
-5463: pushConstant <replaced address e2e040449b401065> <symbol-id 25>
+5463: pushConstant inline <symbol-id 25>
 5464: pushFromStack 14
 5465: createStruct 2
 5466: pushFromStack 0
@@ -6294,7 +6271,7 @@
 5495: call with 1 argument
 5496: pushConstant inline builtinEquals
 5497: pushFromStack 1
-5498: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+5498: pushConstant inline <symbol-id 6>
 5499: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 5500: call with 2 arguments
 5501: pushFromStack 2
@@ -6344,7 +6321,7 @@
 5543: call with 1 argument
 5544: pushConstant inline builtinEquals
 5545: pushFromStack 1
-5546: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+5546: pushConstant inline <symbol-id 6>
 5547: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 5548: call with 2 arguments
 5549: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -6359,7 +6336,7 @@
 5558: call with 1 argument
 5559: pushConstant inline builtinEquals
 5560: pushFromStack 1
-5561: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+5561: pushConstant inline <symbol-id 6>
 5562: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 5563: call with 2 arguments
 5564: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -6376,7 +6353,7 @@
 5575: pushFromStack 0
 5576: createFunction with 0 arguments capturing 0 starting at ip-5528
 5577: pushConstant <replaced address e02d7cb03a3b5bf6> { 2 arguments (capturing nothing) → ip-3212 }
-5578: pushConstant <replaced address 633c932349b684cc> <symbol-id 20>
+5578: pushConstant inline <symbol-id 20>
 5579: pushFromStack 2
 5580: pushConstant <replaced address 5753a7d40ff7c4be> Core:fixedDecimal:isScale:19
 5581: call with 2 arguments
@@ -6416,7 +6393,7 @@
 5613: call with 1 argument
 5614: pushConstant inline builtinEquals
 5615: pushFromStack 1
-5616: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+5616: pushConstant inline <symbol-id 6>
 5617: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 5618: call with 2 arguments
 5619: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -6431,7 +6408,7 @@
 5628: call with 1 argument
 5629: pushConstant inline builtinEquals
 5630: pushFromStack 1
-5631: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+5631: pushConstant inline <symbol-id 6>
 5632: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 5633: call with 2 arguments
 5634: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -6448,7 +6425,7 @@
 5645: pushFromStack 0
 5646: createFunction with 0 arguments capturing 0 starting at ip-5598
 5647: pushConstant <replaced address e02d7cb03a3b5bf6> { 2 arguments (capturing nothing) → ip-3212 }
-5648: pushConstant <replaced address 633c932349b684cc> <symbol-id 20>
+5648: pushConstant inline <symbol-id 20>
 5649: pushFromStack 2
 5650: pushConstant <replaced address 5753a7d40ff7c4be> Core:fixedDecimal:isScale:19
 5651: call with 2 arguments
@@ -6469,7 +6446,7 @@
 5666: call with 1 argument
 5667: pushConstant inline builtinEquals
 5668: pushFromStack 1
-5669: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+5669: pushConstant inline <symbol-id 6>
 5670: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 5671: call with 2 arguments
 5672: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -6484,7 +6461,7 @@
 5681: call with 1 argument
 5682: pushConstant inline builtinEquals
 5683: pushFromStack 1
-5684: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+5684: pushConstant inline <symbol-id 6>
 5685: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 5686: call with 2 arguments
 5687: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -6515,7 +6492,7 @@
 5711: call with 1 argument
 5712: pushConstant inline builtinEquals
 5713: pushFromStack 1
-5714: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+5714: pushConstant inline <symbol-id 6>
 5715: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 5716: call with 2 arguments
 5717: pushFromStack 5
@@ -6596,11 +6573,11 @@
 5791: pushFromStack 3
 5792: pushConstant <replaced address 40f5be0d0d2bb859> Core:fixedDecimal:comparableMinorUnits:36
 5793: call with 2 arguments
-5794: pushConstant <replaced address 7a5008d85eea454e> <symbol-id 30>
+5794: pushConstant inline <symbol-id 30>
 5795: pushFromStack 2
-5796: pushConstant <replaced address cbccca8f860c4fe3> <symbol-id 31>
+5796: pushConstant inline <symbol-id 31>
 5797: pushFromStack 3
-5798: pushConstant <replaced address 28d3472137c83ab9> <symbol-id 29>
+5798: pushConstant inline <symbol-id 29>
 5799: pushFromStack 7
 5800: createStruct 3
 5801: popMultipleBelowTop 12
@@ -6608,17 +6585,17 @@
 # Core:fixedDecimal:add:14:hasKey:then
 5803: pushConstant inline builtinStructGet
 5804: pushFromStack 2
-5805: pushConstant <replaced address 7a5008d85eea454e> <symbol-id 30>
+5805: pushConstant inline <symbol-id 30>
 5806: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 5807: call with 2 arguments
-5808: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+5808: pushConstant inline <symbol-id 24>
 5809: pushFromStack 1
 5810: createList 2
 5811: popMultipleBelowTop 3
 5812: return
 # Core:fixedDecimal:add:14:hasKey:else
 5813: pushConstant inline builtinToDebugText
-5814: pushConstant <replaced address 7a5008d85eea454e> <symbol-id 30>
+5814: pushConstant inline <symbol-id 30>
 5815: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 5816: call with 1 argument
 5817: pushConstant inline builtinToDebugText
@@ -6645,7 +6622,7 @@
 5838: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 5839: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 5840: call with 2 arguments
-5841: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+5841: pushConstant inline <symbol-id 26>
 5842: pushFromStack 1
 5843: createList 2
 5844: popMultipleBelowTop 8
@@ -6653,17 +6630,17 @@
 # Core:fixedDecimal:add:14:hasKey:then
 5846: pushConstant inline builtinStructGet
 5847: pushFromStack 2
-5848: pushConstant <replaced address cbccca8f860c4fe3> <symbol-id 31>
+5848: pushConstant inline <symbol-id 31>
 5849: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 5850: call with 2 arguments
-5851: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+5851: pushConstant inline <symbol-id 24>
 5852: pushFromStack 1
 5853: createList 2
 5854: popMultipleBelowTop 3
 5855: return
 # Core:fixedDecimal:add:14:hasKey:else
 5856: pushConstant inline builtinToDebugText
-5857: pushConstant <replaced address cbccca8f860c4fe3> <symbol-id 31>
+5857: pushConstant inline <symbol-id 31>
 5858: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 5859: call with 1 argument
 5860: pushConstant inline builtinToDebugText
@@ -6690,7 +6667,7 @@
 5881: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 5882: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 5883: call with 2 arguments
-5884: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+5884: pushConstant inline <symbol-id 26>
 5885: pushFromStack 1
 5886: createList 2
 5887: popMultipleBelowTop 8
@@ -6698,17 +6675,17 @@
 # Core:fixedDecimal:add:14:hasKey:then
 5889: pushConstant inline builtinStructGet
 5890: pushFromStack 2
-5891: pushConstant <replaced address 28d3472137c83ab9> <symbol-id 29>
+5891: pushConstant inline <symbol-id 29>
 5892: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 5893: call with 2 arguments
-5894: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+5894: pushConstant inline <symbol-id 24>
 5895: pushFromStack 1
 5896: createList 2
 5897: popMultipleBelowTop 3
 5898: return
 # Core:fixedDecimal:add:14:hasKey:else
 5899: pushConstant inline builtinToDebugText
-5900: pushConstant <replaced address 28d3472137c83ab9> <symbol-id 29>
+5900: pushConstant inline <symbol-id 29>
 5901: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 5902: call with 1 argument
 5903: pushConstant inline builtinToDebugText
@@ -6735,7 +6712,7 @@
 5924: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 5925: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 5926: call with 2 arguments
-5927: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+5927: pushConstant inline <symbol-id 26>
 5928: pushFromStack 1
 5929: createList 2
 5930: popMultipleBelowTop 8
@@ -6746,7 +6723,7 @@
 5934: pushConstant inline 1
 5935: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 5936: call with 2 arguments
-5937: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+5937: pushConstant inline <symbol-id 24>
 5938: pushFromStack 4
 5939: pushFromStack 4
 5940: pushFromStack 3
@@ -6765,7 +6742,7 @@
 5951: call with 2 arguments
 5952: pushConstant inline builtinStructHasKey
 5953: pushFromStack 3
-5954: pushConstant <replaced address 28d3472137c83ab9> <symbol-id 29>
+5954: pushConstant inline <symbol-id 29>
 5955: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 5956: call with 2 arguments
 5957: pushFromStack 3
@@ -6785,7 +6762,7 @@
 5971: call with 2 arguments
 5972: pushConstant inline builtinEquals
 5973: pushFromStack 1
-5974: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+5974: pushConstant inline <symbol-id 24>
 5975: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 5976: call with 2 arguments
 5977: pushFromStack 2
@@ -6812,7 +6789,7 @@
 5996: call with 2 arguments
 5997: pushConstant inline builtinStructHasKey
 5998: pushFromStack 3
-5999: pushConstant <replaced address cbccca8f860c4fe3> <symbol-id 31>
+5999: pushConstant inline <symbol-id 31>
 6000: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 6001: call with 2 arguments
 6002: pushFromStack 3
@@ -6832,7 +6809,7 @@
 6016: call with 2 arguments
 6017: pushConstant inline builtinEquals
 6018: pushFromStack 1
-6019: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+6019: pushConstant inline <symbol-id 24>
 6020: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 6021: call with 2 arguments
 6022: pushFromStack 2
@@ -6854,7 +6831,7 @@
 # Core:fixedDecimal:add:14:equals:then
 6037: pushConstant inline builtinStructHasKey
 6038: pushFromStack 2
-6039: pushConstant <replaced address 7a5008d85eea454e> <symbol-id 30>
+6039: pushConstant inline <symbol-id 30>
 6040: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 6041: call with 2 arguments
 6042: pushFromStack 2
@@ -6874,7 +6851,7 @@
 6056: call with 2 arguments
 6057: pushConstant inline builtinEquals
 6058: pushFromStack 1
-6059: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+6059: pushConstant inline <symbol-id 24>
 6060: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 6061: call with 2 arguments
 6062: pushFromStack 2
@@ -6890,7 +6867,7 @@
 6072: tailCall with 15 locals and 3 arguments
 # Core:fixedDecimal:add:14:equals:else
 6073: pushConstant inline builtinToDebugText
-6074: pushConstant <replaced address 6ec64dfdd450650d> <symbol-id 17>
+6074: pushConstant inline <symbol-id 17>
 6075: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 6076: call with 1 argument
 6077: pushConstant inline builtinToDebugText
@@ -6917,7 +6894,7 @@
 6098: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 6099: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 6100: call with 2 arguments
-6101: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+6101: pushConstant inline <symbol-id 26>
 6102: pushFromStack 1
 6103: createList 2
 6104: popMultipleBelowTop 8
@@ -6964,7 +6941,7 @@
 6143: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 6144: call with 1 argument
 6145: pushConstant inline builtinEquals
-6146: pushConstant <replaced address 6ec64dfdd450650d> <symbol-id 17>
+6146: pushConstant inline <symbol-id 17>
 6147: pushFromStack 2
 6148: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 6149: call with 2 arguments
@@ -6985,7 +6962,7 @@
 6164: call with 2 arguments
 6165: pushConstant inline builtinEquals
 6166: pushFromStack 1
-6167: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+6167: pushConstant inline <symbol-id 24>
 6168: pushConstant <replaced address 681b8c6259c3448a> Core:fixedDecimal:add:14
 6169: call with 2 arguments
 6170: pushFromStack 2
@@ -7017,7 +6994,7 @@
 6196: call with 1 argument
 6197: pushConstant inline builtinEquals
 6198: pushFromStack 1
-6199: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+6199: pushConstant inline <symbol-id 6>
 6200: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 6201: call with 2 arguments
 6202: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -7032,7 +7009,7 @@
 6211: call with 1 argument
 6212: pushConstant inline builtinEquals
 6213: pushFromStack 1
-6214: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+6214: pushConstant inline <symbol-id 6>
 6215: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 6216: call with 2 arguments
 6217: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -7054,17 +7031,17 @@
 # Core:fixedDecimal:subtract:14:hasKey:then
 6233: pushConstant inline builtinStructGet
 6234: pushFromStack 2
-6235: pushConstant <replaced address 7a5008d85eea454e> <symbol-id 30>
+6235: pushConstant inline <symbol-id 30>
 6236: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6237: call with 2 arguments
-6238: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+6238: pushConstant inline <symbol-id 24>
 6239: pushFromStack 1
 6240: createList 2
 6241: popMultipleBelowTop 3
 6242: return
 # Core:fixedDecimal:subtract:14:hasKey:else
 6243: pushConstant inline builtinToDebugText
-6244: pushConstant <replaced address 7a5008d85eea454e> <symbol-id 30>
+6244: pushConstant inline <symbol-id 30>
 6245: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6246: call with 1 argument
 6247: pushConstant inline builtinToDebugText
@@ -7091,7 +7068,7 @@
 6268: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 6269: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6270: call with 2 arguments
-6271: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+6271: pushConstant inline <symbol-id 26>
 6272: pushFromStack 1
 6273: createList 2
 6274: popMultipleBelowTop 8
@@ -7099,17 +7076,17 @@
 # Core:fixedDecimal:subtract:14:hasKey:then
 6276: pushConstant inline builtinStructGet
 6277: pushFromStack 2
-6278: pushConstant <replaced address cbccca8f860c4fe3> <symbol-id 31>
+6278: pushConstant inline <symbol-id 31>
 6279: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6280: call with 2 arguments
-6281: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+6281: pushConstant inline <symbol-id 24>
 6282: pushFromStack 1
 6283: createList 2
 6284: popMultipleBelowTop 3
 6285: return
 # Core:fixedDecimal:subtract:14:hasKey:else
 6286: pushConstant inline builtinToDebugText
-6287: pushConstant <replaced address cbccca8f860c4fe3> <symbol-id 31>
+6287: pushConstant inline <symbol-id 31>
 6288: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6289: call with 1 argument
 6290: pushConstant inline builtinToDebugText
@@ -7136,7 +7113,7 @@
 6311: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 6312: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6313: call with 2 arguments
-6314: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+6314: pushConstant inline <symbol-id 26>
 6315: pushFromStack 1
 6316: createList 2
 6317: popMultipleBelowTop 8
@@ -7144,17 +7121,17 @@
 # Core:fixedDecimal:subtract:14:hasKey:then
 6319: pushConstant inline builtinStructGet
 6320: pushFromStack 2
-6321: pushConstant <replaced address 28d3472137c83ab9> <symbol-id 29>
+6321: pushConstant inline <symbol-id 29>
 6322: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6323: call with 2 arguments
-6324: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+6324: pushConstant inline <symbol-id 24>
 6325: pushFromStack 1
 6326: createList 2
 6327: popMultipleBelowTop 3
 6328: return
 # Core:fixedDecimal:subtract:14:hasKey:else
 6329: pushConstant inline builtinToDebugText
-6330: pushConstant <replaced address 28d3472137c83ab9> <symbol-id 29>
+6330: pushConstant inline <symbol-id 29>
 6331: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6332: call with 1 argument
 6333: pushConstant inline builtinToDebugText
@@ -7181,7 +7158,7 @@
 6354: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 6355: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6356: call with 2 arguments
-6357: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+6357: pushConstant inline <symbol-id 26>
 6358: pushFromStack 1
 6359: createList 2
 6360: popMultipleBelowTop 8
@@ -7192,7 +7169,7 @@
 6364: pushConstant inline 1
 6365: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6366: call with 2 arguments
-6367: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+6367: pushConstant inline <symbol-id 24>
 6368: pushFromStack 3
 6369: pushFromStack 6
 6370: pushFromStack 3
@@ -7211,7 +7188,7 @@
 6381: call with 2 arguments
 6382: pushConstant inline builtinStructHasKey
 6383: pushFromStack 5
-6384: pushConstant <replaced address 28d3472137c83ab9> <symbol-id 29>
+6384: pushConstant inline <symbol-id 29>
 6385: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6386: call with 2 arguments
 6387: pushFromStack 5
@@ -7231,7 +7208,7 @@
 6401: call with 2 arguments
 6402: pushConstant inline builtinEquals
 6403: pushFromStack 1
-6404: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+6404: pushConstant inline <symbol-id 24>
 6405: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6406: call with 2 arguments
 6407: pushFromStack 8
@@ -7258,7 +7235,7 @@
 6426: call with 2 arguments
 6427: pushConstant inline builtinStructHasKey
 6428: pushFromStack 3
-6429: pushConstant <replaced address cbccca8f860c4fe3> <symbol-id 31>
+6429: pushConstant inline <symbol-id 31>
 6430: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6431: call with 2 arguments
 6432: pushFromStack 3
@@ -7278,7 +7255,7 @@
 6446: call with 2 arguments
 6447: pushConstant inline builtinEquals
 6448: pushFromStack 1
-6449: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+6449: pushConstant inline <symbol-id 24>
 6450: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6451: call with 2 arguments
 6452: pushFromStack 4
@@ -7300,7 +7277,7 @@
 # Core:fixedDecimal:subtract:14:equals:then
 6467: pushConstant inline builtinStructHasKey
 6468: pushFromStack 2
-6469: pushConstant <replaced address 7a5008d85eea454e> <symbol-id 30>
+6469: pushConstant inline <symbol-id 30>
 6470: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6471: call with 2 arguments
 6472: pushFromStack 2
@@ -7320,7 +7297,7 @@
 6486: call with 2 arguments
 6487: pushConstant inline builtinEquals
 6488: pushFromStack 1
-6489: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+6489: pushConstant inline <symbol-id 24>
 6490: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6491: call with 2 arguments
 6492: pushFromStack 2
@@ -7336,7 +7313,7 @@
 6502: tailCall with 15 locals and 3 arguments
 # Core:fixedDecimal:subtract:14:equals:else
 6503: pushConstant inline builtinToDebugText
-6504: pushConstant <replaced address 6ec64dfdd450650d> <symbol-id 17>
+6504: pushConstant inline <symbol-id 17>
 6505: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6506: call with 1 argument
 6507: pushConstant inline builtinToDebugText
@@ -7363,7 +7340,7 @@
 6528: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 6529: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6530: call with 2 arguments
-6531: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+6531: pushConstant inline <symbol-id 26>
 6532: pushFromStack 1
 6533: createList 2
 6534: popMultipleBelowTop 8
@@ -7410,7 +7387,7 @@
 6573: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6574: call with 1 argument
 6575: pushConstant inline builtinEquals
-6576: pushConstant <replaced address 6ec64dfdd450650d> <symbol-id 17>
+6576: pushConstant inline <symbol-id 17>
 6577: pushFromStack 2
 6578: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6579: call with 2 arguments
@@ -7431,7 +7408,7 @@
 6594: call with 2 arguments
 6595: pushConstant inline builtinEquals
 6596: pushFromStack 1
-6597: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+6597: pushConstant inline <symbol-id 24>
 6598: pushConstant <replaced address 5e13b1465ba9c4a5> Core:fixedDecimal:subtract:14
 6599: call with 2 arguments
 6600: pushFromStack 2
@@ -7463,7 +7440,7 @@
 6626: call with 1 argument
 6627: pushConstant inline builtinEquals
 6628: pushFromStack 1
-6629: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+6629: pushConstant inline <symbol-id 6>
 6630: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 6631: call with 2 arguments
 6632: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -7478,7 +7455,7 @@
 6641: call with 1 argument
 6642: pushConstant inline builtinEquals
 6643: pushFromStack 1
-6644: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+6644: pushConstant inline <symbol-id 6>
 6645: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 6646: call with 2 arguments
 6647: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -7518,7 +7495,7 @@
 6680: call with 1 argument
 6681: pushConstant inline builtinEquals
 6682: pushFromStack 1
-6683: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+6683: pushConstant inline <symbol-id 6>
 6684: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 6685: call with 2 arguments
 6686: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -7533,7 +7510,7 @@
 6695: call with 1 argument
 6696: pushConstant inline builtinEquals
 6697: pushFromStack 1
-6698: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+6698: pushConstant inline <symbol-id 6>
 6699: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 6700: call with 2 arguments
 6701: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -7564,17 +7541,17 @@
 # Core:fixedDecimal:divideTruncatingAtScale:42:hasKey:then
 6725: pushConstant inline builtinStructGet
 6726: pushFromStack 2
-6727: pushConstant <replaced address 7a5008d85eea454e> <symbol-id 30>
+6727: pushConstant inline <symbol-id 30>
 6728: pushConstant <replaced address 0d5fdcdea1aa3d7b> Core:fixedDecimal:divideTruncatingAtScale:42
 6729: call with 2 arguments
-6730: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+6730: pushConstant inline <symbol-id 24>
 6731: pushFromStack 1
 6732: createList 2
 6733: popMultipleBelowTop 3
 6734: return
 # Core:fixedDecimal:divideTruncatingAtScale:42:hasKey:else
 6735: pushConstant inline builtinToDebugText
-6736: pushConstant <replaced address 7a5008d85eea454e> <symbol-id 30>
+6736: pushConstant inline <symbol-id 30>
 6737: pushConstant <replaced address 0d5fdcdea1aa3d7b> Core:fixedDecimal:divideTruncatingAtScale:42
 6738: call with 1 argument
 6739: pushConstant inline builtinToDebugText
@@ -7601,7 +7578,7 @@
 6760: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 6761: pushConstant <replaced address 0d5fdcdea1aa3d7b> Core:fixedDecimal:divideTruncatingAtScale:42
 6762: call with 2 arguments
-6763: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+6763: pushConstant inline <symbol-id 26>
 6764: pushFromStack 1
 6765: createList 2
 6766: popMultipleBelowTop 8
@@ -7609,17 +7586,17 @@
 # Core:fixedDecimal:divideTruncatingAtScale:42:hasKey:then
 6768: pushConstant inline builtinStructGet
 6769: pushFromStack 2
-6770: pushConstant <replaced address cbccca8f860c4fe3> <symbol-id 31>
+6770: pushConstant inline <symbol-id 31>
 6771: pushConstant <replaced address 0d5fdcdea1aa3d7b> Core:fixedDecimal:divideTruncatingAtScale:42
 6772: call with 2 arguments
-6773: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+6773: pushConstant inline <symbol-id 24>
 6774: pushFromStack 1
 6775: createList 2
 6776: popMultipleBelowTop 3
 6777: return
 # Core:fixedDecimal:divideTruncatingAtScale:42:hasKey:else
 6778: pushConstant inline builtinToDebugText
-6779: pushConstant <replaced address cbccca8f860c4fe3> <symbol-id 31>
+6779: pushConstant inline <symbol-id 31>
 6780: pushConstant <replaced address 0d5fdcdea1aa3d7b> Core:fixedDecimal:divideTruncatingAtScale:42
 6781: call with 1 argument
 6782: pushConstant inline builtinToDebugText
@@ -7646,7 +7623,7 @@
 6803: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 6804: pushConstant <replaced address 0d5fdcdea1aa3d7b> Core:fixedDecimal:divideTruncatingAtScale:42
 6805: call with 2 arguments
-6806: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+6806: pushConstant inline <symbol-id 26>
 6807: pushFromStack 1
 6808: createList 2
 6809: popMultipleBelowTop 8
@@ -7657,7 +7634,7 @@
 6813: pushConstant inline 1
 6814: pushConstant <replaced address 0d5fdcdea1aa3d7b> Core:fixedDecimal:divideTruncatingAtScale:42
 6815: call with 2 arguments
-6816: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+6816: pushConstant inline <symbol-id 24>
 6817: pushFromStack 4
 6818: pushFromStack 2
 6819: createList 3
@@ -7675,7 +7652,7 @@
 6829: call with 2 arguments
 6830: pushConstant inline builtinStructHasKey
 6831: pushFromStack 4
-6832: pushConstant <replaced address cbccca8f860c4fe3> <symbol-id 31>
+6832: pushConstant inline <symbol-id 31>
 6833: pushConstant <replaced address 0d5fdcdea1aa3d7b> Core:fixedDecimal:divideTruncatingAtScale:42
 6834: call with 2 arguments
 6835: pushFromStack 4
@@ -7695,7 +7672,7 @@
 6849: call with 2 arguments
 6850: pushConstant inline builtinEquals
 6851: pushFromStack 1
-6852: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+6852: pushConstant inline <symbol-id 24>
 6853: pushConstant <replaced address 0d5fdcdea1aa3d7b> Core:fixedDecimal:divideTruncatingAtScale:42
 6854: call with 2 arguments
 6855: pushFromStack 8
@@ -7716,7 +7693,7 @@
 # Core:fixedDecimal:divideTruncatingAtScale:42:equals:then
 6869: pushConstant inline builtinStructHasKey
 6870: pushFromStack 2
-6871: pushConstant <replaced address 7a5008d85eea454e> <symbol-id 30>
+6871: pushConstant inline <symbol-id 30>
 6872: pushConstant <replaced address 0d5fdcdea1aa3d7b> Core:fixedDecimal:divideTruncatingAtScale:42
 6873: call with 2 arguments
 6874: pushFromStack 2
@@ -7736,7 +7713,7 @@
 6888: call with 2 arguments
 6889: pushConstant inline builtinEquals
 6890: pushFromStack 1
-6891: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+6891: pushConstant inline <symbol-id 24>
 6892: pushConstant <replaced address 0d5fdcdea1aa3d7b> Core:fixedDecimal:divideTruncatingAtScale:42
 6893: call with 2 arguments
 6894: pushFromStack 4
@@ -7752,7 +7729,7 @@
 6904: tailCall with 15 locals and 3 arguments
 # Core:fixedDecimal:divideTruncatingAtScale:42:equals:else
 6905: pushConstant inline builtinToDebugText
-6906: pushConstant <replaced address 6ec64dfdd450650d> <symbol-id 17>
+6906: pushConstant inline <symbol-id 17>
 6907: pushConstant <replaced address 0d5fdcdea1aa3d7b> Core:fixedDecimal:divideTruncatingAtScale:42
 6908: call with 1 argument
 6909: pushConstant inline builtinToDebugText
@@ -7779,7 +7756,7 @@
 6930: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 6931: pushConstant <replaced address 0d5fdcdea1aa3d7b> Core:fixedDecimal:divideTruncatingAtScale:42
 6932: call with 2 arguments
-6933: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+6933: pushConstant inline <symbol-id 26>
 6934: pushFromStack 1
 6935: createList 2
 6936: popMultipleBelowTop 8
@@ -7822,7 +7799,7 @@
 6971: call with 1 argument
 6972: pushConstant inline builtinEquals
 6973: pushFromStack 1
-6974: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+6974: pushConstant inline <symbol-id 6>
 6975: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 6976: call with 2 arguments
 6977: pushFromStack 7
@@ -7867,7 +7844,7 @@
 7016: pushConstant <replaced address 0d5fdcdea1aa3d7b> Core:fixedDecimal:divideTruncatingAtScale:42
 7017: call with 1 argument
 7018: pushConstant inline builtinEquals
-7019: pushConstant <replaced address 6ec64dfdd450650d> <symbol-id 17>
+7019: pushConstant inline <symbol-id 17>
 7020: pushFromStack 2
 7021: pushConstant <replaced address 0d5fdcdea1aa3d7b> Core:fixedDecimal:divideTruncatingAtScale:42
 7022: call with 2 arguments
@@ -7888,7 +7865,7 @@
 7037: call with 2 arguments
 7038: pushConstant inline builtinEquals
 7039: pushFromStack 1
-7040: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+7040: pushConstant inline <symbol-id 24>
 7041: pushConstant <replaced address 0d5fdcdea1aa3d7b> Core:fixedDecimal:divideTruncatingAtScale:42
 7042: call with 2 arguments
 7043: pushFromStack 2
@@ -7915,7 +7892,7 @@
 7064: call with 1 argument
 7065: pushConstant inline builtinEquals
 7066: pushFromStack 1
-7067: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+7067: pushConstant inline <symbol-id 6>
 7068: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 7069: call with 2 arguments
 7070: pushConstant <replaced address e02d7cb03a3b5bf6> { 2 arguments (capturing nothing) → ip-3212 }
@@ -7940,7 +7917,7 @@
 7089: call with 1 argument
 7090: pushConstant inline builtinEquals
 7091: pushFromStack 1
-7092: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+7092: pushConstant inline <symbol-id 6>
 7093: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 7094: call with 2 arguments
 7095: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -7955,7 +7932,7 @@
 7104: call with 1 argument
 7105: pushConstant inline builtinEquals
 7106: pushFromStack 1
-7107: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+7107: pushConstant inline <symbol-id 6>
 7108: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 7109: call with 2 arguments
 7110: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -7982,17 +7959,17 @@
 # Core:fixedDecimal:compareTo:14:hasKey:then
 7131: pushConstant inline builtinStructGet
 7132: pushFromStack 2
-7133: pushConstant <replaced address 7a5008d85eea454e> <symbol-id 30>
+7133: pushConstant inline <symbol-id 30>
 7134: pushConstant <replaced address ccbc806fb265dad8> Core:fixedDecimal:compareTo:14
 7135: call with 2 arguments
-7136: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+7136: pushConstant inline <symbol-id 24>
 7137: pushFromStack 1
 7138: createList 2
 7139: popMultipleBelowTop 3
 7140: return
 # Core:fixedDecimal:compareTo:14:hasKey:else
 7141: pushConstant inline builtinToDebugText
-7142: pushConstant <replaced address 7a5008d85eea454e> <symbol-id 30>
+7142: pushConstant inline <symbol-id 30>
 7143: pushConstant <replaced address ccbc806fb265dad8> Core:fixedDecimal:compareTo:14
 7144: call with 1 argument
 7145: pushConstant inline builtinToDebugText
@@ -8019,7 +7996,7 @@
 7166: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 7167: pushConstant <replaced address ccbc806fb265dad8> Core:fixedDecimal:compareTo:14
 7168: call with 2 arguments
-7169: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+7169: pushConstant inline <symbol-id 26>
 7170: pushFromStack 1
 7171: createList 2
 7172: popMultipleBelowTop 8
@@ -8027,17 +8004,17 @@
 # Core:fixedDecimal:compareTo:14:hasKey:then
 7174: pushConstant inline builtinStructGet
 7175: pushFromStack 2
-7176: pushConstant <replaced address cbccca8f860c4fe3> <symbol-id 31>
+7176: pushConstant inline <symbol-id 31>
 7177: pushConstant <replaced address ccbc806fb265dad8> Core:fixedDecimal:compareTo:14
 7178: call with 2 arguments
-7179: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+7179: pushConstant inline <symbol-id 24>
 7180: pushFromStack 1
 7181: createList 2
 7182: popMultipleBelowTop 3
 7183: return
 # Core:fixedDecimal:compareTo:14:hasKey:else
 7184: pushConstant inline builtinToDebugText
-7185: pushConstant <replaced address cbccca8f860c4fe3> <symbol-id 31>
+7185: pushConstant inline <symbol-id 31>
 7186: pushConstant <replaced address ccbc806fb265dad8> Core:fixedDecimal:compareTo:14
 7187: call with 1 argument
 7188: pushConstant inline builtinToDebugText
@@ -8064,7 +8041,7 @@
 7209: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 7210: pushConstant <replaced address ccbc806fb265dad8> Core:fixedDecimal:compareTo:14
 7211: call with 2 arguments
-7212: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+7212: pushConstant inline <symbol-id 26>
 7213: pushFromStack 1
 7214: createList 2
 7215: popMultipleBelowTop 8
@@ -8075,7 +8052,7 @@
 7219: pushConstant inline 1
 7220: pushConstant <replaced address ccbc806fb265dad8> Core:fixedDecimal:compareTo:14
 7221: call with 2 arguments
-7222: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+7222: pushConstant inline <symbol-id 24>
 7223: pushFromStack 3
 7224: pushFromStack 2
 7225: createList 3
@@ -8093,7 +8070,7 @@
 7235: call with 2 arguments
 7236: pushConstant inline builtinStructHasKey
 7237: pushFromStack 3
-7238: pushConstant <replaced address cbccca8f860c4fe3> <symbol-id 31>
+7238: pushConstant inline <symbol-id 31>
 7239: pushConstant <replaced address ccbc806fb265dad8> Core:fixedDecimal:compareTo:14
 7240: call with 2 arguments
 7241: pushFromStack 3
@@ -8113,7 +8090,7 @@
 7255: call with 2 arguments
 7256: pushConstant inline builtinEquals
 7257: pushFromStack 1
-7258: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+7258: pushConstant inline <symbol-id 24>
 7259: pushConstant <replaced address ccbc806fb265dad8> Core:fixedDecimal:compareTo:14
 7260: call with 2 arguments
 7261: pushFromStack 2
@@ -8134,7 +8111,7 @@
 # Core:fixedDecimal:compareTo:14:equals:then
 7275: pushConstant inline builtinStructHasKey
 7276: pushFromStack 2
-7277: pushConstant <replaced address 7a5008d85eea454e> <symbol-id 30>
+7277: pushConstant inline <symbol-id 30>
 7278: pushConstant <replaced address ccbc806fb265dad8> Core:fixedDecimal:compareTo:14
 7279: call with 2 arguments
 7280: pushFromStack 2
@@ -8154,7 +8131,7 @@
 7294: call with 2 arguments
 7295: pushConstant inline builtinEquals
 7296: pushFromStack 1
-7297: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+7297: pushConstant inline <symbol-id 24>
 7298: pushConstant <replaced address ccbc806fb265dad8> Core:fixedDecimal:compareTo:14
 7299: call with 2 arguments
 7300: pushFromStack 2
@@ -8170,7 +8147,7 @@
 7310: tailCall with 15 locals and 3 arguments
 # Core:fixedDecimal:compareTo:14:equals:else
 7311: pushConstant inline builtinToDebugText
-7312: pushConstant <replaced address 6ec64dfdd450650d> <symbol-id 17>
+7312: pushConstant inline <symbol-id 17>
 7313: pushConstant <replaced address ccbc806fb265dad8> Core:fixedDecimal:compareTo:14
 7314: call with 1 argument
 7315: pushConstant inline builtinToDebugText
@@ -8197,7 +8174,7 @@
 7336: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 7337: pushConstant <replaced address ccbc806fb265dad8> Core:fixedDecimal:compareTo:14
 7338: call with 2 arguments
-7339: pushConstant <replaced address 345d01fbc2621afa> <symbol-id 26>
+7339: pushConstant inline <symbol-id 26>
 7340: pushFromStack 1
 7341: createList 2
 7342: popMultipleBelowTop 8
@@ -8244,7 +8221,7 @@
 7381: pushConstant <replaced address ccbc806fb265dad8> Core:fixedDecimal:compareTo:14
 7382: call with 1 argument
 7383: pushConstant inline builtinEquals
-7384: pushConstant <replaced address 6ec64dfdd450650d> <symbol-id 17>
+7384: pushConstant inline <symbol-id 17>
 7385: pushFromStack 2
 7386: pushConstant <replaced address ccbc806fb265dad8> Core:fixedDecimal:compareTo:14
 7387: call with 2 arguments
@@ -8265,7 +8242,7 @@
 7402: call with 2 arguments
 7403: pushConstant inline builtinEquals
 7404: pushFromStack 1
-7405: pushConstant <replaced address 91637e8d741e05d0> <symbol-id 24>
+7405: pushConstant inline <symbol-id 24>
 7406: pushConstant <replaced address ccbc806fb265dad8> Core:fixedDecimal:compareTo:14
 7407: call with 2 arguments
 7408: pushFromStack 2
@@ -8294,7 +8271,7 @@
 7431: pushFromStack 0
 7432: pushConstant inline builtinEquals
 7433: pushFromStack 2
-7434: pushConstant <replaced address 56fa328b622fbbbd> <symbol-id 1>
+7434: pushConstant inline <symbol-id 1>
 7435: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 7436: call with 2 arguments
 7437: pushConstant inline builtinEquals
@@ -8374,7 +8351,7 @@
 7510: call with 2 arguments
 7511: pushConstant inline builtinEquals
 7512: pushFromStack 1
-7513: pushConstant <replaced address 9ced3967feb7e611> <symbol-id 5>
+7513: pushConstant inline <symbol-id 5>
 7514: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 7515: call with 2 arguments
 7516: pushConstant <replaced address 0dbf22825fe1d982> { 1 argument (capturing nothing) → ip-2826 }
@@ -8526,7 +8503,7 @@
 7656: call with 1 argument
 7657: pushConstant inline builtinEquals
 7658: pushFromStack 1
-7659: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+7659: pushConstant inline <symbol-id 6>
 7660: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 7661: call with 2 arguments
 7662: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -8541,7 +8518,7 @@
 7671: call with 1 argument
 7672: pushConstant inline builtinEquals
 7673: pushFromStack 1
-7674: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+7674: pushConstant inline <symbol-id 6>
 7675: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 7676: call with 2 arguments
 7677: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -8571,7 +8548,7 @@
 7700: call with 1 argument
 7701: pushConstant inline builtinEquals
 7702: pushFromStack 1
-7703: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+7703: pushConstant inline <symbol-id 6>
 7704: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 7705: call with 2 arguments
 7706: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -8586,7 +8563,7 @@
 7715: call with 1 argument
 7716: pushConstant inline builtinEquals
 7717: pushFromStack 1
-7718: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+7718: pushConstant inline <symbol-id 6>
 7719: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
 7720: call with 2 arguments
 7721: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -8620,7 +8597,7 @@
 7748: call with 1 argument
 7749: pushConstant inline builtinEquals
 7750: pushFromStack 1
-7751: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+7751: pushConstant inline <symbol-id 6>
 7752: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 7753: call with 2 arguments
 7754: pushFromStack 2
@@ -8711,7 +8688,7 @@
 7834: call with 1 argument
 7835: pushConstant inline builtinEquals
 7836: pushFromStack 1
-7837: pushConstant <replaced address 11bfd16c22947a37> <symbol-id 19>
+7837: pushConstant inline <symbol-id 19>
 7838: pushConstant <replaced address 679f517cd03c5fc7> Core:fixedDecimal:toText:23
 7839: call with 2 arguments
 7840: pushFromStack 5
@@ -8730,7 +8707,7 @@
 7853: call with 1 argument
 7854: pushConstant inline builtinEquals
 7855: pushFromStack 1
-7856: pushConstant <replaced address 11bfd16c22947a37> <symbol-id 19>
+7856: pushConstant inline <symbol-id 19>
 7857: pushConstant <replaced address 8a3c820c700a008a> Core:fixedDecimal:toText:30
 7858: call with 2 arguments
 7859: pushFromStack 9
@@ -8872,7 +8849,7 @@
 7989: call with 1 argument
 7990: pushConstant inline builtinEquals
 7991: pushFromStack 1
-7992: pushConstant <replaced address ee69fb1f25d9f0a6> <symbol-id 6>
+7992: pushConstant inline <symbol-id 6>
 7993: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
 7994: call with 2 arguments
 7995: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
@@ -8962,7 +8939,7 @@
 8076: call with 1 argument
 8077: pushConstant inline builtinEquals
 8078: pushFromStack 1
-8079: pushConstant <replaced address 11bfd16c22947a37> <symbol-id 19>
+8079: pushConstant inline <symbol-id 19>
 8080: pushConstant <replaced address b6da036781860061> Examples:sqrt:main:51
 8081: call with 2 arguments
 8082: pushFromStack 2
@@ -8995,6 +8972,6 @@
 8109: pushConstant <replaced address 55043490d5f24695> Builtins::print:11
 8110: tailCall with 16 locals and 1 argument
 # Examples:sqrt:
-8111: pushConstant <replaced address 1a5308383c99f99b> [CB1424D2291F6715 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-8055 }, D756856A10A63024 → <symbol-id 28>: { 2 arguments (capturing nothing) → ip-7937 }]
+8111: pushConstant <replaced address 3cc13d18269c7827> [3E2B0DC28FC21A8A → <symbol-id 28>: { 2 arguments (capturing nothing) → ip-7937 }, ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-8055 }]
 8112: popMultipleBelowTop 1
 8113: return
