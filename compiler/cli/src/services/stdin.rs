@@ -40,7 +40,7 @@ impl StdinService {
             };
             let packet = {
                 let mut heap = Heap::default();
-                let object = Text::create(&mut heap, &input).into();
+                let object = Text::create(&mut heap, true, &input).into();
                 Packet { heap, object }
             };
             vm.send(request.channel_id(), packet);

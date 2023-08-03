@@ -19,25 +19,27 @@ use std::{
 pub struct HeapList(HeapObject);
 
 impl HeapList {
-    const LEN_SHIFT: usize = 3;
+    const LEN_SHIFT: usize = 4;
 
     pub fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
-    pub fn create(heap: &mut Heap, value: &[InlineObject]) -> Self {
+    pub fn create(heap: &mut Heap, is_reference_counted: bool, value: &[InlineObject]) -> Self {
         let len = value.len();
-        let list = Self::create_uninitialized(heap, len);
+        let list = Self::create_uninitialized(heap, is_reference_counted, len);
         unsafe { ptr::copy_nonoverlapping(value.as_ptr(), list.items_pointer().as_ptr(), len) };
         list
     }
-    fn create_uninitialized(heap: &mut Heap, len: usize) -> Self {
+    fn create_uninitialized(heap: &mut Heap, is_reference_counted: bool, len: usize) -> Self {
         assert_eq!(
             (len << Self::LEN_SHIFT) >> Self::LEN_SHIFT,
             len,
             "List is too long.",
         );
         Self(heap.allocate(
-            HeapObject::KIND_LIST | ((len as u64) << Self::LEN_SHIFT),
+            HeapObject::KIND_LIST,
+            is_reference_counted,
+            (len as u64) << Self::LEN_SHIFT,
             len * HeapObject::WORD_SIZE,
         ))
     }
@@ -65,7 +67,7 @@ impl HeapList {
         assert!(index <= self.len());
 
         let len = self.len() + 1;
-        let new_list = Self::create_uninitialized(heap, len);
+        let new_list = Self::create_uninitialized(heap, true, len);
         unsafe {
             ptr::copy_nonoverlapping(
                 self.content_word_pointer(0).as_ptr(),
@@ -86,7 +88,7 @@ impl HeapList {
         assert!(index < self.len());
 
         let len = self.len() - 1;
-        let new_list = Self::create_uninitialized(heap, len);
+        let new_list = Self::create_uninitialized(heap, true, len);
         unsafe {
             ptr::copy_nonoverlapping(
                 self.content_word_pointer(0).as_ptr(),
@@ -105,7 +107,7 @@ impl HeapList {
     pub fn replace(self, heap: &mut Heap, index: usize, value: InlineObject) -> Self {
         assert!(index < self.len());
 
-        let new_list = Self::create(heap, self.items());
+        let new_list = Self::create(heap, true, self.items());
         unsafe { ptr::write(new_list.content_word_pointer(index).cast().as_ptr(), value) };
         new_list
     }

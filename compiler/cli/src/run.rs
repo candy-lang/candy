@@ -72,17 +72,10 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         ("Stdout", SendPort::create(&mut ended.heap, stdout.channel)),
         ("Stdin", SendPort::create(&mut ended.heap, stdin.channel)),
     ];
-    let environment = Struct::create_with_symbol_keys(&mut ended.heap, fields).into();
+    let environment = Struct::create_with_symbol_keys(&mut ended.heap, true, fields).into();
     let mut tracer = StackTracer::default();
-    let platform = HirId::create(&mut ended.heap, hir::Id::platform());
-    vm.initialize_for_function(
-        ended.heap,
-        ended.constant_mapping,
-        main,
-        &[environment],
-        platform,
-        &mut tracer,
-    );
+    let platform = HirId::create(&mut ended.heap, true, hir::Id::platform());
+    vm.initialize_for_function(ended.heap, main, &[environment], platform, &mut tracer);
     loop {
         match vm.status() {
             Status::CanRun => {

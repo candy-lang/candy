@@ -12,9 +12,8 @@
 use crate::heap::{Struct, Tag};
 use execution_controller::RunForever;
 use fiber::{EndedReason, VmEnded};
-use heap::{Function, Heap, HeapObject, InlineObject};
+use heap::{Function, Heap, InlineObject};
 use lir::Lir;
-use rustc_hash::FxHashMap;
 use std::borrow::Borrow;
 use tracer::Tracer;
 use tracing::{debug, error};
@@ -43,13 +42,11 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
 }
 
 impl VmEnded {
-    pub fn into_main_function(
-        mut self,
-    ) -> Result<(Heap, Function, FxHashMap<HeapObject, HeapObject>), String> {
+    pub fn into_main_function(mut self) -> Result<(Heap, Function), String> {
         match self.reason {
             EndedReason::Finished(return_value) => {
                 match return_value_into_main_function(&mut self.heap, return_value) {
-                    Ok(main) => Ok((self.heap, main, self.constant_mapping)),
+                    Ok(main) => Ok((self.heap, main)),
                     Err(err) => Err(err.to_string()),
                 }
             }
@@ -68,7 +65,7 @@ pub fn return_value_into_main_function(
     let exported_definitions: Struct = return_value.try_into().unwrap();
     debug!("The module exports these definitions: {exported_definitions}");
 
-    let main = Tag::create_from_str(heap, "Main", None);
+    let main = Tag::create_from_str(heap, true, "Main", None);
     exported_definitions
         .get(main)
         .ok_or("The module doesn't export a main function.")
