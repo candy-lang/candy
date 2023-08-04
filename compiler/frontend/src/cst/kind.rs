@@ -123,6 +123,7 @@ pub enum CstKind<D = CstData> {
 }
 pub type FunctionParametersAndArrow<D> = (Vec<Cst<D>>, Box<Cst<D>>);
 impl<D> CstKind<D> {
+    #[must_use]
     pub fn is_whitespace_or_comment(&self) -> bool {
         match self {
             CstKind::Whitespace(_) | CstKind::Newline(_) | CstKind::Comment { .. } => true,
@@ -131,6 +132,7 @@ impl<D> CstKind<D> {
         }
     }
 
+    #[must_use]
     pub fn children(&self) -> Vec<&Cst<D>> {
         match self {
             CstKind::EqualsSign

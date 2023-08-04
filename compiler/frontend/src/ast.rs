@@ -29,9 +29,11 @@ pub struct Id {
     pub local: usize,
 }
 impl Id {
+    #[must_use]
     pub fn new(module: Module, local: usize) -> Self {
         Self { module, local }
     }
+    #[must_use]
     pub fn to_short_debug_string(&self) -> String {
         format!("${}", self.local)
     }
@@ -266,6 +268,7 @@ impl FindAst for Vec<Ast> {
 }
 
 impl AstKind {
+    #[must_use]
     pub fn captured_identifiers(&self) -> FxHashMap<String, Vec<Id>> {
         let mut captured_identifiers = FxHashMap::default();
         self.captured_identifiers_helper(&mut captured_identifiers);

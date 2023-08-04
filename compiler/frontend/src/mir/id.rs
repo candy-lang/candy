@@ -8,6 +8,7 @@ use std::fmt::{self, Debug, Display, Formatter};
 #[derive(Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Id(usize);
 impl Id {
+    #[must_use]
     pub fn to_short_debug_string(&self) -> String {
         format!("${}", self.0)
     }

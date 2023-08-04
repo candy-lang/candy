@@ -59,6 +59,7 @@ lazy_static! {
 }
 
 impl BuiltinFunction {
+    #[must_use]
     pub fn is_pure(&self) -> bool {
         match self {
             BuiltinFunction::ChannelCreate => false,
@@ -113,6 +114,7 @@ impl BuiltinFunction {
         }
     }
 
+    #[must_use]
     pub fn num_parameters(&self) -> usize {
         match self {
             BuiltinFunction::ChannelCreate => 1,

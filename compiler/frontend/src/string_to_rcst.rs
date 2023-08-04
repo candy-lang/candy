@@ -33,6 +33,7 @@ fn rcst(db: &dyn StringToRcst, module: Module) -> RcstResult {
     };
     Ok(Arc::new(parse_rcst(source)))
 }
+#[must_use]
 pub fn parse_rcst(source: &str) -> Vec<Rcst> {
     let (mut rest, mut rcsts) = parse::body(source, 0);
     if !rest.is_empty() {
@@ -81,11 +82,13 @@ impl ToRichIr for ModuleError {
 }
 
 impl CstKind<()> {
+    #[must_use]
     fn wrap_in_whitespace(self, whitespace: Vec<Rcst>) -> Rcst {
         Rcst::from(self).wrap_in_whitespace(whitespace)
     }
 }
 impl Rcst {
+    #[must_use]
     fn wrap_in_whitespace(mut self, mut whitespace: Vec<Rcst>) -> Rcst {
         if whitespace.is_empty() {
             return self;
@@ -108,6 +111,7 @@ impl Rcst {
     }
 }
 
+#[must_use]
 fn whitespace_indentation_score(whitespace: &str) -> usize {
     whitespace
         .chars()

@@ -294,6 +294,7 @@ impl RichIrBuilder {
         );
     }
 
+    #[must_use]
     pub fn finish(mut self, trailing_newline: bool) -> RichIr {
         if trailing_newline && !self.ir.text.is_empty() && !self.ir.text.ends_with('\n') {
             self.push("\n", None, EnumSet::empty());
@@ -303,6 +304,7 @@ impl RichIrBuilder {
 }
 
 impl RichIr {
+    #[must_use]
     pub fn for_rcst(module: &Module, rcst: &RcstResult) -> Option<RichIr> {
         let mut builder = RichIrBuilder::default();
         builder.push(
@@ -319,6 +321,7 @@ impl RichIr {
         Some(builder.finish(true))
     }
 
+    #[must_use]
     pub fn for_cst(module: &Module, cst: &CstResult) -> Option<RichIr> {
         let mut builder = RichIrBuilder::default();
         builder.push(
@@ -342,6 +345,7 @@ impl RichIr {
         Some(builder.finish(true))
     }
 
+    #[must_use]
     pub fn for_ast(module: &Module, asts: &[Ast]) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
@@ -354,6 +358,7 @@ impl RichIr {
         builder.finish(true)
     }
 
+    #[must_use]
     pub fn for_hir(module: &Module, body: &hir::Body) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
@@ -366,6 +371,7 @@ impl RichIr {
         builder.finish(true)
     }
 
+    #[must_use]
     pub fn for_mir(module: &Module, mir: &Mir, tracing_config: &TracingConfig) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
@@ -380,6 +386,7 @@ impl RichIr {
         builder.finish(true)
     }
 
+    #[must_use]
     pub fn for_optimized_mir(module: &Module, mir: &Mir, tracing_config: &TracingConfig) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(

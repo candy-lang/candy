@@ -2,6 +2,7 @@ use super::{Cst, CstKind};
 use std::ops::Deref;
 
 pub trait UnwrapWhitespaceAndComment {
+    #[must_use]
     fn unwrap_whitespace_and_comment(&self) -> Self;
 }
 impl<D: Clone> UnwrapWhitespaceAndComment for Cst<D> {

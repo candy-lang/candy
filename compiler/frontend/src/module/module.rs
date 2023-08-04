@@ -26,6 +26,7 @@ pub enum ModuleKind {
 }
 
 impl Module {
+    #[must_use]
     pub fn from_package_name(name: String) -> Self {
         Module {
             package: Package::Managed(name.into()),
@@ -89,6 +90,7 @@ impl Module {
         })
     }
 
+    #[must_use]
     pub fn to_possible_paths(&self, packages_path: &PackagesPath) -> Option<Vec<PathBuf>> {
         let mut path = self.package.to_path(packages_path)?;
         for component in self.path.clone() {
@@ -110,6 +112,7 @@ impl Module {
             ],
         })
     }
+    #[must_use]
     fn try_to_path(&self, packages_path: &PackagesPath) -> Option<PathBuf> {
         let paths = self.to_possible_paths(packages_path).unwrap_or_else(|| {
             panic!(

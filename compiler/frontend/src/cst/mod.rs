@@ -35,6 +35,7 @@ impl Cst {
     ///
     /// For example, if a call contains errors, we want to only underline the
     /// name of the called function itself, not everything including arguments.
+    #[must_use]
     pub fn display_span(&self) -> Range<Offset> {
         match &self.kind {
             CstKind::TrailingWhitespace { child, .. } => child.display_span(),

@@ -8,6 +8,7 @@ pub struct TracingConfig {
     pub evaluated_expressions: TracingMode,
 }
 impl TracingConfig {
+    #[must_use]
     pub const fn off() -> Self {
         Self {
             register_fuzzables: TracingMode::Off,
@@ -16,6 +17,7 @@ impl TracingConfig {
         }
     }
 
+    #[must_use]
     pub fn for_child_module(&self) -> Self {
         Self {
             register_fuzzables: self.register_fuzzables.for_child_module(),
@@ -37,6 +39,7 @@ pub enum TracingMode {
     All,
 }
 impl TracingMode {
+    #[must_use]
     pub fn all_or_off(should_trace: bool) -> Self {
         if should_trace {
             TracingMode::All
@@ -45,6 +48,7 @@ impl TracingMode {
         }
     }
 
+    #[must_use]
     pub fn only_current_or_off(should_trace: bool) -> Self {
         if should_trace {
             TracingMode::OnlyCurrent
@@ -53,6 +57,7 @@ impl TracingMode {
         }
     }
 
+    #[must_use]
     pub fn is_enabled(&self) -> bool {
         match self {
             TracingMode::Off => false,
@@ -61,6 +66,7 @@ impl TracingMode {
         }
     }
 
+    #[must_use]
     pub fn for_child_module(&self) -> Self {
         match self {
             TracingMode::Off => TracingMode::Off,

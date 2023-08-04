@@ -20,6 +20,7 @@ pub struct InMemoryModuleProvider {
 impl InMemoryModuleProvider {
     // It's exported in `lib.rs`, but the linter still complains about it.
     #[allow(dead_code)]
+    #[must_use]
     pub fn for_modules<S: AsRef<str>>(modules: FxHashMap<Module, S>) -> Self {
         let mut result = Self::default();
         for (module, content) in modules {

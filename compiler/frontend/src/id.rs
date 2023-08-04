@@ -7,12 +7,14 @@ pub struct IdGenerator<T: CountableId> {
 }
 
 impl<T: CountableId> IdGenerator<T> {
+    #[must_use]
     pub fn start_at(id: usize) -> Self {
         Self {
             next_id: id,
             _data: PhantomData,
         }
     }
+    #[must_use]
     pub fn generate(&mut self) -> T {
         let id = self.next_id;
         self.next_id += 1;
@@ -27,6 +29,8 @@ impl<T: CountableId> Default for IdGenerator<T> {
 }
 
 pub trait CountableId {
+    #[must_use]
     fn from_usize(id: usize) -> Self;
+    #[must_use]
     fn to_usize(&self) -> usize;
 }

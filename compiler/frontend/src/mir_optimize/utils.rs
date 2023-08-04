@@ -7,6 +7,7 @@ impl Expression {
     /// All IDs defined inside this expression. For all expressions except
     /// functions, this returns an empty vector. The IDs are returned in the
     /// order that they are defined in.
+    #[must_use]
     pub fn defined_ids(&self) -> Vec<Id> {
         let mut defined = vec![];
         self.collect_defined_ids(&mut defined);
@@ -27,6 +28,7 @@ impl Expression {
     }
 }
 impl Body {
+    #[must_use]
     pub fn defined_ids(&self) -> Vec<Id> {
         let mut defined = vec![];
         self.collect_defined_ids(&mut defined);
@@ -46,6 +48,7 @@ impl Expression {
     /// order that they are referenced, which means that the vector may contain
     /// the same ID multiple times.
     // PERF: Maybe change this to accept a closure instead of collecting them to an `FxHashSet`
+    #[must_use]
     pub fn referenced_ids(&self) -> FxHashSet<Id> {
         let mut referenced = FxHashSet::default();
         self.collect_referenced_ids(&mut referenced);
@@ -140,6 +143,7 @@ impl Body {
 }
 
 impl Expression {
+    #[must_use]
     pub fn captured_ids(&self) -> FxHashSet<Id> {
         let mut ids = self.referenced_ids();
         for id in self.defined_ids() {
@@ -150,6 +154,7 @@ impl Expression {
 }
 
 impl Body {
+    #[must_use]
     pub fn all_ids(&self) -> FxHashSet<Id> {
         let mut ids = self.defined_ids().into_iter().collect();
         self.collect_referenced_ids(&mut ids);
@@ -158,6 +163,7 @@ impl Body {
 }
 
 impl Id {
+    #[must_use]
     pub fn semantically_equals(
         self,
         other: Id,

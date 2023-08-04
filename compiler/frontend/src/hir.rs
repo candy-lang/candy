@@ -143,6 +143,7 @@ pub enum IdKey {
     Positional(usize),
 }
 impl Id {
+    #[must_use]
     pub fn new(module: Module, keys: Vec<IdKey>) -> Self {
         Self { module, keys }
     }
@@ -163,17 +164,21 @@ impl Id {
     /// The user of the Candy tooling is responsible. For example, when the user
     /// instructs the tooling to run a non-existent module, then the program
     /// will panic with this responsiblity.
+    #[must_use]
     pub fn user() -> Self {
         Self::tooling("user".to_string())
     }
     /// Refers to the platform (non-Candy code).
+    #[must_use]
     pub fn platform() -> Self {
         Self::tooling("platform".to_string())
     }
+    #[must_use]
     pub fn fuzzer() -> Self {
         Self::tooling("fuzzer".to_string())
     }
     /// A dummy ID that is guaranteed to never be responsible for a panic.
+    #[must_use]
     pub fn dummy() -> Self {
         Self::tooling("dummy".to_string())
     }
@@ -184,10 +189,12 @@ impl Id {
     /// how that works so that the caller of the higher-order function is at
     /// fault when passing a panicking function. After we did that, we should be
     /// able to remove this ID.
+    #[must_use]
     pub fn complicated_responsibility() -> Self {
         Self::tooling("complicated-responsibility".to_string())
     }
 
+    #[must_use]
     pub fn needs() -> Self {
         Self {
             module: Module {
@@ -201,14 +208,17 @@ impl Id {
         }
     }
 
+    #[must_use]
     pub fn to_short_debug_string(&self) -> String {
         format!("${}", self.keys.iter().join(":"))
     }
 
+    #[must_use]
     pub fn is_root(&self) -> bool {
         self.keys.is_empty()
     }
 
+    #[must_use]
     pub fn parent(&self) -> Option<Id> {
         match self.keys.len() {
             0 => None,
@@ -219,6 +229,7 @@ impl Id {
         }
     }
 
+    #[must_use]
     pub fn child(&self, key: impl Into<IdKey>) -> Self {
         let mut keys = self.keys.clone();
         keys.push(key.into());
@@ -228,12 +239,14 @@ impl Id {
         }
     }
 
+    #[must_use]
     pub fn is_same_module_and_any_parent_of(&self, other: &Self) -> bool {
         self.module == other.module
             && self.keys.len() < other.keys.len()
             && self.keys.iter().zip(&other.keys).all(|(a, b)| a == b)
     }
 
+    #[must_use]
     pub fn function_name(&self) -> String {
         self.keys
             .iter()
@@ -340,6 +353,7 @@ pub enum Expression {
     },
 }
 impl Expression {
+    #[must_use]
     pub fn nothing() -> Self {
         Expression::Symbol("Nothing".to_string())
     }
@@ -455,6 +469,7 @@ impl Pattern {
     /// Returns a mapping from `PatternIdentifierId` to the position of the
     /// corresponding identifier in the `(Match, …)` result (zero-based,
     /// ignoring the `Match` symbol).
+    #[must_use]
     pub fn captured_identifiers(&self) -> Vec<PatternIdentifierId> {
         let mut ids = vec![];
         self.collect_captured_identifiers(&mut ids);
@@ -786,6 +801,7 @@ impl Expression {
     }
 }
 impl Body {
+    #[must_use]
     pub fn find(&self, id: &Id) -> Option<&Expression> {
         if let Some(expression) = self.expressions.get(id) {
             Some(expression)

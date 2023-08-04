@@ -197,6 +197,7 @@ impl Display for CompilerErrorPayload {
 }
 
 impl CompilerError {
+    #[must_use]
     pub fn to_related_information(&self) -> Vec<(Module, cst::Id, String)> {
         match &self.payload {
             CompilerErrorPayload::Ast(AstError::OrPatternIsMissingIdentifiers {

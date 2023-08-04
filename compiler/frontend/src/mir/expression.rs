@@ -90,12 +90,14 @@ pub enum Expression {
 }
 
 impl Expression {
+    #[must_use]
     pub fn tag(symbol: String) -> Self {
         Expression::Tag {
             symbol,
             value: None,
         }
     }
+    #[must_use]
     pub fn nothing() -> Self {
         Self::tag("Nothing".to_string())
     }

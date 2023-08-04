@@ -14,6 +14,7 @@ use strum_macros::EnumIs;
 pub struct PackagesPath(PathBuf);
 
 impl PackagesPath {
+    #[must_use]
     pub fn find_surrounding_package(&self, path: &Path) -> Option<Package> {
         let mut candidate = dunce::canonicalize(path).unwrap_or_else(|error| {
             panic!(
@@ -110,13 +111,16 @@ pub enum Package {
 }
 
 impl Package {
+    #[must_use]
     pub fn builtins() -> Package {
         Package::Managed(PathBuf::from("Builtins"))
     }
+    #[must_use]
     pub fn core() -> Package {
         Package::Managed(PathBuf::from("Core"))
     }
 
+    #[must_use]
     pub fn to_path(&self, packages_path: &PackagesPath) -> Option<PathBuf> {
         match self {
             Package::User(path) => Some(path.clone()),

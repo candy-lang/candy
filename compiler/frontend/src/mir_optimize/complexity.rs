@@ -63,11 +63,13 @@ impl fmt::Display for Complexity {
 }
 
 impl Mir {
+    #[must_use]
     pub fn complexity(&self) -> Complexity {
         self.body.complexity()
     }
 }
 impl Body {
+    #[must_use]
     pub fn complexity(&self) -> Complexity {
         self.iter()
             .fold(Complexity::none(), |complexity, (_, expression)| {

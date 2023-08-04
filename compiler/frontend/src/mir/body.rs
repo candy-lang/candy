@@ -22,14 +22,17 @@ pub struct Body {
     pub expressions: Vec<(Id, Expression)>,
 }
 impl Body {
+    #[must_use]
     pub fn new(expressions: Vec<(Id, Expression)>) -> Self {
         Self { expressions }
     }
+    #[must_use]
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = (Id, &Expression)> {
         self.expressions
             .iter()
             .map(|(id, expression)| (*id, expression))
     }
+    #[must_use]
     pub fn iter_mut(&mut self) -> impl DoubleEndedIterator<Item = (Id, &mut Expression)> {
         self.expressions
             .iter_mut()
@@ -45,6 +48,7 @@ impl IntoIterator for Body {
     }
 }
 impl Body {
+    #[must_use]
     pub fn return_value(&self) -> Id {
         let (id, _) = self.expressions.last().unwrap();
         *id
@@ -92,6 +96,7 @@ pub struct VisibleExpressions {
     expressions: FxHashMap<Id, Expression>,
 }
 impl VisibleExpressions {
+    #[must_use]
     pub fn none_visible() -> Self {
         Self {
             expressions: FxHashMap::default(),
@@ -103,11 +108,13 @@ impl VisibleExpressions {
     pub fn remove(&mut self, id: Id) -> Expression {
         self.expressions.remove(&id).unwrap()
     }
+    #[must_use]
     pub fn get(&self, id: Id) -> &Expression {
         self.expressions.get(&id).unwrap_or_else(|| {
             panic!("Expression with ID {id} is not visible in this scope. Visible expressions: {self:?}")
         })
     }
+    #[must_use]
     pub fn contains(&self, id: Id) -> bool {
         self.expressions.contains_key(&id)
     }
@@ -282,6 +289,7 @@ pub struct BodyBuilder {
     body: Body,
 }
 impl BodyBuilder {
+    #[must_use]
     pub fn new(id_generator: IdGenerator<Id>) -> Self {
         BodyBuilder {
             id_generator,
@@ -379,10 +387,12 @@ impl BodyBuilder {
         })
     }
 
+    #[must_use]
     pub fn current_return_value(&self) -> Id {
         self.body.return_value()
     }
 
+    #[must_use]
     pub fn finish(self) -> (IdGenerator<Id>, Body) {
         (self.id_generator, self.body)
     }
