@@ -519,7 +519,7 @@ mod parse {
     fn test_leading_indentation() {
         assert_eq!(
             leading_indentation("foo", 0),
-            Some(("foo", CstKind::Whitespace("".to_string()).into())),
+            Some(("foo", CstKind::Whitespace(String::new()).into())),
         );
         assert_eq!(
             leading_indentation("  foo", 1),
@@ -692,7 +692,7 @@ mod parse {
             .unwrap_or((
                 input,
                 CstKind::Error {
-                    unparsable_input: "".to_string(),
+                    unparsable_input: String::new(),
                     error: CstError::TextInterpolationMissesExpression,
                 }
                 .into(),
@@ -706,7 +706,7 @@ mod parse {
                 (
                     input,
                     vec![CstKind::Error {
-                        unparsable_input: "".to_string(),
+                        unparsable_input: String::new(),
                         error: CstError::TextInterpolationNotClosed,
                     }
                     .into()],
@@ -775,7 +775,7 @@ mod parse {
                 None => {
                     push_line_to_parts(&mut line, &mut parts);
                     break CstKind::Error {
-                        unparsable_input: "".to_string(),
+                        unparsable_input: String::new(),
                         error: CstError::TextNotClosed,
                     };
                 }
@@ -787,7 +787,7 @@ mod parse {
                     parts.append(&mut whitespace);
                     if let Some('\n') = input.chars().next() {
                         break CstKind::Error {
-                            unparsable_input: "".to_string(),
+                            unparsable_input: String::new(),
                             error: CstError::TextNotSufficientlyIndented,
                         };
                     }
@@ -869,7 +869,7 @@ mod parse {
                     parts: vec![CstKind::TextPart("foo".to_string()).into()],
                     closing: Box::new(
                         CstKind::Error {
-                            unparsable_input: "".to_string(),
+                            unparsable_input: String::new(),
                             error: CstError::TextNotSufficientlyIndented,
                         }
                         .into(),
@@ -893,7 +893,7 @@ mod parse {
                     parts: vec![CstKind::TextPart("foo".to_string()).into()],
                     closing: Box::new(
                         CstKind::Error {
-                            unparsable_input: "".to_string(),
+                            unparsable_input: String::new(),
                             error: CstError::TextNotClosed,
                         }
                         .into(),
@@ -1204,7 +1204,7 @@ mod parse {
                             opening_curly_braces: vec![CstKind::OpeningCurlyBrace.into()],
                             expression: Box::new(
                                 CstKind::Error {
-                                    unparsable_input: "".to_string(),
+                                    unparsable_input: String::new(),
                                     error: CstError::TextInterpolationMissesExpression,
                                 }
                                 .into(),
@@ -1261,7 +1261,7 @@ mod parse {
                                             parts: vec![],
                                             closing: Box::new(
                                                 CstKind::Error {
-                                                    unparsable_input: "".to_string(),
+                                                    unparsable_input: String::new(),
                                                     error: CstError::TextNotClosed,
                                                 }
                                                 .into()
@@ -1273,7 +1273,7 @@ mod parse {
                                 .into(),
                             ),
                             closing_curly_braces: vec![CstKind::Error {
-                                unparsable_input: "".to_string(),
+                                unparsable_input: String::new(),
                                 error: CstError::TextInterpolationNotClosed,
                             }
                             .into()],
@@ -1282,7 +1282,7 @@ mod parse {
                     ],
                     closing: Box::new(
                         CstKind::Error {
-                            unparsable_input: "".to_string(),
+                            unparsable_input: String::new(),
                             error: CstError::TextNotClosed,
                         }
                         .into(),
@@ -1530,7 +1530,7 @@ mod parse {
         let (input, call) =
             expression(input, indentation, false, true, false).unwrap_or_else(|| {
                 let error = CstKind::Error {
-                    unparsable_input: "".to_string(),
+                    unparsable_input: String::new(),
                     error: CstError::BinaryBarMissesRight,
                 };
                 (input, error.into())
@@ -1579,7 +1579,7 @@ mod parse {
         if cases.is_empty() {
             cases.push(
                 CstKind::Error {
-                    unparsable_input: "".to_string(),
+                    unparsable_input: String::new(),
                     error: CstError::MatchMissesCases,
                 }
                 .into(),
@@ -2012,7 +2012,7 @@ mod parse {
                     expression: Box::new(build_identifier("foo").with_trailing_space()),
                     percent: Box::new(CstKind::Percent.into()),
                     cases: vec![CstKind::Error {
-                        unparsable_input: "".to_string(),
+                        unparsable_input: String::new(),
                         error: CstError::MatchMissesCases,
                     }
                     .into()],
@@ -2028,7 +2028,7 @@ mod parse {
                     expression: Box::new(build_identifier("foo").with_trailing_space()),
                     percent: Box::new(CstKind::Percent.into()),
                     cases: vec![CstKind::Error {
-                        unparsable_input: "".to_string(),
+                        unparsable_input: String::new(),
                         error: CstError::MatchMissesCases,
                     }
                     .into()],
@@ -2364,7 +2364,7 @@ mod parse {
                     None => (
                         new_input,
                         CstKind::Error {
-                            unparsable_input: "".to_string(),
+                            unparsable_input: String::new(),
                             error: CstError::ListItemMissesValue,
                         }
                         .into(),
@@ -2419,7 +2419,7 @@ mod parse {
             None => (
                 input,
                 CstKind::Error {
-                    unparsable_input: "".to_string(),
+                    unparsable_input: String::new(),
                     error: CstError::ListNotClosed,
                 }
                 .into(),
@@ -2598,7 +2598,7 @@ mod parse {
                 _ => (
                     input,
                     CstKind::Error {
-                        unparsable_input: "".to_string(),
+                        unparsable_input: String::new(),
                         error: CstError::StructFieldMissesColon,
                     }
                     .into(),
@@ -2620,7 +2620,7 @@ mod parse {
                     None => (
                         input,
                         CstKind::Error {
-                            unparsable_input: "".to_string(),
+                            unparsable_input: String::new(),
                             error: CstError::StructFieldMissesValue,
                         }
                         .into(),
@@ -2648,7 +2648,7 @@ mod parse {
             let is_using_shorthand = key_or_value.is_some() && !has_colon && !has_value;
             let key_or_value = key_or_value.unwrap_or_else(|| {
                 CstKind::Error {
-                    unparsable_input: "".to_string(),
+                    unparsable_input: String::new(),
                     error: if is_using_shorthand {
                         CstError::StructFieldMissesValue
                     } else {
@@ -2693,7 +2693,7 @@ mod parse {
             None => (
                 input,
                 CstKind::Error {
-                    unparsable_input: "".to_string(),
+                    unparsable_input: String::new(),
                     error: CstError::StructNotClosed,
                 }
                 .into(),
@@ -2799,7 +2799,7 @@ mod parse {
                     .into()],
                     closing_bracket: Box::new(
                         CstKind::Error {
-                            unparsable_input: "".to_string(),
+                            unparsable_input: String::new(),
                             error: CstError::StructNotClosed,
                         }
                         .into()
@@ -2868,7 +2868,7 @@ mod parse {
         let (input, inner) = expression(input, inner_indentation, false, true, true).unwrap_or((
             input,
             CstKind::Error {
-                unparsable_input: "".to_string(),
+                unparsable_input: String::new(),
                 error: CstError::OpeningParenthesisMissesExpression,
             }
             .into(),
@@ -2880,7 +2880,7 @@ mod parse {
         let (input, closing_parenthesis) = closing_parenthesis(input).unwrap_or((
             input,
             CstKind::Error {
-                unparsable_input: "".to_string(),
+                unparsable_input: String::new(),
                 error: CstError::ParenthesisNotClosed,
             }
             .into(),
@@ -2920,7 +2920,7 @@ mod parse {
                     inner: Box::new(build_identifier("foo")),
                     closing_parenthesis: Box::new(
                         CstKind::Error {
-                            unparsable_input: "".to_string(),
+                            unparsable_input: String::new(),
                             error: CstError::ParenthesisNotClosed
                         }
                         .into()
@@ -3015,7 +3015,7 @@ mod parse {
             (input, arrow.wrap_in_whitespace(whitespace))
         } else {
             let error = CstKind::Error {
-                unparsable_input: "".to_string(),
+                unparsable_input: String::new(),
                 error: CstError::MatchCaseMissesArrow,
             };
             (input, error.into())
@@ -3025,7 +3025,7 @@ mod parse {
         if body.is_empty() {
             body.push(
                 CstKind::Error {
-                    unparsable_input: "".to_string(),
+                    unparsable_input: String::new(),
                     error: CstError::MatchCaseMissesBody,
                 }
                 .into(),
@@ -3114,7 +3114,7 @@ mod parse {
                         body,
                         vec![],
                         CstKind::Error {
-                            unparsable_input: "".to_string(),
+                            unparsable_input: String::new(),
                             error: CstError::CurlyBraceNotClosed,
                         }
                         .into(),
@@ -3198,7 +3198,7 @@ mod parse {
                     body: vec![],
                     closing_curly_brace: Box::new(
                         CstKind::Error {
-                            unparsable_input: "".to_string(),
+                            unparsable_input: String::new(),
                             error: CstError::CurlyBraceNotClosed
                         }
                         .into()
@@ -3219,7 +3219,7 @@ mod parse {
                     body: vec![],
                     closing_curly_brace: Box::new(
                         CstKind::Error {
-                            unparsable_input: "".to_string(),
+                            unparsable_input: String::new(),
                             error: CstError::CurlyBraceNotClosed
                         }
                         .into()

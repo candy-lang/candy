@@ -490,7 +490,7 @@ impl Context<'_> {
                     None,
                 )
             })
-            .unwrap_or_else(|| self.push(id, Expression::Text("".to_string()), None))
+            .unwrap_or_else(|| self.push(id, Expression::Text(String::new()), None))
     }
 
     fn compile_function(
