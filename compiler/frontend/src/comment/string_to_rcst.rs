@@ -839,14 +839,15 @@ mod parse {
 
     #[instrument]
     fn url_line(input: Vec<&str>) -> Option<(Vec<&str>, Rcst)> {
+        fn is_whitespace(character: char) -> bool {
+            SUPPORTED_WHITESPACE.contains(character)
+        }
+
         if let [line, remaining @ ..] = input.as_slice() {
             if !line.starts_with("https://") && !line.starts_with("http://") {
                 return None;
             }
 
-            fn is_whitespace(character: char) -> bool {
-                SUPPORTED_WHITESPACE.contains(character)
-            }
             let end_index = line.find(is_whitespace).unwrap_or(line.len());
 
             // TODO: handle violations

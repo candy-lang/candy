@@ -1369,6 +1369,7 @@ mod parse {
         loop {
             let mut did_make_progress = false;
 
+            #[allow(clippy::items_after_statements)]
             fn parse_suffix<'input>(
                 input: &mut &'input str,
                 indentation: usize,
