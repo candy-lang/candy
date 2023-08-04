@@ -35,7 +35,7 @@ pub type AstResult = Result<(Arc<Vec<Ast>>, Arc<FxHashMap<ast::Id, cst::Id>>), M
 
 fn ast_to_cst_id(db: &dyn CstToAst, id: &ast::Id) -> Option<cst::Id> {
     let (_, ast_to_cst_id_mapping) = db.ast(id.module.clone()).ok()?;
-    ast_to_cst_id_mapping.get(id).cloned()
+    ast_to_cst_id_mapping.get(id).copied()
 }
 fn ast_id_to_span(db: &dyn CstToAst, id: &ast::Id) -> Option<Range<Offset>> {
     let cst_id = db.ast_to_cst_id(id)?;
@@ -333,7 +333,7 @@ impl LoweringContext {
                             let all_captures = captured_identifiers
                                 .iter()
                                 .flat_map(|it| it.get(identifier).unwrap_or(&empty_vec))
-                                .filter_map(|it| self.id_mapping.get(it).cloned())
+                                .filter_map(|it| self.id_mapping.get(it).copied())
                                 .collect_vec();
                             errors.push(self.create_error(
                                 left,
