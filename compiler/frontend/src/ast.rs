@@ -278,20 +278,20 @@ impl AstKind {
                 let entry = captured_identifiers
                     .entry(identifier.value.clone())
                     .or_insert_with(Vec::new);
-                entry.push(identifier.id.clone())
+                entry.push(identifier.id.clone());
             }
             AstKind::Symbol(_) => {}
             AstKind::List(List(list)) => {
                 for item in list {
-                    item.captured_identifiers_helper(captured_identifiers)
+                    item.captured_identifiers_helper(captured_identifiers);
                 }
             }
             AstKind::Struct(Struct { fields }) => {
                 for (key, value) in fields {
                     if let Some(key) = key {
-                        key.captured_identifiers_helper(captured_identifiers)
+                        key.captured_identifiers_helper(captured_identifiers);
                     }
-                    value.captured_identifiers_helper(captured_identifiers)
+                    value.captured_identifiers_helper(captured_identifiers);
                 }
             }
             AstKind::StructAccess(_)
@@ -307,7 +307,7 @@ impl AstKind {
             }
             AstKind::Error { child, .. } => {
                 if let Some(child) = child {
-                    child.captured_identifiers_helper(captured_identifiers)
+                    child.captured_identifiers_helper(captured_identifiers);
                 }
             }
         }
@@ -333,7 +333,7 @@ impl CollectErrors for Ast {
             AstKind::Struct(struct_) => {
                 for (key, value) in struct_.fields {
                     if let Some(key) = key {
-                        key.collect_errors(errors)
+                        key.collect_errors(errors);
                     }
                     value.collect_errors(errors);
                 }
@@ -345,7 +345,7 @@ impl CollectErrors for Ast {
             AstKind::Call(call) => call.arguments.collect_errors(errors),
             AstKind::Assignment(assignment) => match assignment.body {
                 AssignmentBody::Function { name: _, function } => {
-                    function.body.collect_errors(errors)
+                    function.body.collect_errors(errors);
                 }
                 AssignmentBody::Body { pattern, body } => {
                     pattern.collect_errors(errors);
@@ -373,7 +373,7 @@ impl CollectErrors for Ast {
             } => {
                 errors.append(&mut recovered_errors);
                 if let Some(child) = child {
-                    child.collect_errors(errors)
+                    child.collect_errors(errors);
                 }
             }
         }
@@ -527,7 +527,7 @@ impl ToRichIr for Assignment {
         match &self.body {
             AssignmentBody::Function { function, .. } => function.build_rich_ir(builder),
             AssignmentBody::Body { body, .. } => {
-                builder.push_foldable(|builder| builder.push_children_multiline(body))
+                builder.push_foldable(|builder| builder.push_children_multiline(body));
             }
         }
     }

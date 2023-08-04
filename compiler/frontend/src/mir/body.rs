@@ -234,7 +234,7 @@ impl Body {
 impl Expression {
     pub fn visit_bodies(&mut self, visitor: &mut dyn FnMut(&mut Body)) {
         if let Expression::Function { body, .. } = self {
-            body.visit_bodies(visitor)
+            body.visit_bodies(visitor);
         }
     }
 }

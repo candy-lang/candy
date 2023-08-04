@@ -489,10 +489,10 @@ mod parse {
                         }
                     }
                     '[' if !self.is_in_link() && !self.is_in_code() => {
-                        self.start_formatting(InlineFormatting::Link)
+                        self.start_formatting(InlineFormatting::Link);
                     }
                     ']' if self.is_in_link() && !self.is_in_code() => {
-                        self.end_formatting(InlineFormatting::Link, true)
+                        self.end_formatting(InlineFormatting::Link, true);
                     }
                     '`' => {
                         if !self.is_in_code() {

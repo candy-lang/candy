@@ -343,7 +343,7 @@ impl LoweringContext {
                                         number_of_missing_captures.try_into().unwrap(),
                                     all_captures,
                                 },
-                            ))
+                            ));
                         }
 
                         let ast =
@@ -546,7 +546,7 @@ impl LoweringContext {
                                         errors: vec![self
                                             .create_error(colon, AstError::StructKeyMissesColon)],
                                     },
-                                )
+                                );
                             }
 
                             let mut value = self.lower_cst(&value.clone(), lowering_type);
@@ -561,7 +561,7 @@ impl LoweringContext {
                                             AstError::StructValueMissesComma,
                                         )],
                                     },
-                                )
+                                );
                             }
                             Some((Some(key), value))
                         } else {
@@ -578,7 +578,7 @@ impl LoweringContext {
                                             AstError::StructShorthandWithNotIdentifier,
                                         )],
                                     },
-                                )
+                                );
                             }
 
                             if let Some(comma) = comma && !comma.kind.is_comma() {
@@ -591,7 +591,7 @@ impl LoweringContext {
                                             AstError::StructValueMissesComma,
                                         )],
                                     },
-                                )
+                                );
                             }
                             Some((None, ast))
                         }

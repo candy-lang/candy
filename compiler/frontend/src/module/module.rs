@@ -142,7 +142,7 @@ impl Module {
             warn!(
                 "Couldn't write to associated debug file {}: {error}.",
                 path.to_string_lossy(),
-            )
+            );
         });
     }
 }

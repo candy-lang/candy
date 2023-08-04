@@ -166,7 +166,9 @@ impl RichIrBuilder {
     where
         C: ToRichIr + 'c,
     {
-        self.push_children_custom_multiline(children, |builder, child| child.build_rich_ir(builder))
+        self.push_children_custom_multiline(children, |builder, child| {
+            child.build_rich_ir(builder)
+        });
     }
     pub fn push_children_custom_multiline<C>(
         &mut self,
@@ -190,7 +192,7 @@ impl RichIrBuilder {
             children,
             |builder, child| child.build_rich_ir(builder),
             separator,
-        )
+        );
     }
     pub fn push_children_custom<C>(
         &mut self,

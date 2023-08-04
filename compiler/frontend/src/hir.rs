@@ -577,7 +577,7 @@ impl ToRichIr for Expression {
                 pattern.build_rich_ir(builder);
             }
             Expression::PatternIdentifierReference(identifier_id) => {
-                identifier_id.build_rich_ir(builder)
+                identifier_id.build_rich_ir(builder);
             }
             Expression::Match { expression, cases } => {
                 expression.build_rich_ir(builder);

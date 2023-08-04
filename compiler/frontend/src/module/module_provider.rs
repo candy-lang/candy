@@ -32,7 +32,7 @@ impl InMemoryModuleProvider {
         self.modules.insert(module.clone(), Arc::new(content));
     }
     pub fn add_str<S: AsRef<str>>(&mut self, module: &Module, content: S) {
-        self.add(module, content.as_ref().as_bytes().to_vec())
+        self.add(module, content.as_ref().as_bytes().to_vec());
     }
     pub fn remove(&mut self, module: &Module) {
         self.modules.remove(module);
