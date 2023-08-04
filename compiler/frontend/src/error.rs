@@ -207,7 +207,7 @@ impl CompilerError {
                 .map(|capture| {
                     (
                         self.module.clone(),
-                        capture.clone(),
+                        *capture,
                         "The identifier is bound here.".to_string(),
                     )
                 })

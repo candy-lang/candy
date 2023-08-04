@@ -734,7 +734,7 @@ impl LoweringContext {
                 {
                     let name = match &name.kind {
                         CstKind::Identifier(identifier) => {
-                            self.create_string(name.data.id.clone(), identifier.clone())
+                            self.create_string(name.data.id, identifier.clone())
                         }
                         CstKind::Error { error, .. } => {
                             return self.create_ast(
@@ -815,8 +815,7 @@ impl LoweringContext {
 
         match key.kind.clone() {
             CstKind::Identifier(identifier) => {
-                let key =
-                    self.create_string(key.data.id.clone(), identifier.uppercase_first_letter());
+                let key = self.create_string(key.data.id, identifier.uppercase_first_letter());
                 self.create_ast(
                     id,
                     AstKind::StructAccess(ast::StructAccess {
@@ -826,7 +825,7 @@ impl LoweringContext {
                 )
             }
             CstKind::Error { error, .. } => self.create_ast(
-                id.clone(),
+                id,
                 AstKind::Error {
                     child: None,
                     errors: vec![CompilerError {
@@ -860,7 +859,7 @@ impl LoweringContext {
     }
     fn lower_parameter(&mut self, cst: &Cst) -> Result<AstString, Box<CompilerError>> {
         if let CstKind::Identifier(identifier) = &cst.kind {
-            Ok(self.create_string(cst.data.id.clone(), identifier.clone()))
+            Ok(self.create_string(cst.data.id, identifier.clone()))
         } else {
             Err(Box::new(
                 self.create_error(cst, AstError::ExpectedParameter),

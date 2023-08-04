@@ -825,7 +825,7 @@ impl<'a> PatternContext<'a> {
                     .identifier_ids
                     .entry(name.value.clone())
                     .or_insert_with(|| (ast.id.clone(), self.identifier_id_generator.generate()));
-                Pattern::NewIdentifier(pattern_id.clone())
+                Pattern::NewIdentifier(*pattern_id)
             }
             AstKind::Symbol(Symbol(symbol)) => Pattern::Tag {
                 symbol: symbol.value.clone(),
