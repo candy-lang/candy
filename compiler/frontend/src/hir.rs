@@ -238,7 +238,7 @@ impl Id {
             .iter()
             .map(|it| match it {
                 IdKey::Positional(index) => format!("<anonymous {index}>"),
-                it => it.to_string(),
+                IdKey::Named { name, .. } => name.to_string(),
             })
             .join(" → ")
     }

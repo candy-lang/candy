@@ -86,7 +86,7 @@ pub fn eliminate_common_subtrees(body: &mut Body, pureness: &PurenessInsights) {
                     }
                 }
             }
-            _ => {
+            Entry::Vacant(_) => {
                 existing_entry.insert_entry(*id);
             }
         }
