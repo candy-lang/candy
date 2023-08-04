@@ -153,10 +153,7 @@ impl ToRichIr for Module {
             format!(
                 "{}:{}",
                 self.package,
-                self.path
-                    .iter()
-                    .map(|component| component.to_string())
-                    .join("/"),
+                self.path.iter().map(ToString::to_string).join("/"),
             ),
             TokenType::Module,
             EnumSet::default(),

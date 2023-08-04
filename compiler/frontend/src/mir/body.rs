@@ -120,7 +120,7 @@ impl Debug for VisibleExpressions {
             self.expressions
                 .keys()
                 .sorted()
-                .map(|id| id.to_string())
+                .map(ToString::to_string)
                 .join(", "),
         )
     }

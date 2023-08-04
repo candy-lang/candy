@@ -3334,10 +3334,7 @@ mod parse {
         fn with_trailing_whitespace(self, trailing_whitespace: Vec<CstKind<()>>) -> Rcst {
             CstKind::TrailingWhitespace {
                 child: Box::new(self),
-                whitespace: trailing_whitespace
-                    .into_iter()
-                    .map(|it| it.into())
-                    .collect(),
+                whitespace: trailing_whitespace.into_iter().map(Into::into).collect(),
             }
             .into()
         }

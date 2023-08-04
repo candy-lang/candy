@@ -328,14 +328,14 @@ impl TreeWithIds for Cst {
 }
 impl<T: TreeWithIds> TreeWithIds for Option<T> {
     fn first_id(&self) -> Option<Id> {
-        self.as_ref().and_then(|it| it.first_id())
+        self.as_ref().and_then(TreeWithIds::first_id)
     }
     fn find(&self, id: Id) -> Option<&Cst> {
         self.as_ref().and_then(|it| it.find(id))
     }
 
     fn first_offset(&self) -> Option<Offset> {
-        self.as_ref().and_then(|it| it.first_offset())
+        self.as_ref().and_then(TreeWithIds::first_offset)
     }
     fn find_by_offset(&self, offset: Offset) -> Option<&Cst> {
         self.as_ref().and_then(|it| it.find_by_offset(offset))
@@ -359,7 +359,7 @@ impl<T: TreeWithIds> TreeWithIds for Box<T> {
 impl<T: TreeWithIds> TreeWithIds for [T] {
     fn first_id(&self) -> Option<Id> {
         self.iter()
-            .map(|it| it.first_id())
+            .map(TreeWithIds::first_id)
             .filter_map(Some)
             .next()
             .flatten()
@@ -374,7 +374,7 @@ impl<T: TreeWithIds> TreeWithIds for [T] {
 
     fn first_offset(&self) -> Option<Offset> {
         self.iter()
-            .map(|it| it.first_offset())
+            .map(TreeWithIds::first_offset)
             .filter_map(Some)
             .next()
             .flatten()

@@ -34,7 +34,7 @@ fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
         panic!("You can't get the root because that got lowered into multiple IDs.");
     }
 
-    hir.find(&id).map(|it| it.clone())
+    hir.find(&id).cloned()
 }
 fn containing_body_of(db: &dyn HirDb, id: Id) -> Arc<Body> {
     let parent_id = id.parent().expect("The root scope has no parent.");
@@ -410,7 +410,7 @@ impl Pattern {
                 .as_ref()
                 .map(|value| value.contains_captured_identifiers())
                 .unwrap_or_default(),
-            Pattern::List(list) => list.iter().any(|it| it.contains_captured_identifiers()),
+            Pattern::List(list) => list.iter().any(Pattern::contains_captured_identifiers),
             Pattern::Struct(struct_) => struct_
                 .iter()
                 .any(|(_, value_pattern)| value_pattern.contains_captured_identifiers()),
@@ -429,7 +429,7 @@ impl Pattern {
                 .as_ref()
                 .map(|value| value.captured_identifier_count())
                 .unwrap_or_default(),
-            Pattern::List(list) => list.iter().map(|it| it.captured_identifier_count()).sum(),
+            Pattern::List(list) => list.iter().map(Pattern::captured_identifier_count).sum(),
             Pattern::Struct(struct_) => struct_
                 .iter()
                 .map(|(key, value)| {

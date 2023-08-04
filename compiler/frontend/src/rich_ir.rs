@@ -329,7 +329,7 @@ impl RichIr {
             Ok(cst) => {
                 // TODO: `impl ToRichIr for Cst`
                 builder.push(
-                    cst.iter().map(|it| it.to_string()).join(""),
+                    cst.iter().map(ToString::to_string).join(""),
                     None,
                     EnumSet::empty(),
                 );

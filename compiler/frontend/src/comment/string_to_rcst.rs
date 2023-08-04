@@ -1044,7 +1044,7 @@ mod parse {
     fn ordered_list_item_marker(mut line: &str) -> Option<(&str, RcstListItemMarker, usize)> {
         let number = line
             .chars()
-            .take_while(|it| it.is_ascii_digit())
+            .take_while(char::is_ascii_digit)
             .collect::<String>();
         if number.is_empty() {
             return None;

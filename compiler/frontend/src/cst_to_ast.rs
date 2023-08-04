@@ -14,7 +14,7 @@ use crate::{
     string_to_rcst::ModuleError,
     utils::AdjustCasingOfFirstLetter,
 };
-use std::{ops::Range, sync::Arc};
+use std::{collections::HashMap, ops::Range, sync::Arc};
 
 #[salsa::query_group(CstToAstStorage)]
 pub trait CstToAst: CstDb + RcstToCst {
@@ -318,7 +318,7 @@ impl LoweringContext {
                             .collect_vec();
                         let all_identifiers = captured_identifiers
                             .iter()
-                            .flat_map(|it| it.keys())
+                            .flat_map(HashMap::keys)
                             .collect::<FxHashSet<_>>();
                         for identifier in all_identifiers {
                             let number_of_missing_captures = captured_identifiers

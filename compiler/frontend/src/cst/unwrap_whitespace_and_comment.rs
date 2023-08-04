@@ -100,7 +100,7 @@ impl<D: Clone> UnwrapWhitespaceAndComment for Cst<D> {
                 value: value.unwrap_whitespace_and_comment(),
                 comma: comma
                     .as_ref()
-                    .map(|comma| comma.unwrap_whitespace_and_comment()),
+                    .map(UnwrapWhitespaceAndComment::unwrap_whitespace_and_comment),
             },
             CstKind::Struct {
                 opening_bracket,
@@ -125,7 +125,7 @@ impl<D: Clone> UnwrapWhitespaceAndComment for Cst<D> {
                 value: value.unwrap_whitespace_and_comment(),
                 comma: comma
                     .as_ref()
-                    .map(|comma| comma.unwrap_whitespace_and_comment()),
+                    .map(UnwrapWhitespaceAndComment::unwrap_whitespace_and_comment),
             },
             CstKind::StructAccess { struct_, dot, key } => CstKind::StructAccess {
                 struct_: struct_.unwrap_whitespace_and_comment(),
@@ -192,7 +192,7 @@ impl<D: Clone> UnwrapWhitespaceAndComment for Vec<Cst<D>> {
     fn unwrap_whitespace_and_comment(&self) -> Self {
         self.iter()
             .filter(|it| !it.is_whitespace_or_comment())
-            .map(|it| it.unwrap_whitespace_and_comment())
+            .map(UnwrapWhitespaceAndComment::unwrap_whitespace_and_comment)
             .collect()
     }
 }

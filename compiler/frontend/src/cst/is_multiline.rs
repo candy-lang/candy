@@ -154,7 +154,7 @@ impl IsMultiline for str {
 
 impl<C: IsMultiline> IsMultiline for Vec<C> {
     fn is_multiline(&self) -> bool {
-        self.iter().any(|cst| cst.is_multiline())
+        self.iter().any(IsMultiline::is_multiline)
     }
 }
 
