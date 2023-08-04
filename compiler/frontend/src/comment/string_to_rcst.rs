@@ -482,10 +482,10 @@ mod parse {
             while let Some(character) = characters.next() {
                 match character {
                     '_' if !self.is_in_code() => {
-                        if !self.is_in_emphasized() {
-                            self.start_formatting(InlineFormatting::Emphasized);
-                        } else {
+                        if self.is_in_emphasized() {
                             self.end_formatting(InlineFormatting::Emphasized, true);
+                        } else {
+                            self.start_formatting(InlineFormatting::Emphasized);
                         }
                     }
                     '[' if !self.is_in_link() && !self.is_in_code() => {
@@ -495,10 +495,10 @@ mod parse {
                         self.end_formatting(InlineFormatting::Link, true);
                     }
                     '`' => {
-                        if !self.is_in_code() {
-                            self.start_formatting(InlineFormatting::Code);
-                        } else {
+                        if self.is_in_code() {
                             self.end_formatting(InlineFormatting::Code, true);
+                        } else {
+                            self.start_formatting(InlineFormatting::Code);
                         }
                     }
                     '\\' => {
