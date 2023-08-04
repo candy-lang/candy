@@ -10,7 +10,7 @@ impl<T: CountableId> IdGenerator<T> {
     pub fn start_at(id: usize) -> Self {
         Self {
             next_id: id,
-            _data: PhantomData::default(),
+            _data: PhantomData,
         }
     }
     pub fn generate(&mut self) -> T {
