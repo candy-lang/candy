@@ -30,9 +30,10 @@ pub trait HirDb: AstToHir {
 #[allow(clippy::needless_pass_by_value)]
 fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
     let (hir, _) = db.hir(id.module.clone()).ok()?;
-    if id.is_root() {
-        panic!("You can't get the root because that got lowered into multiple IDs.");
-    }
+    assert!(
+        !id.is_root(),
+        "You can't get the root because that got lowered into multiple IDs.",
+    );
 
     hir.find(&id).cloned()
 }
