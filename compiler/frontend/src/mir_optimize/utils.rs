@@ -326,7 +326,7 @@ impl Expression {
 impl Body {
     pub fn replace_ids(&mut self, replacer: &mut impl FnMut(&mut Id)) {
         let body = mem::take(self);
-        for (mut id, mut expression) in body.into_iter() {
+        for (mut id, mut expression) in body {
             replacer(&mut id);
             expression.replace_ids(replacer);
             self.push(id, expression);

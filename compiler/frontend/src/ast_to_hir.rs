@@ -503,7 +503,7 @@ impl Context<'_> {
         let function_id = self.create_next_id(Some(id), identifier);
         self.id_prefix = function_id.clone();
 
-        for parameter in function.parameters.iter() {
+        for parameter in &function.parameters {
             let name = parameter.value.to_string();
             let id = self.create_next_id(Some(parameter.id.clone()), Some(name.clone()));
             self.body.identifiers.insert(id.clone(), name.clone());

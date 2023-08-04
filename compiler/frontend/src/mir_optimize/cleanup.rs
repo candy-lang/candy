@@ -35,7 +35,7 @@ impl Mir {
         // PERF: use `partition_point` instead of moving expressions to a new body
         let mut still_constants = true;
         let old_body = mem::take(&mut self.body);
-        for (id, expression) in old_body.into_iter() {
+        for (id, expression) in old_body {
             if still_constants && !pureness.is_definition_const(&expression) {
                 still_constants = false;
                 Self::sort_constants(&mut self.body);

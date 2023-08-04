@@ -373,7 +373,7 @@ fn run_builtin(
             };
 
             let mut is_contained = Some(false);
-            for (k, _) in fields.iter() {
+            for (k, _) in fields {
                 match k.semantically_equals(*key, visible, pureness) {
                     Some(is_equal) => {
                         if is_equal {

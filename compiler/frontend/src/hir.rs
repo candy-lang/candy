@@ -79,7 +79,7 @@ impl Expression {
                 ids.extend_from_slice(items);
             }
             Expression::Struct(entries) => {
-                for (key_id, value_id) in entries.iter() {
+                for (key_id, value_id) in entries {
                     ids.push(key_id.clone());
                     ids.push(value_id.clone());
                 }

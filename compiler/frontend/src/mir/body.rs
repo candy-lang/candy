@@ -210,12 +210,12 @@ impl Body {
             ..
         } = expression
         {
-            for parameter in parameters.iter() {
+            for parameter in &*parameters {
                 visible.insert(*parameter, Expression::Parameter);
             }
             visible.insert(*responsible_parameter, Expression::Parameter);
             body.visit_with_visible_rec(visible, visitor);
-            for parameter in parameters.iter() {
+            for parameter in &*parameters {
                 visible.remove(*parameter);
             }
             visible.remove(*responsible_parameter);
