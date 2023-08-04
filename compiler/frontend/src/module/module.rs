@@ -3,6 +3,7 @@ use crate::{
     impl_display_via_richir,
     rich_ir::{RichIrBuilder, ToRichIr, TokenType},
 };
+use enumset::EnumSet;
 use itertools::Itertools;
 use std::{
     fmt::{self, Display, Formatter},
@@ -158,7 +159,7 @@ impl ToRichIr for Module {
                     .join("/"),
             ),
             TokenType::Module,
-            Default::default(),
+            EnumSet::default(),
         );
         builder.push_reference(self.clone(), range);
     }

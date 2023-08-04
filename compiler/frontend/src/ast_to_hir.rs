@@ -651,8 +651,8 @@ impl Context<'_> {
         let mut context = PatternContext {
             db: self.db,
             module: self.module.clone(),
-            identifier_id_generator: Default::default(),
-            identifier_ids: Default::default(),
+            identifier_id_generator: IdGenerator::default(),
+            identifier_ids: FxHashMap::default(),
         };
         let pattern = context.compile_pattern(ast);
         (pattern, context.identifier_ids)

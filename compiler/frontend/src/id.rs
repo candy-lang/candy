@@ -5,11 +5,12 @@ pub struct IdGenerator<T: CountableId> {
     next_id: usize,
     _data: PhantomData<T>,
 }
+
 impl<T: CountableId> IdGenerator<T> {
     pub fn start_at(id: usize) -> Self {
         Self {
             next_id: id,
-            _data: Default::default(),
+            _data: PhantomData::default(),
         }
     }
     pub fn generate(&mut self) -> T {
@@ -18,12 +19,10 @@ impl<T: CountableId> IdGenerator<T> {
         T::from_usize(id)
     }
 }
+
 impl<T: CountableId> Default for IdGenerator<T> {
     fn default() -> Self {
-        Self {
-            next_id: 0,
-            _data: Default::default(),
-        }
+        Self::start_at(0)
     }
 }
 
