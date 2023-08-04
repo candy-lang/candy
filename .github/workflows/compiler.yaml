@@ -42,7 +42,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3.5.3
       - uses: dsherret/rust-toolchain-file@v1
-      - uses: Swatinem/rust-cache@v2.5.1
+      - uses: Swatinem/rust-cache@v2.6.0
 
       - name: Check Goldens
         run: cargo run --release -- debug gold check ./packages/Examples/
