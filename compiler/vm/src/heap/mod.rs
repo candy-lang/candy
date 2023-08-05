@@ -9,6 +9,7 @@ pub use self::{
         InlineObjectTrait, ToDebugText,
     },
     pointer::Pointer,
+    symbol_table::{DisplayWithSymbolTable, OrdWithSymbolTable, SymbolId, SymbolTable},
 };
 use crate::channel::ChannelId;
 use derive_more::{DebugCustom, Deref, Pointer};
@@ -25,6 +26,7 @@ mod object;
 mod object_heap;
 mod object_inline;
 mod pointer;
+mod symbol_table;
 
 #[derive(Default)]
 pub struct Heap {
@@ -33,7 +35,24 @@ pub struct Heap {
 }
 
 impl Heap {
-    pub fn allocate(&mut self, header_word: u64, content_size: usize) -> HeapObject {
+    pub fn allocate(
+        &mut self,
+        kind_bits: u64,
+        is_reference_counted: bool,
+        remaining_header_word: u64,
+        content_size: usize,
+    ) -> HeapObject {
+        debug_assert_eq!(kind_bits & !HeapObject::KIND_MASK, 0);
+        debug_assert_eq!(
+            remaining_header_word & (HeapObject::KIND_MASK | HeapObject::IS_REFERENCE_COUNTED_MASK),
+            0,
+        );
+        let header_word = kind_bits
+            | ((is_reference_counted as u64) << HeapObject::IS_REFERENCE_COUNTED_SHIFT)
+            | remaining_header_word;
+        self.allocate_raw(header_word, content_size)
+    }
+    pub fn allocate_raw(&mut self, header_word: u64, content_size: usize) -> HeapObject {
         let layout = Layout::from_size_align(
             2 * HeapObject::WORD_SIZE + content_size,
             HeapObject::WORD_SIZE,
@@ -47,7 +66,9 @@ impl Heap {
             .cast();
         unsafe { *pointer.as_ptr() = header_word };
         let object = HeapObject::new(pointer);
-        object.set_reference_count(1);
+        if object.is_reference_counted() {
+            object.set_reference_count(1);
+        }
         self.objects.insert(ObjectInHeap(object));
         object
     }
@@ -121,21 +142,24 @@ impl Heap {
             *value = 0;
         }
 
-        let to_deallocate = self
-            .objects
-            .iter()
-            .filter(|it| it.reference_count() == 0)
-            .map(|&it| *it)
-            .collect_vec();
-        for object in to_deallocate {
-            self.deallocate(object.into());
+        for object in &self.objects {
+            if object.is_reference_counted() {
+                object.set_reference_count(0);
+            }
         }
     }
     pub(super) fn drop_all_unreferenced(&mut self) {
         self.channel_refcounts
             .retain(|_, &mut refcount| refcount > 0);
-        for object in &self.objects {
-            object.set_reference_count(0);
+
+        let to_deallocate = self
+            .objects
+            .iter()
+            .filter(|it| it.reference_count() == Some(0))
+            .map(|&it| *it)
+            .collect_vec();
+        for object in to_deallocate {
+            self.deallocate(object.into());
         }
     }
 
@@ -152,11 +176,17 @@ impl Debug for Heap {
         writeln!(f, "{{\n  channel_refcounts: {:?}", self.channel_refcounts)?;
 
         for &object in &self.objects {
-            let reference_count = object.reference_count();
             writeln!(
                 f,
-                "  {object:p} ({reference_count} {}): {object:?}",
-                if reference_count == 1 { "ref" } else { "refs" },
+                "  {object:p}{}: {object:?}",
+                if let Some(reference_count) = object.reference_count() {
+                    format!(
+                        " ({reference_count} {})",
+                        if reference_count == 1 { "ref" } else { "refs" },
+                    )
+                } else {
+                    String::new()
+                },
             )?;
         }
         write!(f, "}}")

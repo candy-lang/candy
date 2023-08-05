@@ -1,7 +1,10 @@
 use super::{utils::heap_object_impls, HeapObjectTrait};
 use crate::{
     fiber::InstructionPointer,
-    heap::{object_heap::HeapObject, Heap, InlineObject},
+    heap::{
+        object_heap::HeapObject, symbol_table::impl_ord_with_symbol_table_via_ord, Heap,
+        InlineObject,
+    },
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
 use derive_more::Deref;
@@ -20,13 +23,14 @@ pub struct HeapFunction(HeapObject);
 
 impl HeapFunction {
     const CAPTURED_LEN_SHIFT: usize = 32;
-    const ARGUMENT_COUNT_SHIFT: usize = 3;
+    const ARGUMENT_COUNT_SHIFT: usize = 4;
 
     pub fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
     pub fn create(
         heap: &mut Heap,
+        is_reference_counted: bool,
         captured: &[InlineObject],
         argument_count: usize,
         body: InstructionPointer,
@@ -48,8 +52,9 @@ impl HeapFunction {
         );
 
         let function = Self(heap.allocate(
-            HeapObject::KIND_FUNCTION
-                | ((captured_len as u64) << Self::CAPTURED_LEN_SHIFT)
+            HeapObject::KIND_FUNCTION,
+            is_reference_counted,
+            ((captured_len as u64) << Self::CAPTURED_LEN_SHIFT)
                 | ((argument_count as u64) << Self::ARGUMENT_COUNT_SHIFT),
             (1 + captured_len) * HeapObject::WORD_SIZE,
         ));
@@ -109,10 +114,7 @@ impl DebugDisplay for HeapFunction {
                 if captured.is_empty() {
                     "nothing".to_string()
                 } else {
-                    captured
-                        .iter()
-                        .map(|it| DebugDisplay::to_string(it, false))
-                        .join(", ")
+                    captured.iter().map(|it| format!("{:?}", it)).join(", ")
                 },
                 self.body(),
             )
@@ -185,3 +187,5 @@ impl HeapObjectTrait for HeapFunction {
 
     fn deallocate_external_stuff(self) {}
 }
+
+impl_ord_with_symbol_table_via_ord!(HeapFunction);

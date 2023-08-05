@@ -6,12 +6,11 @@ use candy_frontend::{
     format::{MaxLength, Precedence},
     hir::{Expression, HirDb, Id},
     module::Module,
-    position::Offset,
 };
 use candy_fuzzer::{Fuzzer, RunResult, Status};
 use candy_vm::{
     fiber::Panic,
-    heap::{InlineObject, ToDebugText},
+    heap::{DisplayWithSymbolTable, InlineObject, SymbolTable, ToDebugText},
 };
 use extension_trait::extension_trait;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
@@ -41,7 +40,12 @@ pub enum HintKind {
 }
 
 impl Insight {
-    pub fn for_value(db: &Database, id: Id, value: InlineObject) -> Option<Self> {
+    pub fn for_value(
+        db: &Database,
+        symbol_table: &SymbolTable,
+        id: Id,
+        value: InlineObject,
+    ) -> Option<Self> {
         let Some(hir) = db.find_expression(id.clone()) else {
             return None;
         };
@@ -67,14 +71,14 @@ impl Insight {
                     return None;
                 }
 
-                value.to_debug_text(Precedence::Low, MaxLength::Limited(60))
+                value.to_debug_text(Precedence::Low, MaxLength::Limited(60), symbol_table)
             }
             Expression::PatternIdentifierReference { .. } => {
                 let body = db.containing_body_of(id.clone());
                 let name = body.identifiers.get(&id).unwrap();
                 format!(
                     "{name} = {}",
-                    value.to_debug_text(Precedence::Low, MaxLength::Limited(60)),
+                    value.to_debug_text(Precedence::Low, MaxLength::Limited(60), symbol_table),
                 )
             }
             _ => return None,
@@ -112,7 +116,10 @@ impl Insight {
             insights.push(Insight::Hint(Hint {
                 kind: HintKind::SampleInputPanickingWithInternalCodeResponsible,
                 position: end_of_line,
-                text: format!("{function_name} {input}"),
+                text: format!(
+                    "{function_name} {}",
+                    input.to_string(&fuzzer.lir.symbol_table)
+                ),
             }));
         }
 
@@ -122,17 +129,30 @@ impl Insight {
                 RunResult::Done(return_value) => Hint {
                     kind: HintKind::SampleInputReturningNormally,
                     position: end_of_line,
-                    text: format!("{function_name} {input} = {}", return_value.object),
+                    text: format!(
+                        "{function_name} {} = {}",
+                        input.to_string(&fuzzer.lir.symbol_table),
+                        DisplayWithSymbolTable::to_string(
+                            &return_value.object,
+                            &fuzzer.lir().symbol_table,
+                        ),
+                    ),
                 },
                 RunResult::NeedsUnfulfilled { .. } => Hint {
                     kind: HintKind::SampleInputPanickingWithCallerResponsible,
                     position: end_of_line,
-                    text: format!("{function_name} {input}"),
+                    text: format!(
+                        "{function_name} {}",
+                        input.to_string(&fuzzer.lir.symbol_table)
+                    ),
                 },
                 RunResult::Panicked(_) => Hint {
                     kind: HintKind::SampleInputPanickingWithInternalCodeResponsible,
                     position: end_of_line,
-                    text: format!("{function_name} {input}"),
+                    text: format!(
+                        "{function_name} {}",
+                        input.to_string(&fuzzer.lir.symbol_table)
+                    ),
                 },
             })
         }));
@@ -146,7 +166,10 @@ impl Insight {
             .unwrap();
         let call_span = db.range_to_lsp_range(module, call_span);
 
-        Insight::Diagnostic(Diagnostic::error(call_span, panic.reason.to_string()))
+        Insight::Diagnostic(Diagnostic::error(
+            call_span,
+            ToString::to_string(&panic.reason),
+        ))
     }
 }
 

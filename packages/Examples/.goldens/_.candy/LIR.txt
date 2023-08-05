@@ -1,0 +1,53 @@
+# LIR for module Examples:
+#
+# Tracing Config:
+#
+# • Include tracing of fuzzable functions? No
+# • Include tracing of calls? No
+# • Include tracing of evaluated expressions? No
+
+# Symbol Table
+<symbol-id 0>: Builtin
+<symbol-id 1>: Equal
+<symbol-id 2>: Error
+<symbol-id 3>: False
+<symbol-id 4>: Function
+<symbol-id 5>: Greater
+<symbol-id 6>: Int
+<symbol-id 7>: Less
+<symbol-id 8>: List
+<symbol-id 9>: Main
+<symbol-id 10>: Nothing
+<symbol-id 11>: Ok
+<symbol-id 12>: ReceivePort
+<symbol-id 13>: ReturnChannel
+<symbol-id 14>: SendPort
+<symbol-id 15>: Stdin
+<symbol-id 16>: Stdout
+<symbol-id 17>: Struct
+<symbol-id 18>: Tag
+<symbol-id 19>: Text
+<symbol-id 20>: True
+
+# Constant heap
+<replaced address 3974cba2aa713a1b>: [ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-0 }]
+<replaced address 3b3270094f01d6b0>: { 1 argument (capturing nothing) → ip-0 }
+<replaced address 55043490d5f24695>: Builtins::print:11
+<replaced address 8383f19ea0a5e146>: Builtins::toDebugText:5
+<replaced address b9d313d4403e6a66>: { 0 arguments (capturing nothing) → ip-8 }
+<replaced address c52c1f71bac3244c>: Examples::
+
+# Instructions
+# Examples::11
+ 0: pushConstant inline builtinToDebugText
+ 1: pushConstant inline 3
+ 2: pushConstant <replaced address 8383f19ea0a5e146> Builtins::toDebugText:5
+ 3: call with 1 argument
+ 4: pushConstant inline builtinPrint
+ 5: pushFromStack 1
+ 6: pushConstant <replaced address 55043490d5f24695> Builtins::print:11
+ 7: tailCall with 3 locals and 1 argument
+# Examples::
+ 8: pushConstant <replaced address 3974cba2aa713a1b> [ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-0 }]
+ 9: popMultipleBelowTop 1
+10: return

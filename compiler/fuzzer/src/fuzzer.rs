@@ -3,14 +3,13 @@ use crate::{
     input::Input,
     input_pool::{InputPool, Score},
     runner::{RunResult, Runner},
-    utils::collect_symbols_in_heap,
     values::InputGeneration,
 };
 use candy_frontend::hir::Id;
 use candy_vm::{
     execution_controller::ExecutionController,
     fiber::Panic,
-    heap::{Data, Function, Heap},
+    heap::{Data, DisplayWithSymbolTable, Function, Heap},
     lir::Lir,
     tracer::stack_trace::{FiberStackTracer, StackTracer},
 };
@@ -18,7 +17,7 @@ use std::rc::Rc;
 use tracing::debug;
 
 pub struct Fuzzer {
-    lir: Rc<Lir>,
+    pub lir: Rc<Lir>,
     pub function_heap: Heap,
     pub function: Function,
     pub function_id: Id,
@@ -49,7 +48,7 @@ impl Fuzzer {
             .unwrap();
 
         // PERF: Avoid collecting the symbols into a hash set of owned strings that we then copy again.
-        let pool = InputPool::new(function.argument_count(), &collect_symbols_in_heap(&heap));
+        let pool = InputPool::new(function.argument_count(), lir.symbol_table.clone());
         let runner = Runner::new(lir.clone(), function, pool.generate_new_input());
 
         let num_instructions = lir.instructions.len();
@@ -126,11 +125,17 @@ impl Fuzzer {
             self.function_id
                 .keys
                 .last()
-                .map(|function_name| function_name.to_string())
+                .map(|function_name| DisplayWithSymbolTable::to_string(
+                    function_name,
+                    &runner.lir.symbol_table
+                ))
                 .unwrap_or_else(|| "{…}".to_string()),
-            runner.input,
+            runner.input.to_string(&runner.lir.symbol_table),
         );
-        debug!("{}", result.to_string(&call_string));
+        debug!(
+            "{}",
+            result.to_string(&runner.lir.symbol_table, &call_string)
+        );
         match result {
             RunResult::Timeout => self.create_new_fuzzing_case(total_coverage),
             RunResult::Done { .. } | RunResult::NeedsUnfulfilled { .. } => {

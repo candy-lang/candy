@@ -5,11 +5,13 @@ use crate::{
     mir::{self, Mir},
     module::Module,
     position::Offset,
+    rcst_to_cst::CstResult,
     string_to_rcst::{ModuleError, RcstResult},
     TracingConfig, TracingMode,
 };
 use derive_more::From;
 use enumset::{EnumSet, EnumSetType};
+use itertools::Itertools;
 use num_bigint::BigInt;
 use rustc_hash::FxHashMap;
 use std::{
@@ -76,10 +78,10 @@ pub enum TokenModifier {
 }
 
 pub trait ToRichIr {
-    fn to_rich_ir(&self) -> RichIr {
+    fn to_rich_ir(&self, trailing_newline: bool) -> RichIr {
         let mut builder = RichIrBuilder::default();
         self.build_rich_ir(&mut builder);
-        builder.finish()
+        builder.finish(trailing_newline)
     }
     fn build_rich_ir(&self, builder: &mut RichIrBuilder);
 }
@@ -121,7 +123,7 @@ macro_rules! impl_debug_via_richir {
     ($type:ty) => {
         impl std::fmt::Debug for $type {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, "{}", self.to_rich_ir().text)
+                write!(f, "{}", self.to_rich_ir(false).text)
             }
         }
     };
@@ -131,7 +133,7 @@ macro_rules! impl_display_via_richir {
     ($type:ty) => {
         impl std::fmt::Display for $type {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, "{}", self.to_rich_ir().text)
+                write!(f, "{}", self.to_rich_ir(false).text)
             }
         }
     };
@@ -290,7 +292,10 @@ impl RichIrBuilder {
         );
     }
 
-    pub fn finish(self) -> RichIr {
+    pub fn finish(mut self, trailing_newline: bool) -> RichIr {
+        if trailing_newline && !self.ir.text.is_empty() && !self.ir.text.ends_with('\n') {
+            self.push("\n", None, EnumSet::empty());
+        }
         self.ir
     }
 }
@@ -307,21 +312,32 @@ impl RichIr {
         match rcst {
             Ok(rcst) => rcst.build_rich_ir(&mut builder),
             Err(ModuleError::DoesNotExist) => return None,
-            Err(ModuleError::InvalidUtf8) => {
-                builder.push("# Invalid UTF-8", TokenType::Comment, EnumSet::empty());
-            }
-            Err(ModuleError::IsNotCandy) => {
-                builder.push("# Is not Candy code", TokenType::Comment, EnumSet::empty());
-            }
-            Err(ModuleError::IsToolingModule) => {
+            Err(error) => error.build_rich_ir(&mut builder),
+        }
+        Some(builder.finish(true))
+    }
+
+    pub fn for_cst(module: &Module, cst: &CstResult) -> Option<RichIr> {
+        let mut builder = RichIrBuilder::default();
+        builder.push(
+            format!("# CST for module {module}"),
+            TokenType::Comment,
+            EnumSet::empty(),
+        );
+        builder.push_newline();
+        match cst {
+            Ok(cst) => {
+                // TODO: `impl ToRichIr for Cst`
                 builder.push(
-                    "# Is a tooling module",
-                    TokenType::Comment,
+                    cst.iter().map(|it| it.to_string()).join(""),
+                    None,
                     EnumSet::empty(),
                 );
             }
+            Err(ModuleError::DoesNotExist) => return None,
+            Err(error) => error.build_rich_ir(&mut builder),
         }
-        Some(builder.finish())
+        Some(builder.finish(true))
     }
 
     pub fn for_ast(module: &Module, asts: &[Ast]) -> RichIr {
@@ -333,7 +349,7 @@ impl RichIr {
         );
         builder.push_newline();
         asts.build_rich_ir(&mut builder);
-        builder.finish()
+        builder.finish(true)
     }
 
     pub fn for_hir(module: &Module, body: &hir::Body) -> RichIr {
@@ -345,7 +361,7 @@ impl RichIr {
         );
         builder.push_newline();
         body.build_rich_ir(&mut builder);
-        builder.finish()
+        builder.finish(true)
     }
 
     pub fn for_mir(module: &Module, mir: &Mir, tracing_config: &TracingConfig) -> RichIr {
@@ -359,7 +375,7 @@ impl RichIr {
         builder.push_tracing_config(tracing_config);
         builder.push_newline();
         mir.build_rich_ir(&mut builder);
-        builder.finish()
+        builder.finish(true)
     }
 
     pub fn for_optimized_mir(module: &Module, mir: &Mir, tracing_config: &TracingConfig) -> RichIr {
@@ -373,6 +389,6 @@ impl RichIr {
         builder.push_tracing_config(tracing_config);
         builder.push_newline();
         mir.build_rich_ir(&mut builder);
-        builder.finish()
+        builder.finish(true)
     }
 }

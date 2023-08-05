@@ -10,6 +10,7 @@ use candy_fuzzer::{FuzzablesFinder, Fuzzer, Status};
 use candy_vm::{
     execution_controller::RunLimitedNumberOfInstructions,
     fiber::{Panic, VmEnded},
+    heap::DisplayWithSymbolTable,
     lir::Lir,
     mir_to_lir::compile_lir,
     tracer::{evaluated_values::EvaluatedValuesTracer, stack_trace::StackTracer},
@@ -253,15 +254,13 @@ impl ModuleAnalyzer {
             State::FindFuzzables {
                 static_panics,
                 evaluated_values,
+                vm,
                 ..
             } => {
                 insights.extend(static_panics.to_insights(db, &self.module));
-                insights.extend(
-                    evaluated_values
-                        .values()
-                        .iter()
-                        .flat_map(|(id, value)| Insight::for_value(db, id.clone(), *value)),
-                );
+                insights.extend(evaluated_values.values().iter().flat_map(|(id, value)| {
+                    Insight::for_value(db, &vm.lir().symbol_table, id.clone(), *value)
+                }));
             }
             State::Fuzz {
                 static_panics,
@@ -270,12 +269,10 @@ impl ModuleAnalyzer {
                 ..
             } => {
                 insights.extend(static_panics.to_insights(db, &self.module));
-                insights.extend(
-                    evaluated_values
-                        .values()
-                        .iter()
-                        .flat_map(|(id, value)| Insight::for_value(db, id.clone(), *value)),
-                );
+                let symbol_table = &fuzzers.first().unwrap().lir().symbol_table;
+                insights.extend(evaluated_values.values().iter().flat_map(|(id, value)| {
+                    Insight::for_value(db, symbol_table, id.clone(), *value)
+                }));
 
                 for fuzzer in fuzzers {
                     insights.append(&mut Insight::for_fuzzer_status(db, fuzzer));
@@ -318,7 +315,10 @@ impl ModuleAnalyzer {
                             input
                                 .arguments
                                 .iter()
-                                .map(|argument| format!("{argument}"))
+                                .map(|argument| DisplayWithSymbolTable::to_string(
+                                    argument,
+                                    symbol_table,
+                                ))
                                 .join(" "),
                             panic.reason,
                         ),

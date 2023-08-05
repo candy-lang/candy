@@ -1,9 +1,9 @@
 use candy_frontend::format::{MaxLength, Precedence};
-use candy_vm::heap::{Heap, InlineObject, ToDebugText};
+use candy_vm::heap::{DisplayWithSymbolTable, Heap, InlineObject, SymbolTable, ToDebugText};
 use itertools::Itertools;
 use std::{
     cell::RefCell,
-    fmt::{self, Display, Formatter},
+    fmt::{self, Formatter},
     hash::{Hash, Hasher},
     rc::Rc,
 };
@@ -14,14 +14,18 @@ pub struct Input {
     pub arguments: Vec<InlineObject>,
 }
 
-impl Display for Input {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+impl DisplayWithSymbolTable for Input {
+    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
         write!(
             f,
             "{}",
             self.arguments
                 .iter()
-                .map(|argument| argument.to_debug_text(Precedence::High, MaxLength::Limited(40)))
+                .map(|argument| argument.to_debug_text(
+                    Precedence::High,
+                    MaxLength::Limited(40),
+                    symbol_table
+                ))
                 .join(" "),
         )
     }
