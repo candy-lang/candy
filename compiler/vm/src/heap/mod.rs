@@ -1,7 +1,6 @@
 pub use self::{
     object::{
-        Builtin, Data, DataDiscriminants, Function, HirId, Int, List, ReceivePort, SendPort,
-        Struct, Tag, Text,
+        Builtin, Data, DataDiscriminants, Function, Handle, HirId, Int, List, Struct, Tag, Text,
     },
     object_heap::{HeapData, HeapObject, HeapObjectTrait},
     object_inline::{
@@ -11,9 +10,9 @@ pub use self::{
     pointer::Pointer,
     symbol_table::{DisplayWithSymbolTable, OrdWithSymbolTable, SymbolId, SymbolTable},
 };
-use crate::channel::ChannelId;
+use crate::handle::HandleId;
+use candy_frontend::id::IdGenerator;
 use derive_more::{DebugCustom, Deref, Pointer};
-use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     alloc::{self, Allocator, Layout},
@@ -31,7 +30,8 @@ mod symbol_table;
 #[derive(Default)]
 pub struct Heap {
     objects: FxHashSet<ObjectInHeap>,
-    channel_refcounts: FxHashMap<ChannelId, usize>,
+    handle_id_generator: IdGenerator<HandleId>,
+    handle_refcounts: FxHashMap<HandleId, usize>,
 }
 
 impl Heap {
@@ -84,29 +84,29 @@ impl Heap {
         unsafe { alloc::Global.deallocate(object.address().cast(), layout) };
     }
 
-    pub(self) fn notify_port_created(&mut self, channel_id: ChannelId) {
-        *self.channel_refcounts.entry(channel_id).or_default() += 1;
+    pub(self) fn notify_handle_created(&mut self, handle_id: HandleId) {
+        *self.handle_refcounts.entry(handle_id).or_default() += 1;
     }
-    pub(self) fn dup_channel_by(&mut self, channel_id: ChannelId, amount: usize) {
-        *self.channel_refcounts.entry(channel_id).or_insert_with(|| {
-            panic!("Called `dup_channel_by`, but {channel_id:?} doesn't exist.")
+    pub(self) fn dup_channel_by(&mut self, handle_id: HandleId, amount: usize) {
+        *self.handle_refcounts.entry(handle_id).or_insert_with(|| {
+            panic!("Called `dup_handle_by`, but {handle_id:?} doesn't exist.")
         }) += amount;
     }
-    pub(self) fn drop_channel(&mut self, channel_id: ChannelId) {
-        let channel_refcount = self
-            .channel_refcounts
-            .entry(channel_id)
-            .or_insert_with(|| panic!("Called `drop_channel`, but {channel_id:?} doesn't exist."));
-        *channel_refcount -= 1;
-        if *channel_refcount == 0 {
-            self.channel_refcounts.remove(&channel_id).unwrap();
+    pub(self) fn drop_handle(&mut self, handle_id: HandleId) {
+        let handle_refcount = self
+            .handle_refcounts
+            .entry(handle_id)
+            .or_insert_with(|| panic!("Called `drop_handle`, but {handle_id:?} doesn't exist."));
+        *handle_refcount -= 1;
+        if *handle_refcount == 0 {
+            self.handle_refcounts.remove(&handle_id).unwrap();
         }
     }
 
     pub fn adopt(&mut self, mut other: Heap) {
         self.objects.extend(mem::take(&mut other.objects));
-        for (channel_id, refcount) in mem::take(&mut other.channel_refcounts) {
-            *self.channel_refcounts.entry(channel_id).or_default() += refcount;
+        for (handle_id, refcount) in mem::take(&mut other.handle_refcounts) {
+            *self.handle_refcounts.entry(handle_id).or_default() += refcount;
         }
     }
 
@@ -117,8 +117,8 @@ impl Heap {
         self.objects.iter().map(|it| **it)
     }
 
-    pub fn known_channels(&self) -> impl IntoIterator<Item = ChannelId> + '_ {
-        self.channel_refcounts.keys().copied()
+    pub fn known_handles(&self) -> impl IntoIterator<Item = HandleId> + '_ {
+        self.handle_refcounts.keys().copied()
     }
 
     // We do not confuse this with the `std::Clone::clone` method.
@@ -126,7 +126,8 @@ impl Heap {
     pub fn clone(&self) -> (Heap, FxHashMap<HeapObject, HeapObject>) {
         let mut cloned = Heap {
             objects: FxHashSet::default(),
-            channel_refcounts: self.channel_refcounts.clone(),
+            handle_id_generator: IdGenerator::default(),
+            handle_refcounts: self.handle_refcounts.clone(),
         };
 
         let mut mapping = FxHashMap::default();
@@ -137,43 +138,17 @@ impl Heap {
         (cloned, mapping)
     }
 
-    pub(super) fn reset_reference_counts(&mut self) {
-        for value in self.channel_refcounts.values_mut() {
-            *value = 0;
-        }
-
-        for object in &self.objects {
-            if object.is_reference_counted() {
-                object.set_reference_count(0);
-            }
-        }
-    }
-    pub(super) fn drop_all_unreferenced(&mut self) {
-        self.channel_refcounts
-            .retain(|_, &mut refcount| refcount > 0);
-
-        let to_deallocate = self
-            .objects
-            .iter()
-            .filter(|it| it.reference_count() == Some(0))
-            .map(|&it| *it)
-            .collect_vec();
-        for object in to_deallocate {
-            self.deallocate(object.into());
-        }
-    }
-
     pub fn clear(&mut self) {
         for object in mem::take(&mut self.objects).iter() {
             self.deallocate(HeapData::from(object.0));
         }
-        self.channel_refcounts.clear();
+        self.handle_refcounts.clear();
     }
 }
 
 impl Debug for Heap {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        writeln!(f, "{{\n  channel_refcounts: {:?}", self.channel_refcounts)?;
+        writeln!(f, "{{\n  handle_refcounts: {:?}", self.handle_refcounts)?;
 
         for &object in &self.objects {
             writeln!(

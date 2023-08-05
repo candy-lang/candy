@@ -4,7 +4,7 @@ use candy_frontend::{
     mir::{Body, Expression, Mir, VisibleExpressions},
     module::Module,
 };
-use candy_vm::fiber::Panic;
+use candy_vm::Panic;
 use extension_trait::extension_trait;
 use lsp_types::{Diagnostic, DiagnosticSeverity};
 use std::mem;
@@ -86,7 +86,6 @@ impl StaticPanicsOfExpression for Expression {
                 panics.push(Panic {
                     reason: reason.to_string(),
                     responsible: responsible.clone(),
-                    panicked_child: None,
                 });
             }
             _ => {}

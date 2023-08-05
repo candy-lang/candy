@@ -1,7 +1,8 @@
+use crate::heap::Heap;
 use crate::heap::{
     DisplayWithSymbolTable, Function, HirId, InlineData, InlineObject, SymbolId, SymbolTable,
 };
-use crate::{fiber::InstructionPointer, heap::Heap};
+use crate::instruction_pointer::InstructionPointer;
 use candy_frontend::hir;
 use candy_frontend::rich_ir::ReferenceKey;
 use candy_frontend::{

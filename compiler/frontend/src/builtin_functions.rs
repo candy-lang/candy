@@ -4,9 +4,6 @@ use strum_macros::EnumIter;
 
 #[derive(Clone, Copy, Debug, EnumIter, Eq, Hash, PartialEq)]
 pub enum BuiltinFunction {
-    ChannelCreate,       // capacity -> [sendPort, receivePort]
-    ChannelSend,         // channel any -> Nothing
-    ChannelReceive,      // channel -> any
     Equals,              // any any -> booleanTag
     FunctionRun,         // (functionWith0Arguments) -> (returnValue: any)
     GetArgumentCount,    // function -> argumentCount
@@ -31,7 +28,6 @@ pub enum BuiltinFunction {
     ListLength,          // list -> int
     ListRemoveAt,        // list (index: int) -> (list, item)
     ListReplace,         // list (index: int) newItem -> list
-    Parallel,            // body: Function -> returnValueOfFunction
     Print,               // message -> Nothing
     StructGet,           // struct key -> value
     StructGetKeys,       // struct -> listOfKeys
@@ -51,7 +47,6 @@ pub enum BuiltinFunction {
     TextTrimEnd,         // text -> text
     TextTrimStart,       // text -> text
     ToDebugText,         // any -> text
-    Try,                 // function -> okWithFunctionResultOrErrorWithPanicReason
     TypeOf,              // any -> typeTag
 }
 lazy_static! {
@@ -61,9 +56,6 @@ lazy_static! {
 impl BuiltinFunction {
     pub fn is_pure(&self) -> bool {
         match self {
-            BuiltinFunction::ChannelCreate => false,
-            BuiltinFunction::ChannelSend => false,
-            BuiltinFunction::ChannelReceive => false,
             BuiltinFunction::Equals => true,
             BuiltinFunction::FunctionRun => false,
             BuiltinFunction::GetArgumentCount => true,
@@ -88,7 +80,6 @@ impl BuiltinFunction {
             BuiltinFunction::ListLength => true,
             BuiltinFunction::ListRemoveAt => true,
             BuiltinFunction::ListReplace => true,
-            BuiltinFunction::Parallel => false,
             BuiltinFunction::Print => false,
             BuiltinFunction::StructGet => true,
             BuiltinFunction::StructGetKeys => true,
@@ -108,16 +99,12 @@ impl BuiltinFunction {
             BuiltinFunction::TextTrimEnd => true,
             BuiltinFunction::TextTrimStart => true,
             BuiltinFunction::ToDebugText => true,
-            BuiltinFunction::Try => false,
             BuiltinFunction::TypeOf => true,
         }
     }
 
     pub fn num_parameters(&self) -> usize {
         match self {
-            BuiltinFunction::ChannelCreate => 1,
-            BuiltinFunction::ChannelSend => 2,
-            BuiltinFunction::ChannelReceive => 1,
             BuiltinFunction::Equals => 2,
             BuiltinFunction::FunctionRun => 1,
             BuiltinFunction::GetArgumentCount => 1,
@@ -142,7 +129,6 @@ impl BuiltinFunction {
             BuiltinFunction::ListLength => 1,
             BuiltinFunction::ListRemoveAt => 2,
             BuiltinFunction::ListReplace => 3,
-            BuiltinFunction::Parallel => 1,
             BuiltinFunction::Print => 1,
             BuiltinFunction::StructGet => 2,
             BuiltinFunction::StructGetKeys => 1,
@@ -162,7 +148,6 @@ impl BuiltinFunction {
             BuiltinFunction::TextTrimEnd => 1,
             BuiltinFunction::TextTrimStart => 1,
             BuiltinFunction::ToDebugText => 1,
-            BuiltinFunction::Try => 1,
             BuiltinFunction::TypeOf => 1,
         }
     }

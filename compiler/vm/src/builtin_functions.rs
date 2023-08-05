@@ -1,32 +1,28 @@
 use crate::{
-    channel::ChannelId,
-    channel::{Capacity, Packet},
-    fiber::{Fiber, Panic, Status},
     heap::{
-        Data, DisplayWithSymbolTable, Function, Heap, HirId, InlineObject, Int, List, ReceivePort,
-        SendPort, Struct, SymbolId, SymbolTable, Tag, Text,
+        Data, DisplayWithSymbolTable, Function, Heap, HirId, InlineObject, Int, List, Struct,
+        SymbolId, SymbolTable, Tag, Text,
     },
-    tracer::FiberTracer,
+    instructions::InstructionResult,
+    vm::{CallHandle, MachineState, Panic},
 };
 use candy_frontend::builtin_functions::BuiltinFunction;
+use derive_more::Deref;
 use itertools::Itertools;
 use num_bigint::BigInt;
 use paste::paste;
 use std::str::FromStr;
 use tracing::{info, span, Level};
 
-impl<FT: FiberTracer> Fiber<FT> {
+impl MachineState {
     pub(super) fn run_builtin_function(
         &mut self,
-        symbol_table: &SymbolTable,
         builtin_function: BuiltinFunction,
         args: &[InlineObject],
         responsible: HirId,
-    ) {
+        symbol_table: &SymbolTable,
+    ) -> InstructionResult {
         let result = span!(Level::TRACE, "Running builtin").in_scope(|| match &builtin_function {
-            BuiltinFunction::ChannelCreate => self.heap.channel_create(args),
-            BuiltinFunction::ChannelSend => self.heap.channel_send(args),
-            BuiltinFunction::ChannelReceive => self.heap.channel_receive(args),
             BuiltinFunction::Equals => self.heap.equals(args),
             BuiltinFunction::FunctionRun => self.heap.function_run(args, responsible),
             BuiltinFunction::GetArgumentCount => self.heap.get_argument_count(args),
@@ -51,7 +47,6 @@ impl<FT: FiberTracer> Fiber<FT> {
             BuiltinFunction::ListLength => self.heap.list_length(args),
             BuiltinFunction::ListRemoveAt => self.heap.list_remove_at(args),
             BuiltinFunction::ListReplace => self.heap.list_replace(args),
-            BuiltinFunction::Parallel => self.heap.parallel(args),
             BuiltinFunction::Print => self.heap.print(args),
             BuiltinFunction::StructGet => self.heap.struct_get(args),
             BuiltinFunction::StructGetKeys => self.heap.struct_get_keys(args),
@@ -71,21 +66,23 @@ impl<FT: FiberTracer> Fiber<FT> {
             BuiltinFunction::TextTrimEnd => self.heap.text_trim_end(args),
             BuiltinFunction::TextTrimStart => self.heap.text_trim_start(args),
             BuiltinFunction::ToDebugText => self.heap.to_debug_text(args),
-            BuiltinFunction::Try => self.heap.try_(args),
             BuiltinFunction::TypeOf => self.heap.type_of(args),
         });
+
         match result {
-            Ok(Return(value)) => self.data_stack.push(value),
+            Ok(Return(value)) => {
+                self.data_stack.push(value);
+                InstructionResult::Done
+            }
             Ok(DivergeControlFlow {
                 function,
                 responsible,
             }) => self.call_function(function, &[], responsible),
-            Ok(CreateChannel { capacity }) => self.status = Status::CreatingChannel { capacity },
-            Ok(Send { channel, packet }) => self.status = Status::Sending { channel, packet },
-            Ok(Receive { channel }) => self.status = Status::Receiving { channel },
-            Ok(Parallel { body }) => self.status = Status::InParallelScope { body },
-            Ok(Try { body }) => self.status = Status::InTry { body },
-            Err(reason) => self.panic(Panic::new(reason, responsible.get().to_owned())),
+            Ok(CallHandle(call)) => InstructionResult::CallHandle(call),
+            Err(reason) => InstructionResult::Panic(Panic {
+                reason,
+                responsible: responsible.get().to_owned(),
+            }),
         }
     }
 }
@@ -97,25 +94,8 @@ enum SuccessfulBehavior {
         function: Function,
         responsible: HirId,
     },
-    CreateChannel {
-        capacity: Capacity,
-    },
-    Send {
-        channel: ChannelId,
-        packet: Packet,
-    },
-    Receive {
-        channel: ChannelId,
-    },
-    Parallel {
-        body: Function,
-    },
-    Try {
-        body: Function,
-    },
+    CallHandle(CallHandle),
 }
-use derive_more::Deref;
-use SuccessfulBehavior::*;
 
 impl From<SuccessfulBehavior> for BuiltinResult {
     fn from(ok: SuccessfulBehavior) -> Self {
@@ -170,31 +150,9 @@ macro_rules! unpack_and_later_drop {
     };
 }
 
-impl Heap {
-    fn channel_create(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |capacity: Int| {
-            let capacity = capacity.try_get().unwrap();
-            CreateChannel { capacity }
-        })
-    }
-    fn channel_send(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |port: SendPort, packet: Any| {
-            let mut heap = Heap::default();
-            let object = packet.object.clone_to_heap(&mut heap);
-            Send {
-                channel: port.channel_id(),
-                packet: Packet { heap, object },
-            }
-        })
-    }
-    fn channel_receive(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |port: ReceivePort| {
-            Receive {
-                channel: port.channel_id(),
-            }
-        })
-    }
+use SuccessfulBehavior::*;
 
+impl Heap {
     fn equals(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |a: Any, b: Any| {
             Return(Tag::create_bool(**a == **b).into())
@@ -202,6 +160,7 @@ impl Heap {
     }
 
     fn function_run(&mut self, args: &[InlineObject], responsible: HirId) -> BuiltinResult {
+        // TODO: handle calling builtins or handles
         unpack!(self, args, |function: Function| {
             DivergeControlFlow {
                 function: *function,
@@ -364,14 +323,6 @@ impl Heap {
         })
     }
 
-    fn parallel(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack!(self, args, |body_taking_nursery: Function| {
-            Parallel {
-                body: *body_taking_nursery,
-            }
-        })
-    }
-
     fn print(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |message: Text| {
             info!("{}", message.get());
@@ -503,10 +454,6 @@ impl Heap {
         })
     }
 
-    fn try_(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack!(self, args, |body: Function| { Try { body: *body } })
-    }
-
     fn type_of(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Any| {
             let type_symbol_id = match **value {
@@ -520,8 +467,7 @@ impl Heap {
                 ),
                 Data::Function(_) => SymbolId::FUNCTION,
                 Data::Builtin(_) => SymbolId::BUILTIN,
-                Data::SendPort(_) => SymbolId::SEND_PORT,
-                Data::ReceivePort(_) => SymbolId::RECEIVE_PORT,
+                Data::Handle(_) => SymbolId::FUNCTION,
             };
             Return(Tag::create(type_symbol_id).into())
         })

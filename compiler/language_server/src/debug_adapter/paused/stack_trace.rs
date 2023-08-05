@@ -1,19 +1,17 @@
-use super::{utils::FiberIdExtension, PausedState};
+use super::PausedState;
 use crate::{
     database::Database,
     debug_adapter::{
         session::StartAt1Config,
         tracer::{DebugTracer, StackFrame},
-        utils::FiberIdThreadIdConversion,
     },
     utils::{module_to_url, LspPositionConversion},
 };
 use candy_frontend::{ast_to_hir::AstToHir, hir::Id, utils::AdjustCasingOfFirstLetter};
 use candy_vm::{
-    fiber::FiberId,
     heap::{Data, DisplayWithSymbolTable, InlineObject},
     lir::Lir,
-    vm::Vm,
+    Vm,
 };
 use dap::{
     self,
@@ -30,14 +28,8 @@ impl PausedState {
         start_at_1_config: StartAt1Config,
         args: StackTraceArguments,
     ) -> Result<StackTraceResponse, &'static str> {
-        let fiber_id = FiberId::from_thread_id(args.thread_id);
-        let fiber = self
-            .vm_state
-            .vm
-            .fiber(fiber_id)
-            .ok_or("fiber-not-found")?
-            .fiber_ref();
-        let fiber_state = &fiber.tracer;
+        let vm = &self.vm.as_ref().unwrap();
+        let fiber_state = &vm.tracer;
 
         let start_frame = args.start_frame.unwrap_or_default();
         let levels = args
@@ -52,12 +44,15 @@ impl PausedState {
             |(index, frame)| {
                 let id = self
                     .stack_frame_ids
-                    .key_to_id(StackFrameKey {
-                        fiber_id,
-                        index: index + 1,
-                    })
+                    .key_to_id(StackFrameKey { index: index + 1 })
                     .get();
-                Self::stack_frame(db, start_at_1_config, id, frame, self.vm_state.vm.lir())
+                Self::stack_frame(
+                    db,
+                    start_at_1_config,
+                    id,
+                    frame,
+                    &self.vm.as_ref().unwrap().lir,
+                )
             },
         ));
 
@@ -65,7 +60,7 @@ impl PausedState {
             stack_frames.push(dap::types::StackFrame {
                 id: self
                     .stack_frame_ids
-                    .key_to_id(StackFrameKey { fiber_id, index: 0 })
+                    .key_to_id(StackFrameKey { index: 0 })
                     .get(),
                 name: "Spawn".to_string(),
                 source: None,
@@ -150,9 +145,7 @@ impl PausedState {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct StackFrameKey {
-    pub fiber_id: FiberId,
-
-    /// `0` represents the fiber spawn for which we don't have a stack frame.
+    /// `0` represents the root call for which we don't have a stack frame.
     index: usize,
 }
 impl StackFrameKey {
@@ -161,13 +154,13 @@ impl StackFrameKey {
             return None;
         }
 
-        Some(&self.fiber_id.get(vm).tracer.call_stack[self.index - 1])
+        Some(&vm.tracer.call_stack[self.index - 1])
     }
     pub fn get_locals<'a, L: Borrow<Lir>>(
         &self,
         vm: &'a Vm<L, DebugTracer>,
     ) -> &'a Vec<(Id, InlineObject)> {
-        let fiber_state = &self.fiber_id.get(vm).tracer;
+        let fiber_state = &vm.tracer;
         if self.index == 0 {
             &fiber_state.root_locals
         } else {

@@ -8,13 +8,11 @@ use candy_frontend::{
 };
 use candy_fuzzer::{FuzzablesFinder, Fuzzer, Status};
 use candy_vm::{
-    execution_controller::RunLimitedNumberOfInstructions,
-    fiber::{Panic, VmEnded},
-    heap::DisplayWithSymbolTable,
+    heap::{DisplayWithSymbolTable, Heap},
     lir::Lir,
     mir_to_lir::compile_lir,
     tracer::{evaluated_values::EvaluatedValuesTracer, stack_trace::StackTracer},
-    vm::{self, Vm},
+    Panic, Vm, VmPanicked, VmReturned,
 };
 use extension_trait::extension_trait;
 use itertools::Itertools;
@@ -34,7 +32,6 @@ enum State {
     /// This enables us to show hints for constants.
     EvaluateConstants {
         static_panics: Vec<Panic>,
-        tracer: (StackTracer, EvaluatedValuesTracer),
         vm: Vm<Lir, (StackTracer, EvaluatedValuesTracer)>,
     },
     /// Next, we run the module again to finds fuzzable functions. This time, we
@@ -43,20 +40,19 @@ enum State {
     /// efficient LIR possible.
     FindFuzzables {
         static_panics: Vec<Panic>,
-        constants_ended: VmEnded,
+        heap_for_constants: Heap,
         stack_tracer: StackTracer,
         evaluated_values: EvaluatedValuesTracer,
         lir: Rc<Lir>,
-        tracer: FuzzablesFinder,
         vm: Vm<Rc<Lir>, FuzzablesFinder>,
     },
     /// Then, the functions are actually fuzzed.
     Fuzz {
         static_panics: Vec<Panic>,
-        constants_ended: VmEnded,
+        heap_for_constants: Heap,
         stack_tracer: StackTracer,
         evaluated_values: EvaluatedValuesTracer,
-        fuzzable_finder_ended: VmEnded,
+        heap_for_fuzzables: Heap,
         fuzzers: Vec<Fuzzer>,
     },
 }
@@ -106,37 +102,31 @@ impl ModuleAnalyzer {
                 };
                 let (lir, _) = compile_lir(db, self.module.clone(), tracing);
 
-                let mut tracer = (
+                let tracer = (
                     StackTracer::default(),
                     EvaluatedValuesTracer::new(self.module.clone()),
                 );
-                let vm = Vm::for_module(lir, &mut tracer);
+                let vm = Vm::for_module(lir, tracer);
 
-                State::EvaluateConstants {
-                    static_panics,
-                    tracer,
-                    vm,
-                }
+                State::EvaluateConstants { static_panics, vm }
             }
-            State::EvaluateConstants {
-                static_panics,
-                mut tracer,
-                mut vm,
-            } => {
+            State::EvaluateConstants { static_panics, vm } => {
                 client
                     .update_status(Some(format!("Evaluating {}", self.module)))
                     .await;
 
-                vm.run(&mut RunLimitedNumberOfInstructions::new(500), &mut tracer);
-                if !matches!(vm.status(), vm::Status::Done | vm::Status::Panicked(_)) {
-                    return State::EvaluateConstants {
-                        static_panics,
-                        tracer,
-                        vm,
-                    };
-                }
-
-                let constants_ended = vm.tear_down(&mut tracer);
+                let (heap, tracer) = match vm.run_n(500) {
+                    candy_vm::StateAfterRun::Running(vm) => {
+                        return State::EvaluateConstants { static_panics, vm }
+                    }
+                    candy_vm::StateAfterRun::CallingHandle(_) => unreachable!(),
+                    candy_vm::StateAfterRun::Returned(VmReturned { heap, tracer, .. }) => {
+                        (heap, tracer)
+                    }
+                    candy_vm::StateAfterRun::Panicked(VmPanicked { heap, tracer, .. }) => {
+                        (heap, tracer)
+                    }
+                };
                 let (stack_tracer, evaluated_values) = tracer;
 
                 let tracing = TracingConfig {
@@ -147,65 +137,68 @@ impl ModuleAnalyzer {
                 let (lir, _) = compile_lir(db, self.module.clone(), tracing);
                 let lir = Rc::new(lir);
 
-                let mut tracer = FuzzablesFinder::default();
-                let vm = Vm::for_module(lir.clone(), &mut tracer);
+                let vm = Vm::for_module(lir.clone(), FuzzablesFinder::default());
                 State::FindFuzzables {
                     static_panics,
-                    constants_ended,
+                    heap_for_constants: heap,
                     stack_tracer,
                     evaluated_values,
                     lir,
-                    tracer,
                     vm,
                 }
             }
             State::FindFuzzables {
                 static_panics,
-                constants_ended,
+                heap_for_constants,
                 stack_tracer,
                 evaluated_values,
                 lir,
-                mut tracer,
-                mut vm,
+                vm,
             } => {
                 client
                     .update_status(Some(format!("Evaluating {}", self.module)))
                     .await;
 
-                vm.run(&mut RunLimitedNumberOfInstructions::new(500), &mut tracer);
-                if !matches!(vm.status(), vm::Status::Done | vm::Status::Panicked(_)) {
-                    return State::FindFuzzables {
-                        static_panics,
-                        constants_ended,
-                        stack_tracer,
-                        evaluated_values,
-                        lir,
-                        tracer,
-                        vm,
-                    };
-                }
+                let (heap, tracer) = match vm.run_n(500) {
+                    candy_vm::StateAfterRun::Running(vm) => {
+                        return State::FindFuzzables {
+                            static_panics,
+                            heap_for_constants,
+                            stack_tracer,
+                            evaluated_values,
+                            lir,
+                            vm,
+                        }
+                    }
+                    candy_vm::StateAfterRun::CallingHandle(_) => unreachable!(),
+                    candy_vm::StateAfterRun::Returned(VmReturned { heap, tracer, .. }) => {
+                        (heap, tracer)
+                    }
+                    candy_vm::StateAfterRun::Panicked(VmPanicked { heap, tracer, .. }) => {
+                        (heap, tracer)
+                    }
+                };
 
-                let fuzzable_finder_ended = vm.tear_down(&mut tracer);
                 let fuzzers = tracer
-                    .into_fuzzables()
+                    .fuzzables
                     .iter()
                     .map(|(id, function)| Fuzzer::new(lir.clone(), *function, id.clone()))
                     .collect();
                 State::Fuzz {
                     static_panics,
-                    constants_ended,
+                    heap_for_constants,
                     stack_tracer,
                     evaluated_values,
-                    fuzzable_finder_ended,
+                    heap_for_fuzzables: heap,
                     fuzzers,
                 }
             }
             State::Fuzz {
                 static_panics,
-                constants_ended,
+                heap_for_constants,
                 stack_tracer,
                 evaluated_values,
-                fuzzable_finder_ended,
+                heap_for_fuzzables,
                 mut fuzzers,
             } => {
                 let mut running_fuzzers = fuzzers
@@ -216,10 +209,10 @@ impl ModuleAnalyzer {
                     client.update_status(None).await;
                     return State::Fuzz {
                         static_panics,
-                        constants_ended,
+                        heap_for_constants,
                         stack_tracer,
                         evaluated_values,
-                        fuzzable_finder_ended,
+                        heap_for_fuzzables,
                         fuzzers,
                     };
                 };
@@ -228,14 +221,14 @@ impl ModuleAnalyzer {
                     .update_status(Some(format!("Fuzzing {}", fuzzer.function_id)))
                     .await;
 
-                fuzzer.run(&mut RunLimitedNumberOfInstructions::new(500));
+                fuzzer.run(500);
 
                 State::Fuzz {
                     static_panics,
-                    constants_ended,
+                    heap_for_constants,
                     stack_tracer,
                     evaluated_values,
-                    fuzzable_finder_ended,
+                    heap_for_fuzzables,
                     fuzzers,
                 }
             }
@@ -259,7 +252,7 @@ impl ModuleAnalyzer {
             } => {
                 insights.extend(static_panics.to_insights(db, &self.module));
                 insights.extend(evaluated_values.values().iter().flat_map(|(id, value)| {
-                    Insight::for_value(db, &vm.lir().symbol_table, id.clone(), *value)
+                    Insight::for_value(db, &vm.lir.symbol_table, id.clone(), *value)
                 }));
             }
             State::Fuzz {

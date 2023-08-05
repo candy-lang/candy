@@ -1,10 +1,10 @@
 use super::{utils::heap_object_impls, HeapObjectTrait};
 use crate::{
-    fiber::InstructionPointer,
     heap::{
         object_heap::HeapObject, symbol_table::impl_ord_with_symbol_table_via_ord, Heap,
         InlineObject,
     },
+    instruction_pointer::InstructionPointer,
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
 use derive_more::Deref;

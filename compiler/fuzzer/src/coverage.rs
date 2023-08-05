@@ -1,5 +1,5 @@
 use bitvec::prelude::*;
-use candy_vm::fiber::InstructionPointer;
+use candy_vm::InstructionPointer;
 use std::{
     fmt,
     ops::{Add, Range},

@@ -16,13 +16,11 @@ use candy_frontend::{
     TracingConfig,
 };
 use candy_vm::{
-    channel::Packet,
-    fiber::EndedReason,
-    heap::{HirId, Struct},
+    heap::{Heap, HirId, InlineObject, Struct},
     lir::Lir,
     mir_to_lir::compile_lir,
     tracer::DummyTracer,
-    vm::Vm,
+    Vm,
 };
 use lazy_static::lazy_static;
 use rustc_hash::FxHashMap;
@@ -125,31 +123,23 @@ pub fn compile(db: &mut Database, source_code: &str) -> Lir {
     compile_lir(db, MODULE.clone(), TRACING.clone()).0
 }
 
-pub fn run(lir: impl Borrow<Lir>) -> Packet {
-    let mut tracer = DummyTracer;
-    let (mut heap, main) = Vm::for_module(lir.borrow(), &mut tracer)
-        .run_until_completion(&mut tracer)
+pub fn run(lir: impl Borrow<Lir>) -> (Heap, InlineObject) {
+    let (mut heap, tracer, result) =
+        Vm::for_module(lir.borrow(), DummyTracer).run_forever_without_handles();
+    let main = result
+        .expect("Module panicked.")
         .into_main_function(&lir.borrow().symbol_table)
         .unwrap();
 
     // Run the `main` function.
     let environment = Struct::create(&mut heap, true, &FxHashMap::default());
     let responsible = HirId::create(&mut heap, true, hir::Id::user());
-    let ended = Vm::for_function(
-        lir,
-        heap,
-        main,
-        &[environment.into()],
-        responsible,
-        &mut tracer,
-    )
-    .run_until_completion(&mut tracer);
-    match ended.reason {
-        EndedReason::Finished(return_value) => Packet {
-            heap: ended.heap,
-            object: return_value,
-        },
-        EndedReason::Panicked(panic) => {
+    let (heap, _, result) =
+        Vm::for_function(lir, heap, main, &[environment.into()], responsible, tracer)
+            .run_forever_without_handles();
+    match result {
+        Ok(return_value) => (heap, return_value),
+        Err(panic) => {
             panic!("The main function panicked: {}", panic.reason)
         }
     }
