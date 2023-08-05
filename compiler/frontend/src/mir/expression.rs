@@ -343,7 +343,8 @@ impl ToRichIr for Expression {
             }
             Expression::Reference(id) => id.build_rich_ir(builder),
             Expression::HirId(id) => {
-                id.build_rich_ir(builder);
+                let range = builder.push(id.to_string(), TokenType::Symbol, EnumSet::empty());
+                builder.push_reference(id.to_owned(), range);
             }
             Expression::Function {
                 // IDs are displayed by the body before the entire expression
