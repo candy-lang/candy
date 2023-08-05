@@ -284,11 +284,11 @@ impl LoweringContext {
         ids.iter().map(|it| self.id_for(*it)).collect()
     }
     fn id_for(&mut self, id: mir::Id) -> lir::Id {
-        if let Some(constant_id) = self.constant_for(id) {
-            self.current_body.push(id, constant_id)
-        } else {
-            self.current_body.id_mapping[&id]
+        if let Some(id) = self.current_body.id_mapping.get(&id) {
+            return *id;
         }
+
+        self.current_body.push(id, self.constant_for(id).unwrap())
     }
 
     fn push_constant(&mut self, id: mir::Id, constant: impl Into<lir::Constant>) {
