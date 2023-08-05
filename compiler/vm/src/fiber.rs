@@ -15,7 +15,6 @@ use crate::{
 };
 use candy_frontend::{
     hir::{self, Id},
-    id::CountableId,
     impl_countable_id,
     module::Module,
 };

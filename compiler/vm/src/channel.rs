@@ -3,7 +3,7 @@ use crate::{
     heap::{Heap, HeapObject, InlineObject},
     vm::OperationId,
 };
-use candy_frontend::{id::CountableId, impl_countable_id};
+use candy_frontend::impl_countable_id;
 use itertools::Itertools;
 use std::{
     collections::VecDeque,

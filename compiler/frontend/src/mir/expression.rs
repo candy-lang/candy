@@ -3,7 +3,7 @@ use crate::{
     builtin_functions::BuiltinFunction,
     hir, impl_display_via_richir,
     module::Module,
-    rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr, TokenModifier, TokenType},
+    rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr, TokenType},
 };
 use core::mem;
 use derive_more::{From, TryInto};
@@ -22,22 +22,30 @@ pub enum Expression {
     #[from]
     #[try_into]
     Int(BigInt),
+
     #[from]
     #[try_into]
     Text(String),
+
     Tag {
         symbol: String,
         value: Option<Id>,
     },
+
     #[from]
     Builtin(BuiltinFunction),
+
     #[from]
     List(Vec<Id>),
+
     Struct(Vec<(Id, Id)>),
+
     Reference(Id),
+
     /// A HIR ID that can be used to refer to code in the HIR.
     #[from]
     HirId(hir::Id),
+
     /// In the MIR, responsibilities are explicitly tracked. All functions take
     /// a responsible HIR ID as an extra parameter. Based on whether the
     /// function is fuzzable or not, this parameter may be used to dynamically
@@ -48,20 +56,24 @@ pub enum Expression {
         responsible_parameter: Id,
         body: Body,
     },
+
     /// This expression is never contained in an actual MIR body, but when
     /// dealing with expressions, its easier to not special-case IDs referring
     /// to parameters.
     Parameter,
+
     Call {
         function: Id,
         arguments: Vec<Id>,
         responsible: Id,
     },
+
     UseModule {
         current_module: Module,
         relative_path: Id,
         responsible: Id,
     },
+
     /// This expression indicates that the code will panic. It's created in the
     /// generated `needs` function or if the compiler can statically determine
     /// that some expression will always panic.
@@ -76,13 +88,16 @@ pub enum Expression {
         arguments: Vec<Id>,
         responsible: Id,
     },
+
     TraceCallEnds {
         return_value: Id,
     },
+
     TraceExpressionEvaluated {
         hir_expression: Id,
         value: Id,
     },
+
     TraceFoundFuzzableFunction {
         hir_definition: Id,
         function: Id,

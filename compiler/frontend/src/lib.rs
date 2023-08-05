@@ -1,3 +1,4 @@
+#![feature(anonymous_lifetime_in_impl_trait)]
 #![feature(box_patterns)]
 #![feature(entry_insert)]
 #![feature(io_error_more)]
