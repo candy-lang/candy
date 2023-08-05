@@ -13,42 +13,59 @@ pub enum Expression {
         symbol: String,
         value: Id,
     },
+
     #[from]
     CreateList(Vec<Id>),
+
     #[from]
     CreateStruct(Vec<(Id, Id)>),
+
     CreateFunction {
         captured: Vec<Id>,
         body_id: BodyId,
     },
+
     #[from]
     Constant(ConstantId),
+
     #[from]
     Reference(Id),
+
+    /// Increase the reference count of the given value.
     Dup(Id),
+
+    /// Decrease the reference count of the given value.
+    ///
+    /// If the reference count reaches zero, the value is freed.
     Drop(Id),
+
     Call {
         function: Id,
         arguments: Vec<Id>,
         responsible: Id,
     },
+
     Panic {
         reason: Id,
         responsible: Id,
     },
+
     TraceCallStarts {
         hir_call: Id,
         function: Id,
         arguments: Vec<Id>,
         responsible: Id,
     },
+
     TraceCallEnds {
         return_value: Id,
     },
+
     TraceExpressionEvaluated {
         hir_expression: Id,
         value: Id,
     },
+
     TraceFoundFuzzableFunction {
         hir_definition: Id,
         function: Id,

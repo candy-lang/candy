@@ -61,9 +61,9 @@ impl LoweringContext {
         }
 
         if self.current_body.expressions.is_empty() {
-            // If the MIR body only contains constants, its LIR body will still
-            // be empty. Hence, we push a reference to the last constant we
-            // encountered.
+            // If the top-level MIR contains only constants, its LIR body will
+            // still be empty. Hence, we push a reference to the last constant
+            // we encountered.
             let last_constant_id = self.last_constant.unwrap();
             self.current_body
                 .push(last_constant_id, self.constant_mapping[&last_constant_id]);
@@ -136,8 +136,23 @@ impl LoweringContext {
                 }
             }
             mir::Expression::Reference(referenced_id) => {
-                let referenced_id = self.id_for(*referenced_id);
-                self.current_body.push(id, referenced_id);
+                // References only remain in the MIR to return a constant from a
+                // function.
+                if let Some(&referenced_id) = self.current_body.id_mapping.get(referenced_id) {
+                    self.current_body.maybe_dup(referenced_id);
+                    // TODO: The reference following MIR optimization isn't
+                    // always working correctly. Add the following code once it
+                    // does work.
+                    // assert!(
+                    //     !self.current_body.ids_to_drop.contains(&referenced_id),
+                    //     "References in the optimized MIR should only point to constants.",
+                    // );
+                    self.current_body.push(id, referenced_id);
+                    return;
+                }
+
+                self.current_body
+                    .push(id, self.constant_for(*referenced_id).unwrap());
             }
             mir::Expression::HirId(hir_id) => self.push_constant(id, hir_id.clone()),
             mir::Expression::Function {
@@ -276,8 +291,9 @@ impl LoweringContext {
         ids.iter().map(|it| self.id_for(*it)).collect()
     }
     fn id_for(&mut self, id: mir::Id) -> lir::Id {
-        if let Some(id) = self.current_body.id_mapping.get(&id) {
-            return *id;
+        if let Some(&id) = self.current_body.id_mapping.get(&id) {
+            self.current_body.maybe_dup(id);
+            return id;
         }
 
         self.current_body.push(id, self.constant_for(id).unwrap())
@@ -299,6 +315,7 @@ struct CurrentBody {
     captured_count: usize,
     parameter_count: usize,
     expressions: Vec<lir::Expression>,
+    ids_to_drop: FxHashSet<lir::Id>,
 }
 impl CurrentBody {
     fn new(captured: &[mir::Id], parameters: &[mir::Id], responsible_parameter: mir::Id) -> Self {
@@ -317,18 +334,40 @@ impl CurrentBody {
             captured_count,
             parameter_count,
             expressions: Vec::new(),
+            ids_to_drop: FxHashSet::default(),
         }
     }
 
     fn push(&mut self, mir_id: mir::Id, expression: impl Into<lir::Expression>) -> lir::Id {
-        self.expressions.push(expression.into());
-        let id = lir::Id::from_usize(
-            self.captured_count + self.parameter_count + self.expressions.len(),
-        );
+        let expression = expression.into();
+        let is_constant = matches!(expression, lir::Expression::Constant(_));
+        self.expressions.push(expression);
+
+        let id = self.last_expression_id();
         assert!(self.id_mapping.insert(mir_id, id).is_none());
+        if !is_constant {
+            assert!(self.ids_to_drop.insert(id));
+        }
         id
     }
-    fn finish(self, original_hirs: FxHashSet<hir::Id>) -> lir::Body {
+
+    fn last_expression_id(&self) -> lir::Id {
+        lir::Id::from_usize(self.captured_count + self.parameter_count + self.expressions.len())
+    }
+
+    fn maybe_dup(&mut self, id: lir::Id) {
+        if !self.ids_to_drop.contains(&id) {
+            return;
+        }
+
+        self.expressions.push(lir::Expression::Dup(id));
+    }
+    fn finish(mut self, original_hirs: FxHashSet<hir::Id>) -> lir::Body {
+        self.ids_to_drop.remove(&self.last_expression_id());
+        for id in self.ids_to_drop.iter().sorted().rev() {
+            self.expressions.push(lir::Expression::Drop(*id));
+        }
+
         lir::Body::new(
             original_hirs,
             self.captured_count,

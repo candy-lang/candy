@@ -27,8 +27,10 @@ body_0 =
   $4 = %1
   $5 = call $2 with $3 ($4 is responsible)
   $6 = %2
-  $7 = %0
-  $8 = call $6 with $5 ($7 is responsible)
+  $7 = dup $5
+  $8 = %0
+  $9 = call $6 with $5 ($8 is responsible)
+  $10 = drop $5
 body_1 =
   # Original HIR IDs: Examples::
   # Captured IDs: none
