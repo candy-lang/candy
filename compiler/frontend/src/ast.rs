@@ -5,7 +5,7 @@ use crate::{
 };
 use derive_more::Deref;
 use enumset::EnumSet;
-use num_bigint::BigUint;
+use num_bigint::{BigInt, BigUint};
 use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Display, Formatter},
@@ -420,7 +420,7 @@ impl ToRichIr for Ast {
 impl ToRichIr for Int {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         let range = builder.push(format!("int {}", self.0), TokenType::Int, EnumSet::empty());
-        builder.push_reference(self.0.clone(), range);
+        builder.push_reference(BigInt::from(self.0.clone()), range);
     }
 }
 impl ToRichIr for Text {
