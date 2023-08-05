@@ -12,7 +12,6 @@ use crate::{
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{mem, sync::Arc};
-use tracing::debug;
 
 #[salsa::query_group(MirToLirStorage)]
 pub trait MirToLir: OptimizeMir {
@@ -24,7 +23,6 @@ pub type LirResult = Result<(Arc<Lir>, Arc<FxHashSet<CompilerError>>), ModuleErr
 fn lir(db: &dyn MirToLir, module: Module, tracing: TracingConfig) -> LirResult {
     let (mir, _, errors) = db.optimized_mir(module.clone(), tracing)?;
 
-    debug!("Lowering MIR to LIR: {module}");
     let mut context = LoweringContext::default();
     context.compile_function(
         FxHashSet::from_iter([hir::Id::new(module, vec![])]),
@@ -55,10 +53,6 @@ impl LoweringContext {
         responsible_parameter: mir::Id,
         body: &mir::Body,
     ) -> lir::BodyId {
-        debug!(
-            "compile_function({:?}, {:?}, {:?}, {:?}, {:?})",
-            original_hirs, captured, parameters, responsible_parameter, body,
-        );
         let inner_body = CurrentBody::new(captured, parameters, responsible_parameter);
         let outer_body = mem::replace(&mut self.current_body, inner_body);
 
@@ -76,11 +70,9 @@ impl LoweringContext {
         }
 
         let inner_body = mem::replace(&mut self.current_body, outer_body);
-        debug!("Body compiled");
         self.bodies.push(inner_body.finish(original_hirs))
     }
     fn compile_expression(&mut self, id: mir::Id, expression: &mir::Expression) {
-        debug!("compile_expression({:?}, {:?})", id, expression);
         match expression {
             mir::Expression::Int(int) => self.push_constant(id, int.clone()),
             mir::Expression::Text(text) => self.push_constant(id, text.clone()),
@@ -329,8 +321,6 @@ impl CurrentBody {
     }
 
     fn push(&mut self, mir_id: mir::Id, expression: impl Into<lir::Expression>) -> lir::Id {
-        let expression = expression.into();
-        debug!("Pushing {mir_id:?}: {expression:?}");
         self.expressions.push(expression.into());
         let id = lir::Id::from_usize(
             self.captured_count + self.parameter_count + self.expressions.len(),
