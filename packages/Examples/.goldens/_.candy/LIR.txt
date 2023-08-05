@@ -17,11 +17,9 @@
 %7 = [%4: %6]
 
 # Bodies
-body_0 =
+body_0 $0 (+ responsible $1) =
   # Original HIR IDs: Examples::11
   # Captured IDs: none
-  # Parameter IDs: $0
-  # Responsible Parameter ID: $1
   $2 = %3
   $3 = %5
   $4 = %1
@@ -32,9 +30,7 @@ body_0 =
   $9 = call $6 with $5 ($8 is responsible)
   $10 = drop $5
   $11 = $9
-body_1 =
+body_1 (responsible $0) =
   # Original HIR IDs: Examples::
   # Captured IDs: none
-  # Parameter IDs: none
-  # Responsible Parameter ID: $0
   $1 = %7

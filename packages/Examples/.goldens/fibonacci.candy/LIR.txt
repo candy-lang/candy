@@ -105,52 +105,38 @@
 %95 = [%53: %94, %47: %90, %57: %89, %51: %91]
 
 # Bodies
-body_0 =
+body_0 (responsible $0) =
   # Original HIR IDs: anonymous:$generated::needs:isConditionTrue:then
   # Captured IDs: none
-  # Parameter IDs: none
-  # Responsible Parameter ID: $0
   $1 = %60
-body_1 =
+body_1 (responsible $0) =
   # Original HIR IDs: anonymous:$generated::needs:isConditionBool:then
   # Captured IDs: none
-  # Parameter IDs: none
-  # Responsible Parameter ID: $0
   $1 = %56
-body_2 =
+body_2 (responsible $1) =
   # Original HIR IDs: anonymous:$generated::needs:isConditionTrue:else
   # Captured IDs: $0
-  # Parameter IDs: none
-  # Responsible Parameter ID: $1
   $2 = %34
   $3 = %48
   $4 = %33
   $5 = call $2 with $0 $3 ($4 is responsible)
-body_3 =
+body_3 (responsible $1) =
   # Original HIR IDs: anonymous:$generated::needs:isConditionBool:else
   # Captured IDs: $0
-  # Parameter IDs: none
-  # Responsible Parameter ID: $1
   $2 = %71
   $3 = panicking because $2 ($0 is at fault)
-body_4 =
+body_4 (responsible $1) =
   # Original HIR IDs: anonymous:$generated::needs:isReasonText:else
   # Captured IDs: $0
-  # Parameter IDs: none
-  # Responsible Parameter ID: $1
   $2 = %72
   $3 = panicking because $2 ($0 is at fault)
-body_5 =
+body_5 (responsible $2) =
   # Original HIR IDs: anonymous:$generated::needs:condition:else
   # Captured IDs: $0, $1
-  # Parameter IDs: none
-  # Responsible Parameter ID: $2
   $3 = panicking because $0 ($1 is at fault)
-body_6 =
+body_6 $0 $1 $2 (+ responsible $3) =
   # Original HIR IDs: anonymous:$generated::needs
   # Captured IDs: none
-  # Parameter IDs: $0, $1, $2
-  # Responsible Parameter ID: $3
   $4 = %34
   $5 = %60
   $6 = %33
@@ -189,17 +175,13 @@ body_6 =
   $39 = drop $8
   $40 = drop $7
   $41 = $30
-body_7 =
+body_7 (responsible $0) =
   # Original HIR IDs: Builtins::not:1:equals:then
   # Captured IDs: none
-  # Parameter IDs: none
-  # Responsible Parameter ID: $0
   $1 = %86
-body_8 =
+body_8 (responsible $2) =
   # Original HIR IDs: Builtins::ifElse:1:equals:else
   # Captured IDs: $0, $1
-  # Parameter IDs: none
-  # Responsible Parameter ID: $2
   $3 = %45
   $4 = %48
   $5 = %3
@@ -226,11 +208,9 @@ body_8 =
   $26 = drop $7
   $27 = drop $6
   $28 = $21
-body_9 =
+body_9 (responsible $1) =
   # Original HIR IDs: Builtins::ifElse:1:equals:then
   # Captured IDs: $0
-  # Parameter IDs: none
-  # Responsible Parameter ID: $1
   $2 = %42
   $3 = %3
   $4 = call $2 with $0 ($3 is responsible)
@@ -248,11 +228,9 @@ body_9 =
   $16 = drop $8
   $17 = drop $4
   $18 = $14
-body_10 =
+body_10 (responsible $1) =
   # Original HIR IDs: Builtins::ifElse:1:equals:else
   # Captured IDs: $0
-  # Parameter IDs: none
-  # Responsible Parameter ID: $1
   $2 = %45
   $3 = %60
   $4 = %3
@@ -281,11 +259,9 @@ body_10 =
   $27 = drop $6
   $28 = drop $5
   $29 = $22
-body_11 =
+body_11 (responsible $1) =
   # Original HIR IDs: Builtins::ifElse:1:equals:then
   # Captured IDs: $0
-  # Parameter IDs: none
-  # Responsible Parameter ID: $1
   $2 = %43
   $3 = %3
   $4 = call $2 with $0 ($3 is responsible)
@@ -305,11 +281,9 @@ body_11 =
   $18 = drop $8
   $19 = drop $4
   $20 = $15
-body_12 =
+body_12 (responsible $1) =
   # Original HIR IDs: Builtins::ifElse:1:equals:else
   # Captured IDs: $0
-  # Parameter IDs: none
-  # Responsible Parameter ID: $1
   $2 = %45
   $3 = %58
   $4 = %3
@@ -338,17 +312,13 @@ body_12 =
   $27 = drop $6
   $28 = drop $5
   $29 = $22
-body_13 =
+body_13 (responsible $1) =
   # Original HIR IDs: Builtins::ifElse:1:isMatch:then
   # Captured IDs: $0
-  # Parameter IDs: none
-  # Responsible Parameter ID: $1
   $2 = $0
-body_14 =
+body_14 (responsible $2) =
   # Original HIR IDs: Builtins::ifElse:1:equals:else
   # Captured IDs: $0, $1
-  # Parameter IDs: none
-  # Responsible Parameter ID: $2
   $3 = %45
   $4 = %48
   $5 = %3
@@ -375,11 +345,9 @@ body_14 =
   $26 = drop $7
   $27 = drop $6
   $28 = $21
-body_15 =
+body_15 (responsible $1) =
   # Original HIR IDs: Builtins::ifElse:1:equals:then
   # Captured IDs: $0
-  # Parameter IDs: none
-  # Responsible Parameter ID: $1
   $2 = %42
   $3 = %3
   $4 = call $2 with $0 ($3 is responsible)
@@ -397,11 +365,9 @@ body_15 =
   $16 = drop $8
   $17 = drop $4
   $18 = $14
-body_16 =
+body_16 (responsible $1) =
   # Original HIR IDs: Builtins::ifElse:1:equals:else
   # Captured IDs: $0
-  # Parameter IDs: none
-  # Responsible Parameter ID: $1
   $2 = %45
   $3 = %48
   $4 = %3
@@ -430,11 +396,9 @@ body_16 =
   $27 = drop $6
   $28 = drop $5
   $29 = $22
-body_17 =
+body_17 (responsible $1) =
   # Original HIR IDs: Builtins::ifElse:1:equals:then
   # Captured IDs: $0
-  # Parameter IDs: none
-  # Responsible Parameter ID: $1
   $2 = %43
   $3 = %3
   $4 = call $2 with $0 ($3 is responsible)
@@ -454,11 +418,9 @@ body_17 =
   $18 = drop $8
   $19 = drop $4
   $20 = $15
-body_18 =
+body_18 (responsible $1) =
   # Original HIR IDs: Builtins::ifElse:1:equals:else
   # Captured IDs: $0
-  # Parameter IDs: none
-  # Responsible Parameter ID: $1
   $2 = %45
   $3 = %58
   $4 = %3
@@ -487,11 +449,9 @@ body_18 =
   $27 = drop $6
   $28 = drop $5
   $29 = $22
-body_19 =
+body_19 (responsible $1) =
   # Original HIR IDs: Builtins::ifElse:1:isMatch:else
   # Captured IDs: $0
-  # Parameter IDs: none
-  # Responsible Parameter ID: $1
   $2 = %46
   $3 = %3
   $4 = call $2 with $0 ($3 is responsible)
@@ -511,11 +471,9 @@ body_19 =
   $18 = drop $8
   $19 = drop $4
   $20 = $15
-body_20 =
+body_20 (responsible $1) =
   # Original HIR IDs: Builtins::ifElse:1:case-0:didNotMatch
   # Captured IDs: $0
-  # Parameter IDs: none
-  # Responsible Parameter ID: $1
   $2 = %40
   $3 = %62
   $4 = %3
@@ -523,11 +481,9 @@ body_20 =
   $6 = %48
   $7 = drop $5
   $8 = $6
-body_21 =
+body_21 $0 $1 $2 (+ responsible $3) =
   # Original HIR IDs: Builtins::ifElse
   # Captured IDs: none
-  # Parameter IDs: $0, $1, $2
-  # Responsible Parameter ID: $3
   $4 = %46
   $5 = %3
   $6 = call $4 with $0 ($5 is responsible)
@@ -653,29 +609,23 @@ body_21 =
   $126 = drop $10
   $127 = drop $6
   $128 = $94
-body_22 =
+body_22 $1 (+ responsible $2) =
   # Original HIR IDs: Examples:fibonacci:recursive:0:0
   # Captured IDs: $0
-  # Parameter IDs: $1
-  # Responsible Parameter ID: $2
   $3 = %30
   $4 = call $0 with $0 $1 ($3 is responsible)
-body_23 =
+body_23 $1 $2 (+ responsible $3) =
   # Original HIR IDs: Examples:fibonacci:recursive:0
   # Captured IDs: $0
-  # Parameter IDs: $1, $2
-  # Responsible Parameter ID: $3
   $4 = { body_22 capturing $1 }
   $5 = dup $4
   $6 = %31
   $7 = call $0 with $4 $2 ($6 is responsible)
   $8 = drop $4
   $9 = $7
-body_24 =
+body_24 $0 $1 (+ responsible $2) =
   # Original HIR IDs: Examples:fibonacci:recursive
   # Captured IDs: none
-  # Parameter IDs: $0, $1
-  # Responsible Parameter ID: $2
   $3 = { body_23 capturing $1 }
   $4 = dup $3
   $5 = dup $3
@@ -683,11 +633,9 @@ body_24 =
   $7 = call $3 with $3 $0 ($6 is responsible)
   $8 = drop $3
   $9 = $7
-body_25 =
+body_25 $0 $1 (+ responsible $2) =
   # Original HIR IDs: Examples:fibonacci:compareTo
   # Captured IDs: none
-  # Parameter IDs: $0, $1
-  # Responsible Parameter ID: $2
   $3 = %46
   $4 = %20
   $5 = call $3 with $0 ($4 is responsible)
@@ -719,11 +667,9 @@ body_25 =
   $31 = drop $10
   $32 = drop $5
   $33 = $26
-body_26 =
+body_26 $0 $1 (+ responsible $2) =
   # Original HIR IDs: Examples:fibonacci:isLessThan
   # Captured IDs: none
-  # Parameter IDs: $0, $1
-  # Responsible Parameter ID: $2
   $3 = %46
   $4 = %20
   $5 = call $3 with $0 ($4 is responsible)
@@ -760,17 +706,13 @@ body_26 =
   $36 = drop $10
   $37 = drop $5
   $38 = $30
-body_27 =
+body_27 (responsible $1) =
   # Original HIR IDs: Examples:fibonacci:fibonacci:2:12
   # Captured IDs: $0
-  # Parameter IDs: none
-  # Responsible Parameter ID: $1
   $2 = $0
-body_28 =
+body_28 (responsible $2) =
   # Original HIR IDs: Examples:fibonacci:fibonacci:2:13
   # Captured IDs: $0, $1
-  # Parameter IDs: none
-  # Responsible Parameter ID: $2
   $3 = %46
   $4 = %20
   $5 = call $3 with $1 ($4 is responsible)
@@ -842,11 +784,9 @@ body_28 =
   $71 = drop $10
   $72 = drop $5
   $73 = $56
-body_29 =
+body_29 $0 $1 (+ responsible $2) =
   # Original HIR IDs: Examples:fibonacci:fibonacci:2
   # Captured IDs: none
-  # Parameter IDs: $0, $1
-  # Responsible Parameter ID: $2
   $3 = %91
   $4 = %63
   $5 = %23
@@ -863,18 +803,14 @@ body_29 =
   $16 = drop $7
   $17 = drop $6
   $18 = $14
-body_30 =
+body_30 $1 (+ responsible $2) =
   # Original HIR IDs: Examples:fibonacci:recursive:0:0
   # Captured IDs: $0
-  # Parameter IDs: $1
-  # Responsible Parameter ID: $2
   $3 = %30
   $4 = call $0 with $0 $1 ($3 is responsible)
-body_31 =
+body_31 $0 $1 (+ responsible $2) =
   # Original HIR IDs: Examples:fibonacci:recursive:0
   # Captured IDs: none
-  # Parameter IDs: $0, $1
-  # Responsible Parameter ID: $2
   $3 = { body_30 capturing $0 }
   $4 = %92
   $5 = dup $3
@@ -882,18 +818,14 @@ body_31 =
   $7 = call $4 with $3 $1 ($6 is responsible)
   $8 = drop $3
   $9 = $7
-body_32 =
+body_32 $0 (+ responsible $1) =
   # Original HIR IDs: Examples:fibonacci:main
   # Captured IDs: none
-  # Parameter IDs: $0
-  # Responsible Parameter ID: $1
   $2 = %93
   $3 = %64
   $4 = %32
   $5 = call $2 with $2 $3 ($4 is responsible)
-body_33 =
+body_33 (responsible $0) =
   # Original HIR IDs: Examples:fibonacci:
   # Captured IDs: none
-  # Parameter IDs: none
-  # Responsible Parameter ID: $0
   $1 = %95

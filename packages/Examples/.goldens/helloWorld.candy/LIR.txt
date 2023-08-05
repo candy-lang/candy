@@ -45,52 +45,38 @@
 %35 = [%18: %34]
 
 # Bodies
-body_0 =
+body_0 (responsible $0) =
   # Original HIR IDs: anonymous:$generated::needs:isConditionTrue:then
   # Captured IDs: none
-  # Parameter IDs: none
-  # Responsible Parameter ID: $0
   $1 = %24
-body_1 =
+body_1 (responsible $0) =
   # Original HIR IDs: anonymous:$generated::needs:isConditionBool:then
   # Captured IDs: none
-  # Parameter IDs: none
-  # Responsible Parameter ID: $0
   $1 = %19
-body_2 =
+body_2 (responsible $1) =
   # Original HIR IDs: anonymous:$generated::needs:isConditionTrue:else
   # Captured IDs: $0
-  # Parameter IDs: none
-  # Responsible Parameter ID: $1
   $2 = %12
   $3 = %17
   $4 = %10
   $5 = call $2 with $0 $3 ($4 is responsible)
-body_3 =
+body_3 (responsible $1) =
   # Original HIR IDs: anonymous:$generated::needs:isConditionBool:else
   # Captured IDs: $0
-  # Parameter IDs: none
-  # Responsible Parameter ID: $1
   $2 = %26
   $3 = panicking because $2 ($0 is at fault)
-body_4 =
+body_4 (responsible $1) =
   # Original HIR IDs: anonymous:$generated::needs:isReasonText:else
   # Captured IDs: $0
-  # Parameter IDs: none
-  # Responsible Parameter ID: $1
   $2 = %27
   $3 = panicking because $2 ($0 is at fault)
-body_5 =
+body_5 (responsible $2) =
   # Original HIR IDs: anonymous:$generated::needs:condition:else
   # Captured IDs: $0, $1
-  # Parameter IDs: none
-  # Responsible Parameter ID: $2
   $3 = panicking because $0 ($1 is at fault)
-body_6 =
+body_6 $0 $1 $2 (+ responsible $3) =
   # Original HIR IDs: anonymous:$generated::needs
   # Captured IDs: none
-  # Parameter IDs: $0, $1, $2
-  # Responsible Parameter ID: $3
   $4 = %12
   $5 = %24
   $6 = %10
@@ -129,11 +115,9 @@ body_6 =
   $39 = drop $8
   $40 = drop $7
   $41 = $30
-body_7 =
+body_7 $0 (+ responsible $1) =
   # Original HIR IDs: Examples:helloWorld:11
   # Captured IDs: none
-  # Parameter IDs: $0
-  # Responsible Parameter ID: $1
   $2 = %16
   $3 = %6
   $4 = call $2 with $0 ($3 is responsible)
@@ -184,9 +168,7 @@ body_7 =
   $49 = drop $9
   $50 = drop $4
   $51 = $41
-body_8 =
+body_8 (responsible $0) =
   # Original HIR IDs: Examples:helloWorld:
   # Captured IDs: none
-  # Parameter IDs: none
-  # Responsible Parameter ID: $0
   $1 = %35

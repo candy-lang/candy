@@ -10,9 +10,7 @@
 %0 = []
 
 # Bodies
-body_0 =
+body_0 (responsible $0) =
   # Original HIR IDs: Examples:_package:
   # Captured IDs: none
-  # Parameter IDs: none
-  # Responsible Parameter ID: $0
   $1 = %0

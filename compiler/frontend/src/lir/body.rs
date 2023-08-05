@@ -60,8 +60,37 @@ impl ToRichIr for Bodies {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         builder.push_custom_multiline(self.ids_and_bodies(), |builder, (id, body)| {
             let range = builder.push(id.to_string(), TokenType::Function, EnumSet::empty());
+
             builder.push_definition(*id, range);
-            builder.push(" =", None, EnumSet::empty());
+            for parameter_id in body.parameter_ids() {
+                builder.push(" ", None, EnumSet::empty());
+                let range = builder.push(
+                    parameter_id.to_string(),
+                    TokenType::Parameter,
+                    EnumSet::empty(),
+                );
+                builder.push_definition(parameter_id, range);
+            }
+
+            let responsible_parameter_id = body.responsible_parameter_id();
+            builder.push(
+                if body.parameter_count == 0 {
+                    " (responsible "
+                } else {
+                    " (+ responsible "
+                },
+                None,
+                EnumSet::empty(),
+            );
+            let range = builder.push(
+                responsible_parameter_id.to_string(),
+                TokenType::Parameter,
+                EnumSet::empty(),
+            );
+            builder.push_definition(responsible_parameter_id, range);
+
+            builder.push(") =", None, EnumSet::empty());
+
             builder.indent();
             builder.push_newline();
             body.build_rich_ir(builder);
@@ -159,35 +188,6 @@ impl ToRichIr for Body {
                 ", ",
             );
         }
-        builder.push_newline();
-
-        builder.push("# Parameter IDs: ", TokenType::Comment, EnumSet::empty());
-        if self.parameter_ids().next().is_none() {
-            builder.push("none", None, EnumSet::empty());
-        } else {
-            builder.push_children_custom(
-                self.parameter_ids().collect_vec(),
-                |builder, id| {
-                    let range =
-                        builder.push(id.to_string(), TokenType::Parameter, EnumSet::empty());
-                    builder.push_definition(*id, range);
-                },
-                ", ",
-            );
-        }
-        builder.push_newline();
-
-        builder.push(
-            "# Responsible Parameter ID: ",
-            TokenType::Comment,
-            EnumSet::empty(),
-        );
-        let range = builder.push(
-            self.responsible_parameter_id().to_string(),
-            TokenType::Parameter,
-            EnumSet::empty(),
-        );
-        builder.push_definition(self.responsible_parameter_id(), range);
         builder.push_newline();
 
         builder.push_custom_multiline(self.ids_and_expressions(), |builder, (id, expression)| {

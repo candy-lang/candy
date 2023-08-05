@@ -374,7 +374,7 @@ impl Instruction {
             }
             Instruction::Call { num_args } => {
                 builder.push(
-                    format!(" with {num_args} {}", arguments_plural(*num_args),),
+                    format!(" with {num_args} {}", arguments_plural(*num_args)),
                     None,
                     EnumSet::empty(),
                 );
@@ -396,7 +396,7 @@ impl Instruction {
             Instruction::Panic => {}
             Instruction::TraceCallStarts { num_args } => {
                 builder.push(
-                    format!(" ({num_args} {})", arguments_plural(*num_args),),
+                    format!(" ({num_args} {})", arguments_plural(*num_args)),
                     None,
                     EnumSet::empty(),
                 );
