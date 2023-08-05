@@ -246,18 +246,27 @@ pub(crate) fn format_cst<'a>(
         }
         CstKind::Text {
             opening,
-            parts,
+            lines,
             closing,
         } => {
             // TODO: Format text
             let mut width =
                 format_cst(edits, previous_width, opening, info).min_width(info.indentation);
-            for part in parts {
-                width += format_cst(edits, previous_width + width, part, info)
+            for line in lines {
+                width += format_cst(edits, previous_width + width, line, info)
                     .min_width(info.indentation);
             }
             width += format_cst(edits, previous_width + width, closing, info)
                 .min_width(info.indentation);
+            width
+        }
+        CstKind::TextLine(parts) => {
+            // TODO: Format text
+            let mut width = Width::default();
+            for part in parts {
+                width += format_cst(edits, previous_width + width, part, info)
+                    .min_width(info.indentation);
+            }
             width
         }
         CstKind::TextPart(text) => text.width(),
@@ -1150,7 +1159,7 @@ pub impl<D> CstExtension for Cst<D> {
             }
             CstKind::OpeningText { .. } | CstKind::ClosingText { .. } => None,
             CstKind::Text { .. } => Some(PrecedenceCategory::High),
-            CstKind::TextPart(_) | CstKind::TextInterpolation { .. } => None,
+            CstKind::TextLine(_) | CstKind::TextPart(_) | CstKind::TextInterpolation { .. } => None,
             CstKind::BinaryBar { .. } => Some(PrecedenceCategory::Low),
             CstKind::Parenthesized { .. } => Some(PrecedenceCategory::High),
             CstKind::Call { .. } => Some(PrecedenceCategory::Low),

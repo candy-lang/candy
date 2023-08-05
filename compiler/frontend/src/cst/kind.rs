@@ -48,9 +48,10 @@ pub enum CstKind<D = CstData> {
     },
     Text {
         opening: Box<Cst<D>>,
-        parts: Vec<Cst<D>>,
+        lines: Vec<Cst<D>>,
         closing: Box<Cst<D>>,
     },
+    TextLine(Vec<Cst<D>>),
     TextPart(String),
     TextInterpolation {
         opening_curly_braces: Vec<Cst<D>>,
@@ -178,12 +179,17 @@ impl<D> CstKind<D> {
             }
             CstKind::Text {
                 opening,
-                parts,
+                lines,
                 closing,
             } => {
                 let mut children = vec![opening.as_ref()];
-                children.extend(parts);
+                children.extend(lines);
                 children.push(closing);
+                children
+            }
+            CstKind::TextLine(parts) => {
+                let mut children = vec![];
+                children.extend(parts);
                 children
             }
             CstKind::TextPart(_) => vec![],
@@ -376,14 +382,20 @@ impl<D> Display for CstKind<D> {
             }
             CstKind::Text {
                 opening,
-                parts,
+                lines,
                 closing,
             } => {
                 opening.fmt(f)?;
+                for line in lines {
+                    line.fmt(f)?;
+                }
+                closing.fmt(f)
+            }
+            CstKind::TextLine(parts) => {
                 for part in parts {
                     part.fmt(f)?;
                 }
-                closing.fmt(f)
+                Ok(())
             }
             CstKind::TextPart(literal) => literal.fmt(f),
             CstKind::TextInterpolation {

@@ -711,54 +711,59 @@ mod parse {
         ))
     }
 
+    fn drain_and_push_text_part(text_part: &mut Vec<char>, lines: &mut [Rcst]) {
+        let text_part = text_part.drain(..).join("");
+        if !text_part.is_empty() && let Some(Cst {
+                kind: CstKind::TextLine(last_line),
+                ..
+            }) = lines.last_mut()
+            {
+                last_line.push(CstKind::TextPart(text_part).into());
+            }
+    }
+
     // TODO: It might be a good idea to ignore text interpolations in patterns
     #[instrument(level = "trace")]
     fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
         let (input, opening_single_quotes) = parse_multiple(input, single_quote, None)?;
         let (mut input, opening_double_quote) = double_quote(input)?;
+        let (new_input, opening_whitespace) =
+            whitespaces_and_newlines(input, indentation + 1, false);
+        input = new_input;
 
-        let push_line_to_parts = |line: &mut Vec<char>, parts: &mut Vec<Rcst>| {
-            let joined_line = line.drain(..).join("");
-            if !joined_line.is_empty() {
-                parts.push(CstKind::TextPart(joined_line).into());
-            }
-        };
+        let mut text_part = vec![];
+        let mut lines: Vec<Rcst> = vec![CstKind::TextLine(Vec::new()).into()];
 
-        let mut line = vec![];
-        let mut parts = vec![];
         let closing = loop {
             if let Some((input_after_newline, newline)) = newline(input) {
-                input = input_after_newline;
-                push_line_to_parts(&mut line, &mut parts);
-                parts.push(newline);
-                if let Some((i, indentation)) = leading_indentation(input, indentation + 1) {
-                    input = i;
-                    parts.push(indentation);
-                    continue;
-                } else if let Some((
-                    i,
-                    Cst {
-                        kind: CstKind::Whitespace(whitespace),
-                        ..
-                    },
-                )) = single_line_whitespace(input)
+                drain_and_push_text_part(&mut text_part, &mut lines);
+                if let Some((input_after_indentation, indentation)) =
+                    leading_indentation(input_after_newline, indentation + 1)
                 {
-                    input = i;
-                    parts.push(
-                        CstKind::Error {
-                            unparsable_input: whitespace,
-                            error: CstError::TextNotSufficientlyIndented,
-                        }
-                        .into(),
-                    );
+                    input = input_after_indentation;
+                    let last_line = lines.pop().unwrap();
+                    lines.push(last_line.wrap_in_whitespace(vec![newline, indentation]));
+                    lines.push(CstKind::TextLine(Vec::new()).into())
+                } else if let Some((input_after_single_quotes, indentation)) =
+                    leading_indentation(input_after_newline, indentation) && let Some((input_after_double_quote, _)) =
+                    double_quote(input_after_single_quotes) && let Some((new_new_new_new_input, closing_single_quotes)) =
+                    parse_multiple(
+                        input_after_double_quote,
+                        single_quote,
+                        Some((opening_single_quotes.len(), false)),
+                    ) {
+                    input = new_new_new_new_input;
+                    let last_line = lines.pop().unwrap();
+                    lines.push(last_line.wrap_in_whitespace(vec![newline, indentation]));
+                    break CstKind::ClosingText {
+                        closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                        closing_single_quotes,
+                    };
                 } else {
-                    parts.push(
-                        CstKind::Error {
-                            unparsable_input: "".to_string(),
-                            error: CstError::TextNotSufficientlyIndented,
-                        }
-                        .into(),
-                    );
+                    break CstKind::Error {
+                        unparsable_input: "".to_string(),
+                        error: CstError::TextNotSufficientlyIndented,
+                    };
                 }
             }
 
@@ -772,47 +777,36 @@ mod parse {
                     ) {
                         Some((input_after_single_quotes, closing_single_quotes)) => {
                             input = input_after_single_quotes;
-                            push_line_to_parts(&mut line, &mut parts);
-                            // Allow closing brackets to be indented one step less then the text
-                            match parts.pop() {
-                                Some(Cst {
-                                    kind:
-                                        CstKind::Error {
-                                            unparsable_input,
-                                            error: CstError::TextNotSufficientlyIndented,
-                                        },
-                                    ..
-                                }) if whitespace_indentation_score(unparsable_input.as_str())
-                                    == indentation =>
-                                {
-                                    parts.push(CstKind::Whitespace(unparsable_input).into())
-                                }
-                                Some(cst) => parts.push(cst),
-                                _ => {}
-                            };
+                            drain_and_push_text_part(&mut text_part, &mut lines);
                             break CstKind::ClosingText {
                                 closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
                                 closing_single_quotes,
                             };
                         }
-                        None => line.push('"'),
+                        None => text_part.push('"'),
                     }
                 }
                 Some('{') => {
                     match text_interpolation(input, indentation, opening_single_quotes.len() + 1) {
                         Some((input_after_interpolation, interpolation)) => {
-                            push_line_to_parts(&mut line, &mut parts);
+                            drain_and_push_text_part(&mut text_part, &mut lines);
                             input = input_after_interpolation;
-                            parts.push(interpolation);
+                            if let Some(Cst {
+                                kind: CstKind::TextLine(last_line),
+                                ..
+                            }) = lines.last_mut()
+                            {
+                                last_line.push(interpolation);
+                            }
                         }
                         None => {
                             input = &input[1..];
-                            line.push('{');
+                            text_part.push('{');
                         }
                     }
                 }
                 None => {
-                    push_line_to_parts(&mut line, &mut parts);
+                    drain_and_push_text_part(&mut text_part, &mut lines);
                     break CstKind::Error {
                         unparsable_input: "".to_string(),
                         error: CstError::TextNotClosed,
@@ -820,21 +814,20 @@ mod parse {
                 }
                 Some(c) => {
                     input = &input[c.len_utf8()..];
-                    line.push(c);
+                    text_part.push(c);
                 }
             }
         };
+        let opening = CstKind::OpeningText {
+            opening_single_quotes,
+            opening_double_quote: Box::new(opening_double_quote),
+        }
+        .wrap_in_whitespace(opening_whitespace);
         Some((
             input,
             CstKind::Text {
-                opening: Box::new(
-                    CstKind::OpeningText {
-                        opening_single_quotes,
-                        opening_double_quote: Box::new(opening_double_quote),
-                    }
-                    .into(),
-                ),
-                parts,
+                opening: Box::new(opening),
+                lines,
                 closing: Box::new(closing.into()),
             }
             .into(),
@@ -861,11 +854,13 @@ mod parse {
                         }
                         .into(),
                     ),
-                    parts: vec![
-                        CstKind::TextPart("foo".to_string()).into(),
-                        build_newline(),
-                        CstKind::Whitespace("  ".to_string()).into(),
-                        CstKind::TextPart("bar".to_string()).into(),
+                    lines: vec![
+                        CstKind::TextLine(vec![CstKind::TextPart("foo".to_string()).into()])
+                            .with_trailing_whitespace(vec![
+                                CstKind::Newline("\n".to_string()),
+                                CstKind::Whitespace("  ".to_string(),)
+                            ]),
+                        CstKind::TextLine(vec![CstKind::TextPart("bar".to_string()).into()]).into(),
                     ],
                     closing: Box::new(
                         CstKind::ClosingText {
@@ -892,7 +887,10 @@ mod parse {
                         }
                         .into(),
                     ),
-                    parts: vec![CstKind::TextPart("foo".to_string()).into()],
+                    lines: vec![CstKind::TextLine(vec![
+                        CstKind::TextPart("foo".to_string()).into()
+                    ])
+                    .into(),],
                     closing: Box::new(
                         CstKind::Error {
                             unparsable_input: "".to_string(),
@@ -916,7 +914,10 @@ mod parse {
                         }
                         .into(),
                     ),
-                    parts: vec![CstKind::TextPart("foo".to_string()).into()],
+                    lines: vec![CstKind::TextLine(vec![
+                        CstKind::TextPart("foo".to_string()).into()
+                    ])
+                    .into(),],
                     closing: Box::new(
                         CstKind::Error {
                             unparsable_input: "".to_string(),
@@ -943,7 +944,11 @@ mod parse {
                         }
                         .into(),
                     ),
-                    parts: vec![CstKind::TextPart("foo\"'bar".to_string()).into()],
+                    lines: vec![CstKind::TextLine(vec![CstKind::TextPart(
+                        "foo\"'bar".to_string()
+                    )
+                    .into()])
+                    .into(),],
                     closing: Box::new(
                         CstKind::ClosingText {
                             closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
@@ -970,7 +975,7 @@ mod parse {
                         }
                         .into(),
                     ),
-                    parts: vec![
+                    lines: vec![CstKind::TextLine(vec![
                         CstKind::TextPart("foo ".to_string()).into(),
                         CstKind::TextInterpolation {
                             opening_curly_braces: vec![CstKind::OpeningCurlyBrace.into()],
@@ -979,7 +984,8 @@ mod parse {
                         }
                         .into(),
                         CstKind::TextPart(" baz".to_string()).into(),
-                    ],
+                    ])
+                    .into(),],
                     closing: Box::new(
                         CstKind::ClosingText {
                             closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
@@ -1003,7 +1009,11 @@ mod parse {
                         }
                         .into(),
                     ),
-                    parts: vec![CstKind::TextPart("foo {\"bar\"} baz".to_string()).into()],
+                    lines: vec![CstKind::TextLine(vec![CstKind::TextPart(
+                        "foo {\"bar\"} baz".to_string()
+                    )
+                    .into()])
+                    .into(),],
                     closing: Box::new(
                         CstKind::ClosingText {
                             closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
@@ -1027,7 +1037,7 @@ mod parse {
                         }
                         .into(),
                     ),
-                    parts: vec![
+                    lines: vec![CstKind::TextLine(vec![
                         CstKind::TextPart("foo ".to_string()).into(),
                         CstKind::TextInterpolation {
                             opening_curly_braces: vec![CstKind::OpeningCurlyBrace
@@ -1039,7 +1049,8 @@ mod parse {
                         }
                         .into(),
                         CstKind::TextPart(" baz".to_string()).into(),
-                    ],
+                    ])
+                    .into(),],
                     closing: Box::new(
                         CstKind::ClosingText {
                             closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
@@ -1066,7 +1077,7 @@ mod parse {
                         }
                         .into(),
                     ),
-                    parts: vec![
+                    lines: vec![CstKind::TextLine(vec![
                         CstKind::TextPart("Some text with ".to_string()).into(),
                         CstKind::TextInterpolation {
                             opening_curly_braces: vec![CstKind::OpeningCurlyBrace.into()],
@@ -1084,7 +1095,7 @@ mod parse {
                                             }
                                             .into(),
                                         ),
-                                    parts: vec![
+                                    lines: vec![CstKind::TextLine(vec![
                                         CstKind::TextPart(
                                             "an interpolation containing ".to_string(),
                                         )
@@ -1103,7 +1114,8 @@ mod parse {
                                             ],
                                         }
                                         .into(),
-                                    ],
+                                    ])
+                                    .into()],
                                     closing:
                                         Box::new(
                                             CstKind::ClosingText {
@@ -1122,7 +1134,8 @@ mod parse {
                             closing_curly_braces: vec![CstKind::ClosingCurlyBrace.into()],
                         }
                         .into(),
-                    ],
+                    ])
+                    .into(),],
                     closing: Box::new(
                         CstKind::ClosingText {
                             closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
@@ -1146,7 +1159,7 @@ mod parse {
                         }
                         .into(),
                     ),
-                    parts: vec![
+                    lines: vec![CstKind::TextLine(vec![
                         CstKind::TextInterpolation {
                             opening_curly_braces: vec![
                                 CstKind::OpeningCurlyBrace.with_trailing_space()
@@ -1167,7 +1180,8 @@ mod parse {
                             closing_curly_braces: vec![CstKind::ClosingCurlyBrace.into()],
                         }
                         .into(),
-                    ],
+                    ])
+                    .into(),],
                     closing: Box::new(
                         CstKind::ClosingText {
                             closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
@@ -1191,7 +1205,7 @@ mod parse {
                         }
                         .into(),
                     ),
-                    parts: vec![
+                    lines: vec![CstKind::TextLine(vec![
                         CstKind::TextPart("{".to_string()).into(),
                         CstKind::TextInterpolation {
                             opening_curly_braces: vec![CstKind::OpeningCurlyBrace.into()],
@@ -1200,7 +1214,8 @@ mod parse {
                         }
                         .into(),
                         CstKind::TextPart("}".to_string()).into(),
-                    ],
+                    ])
+                    .into(),],
                     closing: Box::new(
                         CstKind::ClosingText {
                             closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
@@ -1224,7 +1239,7 @@ mod parse {
                         }
                         .into(),
                     ),
-                    parts: vec![
+                    lines: vec![CstKind::TextLine(vec![
                         CstKind::TextPart("foo ".to_string()).into(),
                         CstKind::TextInterpolation {
                             opening_curly_braces: vec![CstKind::OpeningCurlyBrace.into()],
@@ -1239,7 +1254,8 @@ mod parse {
                         }
                         .into(),
                         CstKind::TextPart(" baz".to_string()).into(),
-                    ],
+                    ])
+                    .into(),],
                     closing: Box::new(
                         CstKind::ClosingText {
                             closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
@@ -1263,7 +1279,7 @@ mod parse {
                         }
                         .into(),
                     ),
-                    parts: vec![
+                    lines: vec![CstKind::TextLine(vec![
                         CstKind::TextPart("foo ".to_string()).into(),
                         CstKind::TextInterpolation {
                             opening_curly_braces: vec![CstKind::OpeningCurlyBrace.into()],
@@ -1284,7 +1300,7 @@ mod parse {
                                                 }
                                                 .into(),
                                             ),
-                                            parts: vec![],
+                                            lines: vec![CstKind::TextLine(vec![]).into()],
                                             closing: Box::new(
                                                 CstKind::Error {
                                                     unparsable_input: "".to_string(),
@@ -1305,7 +1321,8 @@ mod parse {
                             .into()],
                         }
                         .into(),
-                    ],
+                    ])
+                    .into(),],
                     closing: Box::new(
                         CstKind::Error {
                             unparsable_input: "".to_string(),
@@ -1329,7 +1346,7 @@ mod parse {
                         }
                         .into(),
                     ),
-                    parts: vec![
+                    lines: vec![CstKind::TextLine(vec![
                         CstKind::TextPart("foo ".to_string()).into(),
                         CstKind::TextInterpolation {
                             opening_curly_braces: vec![CstKind::OpeningCurlyBrace.into()],
@@ -1346,7 +1363,8 @@ mod parse {
                         }
                         .into(),
                         CstKind::TextPart(" baz".to_string()).into(),
-                    ],
+                    ])
+                    .into(),],
                     closing: Box::new(
                         CstKind::ClosingText {
                             closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
@@ -3332,7 +3350,10 @@ mod parse {
                 }
                 .into(),
             ),
-            parts: vec![CstKind::TextPart(value.as_ref().to_string()).into()],
+            lines: vec![CstKind::TextLine(vec![
+                CstKind::TextPart(value.as_ref().to_string()).into()
+            ])
+            .into()],
             closing: Box::new(
                 CstKind::ClosingText {
                     closing_double_quote: Box::new(CstKind::DoubleQuote.into()),

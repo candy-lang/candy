@@ -129,14 +129,19 @@ fn visit_cst(
         }
         CstKind::Text {
             opening,
-            parts,
+            lines,
             closing,
         } => {
             visit_cst(builder, opening, None);
+            for line in lines {
+                visit_cst(builder, line, None);
+            }
+            visit_cst(builder, closing, None);
+        }
+        CstKind::TextLine(parts) => {
             for part in parts {
                 visit_cst(builder, part, None);
             }
-            visit_cst(builder, closing, None);
         }
         CstKind::TextPart(_) => builder.add(
             cst.data.span.clone(),

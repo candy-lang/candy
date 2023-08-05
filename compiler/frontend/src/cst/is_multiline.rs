@@ -44,9 +44,10 @@ impl<D> IsMultiline for CstKind<D> {
             CstKind::ClosingText { .. } => false,
             CstKind::Text {
                 opening,
-                parts,
+                lines,
                 closing,
-            } => opening.is_multiline() || parts.is_multiline() || closing.is_multiline(),
+            } => opening.is_multiline() || lines.is_multiline() || closing.is_multiline(),
+            CstKind::TextLine(parts) => parts.is_multiline(),
             CstKind::TextPart(_) => false,
             CstKind::TextInterpolation { .. } => false,
             CstKind::BinaryBar { left, bar, right } => {

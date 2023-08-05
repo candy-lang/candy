@@ -147,7 +147,7 @@ impl LoweringContext {
             }
             CstKind::Text {
                 opening,
-                parts,
+                lines,
                 closing,
             } => {
                 let mut errors = vec![];
@@ -167,73 +167,76 @@ impl LoweringContext {
 
                 let mut lowered_parts = vec![];
 
-                for (i, part) in parts.iter().enumerate() {
-                    match &part.kind {
-                        CstKind::TextPart(text) => {
-                            let string = self.create_string(part.data.id, text.clone());
-                            let text_part =
-                                self.create_ast(part.data.id, AstKind::TextPart(TextPart(string)));
-                            lowered_parts.push(text_part);
-                        },
-                        CstKind::Newline(_) => {
-                            if 0 < i && i < parts.len() - 1 {
-                                let string = self.create_string(part.data.id, "\n".to_string());
+                for (i, line) in lines.iter().enumerate() {
+                    let CstKind::TextLine(parts) = &line.kind else {
+                        panic!("Text contains non-TextLine. Whitespaces should have been removed already.")
+                    };
+                    for part in parts {
+                        match &part.kind {
+                            CstKind::TextPart(text) => {
+                                let string = self.create_string(part.data.id, text.clone());
                                 let text_part =
                                     self.create_ast(part.data.id, AstKind::TextPart(TextPart(string)));
                                 lowered_parts.push(text_part);
-                            }
-                        },
-                        CstKind::TextInterpolation {
-                            opening_curly_braces,
-                            expression,
-                            closing_curly_braces,
-                        } => {
-                            if lowering_type != LoweringType::Expression {
-                                return self.create_ast_for_invalid_expression_in_pattern(cst);
-                            };
+                            },
+                            CstKind::TextInterpolation {
+                                opening_curly_braces,
+                                expression,
+                                closing_curly_braces,
+                            } => {
+                                if lowering_type != LoweringType::Expression {
+                                    return self.create_ast_for_invalid_expression_in_pattern(cst);
+                                };
 
-                            if opening_curly_braces.len() != (opening_single_quote_count + 1)
-                                || !opening_curly_braces
-                                    .iter()
-                                    .all(|opening_curly_brace| opening_curly_brace.kind.is_opening_curly_brace())
-                            {
-                                panic!(
-                                    "Text interpolation needs to start with {} opening curly braces, but started with {}.", 
-                                    opening_single_quote_count + 1,
-                                    opening_curly_braces.iter().map(|cst| format!("{}", cst)).join(""),
-                                )
-                            }
+                                if opening_curly_braces.len() != (opening_single_quote_count + 1)
+                                    || !opening_curly_braces
+                                        .iter()
+                                        .all(|opening_curly_brace| opening_curly_brace.kind.is_opening_curly_brace())
+                                {
+                                    panic!(
+                                        "Text interpolation needs to start with {} opening curly braces, but started with {}.", 
+                                        opening_single_quote_count + 1,
+                                        opening_curly_braces.iter().map(|cst| format!("{}", cst)).join(""),
+                                    )
+                                }
 
-                            let ast = self.lower_cst(expression, LoweringType::Expression);
+                                let ast = self.lower_cst(expression, LoweringType::Expression);
 
-                            if closing_curly_braces.len() == opening_single_quote_count + 1
-                                && closing_curly_braces
-                                    .iter()
-                                    .all(|closing_curly_brace| closing_curly_brace.kind.is_closing_curly_brace())
-                            {
-                                lowered_parts.push(ast);
-                            } else {
-                                let error = self.create_ast(
-                                    part.data.id,
-                                    AstKind::Error {
-                                        child: Some(Box::new(ast)),
-                                        errors: vec![CompilerError {
-                                            module: self.module.clone(),
-                                            span: part.data.span.clone(),
-                                            payload:
-                                                AstError::TextInterpolationMissesClosingCurlyBraces.into(),
-                                        }],
-                                    },
-                                );
-                                lowered_parts.push(error);
-                            }
-                        },
-                        CstKind::Error { error, .. } => errors.push(CompilerError {
-                            module: self.module.clone(),
-                            span: part.data.span.clone(),
-                            payload: error.clone().into(),
-                        }),
-                        _ => panic!("Text contains non-TextPart. Whitespaces should have been removed already."),
+                                if closing_curly_braces.len() == opening_single_quote_count + 1
+                                    && closing_curly_braces
+                                        .iter()
+                                        .all(|closing_curly_brace| closing_curly_brace.kind.is_closing_curly_brace())
+                                {
+                                    lowered_parts.push(ast);
+                                } else {
+                                    let error = self.create_ast(
+                                        part.data.id,
+                                        AstKind::Error {
+                                            child: Some(Box::new(ast)),
+                                            errors: vec![CompilerError {
+                                                module: self.module.clone(),
+                                                span: part.data.span.clone(),
+                                                payload:
+                                                    AstError::TextInterpolationMissesClosingCurlyBraces.into(),
+                                            }],
+                                        },
+                                    );
+                                    lowered_parts.push(error);
+                                }
+                            },
+                            CstKind::Error { error, .. } => errors.push(CompilerError {
+                                module: self.module.clone(),
+                                span: part.data.span.clone(),
+                                payload: error.clone().into(),
+                            }),
+                            _ => panic!("TextLine contains non-TextPart. Whitespaces should have been removed already."),
+                        }
+                    }
+                    if i + 1 < lines.len() {
+                        let newline = self.create_string(line.data.id, "\n".to_string());
+                        let text_part =
+                            self.create_ast(line.data.id, AstKind::TextPart(TextPart(newline)));
+                        lowered_parts.push(text_part);
                     }
                 }
                 let text = self.create_ast(cst.data.id, AstKind::Text(Text(lowered_parts)));
@@ -258,6 +261,7 @@ impl LoweringContext {
             }
             CstKind::OpeningText { .. } => panic!("OpeningText should only occur in Text."),
             CstKind::ClosingText { .. } => panic!("ClosingText should only occur in Text."),
+            CstKind::TextLine { .. } => panic!("TextLine should only occur in Text."),
             CstKind::TextPart(_) => panic!("TextPart should only occur in Text."),
             CstKind::TextInterpolation { .. } => {
                 panic!("TextInterpolation should only occur in Text.")
