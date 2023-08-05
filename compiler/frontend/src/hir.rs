@@ -610,12 +610,7 @@ impl ToRichIr for Expression {
                 builder.push("}", None, EnumSet::empty());
             }
             Expression::Builtin(builtin) => {
-                let range = builder.push(
-                    format!("builtin{builtin:?}"),
-                    TokenType::Function,
-                    EnumSet::only(TokenModifier::Builtin),
-                );
-                builder.push_reference(*builtin, range);
+                builtin.build_rich_ir(builder);
             }
             Expression::Call {
                 function,
