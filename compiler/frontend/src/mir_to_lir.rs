@@ -364,8 +364,13 @@ impl CurrentBody {
     }
     fn finish(mut self, original_hirs: FxHashSet<hir::Id>) -> lir::Body {
         self.ids_to_drop.remove(&self.last_expression_id());
-        for id in self.ids_to_drop.iter().sorted().rev() {
-            self.expressions.push(lir::Expression::Drop(*id));
+        if !self.ids_to_drop.is_empty() {
+            let return_value_id = self.last_expression_id();
+            for id in self.ids_to_drop.iter().sorted().rev() {
+                self.expressions.push(lir::Expression::Drop(*id));
+            }
+            self.expressions
+                .push(lir::Expression::Reference(return_value_id));
         }
 
         lir::Body::new(

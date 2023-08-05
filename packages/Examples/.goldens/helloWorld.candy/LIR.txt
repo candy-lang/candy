@@ -128,6 +128,7 @@ body_6 =
   $38 = drop $13
   $39 = drop $8
   $40 = drop $7
+  $41 = $30
 body_7 =
   # Original HIR IDs: Examples:helloWorld:11
   # Captured IDs: none
@@ -182,6 +183,7 @@ body_7 =
   $48 = drop $15
   $49 = drop $9
   $50 = drop $4
+  $51 = $41
 body_8 =
   # Original HIR IDs: Examples:helloWorld:
   # Captured IDs: none

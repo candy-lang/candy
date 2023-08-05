@@ -222,6 +222,7 @@ body_6 =
   $38 = drop $13
   $39 = drop $8
   $40 = drop $7
+  $41 = $30
 body_7 =
   # Original HIR IDs: Builtins::not:1:equals:then
   # Captured IDs: none
@@ -264,6 +265,7 @@ body_9 =
   $25 = drop $9
   $26 = drop $7
   $27 = drop $6
+  $28 = $21
 body_10 =
   # Original HIR IDs: Builtins::ifElse:1:equals:then
   # Captured IDs: $0
@@ -285,6 +287,7 @@ body_10 =
   $15 = drop $9
   $16 = drop $8
   $17 = drop $4
+  $18 = $14
 body_11 =
   # Original HIR IDs: Builtins::ifElse:1:equals:else
   # Captured IDs: $0
@@ -317,6 +320,7 @@ body_11 =
   $26 = drop $10
   $27 = drop $6
   $28 = drop $5
+  $29 = $22
 body_12 =
   # Original HIR IDs: Builtins::ifElse:1:equals:then
   # Captured IDs: $0
@@ -340,6 +344,7 @@ body_12 =
   $17 = drop $9
   $18 = drop $8
   $19 = drop $4
+  $20 = $15
 body_13 =
   # Original HIR IDs: Builtins::ifElse:1:equals:else
   # Captured IDs: $0
@@ -372,6 +377,7 @@ body_13 =
   $26 = drop $10
   $27 = drop $6
   $28 = drop $5
+  $29 = $22
 body_14 =
   # Original HIR IDs: Builtins::ifElse:1:isMatch:then
   # Captured IDs: $0
@@ -408,6 +414,7 @@ body_15 =
   $25 = drop $9
   $26 = drop $7
   $27 = drop $6
+  $28 = $21
 body_16 =
   # Original HIR IDs: Builtins::ifElse:1:equals:then
   # Captured IDs: $0
@@ -429,6 +436,7 @@ body_16 =
   $15 = drop $9
   $16 = drop $8
   $17 = drop $4
+  $18 = $14
 body_17 =
   # Original HIR IDs: Builtins::ifElse:1:equals:else
   # Captured IDs: $0
@@ -461,6 +469,7 @@ body_17 =
   $26 = drop $10
   $27 = drop $6
   $28 = drop $5
+  $29 = $22
 body_18 =
   # Original HIR IDs: Builtins::ifElse:1:equals:then
   # Captured IDs: $0
@@ -484,6 +493,7 @@ body_18 =
   $17 = drop $9
   $18 = drop $8
   $19 = drop $4
+  $20 = $15
 body_19 =
   # Original HIR IDs: Builtins::ifElse:1:equals:else
   # Captured IDs: $0
@@ -516,6 +526,7 @@ body_19 =
   $26 = drop $10
   $27 = drop $6
   $28 = drop $5
+  $29 = $22
 body_20 =
   # Original HIR IDs: Builtins::ifElse:1:isMatch:else
   # Captured IDs: $0
@@ -539,6 +550,7 @@ body_20 =
   $17 = drop $9
   $18 = drop $8
   $19 = drop $4
+  $20 = $15
 body_21 =
   # Original HIR IDs: Builtins::ifElse:1:case-0:didNotMatch
   # Captured IDs: $0
@@ -550,6 +562,7 @@ body_21 =
   $5 = call $2 with $0 $3 ($4 is responsible)
   $6 = %71
   $7 = drop $5
+  $8 = $6
 body_22 =
   # Original HIR IDs: Builtins::ifElse
   # Captured IDs: none
@@ -679,6 +692,7 @@ body_22 =
   $125 = drop $11
   $126 = drop $10
   $127 = drop $6
+  $128 = $94
 body_23 =
   # Original HIR IDs: Core:function:is0:11
   # Captured IDs: $0
@@ -709,6 +723,7 @@ body_23 =
   $24 = drop $15
   $25 = drop $9
   $26 = drop $4
+  $27 = $22
 body_24 =
   # Original HIR IDs: Core:function:is0
   # Captured IDs: none
@@ -732,6 +747,7 @@ body_24 =
   $17 = drop $10
   $18 = drop $9
   $19 = drop $4
+  $20 = $16
 body_25 =
   # Original HIR IDs: Core:function:run
   # Captured IDs: none
@@ -779,6 +795,7 @@ body_25 =
   $41 = drop $12
   $42 = drop $9
   $43 = drop $4
+  $44 = $35
 body_26 =
   # Original HIR IDs: Builtins::isNonNegative:13:equals:else
   # Captured IDs: $0, $1
@@ -809,6 +826,7 @@ body_26 =
   $25 = drop $9
   $26 = drop $7
   $27 = drop $6
+  $28 = $21
 body_27 =
   # Original HIR IDs: Builtins::isNonNegative:13:equals:then
   # Captured IDs: $0
@@ -830,6 +848,7 @@ body_27 =
   $15 = drop $9
   $16 = drop $8
   $17 = drop $4
+  $18 = $14
 body_28 =
   # Original HIR IDs: Builtins::isNonNegative:13:equals:else
   # Captured IDs: $0
@@ -862,6 +881,7 @@ body_28 =
   $26 = drop $10
   $27 = drop $6
   $28 = drop $5
+  $29 = $22
 body_29 =
   # Original HIR IDs: Builtins::isNonNegative:13:equals:then
   # Captured IDs: $0
@@ -885,6 +905,7 @@ body_29 =
   $17 = drop $9
   $18 = drop $8
   $19 = drop $4
+  $20 = $15
 body_30 =
   # Original HIR IDs: Builtins::isNonNegative:13:isMatch:then
   # Captured IDs: $0
@@ -921,6 +942,7 @@ body_31 =
   $25 = drop $9
   $26 = drop $7
   $27 = drop $6
+  $28 = $21
 body_32 =
   # Original HIR IDs: Builtins::isNonNegative:13:equals:then
   # Captured IDs: $0
@@ -942,6 +964,7 @@ body_32 =
   $15 = drop $9
   $16 = drop $8
   $17 = drop $4
+  $18 = $14
 body_33 =
   # Original HIR IDs: Builtins::isNonNegative:13:equals:else
   # Captured IDs: $0
@@ -974,6 +997,7 @@ body_33 =
   $26 = drop $10
   $27 = drop $6
   $28 = drop $5
+  $29 = $22
 body_34 =
   # Original HIR IDs: Builtins::isNonNegative:13:equals:then
   # Captured IDs: $0
@@ -997,6 +1021,7 @@ body_34 =
   $17 = drop $9
   $18 = drop $8
   $19 = drop $4
+  $20 = $15
 body_35 =
   # Original HIR IDs: Builtins::isNonNegative:13:isMatch:else
   # Captured IDs: $0
@@ -1007,6 +1032,7 @@ body_35 =
   $4 = %24
   $5 = call $2 with no arguments ($4 is responsible)
   $6 = drop $2
+  $7 = $5
 body_36 =
   # Original HIR IDs: Builtins::isNonNegative:13:equals:else
   # Captured IDs: $0, $1
@@ -1037,6 +1063,7 @@ body_36 =
   $25 = drop $9
   $26 = drop $7
   $27 = drop $6
+  $28 = $21
 body_37 =
   # Original HIR IDs: Builtins::isNonNegative:13:equals:then
   # Captured IDs: $0
@@ -1058,6 +1085,7 @@ body_37 =
   $15 = drop $9
   $16 = drop $8
   $17 = drop $4
+  $18 = $14
 body_38 =
   # Original HIR IDs: Builtins::isNonNegative:13:equals:else
   # Captured IDs: $0
@@ -1090,6 +1118,7 @@ body_38 =
   $26 = drop $10
   $27 = drop $6
   $28 = drop $5
+  $29 = $22
 body_39 =
   # Original HIR IDs: Builtins::isNonNegative:13:equals:then
   # Captured IDs: $0
@@ -1113,6 +1142,7 @@ body_39 =
   $17 = drop $9
   $18 = drop $8
   $19 = drop $4
+  $20 = $15
 body_40 =
   # Original HIR IDs: Builtins::isNonNegative:13:case-1:didNotMatch
   # Captured IDs: $0
@@ -1125,6 +1155,7 @@ body_40 =
   $6 = %98
   $7 = panicking because $6 ($4 is at fault)
   $8 = drop $5
+  $9 = $7
 body_41 =
   # Original HIR IDs: Builtins::isNonNegative:13:case-0:didNotMatch
   # Captured IDs: $0, $1
@@ -1156,6 +1187,7 @@ body_41 =
   $26 = drop $9
   $27 = drop $7
   $28 = drop $6
+  $29 = $22
 body_42 =
   # Original HIR IDs: Builtins::isNonNegative
   # Captured IDs: none
@@ -1218,6 +1250,7 @@ body_42 =
   $56 = drop $14
   $57 = drop $9
   $58 = drop $4
+  $59 = $44
 body_43 =
   # Original HIR IDs: Examples:echo:11:print
   # Captured IDs: $0
@@ -1284,6 +1317,7 @@ body_43 =
   $61 = drop $15
   $62 = drop $10
   $63 = drop $5
+  $64 = $51
 body_44 =
   # Original HIR IDs: Examples:echo:11:0
   # Captured IDs: $0
@@ -1405,6 +1439,7 @@ body_44 =
   $115 = drop $14
   $116 = drop $11
   $117 = drop $5
+  $118 = $92
 body_45 =
   # Original HIR IDs: Examples:echo:11
   # Captured IDs: none
@@ -1433,6 +1468,7 @@ body_45 =
   $22 = drop $7
   $23 = drop $3
   $24 = drop $2
+  $25 = $19
 body_46 =
   # Original HIR IDs: Examples:echo:
   # Captured IDs: none
