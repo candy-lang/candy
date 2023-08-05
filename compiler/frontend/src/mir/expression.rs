@@ -347,7 +347,7 @@ impl ToRichIr for Expression {
                     parameters,
                     |builder, parameter| {
                         let range = builder.push(
-                            parameter.to_short_debug_string(),
+                            parameter.to_string(),
                             TokenType::Parameter,
                             EnumSet::empty(),
                         );
@@ -365,7 +365,7 @@ impl ToRichIr for Expression {
                     EnumSet::empty(),
                 );
                 let range = builder.push(
-                    responsible_parameter.to_short_debug_string(),
+                    responsible_parameter.to_string(),
                     TokenType::Parameter,
                     EnumSet::empty(),
                 );

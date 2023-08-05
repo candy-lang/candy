@@ -406,13 +406,7 @@ impl ToRichIr for Body {
                 builder.push_newline();
             }
 
-            let range = builder.push(
-                id.to_short_debug_string(),
-                TokenType::Variable,
-                EnumSet::empty(),
-            );
-            builder.push_definition(id.to_owned(), range);
-
+            id.build_rich_ir(builder);
             builder.push(" = ", None, EnumSet::empty());
             expression.build_rich_ir(builder);
         }
