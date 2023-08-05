@@ -6,7 +6,7 @@
 # • Include tracing of calls? No
 # • Include tracing of evaluated expressions? No
 
-$1 = Builtins::print:11
+$1 = Builtins::print:5
 $2 = Builtins::toDebugText:5
 $3 = builtinPrint
 $4 = builtinToDebugText

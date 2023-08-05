@@ -4,15 +4,11 @@
 # `cargo build --release && time target/release/candy run`
 
 builtins = use "Builtins"
-# [channel, text] = use "Core"
-# 
 # echo = use ".echo"
 # fibonacci = use ".fibonacci"
 
 main := { environment ->
-  # print message =
-  #   needs (text.is message)
-  #   environment.stdout | channel.send message
+  # print message = environment.stdout message
 
   result = 1 | builtins.intAdd 2
   result | builtins.toDebugText | builtins.print
