@@ -457,19 +457,6 @@ impl State {
             } => Ok(initialize_arguments),
         }
     }
-    fn require_launched(&self) -> Result<&DebugVm, &'static str> {
-        match &self {
-            State::Initial | State::Initialized(_) => Err("not-launched"),
-            State::Launched {
-                execution_state: ExecutionState::Running(vm),
-                ..
-            } => Ok(vm),
-            State::Launched {
-                execution_state: ExecutionState::Paused(PausedState { vm, .. }),
-                ..
-            } => Ok(vm.as_ref().unwrap()),
-        }
-    }
     fn require_paused(&self) -> Result<&PausedState, &'static str> {
         match self {
             State::Launched {

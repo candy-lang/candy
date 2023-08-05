@@ -123,7 +123,7 @@ impl Insight {
             interesting_inputs.into_iter().map(|input| {
                 Insight::Hint(match fuzzer.input_pool().result_of(&input) {
                     RunResult::Timeout => unreachable!(),
-                    RunResult::Done { heap, return_value } => Hint {
+                    RunResult::Done { return_value, .. } => Hint {
                         kind: HintKind::SampleInputReturningNormally,
                         position: end_of_line,
                         text: format!(

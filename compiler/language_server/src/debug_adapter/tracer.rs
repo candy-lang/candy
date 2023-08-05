@@ -23,10 +23,6 @@ impl StackFrame {
         }
     }
 
-    fn dup(&self, heap: &mut Heap) {
-        self.call.dup(heap);
-        self.locals.iter().for_each(|(_, value)| value.dup(heap));
-    }
     fn drop(&self, heap: &mut Heap) {
         self.call.drop(heap);
         self.locals.iter().for_each(|(_, value)| value.drop(heap));
@@ -62,16 +58,5 @@ impl Tracer for DebugTracer {
     }
     fn call_ended(&mut self, heap: &mut Heap, _return_value: InlineObject) {
         self.call_stack.pop().unwrap().drop(heap);
-    }
-}
-
-impl DebugTracer {
-    fn drop(self, heap: &mut Heap) {
-        self.root_locals
-            .into_iter()
-            .for_each(|(_, value)| value.drop(heap));
-        for frame in self.call_stack {
-            frame.drop(heap);
-        }
     }
 }
