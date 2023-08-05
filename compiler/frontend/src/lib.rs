@@ -2,6 +2,7 @@
 #![feature(entry_insert)]
 #![feature(io_error_more)]
 #![feature(let_chains)]
+#![feature(try_blocks)]
 
 pub mod ast;
 pub mod ast_to_hir;
@@ -13,8 +14,10 @@ pub mod error;
 pub mod hir;
 pub mod hir_to_mir;
 pub mod id;
+pub mod lir;
 pub mod mir;
 pub mod mir_optimize;
+pub mod mir_to_lir;
 pub mod module;
 pub mod position;
 pub mod rcst;

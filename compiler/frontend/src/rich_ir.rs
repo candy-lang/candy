@@ -1,7 +1,7 @@
 use crate::{
     ast::Ast,
     builtin_functions::BuiltinFunction,
-    hir,
+    hir, lir,
     mir::{self, Mir},
     module::Module,
     position::Offset,
@@ -45,6 +45,9 @@ pub enum ReferenceKey {
     ModuleWithSpan(Module, Range<Offset>),
     HirId(hir::Id),
     MirId(mir::Id),
+    LirId(lir::Id),
+    LirConstantId(lir::ConstantId),
+    LirBodyId(lir::BodyId),
 }
 #[derive(Debug, Default)]
 pub struct ReferenceCollection {
