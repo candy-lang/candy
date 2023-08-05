@@ -1,4 +1,4 @@
-use super::Expression;
+use super::{Expression, Id};
 use crate::{
     hir,
     id::CountableId,
@@ -6,6 +6,7 @@ use crate::{
     rich_ir::{RichIrBuilder, ToRichIr, TokenType},
 };
 use enumset::EnumSet;
+use itertools::Itertools;
 use rustc_hash::FxHashSet;
 use std::fmt::{self, Debug, Display, Formatter};
 
@@ -39,13 +40,33 @@ impl ToRichIr for BodyId {
 pub struct Bodies(Vec<Body>);
 
 impl Bodies {
+    pub fn get(&self, id: BodyId) -> &Body {
+        &self.0[id.to_usize()]
+    }
     pub fn push(&mut self, constant: Body) -> BodyId {
         let id = BodyId::from_usize(self.0.len());
         self.0.push(constant);
         id
     }
-    pub fn get(&self, id: BodyId) -> &Body {
-        &self.0[id.to_usize()]
+
+    fn ids_and_bodies(&self) -> impl Iterator<Item = (BodyId, &Body)> {
+        self.0
+            .iter()
+            .enumerate()
+            .map(|(index, it)| (BodyId(index), it))
+    }
+}
+impl ToRichIr for Bodies {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push_custom_multiline(self.ids_and_bodies(), |builder, (id, body)| {
+            let range = builder.push(id.to_string(), TokenType::Function, EnumSet::empty());
+            builder.push_definition(*id, range);
+            builder.push(" =", None, EnumSet::empty());
+            builder.indent();
+            builder.push_newline();
+            body.build_rich_ir(builder);
+            builder.dedent();
+        })
     }
 }
 
@@ -82,13 +103,97 @@ impl Body {
     pub fn original_hirs(&self) -> &FxHashSet<hir::Id> {
         &self.original_hirs
     }
+
     pub fn captured_count(&self) -> usize {
         self.captured_count
     }
+    fn captured_ids(&self) -> impl Iterator<Item = Id> {
+        (0..self.captured_count).map(Id::from_usize)
+    }
+
     pub fn parameter_count(&self) -> usize {
         self.parameter_count
     }
+    fn parameter_ids(&self) -> impl Iterator<Item = Id> {
+        (self.captured_count..self.captured_count + self.parameter_count).map(Id::from_usize)
+    }
+
+    fn responsible_parameter_id(&self) -> Id {
+        Id::from_usize(self.captured_count + self.parameter_count)
+    }
+
     pub fn expressions(&self) -> &[Expression] {
         &self.expressions
+    }
+    pub fn ids_and_expressions(&self) -> impl Iterator<Item = (Id, &Expression)> {
+        self.expressions
+            .iter()
+            .enumerate()
+            .map(|(index, it)| (Id::from_usize(index), it))
+    }
+}
+impl ToRichIr for Body {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push("# Original HIR IDs: ", TokenType::Comment, EnumSet::empty());
+        builder.push_children_custom(
+            self.original_hirs.iter().sorted(),
+            |builder, id| {
+                let range = builder.push(id.to_string(), TokenType::Constant, EnumSet::empty());
+                builder.push_reference((*id).clone(), range);
+            },
+            ", ",
+        );
+        builder.push_newline();
+
+        builder.push("# Captured IDs: ", TokenType::Comment, EnumSet::empty());
+        if self.captured_ids().next().is_none() {
+            builder.push("none", None, EnumSet::empty());
+        } else {
+            builder.push_children_custom(
+                self.captured_ids().collect_vec(),
+                |builder, id| {
+                    let range = builder.push(id.to_string(), TokenType::Variable, EnumSet::empty());
+                    builder.push_definition(*id, range);
+                },
+                ", ",
+            );
+        }
+        builder.push_newline();
+
+        builder.push("# Parameter IDs: ", TokenType::Comment, EnumSet::empty());
+        if self.captured_ids().next().is_none() {
+            builder.push("none", None, EnumSet::empty());
+        } else {
+            builder.push_children_custom(
+                self.parameter_ids().collect_vec(),
+                |builder, id| {
+                    let range =
+                        builder.push(id.to_string(), TokenType::Parameter, EnumSet::empty());
+                    builder.push_definition(*id, range);
+                },
+                ", ",
+            );
+        }
+        builder.push_newline();
+
+        builder.push(
+            "# Responsible Parameter ID: ",
+            TokenType::Comment,
+            EnumSet::empty(),
+        );
+        let range = builder.push(
+            self.responsible_parameter_id().to_string(),
+            TokenType::Parameter,
+            EnumSet::empty(),
+        );
+        builder.push_definition(self.responsible_parameter_id(), range);
+        builder.push_newline();
+
+        builder.push_custom_multiline(self.ids_and_expressions(), |builder, (id, expression)| {
+            let range = builder.push(id.to_string(), TokenType::Variable, EnumSet::empty());
+            builder.push_definition(*id, range);
+            builder.push(" = ", None, EnumSet::empty());
+            expression.build_rich_ir(builder);
+        });
     }
 }

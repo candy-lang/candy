@@ -378,6 +378,11 @@ impl RichIr {
             mir.build_rich_ir(builder)
         })
     }
+    pub fn for_lir(module: &Module, lir: &Lir, tracing_config: &TracingConfig) -> RichIr {
+        Self::for_ir("LIR", module, tracing_config, |builder| {
+            lir.build_rich_ir(builder)
+        })
+    }
     fn for_ir(
         ir_name: &str,
         module: &Module,
@@ -387,10 +392,9 @@ impl RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push_comment_line(format!("{ir_name} for module {module}"));
         if let Some(tracing_config) = tracing_config.into() {
-            builder.push_newline();
             builder.push_tracing_config(tracing_config);
+            builder.push_newline();
         }
-        builder.push_newline();
 
         build_rich_ir(&mut builder);
 

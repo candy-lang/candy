@@ -1,21 +1,31 @@
 use crate::{
+    error::CompilerError,
     hir,
     id::CountableId,
     lir::{self, Lir},
-    mir::{self, Mir},
+    mir::{self},
+    mir_optimize::OptimizeMir,
     module::Module,
+    string_to_rcst::ModuleError,
+    TracingConfig,
 };
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::mem;
+use std::{mem, sync::Arc};
+use tracing::debug;
 
-pub fn lir(module: Module, mir: &Mir) -> Lir {
-    let mut context = LoweringContext {
-        constants: lir::Constants::default(),
-        constant_mapping: FxHashMap::default(),
-        bodies: lir::Bodies::default(),
-        current_body: CurrentBody::default(),
-    };
+#[salsa::query_group(MirToLirStorage)]
+pub trait MirToLir: OptimizeMir {
+    fn lir(&self, module: Module, tracing: TracingConfig) -> LirResult;
+}
+
+pub type LirResult = Result<(Arc<Lir>, Arc<FxHashSet<CompilerError>>), ModuleError>;
+
+fn lir(db: &dyn MirToLir, module: Module, tracing: TracingConfig) -> LirResult {
+    let (mir, _, errors) = db.optimized_mir(module.clone(), tracing)?;
+
+    debug!("Lowering MIR to LIR: {module}");
+    let mut context = LoweringContext::default();
     context.compile_function(
         FxHashSet::from_iter([hir::Id::new(module, vec![])]),
         &[],
@@ -23,15 +33,18 @@ pub fn lir(module: Module, mir: &Mir) -> Lir {
         mir::Id::from_usize(0),
         &mir.body,
     );
-    Lir::new(context.constants, context.bodies)
+    let lir = Lir::new(context.constants, context.bodies);
+
+    Ok((Arc::new(lir), errors))
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 struct LoweringContext {
     constants: lir::Constants,
     constant_mapping: FxHashMap<mir::Id, lir::ConstantId>,
     bodies: lir::Bodies,
     current_body: CurrentBody,
+    last_constant: Option<mir::Id>,
 }
 impl LoweringContext {
     fn compile_function(
@@ -42,6 +55,10 @@ impl LoweringContext {
         responsible_parameter: mir::Id,
         body: &mir::Body,
     ) -> lir::BodyId {
+        debug!(
+            "compile_function({:?}, {:?}, {:?}, {:?}, {:?})",
+            original_hirs, captured, parameters, responsible_parameter, body,
+        );
         let inner_body = CurrentBody::new(captured, parameters, responsible_parameter);
         let outer_body = mem::replace(&mut self.current_body, inner_body);
 
@@ -49,10 +66,21 @@ impl LoweringContext {
             self.compile_expression(id, expression);
         }
 
+        if self.current_body.expressions.is_empty() {
+            // If the MIR body only contains constants, its LIR body will still
+            // be empty. Hence, we push a reference to the last constant we
+            // encountered.
+            let last_constant_id = self.last_constant.unwrap();
+            self.current_body
+                .push(last_constant_id, self.constant_mapping[&last_constant_id]);
+        }
+
         let inner_body = mem::replace(&mut self.current_body, outer_body);
+        debug!("Body compiled");
         self.bodies.push(inner_body.finish(original_hirs))
     }
     fn compile_expression(&mut self, id: mir::Id, expression: &mir::Expression) {
+        debug!("compile_expression({:?}, {:?})", id, expression);
         match expression {
             mir::Expression::Int(int) => self.push_constant(id, int.clone()),
             mir::Expression::Text(text) => self.push_constant(id, text.clone()),
@@ -266,6 +294,7 @@ impl LoweringContext {
     fn push_constant(&mut self, id: mir::Id, constant: impl Into<lir::Constant>) {
         let constant_id = self.constants.push(constant);
         self.constant_mapping.insert(id, constant_id);
+        self.last_constant = Some(id);
     }
     fn constant_for(&self, id: mir::Id) -> Option<lir::ConstantId> {
         self.constant_mapping.get(&id).copied()
@@ -300,6 +329,8 @@ impl CurrentBody {
     }
 
     fn push(&mut self, mir_id: mir::Id, expression: impl Into<lir::Expression>) -> lir::Id {
+        let expression = expression.into();
+        debug!("Pushing {mir_id:?}: {expression:?}");
         self.expressions.push(expression.into());
         let id = lir::Id::from_usize(
             self.captured_count + self.parameter_count + self.expressions.len(),

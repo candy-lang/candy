@@ -23,17 +23,17 @@ impl_countable_id!(ConstantId);
 
 impl Debug for ConstantId {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "${}", self.0)
+        write!(f, "%{}", self.0)
     }
 }
 impl Display for ConstantId {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "${}", self.0)
+        write!(f, "%{}", self.0)
     }
 }
 impl ToRichIr for ConstantId {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        let range = builder.push(self.to_string(), TokenType::Variable, EnumSet::empty());
+        let range = builder.push(self.to_string(), TokenType::Constant, EnumSet::empty());
         builder.push_reference(*self, range);
     }
 }
@@ -44,13 +44,30 @@ impl ToRichIr for ConstantId {
 pub struct Constants(Vec<Constant>);
 
 impl Constants {
+    pub fn get(&self, id: ConstantId) -> &Constant {
+        &self.0[id.to_usize()]
+    }
     pub fn push(&mut self, constant: impl Into<Constant>) -> ConstantId {
         let id = ConstantId::from_usize(self.0.len());
         self.0.push(constant.into());
         id
     }
-    pub fn get(&self, id: ConstantId) -> &Constant {
-        &self.0[id.to_usize()]
+
+    pub fn ids_and_constants(&self) -> impl Iterator<Item = (ConstantId, &Constant)> {
+        self.0
+            .iter()
+            .enumerate()
+            .map(|(index, it)| (ConstantId(index), it))
+    }
+}
+impl ToRichIr for Constants {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push_custom_multiline(self.ids_and_constants(), |builder, (id, constant)| {
+            let range = builder.push(id.to_string(), TokenType::Constant, EnumSet::empty());
+            builder.push_definition(*id, range);
+            builder.push(" = ", None, EnumSet::empty());
+            constant.build_rich_ir(builder);
+        })
     }
 }
 

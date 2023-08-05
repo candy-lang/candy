@@ -418,17 +418,17 @@ fn arguments_plural(num_args: usize) -> &'static str {
 
 #[extension_trait]
 pub impl RichIrForLir for RichIr {
-    fn for_lir(module: &Module, lir: &Lir, tracing_config: &TracingConfig) -> RichIr {
+    fn for_byte_code(module: &Module, byte_code: &Lir, tracing_config: &TracingConfig) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!("# LIR for module {module}"),
+            format!("# VM Byte Code for module {module}"),
             TokenType::Comment,
             EnumSet::empty(),
         );
         builder.push_newline();
         builder.push_tracing_config(tracing_config);
         builder.push_newline();
-        lir.build_rich_ir(&mut builder);
+        byte_code.build_rich_ir(&mut builder);
         builder.finish(true)
     }
 }

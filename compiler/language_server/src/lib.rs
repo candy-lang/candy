@@ -1,4 +1,10 @@
-#![feature(async_closure, box_patterns, let_chains, strict_provenance)]
+#![feature(
+    anonymous_lifetime_in_impl_trait,
+    async_closure,
+    box_patterns,
+    let_chains,
+    strict_provenance
+)]
 
 pub mod database;
 pub mod debug_adapter;

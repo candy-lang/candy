@@ -1,4 +1,6 @@
 pub use self::{body::*, constant::*, expression::*, id::*};
+use crate::rich_ir::{RichIrBuilder, ToRichIr, TokenType};
+use enumset::EnumSet;
 
 mod body;
 mod constant;
@@ -15,5 +17,19 @@ pub struct Lir {
 impl Lir {
     pub fn new(constants: Constants, bodies: Bodies) -> Self {
         Self { constants, bodies }
+    }
+}
+
+impl ToRichIr for Lir {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push("# Constants", TokenType::Comment, EnumSet::empty());
+        builder.push_newline();
+        self.constants.build_rich_ir(builder);
+        builder.push_newline();
+        builder.push_newline();
+
+        builder.push("# Bodies", TokenType::Comment, EnumSet::empty());
+        builder.push_newline();
+        self.bodies.build_rich_ir(builder);
     }
 }

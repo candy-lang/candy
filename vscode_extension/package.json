@@ -144,6 +144,11 @@
         "category": "Candy Compiler Debugging",
         "command": "candy.debug.viewLir",
         "title": "View LIR"
+      },
+      {
+        "category": "Candy Compiler Debugging",
+        "command": "candy.debug.viewVmByteCode",
+        "title": "View VM Byte Code"
       }
     ],
     "configuration": {
