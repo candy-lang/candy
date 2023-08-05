@@ -2,10 +2,9 @@ use crate::{
     ast_to_hir::AstToHir,
     builtin_functions::BuiltinFunction,
     error::CompilerError,
-    id::CountableId,
-    impl_display_via_richir,
+    impl_countable_id, impl_display_via_richir,
     module::{Module, ModuleKind, Package},
-    rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr, TokenModifier, TokenType},
+    rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr, TokenType},
 };
 
 use derive_more::From;
@@ -351,14 +350,7 @@ impl Hash for Expression {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PatternIdentifierId(pub usize);
-impl CountableId for PatternIdentifierId {
-    fn from_usize(id: usize) -> Self {
-        Self(id)
-    }
-    fn to_usize(&self) -> usize {
-        self.0
-    }
-}
+impl_countable_id!(PatternIdentifierId);
 impl Debug for PatternIdentifierId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "pattern_identifier_{:x}", self.0)
