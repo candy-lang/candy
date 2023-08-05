@@ -7,8 +7,8 @@
 # • Include tracing of evaluated expressions? No
 
 # Constants
-%0 = $print:11
-%1 = $toDebugText:5
+%0 = Builtins::print:11
+%1 = Builtins::toDebugText:5
 %2 = builtinPrint
 %3 = builtinToDebugText
 %4 = Main
@@ -20,18 +20,18 @@
 body_0 =
   # Original HIR IDs: Examples::11
   # Captured IDs: none
-  # Parameter IDs: none
+  # Parameter IDs: $0
   # Responsible Parameter ID: $1
-  $0 = %3
-  $1 = %5
-  $2 = %1
-  $3 = call $2 with $3 ($4 is responsible)
-  $4 = %2
-  $5 = %0
-  $6 = call $6 with $5 ($7 is responsible)
+  $2 = %3
+  $3 = %5
+  $4 = %1
+  $5 = call $2 with $3 ($4 is responsible)
+  $6 = %2
+  $7 = %0
+  $8 = call $6 with $5 ($7 is responsible)
 body_1 =
   # Original HIR IDs: Examples::
   # Captured IDs: none
   # Parameter IDs: none
   # Responsible Parameter ID: $0
-  $0 = %7
+  $1 = %7

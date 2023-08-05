@@ -126,10 +126,11 @@ impl Body {
         &self.expressions
     }
     pub fn ids_and_expressions(&self) -> impl Iterator<Item = (Id, &Expression)> {
+        let offset = self.captured_count + self.parameter_count + 1;
         self.expressions
             .iter()
             .enumerate()
-            .map(|(index, it)| (Id::from_usize(index), it))
+            .map(move |(index, it)| (Id::from_usize(offset + index), it))
     }
 }
 impl ToRichIr for Body {
@@ -161,7 +162,7 @@ impl ToRichIr for Body {
         builder.push_newline();
 
         builder.push("# Parameter IDs: ", TokenType::Comment, EnumSet::empty());
-        if self.captured_ids().next().is_none() {
+        if self.parameter_ids().next().is_none() {
             builder.push("none", None, EnumSet::empty());
         } else {
             builder.push_children_custom(

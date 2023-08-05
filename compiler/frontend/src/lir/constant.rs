@@ -134,7 +134,8 @@ impl ToRichIr for Constant {
                 builder.push("]", None, EnumSet::empty());
             }
             Constant::HirId(id) => {
-                id.build_rich_ir(builder);
+                let range = builder.push(id.to_string(), TokenType::Symbol, EnumSet::empty());
+                builder.push_reference(id.to_owned(), range);
             }
             Constant::Function(body_id) => {
                 builder.push("{ ", None, EnumSet::empty());

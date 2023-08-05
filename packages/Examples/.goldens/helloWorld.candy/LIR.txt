@@ -7,17 +7,17 @@
 # • Include tracing of evaluated expressions? No
 
 # Constants
-%0 = $channelSend:12
-%1 = $channelSend:5
-%2 = $structGet:12
-%3 = $structGet:14
-%4 = $structGet:21
-%5 = $structGet:5
-%6 = $typeIs:19
-%7 = $typeIs:25
-%8 = $11:23
-%9 = $11:7
-%10 = $needs
+%0 = Builtins::channelSend:12
+%1 = Builtins::channelSend:5
+%2 = Builtins::structGet:12
+%3 = Builtins::structGet:14
+%4 = Builtins::structGet:21
+%5 = Builtins::structGet:5
+%6 = Builtins::typeIs:19
+%7 = Builtins::typeIs:25
+%8 = Examples:helloWorld:11:23
+%9 = Examples:helloWorld:11:7
+%10 = anonymous:$generated::needs
 %11 = builtinChannelSend
 %12 = builtinEquals
 %13 = builtinIfElse
@@ -50,109 +50,109 @@ body_0 =
   # Captured IDs: none
   # Parameter IDs: none
   # Responsible Parameter ID: $0
-  $0 = %24
-  $1 = $1
+  $1 = %24
+  $2 = $1
 body_1 =
   # Original HIR IDs: anonymous:$generated::needs:isConditionBool:then
   # Captured IDs: none
   # Parameter IDs: none
   # Responsible Parameter ID: $0
-  $0 = %19
-  $1 = $1
+  $1 = %19
+  $2 = $1
 body_2 =
   # Original HIR IDs: anonymous:$generated::needs:isConditionTrue:else
   # Captured IDs: $0
-  # Parameter IDs: 
+  # Parameter IDs: none
   # Responsible Parameter ID: $1
-  $0 = %12
-  $1 = %17
-  $2 = %10
-  $3 = call $2 with $0 $3 ($4 is responsible)
+  $2 = %12
+  $3 = %17
+  $4 = %10
+  $5 = call $2 with $0 $3 ($4 is responsible)
 body_3 =
   # Original HIR IDs: anonymous:$generated::needs:isConditionBool:else
   # Captured IDs: $0
-  # Parameter IDs: 
+  # Parameter IDs: none
   # Responsible Parameter ID: $1
-  $0 = %26
-  $1 = panicking because $2 ($0 is at fault)
+  $2 = %26
+  $3 = panicking because $2 ($0 is at fault)
 body_4 =
   # Original HIR IDs: anonymous:$generated::needs:isReasonText:else
   # Captured IDs: $0
-  # Parameter IDs: 
+  # Parameter IDs: none
   # Responsible Parameter ID: $1
-  $0 = %27
-  $1 = panicking because $2 ($0 is at fault)
+  $2 = %27
+  $3 = panicking because $2 ($0 is at fault)
 body_5 =
   # Original HIR IDs: anonymous:$generated::needs:condition:else
   # Captured IDs: $0, $1
-  # Parameter IDs: 
+  # Parameter IDs: none
   # Responsible Parameter ID: $2
-  $0 = panicking because $0 ($1 is at fault)
+  $3 = panicking because $0 ($1 is at fault)
 body_6 =
   # Original HIR IDs: anonymous:$generated::needs
   # Captured IDs: none
-  # Parameter IDs: none
+  # Parameter IDs: $0, $1, $2
   # Responsible Parameter ID: $3
-  $0 = %12
-  $1 = %24
-  $2 = %10
-  $3 = call $4 with $0 $5 ($6 is responsible)
-  $4 = { body_2 capturing $0 }
-  $5 = %13
-  $6 = %31
-  $7 = call $9 with $7 $10 $8 ($6 is responsible)
-  $8 = { body_3 capturing $3 }
-  $9 = %32
-  $10 = call $9 with $11 $13 $12 ($6 is responsible)
-  $11 = %16
-  $12 = call $15 with $1 ($3 is responsible)
-  $13 = %23
-  $14 = call $4 with $16 $17 ($3 is responsible)
-  $15 = { body_4 capturing $3 }
-  $16 = call $9 with $18 $13 $19 ($6 is responsible)
-  $17 = { body_5 capturing $1, $2 }
-  $18 = call $9 with $0 $13 $21 ($6 is responsible)
+  $4 = %12
+  $5 = %24
+  $6 = %10
+  $7 = call $4 with $0 $5 ($6 is responsible)
+  $8 = { body_2 capturing $0 }
+  $9 = %13
+  $10 = %31
+  $11 = call $9 with $7 $10 $8 ($6 is responsible)
+  $12 = { body_3 capturing $3 }
+  $13 = %32
+  $14 = call $9 with $11 $13 $12 ($6 is responsible)
+  $15 = %16
+  $16 = call $15 with $1 ($3 is responsible)
+  $17 = %23
+  $18 = call $4 with $16 $17 ($3 is responsible)
+  $19 = { body_4 capturing $3 }
+  $20 = call $9 with $18 $13 $19 ($6 is responsible)
+  $21 = { body_5 capturing $1, $2 }
+  $22 = call $9 with $0 $13 $21 ($6 is responsible)
 body_7 =
   # Original HIR IDs: Examples:helloWorld:11
   # Captured IDs: none
-  # Parameter IDs: none
+  # Parameter IDs: $0
   # Responsible Parameter ID: $1
-  $0 = %16
-  $1 = %6
-  $2 = call $2 with $0 ($3 is responsible)
-  $3 = %12
-  $4 = %22
-  $5 = %7
-  $6 = call $5 with $4 $6 ($7 is responsible)
-  $7 = %33
-  $8 = %29
-  $9 = %9
-  $10 = %5
-  $11 = call $9 with $8 $10 $11 ($12 is responsible)
-  $12 = %15
-  $13 = %21
-  $14 = %2
-  $15 = call $14 with $0 $15 ($16 is responsible)
-  $16 = %30
-  $17 = %3
-  $18 = call $9 with $17 $18 $11 ($19 is responsible)
-  $19 = %14
-  $20 = %4
-  $21 = call $21 with $0 $15 ($22 is responsible)
-  $22 = call $2 with $23 ($3 is responsible)
-  $23 = %20
-  $24 = call $5 with $24 $25 ($7 is responsible)
-  $25 = %28
-  $26 = %8
-  $27 = %1
-  $28 = call $9 with $26 $27 $28 ($29 is responsible)
-  $29 = %11
-  $30 = %25
-  $31 = %0
-  $32 = call $31 with $23 $32 ($33 is responsible)
+  $2 = %16
+  $3 = %6
+  $4 = call $2 with $0 ($3 is responsible)
+  $5 = %12
+  $6 = %22
+  $7 = %7
+  $8 = call $5 with $4 $6 ($7 is responsible)
+  $9 = %33
+  $10 = %29
+  $11 = %9
+  $12 = %5
+  $13 = call $9 with $8 $10 $11 ($12 is responsible)
+  $14 = %15
+  $15 = %21
+  $16 = %2
+  $17 = call $14 with $0 $15 ($16 is responsible)
+  $18 = %30
+  $19 = %3
+  $20 = call $9 with $17 $18 $11 ($19 is responsible)
+  $21 = %14
+  $22 = %4
+  $23 = call $21 with $0 $15 ($22 is responsible)
+  $24 = call $2 with $23 ($3 is responsible)
+  $25 = %20
+  $26 = call $5 with $24 $25 ($7 is responsible)
+  $27 = %28
+  $28 = %8
+  $29 = %1
+  $30 = call $9 with $26 $27 $28 ($29 is responsible)
+  $31 = %11
+  $32 = %25
+  $33 = %0
+  $34 = call $31 with $23 $32 ($33 is responsible)
 body_8 =
   # Original HIR IDs: Examples:helloWorld:
   # Captured IDs: none
   # Parameter IDs: none
   # Responsible Parameter ID: $0
-  $0 = %35
+  $1 = %35

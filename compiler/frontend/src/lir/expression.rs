@@ -25,6 +25,8 @@ pub enum Expression {
     Constant(ConstantId),
     #[from]
     Reference(Id),
+    Dup(Id),
+    Drop(Id),
     Call {
         function: Id,
         arguments: Vec<Id>,
@@ -98,6 +100,14 @@ impl ToRichIr for Expression {
             }
             Expression::Constant(id) => id.build_rich_ir(builder),
             Expression::Reference(id) => id.build_rich_ir(builder),
+            Expression::Dup(id) => {
+                builder.push("dup ", None, EnumSet::empty());
+                id.build_rich_ir(builder);
+            }
+            Expression::Drop(id) => {
+                builder.push("drop ", None, EnumSet::empty());
+                id.build_rich_ir(builder);
+            }
             Expression::Call {
                 function,
                 arguments,
