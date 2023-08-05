@@ -139,7 +139,7 @@ impl ToRichIr for Body {
         builder.push_children_custom(
             self.original_hirs.iter().sorted(),
             |builder, id| {
-                let range = builder.push(id.to_string(), TokenType::Constant, EnumSet::empty());
+                let range = builder.push(id.to_string(), TokenType::Symbol, EnumSet::empty());
                 builder.push_reference((*id).clone(), range);
             },
             ", ",
