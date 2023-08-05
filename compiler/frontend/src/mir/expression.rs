@@ -308,6 +308,9 @@ impl ToRichIr for Expression {
             Expression::List(items) => {
                 builder.push("(", None, EnumSet::empty());
                 builder.push_children(items, ", ");
+                if items.len() <= 1 {
+                    builder.push(",", None, EnumSet::empty());
+                }
                 builder.push(")", None, EnumSet::empty());
             }
             Expression::Struct(fields) => {
