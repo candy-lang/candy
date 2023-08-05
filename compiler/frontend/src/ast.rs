@@ -419,7 +419,8 @@ impl ToRichIr for Ast {
 }
 impl ToRichIr for Int {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        builder.push(format!("int {}", self.0), TokenType::Int, EnumSet::empty());
+        let range = builder.push(format!("int {}", self.0), TokenType::Int, EnumSet::empty());
+        builder.push_reference(self.0.clone(), range);
     }
 }
 impl ToRichIr for Text {

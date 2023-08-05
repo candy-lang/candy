@@ -12,7 +12,7 @@ use crate::{
 use derive_more::From;
 use enumset::{EnumSet, EnumSetType};
 use itertools::Itertools;
-use num_bigint::BigInt;
+use num_bigint::{BigInt, BigUint};
 use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Display, Formatter},
@@ -115,6 +115,18 @@ impl<T: ToRichIr> ToRichIr for [T] {
                 }
             }
         }
+    }
+}
+impl ToRichIr for BigInt {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        let range = builder.push(self.to_string(), TokenType::Int, EnumSet::empty());
+        builder.push_reference(self.clone(), range);
+    }
+}
+impl ToRichIr for BigUint {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        let range = builder.push(self.to_string(), TokenType::Int, EnumSet::empty());
+        builder.push_reference(BigInt::from(self.clone()), range);
     }
 }
 

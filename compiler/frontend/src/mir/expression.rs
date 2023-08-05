@@ -287,8 +287,7 @@ impl ToRichIr for Expression {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         match self {
             Expression::Int(int) => {
-                let range = builder.push(int.to_string(), TokenType::Int, EnumSet::empty());
-                builder.push_reference(int.to_owned(), range);
+                int.build_rich_ir(builder);
             }
             Expression::Text(text) => {
                 let range =
