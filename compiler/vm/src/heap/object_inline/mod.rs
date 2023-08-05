@@ -64,8 +64,8 @@ impl InlineObject {
         self.dup_by(heap, 1);
     }
     pub fn dup_by(self, heap: &mut Heap, amount: usize) {
-        if let Some(channel) = InlineData::from(self).handle_id() {
-            heap.dup_channel_by(channel, amount);
+        if let Some(handle) = InlineData::from(self).handle_id() {
+            heap.dup_handle_by(handle, amount);
         };
 
         if let Ok(it) = HeapObject::try_from(self) {
@@ -73,8 +73,8 @@ impl InlineObject {
         }
     }
     pub fn drop(self, heap: &mut Heap) {
-        if let Some(channel) = InlineData::from(self).handle_id() {
-            heap.drop_handle(channel);
+        if let Some(handle) = InlineData::from(self).handle_id() {
+            heap.drop_handle(handle);
         };
 
         if let Ok(it) = HeapObject::try_from(self) {

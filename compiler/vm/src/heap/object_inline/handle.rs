@@ -49,10 +49,14 @@ impl InlineHandle {
     pub fn handle_id(self) -> HandleId {
         HandleId::from_usize((self.raw_word().get() >> Self::HANDLE_ID_SHIFT) as usize)
     }
+
+    pub fn argument_count(self) -> usize {
+        ((self.raw_word().get() & 0xFFFF_FFFF) >> Self::ARGUMENT_COUNT_SHIFT) as usize
+    }
 }
 impl From<InlineHandle> for InlineObject {
-    fn from(port: InlineHandle) -> Self {
-        port.0
+    fn from(handle: InlineHandle) -> Self {
+        handle.0
     }
 }
 

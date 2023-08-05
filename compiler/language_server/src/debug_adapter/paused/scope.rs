@@ -49,8 +49,6 @@ impl PausedState {
             end_column: None,
         });
 
-        // TODO: Show channels
-
         let vm = self.vm.as_ref().unwrap();
         scopes.push(Scope {
             name: "Heap".to_string(),

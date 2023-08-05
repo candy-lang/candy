@@ -541,7 +541,7 @@ metaWrapper (String value) [
 ]
 ```
 
-TODO: Give the `ToText` a receive port to support progressive visualizations?
+TODO: Give the `ToText` a handle to support progressive visualizations?
 
 ## Packages
 

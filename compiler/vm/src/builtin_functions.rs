@@ -160,17 +160,36 @@ impl Heap {
     }
 
     fn function_run(&mut self, args: &[InlineObject], responsible: HirId) -> BuiltinResult {
-        // TODO: handle calling builtins or handles
-        unpack!(self, args, |function: Function| {
-            DivergeControlFlow {
-                function: *function,
-                responsible,
+        unpack!(self, args, |function: Any| {
+            match **function {
+                Data::Builtin(_) => {
+                    // TODO: Replace with `unreachable!()` once we have guards
+                    // for argument counts on the Candy side – there are no
+                    // builtins without arguments.
+                    return Err("`function.run` called with builtin".to_string());
+                }
+                Data::Function(function) => DivergeControlFlow {
+                    function,
+                    responsible,
+                },
+                Data::Handle(handle) => CallHandle(CallHandle {
+                    handle,
+                    arguments: vec![],
+                    responsible,
+                }),
+                _ => return Err("`function.run` expects a function or handle".to_string()),
             }
         })
     }
     fn get_argument_count(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |function: Function| {
-            Return(Int::create(self, true, function.argument_count()).into())
+        unpack_and_later_drop!(self, args, |function: Any| {
+            let count = match **function {
+                Data::Builtin(builtin) => builtin.get().num_parameters(),
+                Data::Function(function) => function.argument_count(),
+                Data::Handle(handle) => handle.argument_count(),
+                _ => return Err("`function.run` expects a function or handle".to_string()),
+            };
+            Return(Int::create(self, true, count).into())
         })
     }
 

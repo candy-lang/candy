@@ -59,7 +59,7 @@ impl Heap {
         )
         .unwrap();
 
-        // TODO: Handle allocation failure by stopping the fiber.
+        // TODO: Handle allocation failure by stopping the VM.
         let pointer = alloc::Global
             .allocate(layout)
             .expect("Not enough memory.")
@@ -87,7 +87,7 @@ impl Heap {
     pub(self) fn notify_handle_created(&mut self, handle_id: HandleId) {
         *self.handle_refcounts.entry(handle_id).or_default() += 1;
     }
-    pub(self) fn dup_channel_by(&mut self, handle_id: HandleId, amount: usize) {
+    pub(self) fn dup_handle_by(&mut self, handle_id: HandleId, amount: usize) {
         *self.handle_refcounts.entry(handle_id).or_insert_with(|| {
             panic!("Called `dup_handle_by`, but {handle_id:?} doesn't exist.")
         }) += amount;
