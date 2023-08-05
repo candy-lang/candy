@@ -123,7 +123,7 @@ $90 = { $91 $92 $93 (+ responsible $94) ->
   }
   $113 = call $37 with $91 $87 $110 ($34 is responsible)
 }
-$114 = ($55)
+$114 = ($55,)
 # Builtins::not:1:equals:then
 $115 = { (responsible $116) ->
   $117 = $114

@@ -6,189 +6,153 @@
 # • Include tracing of calls? No
 # • Include tracing of evaluated expressions? No
 
-# Symbol Table
-<symbol-id 0>: Builtin
-<symbol-id 1>: Equal
-<symbol-id 2>: Error
-<symbol-id 3>: False
-<symbol-id 4>: Function
-<symbol-id 5>: Greater
-<symbol-id 6>: Int
-<symbol-id 7>: Less
-<symbol-id 8>: List
-<symbol-id 9>: Main
-<symbol-id 10>: Nothing
-<symbol-id 11>: Ok
-<symbol-id 12>: ReceivePort
-<symbol-id 13>: ReturnChannel
-<symbol-id 14>: SendPort
-<symbol-id 15>: Stdin
-<symbol-id 16>: Stdout
-<symbol-id 17>: Struct
-<symbol-id 18>: Tag
-<symbol-id 19>: Text
-<symbol-id 20>: True
+# Constants
+%0 = $channelSend:12
+%1 = $channelSend:5
+%2 = $structGet:12
+%3 = $structGet:14
+%4 = $structGet:21
+%5 = $structGet:5
+%6 = $typeIs:19
+%7 = $typeIs:25
+%8 = $11:23
+%9 = $11:7
+%10 = $needs
+%11 = builtinChannelSend
+%12 = builtinEquals
+%13 = builtinIfElse
+%14 = builtinStructGet
+%15 = builtinStructHasKey
+%16 = builtinTypeOf
+%17 = False
+%18 = Main
+%19 = Nothing
+%20 = SendPort
+%21 = Stdout
+%22 = Struct
+%23 = Text
+%24 = True
+%25 = "Hello, world!"
+%26 = "The `condition` must be either `True` or `False`."
+%27 = "The `reason` must be a text."
+%28 = "`sendPort | typeIs SendPort` was not satisfied"
+%29 = "`struct | typeIs Struct` was not satisfied"
+%30 = "`struct | ✨.structHasKey key` was not satisfied"
+%31 = { body_0 }
+%32 = { body_1 }
+%33 = { body_6 }
+%34 = { body_7 }
+%35 = [%18: %34]
 
-# Constant heap
-<replaced address 0fea7d5fa5afcc30>: Builtins::typeIs:25
-<replaced address 18dc4adab2c8e8df>: "`struct | ✨.structHasKey key` was not satisfied"
-<replaced address 1f92019f89733a43>: Builtins::structGet:12
-<replaced address 2ded061b072e15be>: { 0 arguments (capturing nothing) → ip-0 }
-<replaced address 36eebe9168aef0b0>: "The `reason` must be a text."
-<replaced address 3eca0e872d043602>: Builtins::typeIs:19
-<replaced address 422f322f2940db06>: Builtins::structGet:21
-<replaced address 4df64a8049a3109b>: "`sendPort | typeIs SendPort` was not satisfied"
-<replaced address 4f872d5446aebe9e>: { 3 arguments (capturing nothing) → ip-26 }
-<replaced address 59d6aae2417bc61d>: "Hello, world!"
-<replaced address 59fb4da19b618456>: Builtins::structGet:5
-<replaced address 5c13f185319596c2>: { 0 arguments (capturing nothing) → ip-124 }
-<replaced address 7c987e313b2f2519>: Builtins::structGet:14
-<replaced address 80f4eaa53f4876cd>: anonymous:$generated::needs
-<replaced address 86a1405868de70c7>: Examples:helloWorld:11:7
-<replaced address 8935c17065d0f29c>: Examples:helloWorld:
-<replaced address 8e9e077368ba415d>: Builtins::channelSend:5
-<replaced address 91ccd4b75c545de9>: "The `condition` must be either `True` or `False`."
-<replaced address 996cc5f08093ac25>: "`struct | typeIs Struct` was not satisfied"
-<replaced address 9e6d5bcadaff1a17>: Examples:helloWorld:11:23
-<replaced address b13b38030887e220>: Builtins::channelSend:12
-<replaced address b964d1afe6b190ad>: { 1 argument (capturing nothing) → ip-73 }
-<replaced address dc704463e00c0b29>: { 0 arguments (capturing nothing) → ip-3 }
-<replaced address fce18e6881bc359e>: [ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-73 }]
-
-# Instructions
-# anonymous:$generated::needs:isConditionTrue:then
-  0: pushConstant inline <symbol-id 20>
-  1: popMultipleBelowTop 1
-  2: return
-# anonymous:$generated::needs:isConditionBool:then
-  3: pushConstant inline <symbol-id 10>
-  4: popMultipleBelowTop 1
-  5: return
-# anonymous:$generated::needs:isConditionTrue:else
-  6: pushConstant inline builtinEquals
-  7: pushFromStack 2
-  8: pushConstant inline <symbol-id 3>
-  9: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
- 10: tailCall with 2 locals and 2 arguments
-# anonymous:$generated::needs:isConditionBool:else
- 11: pushConstant <replaced address 91ccd4b75c545de9> "The `condition` must be either `True` or `False`."
- 12: pushFromStack 2
- 13: panic
- 14: popMultipleBelowTop 2
- 15: return
-# anonymous:$generated::needs:isReasonText:else
- 16: pushConstant <replaced address 36eebe9168aef0b0> "The `reason` must be a text."
- 17: pushFromStack 2
- 18: panic
- 19: popMultipleBelowTop 2
- 20: return
-# anonymous:$generated::needs:condition:else
- 21: pushFromStack 2
- 22: pushFromStack 2
- 23: panic
- 24: popMultipleBelowTop 3
- 25: return
-# anonymous:$generated::needs
- 26: pushConstant inline builtinEquals
- 27: pushFromStack 4
- 28: pushConstant inline <symbol-id 20>
- 29: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
- 30: call with 2 arguments
- 31: pushFromStack 4
- 32: createFunction with 0 arguments capturing 0 starting at ip-6
- 33: pushConstant inline builtinIfElse
- 34: pushFromStack 3
- 35: pushConstant <replaced address 2ded061b072e15be> { 0 arguments (capturing nothing) → ip-0 }
- 36: pushFromStack 3
- 37: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
- 38: call with 3 arguments
- 39: pushFromStack 4
- 40: createFunction with 0 arguments capturing 0 starting at ip-11
- 41: pushConstant inline builtinIfElse
- 42: pushFromStack 3
- 43: pushConstant <replaced address dc704463e00c0b29> { 0 arguments (capturing nothing) → ip-3 }
- 44: pushFromStack 3
- 45: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
- 46: call with 3 arguments
- 47: pushConstant inline builtinTypeOf
- 48: pushFromStack 10
- 49: pushFromStack 4
- 50: call with 1 argument
- 51: pushConstant inline builtinEquals
- 52: pushFromStack 1
- 53: pushConstant inline <symbol-id 19>
- 54: pushFromStack 6
- 55: call with 2 arguments
- 56: pushFromStack 4
- 57: createFunction with 0 arguments capturing 0 starting at ip-16
- 58: pushConstant inline builtinIfElse
- 59: pushFromStack 3
- 60: pushConstant <replaced address dc704463e00c0b29> { 0 arguments (capturing nothing) → ip-3 }
- 61: pushFromStack 3
- 62: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
- 63: call with 3 arguments
- 64: pushFromStack 14
- 65: pushFromStack 14
- 66: createFunction with 0 arguments capturing 1, 0 starting at ip-21
- 67: pushConstant inline builtinIfElse
- 68: pushFromStack 14
- 69: pushConstant <replaced address dc704463e00c0b29> { 0 arguments (capturing nothing) → ip-3 }
- 70: pushFromStack 3
- 71: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
- 72: tailCall with 19 locals and 3 arguments
-# Examples:helloWorld:11
- 73: pushConstant inline builtinTypeOf
- 74: pushFromStack 2
- 75: pushConstant <replaced address 3eca0e872d043602> Builtins::typeIs:19
- 76: call with 1 argument
- 77: pushConstant inline builtinEquals
- 78: pushFromStack 1
- 79: pushConstant inline <symbol-id 17>
- 80: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
- 81: call with 2 arguments
- 82: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
- 83: pushFromStack 1
- 84: pushConstant <replaced address 996cc5f08093ac25> "`struct | typeIs Struct` was not satisfied"
- 85: pushConstant <replaced address 86a1405868de70c7> Examples:helloWorld:11:7
- 86: pushConstant <replaced address 59fb4da19b618456> Builtins::structGet:5
- 87: call with 3 arguments
- 88: pushConstant inline builtinStructHasKey
- 89: pushFromStack 5
- 90: pushConstant inline <symbol-id 16>
- 91: pushConstant <replaced address 1f92019f89733a43> Builtins::structGet:12
- 92: call with 2 arguments
- 93: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
- 94: pushFromStack 1
- 95: pushConstant <replaced address 18dc4adab2c8e8df> "`struct | ✨.structHasKey key` was not satisfied"
- 96: pushConstant <replaced address 86a1405868de70c7> Examples:helloWorld:11:7
- 97: pushConstant <replaced address 7c987e313b2f2519> Builtins::structGet:14
- 98: call with 3 arguments
- 99: pushConstant inline builtinStructGet
-100: pushFromStack 7
-101: pushConstant inline <symbol-id 16>
-102: pushConstant <replaced address 422f322f2940db06> Builtins::structGet:21
-103: call with 2 arguments
-104: pushConstant inline builtinTypeOf
-105: pushFromStack 1
-106: pushConstant <replaced address 3eca0e872d043602> Builtins::typeIs:19
-107: call with 1 argument
-108: pushConstant inline builtinEquals
-109: pushFromStack 1
-110: pushConstant inline <symbol-id 14>
-111: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
-112: call with 2 arguments
-113: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
-114: pushFromStack 1
-115: pushConstant <replaced address 4df64a8049a3109b> "`sendPort | typeIs SendPort` was not satisfied"
-116: pushConstant <replaced address 9e6d5bcadaff1a17> Examples:helloWorld:11:23
-117: pushConstant <replaced address 8e9e077368ba415d> Builtins::channelSend:5
-118: call with 3 arguments
-119: pushConstant inline builtinChannelSend
-120: pushFromStack 4
-121: pushConstant <replaced address 59d6aae2417bc61d> "Hello, world!"
-122: pushConstant <replaced address b13b38030887e220> Builtins::channelSend:12
-123: tailCall with 11 locals and 2 arguments
-# Examples:helloWorld:
-124: pushConstant <replaced address fce18e6881bc359e> [ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-73 }]
-125: popMultipleBelowTop 1
-126: return
+# Bodies
+body_0 =
+  # Original HIR IDs: anonymous:$generated::needs:isConditionTrue:then
+  # Captured IDs: none
+  # Parameter IDs: none
+  # Responsible Parameter ID: $0
+  $0 = %24
+  $1 = $1
+body_1 =
+  # Original HIR IDs: anonymous:$generated::needs:isConditionBool:then
+  # Captured IDs: none
+  # Parameter IDs: none
+  # Responsible Parameter ID: $0
+  $0 = %19
+  $1 = $1
+body_2 =
+  # Original HIR IDs: anonymous:$generated::needs:isConditionTrue:else
+  # Captured IDs: $0
+  # Parameter IDs: 
+  # Responsible Parameter ID: $1
+  $0 = %12
+  $1 = %17
+  $2 = %10
+  $3 = call $2 with $0 $3 ($4 is responsible)
+body_3 =
+  # Original HIR IDs: anonymous:$generated::needs:isConditionBool:else
+  # Captured IDs: $0
+  # Parameter IDs: 
+  # Responsible Parameter ID: $1
+  $0 = %26
+  $1 = panicking because $2 ($0 is at fault)
+body_4 =
+  # Original HIR IDs: anonymous:$generated::needs:isReasonText:else
+  # Captured IDs: $0
+  # Parameter IDs: 
+  # Responsible Parameter ID: $1
+  $0 = %27
+  $1 = panicking because $2 ($0 is at fault)
+body_5 =
+  # Original HIR IDs: anonymous:$generated::needs:condition:else
+  # Captured IDs: $0, $1
+  # Parameter IDs: 
+  # Responsible Parameter ID: $2
+  $0 = panicking because $0 ($1 is at fault)
+body_6 =
+  # Original HIR IDs: anonymous:$generated::needs
+  # Captured IDs: none
+  # Parameter IDs: none
+  # Responsible Parameter ID: $3
+  $0 = %12
+  $1 = %24
+  $2 = %10
+  $3 = call $4 with $0 $5 ($6 is responsible)
+  $4 = { body_2 capturing $0 }
+  $5 = %13
+  $6 = %31
+  $7 = call $9 with $7 $10 $8 ($6 is responsible)
+  $8 = { body_3 capturing $3 }
+  $9 = %32
+  $10 = call $9 with $11 $13 $12 ($6 is responsible)
+  $11 = %16
+  $12 = call $15 with $1 ($3 is responsible)
+  $13 = %23
+  $14 = call $4 with $16 $17 ($3 is responsible)
+  $15 = { body_4 capturing $3 }
+  $16 = call $9 with $18 $13 $19 ($6 is responsible)
+  $17 = { body_5 capturing $1, $2 }
+  $18 = call $9 with $0 $13 $21 ($6 is responsible)
+body_7 =
+  # Original HIR IDs: Examples:helloWorld:11
+  # Captured IDs: none
+  # Parameter IDs: none
+  # Responsible Parameter ID: $1
+  $0 = %16
+  $1 = %6
+  $2 = call $2 with $0 ($3 is responsible)
+  $3 = %12
+  $4 = %22
+  $5 = %7
+  $6 = call $5 with $4 $6 ($7 is responsible)
+  $7 = %33
+  $8 = %29
+  $9 = %9
+  $10 = %5
+  $11 = call $9 with $8 $10 $11 ($12 is responsible)
+  $12 = %15
+  $13 = %21
+  $14 = %2
+  $15 = call $14 with $0 $15 ($16 is responsible)
+  $16 = %30
+  $17 = %3
+  $18 = call $9 with $17 $18 $11 ($19 is responsible)
+  $19 = %14
+  $20 = %4
+  $21 = call $21 with $0 $15 ($22 is responsible)
+  $22 = call $2 with $23 ($3 is responsible)
+  $23 = %20
+  $24 = call $5 with $24 $25 ($7 is responsible)
+  $25 = %28
+  $26 = %8
+  $27 = %1
+  $28 = call $9 with $26 $27 $28 ($29 is responsible)
+  $29 = %11
+  $30 = %25
+  $31 = %0
+  $32 = call $31 with $23 $32 ($33 is responsible)
+body_8 =
+  # Original HIR IDs: Examples:helloWorld:
+  # Captured IDs: none
+  # Parameter IDs: none
+  # Responsible Parameter ID: $0
+  $0 = %35
