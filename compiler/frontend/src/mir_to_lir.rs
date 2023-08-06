@@ -42,7 +42,6 @@ struct LoweringContext {
     constant_mapping: FxHashMap<mir::Id, lir::ConstantId>,
     bodies: lir::Bodies,
     current_body: CurrentBody,
-    last_constant: Option<mir::Id>,
 }
 impl LoweringContext {
     fn compile_function(
@@ -60,17 +59,9 @@ impl LoweringContext {
             self.compile_expression(id, expression);
         }
 
-        if self.current_body.expressions.is_empty() {
-            // If the top-level MIR contains only constants, its LIR body will
-            // still be empty. Hence, we push a reference to the last constant
-            // we encountered.
-            let last_constant_id = self.last_constant.unwrap();
-            self.current_body
-                .push(last_constant_id, self.constant_mapping[&last_constant_id]);
-        }
-
         let inner_body = mem::replace(&mut self.current_body, outer_body);
-        self.bodies.push(inner_body.finish(original_hirs))
+        self.bodies
+            .push(inner_body.finish(&self.constant_mapping, original_hirs))
     }
     fn compile_expression(&mut self, id: mir::Id, expression: &mir::Expression) {
         match expression {
@@ -302,7 +293,7 @@ impl LoweringContext {
     fn push_constant(&mut self, id: mir::Id, constant: impl Into<lir::Constant>) {
         let constant_id = self.constants.push(constant);
         self.constant_mapping.insert(id, constant_id);
-        self.last_constant = Some(id);
+        self.current_body.last_constant = Some(id);
     }
     fn constant_for(&self, id: mir::Id) -> Option<lir::ConstantId> {
         self.constant_mapping.get(&id).copied()
@@ -315,6 +306,7 @@ struct CurrentBody {
     captured_count: usize,
     parameter_count: usize,
     expressions: Vec<lir::Expression>,
+    last_constant: Option<mir::Id>,
     ids_to_drop: FxHashSet<lir::Id>,
 }
 impl CurrentBody {
@@ -342,6 +334,7 @@ impl CurrentBody {
             captured_count,
             parameter_count,
             expressions: Vec::new(),
+            last_constant: None,
             ids_to_drop,
         }
     }
@@ -370,7 +363,19 @@ impl CurrentBody {
 
         self.expressions.push(lir::Expression::Dup(id));
     }
-    fn finish(mut self, original_hirs: FxHashSet<hir::Id>) -> lir::Body {
+    fn finish(
+        mut self,
+        constant_mapping: &FxHashMap<mir::Id, lir::ConstantId>,
+        original_hirs: FxHashSet<hir::Id>,
+    ) -> lir::Body {
+        if self.expressions.is_empty() {
+            // If the top-level MIR contains only constants, its LIR body will
+            // still be empty. Hence, we push a reference to the last constant
+            // we encountered.
+            let last_constant_id = self.last_constant.unwrap();
+            self.push(last_constant_id, constant_mapping[&last_constant_id]);
+        }
+
         self.ids_to_drop.remove(&self.last_expression_id());
         if !self.ids_to_drop.is_empty() {
             let return_value_id = self.last_expression_id();
