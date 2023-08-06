@@ -37,16 +37,12 @@ pub fn parse_rcst(source: &str) -> Vec<Rcst> {
     let (mut rest, mut rcsts) = parse::body(source, 0);
     if !rest.is_empty() {
         let trailing_newline = if rest.ends_with("\r\n") {
-            let Some(("", newline)) = parse::newline(&rest[rest.len() - 2..]) else {
-                unreachable!()
-            };
-            rest = &rest[rest.len() - 2..];
+            let (_, newline) = parse::newline(&rest[rest.len() - 2..]).unwrap();
+            rest = &rest[..rest.len() - 2];
             Some(newline)
         } else if rest.ends_with('\n') {
-            let Some(("", newline)) = parse::newline(&rest[rest.len() - 1..]) else {
-                unreachable!()
-            };
-            rest = &rest[rest.len() - 1..];
+            let (_, newline) = parse::newline(&rest[rest.len() - 1..]).unwrap();
+            rest = &rest[..rest.len() - 1];
             Some(newline)
         } else {
             None
