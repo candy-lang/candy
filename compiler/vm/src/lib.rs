@@ -17,12 +17,11 @@ pub use instruction_pointer::InstructionPointer;
 use tracing::debug;
 pub use utils::PopulateInMemoryProviderFromFileSystem;
 pub use vm::{
-    Panic, StateAfterRun, StateAfterRunForever, StateAfterRunWithoutHandles, Vm, VmPanicked,
-    VmReturned,
+    Panic, StateAfterRun, StateAfterRunForever, StateAfterRunWithoutHandles, Vm, VmFinished,
 };
 
 mod builtin_functions;
-mod handle;
+mod handle_id;
 pub mod heap;
 mod instruction_pointer;
 mod instructions;

@@ -11,7 +11,7 @@ use super::{
     Heap, OrdWithSymbolTable, SymbolId, SymbolTable,
 };
 use crate::{
-    handle::HandleId,
+    handle_id::HandleId,
     instruction_pointer::InstructionPointer,
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };

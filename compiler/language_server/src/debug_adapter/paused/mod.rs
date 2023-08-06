@@ -20,8 +20,4 @@ impl PausedState {
             variables_ids: IdMapping::default(),
         }
     }
-
-    // pub fn vm() -> &DebugVm {
-    //     self.vm.as_ref().unwrap()
-    // }
 }

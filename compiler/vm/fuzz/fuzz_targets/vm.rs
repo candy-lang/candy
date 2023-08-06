@@ -21,7 +21,7 @@ use candy_vm::{
     heap::{HirId, Struct},
     mir_to_lir::compile_lir,
     tracer::DummyTracer,
-    PopulateInMemoryProviderFromFileSystem, Vm,
+    PopulateInMemoryProviderFromFileSystem, Vm, VmFinished,
 };
 use lazy_static::lazy_static;
 use libfuzzer_sys::fuzz_target;
@@ -68,7 +68,9 @@ fuzz_target!(|data: &[u8]| {
 
     let lir = compile_lir(&db, MODULE.clone(), TRACING.clone()).0;
 
-    let (mut heap, _, result) = Vm::for_module(&lir, DummyTracer).run_forever_without_handles();
+    let VmFinished {
+        mut heap, result, ..
+    } = Vm::for_module(&lir, DummyTracer).run_forever_without_handles();
     let Ok(exports) = result else {
         println!("The module panicked.");
         return;
@@ -81,7 +83,7 @@ fuzz_target!(|data: &[u8]| {
     // Run the `main` function.
     let environment = Struct::create(&mut heap, true, &Default::default());
     let responsible = HirId::create(&mut heap, true, hir::Id::user());
-    let (_, _, result) = Vm::for_function(
+    let VmFinished { result, .. } = Vm::for_function(
         &lir,
         heap,
         main,

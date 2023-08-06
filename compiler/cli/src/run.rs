@@ -8,7 +8,7 @@ use candy_vm::{
     heap::{Data, Handle, HirId, Struct, SymbolId, Tag, Text},
     mir_to_lir::compile_lir,
     tracer::stack_trace::StackTracer,
-    StateAfterRunForever, Vm, VmPanicked, VmReturned,
+    StateAfterRunForever, Vm, VmFinished,
 };
 use clap::{Parser, ValueHint};
 use std::{
@@ -50,8 +50,11 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         format_duration(compilation_end - compilation_start),
     );
 
-    let (mut heap, tracer, result) =
-        Vm::for_module(&*lir, StackTracer::default()).run_forever_without_handles();
+    let VmFinished {
+        mut heap,
+        tracer,
+        result,
+    } = Vm::for_module(&*lir, StackTracer::default()).run_forever_without_handles();
     let exports = match result {
         Ok(exports) => exports,
         Err(panic) => {
@@ -110,7 +113,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
                         Data::Text(text) => println!("{}", text.get()),
                         _ => info!("Non-text value sent to stdout: {message:?}"),
                     }
-                    vm = call.complete(Tag::create_nothing().into());
+                    vm = call.complete(Tag::create_nothing());
                 } else if call.handle == stdin {
                     print!(">> ");
                     io::stdout().flush().unwrap();
@@ -118,25 +121,27 @@ pub(crate) fn run(options: Options) -> ProgramResult {
                         let stdin = io::stdin();
                         stdin.lock().lines().next().unwrap().unwrap()
                     };
-                    let text = Text::create(call.heap(), true, &input).into();
+                    let text = Text::create(call.heap(), true, &input);
                     vm = call.complete(text);
                 } else {
                     unreachable!()
                 }
             }
-            StateAfterRunForever::Returned(VmReturned { return_value, .. }) => {
-                debug!("The main function returned: {return_value:?}");
-                break Ok(());
-            }
-            StateAfterRunForever::Panicked(VmPanicked { panic, .. }) => {
-                error!("The main function panicked: {}", panic.reason);
-                error!("{} is responsible.", panic.responsible);
-                error!(
-                    "This is the stack trace:\n{}",
-                    tracer.format(&db, &lir.as_ref().symbol_table),
-                );
-                break Err(Exit::CodePanicked);
-            }
+            StateAfterRunForever::Finished(VmFinished { result, .. }) => match result {
+                Ok(return_value) => {
+                    debug!("The main function returned: {return_value:?}");
+                    break Ok(());
+                }
+                Err(panic) => {
+                    error!("The main function panicked: {}", panic.reason);
+                    error!("{} is responsible.", panic.responsible);
+                    error!(
+                        "This is the stack trace:\n{}",
+                        tracer.format(&db, &lir.as_ref().symbol_table),
+                    );
+                    break Err(Exit::CodePanicked);
+                }
+            },
         }
     };
     let execution_end = Instant::now();

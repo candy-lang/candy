@@ -196,6 +196,7 @@ longFunction = { foo ->
 ### Handles
 
 Handles allow you to communicate with the outside world.
+See the [Environment and Capabilities](#environment-and-capabilities) section for more information.
 
 ### More?
 

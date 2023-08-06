@@ -10,7 +10,7 @@ use candy_vm::{
     tracer::stack_trace::StackTracer,
     Panic, Vm,
 };
-use candy_vm::{StateAfterRunWithoutHandles, VmPanicked, VmReturned};
+use candy_vm::{StateAfterRunWithoutHandles, VmFinished};
 use rustc_hash::FxHashMap;
 use std::borrow::Borrow;
 
@@ -113,16 +113,18 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
 
             match vm.run_without_handles() {
                 StateAfterRunWithoutHandles::Running(new_vm) => vm = new_vm,
-                StateAfterRunWithoutHandles::Returned(VmReturned {
-                    heap, return_value, ..
+                StateAfterRunWithoutHandles::Finished(VmFinished {
+                    heap,
+                    result: Ok(return_value),
+                    ..
                 }) => {
                     self.result = Some(RunResult::Done { heap, return_value });
                     break;
                 }
-                StateAfterRunWithoutHandles::Panicked(VmPanicked {
+                StateAfterRunWithoutHandles::Finished(VmFinished {
                     heap,
                     tracer,
-                    panic,
+                    result: Err(panic),
                 }) => {
                     self.result = Some(if panic.responsible == Id::fuzzer() {
                         RunResult::NeedsUnfulfilled {

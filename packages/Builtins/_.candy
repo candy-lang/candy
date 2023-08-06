@@ -190,9 +190,7 @@ listReplace list index newItem :=
   needs (index | intCompareTo (list | listLength) | equals Less)
   ✨.listReplace list index newItem
 
-print message :=
-  needs (message | typeIs Text)
-  ✨.print message
+print message := ✨.print message
 
 structGet struct key :=
   needs (struct | typeIs Struct)

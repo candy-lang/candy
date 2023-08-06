@@ -75,12 +75,12 @@ where
         assert_eq!(
             function.captured_len(),
             0,
-            "Function is not a module function (it captures stuff).",
+            "Function is not a module function because it captures stuff.",
         );
         assert_eq!(
             function.argument_count(),
             0,
-            "Function is not a module function (it has arguments).",
+            "Function is not a module function because it has arguments.",
         );
         Self::for_function(lir, Heap::default(), function, &[], responsible, tracer)
     }
@@ -102,22 +102,16 @@ pub struct VmHandleCall<L: Borrow<Lir>, T: Tracer> {
     pub call: CallHandle,
     vm: Vm<L, T>,
 }
-pub struct VmReturned<T: Tracer> {
+pub struct VmFinished<T: Tracer> {
     pub heap: Heap,
     pub tracer: T,
-    pub return_value: InlineObject,
-}
-pub struct VmPanicked<T: Tracer> {
-    pub heap: Heap,
-    pub tracer: T,
-    pub panic: Panic,
+    pub result: Result<InlineObject, Panic>,
 }
 
 pub enum StateAfterRun<L: Borrow<Lir>, T: Tracer> {
     Running(Vm<L, T>),
     CallingHandle(VmHandleCall<L, T>),
-    Returned(VmReturned<T>),
-    Panicked(VmPanicked<T>),
+    Finished(VmFinished<T>),
 }
 
 impl<L, T> VmHandleCall<L, T>
@@ -129,8 +123,8 @@ where
         &mut self.vm.state.heap
     }
 
-    pub fn complete(mut self, return_value: InlineObject) -> Vm<L, T> {
-        self.vm.state.data_stack.push(return_value);
+    pub fn complete(mut self, return_value: impl Into<InlineObject>) -> Vm<L, T> {
+        self.vm.state.data_stack.push(return_value.into());
         self.vm
     }
 }
@@ -145,10 +139,10 @@ where
         let Some(current_instruction) = self.state.next_instruction else {
             let return_value = self.state.data_stack.pop().unwrap();
             self.tracer.call_ended(&mut self.state.heap, return_value);
-            return StateAfterRun::Returned(VmReturned {
+            return StateAfterRun::Finished(VmFinished {
                 heap: self.state.heap,
                 tracer: self.tracer,
-                return_value,
+                result: Ok(return_value),
             });
         };
 
@@ -170,10 +164,10 @@ where
             InstructionResult::CallHandle(call) => {
                 StateAfterRun::CallingHandle(VmHandleCall { vm: self, call })
             }
-            InstructionResult::Panic(panic) => StateAfterRun::Panicked(VmPanicked {
+            InstructionResult::Panic(panic) => StateAfterRun::Finished(VmFinished {
                 heap: self.state.heap,
                 tracer: self.tracer,
-                panic,
+                result: Err(panic),
             }),
         }
     }
@@ -192,8 +186,7 @@ where
 
 pub enum StateAfterRunForever<L: Borrow<Lir>, T: Tracer> {
     CallingHandle(VmHandleCall<L, T>),
-    Returned(VmReturned<T>),
-    Panicked(VmPanicked<T>),
+    Finished(VmFinished<T>),
 }
 
 impl<L, T> Vm<L, T>
@@ -210,11 +203,8 @@ where
                 StateAfterRun::CallingHandle(call) => {
                     break StateAfterRunForever::CallingHandle(call)
                 }
-                StateAfterRun::Returned(returned) => {
-                    break StateAfterRunForever::Returned(returned)
-                }
-                StateAfterRun::Panicked(panicked) => {
-                    break StateAfterRunForever::Panicked(panicked)
+                StateAfterRun::Finished(finished) => {
+                    break StateAfterRunForever::Finished(finished)
                 }
             }
         }
@@ -223,8 +213,7 @@ where
 
 pub enum StateAfterRunWithoutHandles<L: Borrow<Lir>, T: Tracer> {
     Running(Vm<L, T>),
-    Returned(VmReturned<T>),
-    Panicked(VmPanicked<T>),
+    Finished(VmFinished<T>),
 }
 impl<L, T> StateAfterRunWithoutHandles<L, T>
 where
@@ -235,8 +224,7 @@ where
         match state {
             StateAfterRun::Running(vm) => Self::Running(vm),
             StateAfterRun::CallingHandle(_) => panic!("A handle was called."),
-            StateAfterRun::Returned(returned) => Self::Returned(returned),
-            StateAfterRun::Panicked(panicked) => Self::Panicked(panicked),
+            StateAfterRun::Finished(finished) => Self::Finished(finished),
         }
     }
 }
@@ -264,21 +252,12 @@ where
 {
     /// Runs this VM until completion. Only call this if you are sure the VM
     /// won't call any handles.
-    pub fn run_forever_without_handles(self) -> (Heap, T, Result<InlineObject, Panic>) {
+    pub fn run_forever_without_handles(self) -> VmFinished<T> {
         match self.run_forever() {
             StateAfterRunForever::CallingHandle(_) => {
                 panic!("A handle was called.")
             }
-            StateAfterRunForever::Returned(VmReturned {
-                heap,
-                tracer,
-                return_value,
-            }) => (heap, tracer, Ok(return_value)),
-            StateAfterRunForever::Panicked(VmPanicked {
-                heap,
-                tracer,
-                panic,
-            }) => (heap, tracer, Err(panic)),
+            StateAfterRunForever::Finished(finished) => finished,
         }
     }
 }

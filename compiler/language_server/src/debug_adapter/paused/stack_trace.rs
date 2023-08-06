@@ -29,15 +29,15 @@ impl PausedState {
         args: StackTraceArguments,
     ) -> Result<StackTraceResponse, &'static str> {
         let vm = &self.vm.as_ref().unwrap();
-        let fiber_state = &vm.tracer;
+        let tracer = &vm.tracer;
 
         let start_frame = args.start_frame.unwrap_or_default();
         let levels = args
             .levels
             .and_then(|it| if it == 0 { None } else { Some(it) })
             .unwrap_or(usize::MAX);
-        let call_stack = &fiber_state.call_stack[..fiber_state.call_stack.len() - start_frame];
-        let total_frames = fiber_state.call_stack.len() + 1;
+        let call_stack = &tracer.call_stack[..tracer.call_stack.len() - start_frame];
+        let total_frames = tracer.call_stack.len() + 1;
 
         let mut stack_frames = Vec::with_capacity((1 + call_stack.len()).min(levels));
         stack_frames.extend(call_stack.iter().enumerate().rev().skip(start_frame).map(
@@ -160,11 +160,11 @@ impl StackFrameKey {
         &self,
         vm: &'a Vm<L, DebugTracer>,
     ) -> &'a Vec<(Id, InlineObject)> {
-        let fiber_state = &vm.tracer;
+        let tracer = &vm.tracer;
         if self.index == 0 {
-            &fiber_state.root_locals
+            &tracer.root_locals
         } else {
-            &fiber_state.call_stack[self.index - 1].locals
+            &tracer.call_stack[self.index - 1].locals
         }
     }
 }

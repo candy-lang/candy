@@ -16,7 +16,7 @@ impl InstructionPointer {
 }
 impl Step for InstructionPointer {
     fn steps_between(start: &Self, end: &Self) -> Option<usize> {
-        Some(**end - **start)
+        (**end).checked_sub(**start)
     }
 
     fn forward_checked(start: Self, count: usize) -> Option<Self> {
@@ -28,7 +28,7 @@ impl Step for InstructionPointer {
     }
 }
 impl Debug for InstructionPointer {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "ip-{}", self.0)
     }
 }

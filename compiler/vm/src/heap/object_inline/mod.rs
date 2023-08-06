@@ -5,7 +5,7 @@ use self::{
 use super::{
     object_heap::HeapObject, Data, DisplayWithSymbolTable, Heap, OrdWithSymbolTable, SymbolTable,
 };
-use crate::handle::HandleId;
+use crate::handle_id::HandleId;
 use candy_frontend::format::{format_value, FormatValue, MaxLength, Precedence};
 use enum_dispatch::enum_dispatch;
 use extension_trait::extension_trait;

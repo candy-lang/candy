@@ -10,7 +10,7 @@ pub use self::{
     pointer::Pointer,
     symbol_table::{DisplayWithSymbolTable, OrdWithSymbolTable, SymbolId, SymbolTable},
 };
-use crate::handle::HandleId;
+use crate::handle_id::HandleId;
 use candy_frontend::id::IdGenerator;
 use derive_more::{DebugCustom, Deref, Pointer};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -126,7 +126,7 @@ impl Heap {
     pub fn clone(&self) -> (Heap, FxHashMap<HeapObject, HeapObject>) {
         let mut cloned = Heap {
             objects: FxHashSet::default(),
-            handle_id_generator: IdGenerator::default(),
+            handle_id_generator: self.handle_id_generator.clone(),
             handle_refcounts: self.handle_refcounts.clone(),
         };
 

@@ -11,7 +11,7 @@ use extension_trait::extension_trait;
 use itertools::Itertools;
 use tracing::trace;
 
-const TRACE: bool = true;
+const TRACE: bool = false;
 
 pub enum InstructionResult {
     Done,
@@ -20,11 +20,11 @@ pub enum InstructionResult {
 }
 
 impl MachineState {
-    pub fn run_instruction<T: Tracer>(
+    pub fn run_instruction(
         &mut self,
         instruction: &Instruction,
         symbol_table: &SymbolTable,
-        tracer: &mut T,
+        tracer: &mut impl Tracer,
     ) -> InstructionResult {
         if TRACE {
             trace!("Running instruction: {instruction:?}");
@@ -221,11 +221,23 @@ impl MachineState {
                 callee.drop(&mut self.heap);
                 self.run_builtin_function(builtin.get(), arguments, responsible, symbol_table)
             }
-            Data::Handle(handle) => InstructionResult::CallHandle(CallHandle {
+            Data::Handle(handle) => {
+                if arguments.len() != handle.argument_count() {
+                    return InstructionResult::Panic(Panic {
+                        reason: format!(
+                            "A function expected {} parameters, but you called it with {} arguments.",
+                            handle.argument_count(),
+                            arguments.len(),
+                        ),
+                        responsible: responsible.get().clone(),
+                    });
+                }
+                InstructionResult::CallHandle(CallHandle {
                 handle,
-                arguments: arguments.iter().copied().collect_vec(),
+                arguments: arguments.to_vec(),
                 responsible,
-            }),
+            })
+        },
             Data::Tag(tag) => {
                 if tag.has_value() {
                     return InstructionResult::Panic(Panic {
@@ -251,7 +263,7 @@ impl MachineState {
             }
             _ => InstructionResult::Panic(Panic {
                 reason: format!(
-                    "You can only call functions, builtins and tags, but you tried to call {}.",
+                    "You can only call functions, builtins, tags, and handles but you tried to call {}.",
                     DisplayWithSymbolTable::to_string(&callee, symbol_table),
                 ),
                 responsible: responsible.get().to_owned(),

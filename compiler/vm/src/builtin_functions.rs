@@ -50,7 +50,7 @@ impl MachineState {
             BuiltinFunction::ListLength => self.heap.list_length(args),
             BuiltinFunction::ListRemoveAt => self.heap.list_remove_at(args),
             BuiltinFunction::ListReplace => self.heap.list_replace(args),
-            BuiltinFunction::Print => self.heap.print(args),
+            BuiltinFunction::Print => self.heap.print(args, symbol_table),
             BuiltinFunction::StructGet => self.heap.struct_get(args),
             BuiltinFunction::StructGetKeys => self.heap.struct_get_keys(args),
             BuiltinFunction::StructHasKey => self.heap.struct_has_key(args),
@@ -169,18 +169,26 @@ impl Heap {
                     // TODO: Replace with `unreachable!()` once we have guards
                     // for argument counts on the Candy side – there are no
                     // builtins without arguments.
-                    return Err("`function.run` called with builtin".to_string());
+                    return Err("`✨.functionRun` called with builtin".to_string());
                 }
                 Data::Function(function) => DivergeControlFlow {
                     function,
                     responsible,
                 },
-                Data::Handle(handle) => CallHandle(CallHandle {
-                    handle,
-                    arguments: vec![],
-                    responsible,
-                }),
-                _ => return Err("`function.run` expects a function or handle".to_string()),
+                Data::Handle(handle) => {
+                    if handle.argument_count() != 0 {
+                        return Err(
+                            "`✨.functionRun` expects a function or handle without arguments"
+                                .to_string(),
+                        );
+                    }
+                    CallHandle(CallHandle {
+                        handle,
+                        arguments: vec![],
+                        responsible,
+                    })
+                }
+                _ => return Err("`✨.functionRun` expects a function or handle".to_string()),
             }
         })
     }
@@ -190,7 +198,7 @@ impl Heap {
                 Data::Builtin(builtin) => builtin.get().num_parameters(),
                 Data::Function(function) => function.argument_count(),
                 Data::Handle(handle) => handle.argument_count(),
-                _ => return Err("`function.run` expects a function or handle".to_string()),
+                _ => return Err("`✨.getArgumentCount` expects a function or handle".to_string()),
             };
             Return(Int::create(self, true, count).into())
         })
@@ -345,9 +353,14 @@ impl Heap {
         })
     }
 
-    fn print(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |message: Text| {
-            info!("{}", message.get());
+    fn print(&mut self, args: &[InlineObject], symbol_table: &SymbolTable) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |message: Any| {
+            info!(
+                "{}",
+                message
+                    .object
+                    .to_debug_text(Precedence::Low, MaxLength::Unlimited, symbol_table)
+            );
             Return(Tag::create_nothing().into())
         })
     }

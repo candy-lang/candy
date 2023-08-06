@@ -1,6 +1,6 @@
 use super::{InlineObject, InlineObjectTrait};
 use crate::{
-    handle::HandleId,
+    handle_id::HandleId,
     heap::{object_heap::HeapObject, symbol_table::impl_ord_with_symbol_table_via_ord, Heap},
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
@@ -33,10 +33,12 @@ impl InlineHandle {
             handle_id,
             "Handle ID is too large.",
         );
+        let argument_count_shift_for_max_size = Self::HANDLE_ID_SHIFT + Self::ARGUMENT_COUNT_SHIFT;
         debug_assert_eq!(
-            (argument_count << Self::ARGUMENT_COUNT_SHIFT) >> Self::ARGUMENT_COUNT_SHIFT,
+            (argument_count << argument_count_shift_for_max_size)
+                >> argument_count_shift_for_max_size,
             argument_count,
-            "Argument count is too large.",
+            "Handle accepts too many arguments.",
         );
 
         let header_word = InlineObject::KIND_HANDLE
@@ -84,7 +86,7 @@ impl PartialOrd for InlineHandle {
 
 impl DebugDisplay for InlineHandle {
     fn fmt(&self, f: &mut Formatter, _is_debug: bool) -> fmt::Result {
-        write!(f, "handle for {:?}", self.handle_id())
+        write!(f, "{:?}", self.handle_id())
     }
 }
 impl_debug_display_via_debugdisplay!(InlineHandle);

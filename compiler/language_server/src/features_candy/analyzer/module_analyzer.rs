@@ -12,7 +12,7 @@ use candy_vm::{
     lir::Lir,
     mir_to_lir::compile_lir,
     tracer::{evaluated_values::EvaluatedValuesTracer, stack_trace::StackTracer},
-    Panic, Vm, VmPanicked, VmReturned,
+    Panic, StateAfterRunWithoutHandles, Vm, VmFinished,
 };
 use extension_trait::extension_trait;
 use itertools::Itertools;
@@ -116,15 +116,11 @@ impl ModuleAnalyzer {
                     .update_status(Some(format!("Evaluating {}", self.module)))
                     .await;
 
-                let (heap, tracer) = match vm.run_n(500) {
-                    candy_vm::StateAfterRun::Running(vm) => {
+                let (heap, tracer) = match vm.run_n_without_handles(500) {
+                    StateAfterRunWithoutHandles::Running(vm) => {
                         return State::EvaluateConstants { static_panics, vm }
                     }
-                    candy_vm::StateAfterRun::CallingHandle(_) => unreachable!(),
-                    candy_vm::StateAfterRun::Returned(VmReturned { heap, tracer, .. }) => {
-                        (heap, tracer)
-                    }
-                    candy_vm::StateAfterRun::Panicked(VmPanicked { heap, tracer, .. }) => {
+                    StateAfterRunWithoutHandles::Finished(VmFinished { heap, tracer, .. }) => {
                         (heap, tracer)
                     }
                 };
@@ -160,8 +156,8 @@ impl ModuleAnalyzer {
                     .update_status(Some(format!("Evaluating {}", self.module)))
                     .await;
 
-                let (heap, tracer) = match vm.run_n(500) {
-                    candy_vm::StateAfterRun::Running(vm) => {
+                let (heap, tracer) = match vm.run_n_without_handles(500) {
+                    StateAfterRunWithoutHandles::Running(vm) => {
                         return State::FindFuzzables {
                             static_panics,
                             heap_for_constants,
@@ -171,11 +167,7 @@ impl ModuleAnalyzer {
                             vm,
                         }
                     }
-                    candy_vm::StateAfterRun::CallingHandle(_) => unreachable!(),
-                    candy_vm::StateAfterRun::Returned(VmReturned { heap, tracer, .. }) => {
-                        (heap, tracer)
-                    }
-                    candy_vm::StateAfterRun::Panicked(VmPanicked { heap, tracer, .. }) => {
+                    StateAfterRunWithoutHandles::Finished(VmFinished { heap, tracer, .. }) => {
                         (heap, tracer)
                     }
                 };

@@ -27,7 +27,7 @@ use candy_vm::{
     heap::{DisplayWithSymbolTable, Heap, SymbolTable},
     mir_to_lir::compile_lir,
     tracer::stack_trace::StackTracer,
-    Panic, Vm,
+    Panic, Vm, VmFinished,
 };
 use std::rc::Rc;
 use tracing::{debug, error, info};
@@ -44,8 +44,10 @@ where
     let (lir, _) = compile_lir(db, module, tracing);
     let lir = Rc::new(lir);
 
-    let (_heap, FuzzablesFinder { fuzzables }, _) =
-        Vm::for_module(lir.clone(), FuzzablesFinder::default()).run_forever_without_handles();
+    let VmFinished {
+        tracer: FuzzablesFinder { fuzzables },
+        ..
+    } = Vm::for_module(lir.clone(), FuzzablesFinder::default()).run_forever_without_handles();
 
     info!(
         "Now, the fuzzing begins. So far, we have {} functions to fuzz.",

@@ -13,7 +13,7 @@ use candy_vm::{
     lir::Instruction,
     mir_to_lir::compile_lir,
     tracer::DummyTracer,
-    StateAfterRunWithoutHandles, Vm,
+    StateAfterRunWithoutHandles, Vm, VmFinished,
 };
 use dap::{
     events::StoppedEventBody,
@@ -189,20 +189,21 @@ impl DebugSession {
                     evaluated_expressions: TracingMode::All,
                 };
                 let lir = compile_lir(&self.db, module.clone(), tracing.clone()).0;
-                let (mut heap, _, result) =
-                    Vm::for_module(&lir, DummyTracer).run_forever_without_handles();
+                let VmFinished {
+                    mut heap, result, ..
+                } = Vm::for_module(&lir, DummyTracer).run_forever_without_handles();
                 let result = match result {
                     Ok(result) => result,
                     Err(error) => {
                         error!("Module panicked: {}", error.reason);
-                        return Err("program-invalid");
+                        return Err("module-panicked");
                     }
                 };
                 let main = match result.into_main_function(&lir.symbol_table) {
                     Ok(main) => main,
                     Err(error) => {
                         error!("Failed to find main function: {error}");
-                        return Err("program-invalid");
+                        return Err("main-function");
                     }
                 };
 
@@ -219,8 +220,7 @@ impl DebugSession {
                 // TODO: remove when we support pause and continue
                 let vm = match vm.run_n_without_handles(10000) {
                     StateAfterRunWithoutHandles::Running(vm) => Some(vm),
-                    StateAfterRunWithoutHandles::Returned(_)
-                    | StateAfterRunWithoutHandles::Panicked(_) => None,
+                    StateAfterRunWithoutHandles::Finished(_) => None,
                 };
 
                 if let Some(vm) = vm {
@@ -345,36 +345,33 @@ impl DebugSession {
         // TODO: honor `args.granularity`
         let mut vm = state.vm.take().unwrap();
         let initial_stack_size = vm.call_stack().len();
-        let mut did_step = false;
         let vm_after_stepping = loop {
-            if did_step {
-                break Some(vm);
-            }
-
             let Some(instruction_pointer) = vm.next_instruction() else {
                 break None; // The VM finished executing anyways.
             };
             let is_trace_instruction = matches!(
                 vm.lir.instructions[*instruction_pointer],
-                Instruction::TraceCallEnds | Instruction::TraceExpressionEvaluated
+                Instruction::TraceCallEnds | Instruction::TraceExpressionEvaluated,
             );
 
             match vm.run_without_handles() {
                 StateAfterRunWithoutHandles::Running(new_vm) => {
                     vm = new_vm;
                 }
-                StateAfterRunWithoutHandles::Returned(_) => break None,
-                StateAfterRunWithoutHandles::Panicked(_) => break None,
+                StateAfterRunWithoutHandles::Finished(_) => break None,
             };
 
             if is_trace_instruction {
                 continue; // Doesn't count.
             }
 
-            did_step = match kind {
+            let did_step = match kind {
                 StepKind::Next => vm.call_stack().len() <= initial_stack_size,
                 StepKind::In => true,
                 StepKind::Out => vm.call_stack().len() < initial_stack_size,
+            };
+            if did_step {
+                break Some(vm);
             }
         };
 
