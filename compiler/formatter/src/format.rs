@@ -249,16 +249,65 @@ pub(crate) fn format_cst<'a>(
             lines,
             closing,
         } => {
-            // TODO: Format text
-            let mut width =
-                format_cst(edits, previous_width, opening, info).min_width(info.indentation);
-            for line in lines {
-                width += format_cst(edits, previous_width + width, line, info)
-                    .min_width(info.indentation);
-            }
-            width += format_cst(edits, previous_width + width, closing, info)
-                .min_width(info.indentation);
-            width
+            let info = info.resolve_for_expression_with_indented_lines(
+                previous_width,
+                SinglelineWidth::PARENTHESIS.into(),
+            );
+
+            let opening = format_cst(edits, previous_width, opening, &info);
+            let closing = format_cst(
+                edits,
+                Width::multiline(None, info.indentation.width()),
+                closing,
+                &info,
+            );
+
+            let quotes_width = info.indentation.width()
+                + opening.min_width(info.indentation)
+                + closing.min_width(info.indentation);
+
+            let previous_width_for_lines =
+                Width::multiline(None, info.indentation.with_indent().width());
+            let lines = lines
+                .iter()
+                .map(|line| format_cst(edits, previous_width_for_lines, line, &info.with_indent()))
+                .collect_vec();
+
+            let (closing_width, whitespace) = closing.split();
+            return if lines.len() == 1
+                && (quotes_width + lines.first().unwrap().min_width(info.indentation))
+                    .fits(info.indentation)
+            {
+                FormattedCst::new(
+                    opening.into_empty_trailing(edits)
+                        + lines.into_iter().next().unwrap().into_empty_trailing(edits)
+                        + closing_width,
+                    whitespace,
+                )
+            } else {
+                let last_line_index = lines.len() - 1;
+                FormattedCst::new(
+                    opening.into_trailing(
+                        edits,
+                        TrailingWhitespace::Indentation(info.indentation.with_indent()),
+                    ) + lines
+                        .into_iter()
+                        .enumerate()
+                        .map(|(index, line)| {
+                            line.into_trailing(
+                                edits,
+                                TrailingWhitespace::Indentation(if index == last_line_index {
+                                    info.indentation
+                                } else {
+                                    info.indentation.with_indent()
+                                }),
+                            )
+                        })
+                        .sum::<Width>()
+                        + closing_width,
+                    whitespace,
+                )
+            };
         }
         CstKind::TextLine(parts) => {
             // TODO: Format text
