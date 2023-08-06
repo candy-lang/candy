@@ -21,7 +21,7 @@ use candy_vm::{
     heap::{HirId, Struct},
     mir_to_lir::compile_lir,
     tracer::DummyTracer,
-    Vm,
+    PopulateInMemoryProviderFromFileSystem, Vm,
 };
 use lazy_static::lazy_static;
 use libfuzzer_sys::fuzz_target;
@@ -63,6 +63,7 @@ impl ModuleProviderOwner for Database {
 
 fuzz_target!(|data: &[u8]| {
     let mut db = Database::default();
+    db.module_provider.load_package_from_file_system("Builtins");
     db.module_provider.add(&MODULE, data.to_vec());
 
     let lir = compile_lir(&db, MODULE.clone(), TRACING.clone()).0;

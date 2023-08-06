@@ -15,6 +15,7 @@ use crate::heap::{DisplayWithSymbolTable, Struct, SymbolId, Tag};
 use heap::{Function, InlineObject, SymbolTable};
 pub use instruction_pointer::InstructionPointer;
 use tracing::debug;
+pub use utils::PopulateInMemoryProviderFromFileSystem;
 pub use vm::{
     Panic, StateAfterRun, StateAfterRunForever, StateAfterRunWithoutHandles, Vm, VmPanicked,
     VmReturned,
