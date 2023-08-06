@@ -764,16 +764,15 @@ mod parse {
                     }
                 }
                 Some('{') => {
-                    match text_interpolation(input, indentation, opening_single_quotes.len() + 1) {
-                        Some((input_after_interpolation, interpolation)) => {
-                            push_line_to_parts(&mut line, &mut parts);
-                            input = input_after_interpolation;
-                            parts.push(interpolation);
-                        }
-                        None => {
-                            input = &input[1..];
-                            line.push('{');
-                        }
+                    if let Some((input_after_interpolation, interpolation)) =
+                        text_interpolation(input, indentation, opening_single_quotes.len() + 1)
+                    {
+                        push_line_to_parts(&mut line, &mut parts);
+                        input = input_after_interpolation;
+                        parts.push(interpolation);
+                    } else {
+                        input = &input[1..];
+                        line.push('{');
                     }
                 }
                 None => {
@@ -1472,26 +1471,26 @@ mod parse {
             let last = expressions.pop().unwrap();
             expressions.push(last.wrap_in_whitespace(whitespace));
 
-            let (i, expr) = match expression(
+            let argument = expression(
                 i,
                 indentation,
                 false,
                 has_multiline_whitespace,
                 has_multiline_whitespace,
-            ) {
-                Some(it) => it,
-                None => {
-                    let fallback = closing_parenthesis(i)
-                        .or_else(|| closing_bracket(i))
-                        .or_else(|| closing_curly_brace(i))
-                        .or_else(|| arrow(i));
-                    if let Some((i, cst)) = fallback && has_multiline_whitespace {
+            );
+            let (i, expr) = if let Some(it) = argument {
+                it
+            } else {
+                let fallback = closing_parenthesis(i)
+                    .or_else(|| closing_bracket(i))
+                    .or_else(|| closing_curly_brace(i))
+                    .or_else(|| arrow(i));
+                if let Some((i, cst)) = fallback && has_multiline_whitespace {
                         (i, cst)
                     } else {
                         input = i;
                         break;
                     }
-                }
             };
 
             expressions.push(expr);
@@ -2970,25 +2969,23 @@ mod parse {
                 );
             }
 
-            match expression(input, indentation, true, true, true) {
-                Some((new_input, expression)) => {
-                    input = new_input;
+            if let Some((new_input, expression)) = expression(input, indentation, true, true, true)
+            {
+                input = new_input;
 
-                    let (mut whitespace, expression) = expression.split_outer_trailing_whitespace();
-                    expressions.push(expression);
-                    expressions.append(&mut whitespace);
-                }
-                None => {
-                    let fallback = colon(new_input)
-                        .or_else(|| comma(new_input))
-                        .or_else(|| closing_parenthesis(new_input))
-                        .or_else(|| closing_bracket(new_input))
-                        .or_else(|| closing_curly_brace(new_input))
-                        .or_else(|| arrow(new_input));
-                    if let Some((new_input, cst)) = fallback {
-                        input = new_input;
-                        expressions.push(cst);
-                    }
+                let (mut whitespace, expression) = expression.split_outer_trailing_whitespace();
+                expressions.push(expression);
+                expressions.append(&mut whitespace);
+            } else {
+                let fallback = colon(new_input)
+                    .or_else(|| comma(new_input))
+                    .or_else(|| closing_parenthesis(new_input))
+                    .or_else(|| closing_bracket(new_input))
+                    .or_else(|| closing_curly_brace(new_input))
+                    .or_else(|| arrow(new_input));
+                if let Some((new_input, cst)) = fallback {
+                    input = new_input;
+                    expressions.push(cst);
                 }
             }
         }
