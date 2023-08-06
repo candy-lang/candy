@@ -10,7 +10,7 @@
 //! ```
 //!
 //! This is useful for [constant folding], which tests for specific expression
-//! types. For example, to constant-fold a `builtinIntAdd', it tests whether
+//! types. For example, to constant-fold a `builtinIntAdd`, it tests whether
 //! both arguments are an `Expression::Int`. An `Expression::Reference` prevents
 //! that optimization.
 //!
