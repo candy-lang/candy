@@ -128,6 +128,7 @@ impl Context<'_> {
     fn start_non_top_level(&mut self) -> NonTopLevelResetState {
         NonTopLevelResetState(mem::replace(&mut self.is_top_level, false))
     }
+    #[allow(clippy::needless_pass_by_value)]
     fn end_non_top_level(&mut self, reset_state: NonTopLevelResetState) {
         self.is_top_level = reset_state.0;
     }
@@ -215,6 +216,7 @@ impl Context<'_> {
                 let fields = fields
                     .iter()
                     .map(|(key, value)| {
+                        #[allow(clippy::map_unwrap_or)]
                         let key = key
                             .as_ref()
                             .map(|key| self.compile_single(key))
@@ -842,10 +844,8 @@ impl<'a> PatternContext<'a> {
                 let fields = fields
                     .iter()
                     .map(|(key, value)| {
-                        let key = key
-                            .as_ref()
-                            .map(|key| self.compile_pattern(key))
-                            .unwrap_or_else(|| match &value.kind {
+                        let key = key.as_ref().map_or_else(
+                            || match &value.kind {
                                 AstKind::Identifier(Identifier(name)) => Pattern::Tag {
                                     symbol: name.value.uppercase_first_letter(),
                                     value: None,
@@ -858,7 +858,9 @@ impl<'a> PatternContext<'a> {
                                 _ => panic!(
                                     "Expected identifier in struct shorthand, got {value:?}."
                                 ),
-                            });
+                            },
+                            |key| self.compile_pattern(key),
+                        );
                         (key, self.compile_pattern(value))
                     })
                     .collect();

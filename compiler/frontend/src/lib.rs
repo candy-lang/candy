@@ -1,7 +1,12 @@
-#![feature(box_patterns)]
-#![feature(entry_insert)]
-#![feature(io_error_more)]
-#![feature(let_chains)]
+#![feature(box_patterns, entry_insert, io_error_more, let_chains)]
+#![allow(
+    clippy::match_same_arms,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::module_name_repetitions,
+    clippy::similar_names,
+    clippy::too_many_lines
+)]
 
 pub mod ast;
 pub mod ast_to_hir;

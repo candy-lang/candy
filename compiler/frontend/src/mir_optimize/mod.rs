@@ -227,6 +227,7 @@ impl Context<'_> {
     }
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn recover_from_cycle(
     _db: &dyn OptimizeMir,
     cycle: &[String],
