@@ -358,11 +358,7 @@ impl<T: TreeWithIds> TreeWithIds for Box<T> {
 }
 impl<T: TreeWithIds> TreeWithIds for [T] {
     fn first_id(&self) -> Option<Id> {
-        self.iter()
-            .map(TreeWithIds::first_id)
-            .filter_map(Some)
-            .next()
-            .flatten()
+        self.iter().find_map(TreeWithIds::first_id)
     }
     fn find(&self, id: Id) -> Option<&Cst> {
         let child_index = self
@@ -373,11 +369,7 @@ impl<T: TreeWithIds> TreeWithIds for [T] {
     }
 
     fn first_offset(&self) -> Option<Offset> {
-        self.iter()
-            .map(TreeWithIds::first_offset)
-            .filter_map(Some)
-            .next()
-            .flatten()
+        self.iter().find_map(TreeWithIds::first_offset)
     }
     fn find_by_offset(&self, offset: Offset) -> Option<&Cst> {
         let child_index = self
