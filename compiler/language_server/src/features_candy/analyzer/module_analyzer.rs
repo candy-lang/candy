@@ -48,6 +48,7 @@ enum State {
     },
     /// Then, the functions are actually fuzzed.
     Fuzz {
+        lir: Rc<Lir>,
         static_panics: Vec<Panic>,
         heap_for_constants: Heap,
         stack_tracer: StackTracer,
@@ -185,6 +186,7 @@ impl ModuleAnalyzer {
                     .map(|(id, function)| Fuzzer::new(lir.clone(), *function, id.clone()))
                     .collect();
                 State::Fuzz {
+                    lir,
                     static_panics,
                     heap_for_constants,
                     stack_tracer,
@@ -194,6 +196,7 @@ impl ModuleAnalyzer {
                 }
             }
             State::Fuzz {
+                lir,
                 static_panics,
                 heap_for_constants,
                 stack_tracer,
@@ -208,6 +211,7 @@ impl ModuleAnalyzer {
                 let Some(fuzzer) = running_fuzzers.choose_mut(&mut thread_rng()) else {
                     client.update_status(None).await;
                     return State::Fuzz {
+                        lir,
                         static_panics,
                         heap_for_constants,
                         stack_tracer,
@@ -224,6 +228,7 @@ impl ModuleAnalyzer {
                 fuzzer.run(500);
 
                 State::Fuzz {
+                    lir,
                     static_panics,
                     heap_for_constants,
                     stack_tracer,
@@ -256,13 +261,14 @@ impl ModuleAnalyzer {
                 }));
             }
             State::Fuzz {
+                lir,
                 static_panics,
                 evaluated_values,
                 fuzzers,
                 ..
             } => {
                 insights.extend(static_panics.to_insights(db, &self.module));
-                let symbol_table = &fuzzers.first().unwrap().lir().symbol_table;
+                let symbol_table = &lir.symbol_table;
                 insights.extend(evaluated_values.values().iter().flat_map(|(id, value)| {
                     Insight::for_value(db, symbol_table, id.clone(), *value)
                 }));
