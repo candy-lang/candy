@@ -7,7 +7,7 @@ use crate::{
         Match, MatchCase, OrPattern, Struct, Symbol, Text, TextPart,
     },
     cst::{self, Cst, CstDb, CstKind, UnwrapWhitespaceAndComment},
-    error::CompilerError,
+    error::{CompilerError, CompilerErrorPayload},
     module::Module,
     position::Offset,
     rcst_to_cst::RcstToCst,
@@ -409,10 +409,18 @@ impl LoweringContext {
                                 opening_parenthesis.kind.is_opening_parenthesis(),
                                 "Parenthesized needs to start with opening parenthesis, but started with {opening_parenthesis}.",
                             );
-                            assert!(
-                                closing_parenthesis.kind.is_closing_parenthesis(),
-                                "Parenthesized for a call receiver needs to end with closing parenthesis, but ended with {closing_parenthesis}.",
-                            );
+                            if !closing_parenthesis.kind.is_closing_parenthesis() {
+                                return self.create_ast(
+                                    closing_parenthesis.data.id,
+                                    AstKind::Error {
+                                        child: None,
+                                        errors: vec![self.create_error(
+                                            closing_parenthesis,
+                                            AstError::ParenthesizedMissesClosingParenthesis,
+                                        )],
+                                    },
+                                );
+                            }
                             &inner.kind
                         }
                         _ => break,
@@ -904,7 +912,7 @@ impl LoweringContext {
             },
         )
     }
-    fn create_error(&self, cst: &Cst, error: AstError) -> CompilerError {
+    fn create_error(&self, cst: &Cst, error: impl Into<CompilerErrorPayload>) -> CompilerError {
         CompilerError {
             module: self.module.clone(),
             span: cst.data.span.clone(),
