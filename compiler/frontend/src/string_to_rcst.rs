@@ -467,9 +467,7 @@ mod parse {
         let mut comment = vec![];
         loop {
             match input.chars().next() {
-                Some('\n') | Some('\r') | None => {
-                    break;
-                }
+                Some('\n' | '\r') | None => break,
                 Some(c) => {
                     comment.push(c);
                     input = &input[c.len_utf8()..];
