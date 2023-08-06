@@ -1036,7 +1036,7 @@ mod parse {
             (
                 line,
                 RcstListItemMarker::Unordered { has_trailing_space },
-                1 + (has_trailing_space as usize),
+                1 + usize::from(has_trailing_space),
             )
         })
     }
@@ -1073,7 +1073,7 @@ mod parse {
             false
         };
 
-        let extra_indentation = format!("{}", number).len() + 1 + (has_trailing_space as usize);
+        let extra_indentation = format!("{}", number).len() + 1 + usize::from(has_trailing_space);
 
         Some((
             line,
