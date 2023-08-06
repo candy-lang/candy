@@ -852,7 +852,7 @@ mod parse {
             // TODO: handle violations
             let url = Url::parse(&line[..end_index]).map_or_else(
                 |_| Rcst::Error {
-                    child: Some(Rcst::TextPart(line.to_string()).into()),
+                    child: Some(Rcst::TextPart((*line).to_string()).into()),
                     error: RcstError::UrlInvalid,
                 },
                 Rcst::UrlLine,
