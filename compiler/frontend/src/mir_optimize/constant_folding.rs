@@ -34,6 +34,7 @@ use super::{
 };
 use crate::{
     builtin_functions::BuiltinFunction,
+    format::{format_value, FormatValue, MaxLength, Precedence},
     id::IdGenerator,
     mir::{Body, Expression, Id, VisibleExpressions},
 };
@@ -42,6 +43,7 @@ use num_bigint::BigInt;
 use num_integer::Integer;
 use num_traits::{ToPrimitive, Zero};
 use std::{
+    borrow::Cow,
     cmp::Ordering,
     str::{self, FromStr},
 };
@@ -309,7 +311,7 @@ fn run_builtin(
                 return None;
             };
             // TODO: Support lists longer than `usize::MAX`.
-            list.get(index.to_usize().unwrap()).unwrap().into()
+            list.get(index.to_usize().unwrap())?.into()
         }
         BuiltinFunction::ListInsert => return None,
         BuiltinFunction::ListLength => {
@@ -594,7 +596,28 @@ fn run_builtin(
             };
             text.trim_start().into()
         }
-        BuiltinFunction::ToDebugText => return None,
+        BuiltinFunction::ToDebugText => {
+            let [argument] = arguments else {
+                unreachable!()
+            };
+            let formatted =
+                format_value(*argument, Precedence::High, MaxLength::Unlimited, &|id| {
+                    Some(match visible.get(id) {
+                        Expression::Int(int) => FormatValue::Int(Cow::Borrowed(int)),
+                        Expression::Text(text) => FormatValue::Text(text),
+                        Expression::Tag { symbol, value } => FormatValue::Tag {
+                            symbol,
+                            value: *value,
+                        },
+                        Expression::Builtin(_) => FormatValue::Function,
+                        Expression::List(items) => FormatValue::List(items),
+                        Expression::Struct(entries) => FormatValue::Struct(Cow::Borrowed(entries)),
+                        Expression::Function { .. } => FormatValue::Function,
+                        _ => return None,
+                    })
+                })?;
+            formatted.into()
+        }
         BuiltinFunction::Try => return None,
         BuiltinFunction::TypeOf => Expression::tag(
             match visible.get(arguments[0]) {
