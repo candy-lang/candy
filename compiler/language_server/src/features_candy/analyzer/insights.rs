@@ -3,13 +3,14 @@ use crate::{database::Database, utils::LspPositionConversion};
 use candy_frontend::{
     ast::{Assignment, AssignmentBody, AstDb, AstKind},
     ast_to_hir::AstToHir,
+    format::{MaxLength, Precedence},
     hir::{Expression, HirDb, Id},
     module::Module,
 };
 use candy_fuzzer::{Fuzzer, RunResult, Status};
 use candy_vm::{
     fiber::Panic,
-    heap::{DisplayWithSymbolTable, InlineObject, SymbolTable},
+    heap::{DisplayWithSymbolTable, InlineObject, SymbolTable, ToDebugText},
 };
 use extension_trait::extension_trait;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
@@ -70,14 +71,14 @@ impl Insight {
                     return None;
                 }
 
-                DisplayWithSymbolTable::to_string(&value, symbol_table)
+                value.to_debug_text(Precedence::Low, MaxLength::Limited(60), symbol_table)
             }
             Expression::PatternIdentifierReference { .. } => {
                 let body = db.containing_body_of(id.clone());
                 let name = body.identifiers.get(&id).unwrap();
                 format!(
                     "{name} = {}",
-                    DisplayWithSymbolTable::to_string(&value, symbol_table)
+                    value.to_debug_text(Precedence::Low, MaxLength::Limited(60), symbol_table),
                 )
             }
             _ => return None,
@@ -115,7 +116,10 @@ impl Insight {
             insights.push(Insight::Hint(Hint {
                 kind: HintKind::SampleInputPanickingWithInternalCodeResponsible,
                 position: end_of_line,
-                text: format!("{function_name} {input}"),
+                text: format!(
+                    "{function_name} {}",
+                    input.to_string(&fuzzer.lir.symbol_table)
+                ),
             }));
         }
 
@@ -126,7 +130,8 @@ impl Insight {
                     kind: HintKind::SampleInputReturningNormally,
                     position: end_of_line,
                     text: format!(
-                        "{function_name} {input} = {}",
+                        "{function_name} {} = {}",
+                        input.to_string(&fuzzer.lir.symbol_table),
                         DisplayWithSymbolTable::to_string(
                             &return_value.object,
                             &fuzzer.lir().symbol_table,
@@ -136,12 +141,18 @@ impl Insight {
                 RunResult::NeedsUnfulfilled { .. } => Hint {
                     kind: HintKind::SampleInputPanickingWithCallerResponsible,
                     position: end_of_line,
-                    text: format!("{function_name} {input}"),
+                    text: format!(
+                        "{function_name} {}",
+                        input.to_string(&fuzzer.lir.symbol_table)
+                    ),
                 },
                 RunResult::Panicked(_) => Hint {
                     kind: HintKind::SampleInputPanickingWithInternalCodeResponsible,
                     position: end_of_line,
-                    text: format!("{function_name} {input}"),
+                    text: format!(
+                        "{function_name} {}",
+                        input.to_string(&fuzzer.lir.symbol_table)
+                    ),
                 },
             })
         }));

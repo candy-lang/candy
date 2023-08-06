@@ -24,8 +24,12 @@ use candy_frontend::{
     {hir::Id, TracingConfig, TracingMode},
 };
 use candy_vm::{
-    execution_controller::RunLimitedNumberOfInstructions, fiber::Panic, mir_to_lir::compile_lir,
-    tracer::stack_trace::StackTracer, vm::Vm,
+    execution_controller::RunLimitedNumberOfInstructions,
+    fiber::Panic,
+    heap::{DisplayWithSymbolTable, SymbolTable},
+    mir_to_lir::compile_lir,
+    tracer::stack_trace::StackTracer,
+    vm::Vm,
 };
 use std::rc::Rc;
 use tracing::{debug, error, info};
@@ -79,7 +83,7 @@ where
                     panic,
                     tracer,
                 };
-                case.dump(db);
+                case.dump(db, &lir.symbol_table);
                 failing_cases.push(case);
             }
         }
@@ -98,13 +102,15 @@ pub struct FailingFuzzCase {
 
 impl FailingFuzzCase {
     #[allow(unused_variables)]
-    pub fn dump<DB>(&self, db: &DB)
+    pub fn dump<DB>(&self, db: &DB, symbol_table: &SymbolTable)
     where
         DB: AstToHir + PositionConversionDb,
     {
         error!(
             "Calling `{} {}` panics: {}",
-            self.function, self.input, self.panic.reason,
+            self.function,
+            self.input.to_string(symbol_table),
+            self.panic.reason,
         );
         error!("{} is responsible.", self.panic.responsible);
         // Segfaults: https://github.com/candy-lang/candy/issues/458

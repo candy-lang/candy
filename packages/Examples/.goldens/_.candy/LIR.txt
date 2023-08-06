@@ -8,30 +8,23 @@
 
 # Constants
 %0 = Builtins::print:11
-%1 = Builtins::toDebugText:5
-%2 = builtinPrint
-%3 = builtinToDebugText
-%4 = Main
-%5 = 3
-%6 = { body_0 }
-%7 = [%4: %6]
+%1 = builtinPrint
+%2 = Main
+%3 = "3"
+%4 = { body_0 }
+%5 = [%2: %4]
 
 # Bodies
 body_0 $0 (+ responsible $1) =
   # Original HIR IDs: Examples::11
   # Captured IDs: none
-  $2 = %3
-  $3 = %5
-  $4 = %1
+  $2 = %1
+  $3 = %3
+  $4 = %0
   $5 = call $2 with $3 ($4 is responsible)
-  $6 = %2
-  $7 = dup $5
-  $8 = %0
-  $9 = call $6 with $5 ($8 is responsible)
-  $10 = drop $5
-  $11 = drop $0
-  $12 = $9
+  $6 = drop $0
+  $7 = $5
 body_1 (responsible $0) =
   # Original HIR IDs: Examples::
   # Captured IDs: none
-  $1 = %7
+  $1 = %5

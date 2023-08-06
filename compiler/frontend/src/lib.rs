@@ -12,6 +12,7 @@ pub mod comment;
 pub mod cst;
 pub mod cst_to_ast;
 pub mod error;
+pub mod format;
 pub mod hir;
 pub mod hir_to_mir;
 pub mod id;
