@@ -29,7 +29,8 @@ body_0 $0 (+ responsible $1) =
   $8 = %0
   $9 = call $6 with $5 ($8 is responsible)
   $10 = drop $5
-  $11 = $9
+  $11 = drop $0
+  $12 = $9
 body_1 (responsible $0) =
   # Original HIR IDs: Examples::
   # Captured IDs: none

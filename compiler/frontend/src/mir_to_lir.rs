@@ -321,7 +321,7 @@ impl CurrentBody {
     fn new(captured: &[mir::Id], parameters: &[mir::Id], responsible_parameter: mir::Id) -> Self {
         let captured_count = captured.len();
         let parameter_count = parameters.len();
-        let id_mapping = captured
+        let id_mapping: FxHashMap<_, _> = captured
             .iter()
             .chain(parameters.iter())
             .copied()
@@ -329,12 +329,20 @@ impl CurrentBody {
             .enumerate()
             .map(|(index, id)| (id, lir::Id::from_usize(index)))
             .collect();
+        // The responsible parameter is a HIR ID, which is always constant.
+        // Hence, it never has to be dropped.
+        let ids_to_drop = id_mapping
+            .iter()
+            .filter(|(&k, _)| k != responsible_parameter)
+            .map(|(_, v)| v)
+            .copied()
+            .collect();
         Self {
             id_mapping,
             captured_count,
             parameter_count,
             expressions: Vec::new(),
-            ids_to_drop: FxHashSet::default(),
+            ids_to_drop,
         }
     }
 
