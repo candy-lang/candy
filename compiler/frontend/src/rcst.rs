@@ -33,7 +33,7 @@ impl SplitOuterTrailingWhitespace for Rcst {
     }
 }
 
-impl<A: SplitOuterTrailingWhitespace> SplitOuterTrailingWhitespace for Vec<A> {
+impl<T: SplitOuterTrailingWhitespace> SplitOuterTrailingWhitespace for Vec<T> {
     fn split_outer_trailing_whitespace(mut self) -> (Vec<Rcst>, Self) {
         match self.pop() {
             Some(last) => {
