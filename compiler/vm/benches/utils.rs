@@ -20,7 +20,7 @@ use candy_vm::{
     lir::Lir,
     mir_to_lir::compile_lir,
     tracer::DummyTracer,
-    PopulateInMemoryProviderFromFileSystem, Vm,
+    PopulateInMemoryProviderFromFileSystem, Vm, VmFinished,
 };
 use lazy_static::lazy_static;
 use rustc_hash::FxHashMap;
@@ -99,8 +99,11 @@ pub fn compile(db: &mut Database, source_code: &str) -> Lir {
 }
 
 pub fn run(lir: impl Borrow<Lir>) -> (Heap, InlineObject) {
-    let (mut heap, tracer, result) =
-        Vm::for_module(lir.borrow(), DummyTracer).run_forever_without_handles();
+    let VmFinished {
+        mut heap,
+        tracer,
+        result,
+    } = Vm::for_module(lir.borrow(), DummyTracer).run_forever_without_handles();
     let main = result
         .expect("Module panicked.")
         .into_main_function(&lir.borrow().symbol_table)
@@ -109,7 +112,7 @@ pub fn run(lir: impl Borrow<Lir>) -> (Heap, InlineObject) {
     // Run the `main` function.
     let environment = Struct::create(&mut heap, true, &FxHashMap::default());
     let responsible = HirId::create(&mut heap, true, hir::Id::user());
-    let (heap, _, result) =
+    let VmFinished { heap, result, .. } =
         Vm::for_function(lir, heap, main, &[environment.into()], responsible, tracer)
             .run_forever_without_handles();
     match result {
