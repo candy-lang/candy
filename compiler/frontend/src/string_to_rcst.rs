@@ -835,7 +835,12 @@ mod parse {
                     closing_double_quote: Box::new(closing_double_quote),
                     closing_single_quotes,
                 };
-            } else if !whitespace.is_empty() || newline(input).is_some() || input.is_empty() {
+            } else if !whitespace.is_empty() || newline(input).is_some() {
+                break CstKind::Error {
+                    unparsable_input: "".to_string(),
+                    error: CstError::TextNotSufficientlyIndented,
+                };
+            } else if input.is_empty() {
                 break CstKind::Error {
                     unparsable_input: "".to_string(),
                     error: CstError::TextNotClosed,
