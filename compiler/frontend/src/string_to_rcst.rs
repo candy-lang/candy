@@ -2937,9 +2937,8 @@ mod parse {
     pub fn body(mut input: &str, indentation: usize) -> (&str, Vec<Rcst>) {
         let mut expressions = vec![];
 
-        let mut number_of_expressions_in_last_iteration = -1i64;
-        while number_of_expressions_in_last_iteration < expressions.len() as i64 {
-            number_of_expressions_in_last_iteration = expressions.len() as i64;
+        loop {
+            let previous_number_of_expressions = expressions.len();
 
             let (new_input, mut whitespace) = whitespaces_and_newlines(input, indentation, true);
             input = new_input;
@@ -2985,6 +2984,10 @@ mod parse {
                     input = new_input;
                     expressions.push(cst);
                 }
+            }
+
+            if previous_number_of_expressions == expressions.len() {
+                break;
             }
         }
         (input, expressions)
