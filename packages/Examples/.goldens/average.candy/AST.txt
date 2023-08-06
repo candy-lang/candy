@@ -1,0 +1,42 @@
+# AST for module Examples:average
+assignment: struct
+  identifier $6@"int"
+  identifier $8@"iterable"
+  identifier $10@"list"
+  identifier $12@"result" = 
+  call identifier $0@"use" with these arguments:
+    text
+      textPart $2@"Core"
+assignment: struct
+  identifier $18@"divideTruncating" = 
+  identifier $16@"int"
+assignment: $94@"average" = function (fuzzable) { $95@"a" ->
+  call identifier $22@"needs" with these arguments:
+    call struct access identifier $24@"list".$26@"Is" with these arguments:
+      identifier $28@"a"
+  call identifier $32@"needs" with these arguments:
+    call struct access identifier $41@"int".$43@"IsPositive" with these arguments:
+      call struct access identifier $34@"list".$36@"Length" with these arguments:
+        identifier $38@"a"
+  call identifier $47@"needs" with these arguments:
+    call struct access identifier $56@"iterable".$58@"All" with these arguments:
+      call struct access identifier $51@"iterable".$53@"FromList" with these arguments:
+        identifier $49@"a"
+      function (non-fuzzable) { $60@"a" ->
+        call struct access identifier $61@"int".$63@"Is" with these arguments:
+          identifier $65@"a"
+      }
+  call identifier $72@"divideTruncating" with these arguments:
+    call struct access identifier $81@"iterable".$83@"Sum" with these arguments:
+      call struct access identifier $76@"iterable".$78@"FromList" with these arguments:
+        identifier $74@"a"
+    call struct access identifier $88@"list".$90@"Length" with these arguments:
+      identifier $86@"a"
+}
+assignment: $104@"main" := function (fuzzable) { $105@"environment" ->
+  call identifier $97@"average" with these arguments:
+    list
+      int 1
+      int 2
+      int 3
+}
