@@ -10,12 +10,12 @@ pub struct Id(usize);
 
 impl_countable_id!(Id);
 
-impl Debug for Id {
+impl Display for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "${}", self.0)
     }
 }
-impl Display for Id {
+impl Debug for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "${}", self.0)
     }

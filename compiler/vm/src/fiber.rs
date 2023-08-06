@@ -15,7 +15,7 @@ use crate::{
 };
 use candy_frontend::{
     hir::{self, Id},
-    id::CountableId,
+    impl_countable_id,
     module::Module,
 };
 use derive_more::{Deref, From};
@@ -31,14 +31,7 @@ const TRACE: bool = false;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FiberId(usize);
-impl CountableId for FiberId {
-    fn from_usize(id: usize) -> Self {
-        Self(id)
-    }
-    fn to_usize(&self) -> usize {
-        self.0
-    }
-}
+impl_countable_id!(FiberId);
 impl Debug for FiberId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "fiber_{:x}", self.0)

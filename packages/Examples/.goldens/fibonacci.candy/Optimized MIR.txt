@@ -29,13 +29,13 @@ $20 = Builtins::intSubtract:5
 $21 = Builtins::typeIs:19
 $22 = Builtins::typeIs:25
 $23 = Examples:fibonacci:compareTo:10
-$24 = Examples:fibonacci:fibonacci:2:13:11
-$25 = Examples:fibonacci:fibonacci:2:13:12
-$26 = Examples:fibonacci:fibonacci:2:13:32
-$27 = Examples:fibonacci:fibonacci:2:13:33
-$28 = Examples:fibonacci:fibonacci:2:13:34
-$29 = Examples:fibonacci:fibonacci:2:14
-$30 = Examples:fibonacci:isLessThan:11
+$24 = Examples:fibonacci:fibonacci:2:11
+$25 = Examples:fibonacci:fibonacci:2:13:11
+$26 = Examples:fibonacci:fibonacci:2:13:12
+$27 = Examples:fibonacci:fibonacci:2:13:32
+$28 = Examples:fibonacci:fibonacci:2:13:33
+$29 = Examples:fibonacci:fibonacci:2:13:34
+$30 = Examples:fibonacci:fibonacci:2:14
 $31 = Examples:fibonacci:recursive:0:0:3
 $32 = Examples:fibonacci:recursive:0:6
 $33 = Examples:fibonacci:recursive:6
@@ -122,7 +122,7 @@ $89 = { $90 $91 $92 (+ responsible $93) ->
   }
   $112 = call $37 with $90 $86 $109 ($34 is responsible)
 }
-$113 = ($55)
+$113 = ($55,)
 # Builtins::not:1:equals:then
 $114 = { (responsible $115) ->
   $116 = $113
@@ -265,54 +265,57 @@ $237 = { $238 $239 (+ responsible $240) ->
   $245 = call $35 with $244 $51 ($22 is responsible)
   $246 = call $89 with $245 $75 $23 ($16 is responsible)
   $247 = call $39 with $238 $239 ($17 is responsible)
-  $248 = $247
-  $249 = $248
 }
 # Examples:fibonacci:isLessThan
-$250 = { $251 $252 (+ responsible $253) ->
-  $254 = call $237 with $251 $252 ($30 is responsible)
-  $255 = call $35 with $254 $53 ($1 is responsible)
+$248 = { $249 $250 (+ responsible $251) ->
+  $252 = call $47 with $249 ($21 is responsible)
+  $253 = call $35 with $252 $51 ($22 is responsible)
+  $254 = call $89 with $253 $74 $23 ($18 is responsible)
+  $255 = call $47 with $250 ($21 is responsible)
+  $256 = call $35 with $255 $51 ($22 is responsible)
+  $257 = call $89 with $256 $75 $23 ($16 is responsible)
+  $258 = call $39 with $249 $250 ($17 is responsible)
+  $259 = call $35 with $258 $53 ($1 is responsible)
 }
 # Examples:fibonacci:fibonacci:2
-$256 = { $257 $258 (+ responsible $259) ->
-  $260 = call $237 with $258 $64 ($30 is responsible)
-  $261 = call $35 with $260 $53 ($1 is responsible)
+$260 = { $261 $262 (+ responsible $263) ->
+  $264 = call $248 with $262 $64 ($24 is responsible)
   # Examples:fibonacci:fibonacci:2:12
-  $262 = { (responsible $263) ->
-    $264 = $258
+  $265 = { (responsible $266) ->
+    $267 = $262
   }
   # Examples:fibonacci:fibonacci:2:13
-  $265 = { (responsible $266) ->
-    $267 = call $47 with $258 ($21 is responsible)
-    $268 = call $35 with $267 $51 ($22 is responsible)
-    $269 = call $89 with $268 $80 $24 ($20 is responsible)
-    $270 = call $40 with $258 $63 ($19 is responsible)
-    $271 = call $257 with $270 ($25 is responsible)
-    $272 = call $47 with $258 ($21 is responsible)
-    $273 = call $35 with $272 $51 ($22 is responsible)
-    $274 = call $89 with $273 $80 $26 ($20 is responsible)
-    $275 = call $40 with $258 $64 ($19 is responsible)
-    $276 = call $257 with $275 ($27 is responsible)
-    $277 = call $47 with $271 ($21 is responsible)
-    $278 = call $35 with $277 $51 ($22 is responsible)
-    $279 = call $89 with $278 $74 $28 ($15 is responsible)
-    $280 = call $47 with $276 ($21 is responsible)
+  $268 = { (responsible $269) ->
+    $270 = call $47 with $262 ($21 is responsible)
+    $271 = call $35 with $270 $51 ($22 is responsible)
+    $272 = call $89 with $271 $80 $25 ($20 is responsible)
+    $273 = call $40 with $262 $63 ($19 is responsible)
+    $274 = call $261 with $273 ($26 is responsible)
+    $275 = call $47 with $262 ($21 is responsible)
+    $276 = call $35 with $275 $51 ($22 is responsible)
+    $277 = call $89 with $276 $80 $27 ($20 is responsible)
+    $278 = call $40 with $262 $64 ($19 is responsible)
+    $279 = call $261 with $278 ($28 is responsible)
+    $280 = call $47 with $274 ($21 is responsible)
     $281 = call $35 with $280 $51 ($22 is responsible)
-    $282 = call $89 with $281 $75 $28 ($13 is responsible)
-    $283 = call $38 with $271 $276 ($14 is responsible)
+    $282 = call $89 with $281 $74 $29 ($15 is responsible)
+    $283 = call $47 with $279 ($21 is responsible)
+    $284 = call $35 with $283 $51 ($22 is responsible)
+    $285 = call $89 with $284 $75 $29 ($13 is responsible)
+    $286 = call $38 with $274 $279 ($14 is responsible)
   }
-  $284 = call $117 with $261 $262 $265 ($29 is responsible)
+  $287 = call $117 with $264 $265 $268 ($30 is responsible)
 }
 # Examples:fibonacci:recursive:0
-$285 = { $286 $287 (+ responsible $288) ->
+$288 = { $289 $290 (+ responsible $291) ->
   # Examples:fibonacci:recursive:0:0
-  $289 = { $290 (+ responsible $291) ->
-    $292 = call $286 with $286 $290 ($31 is responsible)
+  $292 = { $293 (+ responsible $294) ->
+    $295 = call $289 with $289 $293 ($31 is responsible)
   }
-  $293 = call $256 with $289 $287 ($32 is responsible)
+  $296 = call $260 with $292 $290 ($32 is responsible)
 }
 # Examples:fibonacci:main
-$294 = { $295 (+ responsible $296) ->
-  $297 = call $285 with $285 $65 ($33 is responsible)
+$297 = { $298 (+ responsible $299) ->
+  $300 = call $288 with $288 $65 ($33 is responsible)
 }
-$298 = [$52: $250, $54: $294, $58: $223, $48: $237]
+$301 = [$52: $248, $54: $297, $58: $223, $48: $237]

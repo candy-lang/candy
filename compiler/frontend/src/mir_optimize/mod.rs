@@ -158,8 +158,8 @@ impl Context<'_> {
         }
 
         common_subtree_elimination::eliminate_common_subtrees(body, self.pureness);
-        reference_following::remove_redundant_return_references(body);
         tree_shaking::tree_shake(body, self.pureness);
+        reference_following::remove_redundant_return_references(body);
     }
 
     fn optimize_expression(&mut self, expression: &mut CurrentExpression) {
