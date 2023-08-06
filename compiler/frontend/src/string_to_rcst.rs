@@ -737,14 +737,14 @@ mod parse {
         let closing = loop {
             if let Some((input_after_newline, newline)) = newline(input) {
                 drain_and_push_text_part(&mut text_part, &mut lines);
-                if let Some((input_after_indentation, indentation)) =
+                if let Some((input_after_indentation, whitespace)) =
                     leading_indentation(input_after_newline, indentation + 1)
                 {
                     input = input_after_indentation;
                     let last_line = lines.pop().unwrap();
-                    lines.push(last_line.wrap_in_whitespace(vec![newline, indentation]));
+                    lines.push(last_line.wrap_in_whitespace(vec![newline, whitespace]));
                     lines.push(CstKind::TextLine(Vec::new()).into())
-                } else if let Some((input_after_single_quotes, indentation)) =
+                } else if let Some((input_after_single_quotes, whitespace)) =
                     leading_indentation(input_after_newline, indentation) && let Some((input_after_double_quote, _)) =
                     double_quote(input_after_single_quotes) && let Some((new_new_new_new_input, closing_single_quotes)) =
                     parse_multiple(
@@ -754,7 +754,11 @@ mod parse {
                     ) {
                     input = new_new_new_new_input;
                     let last_line = lines.pop().unwrap();
-                    lines.push(last_line.wrap_in_whitespace(vec![newline, indentation]));
+                    if indentation == 0 {
+                        lines.push(last_line.wrap_in_whitespace(vec![newline]));
+                    } else {
+                        lines.push(last_line.wrap_in_whitespace(vec![newline, whitespace]));
+                    }
                     break CstKind::ClosingText {
                         closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
                         closing_single_quotes,
@@ -862,6 +866,39 @@ mod parse {
                             ]),
                         CstKind::TextLine(vec![CstKind::TextPart("bar".to_string()).into()]).into(),
                     ],
+                    closing: Box::new(
+                        CstKind::ClosingText {
+                            closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                            closing_single_quotes: vec![]
+                        }
+                        .into(),
+                    ),
+                }
+                .into(),
+            )),
+        );
+        // "
+        //   foo
+        // "
+        assert_eq!(
+            text("\"\n  foo\n\"2", 0),
+            Some((
+                "2",
+                CstKind::Text {
+                    opening: Box::new(
+                        CstKind::OpeningText {
+                            opening_single_quotes: vec![],
+                            opening_double_quote: Box::new(CstKind::DoubleQuote.into()),
+                        }
+                        .with_trailing_whitespace(vec![
+                            CstKind::Newline("\n".to_string()),
+                            CstKind::Whitespace("  ".to_string())
+                        ]),
+                    ),
+                    lines: vec![CstKind::TextLine(vec![
+                        CstKind::TextPart("foo".to_string()).into()
+                    ])
+                    .with_trailing_whitespace(vec![CstKind::Newline("\n".to_string())]),],
                     closing: Box::new(
                         CstKind::ClosingText {
                             closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
