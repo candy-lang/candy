@@ -414,8 +414,7 @@ mod parse {
         fn is_in_code(&self) -> bool {
             self.formattings
                 .last()
-                .map(|(_, it, _)| it == &InlineFormatting::Code)
-                .unwrap_or(false)
+                .map_or(false, |(_, it, _)| it == &InlineFormatting::Code)
         }
 
         fn push_part(&mut self, part: Rcst) {
@@ -851,12 +850,13 @@ mod parse {
             let end_index = line.find(is_whitespace).unwrap_or(line.len());
 
             // TODO: handle violations
-            let url = Url::parse(&line[..end_index])
-                .map(Rcst::UrlLine)
-                .unwrap_or_else(|_| Rcst::Error {
+            let url = Url::parse(&line[..end_index]).map_or_else(
+                |_| Rcst::Error {
                     child: Some(Rcst::TextPart(line.to_string()).into()),
                     error: RcstError::UrlInvalid,
-                });
+                },
+                Rcst::UrlLine,
+            );
             Some((recombine(&line[end_index..], remaining), url))
         } else {
             None
@@ -1032,8 +1032,7 @@ mod parse {
         line.strip_prefix('-').map(|line| {
             let (line, has_trailing_space) = line
                 .strip_prefix(' ')
-                .map(|line| (line, true))
-                .unwrap_or((line, false));
+                .map_or((line, false), |line| (line, true));
             (
                 line,
                 RcstListItemMarker::Unordered { has_trailing_space },
@@ -1094,10 +1093,8 @@ mod parse {
         let Some((line, remaining)) = input.split_first() else {
             return None;
         };
-        let allows_unordered = list_type
-            .map(|it| it == ListType::Unordered)
-            .unwrap_or(true);
-        let allows_ordered = list_type.map(|it| it == ListType::Ordered).unwrap_or(true);
+        let allows_unordered = list_type.map_or(true, |it| it == ListType::Unordered);
+        let allows_ordered = list_type.map_or(true, |it| it == ListType::Ordered);
         // TODO: move the `allow_…` before the match checks when Rust's MIR no longer breaks
         let ((line, marker, extra_indentation), list_type) =
             if let Some(marker) = unordered_list_item_marker(line) && allows_unordered  {

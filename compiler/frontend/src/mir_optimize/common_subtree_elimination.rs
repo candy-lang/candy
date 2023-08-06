@@ -102,8 +102,7 @@ impl Expression {
             self.captured_ids()
                 .into_iter()
                 .max()
-                .map(|id| id.to_usize() + 1)
-                .unwrap_or(0),
+                .map_or(0, |id| id.to_usize() + 1),
         );
         let mapping: FxHashMap<Id, Id> = self
             .defined_ids()

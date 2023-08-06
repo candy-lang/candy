@@ -75,11 +75,7 @@ impl<D> IsMultiline for CstKind<D> {
                     || closing_parenthesis.is_multiline()
             }
             CstKind::ListItem { value, comma } => {
-                value.is_multiline()
-                    || comma
-                        .as_ref()
-                        .map(|comma| comma.is_multiline())
-                        .unwrap_or(false)
+                value.is_multiline() || comma.as_ref().map_or(false, |comma| comma.is_multiline())
             }
             CstKind::Struct {
                 opening_bracket,
@@ -95,15 +91,10 @@ impl<D> IsMultiline for CstKind<D> {
                 value,
                 comma,
             } => {
-                key_and_colon
-                    .as_deref()
-                    .map(|(key, colon)| key.is_multiline() || colon.is_multiline())
-                    .unwrap_or(false)
-                    || value.is_multiline()
-                    || comma
-                        .as_ref()
-                        .map(|comma| comma.is_multiline())
-                        .unwrap_or(false)
+                key_and_colon.as_deref().map_or(false, |(key, colon)| {
+                    key.is_multiline() || colon.is_multiline()
+                }) || value.is_multiline()
+                    || comma.as_ref().map_or(false, |comma| comma.is_multiline())
             }
             CstKind::StructAccess { struct_, dot, key } => {
                 struct_.is_multiline() || dot.is_multiline() || key.is_multiline()
@@ -127,10 +118,9 @@ impl<D> IsMultiline for CstKind<D> {
                 opening_curly_brace.is_multiline()
                     || parameters_and_arrow
                         .as_ref()
-                        .map(|(parameters, arrow)| {
+                        .map_or(false, |(parameters, arrow)| {
                             parameters.is_multiline() || arrow.is_multiline()
                         })
-                        .unwrap_or(false)
                     || body.is_multiline()
                     || closing_curly_brace.is_multiline()
             }
