@@ -9,10 +9,13 @@ use super::{
     object_heap::HeapObject, Data, DisplayWithSymbolTable, Heap, OrdWithSymbolTable, SymbolTable,
 };
 use crate::channel::ChannelId;
+use candy_frontend::format::{format_value, FormatValue, MaxLength, Precedence};
 use enum_dispatch::enum_dispatch;
 use extension_trait::extension_trait;
+use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use std::{
+    borrow::Cow,
     cmp::Ordering,
     fmt::{self, Debug, Display, Formatter},
     hash::{Hash, Hasher},
@@ -223,5 +226,39 @@ impl Deref for InlineData {
             InlineData::SendPort(value) => value,
             InlineData::ReceivePort(value) => value,
         }
+    }
+}
+
+#[extension_trait]
+pub impl ToDebugText for InlineObject {
+    fn to_debug_text(
+        self,
+        precendence: Precedence,
+        max_length: MaxLength,
+        symbol_table: &SymbolTable,
+    ) -> String {
+        format_value(self, precendence, max_length, &|value| {
+            Some(match value.into() {
+                Data::Int(int) => FormatValue::Int(int.get()),
+                Data::Tag(tag) => FormatValue::Tag {
+                    symbol: symbol_table.get(tag.symbol_id()),
+                    value: tag.value(),
+                },
+                Data::Text(text) => FormatValue::Text(text.get()),
+                Data::List(list) => FormatValue::List(list.items()),
+                Data::Struct(struct_) => FormatValue::Struct(Cow::Owned(
+                    struct_
+                        .iter()
+                        .map(|(_, key, value)| (key, value))
+                        .collect_vec(),
+                )),
+                Data::HirId(_) => unreachable!(),
+                Data::Function(_) => FormatValue::Function,
+                Data::Builtin(_) => FormatValue::Function,
+                Data::SendPort(_) => FormatValue::SendPort,
+                Data::ReceivePort(_) => FormatValue::ReceivePort,
+            })
+        })
+        .unwrap()
     }
 }

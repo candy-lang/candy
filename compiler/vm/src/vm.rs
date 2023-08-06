@@ -9,6 +9,7 @@ use crate::{
 use candy_frontend::{
     hir::Id,
     id::{CountableId, IdGenerator},
+    impl_countable_id,
 };
 use extension_trait::extension_trait;
 use itertools::Itertools;
@@ -23,14 +24,7 @@ use strum::EnumIs;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct OperationId(usize);
-impl CountableId for OperationId {
-    fn from_usize(id: usize) -> Self {
-        Self(id)
-    }
-    fn to_usize(&self) -> usize {
-        self.0
-    }
-}
+impl_countable_id!(OperationId);
 impl fmt::Debug for OperationId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "operation_{:x}", self.0)

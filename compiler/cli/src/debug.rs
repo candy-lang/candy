@@ -8,6 +8,7 @@ use candy_frontend::{
     cst_to_ast::CstToAst,
     hir_to_mir::HirToMir,
     mir_optimize::OptimizeMir,
+    mir_to_lir::MirToLir,
     position::Offset,
     rcst_to_cst::RcstToCst,
     rich_ir::{RichIr, RichIrAnnotation, TokenType},
@@ -15,11 +16,7 @@ use candy_frontend::{
     utils::DoHash,
     TracingConfig, TracingMode,
 };
-use candy_vm::{
-    heap::HeapData,
-    lir::{Lir, RichIrForLir},
-    mir_to_lir::compile_lir,
-};
+use candy_vm::{heap::HeapData, lir::RichIrForLir, mir_to_lir::compile_lir};
 use clap::{Parser, ValueHint};
 use colored::{Color, Colorize};
 use diffy::{create_patch, PatchFormatter};
@@ -59,6 +56,9 @@ pub(crate) enum Options {
 
     /// Low-Level Intermediate Representation
     Lir(PathAndTracing),
+
+    /// VM Byte Code
+    VmByteCode(PathAndTracing),
 
     #[command(subcommand)]
     Gold(GoldOptions),
@@ -131,13 +131,20 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
             let tracing = options.to_tracing_config();
             let mir = db.optimized_mir(module.clone(), tracing.clone());
             mir.ok()
-                .map(|(mir, _, _)| RichIr::for_mir(&module, &mir, &tracing))
+                .map(|(mir, _, _)| RichIr::for_optimized_mir(&module, &mir, &tracing))
         }
         Options::Lir(options) => {
             let module = module_for_path(options.path.clone())?;
             let tracing = options.to_tracing_config();
-            let (lir, _) = compile_lir(&db, module.clone(), tracing.clone());
-            Some(RichIr::for_lir(&module, &lir, &tracing))
+            let lir = db.lir(module.clone(), tracing.clone());
+            lir.ok()
+                .map(|(lir, _)| RichIr::for_lir(&module, &lir, &tracing))
+        }
+        Options::VmByteCode(options) => {
+            let module = module_for_path(options.path.clone())?;
+            let tracing = options.to_tracing_config();
+            let (vm_byte_code, _) = compile_lir(&db, module.clone(), tracing.clone());
+            Some(RichIr::for_byte_code(&module, &vm_byte_code, &tracing))
         }
         Options::Gold(options) => return options.run(&db),
     };
@@ -162,7 +169,7 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
 
         if let Some(token_type) = token_type {
             let color = match token_type {
-                TokenType::Module => Color::Yellow,
+                TokenType::Module => Color::BrightYellow,
                 TokenType::Parameter => Color::Red,
                 TokenType::Variable => Color::Yellow,
                 TokenType::Symbol => Color::Magenta,
@@ -171,7 +178,7 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
                 TokenType::Text => Color::Cyan,
                 TokenType::Int => Color::Red,
                 TokenType::Address => Color::BrightGreen,
-                TokenType::Constant => Color::Yellow,
+                TokenType::Constant => Color::BrightYellow,
             };
             print!("{}", in_annotation.color(color));
         } else {
@@ -315,15 +322,24 @@ impl GoldPath {
                 RichIr::for_optimized_mir(&module, &optimized_mir, &Self::TRACING_CONFIG);
             visit("Optimized MIR", optimized_mir.text);
 
-            // LIR
-            let (lir, _) = compile_lir(db, module.clone(), Self::TRACING_CONFIG.clone());
-            let lir_rich_ir = RichIr::for_lir(&module, &lir, &Self::TRACING_CONFIG);
-            visit("LIR", Self::format_lir(&lir, &lir_rich_ir));
+            let (lir, _) = db
+                .lir(module.clone(), Self::TRACING_CONFIG.clone())
+                .unwrap();
+            let lir = RichIr::for_lir(&module, &lir, &Self::TRACING_CONFIG);
+            visit("LIR", lir.text);
+
+            let (vm_byte_code, _) = compile_lir(db, module.clone(), Self::TRACING_CONFIG.clone());
+            let vm_byte_code_rich_ir =
+                RichIr::for_byte_code(&module, &vm_byte_code, &Self::TRACING_CONFIG);
+            visit(
+                "VM Byte Code",
+                Self::format_lir(&vm_byte_code, &vm_byte_code_rich_ir),
+            );
         }
         Ok(())
     }
 
-    fn format_lir(lir: &Lir, rich_ir: &RichIr) -> String {
+    fn format_lir(lir: &candy_vm::lir::Lir, rich_ir: &RichIr) -> String {
         let address_replacements: FxHashMap<_, _> = lir
             .constant_heap
             .iter()

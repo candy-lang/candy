@@ -6,7 +6,7 @@ pub use self::{
     object_heap::{HeapData, HeapObject, HeapObjectTrait},
     object_inline::{
         int::I64BitLength, InlineData, InlineObject, InlineObjectSliceCloneToHeap,
-        InlineObjectTrait,
+        InlineObjectTrait, ToDebugText,
     },
     pointer::Pointer,
     symbol_table::{DisplayWithSymbolTable, OrdWithSymbolTable, SymbolId, SymbolTable},
