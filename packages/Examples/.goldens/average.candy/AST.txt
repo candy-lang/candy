@@ -10,7 +10,7 @@ assignment: struct
 assignment: struct
   identifier $18@"divideTruncating" = 
   identifier $16@"int"
-assignment: $94@"average" = function (fuzzable) { $95@"a" ->
+assignment: $95@"average" = function (fuzzable) { identifier $96@"a" ->
   call identifier $22@"needs" with these arguments:
     call struct access identifier $24@"list".$26@"Is" with these arguments:
       identifier $28@"a"
@@ -22,19 +22,19 @@ assignment: $94@"average" = function (fuzzable) { $95@"a" ->
     call struct access identifier $56@"iterable".$58@"All" with these arguments:
       call struct access identifier $51@"iterable".$53@"FromList" with these arguments:
         identifier $49@"a"
-      function (non-fuzzable) { $60@"a" ->
-        call struct access identifier $61@"int".$63@"Is" with these arguments:
-          identifier $65@"a"
+      function (non-fuzzable) { identifier $60@"a" ->
+        call struct access identifier $62@"int".$64@"Is" with these arguments:
+          identifier $66@"a"
       }
-  call identifier $72@"divideTruncating" with these arguments:
-    call struct access identifier $81@"iterable".$83@"Sum" with these arguments:
-      call struct access identifier $76@"iterable".$78@"FromList" with these arguments:
-        identifier $74@"a"
-    call struct access identifier $88@"list".$90@"Length" with these arguments:
-      identifier $86@"a"
+  call identifier $73@"divideTruncating" with these arguments:
+    call struct access identifier $82@"iterable".$84@"Sum" with these arguments:
+      call struct access identifier $77@"iterable".$79@"FromList" with these arguments:
+        identifier $75@"a"
+    call struct access identifier $89@"list".$91@"Length" with these arguments:
+      identifier $87@"a"
 }
-assignment: $104@"main" := function (fuzzable) { $105@"environment" ->
-  call identifier $97@"average" with these arguments:
+assignment: $106@"main" := function (fuzzable) { identifier $107@"environment" ->
+  call identifier $99@"average" with these arguments:
     list
       int 1
       int 2

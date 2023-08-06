@@ -3,7 +3,7 @@ assignment: identifier $6@"builtins" =
   call identifier $0@"use" with these arguments:
     text
       textPart $2@"Builtins"
-assignment: $44@"recursive" := function (fuzzable) { identifier $45@"initialArg" identifier $47@"body" ->
+assignment: $44@"recursive" = function (fuzzable) { identifier $45@"initialArg" identifier $47@"body" ->
   assignment: identifier $34@"recurse" = 
     function (non-fuzzable) { identifier $9@"recurse" identifier $11@"arg" ->
       assignment: identifier $23@"rec" = 
@@ -20,14 +20,14 @@ assignment: $44@"recursive" := function (fuzzable) { identifier $45@"initialArg"
     identifier $39@"recurse"
     identifier $41@"initialArg"
 }
-assignment: $65@"compareTo" := function (fuzzable) { identifier $66@"valueA" identifier $68@"valueB" ->
+assignment: $65@"compareTo" = function (fuzzable) { identifier $66@"valueA" identifier $68@"valueB" ->
   assignment: identifier $60@"result" = 
     call struct access identifier $52@"builtins".$54@"IntCompareTo" with these arguments:
       identifier $50@"valueA"
       identifier $56@"valueB"
   identifier $63@"result"
 }
-assignment: $85@"isLessThan" := function (fuzzable) { identifier $86@"valueA" identifier $88@"valueB" ->
+assignment: $85@"isLessThan" = function (fuzzable) { identifier $86@"valueA" identifier $88@"valueB" ->
   call struct access identifier $71@"builtins".$73@"Equals" with these arguments:
     call identifier $75@"compareTo" with these arguments:
       identifier $77@"valueA"
