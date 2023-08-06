@@ -116,7 +116,7 @@ mod parse {
     // mid-writing after putting the opening bracket of a struct.
 
     use crate::{
-        cst::{Cst, CstError, CstKind, IsMultiline},
+        cst::{CstError, CstKind, IsMultiline},
         rcst::{Rcst, SplitOuterTrailingWhitespace},
     };
     use itertools::Itertools;
@@ -711,15 +711,54 @@ mod parse {
         ))
     }
 
-    fn drain_and_push_text_part(text_part: &mut Vec<char>, lines: &mut [Rcst]) {
-        let text_part = text_part.drain(..).join("");
-        if !text_part.is_empty() && let Some(Cst {
-                kind: CstKind::TextLine(last_line),
-                ..
-            }) = lines.last_mut()
-            {
-                last_line.push(CstKind::TextPart(text_part).into());
+    #[instrument(level = "trace")]
+    fn text_line(mut input: &str, indentation: usize, single_quotes_count: usize) -> (&str, Rcst) {
+        fn drain_and_push_text_part(text_part: &mut Vec<char>, line: &mut Vec<Rcst>) {
+            let text_part = text_part.drain(..).join("");
+            if !text_part.is_empty() {
+                line.push(CstKind::TextPart(text_part).into());
             }
+        }
+
+        let mut text_part = vec![];
+        let mut line = vec![];
+        loop {
+            let next_char = input.chars().next();
+            if next_char.is_none()
+                || newline(input).is_some()
+                || double_quote(input)
+                    .and_then(|(input_after_double_quote, _)| {
+                        parse_multiple(
+                            input_after_double_quote,
+                            single_quote,
+                            Some((single_quotes_count, false)),
+                        )
+                    })
+                    .is_some()
+            {
+                drain_and_push_text_part(&mut text_part, &mut line);
+                break;
+            }
+
+            match next_char.unwrap() {
+                '{' => match text_interpolation(input, indentation, single_quotes_count + 1) {
+                    Some((input_after_interpolation, interpolation)) => {
+                        drain_and_push_text_part(&mut text_part, &mut line);
+                        input = input_after_interpolation;
+                        line.push(interpolation);
+                    }
+                    None => {
+                        input = &input[1..];
+                        text_part.push('{');
+                    }
+                },
+                c => {
+                    input = &input[c.len_utf8()..];
+                    text_part.push(c);
+                }
+            }
+        }
+        (input, CstKind::TextLine(line).into())
     }
 
     // TODO: It might be a good idea to ignore text interpolations in patterns
@@ -731,106 +770,89 @@ mod parse {
             whitespaces_and_newlines(input, indentation + 1, false);
         input = new_input;
 
-        let mut text_part = vec![];
-        let mut lines: Vec<Rcst> = vec![CstKind::TextLine(Vec::new()).into()];
-
-        let closing = loop {
-            if let Some((input_after_newline, newline)) = newline(input) {
-                drain_and_push_text_part(&mut text_part, &mut lines);
-                if let Some((input_after_indentation, whitespace)) =
-                    leading_indentation(input_after_newline, indentation + 1)
-                {
-                    input = input_after_indentation;
-                    let last_line = lines.pop().unwrap();
-                    lines.push(last_line.wrap_in_whitespace(vec![newline, whitespace]));
-                    lines.push(CstKind::TextLine(Vec::new()).into())
-                } else if let Some((input_after_single_quotes, whitespace)) =
-                    leading_indentation(input_after_newline, indentation) && let Some((input_after_double_quote, _)) =
-                    double_quote(input_after_single_quotes) && let Some((new_new_new_new_input, closing_single_quotes)) =
-                    parse_multiple(
-                        input_after_double_quote,
-                        single_quote,
-                        Some((opening_single_quotes.len(), false)),
-                    ) {
-                    input = new_new_new_new_input;
-                    let last_line = lines.pop().unwrap();
-                    if indentation == 0 {
-                        lines.push(last_line.wrap_in_whitespace(vec![newline]));
-                    } else {
-                        lines.push(last_line.wrap_in_whitespace(vec![newline, whitespace]));
-                    }
-                    break CstKind::ClosingText {
-                        closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
-                        closing_single_quotes,
-                    };
-                } else {
-                    break CstKind::Error {
-                        unparsable_input: "".to_string(),
-                        error: CstError::TextNotSufficientlyIndented,
-                    };
+        fn split_of_first_line_and_convert_rest_into_textlines(
+            whitespace: Vec<Rcst>,
+        ) -> (Vec<Rcst>, Vec<Rcst>) {
+            let Some(second_newline_index) = whitespace
+                .iter()
+                .enumerate()
+                .filter_map(|(i, whitespace)| {
+                    matches!(whitespace.kind, CstKind::Newline(_)).then(|| i)
+                })
+                .nth(1)
+            else {
+                return (whitespace, vec![]);
+            };
+            let (first_whitespace, rest) = whitespace.split_at(second_newline_index);
+            let mut line_whitespace: Vec<Rcst> = vec![];
+            let mut lines: Vec<Rcst> = vec![];
+            for whitespace in rest {
+                if matches!(whitespace.kind, CstKind::Newline(_)) && !line_whitespace.is_empty() {
+                    lines.push(CstKind::TextLine(Vec::new()).wrap_in_whitespace(line_whitespace));
+                    line_whitespace = vec![];
                 }
+                line_whitespace.push(whitespace.clone());
             }
-
-            match input.chars().next() {
-                Some('"') => {
-                    input = &input[1..];
-                    match parse_multiple(
-                        input,
-                        single_quote,
-                        Some((opening_single_quotes.len(), false)),
-                    ) {
-                        Some((input_after_single_quotes, closing_single_quotes)) => {
-                            input = input_after_single_quotes;
-                            drain_and_push_text_part(&mut text_part, &mut lines);
-                            break CstKind::ClosingText {
-                                closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
-                                closing_single_quotes,
-                            };
-                        }
-                        None => text_part.push('"'),
-                    }
-                }
-                Some('{') => {
-                    match text_interpolation(input, indentation, opening_single_quotes.len() + 1) {
-                        Some((input_after_interpolation, interpolation)) => {
-                            drain_and_push_text_part(&mut text_part, &mut lines);
-                            input = input_after_interpolation;
-                            if let Some(Cst {
-                                kind: CstKind::TextLine(last_line),
-                                ..
-                            }) = lines.last_mut()
-                            {
-                                last_line.push(interpolation);
-                            }
-                        }
-                        None => {
-                            input = &input[1..];
-                            text_part.push('{');
-                        }
-                    }
-                }
-                None => {
-                    drain_and_push_text_part(&mut text_part, &mut lines);
-                    break CstKind::Error {
-                        unparsable_input: "".to_string(),
-                        error: CstError::TextNotClosed,
-                    };
-                }
-                Some(c) => {
-                    input = &input[c.len_utf8()..];
-                    text_part.push(c);
-                }
-            }
-        };
-        let opening = CstKind::OpeningText {
-            opening_single_quotes,
-            opening_double_quote: Box::new(opening_double_quote),
+            lines.push(CstKind::TextLine(Vec::new()).wrap_in_whitespace(line_whitespace));
+            (first_whitespace.to_vec(), lines)
         }
-        .wrap_in_whitespace(opening_whitespace);
+
+        let (opening_whitespace, mut lines) =
+            split_of_first_line_and_convert_rest_into_textlines(opening_whitespace);
+        let closing = loop {
+            let (input_after_line, line) =
+                text_line(input, indentation, opening_single_quotes.len());
+            input = input_after_line;
+
+            let (input_after_whitespace, whitespace) =
+                whitespaces_and_newlines(input, indentation + 1, false);
+            input = input_after_whitespace;
+            let (whitespace, mut empty_lines) =
+                split_of_first_line_and_convert_rest_into_textlines(whitespace);
+            lines.push(line.wrap_in_whitespace(whitespace));
+            lines.append(&mut empty_lines);
+
+            // Allow closing quotes to have the same indentation level as the opening quotes
+            let (input_after_whitespace, whitespace) = if newline(input).is_some() {
+                whitespaces_and_newlines(input, indentation, false)
+            } else {
+                (input, Vec::new())
+            };
+            if let Some((input_after_double_quote, closing_double_quote)) = double_quote(input_after_whitespace) && let Some((input_after_single_quotes, closing_single_quotes)) = parse_multiple(input_after_double_quote, single_quote, Some((opening_single_quotes.len(), false))) {
+                input = input_after_single_quotes;
+
+                let (whitespace, mut empty_lines) =
+                    split_of_first_line_and_convert_rest_into_textlines(whitespace);
+                let mut last_line = lines.pop().unwrap();
+                if matches!(last_line.kind, CstKind::TrailingWhitespace{..}) {
+                    lines.push(last_line);
+                    last_line = CstKind::TextLine(Vec::new()).into()
+                }
+                lines.push(last_line.wrap_in_whitespace(whitespace));
+                lines.append(&mut empty_lines);
+
+                break CstKind::ClosingText {
+                    closing_double_quote: Box::new(closing_double_quote),
+                    closing_single_quotes,
+                };
+            } else if !whitespace.is_empty() || newline(input).is_some() || input.is_empty() {
+                break CstKind::Error {
+                    unparsable_input: "".to_string(),
+                    error: CstError::TextNotClosed,
+                };
+            };
+        };
+
         Some((
             input,
             CstKind::Text {
-                opening: Box::new(opening),
+                opening: Box::new(
+                    CstKind::OpeningText {
+                        opening_single_quotes,
+                        opening_double_quote: Box::new(opening_double_quote),
+                    }
+                    .wrap_in_whitespace(opening_whitespace),
+                ),
                 lines,
                 closing: Box::new(closing.into()),
             }
