@@ -33,21 +33,17 @@
 <replaced address 3974cba2aa713a1b>: [ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-0 }]
 <replaced address 3b3270094f01d6b0>: { 1 argument (capturing nothing) → ip-0 }
 <replaced address 55043490d5f24695>: Builtins::print:11
-<replaced address 8383f19ea0a5e146>: Builtins::toDebugText:5
-<replaced address b9d313d4403e6a66>: { 0 arguments (capturing nothing) → ip-8 }
+<replaced address a299eca8798bd5e6>: "3"
 <replaced address c52c1f71bac3244c>: Examples::
+<replaced address e7f9ff3e6aa5eb6a>: { 0 arguments (capturing nothing) → ip-4 }
 
 # Instructions
 # Examples::11
- 0: pushConstant inline builtinToDebugText
- 1: pushConstant inline 3
- 2: pushConstant <replaced address 8383f19ea0a5e146> Builtins::toDebugText:5
- 3: call with 1 argument
- 4: pushConstant inline builtinPrint
- 5: pushFromStack 1
- 6: pushConstant <replaced address 55043490d5f24695> Builtins::print:11
- 7: tailCall with 3 locals and 1 argument
+0: pushConstant inline builtinPrint
+1: pushConstant <replaced address a299eca8798bd5e6> "3"
+2: pushConstant <replaced address 55043490d5f24695> Builtins::print:11
+3: tailCall with 2 locals and 1 argument
 # Examples::
- 8: pushConstant <replaced address 3974cba2aa713a1b> [ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-0 }]
- 9: popMultipleBelowTop 1
-10: return
+4: pushConstant <replaced address 3974cba2aa713a1b> [ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-0 }]
+5: popMultipleBelowTop 1
+6: return
