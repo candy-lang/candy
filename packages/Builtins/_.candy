@@ -191,7 +191,7 @@ listReplace list index newItem :=
   ✨.listReplace list index newItem
 
 print message :=
-  # needs (message | typeIs Text)
+  needs (message | typeIs Text)
   ✨.print message
 
 structGet struct key :=
