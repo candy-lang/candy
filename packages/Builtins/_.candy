@@ -1,3 +1,22 @@
+# This package is special to the compiler and code in here behaves somewhat
+# different than other code. Be careful when editing the code in here. These are
+# the peculiarities you need to worry about:
+#
+# - There's an magic variable called `✨` in scope. It's a struct containing
+#   entry points to compiler-builtins – functions that are implemented directly
+#   in the Rust compiler rather than in Candy code.
+#   For the VM implementations, see `vm/src/builtin_functions.rs`.
+#
+# - You need to make sure the builtin functions from `✨` are called with valid
+#   arguments, so make sure to guard all calls with appropriate needs. If you
+#   don't, the underlying Rust code may panic.
+#
+# - Invalid struct accesses cause panics, so make sure you know a key is in a
+#   struct when you access it using the dot syntax.
+#
+# - Don't remove the `structGet` function! All struct accesses from other
+#   packages refer to this function.
+
 typeIs value type =
   needs (type | ✨.typeOf | ✨.equals Tag)
   value | ✨.typeOf | ✨.equals type

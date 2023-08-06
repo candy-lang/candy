@@ -163,13 +163,13 @@ impl Int {
             .unwrap_or_else(|_| HeapInt::create(heap, is_reference_counted, value).into())
     }
 
-    pub fn get(&self) -> Cow<BigInt> {
+    pub fn get<'a>(self) -> Cow<'a, BigInt> {
         match self {
             Int::Inline(int) => Cow::Owned(int.get().into()),
             Int::Heap(int) => Cow::Borrowed(int.get()),
         }
     }
-    pub fn try_get<T>(&self) -> Option<T>
+    pub fn try_get<T>(self) -> Option<T>
     where
         T: TryFrom<i64> + for<'a> TryFrom<&'a BigInt>,
     {
@@ -184,9 +184,9 @@ impl Int {
     operator_fn!(multiply);
     operator_fn!(int_divide_truncating);
     operator_fn!(remainder);
-    pub fn modulo(&self, heap: &mut Heap, rhs: &Int) -> Self {
+    pub fn modulo(self, heap: &mut Heap, rhs: Int) -> Self {
         match (self, rhs) {
-            (Int::Inline(lhs), Int::Inline(rhs)) => lhs.modulo(heap, *rhs),
+            (Int::Inline(lhs), Int::Inline(rhs)) => lhs.modulo(heap, rhs),
             (Int::Heap(on_heap), Int::Inline(inline))
             | (Int::Inline(inline), Int::Heap(on_heap)) => {
                 on_heap.modulo(heap, &inline.get().into())
@@ -195,9 +195,9 @@ impl Int {
         }
     }
 
-    pub fn compare_to(&self, rhs: &Int) -> Tag {
+    pub fn compare_to(self, rhs: Int) -> Tag {
         match (self, rhs) {
-            (Int::Inline(lhs), rhs) => lhs.compare_to(*rhs),
+            (Int::Inline(lhs), rhs) => lhs.compare_to(rhs),
             (Int::Heap(lhs), Int::Inline(rhs)) => lhs.compare_to(&rhs.get().into()),
             (Int::Heap(lhs), Int::Heap(rhs)) => lhs.compare_to(rhs.get()),
         }
@@ -206,7 +206,7 @@ impl Int {
     shift_fn!(shift_left, shl);
     shift_fn!(shift_right, shr);
 
-    pub fn bit_length(&self, heap: &mut Heap) -> Self {
+    pub fn bit_length(self, heap: &mut Heap) -> Self {
         match self {
             Int::Inline(int) => int.bit_length().into(),
             Int::Heap(int) => int.bit_length(heap),
@@ -220,9 +220,9 @@ impl Int {
 
 macro_rules! bitwise_fn {
     ($name:ident) => {
-        pub fn $name(&self, heap: &mut Heap, rhs: &Int) -> Self {
+        pub fn $name(self, heap: &mut Heap, rhs: Int) -> Self {
             match (self, rhs) {
-                (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(*rhs).into(),
+                (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(rhs).into(),
                 (Int::Heap(on_heap), Int::Inline(inline))
                 | (Int::Inline(inline), Int::Heap(on_heap)) => {
                     on_heap.$name(heap, &inline.get().into())
@@ -234,9 +234,9 @@ macro_rules! bitwise_fn {
 }
 macro_rules! operator_fn {
     ($name:ident) => {
-        pub fn $name(&self, heap: &mut Heap, rhs: &Int) -> Self {
+        pub fn $name(self, heap: &mut Heap, rhs: Int) -> Self {
             match (self, rhs) {
-                (Int::Inline(lhs), _) => lhs.$name(heap, *rhs),
+                (Int::Inline(lhs), _) => lhs.$name(heap, rhs),
                 (Int::Heap(lhs), Int::Inline(rhs)) => lhs.$name(heap, rhs.get()),
                 (Int::Heap(lhs), Int::Heap(rhs)) => lhs.$name(heap, rhs.get()),
             }
@@ -245,9 +245,9 @@ macro_rules! operator_fn {
 }
 macro_rules! shift_fn {
     ($name:ident, $function:ident) => {
-        pub fn $name(&self, heap: &mut Heap, rhs: &Int) -> Self {
+        pub fn $name(self, heap: &mut Heap, rhs: Int) -> Self {
             match (self, rhs) {
-                (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(heap, *rhs),
+                (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(heap, rhs),
                 // TODO: Support shifting by larger numbers
                 (Int::Inline(lhs), rhs) => Int::create_from_bigint(
                     heap,

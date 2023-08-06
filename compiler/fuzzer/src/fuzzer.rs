@@ -7,7 +7,7 @@ use crate::{
 };
 use candy_frontend::hir::Id;
 use candy_vm::{
-    heap::{Data, Function, Heap},
+    heap::{Data, DisplayWithSymbolTable, Function, Heap},
     lir::Lir,
     tracer::stack_trace::StackTracer,
     Panic,
@@ -16,7 +16,7 @@ use std::rc::Rc;
 use tracing::debug;
 
 pub struct Fuzzer {
-    lir: Rc<Lir>,
+    pub lir: Rc<Lir>,
     pub function_heap: Heap,
     pub function: Function,
     pub function_id: Id,
@@ -127,9 +127,12 @@ impl Fuzzer {
             self.function_id
                 .keys
                 .last()
-                .map(|function_name| function_name.to_string())
+                .map(|function_name| DisplayWithSymbolTable::to_string(
+                    function_name,
+                    &runner.lir.symbol_table
+                ))
                 .unwrap_or_else(|| "{…}".to_string()),
-            runner.input,
+            runner.input.to_string(&runner.lir.symbol_table),
         );
         debug!(
             "{}",
