@@ -75,6 +75,7 @@ impl Insight {
             kind: HintKind::Value,
             position: db.id_to_end_of_line(id).unwrap(),
             text: if let Some(i) = text.find('\n') {
+                // TODO: Show all lines when hovering the hint
                 format!("{}...", &text[0..i])
             } else {
                 text
