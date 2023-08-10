@@ -1,6 +1,8 @@
 #ifndef __CANDY_RT_H
 #define __CANDY_RT_H
 
+#include <stdint.h>
+
 typedef enum
 {
     CANDY_TYPE_INT = 42,
@@ -27,7 +29,7 @@ typedef struct candy_value
 {
     union
     {
-        __int64_t integer;
+        int64_t integer;
         char *text;
         struct candy_value **list;
         candy_function_t function;

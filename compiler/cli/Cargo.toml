@@ -10,7 +10,7 @@ name = "candy"
 path = "src/main.rs"
 
 [dependencies]
-backend_inkwell = { path = "../backend_inkwell" }
+candy_backend_inkwell = { path = "../backend_inkwell" }
 candy_frontend = { path = "../frontend" }
 candy_fuzzer = { path = "../fuzzer" }
 candy_language_server = { path = "../language_server" }

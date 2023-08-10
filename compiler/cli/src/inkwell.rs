@@ -1,12 +1,13 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use backend_inkwell::CodeGen;
+use candy_backend_inkwell::CodeGen;
 use candy_frontend::error::{CompilerError, CompilerErrorPayload};
 use candy_frontend::mir::Mir;
 use candy_frontend::mir_optimize::OptimizeMir;
 use candy_frontend::{hir, TracingConfig};
 use clap::{Parser, ValueHint};
+use rustc_hash::FxHashSet;
 
 use crate::database::Database;
 use crate::utils::{module_for_path, packages_path};
@@ -67,13 +68,13 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
         std::process::exit(1);
     }
 
-    let context = backend_inkwell::inkwell::context::Context::create();
+    let context = candy_backend_inkwell::inkwell::context::Context::create();
     let codegen = CodeGen::new(&context, &path, mir);
     let mut bc_path = PathBuf::new();
     bc_path.push(&format!("{path}.bc"));
     codegen
         .compile(&bc_path, options.print_llvm_ir, options.print_main_output)
-        .map_err(|e| Exit::LLVMError(e.to_string()))?;
+        .map_err(|e| Exit::LlvmError(e.to_string()))?;
     std::process::Command::new("llc")
         .arg(&bc_path)
         .args(["-O3"])
