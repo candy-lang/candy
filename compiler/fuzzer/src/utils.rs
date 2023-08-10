@@ -12,11 +12,11 @@ pub struct FuzzablesFinder {
 impl Tracer for FuzzablesFinder {
     fn found_fuzzable_function(
         &mut self,
-        heap: &mut Heap,
+        _heap: &mut Heap,
         definition: candy_vm::heap::HirId,
         function: Function,
     ) {
-        function.dup(heap);
+        function.dup();
         self.fuzzables.insert(definition.get().to_owned(), function);
     }
 }

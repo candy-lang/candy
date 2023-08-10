@@ -21,12 +21,12 @@ pub struct Call {
 }
 impl Call {
     pub fn dup(&self, heap: &mut Heap) {
-        self.call_site.dup(heap);
+        self.call_site.dup();
         self.callee.dup(heap);
         for argument in &self.arguments {
             argument.dup(heap);
         }
-        self.responsible.dup(heap);
+        self.responsible.dup();
     }
     pub fn drop(&self, heap: &mut Heap) {
         self.call_site.drop(heap);
@@ -62,6 +62,9 @@ impl Tracer for StackTracer {
 }
 
 impl StackTracer {
+    /// When a VM panics, some child fiber might be responsible for that. This
+    /// function returns a formatted stack trace spanning all fibers in the
+    /// chain from the panicking root fiber until the concrete failing needs.
     pub fn format<DB>(&self, db: &DB, symbol_table: &SymbolTable) -> String
     where
         DB: AstToHir + PositionConversionDb,

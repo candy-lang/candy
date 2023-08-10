@@ -72,7 +72,7 @@ impl InlineObject {
         };
 
         if let Ok(it) = HeapObject::try_from(self) {
-            it.dup_by(heap, amount)
+            it.dup_by(amount)
         }
     }
     pub fn drop(self, heap: &mut Heap) {

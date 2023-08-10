@@ -101,10 +101,10 @@ impl HeapObject {
         unsafe { *pointer.as_mut() = value as u64 }
     }
 
-    pub fn dup(self, heap: &mut Heap) {
-        self.dup_by(heap, 1);
+    pub fn dup(self) {
+        self.dup_by(1);
     }
-    pub fn dup_by(self, heap: &mut Heap, amount: usize) {
+    pub fn dup_by(self, amount: usize) {
         let Some(reference_count) = self.reference_count() else {
             return;
         };
@@ -112,10 +112,6 @@ impl HeapObject {
         let new_reference_count = reference_count + amount;
         self.set_reference_count(new_reference_count);
         trace!("RefCount of {self:p} increased to {new_reference_count}. Value: {self:?}");
-
-        if reference_count == 0 {
-            HeapData::from(self).dup_children(heap);
-        }
     }
     pub fn drop(self, heap: &mut Heap) {
         let Some(reference_count) = self.reference_count() else {
@@ -234,13 +230,6 @@ pub trait HeapObjectTrait: Copy + Into<HeapObject> {
         clone: HeapObject,
         address_map: &mut FxHashMap<HeapObject, HeapObject>,
     );
-
-    /// Calls [Heap::dup] for all referenced [HeapObject]s.
-    ///
-    /// This method is called by [HeapObject::dup_by] if the previous reference
-    /// count is zero. This only occurs when tracers dup objects of a panicked
-    /// fiber.
-    fn dup_children(self, heap: &mut Heap);
 
     /// Calls [Heap::drop] for all referenced [HeapObject]s and drops allocated
     /// Rust objects owned by this object.

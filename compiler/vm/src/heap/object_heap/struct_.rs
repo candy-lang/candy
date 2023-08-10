@@ -282,14 +282,6 @@ impl HeapObjectTrait for HeapStruct {
         }
     }
 
-    fn dup_children(self, heap: &mut Heap) {
-        for key in self.keys() {
-            key.dup(heap);
-        }
-        for value in self.values() {
-            value.dup(heap);
-        }
-    }
     fn drop_children(self, heap: &mut Heap) {
         for key in self.keys() {
             key.drop(heap);

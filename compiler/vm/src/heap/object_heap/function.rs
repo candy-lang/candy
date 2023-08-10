@@ -179,11 +179,6 @@ impl HeapObjectTrait for HeapFunction {
         }
     }
 
-    fn dup_children(self, heap: &mut Heap) {
-        for captured in self.captured() {
-            captured.dup(heap);
-        }
-    }
     fn drop_children(self, heap: &mut Heap) {
         for captured in self.captured() {
             captured.drop(heap);
