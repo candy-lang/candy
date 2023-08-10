@@ -8,7 +8,8 @@
     nonzero_ops,
     slice_ptr_get,
     step_trait,
-    strict_provenance
+    strict_provenance,
+    try_blocks
 )]
 
 use crate::heap::{DisplayWithSymbolTable, Struct, SymbolId, Tag};

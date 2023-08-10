@@ -5,23 +5,23 @@ assignment: struct
   call identifier $0@"use" with these arguments:
     text
       textPart $2@"Core"
-assignment: identifier $58@"main" := 
-  function (non-fuzzable) { $12@"environment" ->
-    assignment: $20@"print" = function (fuzzable) { $21@"message" ->
-      call struct access identifier $13@"environment".$15@"Stdout" with these arguments:
-        identifier $17@"message"
+assignment: identifier $60@"main" := 
+  function (non-fuzzable) { identifier $12@"environment" ->
+    assignment: $21@"print" = function (fuzzable) { identifier $22@"message" ->
+      call struct access identifier $14@"environment".$16@"Stdout" with these arguments:
+        identifier $18@"message"
     }
-    assignment: identifier $27@"read" = 
-      struct access identifier $23@"environment".$25@"Stdin"
-    call identifier $30@"print" with these arguments:
+    assignment: identifier $29@"read" = 
+      struct access identifier $25@"environment".$27@"Stdin"
+    call identifier $32@"print" with these arguments:
       text
-        textPart $32@"Hello, world!"
-    assignment: identifier $43@"foo" = 
-      call struct access identifier $36@"function".$38@"Run" with these arguments:
-        identifier $40@"read"
-    call identifier $46@"print" with these arguments:
+        textPart $34@"Hello, world!"
+    assignment: identifier $45@"foo" = 
+      call struct access identifier $38@"function".$40@"Run" with these arguments:
+        identifier $42@"read"
+    call identifier $48@"print" with these arguments:
       text
-        textPart $48@"Echo:"
-    call identifier $52@"print" with these arguments:
-      identifier $54@"foo"
+        textPart $50@"Echo:"
+    call identifier $54@"print" with these arguments:
+      identifier $56@"foo"
   }

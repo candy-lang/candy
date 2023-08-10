@@ -140,10 +140,10 @@ $131 = Core:iterable:forEach:20:2
 $132 = Core:iterable:forEach:21
 $133 = Core:iterable:forEach:4
 $134 = Core:iterable:fromList:18:1
-$135 = Core:iterable:fromList:18:14
-$136 = Core:iterable:fromList:18:15:12
-$137 = Core:iterable:fromList:18:15:27
-$138 = Core:iterable:fromList:18:17
+$135 = Core:iterable:fromList:18:13
+$136 = Core:iterable:fromList:18:14:12
+$137 = Core:iterable:fromList:18:14:27
+$138 = Core:iterable:fromList:18:16
 $139 = Core:iterable:fromList:18:index
 $140 = Core:iterable:fromList:18:l
 $141 = Core:iterable:fromList:19
@@ -384,7 +384,7 @@ $351 = { $352 $353 $354 (+ responsible $355) ->
   }
   $374 = call $220 with $352 $348 $371 ($217 is responsible)
 }
-$375 = ($247)
+$375 = ($247,)
 # Builtins::not:1:equals:then
 $376 = { (responsible $377) ->
   $378 = $375
@@ -1825,7 +1825,7 @@ $1616 = { $1617 (+ responsible $1618) ->
   $1680 = call $224 with $1672 $259 ($140 is responsible)
   $1681 = call $224 with $1672 $260 ($139 is responsible)
   $1682 = call $1399 with $1680 $1681 ($135 is responsible)
-  # Core:iterable:fromList:18:15
+  # Core:iterable:fromList:18:14
   $1683 = { (responsible $1684) ->
     $1685 = call $591 with $1680 $1681 ($136 is responsible)
     $1686 = call $233 with $1681 ($46 is responsible)

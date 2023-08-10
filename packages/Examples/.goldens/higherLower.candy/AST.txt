@@ -13,67 +13,67 @@ assignment: struct
 assignment: struct
   identifier $24@"run" = 
   identifier $22@"function"
-assignment: identifier $154@"main" := 
-  function (non-fuzzable) { $28@"environment" ->
-    assignment: $36@"print" = function (fuzzable) { $37@"message" ->
-      call struct access identifier $29@"environment".$31@"Stdout" with these arguments:
-        identifier $33@"message"
+assignment: identifier $158@"main" := 
+  function (non-fuzzable) { identifier $28@"environment" ->
+    assignment: $37@"print" = function (fuzzable) { identifier $38@"message" ->
+      call struct access identifier $30@"environment".$32@"Stdout" with these arguments:
+        identifier $34@"message"
     }
-    assignment: identifier $47@"read" = 
+    assignment: identifier $49@"read" = 
       function (non-fuzzable) {
-        call identifier $39@"run" with these arguments:
-          struct access identifier $41@"environment".$43@"Stdin"
+        call identifier $41@"run" with these arguments:
+          struct access identifier $43@"environment".$45@"Stdin"
       }
-    call identifier $50@"print" with these arguments:
+    call identifier $52@"print" with these arguments:
       text
-        textPart $52@"Welcome to the number guessing game!"
-    assignment: identifier $57@"correct" = 
+        textPart $54@"Welcome to the number guessing game!"
+    assignment: identifier $59@"correct" = 
       int 42
-    call identifier $60@"loop" with these arguments:
+    call identifier $62@"loop" with these arguments:
       function (non-fuzzable) {
-        call identifier $62@"print" with these arguments:
+        call identifier $64@"print" with these arguments:
           text
-            textPart $64@"What's your guess?"
-        assignment: identifier $83@"guess" = 
-          call struct access identifier $78@"int".$80@"Parse" with these arguments:
-            call struct access identifier $73@"text".$75@"Trim" with these arguments:
-              call identifier $68@"run" with these arguments:
-                identifier $70@"read"
-        call struct access identifier $88@"result".$90@"MapOrElse" with these arguments:
-          identifier $86@"guess"
-          function (non-fuzzable) { $92@"guess" ->
-            call identifier $93@"ifElse" with these arguments:
-              call identifier $95@"equals" with these arguments:
-                identifier $97@"guess"
-                identifier $99@"correct"
+            textPart $66@"What's your guess?"
+        assignment: identifier $85@"guess" = 
+          call struct access identifier $80@"int".$82@"Parse" with these arguments:
+            call struct access identifier $75@"text".$77@"Trim" with these arguments:
+              call identifier $70@"run" with these arguments:
+                identifier $72@"read"
+        call struct access identifier $90@"result".$92@"MapOrElse" with these arguments:
+          identifier $88@"guess"
+          function (non-fuzzable) { identifier $94@"guess" ->
+            call identifier $96@"ifElse" with these arguments:
+              call identifier $98@"equals" with these arguments:
+                identifier $100@"guess"
+                identifier $102@"correct"
               function (non-fuzzable) {
-                call identifier $102@"print" with these arguments:
+                call identifier $105@"print" with these arguments:
                   text
-                    textPart $104@"You did it!"
-                symbol $108@"Break"
+                    textPart $107@"You did it!"
+                symbol $111@"Break"
               }
               function (non-fuzzable) {
-                call identifier $111@"print" with these arguments:
-                  call identifier $113@"ifElse" with these arguments:
-                    call struct access identifier $115@"int".$117@"IsLessThan" with these arguments:
-                      identifier $119@"correct"
-                      identifier $121@"guess"
+                call identifier $114@"print" with these arguments:
+                  call identifier $116@"ifElse" with these arguments:
+                    call struct access identifier $118@"int".$120@"IsLessThan" with these arguments:
+                      identifier $122@"correct"
+                      identifier $124@"guess"
                     function (non-fuzzable) {
                       text
-                        textPart $124@"Lower!"
+                        textPart $127@"Lower!"
                     }
                     function (non-fuzzable) {
                       text
-                        textPart $128@"Higher!"
+                        textPart $131@"Higher!"
                     }
-                symbol $134@"Continue"
+                symbol $137@"Continue"
               }
           }
-          function (non-fuzzable) { $139@"error" ->
-            call identifier $140@"print" with these arguments:
+          function (non-fuzzable) { identifier $142@"error" ->
+            call identifier $144@"print" with these arguments:
               text
-                textPart $142@"Your guess must be a number."
-            symbol $146@"Continue"
+                textPart $146@"Your guess must be a number."
+            symbol $150@"Continue"
           }
       }
   }

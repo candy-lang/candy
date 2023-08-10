@@ -36,7 +36,7 @@ impl InlineBuiltin {
 
 impl DebugDisplay for InlineBuiltin {
     fn fmt(&self, f: &mut Formatter, _is_debug: bool) -> fmt::Result {
-        write!(f, "builtin{:?}", self.get())
+        write!(f, "{}", self.get())
     }
 }
 impl_debug_display_via_debugdisplay!(InlineBuiltin);

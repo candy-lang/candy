@@ -6,167 +6,174 @@
 # • Include tracing of calls? No
 # • Include tracing of evaluated expressions? No
 
-# Symbol Table
-<symbol-id 0>: Builtin
-<symbol-id 1>: Equal
-<symbol-id 2>: Error
-<symbol-id 3>: False
-<symbol-id 4>: Function
-<symbol-id 5>: Greater
-<symbol-id 6>: Int
-<symbol-id 7>: Less
-<symbol-id 8>: List
-<symbol-id 9>: Main
-<symbol-id 10>: Nothing
-<symbol-id 11>: Ok
-<symbol-id 12>: Stdin
-<symbol-id 13>: Stdout
-<symbol-id 14>: Struct
-<symbol-id 15>: Tag
-<symbol-id 16>: Text
-<symbol-id 17>: True
+# Constants
+%0 = Builtins::structGet:12
+%1 = Builtins::structGet:14
+%2 = Builtins::structGet:21
+%3 = Builtins::structGet:5
+%4 = Builtins::typeIs:19
+%5 = Builtins::typeIs:25
+%6 = Examples:helloWorld:0:15
+%7 = Examples:helloWorld:0:7
+%8 = anonymous:$generated::needs
+%9 = builtinEquals
+%10 = builtinIfElse
+%11 = builtinStructGet
+%12 = builtinStructHasKey
+%13 = builtinTypeOf
+%14 = False
+%15 = Main
+%16 = Nothing
+%17 = Stdout
+%18 = Struct
+%19 = Text
+%20 = True
+%21 = "Hello, world!"
+%22 = "The `condition` must be either `True` or `False`."
+%23 = "The `reason` must be a text."
+%24 = "`struct | typeIs Struct` was not satisfied"
+%25 = "`struct | ✨.structHasKey key` was not satisfied"
+%26 = { body_0 }
+%27 = { body_1 }
+%28 = { body_6 }
+%29 = { body_7 }
+%30 = [%15: %29]
 
-# Constant heap
-<replaced address 0fea7d5fa5afcc30>: Builtins::typeIs:25
-<replaced address 18dc4adab2c8e8df>: "`struct | ✨.structHasKey key` was not satisfied"
-<replaced address 1f92019f89733a43>: Builtins::structGet:12
-<replaced address 2ded061b072e15be>: { 0 arguments (capturing nothing) → ip-0 }
-<replaced address 36eebe9168aef0b0>: "The `reason` must be a text."
-<replaced address 3eca0e872d043602>: Builtins::typeIs:19
-<replaced address 422f322f2940db06>: Builtins::structGet:21
-<replaced address 4447d612bf74ed72>: { 0 arguments (capturing nothing) → ip-108 }
-<replaced address 4f872d5446aebe9e>: { 3 arguments (capturing nothing) → ip-26 }
-<replaced address 53edeed76ed1cc58>: Examples:helloWorld:0:15
-<replaced address 59d6aae2417bc61d>: "Hello, world!"
-<replaced address 59fb4da19b618456>: Builtins::structGet:5
-<replaced address 7c987e313b2f2519>: Builtins::structGet:14
-<replaced address 80f4eaa53f4876cd>: anonymous:$generated::needs
-<replaced address 8935c17065d0f29c>: Examples:helloWorld:
-<replaced address 91ccd4b75c545de9>: "The `condition` must be either `True` or `False`."
-<replaced address 996cc5f08093ac25>: "`struct | typeIs Struct` was not satisfied"
-<replaced address b964d1afe6b190ad>: { 1 argument (capturing nothing) → ip-73 }
-<replaced address c807e11e35c177b0>: Examples:helloWorld:0:7
-<replaced address dc704463e00c0b29>: { 0 arguments (capturing nothing) → ip-3 }
-<replaced address fce18e6881bc359e>: [ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-73 }]
-
-# Instructions
-# anonymous:$generated::needs:isConditionTrue:then
-  0: pushConstant inline <symbol-id 17>
-  1: popMultipleBelowTop 1
-  2: return
-# anonymous:$generated::needs:isConditionBool:then
-  3: pushConstant inline <symbol-id 10>
-  4: popMultipleBelowTop 1
-  5: return
-# anonymous:$generated::needs:isConditionTrue:else
-  6: pushConstant inline builtinEquals
-  7: pushFromStack 2
-  8: pushConstant inline <symbol-id 3>
-  9: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
- 10: tailCall with 2 locals and 2 arguments
-# anonymous:$generated::needs:isConditionBool:else
- 11: pushConstant <replaced address 91ccd4b75c545de9> "The `condition` must be either `True` or `False`."
- 12: pushFromStack 2
- 13: panic
- 14: popMultipleBelowTop 2
- 15: return
-# anonymous:$generated::needs:isReasonText:else
- 16: pushConstant <replaced address 36eebe9168aef0b0> "The `reason` must be a text."
- 17: pushFromStack 2
- 18: panic
- 19: popMultipleBelowTop 2
- 20: return
-# anonymous:$generated::needs:condition:else
- 21: pushFromStack 1
- 22: pushFromStack 3
- 23: panic
- 24: popMultipleBelowTop 3
- 25: return
-# anonymous:$generated::needs
- 26: pushConstant inline builtinEquals
- 27: pushFromStack 4
- 28: pushConstant inline <symbol-id 17>
- 29: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
- 30: call with 2 arguments
- 31: pushFromStack 4
- 32: createFunction with 0 arguments capturing 0 starting at ip-6
- 33: pushConstant inline builtinIfElse
- 34: pushFromStack 3
- 35: pushConstant <replaced address 2ded061b072e15be> { 0 arguments (capturing nothing) → ip-0 }
- 36: pushFromStack 3
- 37: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
- 38: call with 3 arguments
- 39: pushFromStack 4
- 40: createFunction with 0 arguments capturing 0 starting at ip-11
- 41: pushConstant inline builtinIfElse
- 42: pushFromStack 3
- 43: pushConstant <replaced address dc704463e00c0b29> { 0 arguments (capturing nothing) → ip-3 }
- 44: pushFromStack 3
- 45: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
- 46: call with 3 arguments
- 47: pushConstant inline builtinTypeOf
- 48: pushFromStack 10
- 49: pushFromStack 4
- 50: call with 1 argument
- 51: pushConstant inline builtinEquals
- 52: pushFromStack 1
- 53: pushConstant inline <symbol-id 16>
- 54: pushFromStack 6
- 55: call with 2 arguments
- 56: pushFromStack 4
- 57: createFunction with 0 arguments capturing 0 starting at ip-16
- 58: pushConstant inline builtinIfElse
- 59: pushFromStack 3
- 60: pushConstant <replaced address dc704463e00c0b29> { 0 arguments (capturing nothing) → ip-3 }
- 61: pushFromStack 3
- 62: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
- 63: call with 3 arguments
- 64: pushFromStack 13
- 65: pushFromStack 15
- 66: createFunction with 0 arguments capturing 1, 0 starting at ip-21
- 67: pushConstant inline builtinIfElse
- 68: pushFromStack 14
- 69: pushConstant <replaced address dc704463e00c0b29> { 0 arguments (capturing nothing) → ip-3 }
- 70: pushFromStack 3
- 71: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
- 72: tailCall with 19 locals and 3 arguments
-# Examples:helloWorld:0
- 73: pushConstant inline builtinTypeOf
- 74: pushFromStack 2
- 75: pushConstant <replaced address 3eca0e872d043602> Builtins::typeIs:19
- 76: call with 1 argument
- 77: pushConstant inline builtinEquals
- 78: pushFromStack 1
- 79: pushConstant inline <symbol-id 14>
- 80: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
- 81: call with 2 arguments
- 82: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
- 83: pushFromStack 1
- 84: pushConstant <replaced address 996cc5f08093ac25> "`struct | typeIs Struct` was not satisfied"
- 85: pushConstant <replaced address c807e11e35c177b0> Examples:helloWorld:0:7
- 86: pushConstant <replaced address 59fb4da19b618456> Builtins::structGet:5
- 87: call with 3 arguments
- 88: pushConstant inline builtinStructHasKey
- 89: pushFromStack 5
- 90: pushConstant inline <symbol-id 13>
- 91: pushConstant <replaced address 1f92019f89733a43> Builtins::structGet:12
- 92: call with 2 arguments
- 93: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
- 94: pushFromStack 1
- 95: pushConstant <replaced address 18dc4adab2c8e8df> "`struct | ✨.structHasKey key` was not satisfied"
- 96: pushConstant <replaced address c807e11e35c177b0> Examples:helloWorld:0:7
- 97: pushConstant <replaced address 7c987e313b2f2519> Builtins::structGet:14
- 98: call with 3 arguments
- 99: pushConstant inline builtinStructGet
-100: pushFromStack 7
-101: pushConstant inline <symbol-id 13>
-102: pushConstant <replaced address 422f322f2940db06> Builtins::structGet:21
-103: call with 2 arguments
-104: pushFromStack 0
-105: pushConstant <replaced address 59d6aae2417bc61d> "Hello, world!"
-106: pushConstant <replaced address 53edeed76ed1cc58> Examples:helloWorld:0:15
-107: tailCall with 8 locals and 1 argument
-# Examples:helloWorld:
-108: pushConstant <replaced address fce18e6881bc359e> [ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-73 }]
-109: popMultipleBelowTop 1
-110: return
+# Bodies
+body_0 (responsible $0) =
+  # Original HIR IDs: anonymous:$generated::needs:isConditionTrue:then
+  # Captured IDs: none
+  $1 = %20
+body_1 (responsible $0) =
+  # Original HIR IDs: anonymous:$generated::needs:isConditionBool:then
+  # Captured IDs: none
+  $1 = %16
+body_2 (responsible $1) =
+  # Original HIR IDs: anonymous:$generated::needs:isConditionTrue:else
+  # Captured IDs: $0
+  $2 = %9
+  $3 = dup $0
+  $4 = %14
+  $5 = %8
+  $6 = call $2 with $0 $4 ($5 is responsible)
+  $7 = drop $0
+  $8 = $6
+body_3 (responsible $1) =
+  # Original HIR IDs: anonymous:$generated::needs:isConditionBool:else
+  # Captured IDs: $0
+  $2 = %22
+  $3 = dup $0
+  $4 = panicking because $2 ($0 is at fault)
+  $5 = drop $0
+  $6 = $4
+body_4 (responsible $1) =
+  # Original HIR IDs: anonymous:$generated::needs:isReasonText:else
+  # Captured IDs: $0
+  $2 = %23
+  $3 = dup $0
+  $4 = panicking because $2 ($0 is at fault)
+  $5 = drop $0
+  $6 = $4
+body_5 (responsible $2) =
+  # Original HIR IDs: anonymous:$generated::needs:condition:else
+  # Captured IDs: $0, $1
+  $3 = dup $0
+  $4 = dup $1
+  $5 = panicking because $0 ($1 is at fault)
+  $6 = drop $1
+  $7 = drop $0
+  $8 = $5
+body_6 $0 $1 $2 (+ responsible $3) =
+  # Original HIR IDs: anonymous:$generated::needs
+  # Captured IDs: none
+  $4 = %9
+  $5 = dup $0
+  $6 = %20
+  $7 = %8
+  $8 = call $4 with $0 $6 ($7 is responsible)
+  $9 = { body_2 capturing $0 }
+  $10 = %10
+  $11 = dup $8
+  $12 = %26
+  $13 = dup $9
+  $14 = call $10 with $8 $12 $9 ($7 is responsible)
+  $15 = { body_3 capturing $3 }
+  $16 = dup $14
+  $17 = %27
+  $18 = dup $15
+  $19 = call $10 with $14 $17 $15 ($7 is responsible)
+  $20 = %13
+  $21 = dup $1
+  $22 = call $20 with $1 ($3 is responsible)
+  $23 = dup $22
+  $24 = %19
+  $25 = call $4 with $22 $24 ($3 is responsible)
+  $26 = { body_4 capturing $3 }
+  $27 = dup $25
+  $28 = dup $26
+  $29 = call $10 with $25 $17 $26 ($7 is responsible)
+  $30 = { body_5 capturing $1, $2 }
+  $31 = dup $0
+  $32 = dup $30
+  $33 = call $10 with $0 $17 $30 ($7 is responsible)
+  $34 = drop $30
+  $35 = drop $29
+  $36 = drop $26
+  $37 = drop $25
+  $38 = drop $22
+  $39 = drop $19
+  $40 = drop $15
+  $41 = drop $14
+  $42 = drop $9
+  $43 = drop $8
+  $44 = drop $2
+  $45 = drop $1
+  $46 = drop $0
+  $47 = $33
+body_7 $0 (+ responsible $1) =
+  # Original HIR IDs: Examples:helloWorld:0
+  # Captured IDs: none
+  $2 = %13
+  $3 = dup $0
+  $4 = %4
+  $5 = call $2 with $0 ($4 is responsible)
+  $6 = %9
+  $7 = dup $5
+  $8 = %18
+  $9 = %5
+  $10 = call $6 with $5 $8 ($9 is responsible)
+  $11 = %28
+  $12 = dup $10
+  $13 = %24
+  $14 = %7
+  $15 = %3
+  $16 = call $11 with $10 $13 $14 ($15 is responsible)
+  $17 = %12
+  $18 = dup $0
+  $19 = %17
+  $20 = %0
+  $21 = call $17 with $0 $19 ($20 is responsible)
+  $22 = dup $21
+  $23 = %25
+  $24 = %1
+  $25 = call $11 with $21 $23 $14 ($24 is responsible)
+  $26 = %11
+  $27 = dup $0
+  $28 = %2
+  $29 = call $26 with $0 $19 ($28 is responsible)
+  $30 = dup $29
+  $31 = %21
+  $32 = %6
+  $33 = call $29 with $31 ($32 is responsible)
+  $34 = drop $29
+  $35 = drop $25
+  $36 = drop $21
+  $37 = drop $16
+  $38 = drop $10
+  $39 = drop $5
+  $40 = drop $0
+  $41 = $33
+body_8 (responsible $0) =
+  # Original HIR IDs: Examples:helloWorld:
+  # Captured IDs: none
+  $1 = %30
