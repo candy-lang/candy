@@ -15,9 +15,9 @@ assignment: $95@"average" = function (fuzzable) { identifier $96@"a" ->
     call struct access identifier $24@"list".$26@"Is" with these arguments:
       identifier $28@"a"
   call identifier $32@"needs" with these arguments:
-    call struct access identifier $41@"int".$43@"IsPositive" with these arguments:
-      call struct access identifier $34@"list".$36@"Length" with these arguments:
-        identifier $38@"a"
+    call struct access identifier $41@"bool".$43@"Not" with these arguments:
+      call struct access identifier $36@"list".$38@"IsEmpty" with these arguments:
+        identifier $34@"a"
   call identifier $47@"needs" with these arguments:
     call struct access identifier $56@"iterable".$58@"All" with these arguments:
       call struct access identifier $51@"iterable".$53@"FromList" with these arguments:

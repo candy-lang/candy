@@ -19,15 +19,12 @@
 <symbol-id 9>: Main
 <symbol-id 10>: Nothing
 <symbol-id 11>: Ok
-<symbol-id 12>: ReceivePort
-<symbol-id 13>: ReturnChannel
-<symbol-id 14>: SendPort
-<symbol-id 15>: Stdin
-<symbol-id 16>: Stdout
-<symbol-id 17>: Struct
-<symbol-id 18>: Tag
-<symbol-id 19>: Text
-<symbol-id 20>: True
+<symbol-id 12>: Stdin
+<symbol-id 13>: Stdout
+<symbol-id 14>: Struct
+<symbol-id 15>: Tag
+<symbol-id 16>: Text
+<symbol-id 17>: True
 
 # Constant heap
 <replaced address 2ded061b072e15be>: { 0 arguments (capturing nothing) → ip-0 }
