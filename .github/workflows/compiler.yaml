@@ -41,11 +41,57 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3.5.3
+        with:
+          path: candy/
       - uses: dsherret/rust-toolchain-file@v1
       - uses: Swatinem/rust-cache@v2.6.0
+      
+      - name: Generate Goldens
+        working-directory: candy/
+        run: cargo run --release -- debug gold generate ./packages/Examples/
 
-      - name: Check Goldens
-        run: cargo run --release -- debug gold check ./packages/Examples/
+      - name: Checkout Golden IRs
+        uses: actions/checkout@v3.5.3
+        with:
+          token: ${{ secrets.GOLDEN_IR_PUSH_TOKEN }}
+          repository: candy-lang/golden-irs
+          ref: ${{ github.base_ref }}
+          fetch-depth: 1
+          path: golden-irs/
+
+      - name: Create new branch in golden-irs/
+        working-directory: golden-irs/
+        run: |
+          git checkout --orphan ${{ github.sha }}_
+          git rm -r --force .
+      - run: mv candy/packages/Examples/.goldens/* golden-irs/
+      - uses: EndBug/add-and-commit@v9.1.3
+        with:
+          cwd: golden-irs/
+          add: .
+          message: Generate golden IRs
+          push: --force origin ${{ github.sha }}_
+
+      - id: diff
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        working-directory: golden-irs/
+        run: git diff --exit-code ${{ github.base_ref }}_ ${{ github.head_ref }}_
+      - if: steps.diff.outcome == 'failure'
+        uses: peter-evans/create-or-update-comment@v3.0.2
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            The golden IRs have changed: https://github.com/candy-lang/golden-irs/compare/${{ github.base_ref }}_..${{ github.head_ref }}_
+
+            <details>
+            <summary>Diff</summary>
+
+            ```diff
+            ${{ steps.diff.outputs.result }}
+            ```
+
+            </details>
 
   benchmark:
     name: Benchmark
