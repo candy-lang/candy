@@ -34,3 +34,17 @@ pub trait CountableId {
     #[must_use]
     fn to_usize(&self) -> usize;
 }
+
+#[macro_export]
+macro_rules! impl_countable_id {
+    ($name:ident) => {
+        impl $crate::id::CountableId for $name {
+            fn from_usize(id: usize) -> Self {
+                Self(id)
+            }
+            fn to_usize(&self) -> usize {
+                self.0
+            }
+        }
+    };
+}

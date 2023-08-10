@@ -52,6 +52,7 @@ assignment: $134@"split" = function (fuzzable) { $135@"iter" $136@"delimeter" ->
         call struct access identifier $120@"iterable".$122@"Next" with these arguments:
           identifier $118@"state"
         function (non-fuzzable) {
+          
         }
     }
 }

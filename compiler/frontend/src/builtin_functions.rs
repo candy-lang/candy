@@ -1,3 +1,8 @@
+use crate::{
+    impl_display_via_richir,
+    rich_ir::{RichIrBuilder, ToRichIr, TokenModifier, TokenType},
+};
+use enumset::EnumSet;
 use lazy_static::lazy_static;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -167,5 +172,17 @@ impl BuiltinFunction {
             Self::Try => 1,
             Self::TypeOf => 1,
         }
+    }
+}
+
+impl_display_via_richir!(BuiltinFunction);
+impl ToRichIr for BuiltinFunction {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        let range = builder.push(
+            format!("builtin{self:?}"),
+            TokenType::Function,
+            EnumSet::only(TokenModifier::Builtin),
+        );
+        builder.push_reference(*self, range);
     }
 }

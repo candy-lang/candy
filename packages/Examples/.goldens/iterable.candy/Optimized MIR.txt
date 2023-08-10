@@ -390,7 +390,7 @@ $357 = { $358 $359 $360 (+ responsible $361) ->
   }
   $380 = call $224 with $358 $354 $377 ($220 is responsible)
 }
-$381 = ($251)
+$381 = ($251,)
 # Builtins::not:1:equals:then
 $382 = { (responsible $383) ->
   $384 = $381

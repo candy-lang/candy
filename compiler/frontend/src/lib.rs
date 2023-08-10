@@ -1,4 +1,11 @@
-#![feature(box_patterns, entry_insert, io_error_more, let_chains)]
+#![feature(
+    anonymous_lifetime_in_impl_trait,
+    box_patterns,
+    entry_insert,
+    io_error_more,
+    let_chains,
+    try_blocks
+)]
 #![warn(clippy::nursery, clippy::pedantic)]
 #![allow(
     clippy::cognitive_complexity,
@@ -21,8 +28,10 @@ pub mod format;
 pub mod hir;
 pub mod hir_to_mir;
 pub mod id;
+pub mod lir;
 pub mod mir;
 pub mod mir_optimize;
+pub mod mir_to_lir;
 pub mod module;
 pub mod position;
 pub mod rcst;
