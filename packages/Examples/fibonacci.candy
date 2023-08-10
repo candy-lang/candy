@@ -31,4 +31,4 @@ fibonacci n =
     }
   }
 
-main environment := fibonacci 15 # 610
+main environment := fibonacci 16 # 610
