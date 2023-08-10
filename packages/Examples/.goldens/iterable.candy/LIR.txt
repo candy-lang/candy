@@ -143,10 +143,10 @@
 %133 = Core:iterable:forEach:21
 %134 = Core:iterable:forEach:4
 %135 = Core:iterable:fromList:18:1
-%136 = Core:iterable:fromList:18:14
-%137 = Core:iterable:fromList:18:15:12
-%138 = Core:iterable:fromList:18:15:27
-%139 = Core:iterable:fromList:18:17
+%136 = Core:iterable:fromList:18:13
+%137 = Core:iterable:fromList:18:14:12
+%138 = Core:iterable:fromList:18:14:27
+%139 = Core:iterable:fromList:18:16
 %140 = Core:iterable:fromList:18:index
 %141 = Core:iterable:fromList:18:l
 %142 = Core:iterable:fromList:19
@@ -5648,7 +5648,7 @@ body_204 (responsible $1) =
   $10 = drop $0
   $11 = $8
 body_205 (responsible $2) =
-  # Original HIR IDs: Core:iterable:fromList:18:15
+  # Original HIR IDs: Core:iterable:fromList:18:14
   # Captured IDs: $0, $1
   $3 = %358
   $4 = dup $0

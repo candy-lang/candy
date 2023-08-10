@@ -3,10 +3,10 @@ assignment: identifier $6@"builtins" =
   call identifier $0@"use" with these arguments:
     text
       textPart $2@"Builtins"
-assignment: identifier $24@"main" := 
-  function (non-fuzzable) { $9@"environment" ->
-    call struct access identifier $14@"builtins".$16@"ChannelSend" with these arguments:
-      struct access identifier $10@"environment".$12@"Stdout"
+assignment: identifier $25@"main" := 
+  function (non-fuzzable) { identifier $9@"environment" ->
+    call struct access identifier $15@"builtins".$17@"ChannelSend" with these arguments:
+      struct access identifier $11@"environment".$13@"Stdout"
       text
-        textPart $18@"Hello, world!"
+        textPart $19@"Hello, world!"
   }

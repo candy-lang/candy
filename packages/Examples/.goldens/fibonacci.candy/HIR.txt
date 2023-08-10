@@ -141,8 +141,5 @@ $main = { (fuzzable) $main:environment ->
   $main:2 = call $main:0 with $main:1
 }
 $main#1 = $main
-$11 = Recursive
-$12 = CompareTo
-$13 = IsLessThan
-$14 = Main
-$15 = [$13: $isLessThan#1, $14: $main#1, $11: $recursive#1, $12: $compareTo#1]
+$11 = Main
+$12 = [$11: $main#1]

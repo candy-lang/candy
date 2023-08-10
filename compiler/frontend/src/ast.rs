@@ -3,7 +3,7 @@ use crate::{
     module::Module,
     rich_ir::{RichIrBuilder, ToRichIr, TokenType},
 };
-use derive_more::Deref;
+use derive_more::{Deref, From};
 use enumset::EnumSet;
 use num_bigint::{BigInt, BigUint};
 use rustc_hash::FxHashMap;
@@ -48,7 +48,7 @@ pub struct Ast {
     pub kind: AstKind,
 }
 
-#[derive(Clone, Debug, EnumIs, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, EnumIs, Eq, From, Hash, PartialEq)]
 pub enum AstKind {
     Int(Int),
     Text(Text),
@@ -102,7 +102,7 @@ pub struct StructAccess {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Function {
-    pub parameters: Vec<AstString>,
+    pub parameters: Vec<Ast>,
     pub body: Vec<Ast>,
     pub fuzzable: bool,
 }
@@ -490,13 +490,27 @@ impl ToRichIr for Function {
             None,
             EnumSet::empty(),
         );
-        for parameter in &self.parameters {
-            builder.push(" ", None, EnumSet::empty());
-            parameter.build_rich_ir(builder);
-        }
+
         if !self.parameters.is_empty() {
-            builder.push(" ->", None, EnumSet::empty());
+            if self
+                .parameters
+                .iter()
+                .all(|it| matches!(it.kind, AstKind::Identifier(_)))
+            {
+                for parameter in &self.parameters {
+                    builder.push(" ", None, EnumSet::empty());
+                    parameter.build_rich_ir(builder);
+                }
+                builder.push(" ->", None, EnumSet::empty());
+            } else {
+                builder.push_children_multiline(&self.parameters);
+                builder.indent();
+                builder.push_newline();
+                builder.dedent();
+                builder.push("->", None, EnumSet::empty());
+            }
         }
+
         builder.push_foldable(|builder| {
             builder.push_children_multiline(&self.body);
             builder.push_newline();
