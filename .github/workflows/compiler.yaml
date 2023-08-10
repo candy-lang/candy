@@ -97,15 +97,6 @@ jobs:
           body: |
             The golden IRs have changed: [${{ steps.short-shas.outputs.base_sha }}..${{ steps.short-shas.outputs.head_sha }}](https://github.com/candy-lang/golden-irs/compare/${{ github.event.pull_request.base.sha }}_..${{ github.sha }}_)
 
-            <details>
-            <summary>Diff</summary>
-
-            ```diff
-            ${{ steps.diff.outputs.stdout }}
-            ```
-
-            </details>
-
   benchmark:
     name: Benchmark
     runs-on: ubuntu-latest
