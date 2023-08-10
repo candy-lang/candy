@@ -786,7 +786,7 @@ mod parse {
                         whitespaces_and_newlines(input, indentation + 1, false);
                     input = i;
                     parts.append(&mut whitespace);
-                    if input.chars().next() == Some('\n') {
+                    if input.starts_with('\n') {
                         break CstKind::Error {
                             unparsable_input: String::new(),
                             error: CstError::TextNotSufficientlyIndented,
