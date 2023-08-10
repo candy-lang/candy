@@ -62,9 +62,6 @@ impl Tracer for StackTracer {
 }
 
 impl StackTracer {
-    /// When a VM panics, some child fiber might be responsible for that. This
-    /// function returns a formatted stack trace spanning all fibers in the
-    /// chain from the panicking root fiber until the concrete failing needs.
     pub fn format<DB>(&self, db: &DB, symbol_table: &SymbolTable) -> String
     where
         DB: AstToHir + PositionConversionDb,
