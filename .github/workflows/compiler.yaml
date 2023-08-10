@@ -101,7 +101,7 @@ jobs:
             <summary>Diff</summary>
 
             ```diff
-            ${{ steps.diff.outputs.result }}
+            ${{ steps.diff.outputs.stdout }}
             ```
 
             </details>
