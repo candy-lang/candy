@@ -70,7 +70,7 @@ pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression)
         return;
     };
 
-    let arguments = arguments.to_owned();
+    let arguments = arguments.clone();
     let responsible = *responsible;
     let Some(result) = run_builtin(
         &mut *expression,
@@ -153,7 +153,7 @@ fn run_builtin(
         }
         BuiltinFunction::IntBitwiseAnd => {
             let [a, b] = arguments else { unreachable!() };
-            if let Some(true) = a.semantically_equals(*b, visible, pureness) {
+            if a.semantically_equals(*b, visible, pureness) == Some(true) {
                 return Some(Expression::Reference(*a));
             }
 
@@ -163,7 +163,7 @@ fn run_builtin(
         }
         BuiltinFunction::IntBitwiseOr => {
             let [a, b] = arguments else { unreachable!() };
-            if let Some(true) = a.semantically_equals(*b, visible, pureness) {
+            if a.semantically_equals(*b, visible, pureness) == Some(true) {
                 return Some(Expression::Reference(*a));
             }
 
@@ -173,7 +173,7 @@ fn run_builtin(
         }
         BuiltinFunction::IntBitwiseXor => {
             let [a, b] = arguments else { unreachable!() };
-            if let Some(true) = a.semantically_equals(*b, visible, pureness) {
+            if a.semantically_equals(*b, visible, pureness) == Some(true) {
                 return Some(0.into());
             }
 
@@ -183,7 +183,7 @@ fn run_builtin(
         }
         BuiltinFunction::IntCompareTo => {
             let [a, b] = arguments else { unreachable!() };
-            if let Some(true) = a.semantically_equals(*b, visible, pureness) {
+            if a.semantically_equals(*b, visible, pureness) == Some(true) {
                 return Some(Ordering::Equal.into());
             }
 
@@ -195,7 +195,7 @@ fn run_builtin(
             let [dividend, divisor] = arguments else {
                 unreachable!()
             };
-            if let Some(true) = dividend.semantically_equals(*divisor, visible, pureness) {
+            if dividend.semantically_equals(*divisor, visible, pureness) == Some(true) {
                 return Some(1.into());
             }
 
@@ -207,7 +207,7 @@ fn run_builtin(
             let [dividend, divisor] = arguments else {
                 unreachable!()
             };
-            if let Some(true) = dividend.semantically_equals(*divisor, visible, pureness) {
+            if dividend.semantically_equals(*divisor, visible, pureness) == Some(true) {
                 return Some(0.into());
             }
 
@@ -239,7 +239,7 @@ fn run_builtin(
             let [dividend, divisor] = arguments else {
                 unreachable!()
             };
-            if let Some(true) = dividend.semantically_equals(*divisor, visible, pureness) {
+            if dividend.semantically_equals(*divisor, visible, pureness) == Some(true) {
                 return Some(0.into());
             }
 
@@ -279,7 +279,7 @@ fn run_builtin(
             let [minuend, subtrahend] = arguments else {
                 unreachable!()
             };
-            if let Some(true) = minuend.semantically_equals(*subtrahend, visible, pureness) {
+            if minuend.semantically_equals(*subtrahend, visible, pureness) == Some(true) {
                 return Some(Expression::Int(0.into()));
             }
 
@@ -371,7 +371,7 @@ fn run_builtin(
             };
 
             let mut is_contained = Some(false);
-            for (k, _) in fields.iter() {
+            for (k, _) in fields {
                 match k.semantically_equals(*key, visible, pureness) {
                     Some(is_equal) => {
                         if is_equal {
@@ -508,8 +508,7 @@ fn run_builtin(
             let [text, start_inclusive, end_exclusive] = arguments else {
                 unreachable!()
             };
-            if let Some(true) =
-                start_inclusive.semantically_equals(*end_exclusive, visible, pureness)
+            if start_inclusive.semantically_equals(*end_exclusive, visible, pureness) == Some(true)
             {
                 return Some("".into());
             }

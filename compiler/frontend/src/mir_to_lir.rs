@@ -43,6 +43,10 @@ struct LoweringContext {
     bodies: lir::Bodies,
 }
 impl LoweringContext {
+    fn constant_for(&self, id: mir::Id) -> Option<lir::ConstantId> {
+        self.constant_mapping.get(&id).copied()
+    }
+
     fn compile_function(
         &mut self,
         original_hirs: FxHashSet<hir::Id>,
@@ -81,7 +85,7 @@ impl CurrentBody {
         responsible_parameter: mir::Id,
         body: &mir::Body,
     ) -> lir::Body {
-        let mut lir_body = CurrentBody::new(captured, parameters, responsible_parameter);
+        let mut lir_body = Self::new(captured, parameters, responsible_parameter);
         for (id, expression) in body.iter() {
             lir_body.compile_expression(context, id, expression);
         }
@@ -128,7 +132,7 @@ impl CurrentBody {
             mir::Expression::Text(text) => self.push_constant(context, id, text.clone()),
             mir::Expression::Tag { symbol, value } => {
                 if let Some(value) = value {
-                    if let Some(constant_id) = self.constant_for(context, *value) {
+                    if let Some(constant_id) = context.constant_for(*value) {
                         self.push_constant(
                             context,
                             id,
@@ -161,7 +165,7 @@ impl CurrentBody {
             mir::Expression::List(items) => {
                 if let Some(items) = items
                     .iter()
-                    .map(|item| self.constant_for(context, *item))
+                    .map(|item| context.constant_for(*item))
                     .collect::<Option<Vec<_>>>()
                 {
                     self.push_constant(context, id, items);
@@ -174,10 +178,7 @@ impl CurrentBody {
                 if let Some(fields) = fields
                     .iter()
                     .map(|(key, value)| try {
-                        (
-                            self.constant_for(context, *key)?,
-                            self.constant_for(context, *value)?,
-                        )
+                        (context.constant_for(*key)?, context.constant_for(*value)?)
                     })
                     .collect::<Option<FxHashMap<_, _>>>()
                 {
@@ -208,7 +209,7 @@ impl CurrentBody {
                     return;
                 }
 
-                self.push(id, self.constant_for(context, *referenced_id).unwrap());
+                self.push(id, context.constant_for(*referenced_id).unwrap());
             }
             mir::Expression::HirId(hir_id) => self.push_constant(context, id, hir_id.clone()),
             mir::Expression::Function {
@@ -346,7 +347,7 @@ impl CurrentBody {
             return id;
         }
 
-        self.push(id, self.constant_for(context, id).unwrap())
+        self.push(id, context.constant_for(id).unwrap())
     }
     fn push_constant(
         &mut self,
@@ -357,9 +358,6 @@ impl CurrentBody {
         let constant_id = context.constants.push(constant);
         context.constant_mapping.insert(id, constant_id);
         self.last_constant = Some(id);
-    }
-    fn constant_for(&self, context: &LoweringContext, id: mir::Id) -> Option<lir::ConstantId> {
-        context.constant_mapping.get(&id).copied()
     }
 
     fn push(&mut self, mir_id: mir::Id, expression: impl Into<lir::Expression>) -> lir::Id {

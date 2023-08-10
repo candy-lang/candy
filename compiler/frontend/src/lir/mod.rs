@@ -15,7 +15,8 @@ pub struct Lir {
     bodies: Bodies,
 }
 impl Lir {
-    pub fn new(constants: Constants, bodies: Bodies) -> Self {
+    #[must_use]
+    pub const fn new(constants: Constants, bodies: Bodies) -> Self {
         Self { constants, bodies }
     }
 }

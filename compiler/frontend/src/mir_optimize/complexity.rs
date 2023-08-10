@@ -2,19 +2,20 @@ use crate::mir::{Body, Expression, Mir};
 use core::fmt;
 use std::{cmp::Ordering, ops::Add};
 
+#[derive(Clone, Copy, Debug)]
 pub struct Complexity {
     pub is_self_contained: bool,
     pub expressions: usize,
 }
 
 impl Complexity {
-    fn none() -> Self {
+    const fn none() -> Self {
         Self {
             is_self_contained: true,
             expressions: 0,
         }
     }
-    fn single_expression() -> Self {
+    const fn single_expression() -> Self {
         Self {
             is_self_contained: true,
             expressions: 1,
@@ -22,10 +23,10 @@ impl Complexity {
     }
 }
 impl Add for Complexity {
-    type Output = Complexity;
+    type Output = Self;
 
     fn add(self, other: Self) -> Self::Output {
-        Complexity {
+        Self {
             is_self_contained: self.is_self_contained && other.is_self_contained,
             expressions: self.expressions + other.expressions,
         }
@@ -62,11 +63,13 @@ impl fmt::Display for Complexity {
 }
 
 impl Mir {
+    #[must_use]
     pub fn complexity(&self) -> Complexity {
         self.body.complexity()
     }
 }
 impl Body {
+    #[must_use]
     pub fn complexity(&self) -> Complexity {
         self.iter()
             .fold(Complexity::none(), |complexity, (_, expression)| {
@@ -77,10 +80,8 @@ impl Body {
 impl Expression {
     fn complexity(&self) -> Complexity {
         match self {
-            Expression::Function { body, .. } => {
-                Complexity::single_expression() + body.complexity()
-            }
-            Expression::UseModule { .. } => Complexity {
+            Self::Function { body, .. } => Complexity::single_expression() + body.complexity(),
+            Self::UseModule { .. } => Complexity {
                 is_self_contained: false,
                 expressions: 1,
             },

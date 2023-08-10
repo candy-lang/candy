@@ -17,9 +17,9 @@ impl UsePath {
 
     pub fn parse(mut path: &str) -> Result<Self, String> {
         let mut dots = 0;
-        while path.starts_with(UsePath::PARENT_NAVIGATION_CHAR) {
+        while path.starts_with(Self::PARENT_NAVIGATION_CHAR) {
             dots += 1;
-            path = &path[UsePath::PARENT_NAVIGATION_CHAR.len_utf8()..];
+            path = &path[Self::PARENT_NAVIGATION_CHAR.len_utf8()..];
         }
         let path = {
             if !path.chars().all(|c| c.is_ascii_alphanumeric() || c == '.') {
@@ -29,8 +29,8 @@ impl UsePath {
         };
 
         Ok(match dots {
-            0 => UsePath::Managed(path),
-            i => UsePath::Relative {
+            0 => Self::Managed(path),
+            i => Self::Relative {
                 parent_navigations: i - 1, // two dots means one parent navigation
                 path,
             },
@@ -39,12 +39,12 @@ impl UsePath {
 
     pub fn resolve_relative_to(&self, current_module: Module) -> Result<Module, String> {
         Ok(match self {
-            UsePath::Managed(name) => Module {
+            Self::Managed(name) => Module {
                 package: Package::Managed(name.into()),
                 path: vec![],
                 kind: ModuleKind::Code,
             },
-            UsePath::Relative {
+            Self::Relative {
                 parent_navigations,
                 path,
             } => {
@@ -74,8 +74,8 @@ impl UsePath {
 impl Display for UsePath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            UsePath::Managed(name) => write!(f, "{}", name),
-            UsePath::Relative {
+            Self::Managed(name) => write!(f, "{}", name),
+            Self::Relative {
                 parent_navigations,
                 path,
             } => write!(f, "{}{path}", ".".repeat(1 + parent_navigations)),

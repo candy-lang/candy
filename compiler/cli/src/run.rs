@@ -60,7 +60,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         Err(panic) => {
             error!("The module panicked: {}", panic.reason);
             error!("{} is responsible.", panic.responsible);
-            if let Some(span) = db.hir_id_to_span(panic.responsible) {
+            if let Some(span) = db.hir_id_to_span(&panic.responsible) {
                 error!("Responsible is at {span:?}.");
             }
             error!(

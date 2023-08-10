@@ -30,22 +30,22 @@ pub enum MaxLength {
     Limited(usize),
 }
 impl MaxLength {
-    fn fits(self, len: usize) -> bool {
+    const fn fits(self, len: usize) -> bool {
         match self {
-            MaxLength::Unlimited => true,
-            MaxLength::Limited(max) => len <= max,
+            Self::Unlimited => true,
+            Self::Limited(max) => len <= max,
         }
     }
 }
 impl Sub<usize> for MaxLength {
-    type Output = MaxLength;
+    type Output = Self;
 
     fn sub(self, rhs: usize) -> Self::Output {
         match self {
-            MaxLength::Unlimited => MaxLength::Unlimited,
-            MaxLength::Limited(n) => {
+            Self::Unlimited => Self::Unlimited,
+            Self::Limited(n) => {
                 assert!(n >= rhs);
-                MaxLength::Limited(n - rhs)
+                Self::Limited(n - rhs)
             }
         }
     }
@@ -90,7 +90,7 @@ pub fn format_value<'a, T: 'a + Copy>(
                 return Some("…".to_string());
             }
 
-            let mut string = "".to_string();
+            let mut string = String::new();
             if needs_parentheses {
                 string.push('(');
             }

@@ -40,6 +40,7 @@ impl ToRichIr for BodyId {
 pub struct Bodies(Vec<Body>);
 
 impl Bodies {
+    #[must_use]
     pub fn get(&self, id: BodyId) -> &Body {
         &self.0[id.to_usize()]
     }
@@ -95,7 +96,7 @@ impl ToRichIr for Bodies {
             builder.push_newline();
             body.build_rich_ir(builder);
             builder.dedent();
-        })
+        });
     }
 }
 
@@ -115,6 +116,7 @@ pub struct Body {
     expressions: Vec<Expression>,
 }
 impl Body {
+    #[must_use]
     pub fn new(
         original_hirs: FxHashSet<hir::Id>,
         captured_count: usize,
@@ -129,18 +131,21 @@ impl Body {
         }
     }
 
-    pub fn original_hirs(&self) -> &FxHashSet<hir::Id> {
+    #[must_use]
+    pub const fn original_hirs(&self) -> &FxHashSet<hir::Id> {
         &self.original_hirs
     }
 
-    pub fn captured_count(&self) -> usize {
+    #[must_use]
+    pub const fn captured_count(&self) -> usize {
         self.captured_count
     }
     fn captured_ids(&self) -> impl Iterator<Item = Id> {
         (0..self.captured_count).map(Id::from_usize)
     }
 
-    pub fn parameter_count(&self) -> usize {
+    #[must_use]
+    pub const fn parameter_count(&self) -> usize {
         self.parameter_count
     }
     fn parameter_ids(&self) -> impl Iterator<Item = Id> {
@@ -151,6 +156,7 @@ impl Body {
         Id::from_usize(self.captured_count + self.parameter_count)
     }
 
+    #[must_use]
     pub fn expressions(&self) -> &[Expression] {
         &self.expressions
     }

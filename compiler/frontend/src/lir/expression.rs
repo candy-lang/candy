@@ -76,13 +76,13 @@ impl_display_via_richir!(Expression);
 impl ToRichIr for Expression {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         match self {
-            Expression::CreateTag { symbol, value } => {
+            Self::CreateTag { symbol, value } => {
                 let range = builder.push(symbol, TokenType::Symbol, EnumSet::empty());
-                builder.push_reference(ReferenceKey::Symbol(symbol.to_owned()), range);
+                builder.push_reference(ReferenceKey::Symbol(symbol.clone()), range);
                 builder.push(" ", None, EnumSet::empty());
                 value.build_rich_ir(builder);
             }
-            Expression::CreateList(items) => {
+            Self::CreateList(items) => {
                 builder.push("(", None, EnumSet::empty());
                 builder.push_children(items, ", ");
                 if items.len() <= 1 {
@@ -90,7 +90,7 @@ impl ToRichIr for Expression {
                 }
                 builder.push(")", None, EnumSet::empty());
             }
-            Expression::CreateStruct(fields) => {
+            Self::CreateStruct(fields) => {
                 builder.push("[", None, EnumSet::empty());
                 builder.push_children_custom(
                     fields.iter().collect_vec(),
@@ -103,7 +103,7 @@ impl ToRichIr for Expression {
                 );
                 builder.push("]", None, EnumSet::empty());
             }
-            Expression::CreateFunction { captured, body_id } => {
+            Self::CreateFunction { captured, body_id } => {
                 builder.push("{ ", None, EnumSet::empty());
                 body_id.build_rich_ir(builder);
                 builder.push(" capturing ", None, EnumSet::empty());
@@ -115,17 +115,17 @@ impl ToRichIr for Expression {
 
                 builder.push(" }", None, EnumSet::empty());
             }
-            Expression::Constant(id) => id.build_rich_ir(builder),
-            Expression::Reference(id) => id.build_rich_ir(builder),
-            Expression::Dup(id) => {
+            Self::Constant(id) => id.build_rich_ir(builder),
+            Self::Reference(id) => id.build_rich_ir(builder),
+            Self::Dup(id) => {
                 builder.push("dup ", None, EnumSet::empty());
                 id.build_rich_ir(builder);
             }
-            Expression::Drop(id) => {
+            Self::Drop(id) => {
                 builder.push("drop ", None, EnumSet::empty());
                 id.build_rich_ir(builder);
             }
-            Expression::Call {
+            Self::Call {
                 function,
                 arguments,
                 responsible,
@@ -142,7 +142,7 @@ impl ToRichIr for Expression {
                 responsible.build_rich_ir(builder);
                 builder.push(" is responsible)", None, EnumSet::empty());
             }
-            Expression::Panic {
+            Self::Panic {
                 reason,
                 responsible,
             } => {
@@ -152,7 +152,7 @@ impl ToRichIr for Expression {
                 responsible.build_rich_ir(builder);
                 builder.push(" is at fault)", None, EnumSet::empty());
             }
-            Expression::TraceCallStarts {
+            Self::TraceCallStarts {
                 hir_call,
                 function,
                 arguments,
@@ -168,7 +168,7 @@ impl ToRichIr for Expression {
                 hir_call.build_rich_ir(builder);
                 builder.push(")", None, EnumSet::empty());
             }
-            Expression::TraceCallEnds { return_value } => {
+            Self::TraceCallEnds { return_value } => {
                 builder.push(
                     "trace: end of call with return value ",
                     None,
@@ -176,7 +176,7 @@ impl ToRichIr for Expression {
                 );
                 return_value.build_rich_ir(builder);
             }
-            Expression::TraceExpressionEvaluated {
+            Self::TraceExpressionEvaluated {
                 hir_expression,
                 value,
             } => {
@@ -185,7 +185,7 @@ impl ToRichIr for Expression {
                 builder.push(" evaluated to ", None, EnumSet::empty());
                 value.build_rich_ir(builder);
             }
-            Expression::TraceFoundFuzzableFunction {
+            Self::TraceFoundFuzzableFunction {
                 hir_definition,
                 function,
             } => {

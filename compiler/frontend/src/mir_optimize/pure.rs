@@ -12,7 +12,8 @@ impl PurenessInsights {
     ///
     /// E.g., a function definition is pure even if the defined function is not
     /// pure.
-    pub fn is_definition_pure(&self, expression: &Expression) -> bool {
+    #[allow(clippy::unused_self)]
+    pub const fn is_definition_pure(&self, expression: &Expression) -> bool {
         match expression {
             Expression::Int(_)
             | Expression::Text(_)
@@ -87,7 +88,7 @@ impl PurenessInsights {
         update(&mut self.definition_pureness, mapping);
         update(&mut self.definition_constness, mapping);
     }
-    pub(super) fn include(&mut self, other: &PurenessInsights, mapping: &FxHashMap<Id, Id>) {
+    pub(super) fn include(&mut self, other: &Self, mapping: &FxHashMap<Id, Id>) {
         fn insert(
             source: &FxHashMap<Id, bool>,
             mapping: &FxHashMap<Id, Id>,

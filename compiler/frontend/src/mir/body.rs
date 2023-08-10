@@ -22,14 +22,17 @@ pub struct Body {
     pub expressions: Vec<(Id, Expression)>,
 }
 impl Body {
+    #[must_use]
     pub fn new(expressions: Vec<(Id, Expression)>) -> Self {
         Self { expressions }
     }
+    #[must_use]
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = (Id, &Expression)> {
         self.expressions
             .iter()
             .map(|(id, expression)| (*id, expression))
     }
+    #[must_use]
     pub fn iter_mut(&mut self) -> impl DoubleEndedIterator<Item = (Id, &mut Expression)> {
         self.expressions
             .iter_mut()
@@ -45,6 +48,7 @@ impl IntoIterator for Body {
     }
 }
 impl Body {
+    #[must_use]
     pub fn return_value(&self) -> Id {
         let (id, _) = self.expressions.last().unwrap();
         *id
@@ -92,6 +96,7 @@ pub struct VisibleExpressions {
     expressions: FxHashMap<Id, Expression>,
 }
 impl VisibleExpressions {
+    #[must_use]
     pub fn none_visible() -> Self {
         Self {
             expressions: FxHashMap::default(),
@@ -103,11 +108,13 @@ impl VisibleExpressions {
     pub fn remove(&mut self, id: Id) -> Expression {
         self.expressions.remove(&id).unwrap()
     }
+    #[must_use]
     pub fn get(&self, id: Id) -> &Expression {
         self.expressions.get(&id).unwrap_or_else(|| {
             panic!("Expression with ID {id} is not visible in this scope. Visible expressions: {self:?}")
         })
     }
+    #[must_use]
     pub fn contains(&self, id: Id) -> bool {
         self.expressions.contains_key(&id)
     }
@@ -120,7 +127,7 @@ impl Debug for VisibleExpressions {
             self.expressions
                 .keys()
                 .sorted()
-                .map(|id| id.to_string())
+                .map(ToString::to_string)
                 .join(", "),
         )
     }
@@ -239,12 +246,12 @@ impl Body {
             ..
         } = expression
         {
-            for parameter in parameters.iter() {
+            for parameter in &*parameters {
                 visible.insert(*parameter, Expression::Parameter);
             }
             visible.insert(*responsible_parameter, Expression::Parameter);
             body.visit_with_visible_rec(visible, visitor);
-            for parameter in parameters.iter() {
+            for parameter in &*parameters {
                 visible.remove(*parameter);
             }
             visible.remove(*responsible_parameter);
@@ -253,7 +260,7 @@ impl Body {
         visitor(id, expression, visible, is_returned);
     }
 
-    pub fn visit_bodies(&mut self, visitor: &mut dyn FnMut(&mut Body)) {
+    pub fn visit_bodies(&mut self, visitor: &mut dyn FnMut(&mut Self)) {
         for (_, expression) in self.iter_mut() {
             expression.visit_bodies(visitor);
         }
@@ -262,8 +269,8 @@ impl Body {
 }
 impl Expression {
     pub fn visit_bodies(&mut self, visitor: &mut dyn FnMut(&mut Body)) {
-        if let Expression::Function { body, .. } = self {
-            body.visit_bodies(visitor)
+        if let Self::Function { body, .. } = self {
+            body.visit_bodies(visitor);
         }
     }
 }
@@ -281,7 +288,7 @@ pub struct FunctionBodyBuilder {
 impl FunctionBodyBuilder {
     fn new(hir_id: hir::Id, mut id_generator: IdGenerator<Id>) -> Self {
         let responsible_parameter = id_generator.generate();
-        FunctionBodyBuilder {
+        Self {
             hir_id,
             body_builder: BodyBuilder::new(id_generator),
             parameters: vec![],
@@ -312,8 +319,9 @@ pub struct BodyBuilder {
     body: Body,
 }
 impl BodyBuilder {
+    #[must_use]
     pub fn new(id_generator: IdGenerator<Id>) -> Self {
-        BodyBuilder {
+        Self {
             id_generator,
             body: Body::default(),
         }
@@ -382,7 +390,7 @@ impl BodyBuilder {
     }
     pub fn push_if_else<T, E>(
         &mut self,
-        hir_id: hir::Id,
+        hir_id: &hir::Id,
         condition: Id,
         then_builder: T,
         else_builder: E,
@@ -409,10 +417,12 @@ impl BodyBuilder {
         })
     }
 
+    #[must_use]
     pub fn current_return_value(&self) -> Id {
         self.body.return_value()
     }
 
+    #[must_use]
     pub fn finish(self) -> (IdGenerator<Id>, Body) {
         (self.id_generator, self.body)
     }

@@ -7,6 +7,16 @@
     let_chains,
     try_blocks
 )]
+#![warn(clippy::nursery, clippy::pedantic)]
+#![allow(
+    clippy::cognitive_complexity,
+    clippy::match_same_arms,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::module_name_repetitions,
+    clippy::similar_names,
+    clippy::too_many_lines
+)]
 
 pub use self::tracing::{TracingConfig, TracingMode};
 

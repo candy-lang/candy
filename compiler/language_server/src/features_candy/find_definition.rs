@@ -31,7 +31,7 @@ pub fn find_definition(db: &Database, module: Module, offset: Offset) -> Option<
         Expression::Reference(id) => id,
         _ => return None,
     };
-    let target_cst_id = db.hir_to_cst_id(target_hir_id)?;
+    let target_cst_id = db.hir_to_cst_id(&target_hir_id)?;
     let target_cst = db.find_cst(module.clone(), target_cst_id);
 
     Some(LocationLink {
