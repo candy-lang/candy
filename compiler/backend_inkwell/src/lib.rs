@@ -1,4 +1,6 @@
-use candy_frontend::mir::{Body, Id, Mir};
+#![feature(let_chains)]
+
+use candy_frontend::mir::{Body, Expression, Id, Mir};
 use inkwell::{
     builder::Builder,
     context::Context,
@@ -10,10 +12,10 @@ use inkwell::{
 };
 
 pub use inkwell;
+use itertools::Itertools;
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
-    rc::Rc,
     sync::Arc,
 };
 
@@ -30,8 +32,8 @@ pub struct CodeGen<'ctx> {
     builder: Builder<'ctx>,
     mir: Arc<Mir>,
     tags: HashMap<String, Option<Id>>,
-    globals: HashMap<Id, Rc<GlobalValue<'ctx>>>,
-    locals: HashMap<Id, Rc<BasicValueEnum<'ctx>>>,
+    globals: HashMap<Id, GlobalValue<'ctx>>,
+    locals: HashMap<Id, BasicValueEnum<'ctx>>,
     functions: HashMap<Id, FunctionInfo<'ctx>>,
     unrepresented_ids: HashSet<Id>,
     main_return: Option<PointerValue<'ctx>>,
@@ -113,17 +115,18 @@ impl<'ctx> CodeGen<'ctx> {
             self.module
                 .add_function("candy_builtin_struct_get", struct_get_fn_type, None);
 
-        let panic_fn_type = void_type.fn_type(
+        let ptr_to_void_fn_type = void_type.fn_type(
             &[candy_value.ptr_type(AddressSpace::default()).into()],
             false,
         );
-        self.module.add_function("candy_panic", panic_fn_type, None);
+        self.module
+            .add_function("candy_panic", ptr_to_void_fn_type, None);
         let free_fn = self
             .module
-            .add_function("free_candy_value", panic_fn_type, None);
+            .add_function("free_candy_value", ptr_to_void_fn_type, None);
         let print_fn = self
             .module
-            .add_function("print_candy_value", panic_fn_type, None);
+            .add_function("print_candy_value", ptr_to_void_fn_type, None);
 
         let candy_fn_type = candy_value_ptr.fn_type(&[], true);
         let get_candy_fn_ptr_type = candy_fn_type
@@ -268,19 +271,14 @@ impl<'ctx> CodeGen<'ctx> {
                     let i64_type = self.context.i64_type();
                     let v = i64_type.const_int(value.try_into().unwrap(), false);
 
-                    let global =
-                        self.module
-                            .add_global(candy_value_ptr, None, &format!("num_{value}"));
-                    global.set_initializer(&candy_value_ptr.const_null());
                     let make_candy_int = self.module.get_function("make_candy_int").unwrap();
                     let call = self.builder.build_call(make_candy_int, &[v.into()], "");
 
-                    self.builder.build_store(
-                        global.as_pointer_value(),
+                    let global = self.create_global(
+                        &format!("num_{value}"),
+                        id,
                         call.try_as_basic_value().unwrap_left(),
                     );
-
-                    self.globals.insert(*id, Rc::new(global));
 
                     if idx == mir.expressions.len() - 1 {
                         self.builder
@@ -288,20 +286,14 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                 }
                 candy_frontend::mir::Expression::Text(text) => {
-                    let global = self.module.add_global(candy_value_ptr, None, text);
                     let string = self.make_str_literal(text);
                     let make_candy_text = self.module.get_function("make_candy_text").unwrap();
                     let call = self
                         .builder
                         .build_call(make_candy_text, &[string.into()], "");
 
-                    self.builder.build_store(
-                        global.as_pointer_value(),
-                        call.try_as_basic_value().unwrap_left(),
-                    );
-
-                    global.set_initializer(&candy_value_ptr.const_null());
-                    self.globals.insert(*id, Rc::new(global));
+                    let global =
+                        self.create_global(text, id, call.try_as_basic_value().unwrap_left());
 
                     if idx == mir.expressions.len() - 1 {
                         self.builder
@@ -311,20 +303,17 @@ impl<'ctx> CodeGen<'ctx> {
                 candy_frontend::mir::Expression::Tag { symbol, value } => {
                     self.tags.insert(symbol.clone(), *value);
 
-                    let global = self.module.add_global(candy_value_ptr, None, symbol);
                     let string = self.make_str_literal(symbol);
                     let make_candy_tag = self.module.get_function("make_candy_tag").unwrap();
                     let call = self
                         .builder
                         .build_call(make_candy_tag, &[string.into()], "");
 
-                    self.builder.build_store(
-                        global.as_pointer_value(),
-                        call.try_as_basic_value().unwrap_left(),
-                    );
+                    let global =
+                        self.create_global(symbol, id, call.try_as_basic_value().unwrap_left());
 
                     global.set_initializer(&candy_value_ptr.const_null());
-                    self.globals.insert(*id, Rc::new(global));
+                    self.globals.insert(*id, global);
 
                     if idx == mir.expressions.len() - 1 {
                         self.builder
@@ -345,14 +334,37 @@ impl<'ctx> CodeGen<'ctx> {
                         },
                     );
 
-                    self.unrepresented_ids.insert(*id);
+                    let i64_type = self.context.i64_type();
+                    let function_ptr = function.as_global_value().as_pointer_value();
+                    let make_candy_function =
+                        self.module.get_function("make_candy_function").unwrap();
+                    let call = self.builder.build_call(
+                        make_candy_function,
+                        &[
+                            function_ptr.into(),
+                            candy_value_ptr.const_null().into(),
+                            i64_type.const_zero().into(),
+                        ],
+                        "",
+                    );
+
+                    let global = self.create_global(
+                        &format!("fun_{builtin_name}"),
+                        id,
+                        call.try_as_basic_value().unwrap_left(),
+                    );
+
+                    if idx == mir.expressions.len() - 1 {
+                        self.builder
+                            .build_return(Some(&global.as_basic_value_enum()));
+                    }
                 }
                 candy_frontend::mir::Expression::List(list) => {
-                    let i32_type = self.context.i32_type();
+                    let i64_type = self.context.i64_type();
 
                     let list_array = self.builder.build_array_alloca(
                         candy_value_ptr,
-                        i32_type.const_int(list.len() as u64 + 1, false),
+                        i64_type.const_int(list.len() as u64 + 1, false),
                         "",
                     );
                     let values = list.iter().map(|v| {
@@ -365,7 +377,7 @@ impl<'ctx> CodeGen<'ctx> {
                             self.builder.build_gep(
                                 candy_value_ptr,
                                 list_array,
-                                &[i32_type.const_int(idx as u64, false)],
+                                &[i64_type.const_int(idx as u64, false)],
                                 "",
                             )
                         };
@@ -375,38 +387,38 @@ impl<'ctx> CodeGen<'ctx> {
                         self.builder.build_gep(
                             candy_value_ptr,
                             list_array,
-                            &[i32_type.const_int(list.len() as u64, false)],
+                            &[i64_type.const_int(list.len() as u64, false)],
                             "",
                         )
                     };
                     self.builder
                         .build_store(end_position, candy_value_ptr.const_null());
 
-                    let global = self.module.add_global(candy_value_ptr, None, "");
-                    global.set_initializer(&candy_value_ptr.const_null());
-
                     let make_candy_list = self.module.get_function("make_candy_list").unwrap();
                     let candy_list =
                         self.builder
                             .build_call(make_candy_list, &[list_array.into()], "");
-                    self.builder.build_store(
-                        global.as_pointer_value(),
-                        candy_list.try_as_basic_value().unwrap_left(),
-                    );
-                    self.globals.insert(*id, Rc::new(global));
+
+                    let global =
+                        self.create_global("", id, candy_list.try_as_basic_value().unwrap_left());
+
+                    if idx == mir.expressions.len() - 1 {
+                        self.builder
+                            .build_return(Some(&global.as_basic_value_enum()));
+                    }
                 }
                 candy_frontend::mir::Expression::Struct(s) => {
-                    let i32_type = self.context.i32_type();
+                    let i64_type = self.context.i64_type();
                     let make_candy_struct = self.module.get_function("make_candy_struct").unwrap();
 
                     let keys_array = self.builder.build_array_alloca(
                         candy_value_ptr,
-                        i32_type.const_int(s.len() as u64 + 1, false),
+                        i64_type.const_int(s.len() as u64 + 1, false),
                         "",
                     );
                     let values_array = self.builder.build_array_alloca(
                         candy_value_ptr,
-                        i32_type.const_int(s.len() as u64 + 1, false),
+                        i64_type.const_int(s.len() as u64 + 1, false),
                         "",
                     );
                     for (idx, (key, value)) in s.iter().enumerate() {
@@ -423,7 +435,7 @@ impl<'ctx> CodeGen<'ctx> {
                             self.builder.build_gep(
                                 candy_value_ptr,
                                 keys_array,
-                                &[i32_type.const_int(idx as u64, false)],
+                                &[i64_type.const_int(idx as u64, false)],
                                 "",
                             )
                         };
@@ -432,7 +444,7 @@ impl<'ctx> CodeGen<'ctx> {
                             self.builder.build_gep(
                                 candy_value_ptr,
                                 values_array,
-                                &[i32_type.const_int(idx as u64, false)],
+                                &[i64_type.const_int(idx as u64, false)],
                                 "",
                             )
                         };
@@ -444,7 +456,7 @@ impl<'ctx> CodeGen<'ctx> {
                         self.builder.build_gep(
                             candy_value_ptr,
                             keys_array,
-                            &[i32_type.const_int(s.len() as u64, false)],
+                            &[i64_type.const_int(s.len() as u64, false)],
                             "",
                         )
                     };
@@ -454,7 +466,7 @@ impl<'ctx> CodeGen<'ctx> {
                         self.builder.build_gep(
                             candy_value_ptr,
                             values_array,
-                            &[i32_type.const_int(s.len() as u64, false)],
+                            &[i64_type.const_int(s.len() as u64, false)],
                             "",
                         )
                     };
@@ -471,7 +483,7 @@ impl<'ctx> CodeGen<'ctx> {
                         .try_as_basic_value()
                         .unwrap_left();
 
-                    self.locals.insert(*id, Rc::new(struct_value));
+                    self.locals.insert(*id, struct_value);
 
                     let function_ctx_name =
                         function_ctx.function_value.get_name().to_str().unwrap();
@@ -487,7 +499,7 @@ impl<'ctx> CodeGen<'ctx> {
                 candy_frontend::mir::Expression::Reference(ref_id) => {
                     let value = self.get_value_with_id(function_ctx, ref_id).unwrap();
 
-                    self.locals.insert(*id, Rc::new(value));
+                    self.locals.insert(*id, value);
                     if idx == mir.expressions.len() - 1 {
                         self.builder.build_return(Some(&value));
                     }
@@ -495,20 +507,13 @@ impl<'ctx> CodeGen<'ctx> {
                 candy_frontend::mir::Expression::HirId(hir_id) => {
                     let text = format!("{hir_id}");
 
-                    let global = self.module.add_global(candy_value_ptr, None, &text);
                     let string = self.make_str_literal(&text);
                     let make_candy_text = self.module.get_function("make_candy_text").unwrap();
                     let call = self
                         .builder
                         .build_call(make_candy_text, &[string.into()], "");
 
-                    self.builder.build_store(
-                        global.as_pointer_value(),
-                        call.try_as_basic_value().unwrap_left(),
-                    );
-
-                    global.set_initializer(&candy_value_ptr.const_null());
-                    self.globals.insert(*id, Rc::new(global));
+                    self.create_global(&text, id, call.try_as_basic_value().unwrap_left());
                 }
                 candy_frontend::mir::Expression::Function {
                     original_hirs,
@@ -517,10 +522,11 @@ impl<'ctx> CodeGen<'ctx> {
                     responsible_parameter,
                 } => {
                     self.unrepresented_ids.insert(*responsible_parameter);
-                    let name = format!("{original_hirs:?}")
-                        .replace('{', "")
-                        .replace('}', "")
-                        .replace([':', '.'], "_");
+                    let name = original_hirs
+                        .iter()
+                        .sorted()
+                        .map(|it| it.to_string().replace([':', '.'], "_"))
+                        .join(", ");
 
                     let captured_ids: Vec<_> = expr
                         .captured_ids()
@@ -561,7 +567,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                     let function = self.module.add_function(&name, fn_type, None);
 
-                    let fun_info = FunctionInfo {
+                    let function_info = FunctionInfo {
                         function_value: function,
                         captured_ids: captured_ids.clone(),
                         env_type: if !captured_ids.is_empty() {
@@ -570,10 +576,10 @@ impl<'ctx> CodeGen<'ctx> {
                             None
                         },
                     };
-                    self.functions.insert(*id, fun_info.clone());
+                    self.functions.insert(*id, function_info.clone());
 
                     for (id, param) in parameters.iter().zip(function.get_params()) {
-                        self.locals.insert(*id, Rc::new(param));
+                        self.locals.insert(*id, param);
                     }
 
                     let current_block = self.builder.get_insert_block().unwrap();
@@ -588,23 +594,21 @@ impl<'ctx> CodeGen<'ctx> {
                         "",
                     );
 
-                    let global =
-                        self.module
-                            .add_global(candy_value_ptr, None, &format!("fun_{name}"));
-                    global.set_initializer(&function_ptr.get_type().const_null());
-
-                    self.builder.build_store(
-                        global.as_pointer_value(),
+                    let global = self.create_global(
+                        &format!("fun_{name}"),
+                        id,
                         call.try_as_basic_value().unwrap_left(),
                     );
-
-                    self.globals.insert(*id, Rc::new(global));
 
                     let inner_block = self.context.append_basic_block(function, &name);
                     self.builder.position_at_end(inner_block);
 
-                    self.compile_mir(body, &fun_info);
+                    self.compile_mir(body, &function_info);
                     self.builder.position_at_end(current_block);
+
+                    if idx == mir.expressions.len() - 1 {
+                        self.builder.build_return(Some(&global));
+                    }
                 }
                 candy_frontend::mir::Expression::Parameter => unreachable!(),
                 candy_frontend::mir::Expression::Call {
@@ -644,8 +648,8 @@ impl<'ctx> CodeGen<'ctx> {
                             args.push(fn_env_ptr.try_as_basic_value().unwrap_left().into());
                         }
                         let call = self.builder.build_call(*function_value, &args, "");
-                        let call_value = Rc::new(call.try_as_basic_value().unwrap_left());
-                        self.locals.insert(*id, call_value.clone());
+                        let call_value = call.try_as_basic_value().unwrap_left();
+                        self.locals.insert(*id, call_value);
 
                         if idx == mir.expressions.len() - 1 {
                             self.builder
@@ -685,8 +689,8 @@ impl<'ctx> CodeGen<'ctx> {
                             self.builder
                                 .build_indirect_call(candy_fn_type, inner_fn, &args, "");
 
-                        let call_value = Rc::new(call.try_as_basic_value().unwrap_left());
-                        self.locals.insert(*id, call_value.clone());
+                        let call_value = call.try_as_basic_value().unwrap_left();
+                        self.locals.insert(*id, call_value);
 
                         if idx == mir.expressions.len() - 1 {
                             self.builder
@@ -716,7 +720,26 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
-    fn make_str_literal(&self, text: &str) -> BasicValueEnum<'_> {
+    fn create_global<V: BasicValue<'ctx>>(
+        &mut self,
+        name: &str,
+        id: &Id,
+        value: V,
+    ) -> GlobalValue<'ctx> {
+        let candy_value_ptr = self
+            .module
+            .get_struct_type("candy_value")
+            .unwrap()
+            .ptr_type(AddressSpace::default());
+        let global = self.module.add_global(candy_value_ptr, None, name);
+        self.builder.build_store(global.as_pointer_value(), value);
+
+        global.set_initializer(&candy_value_ptr.const_null());
+        self.globals.insert(*id, global);
+        global
+    }
+
+    fn make_str_literal(&self, text: &str) -> BasicValueEnum<'ctx> {
         let i8_type = self.context.i8_type();
         let i64_type = self.context.i64_type();
 
@@ -749,27 +772,23 @@ impl<'ctx> CodeGen<'ctx> {
             self.builder
                 .build_load(candy_value_ptr, a.as_pointer_value(), "")
         });
-        if v.is_none() {
-            if let Some(i) = function_ctx.captured_ids.iter().position(|i| i == id) {
-                let env_ptr = function_ctx.function_value.get_last_param().unwrap();
+        if v.is_none() && let Some(i) = function_ctx.captured_ids.iter().position(|i| i == id) {
+            let env_ptr = function_ctx.function_value.get_last_param().unwrap();
 
-                let env_value = self
-                    .builder
-                    .build_struct_gep(
-                        function_ctx.env_type.unwrap(),
-                        env_ptr.into_pointer_value(),
-                        i as u32,
-                        "",
-                    )
-                    .unwrap();
+            let env_value = self
+                .builder
+                .build_struct_gep(
+                    function_ctx.env_type.unwrap(),
+                    env_ptr.into_pointer_value(),
+                    i as u32,
+                    "",
+                )
+                .unwrap();
 
-                v.replace(self.builder.build_load(candy_value_ptr, env_value, ""));
-            }
+            v.replace(self.builder.build_load(candy_value_ptr, env_value, ""));
         }
-        if v.is_none() {
-            if let Some(value) = self.locals.get(id) {
-                v.replace(*value.clone());
-            }
+        if v.is_none() && let Some(value) = self.locals.get(id) {
+            v.replace(*value);
         }
         v.unwrap_or_else(|| panic!("{id} should be a real ID"))
             .into()
