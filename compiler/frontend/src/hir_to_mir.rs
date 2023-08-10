@@ -751,11 +751,7 @@ impl PatternLoweringContext {
             }
             hir::Pattern::Error { child, errors } => {
                 let result = body.compile_errors(self.responsible, errors);
-                if let Some(child) = child {
-                    self.compile(body, expression, child)
-                } else {
-                    result
-                }
+                child.as_ref().map_or(result, |child| self.compile(body, expression, child))
             }
         }
     }

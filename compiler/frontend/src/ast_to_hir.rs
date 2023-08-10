@@ -703,18 +703,19 @@ impl Context<'_> {
 
     fn create_next_id(&mut self, ast_id: Option<ast::Id>, key: Option<String>) -> hir::Id {
         for disambiguator in 0.. {
-            let last_part = if let Some(key) = &key {
-                if disambiguator == 0 {
-                    key.to_string().into()
-                } else {
-                    IdKey::Named {
-                        name: key.to_string(),
-                        disambiguator,
+            let last_part = key.as_ref().map_or_else(
+                || disambiguator.into(),
+                |key| {
+                    if disambiguator == 0 {
+                        key.to_string().into()
+                    } else {
+                        IdKey::Named {
+                            name: key.to_string(),
+                            disambiguator,
+                        }
                     }
-                }
-            } else {
-                disambiguator.into()
-            };
+                },
+            );
             let id = self.id_prefix.child(last_part);
             if let Entry::Vacant(entry) = self.id_mapping.entry(id.clone()) {
                 entry.insert(ast_id);

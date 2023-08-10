@@ -47,6 +47,7 @@ impl PackagesPath {
 
         // The `candidate` folder contains the `_package.candy` file.
         Some(
+            #[allow(clippy::option_if_let_else)]
             if let Ok(path_relative_to_packages) = candidate.strip_prefix(&**self) {
                 Package::Managed(path_relative_to_packages.to_path_buf())
             } else {
