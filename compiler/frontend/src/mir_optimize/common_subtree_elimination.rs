@@ -257,9 +257,8 @@ impl<T: NormalizedComparison> NormalizedComparison for Option<T> {
 
     fn hash_normalized(&self, normalization: &mut NormalizationState, state: &mut impl Hasher) {
         mem::discriminant(self).hash(state);
-        match self {
-            None => {}
-            Some(value) => value.hash_normalized(normalization, state),
+        if let Some(value) = self {
+            value.hash_normalized(normalization, state);
         }
     }
 }
@@ -350,18 +349,18 @@ impl NormalizedComparison for Expression {
         other_normalization: &mut NormalizationState,
     ) -> bool {
         match (self, other) {
-            (Expression::Int(self_int), Expression::Int(other_int)) => {
+            (Self::Int(self_int), Self::Int(other_int)) => {
                 self_int.equals_normalized(self_normalization, other_int, other_normalization)
             }
-            (Expression::Text(self_text), Expression::Text(other_text)) => {
+            (Self::Text(self_text), Self::Text(other_text)) => {
                 self_text.equals_normalized(self_normalization, other_text, other_normalization)
             }
             (
-                Expression::Tag {
+                Self::Tag {
                     symbol: self_symbol,
                     value: self_value,
                 },
-                Expression::Tag {
+                Self::Tag {
                     symbol: other_symbol,
                     value: other_value,
                 },
@@ -373,28 +372,28 @@ impl NormalizedComparison for Expression {
                         other_normalization,
                     )
             }
-            (Expression::Builtin(self_builtin), Expression::Builtin(other_builtin)) => self_builtin
+            (Self::Builtin(self_builtin), Self::Builtin(other_builtin)) => self_builtin
                 .equals_normalized(self_normalization, other_builtin, other_normalization),
-            (Expression::List(self_items), Expression::List(other_items)) => {
+            (Self::List(self_items), Self::List(other_items)) => {
                 self_items.equals_normalized(self_normalization, other_items, other_normalization)
             }
-            (Expression::Struct(self_fields), Expression::Struct(other_fields)) => {
+            (Self::Struct(self_fields), Self::Struct(other_fields)) => {
                 self_fields.equals_normalized(self_normalization, other_fields, other_normalization)
             }
-            (Expression::Reference(self_id), Expression::Reference(other_id)) => {
+            (Self::Reference(self_id), Self::Reference(other_id)) => {
                 self_id.equals_normalized(self_normalization, other_id, other_normalization)
             }
-            (Expression::HirId(self_id), Expression::HirId(other_id)) => {
+            (Self::HirId(self_id), Self::HirId(other_id)) => {
                 self_id.equals_normalized(self_normalization, other_id, other_normalization)
             }
             (
-                Expression::Function {
+                Self::Function {
                     original_hirs: _,
                     parameters: self_parameters,
                     responsible_parameter: self_responsible_parameter,
                     body: self_body,
                 },
-                Expression::Function {
+                Self::Function {
                     original_hirs: _,
                     parameters: other_parameters,
                     responsible_parameter: other_responsible_parameter,
@@ -420,14 +419,14 @@ impl NormalizedComparison for Expression {
                     other_normalization,
                 )
             }
-            (Expression::Parameter, Expression::Parameter) => true,
+            (Self::Parameter, Self::Parameter) => true,
             (
-                Expression::Call {
+                Self::Call {
                     function: self_function,
                     arguments: self_arguments,
                     responsible: self_responsible,
                 },
-                Expression::Call {
+                Self::Call {
                     function: other_function,
                     arguments: other_arguments,
                     responsible: other_responsible,
@@ -448,12 +447,12 @@ impl NormalizedComparison for Expression {
                 )
             }
             (
-                Expression::UseModule {
+                Self::UseModule {
                     current_module: self_current_module,
                     relative_path: self_relative_path,
                     responsible: self_responsible,
                 },
-                Expression::UseModule {
+                Self::UseModule {
                     current_module: other_current_module,
                     relative_path: other_relative_path,
                     responsible: other_responsible,
@@ -474,11 +473,11 @@ impl NormalizedComparison for Expression {
                 )
             }
             (
-                Expression::Panic {
+                Self::Panic {
                     reason: self_reason,
                     responsible: self_responsible,
                 },
-                Expression::Panic {
+                Self::Panic {
                     reason: other_reason,
                     responsible: other_responsible,
                 },
@@ -491,13 +490,13 @@ impl NormalizedComparison for Expression {
                     )
             }
             (
-                Expression::TraceCallStarts {
+                Self::TraceCallStarts {
                     hir_call: self_hir_call,
                     function: self_function,
                     arguments: self_arguments,
                     responsible: self_responsible,
                 },
-                Expression::TraceCallStarts {
+                Self::TraceCallStarts {
                     hir_call: other_hir_call,
                     function: other_function,
                     arguments: other_arguments,
@@ -523,10 +522,10 @@ impl NormalizedComparison for Expression {
                 )
             }
             (
-                Expression::TraceCallEnds {
+                Self::TraceCallEnds {
                     return_value: self_return_value,
                 },
-                Expression::TraceCallEnds {
+                Self::TraceCallEnds {
                     return_value: other_return_value,
                 },
             ) => self_return_value.equals_normalized(
@@ -535,11 +534,11 @@ impl NormalizedComparison for Expression {
                 other_normalization,
             ),
             (
-                Expression::TraceExpressionEvaluated {
+                Self::TraceExpressionEvaluated {
                     hir_expression: self_hir_expression,
                     value: self_value,
                 },
-                Expression::TraceExpressionEvaluated {
+                Self::TraceExpressionEvaluated {
                     hir_expression: other_hir_expression,
                     value: other_value,
                 },
@@ -555,11 +554,11 @@ impl NormalizedComparison for Expression {
                 )
             }
             (
-                Expression::TraceFoundFuzzableFunction {
+                Self::TraceFoundFuzzableFunction {
                     hir_definition: self_hir_definition,
                     function: self_function,
                 },
-                Expression::TraceFoundFuzzableFunction {
+                Self::TraceFoundFuzzableFunction {
                     hir_definition: other_hir_definition,
                     function: other_function,
                 },
@@ -581,18 +580,18 @@ impl NormalizedComparison for Expression {
     fn hash_normalized(&self, normalization: &mut NormalizationState, state: &mut impl Hasher) {
         mem::discriminant(self).hash(state);
         match self {
-            Expression::Int(int) => int.hash_normalized(normalization, state),
-            Expression::Text(text) => text.hash_normalized(normalization, state),
-            Expression::Tag { symbol, value } => {
+            Self::Int(int) => int.hash_normalized(normalization, state),
+            Self::Text(text) => text.hash_normalized(normalization, state),
+            Self::Tag { symbol, value } => {
                 symbol.hash_normalized(normalization, state);
                 value.hash_normalized(normalization, state);
             }
-            Expression::Builtin(builtin) => builtin.hash_normalized(normalization, state),
-            Expression::List(items) => items.hash_normalized(normalization, state),
-            Expression::Struct(fields) => fields.len().hash_normalized(normalization, state),
-            Expression::Reference(id) => id.hash_normalized(normalization, state),
-            Expression::HirId(id) => id.hash_normalized(normalization, state),
-            Expression::Function {
+            Self::Builtin(builtin) => builtin.hash_normalized(normalization, state),
+            Self::List(items) => items.hash_normalized(normalization, state),
+            Self::Struct(fields) => fields.len().hash_normalized(normalization, state),
+            Self::Reference(id) => id.hash_normalized(normalization, state),
+            Self::HirId(id) => id.hash_normalized(normalization, state),
+            Self::Function {
                 original_hirs: _,
                 parameters,
                 responsible_parameter,
@@ -604,8 +603,8 @@ impl NormalizedComparison for Expression {
                 responsible_parameter.hash_normalized(normalization, state);
                 body.hash_normalized(normalization, state);
             }
-            Expression::Parameter => {}
-            Expression::Call {
+            Self::Parameter => {}
+            Self::Call {
                 function,
                 arguments,
                 responsible,
@@ -614,7 +613,7 @@ impl NormalizedComparison for Expression {
                 arguments.hash_normalized(normalization, state);
                 responsible.hash_normalized(normalization, state);
             }
-            Expression::UseModule {
+            Self::UseModule {
                 current_module,
                 relative_path,
                 responsible,
@@ -623,14 +622,14 @@ impl NormalizedComparison for Expression {
                 relative_path.hash_normalized(normalization, state);
                 responsible.hash_normalized(normalization, state);
             }
-            Expression::Panic {
+            Self::Panic {
                 reason,
                 responsible,
             } => {
                 reason.hash_normalized(normalization, state);
                 responsible.hash_normalized(normalization, state);
             }
-            Expression::TraceCallStarts {
+            Self::TraceCallStarts {
                 hir_call,
                 function,
                 arguments,
@@ -641,17 +640,17 @@ impl NormalizedComparison for Expression {
                 arguments.hash_normalized(normalization, state);
                 responsible.hash_normalized(normalization, state);
             }
-            Expression::TraceCallEnds { return_value } => {
-                return_value.hash_normalized(normalization, state)
+            Self::TraceCallEnds { return_value } => {
+                return_value.hash_normalized(normalization, state);
             }
-            Expression::TraceExpressionEvaluated {
+            Self::TraceExpressionEvaluated {
                 hir_expression,
                 value,
             } => {
                 hir_expression.hash_normalized(normalization, state);
                 value.hash_normalized(normalization, state);
             }
-            Expression::TraceFoundFuzzableFunction {
+            Self::TraceFoundFuzzableFunction {
                 hir_definition,
                 function,
             } => {
