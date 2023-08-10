@@ -241,8 +241,8 @@ impl FindAst for Assignment {
 impl FindAst for AssignmentBody {
     fn find(&self, id: &Id) -> Option<&Ast> {
         match self {
-            AssignmentBody::Function { name: _, function } => function.find(id),
-            AssignmentBody::Body { pattern, body } => pattern.find(id).or_else(|| body.find(id)),
+            Self::Function { name: _, function } => function.find(id),
+            Self::Body { pattern, body } => pattern.find(id).or_else(|| body.find(id)),
         }
     }
 }
@@ -276,20 +276,20 @@ impl AstKind {
     }
     fn captured_identifiers_helper(&self, captured_identifiers: &mut FxHashMap<String, Vec<Id>>) {
         match self {
-            AstKind::Int(_) | AstKind::Text(_) | AstKind::TextPart(_) => {}
-            AstKind::Identifier(Identifier(identifier)) => {
+            Self::Int(_) | Self::Text(_) | Self::TextPart(_) => {}
+            Self::Identifier(Identifier(identifier)) => {
                 let entry = captured_identifiers
                     .entry(identifier.value.clone())
                     .or_insert_with(Vec::new);
                 entry.push(identifier.id.clone());
             }
-            AstKind::Symbol(_) => {}
-            AstKind::List(List(list)) => {
+            Self::Symbol(_) => {}
+            Self::List(List(list)) => {
                 for item in list {
                     item.captured_identifiers_helper(captured_identifiers);
                 }
             }
-            AstKind::Struct(Struct { fields }) => {
+            Self::Struct(Struct { fields }) => {
                 for (key, value) in fields {
                     if let Some(key) = key {
                         key.captured_identifiers_helper(captured_identifiers);
@@ -297,18 +297,18 @@ impl AstKind {
                     value.captured_identifiers_helper(captured_identifiers);
                 }
             }
-            AstKind::StructAccess(_)
-            | AstKind::Function(_)
-            | AstKind::Call(_)
-            | AstKind::Assignment(_)
-            | AstKind::Match(_)
-            | AstKind::MatchCase(_) => {}
-            AstKind::OrPattern(OrPattern(patterns)) => {
+            Self::StructAccess(_)
+            | Self::Function(_)
+            | Self::Call(_)
+            | Self::Assignment(_)
+            | Self::Match(_)
+            | Self::MatchCase(_) => {}
+            Self::OrPattern(OrPattern(patterns)) => {
                 for pattern in patterns {
                     pattern.captured_identifiers_helper(captured_identifiers);
                 }
             }
-            AstKind::Error { child, .. } => {
+            Self::Error { child, .. } => {
                 if let Some(child) = child {
                     child.captured_identifiers_helper(captured_identifiers);
                 }

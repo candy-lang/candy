@@ -231,7 +231,7 @@ impl Body {
         visitor(id, expression, visible, is_returned);
     }
 
-    pub fn visit_bodies(&mut self, visitor: &mut dyn FnMut(&mut Body)) {
+    pub fn visit_bodies(&mut self, visitor: &mut dyn FnMut(&mut Self)) {
         for (_, expression) in self.iter_mut() {
             expression.visit_bodies(visitor);
         }
@@ -240,7 +240,7 @@ impl Body {
 }
 impl Expression {
     pub fn visit_bodies(&mut self, visitor: &mut dyn FnMut(&mut Body)) {
-        if let Expression::Function { body, .. } = self {
+        if let Self::Function { body, .. } = self {
             body.visit_bodies(visitor);
         }
     }
@@ -258,7 +258,7 @@ pub struct FunctionBodyBuilder {
 impl FunctionBodyBuilder {
     fn new(hir_id: hir::Id, mut id_generator: IdGenerator<Id>) -> Self {
         let responsible_parameter = id_generator.generate();
-        FunctionBodyBuilder {
+        Self {
             hir_id,
             body_builder: BodyBuilder::new(id_generator),
             parameters: vec![],
@@ -291,7 +291,7 @@ pub struct BodyBuilder {
 impl BodyBuilder {
     #[must_use]
     pub fn new(id_generator: IdGenerator<Id>) -> Self {
-        BodyBuilder {
+        Self {
             id_generator,
             body: Body::default(),
         }

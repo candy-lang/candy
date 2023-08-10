@@ -87,7 +87,7 @@ impl TryFrom<&Path> for PackagesPath {
             ));
         }
 
-        Ok(PackagesPath(path))
+        Ok(Self(path))
     }
 }
 
@@ -112,34 +112,34 @@ pub enum Package {
 
 impl Package {
     #[must_use]
-    pub fn builtins() -> Package {
-        Package::Managed(PathBuf::from("Builtins"))
+    pub fn builtins() -> Self {
+        Self::Managed(PathBuf::from("Builtins"))
     }
     #[must_use]
-    pub fn core() -> Package {
-        Package::Managed(PathBuf::from("Core"))
+    pub fn core() -> Self {
+        Self::Managed(PathBuf::from("Core"))
     }
 
     #[must_use]
     pub fn to_path(&self, packages_path: &PackagesPath) -> Option<PathBuf> {
         match self {
-            Package::User(path) => Some(path.clone()),
-            Package::Managed(path) => Some(packages_path.join(path)),
-            Package::Anonymous { .. } => None,
-            Package::Tooling(_) => None,
+            Self::User(path) => Some(path.clone()),
+            Self::Managed(path) => Some(packages_path.join(path)),
+            Self::Anonymous { .. } => None,
+            Self::Tooling(_) => None,
         }
     }
 }
 impl Display for Package {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Package::User(path) => write!(f, "{path:?}"),
-            Package::Managed(path) => match path.as_os_str().to_str() {
+            Self::User(path) => write!(f, "{path:?}"),
+            Self::Managed(path) => match path.as_os_str().to_str() {
                 Some(string) => write!(f, "{string}"),
                 None => write!(f, "{path:?}"),
             },
-            Package::Anonymous { url } => write!(f, "anonymous:{url}"),
-            Package::Tooling(tooling) => write!(f, "tooling:{tooling}"),
+            Self::Anonymous { url } => write!(f, "anonymous:{url}"),
+            Self::Tooling(tooling) => write!(f, "tooling:{tooling}"),
         }
     }
 }

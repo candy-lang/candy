@@ -28,7 +28,7 @@ pub enum ModuleKind {
 impl Module {
     #[must_use]
     pub fn from_package_name(name: String) -> Self {
-        Module {
+        Self {
             package: Package::Managed(name.into()),
             path: vec![],
             kind: ModuleKind::Code,
@@ -83,7 +83,7 @@ impl Module {
             }
         }
 
-        Ok(Module {
+        Ok(Self {
             package,
             path,
             kind,
@@ -174,14 +174,14 @@ pub enum ModuleFromPathError {
 impl Display for ModuleFromPathError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            ModuleFromPathError::NotFound(path) => {
+            Self::NotFound(path) => {
                 write!(
                     f,
                     "File `{}` does not exist or its path is invalid.",
                     path.to_string_lossy(),
                 )
             }
-            ModuleFromPathError::NotInPackage(path) => {
+            Self::NotInPackage(path) => {
                 write!(
                     f,
                     "File `{}` is not located in the package.",

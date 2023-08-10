@@ -118,7 +118,7 @@ impl Expression {
         self.strip_original_hirs();
     }
     fn strip_original_hirs(&mut self) {
-        if let Expression::Function {
+        if let Self::Function {
             original_hirs,
             body,
             ..

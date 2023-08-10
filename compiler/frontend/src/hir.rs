@@ -70,33 +70,33 @@ fn all_hir_ids(db: &dyn HirDb, module: Module) -> Vec<Id> {
 impl Expression {
     pub fn collect_all_ids(&self, ids: &mut Vec<Id>) {
         match self {
-            Expression::Int(_) => {}
-            Expression::Text(_) => {}
-            Expression::Reference(id) => {
+            Self::Int(_) => {}
+            Self::Text(_) => {}
+            Self::Reference(id) => {
                 ids.push(id.clone());
             }
-            Expression::Symbol(_) => {}
-            Expression::List(items) => {
+            Self::Symbol(_) => {}
+            Self::List(items) => {
                 ids.extend_from_slice(items);
             }
-            Expression::Struct(entries) => {
+            Self::Struct(entries) => {
                 for (key_id, value_id) in entries {
                     ids.push(key_id.clone());
                     ids.push(value_id.clone());
                 }
             }
-            Expression::Destructure {
+            Self::Destructure {
                 expression,
                 pattern: _,
             } => ids.push(expression.clone()),
-            Expression::PatternIdentifierReference(_) => {}
-            Expression::Match { expression, cases } => {
+            Self::PatternIdentifierReference(_) => {}
+            Self::Match { expression, cases } => {
                 ids.push(expression.clone());
                 for (_, body) in cases {
                     body.collect_all_ids(ids);
                 }
             }
-            Expression::Function(Function {
+            Self::Function(Function {
                 parameters, body, ..
             }) => {
                 for parameter in parameters {
@@ -104,22 +104,22 @@ impl Expression {
                 }
                 body.collect_all_ids(ids);
             }
-            Expression::Call {
+            Self::Call {
                 function,
                 arguments,
             } => {
                 ids.push(function.clone());
                 ids.extend_from_slice(arguments);
             }
-            Expression::UseModule { relative_path, .. } => {
+            Self::UseModule { relative_path, .. } => {
                 ids.push(relative_path.clone());
             }
-            Expression::Builtin(_) => {}
-            Expression::Needs { condition, reason } => {
+            Self::Builtin(_) => {}
+            Self::Needs { condition, reason } => {
                 ids.push(condition.clone());
                 ids.push(reason.clone());
             }
-            Expression::Error { .. } => {}
+            Self::Error { .. } => {}
         }
     }
 }
@@ -219,10 +219,10 @@ impl Id {
     }
 
     #[must_use]
-    pub fn parent(&self) -> Option<Id> {
+    pub fn parent(&self) -> Option<Self> {
         match self.keys.len() {
             0 => None,
-            _ => Some(Id {
+            _ => Some(Self {
                 module: self.module.clone(),
                 keys: self.keys[..self.keys.len() - 1].to_vec(),
             }),
@@ -280,7 +280,7 @@ impl ToRichIr for Id {
 impl Debug for IdKey {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match &self {
-            IdKey::Named {
+            Self::Named {
                 name,
                 disambiguator,
             } => {
@@ -290,7 +290,7 @@ impl Debug for IdKey {
                 }
                 Ok(())
             }
-            IdKey::Positional(index) => write!(f, "{index}"),
+            Self::Positional(index) => write!(f, "{index}"),
         }
     }
 }
@@ -301,7 +301,7 @@ impl Display for IdKey {
 }
 impl From<String> for IdKey {
     fn from(value: String) -> Self {
-        IdKey::Named {
+        Self::Named {
             name: value,
             disambiguator: 0,
         }
@@ -355,7 +355,7 @@ pub enum Expression {
 impl Expression {
     #[must_use]
     pub fn nothing() -> Self {
-        Expression::Symbol("Nothing".to_string())
+        Self::Symbol("Nothing".to_string())
     }
 }
 #[allow(clippy::derived_hash_with_manual_eq)]
@@ -419,18 +419,18 @@ impl Hash for Pattern {
 impl Pattern {
     pub fn contains_captured_identifiers(&self) -> bool {
         match self {
-            Pattern::NewIdentifier(_) => true,
-            Pattern::Int(_) | Pattern::Text(_) => false,
-            Pattern::Tag { value, .. } => value
+            Self::NewIdentifier(_) => true,
+            Self::Int(_) | Self::Text(_) => false,
+            Self::Tag { value, .. } => value
                 .as_ref()
                 .map(|value| value.contains_captured_identifiers())
                 .unwrap_or_default(),
-            Pattern::List(list) => list.iter().any(Pattern::contains_captured_identifiers),
-            Pattern::Struct(struct_) => struct_
+            Self::List(list) => list.iter().any(Self::contains_captured_identifiers),
+            Self::Struct(struct_) => struct_
                 .iter()
                 .any(|(_, value_pattern)| value_pattern.contains_captured_identifiers()),
-            Pattern::Or(patterns) => patterns.first().unwrap().contains_captured_identifiers(),
-            Pattern::Error { child, .. } => child
+            Self::Or(patterns) => patterns.first().unwrap().contains_captured_identifiers(),
+            Self::Error { child, .. } => child
                 .as_ref()
                 .map(|child| child.contains_captured_identifiers())
                 .unwrap_or_default(),
@@ -438,14 +438,14 @@ impl Pattern {
     }
     pub fn captured_identifier_count(&self) -> usize {
         match self {
-            Pattern::NewIdentifier(_) => 1,
-            Pattern::Int(_) | Pattern::Text(_) => 0,
-            Pattern::Tag { value, .. } => value
+            Self::NewIdentifier(_) => 1,
+            Self::Int(_) | Self::Text(_) => 0,
+            Self::Tag { value, .. } => value
                 .as_ref()
                 .map(|value| value.captured_identifier_count())
                 .unwrap_or_default(),
-            Pattern::List(list) => list.iter().map(Pattern::captured_identifier_count).sum(),
-            Pattern::Struct(struct_) => struct_
+            Self::List(list) => list.iter().map(Self::captured_identifier_count).sum(),
+            Self::Struct(struct_) => struct_
                 .iter()
                 .map(|(key, value)| {
                     key.captured_identifier_count() + value.captured_identifier_count()
@@ -453,8 +453,8 @@ impl Pattern {
                 .sum(),
             // If the number or captured identifiers isn't the same in both
             // sides, the pattern is invalid and the generated code will panic.
-            Pattern::Or(patterns) => patterns.first().unwrap().captured_identifier_count(),
-            Pattern::Error { child, .. } => {
+            Self::Or(patterns) => patterns.first().unwrap().captured_identifier_count(),
+            Self::Error { child, .. } => {
                 // Since generated code panics in this case, it doesn't matter
                 // whether the child captured any identifiers since they can't
                 // be accessed anyway.
@@ -477,19 +477,19 @@ impl Pattern {
     }
     fn collect_captured_identifiers(&self, ids: &mut Vec<PatternIdentifierId>) {
         match self {
-            Pattern::NewIdentifier(identifier_id) => ids.push(*identifier_id),
-            Pattern::Int(_) | Pattern::Text(_) => {}
-            Pattern::Tag { value, .. } => {
+            Self::NewIdentifier(identifier_id) => ids.push(*identifier_id),
+            Self::Int(_) | Self::Text(_) => {}
+            Self::Tag { value, .. } => {
                 if let Some(value) = value {
                     value.collect_captured_identifiers(ids);
                 }
             }
-            Pattern::List(list) => {
+            Self::List(list) => {
                 for pattern in list {
                     pattern.collect_captured_identifiers(ids);
                 }
             }
-            Pattern::Struct(struct_) => {
+            Self::Struct(struct_) => {
                 for (_, value_pattern) in struct_ {
                     // Keys can't capture identifiers.
                     value_pattern.collect_captured_identifiers(ids);
@@ -497,8 +497,8 @@ impl Pattern {
             }
             // If the number or captured identifiers isn't the same in both
             // sides, the pattern is invalid and the generated code will panic.
-            Pattern::Or(patterns) => patterns.first().unwrap().collect_captured_identifiers(ids),
-            Pattern::Error { .. } => {
+            Self::Or(patterns) => patterns.first().unwrap().collect_captured_identifiers(ids),
+            Self::Error { .. } => {
                 // Since generated code panics in this case, it doesn't matter
                 // whether the child captured any identifiers since they can't
                 // be accessed anyway.
@@ -548,28 +548,28 @@ impl_display_via_richir!(Expression);
 impl ToRichIr for Expression {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         match self {
-            Expression::Int(int) => {
+            Self::Int(int) => {
                 let range = builder.push(int.to_string(), TokenType::Int, EnumSet::empty());
                 builder.push_reference(ReferenceKey::Int(int.clone().into()), range);
             }
-            Expression::Text(text) => {
+            Self::Text(text) => {
                 let range =
                     builder.push(format!(r#""{}""#, text), TokenType::Text, EnumSet::empty());
                 builder.push_reference(text.clone(), range);
             }
-            Expression::Reference(reference) => {
+            Self::Reference(reference) => {
                 reference.build_rich_ir(builder);
             }
-            Expression::Symbol(symbol) => {
+            Self::Symbol(symbol) => {
                 let range = builder.push(symbol, TokenType::Symbol, EnumSet::empty());
                 builder.push_reference(ReferenceKey::Symbol(symbol.clone()), range);
             }
-            Expression::List(items) => {
+            Self::List(items) => {
                 builder.push("(", None, EnumSet::empty());
                 builder.push_children(items, ", ");
                 builder.push(")", None, EnumSet::empty());
             }
-            Expression::Struct(fields) => {
+            Self::Struct(fields) => {
                 builder.push("[", None, EnumSet::empty());
                 builder.push_children_custom(
                     fields.iter().collect_vec(),
@@ -582,7 +582,7 @@ impl ToRichIr for Expression {
                 );
                 builder.push("]", None, EnumSet::empty());
             }
-            Expression::Destructure {
+            Self::Destructure {
                 expression,
                 pattern,
             } => {
@@ -591,10 +591,10 @@ impl ToRichIr for Expression {
                 builder.push(" into ", None, EnumSet::empty());
                 pattern.build_rich_ir(builder);
             }
-            Expression::PatternIdentifierReference(identifier_id) => {
+            Self::PatternIdentifierReference(identifier_id) => {
                 identifier_id.build_rich_ir(builder);
             }
-            Expression::Match { expression, cases } => {
+            Self::Match { expression, cases } => {
                 expression.build_rich_ir(builder);
                 builder.push(" %", None, EnumSet::empty());
                 builder.push_children_custom_multiline(cases, |builder, (pattern, body)| {
@@ -610,7 +610,7 @@ impl ToRichIr for Expression {
                     builder.dedent();
                 });
             }
-            Expression::Function(function) => {
+            Self::Function(function) => {
                 builder.push(
                     format!(
                         "{{ ({}) ",
@@ -626,7 +626,7 @@ impl ToRichIr for Expression {
                 function.build_rich_ir(builder);
                 builder.push("}", None, EnumSet::empty());
             }
-            Expression::Builtin(builtin) => {
+            Self::Builtin(builtin) => {
                 let range = builder.push(
                     format!("builtin{builtin:?}"),
                     TokenType::Function,
@@ -634,7 +634,7 @@ impl ToRichIr for Expression {
                 );
                 builder.push_reference(*builtin, range);
             }
-            Expression::Call {
+            Self::Call {
                 function,
                 arguments,
             } => {
@@ -644,7 +644,7 @@ impl ToRichIr for Expression {
                 builder.push(" with ", None, EnumSet::empty());
                 builder.push_children(arguments, " ");
             }
-            Expression::UseModule {
+            Self::UseModule {
                 current_module,
                 relative_path,
             } => {
@@ -653,13 +653,13 @@ impl ToRichIr for Expression {
                 builder.push(", use ", None, EnumSet::empty());
                 relative_path.build_rich_ir(builder);
             }
-            Expression::Needs { condition, reason } => {
+            Self::Needs { condition, reason } => {
                 builder.push("needs ", None, EnumSet::empty());
                 condition.build_rich_ir(builder);
                 builder.push(" with reason ", None, EnumSet::empty());
                 reason.build_rich_ir(builder);
             }
-            Expression::Error { child, errors } => {
+            Self::Error { child, errors } => {
                 build_errors_rich_ir(builder, errors, child);
             }
         }
@@ -668,14 +668,14 @@ impl ToRichIr for Expression {
 impl ToRichIr for Pattern {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         match self {
-            Pattern::Int(int) => {
+            Self::Int(int) => {
                 builder.push(format!("{int}"), TokenType::Int, EnumSet::empty());
             }
-            Pattern::Text(text) => {
+            Self::Text(text) => {
                 builder.push(format!(r#""{text:?}\""#), TokenType::Text, EnumSet::empty());
             }
-            Pattern::NewIdentifier(reference) => reference.build_rich_ir(builder),
-            Pattern::Tag { symbol, value } => {
+            Self::NewIdentifier(reference) => reference.build_rich_ir(builder),
+            Self::Tag { symbol, value } => {
                 builder.push(symbol, TokenType::Symbol, EnumSet::empty());
                 if let Some(value) = value {
                     builder.push(" (", None, EnumSet::empty());
@@ -683,7 +683,7 @@ impl ToRichIr for Pattern {
                     builder.push(")", None, EnumSet::empty());
                 }
             }
-            Pattern::List(items) => {
+            Self::List(items) => {
                 builder.push("(", None, EnumSet::empty());
                 builder.push_children(items, ", ");
                 if items.len() <= 1 {
@@ -691,7 +691,7 @@ impl ToRichIr for Pattern {
                 }
                 builder.push(")", None, EnumSet::empty());
             }
-            Pattern::Struct(entries) => {
+            Self::Struct(entries) => {
                 builder.push("[", None, EnumSet::empty());
                 builder.push_children_custom(
                     entries,
@@ -704,8 +704,8 @@ impl ToRichIr for Pattern {
                 );
                 builder.push("]", None, EnumSet::empty());
             }
-            Pattern::Or(patterns) => builder.push_children(patterns, " | "),
-            Pattern::Error { child, errors } => {
+            Self::Or(patterns) => builder.push_children(patterns, " | "),
+            Self::Error { child, errors } => {
                 build_errors_rich_ir(builder, errors, child);
             }
         }
@@ -781,22 +781,22 @@ impl ToRichIr for Body {
 impl Expression {
     fn find(&self, id: &Id) -> Option<&Self> {
         match self {
-            Expression::Int { .. } => None,
-            Expression::Text { .. } => None,
-            Expression::Reference { .. } => None,
-            Expression::Symbol { .. } => None,
-            Expression::List(_) => None,
-            Expression::Struct(_) => None,
-            Expression::Destructure { .. } => None,
-            Expression::PatternIdentifierReference { .. } => None,
+            Self::Int { .. } => None,
+            Self::Text { .. } => None,
+            Self::Reference { .. } => None,
+            Self::Symbol { .. } => None,
+            Self::List(_) => None,
+            Self::Struct(_) => None,
+            Self::Destructure { .. } => None,
+            Self::PatternIdentifierReference { .. } => None,
             // TODO: use binary search
-            Expression::Match { cases, .. } => cases.iter().find_map(|(_, body)| body.find(id)),
-            Expression::Function(Function { body, .. }) => body.find(id),
-            Expression::Builtin(_) => None,
-            Expression::Call { .. } => None,
-            Expression::UseModule { .. } => None,
-            Expression::Needs { .. } => None,
-            Expression::Error { .. } => None,
+            Self::Match { cases, .. } => cases.iter().find_map(|(_, body)| body.find(id)),
+            Self::Function(Function { body, .. }) => body.find(id),
+            Self::Builtin(_) => None,
+            Self::Call { .. } => None,
+            Self::UseModule { .. } => None,
+            Self::Needs { .. } => None,
+            Self::Error { .. } => None,
         }
     }
 }
@@ -822,26 +822,23 @@ pub trait CollectErrors {
 impl CollectErrors for Expression {
     fn collect_errors(&self, errors: &mut Vec<CompilerError>) {
         match self {
-            Expression::Int(_)
-            | Expression::Text(_)
-            | Expression::Reference(_)
-            | Expression::Symbol(_)
-            | Expression::List(_)
-            | Expression::Struct(_)
-            | Expression::PatternIdentifierReference { .. } => {}
-            Expression::Match { cases, .. } => {
+            Self::Int(_)
+            | Self::Text(_)
+            | Self::Reference(_)
+            | Self::Symbol(_)
+            | Self::List(_)
+            | Self::Struct(_)
+            | Self::PatternIdentifierReference { .. } => {}
+            Self::Match { cases, .. } => {
                 for (pattern, body) in cases {
                     pattern.collect_errors(errors);
                     body.collect_errors(errors);
                 }
             }
-            Expression::Builtin(_)
-            | Expression::Call { .. }
-            | Expression::UseModule { .. }
-            | Expression::Needs { .. } => {}
-            Expression::Function(function) => function.body.collect_errors(errors),
-            Expression::Destructure { pattern, .. } => pattern.collect_errors(errors),
-            Expression::Error {
+            Self::Builtin(_) | Self::Call { .. } | Self::UseModule { .. } | Self::Needs { .. } => {}
+            Self::Function(function) => function.body.collect_errors(errors),
+            Self::Destructure { pattern, .. } => pattern.collect_errors(errors),
+            Self::Error {
                 errors: the_errors, ..
             } => {
                 errors.append(&mut the_errors.clone());
@@ -852,29 +849,29 @@ impl CollectErrors for Expression {
 impl CollectErrors for Pattern {
     fn collect_errors(&self, errors: &mut Vec<CompilerError>) {
         match self {
-            Pattern::NewIdentifier(_) | Pattern::Int(_) | Pattern::Text(_) => {}
-            Pattern::Tag { value, .. } => {
+            Self::NewIdentifier(_) | Self::Int(_) | Self::Text(_) => {}
+            Self::Tag { value, .. } => {
                 if let Some(value) = value {
                     value.collect_errors(errors);
                 }
             }
-            Pattern::List(patterns) => {
+            Self::List(patterns) => {
                 for item_pattern in patterns {
                     item_pattern.collect_errors(errors);
                 }
             }
-            Pattern::Struct(patterns) => {
+            Self::Struct(patterns) => {
                 for (key_pattern, value_pattern) in patterns {
                     key_pattern.collect_errors(errors);
                     value_pattern.collect_errors(errors);
                 }
             }
-            Pattern::Or(patterns) => {
+            Self::Or(patterns) => {
                 for pattern in patterns {
                     pattern.collect_errors(errors);
                 }
             }
-            Pattern::Error {
+            Self::Error {
                 errors: the_errors, ..
             } => {
                 errors.append(&mut the_errors.clone());

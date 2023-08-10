@@ -178,7 +178,7 @@ impl<D: Clone> UnwrapWhitespaceAndComment for Cst<D> {
             },
             kind @ CstKind::Error { .. } => kind.clone(),
         };
-        Cst {
+        Self {
             data: self.data.clone(),
             kind,
         }
@@ -186,7 +186,7 @@ impl<D: Clone> UnwrapWhitespaceAndComment for Cst<D> {
 }
 impl<C: UnwrapWhitespaceAndComment> UnwrapWhitespaceAndComment for Box<C> {
     fn unwrap_whitespace_and_comment(&self) -> Self {
-        Box::new(self.deref().unwrap_whitespace_and_comment())
+        Self::new(self.deref().unwrap_whitespace_and_comment())
     }
 }
 impl<D: Clone> UnwrapWhitespaceAndComment for Vec<Cst<D>> {

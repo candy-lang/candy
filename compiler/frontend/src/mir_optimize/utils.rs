@@ -14,7 +14,7 @@ impl Expression {
         defined
     }
     fn collect_defined_ids(&self, defined: &mut Vec<Id>) {
-        if let Expression::Function {
+        if let Self::Function {
             parameters,
             responsible_parameter,
             body,
@@ -56,30 +56,27 @@ impl Expression {
     }
     fn collect_referenced_ids(&self, referenced: &mut FxHashSet<Id>) {
         match self {
-            Expression::Int(_)
-            | Expression::Text(_)
-            | Expression::Builtin(_)
-            | Expression::HirId(_) => {}
-            Expression::Tag { value, .. } => {
+            Self::Int(_) | Self::Text(_) | Self::Builtin(_) | Self::HirId(_) => {}
+            Self::Tag { value, .. } => {
                 if let Some(value) = value {
                     referenced.insert(*value);
                 }
             }
-            Expression::List(items) => {
+            Self::List(items) => {
                 referenced.extend(items);
             }
-            Expression::Struct(fields) => {
+            Self::Struct(fields) => {
                 for (key, value) in fields {
                     referenced.insert(*key);
                     referenced.insert(*value);
                 }
             }
-            Expression::Reference(reference) => {
+            Self::Reference(reference) => {
                 referenced.insert(*reference);
             }
-            Expression::Function { body, .. } => body.collect_referenced_ids(referenced),
-            Expression::Parameter => {}
-            Expression::Call {
+            Self::Function { body, .. } => body.collect_referenced_ids(referenced),
+            Self::Parameter => {}
+            Self::Call {
                 function,
                 arguments,
                 responsible,
@@ -88,7 +85,7 @@ impl Expression {
                 referenced.extend(arguments);
                 referenced.insert(*responsible);
             }
-            Expression::UseModule {
+            Self::UseModule {
                 current_module: _,
                 relative_path,
                 responsible,
@@ -96,14 +93,14 @@ impl Expression {
                 referenced.insert(*relative_path);
                 referenced.insert(*responsible);
             }
-            Expression::Panic {
+            Self::Panic {
                 reason,
                 responsible,
             } => {
                 referenced.insert(*reason);
                 referenced.insert(*responsible);
             }
-            Expression::TraceCallStarts {
+            Self::TraceCallStarts {
                 hir_call,
                 function,
                 arguments,
@@ -114,17 +111,17 @@ impl Expression {
                 referenced.extend(arguments);
                 referenced.insert(*responsible);
             }
-            Expression::TraceCallEnds { return_value } => {
+            Self::TraceCallEnds { return_value } => {
                 referenced.insert(*return_value);
             }
-            Expression::TraceExpressionEvaluated {
+            Self::TraceExpressionEvaluated {
                 hir_expression,
                 value,
             } => {
                 referenced.insert(*hir_expression);
                 referenced.insert(*value);
             }
-            Expression::TraceFoundFuzzableFunction {
+            Self::TraceFoundFuzzableFunction {
                 hir_definition,
                 function,
             } => {
@@ -166,7 +163,7 @@ impl Id {
     #[must_use]
     pub fn semantically_equals(
         self,
-        other: Id,
+        other: Self,
         visible: &VisibleExpressions,
         pureness: &PurenessInsights,
     ) -> Option<bool> {
@@ -205,28 +202,25 @@ impl Expression {
     /// this expression.
     pub fn replace_id_references(&mut self, replacer: &mut impl FnMut(&mut Id)) {
         match self {
-            Expression::Int(_)
-            | Expression::Text(_)
-            | Expression::Builtin(_)
-            | Expression::HirId(_) => {}
-            Expression::Tag { value, .. } => {
+            Self::Int(_) | Self::Text(_) | Self::Builtin(_) | Self::HirId(_) => {}
+            Self::Tag { value, .. } => {
                 if let Some(value) = value {
                     replacer(value);
                 }
             }
-            Expression::List(items) => {
+            Self::List(items) => {
                 for item in items {
                     replacer(item);
                 }
             }
-            Expression::Struct(fields) => {
+            Self::Struct(fields) => {
                 for (key, value) in fields {
                     replacer(key);
                     replacer(value);
                 }
             }
-            Expression::Reference(reference) => replacer(reference),
-            Expression::Function {
+            Self::Reference(reference) => replacer(reference),
+            Self::Function {
                 original_hirs: _,
                 parameters,
                 responsible_parameter,
@@ -238,8 +232,8 @@ impl Expression {
                 replacer(responsible_parameter);
                 body.replace_id_references(replacer);
             }
-            Expression::Parameter => {}
-            Expression::Call {
+            Self::Parameter => {}
+            Self::Call {
                 function,
                 arguments,
                 responsible,
@@ -250,7 +244,7 @@ impl Expression {
                 }
                 replacer(responsible);
             }
-            Expression::UseModule {
+            Self::UseModule {
                 current_module: _,
                 relative_path,
                 responsible,
@@ -258,14 +252,14 @@ impl Expression {
                 replacer(relative_path);
                 replacer(responsible);
             }
-            Expression::Panic {
+            Self::Panic {
                 reason,
                 responsible,
             } => {
                 replacer(reason);
                 replacer(responsible);
             }
-            Expression::TraceCallStarts {
+            Self::TraceCallStarts {
                 hir_call,
                 function,
                 arguments,
@@ -278,17 +272,17 @@ impl Expression {
                 }
                 replacer(responsible);
             }
-            Expression::TraceCallEnds { return_value } => {
+            Self::TraceCallEnds { return_value } => {
                 replacer(return_value);
             }
-            Expression::TraceExpressionEvaluated {
+            Self::TraceExpressionEvaluated {
                 hir_expression,
                 value,
             } => {
                 replacer(hir_expression);
                 replacer(value);
             }
-            Expression::TraceFoundFuzzableFunction {
+            Self::TraceFoundFuzzableFunction {
                 hir_definition,
                 function,
             } => {
@@ -311,7 +305,7 @@ impl Expression {
     /// definitions.
     pub fn replace_ids(&mut self, replacer: &mut impl FnMut(&mut Id)) {
         match self {
-            Expression::Function {
+            Self::Function {
                 original_hirs: _,
                 parameters,
                 responsible_parameter,

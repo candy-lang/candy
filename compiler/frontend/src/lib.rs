@@ -7,7 +7,7 @@
     clippy::similar_names,
     clippy::too_many_lines
 )]
-#![warn(clippy::missing_const_for_fn)]
+#![warn(clippy::nursery)]
 
 pub mod ast;
 pub mod ast_to_hir;

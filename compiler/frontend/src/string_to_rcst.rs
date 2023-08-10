@@ -72,10 +72,10 @@ pub enum ModuleError {
 impl ToRichIr for ModuleError {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         let text = match self {
-            ModuleError::DoesNotExist => return,
-            ModuleError::InvalidUtf8 => "# Invalid UTF-8",
-            ModuleError::IsNotCandy => "# Is not Candy code",
-            ModuleError::IsToolingModule => "# Is a tooling module",
+            Self::DoesNotExist => return,
+            Self::InvalidUtf8 => "# Invalid UTF-8",
+            Self::IsNotCandy => "# Is not Candy code",
+            Self::IsToolingModule => "# Is a tooling module",
         };
         builder.push(text, TokenType::Comment, EnumSet::empty());
     }
@@ -89,7 +89,7 @@ impl CstKind<()> {
 }
 impl Rcst {
     #[must_use]
-    fn wrap_in_whitespace(mut self, mut whitespace: Vec<Rcst>) -> Rcst {
+    fn wrap_in_whitespace(mut self, mut whitespace: Vec<Self>) -> Self {
         if whitespace.is_empty() {
             return self;
         }
@@ -3331,10 +3331,10 @@ mod parse {
 
     #[cfg(test)]
     impl Rcst {
-        fn with_trailing_space(self) -> Rcst {
+        fn with_trailing_space(self) -> Self {
             self.with_trailing_whitespace(vec![CstKind::Whitespace(" ".to_string())])
         }
-        fn with_trailing_whitespace(self, trailing_whitespace: Vec<CstKind<()>>) -> Rcst {
+        fn with_trailing_whitespace(self, trailing_whitespace: Vec<CstKind<()>>) -> Self {
             CstKind::TrailingWhitespace {
                 child: Box::new(self),
                 whitespace: trailing_whitespace.into_iter().map(Into::into).collect(),
@@ -3347,7 +3347,7 @@ mod parse {
         fn with_trailing_space(self) -> Rcst {
             Rcst::from(self).with_trailing_space()
         }
-        fn with_trailing_whitespace(self, trailing_whitespace: Vec<CstKind<()>>) -> Rcst {
+        fn with_trailing_whitespace(self, trailing_whitespace: Vec<Self>) -> Rcst {
             Rcst::from(self).with_trailing_whitespace(trailing_whitespace)
         }
     }

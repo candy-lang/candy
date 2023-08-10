@@ -23,10 +23,10 @@ impl Complexity {
     }
 }
 impl Add for Complexity {
-    type Output = Complexity;
+    type Output = Self;
 
     fn add(self, other: Self) -> Self::Output {
-        Complexity {
+        Self {
             is_self_contained: self.is_self_contained && other.is_self_contained,
             expressions: self.expressions + other.expressions,
         }
@@ -80,10 +80,8 @@ impl Body {
 impl Expression {
     fn complexity(&self) -> Complexity {
         match self {
-            Expression::Function { body, .. } => {
-                Complexity::single_expression() + body.complexity()
-            }
-            Expression::UseModule { .. } => Complexity {
+            Self::Function { body, .. } => Complexity::single_expression() + body.complexity(),
+            Self::UseModule { .. } => Complexity {
                 is_self_contained: false,
                 expressions: 1,
             },

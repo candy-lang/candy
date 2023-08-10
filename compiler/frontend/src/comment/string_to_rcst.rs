@@ -58,12 +58,12 @@ fn comment_rcst(db: &dyn CommentStringToRcst, id: hir::Id) -> Arc<Vec<Rcst>> {
 }
 
 impl Rcst {
-    fn wrap_in_whitespace(mut self, mut whitespace: Vec<Rcst>) -> Self {
+    fn wrap_in_whitespace(mut self, mut whitespace: Vec<Self>) -> Self {
         if whitespace.is_empty() {
             return self;
         }
 
-        if let Rcst::TrailingWhitespace {
+        if let Self::TrailingWhitespace {
             whitespace: self_whitespace,
             ..
         } = &mut self
@@ -71,7 +71,7 @@ impl Rcst {
             self_whitespace.append(&mut whitespace);
             self
         } else {
-            Rcst::TrailingWhitespace {
+            Self::TrailingWhitespace {
                 child: Box::new(self),
                 whitespace,
             }
@@ -357,17 +357,17 @@ mod parse {
             has_closing_char: bool,
         ) -> Rcst {
             match self {
-                InlineFormatting::Emphasized => Rcst::Emphasized {
+                Self::Emphasized => Rcst::Emphasized {
                     has_opening_underscore: has_opening_char,
                     text: inner_parts,
                     has_closing_underscore: has_closing_char,
                 },
-                InlineFormatting::Link => Rcst::Link {
+                Self::Link => Rcst::Link {
                     has_opening_bracket: has_opening_char,
                     text: inner_parts,
                     has_closing_bracket: has_closing_char,
                 },
-                InlineFormatting::Code => Rcst::InlineCode {
+                Self::Code => Rcst::InlineCode {
                     has_opening_backtick: has_opening_char,
                     code: inner_parts,
                     has_closing_backtick: has_closing_char,
@@ -390,7 +390,7 @@ mod parse {
                 initial_state.len(),
                 initial_state.iter().collect::<FxHashSet<_>>().len()
             );
-            let parser = SingleLineInlineParser {
+            let parser = Self {
                 top_level_parts: vec![],
                 formattings: initial_state
                     .iter()

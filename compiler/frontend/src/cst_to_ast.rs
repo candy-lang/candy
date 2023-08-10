@@ -82,7 +82,7 @@ struct LoweringContext {
 }
 impl LoweringContext {
     fn new(module: Module) -> Self {
-        LoweringContext {
+        Self {
             module,
             next_id: 0,
             id_mapping: FxHashMap::default(),

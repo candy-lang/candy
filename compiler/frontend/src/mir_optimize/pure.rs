@@ -88,7 +88,7 @@ impl PurenessInsights {
         update(&mut self.definition_pureness, mapping);
         update(&mut self.definition_constness, mapping);
     }
-    pub(super) fn include(&mut self, other: &PurenessInsights, mapping: &FxHashMap<Id, Id>) {
+    pub(super) fn include(&mut self, other: &Self, mapping: &FxHashMap<Id, Id>) {
         fn insert(
             source: &FxHashMap<Id, bool>,
             mapping: &FxHashMap<Id, Id>,

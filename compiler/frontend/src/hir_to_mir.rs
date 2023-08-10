@@ -518,7 +518,7 @@ impl PatternLoweringContext {
     ) -> Id {
         let match_tag = body.push_match_tag();
         let no_match_tag = body.push_no_match_tag();
-        let context = PatternLoweringContext {
+        let context = Self {
             hir_id,
             match_tag,
             no_match_tag,
