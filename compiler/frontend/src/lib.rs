@@ -1,5 +1,7 @@
 #![feature(box_patterns, entry_insert, io_error_more, let_chains)]
+#![warn(clippy::nursery, clippy::pedantic)]
 #![allow(
+    clippy::cognitive_complexity,
     clippy::match_same_arms,
     clippy::missing_errors_doc,
     clippy::missing_panics_doc,
@@ -7,7 +9,6 @@
     clippy::similar_names,
     clippy::too_many_lines
 )]
-#![warn(clippy::nursery)]
 
 pub mod ast;
 pub mod ast_to_hir;
