@@ -264,7 +264,7 @@ impl<'ctx> CodeGen<'ctx> {
 
         for (idx, (id, expr)) in mir.expressions.iter().enumerate() {
             match expr {
-                candy_frontend::mir::Expression::Int(value) => {
+                Expression::Int(value) => {
                     let i64_type = self.context.i64_type();
                     let v = i64_type.const_int(value.try_into().unwrap(), false);
 
