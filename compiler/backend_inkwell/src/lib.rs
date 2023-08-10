@@ -61,10 +61,10 @@ impl<'ctx> CodeGen<'ctx> {
         print_llvm_ir: bool,
         print_main_output: bool,
     ) -> Result<(), LLVMString> {
+        let void_type = self.context.void_type();
+        let i8_type = self.context.i8_type();
         let i32_type = self.context.i32_type();
         let i64_type = self.context.i64_type();
-        let i8_type = self.context.i8_type();
-        let void_type = self.context.void_type();
 
         let candy_value = self.context.opaque_struct_type("candy_value");
         let candy_value_ptr = candy_value.ptr_type(AddressSpace::default());
