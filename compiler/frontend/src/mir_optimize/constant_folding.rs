@@ -106,9 +106,6 @@ fn run_builtin(
     );
 
     let result = match builtin {
-        BuiltinFunction::ChannelCreate
-        | BuiltinFunction::ChannelSend
-        | BuiltinFunction::ChannelReceive => return None,
         BuiltinFunction::Equals => {
             let [a, b] = arguments else { unreachable!() };
             a.semantically_equals(*b, visible, pureness)?.into()
@@ -323,7 +320,6 @@ fn run_builtin(
         }
         BuiltinFunction::ListRemoveAt => return None,
         BuiltinFunction::ListReplace => return None,
-        BuiltinFunction::Parallel => return None,
         BuiltinFunction::Print => return None,
         BuiltinFunction::StructGet => {
             let [struct_, key] = arguments else {
@@ -617,7 +613,6 @@ fn run_builtin(
                 })?;
             formatted.into()
         }
-        BuiltinFunction::Try => return None,
         BuiltinFunction::TypeOf => Expression::tag(
             match visible.get(arguments[0]) {
                 Expression::Int(_) => "Int",
@@ -636,9 +631,6 @@ fn run_builtin(
                         return None;
                     };
                     match builtin {
-                        BuiltinFunction::ChannelCreate => "Struct",
-                        BuiltinFunction::ChannelSend => "Tag",
-                        BuiltinFunction::ChannelReceive => return None,
                         BuiltinFunction::Equals => "Tag",
                         BuiltinFunction::GetArgumentCount => "Int",
                         BuiltinFunction::FunctionRun => return None,
@@ -663,7 +655,6 @@ fn run_builtin(
                         BuiltinFunction::ListLength => "Int",
                         BuiltinFunction::ListRemoveAt => "List",
                         BuiltinFunction::ListReplace => "List",
-                        BuiltinFunction::Parallel => return None,
                         BuiltinFunction::Print => "Tag",
                         BuiltinFunction::StructGet => return None,
                         BuiltinFunction::StructGetKeys => "List",
@@ -683,7 +674,6 @@ fn run_builtin(
                         BuiltinFunction::TextTrimEnd => "Text",
                         BuiltinFunction::TextTrimStart => "Text",
                         BuiltinFunction::ToDebugText => "Text",
-                        BuiltinFunction::Try => "Struct",
                         BuiltinFunction::TypeOf => "Tag",
                     }
                 }

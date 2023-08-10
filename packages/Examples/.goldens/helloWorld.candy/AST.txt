@@ -1,12 +1,7 @@
 # AST for module Examples:helloWorld
-assignment: identifier $6@"builtins" = 
-  call identifier $0@"use" with these arguments:
-    text
-      textPart $2@"Builtins"
-assignment: identifier $25@"main" := 
-  function (non-fuzzable) { identifier $9@"environment" ->
-    call struct access identifier $15@"builtins".$17@"ChannelSend" with these arguments:
-      struct access identifier $11@"environment".$13@"Stdout"
+assignment: identifier $11@"main" := 
+  function (non-fuzzable) { identifier $0@"environment" ->
+    call struct access identifier $2@"environment".$4@"Stdout" with these arguments:
       text
-        textPart $19@"Hello, world!"
+        textPart $6@"Hello, world!"
   }

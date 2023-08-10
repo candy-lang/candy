@@ -122,9 +122,6 @@ impl HeapObjectTrait for HeapTag {
         };
     }
 
-    fn dup_children(self, heap: &mut Heap) {
-        self.value().dup(heap);
-    }
     fn drop_children(self, heap: &mut Heap) {
         self.value().drop(heap);
     }

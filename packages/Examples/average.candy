@@ -3,7 +3,7 @@
 
 average a =
   needs (list.is a)
-  needs (list.length a | int.isPositive)
+  needs (a | list.isEmpty | bool.not)
   needs (a | iterable.fromList | iterable.all { a -> int.is a })
   divideTruncating (a | iterable.fromList | iterable.sum) (a | list.length)
 

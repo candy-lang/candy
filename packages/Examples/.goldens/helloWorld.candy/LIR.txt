@@ -7,66 +7,61 @@
 # • Include tracing of evaluated expressions? No
 
 # Constants
-%0 = Builtins::channelSend:12
-%1 = Builtins::channelSend:5
-%2 = Builtins::structGet:12
-%3 = Builtins::structGet:14
-%4 = Builtins::structGet:21
-%5 = Builtins::structGet:5
-%6 = Builtins::typeIs:19
-%7 = Builtins::typeIs:25
-%8 = Examples:helloWorld:11:23
-%9 = Examples:helloWorld:11:7
-%10 = anonymous:$generated::needs
-%11 = builtinChannelSend
-%12 = builtinEquals
-%13 = builtinIfElse
-%14 = builtinStructGet
-%15 = builtinStructHasKey
-%16 = builtinTypeOf
-%17 = False
-%18 = Main
-%19 = Nothing
-%20 = SendPort
-%21 = Stdout
-%22 = Struct
-%23 = Text
-%24 = True
-%25 = "Hello, world!"
-%26 = "The `condition` must be either `True` or `False`."
-%27 = "The `reason` must be a text."
-%28 = "`sendPort | typeIs SendPort` was not satisfied"
-%29 = "`struct | typeIs Struct` was not satisfied"
-%30 = "`struct | ✨.structHasKey key` was not satisfied"
-%31 = { body_0 }
-%32 = { body_1 }
-%33 = { body_6 }
-%34 = { body_7 }
-%35 = [%18: %34]
+%0 = Builtins::structGet:12
+%1 = Builtins::structGet:14
+%2 = Builtins::structGet:21
+%3 = Builtins::structGet:5
+%4 = Builtins::typeIs:19
+%5 = Builtins::typeIs:25
+%6 = Examples:helloWorld:0:15
+%7 = Examples:helloWorld:0:7
+%8 = anonymous:$generated::needs
+%9 = builtinEquals
+%10 = builtinIfElse
+%11 = builtinStructGet
+%12 = builtinStructHasKey
+%13 = builtinTypeOf
+%14 = False
+%15 = Main
+%16 = Nothing
+%17 = Stdout
+%18 = Struct
+%19 = Text
+%20 = True
+%21 = "Hello, world!"
+%22 = "The `condition` must be either `True` or `False`."
+%23 = "The `reason` must be a text."
+%24 = "`struct | typeIs Struct` was not satisfied"
+%25 = "`struct | ✨.structHasKey key` was not satisfied"
+%26 = { body_0 }
+%27 = { body_1 }
+%28 = { body_6 }
+%29 = { body_7 }
+%30 = [%15: %29]
 
 # Bodies
 body_0 (responsible $0) =
-  # Original HIR IDs: anonymous:$generated::needs:isConditionTrue:then
+  # Original HIR IDs: Builtins::ifElse:1:case-0:matched, Builtins::isLessThanOrEqualTo:19:case-0:matched, Builtins::isNonNegative:13:case-0:matched, Builtins::not:1:case-1:matched, anonymous:$generated::needs:isConditionTrue:then
   # Captured IDs: none
-  $1 = %24
+  $1 = %20
 body_1 (responsible $0) =
-  # Original HIR IDs: anonymous:$generated::needs:isConditionBool:then
+  # Original HIR IDs: anonymous:$generated::needs:condition:then, anonymous:$generated::needs:isConditionBool:then, anonymous:$generated::needs:isReasonText:then
   # Captured IDs: none
-  $1 = %19
+  $1 = %16
 body_2 (responsible $1) =
   # Original HIR IDs: anonymous:$generated::needs:isConditionTrue:else
   # Captured IDs: $0
-  $2 = %12
+  $2 = %9
   $3 = dup $0
-  $4 = %17
-  $5 = %10
+  $4 = %14
+  $5 = %8
   $6 = call $2 with $0 $4 ($5 is responsible)
   $7 = drop $0
   $8 = $6
 body_3 (responsible $1) =
   # Original HIR IDs: anonymous:$generated::needs:isConditionBool:else
   # Captured IDs: $0
-  $2 = %26
+  $2 = %22
   $3 = dup $0
   $4 = panicking because $2 ($0 is at fault)
   $5 = drop $0
@@ -74,7 +69,7 @@ body_3 (responsible $1) =
 body_4 (responsible $1) =
   # Original HIR IDs: anonymous:$generated::needs:isReasonText:else
   # Captured IDs: $0
-  $2 = %27
+  $2 = %23
   $3 = dup $0
   $4 = panicking because $2 ($0 is at fault)
   $5 = drop $0
@@ -91,27 +86,27 @@ body_5 (responsible $2) =
 body_6 $0 $1 $2 (+ responsible $3) =
   # Original HIR IDs: anonymous:$generated::needs
   # Captured IDs: none
-  $4 = %12
+  $4 = %9
   $5 = dup $0
-  $6 = %24
-  $7 = %10
+  $6 = %20
+  $7 = %8
   $8 = call $4 with $0 $6 ($7 is responsible)
   $9 = { body_2 capturing $0 }
-  $10 = %13
+  $10 = %10
   $11 = dup $8
-  $12 = %31
+  $12 = %26
   $13 = dup $9
   $14 = call $10 with $8 $12 $9 ($7 is responsible)
   $15 = { body_3 capturing $3 }
   $16 = dup $14
-  $17 = %32
+  $17 = %27
   $18 = dup $15
   $19 = call $10 with $14 $17 $15 ($7 is responsible)
-  $20 = %16
+  $20 = %13
   $21 = dup $1
   $22 = call $20 with $1 ($3 is responsible)
   $23 = dup $22
-  $24 = %23
+  $24 = %19
   $25 = call $4 with $22 $24 ($3 is responsible)
   $26 = { body_4 capturing $3 }
   $27 = dup $25
@@ -136,63 +131,49 @@ body_6 $0 $1 $2 (+ responsible $3) =
   $46 = drop $0
   $47 = $33
 body_7 $0 (+ responsible $1) =
-  # Original HIR IDs: Examples:helloWorld:11
+  # Original HIR IDs: Examples:helloWorld:0
   # Captured IDs: none
-  $2 = %16
+  $2 = %13
   $3 = dup $0
-  $4 = %6
+  $4 = %4
   $5 = call $2 with $0 ($4 is responsible)
-  $6 = %12
+  $6 = %9
   $7 = dup $5
-  $8 = %22
-  $9 = %7
+  $8 = %18
+  $9 = %5
   $10 = call $6 with $5 $8 ($9 is responsible)
-  $11 = %33
+  $11 = %28
   $12 = dup $10
-  $13 = %29
-  $14 = %9
-  $15 = %5
+  $13 = %24
+  $14 = %7
+  $15 = %3
   $16 = call $11 with $10 $13 $14 ($15 is responsible)
-  $17 = %15
+  $17 = %12
   $18 = dup $0
-  $19 = %21
-  $20 = %2
+  $19 = %17
+  $20 = %0
   $21 = call $17 with $0 $19 ($20 is responsible)
   $22 = dup $21
-  $23 = %30
-  $24 = %3
+  $23 = %25
+  $24 = %1
   $25 = call $11 with $21 $23 $14 ($24 is responsible)
-  $26 = %14
+  $26 = %11
   $27 = dup $0
-  $28 = %4
+  $28 = %2
   $29 = call $26 with $0 $19 ($28 is responsible)
   $30 = dup $29
-  $31 = call $2 with $29 ($4 is responsible)
-  $32 = dup $31
-  $33 = %20
-  $34 = call $6 with $31 $33 ($9 is responsible)
-  $35 = dup $34
-  $36 = %28
-  $37 = %8
-  $38 = %1
-  $39 = call $11 with $34 $36 $37 ($38 is responsible)
-  $40 = %11
-  $41 = dup $29
-  $42 = %25
-  $43 = %0
-  $44 = call $40 with $29 $42 ($43 is responsible)
-  $45 = drop $39
-  $46 = drop $34
-  $47 = drop $31
-  $48 = drop $29
-  $49 = drop $25
-  $50 = drop $21
-  $51 = drop $16
-  $52 = drop $10
-  $53 = drop $5
-  $54 = drop $0
-  $55 = $44
+  $31 = %21
+  $32 = %6
+  $33 = call $29 with $31 ($32 is responsible)
+  $34 = drop $29
+  $35 = drop $25
+  $36 = drop $21
+  $37 = drop $16
+  $38 = drop $10
+  $39 = drop $5
+  $40 = drop $0
+  $41 = $33
 body_8 (responsible $0) =
   # Original HIR IDs: Examples:helloWorld:
   # Captured IDs: none
-  $1 = %35
+  $1 = %30

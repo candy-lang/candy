@@ -9,9 +9,6 @@ use strum_macros::EnumIter;
 
 #[derive(Clone, Copy, Debug, EnumIter, Eq, Hash, PartialEq)]
 pub enum BuiltinFunction {
-    ChannelCreate,       // capacity -> [sendPort, receivePort]
-    ChannelSend,         // channel any -> Nothing
-    ChannelReceive,      // channel -> any
     Equals,              // any any -> booleanTag
     FunctionRun,         // (functionWith0Arguments) -> (returnValue: any)
     GetArgumentCount,    // function -> argumentCount
@@ -36,7 +33,6 @@ pub enum BuiltinFunction {
     ListLength,          // list -> int
     ListRemoveAt,        // list (index: int) -> (list, item)
     ListReplace,         // list (index: int) newItem -> list
-    Parallel,            // body: Function -> returnValueOfFunction
     Print,               // message -> Nothing
     StructGet,           // struct key -> value
     StructGetKeys,       // struct -> listOfKeys
@@ -56,7 +52,6 @@ pub enum BuiltinFunction {
     TextTrimEnd,         // text -> text
     TextTrimStart,       // text -> text
     ToDebugText,         // any -> text
-    Try,                 // function -> okWithFunctionResultOrErrorWithPanicReason
     TypeOf,              // any -> typeTag
 }
 lazy_static! {
@@ -67,9 +62,6 @@ impl BuiltinFunction {
     #[must_use]
     pub const fn is_pure(&self) -> bool {
         match self {
-            Self::ChannelCreate => false,
-            Self::ChannelSend => false,
-            Self::ChannelReceive => false,
             Self::Equals => true,
             Self::FunctionRun => false,
             Self::GetArgumentCount => true,
@@ -94,7 +86,6 @@ impl BuiltinFunction {
             Self::ListLength => true,
             Self::ListRemoveAt => true,
             Self::ListReplace => true,
-            Self::Parallel => false,
             Self::Print => false,
             Self::StructGet => true,
             Self::StructGetKeys => true,
@@ -114,7 +105,6 @@ impl BuiltinFunction {
             Self::TextTrimEnd => true,
             Self::TextTrimStart => true,
             Self::ToDebugText => true,
-            Self::Try => false,
             Self::TypeOf => true,
         }
     }
@@ -122,9 +112,6 @@ impl BuiltinFunction {
     #[must_use]
     pub const fn num_parameters(&self) -> usize {
         match self {
-            Self::ChannelCreate => 1,
-            Self::ChannelSend => 2,
-            Self::ChannelReceive => 1,
             Self::Equals => 2,
             Self::FunctionRun => 1,
             Self::GetArgumentCount => 1,
@@ -149,7 +136,6 @@ impl BuiltinFunction {
             Self::ListLength => 1,
             Self::ListRemoveAt => 2,
             Self::ListReplace => 3,
-            Self::Parallel => 1,
             Self::Print => 1,
             Self::StructGet => 2,
             Self::StructGetKeys => 1,
@@ -169,7 +155,6 @@ impl BuiltinFunction {
             Self::TextTrimEnd => 1,
             Self::TextTrimStart => 1,
             Self::ToDebugText => 1,
-            Self::Try => 1,
             Self::TypeOf => 1,
         }
     }

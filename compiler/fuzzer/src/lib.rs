@@ -24,12 +24,10 @@ use candy_frontend::{
     {hir::Id, TracingConfig, TracingMode},
 };
 use candy_vm::{
-    execution_controller::RunLimitedNumberOfInstructions,
-    fiber::Panic,
-    heap::{DisplayWithSymbolTable, SymbolTable},
+    heap::{DisplayWithSymbolTable, Heap, SymbolTable},
     mir_to_lir::compile_lir,
     tracer::stack_trace::StackTracer,
-    vm::Vm,
+    Panic, Vm, VmFinished,
 };
 use std::rc::Rc;
 use tracing::{debug, error, info};
@@ -46,11 +44,10 @@ where
     let (lir, _) = compile_lir(db, module, tracing);
     let lir = Rc::new(lir);
 
-    let (_heap, fuzzables) = {
-        let mut tracer = FuzzablesFinder::default();
-        let result = Vm::for_module(lir.clone(), &mut tracer).run_until_completion(&mut tracer);
-        (result.heap, tracer.into_fuzzables())
-    };
+    let VmFinished {
+        tracer: FuzzablesFinder { fuzzables },
+        ..
+    } = Vm::for_module(lir.clone(), FuzzablesFinder::default()).run_forever_without_handles();
 
     info!(
         "Now, the fuzzing begins. So far, we have {} functions to fuzz.",
@@ -62,7 +59,7 @@ where
     for (id, function) in fuzzables {
         info!("Fuzzing {id}.");
         let mut fuzzer = Fuzzer::new(lir.clone(), function, id.clone());
-        fuzzer.run(&mut RunLimitedNumberOfInstructions::new(100000));
+        fuzzer.run(100000);
 
         match fuzzer.into_status() {
             Status::StillFuzzing { total_coverage, .. } => {
@@ -74,6 +71,7 @@ where
             Status::FoundPanic {
                 input,
                 panic,
+                heap,
                 tracer,
             } => {
                 error!("The fuzzer discovered an input that crashes {id}:");
@@ -81,6 +79,7 @@ where
                     function: id,
                     input,
                     panic,
+                    heap,
                     tracer,
                 };
                 case.dump(db, &lir.symbol_table);
@@ -96,6 +95,8 @@ pub struct FailingFuzzCase {
     function: Id,
     input: Input,
     panic: Panic,
+    #[allow(dead_code)]
+    heap: Heap,
     #[allow(dead_code)]
     tracer: StackTracer,
 }

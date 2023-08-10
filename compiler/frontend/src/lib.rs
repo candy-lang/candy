@@ -2,6 +2,7 @@
     anonymous_lifetime_in_impl_trait,
     box_patterns,
     entry_insert,
+    hasher_prefixfree_extras,
     io_error_more,
     let_chains,
     try_blocks
@@ -16,6 +17,8 @@
     clippy::similar_names,
     clippy::too_many_lines
 )]
+
+pub use self::tracing::{TracingConfig, TracingMode};
 
 pub mod ast;
 pub mod ast_to_hir;
@@ -40,5 +43,3 @@ pub mod rich_ir;
 pub mod string_to_rcst;
 pub mod tracing;
 pub mod utils;
-
-pub use self::tracing::{TracingConfig, TracingMode};
