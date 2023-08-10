@@ -81,13 +81,21 @@ jobs:
         continue-on-error: true
         working-directory: golden-irs/
         run: git diff --exit-code ${{ github.event.pull_request.base.sha }}_ ${{ github.sha }}_
+      - name: Shorten commit SHAs
+        id: short-shas
+        if: steps.diff.outcome == 'failure'
+        run: |
+          base_sha=${{ github.event.pull_request.base.sha }}
+          echo "base_sha=${base_sha::7}" >> "$GITHUB_OUTPUT"
+          head_sha=${{ github.sha }}
+          echo "head_sha=${head_sha::7}" >> "$GITHUB_OUTPUT"
       - if: steps.diff.outcome == 'failure'
         uses: peter-evans/create-or-update-comment@v3.0.2
         with:
           issue-number: ${{ github.event.pull_request.number }}
           token: ${{ secrets.GOLDEN_IR_COMMENT_TOKEN }}
           body: |
-            The golden IRs have changed: https://github.com/candy-lang/golden-irs/compare/${{ github.event.pull_request.base.sha }}_..${{ github.sha }}_
+            The golden IRs have changed: [${{ steps.short-shas.outputs.base_sha }}..${{ steps.short-shas.outputs.head_sha }}](https://github.com/candy-lang/golden-irs/compare/${{ github.event.pull_request.base.sha }}_..${{ github.sha }}_)
 
             <details>
             <summary>Diff</summary>
