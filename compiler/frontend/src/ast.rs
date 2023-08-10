@@ -64,12 +64,7 @@ pub enum AstKind {
     Match(Match),
     MatchCase(MatchCase),
     OrPattern(OrPattern),
-    Error {
-        /// The child may be set if it still makes sense to continue working
-        /// with the error-containing subtree.
-        child: Option<Box<Ast>>,
-        errors: Vec<CompilerError>,
-    },
+    Error { errors: Vec<CompilerError> },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -197,7 +192,7 @@ impl FindAst for Ast {
             AstKind::Match(match_) => match_.find(id),
             AstKind::MatchCase(match_case) => match_case.find(id),
             AstKind::OrPattern(or_pattern) => or_pattern.find(id),
-            AstKind::Error { child, .. } => child.as_ref().and_then(|child| child.find(id)),
+            AstKind::Error { .. } => None,
         }
     }
 }
@@ -304,11 +299,7 @@ impl AstKind {
                     pattern.captured_identifiers_helper(captured_identifiers);
                 }
             }
-            AstKind::Error { child, .. } => {
-                if let Some(child) = child {
-                    child.captured_identifiers_helper(captured_identifiers)
-                }
-            }
+            AstKind::Error { .. } => {}
         }
     }
 }
@@ -367,13 +358,9 @@ impl CollectErrors for Ast {
                 }
             }
             AstKind::Error {
-                child,
-                errors: mut recovered_errors,
+                errors: mut ast_errors,
             } => {
-                errors.append(&mut recovered_errors);
-                if let Some(child) = child {
-                    child.collect_errors(errors)
-                }
+                errors.append(&mut ast_errors);
             }
         }
     }
@@ -403,16 +390,9 @@ impl ToRichIr for Ast {
             AstKind::Match(match_) => match_.build_rich_ir(builder),
             AstKind::MatchCase(match_case) => match_case.build_rich_ir(builder),
             AstKind::OrPattern(or_pattern) => or_pattern.build_rich_ir(builder),
-            AstKind::Error { child, errors } => {
+            AstKind::Error { errors } => {
                 builder.push("error:", None, EnumSet::empty());
                 builder.push_children_multiline(errors);
-                if let Some(child) = child {
-                    builder.indent();
-                    builder.push_newline();
-                    builder.push("fallback: ", None, EnumSet::empty());
-                    child.build_rich_ir(builder);
-                    builder.dedent();
-                }
             }
         }
     }

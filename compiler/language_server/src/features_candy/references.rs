@@ -199,10 +199,7 @@ where
                     self.add_reference(id, false);
                 }
             }
-            Expression::Error { child, .. } => {
-                if let Some(child) = child {
-                    self.visit_id(child.clone());
-                }
+            Expression::Error { .. } => {
             }
         }
     }

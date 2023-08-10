@@ -223,11 +223,9 @@ impl Context<'_> {
                                     Expression::Symbol(name.value.uppercase_first_letter()),
                                     None,
                                 ),
-                                AstKind::Error { errors, .. } => self.push(
+                                AstKind::Error { errors } => self.push(
                                     ast.id.clone(),
                                     Expression::Error {
-                                        child: None,
-                                        // TODO: These errors are already reported for the value itself.
                                         errors: errors.clone(),
                                     },
                                     None,
@@ -346,9 +344,8 @@ impl Context<'_> {
 
                             (pattern, body)
                         }
-                        AstKind::Error { errors, .. } => {
+                        AstKind::Error { errors } => {
                             let pattern = Pattern::Error {
-                                child: None,
                                 errors: errors.to_owned(),
                             };
 
@@ -374,17 +371,13 @@ impl Context<'_> {
             AstKind::OrPattern(_) => {
                 unreachable!("Or patterns should be handled in `PatternContext`.")
             }
-            AstKind::Error { child, errors } => {
-                let child = child.as_ref().map(|child| self.compile_single(child));
-                self.push(
-                    ast.id.clone(),
-                    Expression::Error {
-                        child,
-                        errors: errors.clone(),
-                    },
-                    None,
-                )
-            }
+            AstKind::Error { errors } => self.push(
+                ast.id.clone(),
+                Expression::Error {
+                    errors: errors.clone(),
+                },
+                None,
+            ),
         }
     }
 
@@ -721,7 +714,6 @@ impl Context<'_> {
         self.push(
             ast_id,
             Expression::Error {
-                child: None,
                 errors: vec![CompilerError {
                     module: self.module.clone(),
                     span,
@@ -891,8 +883,6 @@ impl<'a> PatternContext<'a> {
                                     value: None,
                                 },
                                 AstKind::Error { errors, .. } => Pattern::Error {
-                                    child: None,
-                                    // TODO: These errors are already reported for the value itself.
                                     errors: errors.to_owned(),
                                 },
                                 _ => panic!(
@@ -938,7 +928,6 @@ impl<'a> PatternContext<'a> {
                 Pattern::Or(patterns)
             }
             AstKind::Error { errors, .. } => Pattern::Error {
-                child: None,
                 errors: errors.to_owned(),
             },
         }
@@ -946,7 +935,6 @@ impl<'a> PatternContext<'a> {
 
     fn error(&self, ast: &Ast, error: HirError) -> Pattern {
         Pattern::Error {
-            child: None,
             errors: vec![CompilerError {
                 module: self.module.clone(),
                 span: self.db.ast_id_to_span(ast.id.clone()).unwrap(),
