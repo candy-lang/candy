@@ -90,7 +90,7 @@ pub fn format_value<'a, T: 'a + Copy>(
                 return Some("…".to_string());
             }
 
-            let mut string = "".to_string();
+            let mut string = String::new();
             if needs_parentheses {
                 string.push('(');
             }

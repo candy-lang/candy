@@ -150,7 +150,7 @@ impl<C: IsMultiline> IsMultiline for Vec<C> {
 
 impl<T: IsMultiline> IsMultiline for Option<T> {
     fn is_multiline(&self) -> bool {
-        self.as_ref().map_or(false, |it| it.is_multiline())
+        self.as_ref().map_or(false, IsMultiline::is_multiline)
     }
 }
 
