@@ -2,10 +2,9 @@ use crate::{
     ast_to_hir::AstToHir,
     builtin_functions::BuiltinFunction,
     error::CompilerError,
-    id::CountableId,
-    impl_display_via_richir,
+    impl_countable_id, impl_display_via_richir,
     module::{Module, ModuleKind, Package},
-    rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr, TokenModifier, TokenType},
+    rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr, TokenType},
 };
 
 use derive_more::From;
@@ -351,14 +350,7 @@ impl Hash for Expression {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PatternIdentifierId(pub usize);
-impl CountableId for PatternIdentifierId {
-    fn from_usize(id: usize) -> Self {
-        Self(id)
-    }
-    fn to_usize(&self) -> usize {
-        self.0
-    }
-}
+impl_countable_id!(PatternIdentifierId);
 impl Debug for PatternIdentifierId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "pattern_identifier_{:x}", self.0)
@@ -532,8 +524,7 @@ impl ToRichIr for Expression {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         match self {
             Expression::Int(int) => {
-                let range = builder.push(int.to_string(), TokenType::Int, EnumSet::empty());
-                builder.push_reference(ReferenceKey::Int(int.to_owned().into()), range);
+                int.build_rich_ir(builder);
             }
             Expression::Text(text) => {
                 let range =
@@ -610,12 +601,7 @@ impl ToRichIr for Expression {
                 builder.push("}", None, EnumSet::empty());
             }
             Expression::Builtin(builtin) => {
-                let range = builder.push(
-                    format!("builtin{builtin:?}"),
-                    TokenType::Function,
-                    EnumSet::only(TokenModifier::Builtin),
-                );
-                builder.push_reference(*builtin, range);
+                builtin.build_rich_ir(builder);
             }
             Expression::Call {
                 function,
