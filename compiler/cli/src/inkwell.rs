@@ -69,49 +69,15 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
     }
 
     let context = candy_backend_inkwell::inkwell::context::Context::create();
-    let codegen = CodeGen::new(&context, &path, mir);
+    let mut codegen = CodeGen::new(&context, &path, mir);
     let mut bc_path = PathBuf::new();
     bc_path.push(&format!("{path}.bc"));
     codegen
         .compile(&bc_path, options.print_llvm_ir, options.print_main_output)
         .map_err(|e| Exit::LlvmError(e.to_string()))?;
-    std::process::Command::new("llc")
-        .arg(&bc_path)
-        .args(["-O3"])
-        .spawn()
-        .unwrap()
-        .wait()
-        .unwrap();
-    if options.build_rt {
-        std::process::Command::new("make")
-            .args(["-C", "compiler/backend_inkwell/candy_rt/", "clean"])
-            .spawn()
-            .unwrap()
-            .wait()
-            .unwrap();
-
-        std::process::Command::new("make")
-            .args(["-C", "compiler/backend_inkwell/candy_rt/", "candy_rt.a"])
-            .spawn()
-            .unwrap()
-            .wait()
-            .unwrap();
-    }
-    let s_path = PathBuf::from(format!("{path}.s"));
-    std::process::Command::new("clang")
-        .args([
-            s_path.to_str().unwrap(),
-            "compiler/backend_inkwell/candy_rt/candy_rt.a",
-            if options.debug { "-g" } else { "" },
-            "-O3",
-            "-flto",
-            "-o",
-            &s_path.to_str().unwrap().replace(".candy.s", ""),
-        ])
-        .spawn()
-        .unwrap()
-        .wait()
-        .unwrap();
+    codegen
+        .compile_asm_and_link(&path, options.build_rt, options.debug)
+        .map_err(|_| Exit::ExternalError)?;
 
     ProgramResult::Ok(())
 }

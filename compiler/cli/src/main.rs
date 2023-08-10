@@ -58,6 +58,7 @@ type ProgramResult = Result<(), Exit>;
 enum Exit {
     CodePanicked,
     DirectoryNotFound,
+    ExternalError,
     FileNotFound,
     FuzzingFoundFailingCases,
     NotInCandyPackage,
