@@ -1,8 +1,9 @@
 use lazy_static::lazy_static;
 use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
+use strum_macros::{AsRefStr, EnumIter};
 
-#[derive(Clone, Copy, Debug, EnumIter, Eq, Hash, PartialEq)]
+#[derive(AsRefStr, Clone, Copy, Debug, EnumIter, Eq, Hash, PartialEq)]
+#[strum(serialize_all = "snake_case")]
 pub enum BuiltinFunction {
     ChannelCreate,       // capacity -> [sendPort, receivePort]
     ChannelSend,         // channel any -> Nothing

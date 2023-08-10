@@ -193,7 +193,7 @@ void candy_panic(const candy_value_t *reason)
 
 void free_candy_value(candy_value_t *value)
 {
-    if (value == candy_environment && value == NULL)
+    if (value == candy_environment || value == NULL)
     {
         return;
     }
