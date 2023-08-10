@@ -85,6 +85,7 @@ jobs:
         uses: peter-evans/create-or-update-comment@v3.0.2
         with:
           issue-number: ${{ github.event.pull_request.number }}
+          token: ${{ secrets.GOLDEN_IR_COMMENT_TOKEN }}
           body: |
             The golden IRs have changed: https://github.com/candy-lang/golden-irs/compare/${{ github.base_ref }}_..${{ github.head_ref }}_
 
