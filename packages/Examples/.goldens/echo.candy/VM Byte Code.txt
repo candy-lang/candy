@@ -97,11 +97,11 @@
 <replaced address f921b2be2e6a74f5>: "`function | ✨.getArgumentCount | equals 0` was not satisfied"
 
 # Instructions
-# anonymous:$generated::needs:isConditionTrue:then
+# Builtins::ifElse:1:case-0:matched, Core:bool:lazyOr:18:case-0:matched, Builtins::not:1:case-1:matched, Core:bool:is:1:case-0:matched, Builtins::isLessThanOrEqualTo:19:case-0:matched, anonymous:$generated::needs:isConditionTrue:then, Core:bool:not:6:case-1:matched, Builtins::isNonNegative:13:case-0:matched
   0: pushConstant inline <symbol-id 17>
   1: popMultipleBelowTop 1
   2: return
-# anonymous:$generated::needs:isConditionBool:then
+# Core:int:31:isMatch:then, Core:type:20:isMatch:then, Core:text:31:isMatch:then, Core:check:20:isMatch:then, Core:fixedDecimal:divideTruncating:37:isMatch:then, Core:iterable:88:11:1:isMatch:then, Core::31:isMatch:then, Core:iterable:91:2:11:1:isMatch:then, Core:controlFlow:31:isMatch:then, Core:iterable:withIndex:11:1:isMatch:then, Core:iterable:map:19:11:1:isMatch:then, Core:iterable:take:33:1:isMatch:then, Core:result:20:isMatch:then, Core:function:20:isMatch:then, Core:fixedDecimal:108:isMatch:then, Core:bool:9:isMatch:then, Core:fixedDecimal:add:14:isMatch:then, Core::108:isMatch:then, Core:iterable:reduceLeft:38:1:isMatch:then, Core:fixedDecimal:42:isMatch:then, Core:iterable:takeWhile:2:11:1:isMatch:then, Core::174:isMatch:then, Core:struct:20:isMatch:then, Core:list:generate:60:1:isMatch:then, Core:controlFlow:53:isMatch:then, Core:fixedDecimal:31:isMatch:then, Core:list:42:isMatch:then, Core:iterable:generateWithState:14:0:11:1:isMatch:then, Examples:echo:9:isMatch:then, anonymous:$generated::needs:condition:then, Core:tag:31:isMatch:then, Core:controlFlow:if:27, Core:int:42:isMatch:then, Core:fixedDecimal:subtract:14:isMatch:then, Core:fixedDecimal:divideTruncatingAtScale:42:isMatch:then, Core::163:isMatch:then, Core:int:53:isMatch:then, anonymous:$generated::needs:isReasonText:then, Core:text:42:isMatch:then, Core:int:pow:21:1:isMatch:then, Core:fixedDecimal:compareTo:14:isMatch:then, Core::20:isMatch:then, Core:iterable:withIndex:11:14:1:isMatch:then, Core:fixedDecimal:20:isMatch:then, Core:fixedDecimal:53:isMatch:then, Core:result:31:isMatch:then, anonymous:$generated::needs:isConditionBool:then, Core:iterable:20:isMatch:then, Core:list:31:isMatch:then, Core:iterable:31:isMatch:then, Core:iterable:94:6:21, Core:iterable:fromList:18:1:isMatch:then, Core::42:isMatch:then
   3: pushConstant inline <symbol-id 10>
   4: popMultipleBelowTop 1
   5: return
@@ -177,11 +177,11 @@
  70: pushFromStack 3
  71: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
  72: tailCall with 19 locals and 3 arguments
-# Builtins::not:1:equals:then
+# Core:bool:lazyAnd:18:equals:then, Builtins::not:1:equals:then, Builtins::ifElse:1:equals:then, Core:bool:is:1:equals:then, Builtins::isNonNegative:13:equals:then, Core:bool:not:6:equals:then, Builtins::isLessThanOrEqualTo:19:equals:then, Core:int:pow:21:4:equals:then, Core:bool:lazyOr:18:equals:then
  73: pushConstant <replaced address a8ce59667c2d1f54> (<symbol-id 18>)
  74: popMultipleBelowTop 1
  75: return
-# Builtins::not:1:case-0:matched
+# Core:list:isValidInsertIndex:21, Core:function:is3:12, Core:function:is2:12, Builtins::isLessThanOrEqualTo:19:case-1:matched, Core:function:is5:12, Builtins::isNonNegative:13:case-1:matched, Core:bool:not:6:case-0:matched, Core:list:isValidIndex:21, Builtins::not:1:case-0:matched, Core:function:is0:12, Core:function:is4:12, Core:function:is1:12, Core:bool:lazyAnd:18:case-1:matched
  76: pushConstant inline <symbol-id 3>
  77: popMultipleBelowTop 1
  78: return

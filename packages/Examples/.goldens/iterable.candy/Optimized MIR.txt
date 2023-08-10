@@ -350,11 +350,11 @@ $341 = "t"
 $342 = "u"
 $343 = "w"
 $344 = "x"
-# anonymous:$generated::needs:isConditionTrue:then
+# Builtins::ifElse:1:case-0:matched, Builtins::isLessThanOrEqualTo:19:case-0:matched, Builtins::isNonNegative:13:case-0:matched, Builtins::not:1:case-1:matched, Core:bool:is:1:case-0:matched, Core:bool:lazyOr:18:case-0:matched, Core:bool:not:6:case-1:matched, anonymous:$generated::needs:isConditionTrue:then
 $345 = { (responsible $346) ->
   $347 = $257
 }
-# anonymous:$generated::needs:isConditionBool:then
+# Core::20:isMatch:then, Core::31:isMatch:then, Core::42:isMatch:then, Core::108:isMatch:then, Core::163:isMatch:then, Core::174:isMatch:then, Core:bool:9:isMatch:then, Core:check:20:isMatch:then, Core:controlFlow:if:27, Core:controlFlow:31:isMatch:then, Core:controlFlow:53:isMatch:then, Core:fixedDecimal:add:14:isMatch:then, Core:fixedDecimal:compareTo:14:isMatch:then, Core:fixedDecimal:divideTruncating:37:isMatch:then, Core:fixedDecimal:divideTruncatingAtScale:42:isMatch:then, Core:fixedDecimal:subtract:14:isMatch:then, Core:fixedDecimal:20:isMatch:then, Core:fixedDecimal:31:isMatch:then, Core:fixedDecimal:42:isMatch:then, Core:fixedDecimal:53:isMatch:then, Core:fixedDecimal:108:isMatch:then, Core:function:20:isMatch:then, Core:int:pow:21:1:isMatch:then, Core:int:31:isMatch:then, Core:int:42:isMatch:then, Core:int:53:isMatch:then, Core:iterable:fromList:18:1:isMatch:then, Core:iterable:generateWithState:14:0:11:1:isMatch:then, Core:iterable:map:19:11:1:isMatch:then, Core:iterable:reduceLeft:38:1:isMatch:then, Core:iterable:take:33:1:isMatch:then, Core:iterable:takeWhile:2:11:1:isMatch:then, Core:iterable:withIndex:11:1:isMatch:then, Core:iterable:withIndex:11:14:1:isMatch:then, Core:iterable:20:isMatch:then, Core:iterable:31:isMatch:then, Core:iterable:88:11:1:isMatch:then, Core:iterable:91:2:11:1:isMatch:then, Core:iterable:94:6:21, Core:list:generate:60:1:isMatch:then, Core:list:31:isMatch:then, Core:list:42:isMatch:then, Core:result:20:isMatch:then, Core:result:31:isMatch:then, Core:struct:20:isMatch:then, Core:tag:31:isMatch:then, Core:text:31:isMatch:then, Core:text:42:isMatch:then, Core:type:20:isMatch:then, Examples:iterable:split:9:29, Examples:iterable:20:isMatch:then, anonymous:$generated::needs:condition:then, anonymous:$generated::needs:isConditionBool:then, anonymous:$generated::needs:isReasonText:then
 $348 = { (responsible $349) ->
   $350 = $249
 }
@@ -385,11 +385,11 @@ $351 = { $352 $353 $354 (+ responsible $355) ->
   $374 = call $220 with $352 $348 $371 ($217 is responsible)
 }
 $375 = ($247,)
-# Builtins::not:1:equals:then
+# Builtins::ifElse:1:equals:then, Builtins::isLessThanOrEqualTo:19:equals:then, Builtins::isNonNegative:13:equals:then, Builtins::not:1:equals:then, Core:bool:is:1:equals:then, Core:bool:lazyAnd:18:equals:then, Core:bool:lazyOr:18:equals:then, Core:bool:not:6:equals:then, Core:int:pow:21:4:equals:then
 $376 = { (responsible $377) ->
   $378 = $375
 }
-# Builtins::not:1:case-0:matched
+# Builtins::isLessThanOrEqualTo:19:case-1:matched, Builtins::isNonNegative:13:case-1:matched, Builtins::not:1:case-0:matched, Core:bool:lazyAnd:18:case-1:matched, Core:bool:not:6:case-0:matched, Core:function:is0:12, Core:function:is1:12, Core:function:is2:12, Core:function:is3:12, Core:function:is4:12, Core:function:is5:12, Core:list:isValidIndex:21, Core:list:isValidInsertIndex:21
 $379 = { (responsible $380) ->
   $381 = $237
 }
@@ -1640,7 +1640,7 @@ $1420 = { $1421 $1422 (+ responsible $1423) ->
   $1513 = call $1504 with $1504 $1421 ($86 is responsible)
 }
 $1514 = Error $234
-# Core:iterable:generate:50:5
+# Core:iterable:fromList:18:15, Core:iterable:generate:50:5, Core:iterable:takeWhile:2:11:8, Core:iterable:windowed:67:30
 $1515 = { (responsible $1516) ->
   $1517 = $1514
 }
@@ -1842,7 +1842,7 @@ $1694 = ($279, $331, $335, $335, $338, $263, $261, $343, $338, $339, $335, $330,
 $1695 = [$240: $258, $243: $1694]
 # Examples:iterable:22
 $1696 = { $1697 (+ responsible $1698) ->
-  # Examples:iterable:22:print
+  # Examples:iterable:22:print, Examples:iterable:22:35
   $1699 = { $1700 (+ responsible $1701) ->
     $1702 = call $233 with $1697 ($46 is responsible)
     $1703 = call $218 with $1702 $254 ($47 is responsible)

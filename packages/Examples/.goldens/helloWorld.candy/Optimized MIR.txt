@@ -32,11 +32,11 @@ $23 = "The `condition` must be either `True` or `False`."
 $24 = "The `reason` must be a text."
 $25 = "`struct | typeIs Struct` was not satisfied"
 $26 = "`struct | ✨.structHasKey key` was not satisfied"
-# anonymous:$generated::needs:isConditionTrue:then
+# Builtins::ifElse:1:case-0:matched, Builtins::isLessThanOrEqualTo:19:case-0:matched, Builtins::isNonNegative:13:case-0:matched, Builtins::not:1:case-1:matched, anonymous:$generated::needs:isConditionTrue:then
 $27 = { (responsible $28) ->
   $29 = $21
 }
-# anonymous:$generated::needs:isConditionBool:then
+# anonymous:$generated::needs:condition:then, anonymous:$generated::needs:isConditionBool:then, anonymous:$generated::needs:isReasonText:then
 $30 = { (responsible $31) ->
   $32 = $17
 }

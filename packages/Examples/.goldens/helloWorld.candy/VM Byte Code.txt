@@ -50,11 +50,11 @@
 <replaced address fce18e6881bc359e>: [ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-73 }]
 
 # Instructions
-# anonymous:$generated::needs:isConditionTrue:then
+# Builtins::ifElse:1:case-0:matched, anonymous:$generated::needs:isConditionTrue:then, Builtins::isLessThanOrEqualTo:19:case-0:matched, Builtins::isNonNegative:13:case-0:matched, Builtins::not:1:case-1:matched
   0: pushConstant inline <symbol-id 17>
   1: popMultipleBelowTop 1
   2: return
-# anonymous:$generated::needs:isConditionBool:then
+# anonymous:$generated::needs:isReasonText:then, anonymous:$generated::needs:isConditionBool:then, anonymous:$generated::needs:condition:then
   3: pushConstant inline <symbol-id 10>
   4: popMultipleBelowTop 1
   5: return
