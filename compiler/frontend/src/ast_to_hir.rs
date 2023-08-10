@@ -937,15 +937,10 @@ impl<'a> PatternContext<'a> {
                     .collect();
                 Pattern::Or(patterns)
             }
-            AstKind::Error { child, errors, .. } => {
-                let child = child
-                    .as_ref()
-                    .map(|child| Box::new(self.compile_pattern(child)));
-                Pattern::Error {
-                    child,
-                    errors: errors.to_owned(),
-                }
-            }
+            AstKind::Error { errors, .. } => Pattern::Error {
+                child: None,
+                errors: errors.to_owned(),
+            },
         }
     }
 

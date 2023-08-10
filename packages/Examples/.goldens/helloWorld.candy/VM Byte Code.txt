@@ -19,15 +19,12 @@
 <symbol-id 9>: Main
 <symbol-id 10>: Nothing
 <symbol-id 11>: Ok
-<symbol-id 12>: ReceivePort
-<symbol-id 13>: ReturnChannel
-<symbol-id 14>: SendPort
-<symbol-id 15>: Stdin
-<symbol-id 16>: Stdout
-<symbol-id 17>: Struct
-<symbol-id 18>: Tag
-<symbol-id 19>: Text
-<symbol-id 20>: True
+<symbol-id 12>: Stdin
+<symbol-id 13>: Stdout
+<symbol-id 14>: Struct
+<symbol-id 15>: Tag
+<symbol-id 16>: Text
+<symbol-id 17>: True
 
 # Constant heap
 <replaced address 0fea7d5fa5afcc30>: Builtins::typeIs:25
@@ -37,27 +34,24 @@
 <replaced address 36eebe9168aef0b0>: "The `reason` must be a text."
 <replaced address 3eca0e872d043602>: Builtins::typeIs:19
 <replaced address 422f322f2940db06>: Builtins::structGet:21
-<replaced address 4df64a8049a3109b>: "`sendPort | typeIs SendPort` was not satisfied"
+<replaced address 4447d612bf74ed72>: { 0 arguments (capturing nothing) → ip-108 }
 <replaced address 4f872d5446aebe9e>: { 3 arguments (capturing nothing) → ip-26 }
+<replaced address 53edeed76ed1cc58>: Examples:helloWorld:0:15
 <replaced address 59d6aae2417bc61d>: "Hello, world!"
 <replaced address 59fb4da19b618456>: Builtins::structGet:5
-<replaced address 5c13f185319596c2>: { 0 arguments (capturing nothing) → ip-124 }
 <replaced address 7c987e313b2f2519>: Builtins::structGet:14
 <replaced address 80f4eaa53f4876cd>: anonymous:$generated::needs
-<replaced address 86a1405868de70c7>: Examples:helloWorld:11:7
 <replaced address 8935c17065d0f29c>: Examples:helloWorld:
-<replaced address 8e9e077368ba415d>: Builtins::channelSend:5
 <replaced address 91ccd4b75c545de9>: "The `condition` must be either `True` or `False`."
 <replaced address 996cc5f08093ac25>: "`struct | typeIs Struct` was not satisfied"
-<replaced address 9e6d5bcadaff1a17>: Examples:helloWorld:11:23
-<replaced address b13b38030887e220>: Builtins::channelSend:12
 <replaced address b964d1afe6b190ad>: { 1 argument (capturing nothing) → ip-73 }
+<replaced address c807e11e35c177b0>: Examples:helloWorld:0:7
 <replaced address dc704463e00c0b29>: { 0 arguments (capturing nothing) → ip-3 }
 <replaced address fce18e6881bc359e>: [ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-73 }]
 
 # Instructions
 # Builtins::ifElse:1:case-0:matched, anonymous:$generated::needs:isConditionTrue:then, Builtins::isLessThanOrEqualTo:19:case-0:matched, Builtins::isNonNegative:13:case-0:matched, Builtins::not:1:case-1:matched
-  0: pushConstant inline <symbol-id 20>
+  0: pushConstant inline <symbol-id 17>
   1: popMultipleBelowTop 1
   2: return
 # anonymous:$generated::needs:isReasonText:then, anonymous:$generated::needs:isConditionBool:then, anonymous:$generated::needs:condition:then
@@ -83,15 +77,15 @@
  19: popMultipleBelowTop 2
  20: return
 # anonymous:$generated::needs:condition:else
- 21: pushFromStack 2
- 22: pushFromStack 2
+ 21: pushFromStack 1
+ 22: pushFromStack 3
  23: panic
  24: popMultipleBelowTop 3
  25: return
 # anonymous:$generated::needs
  26: pushConstant inline builtinEquals
  27: pushFromStack 4
- 28: pushConstant inline <symbol-id 20>
+ 28: pushConstant inline <symbol-id 17>
  29: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
  30: call with 2 arguments
  31: pushFromStack 4
@@ -116,7 +110,7 @@
  50: call with 1 argument
  51: pushConstant inline builtinEquals
  52: pushFromStack 1
- 53: pushConstant inline <symbol-id 19>
+ 53: pushConstant inline <symbol-id 16>
  54: pushFromStack 6
  55: call with 2 arguments
  56: pushFromStack 4
@@ -127,8 +121,8 @@
  61: pushFromStack 3
  62: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
  63: call with 3 arguments
- 64: pushFromStack 14
- 65: pushFromStack 14
+ 64: pushFromStack 13
+ 65: pushFromStack 15
  66: createFunction with 0 arguments capturing 1, 0 starting at ip-21
  67: pushConstant inline builtinIfElse
  68: pushFromStack 14
@@ -136,59 +130,43 @@
  70: pushFromStack 3
  71: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
  72: tailCall with 19 locals and 3 arguments
-# Examples:helloWorld:11
+# Examples:helloWorld:0
  73: pushConstant inline builtinTypeOf
  74: pushFromStack 2
  75: pushConstant <replaced address 3eca0e872d043602> Builtins::typeIs:19
  76: call with 1 argument
  77: pushConstant inline builtinEquals
  78: pushFromStack 1
- 79: pushConstant inline <symbol-id 17>
+ 79: pushConstant inline <symbol-id 14>
  80: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
  81: call with 2 arguments
  82: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
  83: pushFromStack 1
  84: pushConstant <replaced address 996cc5f08093ac25> "`struct | typeIs Struct` was not satisfied"
- 85: pushConstant <replaced address 86a1405868de70c7> Examples:helloWorld:11:7
+ 85: pushConstant <replaced address c807e11e35c177b0> Examples:helloWorld:0:7
  86: pushConstant <replaced address 59fb4da19b618456> Builtins::structGet:5
  87: call with 3 arguments
  88: pushConstant inline builtinStructHasKey
  89: pushFromStack 5
- 90: pushConstant inline <symbol-id 16>
+ 90: pushConstant inline <symbol-id 13>
  91: pushConstant <replaced address 1f92019f89733a43> Builtins::structGet:12
  92: call with 2 arguments
  93: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
  94: pushFromStack 1
  95: pushConstant <replaced address 18dc4adab2c8e8df> "`struct | ✨.structHasKey key` was not satisfied"
- 96: pushConstant <replaced address 86a1405868de70c7> Examples:helloWorld:11:7
+ 96: pushConstant <replaced address c807e11e35c177b0> Examples:helloWorld:0:7
  97: pushConstant <replaced address 7c987e313b2f2519> Builtins::structGet:14
  98: call with 3 arguments
  99: pushConstant inline builtinStructGet
 100: pushFromStack 7
-101: pushConstant inline <symbol-id 16>
+101: pushConstant inline <symbol-id 13>
 102: pushConstant <replaced address 422f322f2940db06> Builtins::structGet:21
 103: call with 2 arguments
-104: pushConstant inline builtinTypeOf
-105: pushFromStack 1
-106: pushConstant <replaced address 3eca0e872d043602> Builtins::typeIs:19
-107: call with 1 argument
-108: pushConstant inline builtinEquals
-109: pushFromStack 1
-110: pushConstant inline <symbol-id 14>
-111: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
-112: call with 2 arguments
-113: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
-114: pushFromStack 1
-115: pushConstant <replaced address 4df64a8049a3109b> "`sendPort | typeIs SendPort` was not satisfied"
-116: pushConstant <replaced address 9e6d5bcadaff1a17> Examples:helloWorld:11:23
-117: pushConstant <replaced address 8e9e077368ba415d> Builtins::channelSend:5
-118: call with 3 arguments
-119: pushConstant inline builtinChannelSend
-120: pushFromStack 4
-121: pushConstant <replaced address 59d6aae2417bc61d> "Hello, world!"
-122: pushConstant <replaced address b13b38030887e220> Builtins::channelSend:12
-123: tailCall with 11 locals and 2 arguments
+104: pushFromStack 0
+105: pushConstant <replaced address 59d6aae2417bc61d> "Hello, world!"
+106: pushConstant <replaced address 53edeed76ed1cc58> Examples:helloWorld:0:15
+107: tailCall with 8 locals and 1 argument
 # Examples:helloWorld:
-124: pushConstant <replaced address fce18e6881bc359e> [ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-73 }]
-125: popMultipleBelowTop 1
-126: return
+108: pushConstant <replaced address fce18e6881bc359e> [ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-73 }]
+109: popMultipleBelowTop 1
+110: return

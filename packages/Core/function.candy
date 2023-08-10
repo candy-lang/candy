@@ -38,4 +38,3 @@ doNotRun body :=
   # - Making the code invalid (for example, by deleting needed functions) results in compiler
   #   errors.
   needs (is0 body)
-  Nothing

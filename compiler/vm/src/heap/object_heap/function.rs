@@ -1,10 +1,10 @@
 use super::{utils::heap_object_impls, HeapObjectTrait};
 use crate::{
-    fiber::InstructionPointer,
     heap::{
         object_heap::HeapObject, symbol_table::impl_ord_with_symbol_table_via_ord, Heap,
         InlineObject,
     },
+    instruction_pointer::InstructionPointer,
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
 use derive_more::Deref;
@@ -179,11 +179,6 @@ impl HeapObjectTrait for HeapFunction {
         }
     }
 
-    fn dup_children(self, heap: &mut Heap) {
-        for captured in self.captured() {
-            captured.dup(heap);
-        }
-    }
     fn drop_children(self, heap: &mut Heap) {
         for captured in self.captured() {
             captured.drop(heap);

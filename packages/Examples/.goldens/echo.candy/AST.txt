@@ -1,43 +1,27 @@
 # AST for module Examples:echo
 assignment: struct
-  identifier $6@"async"
-  identifier $8@"await"
-  identifier $10@"channel"
-  identifier $12@"function"
-  identifier $14@"text" = 
+  identifier $6@"function"
+  identifier $8@"text" = 
   call identifier $0@"use" with these arguments:
     text
       textPart $2@"Core"
-assignment: identifier $108@"main" := 
-  function (non-fuzzable) { identifier $18@"environment" ->
-    assignment: $42@"print" = function (fuzzable) { identifier $43@"message" ->
-      call identifier $20@"needs" with these arguments:
-        call struct access identifier $22@"text".$24@"Is" with these arguments:
-          identifier $26@"message"
-      call struct access identifier $34@"channel".$36@"Send" with these arguments:
-        struct access identifier $30@"environment".$32@"Stdout"
-        identifier $38@"message"
+assignment: identifier $60@"main" := 
+  function (non-fuzzable) { identifier $12@"environment" ->
+    assignment: $21@"print" = function (fuzzable) { identifier $22@"message" ->
+      call struct access identifier $14@"environment".$16@"Stdout" with these arguments:
+        identifier $18@"message"
     }
-    assignment: identifier $77@"read" = 
-      function (non-fuzzable) {
-        assignment: identifier $52@"response" = 
-          call struct access identifier $46@"channel".$48@"Create" with these arguments:
-            int 1
-        call struct access identifier $59@"channel".$61@"Send" with these arguments:
-          struct access identifier $55@"environment".$57@"Stdin"
-          struct access identifier $63@"response".$65@"SendPort"
-        call identifier $69@"await" with these arguments:
-          struct access identifier $71@"response".$73@"ReceivePort"
-      }
-    call identifier $80@"print" with these arguments:
+    assignment: identifier $29@"read" = 
+      struct access identifier $25@"environment".$27@"Stdin"
+    call identifier $32@"print" with these arguments:
       text
-        textPart $82@"Hello, world!"
-    assignment: identifier $93@"foo" = 
-      call struct access identifier $86@"function".$88@"Run" with these arguments:
-        identifier $90@"read"
-    call identifier $96@"print" with these arguments:
+        textPart $34@"Hello, world!"
+    assignment: identifier $45@"foo" = 
+      call struct access identifier $38@"function".$40@"Run" with these arguments:
+        identifier $42@"read"
+    call identifier $48@"print" with these arguments:
       text
-        textPart $98@"Echo:"
-    call identifier $102@"print" with these arguments:
-      identifier $104@"foo"
+        textPart $50@"Echo:"
+    call identifier $54@"print" with these arguments:
+      identifier $56@"foo"
   }

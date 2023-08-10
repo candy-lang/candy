@@ -19,29 +19,26 @@
 <symbol-id 9>: Main
 <symbol-id 10>: Nothing
 <symbol-id 11>: Ok
-<symbol-id 12>: ReceivePort
-<symbol-id 13>: ReturnChannel
-<symbol-id 14>: SendPort
-<symbol-id 15>: Stdin
-<symbol-id 16>: Stdout
-<symbol-id 17>: Struct
-<symbol-id 18>: Tag
-<symbol-id 19>: Text
-<symbol-id 20>: True
+<symbol-id 12>: Stdin
+<symbol-id 13>: Stdout
+<symbol-id 14>: Struct
+<symbol-id 15>: Tag
+<symbol-id 16>: Text
+<symbol-id 17>: True
 
 # Constant heap
 <replaced address 3974cba2aa713a1b>: [ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-0 }]
 <replaced address 3b3270094f01d6b0>: { 1 argument (capturing nothing) → ip-0 }
-<replaced address 55043490d5f24695>: Builtins::print:11
 <replaced address a299eca8798bd5e6>: "3"
 <replaced address c52c1f71bac3244c>: Examples::
+<replaced address c9d6cc94f9cedabb>: Builtins::print:5
 <replaced address e7f9ff3e6aa5eb6a>: { 0 arguments (capturing nothing) → ip-4 }
 
 # Instructions
 # Examples::11
 0: pushConstant inline builtinPrint
 1: pushConstant <replaced address a299eca8798bd5e6> "3"
-2: pushConstant <replaced address 55043490d5f24695> Builtins::print:11
+2: pushConstant <replaced address c9d6cc94f9cedabb> Builtins::print:5
 3: tailCall with 2 locals and 1 argument
 # Examples::
 4: pushConstant <replaced address 3974cba2aa713a1b> [ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-0 }]

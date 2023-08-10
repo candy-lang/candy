@@ -188,11 +188,6 @@ impl HeapObjectTrait for HeapList {
         }
     }
 
-    fn dup_children(self, heap: &mut Heap) {
-        for item in self.items() {
-            item.dup(heap)
-        }
-    }
     fn drop_children(self, heap: &mut Heap) {
         for item in self.items() {
             item.drop(heap)

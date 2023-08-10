@@ -1,8 +1,8 @@
 use crate::{
-    fiber::InstructionPointer,
     heap::{
         Builtin, Function, Heap, HirId, InlineObject, Int, List, Struct, SymbolTable, Tag, Text,
     },
+    instruction_pointer::InstructionPointer,
     lir::{Instruction, Lir, StackOffset},
 };
 use candy_frontend::{

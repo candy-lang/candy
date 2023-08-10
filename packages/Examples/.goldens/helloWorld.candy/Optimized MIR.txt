@@ -6,82 +6,74 @@
 # • Include tracing of calls? No
 # • Include tracing of evaluated expressions? No
 
-$1 = Builtins::channelSend:12
-$2 = Builtins::channelSend:5
-$3 = Builtins::structGet:12
-$4 = Builtins::structGet:14
-$5 = Builtins::structGet:21
-$6 = Builtins::structGet:5
-$7 = Builtins::typeIs:19
-$8 = Builtins::typeIs:25
-$9 = Examples:helloWorld:11:23
-$10 = Examples:helloWorld:11:7
-$11 = anonymous:$generated::needs
-$12 = builtinChannelSend
-$13 = builtinEquals
-$14 = builtinIfElse
-$15 = builtinStructGet
-$16 = builtinStructHasKey
-$17 = builtinTypeOf
-$18 = False
-$19 = Main
-$20 = Nothing
-$21 = SendPort
-$22 = Stdout
-$23 = Struct
-$24 = Text
-$25 = True
-$26 = "Hello, world!"
-$27 = "The `condition` must be either `True` or `False`."
-$28 = "The `reason` must be a text."
-$29 = "`sendPort | typeIs SendPort` was not satisfied"
-$30 = "`struct | typeIs Struct` was not satisfied"
-$31 = "`struct | ✨.structHasKey key` was not satisfied"
+$1 = Builtins::structGet:12
+$2 = Builtins::structGet:14
+$3 = Builtins::structGet:21
+$4 = Builtins::structGet:5
+$5 = Builtins::typeIs:19
+$6 = Builtins::typeIs:25
+$7 = Examples:helloWorld:0:15
+$8 = Examples:helloWorld:0:7
+$9 = anonymous:$generated::needs
+$10 = builtinEquals
+$11 = builtinIfElse
+$12 = builtinStructGet
+$13 = builtinStructHasKey
+$14 = builtinTypeOf
+$15 = False
+$16 = Main
+$17 = Nothing
+$18 = Stdout
+$19 = Struct
+$20 = Text
+$21 = True
+$22 = "Hello, world!"
+$23 = "The `condition` must be either `True` or `False`."
+$24 = "The `reason` must be a text."
+$25 = "`struct | typeIs Struct` was not satisfied"
+$26 = "`struct | ✨.structHasKey key` was not satisfied"
 # Builtins::ifElse:1:case-0:matched, Builtins::isLessThanOrEqualTo:19:case-0:matched, Builtins::isNonNegative:13:case-0:matched, Builtins::not:1:case-1:matched, anonymous:$generated::needs:isConditionTrue:then
-$32 = { (responsible $33) ->
-  $34 = $25
+$27 = { (responsible $28) ->
+  $29 = $21
 }
 # anonymous:$generated::needs:condition:then, anonymous:$generated::needs:isConditionBool:then, anonymous:$generated::needs:isReasonText:then
-$35 = { (responsible $36) ->
-  $37 = $20
+$30 = { (responsible $31) ->
+  $32 = $17
 }
 # anonymous:$generated::needs
-$38 = { $39 $40 $41 (+ responsible $42) ->
-  $43 = call $13 with $39 $25 ($11 is responsible)
+$33 = { $34 $35 $36 (+ responsible $37) ->
+  $38 = call $10 with $34 $21 ($9 is responsible)
   # anonymous:$generated::needs:isConditionTrue:else
-  $44 = { (responsible $45) ->
-    $46 = call $13 with $39 $18 ($11 is responsible)
+  $39 = { (responsible $40) ->
+    $41 = call $10 with $34 $15 ($9 is responsible)
   }
-  $47 = call $14 with $43 $32 $44 ($11 is responsible)
+  $42 = call $11 with $38 $27 $39 ($9 is responsible)
   # anonymous:$generated::needs:isConditionBool:else
-  $48 = { (responsible $49) ->
-    $50 = panicking because $27 ($42 is at fault)
+  $43 = { (responsible $44) ->
+    $45 = panicking because $23 ($37 is at fault)
   }
-  $51 = call $14 with $47 $35 $48 ($11 is responsible)
-  $52 = call $17 with $40 ($42 is responsible)
-  $53 = call $13 with $52 $24 ($42 is responsible)
+  $46 = call $11 with $42 $30 $43 ($9 is responsible)
+  $47 = call $14 with $35 ($37 is responsible)
+  $48 = call $10 with $47 $20 ($37 is responsible)
   # anonymous:$generated::needs:isReasonText:else
-  $54 = { (responsible $55) ->
-    $56 = panicking because $28 ($42 is at fault)
+  $49 = { (responsible $50) ->
+    $51 = panicking because $24 ($37 is at fault)
   }
-  $57 = call $14 with $53 $35 $54 ($11 is responsible)
+  $52 = call $11 with $48 $30 $49 ($9 is responsible)
   # anonymous:$generated::needs:condition:else
-  $58 = { (responsible $59) ->
-    $60 = panicking because $40 ($41 is at fault)
+  $53 = { (responsible $54) ->
+    $55 = panicking because $35 ($36 is at fault)
   }
-  $61 = call $14 with $39 $35 $58 ($11 is responsible)
+  $56 = call $11 with $34 $30 $53 ($9 is responsible)
 }
-# Examples:helloWorld:11
-$62 = { $63 (+ responsible $64) ->
-  $65 = call $17 with $63 ($7 is responsible)
-  $66 = call $13 with $65 $23 ($8 is responsible)
-  $67 = call $38 with $66 $30 $10 ($6 is responsible)
-  $68 = call $16 with $63 $22 ($3 is responsible)
-  $69 = call $38 with $68 $31 $10 ($4 is responsible)
-  $70 = call $15 with $63 $22 ($5 is responsible)
-  $71 = call $17 with $70 ($7 is responsible)
-  $72 = call $13 with $71 $21 ($8 is responsible)
-  $73 = call $38 with $72 $29 $9 ($2 is responsible)
-  $74 = call $12 with $70 $26 ($1 is responsible)
+# Examples:helloWorld:0
+$57 = { $58 (+ responsible $59) ->
+  $60 = call $14 with $58 ($5 is responsible)
+  $61 = call $10 with $60 $19 ($6 is responsible)
+  $62 = call $33 with $61 $25 $8 ($4 is responsible)
+  $63 = call $13 with $58 $18 ($1 is responsible)
+  $64 = call $33 with $63 $26 $8 ($2 is responsible)
+  $65 = call $12 with $58 $18 ($3 is responsible)
+  $66 = call $65 with $22 ($7 is responsible)
 }
-$75 = [$19: $62]
+$67 = [$16: $57]

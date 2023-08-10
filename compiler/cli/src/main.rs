@@ -14,7 +14,6 @@ mod debug;
 mod fuzz;
 mod lsp;
 mod run;
-mod services;
 mod utils;
 
 #[derive(Parser, Debug)]
@@ -56,6 +55,7 @@ enum Exit {
     DirectoryNotFound,
     FileNotFound,
     FuzzingFoundFailingCases,
+    NoMainFunction,
     NotInCandyPackage,
     CodeContainsErrors,
     GoldOutdated,

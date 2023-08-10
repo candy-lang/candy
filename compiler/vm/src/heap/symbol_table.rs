@@ -63,9 +63,6 @@ impl Default for SymbolTable {
                 "Main".to_string(),
                 "Nothing".to_string(),
                 "Ok".to_string(),
-                "ReceivePort".to_string(),
-                "ReturnChannel".to_string(),
-                "SendPort".to_string(),
                 "Stdin".to_string(),
                 "Stdout".to_string(),
                 "Struct".to_string(),
@@ -98,15 +95,12 @@ impl SymbolId {
     pub const MAIN: SymbolId = SymbolId(9);
     pub const NOTHING: SymbolId = SymbolId(10);
     pub const OK: SymbolId = SymbolId(11);
-    pub const RECEIVE_PORT: SymbolId = SymbolId(12);
-    pub const RETURN_CHANNEL: SymbolId = SymbolId(13);
-    pub const SEND_PORT: SymbolId = SymbolId(14);
-    pub const STDIN: SymbolId = SymbolId(15);
-    pub const STDOUT: SymbolId = SymbolId(16);
-    pub const STRUCT: SymbolId = SymbolId(17);
-    pub const TAG: SymbolId = SymbolId(18);
-    pub const TEXT: SymbolId = SymbolId(19);
-    pub const TRUE: SymbolId = SymbolId(20);
+    pub const STDIN: SymbolId = SymbolId(12);
+    pub const STDOUT: SymbolId = SymbolId(13);
+    pub const STRUCT: SymbolId = SymbolId(14);
+    pub const TAG: SymbolId = SymbolId(15);
+    pub const TEXT: SymbolId = SymbolId(16);
+    pub const TRUE: SymbolId = SymbolId(17);
 
     pub fn value(self) -> usize {
         self.0

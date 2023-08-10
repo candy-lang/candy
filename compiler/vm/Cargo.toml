@@ -26,6 +26,7 @@ salsa = "0.16.1"
 strum = { version = "0.25.0", features = ["derive"] }
 tracing = { version = "0.1", features = ["release_max_level_debug"] }
 unicode-segmentation = "1.9.0"
+walkdir = "2.3.3"
 
 [dev-dependencies]
 criterion = "0.5.1"

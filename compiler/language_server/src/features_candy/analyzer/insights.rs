@@ -9,8 +9,8 @@ use candy_frontend::{
 };
 use candy_fuzzer::{Fuzzer, RunResult, Status};
 use candy_vm::{
-    fiber::Panic,
     heap::{DisplayWithSymbolTable, InlineObject, SymbolTable, ToDebugText},
+    Panic,
 };
 use extension_trait::extension_trait;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
@@ -123,39 +123,41 @@ impl Insight {
             }));
         }
 
-        insights.extend(interesting_inputs.into_iter().map(|input| {
-            Insight::Hint(match fuzzer.input_pool().result_of(&input) {
-                RunResult::Timeout => unreachable!(),
-                RunResult::Done(return_value) => Hint {
-                    kind: HintKind::SampleInputReturningNormally,
-                    position: end_of_line,
-                    text: format!(
-                        "{function_name} {} = {}",
-                        input.to_string(&fuzzer.lir.symbol_table),
-                        DisplayWithSymbolTable::to_string(
-                            &return_value.object,
-                            &fuzzer.lir().symbol_table,
+        insights.extend(
+            interesting_inputs.into_iter().map(|input| {
+                Insight::Hint(match fuzzer.input_pool().result_of(&input) {
+                    RunResult::Timeout => unreachable!(),
+                    RunResult::Done { return_value, .. } => Hint {
+                        kind: HintKind::SampleInputReturningNormally,
+                        position: end_of_line,
+                        text: format!(
+                            "{function_name} {} = {}",
+                            input.to_string(&fuzzer.lir.symbol_table),
+                            DisplayWithSymbolTable::to_string(
+                                return_value,
+                                &fuzzer.lir().symbol_table,
+                            ),
                         ),
-                    ),
-                },
-                RunResult::NeedsUnfulfilled { .. } => Hint {
-                    kind: HintKind::SampleInputPanickingWithCallerResponsible,
-                    position: end_of_line,
-                    text: format!(
-                        "{function_name} {}",
-                        input.to_string(&fuzzer.lir.symbol_table)
-                    ),
-                },
-                RunResult::Panicked(_) => Hint {
-                    kind: HintKind::SampleInputPanickingWithInternalCodeResponsible,
-                    position: end_of_line,
-                    text: format!(
-                        "{function_name} {}",
-                        input.to_string(&fuzzer.lir.symbol_table)
-                    ),
-                },
-            })
-        }));
+                    },
+                    RunResult::NeedsUnfulfilled { .. } => Hint {
+                        kind: HintKind::SampleInputPanickingWithCallerResponsible,
+                        position: end_of_line,
+                        text: format!(
+                            "{function_name} {}",
+                            input.to_string(&fuzzer.lir.symbol_table)
+                        ),
+                    },
+                    RunResult::Panicked { .. } => Hint {
+                        kind: HintKind::SampleInputPanickingWithInternalCodeResponsible,
+                        position: end_of_line,
+                        text: format!(
+                            "{function_name} {}",
+                            input.to_string(&fuzzer.lir.symbol_table)
+                        ),
+                    },
+                })
+            }),
+        );
 
         insights
     }

@@ -7,7 +7,7 @@
 # • Include tracing of evaluated expressions? No
 
 # Constants
-%0 = Builtins::print:11
+%0 = Builtins::print:5
 %1 = builtinPrint
 %2 = Main
 %3 = "3"

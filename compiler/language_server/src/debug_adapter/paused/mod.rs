@@ -1,5 +1,5 @@
 use self::{stack_trace::StackFrameKey, utils::IdMapping, variable::VariablesKey};
-use super::vm_state::VmState;
+use super::DebugVm;
 
 mod memory;
 mod scope;
@@ -8,14 +8,14 @@ mod utils;
 mod variable;
 
 pub struct PausedState {
-    pub vm_state: VmState,
+    pub vm: Option<DebugVm>, // only `None` during state transitions
     stack_frame_ids: IdMapping<StackFrameKey>,
     variables_ids: IdMapping<VariablesKey>,
 }
 impl PausedState {
-    pub fn new(vm_state: VmState) -> Self {
+    pub fn new(vm: DebugVm) -> Self {
         Self {
-            vm_state,
+            vm: Some(vm),
             stack_frame_ids: IdMapping::default(),
             variables_ids: IdMapping::default(),
         }

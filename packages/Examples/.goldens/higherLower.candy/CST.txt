@@ -2,18 +2,12 @@
 # Repeatedly asks you for a guess and tells you whether the secret number is
 # higher or lower. Exits once you found the secret number.
 
-[async, await, channel, equals, ifElse, int, loop, result, Function: [run], text] = use "Core"
+[equals, ifElse, int, loop, result, function, text] = use "Core"
+[run] = function
 
 main := { environment ->
-  print message =
-    needs (text.is message)
-    environment.stdout | channel.send message
-
-  read = {
-    response = channel.create 1
-    environment.stdin | channel.send response.sendPort
-    await response.receivePort
-  }
+  print message = environment.stdout message
+  read = { run environment.stdin }
 
   print "Welcome to the number guessing game!"
 

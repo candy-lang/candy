@@ -1,26 +1,23 @@
 use crate::{
     database::Database,
-    services::{stdin::StdinService, stdout::StdoutService},
     utils::{module_for_path, packages_path},
     Exit, ProgramResult,
 };
 use candy_frontend::{ast_to_hir::AstToHir, hir, TracingConfig};
 use candy_vm::{
-    execution_controller::RunForever,
-    fiber::EndedReason,
-    heap::{HirId, SendPort, Struct, SymbolId},
+    heap::{Data, Handle, HirId, Struct, SymbolId, Tag, Text},
     mir_to_lir::compile_lir,
-    return_value_into_main_function,
     tracer::stack_trace::StackTracer,
-    vm::{Status, Vm},
+    StateAfterRunForever, Vm, VmFinished,
 };
 use clap::{Parser, ValueHint};
 use std::{
+    io::{self, BufRead, Write},
     path::PathBuf,
     rc::Rc,
     time::{Duration, Instant},
 };
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 /// Run a Candy program.
 ///
@@ -45,7 +42,6 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     debug!("Running {module}.");
 
     let compilation_start = Instant::now();
-    let mut tracer = StackTracer::default();
     let lir = Rc::new(compile_lir(&db, module, tracing).0);
 
     let compilation_end = Instant::now();
@@ -54,12 +50,14 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         format_duration(compilation_end - compilation_start),
     );
 
-    let mut ended = Vm::for_module(&*lir, &mut tracer).run_until_completion(&mut tracer);
-    let main = match ended.reason {
-        EndedReason::Finished(return_value) => {
-            return_value_into_main_function(&lir.symbol_table, return_value).unwrap()
-        }
-        EndedReason::Panicked(panic) => {
+    let VmFinished {
+        mut heap,
+        tracer,
+        result,
+    } = Vm::for_module(&*lir, StackTracer::default()).run_forever_without_handles();
+    let exports = match result {
+        Ok(exports) => exports,
+        Err(panic) => {
             error!("The module panicked: {}", panic.reason);
             error!("{} is responsible.", panic.responsible);
             if let Some(span) = db.hir_id_to_span(panic.responsible) {
@@ -67,9 +65,16 @@ pub(crate) fn run(options: Options) -> ProgramResult {
             }
             error!(
                 "This is the stack trace:\n{}",
-                tracer.format_panic_stack_trace_to_root_fiber(&db, &lir.as_ref().symbol_table),
+                tracer.format(&db, &lir.as_ref().symbol_table),
             );
             return Err(Exit::CodePanicked);
+        }
+    };
+    let main = match exports.into_main_function(&lir.symbol_table) {
+        Ok(main) => main,
+        Err(error) => {
+            error!("{error}");
+            return Err(Exit::NoMainFunction);
         }
     };
     let discovery_end = Instant::now();
@@ -80,49 +85,63 @@ pub(crate) fn run(options: Options) -> ProgramResult {
 
     debug!("Running main function.");
     // TODO: Add more environment stuff.
-    let mut vm = Vm::uninitialized(lir.clone());
-    let mut stdout = StdoutService::new(&mut vm);
-    let mut stdin = StdinService::new(&mut vm);
-    let fields = [
-        (
-            SymbolId::STDOUT,
-            SendPort::create(&mut ended.heap, stdout.channel),
-        ),
-        (
-            SymbolId::STDIN,
-            SendPort::create(&mut ended.heap, stdin.channel),
-        ),
-    ];
-    let environment = Struct::create_with_symbol_keys(&mut ended.heap, true, fields).into();
-    let mut tracer = StackTracer::default();
-    let platform = HirId::create(&mut ended.heap, true, hir::Id::platform());
-    vm.initialize_for_function(ended.heap, main, &[environment], platform, &mut tracer);
-    loop {
-        match vm.status() {
-            Status::CanRun => {
-                vm.run(&mut RunForever, &mut tracer);
+    let stdout = Handle::new(&mut heap, 1);
+    let stdin = Handle::new(&mut heap, 0);
+    let environment = Struct::create_with_symbol_keys(
+        &mut heap,
+        true,
+        [(SymbolId::STDOUT, **stdout), (SymbolId::STDIN, **stdin)],
+    )
+    .into();
+    let platform = HirId::create(&mut heap, true, hir::Id::platform());
+    let mut vm = Vm::for_function(
+        lir.clone(),
+        heap,
+        main,
+        &[environment],
+        platform,
+        StackTracer::default(),
+    );
+
+    let result = loop {
+        match vm.run_forever() {
+            StateAfterRunForever::CallingHandle(mut call) => {
+                if call.handle == stdout {
+                    let message = call.arguments[0];
+
+                    match message.into() {
+                        Data::Text(text) => println!("{}", text.get()),
+                        _ => info!("Non-text value sent to stdout: {message:?}"),
+                    }
+                    vm = call.complete(Tag::create_nothing());
+                } else if call.handle == stdin {
+                    print!(">> ");
+                    io::stdout().flush().unwrap();
+                    let input = {
+                        let stdin = io::stdin();
+                        stdin.lock().lines().next().unwrap().unwrap()
+                    };
+                    let text = Text::create(call.heap(), true, &input);
+                    vm = call.complete(text);
+                } else {
+                    unreachable!()
+                }
             }
-            Status::WaitingForOperations => {}
-            _ => break,
-        }
-        stdout.run(&mut vm);
-        stdin.run(&mut vm);
-        vm.free_unreferenced_channels();
-    }
-    let ended = vm.tear_down(&mut tracer);
-    let result = match ended.reason {
-        EndedReason::Finished(return_value) => {
-            debug!("The main function returned: {return_value:?}");
-            Ok(())
-        }
-        EndedReason::Panicked(panic) => {
-            error!("The main function panicked: {}", panic.reason);
-            error!("{} is responsible.", panic.responsible);
-            error!(
-                "This is the stack trace:\n{}",
-                tracer.format_panic_stack_trace_to_root_fiber(&db, &lir.as_ref().symbol_table),
-            );
-            Err(Exit::CodePanicked)
+            StateAfterRunForever::Finished(VmFinished { result, .. }) => match result {
+                Ok(return_value) => {
+                    debug!("The main function returned: {return_value:?}");
+                    break Ok(());
+                }
+                Err(panic) => {
+                    error!("The main function panicked: {}", panic.reason);
+                    error!("{} is responsible.", panic.responsible);
+                    error!(
+                        "This is the stack trace:\n{}",
+                        tracer.format(&db, &lir.as_ref().symbol_table),
+                    );
+                    break Err(Exit::CodePanicked);
+                }
+            },
         }
     };
     let execution_end = Instant::now();

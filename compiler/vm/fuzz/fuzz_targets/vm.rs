@@ -18,11 +18,10 @@ use candy_frontend::{
     TracingConfig,
 };
 use candy_vm::{
-    fiber::EndedReason,
     heap::{HirId, Struct},
     mir_to_lir::compile_lir,
     tracer::DummyTracer,
-    vm::Vm,
+    PopulateInMemoryProviderFromFileSystem, Vm, VmFinished,
 };
 use lazy_static::lazy_static;
 use libfuzzer_sys::fuzz_target;
@@ -64,13 +63,19 @@ impl ModuleProviderOwner for Database {
 
 fuzz_target!(|data: &[u8]| {
     let mut db = Database::default();
+    db.module_provider.load_package_from_file_system("Builtins");
     db.module_provider.add(&MODULE, data.to_vec());
 
     let lir = compile_lir(&db, MODULE.clone(), TRACING.clone()).0;
 
-    let result = Vm::for_module(&lir, &mut DummyTracer).run_until_completion(&mut DummyTracer);
-
-    let Ok((mut heap, main)) = result.into_main_function(&lir.symbol_table) else {
+    let VmFinished {
+        mut heap, result, ..
+    } = Vm::for_module(&lir, DummyTracer).run_forever_without_handles();
+    let Ok(exports) = result else {
+        println!("The module panicked.");
+        return;
+    };
+    let Ok(main) = exports.into_main_function(&lir.symbol_table) else {
         println!("The module doesn't export a main function.");
         return;
     };
@@ -78,21 +83,20 @@ fuzz_target!(|data: &[u8]| {
     // Run the `main` function.
     let environment = Struct::create(&mut heap, true, &Default::default());
     let responsible = HirId::create(&mut heap, true, hir::Id::user());
-    match Vm::for_function(
+    let VmFinished { result, .. } = Vm::for_function(
         &lir,
         heap,
         main,
         &[environment.into()],
         responsible,
-        &mut DummyTracer,
+        DummyTracer,
     )
-    .run_until_completion(&mut DummyTracer)
-    .reason
-    {
-        EndedReason::Finished(return_value) => {
+    .run_forever_without_handles();
+    match result {
+        Ok(return_value) => {
             println!("The main function returned: {return_value:?}")
         }
-        EndedReason::Panicked(panic) => {
+        Err(panic) => {
             panic!("The main function panicked: {}", panic.reason)
         }
     }
