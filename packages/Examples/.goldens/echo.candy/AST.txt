@@ -8,36 +8,36 @@ assignment: struct
   call identifier $0@"use" with these arguments:
     text
       textPart $2@"Core"
-assignment: identifier $106@"main" := 
-  function (non-fuzzable) { $18@"environment" ->
-    assignment: $41@"print" = function (fuzzable) { $42@"message" ->
-      call identifier $19@"needs" with these arguments:
-        call struct access identifier $21@"text".$23@"Is" with these arguments:
-          identifier $25@"message"
-      call struct access identifier $33@"channel".$35@"Send" with these arguments:
-        struct access identifier $29@"environment".$31@"Stdout"
-        identifier $37@"message"
+assignment: identifier $108@"main" := 
+  function (non-fuzzable) { identifier $18@"environment" ->
+    assignment: $42@"print" = function (fuzzable) { identifier $43@"message" ->
+      call identifier $20@"needs" with these arguments:
+        call struct access identifier $22@"text".$24@"Is" with these arguments:
+          identifier $26@"message"
+      call struct access identifier $34@"channel".$36@"Send" with these arguments:
+        struct access identifier $30@"environment".$32@"Stdout"
+        identifier $38@"message"
     }
-    assignment: identifier $75@"read" = 
+    assignment: identifier $77@"read" = 
       function (non-fuzzable) {
-        assignment: identifier $50@"response" = 
-          call struct access identifier $44@"channel".$46@"Create" with these arguments:
+        assignment: identifier $52@"response" = 
+          call struct access identifier $46@"channel".$48@"Create" with these arguments:
             int 1
-        call struct access identifier $57@"channel".$59@"Send" with these arguments:
-          struct access identifier $53@"environment".$55@"Stdin"
-          struct access identifier $61@"response".$63@"SendPort"
-        call identifier $67@"await" with these arguments:
-          struct access identifier $69@"response".$71@"ReceivePort"
+        call struct access identifier $59@"channel".$61@"Send" with these arguments:
+          struct access identifier $55@"environment".$57@"Stdin"
+          struct access identifier $63@"response".$65@"SendPort"
+        call identifier $69@"await" with these arguments:
+          struct access identifier $71@"response".$73@"ReceivePort"
       }
-    call identifier $78@"print" with these arguments:
+    call identifier $80@"print" with these arguments:
       text
-        textPart $80@"Hello, world!"
-    assignment: identifier $91@"foo" = 
-      call struct access identifier $84@"function".$86@"Run" with these arguments:
-        identifier $88@"read"
-    call identifier $94@"print" with these arguments:
+        textPart $82@"Hello, world!"
+    assignment: identifier $93@"foo" = 
+      call struct access identifier $86@"function".$88@"Run" with these arguments:
+        identifier $90@"read"
+    call identifier $96@"print" with these arguments:
       text
-        textPart $96@"Echo:"
-    call identifier $100@"print" with these arguments:
-      identifier $102@"foo"
+        textPart $98@"Echo:"
+    call identifier $102@"print" with these arguments:
+      identifier $104@"foo"
   }

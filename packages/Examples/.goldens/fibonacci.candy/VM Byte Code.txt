@@ -28,17 +28,13 @@
 <symbol-id 18>: Tag
 <symbol-id 19>: Text
 <symbol-id 20>: True
-<symbol-id 21>: CompareTo
-<symbol-id 22>: IsLessThan
-<symbol-id 23>: Match
-<symbol-id 24>: NoMatch
-<symbol-id 25>: Recursive
+<symbol-id 21>: Match
+<symbol-id 22>: NoMatch
 
 # Constant heap
 <replaced address 07c1052bec280409>: "`then | typeIs Function` was not satisfied"
 <replaced address 09452ee45e345fc6>: Examples:fibonacci:fibonacci:2:11
 <replaced address 0fea7d5fa5afcc30>: Builtins::typeIs:25
-<replaced address 11f228ba46161b7c>: { 2 arguments (capturing nothing) → ip-670 }
 <replaced address 13bbc38331a2c1a7>: Builtins::intSubtract:18
 <replaced address 14cee9bee8ce4007>: Examples:fibonacci:fibonacci:2:14
 <replaced address 1e8bfe6c9766355f>: Builtins::ifElse:20
@@ -47,6 +43,7 @@
 <replaced address 2ace5f047eecfe6e>: Builtins::ifElse:1
 <replaced address 2ded061b072e15be>: { 0 arguments (capturing nothing) → ip-0 }
 <replaced address 2e5df8c541272e37>: Examples:fibonacci:compareTo:10
+<replaced address 32656811cf1d01d5>: { 2 arguments (capturing nothing) → ip-595 }
 <replaced address 359f7421ac99f5e1>: Builtins::ifElse:42
 <replaced address 36eebe9168aef0b0>: "The `reason` must be a text."
 <replaced address 3dcd25f189b573e4>: Examples:fibonacci:fibonacci:2:13:11
@@ -60,11 +57,13 @@
 <replaced address 4ba19bf7dddc0462>: "Expected a Tag, got `"
 <replaced address 4d6b8f941eba9f31>: Builtins::ifElse:26
 <replaced address 4f872d5446aebe9e>: { 3 arguments (capturing nothing) → ip-26 }
+<replaced address 572c89d985b15d02>: { 2 arguments (capturing nothing) → ip-616 }
+<replaced address 575197af550b14bf>: (<symbol-id 21>)
 <replaced address 58f54a6ea9547f72>: Builtins::ifElse:29
-<replaced address 5e626243e2bdc86f>: { 2 arguments (capturing nothing) → ip-481 }
+<replaced address 5cf116c928e3f6d3>: { 2 arguments (capturing nothing) → ip-469 }
 <replaced address 65869b7b7c4defee>: "`a | typeIs Int` was not satisfied"
 <replaced address 70a2d1d7839b24a4>: Examples:fibonacci:
-<replaced address 76e72373b1cb5a8d>: { 2 arguments (capturing nothing) → ip-523 }
+<replaced address 7935b6c7a927538b>: { 1 argument (capturing nothing) → ip-623 }
 <replaced address 7b5c0ed7f870b37f>: "`conditionIsBool` was not satisfied"
 <replaced address 7c65f9f539f0d0fa>: Builtins::intCompareTo:11
 <replaced address 7d04a0accae5758c>: Builtins::intSubtract:5
@@ -75,32 +74,28 @@
 <replaced address 935e9670bb42c985>: Builtins::ifElse:6
 <replaced address 954857ba37276558>: Examples:fibonacci:recursive:0:6
 <replaced address 957eb8ad35ecdba0>: "`else | getArgumentCount | equals 0` was not satisfied"
-<replaced address 98cbae45f4ac1282>: { 2 arguments (capturing nothing) → ip-488 }
 <replaced address 999eaa115035be18>: "Expected True, got "
 <replaced address 9a411ed2de02bbfd>: "`else | typeIs Function` was not satisfied"
 <replaced address 9c44edfdf54b3056>: Examples:fibonacci:fibonacci:2:13:33
-<replaced address a46186f8edf9eae9>: [1B8DDD32EFF479C7 → <symbol-id 21>: { 2 arguments (capturing nothing) → ip-488 }, 2717980D7A8E5A08 → <symbol-id 22>: { 2 arguments (capturing nothing) → ip-523 }, D59AD656536C4F73 → <symbol-id 25>: { 2 arguments (capturing nothing) → ip-481 }, ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-677 }]
 <replaced address a9b966687389a139>: Builtins::ifElse:34
 <replaced address ab458b1cc1453acc>: Builtins::intCompareTo:5
 <replaced address ac1f67c19eddcfbb>: { 0 arguments (capturing nothing) → ip-73 }
-<replaced address b458144106c6ff95>: (<symbol-id 23>)
 <replaced address b7d5083e90b08e9b>: Builtins::getArgumentCount:11
 <replaced address c23e279842973357>: Builtins::ifElse:12
 <replaced address c4f0291b7762e5a8>: "`minuend | typeIs Int` was not satisfied"
+<replaced address c9b1521a3c9a6c1a>: { 0 arguments (capturing nothing) → ip-628 }
 <replaced address cdc7e272cd311398>: Builtins::ifElse:15
 <replaced address cf37b22a7a5dec95>: Builtins::intAdd:11
-<replaced address d84182759114ba37>: { 2 arguments (capturing nothing) → ip-649 }
 <replaced address dc704463e00c0b29>: { 0 arguments (capturing nothing) → ip-3 }
+<replaced address dde03b86f6c3cd80>: [ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-623 }]
 <replaced address e1d6728501bc6b89>: Builtins::equals:6
 <replaced address e2a3b47321002b52>: { 3 arguments (capturing nothing) → ip-310 }
 <replaced address e3396a2327477786>: Examples:fibonacci:recursive:6
 <replaced address eaff3e6d4bab56cb>: "Expected tag to not have a value, but it has one: `"
-<replaced address eb25b7d659504479>: { 1 argument (capturing nothing) → ip-677 }
 <replaced address ec50643a6293694f>: Examples:fibonacci:fibonacci:2:13:12
 <replaced address edc1afb51c6d3aeb>: Examples:fibonacci:fibonacci:2:13:32
 <replaced address ee78a67daaae8b1b>: "."
 <replaced address f8a743cca2278691>: Examples:fibonacci:recursive:0:0:3
-<replaced address fe56112cab561c5c>: { 0 arguments (capturing nothing) → ip-682 }
 
 # Instructions
 # anonymous:$generated::needs:isConditionTrue:then
@@ -130,8 +125,8 @@
  19: popMultipleBelowTop 2
  20: return
 # anonymous:$generated::needs:condition:else
- 21: pushFromStack 1
- 22: pushFromStack 3
+ 21: pushFromStack 2
+ 22: pushFromStack 2
  23: panic
  24: popMultipleBelowTop 3
  25: return
@@ -174,8 +169,8 @@
  61: pushFromStack 3
  62: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
  63: call with 3 arguments
- 64: pushFromStack 13
- 65: pushFromStack 15
+ 64: pushFromStack 14
+ 65: pushFromStack 14
  66: createFunction with 0 arguments capturing 1, 0 starting at ip-21
  67: pushConstant inline builtinIfElse
  68: pushFromStack 14
@@ -184,16 +179,16 @@
  71: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
  72: tailCall with 19 locals and 3 arguments
 # Builtins::not:1:equals:then
- 73: pushConstant <replaced address b458144106c6ff95> (<symbol-id 23>)
+ 73: pushConstant <replaced address 575197af550b14bf> (<symbol-id 21>)
  74: popMultipleBelowTop 1
  75: return
 # Builtins::ifElse:1:equals:else
  76: pushConstant inline builtinToDebugText
- 77: pushFromStack 3
+ 77: pushFromStack 2
  78: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
  79: call with 1 argument
  80: pushConstant inline builtinTagGetValue
- 81: pushFromStack 3
+ 81: pushFromStack 4
  82: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
  83: call with 1 argument
  84: pushConstant inline builtinToDebugText
@@ -210,7 +205,7 @@
  95: pushConstant <replaced address 8dbb18a7278b48a0> "`."
  96: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
  97: call with 2 arguments
- 98: pushConstant inline <symbol-id 24>
+ 98: pushConstant inline <symbol-id 22>
  99: pushFromStack 1
 100: createList 2
 101: popMultipleBelowTop 8
@@ -225,8 +220,8 @@
 109: pushFromStack 2
 110: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 111: call with 2 arguments
-112: pushFromStack 1
-113: pushFromStack 4
+112: pushFromStack 3
+113: pushFromStack 2
 114: createFunction with 0 arguments capturing 1, 0 starting at ip-76
 115: pushConstant inline builtinIfElse
 116: pushFromStack 4
@@ -249,7 +244,7 @@
 132: pushConstant <replaced address ee78a67daaae8b1b> "."
 133: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 134: call with 2 arguments
-135: pushConstant inline <symbol-id 24>
+135: pushConstant inline <symbol-id 22>
 136: pushFromStack 1
 137: createList 2
 138: popMultipleBelowTop 5
@@ -289,7 +284,7 @@
 170: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 171: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 172: call with 2 arguments
-173: pushConstant inline <symbol-id 24>
+173: pushConstant inline <symbol-id 22>
 174: pushFromStack 1
 175: createList 2
 176: popMultipleBelowTop 5
@@ -300,11 +295,11 @@
 180: return
 # Builtins::ifElse:1:equals:else
 181: pushConstant inline builtinToDebugText
-182: pushFromStack 3
+182: pushFromStack 2
 183: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 184: call with 1 argument
 185: pushConstant inline builtinTagGetValue
-186: pushFromStack 3
+186: pushFromStack 4
 187: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 188: call with 1 argument
 189: pushConstant inline builtinToDebugText
@@ -321,7 +316,7 @@
 200: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 201: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 202: call with 2 arguments
-203: pushConstant inline <symbol-id 24>
+203: pushConstant inline <symbol-id 22>
 204: pushFromStack 1
 205: createList 2
 206: popMultipleBelowTop 8
@@ -336,8 +331,8 @@
 214: pushFromStack 2
 215: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 216: call with 2 arguments
-217: pushFromStack 1
-218: pushFromStack 4
+217: pushFromStack 3
+218: pushFromStack 2
 219: createFunction with 0 arguments capturing 1, 0 starting at ip-181
 220: pushConstant inline builtinIfElse
 221: pushFromStack 4
@@ -360,7 +355,7 @@
 237: pushConstant <replaced address ee78a67daaae8b1b> "."
 238: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 239: call with 2 arguments
-240: pushConstant inline <symbol-id 24>
+240: pushConstant inline <symbol-id 22>
 241: pushFromStack 1
 242: createList 2
 243: popMultipleBelowTop 5
@@ -400,7 +395,7 @@
 275: pushConstant <replaced address 8dbb18a7278b48a0> "`."
 276: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 277: call with 2 arguments
-278: pushConstant inline <symbol-id 24>
+278: pushConstant inline <symbol-id 22>
 279: pushFromStack 1
 280: createList 2
 281: popMultipleBelowTop 5
@@ -461,7 +456,7 @@
 333: call with 2 arguments
 334: pushConstant inline builtinEquals
 335: pushFromStack 1
-336: pushConstant inline <symbol-id 23>
+336: pushConstant inline <symbol-id 21>
 337: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 338: call with 2 arguments
 339: pushFromStack 2
@@ -481,7 +476,7 @@
 353: call with 2 arguments
 354: pushConstant inline builtinEquals
 355: pushFromStack 1
-356: pushConstant inline <symbol-id 23>
+356: pushConstant inline <symbol-id 21>
 357: pushConstant <replaced address 2ace5f047eecfe6e> Builtins::ifElse:1
 358: call with 2 arguments
 359: pushFromStack 2
@@ -594,231 +589,173 @@
 466: pushFromStack 42
 467: pushConstant <replaced address 359f7421ac99f5e1> Builtins::ifElse:42
 468: tailCall with 42 locals and 3 arguments
-# Examples:fibonacci:recursive:0:0
-469: pushFromStack 2
-470: pushFromStack 0
-471: pushFromStack 3
-472: pushConstant <replaced address f8a743cca2278691> Examples:fibonacci:recursive:0:0:3
-473: tailCall with 3 locals and 2 arguments
-# Examples:fibonacci:recursive:0
-474: pushFromStack 2
-475: createFunction with 1 argument capturing 0 starting at ip-469
-476: pushFromStack 5
-477: pushFromStack 1
-478: pushFromStack 5
-479: pushConstant <replaced address 954857ba37276558> Examples:fibonacci:recursive:0:6
-480: tailCall with 6 locals and 2 arguments
-# Examples:fibonacci:recursive
-481: pushFromStack 1
-482: createFunction with 2 arguments capturing 0 starting at ip-474
-483: pushFromStack 0
-484: pushFromStack 0
-485: pushFromStack 6
-486: pushConstant <replaced address e3396a2327477786> Examples:fibonacci:recursive:6
-487: tailCall with 5 locals and 2 arguments
-# Examples:fibonacci:compareTo
-488: pushConstant inline builtinTypeOf
-489: pushFromStack 3
-490: pushConstant <replaced address 3eca0e872d043602> Builtins::typeIs:19
-491: call with 1 argument
-492: pushConstant inline builtinEquals
-493: pushFromStack 1
-494: pushConstant inline <symbol-id 6>
-495: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
-496: call with 2 arguments
-497: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
-498: pushFromStack 1
-499: pushConstant <replaced address 65869b7b7c4defee> "`a | typeIs Int` was not satisfied"
-500: pushConstant <replaced address 2e5df8c541272e37> Examples:fibonacci:compareTo:10
-501: pushConstant <replaced address ab458b1cc1453acc> Builtins::intCompareTo:5
-502: call with 3 arguments
-503: pushConstant inline builtinTypeOf
-504: pushFromStack 5
-505: pushConstant <replaced address 3eca0e872d043602> Builtins::typeIs:19
-506: call with 1 argument
-507: pushConstant inline builtinEquals
-508: pushFromStack 1
-509: pushConstant inline <symbol-id 6>
-510: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
-511: call with 2 arguments
-512: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
-513: pushFromStack 1
-514: pushConstant <replaced address 2749496cbbd972e7> "`b | typeIs Int` was not satisfied"
-515: pushConstant <replaced address 2e5df8c541272e37> Examples:fibonacci:compareTo:10
-516: pushConstant <replaced address 7c65f9f539f0d0fa> Builtins::intCompareTo:11
-517: call with 3 arguments
-518: pushConstant inline builtinIntCompareTo
-519: pushFromStack 9
-520: pushFromStack 9
-521: pushConstant <replaced address 41fcadf3280286e7> Builtins::intCompareTo:18
-522: tailCall with 9 locals and 2 arguments
 # Examples:fibonacci:isLessThan
-523: pushConstant inline builtinTypeOf
-524: pushFromStack 3
-525: pushConstant <replaced address 3eca0e872d043602> Builtins::typeIs:19
-526: call with 1 argument
-527: pushConstant inline builtinEquals
-528: pushFromStack 1
-529: pushConstant inline <symbol-id 6>
-530: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
-531: call with 2 arguments
-532: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
-533: pushFromStack 1
-534: pushConstant <replaced address 65869b7b7c4defee> "`a | typeIs Int` was not satisfied"
-535: pushConstant <replaced address 2e5df8c541272e37> Examples:fibonacci:compareTo:10
-536: pushConstant <replaced address ab458b1cc1453acc> Builtins::intCompareTo:5
-537: call with 3 arguments
-538: pushConstant inline builtinTypeOf
-539: pushFromStack 5
-540: pushConstant <replaced address 3eca0e872d043602> Builtins::typeIs:19
-541: call with 1 argument
-542: pushConstant inline builtinEquals
-543: pushFromStack 1
-544: pushConstant inline <symbol-id 6>
-545: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
-546: call with 2 arguments
-547: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
-548: pushFromStack 1
-549: pushConstant <replaced address 2749496cbbd972e7> "`b | typeIs Int` was not satisfied"
-550: pushConstant <replaced address 2e5df8c541272e37> Examples:fibonacci:compareTo:10
-551: pushConstant <replaced address 7c65f9f539f0d0fa> Builtins::intCompareTo:11
-552: call with 3 arguments
-553: pushConstant inline builtinIntCompareTo
-554: pushFromStack 9
-555: pushFromStack 9
-556: pushConstant <replaced address 41fcadf3280286e7> Builtins::intCompareTo:18
-557: call with 2 arguments
-558: pushConstant inline builtinEquals
-559: pushFromStack 1
-560: pushConstant inline <symbol-id 7>
-561: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
-562: tailCall with 10 locals and 2 arguments
+469: pushConstant inline builtinTypeOf
+470: pushFromStack 3
+471: pushConstant <replaced address 3eca0e872d043602> Builtins::typeIs:19
+472: call with 1 argument
+473: pushConstant inline builtinEquals
+474: pushFromStack 1
+475: pushConstant inline <symbol-id 6>
+476: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
+477: call with 2 arguments
+478: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
+479: pushFromStack 1
+480: pushConstant <replaced address 65869b7b7c4defee> "`a | typeIs Int` was not satisfied"
+481: pushConstant <replaced address 2e5df8c541272e37> Examples:fibonacci:compareTo:10
+482: pushConstant <replaced address ab458b1cc1453acc> Builtins::intCompareTo:5
+483: call with 3 arguments
+484: pushConstant inline builtinTypeOf
+485: pushFromStack 5
+486: pushConstant <replaced address 3eca0e872d043602> Builtins::typeIs:19
+487: call with 1 argument
+488: pushConstant inline builtinEquals
+489: pushFromStack 1
+490: pushConstant inline <symbol-id 6>
+491: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
+492: call with 2 arguments
+493: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
+494: pushFromStack 1
+495: pushConstant <replaced address 2749496cbbd972e7> "`b | typeIs Int` was not satisfied"
+496: pushConstant <replaced address 2e5df8c541272e37> Examples:fibonacci:compareTo:10
+497: pushConstant <replaced address 7c65f9f539f0d0fa> Builtins::intCompareTo:11
+498: call with 3 arguments
+499: pushConstant inline builtinIntCompareTo
+500: pushFromStack 9
+501: pushFromStack 9
+502: pushConstant <replaced address 41fcadf3280286e7> Builtins::intCompareTo:18
+503: call with 2 arguments
+504: pushConstant inline builtinEquals
+505: pushFromStack 1
+506: pushConstant inline <symbol-id 7>
+507: pushConstant <replaced address e1d6728501bc6b89> Builtins::equals:6
+508: tailCall with 10 locals and 2 arguments
 # Examples:fibonacci:fibonacci:2:12
-563: pushFromStack 1
-564: popMultipleBelowTop 2
-565: return
+509: pushFromStack 1
+510: popMultipleBelowTop 2
+511: return
 # Examples:fibonacci:fibonacci:2:13
-566: pushConstant inline builtinTypeOf
-567: pushFromStack 2
-568: pushConstant <replaced address 3eca0e872d043602> Builtins::typeIs:19
-569: call with 1 argument
-570: pushConstant inline builtinEquals
-571: pushFromStack 1
-572: pushConstant inline <symbol-id 6>
-573: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
-574: call with 2 arguments
-575: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
-576: pushFromStack 1
-577: pushConstant <replaced address c4f0291b7762e5a8> "`minuend | typeIs Int` was not satisfied"
-578: pushConstant <replaced address 3dcd25f189b573e4> Examples:fibonacci:fibonacci:2:13:11
-579: pushConstant <replaced address 7d04a0accae5758c> Builtins::intSubtract:5
-580: call with 3 arguments
-581: pushConstant inline builtinIntSubtract
-582: pushFromStack 5
-583: pushConstant inline 1
-584: pushConstant <replaced address 13bbc38331a2c1a7> Builtins::intSubtract:18
-585: call with 2 arguments
-586: pushFromStack 6
-587: pushFromStack 1
-588: pushConstant <replaced address ec50643a6293694f> Examples:fibonacci:fibonacci:2:13:12
-589: call with 1 argument
-590: pushConstant inline builtinTypeOf
-591: pushFromStack 7
-592: pushConstant <replaced address 3eca0e872d043602> Builtins::typeIs:19
-593: call with 1 argument
-594: pushConstant inline builtinEquals
-595: pushFromStack 1
-596: pushConstant inline <symbol-id 6>
-597: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
-598: call with 2 arguments
-599: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
-600: pushFromStack 1
-601: pushConstant <replaced address c4f0291b7762e5a8> "`minuend | typeIs Int` was not satisfied"
-602: pushConstant <replaced address edc1afb51c6d3aeb> Examples:fibonacci:fibonacci:2:13:32
-603: pushConstant <replaced address 7d04a0accae5758c> Builtins::intSubtract:5
-604: call with 3 arguments
-605: pushConstant inline builtinIntSubtract
-606: pushFromStack 10
-607: pushConstant inline 2
-608: pushConstant <replaced address 13bbc38331a2c1a7> Builtins::intSubtract:18
-609: call with 2 arguments
-610: pushFromStack 11
-611: pushFromStack 1
-612: pushConstant <replaced address 9c44edfdf54b3056> Examples:fibonacci:fibonacci:2:13:33
-613: call with 1 argument
-614: pushConstant inline builtinTypeOf
-615: pushFromStack 6
-616: pushConstant <replaced address 3eca0e872d043602> Builtins::typeIs:19
-617: call with 1 argument
-618: pushConstant inline builtinEquals
-619: pushFromStack 1
-620: pushConstant inline <symbol-id 6>
-621: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
-622: call with 2 arguments
-623: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
-624: pushFromStack 1
-625: pushConstant <replaced address 65869b7b7c4defee> "`a | typeIs Int` was not satisfied"
-626: pushConstant <replaced address 4ac82c46ce2925c1> Examples:fibonacci:fibonacci:2:13:34
-627: pushConstant <replaced address 440a4a2e9e3a80bb> Builtins::intAdd:5
-628: call with 3 arguments
-629: pushConstant inline builtinTypeOf
-630: pushFromStack 4
-631: pushConstant <replaced address 3eca0e872d043602> Builtins::typeIs:19
-632: call with 1 argument
-633: pushConstant inline builtinEquals
-634: pushFromStack 1
-635: pushConstant inline <symbol-id 6>
-636: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
-637: call with 2 arguments
-638: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
-639: pushFromStack 1
-640: pushConstant <replaced address 2749496cbbd972e7> "`b | typeIs Int` was not satisfied"
-641: pushConstant <replaced address 4ac82c46ce2925c1> Examples:fibonacci:fibonacci:2:13:34
-642: pushConstant <replaced address cf37b22a7a5dec95> Builtins::intAdd:11
-643: call with 3 arguments
-644: pushConstant inline builtinIntAdd
-645: pushFromStack 12
-646: pushFromStack 8
-647: pushConstant <replaced address 216d199efe6cdff8> Builtins::intAdd:18
-648: tailCall with 19 locals and 2 arguments
+512: pushConstant inline builtinTypeOf
+513: pushFromStack 2
+514: pushConstant <replaced address 3eca0e872d043602> Builtins::typeIs:19
+515: call with 1 argument
+516: pushConstant inline builtinEquals
+517: pushFromStack 1
+518: pushConstant inline <symbol-id 6>
+519: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
+520: call with 2 arguments
+521: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
+522: pushFromStack 1
+523: pushConstant <replaced address c4f0291b7762e5a8> "`minuend | typeIs Int` was not satisfied"
+524: pushConstant <replaced address 3dcd25f189b573e4> Examples:fibonacci:fibonacci:2:13:11
+525: pushConstant <replaced address 7d04a0accae5758c> Builtins::intSubtract:5
+526: call with 3 arguments
+527: pushConstant inline builtinIntSubtract
+528: pushFromStack 5
+529: pushConstant inline 1
+530: pushConstant <replaced address 13bbc38331a2c1a7> Builtins::intSubtract:18
+531: call with 2 arguments
+532: pushFromStack 6
+533: pushFromStack 1
+534: pushConstant <replaced address ec50643a6293694f> Examples:fibonacci:fibonacci:2:13:12
+535: call with 1 argument
+536: pushConstant inline builtinTypeOf
+537: pushFromStack 7
+538: pushConstant <replaced address 3eca0e872d043602> Builtins::typeIs:19
+539: call with 1 argument
+540: pushConstant inline builtinEquals
+541: pushFromStack 1
+542: pushConstant inline <symbol-id 6>
+543: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
+544: call with 2 arguments
+545: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
+546: pushFromStack 1
+547: pushConstant <replaced address c4f0291b7762e5a8> "`minuend | typeIs Int` was not satisfied"
+548: pushConstant <replaced address edc1afb51c6d3aeb> Examples:fibonacci:fibonacci:2:13:32
+549: pushConstant <replaced address 7d04a0accae5758c> Builtins::intSubtract:5
+550: call with 3 arguments
+551: pushConstant inline builtinIntSubtract
+552: pushFromStack 10
+553: pushConstant inline 2
+554: pushConstant <replaced address 13bbc38331a2c1a7> Builtins::intSubtract:18
+555: call with 2 arguments
+556: pushFromStack 11
+557: pushFromStack 1
+558: pushConstant <replaced address 9c44edfdf54b3056> Examples:fibonacci:fibonacci:2:13:33
+559: call with 1 argument
+560: pushConstant inline builtinTypeOf
+561: pushFromStack 6
+562: pushConstant <replaced address 3eca0e872d043602> Builtins::typeIs:19
+563: call with 1 argument
+564: pushConstant inline builtinEquals
+565: pushFromStack 1
+566: pushConstant inline <symbol-id 6>
+567: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
+568: call with 2 arguments
+569: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
+570: pushFromStack 1
+571: pushConstant <replaced address 65869b7b7c4defee> "`a | typeIs Int` was not satisfied"
+572: pushConstant <replaced address 4ac82c46ce2925c1> Examples:fibonacci:fibonacci:2:13:34
+573: pushConstant <replaced address 440a4a2e9e3a80bb> Builtins::intAdd:5
+574: call with 3 arguments
+575: pushConstant inline builtinTypeOf
+576: pushFromStack 4
+577: pushConstant <replaced address 3eca0e872d043602> Builtins::typeIs:19
+578: call with 1 argument
+579: pushConstant inline builtinEquals
+580: pushFromStack 1
+581: pushConstant inline <symbol-id 6>
+582: pushConstant <replaced address 0fea7d5fa5afcc30> Builtins::typeIs:25
+583: call with 2 arguments
+584: pushConstant <replaced address 4f872d5446aebe9e> { 3 arguments (capturing nothing) → ip-26 }
+585: pushFromStack 1
+586: pushConstant <replaced address 2749496cbbd972e7> "`b | typeIs Int` was not satisfied"
+587: pushConstant <replaced address 4ac82c46ce2925c1> Examples:fibonacci:fibonacci:2:13:34
+588: pushConstant <replaced address cf37b22a7a5dec95> Builtins::intAdd:11
+589: call with 3 arguments
+590: pushConstant inline builtinIntAdd
+591: pushFromStack 12
+592: pushFromStack 8
+593: pushConstant <replaced address 216d199efe6cdff8> Builtins::intAdd:18
+594: tailCall with 19 locals and 2 arguments
 # Examples:fibonacci:fibonacci:2
-649: pushConstant <replaced address 76e72373b1cb5a8d> { 2 arguments (capturing nothing) → ip-523 }
-650: pushFromStack 2
-651: pushConstant inline 2
-652: pushConstant <replaced address 09452ee45e345fc6> Examples:fibonacci:fibonacci:2:11
-653: call with 2 arguments
-654: pushFromStack 2
-655: createFunction with 0 arguments capturing 0 starting at ip-563
-656: pushFromStack 5
-657: pushFromStack 2
-658: createFunction with 0 arguments capturing 1, 0 starting at ip-566
-659: pushConstant <replaced address e2a3b47321002b52> { 3 arguments (capturing nothing) → ip-310 }
-660: pushFromStack 6
-661: pushFromStack 5
-662: pushFromStack 3
-663: pushConstant <replaced address 14cee9bee8ce4007> Examples:fibonacci:fibonacci:2:14
-664: tailCall with 9 locals and 3 arguments
+595: pushConstant <replaced address 5cf116c928e3f6d3> { 2 arguments (capturing nothing) → ip-469 }
+596: pushFromStack 2
+597: pushConstant inline 2
+598: pushConstant <replaced address 09452ee45e345fc6> Examples:fibonacci:fibonacci:2:11
+599: call with 2 arguments
+600: pushFromStack 2
+601: createFunction with 0 arguments capturing 0 starting at ip-509
+602: pushFromStack 5
+603: pushFromStack 2
+604: createFunction with 0 arguments capturing 1, 0 starting at ip-512
+605: pushConstant <replaced address e2a3b47321002b52> { 3 arguments (capturing nothing) → ip-310 }
+606: pushFromStack 6
+607: pushFromStack 5
+608: pushFromStack 3
+609: pushConstant <replaced address 14cee9bee8ce4007> Examples:fibonacci:fibonacci:2:14
+610: tailCall with 9 locals and 3 arguments
 # Examples:fibonacci:recursive:0:0
-665: pushFromStack 2
-666: pushFromStack 0
-667: pushFromStack 3
-668: pushConstant <replaced address f8a743cca2278691> Examples:fibonacci:recursive:0:0:3
-669: tailCall with 3 locals and 2 arguments
+611: pushFromStack 2
+612: pushFromStack 0
+613: pushFromStack 3
+614: pushConstant <replaced address f8a743cca2278691> Examples:fibonacci:recursive:0:0:3
+615: tailCall with 3 locals and 2 arguments
 # Examples:fibonacci:recursive:0
-670: pushFromStack 2
-671: createFunction with 1 argument capturing 0 starting at ip-665
-672: pushConstant <replaced address d84182759114ba37> { 2 arguments (capturing nothing) → ip-649 }
-673: pushFromStack 1
-674: pushFromStack 5
-675: pushConstant <replaced address 954857ba37276558> Examples:fibonacci:recursive:0:6
-676: tailCall with 5 locals and 2 arguments
+616: pushFromStack 2
+617: createFunction with 1 argument capturing 0 starting at ip-611
+618: pushConstant <replaced address 32656811cf1d01d5> { 2 arguments (capturing nothing) → ip-595 }
+619: pushFromStack 1
+620: pushFromStack 5
+621: pushConstant <replaced address 954857ba37276558> Examples:fibonacci:recursive:0:6
+622: tailCall with 5 locals and 2 arguments
 # Examples:fibonacci:main
-677: pushConstant <replaced address 11f228ba46161b7c> { 2 arguments (capturing nothing) → ip-670 }
-678: pushConstant <replaced address 11f228ba46161b7c> { 2 arguments (capturing nothing) → ip-670 }
-679: pushConstant inline 15
-680: pushConstant <replaced address e3396a2327477786> Examples:fibonacci:recursive:6
-681: tailCall with 2 locals and 2 arguments
+623: pushConstant <replaced address 572c89d985b15d02> { 2 arguments (capturing nothing) → ip-616 }
+624: pushConstant <replaced address 572c89d985b15d02> { 2 arguments (capturing nothing) → ip-616 }
+625: pushConstant inline 15
+626: pushConstant <replaced address e3396a2327477786> Examples:fibonacci:recursive:6
+627: tailCall with 2 locals and 2 arguments
 # Examples:fibonacci:
-682: pushConstant <replaced address a46186f8edf9eae9> [1B8DDD32EFF479C7 → <symbol-id 21>: { 2 arguments (capturing nothing) → ip-488 }, 2717980D7A8E5A08 → <symbol-id 22>: { 2 arguments (capturing nothing) → ip-523 }, D59AD656536C4F73 → <symbol-id 25>: { 2 arguments (capturing nothing) → ip-481 }, ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-677 }]
-683: popMultipleBelowTop 1
-684: return
+628: pushConstant <replaced address dde03b86f6c3cd80> [ED66F1C8C58CF8C3 → <symbol-id 9>: { 1 argument (capturing nothing) → ip-623 }]
+629: popMultipleBelowTop 1
+630: return

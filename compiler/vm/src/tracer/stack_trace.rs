@@ -29,12 +29,12 @@ pub struct Call {
 }
 impl Call {
     pub fn dup(&self, heap: &mut Heap) {
-        self.call_site.dup();
+        self.call_site.dup(heap);
         self.callee.dup(heap);
         for argument in &self.arguments {
             argument.dup(heap);
         }
-        self.responsible.dup();
+        self.responsible.dup(heap);
     }
     pub fn drop(&self, heap: &mut Heap) {
         self.call_site.drop(heap);

@@ -203,9 +203,9 @@ pub fn format_value<'a, T: 'a + Copy>(
             }
         }
         FormatValue::Struct(entries) => {
-            // - all entries: `[Foo: Bar, Baz: 2]`
-            // - all keys, some values: `[Foo: Bar, Baz: …, Quz: …]`
-            // - some keys: `[Foo: …, Bar: …, + 2 more]`
+            // - all entries: `[Baz: 2, Foo: Bar]`
+            // - all keys, some values: `[Baz: …, Foo: Bar, Quz: …]`
+            // - some keys: `[Bar: …, Foo: …, + 2 more]`
             // - no items shown: `[struct with 2 entries]`
             // - `…`
 
@@ -219,28 +219,32 @@ pub fn format_value<'a, T: 'a + Copy>(
 
             let num_entries = entries.len();
 
-            let mut keys = Vec::with_capacity(num_entries);
-            let mut total_keys_length = 0;
-            for (key, _) in &*entries {
-                // surrounding brackets, keys, and for each key colon + space + dots + comma + space
-                if !max_length.fits(total_keys_length + keys.len() * 5) {
-                    break;
-                }
+            let mut entries = entries
+                .iter()
+                .map(|(key, value)| {
+                    format_value(*key, Precedence::Low, MaxLength::Unlimited, visitor)
+                        .map(|key| (key, value))
+                })
+                .collect::<Option<Vec<_>>>()?;
+            entries.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
+            let mut total_keys_length: usize = entries.iter().map(|(key, _)| key.len()).sum();
 
-                let key = format_value(*key, Precedence::Low, MaxLength::Unlimited, visitor)?;
-                total_keys_length += key.len();
-                keys.push(key);
-            }
-
-            if keys.len() < num_entries || !max_length.fits(total_keys_length + keys.len() * 5) {
+            // surrounding brackets, keys, and for each key colon + space + dots + comma + space
+            if entries.len() < num_entries
+                || !max_length.fits(2 + total_keys_length + entries.len() * 5)
+            {
                 // Not all keys fit. Try to remove the back ones, showing "+ X more" instead.
-                while let Some(popped) = keys.pop() {
-                    total_keys_length -= popped.len();
-                    let extra_text = format!("+ {} more", num_entries - keys.len());
-                    if max_length.fits(total_keys_length + keys.len() * 5 + extra_text.len()) {
+                while let Some(popped) = entries.pop() {
+                    total_keys_length -= popped.0.len();
+                    let extra_text = format!("+ {} more", num_entries - entries.len());
+                    if max_length.fits(2 + total_keys_length + entries.len() * 5 + extra_text.len())
+                    {
                         return Some(format!(
                             "[{}, {}]",
-                            keys.into_iter().map(|key| format!("{key}: …")).join(", "),
+                            entries
+                                .into_iter()
+                                .map(|(key, _)| format!("{key}: …"))
+                                .join(", "),
                             extra_text,
                         ));
                     }
@@ -256,23 +260,25 @@ pub fn format_value<'a, T: 'a + Copy>(
 
             let mut values = Vec::with_capacity(num_entries);
             let mut total_values_length = num_entries; // dots for every value
-            for (_, value) in &*entries {
-                let value = format_value(*value, Precedence::Low, MaxLength::Unlimited, visitor)?;
+            for (_, value) in &entries {
+                let value = format_value(**value, Precedence::Low, MaxLength::Unlimited, visitor)?;
                 total_values_length += value.len() - 1; // remove the dots, add the value
                 values.push(value);
 
-                if !max_length.fits(total_keys_length + keys.len() * 4 + total_values_length) {
+                if !max_length.fits(total_keys_length + entries.len() * 4 + total_values_length) {
                     break;
                 }
             }
 
             if values.len() == num_entries
-                && max_length.fits(total_keys_length + keys.len() * 4 + total_values_length)
+                && max_length.fits(total_keys_length + entries.len() * 4 + total_values_length)
             {
                 // Everything fits!
                 return Some(format!(
                     "[{}]",
-                    keys.into_iter()
+                    entries
+                        .into_iter()
+                        .map(|(key, _)| key)
                         .zip(values)
                         .map(|(key, value)| format!("{key}: {value}"))
                         .join(", "),
@@ -289,7 +295,9 @@ pub fn format_value<'a, T: 'a + Copy>(
 
             format!(
                 "[{}]",
-                keys.into_iter()
+                entries
+                    .into_iter()
+                    .map(|(key, _)| key)
                     .zip_longest(values)
                     .map(|zipped| match zipped {
                         EitherOrBoth::Both(key, value) => format!("{key}: {value}"),

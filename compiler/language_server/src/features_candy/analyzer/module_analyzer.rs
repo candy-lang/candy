@@ -35,7 +35,7 @@ enum State {
     EvaluateConstants {
         static_panics: Vec<Panic>,
         tracer: (StackTracer, EvaluatedValuesTracer),
-        vm: Vm<Lir, (StackTracer, EvaluatedValuesTracer)>,
+        vm: Vm<Rc<Lir>, (StackTracer, EvaluatedValuesTracer)>,
     },
     /// Next, we run the module again to finds fuzzable functions. This time, we
     /// disable tracing of evaluated expressions, but we enable registration of
@@ -45,6 +45,9 @@ enum State {
         static_panics: Vec<Panic>,
         constants_ended: VmEnded,
         stack_tracer: StackTracer,
+        /// We need to keep a reference to this LIR for its constant heap and
+        /// symbol table since objects in `evaluated_values` refer to it.
+        evaluated_values_lir: Rc<Lir>,
         evaluated_values: EvaluatedValuesTracer,
         lir: Rc<Lir>,
         tracer: FuzzablesFinder,
@@ -55,6 +58,7 @@ enum State {
         static_panics: Vec<Panic>,
         constants_ended: VmEnded,
         stack_tracer: StackTracer,
+        evaluated_values_lir: Rc<Lir>,
         evaluated_values: EvaluatedValuesTracer,
         fuzzable_finder_ended: VmEnded,
         fuzzers: Vec<Fuzzer>,
@@ -110,7 +114,7 @@ impl ModuleAnalyzer {
                     StackTracer::default(),
                     EvaluatedValuesTracer::new(self.module.clone()),
                 );
-                let vm = Vm::for_module(lir, &mut tracer);
+                let vm = Vm::for_module(Rc::new(lir), &mut tracer);
 
                 State::EvaluateConstants {
                     static_panics,
@@ -136,6 +140,7 @@ impl ModuleAnalyzer {
                     };
                 }
 
+                let evaluated_values_lir = vm.lir().clone();
                 let constants_ended = vm.tear_down(&mut tracer);
                 let (stack_tracer, evaluated_values) = tracer;
 
@@ -153,6 +158,7 @@ impl ModuleAnalyzer {
                     static_panics,
                     constants_ended,
                     stack_tracer,
+                    evaluated_values_lir,
                     evaluated_values,
                     lir,
                     tracer,
@@ -163,6 +169,7 @@ impl ModuleAnalyzer {
                 static_panics,
                 constants_ended,
                 stack_tracer,
+                evaluated_values_lir,
                 evaluated_values,
                 lir,
                 mut tracer,
@@ -178,6 +185,7 @@ impl ModuleAnalyzer {
                         static_panics,
                         constants_ended,
                         stack_tracer,
+                        evaluated_values_lir,
                         evaluated_values,
                         lir,
                         tracer,
@@ -195,6 +203,7 @@ impl ModuleAnalyzer {
                     static_panics,
                     constants_ended,
                     stack_tracer,
+                    evaluated_values_lir,
                     evaluated_values,
                     fuzzable_finder_ended,
                     fuzzers,
@@ -204,6 +213,7 @@ impl ModuleAnalyzer {
                 static_panics,
                 constants_ended,
                 stack_tracer,
+                evaluated_values_lir,
                 evaluated_values,
                 fuzzable_finder_ended,
                 mut fuzzers,
@@ -218,6 +228,7 @@ impl ModuleAnalyzer {
                         static_panics,
                         constants_ended,
                         stack_tracer,
+                        evaluated_values_lir,
                         evaluated_values,
                         fuzzable_finder_ended,
                         fuzzers,
@@ -234,6 +245,7 @@ impl ModuleAnalyzer {
                     static_panics,
                     constants_ended,
                     stack_tracer,
+                    evaluated_values_lir,
                     evaluated_values,
                     fuzzable_finder_ended,
                     fuzzers,
@@ -253,25 +265,25 @@ impl ModuleAnalyzer {
             }
             State::FindFuzzables {
                 static_panics,
+                evaluated_values_lir,
                 evaluated_values,
-                vm,
                 ..
             } => {
                 insights.extend(static_panics.to_insights(db, &self.module));
                 insights.extend(evaluated_values.values().iter().flat_map(|(id, value)| {
-                    Insight::for_value(db, &vm.lir().symbol_table, id.clone(), *value)
+                    Insight::for_value(db, &evaluated_values_lir.symbol_table, id.clone(), *value)
                 }));
             }
             State::Fuzz {
                 static_panics,
+                evaluated_values_lir,
                 evaluated_values,
                 fuzzers,
                 ..
             } => {
                 insights.extend(static_panics.to_insights(db, &self.module));
-                let symbol_table = &fuzzers.first().unwrap().lir().symbol_table;
                 insights.extend(evaluated_values.values().iter().flat_map(|(id, value)| {
-                    Insight::for_value(db, symbol_table, id.clone(), *value)
+                    Insight::for_value(db, &evaluated_values_lir.symbol_table, id.clone(), *value)
                 }));
 
                 for fuzzer in fuzzers {
@@ -315,7 +327,7 @@ impl ModuleAnalyzer {
                                 .iter()
                                 .map(|argument| DisplayWithSymbolTable::to_string(
                                     argument,
-                                    symbol_table,
+                                    &fuzzer.lir().symbol_table,
                                 ))
                                 .join(" "),
                             panic.reason,
