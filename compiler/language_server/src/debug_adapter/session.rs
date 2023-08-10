@@ -203,7 +203,7 @@ impl DebugSession {
                     Ok(main) => main,
                     Err(error) => {
                         error!("Failed to find main function: {error}");
-                        return Err("main-function");
+                        return Err("no-main-function");
                     }
                 };
 

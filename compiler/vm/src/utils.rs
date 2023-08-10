@@ -21,7 +21,6 @@ pub impl PopulateInMemoryProviderFromFileSystem for InMemoryModuleProvider {
             .into_iter()
             .map(|it| it.unwrap())
             .filter(|it| it.file_type().is_file())
-            .filter(|it| it.file_name().to_string_lossy().ends_with(".candy"))
         {
             let module = Module::from_package_and_path(
                 &packages_path,

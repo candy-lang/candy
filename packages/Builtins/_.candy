@@ -2,8 +2,8 @@
 # different than other code. Be careful when editing the code in here. These are
 # the peculiarities you need to worry about:
 #
-# - There's an magic variable called `✨` in scope. It's a struct containing
-#   entry points to compiler-builtins – functions that are implemented directly
+# - There's a magic variable called `✨` in scope. It's a struct containing
+#   entry points to compiler builtins – functions that are implemented directly
 #   in the Rust compiler rather than in Candy code.
 #   For the VM implementations, see `vm/src/builtin_functions.rs`.
 #

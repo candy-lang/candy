@@ -263,7 +263,7 @@ impl MachineState {
             }
             _ => InstructionResult::Panic(Panic {
                 reason: format!(
-                    "You can only call functions, builtins, tags, and handles but you tried to call {}.",
+                    "You can only call functions, builtins, tags, and handles, but you tried to call {}.",
                     DisplayWithSymbolTable::to_string(&callee, symbol_table),
                 ),
                 responsible: responsible.get().to_owned(),
