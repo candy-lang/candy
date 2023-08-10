@@ -136,6 +136,7 @@ impl HeapObjectTrait for HeapText {
         };
     }
 
+    fn dup_children(self, _heap: &mut Heap) {}
     fn drop_children(self, _heap: &mut Heap) {}
 
     fn deallocate_external_stuff(self) {}

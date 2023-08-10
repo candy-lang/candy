@@ -12,7 +12,7 @@ assignment: struct
   call identifier $9@"use" with these arguments:
     text
       textPart $11@"Core"
-assignment: $160@"sqrt" := function (fuzzable) { $161@"x" $162@"precision" ->
+assignment: $162@"sqrt" := function (fuzzable) { identifier $163@"x" identifier $165@"precision" ->
   call identifier $27@"needs" with these arguments:
     call struct access identifier $29@"fixedDecimal".$31@"Is" with these arguments:
       identifier $33@"x"
@@ -35,45 +35,45 @@ assignment: $160@"sqrt" := function (fuzzable) { $161@"x" $162@"precision" ->
       call struct access identifier $88@"fixedDecimal".$90@"FromInt" with these arguments:
         int 2
       identifier $93@"precision"
-    function (non-fuzzable) { $97@"recurse" $98@"guess" ->
-      assignment: identifier $132@"refinedGuess" = 
-        call struct access identifier $99@"fixedDecimal".$101@"DivideTruncatingAtScale" with these arguments:
-          call struct access identifier $105@"fixedDecimal".$107@"Add" with these arguments:
-            identifier $103@"guess"
-            call struct access identifier $111@"fixedDecimal".$113@"DivideTruncatingAtScale" with these arguments:
-              identifier $109@"x"
-              identifier $115@"guess"
-              identifier $117@"precision"
-          call struct access identifier $124@"fixedDecimal".$126@"FromInt" with these arguments:
+    function (non-fuzzable) { identifier $97@"recurse" identifier $99@"guess" ->
+      assignment: identifier $134@"refinedGuess" = 
+        call struct access identifier $101@"fixedDecimal".$103@"DivideTruncatingAtScale" with these arguments:
+          call struct access identifier $107@"fixedDecimal".$109@"Add" with these arguments:
+            identifier $105@"guess"
+            call struct access identifier $113@"fixedDecimal".$115@"DivideTruncatingAtScale" with these arguments:
+              identifier $111@"x"
+              identifier $117@"guess"
+              identifier $119@"precision"
+          call struct access identifier $126@"fixedDecimal".$128@"FromInt" with these arguments:
             int 2
-          identifier $129@"precision"
-      call identifier $135@"ifElse" with these arguments:
-        call struct access identifier $137@"fixedDecimal".$139@"ApproxEquals" with these arguments:
-          identifier $141@"guess"
-          identifier $143@"refinedGuess"
-          identifier $145@"delta"
+          identifier $131@"precision"
+      call identifier $137@"ifElse" with these arguments:
+        call struct access identifier $139@"fixedDecimal".$141@"ApproxEquals" with these arguments:
+          identifier $143@"guess"
+          identifier $145@"refinedGuess"
+          identifier $147@"delta"
         function (non-fuzzable) {
-          identifier $148@"guess"
+          identifier $150@"guess"
         }
         function (non-fuzzable) {
-          call identifier $151@"recurse" with these arguments:
-            identifier $153@"refinedGuess"
+          call identifier $153@"recurse" with these arguments:
+            identifier $155@"refinedGuess"
         }
     }
 }
-assignment: $202@"main" := function (fuzzable) { $203@"_" ->
-  assignment: identifier $165@"input" = 
+assignment: $206@"main" := function (fuzzable) { identifier $207@"_" ->
+  assignment: identifier $169@"input" = 
     int 2
-  assignment: identifier $180@"result" = 
-    call identifier $175@"sqrt" with these arguments:
-      call struct access identifier $170@"fixedDecimal".$172@"FromInt" with these arguments:
-        identifier $168@"input"
+  assignment: identifier $184@"result" = 
+    call identifier $179@"sqrt" with these arguments:
+      call struct access identifier $174@"fixedDecimal".$176@"FromInt" with these arguments:
+        identifier $172@"input"
       int 65
-  call struct access identifier $183@"builtins".$185@"Print" with these arguments:
+  call struct access identifier $187@"builtins".$189@"Print" with these arguments:
     text
-      textPart $187@"The root of "
-      identifier $189@"input"
-      textPart $191@" is "
-      call struct access identifier $195@"fixedDecimal".$197@"ToText" with these arguments:
-        identifier $193@"result"
+      textPart $191@"The root of "
+      identifier $193@"input"
+      textPart $195@" is "
+      call struct access identifier $199@"fixedDecimal".$201@"ToText" with these arguments:
+        identifier $197@"result"
 }

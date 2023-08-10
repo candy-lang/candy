@@ -2,7 +2,7 @@
 builtins = use "Builtins"
 # [ifElse, int, recursive] = use "Core"
 
-recursive initialArg body :=
+recursive initialArg body =
   # needs
   #   function.is2 body
   #   "The `body` should take the recursive function and the argument."
@@ -12,14 +12,14 @@ recursive initialArg body :=
   }
   recurse recurse initialArg
 
-compareTo valueA valueB :=
+compareTo valueA valueB =
   # needs (is valueA)
   # needs (is valueB)
   result = valueA | builtins.intCompareTo valueB
   # check (equals result Equal | bool.implies (equals valueA valueB))
   # check ((equals result Equal) | bool.implies (equals valueA valueB))
   result
-isLessThan valueA valueB :=
+isLessThan valueA valueB =
   # needs (is valueA)
   # needs (is valueB)
   builtins.equals (compareTo valueA valueB) Less
