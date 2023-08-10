@@ -44,8 +44,13 @@ pub fn newline(input: &str) -> Option<(&str, Rcst)> {
     None
 }
 
-#[test]
-fn test_literal() {
-    assert_eq!(literal("hello, world", "hello"), Some(", world"));
-    assert_eq!(literal("hello, world", "hi"), None);
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_literal() {
+        assert_eq!(literal("hello, world", "hello"), Some(", world"));
+        assert_eq!(literal("hello, world", "hi"), None);
+    }
 }

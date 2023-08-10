@@ -66,37 +66,44 @@ pub fn parenthesized(
         .into(),
     ))
 }
-// #[test]
-// fn test_parenthesized() {
-//     assert_eq!(
-//         parenthesized("(foo)", 0),
-//         Some((
-//             "",
-//             CstKind::Parenthesized {
-//                 opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
-//                 inner: Box::new(build_identifier("foo")),
-//                 closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
-//             }
-//             .into(),
-//         )),
-//     );
-//     assert_eq!(parenthesized("foo", 0), None);
-//     assert_eq!(
-//         parenthesized("(foo", 0),
-//         Some((
-//             "",
-//             CstKind::Parenthesized {
-//                 opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
-//                 inner: Box::new(build_identifier("foo")),
-//                 closing_parenthesis: Box::new(
-//                     CstKind::Error {
-//                         unparsable_input: "".to_string(),
-//                         error: CstError::ParenthesisNotClosed
-//                     }
-//                     .into()
-//                 ),
-//             }
-//             .into(),
-//         )),
-//     );
-// }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::string_to_rcst::utils::build_identifier;
+
+    #[test]
+    fn test_parenthesized() {
+        assert_eq!(
+            parenthesized("(foo)", 0, true),
+            Some((
+                "",
+                CstKind::Parenthesized {
+                    opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
+                    inner: Box::new(build_identifier("foo")),
+                    closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
+                }
+                .into(),
+            )),
+        );
+        assert_eq!(parenthesized("foo", 0, true), None);
+        assert_eq!(
+            parenthesized("(foo", 0, true),
+            Some((
+                "",
+                CstKind::Parenthesized {
+                    opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
+                    inner: Box::new(build_identifier("foo")),
+                    closing_parenthesis: Box::new(
+                        CstKind::Error {
+                            unparsable_input: "".to_string(),
+                            error: CstError::ParenthesisNotClosed
+                        }
+                        .into()
+                    ),
+                }
+                .into(),
+            )),
+        );
+    }
+}

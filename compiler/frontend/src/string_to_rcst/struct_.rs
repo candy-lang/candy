@@ -181,145 +181,152 @@ pub fn struct_(input: &str, indentation: usize, allow_function: bool) -> Option<
         .into(),
     ))
 }
-// #[test]
-// fn test_struct() {
-//     assert_eq!(struct_("hello", 0), None);
-//     assert_eq!(
-//         struct_("[]", 0),
-//         Some((
-//             "",
-//             CstKind::Struct {
-//                 opening_bracket: Box::new(CstKind::OpeningBracket.into()),
-//                 fields: vec![],
-//                 closing_bracket: Box::new(CstKind::ClosingBracket.into()),
-//             }
-//             .into(),
-//         )),
-//     );
-//     assert_eq!(
-//         struct_("[ ]", 0),
-//         Some((
-//             "",
-//             CstKind::Struct {
-//                 opening_bracket: Box::new(CstKind::OpeningBracket.with_trailing_space()),
-//                 fields: vec![],
-//                 closing_bracket: Box::new(CstKind::ClosingBracket.into()),
-//             }
-//             .into(),
-//         )),
-//     );
-//     assert_eq!(
-//         struct_("[foo:bar]", 0),
-//         Some((
-//             "",
-//             CstKind::Struct {
-//                 opening_bracket: Box::new(CstKind::OpeningBracket.into()),
-//                 fields: vec![CstKind::StructField {
-//                     key_and_colon: Some(Box::new((
-//                         build_identifier("foo"),
-//                         CstKind::Colon.into(),
-//                     ))),
-//                     value: Box::new(build_identifier("bar")),
-//                     comma: None,
-//                 }
-//                 .into()],
-//                 closing_bracket: Box::new(CstKind::ClosingBracket.into()),
-//             }
-//             .into(),
-//         )),
-//     );
-//     assert_eq!(
-//         struct_("[foo,bar:baz]", 0),
-//         Some((
-//             "",
-//             CstKind::Struct {
-//                 opening_bracket: Box::new(CstKind::OpeningBracket.into()),
-//                 fields: vec![
-//                     CstKind::StructField {
-//                         key_and_colon: None,
-//                         value: Box::new(build_identifier("foo")),
-//                         comma: Some(Box::new(CstKind::Comma.into())),
-//                     }
-//                     .into(),
-//                     CstKind::StructField {
-//                         key_and_colon: Some(Box::new((
-//                             build_identifier("bar"),
-//                             CstKind::Colon.into(),
-//                         ))),
-//                         value: Box::new(build_identifier("baz")),
-//                         comma: None,
-//                     }
-//                     .into(),
-//                 ],
-//                 closing_bracket: Box::new(CstKind::ClosingBracket.into()),
-//             }
-//             .into(),
-//         )),
-//     );
-//     assert_eq!(
-//         struct_("[foo := [foo]", 0),
-//         Some((
-//             ":= [foo]",
-//             CstKind::Struct {
-//                 opening_bracket: Box::new(CstKind::OpeningBracket.into()),
-//                 fields: vec![CstKind::StructField {
-//                     key_and_colon: None,
-//                     value: Box::new(build_identifier("foo").with_trailing_space()),
-//                     comma: None,
-//                 }
-//                 .into()],
-//                 closing_bracket: Box::new(
-//                     CstKind::Error {
-//                         unparsable_input: "".to_string(),
-//                         error: CstError::StructNotClosed,
-//                     }
-//                     .into()
-//                 ),
-//             }
-//             .into(),
-//         )),
-//     );
-//     // [
-//     //   foo: bar,
-//     //   4: "Hi",
-//     // ]
-//     assert_eq!(
-//         struct_("[\n  foo: bar,\n  4: \"Hi\",\n]", 0),
-//         Some((
-//             "",
-//             CstKind::Struct {
-//                 opening_bracket: Box::new(CstKind::OpeningBracket.with_trailing_whitespace(
-//                     vec![
-//                         CstKind::Newline("\n".to_string()),
-//                         CstKind::Whitespace("  ".to_string()),
-//                     ],
-//                 )),
-//                 fields: vec![
-//                     CstKind::StructField {
-//                         key_and_colon: Some(Box::new((
-//                             build_identifier("foo"),
-//                             CstKind::Colon.with_trailing_space(),
-//                         ))),
-//                         value: Box::new(build_identifier("bar")),
-//                         comma: Some(Box::new(CstKind::Comma.into())),
-//                     }
-//                     .with_trailing_whitespace(vec![
-//                         CstKind::Newline("\n".to_string()),
-//                         CstKind::Whitespace("  ".to_string()),
-//                     ]),
-//                     CstKind::StructField {
-//                         key_and_colon: Some(Box::new((
-//                             build_simple_int(4),
-//                             CstKind::Colon.with_trailing_space(),
-//                         ))),
-//                         value: Box::new(build_simple_text("Hi")),
-//                         comma: Some(Box::new(CstKind::Comma.into())),
-//                     }
-//                     .with_trailing_whitespace(vec![CstKind::Newline("\n".to_string())]),
-//                 ],
-//                 closing_bracket: Box::new(CstKind::ClosingBracket.into()),
-//             }
-//             .into(),
-//         )),
-//     );
-// }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::string_to_rcst::utils::{build_identifier, build_simple_int, build_simple_text};
+
+    #[test]
+    fn test_struct() {
+        assert_eq!(struct_("hello", 0, true), None);
+        assert_eq!(
+            struct_("[]", 0, true),
+            Some((
+                "",
+                CstKind::Struct {
+                    opening_bracket: Box::new(CstKind::OpeningBracket.into()),
+                    fields: vec![],
+                    closing_bracket: Box::new(CstKind::ClosingBracket.into()),
+                }
+                .into(),
+            )),
+        );
+        assert_eq!(
+            struct_("[ ]", 0, true),
+            Some((
+                "",
+                CstKind::Struct {
+                    opening_bracket: Box::new(CstKind::OpeningBracket.with_trailing_space()),
+                    fields: vec![],
+                    closing_bracket: Box::new(CstKind::ClosingBracket.into()),
+                }
+                .into(),
+            )),
+        );
+        assert_eq!(
+            struct_("[foo:bar]", 0, true),
+            Some((
+                "",
+                CstKind::Struct {
+                    opening_bracket: Box::new(CstKind::OpeningBracket.into()),
+                    fields: vec![CstKind::StructField {
+                        key_and_colon: Some(Box::new((
+                            build_identifier("foo"),
+                            CstKind::Colon.into(),
+                        ))),
+                        value: Box::new(build_identifier("bar")),
+                        comma: None,
+                    }
+                    .into()],
+                    closing_bracket: Box::new(CstKind::ClosingBracket.into()),
+                }
+                .into(),
+            )),
+        );
+        assert_eq!(
+            struct_("[foo,bar:baz]", 0, true),
+            Some((
+                "",
+                CstKind::Struct {
+                    opening_bracket: Box::new(CstKind::OpeningBracket.into()),
+                    fields: vec![
+                        CstKind::StructField {
+                            key_and_colon: None,
+                            value: Box::new(build_identifier("foo")),
+                            comma: Some(Box::new(CstKind::Comma.into())),
+                        }
+                        .into(),
+                        CstKind::StructField {
+                            key_and_colon: Some(Box::new((
+                                build_identifier("bar"),
+                                CstKind::Colon.into(),
+                            ))),
+                            value: Box::new(build_identifier("baz")),
+                            comma: None,
+                        }
+                        .into(),
+                    ],
+                    closing_bracket: Box::new(CstKind::ClosingBracket.into()),
+                }
+                .into(),
+            )),
+        );
+        assert_eq!(
+            struct_("[foo := [foo]", 0, true),
+            Some((
+                ":= [foo]",
+                CstKind::Struct {
+                    opening_bracket: Box::new(CstKind::OpeningBracket.into()),
+                    fields: vec![CstKind::StructField {
+                        key_and_colon: None,
+                        value: Box::new(build_identifier("foo").with_trailing_space()),
+                        comma: None,
+                    }
+                    .into()],
+                    closing_bracket: Box::new(
+                        CstKind::Error {
+                            unparsable_input: "".to_string(),
+                            error: CstError::StructNotClosed,
+                        }
+                        .into()
+                    ),
+                }
+                .into(),
+            )),
+        );
+        // [
+        //   foo: bar,
+        //   4: "Hi",
+        // ]
+        assert_eq!(
+            struct_("[\n  foo: bar,\n  4: \"Hi\",\n]", 0, true),
+            Some((
+                "",
+                CstKind::Struct {
+                    opening_bracket: Box::new(CstKind::OpeningBracket.with_trailing_whitespace(
+                        vec![
+                            CstKind::Newline("\n".to_string()),
+                            CstKind::Whitespace("  ".to_string()),
+                        ],
+                    )),
+                    fields: vec![
+                        CstKind::StructField {
+                            key_and_colon: Some(Box::new((
+                                build_identifier("foo"),
+                                CstKind::Colon.with_trailing_space(),
+                            ))),
+                            value: Box::new(build_identifier("bar")),
+                            comma: Some(Box::new(CstKind::Comma.into())),
+                        }
+                        .with_trailing_whitespace(vec![
+                            CstKind::Newline("\n".to_string()),
+                            CstKind::Whitespace("  ".to_string()),
+                        ]),
+                        CstKind::StructField {
+                            key_and_colon: Some(Box::new((
+                                build_simple_int(4),
+                                CstKind::Colon.with_trailing_space(),
+                            ))),
+                            value: Box::new(build_simple_text("Hi")),
+                            comma: Some(Box::new(CstKind::Comma.into())),
+                        }
+                        .with_trailing_whitespace(vec![CstKind::Newline("\n".to_string())]),
+                    ],
+                    closing_bracket: Box::new(CstKind::ClosingBracket.into()),
+                }
+                .into(),
+            )),
+        );
+    }
+}
