@@ -16,7 +16,7 @@ typedef enum
 typedef struct
 {
     void *environment;
-    struct candy_value *(*function)(struct candy_value *);
+    struct candy_value *(*function)(struct candy_value *, ...);
 } candy_function_t;
 
 typedef struct
@@ -38,7 +38,7 @@ typedef struct candy_value
     candy_type_t type;
 } candy_value_t;
 
-typedef candy_value_t *(*candy_function)(candy_value_t *);
+typedef candy_value_t *(*candy_function)(candy_value_t *, ...);
 
 const extern candy_value_t __internal_true;
 const extern candy_value_t __internal_false;
@@ -53,6 +53,7 @@ const extern candy_value_t __internal_list;
 const extern candy_value_t __internal_struct;
 const extern candy_value_t __internal_function;
 const extern candy_value_t __internal_unknown;
+const extern candy_value_t __internal_platform;
 extern candy_value_t _candy_environment;
 extern candy_value_t *candy_environment;
 
