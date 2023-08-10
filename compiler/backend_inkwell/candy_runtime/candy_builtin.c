@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-#include "candy_rt.h"
+#include "candy_runtime.h"
 
 const candy_value_t *candy_builtin_equals(candy_value_t *left, candy_value_t *right)
 {

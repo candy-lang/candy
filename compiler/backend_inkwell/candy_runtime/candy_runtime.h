@@ -65,7 +65,7 @@ candy_value_t *make_candy_text(char *text);
 candy_value_t *make_candy_tag(char *tag);
 candy_value_t *make_candy_list(candy_value_t **values);
 candy_value_t *make_candy_function(candy_function function, void *environment, int env_size);
-candy_value_t *call_candy_function_with(candy_value_t *function, candy_value_t *arg);
+candy_value_t *run_candy_main(candy_value_t *function, candy_value_t *arg);
 candy_function get_candy_function_pointer(candy_value_t *function);
 void *get_candy_function_environment(candy_value_t *function);
 void candy_panic(const candy_value_t *reason);

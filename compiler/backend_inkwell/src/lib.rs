@@ -145,11 +145,11 @@ impl<'ctx> CodeGen<'ctx> {
         let main_fn = self.module.add_function("main", main_type, None);
         let block = self.context.append_basic_block(main_fn, "entry");
 
-        let call_candy_function_type =
+        let run_candy_main_type =
             candy_value_ptr.fn_type(&[candy_value_ptr.into(), candy_value_ptr.into()], false);
-        let call_candy_function_with =
-            self.module
-                .add_function("call_candy_function_with", call_candy_function_type, None);
+        let run_candy_main = self
+            .module
+            .add_function("run_candy_main", run_candy_main_type, None);
 
         let main_info = FunctionInfo {
             function_value: main_fn,
@@ -187,7 +187,7 @@ impl<'ctx> CodeGen<'ctx> {
                 .unwrap_left();
 
             let main_res_ptr = self.builder.build_call(
-                call_candy_function_with,
+                run_candy_main,
                 &[main_fn.into(), environment.as_basic_value_enum().into()],
                 "",
             );
@@ -233,12 +233,16 @@ impl<'ctx> CodeGen<'ctx> {
             .wait()?;
         if build_rt {
             std::process::Command::new("make")
-                .args(["-C", "compiler/backend_inkwell/candy_rt/", "clean"])
+                .args(["-C", "compiler/backend_inkwell/candy_runtime/", "clean"])
                 .spawn()?
                 .wait()?;
 
             std::process::Command::new("make")
-                .args(["-C", "compiler/backend_inkwell/candy_rt/", "candy_rt.a"])
+                .args([
+                    "-C",
+                    "compiler/backend_inkwell/candy_runtime/",
+                    "candy_runtime.a",
+                ])
                 .spawn()?
                 .wait()?;
         }
@@ -246,7 +250,7 @@ impl<'ctx> CodeGen<'ctx> {
         std::process::Command::new("clang")
             .args([
                 s_path.to_str().unwrap(),
-                "compiler/backend_inkwell/candy_rt/candy_rt.a",
+                "compiler/backend_inkwell/candy_runtime/candy_runtime.a",
                 if debug { "-g" } else { "" },
                 "-O3",
                 "-flto",

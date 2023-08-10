@@ -1,6 +1,6 @@
 CC=clang
 
-candy_rt.a: candy_rt.o candy_builtin.o
+candy_runtime.a: candy_runtime.o candy_builtin.o
 	ar rcs $@ $^
 
 %.o: %.c %.h

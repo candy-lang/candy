@@ -1,4 +1,4 @@
-#include "candy_rt.h"
+#include "candy_runtime.h"
 
 const candy_value_t *candy_builtin_equals(candy_value_t *left, candy_value_t *right);
 const candy_value_t *candy_builtin_if_else(candy_value_t *condition, candy_value_t *then, candy_value_t *otherwise);

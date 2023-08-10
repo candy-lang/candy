@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -5,7 +6,7 @@ use candy_backend_inkwell::CodeGen;
 use candy_frontend::error::{CompilerError, CompilerErrorPayload};
 use candy_frontend::mir::Mir;
 use candy_frontend::mir_optimize::OptimizeMir;
-use candy_frontend::{hir, TracingConfig};
+use candy_frontend::{hir, module, TracingConfig};
 use clap::{Parser, ValueHint};
 use rustc_hash::FxHashSet;
 
@@ -45,11 +46,19 @@ pub(crate) struct Options {
 pub(crate) fn compile(options: Options) -> ProgramResult {
     let packages_path = packages_path();
     let db = Database::new_with_file_system_module_provider(packages_path);
+    let module = module_for_path(options.path.clone())?;
     let path = options
         .path
         .as_ref()
-        .map_or_else(|| "Unknown".into(), |p| p.to_string_lossy().to_string());
-    let module = module_for_path(options.path)?;
+        .unwrap_or_else(|| match &module.package {
+            module::Package::User(user) => user,
+            module::Package::Managed(managed) => managed,
+            _ => unreachable!(),
+        })
+        .file_name()
+        .unwrap_or(OsStr::new("Executable"))
+        .to_string_lossy()
+        .to_string();
 
     let (mir, errors) = db
         .optimized_mir(module.clone(), TracingConfig::off())

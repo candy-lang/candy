@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "candy_rt.h"
+#include "candy_runtime.h"
 #include "candy_builtin.h"
 
 const candy_value_t __internal_true = {
@@ -168,7 +168,7 @@ candy_value_t *make_candy_struct(candy_value_t **keys, candy_value_t **values)
     return candy_value;
 }
 
-candy_value_t *call_candy_function_with(candy_value_t *function, candy_value_t *arg)
+candy_value_t *run_candy_main(candy_value_t *function, candy_value_t *arg)
 {
     return function->value.function.function(arg);
 }
