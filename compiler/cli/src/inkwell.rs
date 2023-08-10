@@ -13,6 +13,11 @@ use crate::database::Database;
 use crate::utils::{module_for_path, packages_path};
 use crate::{Exit, ProgramResult};
 
+/// Compile a Candy program to a native binary.
+///
+/// This command compiles the given file, or, if no file is provided, the package of
+/// your current working directory. The module should export a `main` function.
+/// This function is then called with an environment.
 #[derive(Parser, Debug)]
 pub(crate) struct Options {
     /// If enabled, print the generated LLVM IR to stderr.

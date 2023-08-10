@@ -12,6 +12,7 @@ mod check;
 mod database;
 mod debug;
 mod fuzz;
+#[cfg(feature = "inkwell")]
 mod inkwell;
 mod lsp;
 mod run;
@@ -33,6 +34,7 @@ enum CandyOptions {
     /// Start a Language Server.
     Lsp,
 
+    #[cfg(feature = "inkwell")]
     Inkwell(inkwell::Options),
 }
 
@@ -49,6 +51,7 @@ async fn main() -> ProgramResult {
         CandyOptions::Fuzz(options) => fuzz::fuzz(options),
         CandyOptions::Debug(options) => debug::debug(options),
         CandyOptions::Lsp => lsp::lsp().await,
+        #[cfg(feature = "inkwell")]
         CandyOptions::Inkwell(options) => inkwell::compile(options),
     }
 }
@@ -58,11 +61,13 @@ type ProgramResult = Result<(), Exit>;
 enum Exit {
     CodePanicked,
     DirectoryNotFound,
+    #[cfg(feature = "inkwell")]
     ExternalError,
     FileNotFound,
     FuzzingFoundFailingCases,
     NotInCandyPackage,
     CodeContainsErrors,
+    #[cfg(feature = "inkwell")]
     LlvmError(String),
     GoldOutdated,
 }
