@@ -86,13 +86,13 @@ pub fn function(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
         if let Some((input, curly_brace)) = closing_curly_brace(input) {
             (input, whitespace, curly_brace)
         } else {
-            // There is no closing brace after a single expression. Thus,
-            // we now try to parse a body of multiple expressions. We didn't
-            // try this first because then the body would also have consumed
-            // any trailing closing curly brace in the same line.
-            // For example, for the function `{ 2 }`, the body parser would
-            // have already consumed the `}`. The body parser works great
-            // for multiline bodies, though.
+            // There is no closing brace after a single expression. Thus, we now
+            // try to parse a body of multiple expressions. We didn't try this
+            // first because then the body would also have consumed any trailing
+            // closing curly brace in the same line.
+            // For example, for the function `{ 2 }`, the body parser would have
+            // already consumed the `}`. The body parser works great for
+            // multiline bodies, though.
             let (input, mut body) = body(input, indentation + 1);
             body_expressions.append(&mut body);
 

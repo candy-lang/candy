@@ -6,11 +6,10 @@ use crate::{
 use itertools::Itertools;
 use tracing::instrument;
 
-/// "Word" refers to a bunch of characters that are not separated by
-/// whitespace or significant punctuation. Identifiers, symbols, and ints
-/// are words. Words may be invalid because they contain non-ascii or
-/// non-alphanumeric characters – for example, the word `Magic🌵` is an
-/// invalid symbol.
+/// "Word" refers to a bunch of characters that are not separated by whitespace
+/// or significant punctuation. Identifiers, symbols, and ints are words. Words
+/// may be invalid because they contain non-ascii or non-alphanumeric characters
+/// – for example, the word `Magic🌵` is an invalid symbol.
 #[instrument(level = "trace")]
 pub fn word(mut input: &str) -> Option<(&str, String)> {
     let mut chars = vec![];

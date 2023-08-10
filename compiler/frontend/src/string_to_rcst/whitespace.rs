@@ -102,10 +102,10 @@ pub fn leading_indentation(mut input: &str, indentation: usize) -> Option<(&str,
     ))
 }
 
-/// Consumes all leading whitespace (including newlines) and optionally
-/// comments that are still within the given indentation. Won't consume a
-/// newline followed by less-indented whitespace followed by non-whitespace
-/// stuff like an expression.
+/// Consumes all leading whitespace (including newlines) and optionally comments
+/// that are still within the given indentation. Won't consume a newline
+/// followed by less-indented whitespace followed by non-whitespace stuff like
+/// an expression.
 #[instrument(level = "trace")]
 pub fn whitespaces_and_newlines(
     mut input: &str,

@@ -33,8 +33,8 @@ pub fn expression(
     indentation: usize,
     options: ExpressionParsingOptions,
 ) -> Option<(&str, Rcst)> {
-    // If we start the call list with `if … else …`, the formatting looks
-    // weird. Hence, we start with a single `None`.
+    // If we start the call list with `if … else …`, the formatting looks weird.
+    // Hence, we start with a single `None`.
     let (mut input, mut result) = None
         .or_else(|| int(input))
         .or_else(|| text(input, indentation))
@@ -321,8 +321,8 @@ fn expression_suffix_assignment<'a>(
     let (input, mut assignment_sign) = colon_equals_sign(input).or_else(|| equals_sign(input))?;
 
     // By now, it's clear that we are in an assignment, so we can do more
-    // expensive operations. We also save some state in case the assignment
-    // is invalid (so we can stop parsing right after the assignment sign).
+    // expensive operations. We also save some state in case the assignment is
+    // invalid (so we can stop parsing right after the assignment sign).
     let left = left.clone().wrap_in_whitespace(whitespace_after_left);
     let just_the_assignment_sign = assignment_sign.clone();
     let input_after_assignment_sign = input;
