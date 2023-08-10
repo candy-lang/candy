@@ -23,18 +23,10 @@ const candy_value_t *candy_builtin_equals(candy_value_t *left, candy_value_t *ri
 
 const candy_value_t *candy_builtin_ifelse(candy_value_t *condition, candy_value_t *then, candy_value_t *otherwise)
 {
-    if (candy_tag_to_bool(condition))
-    {
-        candy_function then_function = (then->value).function.function;
-        candy_value_t *environment = (then->value).function.environment;
-        return then_function(environment);
-    }
-    else
-    {
-        candy_function otherwise_function = (otherwise->value).function.function;
-        candy_value_t *environment = (otherwise->value).function.environment;
-        return otherwise_function(environment);
-    }
+    candy_value_t *body = candy_tag_to_bool(condition) ? then : otherwise;
+    candy_function function = (body->value).function.function;
+    candy_value_t *environment = (body->value).function.environment;
+    return function(environment);
 }
 
 candy_value_t *candy_builtin_int_add(candy_value_t *left, candy_value_t *right)
@@ -107,10 +99,6 @@ candy_value_t *candy_builtin_struct_get(candy_value_t *structure, candy_value_t 
     size_t index = 0;
     while (!candy_tag_to_bool(candy_builtin_equals(structure->value.structure.keys[index], key)))
     {
-        if (structure->value.structure.keys[index] == NULL)
-        {
-            candy_panic(make_candy_text("Attempted to access non-existent struct member"));
-        }
         index++;
     }
     return structure->value.structure.values[index];
@@ -123,7 +111,6 @@ candy_value_t *candy_builtin_struct_get_keys(candy_value_t *structure)
 
 const candy_value_t *candy_builtin_struct_has_key(candy_value_t *structure, candy_value_t *key)
 {
-
     size_t index = 0;
     while (structure->value.structure.keys[index] != NULL)
     {

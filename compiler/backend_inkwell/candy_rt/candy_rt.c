@@ -63,13 +63,23 @@ void print_candy_value(const candy_value_t *value)
         size_t list_length = length->value.integer;
         free_candy_value(length);
         size_t index = 0;
-        for (size_t index = 0; index < list_length; index++)
+        switch (list_length)
         {
-            print_candy_value(value->value.list[index]);
-            if (index != list_length - 1)
+        case 1:
+            print_candy_value(value->value.list[0]);
+        case 0:
+            printf(",");
+            break;
+        default:
+            for (size_t index = 0; index < list_length; index++)
             {
-                printf(", ");
+                print_candy_value(value->value.list[index]);
+                if (index != list_length - 1)
+                {
+                    printf(", ");
+                }
             }
+            break;
         }
         printf(")");
         break;
@@ -84,14 +94,7 @@ void print_candy_value(const candy_value_t *value)
 
 const candy_value_t *to_candy_bool(int value)
 {
-    if (value)
-    {
-        return &__internal_true;
-    }
-    else
-    {
-        return &__internal_false;
-    }
+    return value ? &__internal_true : &__internal_false;
 }
 
 int candy_tag_to_bool(const candy_value_t *value)
@@ -190,15 +193,17 @@ void candy_panic(const candy_value_t *reason)
 
 void free_candy_value(candy_value_t *value)
 {
-    if (value != candy_environment && value != NULL)
+    if (value == candy_environment && value == NULL)
     {
-        if (value->type == CANDY_TYPE_TAG || value->type == CANDY_TYPE_TEXT)
-        {
-            free(value->value.text);
-        }
-        // List and struct entries may not be freed as part of freeing
-        // the list/struct, because they will be freed on their own
-        // at the end of the main function.
-        free(value);
+        return;
     }
+
+    if (value->type == CANDY_TYPE_TAG || value->type == CANDY_TYPE_TEXT)
+    {
+        free(value->value.text);
+    }
+    // List and struct entries may not be freed as part of freeing
+    // the list/struct, because they will be freed on their own
+    // at the end of the main function.
+    free(value);
 }

@@ -62,7 +62,7 @@ enum Exit {
     FuzzingFoundFailingCases,
     NotInCandyPackage,
     CodeContainsErrors,
-    LLVMError(String),
+    LlvmError(String),
     GoldOutdated,
 }
 

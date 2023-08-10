@@ -14,20 +14,24 @@ use crate::{Exit, ProgramResult};
 
 #[derive(Parser, Debug)]
 pub(crate) struct Options {
-    /// If enabled, the compiler will print the generated LLVM IR to stderr.
+    /// If enabled, print the generated LLVM IR to stderr.
     #[arg(long = "print-llvm-ir", default_value_t = false)]
-    print_llvm_ir: bool,
-    /// If enabled, the program will print the output of the candy main function.
+    print_llvm_ir: bool, 
+    
+    /// If enabled, print the output of the Candy main function.
     #[arg(long = "print-main-output", default_value_t = false)]
     print_main_output: bool,
-    /// If enabled, the compiler will build the Candy runtime from scratch.
+
+    /// If enabled, build the Candy runtime from scratch.
     #[arg(long = "build-rt", default_value_t = false)]
     build_rt: bool,
-    /// If enabled, the LLVM bitcode will be compiled with debug information.
+
+    /// If enabled, compile the LLVM bitcode with debug information.
     #[arg(short = 'g', default_value_t = false)]
     debug: bool,
-    /// The file or package to run. If none is provided, the package of your
-    /// current working directory will be run.
+
+    /// The file or package to run. If none is provided, run the package of your
+    /// current working directory.
     #[arg(value_hint = ValueHint::FilePath)]
     path: Option<PathBuf>,
 }
@@ -51,9 +55,8 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
                 let responsible = body.push_hir_id(hir::Id::user());
                 body.push_panic(reason, responsible);
             });
-            let errors = vec![CompilerError::for_whole_module(module.clone(), payload)]
-                .into_iter()
-                .collect();
+            let errors =
+                FxHashSet::from_iter([CompilerError::for_whole_module(module.clone(), payload)]);
             (Arc::new(mir), Arc::new(errors))
         });
 
@@ -68,8 +71,7 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
     let module = context.create_module(&path);
     let builder = context.create_builder();
     let codegen = CodeGen::new(&context, module, builder, mir);
-    let mut bc_path = PathBuf::new();
-    bc_path.push(&format!("{path}.bc"));
+    let bc_path = PathBuf::from(format!("{path}.bc"));
     codegen
         .compile(&bc_path, options.print_llvm_ir, options.print_main_output)
         .map_err(|e| Exit::LLVMError(e.to_string()))?;
@@ -95,8 +97,7 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
             .wait()
             .unwrap();
     }
-    let mut s_path = PathBuf::new();
-    s_path.push(&format!("{path}.s"));
+    let s_path = PathBuf::from(format!("{path}.s"));
     std::process::Command::new("clang")
         .args([
             s_path.to_str().unwrap(),
