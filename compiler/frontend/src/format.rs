@@ -30,7 +30,7 @@ pub enum MaxLength {
     Limited(usize),
 }
 impl MaxLength {
-    fn fits(self, len: usize) -> bool {
+    const fn fits(self, len: usize) -> bool {
         match self {
             MaxLength::Unlimited => true,
             MaxLength::Limited(max) => len <= max,

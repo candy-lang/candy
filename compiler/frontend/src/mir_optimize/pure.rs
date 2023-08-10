@@ -13,7 +13,7 @@ impl PurenessInsights {
     /// E.g., a function definition is pure even if the defined function is not
     /// pure.
     #[allow(clippy::unused_self)]
-    pub fn is_definition_pure(&self, expression: &Expression) -> bool {
+    pub const fn is_definition_pure(&self, expression: &Expression) -> bool {
         match expression {
             Expression::Int(_)
             | Expression::Text(_)

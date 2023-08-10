@@ -18,7 +18,7 @@ impl TracingConfig {
     }
 
     #[must_use]
-    pub fn for_child_module(&self) -> Self {
+    pub const fn for_child_module(&self) -> Self {
         Self {
             register_fuzzables: self.register_fuzzables.for_child_module(),
             calls: self.calls.for_child_module(),
@@ -40,7 +40,7 @@ pub enum TracingMode {
 }
 impl TracingMode {
     #[must_use]
-    pub fn all_or_off(should_trace: bool) -> Self {
+    pub const fn all_or_off(should_trace: bool) -> Self {
         if should_trace {
             TracingMode::All
         } else {
@@ -49,7 +49,7 @@ impl TracingMode {
     }
 
     #[must_use]
-    pub fn only_current_or_off(should_trace: bool) -> Self {
+    pub const fn only_current_or_off(should_trace: bool) -> Self {
         if should_trace {
             TracingMode::OnlyCurrent
         } else {
@@ -58,7 +58,7 @@ impl TracingMode {
     }
 
     #[must_use]
-    pub fn is_enabled(&self) -> bool {
+    pub const fn is_enabled(&self) -> bool {
         match self {
             TracingMode::Off => false,
             TracingMode::OnlyCurrent => true,
@@ -67,7 +67,7 @@ impl TracingMode {
     }
 
     #[must_use]
-    pub fn for_child_module(&self) -> Self {
+    pub const fn for_child_module(&self) -> Self {
         match self {
             TracingMode::Off => TracingMode::Off,
             TracingMode::OnlyCurrent => TracingMode::Off,

@@ -26,7 +26,7 @@ impl<'a> CurrentExpression<'a> {
         Self { body, index }
     }
 
-    pub fn index(&self) -> usize {
+    pub const fn index(&self) -> usize {
         self.index
     }
     pub fn id(&self) -> Id {

@@ -91,7 +91,7 @@ pub enum Expression {
 
 impl Expression {
     #[must_use]
-    pub fn tag(symbol: String) -> Self {
+    pub const fn tag(symbol: String) -> Self {
         Expression::Tag {
             symbol,
             value: None,

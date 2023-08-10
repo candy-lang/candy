@@ -30,7 +30,7 @@ pub struct Id {
 }
 impl Id {
     #[must_use]
-    pub fn new(module: Module, local: usize) -> Self {
+    pub const fn new(module: Module, local: usize) -> Self {
         Self { module, local }
     }
     #[must_use]

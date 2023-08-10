@@ -79,7 +79,7 @@ pub struct OverlayModuleProvider<O: ModuleProvider, F: ModuleProvider> {
     pub fallback: F,
 }
 impl<O: ModuleProvider, F: ModuleProvider> OverlayModuleProvider<O, F> {
-    pub fn new(overlay: O, fallback: F) -> Self {
+    pub const fn new(overlay: O, fallback: F) -> Self {
         Self { overlay, fallback }
     }
 }

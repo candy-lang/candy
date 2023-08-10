@@ -8,7 +8,7 @@ pub struct IdGenerator<T: CountableId> {
 
 impl<T: CountableId> IdGenerator<T> {
     #[must_use]
-    pub fn start_at(id: usize) -> Self {
+    pub const fn start_at(id: usize) -> Self {
         Self {
             next_id: id,
             _data: PhantomData,

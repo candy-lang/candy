@@ -9,13 +9,13 @@ pub struct Complexity {
 }
 
 impl Complexity {
-    fn none() -> Self {
+    const fn none() -> Self {
         Self {
             is_self_contained: true,
             expressions: 0,
         }
     }
-    fn single_expression() -> Self {
+    const fn single_expression() -> Self {
         Self {
             is_self_contained: true,
             expressions: 1,
