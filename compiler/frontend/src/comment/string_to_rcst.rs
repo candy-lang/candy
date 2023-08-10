@@ -1066,7 +1066,7 @@ mod parse {
             return None;
         }
 
-        let has_trailing_space = if let Some(' ') = line.chars().next() {
+        let has_trailing_space = if line.chars().next() == Some(' ') {
             line = &line[1..];
             true
         } else {

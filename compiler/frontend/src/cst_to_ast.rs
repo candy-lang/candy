@@ -452,14 +452,11 @@ impl LoweringContext {
                 );
 
                 let mut ast_items = vec![];
-                if items.len() == 1 && let CstKind::Comma = items[0].kind {
+                if items.len() == 1 && items[0].kind.is_comma() {
                     // Empty list (`(,)`), do nothing.
                 } else {
                     for item in items {
-                        let CstKind::ListItem {
-                            value,
-                            comma,
-                        } = &item.kind else {
+                        let CstKind::ListItem { value, comma } = &item.kind else {
                             errors.push(self.create_error(cst, AstError::ListWithNonListItem));
                             continue;
                         };
