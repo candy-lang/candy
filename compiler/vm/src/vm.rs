@@ -14,9 +14,16 @@ use std::{borrow::Borrow, collections::HashMap, fmt::Debug, hash::Hash};
 /// VMs are first-class Rust structs, they enable other code to store "freezed"
 /// programs and to remain in control about when and for how long code runs.
 pub struct Vm<L: Borrow<Lir>, T: Tracer> {
-    pub lir: L,
+    // For type-safety, the VM has an API that takes ownership of the VM and
+    // returns a new VM. If the VM is big, this causes lots of memcopies of
+    // stack memory. So, we instead only store a pointer to the actual VM state.
+    inner: Box<VmInner<L, T>>,
+}
+
+struct VmInner<L: Borrow<Lir>, T: Tracer> {
+    lir: L,
     state: MachineState,
-    pub tracer: T,
+    tracer: T,
 }
 pub(super) struct MachineState {
     pub next_instruction: Option<InstructionPointer>,
@@ -66,7 +73,8 @@ where
         };
         state.call_function(function, arguments, responsible);
 
-        Self { lir, state, tracer }
+        let inner = Box::new(VmInner { lir, state, tracer });
+        Self { inner }
     }
     pub fn for_module(lir: L, tracer: T) -> Self {
         let actual_lir = lir.borrow();
@@ -85,14 +93,20 @@ where
         Self::for_function(lir, Heap::default(), function, &[], responsible, tracer)
     }
 
+    pub fn lir(&self) -> &L {
+        &self.inner.lir
+    }
+    pub fn tracer(&self) -> &T {
+        &self.inner.tracer
+    }
     pub fn next_instruction(&self) -> Option<InstructionPointer> {
-        self.state.next_instruction
+        self.inner.state.next_instruction
     }
     pub fn call_stack(&self) -> &[InstructionPointer] {
-        &self.state.call_stack
+        &self.inner.state.call_stack
     }
     pub fn heap(&self) -> &Heap {
-        &self.state.heap
+        &self.inner.state.heap
     }
 }
 
@@ -120,11 +134,11 @@ where
     T: Tracer,
 {
     pub fn heap(&mut self) -> &mut Heap {
-        &mut self.vm.state.heap
+        &mut self.vm.inner.state.heap
     }
 
     pub fn complete(mut self, return_value: impl Into<InlineObject>) -> Vm<L, T> {
-        self.vm.state.data_stack.push(return_value.into());
+        self.vm.inner.state.data_stack.push(return_value.into());
         self.vm
     }
 }
@@ -136,28 +150,31 @@ where
 {
     /// Runs one instruction in the VM and returns its new state.
     pub fn run(mut self) -> StateAfterRun<L, T> {
-        let Some(current_instruction) = self.state.next_instruction else {
-            let return_value = self.state.data_stack.pop().unwrap();
-            self.tracer.call_ended(&mut self.state.heap, return_value);
+        let Some(current_instruction) = self.inner.state.next_instruction else {
+            let return_value = self.inner.state.data_stack.pop().unwrap();
+            self.inner
+                .tracer
+                .call_ended(&mut self.inner.state.heap, return_value);
             return StateAfterRun::Finished(VmFinished {
-                heap: self.state.heap,
-                tracer: self.tracer,
+                heap: self.inner.state.heap,
+                tracer: self.inner.tracer,
                 result: Ok(return_value),
             });
         };
 
         let instruction = self
+            .inner
             .lir
             .borrow()
             .instructions
             .get(*current_instruction)
             .expect("invalid instruction pointer");
-        self.state.next_instruction = Some(current_instruction.next());
+        self.inner.state.next_instruction = Some(current_instruction.next());
 
-        let result = self.state.run_instruction(
+        let result = self.inner.state.run_instruction(
             instruction,
-            &self.lir.borrow().symbol_table,
-            &mut self.tracer,
+            &self.inner.lir.borrow().symbol_table,
+            &mut self.inner.tracer,
         );
         match result {
             InstructionResult::Done => StateAfterRun::Running(self),
@@ -165,8 +182,8 @@ where
                 StateAfterRun::CallingHandle(VmHandleCall { vm: self, call })
             }
             InstructionResult::Panic(panic) => StateAfterRun::Finished(VmFinished {
-                heap: self.state.heap,
-                tracer: self.tracer,
+                heap: self.inner.state.heap,
+                tracer: self.inner.tracer,
                 result: Err(panic),
             }),
         }

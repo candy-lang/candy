@@ -53,7 +53,7 @@ impl PausedState {
                                 .vm
                                 .as_ref()
                                 .unwrap()
-                                .lir
+                                .lir()
                                 .functions_behind(function.body());
                             assert_eq!(functions.len(), 1);
                             let function = functions.iter().next().unwrap();
@@ -102,7 +102,7 @@ impl PausedState {
                         "Unexpected callee: {}",
                         DisplayWithSymbolTable::to_string(
                             &it,
-                            &self.vm.as_ref().unwrap().lir.symbol_table,
+                            &self.vm.as_ref().unwrap().lir().symbol_table,
                         ),
                     ),
                 };
@@ -162,7 +162,7 @@ impl PausedState {
                 Data::Tag(Tag::Heap(tag)) => {
                     if should_include_named {
                         if start == 0 && count > 0 {
-                            let symbol_table = &self.vm.as_ref().unwrap().lir.symbol_table;
+                            let symbol_table = &self.vm.as_ref().unwrap().lir().symbol_table;
                             variables.push(Variable {
                                 name: "Symbol".to_string(),
                                 value: symbol_table.get(tag.symbol_id()).to_string(),
@@ -235,11 +235,11 @@ impl PausedState {
                             .copied()
                             .zip_eq(struct_.values().iter().copied())
                             .collect_vec();
-                        let symbol_table = &self.vm.as_ref().unwrap().lir.symbol_table;
+                        let symbol_table = &self.vm.as_ref().unwrap().lir().symbol_table;
                         fields.sort_by(|a, b| OrdWithSymbolTable::cmp(a, symbol_table, b));
                         variables.extend(fields.into_iter().skip(start).take(count).map(
                             |(key, value)| {
-                                let symbol_table = &self.vm.as_ref().unwrap().lir.symbol_table;
+                                let symbol_table = &self.vm.as_ref().unwrap().lir().symbol_table;
                                 self.create_variable(
                                     DisplayWithSymbolTable::to_string(&key, symbol_table),
                                     value,
@@ -253,7 +253,7 @@ impl PausedState {
                     "Tried to get inner variables of {}.",
                     DisplayWithSymbolTable::to_string(
                         &it,
-                        &self.vm.as_ref().unwrap().lir.symbol_table
+                        &self.vm.as_ref().unwrap().lir().symbol_table
                     ),
                 ),
             },
@@ -303,7 +303,7 @@ impl PausedState {
             name,
             value: DisplayWithSymbolTable::to_string(
                 &object,
-                &self.vm.as_ref().unwrap().lir.symbol_table,
+                &self.vm.as_ref().unwrap().lir().symbol_table,
             ),
             type_field: Self::type_field_for(data.into(), supports_variable_type),
             presentation_hint: Some(Self::presentation_hint_for(data.into())),
