@@ -59,7 +59,7 @@ jobs:
         with:
           token: ${{ secrets.GOLDEN_IR_PUSH_TOKEN }}
           repository: candy-lang/golden-irs
-          ref: ${{ github.base_ref }}
+          ref: ${{ github.event.pull_request.base.sha }}_
           fetch-depth: 1
           path: golden-irs/
 
@@ -80,14 +80,14 @@ jobs:
         if: github.event_name == 'pull_request'
         continue-on-error: true
         working-directory: golden-irs/
-        run: git diff --exit-code ${{ github.base_ref }}_ ${{ github.head_ref }}_
+        run: git diff --exit-code ${{ github.event.pull_request.base.sha }}_ ${{ github.sha }}_
       - if: steps.diff.outcome == 'failure'
         uses: peter-evans/create-or-update-comment@v3.0.2
         with:
           issue-number: ${{ github.event.pull_request.number }}
           token: ${{ secrets.GOLDEN_IR_COMMENT_TOKEN }}
           body: |
-            The golden IRs have changed: https://github.com/candy-lang/golden-irs/compare/${{ github.base_ref }}_..${{ github.head_ref }}_
+            The golden IRs have changed: https://github.com/candy-lang/golden-irs/compare/${{ github.event.pull_request.base.sha }}_..${{ github.sha }}_
 
             <details>
             <summary>Diff</summary>
