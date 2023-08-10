@@ -350,7 +350,7 @@ impl DebugSession {
                 break None; // The VM finished executing anyways.
             };
             let is_trace_instruction = matches!(
-                vm.lir.instructions[*instruction_pointer],
+                vm.lir().instructions[*instruction_pointer],
                 Instruction::TraceCallEnds | Instruction::TraceExpressionEvaluated,
             );
 

@@ -29,7 +29,7 @@ impl PausedState {
         args: StackTraceArguments,
     ) -> Result<StackTraceResponse, &'static str> {
         let vm = &self.vm.as_ref().unwrap();
-        let tracer = &vm.tracer;
+        let tracer = vm.tracer();
 
         let start_frame = args.start_frame.unwrap_or_default();
         let levels = args
@@ -51,7 +51,7 @@ impl PausedState {
                     start_at_1_config,
                     id,
                     frame,
-                    &self.vm.as_ref().unwrap().lir,
+                    self.vm.as_ref().unwrap().lir(),
                 )
             },
         ));
@@ -154,13 +154,13 @@ impl StackFrameKey {
             return None;
         }
 
-        Some(&vm.tracer.call_stack[self.index - 1])
+        Some(&vm.tracer().call_stack[self.index - 1])
     }
     pub fn get_locals<'a, L: Borrow<Lir>>(
         &self,
         vm: &'a Vm<L, DebugTracer>,
     ) -> &'a Vec<(Id, InlineObject)> {
-        let tracer = &vm.tracer;
+        let tracer = vm.tracer();
         if self.index == 0 {
             &tracer.root_locals
         } else {
