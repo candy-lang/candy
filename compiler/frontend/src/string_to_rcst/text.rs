@@ -102,7 +102,7 @@ pub fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
 }
 
 #[instrument(level = "trace")]
-pub fn text_interpolation(
+fn text_interpolation(
     input: &str,
     indentation: usize,
     curly_brace_count: usize,
