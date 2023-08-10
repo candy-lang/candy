@@ -203,9 +203,9 @@ pub fn format_value<'a, T: 'a + Copy>(
             }
         }
         FormatValue::Struct(entries) => {
-            // - all entries: `[Foo: Bar, Baz: 2]`
-            // - all keys, some values: `[Foo: Bar, Baz: …, Quz: …]`
-            // - some keys: `[Foo: …, Bar: …, + 2 more]`
+            // - all entries: `[Baz: 2, Foo: Bar]`
+            // - all keys, some values: `[Baz: …, Foo: Bar, Quz: …]`
+            // - some keys: `[Bar: …, Foo: …, + 2 more]`
             // - no items shown: `[struct with 2 entries]`
             // - `…`
 
@@ -226,7 +226,7 @@ pub fn format_value<'a, T: 'a + Copy>(
                         .map(|key| (key, value))
                 })
                 .collect::<Option<Vec<_>>>()?;
-            entries.sort_by_key(|(key, _)| key.clone());
+            entries.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
             let mut total_keys_length: usize = entries.iter().map(|(key, _)| key.len()).sum();
 
             // surrounding brackets, keys, and for each key colon + space + dots + comma + space
