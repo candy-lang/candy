@@ -6,74 +6,33 @@ fn literal<'a>(input: &'a str, literal: &'static str) -> Option<&'a str> {
     input.strip_prefix(literal)
 }
 
-#[instrument(level = "trace")]
-pub fn equals_sign(input: &str) -> Option<(&str, Rcst)> {
-    literal(input, "=").map(|it| (it, CstKind::EqualsSign.into()))
+macro_rules! define_literal {
+    ($name:ident, $string:expr, $kind:expr) => {
+        #[instrument(level = "trace")]
+        pub fn $name(input: &str) -> Option<(&str, Rcst)> {
+            literal(input, $string).map(|it| (it, $kind.into()))
+        }
+    };
 }
-#[instrument(level = "trace")]
-pub fn comma(input: &str) -> Option<(&str, Rcst)> {
-    literal(input, ",").map(|it| (it, CstKind::Comma.into()))
-}
-#[instrument(level = "trace")]
-pub fn dot(input: &str) -> Option<(&str, Rcst)> {
-    literal(input, ".").map(|it| (it, CstKind::Dot.into()))
-}
-#[instrument(level = "trace")]
-pub fn colon(input: &str) -> Option<(&str, Rcst)> {
-    literal(input, ":").map(|it| (it, CstKind::Colon.into()))
-}
-#[instrument(level = "trace")]
-pub fn colon_equals_sign(input: &str) -> Option<(&str, Rcst)> {
-    literal(input, ":=").map(|it| (it, CstKind::ColonEqualsSign.into()))
-}
-#[instrument(level = "trace")]
-pub fn bar(input: &str) -> Option<(&str, Rcst)> {
-    literal(input, "|").map(|it| (it, CstKind::Bar.into()))
-}
-#[instrument(level = "trace")]
-pub fn opening_bracket(input: &str) -> Option<(&str, Rcst)> {
-    literal(input, "[").map(|it| (it, CstKind::OpeningBracket.into()))
-}
-#[instrument(level = "trace")]
-pub fn closing_bracket(input: &str) -> Option<(&str, Rcst)> {
-    literal(input, "]").map(|it| (it, CstKind::ClosingBracket.into()))
-}
-#[instrument(level = "trace")]
-pub fn opening_parenthesis(input: &str) -> Option<(&str, Rcst)> {
-    literal(input, "(").map(|it| (it, CstKind::OpeningParenthesis.into()))
-}
-#[instrument(level = "trace")]
-pub fn closing_parenthesis(input: &str) -> Option<(&str, Rcst)> {
-    literal(input, ")").map(|it| (it, CstKind::ClosingParenthesis.into()))
-}
-#[instrument(level = "trace")]
-pub fn opening_curly_brace(input: &str) -> Option<(&str, Rcst)> {
-    literal(input, "{").map(|it| (it, CstKind::OpeningCurlyBrace.into()))
-}
-#[instrument(level = "trace")]
-pub fn closing_curly_brace(input: &str) -> Option<(&str, Rcst)> {
-    literal(input, "}").map(|it| (it, CstKind::ClosingCurlyBrace.into()))
-}
-#[instrument(level = "trace")]
-pub fn arrow(input: &str) -> Option<(&str, Rcst)> {
-    literal(input, "->").map(|it| (it, CstKind::Arrow.into()))
-}
-#[instrument(level = "trace")]
-pub fn single_quote(input: &str) -> Option<(&str, Rcst)> {
-    literal(input, "'").map(|it| (it, CstKind::SingleQuote.into()))
-}
-#[instrument(level = "trace")]
-pub fn double_quote(input: &str) -> Option<(&str, Rcst)> {
-    literal(input, "\"").map(|it| (it, CstKind::DoubleQuote.into()))
-}
-#[instrument(level = "trace")]
-pub fn percent(input: &str) -> Option<(&str, Rcst)> {
-    literal(input, "%").map(|it| (it, CstKind::Percent.into()))
-}
-#[instrument(level = "trace")]
-pub fn octothorpe(input: &str) -> Option<(&str, Rcst)> {
-    literal(input, "#").map(|it| (it, CstKind::Octothorpe.into()))
-}
+
+define_literal!(equals_sign, "=", CstKind::EqualsSign);
+define_literal!(comma, ",", CstKind::Comma);
+define_literal!(dot, ".", CstKind::Dot);
+define_literal!(colon, ":", CstKind::Colon);
+define_literal!(colon_equals_sign, ":=", CstKind::ColonEqualsSign);
+define_literal!(bar, "|", CstKind::Bar);
+define_literal!(opening_bracket, "[", CstKind::OpeningBracket);
+define_literal!(closing_bracket, "]", CstKind::ClosingBracket);
+define_literal!(opening_parenthesis, "(", CstKind::OpeningParenthesis);
+define_literal!(closing_parenthesis, ")", CstKind::ClosingParenthesis);
+define_literal!(opening_curly_brace, "{", CstKind::OpeningCurlyBrace);
+define_literal!(closing_curly_brace, "}", CstKind::ClosingCurlyBrace);
+define_literal!(arrow, "->", CstKind::Arrow);
+define_literal!(single_quote, "'", CstKind::SingleQuote);
+define_literal!(double_quote, "\"", CstKind::DoubleQuote);
+define_literal!(percent, "%", CstKind::Percent);
+define_literal!(octothorpe, "#", CstKind::Octothorpe);
+
 #[instrument(level = "trace")]
 pub fn newline(input: &str) -> Option<(&str, Rcst)> {
     let newlines = vec!["\n", "\r\n"];
