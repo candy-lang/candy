@@ -89,7 +89,7 @@ mod test {
             kind: ModuleKind::Code,
         };
 
-        db.did_open_module(&module, "123".to_string().into_bytes());
+        db.did_open_module(&module, b"123".to_vec());
         assert_eq!(
             db.get_module_content_as_string(module.clone())
                 .unwrap()
@@ -105,7 +105,7 @@ mod test {
             .into()],
         );
 
-        db.did_change_module(&module, "456".to_string().into_bytes());
+        db.did_change_module(&module, b"456".to_vec());
         assert_eq!(
             db.get_module_content_as_string(module.clone())
                 .unwrap()
