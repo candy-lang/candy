@@ -38,12 +38,9 @@ pub struct CodeGen<'ctx> {
 }
 
 impl<'ctx> CodeGen<'ctx> {
-    pub fn new(
-        context: &'ctx Context,
-        module: Module<'ctx>,
-        builder: Builder<'ctx>,
-        mir: Arc<Mir>,
-    ) -> Self {
+    pub fn new(context: &'ctx Context, module_name: &str, mir: Arc<Mir>) -> Self {
+        let module = context.create_module(module_name);
+        let builder = context.create_builder();
         Self {
             context,
             module,
@@ -69,25 +66,29 @@ impl<'ctx> CodeGen<'ctx> {
         let i8_type = self.context.i8_type();
         let void_type = self.context.void_type();
 
-        let candy_type = self.context.opaque_struct_type("candy_type");
-        let candy_type_ptr = candy_type.ptr_type(AddressSpace::default());
+        let candy_value = self.context.opaque_struct_type("candy_value");
+        let candy_value_ptr = candy_value.ptr_type(AddressSpace::default());
 
-        let make_int_fn_type = candy_type_ptr.fn_type(&[i64_type.into()], false);
+        let make_int_fn_type = candy_value_ptr.fn_type(&[i64_type.into()], false);
         self.module
             .add_function("make_candy_int", make_int_fn_type, Some(Linkage::External));
         let make_tag_fn_type =
-            candy_type_ptr.fn_type(&[i8_type.ptr_type(AddressSpace::default()).into()], false);
+            candy_value_ptr.fn_type(&[i8_type.ptr_type(AddressSpace::default()).into()], false);
         let make_candy_tag =
             self.module
                 .add_function("make_candy_tag", make_tag_fn_type, Some(Linkage::External));
         self.module
             .add_function("make_candy_text", make_tag_fn_type, Some(Linkage::External));
-        self.module
-            .add_function("make_candy_list", make_tag_fn_type, Some(Linkage::External));
-        let make_function_fn_type = candy_type_ptr.fn_type(
+        let make_list_fn_type = candy_value_ptr.fn_type(&[candy_value_ptr.into()], false);
+        self.module.add_function(
+            "make_candy_list",
+            make_list_fn_type,
+            Some(Linkage::External),
+        );
+        let make_function_fn_type = candy_value_ptr.fn_type(
             &[
-                candy_type_ptr.into(),
-                candy_type_ptr.into(),
+                candy_value_ptr.into(),
+                candy_value_ptr.into(),
                 i64_type.into(),
             ],
             false,
@@ -99,7 +100,7 @@ impl<'ctx> CodeGen<'ctx> {
         );
 
         let make_struct_fn_type =
-            candy_type_ptr.fn_type(&[candy_type_ptr.into(), candy_type_ptr.into()], false);
+            candy_value_ptr.fn_type(&[candy_value_ptr.into(), candy_value_ptr.into()], false);
         self.module.add_function(
             "make_candy_struct",
             make_struct_fn_type,
@@ -107,13 +108,13 @@ impl<'ctx> CodeGen<'ctx> {
         );
 
         let struct_get_fn_type =
-            candy_type_ptr.fn_type(&[candy_type_ptr.into(), candy_type_ptr.into()], false);
+            candy_value_ptr.fn_type(&[candy_value_ptr.into(), candy_value_ptr.into()], false);
         let candy_builtin_struct_get =
             self.module
                 .add_function("candy_builtin_struct_get", struct_get_fn_type, None);
 
         let panic_fn_type = void_type.fn_type(
-            &[candy_type.ptr_type(AddressSpace::default()).into()],
+            &[candy_value.ptr_type(AddressSpace::default()).into()],
             false,
         );
         self.module.add_function("candy_panic", panic_fn_type, None);
@@ -124,13 +125,13 @@ impl<'ctx> CodeGen<'ctx> {
             .module
             .add_function("print_candy_value", panic_fn_type, None);
 
-        let candy_fn_type = candy_type_ptr.fn_type(&[], true);
+        let candy_fn_type = candy_value_ptr.fn_type(&[], true);
         let get_candy_fn_ptr_type = candy_fn_type
             .ptr_type(AddressSpace::default())
-            .fn_type(&[candy_type_ptr.into()], false);
+            .fn_type(&[candy_value_ptr.into()], false);
         self.module
             .add_function("get_candy_function_pointer", get_candy_fn_ptr_type, None);
-        let get_candy_fn_env_type = candy_type_ptr.fn_type(&[candy_type_ptr.into()], false);
+        let get_candy_fn_env_type = candy_value_ptr.fn_type(&[candy_value_ptr.into()], false);
         self.module.add_function(
             "get_candy_function_environment",
             get_candy_fn_env_type,
@@ -142,7 +143,7 @@ impl<'ctx> CodeGen<'ctx> {
         let block = self.context.append_basic_block(main_fn, "entry");
 
         let call_candy_function_type =
-            candy_type_ptr.fn_type(&[candy_type_ptr.into(), candy_type_ptr.into()], false);
+            candy_value_ptr.fn_type(&[candy_value_ptr.into(), candy_value_ptr.into()], false);
         let call_candy_function_with =
             self.module
                 .add_function("call_candy_function_with", call_candy_function_type, None);
@@ -159,7 +160,7 @@ impl<'ctx> CodeGen<'ctx> {
 
         let environment = self
             .module
-            .add_global(candy_type_ptr, None, "candy_environment");
+            .add_global(candy_value_ptr, None, "candy_environment");
 
         if let Some(main_return) = self.main_return {
             const MAIN_FN_NAME: &str = "Main";
@@ -198,9 +199,9 @@ impl<'ctx> CodeGen<'ctx> {
                     "",
                 );
                 for value in self.module.get_globals() {
-                    let val = self
-                        .builder
-                        .build_load(candy_type_ptr, value.as_pointer_value(), "");
+                    let val =
+                        self.builder
+                            .build_load(candy_value_ptr, value.as_pointer_value(), "");
                     self.builder.build_call(free_fn, &[val.into()], "");
                 }
             }

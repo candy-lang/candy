@@ -1,8 +1,6 @@
 #ifndef __CANDY_RT_H
 #define __CANDY_RT_H
 
-#define int128_t long long int
-
 typedef enum
 {
     CANDY_TYPE_INT = 42,
@@ -29,7 +27,7 @@ typedef struct candy_value
 {
     union
     {
-        int128_t integer;
+        __int64_t integer;
         char *text;
         struct candy_value **list;
         candy_function_t function;
@@ -59,7 +57,7 @@ extern candy_value_t *candy_environment;
 void print_candy_value(const candy_value_t *value);
 const candy_value_t *to_candy_bool(int value);
 int candy_tag_to_bool(const candy_value_t *value);
-candy_value_t *make_candy_int(int128_t value);
+candy_value_t *make_candy_int(int64_t value);
 candy_value_t *make_candy_text(char *text);
 candy_value_t *make_candy_tag(char *tag);
 candy_value_t *make_candy_list(candy_value_t **values);

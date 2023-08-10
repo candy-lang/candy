@@ -49,7 +49,7 @@ void print_candy_value(const candy_value_t *value)
     switch (value->type)
     {
     case CANDY_TYPE_INT:
-        printf("%lld", value->value.integer);
+        printf("%ld", value->value.integer);
         break;
     case CANDY_TYPE_TEXT:
         printf("%s", value->value.text);
@@ -113,7 +113,7 @@ int candy_tag_to_bool(const candy_value_t *value)
     }
 }
 
-candy_value_t *make_candy_int(int128_t value)
+candy_value_t *make_candy_int(int64_t value)
 {
     candy_value_t *candy_value = malloc(sizeof(candy_value_t));
     candy_value->value.integer = value;

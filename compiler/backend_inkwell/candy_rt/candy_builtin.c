@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include "candy_rt.h"
 
@@ -49,7 +50,14 @@ candy_value_t *candy_builtin_int_subtract(candy_value_t *left, candy_value_t *ri
 
 candy_value_t *candy_builtin_int_bit_length(candy_value_t *value)
 {
-    return make_candy_int(64);
+    long long int_value = value->value.integer;
+    int shifts = 0;
+    while (int_value)
+    {
+        int_value = int_value >> shifts;
+        shifts++;
+    }
+    return make_candy_int(shifts);
 }
 
 candy_value_t *candy_builtin_int_bitwise_and(candy_value_t *left, candy_value_t *right)
@@ -69,8 +77,8 @@ candy_value_t *candy_builtin_int_bitwise_xor(candy_value_t *left, candy_value_t 
 
 const candy_value_t *candy_builtin_int_compareto(candy_value_t *left, candy_value_t *right)
 {
-    int128_t left_value = left->value.integer;
-    int128_t right_value = right->value.integer;
+    int64_t left_value = left->value.integer;
+    int64_t right_value = right->value.integer;
     if (left_value < right_value)
     {
         return &__internal_less;

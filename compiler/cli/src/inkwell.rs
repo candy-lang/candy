@@ -65,9 +65,7 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
     }
 
     let context = backend_inkwell::inkwell::context::Context::create();
-    let module = context.create_module(&path);
-    let builder = context.create_builder();
-    let codegen = CodeGen::new(&context, module, builder, mir);
+    let codegen = CodeGen::new(&context, &path, mir);
     let mut bc_path = PathBuf::new();
     bc_path.push(&format!("{path}.bc"));
     codegen
