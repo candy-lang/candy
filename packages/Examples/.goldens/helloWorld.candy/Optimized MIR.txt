@@ -37,11 +37,11 @@ $28 = "The `reason` must be a text."
 $29 = "`sendPort | typeIs SendPort` was not satisfied"
 $30 = "`struct | typeIs Struct` was not satisfied"
 $31 = "`struct | ✨.structHasKey key` was not satisfied"
-# anonymous:$generated::needs:isConditionTrue:then
+# Builtins::ifElse:1:case-0:matched, Builtins::isLessThanOrEqualTo:19:case-0:matched, Builtins::isNonNegative:13:case-0:matched, Builtins::not:1:case-1:matched, anonymous:$generated::needs:isConditionTrue:then
 $32 = { (responsible $33) ->
   $34 = $25
 }
-# anonymous:$generated::needs:isConditionBool:then
+# anonymous:$generated::needs:condition:then, anonymous:$generated::needs:isConditionBool:then, anonymous:$generated::needs:isReasonText:then
 $35 = { (responsible $36) ->
   $37 = $20
 }

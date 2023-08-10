@@ -393,11 +393,11 @@
 <replaced address ff086d195e3446f4>: { 0 arguments (capturing nothing) → ip-3938 }
 
 # Instructions
-# anonymous:$generated::needs:isConditionTrue:then
+# Builtins::ifElse:1:case-0:matched, Core:bool:not:6:case-1:matched, Core:bool:lazyOr:18:case-0:matched, Core:bool:is:1:case-0:matched, Builtins::isLessThanOrEqualTo:19:case-0:matched, anonymous:$generated::needs:isConditionTrue:then, Builtins::not:1:case-1:matched, Builtins::isNonNegative:13:case-0:matched
    0: pushConstant inline <symbol-id 20>
    1: popMultipleBelowTop 1
    2: return
-# anonymous:$generated::needs:isConditionBool:then
+# Core:type:20:isMatch:then, Core:text:31:isMatch:then, Core:iterable:88:11:1:isMatch:then, Core::31:isMatch:then, Core:iterable:91:2:11:1:isMatch:then, Core:controlFlow:31:isMatch:then, Core:iterable:withIndex:11:1:isMatch:then, Core::64:isMatch:then, Core:function:20:isMatch:then, Core:bool:9:isMatch:then, Core:fixedDecimal:add:14:isMatch:then, Core:iterable:reduceLeft:38:1:isMatch:then, Core:iterable:takeWhile:2:11:1:isMatch:then, Core::207:isMatch:then, Core:channel:31:isMatch:then, Core:fixedDecimal:31:isMatch:then, Core:list:42:isMatch:then, Core:iterable:generateWithState:14:0:11:1:isMatch:then, Core:tag:31:isMatch:then, Core:controlFlow:if:27, Core:int:42:isMatch:then, Core:fixedDecimal:subtract:14:isMatch:then, Core:fixedDecimal:divideTruncatingAtScale:42:isMatch:then, anonymous:$generated::needs:isReasonText:then, Core:text:42:isMatch:then, Core:int:pow:21:1:isMatch:then, Core:concurrency:42:isMatch:then, Core:list:31:isMatch:then, Core:iterable:20:isMatch:then, Examples:iterable:20:isMatch:then, Core:int:31:isMatch:then, Core::141:isMatch:then, Core:check:20:isMatch:then, Core:fixedDecimal:divideTruncating:37:isMatch:then, Core:iterable:map:19:11:1:isMatch:then, Core:fixedDecimal:108:isMatch:then, Core:iterable:take:33:1:isMatch:then, Core:result:20:isMatch:then, Core:fixedDecimal:42:isMatch:then, Core:struct:20:isMatch:then, Core:list:generate:60:1:isMatch:then, Core:mutable:31:isMatch:then, Core:controlFlow:53:isMatch:then, anonymous:$generated::needs:condition:then, Core:int:53:isMatch:then, Core:channel:42:isMatch:then, Core::53:isMatch:then, Core:fixedDecimal:compareTo:14:isMatch:then, Core:mutable:20:isMatch:then, Core:iterable:withIndex:11:14:1:isMatch:then, Examples:iterable:split:9:29, Core:fixedDecimal:20:isMatch:then, Core:fixedDecimal:53:isMatch:then, Core:result:31:isMatch:then, Core::196:isMatch:then, anonymous:$generated::needs:isConditionBool:then, Core:iterable:31:isMatch:then, Core:iterable:94:6:21, Core:iterable:fromList:18:1:isMatch:then, Core::42:isMatch:then
    3: pushConstant inline <symbol-id 10>
    4: popMultipleBelowTop 1
    5: return
@@ -473,11 +473,11 @@
   70: pushFromStack 3
   71: pushConstant <replaced address 80f4eaa53f4876cd> anonymous:$generated::needs
   72: tailCall with 19 locals and 3 arguments
-# Builtins::not:1:equals:then
+# Core:bool:lazyAnd:18:equals:then, Builtins::not:1:equals:then, Builtins::ifElse:1:equals:then, Core:bool:is:1:equals:then, Builtins::isNonNegative:13:equals:then, Core:mutable:inScope:13:18:17:equals:then, Core:bool:not:6:equals:then, Builtins::isLessThanOrEqualTo:19:equals:then, Core:int:pow:21:4:equals:then, Core:bool:lazyOr:18:equals:then
   73: pushConstant <replaced address 292aac452aa393bb> (<symbol-id 25>)
   74: popMultipleBelowTop 1
   75: return
-# Builtins::not:1:case-0:matched
+# Core:list:isValidInsertIndex:21, Builtins::isNonNegative:13:case-1:matched, Core:function:is3:12, Core:function:is2:12, Core:bool:not:6:case-0:matched, Core:list:isValidIndex:21, Builtins::isLessThanOrEqualTo:19:case-1:matched, Builtins::not:1:case-0:matched, Core:function:is5:12, Core:function:is0:12, Core:function:is4:12, Core:function:is1:12, Core:bool:lazyAnd:18:case-1:matched
   76: pushConstant inline <symbol-id 3>
   77: popMultipleBelowTop 1
   78: return
@@ -4507,7 +4507,7 @@
 3935: pushFromStack 12
 3936: pushConstant <replaced address 5d03f65b38f72e0a> Core:controlFlow:recursive:24
 3937: tailCall with 11 locals and 2 arguments
-# Core:iterable:generate:50:5
+# Core:iterable:windowed:67:30, Core:iterable:generate:50:5, Core:iterable:fromList:18:15, Core:iterable:takeWhile:2:11:8
 3938: pushConstant <replaced address a5e21bf5aa5162f9> <symbol-id 2> (<symbol-id 21>)
 3939: popMultipleBelowTop 1
 3940: return

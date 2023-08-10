@@ -128,12 +128,12 @@ impl Debug for VisibleExpressions {
 
 impl Body {
     pub fn visit(
-        &mut self,
-        visitor: &mut dyn FnMut(Id, &mut Expression, bool) -> VisitorResult,
+        &self,
+        visitor: &mut dyn FnMut(Id, &Expression, bool) -> VisitorResult,
     ) -> VisitorResult {
         let length = self.expressions.len();
         for i in 0..length {
-            let (id, expression) = self.expressions.get_mut(i).unwrap();
+            let (id, expression) = self.expressions.get(i).unwrap();
             match Self::visit_expression(*id, expression, i == length - 1, visitor) {
                 VisitorResult::Continue => {}
                 VisitorResult::Abort => return VisitorResult::Abort,
@@ -143,12 +143,41 @@ impl Body {
     }
     fn visit_expression(
         id: Id,
+        expression: &Expression,
+        is_returned: bool,
+        visitor: &mut dyn FnMut(Id, &Expression, bool) -> VisitorResult,
+    ) -> VisitorResult {
+        if let Expression::Function { body, .. } = expression {
+            match body.visit(visitor) {
+                VisitorResult::Continue => {}
+                VisitorResult::Abort => return VisitorResult::Abort,
+            }
+        }
+        visitor(id, expression, is_returned)
+    }
+
+    pub fn visit_mut(
+        &mut self,
+        visitor: &mut dyn FnMut(Id, &mut Expression, bool) -> VisitorResult,
+    ) -> VisitorResult {
+        let length = self.expressions.len();
+        for i in 0..length {
+            let (id, expression) = self.expressions.get_mut(i).unwrap();
+            match Self::visit_expression_mut(*id, expression, i == length - 1, visitor) {
+                VisitorResult::Continue => {}
+                VisitorResult::Abort => return VisitorResult::Abort,
+            }
+        }
+        VisitorResult::Continue
+    }
+    fn visit_expression_mut(
+        id: Id,
         expression: &mut Expression,
         is_returned: bool,
         visitor: &mut dyn FnMut(Id, &mut Expression, bool) -> VisitorResult,
     ) -> VisitorResult {
         if let Expression::Function { body, .. } = expression {
-            match body.visit(visitor) {
+            match body.visit_mut(visitor) {
                 VisitorResult::Continue => {}
                 VisitorResult::Abort => return VisitorResult::Abort,
             }

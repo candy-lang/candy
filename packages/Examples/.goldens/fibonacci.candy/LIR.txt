@@ -100,11 +100,11 @@
 
 # Bodies
 body_0 (responsible $0) =
-  # Original HIR IDs: anonymous:$generated::needs:isConditionTrue:then
+  # Original HIR IDs: Builtins::ifElse:1:case-0:matched, Builtins::isLessThanOrEqualTo:19:case-0:matched, Builtins::isNonNegative:13:case-0:matched, Builtins::not:1:case-1:matched, anonymous:$generated::needs:isConditionTrue:then
   # Captured IDs: none
   $1 = %57
 body_1 (responsible $0) =
-  # Original HIR IDs: anonymous:$generated::needs:isConditionBool:then
+  # Original HIR IDs: anonymous:$generated::needs:condition:then, anonymous:$generated::needs:isConditionBool:then, anonymous:$generated::needs:isReasonText:then
   # Captured IDs: none
   $1 = %54
 body_2 (responsible $1) =
@@ -190,7 +190,7 @@ body_6 $0 $1 $2 (+ responsible $3) =
   $46 = drop $0
   $47 = $33
 body_7 (responsible $0) =
-  # Original HIR IDs: Builtins::not:1:equals:then
+  # Original HIR IDs: Builtins::ifElse:1:equals:then, Builtins::isLessThanOrEqualTo:19:equals:then, Builtins::isNonNegative:13:equals:then, Builtins::not:1:equals:then
   # Captured IDs: none
   $1 = %82
 body_8 (responsible $2) =
