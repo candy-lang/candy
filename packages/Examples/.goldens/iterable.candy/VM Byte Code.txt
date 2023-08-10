@@ -4507,7 +4507,7 @@
 3935: pushFromStack 12
 3936: pushConstant <replaced address 5d03f65b38f72e0a> Core:controlFlow:recursive:24
 3937: tailCall with 11 locals and 2 arguments
-# Core:iterable:takeWhile:2:11:8, Core:iterable:windowed:67:30, Core:iterable:generate:50:5, Core:iterable:fromList:18:16
+# Core:iterable:windowed:67:30, Core:iterable:generate:50:5, Core:iterable:fromList:18:15, Core:iterable:takeWhile:2:11:8
 3938: pushConstant <replaced address a5e21bf5aa5162f9> <symbol-id 2> (<symbol-id 21>)
 3939: popMultipleBelowTop 1
 3940: return

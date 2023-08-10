@@ -1646,7 +1646,7 @@ $1426 = { $1427 $1428 (+ responsible $1429) ->
   $1519 = call $1510 with $1510 $1427 ($88 is responsible)
 }
 $1520 = Error $238
-# Core:iterable:fromList:18:16, Core:iterable:generate:50:5, Core:iterable:takeWhile:2:11:8, Core:iterable:windowed:67:30
+# Core:iterable:fromList:18:15, Core:iterable:generate:50:5, Core:iterable:takeWhile:2:11:8, Core:iterable:windowed:67:30
 $1521 = { (responsible $1522) ->
   $1523 = $1520
 }

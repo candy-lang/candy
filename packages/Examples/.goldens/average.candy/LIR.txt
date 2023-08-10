@@ -5588,7 +5588,7 @@ body_197 $0 $1 (+ responsible $2) =
   $35 = drop $0
   $36 = $27
 body_198 (responsible $0) =
-  # Original HIR IDs: Core:iterable:fromList:18:16, Core:iterable:generate:50:5, Core:iterable:takeWhile:2:11:8, Core:iterable:windowed:67:30
+  # Original HIR IDs: Core:iterable:fromList:18:15, Core:iterable:generate:50:5, Core:iterable:takeWhile:2:11:8, Core:iterable:windowed:67:30
   # Captured IDs: none
   $1 = %425
 body_199 (responsible $1) =
