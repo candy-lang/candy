@@ -508,7 +508,7 @@ impl LoweringContext {
                                     colon,
                                     key,
                                     AstError::StructKeyMissesColon,
-                                )
+                                );
                             }
 
                             let mut value = self.lower_cst(&value.clone(), lowering_type);
@@ -518,7 +518,7 @@ impl LoweringContext {
                                     comma,
                                     value,
                                     AstError::StructValueMissesComma,
-                                )
+                                );
                             }
                             Some((Some(key), value))
                         } else {
@@ -530,7 +530,7 @@ impl LoweringContext {
                                     value,
                                     ast,
                                     AstError::StructShorthandWithNotIdentifier,
-                                )
+                                );
                             }
 
                             if let Some(comma) = comma && !comma.kind.is_comma() {
@@ -538,7 +538,7 @@ impl LoweringContext {
                                     comma,
                                     ast,
                                     AstError::StructValueMissesComma,
-                                )
+                                );
                             }
                             Some((None, ast))
                         }
@@ -759,12 +759,11 @@ impl LoweringContext {
         }
 
         if let CstKind::Identifier(identifier) = &cst.kind {
-            let identifier = self.create_string(cst.data.id.to_owned(), identifier.clone());
-            self.create_ast(cst.data.id.to_owned(), Identifier(identifier))
+            let identifier = self.create_string(cst.data.id, identifier.clone());
+            self.create_ast(cst.data.id, Identifier(identifier))
         } else {
-            let identifier =
-                self.create_string(cst.data.id.to_owned(), format!("<invalid#{index}>"));
-            let ast = self.create_ast(cst.data.id.to_owned(), Identifier(identifier));
+            let identifier = self.create_string(cst.data.id, format!("<invalid#{index}>"));
+            let ast = self.create_ast(cst.data.id, Identifier(identifier));
             self.create_error_ast(cst, ast, AstError::ExpectedParameter)
         }
     }
@@ -816,7 +815,7 @@ impl LoweringContext {
         error: impl Into<CompilerErrorPayload>,
     ) -> Ast {
         self.create_ast(
-            cst.data.id.to_owned(),
+            cst.data.id,
             AstKind::Error {
                 child: child.into().map(Box::new),
                 errors: vec![self.create_error(cst, error)],

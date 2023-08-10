@@ -297,7 +297,7 @@ impl Rcst {
                 *state.offset += unparsable_input.len();
                 CstKind::Error {
                     unparsable_input: unparsable_input.clone(),
-                    error: error.clone(),
+                    error: *error,
                 }
             }
         }

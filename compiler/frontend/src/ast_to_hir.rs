@@ -176,15 +176,11 @@ impl Context<'_> {
 
     fn compile_single(&mut self, ast: &Ast) -> hir::Id {
         match &ast.kind {
-            AstKind::Int(Int(int)) => {
-                self.push(ast.id.clone(), Expression::Int(int.to_owned()), None)
-            }
+            AstKind::Int(Int(int)) => self.push(ast.id.clone(), Expression::Int(int.clone()), None),
             AstKind::Text(text) => self.lower_text(Some(ast.id.clone()), text),
-            AstKind::TextPart(TextPart(string)) => self.push(
-                ast.id.clone(),
-                Expression::Text(string.value.to_owned()),
-                None,
-            ),
+            AstKind::TextPart(TextPart(string)) => {
+                self.push(ast.id.clone(), Expression::Text(string.value.clone()), None)
+            }
             AstKind::Identifier(Identifier(name)) => {
                 let reference = match self.identifiers.get(&name.value) {
                     Some(reference) => reference.clone(),
@@ -202,7 +198,7 @@ impl Context<'_> {
             }
             AstKind::Symbol(Symbol(symbol)) => self.push(
                 ast.id.clone(),
-                Expression::Symbol(symbol.value.to_owned()),
+                Expression::Symbol(symbol.value.clone()),
                 None,
             ),
             AstKind::List(List(items)) => {
@@ -252,13 +248,11 @@ impl Context<'_> {
             AstKind::Assignment(Assignment { is_public, body }) => {
                 let (names, body) = match body {
                     ast::AssignmentBody::Function { name, function } => {
-                        let name_string = name.value.clone();
-                        let body =
-                            self.compile_function(ast.id.clone(), function, Some(name_string));
+                        let body = self.compile_function(ast.id.clone(), function, &***name);
                         let name_id = self.push(
                             name.id.clone(),
                             Expression::Reference(body.clone()),
-                            name.value.to_owned(),
+                            name.value.clone(),
                         );
                         (vec![(name.value.clone(), name_id)], body)
                     }
@@ -284,7 +278,7 @@ impl Context<'_> {
                                 let id = self.push(
                                     ast_id,
                                     Expression::PatternIdentifierReference(identifier_id),
-                                    name.to_owned(),
+                                    name.clone(),
                                 );
                                 (name, id)
                             })
@@ -339,7 +333,7 @@ impl Context<'_> {
                                 self.push(
                                     ast_id,
                                     Expression::PatternIdentifierReference(identifier_id),
-                                    name.to_owned(),
+                                    name.clone(),
                                 );
                             }
                             self.compile(body.as_ref());
@@ -499,7 +493,7 @@ impl Context<'_> {
         &mut self,
         id: ast::Id,
         function: &ast::Function,
-        identifier: Option<String>,
+        identifier: impl Into<Option<&str>>,
     ) -> hir::Id {
         let reset_state = self.start_scope();
         let function_id = self.create_next_id(id, identifier);
@@ -512,7 +506,7 @@ impl Context<'_> {
                 let name = parameter.value.to_string();
                 parameters.push(function_id.child(name.clone()));
 
-                let id = self.create_next_id(parameter.id.clone(), name.clone());
+                let id = self.create_next_id(parameter.id.clone(), &*name);
                 self.body.identifiers.insert(id.clone(), name.clone());
                 self.identifiers.insert(name, id);
             } else {
@@ -536,7 +530,7 @@ impl Context<'_> {
                     self.push(
                         ast_id,
                         Expression::PatternIdentifierReference(identifier_id),
-                        name.to_owned(),
+                        name.clone(),
                     );
                 }
             }
@@ -547,7 +541,7 @@ impl Context<'_> {
         let inner_body = self.end_scope(reset_state);
 
         self.push_with_existing_id(
-            function_id.clone(),
+            function_id,
             Expression::Function(Function {
                 parameters,
                 body: inner_body,
@@ -693,7 +687,7 @@ impl Context<'_> {
         identifier: impl Into<Option<String>>,
     ) -> hir::Id {
         let identifier = identifier.into();
-        let id = self.create_next_id(ast_id, identifier.clone());
+        let id = self.create_next_id(ast_id, identifier.as_deref());
         self.push_with_existing_id(id, expression, identifier)
     }
     fn push_with_existing_id(
@@ -732,7 +726,7 @@ impl Context<'_> {
     fn create_next_id(
         &mut self,
         ast_id: impl Into<Option<ast::Id>>,
-        key: impl Into<Option<String>>,
+        key: impl Into<Option<&str>>,
     ) -> hir::Id {
         let key = key.into();
         for disambiguator in 0.. {
@@ -740,10 +734,10 @@ impl Context<'_> {
                 || disambiguator.into(),
                 |key| {
                     if disambiguator == 0 {
-                        key.to_string().into()
+                        (*key).to_string().into()
                     } else {
                         IdKey::Named {
-                            name: key.to_string(),
+                            name: (*key).to_string(),
                             disambiguator,
                         }
                     }
@@ -785,7 +779,7 @@ impl Context<'_> {
         assert!(self.use_id.is_none());
 
         let reset_state = self.start_scope();
-        let use_id = self.create_next_id(None, "use".to_string());
+        let use_id = self.create_next_id(None, "use");
         self.id_prefix = use_id.clone();
         let relative_path = use_id.child("relativePath");
 
