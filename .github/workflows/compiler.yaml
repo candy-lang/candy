@@ -59,7 +59,7 @@ jobs:
         with:
           token: ${{ secrets.GOLDEN_IR_PUSH_TOKEN }}
           repository: candy-lang/golden-irs
-          ref: ${{ github.event.pull_request.base.sha }}_
+          ref: ${{ github.event_name == 'pull_request' && format('{0}_', github.event.pull_request.base.sha) || 'main' }}_
           fetch-depth: 1
           path: golden-irs/
 
