@@ -61,7 +61,7 @@ pub(crate) enum Options {
     VmByteCode(PathAndTracing),
 
     #[command(subcommand)]
-    Gold(GoldOptions),
+    Gold(Gold),
 }
 #[derive(Parser, Debug)]
 pub(crate) struct OnlyPath {
@@ -196,26 +196,28 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
 /// Dump IRs next to the original files to compare outputs of different compiler
 /// versions.
 #[derive(Parser, Debug)]
-pub(crate) enum GoldOptions {
+pub(crate) enum Gold {
     /// For each Candy file, generate the IRs next to the file.
-    Generate(GoldPath),
+    Generate(GoldOptions),
 
     /// For each Candy file, check if the IRs next to the file are up-to-date.
-    Check(GoldPath),
+    Check(GoldOptions),
 }
 #[derive(Parser, Debug)]
-pub(crate) struct GoldPath {
+pub(crate) struct GoldOptions {
     #[arg(value_hint = ValueHint::DirPath)]
     directory: Option<PathBuf>,
+
+    #[arg(long, value_hint = ValueHint::DirPath)]
+    output_directory: Option<PathBuf>,
 }
-impl GoldOptions {
+impl Gold {
     fn run(&self, db: &Database) -> ProgramResult {
         match &self {
-            GoldOptions::Generate(options) => options
-                .visit_irs(db, |_file, _ir_name, ir_file, ir| {
-                    fs::write(ir_file, ir).unwrap()
-                }),
-            GoldOptions::Check(options) => {
+            Gold::Generate(options) => options.visit_irs(db, |_file, _ir_name, ir_file, ir| {
+                fs::write(ir_file, ir).unwrap()
+            }),
+            Gold::Check(options) => {
                 let mut did_change = false;
                 let formatter = PatchFormatter::new().with_color();
                 options.visit_irs(db, |file, ir_name, ir_file, ir| {
@@ -258,7 +260,7 @@ impl GoldOptions {
         }
     }
 }
-impl GoldPath {
+impl GoldOptions {
     const TRACING_CONFIG: TracingConfig = TracingConfig::off();
     fn visit_irs(
         &self,
@@ -274,7 +276,10 @@ impl GoldPath {
             return Err(Exit::DirectoryNotFound);
         }
 
-        let output_directory = directory.join(".goldens");
+        let output_directory = self
+            .output_directory
+            .clone()
+            .unwrap_or_else(|| directory.join(".goldens"));
         fs::create_dir_all(&output_directory).unwrap();
 
         for file in WalkDir::new(&directory)
