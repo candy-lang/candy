@@ -158,13 +158,13 @@
           "type": "string",
           "default": "",
           "markdownDescription": "Command to start the 🍭 Candy language server. If empty, we'll attempt to find the 🍭 Candy executable in the `PATH` environment variable.",
-          "scope": "machine"
+          "scope": "machine-overridable"
         },
         "candy.packagesPath": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Path of a folder containing all packages.",
-          "scope": "machine"
+          "markdownDescription": "Path of a folder containing all 🍭 Candy packages.",
+          "scope": "machine-overridable"
         }
       }
     },
