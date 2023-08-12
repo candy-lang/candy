@@ -58,16 +58,10 @@
     "explorer.fileNesting.patterns": {
       "*.candy": "${capture}.candy.*"
     },
-    "git.branchProtection": [
-      "main"
-    ],
+    "git.branchProtection": ["main"],
     "rust-analyzer.check.command": "clippy",
     "rust-analyzer.imports.group.enable": false,
     "task.allowAutomaticTasks": "on",
-    "todo-tree.general.tags": [
-      "FIXME",
-      "PERF",
-      "TODO"
-    ]
+    "todo-tree.general.tags": ["FIXME", "PERF", "TODO"]
   }
 }
