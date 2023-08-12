@@ -40,6 +40,13 @@ impl InlineTag {
         let pointer = unsafe { NonNull::new_unchecked(pointer as *mut u64) };
         Text::from(HeapText::new_unchecked(HeapObject::new(pointer)))
     }
+
+    pub fn dup_by(self, amount: usize) {
+        self.get().dup_by(amount);
+    }
+    pub fn drop(self, heap: &mut Heap) {
+        self.get().drop(heap);
+    }
 }
 
 impl DebugDisplay for InlineTag {

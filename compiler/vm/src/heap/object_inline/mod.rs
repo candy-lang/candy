@@ -72,8 +72,10 @@ impl InlineObject {
             heap.dup_handle_by(handle, amount);
         };
 
-        if let Ok(it) = HeapObject::try_from(self) {
-            it.dup_by(amount)
+        match InlineData::from(self) {
+            InlineData::Pointer(pointer) => pointer.get().dup_by(amount),
+            InlineData::Tag(tag) => tag.dup_by(amount),
+            _ => {}
         }
     }
     pub fn drop(self, heap: &mut Heap) {
@@ -81,8 +83,10 @@ impl InlineObject {
             heap.drop_handle(handle);
         };
 
-        if let Ok(it) = HeapObject::try_from(self) {
-            it.drop(heap)
+        match InlineData::from(self) {
+            InlineData::Pointer(pointer) => pointer.get().drop(heap),
+            InlineData::Tag(tag) => tag.drop(heap),
+            _ => {}
         }
     }
 
