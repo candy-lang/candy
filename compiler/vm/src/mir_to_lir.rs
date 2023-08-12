@@ -365,6 +365,9 @@ impl<'c> LoweringContext<'c> {
         }
     }
     fn emit(&mut self, id: Id, instruction: Instruction) {
+        if matches!(instruction, Instruction::PopMultipleBelowTop(0)) {
+            return;
+        }
         instruction.apply_to_stack(&mut self.stack, id);
         self.instructions.push(instruction);
     }
