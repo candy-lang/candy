@@ -1,6 +1,6 @@
 # 🍭 Candy
 
-A sweet programming language that is robust, minimalistic, and expressive.
+A sweet, functional programming language that is robust, minimalistic, and expressive.
 
 Many programming languages have a strict separation between compile-time and runtime errors.
 Sometimes, this border can seem arbitrary:
