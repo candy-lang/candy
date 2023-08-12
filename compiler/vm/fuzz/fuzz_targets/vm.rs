@@ -87,8 +87,7 @@ fuzz_target!(|data: &[u8]| {
         &lir,
         heap,
         main,
-        &[environment.into()],
-        responsible,
+        &[environment.into(), responsible.into()],
         DummyTracer,
     )
     .run_forever_without_handles();
