@@ -92,7 +92,7 @@ impl CurrentBody {
             .enumerate()
             .map(|(index, id)| (id, lir::Id::from_usize(index)))
             .collect();
-        let ids_to_drop = id_mapping.iter().map(|(_, v)| v).copied().collect();
+        let ids_to_drop = id_mapping.values().copied().collect();
         Self {
             id_mapping,
             captured_count,
