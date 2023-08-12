@@ -44,3 +44,9 @@ coverage/
 .buildlog/
 .history
 .svn/
+
+# LLVM Artefacts
+*.o
+*.a
+*.ll
+*.s
