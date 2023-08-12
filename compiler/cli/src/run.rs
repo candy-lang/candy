@@ -120,7 +120,6 @@ pub(crate) fn run(options: Options) -> ProgramResult {
                         unreachable!()
                     };
 
-                    print!(">> ");
                     io::stdout().flush().unwrap();
                     let input = {
                         let stdin = io::stdin();

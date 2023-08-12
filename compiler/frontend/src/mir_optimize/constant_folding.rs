@@ -60,7 +60,7 @@ pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression)
     };
 
     let function = context.visible.get(*function);
-    if let Expression::Tag { symbol, value: None } = function && arguments.len() == 1 {
+    if let Expression::Tag { symbol, value: None } = function && arguments.len() == 2 {
         **expression = Expression::Tag { symbol: symbol.clone(), value: Some(arguments[0]) };
         return;
     }
