@@ -20,7 +20,7 @@ In fact, we try to show more errors than typical statically typed languages.
   ```candy
   3                   # int
   "Candy"             # text
-  Green               # symbol
+  Green               # symbol (uppercase)
   (Foo, Bar)          # list
   [Name: "Candy"]     # struct
   { it -> add it 2 }  # function
@@ -31,9 +31,10 @@ In fact, we try to show more errors than typical statically typed languages.
   The syntax is indentation-aware.
 
   ```candy
-  foo = 42
-  println message =
-    print message
+  # I'm a comment
+  foo = 42                # variable (lowercase)
+  println message =       # function
+    print message         # function call
     print "\n"
   println "Hello, world!"
   ```
