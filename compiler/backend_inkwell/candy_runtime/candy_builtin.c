@@ -42,14 +42,19 @@ candy_value_t *candy_builtin_int_subtract(candy_value_t *left, candy_value_t *ri
 
 candy_value_t *candy_builtin_int_bit_length(candy_value_t *value)
 {
-    long long int_value = value->value.integer;
+    int64_t int_value = value->value.integer;
+    int is_negative = int_value < 0;
+    if (is_negative)
+    {
+        int_value = -int_value;
+    }
     int shifts = 0;
     while (int_value)
     {
         int_value = int_value >> shifts;
         shifts++;
     }
-    return make_candy_int(shifts);
+    return make_candy_int(shifts + is_negative);
 }
 
 candy_value_t *candy_builtin_int_bitwise_and(candy_value_t *left, candy_value_t *right)

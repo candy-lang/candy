@@ -30,8 +30,8 @@ pub(crate) struct Options {
     print_main_output: bool,
 
     /// If enabled, build the Candy runtime from scratch.
-    #[arg(long = "build-rt", default_value_t = false)]
-    build_rt: bool,
+    #[arg(long = "build-runtime", default_value_t = false)]
+    build_runtime: bool,
 
     /// If enabled, compile the LLVM bitcode with debug information.
     #[arg(short = 'g', default_value_t = false)]
@@ -84,13 +84,11 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
 
     let context = candy_backend_inkwell::inkwell::context::Context::create();
     let mut codegen = CodeGen::new(&context, &path, mir);
-    let mut bc_path = PathBuf::new();
-    bc_path.push(&format!("{path}.bc"));
     codegen
-        .compile(&bc_path, options.print_llvm_ir, options.print_main_output)
+        .compile(&path, options.print_llvm_ir, options.print_main_output)
         .map_err(|e| Exit::LlvmError(e.to_string()))?;
     codegen
-        .compile_asm_and_link(&path, options.build_rt, options.debug)
+        .compile_asm_and_link(&path, options.build_runtime, options.debug)
         .map_err(|_| Exit::ExternalError)?;
 
     ProgramResult::Ok(())

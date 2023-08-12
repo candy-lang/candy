@@ -15,7 +15,7 @@ pub use inkwell;
 use itertools::Itertools;
 use std::{
     collections::{HashMap, HashSet},
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::Arc,
 };
 
@@ -59,7 +59,7 @@ impl<'ctx> CodeGen<'ctx> {
 
     pub fn compile(
         &mut self,
-        path: &Path,
+        path: &str,
         print_llvm_ir: bool,
         print_main_output: bool,
     ) -> Result<(), LLVMString> {
@@ -215,7 +215,8 @@ impl<'ctx> CodeGen<'ctx> {
             self.module.print_to_stderr();
         }
         self.module.verify()?;
-        self.module.write_bitcode_to_path(path);
+        let bc_path = PathBuf::from(format!("{path}.bc"));
+        self.module.write_bitcode_to_path(&bc_path);
         Ok(())
     }
 
@@ -315,9 +316,6 @@ impl<'ctx> CodeGen<'ctx> {
 
                     let global =
                         self.create_global(symbol, id, call.try_as_basic_value().unwrap_left());
-
-                    global.set_initializer(&candy_value_ptr.const_null());
-                    self.globals.insert(*id, global);
 
                     if idx == mir.expressions.len() - 1 {
                         self.builder
@@ -628,7 +626,6 @@ impl<'ctx> CodeGen<'ctx> {
 
                     if let Some(FunctionInfo {
                         function_value,
-
                         captured_ids: _,
                         env_type,
                     }) = self.functions.get(function)
@@ -724,11 +721,11 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
-    fn create_global<V: BasicValue<'ctx>>(
+    fn create_global(
         &mut self,
         name: &str,
         id: &Id,
-        value: V,
+        value: impl BasicValue<'ctx>,
     ) -> GlobalValue<'ctx> {
         let candy_value_ptr = self
             .module
@@ -739,7 +736,7 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.build_store(global.as_pointer_value(), value);
 
         global.set_initializer(&candy_value_ptr.const_null());
-        self.globals.insert(*id, global);
+        assert!(self.globals.insert(*id, global).is_none());
         global
     }
 
