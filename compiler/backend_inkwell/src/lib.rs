@@ -158,7 +158,7 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(block);
         let main_return = self
             .compile_mir(&self.mir.body.clone(), &main_info)
-            .expect("Main Function should return a struct");
+            .unwrap();
         self.builder.position_at_end(block);
 
         let environment = self
@@ -298,8 +298,11 @@ impl<'ctx> CodeGen<'ctx> {
                         .builder
                         .build_call(make_candy_text, &[string.into()], "");
 
-                    let global =
-                        self.create_global(text, id, call.try_as_basic_value().unwrap_left());
+                    let global = self.create_global(
+                        &format!("text_{text}"),
+                        id,
+                        call.try_as_basic_value().unwrap_left(),
+                    );
 
                     Some(global.as_basic_value_enum())
                 }
@@ -312,8 +315,11 @@ impl<'ctx> CodeGen<'ctx> {
                         .builder
                         .build_call(make_candy_tag, &[string.into()], "");
 
-                    let global =
-                        self.create_global(symbol, id, call.try_as_basic_value().unwrap_left());
+                    let global = self.create_global(
+                        &format!("tag_{symbol}"),
+                        id,
+                        call.try_as_basic_value().unwrap_left(),
+                    );
 
                     Some(global.as_basic_value_enum())
                 }
@@ -682,7 +688,8 @@ impl<'ctx> CodeGen<'ctx> {
 
                     self.builder.build_unreachable();
 
-                    None
+                    // Early return to avoid building a return instruction.
+                    return None;
                 }
                 candy_frontend::mir::Expression::TraceCallStarts { .. } => unimplemented!(),
                 candy_frontend::mir::Expression::TraceCallEnds { .. } => unimplemented!(),
