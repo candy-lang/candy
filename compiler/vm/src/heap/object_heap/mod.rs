@@ -2,13 +2,14 @@ use self::{
     function::HeapFunction, hir_id::HeapHirId, int::HeapInt, list::HeapList, struct_::HeapStruct,
     tag::HeapTag, text::HeapText,
 };
-use super::{Data, DisplayWithSymbolTable, Heap, OrdWithSymbolTable, SymbolTable};
+use super::{Data, Heap};
+use crate::utils::{impl_debug_display_via_debugdisplay, DebugDisplay};
 use enum_dispatch::enum_dispatch;
 use rustc_hash::FxHashMap;
 use std::{
     cmp::Ordering,
     collections::hash_map,
-    fmt::{self, Debug, Display, Formatter, Pointer},
+    fmt::{self, Formatter, Pointer},
     hash::{Hash, Hasher},
     num::NonZeroUsize,
     ops::{Deref, Range},
@@ -178,16 +179,12 @@ impl HeapObject {
     }
 }
 
-impl Debug for HeapObject {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        Debug::fmt(&HeapData::from(*self), f)
+impl DebugDisplay for HeapObject {
+    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
+        DebugDisplay::fmt(&HeapData::from(*self), f, is_debug)
     }
 }
-impl DisplayWithSymbolTable for HeapObject {
-    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
-        DisplayWithSymbolTable::fmt(&HeapData::from(*self), f, symbol_table)
-    }
-}
+impl_debug_display_via_debugdisplay!(HeapObject);
 
 impl Pointer for HeapObject {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -206,9 +203,14 @@ impl Hash for HeapObject {
         HeapData::from(*self).hash(state);
     }
 }
-impl OrdWithSymbolTable for HeapObject {
-    fn cmp(&self, symbol_table: &SymbolTable, other: &Self) -> Ordering {
-        OrdWithSymbolTable::cmp(&Data::from(*self), symbol_table, &Data::from(*other))
+impl Ord for HeapObject {
+    fn cmp(&self, other: &Self) -> Ordering {
+        Data::from(*self).cmp(&Data::from(*other))
+    }
+}
+impl PartialOrd for HeapObject {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -255,32 +257,20 @@ pub enum HeapData {
     HirId(HeapHirId),
 }
 
-impl Debug for HeapData {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+impl DebugDisplay for HeapData {
+    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         match self {
-            Self::Int(int) => Debug::fmt(int, f),
-            Self::List(list) => Debug::fmt(list, f),
-            Self::Struct(struct_) => Debug::fmt(struct_, f),
-            Self::Text(text) => Debug::fmt(text, f),
-            Self::Tag(tag) => Debug::fmt(tag, f),
-            Self::Function(function) => Debug::fmt(function, f),
-            Self::HirId(hir_id) => Debug::fmt(hir_id, f),
+            Self::Int(int) => DebugDisplay::fmt(int, f, is_debug),
+            Self::List(list) => DebugDisplay::fmt(list, f, is_debug),
+            Self::Struct(struct_) => DebugDisplay::fmt(struct_, f, is_debug),
+            Self::Text(text) => DebugDisplay::fmt(text, f, is_debug),
+            Self::Tag(tag) => DebugDisplay::fmt(tag, f, is_debug),
+            Self::Function(function) => DebugDisplay::fmt(function, f, is_debug),
+            Self::HirId(hir_id) => DebugDisplay::fmt(hir_id, f, is_debug),
         }
     }
 }
-impl DisplayWithSymbolTable for HeapData {
-    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
-        match self {
-            Self::Int(int) => Display::fmt(int, f),
-            Self::List(list) => DisplayWithSymbolTable::fmt(list, f, symbol_table),
-            Self::Struct(struct_) => DisplayWithSymbolTable::fmt(struct_, f, symbol_table),
-            Self::Text(text) => Display::fmt(text, f),
-            Self::Tag(tag) => DisplayWithSymbolTable::fmt(tag, f, symbol_table),
-            Self::Function(function) => Display::fmt(function, f),
-            Self::HirId(hir_id) => Display::fmt(hir_id, f),
-        }
-    }
-}
+impl_debug_display_via_debugdisplay!(HeapData);
 
 impl From<HeapObject> for HeapData {
     fn from(object: HeapObject) -> Self {

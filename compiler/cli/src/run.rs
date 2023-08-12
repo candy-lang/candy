@@ -5,7 +5,7 @@ use crate::{
 };
 use candy_frontend::{ast_to_hir::AstToHir, hir, TracingConfig};
 use candy_vm::{
-    heap::{Data, Handle, HirId, Struct, SymbolId, Tag, Text},
+    heap::{Data, Handle, HirId, Struct, Tag, Text},
     mir_to_lir::compile_lir,
     tracer::stack_trace::StackTracer,
     StateAfterRunForever, Vm, VmFinished,
@@ -63,14 +63,11 @@ pub(crate) fn run(options: Options) -> ProgramResult {
             if let Some(span) = db.hir_id_to_span(&panic.responsible) {
                 error!("Responsible is at {span:?}.");
             }
-            error!(
-                "This is the stack trace:\n{}",
-                tracer.format(&db, &lir.as_ref().symbol_table),
-            );
+            error!("This is the stack trace:\n{}", tracer.format(&db),);
             return Err(Exit::CodePanicked);
         }
     };
-    let main = match exports.into_main_function(&lir.symbol_table) {
+    let main = match exports.into_main_function(&heap) {
         Ok(main) => main,
         Err(error) => {
             error!("{error}");
@@ -85,12 +82,14 @@ pub(crate) fn run(options: Options) -> ProgramResult {
 
     debug!("Running main function.");
     // TODO: Add more environment stuff.
+    let stdout_symbol = heap.default_symbols().stdout;
     let stdout = Handle::new(&mut heap, 1);
+    let stdin_symbol = heap.default_symbols().stdin;
     let stdin = Handle::new(&mut heap, 0);
     let environment = Struct::create_with_symbol_keys(
         &mut heap,
         true,
-        [(SymbolId::STDOUT, **stdout), (SymbolId::STDIN, **stdin)],
+        [(stdout_symbol, **stdout), (stdin_symbol, **stdin)],
     )
     .into();
     let platform = HirId::create(&mut heap, true, hir::Id::platform());
@@ -113,7 +112,8 @@ pub(crate) fn run(options: Options) -> ProgramResult {
                         Data::Text(text) => println!("{}", text.get()),
                         _ => info!("Non-text value sent to stdout: {message:?}"),
                     }
-                    vm = call.complete(Tag::create_nothing());
+                    let nothing = Tag::create_nothing(call.heap());
+                    vm = call.complete(nothing);
                 } else if call.handle == stdin {
                     print!(">> ");
                     io::stdout().flush().unwrap();
@@ -135,10 +135,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
                 Err(panic) => {
                     error!("The main function panicked: {}", panic.reason);
                     error!("{} is responsible.", panic.responsible);
-                    error!(
-                        "This is the stack trace:\n{}",
-                        tracer.format(&db, &lir.as_ref().symbol_table),
-                    );
+                    error!("This is the stack trace:\n{}", tracer.format(&db),);
                     break Err(Exit::CodePanicked);
                 }
             },

@@ -1,5 +1,5 @@
 use super::Tracer;
-use crate::heap::{DisplayWithSymbolTable, Heap, HirId, InlineObject, SymbolTable};
+use crate::heap::{Heap, HirId, InlineObject};
 use candy_frontend::{ast_to_hir::AstToHir, cst::CstKind, position::PositionConversionDb};
 use itertools::Itertools;
 use pad::PadStr;
@@ -62,7 +62,7 @@ impl Tracer for StackTracer {
 }
 
 impl StackTracer {
-    pub fn format<DB>(&self, db: &DB, symbol_table: &SymbolTable) -> String
+    pub fn format<DB>(&self, db: &DB) -> String
     where
         DB: AstToHir + PositionConversionDb,
     {
@@ -102,7 +102,7 @@ impl StackTracer {
                             _ => None,
                         }
                     })
-                    .unwrap_or_else(|| DisplayWithSymbolTable::to_string(callee, symbol_table)),
+                    .unwrap_or_else(|| callee.to_string()),
                 arguments.iter().map(|arg| format!("{arg:?}")).join(" "),
             );
             caller_locations_and_calls.push((caller_location_string, call_string));
@@ -124,7 +124,7 @@ impl StackTracer {
 fn extract_receiver_name(cst_kind: &CstKind) -> Option<String> {
     match cst_kind {
         CstKind::TrailingWhitespace { child, .. } => extract_receiver_name(child),
-        CstKind::Identifier(identifier) => Some(ToString::to_string(identifier)),
+        CstKind::Identifier(identifier) => Some(identifier.to_string()),
         CstKind::Parenthesized { inner, .. } => extract_receiver_name(inner),
         CstKind::StructAccess { struct_, key, .. } => {
             let struct_string = extract_receiver_name(struct_)?;

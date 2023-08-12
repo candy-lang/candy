@@ -1,10 +1,7 @@
 use super::{memory::MemoryReference, stack_trace::StackFrameKey, PausedState};
 use crate::database::Database;
 use candy_frontend::hir::{self, Expression, HirDb};
-use candy_vm::heap::{
-    Data, DataDiscriminants, DisplayWithSymbolTable, InlineObject, ObjectInHeap,
-    OrdWithSymbolTable, Tag,
-};
+use candy_vm::heap::{Data, DataDiscriminants, InlineObject, ObjectInHeap, Tag};
 use dap::{
     requests::VariablesArguments,
     responses::VariablesResponse,
@@ -98,13 +95,7 @@ impl PausedState {
                             );
                         }
                     }
-                    it => panic!(
-                        "Unexpected callee: {}",
-                        DisplayWithSymbolTable::to_string(
-                            &it,
-                            &self.vm.as_ref().unwrap().lir().symbol_table,
-                        ),
-                    ),
+                    it => panic!("Unexpected callee: {it}"),
                 };
             }
             VariablesKey::Locals(stack_frame_key) => {
@@ -162,10 +153,9 @@ impl PausedState {
                 Data::Tag(Tag::Heap(tag)) => {
                     if should_include_named {
                         if start == 0 && count > 0 {
-                            let symbol_table = &self.vm.as_ref().unwrap().lir().symbol_table;
                             variables.push(Variable {
                                 name: "Symbol".to_string(),
-                                value: symbol_table.get(tag.symbol_id()).to_string(),
+                                value: tag.symbol().get().to_string(),
                                 type_field: if supports_variable_type {
                                     Some("Symbol".to_string())
                                 } else {
@@ -229,33 +219,21 @@ impl PausedState {
                         start = start.saturating_sub(1);
                         count = count.saturating_sub(1);
 
-                        let mut fields = struct_
+                        let fields = struct_
                             .keys()
                             .iter()
                             .copied()
                             .zip_eq(struct_.values().iter().copied())
+                            .sorted()
                             .collect_vec();
-                        let symbol_table = &self.vm.as_ref().unwrap().lir().symbol_table;
-                        fields.sort_by(|a, b| OrdWithSymbolTable::cmp(a, symbol_table, b));
                         variables.extend(fields.into_iter().skip(start).take(count).map(
                             |(key, value)| {
-                                let symbol_table = &self.vm.as_ref().unwrap().lir().symbol_table;
-                                self.create_variable(
-                                    DisplayWithSymbolTable::to_string(&key, symbol_table),
-                                    value,
-                                    supports_variable_type,
-                                )
+                                self.create_variable(key.to_string(), value, supports_variable_type)
                             },
                         ));
                     }
                 }
-                it => panic!(
-                    "Tried to get inner variables of {}.",
-                    DisplayWithSymbolTable::to_string(
-                        &it,
-                        &self.vm.as_ref().unwrap().lir().symbol_table
-                    ),
-                ),
+                it => panic!("Tried to get inner variables of {it}."),
             },
         }
 
@@ -301,10 +279,7 @@ impl PausedState {
 
         Variable {
             name,
-            value: DisplayWithSymbolTable::to_string(
-                &object,
-                &self.vm.as_ref().unwrap().lir().symbol_table,
-            ),
+            value: object.to_string(),
             type_field: Self::type_field_for(data.into(), supports_variable_type),
             presentation_hint: Some(Self::presentation_hint_for(data.into())),
             evaluate_name: None,

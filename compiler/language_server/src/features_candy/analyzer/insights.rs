@@ -9,7 +9,7 @@ use candy_frontend::{
 };
 use candy_fuzzer::{Fuzzer, RunResult, Status};
 use candy_vm::{
-    heap::{DisplayWithSymbolTable, InlineObject, SymbolTable, ToDebugText},
+    heap::{InlineObject, ToDebugText},
     Panic,
 };
 use extension_trait::extension_trait;
@@ -40,12 +40,7 @@ pub enum HintKind {
 }
 
 impl Insight {
-    pub fn for_value(
-        db: &Database,
-        symbol_table: &SymbolTable,
-        id: Id,
-        value: InlineObject,
-    ) -> Option<Self> {
+    pub fn for_value(db: &Database, id: Id, value: InlineObject) -> Option<Self> {
         let Some(hir) = db.find_expression(id.clone()) else {
             return None;
         };
@@ -71,14 +66,14 @@ impl Insight {
                     return None;
                 }
 
-                value.to_debug_text(Precedence::Low, MaxLength::Limited(60), symbol_table)
+                value.to_debug_text(Precedence::Low, MaxLength::Limited(60))
             }
             Expression::PatternIdentifierReference { .. } => {
                 let body = db.containing_body_of(id.clone());
                 let name = body.identifiers.get(&id).unwrap();
                 format!(
                     "{name} = {}",
-                    value.to_debug_text(Precedence::Low, MaxLength::Limited(60), symbol_table),
+                    value.to_debug_text(Precedence::Low, MaxLength::Limited(60)),
                 )
             }
             _ => return None,
@@ -116,48 +111,30 @@ impl Insight {
             insights.push(Insight::Hint(Hint {
                 kind: HintKind::SampleInputPanickingWithInternalCodeResponsible,
                 position: end_of_line,
-                text: format!(
-                    "{function_name} {}",
-                    input.to_string(&fuzzer.lir.symbol_table)
-                ),
+                text: format!("{function_name} {input}"),
             }));
         }
 
-        insights.extend(
-            interesting_inputs.into_iter().map(|input| {
-                Insight::Hint(match fuzzer.input_pool().result_of(&input) {
-                    RunResult::Timeout => unreachable!(),
-                    RunResult::Done { return_value, .. } => Hint {
-                        kind: HintKind::SampleInputReturningNormally,
-                        position: end_of_line,
-                        text: format!(
-                            "{function_name} {} = {}",
-                            input.to_string(&fuzzer.lir.symbol_table),
-                            DisplayWithSymbolTable::to_string(
-                                return_value,
-                                &fuzzer.lir().symbol_table,
-                            ),
-                        ),
-                    },
-                    RunResult::NeedsUnfulfilled { .. } => Hint {
-                        kind: HintKind::SampleInputPanickingWithCallerResponsible,
-                        position: end_of_line,
-                        text: format!(
-                            "{function_name} {}",
-                            input.to_string(&fuzzer.lir.symbol_table)
-                        ),
-                    },
-                    RunResult::Panicked { .. } => Hint {
-                        kind: HintKind::SampleInputPanickingWithInternalCodeResponsible,
-                        position: end_of_line,
-                        text: format!(
-                            "{function_name} {}",
-                            input.to_string(&fuzzer.lir.symbol_table)
-                        ),
-                    },
-                })
-            }),
-        );
+        insights.extend(interesting_inputs.into_iter().map(|input| {
+            Insight::Hint(match fuzzer.input_pool().result_of(&input) {
+                RunResult::Timeout => unreachable!(),
+                RunResult::Done { return_value, .. } => Hint {
+                    kind: HintKind::SampleInputReturningNormally,
+                    position: end_of_line,
+                    text: format!("{function_name} {input} = {return_value}"),
+                },
+                RunResult::NeedsUnfulfilled { .. } => Hint {
+                    kind: HintKind::SampleInputPanickingWithCallerResponsible,
+                    position: end_of_line,
+                    text: format!("{function_name} {input}"),
+                },
+                RunResult::Panicked { .. } => Hint {
+                    kind: HintKind::SampleInputPanickingWithInternalCodeResponsible,
+                    position: end_of_line,
+                    text: format!("{function_name} {input}"),
+                },
+            })
+        }));
 
         insights
     }

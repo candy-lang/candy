@@ -171,11 +171,10 @@ where
             .expect("invalid instruction pointer");
         self.inner.state.next_instruction = Some(current_instruction.next());
 
-        let result = self.inner.state.run_instruction(
-            instruction,
-            &self.inner.lir.borrow().symbol_table,
-            &mut self.inner.tracer,
-        );
+        let result = self
+            .inner
+            .state
+            .run_instruction(instruction, &mut self.inner.tracer);
         match result {
             InstructionResult::Done => StateAfterRun::Running(self),
             InstructionResult::CallHandle(call) => {

@@ -2,10 +2,11 @@ use self::{
     builtin::InlineBuiltin, handle::InlineHandle, int::InlineInt, pointer::InlinePointer,
     tag::InlineTag,
 };
-use super::{
-    object_heap::HeapObject, Data, DisplayWithSymbolTable, Heap, OrdWithSymbolTable, SymbolTable,
+use super::{object_heap::HeapObject, Data, Heap};
+use crate::{
+    handle_id::HandleId,
+    utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
-use crate::handle_id::HandleId;
 use candy_frontend::format::{format_value, FormatValue, MaxLength, Precedence};
 use enum_dispatch::enum_dispatch;
 use extension_trait::extension_trait;
@@ -14,7 +15,7 @@ use rustc_hash::FxHashMap;
 use std::{
     borrow::Cow,
     cmp::Ordering,
-    fmt::{self, Debug, Display, Formatter},
+    fmt::{self, Formatter},
     hash::{Hash, Hasher},
     num::NonZeroU64,
     ops::Deref,
@@ -98,16 +99,12 @@ impl InlineObject {
     }
 }
 
-impl Debug for InlineObject {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        Debug::fmt(&InlineData::from(*self), f)
+impl DebugDisplay for InlineObject {
+    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
+        InlineData::from(*self).fmt(f, is_debug)
     }
 }
-impl DisplayWithSymbolTable for InlineObject {
-    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
-        DisplayWithSymbolTable::fmt(&InlineData::from(*self), f, symbol_table)
-    }
-}
+impl_debug_display_via_debugdisplay!(InlineObject);
 
 impl Eq for InlineObject {}
 impl PartialEq for InlineObject {
@@ -120,9 +117,14 @@ impl Hash for InlineObject {
         InlineData::from(*self).hash(state)
     }
 }
-impl OrdWithSymbolTable for InlineObject {
-    fn cmp(&self, symbol_table: &SymbolTable, other: &Self) -> Ordering {
-        OrdWithSymbolTable::cmp(&Data::from(*self), symbol_table, &Data::from(*other))
+impl Ord for InlineObject {
+    fn cmp(&self, other: &Self) -> Ordering {
+        Data::from(*self).cmp(&Data::from(*other))
+    }
+}
+impl PartialOrd for InlineObject {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -138,7 +140,7 @@ impl TryFrom<InlineObject> for HeapObject {
 }
 
 #[enum_dispatch]
-pub trait InlineObjectTrait: Copy + Debug + DisplayWithSymbolTable + Eq + Hash {
+pub trait InlineObjectTrait: Copy + DebugDisplay + Eq + Hash {
     fn clone_to_heap_with_mapping(
         self,
         heap: &mut Heap,
@@ -178,28 +180,18 @@ impl From<InlineObject> for InlineData {
     }
 }
 
-impl Debug for InlineData {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+impl DebugDisplay for InlineData {
+    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         match self {
-            InlineData::Pointer(value) => Debug::fmt(value, f),
-            InlineData::Int(value) => Debug::fmt(value, f),
-            InlineData::Builtin(value) => Debug::fmt(value, f),
-            InlineData::Tag(value) => Debug::fmt(value, f),
-            InlineData::Handle(value) => Debug::fmt(value, f),
+            InlineData::Pointer(value) => value.fmt(f, is_debug),
+            InlineData::Int(value) => value.fmt(f, is_debug),
+            InlineData::Builtin(value) => value.fmt(f, is_debug),
+            InlineData::Tag(value) => value.fmt(f, is_debug),
+            InlineData::Handle(value) => value.fmt(f, is_debug),
         }
     }
 }
-impl DisplayWithSymbolTable for InlineData {
-    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
-        match self {
-            InlineData::Pointer(value) => DisplayWithSymbolTable::fmt(value, f, symbol_table),
-            InlineData::Int(value) => Display::fmt(value, f),
-            InlineData::Builtin(value) => Display::fmt(value, f),
-            InlineData::Tag(value) => DisplayWithSymbolTable::fmt(value, f, symbol_table),
-            InlineData::Handle(value) => Display::fmt(value, f),
-        }
-    }
-}
+impl_debug_display_via_debugdisplay!(InlineData);
 
 impl Deref for InlineData {
     type Target = InlineObject;
@@ -217,17 +209,12 @@ impl Deref for InlineData {
 
 #[extension_trait]
 pub impl ToDebugText for InlineObject {
-    fn to_debug_text(
-        self,
-        precendence: Precedence,
-        max_length: MaxLength,
-        symbol_table: &SymbolTable,
-    ) -> String {
+    fn to_debug_text(self, precendence: Precedence, max_length: MaxLength) -> String {
         format_value(self, precendence, max_length, &|value| {
             Some(match value.into() {
                 Data::Int(int) => FormatValue::Int(int.get()),
                 Data::Tag(tag) => FormatValue::Tag {
-                    symbol: symbol_table.get(tag.symbol_id()),
+                    symbol: tag.symbol().get(),
                     value: tag.value(),
                 },
                 Data::Text(text) => FormatValue::Text(text.get()),
