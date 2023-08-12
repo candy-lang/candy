@@ -110,14 +110,17 @@ impl HeapObjectTrait for HeapTag {
         clone: HeapObject,
         address_map: &mut FxHashMap<HeapObject, HeapObject>,
     ) {
+        let symbol = self.symbol().clone_to_heap_with_mapping(heap, address_map);
         let value = self.value().clone_to_heap_with_mapping(heap, address_map);
         let clone = Self(clone);
         unsafe {
+            *clone.symbol_pointer().as_mut() = symbol.into();
             *clone.value_pointer().as_mut() = value.raw_word().get();
         };
     }
 
     fn drop_children(self, heap: &mut Heap) {
+        self.symbol().drop(heap);
         self.value().drop(heap);
     }
 
