@@ -90,6 +90,7 @@ pub fn function(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
             // try to parse a body of multiple expressions. We didn't try this
             // first because then the body would also have consumed any trailing
             // closing curly brace in the same line.
+            //
             // For example, for the function `{ 2 }`, the body parser would have
             // already consumed the `}`. The body parser works great for
             // multiline bodies, though.
