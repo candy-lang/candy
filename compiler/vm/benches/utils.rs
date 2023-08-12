@@ -112,9 +112,14 @@ pub fn run(lir: impl Borrow<Lir>) -> (Heap, InlineObject) {
     // Run the `main` function.
     let environment = Struct::create(&mut heap, true, &FxHashMap::default());
     let responsible = HirId::create(&mut heap, true, hir::Id::user());
-    let VmFinished { heap, result, .. } =
-        Vm::for_function(lir, heap, main, &[environment.into()], responsible, tracer)
-            .run_forever_without_handles();
+    let VmFinished { heap, result, .. } = Vm::for_function(
+        lir,
+        heap,
+        main,
+        &[environment.into(), responsible.into()],
+        tracer,
+    )
+    .run_forever_without_handles();
     match result {
         Ok(return_value) => (heap, return_value),
         Err(panic) => {
