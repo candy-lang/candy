@@ -127,7 +127,7 @@ impl LoweringContext {
                     return self.create_ast_for_invalid_expression_in_pattern(cst);
                 };
                 let string = self.create_string(cst.data.id, identifier.to_string());
-                self.create_ast(cst.data.id, AstKind::Identifier(Identifier(string)))
+                self.create_ast(cst.data.id, Identifier(string))
             }
             CstKind::Symbol(symbol) => {
                 let string = self.create_string(cst.data.id, symbol.to_string());
