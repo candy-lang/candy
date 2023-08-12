@@ -4,18 +4,15 @@ use super::{
         struct_::HeapStruct, tag::HeapTag, text::HeapText, HeapData, HeapObject,
     },
     object_inline::{
-        builtin::InlineBuiltin,
-        int::InlineInt,
-        port::{InlineReceivePort, InlineSendPort},
-        tag::InlineTag,
-        InlineData, InlineObject,
+        builtin::InlineBuiltin, handle::InlineHandle, int::InlineInt, tag::InlineTag, InlineData,
+        InlineObject,
     },
     symbol_table::{impl_ord_with_symbol_table_via_ord, DisplayWithSymbolTable},
     Heap, OrdWithSymbolTable, SymbolId, SymbolTable,
 };
 use crate::{
-    channel::ChannelId,
-    fiber::InstructionPointer,
+    handle_id::HandleId,
+    instruction_pointer::InstructionPointer,
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
 use candy_frontend::{builtin_functions::BuiltinFunction, hir::Id};
@@ -45,8 +42,7 @@ pub enum Data {
     HirId(HirId),
     Function(Function),
     Builtin(Builtin),
-    SendPort(SendPort),
-    ReceivePort(ReceivePort),
+    Handle(Handle),
 }
 impl Data {
     pub fn function(&self) -> Option<&Function> {
@@ -65,8 +61,7 @@ impl From<InlineObject> for Data {
             InlineData::Int(int) => Data::Int(Int::Inline(int)),
             InlineData::Builtin(builtin) => Data::Builtin(Builtin(builtin)),
             InlineData::Tag(symbol_id) => Data::Tag(Tag::Inline(symbol_id)),
-            InlineData::SendPort(send_port) => Data::SendPort(SendPort(send_port)),
-            InlineData::ReceivePort(receive_port) => Data::ReceivePort(ReceivePort(receive_port)),
+            InlineData::Handle(handle) => Data::Handle(Handle(handle)),
         }
     }
 }
@@ -95,8 +90,7 @@ impl Debug for Data {
             Data::HirId(hir_id) => Debug::fmt(hir_id, f),
             Data::Function(function) => Debug::fmt(function, f),
             Data::Builtin(builtin) => Debug::fmt(builtin, f),
-            Data::SendPort(send_port) => Debug::fmt(send_port, f),
-            Data::ReceivePort(receive_port) => Debug::fmt(receive_port, f),
+            Data::Handle(handle) => Debug::fmt(handle, f),
         }
     }
 }
@@ -112,10 +106,7 @@ impl DisplayWithSymbolTable for Data {
             Data::HirId(hir_id) => DisplayWithSymbolTable::fmt(hir_id, f, symbol_table),
             Data::Function(function) => DisplayWithSymbolTable::fmt(function, f, symbol_table),
             Data::Builtin(builtin) => DisplayWithSymbolTable::fmt(builtin, f, symbol_table),
-            Data::SendPort(send_port) => DisplayWithSymbolTable::fmt(send_port, f, symbol_table),
-            Data::ReceivePort(receive_port) => {
-                DisplayWithSymbolTable::fmt(receive_port, f, symbol_table)
-            }
+            Data::Handle(handle) => DisplayWithSymbolTable::fmt(handle, f, symbol_table),
         }
     }
 }
@@ -137,8 +128,7 @@ impl OrdWithSymbolTable for Data {
             (Data::HirId(this), Data::HirId(other)) => Ord::cmp(this, other),
             (Data::Function(this), Data::Function(other)) => Ord::cmp(this, other),
             (Data::Builtin(this), Data::Builtin(other)) => Ord::cmp(this, other),
-            (Data::SendPort(this), Data::SendPort(other)) => Ord::cmp(this, other),
-            (Data::ReceivePort(this), Data::ReceivePort(other)) => Ord::cmp(this, other),
+            (Data::Handle(this), Data::Handle(other)) => Ord::cmp(this, other),
             _ => intrinsics::discriminant_value(self).cmp(&intrinsics::discriminant_value(other)),
         }
     }
@@ -173,13 +163,13 @@ impl Int {
             .unwrap_or_else(|_| HeapInt::create(heap, is_reference_counted, value).into())
     }
 
-    pub fn get(&self) -> Cow<BigInt> {
+    pub fn get<'a>(self) -> Cow<'a, BigInt> {
         match self {
             Int::Inline(int) => Cow::Owned(int.get().into()),
             Int::Heap(int) => Cow::Borrowed(int.get()),
         }
     }
-    pub fn try_get<T>(&self) -> Option<T>
+    pub fn try_get<T>(self) -> Option<T>
     where
         T: TryFrom<i64> + for<'a> TryFrom<&'a BigInt>,
     {
@@ -194,9 +184,9 @@ impl Int {
     operator_fn!(multiply);
     operator_fn!(int_divide_truncating);
     operator_fn!(remainder);
-    pub fn modulo(&self, heap: &mut Heap, rhs: &Int) -> Self {
+    pub fn modulo(self, heap: &mut Heap, rhs: Int) -> Self {
         match (self, rhs) {
-            (Int::Inline(lhs), Int::Inline(rhs)) => lhs.modulo(heap, *rhs),
+            (Int::Inline(lhs), Int::Inline(rhs)) => lhs.modulo(heap, rhs),
             (Int::Heap(on_heap), Int::Inline(inline))
             | (Int::Inline(inline), Int::Heap(on_heap)) => {
                 on_heap.modulo(heap, &inline.get().into())
@@ -205,9 +195,9 @@ impl Int {
         }
     }
 
-    pub fn compare_to(&self, rhs: &Int) -> Tag {
+    pub fn compare_to(self, rhs: Int) -> Tag {
         match (self, rhs) {
-            (Int::Inline(lhs), rhs) => lhs.compare_to(*rhs),
+            (Int::Inline(lhs), rhs) => lhs.compare_to(rhs),
             (Int::Heap(lhs), Int::Inline(rhs)) => lhs.compare_to(&rhs.get().into()),
             (Int::Heap(lhs), Int::Heap(rhs)) => lhs.compare_to(rhs.get()),
         }
@@ -216,7 +206,7 @@ impl Int {
     shift_fn!(shift_left, shl);
     shift_fn!(shift_right, shr);
 
-    pub fn bit_length(&self, heap: &mut Heap) -> Self {
+    pub fn bit_length(self, heap: &mut Heap) -> Self {
         match self {
             Int::Inline(int) => int.bit_length().into(),
             Int::Heap(int) => int.bit_length(heap),
@@ -230,9 +220,9 @@ impl Int {
 
 macro_rules! bitwise_fn {
     ($name:ident) => {
-        pub fn $name(&self, heap: &mut Heap, rhs: &Int) -> Self {
+        pub fn $name(self, heap: &mut Heap, rhs: Int) -> Self {
             match (self, rhs) {
-                (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(*rhs).into(),
+                (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(rhs).into(),
                 (Int::Heap(on_heap), Int::Inline(inline))
                 | (Int::Inline(inline), Int::Heap(on_heap)) => {
                     on_heap.$name(heap, &inline.get().into())
@@ -244,9 +234,9 @@ macro_rules! bitwise_fn {
 }
 macro_rules! operator_fn {
     ($name:ident) => {
-        pub fn $name(&self, heap: &mut Heap, rhs: &Int) -> Self {
+        pub fn $name(self, heap: &mut Heap, rhs: Int) -> Self {
             match (self, rhs) {
-                (Int::Inline(lhs), _) => lhs.$name(heap, *rhs),
+                (Int::Inline(lhs), _) => lhs.$name(heap, rhs),
                 (Int::Heap(lhs), Int::Inline(rhs)) => lhs.$name(heap, rhs.get()),
                 (Int::Heap(lhs), Int::Heap(rhs)) => lhs.$name(heap, rhs.get()),
             }
@@ -255,9 +245,9 @@ macro_rules! operator_fn {
 }
 macro_rules! shift_fn {
     ($name:ident, $function:ident) => {
-        pub fn $name(&self, heap: &mut Heap, rhs: &Int) -> Self {
+        pub fn $name(self, heap: &mut Heap, rhs: Int) -> Self {
             match (self, rhs) {
-                (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(heap, *rhs),
+                (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(heap, rhs),
                 // TODO: Support shifting by larger numbers
                 (Int::Inline(lhs), rhs) => Int::create_from_bigint(
                     heap,
@@ -589,35 +579,24 @@ impl Builtin {
 impls_via_0!(Builtin);
 impl_ord_with_symbol_table_via_ord!(Builtin);
 
-// Send Port
+// Handle
 
-#[derive(Clone, Copy, Deref, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct SendPort(InlineSendPort);
+#[derive(Clone, Copy, Deref, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Handle(InlineHandle);
 
-impl SendPort {
-    pub fn create(heap: &mut Heap, channel_id: ChannelId) -> InlineObject {
-        InlineSendPort::create(heap, channel_id)
+impl Handle {
+    pub fn new(heap: &mut Heap, argument_count: usize) -> Self {
+        let id = heap.handle_id_generator.generate();
+        Self::create(heap, id, argument_count)
+    }
+    pub fn create(heap: &mut Heap, handle_id: HandleId, argument_count: usize) -> Self {
+        InlineHandle::create(heap, handle_id, argument_count).into()
     }
 }
 
-impls_via_0!(SendPort);
-impl_ord_with_symbol_table_via_ord!(SendPort);
-impl_try_froms!(SendPort, "Expected a send port.");
-
-// Receive Port
-
-#[derive(Clone, Copy, Deref, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct ReceivePort(InlineReceivePort);
-
-impl ReceivePort {
-    pub fn create(heap: &mut Heap, channel_id: ChannelId) -> InlineObject {
-        InlineReceivePort::create(heap, channel_id)
-    }
-}
-
-impls_via_0!(ReceivePort);
-impl_ord_with_symbol_table_via_ord!(ReceivePort);
-impl_try_froms!(ReceivePort, "Expected a receive port.");
+impls_via_0!(Handle);
+impl_ord_with_symbol_table_via_ord!(Handle);
+impl_try_froms!(Handle, "Expected a handle.");
 
 // Utils
 

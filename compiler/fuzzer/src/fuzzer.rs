@@ -7,17 +7,16 @@ use crate::{
 };
 use candy_frontend::hir::Id;
 use candy_vm::{
-    execution_controller::ExecutionController,
-    fiber::Panic,
-    heap::{Data, Function, Heap},
+    heap::{Data, DisplayWithSymbolTable, Function, Heap},
     lir::Lir,
-    tracer::stack_trace::{FiberStackTracer, StackTracer},
+    tracer::stack_trace::StackTracer,
+    Panic,
 };
 use std::rc::Rc;
 use tracing::debug;
 
 pub struct Fuzzer {
-    lir: Rc<Lir>,
+    pub lir: Rc<Lir>,
     pub function_heap: Heap,
     pub function: Function,
     pub function_id: Id,
@@ -36,6 +35,7 @@ pub enum Status {
     FoundPanic {
         input: Input,
         panic: Panic,
+        heap: Heap,
         tracer: StackTracer,
     },
 }
@@ -80,25 +80,27 @@ impl Fuzzer {
         &self.pool
     }
 
-    pub fn run(&mut self, execution_controller: &mut impl ExecutionController<FiberStackTracer>) {
+    pub fn run(&mut self, max_instructions: usize) {
         let mut status = self.status.take().unwrap();
-        while matches!(status, Status::StillFuzzing { .. })
-            && execution_controller.should_continue_running()
-        {
+        let mut instructions_left = max_instructions;
+
+        while matches!(status, Status::StillFuzzing { .. }) && instructions_left > 0 {
             status = match status {
                 Status::StillFuzzing {
                     total_coverage,
                     runner,
-                } => self.continue_fuzzing(execution_controller, total_coverage, runner),
+                } => self.continue_fuzzing(&mut instructions_left, total_coverage, runner),
                 // We already found some arguments that caused the function to panic,
                 // so there's nothing more to do.
                 Status::FoundPanic {
                     input,
                     panic,
+                    heap,
                     tracer,
                 } => Status::FoundPanic {
                     input,
                     panic,
+                    heap,
                     tracer,
                 },
             };
@@ -108,11 +110,11 @@ impl Fuzzer {
 
     fn continue_fuzzing(
         &mut self,
-        execution_controller: &mut impl ExecutionController<FiberStackTracer>,
+        instructions_left: &mut usize,
         total_coverage: Coverage,
         mut runner: Runner<Rc<Lir>>,
     ) -> Status {
-        runner.run(execution_controller);
+        runner.run(instructions_left);
         let Some(result) = runner.result else {
             return Status::StillFuzzing {
                 total_coverage,
@@ -125,9 +127,12 @@ impl Fuzzer {
             self.function_id
                 .keys
                 .last()
-                .map(|function_name| function_name.to_string())
+                .map(|function_name| DisplayWithSymbolTable::to_string(
+                    function_name,
+                    &runner.lir.symbol_table
+                ))
                 .unwrap_or_else(|| "{…}".to_string()),
-            runner.input,
+            runner.input.to_string(&runner.lir.symbol_table),
         );
         debug!(
             "{}",
@@ -151,10 +156,15 @@ impl Fuzzer {
                 self.pool.add(runner.input, result, score);
                 self.create_new_fuzzing_case(&total_coverage + &runner.coverage)
             }
-            RunResult::Panicked(panic) => Status::FoundPanic {
+            RunResult::Panicked {
+                heap,
+                tracer,
+                panic,
+            } => Status::FoundPanic {
                 input: runner.input,
                 panic,
-                tracer: runner.tracer,
+                heap,
+                tracer,
             },
         }
     }

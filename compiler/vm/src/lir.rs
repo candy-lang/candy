@@ -1,7 +1,8 @@
+use crate::heap::Heap;
 use crate::heap::{
     DisplayWithSymbolTable, Function, HirId, InlineData, InlineObject, SymbolId, SymbolTable,
 };
-use crate::{fiber::InstructionPointer, heap::Heap};
+use crate::instruction_pointer::InstructionPointer;
 use candy_frontend::hir;
 use candy_frontend::rich_ir::ReferenceKey;
 use candy_frontend::{
@@ -374,7 +375,7 @@ impl Instruction {
             }
             Instruction::Call { num_args } => {
                 builder.push(
-                    format!(" with {num_args} {}", arguments_plural(*num_args),),
+                    format!(" with {num_args} {}", arguments_plural(*num_args)),
                     None,
                     EnumSet::empty(),
                 );
@@ -396,7 +397,7 @@ impl Instruction {
             Instruction::Panic => {}
             Instruction::TraceCallStarts { num_args } => {
                 builder.push(
-                    format!(" ({num_args} {})", arguments_plural(*num_args),),
+                    format!(" ({num_args} {})", arguments_plural(*num_args)),
                     None,
                     EnumSet::empty(),
                 );
@@ -418,17 +419,17 @@ fn arguments_plural(num_args: usize) -> &'static str {
 
 #[extension_trait]
 pub impl RichIrForLir for RichIr {
-    fn for_lir(module: &Module, lir: &Lir, tracing_config: &TracingConfig) -> RichIr {
+    fn for_byte_code(module: &Module, byte_code: &Lir, tracing_config: &TracingConfig) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
-            format!("# LIR for module {module}"),
+            format!("# VM Byte Code for module {module}"),
             TokenType::Comment,
             EnumSet::empty(),
         );
         builder.push_newline();
         builder.push_tracing_config(tracing_config);
         builder.push_newline();
-        lir.build_rich_ir(&mut builder);
+        byte_code.build_rich_ir(&mut builder);
         builder.finish(true)
     }
 }

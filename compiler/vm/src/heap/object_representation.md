@@ -13,8 +13,7 @@ An inline object is a single word containing a tagged union of different types o
 | `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx001` | Int               |
 | `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx010` | Builtin           |
 | `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx011` | Tag without value |
-| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx100` | SendPort          |
-| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx101` | ReceivePort       |
+| `bbbbbbbb bbbbbbbb bbbbbbbb bbbbbbbb aaaaaaaa aaaaaaaa aaaaaaaa aaaaa100` | Handle            |
 
 > The remaining patterns are invalid.
 
@@ -38,9 +37,10 @@ For larger values, a pointer to a heap object containing an integer of (practica
 `x` stores the symbol ID that can be resolved via the symbol table.
 The symbol table is currently generated when creating the LIR and no longer changed after that.
 
-### SendPort, ReceivePort
+### Handle
 
-`x` stores the channel ID as an unsigned integer.
+`a` stores the argument count.
+`b` stores the handle ID as an unsigned integer.
 
 ## Heap Object
 

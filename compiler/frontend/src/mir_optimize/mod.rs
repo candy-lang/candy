@@ -87,6 +87,7 @@ pub type OptimizedMirResult = Result<
     ModuleError,
 >;
 
+#[allow(clippy::needless_pass_by_value)]
 fn optimized_mir(
     db: &dyn OptimizeMir,
     module: Module,
@@ -158,8 +159,8 @@ impl Context<'_> {
         }
 
         common_subtree_elimination::eliminate_common_subtrees(body, self.pureness);
-        reference_following::remove_redundant_return_references(body);
         tree_shaking::tree_shake(body, self.pureness);
+        reference_following::remove_redundant_return_references(body);
     }
 
     fn optimize_expression(&mut self, expression: &mut CurrentExpression) {
@@ -226,6 +227,7 @@ impl Context<'_> {
     }
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn recover_from_cycle(
     _db: &dyn OptimizeMir,
     cycle: &[String],

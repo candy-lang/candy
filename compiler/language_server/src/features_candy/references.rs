@@ -219,7 +219,7 @@ where
         }
         self.discovered_references.insert(id.clone());
 
-        if let Some(span) = self.db.hir_id_to_span(id.clone()) {
+        if let Some(span) = self.db.hir_id_to_span(&id) {
             self.references.push(Reference {
                 range: self.db.range_to_lsp_range(id.module, span),
                 is_write,

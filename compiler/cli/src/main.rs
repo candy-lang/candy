@@ -16,7 +16,6 @@ mod fuzz;
 mod inkwell;
 mod lsp;
 mod run;
-mod services;
 mod utils;
 
 #[derive(Parser, Debug)]
@@ -65,6 +64,7 @@ enum Exit {
     ExternalError,
     FileNotFound,
     FuzzingFoundFailingCases,
+    NoMainFunction,
     NotInCandyPackage,
     CodeContainsErrors,
     #[cfg(feature = "inkwell")]

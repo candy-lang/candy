@@ -75,12 +75,7 @@ impl DisplayWithSymbolTable for HeapTag {
     fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
         // We can always use the display formatter since the symbol has a constrained charset.
         write!(f, "{}", symbol_table.get(self.symbol_id()))?;
-
-        write!(
-            f,
-            " ({})",
-            DisplayWithSymbolTable::to_string(&self.value(), symbol_table),
-        )
+        write!(f, " ({})", self.value().to_string(symbol_table))
     }
 }
 

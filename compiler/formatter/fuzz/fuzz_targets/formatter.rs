@@ -85,7 +85,7 @@ impl<T: NormalizeSpans> NormalizeSpans for [T] {
 impl NormalizeSpans for Ast {
     fn normalize_spans(&mut self) {
         match &mut self.kind {
-            AstKind::Int(_) => todo!(),
+            AstKind::Int(_) => {}
             AstKind::Text(Text(parts)) => parts.normalize_spans(),
             AstKind::TextPart(_) | AstKind::Identifier(_) | AstKind::Symbol(_) => {}
             AstKind::List(List(items)) => items.normalize_spans(),

@@ -2,6 +2,7 @@ use crate::{
     ast::Ast,
     builtin_functions::BuiltinFunction,
     hir,
+    lir::{self, Lir},
     mir::{self, Mir},
     module::Module,
     position::Offset,
@@ -12,7 +13,7 @@ use crate::{
 use derive_more::From;
 use enumset::{EnumSet, EnumSetType};
 use itertools::Itertools;
-use num_bigint::BigInt;
+use num_bigint::{BigInt, BigUint};
 use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Display, Formatter},
@@ -45,6 +46,9 @@ pub enum ReferenceKey {
     ModuleWithSpan(Module, Range<Offset>),
     HirId(hir::Id),
     MirId(mir::Id),
+    LirId(lir::Id),
+    LirConstantId(lir::ConstantId),
+    LirBodyId(lir::BodyId),
 }
 #[derive(Debug, Default)]
 pub struct ReferenceCollection {
@@ -78,6 +82,7 @@ pub enum TokenModifier {
 }
 
 pub trait ToRichIr {
+    #[must_use]
     fn to_rich_ir(&self, trailing_newline: bool) -> RichIr {
         let mut builder = RichIrBuilder::default();
         self.build_rich_ir(&mut builder);
@@ -105,16 +110,19 @@ impl<T: ToRichIr> ToRichIr for Box<T> {
 }
 impl<T: ToRichIr> ToRichIr for [T] {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        match self {
-            [] => {}
-            [first, rest @ ..] => {
-                first.build_rich_ir(builder);
-                for child in rest {
-                    builder.push_newline();
-                    child.build_rich_ir(builder);
-                }
-            }
-        }
+        builder.push_multiline(self);
+    }
+}
+impl ToRichIr for BigInt {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        let range = builder.push(self.to_string(), TokenType::Int, EnumSet::empty());
+        builder.push_reference(self.clone(), range);
+    }
+}
+impl ToRichIr for BigUint {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        let range = builder.push(self.to_string(), TokenType::Int, EnumSet::empty());
+        builder.push_reference(BigInt::from(self.clone()), range);
     }
 }
 
@@ -166,19 +174,37 @@ impl RichIrBuilder {
     where
         C: ToRichIr + 'c,
     {
-        self.push_children_custom_multiline(children, |builder, child| child.build_rich_ir(builder))
+        self.push_children_custom_multiline(children, |builder, child| {
+            child.build_rich_ir(builder);
+        });
     }
     pub fn push_children_custom_multiline<C>(
         &mut self,
         children: impl IntoIterator<Item = C>,
-        mut push_child: impl FnMut(&mut Self, &C),
+        push_child: impl FnMut(&mut Self, &C),
     ) {
         self.indent();
-        for child in children {
-            self.push_newline();
-            push_child(self, &child);
-        }
+        self.push_newline();
+        self.push_custom_multiline(children, push_child);
         self.dedent();
+    }
+    pub fn push_multiline<'c, C>(&mut self, items: impl IntoIterator<Item = &'c C>)
+    where
+        C: ToRichIr + 'c,
+    {
+        self.push_custom_multiline(items, |builder, item| item.build_rich_ir(builder));
+    }
+    pub fn push_custom_multiline<C>(
+        &mut self,
+        items: impl IntoIterator<Item = C>,
+        mut push_item: impl FnMut(&mut Self, &C),
+    ) {
+        for (index, item) in items.into_iter().enumerate() {
+            if index > 0 {
+                self.push_newline();
+            }
+            push_item(self, &item);
+        }
     }
 
     pub fn push_children<C: ToRichIr>(
@@ -190,7 +216,7 @@ impl RichIrBuilder {
             children,
             |builder, child| child.build_rich_ir(builder),
             separator,
-        )
+        );
     }
     pub fn push_children_custom<C>(
         &mut self,
@@ -292,6 +318,7 @@ impl RichIrBuilder {
         );
     }
 
+    #[must_use]
     pub fn finish(mut self, trailing_newline: bool) -> RichIr {
         if trailing_newline && !self.ir.text.is_empty() && !self.ir.text.ends_with('\n') {
             self.push("\n", None, EnumSet::empty());
@@ -301,7 +328,8 @@ impl RichIrBuilder {
 }
 
 impl RichIr {
-    pub fn for_rcst(module: &Module, rcst: &RcstResult) -> Option<RichIr> {
+    #[must_use]
+    pub fn for_rcst(module: &Module, rcst: &RcstResult) -> Option<Self> {
         let mut builder = RichIrBuilder::default();
         builder.push(
             format!("# RCST for module {module}"),
@@ -316,79 +344,68 @@ impl RichIr {
         }
         Some(builder.finish(true))
     }
-
-    pub fn for_cst(module: &Module, cst: &CstResult) -> Option<RichIr> {
-        let mut builder = RichIrBuilder::default();
-        builder.push(
-            format!("# CST for module {module}"),
-            TokenType::Comment,
-            EnumSet::empty(),
-        );
-        builder.push_newline();
-        match cst {
-            Ok(cst) => {
-                // TODO: `impl ToRichIr for Cst`
-                builder.push(
-                    cst.iter().map(|it| it.to_string()).join(""),
-                    None,
-                    EnumSet::empty(),
-                );
-            }
-            Err(ModuleError::DoesNotExist) => return None,
-            Err(error) => error.build_rich_ir(&mut builder),
+    #[must_use]
+    pub fn for_cst(module: &Module, cst: &CstResult) -> Option<Self> {
+        if cst == &Err(ModuleError::DoesNotExist) {
+            return None;
         }
-        Some(builder.finish(true))
-    }
 
-    pub fn for_ast(module: &Module, asts: &[Ast]) -> RichIr {
-        let mut builder = RichIrBuilder::default();
-        builder.push(
-            format!("# AST for module {module}"),
-            TokenType::Comment,
-            EnumSet::empty(),
-        );
-        builder.push_newline();
-        asts.build_rich_ir(&mut builder);
-        builder.finish(true)
+        Some(Self::for_ir("CST", module, None, |builder| {
+            match cst {
+                Ok(cst) => {
+                    // TODO: `impl ToRichIr for Cst`
+                    builder.push(
+                        cst.iter().map(ToString::to_string).join(""),
+                        None,
+                        EnumSet::empty(),
+                    );
+                }
+                Err(error) => error.build_rich_ir(builder),
+            };
+        }))
     }
-
-    pub fn for_hir(module: &Module, body: &hir::Body) -> RichIr {
-        let mut builder = RichIrBuilder::default();
-        builder.push(
-            format!("# HIR for module {module}"),
-            TokenType::Comment,
-            EnumSet::empty(),
-        );
-        builder.push_newline();
-        body.build_rich_ir(&mut builder);
-        builder.finish(true)
+    #[must_use]
+    pub fn for_ast(module: &Module, asts: &[Ast]) -> Self {
+        Self::for_ir("AST", module, None, |builder| asts.build_rich_ir(builder))
     }
-
-    pub fn for_mir(module: &Module, mir: &Mir, tracing_config: &TracingConfig) -> RichIr {
-        let mut builder = RichIrBuilder::default();
-        builder.push(
-            format!("# MIR for module {module}"),
-            TokenType::Comment,
-            EnumSet::empty(),
-        );
-        builder.push_newline();
-        builder.push_tracing_config(tracing_config);
-        builder.push_newline();
-        mir.build_rich_ir(&mut builder);
-        builder.finish(true)
+    #[must_use]
+    pub fn for_hir(module: &Module, body: &hir::Body) -> Self {
+        Self::for_ir("HIR", module, None, |builder| body.build_rich_ir(builder))
     }
-
-    pub fn for_optimized_mir(module: &Module, mir: &Mir, tracing_config: &TracingConfig) -> RichIr {
+    #[must_use]
+    pub fn for_mir(module: &Module, mir: &Mir, tracing_config: &TracingConfig) -> Self {
+        Self::for_ir("MIR", module, tracing_config, |builder| {
+            mir.build_rich_ir(builder);
+        })
+    }
+    #[must_use]
+    pub fn for_optimized_mir(module: &Module, mir: &Mir, tracing_config: &TracingConfig) -> Self {
+        Self::for_ir("Optimized MIR", module, tracing_config, |builder| {
+            mir.build_rich_ir(builder);
+        })
+    }
+    #[must_use]
+    pub fn for_lir(module: &Module, lir: &Lir, tracing_config: &TracingConfig) -> Self {
+        Self::for_ir("LIR", module, tracing_config, |builder| {
+            lir.build_rich_ir(builder);
+        })
+    }
+    #[must_use]
+    fn for_ir(
+        ir_name: &str,
+        module: &Module,
+        tracing_config: impl Into<Option<&TracingConfig>>,
+        build_rich_ir: impl FnOnce(&mut RichIrBuilder),
+    ) -> Self {
         let mut builder = RichIrBuilder::default();
-        builder.push(
-            format!("# Optimized MIR for module {module}"),
-            TokenType::Comment,
-            EnumSet::empty(),
-        );
-        builder.push_newline();
-        builder.push_tracing_config(tracing_config);
-        builder.push_newline();
-        mir.build_rich_ir(&mut builder);
+        builder.push_comment_line(format!("{ir_name} for module {module}"));
+        if let Some(tracing_config) = tracing_config.into() {
+            builder.push_tracing_config(tracing_config);
+            builder.push_newline();
+        }
+
+        build_rich_ir(&mut builder);
+
         builder.finish(true)
     }
 }

@@ -1,20 +1,12 @@
-use super::{FiberId, FiberTracer, TracedFiberEnded, TracedFiberEndedReason, Tracer};
+use super::Tracer;
 use crate::heap::{DisplayWithSymbolTable, Heap, HirId, InlineObject, SymbolTable};
 use candy_frontend::{ast_to_hir::AstToHir, cst::CstKind, position::PositionConversionDb};
 use itertools::Itertools;
 use pad::PadStr;
-use rustc_hash::FxHashMap;
-use std::mem;
 
 #[derive(Debug, Default)]
 pub struct StackTracer {
-    panic_chain: Option<Vec<Call>>,
-}
-
-#[derive(Debug, Default)]
-pub struct FiberStackTracer {
     pub call_stack: Vec<Call>,
-    panic_chains: FxHashMap<FiberId, Vec<Call>>,
 }
 
 // Stack traces are a reduced view of the tracing state that represent the stack
@@ -47,44 +39,30 @@ impl Call {
 }
 
 impl Tracer for StackTracer {
-    type ForFiber = FiberStackTracer;
-
-    fn root_fiber_created(&mut self) -> Self::ForFiber {
-        FiberStackTracer::default()
-    }
-    fn root_fiber_ended(&mut self, mut ended: TracedFiberEnded<Self::ForFiber>) {
-        assert!(self.panic_chain.is_none());
-
-        let TracedFiberEndedReason::Panicked(panic) = ended.reason else {
-            return;
+    fn call_started(
+        &mut self,
+        heap: &mut Heap,
+        call_site: HirId,
+        callee: InlineObject,
+        arguments: Vec<InlineObject>,
+        responsible: HirId,
+    ) {
+        let call = Call {
+            call_site,
+            callee,
+            arguments,
+            responsible,
         };
-        ended.tracer.dup_all_stored_objects(ended.heap);
-        self.panic_chain = Some(ended.tracer.take_panic_call_stack(panic.panicked_child));
-        ended.tracer.drop(ended.heap);
+        call.dup(heap);
+        self.call_stack.push(call);
+    }
+    fn call_ended(&mut self, heap: &mut Heap, _return_value: InlineObject) {
+        self.call_stack.pop().unwrap().drop(heap);
     }
 }
 
 impl StackTracer {
-    pub fn panic_chain(&self) -> Option<&[Call]> {
-        self.panic_chain.as_deref()
-    }
-
-    /// When a VM panics, some child fiber might be responsible for that. This
-    /// function returns a formatted stack trace spanning all fibers in the
-    /// chain from the panicking root fiber until the concrete failing needs.
-    pub fn format_panic_stack_trace_to_root_fiber<DB>(
-        &self,
-        db: &DB,
-        symbol_table: &SymbolTable,
-    ) -> String
-    where
-        DB: AstToHir + PositionConversionDb,
-    {
-        let panic_chain = self.panic_chain.as_ref().expect("VM didn't panic (yet)");
-        self.format_stack_trace(db, symbol_table, panic_chain)
-    }
-
-    fn format_stack_trace<DB>(&self, db: &DB, symbol_table: &SymbolTable, stack: &[Call]) -> String
+    pub fn format<DB>(&self, db: &DB, symbol_table: &SymbolTable) -> String
     where
         DB: AstToHir + PositionConversionDb,
     {
@@ -95,14 +73,14 @@ impl StackTracer {
             callee,
             arguments,
             ..
-        } in stack.iter().rev()
+        } in self.call_stack.iter().rev()
         {
             let hir_id = call_site.get();
             let module = hir_id.module.clone();
             let cst_id = if module.package.is_tooling() {
                 None
             } else {
-                db.hir_to_cst_id(hir_id.clone())
+                db.hir_to_cst_id(hir_id)
             };
             let cst = cst_id.map(|id| db.find_cst(module.clone(), id));
             let span = cst.map(|cst| db.range_to_positions(module.clone(), cst.data.span));
@@ -154,70 +132,5 @@ fn extract_receiver_name(cst_kind: &CstKind) -> Option<String> {
             Some(format!("{struct_string}.{key}"))
         }
         _ => None,
-    }
-}
-
-impl FiberTracer for FiberStackTracer {
-    fn child_fiber_created(&mut self, _child: FiberId) -> Self {
-        FiberStackTracer::default()
-    }
-    fn child_fiber_ended(&mut self, mut ended: TracedFiberEnded<Self>) {
-        let TracedFiberEndedReason::Panicked(panic) = ended.reason else {
-            return;
-        };
-        self.panic_chains.insert(
-            ended.id,
-            ended.tracer.take_panic_call_stack(panic.panicked_child),
-        );
-        ended.tracer.drop(ended.heap);
-    }
-
-    fn call_started(
-        &mut self,
-        heap: &mut Heap,
-        call_site: HirId,
-        callee: InlineObject,
-        arguments: Vec<InlineObject>,
-        responsible: HirId,
-    ) {
-        let call = Call {
-            call_site,
-            callee,
-            arguments,
-            responsible,
-        };
-        call.dup(heap);
-        self.call_stack.push(call);
-    }
-    fn call_ended(&mut self, heap: &mut Heap, _return_value: InlineObject) {
-        self.call_stack.pop().unwrap().drop(heap);
-    }
-
-    fn dup_all_stored_objects(&self, heap: &mut Heap) {
-        for call in &self.call_stack {
-            call.dup(heap);
-        }
-        for call in self.panic_chains.values().flatten() {
-            call.dup(heap);
-        }
-    }
-}
-
-impl FiberStackTracer {
-    fn take_panic_call_stack(&mut self, panicked_child: Option<FiberId>) -> Vec<Call> {
-        let mut call_stack = mem::take(&mut self.call_stack);
-        if let Some(panicked_child) = panicked_child {
-            let mut existing_panic_chain = self.panic_chains.remove(&panicked_child).unwrap();
-            call_stack.append(&mut existing_panic_chain);
-        }
-        call_stack
-    }
-    fn drop(self, heap: &mut Heap) {
-        for call in self.call_stack {
-            call.drop(heap);
-        }
-        for call in self.panic_chains.values().flatten() {
-            call.drop(heap);
-        }
     }
 }

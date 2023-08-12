@@ -34,6 +34,7 @@ use super::{
 };
 use crate::{
     builtin_functions::BuiltinFunction,
+    format::{format_value, FormatValue, MaxLength, Precedence},
     id::IdGenerator,
     mir::{Body, Expression, Id, VisibleExpressions},
 };
@@ -42,6 +43,7 @@ use num_bigint::BigInt;
 use num_integer::Integer;
 use num_traits::{ToPrimitive, Zero};
 use std::{
+    borrow::Cow,
     cmp::Ordering,
     str::{self, FromStr},
 };
@@ -68,7 +70,7 @@ pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression)
         return;
     };
 
-    let arguments = arguments.to_owned();
+    let arguments = arguments.clone();
     let responsible = *responsible;
     let Some(result) = run_builtin(
         &mut *expression,
@@ -104,9 +106,6 @@ fn run_builtin(
     );
 
     let result = match builtin {
-        BuiltinFunction::ChannelCreate
-        | BuiltinFunction::ChannelSend
-        | BuiltinFunction::ChannelReceive => return None,
         BuiltinFunction::Equals => {
             let [a, b] = arguments else { unreachable!() };
             a.semantically_equals(*b, visible, pureness)?.into()
@@ -154,7 +153,7 @@ fn run_builtin(
         }
         BuiltinFunction::IntBitwiseAnd => {
             let [a, b] = arguments else { unreachable!() };
-            if let Some(true) = a.semantically_equals(*b, visible, pureness) {
+            if a.semantically_equals(*b, visible, pureness) == Some(true) {
                 return Some(Expression::Reference(*a));
             }
 
@@ -164,7 +163,7 @@ fn run_builtin(
         }
         BuiltinFunction::IntBitwiseOr => {
             let [a, b] = arguments else { unreachable!() };
-            if let Some(true) = a.semantically_equals(*b, visible, pureness) {
+            if a.semantically_equals(*b, visible, pureness) == Some(true) {
                 return Some(Expression::Reference(*a));
             }
 
@@ -174,7 +173,7 @@ fn run_builtin(
         }
         BuiltinFunction::IntBitwiseXor => {
             let [a, b] = arguments else { unreachable!() };
-            if let Some(true) = a.semantically_equals(*b, visible, pureness) {
+            if a.semantically_equals(*b, visible, pureness) == Some(true) {
                 return Some(0.into());
             }
 
@@ -184,7 +183,7 @@ fn run_builtin(
         }
         BuiltinFunction::IntCompareTo => {
             let [a, b] = arguments else { unreachable!() };
-            if let Some(true) = a.semantically_equals(*b, visible, pureness) {
+            if a.semantically_equals(*b, visible, pureness) == Some(true) {
                 return Some(Ordering::Equal.into());
             }
 
@@ -196,7 +195,7 @@ fn run_builtin(
             let [dividend, divisor] = arguments else {
                 unreachable!()
             };
-            if let Some(true) = dividend.semantically_equals(*divisor, visible, pureness) {
+            if dividend.semantically_equals(*divisor, visible, pureness) == Some(true) {
                 return Some(1.into());
             }
 
@@ -208,7 +207,7 @@ fn run_builtin(
             let [dividend, divisor] = arguments else {
                 unreachable!()
             };
-            if let Some(true) = dividend.semantically_equals(*divisor, visible, pureness) {
+            if dividend.semantically_equals(*divisor, visible, pureness) == Some(true) {
                 return Some(0.into());
             }
 
@@ -240,7 +239,7 @@ fn run_builtin(
             let [dividend, divisor] = arguments else {
                 unreachable!()
             };
-            if let Some(true) = dividend.semantically_equals(*divisor, visible, pureness) {
+            if dividend.semantically_equals(*divisor, visible, pureness) == Some(true) {
                 return Some(0.into());
             }
 
@@ -280,7 +279,7 @@ fn run_builtin(
             let [minuend, subtrahend] = arguments else {
                 unreachable!()
             };
-            if let Some(true) = minuend.semantically_equals(*subtrahend, visible, pureness) {
+            if minuend.semantically_equals(*subtrahend, visible, pureness) == Some(true) {
                 return Some(Expression::Int(0.into()));
             }
 
@@ -309,7 +308,7 @@ fn run_builtin(
                 return None;
             };
             // TODO: Support lists longer than `usize::MAX`.
-            list.get(index.to_usize().unwrap()).unwrap().into()
+            list.get(index.to_usize().unwrap())?.into()
         }
         BuiltinFunction::ListInsert => return None,
         BuiltinFunction::ListLength => {
@@ -321,7 +320,6 @@ fn run_builtin(
         }
         BuiltinFunction::ListRemoveAt => return None,
         BuiltinFunction::ListReplace => return None,
-        BuiltinFunction::Parallel => return None,
         BuiltinFunction::Print => return None,
         BuiltinFunction::StructGet => {
             let [struct_, key] = arguments else {
@@ -373,7 +371,7 @@ fn run_builtin(
             };
 
             let mut is_contained = Some(false);
-            for (k, _) in fields.iter() {
+            for (k, _) in fields {
                 match k.semantically_equals(*key, visible, pureness) {
                     Some(is_equal) => {
                         if is_equal {
@@ -510,8 +508,7 @@ fn run_builtin(
             let [text, start_inclusive, end_exclusive] = arguments else {
                 unreachable!()
             };
-            if let Some(true) =
-                start_inclusive.semantically_equals(*end_exclusive, visible, pureness)
+            if start_inclusive.semantically_equals(*end_exclusive, visible, pureness) == Some(true)
             {
                 return Some("".into());
             }
@@ -594,8 +591,28 @@ fn run_builtin(
             };
             text.trim_start().into()
         }
-        BuiltinFunction::ToDebugText => return None,
-        BuiltinFunction::Try => return None,
+        BuiltinFunction::ToDebugText => {
+            let [argument] = arguments else {
+                unreachable!()
+            };
+            let formatted =
+                format_value(*argument, Precedence::High, MaxLength::Unlimited, &|id| {
+                    Some(match visible.get(id) {
+                        Expression::Int(int) => FormatValue::Int(Cow::Borrowed(int)),
+                        Expression::Text(text) => FormatValue::Text(text),
+                        Expression::Tag { symbol, value } => FormatValue::Tag {
+                            symbol,
+                            value: *value,
+                        },
+                        Expression::Builtin(_) => FormatValue::Function,
+                        Expression::List(items) => FormatValue::List(items),
+                        Expression::Struct(entries) => FormatValue::Struct(Cow::Borrowed(entries)),
+                        Expression::Function { .. } => FormatValue::Function,
+                        _ => return None,
+                    })
+                })?;
+            formatted.into()
+        }
         BuiltinFunction::TypeOf => Expression::tag(
             match visible.get(arguments[0]) {
                 Expression::Int(_) => "Int",
@@ -614,9 +631,6 @@ fn run_builtin(
                         return None;
                     };
                     match builtin {
-                        BuiltinFunction::ChannelCreate => "Struct",
-                        BuiltinFunction::ChannelSend => "Tag",
-                        BuiltinFunction::ChannelReceive => return None,
                         BuiltinFunction::Equals => "Tag",
                         BuiltinFunction::GetArgumentCount => "Int",
                         BuiltinFunction::FunctionRun => return None,
@@ -641,7 +655,6 @@ fn run_builtin(
                         BuiltinFunction::ListLength => "Int",
                         BuiltinFunction::ListRemoveAt => "List",
                         BuiltinFunction::ListReplace => "List",
-                        BuiltinFunction::Parallel => return None,
                         BuiltinFunction::Print => "Tag",
                         BuiltinFunction::StructGet => return None,
                         BuiltinFunction::StructGetKeys => "List",
@@ -661,7 +674,6 @@ fn run_builtin(
                         BuiltinFunction::TextTrimEnd => "Text",
                         BuiltinFunction::TextTrimStart => "Text",
                         BuiltinFunction::ToDebugText => "Text",
-                        BuiltinFunction::Try => "Struct",
                         BuiltinFunction::TypeOf => "Tag",
                     }
                 }

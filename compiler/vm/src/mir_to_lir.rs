@@ -1,8 +1,8 @@
 use crate::{
-    fiber::InstructionPointer,
     heap::{
         Builtin, Function, Heap, HirId, InlineObject, Int, List, Struct, SymbolTable, Tag, Text,
     },
+    instruction_pointer::InstructionPointer,
     lir::{Instruction, Lir, StackOffset},
 };
 use candy_frontend::{
@@ -213,11 +213,11 @@ impl<'c> LoweringContext<'c> {
             Expression::Struct(fields) => {
                 if let Some(fields) = fields
                     .iter()
-                    .flat_map(|(key, value)| [key, value].into_iter())
-                    .map(|item| self.constants.get(item).copied())
-                    .collect::<Option<Vec<_>>>()
+                    .map(|(key, value)| try {
+                        (*self.constants.get(key)?, *self.constants.get(value)?)
+                    })
+                    .collect::<Option<FxHashMap<_, _>>>()
                 {
-                    let fields = fields.into_iter().tuples().collect();
                     let struct_ = Struct::create(&mut self.lir.constant_heap, false, &fields);
                     self.constants.insert(id, struct_.into());
                 } else {
@@ -306,7 +306,7 @@ impl<'c> LoweringContext<'c> {
                 );
             }
             Expression::UseModule { .. } => {
-                // Calls of the use function are completely inlined and if
+                // Calls of the use function are completely inlined and, if
                 // they're not statically known, are replaced by panics.
                 // The only way a use can still be in the MIR is if the tracing
                 // of evaluated expressions is enabled. We can emit any nonsense

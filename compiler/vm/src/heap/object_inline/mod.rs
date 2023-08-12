@@ -1,18 +1,18 @@
 use self::{
-    builtin::InlineBuiltin,
-    int::InlineInt,
-    pointer::InlinePointer,
-    port::{InlineReceivePort, InlineSendPort},
+    builtin::InlineBuiltin, handle::InlineHandle, int::InlineInt, pointer::InlinePointer,
     tag::InlineTag,
 };
 use super::{
     object_heap::HeapObject, Data, DisplayWithSymbolTable, Heap, OrdWithSymbolTable, SymbolTable,
 };
-use crate::channel::ChannelId;
+use crate::handle_id::HandleId;
+use candy_frontend::format::{format_value, FormatValue, MaxLength, Precedence};
 use enum_dispatch::enum_dispatch;
 use extension_trait::extension_trait;
+use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use std::{
+    borrow::Cow,
     cmp::Ordering,
     fmt::{self, Debug, Display, Formatter},
     hash::{Hash, Hasher},
@@ -21,9 +21,9 @@ use std::{
 };
 
 pub(super) mod builtin;
+pub(super) mod handle;
 pub(super) mod int;
 pub(super) mod pointer;
-pub(super) mod port;
 pub(super) mod tag;
 
 #[extension_trait]
@@ -53,8 +53,7 @@ impl InlineObject {
     pub const KIND_INT: u64 = 0b001;
     pub const KIND_BUILTIN: u64 = 0b010;
     pub const KIND_TAG: u64 = 0b011;
-    pub const KIND_SEND_PORT: u64 = 0b100;
-    pub const KIND_RECEIVE_PORT: u64 = 0b101;
+    pub const KIND_HANDLE: u64 = 0b100;
 
     pub fn new(value: NonZeroU64) -> Self {
         Self(value)
@@ -68,8 +67,8 @@ impl InlineObject {
         self.dup_by(heap, 1);
     }
     pub fn dup_by(self, heap: &mut Heap, amount: usize) {
-        if let Some(channel) = InlineData::from(self).channel_id() {
-            heap.dup_channel_by(channel, amount);
+        if let Some(handle) = InlineData::from(self).handle_id() {
+            heap.dup_handle_by(handle, amount);
         };
 
         if let Ok(it) = HeapObject::try_from(self) {
@@ -77,8 +76,8 @@ impl InlineObject {
         }
     }
     pub fn drop(self, heap: &mut Heap) {
-        if let Some(channel) = InlineData::from(self).channel_id() {
-            heap.drop_channel(channel);
+        if let Some(handle) = InlineData::from(self).handle_id() {
+            heap.drop_handle(handle);
         };
 
         if let Ok(it) = HeapObject::try_from(self) {
@@ -154,14 +153,12 @@ pub enum InlineData {
     Int(InlineInt),
     Builtin(InlineBuiltin),
     Tag(InlineTag),
-    SendPort(InlineSendPort),
-    ReceivePort(InlineReceivePort),
+    Handle(InlineHandle),
 }
 impl InlineData {
-    fn channel_id(&self) -> Option<ChannelId> {
+    fn handle_id(&self) -> Option<HandleId> {
         match self {
-            InlineData::SendPort(port) => Some(port.channel_id()),
-            InlineData::ReceivePort(port) => Some(port.channel_id()),
+            InlineData::Handle(handle) => Some(handle.handle_id()),
             _ => None,
         }
     }
@@ -175,12 +172,7 @@ impl From<InlineObject> for InlineData {
             InlineObject::KIND_INT => InlineData::Int(InlineInt::new_unchecked(object)),
             InlineObject::KIND_BUILTIN => InlineData::Builtin(InlineBuiltin::new_unchecked(object)),
             InlineObject::KIND_TAG => InlineData::Tag(InlineTag::new_unchecked(object)),
-            InlineObject::KIND_SEND_PORT => {
-                InlineData::SendPort(InlineSendPort::new_unchecked(object))
-            }
-            InlineObject::KIND_RECEIVE_PORT => {
-                InlineData::ReceivePort(InlineReceivePort::new_unchecked(object))
-            }
+            InlineObject::KIND_HANDLE => InlineData::Handle(InlineHandle::new_unchecked(object)),
             _ => panic!("Unknown inline value type: {value:016x}"),
         }
     }
@@ -193,8 +185,7 @@ impl Debug for InlineData {
             InlineData::Int(value) => Debug::fmt(value, f),
             InlineData::Builtin(value) => Debug::fmt(value, f),
             InlineData::Tag(value) => Debug::fmt(value, f),
-            InlineData::SendPort(value) => Debug::fmt(value, f),
-            InlineData::ReceivePort(value) => Debug::fmt(value, f),
+            InlineData::Handle(value) => Debug::fmt(value, f),
         }
     }
 }
@@ -205,8 +196,7 @@ impl DisplayWithSymbolTable for InlineData {
             InlineData::Int(value) => Display::fmt(value, f),
             InlineData::Builtin(value) => Display::fmt(value, f),
             InlineData::Tag(value) => DisplayWithSymbolTable::fmt(value, f, symbol_table),
-            InlineData::SendPort(value) => Display::fmt(value, f),
-            InlineData::ReceivePort(value) => Display::fmt(value, f),
+            InlineData::Handle(value) => Display::fmt(value, f),
         }
     }
 }
@@ -220,8 +210,38 @@ impl Deref for InlineData {
             InlineData::Int(value) => value,
             InlineData::Builtin(value) => value,
             InlineData::Tag(value) => value,
-            InlineData::SendPort(value) => value,
-            InlineData::ReceivePort(value) => value,
+            InlineData::Handle(value) => value,
         }
+    }
+}
+
+#[extension_trait]
+pub impl ToDebugText for InlineObject {
+    fn to_debug_text(
+        self,
+        precendence: Precedence,
+        max_length: MaxLength,
+        symbol_table: &SymbolTable,
+    ) -> String {
+        format_value(self, precendence, max_length, &|value| {
+            Some(match value.into() {
+                Data::Int(int) => FormatValue::Int(int.get()),
+                Data::Tag(tag) => FormatValue::Tag {
+                    symbol: symbol_table.get(tag.symbol_id()),
+                    value: tag.value(),
+                },
+                Data::Text(text) => FormatValue::Text(text.get()),
+                Data::List(list) => FormatValue::List(list.items()),
+                Data::Struct(struct_) => FormatValue::Struct(Cow::Owned(
+                    struct_
+                        .iter()
+                        .map(|(_, key, value)| (key, value))
+                        .collect_vec(),
+                )),
+                Data::HirId(_) => unreachable!(),
+                Data::Function(_) | Data::Builtin(_) | Data::Handle(_) => FormatValue::Function,
+            })
+        })
+        .unwrap()
     }
 }

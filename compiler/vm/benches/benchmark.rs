@@ -67,7 +67,7 @@ main _ := fib {n}"#,
 fn create_binary_trees_code(n: usize) -> String {
     format!(
         r#"
-[channel, equals, if, ifElse, int, iterable, recursive, result, struct, text] = use "Core"
+[equals, if, ifElse, int, iterable, recursive, result, struct, text] = use "Core"
 
 createTree n :=
   needs (int.is n)

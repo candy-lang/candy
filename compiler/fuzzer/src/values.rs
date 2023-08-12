@@ -151,7 +151,7 @@ impl InlineObjectGeneration for InlineObject {
                 }
             }
             Data::Builtin(_) => (*builtin_functions::VALUES.choose(rng).unwrap()).into(),
-            Data::HirId(_) | Data::Function(_) | Data::SendPort(_) | Data::ReceivePort(_) => {
+            Data::HirId(_) | Data::Function(_) | Data::Handle(_) => {
                 panic!("Couldn't have been created for fuzzing.")
             }
         }
@@ -179,11 +179,7 @@ impl InlineObjectGeneration for InlineObject {
                     .sum::<usize>()
                     + 1
             }
-            Data::HirId(_)
-            | Data::Function(_)
-            | Data::Builtin(_)
-            | Data::SendPort(_)
-            | Data::ReceivePort(_) => 1,
+            Data::HirId(_) | Data::Function(_) | Data::Builtin(_) | Data::Handle(_) => 1,
         }
     }
 }

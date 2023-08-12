@@ -3,13 +3,14 @@ use crate::{database::Database, utils::LspPositionConversion};
 use candy_frontend::{
     ast::{Assignment, AssignmentBody, AstDb, AstKind},
     ast_to_hir::AstToHir,
+    format::{MaxLength, Precedence},
     hir::{Expression, HirDb, Id},
     module::Module,
 };
 use candy_fuzzer::{Fuzzer, RunResult, Status};
 use candy_vm::{
-    fiber::Panic,
-    heap::{DisplayWithSymbolTable, InlineObject, SymbolTable},
+    heap::{DisplayWithSymbolTable, InlineObject, SymbolTable, ToDebugText},
+    Panic,
 };
 use extension_trait::extension_trait;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
@@ -51,7 +52,7 @@ impl Insight {
         let text = match hir {
             Expression::Reference(_) => {
                 // Could be an assignment.
-                let Some(ast_id) = db.hir_to_ast_id(id.clone()) else {
+                let Some(ast_id) = db.hir_to_ast_id(&id) else {
                     return None;
                 };
                 let Some(ast) = db.find_ast(ast_id) else {
@@ -70,14 +71,14 @@ impl Insight {
                     return None;
                 }
 
-                DisplayWithSymbolTable::to_string(&value, symbol_table)
+                value.to_debug_text(Precedence::Low, MaxLength::Limited(60), symbol_table)
             }
             Expression::PatternIdentifierReference { .. } => {
                 let body = db.containing_body_of(id.clone());
                 let name = body.identifiers.get(&id).unwrap();
                 format!(
                     "{name} = {}",
-                    DisplayWithSymbolTable::to_string(&value, symbol_table)
+                    value.to_debug_text(Precedence::Low, MaxLength::Limited(60), symbol_table),
                 )
             }
             _ => return None,
@@ -115,44 +116,54 @@ impl Insight {
             insights.push(Insight::Hint(Hint {
                 kind: HintKind::SampleInputPanickingWithInternalCodeResponsible,
                 position: end_of_line,
-                text: format!("{function_name} {input}"),
+                text: format!(
+                    "{function_name} {}",
+                    input.to_string(&fuzzer.lir.symbol_table)
+                ),
             }));
         }
 
-        insights.extend(interesting_inputs.into_iter().map(|input| {
-            Insight::Hint(match fuzzer.input_pool().result_of(&input) {
-                RunResult::Timeout => unreachable!(),
-                RunResult::Done(return_value) => Hint {
-                    kind: HintKind::SampleInputReturningNormally,
-                    position: end_of_line,
-                    text: format!(
-                        "{function_name} {input} = {}",
-                        DisplayWithSymbolTable::to_string(
-                            &return_value.object,
-                            &fuzzer.lir().symbol_table,
+        insights.extend(
+            interesting_inputs.into_iter().map(|input| {
+                Insight::Hint(match fuzzer.input_pool().result_of(&input) {
+                    RunResult::Timeout => unreachable!(),
+                    RunResult::Done { return_value, .. } => Hint {
+                        kind: HintKind::SampleInputReturningNormally,
+                        position: end_of_line,
+                        text: format!(
+                            "{function_name} {} = {}",
+                            input.to_string(&fuzzer.lir.symbol_table),
+                            DisplayWithSymbolTable::to_string(
+                                return_value,
+                                &fuzzer.lir().symbol_table,
+                            ),
                         ),
-                    ),
-                },
-                RunResult::NeedsUnfulfilled { .. } => Hint {
-                    kind: HintKind::SampleInputPanickingWithCallerResponsible,
-                    position: end_of_line,
-                    text: format!("{function_name} {input}"),
-                },
-                RunResult::Panicked(_) => Hint {
-                    kind: HintKind::SampleInputPanickingWithInternalCodeResponsible,
-                    position: end_of_line,
-                    text: format!("{function_name} {input}"),
-                },
-            })
-        }));
+                    },
+                    RunResult::NeedsUnfulfilled { .. } => Hint {
+                        kind: HintKind::SampleInputPanickingWithCallerResponsible,
+                        position: end_of_line,
+                        text: format!(
+                            "{function_name} {}",
+                            input.to_string(&fuzzer.lir.symbol_table)
+                        ),
+                    },
+                    RunResult::Panicked { .. } => Hint {
+                        kind: HintKind::SampleInputPanickingWithInternalCodeResponsible,
+                        position: end_of_line,
+                        text: format!(
+                            "{function_name} {}",
+                            input.to_string(&fuzzer.lir.symbol_table)
+                        ),
+                    },
+                })
+            }),
+        );
 
         insights
     }
 
     pub fn for_static_panic(db: &Database, module: Module, panic: &Panic) -> Self {
-        let call_span = db
-            .hir_id_to_display_span(panic.responsible.clone())
-            .unwrap();
+        let call_span = db.hir_id_to_display_span(&panic.responsible).unwrap();
         let call_span = db.range_to_lsp_range(module, call_span);
 
         Insight::Diagnostic(Diagnostic::error(

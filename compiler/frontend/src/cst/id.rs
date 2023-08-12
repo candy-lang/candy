@@ -1,18 +1,10 @@
-use crate::id::CountableId;
+use crate::impl_countable_id;
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Id(pub usize);
 
-impl CountableId for Id {
-    fn from_usize(id: usize) -> Self {
-        Self(id)
-    }
-
-    fn to_usize(&self) -> usize {
-        self.0
-    }
-}
+impl_countable_id!(Id);
 
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
