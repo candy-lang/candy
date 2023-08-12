@@ -31,7 +31,6 @@ pub struct CodeGen<'ctx> {
     module: Module<'ctx>,
     builder: Builder<'ctx>,
     mir: Arc<Mir>,
-    tags: HashMap<String, Option<Id>>,
     globals: HashMap<Id, GlobalValue<'ctx>>,
     locals: HashMap<Id, BasicValueEnum<'ctx>>,
     functions: HashMap<Id, FunctionInfo<'ctx>>,
@@ -47,7 +46,6 @@ impl<'ctx> CodeGen<'ctx> {
             module,
             builder,
             mir,
-            tags: HashMap::new(),
             globals: HashMap::new(),
             locals: HashMap::new(),
             functions: HashMap::new(),
@@ -72,13 +70,23 @@ impl<'ctx> CodeGen<'ctx> {
         let make_int_fn_type = candy_value_ptr.fn_type(&[i64_type.into()], false);
         self.module
             .add_function("make_candy_int", make_int_fn_type, Some(Linkage::External));
-        let make_tag_fn_type =
-            candy_value_ptr.fn_type(&[i8_type.ptr_type(AddressSpace::default()).into()], false);
+        let make_tag_fn_type = candy_value_ptr.fn_type(
+            &[
+                i8_type.ptr_type(AddressSpace::default()).into(),
+                candy_value_ptr.into(),
+            ],
+            false,
+        );
         let make_candy_tag =
             self.module
                 .add_function("make_candy_tag", make_tag_fn_type, Some(Linkage::External));
-        self.module
-            .add_function("make_candy_text", make_tag_fn_type, Some(Linkage::External));
+        let make_text_fn_type =
+            candy_value_ptr.fn_type(&[i8_type.ptr_type(AddressSpace::default()).into()], false);
+        self.module.add_function(
+            "make_candy_text",
+            make_text_fn_type,
+            Some(Linkage::External),
+        );
         let make_list_fn_type = candy_value_ptr.fn_type(&[candy_value_ptr.into()], false);
         self.module.add_function(
             "make_candy_list",
@@ -168,9 +176,11 @@ impl<'ctx> CodeGen<'ctx> {
         const MAIN_FN_NAME: &str = "Main";
         let main_text = self.make_str_literal(MAIN_FN_NAME);
 
-        let main_tag = self
-            .builder
-            .build_call(make_candy_tag, &[main_text.into()], "");
+        let main_tag = self.builder.build_call(
+            make_candy_tag,
+            &[main_text.into(), candy_value_ptr.const_null().into()],
+            "",
+        );
 
         let main_fn = self
             .builder
@@ -307,13 +317,18 @@ impl<'ctx> CodeGen<'ctx> {
                     Some(global.as_basic_value_enum())
                 }
                 candy_frontend::mir::Expression::Tag { symbol, value } => {
-                    self.tags.insert(symbol.clone(), *value);
+                    let tag_value = match value {
+                        Some(value) => self.get_value_with_id(function_ctx, value).unwrap(),
+                        None => candy_value_ptr.const_null().as_basic_value_enum(),
+                    };
 
                     let string = self.make_str_literal(symbol);
                     let make_candy_tag = self.module.get_function("make_candy_tag").unwrap();
-                    let call = self
-                        .builder
-                        .build_call(make_candy_tag, &[string.into()], "");
+                    let call = self.builder.build_call(
+                        make_candy_tag,
+                        &[string.into(), tag_value.into()],
+                        "",
+                    );
 
                     let global = self.create_global(
                         &format!("tag_{symbol}"),
