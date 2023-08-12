@@ -42,17 +42,10 @@ impl Tracer for DebugTracer {
     fn call_started(
         &mut self,
         heap: &mut Heap,
-        call_site: HirId,
         callee: InlineObject,
         arguments: Vec<InlineObject>,
-        responsible: HirId,
     ) {
-        let call = Call {
-            call_site,
-            callee,
-            arguments,
-            responsible,
-        };
+        let call = Call { callee, arguments };
         call.dup(heap);
         self.call_stack.push(StackFrame::new(call));
     }

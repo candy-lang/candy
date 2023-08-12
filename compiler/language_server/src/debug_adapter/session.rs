@@ -214,8 +214,13 @@ impl DebugSession {
                 let environment = Struct::create(&mut heap, true, &FxHashMap::default()).into();
                 let platform = HirId::create(&mut heap, true, Id::platform());
                 let tracer = DebugTracer::default();
-                let vm =
-                    Vm::for_function(Rc::new(lir), heap, main, &[environment], platform, tracer);
+                let vm = Vm::for_function(
+                    Rc::new(lir),
+                    heap,
+                    main,
+                    &[environment, platform.into()],
+                    tracer,
+                );
 
                 // TODO: remove when we support pause and continue
                 let vm = match vm.run_n_without_handles(10000) {

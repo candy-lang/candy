@@ -14,27 +14,21 @@ pub struct StackTracer {
 
 #[derive(Clone, Debug)]
 pub struct Call {
-    pub call_site: HirId,
     pub callee: InlineObject,
     pub arguments: Vec<InlineObject>,
-    pub responsible: HirId,
 }
 impl Call {
     pub fn dup(&self, heap: &mut Heap) {
-        self.call_site.dup();
         self.callee.dup(heap);
         for argument in &self.arguments {
             argument.dup(heap);
         }
-        self.responsible.dup();
     }
     pub fn drop(&self, heap: &mut Heap) {
-        self.call_site.drop(heap);
         self.callee.drop(heap);
         for argument in &self.arguments {
             argument.drop(heap);
         }
-        self.responsible.drop(heap);
     }
 }
 
@@ -42,17 +36,10 @@ impl Tracer for StackTracer {
     fn call_started(
         &mut self,
         heap: &mut Heap,
-        call_site: HirId,
         callee: InlineObject,
         arguments: Vec<InlineObject>,
-        responsible: HirId,
     ) {
-        let call = Call {
-            call_site,
-            callee,
-            arguments,
-            responsible,
-        };
+        let call = Call { callee, arguments };
         call.dup(heap);
         self.call_stack.push(call);
     }
@@ -69,23 +56,27 @@ impl StackTracer {
         let mut caller_locations_and_calls = vec![];
 
         for Call {
-            call_site,
-            callee,
-            arguments,
-            ..
+            callee, arguments, ..
         } in self.call_stack.iter().rev()
         {
-            let hir_id = call_site.get();
-            let module = hir_id.module.clone();
+            let call_site: HirId = match arguments.last().copied() {
+                Some(responsible) => responsible.try_into().unwrap(),
+                None => {
+                    continue; // Call of a module.
+                }
+            };
+            let call_site = call_site.get().clone();
+
+            let module = call_site.module.clone();
             let cst_id = if module.package.is_tooling() {
                 None
             } else {
-                db.hir_to_cst_id(hir_id)
+                db.hir_to_cst_id(&call_site)
             };
             let cst = cst_id.map(|id| db.find_cst(module.clone(), id));
             let span = cst.map(|cst| db.range_to_positions(module.clone(), cst.data.span));
             let caller_location_string = format!(
-                "{hir_id} {}",
+                "{call_site} {}",
                 span.map(|it| format!(
                     "{}:{} – {}:{}",
                     it.start.line, it.start.character, it.end.line, it.end.character,
@@ -96,7 +87,7 @@ impl StackTracer {
                 "{} {}",
                 cst_id
                     .and_then(|id| {
-                        let cst = db.find_cst(hir_id.module.clone(), id);
+                        let cst = db.find_cst(call_site.module.clone(), id);
                         match cst.kind {
                             CstKind::Call { receiver, .. } => extract_receiver_name(&receiver),
                             _ => None,

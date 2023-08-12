@@ -4,7 +4,7 @@ use crate::{
         SymbolId, SymbolTable, Tag, Text, ToDebugText,
     },
     instructions::InstructionResult,
-    vm::{CallHandle, MachineState, Panic},
+    vm::{MachineState, Panic},
 };
 use candy_frontend::{
     builtin_functions::BuiltinFunction,
@@ -15,19 +15,25 @@ use itertools::Itertools;
 use num_bigint::BigInt;
 use paste::paste;
 use std::str::FromStr;
-use tracing::{info, span, Level};
+use tracing::info;
 
 impl MachineState {
     pub(super) fn run_builtin_function(
         &mut self,
         builtin_function: BuiltinFunction,
         args: &[InlineObject],
-        responsible: HirId,
         symbol_table: &SymbolTable,
     ) -> InstructionResult {
-        let result = span!(Level::TRACE, "Running builtin").in_scope(|| match &builtin_function {
+        let responsible: HirId = (*args.last().unwrap()).try_into().unwrap();
+        let args = &args[..args.len() - 1];
+
+        let result = match &builtin_function {
             BuiltinFunction::Equals => self.heap.equals(args),
-            BuiltinFunction::FunctionRun => self.heap.function_run(args, responsible),
+            BuiltinFunction::FunctionRun => {
+                let [callee] = args else { unreachable!() };
+                self.call(*callee, &[responsible.into()], symbol_table);
+                return InstructionResult::Done;
+            }
             BuiltinFunction::GetArgumentCount => self.heap.get_argument_count(args),
             BuiltinFunction::IfElse => self.heap.if_else(args, responsible),
             BuiltinFunction::IntAdd => self.heap.int_add(args),
@@ -70,7 +76,7 @@ impl MachineState {
             BuiltinFunction::TextTrimStart => self.heap.text_trim_start(args),
             BuiltinFunction::ToDebugText => self.heap.to_debug_text(args, symbol_table),
             BuiltinFunction::TypeOf => self.heap.type_of(args),
-        });
+        };
 
         match result {
             Ok(Return(value)) => {
@@ -80,8 +86,7 @@ impl MachineState {
             Ok(DivergeControlFlow {
                 function,
                 responsible,
-            }) => self.call_function(function, &[], responsible),
-            Ok(CallHandle(call)) => InstructionResult::CallHandle(call),
+            }) => self.call_function(function, &[responsible.into()]),
             Err(reason) => InstructionResult::Panic(Panic {
                 reason,
                 responsible: responsible.get().to_owned(),
@@ -97,7 +102,6 @@ enum SuccessfulBehavior {
         function: Function,
         responsible: HirId,
     },
-    CallHandle(CallHandle),
 }
 
 impl From<SuccessfulBehavior> for BuiltinResult {
@@ -162,36 +166,6 @@ impl Heap {
         })
     }
 
-    fn function_run(&mut self, args: &[InlineObject], responsible: HirId) -> BuiltinResult {
-        unpack!(self, args, |function: Any| {
-            match **function {
-                Data::Builtin(_) => {
-                    // TODO: Replace with `unreachable!()` once we have guards
-                    // for argument counts on the Candy side – there are no
-                    // builtins without arguments.
-                    return Err("`✨.functionRun` called with builtin".to_string());
-                }
-                Data::Function(function) => DivergeControlFlow {
-                    function,
-                    responsible,
-                },
-                Data::Handle(handle) => {
-                    if handle.argument_count() != 0 {
-                        return Err(
-                            "`✨.functionRun` expects a function or handle without arguments"
-                                .to_string(),
-                        );
-                    }
-                    CallHandle(CallHandle {
-                        handle,
-                        arguments: vec![],
-                        responsible,
-                    })
-                }
-                _ => return Err("`✨.functionRun` expects a function or handle".to_string()),
-            }
-        })
-    }
     fn get_argument_count(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |function: Any| {
             let count = match **function {
@@ -200,7 +174,8 @@ impl Heap {
                 Data::Handle(handle) => handle.argument_count(),
                 _ => return Err("`✨.getArgumentCount` expects a function or handle".to_string()),
             };
-            Return(Int::create(self, true, count).into())
+            let count_without_responsibility = count - 1;
+            Return(Int::create(self, true, count_without_responsibility).into())
         })
     }
 

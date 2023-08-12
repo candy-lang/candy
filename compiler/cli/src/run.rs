@@ -85,8 +85,8 @@ pub(crate) fn run(options: Options) -> ProgramResult {
 
     debug!("Running main function.");
     // TODO: Add more environment stuff.
-    let stdout = Handle::new(&mut heap, 1);
-    let stdin = Handle::new(&mut heap, 0);
+    let stdout = Handle::new(&mut heap, 2);
+    let stdin = Handle::new(&mut heap, 1);
     let environment = Struct::create_with_symbol_keys(
         &mut heap,
         true,
@@ -98,8 +98,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         lir.clone(),
         heap,
         main,
-        &[environment],
-        platform,
+        &[environment, platform.into()],
         StackTracer::default(),
     );
 
@@ -107,7 +106,9 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         match vm.run_forever() {
             StateAfterRunForever::CallingHandle(mut call) => {
                 if call.handle == stdout {
-                    let message = call.arguments[0];
+                    let [message, _responsible] = call.arguments[..] else {
+                        unreachable!()
+                    };
 
                     match message.into() {
                         Data::Text(text) => println!("{}", text.get()),
@@ -115,6 +116,10 @@ pub(crate) fn run(options: Options) -> ProgramResult {
                     }
                     vm = call.complete(Tag::create_nothing());
                 } else if call.handle == stdin {
+                    let [_responsible] = call.arguments[..] else {
+                        unreachable!()
+                    };
+
                     print!(">> ");
                     io::stdout().flush().unwrap();
                     let input = {

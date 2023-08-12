@@ -42,7 +42,6 @@ pub enum Expression {
     Call {
         function: Id,
         arguments: Vec<Id>,
-        responsible: Id,
     },
 
     Panic {
@@ -54,7 +53,6 @@ pub enum Expression {
         hir_call: Id,
         function: Id,
         arguments: Vec<Id>,
-        responsible: Id,
     },
 
     TraceCallEnds {
@@ -128,7 +126,6 @@ impl ToRichIr for Expression {
             Self::Call {
                 function,
                 arguments,
-                responsible,
             } => {
                 builder.push("call ", None, EnumSet::empty());
                 function.build_rich_ir(builder);
@@ -138,9 +135,6 @@ impl ToRichIr for Expression {
                 } else {
                     builder.push_children(arguments, " ");
                 }
-                builder.push(" (", None, EnumSet::empty());
-                responsible.build_rich_ir(builder);
-                builder.push(" is responsible)", None, EnumSet::empty());
             }
             Self::Panic {
                 reason,
@@ -148,23 +142,20 @@ impl ToRichIr for Expression {
             } => {
                 builder.push("panicking because ", None, EnumSet::empty());
                 reason.build_rich_ir(builder);
-                builder.push(" (", None, EnumSet::empty());
+                builder.push(", ", None, EnumSet::empty());
                 responsible.build_rich_ir(builder);
-                builder.push(" is at fault)", None, EnumSet::empty());
+                builder.push(" is at fault", None, EnumSet::empty());
             }
             Self::TraceCallStarts {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             } => {
                 builder.push("trace: start of call of ", None, EnumSet::empty());
                 function.build_rich_ir(builder);
                 builder.push(" with ", None, EnumSet::empty());
                 builder.push_children(arguments, " ");
-                builder.push(" (", None, EnumSet::empty());
-                responsible.build_rich_ir(builder);
-                builder.push(" is responsible, code is at ", None, EnumSet::empty());
+                builder.push(" (code is at ", None, EnumSet::empty());
                 hir_call.build_rich_ir(builder);
                 builder.push(")", None, EnumSet::empty());
             }

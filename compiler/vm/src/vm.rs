@@ -1,5 +1,5 @@
 use crate::{
-    heap::{Function, Handle, Heap, HirId, InlineObject},
+    heap::{Function, Handle, Heap, InlineObject},
     instruction_pointer::InstructionPointer,
     instructions::InstructionResult,
     lir::Lir,
@@ -35,7 +35,6 @@ pub(super) struct MachineState {
 pub struct CallHandle {
     pub handle: Handle,
     pub arguments: Vec<InlineObject>,
-    pub responsible: HirId,
 }
 
 #[derive(Clone, Debug)]
@@ -54,16 +53,9 @@ where
         mut heap: Heap,
         function: Function,
         arguments: &[InlineObject],
-        responsible: HirId,
         mut tracer: T,
     ) -> Self {
-        tracer.call_started(
-            &mut heap,
-            responsible,
-            function.into(),
-            arguments.to_vec(),
-            responsible,
-        );
+        tracer.call_started(&mut heap, function.into(), arguments.to_vec());
 
         let mut state = MachineState {
             next_instruction: None,
@@ -71,7 +63,7 @@ where
             call_stack: vec![],
             heap,
         };
-        state.call_function(function, arguments, responsible);
+        state.call_function(function, arguments);
 
         let inner = Box::new(VmInner { lir, state, tracer });
         Self { inner }
@@ -79,7 +71,6 @@ where
     pub fn for_module(lir: L, tracer: T) -> Self {
         let actual_lir = lir.borrow();
         let function = actual_lir.module_function;
-        let responsible = actual_lir.responsible_module;
         assert_eq!(
             function.captured_len(),
             0,
@@ -90,7 +81,7 @@ where
             0,
             "Function is not a module function because it has arguments.",
         );
-        Self::for_function(lir, Heap::default(), function, &[], responsible, tracer)
+        Self::for_function(lir, Heap::default(), function, &[], tracer)
     }
 
     pub fn lir(&self) -> &L {

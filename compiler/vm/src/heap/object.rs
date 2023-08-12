@@ -586,6 +586,10 @@ pub struct Handle(InlineHandle);
 
 impl Handle {
     pub fn new(heap: &mut Heap, argument_count: usize) -> Self {
+        assert!(
+            argument_count >= 1,
+            "Each handle needs to accept at least a responsibility parameter."
+        );
         let id = heap.handle_id_generator.generate();
         Self::create(heap, id, argument_count)
     }

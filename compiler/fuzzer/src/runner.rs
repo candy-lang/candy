@@ -75,17 +75,16 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
             .clone_to_heap_with_mapping(&mut heap, &mut mapping)
             .try_into()
             .unwrap();
-        let arguments = input
+        let mut arguments = input
             .arguments
             .clone_to_heap_with_mapping(&mut heap, &mut mapping);
-        let responsible = HirId::create(&mut heap, true, Id::fuzzer());
+        arguments.push(HirId::create(&mut heap, true, Id::fuzzer()).into());
 
         let vm = Vm::for_function(
             lir.clone(),
             heap,
             function,
             &arguments,
-            responsible,
             StackTracer::default(),
         );
 

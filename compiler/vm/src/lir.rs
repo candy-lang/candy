@@ -155,7 +155,6 @@ impl Instruction {
                 stack.push(top);
             }
             Instruction::Call { num_args } => {
-                stack.pop(); // responsible
                 stack.pop_multiple(*num_args);
                 stack.pop(); // function/builtin
                 stack.push(result); // return value
@@ -164,7 +163,6 @@ impl Instruction {
                 num_locals_to_pop,
                 num_args,
             } => {
-                stack.pop(); // responsible
                 stack.pop_multiple(*num_args);
                 stack.pop(); // function/builtin
                 stack.pop_multiple(*num_locals_to_pop);
@@ -181,7 +179,6 @@ impl Instruction {
             }
             Instruction::TraceCallStarts { num_args } => {
                 stack.pop(); // HIR ID
-                stack.pop(); // responsible
                 stack.pop_multiple(*num_args);
                 stack.pop(); // callee
             }
