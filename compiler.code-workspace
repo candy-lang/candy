@@ -13,6 +13,10 @@
       "path": "compiler/vm"
     },
     {
+      "name": "Compiler: Inkwell Backend",
+      "path": "compiler/backend_inkwell"
+    },
+    {
       "name": "Compiler: Fuzzer",
       "path": "compiler/fuzzer"
     },

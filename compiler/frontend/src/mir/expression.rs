@@ -105,12 +105,14 @@ pub enum Expression {
 }
 
 impl Expression {
-    pub fn tag(symbol: String) -> Self {
-        Expression::Tag {
+    #[must_use]
+    pub const fn tag(symbol: String) -> Self {
+        Self::Tag {
             symbol,
             value: None,
         }
     }
+    #[must_use]
     pub fn nothing() -> Self {
         Self::tag("Nothing".to_string())
     }
@@ -194,7 +196,7 @@ impl From<Result<Id, Id>> for Expression {
             Ok(it) => ("Ok", it),
             Err(it) => ("Error", it),
         };
-        Expression::Tag {
+        Self::Tag {
             symbol: symbol.to_string(),
             value: Some(value),
         }
@@ -212,18 +214,18 @@ impl Hash for Expression {
     fn hash<H: Hasher>(&self, state: &mut H) {
         mem::discriminant(self).hash(state);
         match self {
-            Expression::Int(int) => int.hash(state),
-            Expression::Text(text) => text.hash(state),
-            Expression::Tag { symbol, value } => {
+            Self::Int(int) => int.hash(state),
+            Self::Text(text) => text.hash(state),
+            Self::Tag { symbol, value } => {
                 symbol.hash(state);
                 value.hash(state);
             }
-            Expression::Builtin(builtin) => builtin.hash(state),
-            Expression::List(items) => items.hash(state),
-            Expression::Struct(fields) => fields.len().hash(state),
-            Expression::Reference(id) => id.hash(state),
-            Expression::HirId(id) => id.hash(state),
-            Expression::Function {
+            Self::Builtin(builtin) => builtin.hash(state),
+            Self::List(items) => items.hash(state),
+            Self::Struct(fields) => fields.len().hash(state),
+            Self::Reference(id) => id.hash(state),
+            Self::HirId(id) => id.hash(state),
+            Self::Function {
                 original_hirs,
                 parameters,
                 responsible_parameter,
@@ -242,8 +244,8 @@ impl Hash for Expression {
                 responsible_parameter.hash(state);
                 body.hash(state);
             }
-            Expression::Parameter => {}
-            Expression::Call {
+            Self::Parameter => {}
+            Self::Call {
                 function,
                 arguments,
                 responsible,
@@ -252,7 +254,7 @@ impl Hash for Expression {
                 arguments.hash(state);
                 responsible.hash(state);
             }
-            Expression::UseModule {
+            Self::UseModule {
                 current_module,
                 relative_path,
                 responsible,
@@ -261,14 +263,14 @@ impl Hash for Expression {
                 relative_path.hash(state);
                 responsible.hash(state);
             }
-            Expression::Panic {
+            Self::Panic {
                 reason,
                 responsible,
             } => {
                 reason.hash(state);
                 responsible.hash(state);
             }
-            Expression::TraceCallStarts {
+            Self::TraceCallStarts {
                 hir_call,
                 function,
                 arguments,
@@ -279,15 +281,15 @@ impl Hash for Expression {
                 arguments.hash(state);
                 responsible.hash(state);
             }
-            Expression::TraceCallEnds { return_value } => return_value.hash(state),
-            Expression::TraceExpressionEvaluated {
+            Self::TraceCallEnds { return_value } => return_value.hash(state),
+            Self::TraceExpressionEvaluated {
                 hir_expression,
                 value,
             } => {
                 hir_expression.hash(state);
                 value.hash(state);
             }
-            Expression::TraceFoundFuzzableFunction {
+            Self::TraceFoundFuzzableFunction {
                 hir_definition,
                 function,
             } => {
@@ -301,26 +303,26 @@ impl_display_via_richir!(Expression);
 impl ToRichIr for Expression {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         match self {
-            Expression::Int(int) => {
+            Self::Int(int) => {
                 int.build_rich_ir(builder);
             }
-            Expression::Text(text) => {
+            Self::Text(text) => {
                 let range =
                     builder.push(format!(r#""{}""#, text), TokenType::Text, EnumSet::empty());
-                builder.push_reference(text.to_owned(), range);
+                builder.push_reference(text.clone(), range);
             }
-            Expression::Tag { symbol, value } => {
+            Self::Tag { symbol, value } => {
                 let range = builder.push(symbol, TokenType::Symbol, EnumSet::empty());
-                builder.push_reference(ReferenceKey::Symbol(symbol.to_owned()), range);
+                builder.push_reference(ReferenceKey::Symbol(symbol.clone()), range);
                 if let Some(value) = value {
                     builder.push(" ", None, EnumSet::empty());
                     value.build_rich_ir(builder);
                 }
             }
-            Expression::Builtin(builtin) => {
+            Self::Builtin(builtin) => {
                 builtin.build_rich_ir(builder);
             }
-            Expression::List(items) => {
+            Self::List(items) => {
                 builder.push("(", None, EnumSet::empty());
                 builder.push_children(items, ", ");
                 if items.len() <= 1 {
@@ -328,7 +330,7 @@ impl ToRichIr for Expression {
                 }
                 builder.push(")", None, EnumSet::empty());
             }
-            Expression::Struct(fields) => {
+            Self::Struct(fields) => {
                 builder.push("[", None, EnumSet::empty());
                 builder.push_children_custom(
                     fields.iter().collect_vec(),
@@ -341,12 +343,12 @@ impl ToRichIr for Expression {
                 );
                 builder.push("]", None, EnumSet::empty());
             }
-            Expression::Reference(id) => id.build_rich_ir(builder),
-            Expression::HirId(id) => {
+            Self::Reference(id) => id.build_rich_ir(builder),
+            Self::HirId(id) => {
                 let range = builder.push(id.to_string(), TokenType::Symbol, EnumSet::empty());
-                builder.push_reference(id.to_owned(), range);
+                builder.push_reference(id.clone(), range);
             }
-            Expression::Function {
+            Self::Function {
                 // IDs are displayed by the body before the entire expression
                 // assignment.
                 original_hirs: _,
@@ -392,10 +394,10 @@ impl ToRichIr for Expression {
                 });
                 builder.push("}", None, EnumSet::empty());
             }
-            Expression::Parameter => {
+            Self::Parameter => {
                 builder.push("parameter", None, EnumSet::empty());
             }
-            Expression::Call {
+            Self::Call {
                 function,
                 arguments,
                 responsible,
@@ -412,7 +414,7 @@ impl ToRichIr for Expression {
                 responsible.build_rich_ir(builder);
                 builder.push(" is responsible)", None, EnumSet::empty());
             }
-            Expression::UseModule {
+            Self::UseModule {
                 current_module,
                 relative_path,
                 responsible,
@@ -425,7 +427,7 @@ impl ToRichIr for Expression {
                 responsible.build_rich_ir(builder);
                 builder.push(" is responsible)", None, EnumSet::empty());
             }
-            Expression::Panic {
+            Self::Panic {
                 reason,
                 responsible,
             } => {
@@ -435,7 +437,7 @@ impl ToRichIr for Expression {
                 responsible.build_rich_ir(builder);
                 builder.push(" is at fault)", None, EnumSet::empty());
             }
-            Expression::TraceCallStarts {
+            Self::TraceCallStarts {
                 hir_call,
                 function,
                 arguments,
@@ -451,7 +453,7 @@ impl ToRichIr for Expression {
                 hir_call.build_rich_ir(builder);
                 builder.push(")", None, EnumSet::empty());
             }
-            Expression::TraceCallEnds { return_value } => {
+            Self::TraceCallEnds { return_value } => {
                 builder.push(
                     "trace: end of call with return value ",
                     None,
@@ -459,7 +461,7 @@ impl ToRichIr for Expression {
                 );
                 return_value.build_rich_ir(builder);
             }
-            Expression::TraceExpressionEvaluated {
+            Self::TraceExpressionEvaluated {
                 hir_expression,
                 value,
             } => {
@@ -468,7 +470,7 @@ impl ToRichIr for Expression {
                 builder.push(" evaluated to ", None, EnumSet::empty());
                 value.build_rich_ir(builder);
             }
-            Expression::TraceFoundFuzzableFunction {
+            Self::TraceFoundFuzzableFunction {
                 hir_definition,
                 function,
             } => {

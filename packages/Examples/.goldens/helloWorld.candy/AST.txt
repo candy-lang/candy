@@ -1,7 +1,0 @@
-# AST for module Examples:helloWorld
-assignment: identifier $11@"main" := 
-  function (non-fuzzable) { identifier $0@"environment" ->
-    call struct access identifier $2@"environment".$4@"Stdout" with these arguments:
-      text
-        textPart $6@"Hello, world!"
-  }

@@ -44,6 +44,7 @@ impl ToRichIr for ConstantId {
 pub struct Constants(Vec<Constant>);
 
 impl Constants {
+    #[must_use]
     pub fn get(&self, id: ConstantId) -> &Constant {
         &self.0[id.to_usize()]
     }
@@ -67,7 +68,7 @@ impl ToRichIr for Constants {
             builder.push_definition(*id, range);
             builder.push(" = ", None, EnumSet::empty());
             constant.build_rich_ir(builder);
-        })
+        });
     }
 }
 
@@ -93,26 +94,26 @@ impl_display_via_richir!(Constant);
 impl ToRichIr for Constant {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         match self {
-            Constant::Int(int) => {
+            Self::Int(int) => {
                 int.build_rich_ir(builder);
             }
-            Constant::Text(text) => {
+            Self::Text(text) => {
                 let range =
                     builder.push(format!(r#""{}""#, text), TokenType::Text, EnumSet::empty());
-                builder.push_reference(text.to_owned(), range);
+                builder.push_reference(text.clone(), range);
             }
-            Constant::Tag { symbol, value } => {
+            Self::Tag { symbol, value } => {
                 let range = builder.push(symbol, TokenType::Symbol, EnumSet::empty());
-                builder.push_reference(ReferenceKey::Symbol(symbol.to_owned()), range);
+                builder.push_reference(ReferenceKey::Symbol(symbol.clone()), range);
                 if let Some(value) = value {
                     builder.push(" ", None, EnumSet::empty());
                     value.build_rich_ir(builder);
                 }
             }
-            Constant::Builtin(builtin) => {
+            Self::Builtin(builtin) => {
                 builtin.build_rich_ir(builder);
             }
-            Constant::List(items) => {
+            Self::List(items) => {
                 builder.push("(", None, EnumSet::empty());
                 builder.push_children(items, ", ");
                 if items.len() <= 1 {
@@ -120,7 +121,7 @@ impl ToRichIr for Constant {
                 }
                 builder.push(")", None, EnumSet::empty());
             }
-            Constant::Struct(fields) => {
+            Self::Struct(fields) => {
                 builder.push("[", None, EnumSet::empty());
                 builder.push_children_custom(
                     fields.iter().collect_vec(),
@@ -133,11 +134,11 @@ impl ToRichIr for Constant {
                 );
                 builder.push("]", None, EnumSet::empty());
             }
-            Constant::HirId(id) => {
+            Self::HirId(id) => {
                 let range = builder.push(id.to_string(), TokenType::Symbol, EnumSet::empty());
-                builder.push_reference(id.to_owned(), range);
+                builder.push_reference(id.clone(), range);
             }
-            Constant::Function(body_id) => {
+            Self::Function(body_id) => {
                 builder.push("{ ", None, EnumSet::empty());
                 body_id.build_rich_ir(builder);
                 builder.push(" }", None, EnumSet::empty());

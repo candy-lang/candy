@@ -8,6 +8,8 @@
   - compiler/frontend/**/*
 'P: Compiler: Fuzzer':
   - compiler/fuzzer/**/*
+'P: Compiler: Inkwell Backend':
+  - compiler/backend_inkwell/**/*
 'P: Compiler: Language Server':
   - compiler/language_server/**/*
 'P: Compiler: VM':

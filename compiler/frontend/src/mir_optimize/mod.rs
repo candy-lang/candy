@@ -87,6 +87,7 @@ pub type OptimizedMirResult = Result<
     ModuleError,
 >;
 
+#[allow(clippy::needless_pass_by_value)]
 fn optimized_mir(
     db: &dyn OptimizeMir,
     module: Module,
@@ -226,6 +227,7 @@ impl Context<'_> {
     }
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn recover_from_cycle(
     _db: &dyn OptimizeMir,
     cycle: &[String],

@@ -4,35 +4,51 @@ updates:
     directory: /
     schedule:
       interval: daily
+    labels:
+      - 'T: Build'
 
   - package-ecosystem: cargo
     directory: /compiler/cli
     schedule:
       interval: daily
+    labels:
+      - 'T: Build'
   - package-ecosystem: cargo
     directory: /compiler/formatter
     schedule:
       interval: daily
+    labels:
+      - 'T: Build'
   - package-ecosystem: cargo
     directory: /compiler/frontend
     schedule:
       interval: daily
+    labels:
+      - 'T: Build'
   - package-ecosystem: cargo
     directory: /compiler/fuzzer
     schedule:
       interval: daily
+    labels:
+      - 'T: Build'
   - package-ecosystem: cargo
     directory: /compiler/language_server
     schedule:
       interval: daily
+    labels:
+      - 'T: Build'
   - package-ecosystem: cargo
     directory: /compiler/vm
     schedule:
       interval: daily
+    labels:
+      - 'T: Build'
   - package-ecosystem: cargo
     directory: /compiler/vm/fuzz
     schedule:
       interval: daily
+    labels:
+      - 'T: Build'
 
   - package-ecosystem: npm
     directory: /vscode_extension
@@ -54,3 +70,5 @@ updates:
       typescript-eslint:
         patterns:
           - '@typescript-eslint/*'
+    labels:
+      - 'T: Build'

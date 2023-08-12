@@ -15,16 +15,16 @@ use crate::{
     string_to_rcst::ModuleError,
     utils::AdjustCasingOfFirstLetter,
 };
-use std::{ops::Range, sync::Arc};
+use std::{collections::HashMap, ops::Range, sync::Arc};
 
 #[salsa::query_group(CstToAstStorage)]
 pub trait CstToAst: CstDb + RcstToCst {
     #[salsa::transparent]
-    fn ast_to_cst_id(&self, id: ast::Id) -> Option<cst::Id>;
+    fn ast_to_cst_id(&self, id: &ast::Id) -> Option<cst::Id>;
     #[salsa::transparent]
-    fn ast_id_to_span(&self, id: ast::Id) -> Option<Range<Offset>>;
+    fn ast_id_to_span(&self, id: &ast::Id) -> Option<Range<Offset>>;
     #[salsa::transparent]
-    fn ast_id_to_display_span(&self, id: ast::Id) -> Option<Range<Offset>>;
+    fn ast_id_to_display_span(&self, id: &ast::Id) -> Option<Range<Offset>>;
 
     #[salsa::transparent]
     fn cst_to_ast_id(&self, module: Module, id: cst::Id) -> Vec<ast::Id>;
@@ -34,24 +34,24 @@ pub trait CstToAst: CstDb + RcstToCst {
 
 pub type AstResult = Result<(Arc<Vec<Ast>>, Arc<FxHashMap<ast::Id, cst::Id>>), ModuleError>;
 
-fn ast_to_cst_id(db: &dyn CstToAst, id: ast::Id) -> Option<cst::Id> {
+fn ast_to_cst_id(db: &dyn CstToAst, id: &ast::Id) -> Option<cst::Id> {
     let (_, ast_to_cst_id_mapping) = db.ast(id.module.clone()).ok()?;
-    ast_to_cst_id_mapping.get(&id).cloned()
+    ast_to_cst_id_mapping.get(id).copied()
 }
-fn ast_id_to_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<Offset>> {
-    let cst_id = db.ast_to_cst_id(id.clone())?;
-    Some(db.find_cst(id.module, cst_id).data.span)
+fn ast_id_to_span(db: &dyn CstToAst, id: &ast::Id) -> Option<Range<Offset>> {
+    let cst_id = db.ast_to_cst_id(id)?;
+    Some(db.find_cst(id.module.clone(), cst_id).data.span)
 }
-fn ast_id_to_display_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<Offset>> {
-    let cst_id = db.ast_to_cst_id(id.clone())?;
-    Some(db.find_cst(id.module, cst_id).display_span())
+fn ast_id_to_display_span(db: &dyn CstToAst, id: &ast::Id) -> Option<Range<Offset>> {
+    let cst_id = db.ast_to_cst_id(id)?;
+    Some(db.find_cst(id.module.clone(), cst_id).display_span())
 }
 
 fn cst_to_ast_id(db: &dyn CstToAst, module: Module, id: cst::Id) -> Vec<ast::Id> {
     if let Ok((_, ast_to_cst_id_mapping)) = db.ast(module) {
         ast_to_cst_id_mapping
             .iter()
-            .filter_map(|(key, &value)| if value == id { Some(key) } else { None })
+            .filter_map(|(key, value)| if value == &id { Some(key) } else { None })
             .cloned()
             .collect_vec()
     } else {
@@ -83,7 +83,7 @@ struct LoweringContext {
 }
 impl LoweringContext {
     fn new(module: Module) -> Self {
-        LoweringContext {
+        Self {
             module,
             next_id: 0,
             id_mapping: FxHashMap::default(),
@@ -291,7 +291,7 @@ impl LoweringContext {
                             .collect_vec();
                         let all_identifiers = captured_identifiers
                             .iter()
-                            .flat_map(|it| it.keys())
+                            .flat_map(HashMap::keys)
                             .collect::<FxHashSet<_>>();
                         let mut errors = vec![];
                         for identifier in all_identifiers {
@@ -307,12 +307,12 @@ impl LoweringContext {
                             let all_captures = captured_identifiers
                                 .iter()
                                 .flat_map(|it| it.get(identifier).unwrap_or(&empty_vec))
-                                .filter_map(|it| self.id_mapping.get(it).cloned())
+                                .filter_map(|it| self.id_mapping.get(it).copied())
                                 .collect_vec();
                             errors.push(self.create_error(
                                 left,
                                 AstError::OrPatternIsMissingIdentifiers {
-                                    identifier: identifier.to_owned(),
+                                    identifier: identifier.clone(),
                                     number_of_missing_captures:
                                         number_of_missing_captures.try_into().unwrap(),
                                     all_captures,
@@ -424,14 +424,11 @@ impl LoweringContext {
 
                 let mut ast_items = vec![];
                 let mut errors = vec![];
-                if items.len() == 1 && let CstKind::Comma = items[0].kind {
+                if items.len() == 1 && items[0].kind.is_comma() {
                     // Empty list (`(,)`), do nothing.
                 } else {
                     for item in items {
-                        let CstKind::ListItem {
-                            value,
-                            comma,
-                        } = &item.kind else {
+                        let CstKind::ListItem { value, comma } = &item.kind else {
                             errors.push(self.create_error(cst, AstError::ListWithNonListItem));
                             continue;
                         };
@@ -497,20 +494,28 @@ impl LoweringContext {
                                 LoweringType::PatternLiteralPart
                             }
                         };
-                        let key = self.lower_cst(key, key_lowering_type);
+                        let key = if colon.kind.is_colon() {
+                            self.lower_cst(key, key_lowering_type)
+                        } else {
+                            self.create_error_ast(
+                               colon,
+                               vec![self.create_error(colon,
+                               AstError::StructKeyMissesColon,
+                               )],
+                           )
+                        };
 
-                        if !colon.kind.is_colon() {
-                            errors.push(self.create_error(colon, AstError::StructKeyMissesColon));
-                        }
-
-                        let value = self.lower_cst(&value.clone(), lowering_type);
+                        let mut value = self.lower_cst(&value.clone(), lowering_type);
 
                         if let Some(comma) = comma && !comma.kind.is_comma() {
-                            errors.push(self.create_error(
+                            value = self.create_error_ast(
                                 comma,
+                                vec![self.create_error(comma, 
                                 AstError::StructValueMissesComma,
-                            ))
+                                )],
+                            );
                         }
+
                         lowered_fields.push((Some(key), value));
                     } else {
                         // Shorthand syntax, e.g. `[foo]`.
@@ -673,7 +678,7 @@ impl LoweringContext {
                 {
                     let name = match &name.kind {
                         CstKind::Identifier(identifier) => {
-                            self.create_string(name.data.id.to_owned(), identifier.to_owned())
+                            self.create_string(name.data.id, identifier.clone())
                         }
                         CstKind::Error { error, .. } => {
                             return self
@@ -730,8 +735,7 @@ impl LoweringContext {
 
         match key.kind.clone() {
             CstKind::Identifier(identifier) => {
-                let key =
-                    self.create_string(key.data.id.to_owned(), identifier.uppercase_first_letter());
+                let key = self.create_string(key.data.id, identifier.uppercase_first_letter());
                 self.create_ast(
                     id,
                     StructAccess {
@@ -762,11 +766,11 @@ impl LoweringContext {
         }
 
         if let CstKind::Identifier(identifier) = &cst.kind {
-            let identifier = self.create_string(cst.data.id.to_owned(), identifier.clone());
-            self.create_ast(cst.data.id.to_owned(), Identifier(identifier))
+            let identifier = self.create_string(cst.data.id, identifier.clone());
+            self.create_ast(cst.data.id, Identifier(identifier))
         } else {
             let identifier =
-                self.create_string(cst.data.id.to_owned(), format!("<invalid#{index}>"));
+                self.create_string(cst.data.id, format!("<invalid#{index}>"));
             self.create_ast(cst.data.id.to_owned(), Identifier(identifier));
             self.create_error_ast(
                 cst,

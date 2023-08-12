@@ -80,7 +80,7 @@ impl StackTracer {
             let cst_id = if module.package.is_tooling() {
                 None
             } else {
-                db.hir_to_cst_id(hir_id.clone())
+                db.hir_to_cst_id(hir_id)
             };
             let cst = cst_id.map(|id| db.find_cst(module.clone(), id));
             let span = cst.map(|cst| db.range_to_positions(module.clone(), cst.data.span));
