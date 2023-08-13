@@ -322,6 +322,15 @@ impl<'a> ExistingWhitespace<'a> {
         comments_and_whitespace: &[(&Cst, Option<Offset>)],
         config: &TrailingWithIndentationConfig,
     ) -> Width {
+        enum NewlineCount {
+            NoneOrAdopted,
+            Owned(NonZeroUsize),
+        }
+        enum CommentPosition {
+            FirstLine,
+            NextLine(NewlineCount),
+        }
+
         let (previous_width, indentation, ensure_space_before_first_comment, inner_newline_limit) =
             match config {
                 TrailingWithIndentationConfig::Body {
@@ -343,17 +352,7 @@ impl<'a> ExistingWhitespace<'a> {
             };
 
         let mut width = Width::default();
-
-        enum NewlineCount {
-            NoneOrAdopted,
-            Owned(NonZeroUsize),
-        }
-        enum CommentPosition {
-            FirstLine,
-            NextLine(NewlineCount),
-        }
         let mut comment_position = CommentPosition::FirstLine;
-
         let mut last_reusable_whitespace_range = None;
 
         for (item, offset_override) in comments_and_whitespace {
