@@ -172,5 +172,5 @@ pub fn apply_trailing_comma_condition<'a>(
 }
 
 impl SinglelineWidth {
-    const COMMA: SinglelineWidth = SinglelineWidth::new_const(1);
+    const COMMA: Self = Self::new_const(1);
 }

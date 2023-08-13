@@ -219,7 +219,7 @@ impl<'a> ExistingParentheses<'a> {
 }
 
 impl SinglelineWidth {
-    pub const PARENTHESIS: SinglelineWidth = SinglelineWidth::new_const(1);
+    pub const PARENTHESIS: Self = Self::new_const(1);
 }
 
 fn split_whitespace(cst: &Cst) -> UnformattedCst {
