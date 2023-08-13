@@ -346,7 +346,7 @@ impl<'a> ExistingWhitespace<'a> {
                 TrailingWithIndentationConfig::Trailing {
                     previous_width,
                     indentation,
-                } => (previous_width.clone(), *indentation, true, 1),
+                } => (*previous_width, *indentation, true, 1),
             };
 
         let mut width = Width::default();
