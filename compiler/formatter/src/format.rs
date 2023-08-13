@@ -944,6 +944,7 @@ pub(crate) fn format_cst<'a>(
     FormattedCst::new(width, ExistingWhitespace::empty(cst.data.span.end))
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum ReceiverParent {
     BinaryBar,
     Call,
