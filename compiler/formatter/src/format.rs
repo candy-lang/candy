@@ -311,7 +311,7 @@ pub(crate) fn format_cst<'a>(
                         info.with_indent(),
                     )
                 } else {
-                    (width_for_right_side + bar_width, info.to_owned())
+                    (width_for_right_side + bar_width, info.clone())
                 };
                 let right = format_cst(edits, previous_width_for_right, right, &info_for_right);
                 if right_needs_parentheses {
@@ -399,7 +399,7 @@ pub(crate) fn format_cst<'a>(
                     .sum::<Width>();
             let (is_singleline, argument_info, trailing) =
                 if previous_width.last_line_fits(info.indentation, min_width) {
-                    (true, info.to_owned(), TrailingWhitespace::Space)
+                    (true, info.clone(), TrailingWhitespace::Space)
                 } else {
                     (
                         false,
@@ -573,7 +573,7 @@ pub(crate) fn format_cst<'a>(
                 };
                 (previous_width_for_struct, info.with_indent())
             } else {
-                (previous_width, info.to_owned())
+                (previous_width, info.clone())
             };
             let struct_ = format_cst(edits, previous_width_for_struct, struct_, &info_for_struct);
             let mut struct_ = if struct_needs_parentheses {

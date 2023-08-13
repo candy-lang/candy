@@ -160,7 +160,7 @@ pub fn apply_trailing_comma_condition<'a>(
             // This last item can't fit on one line, so we do have to keep the comma.
             format_cst(edits, previous_width, comma, info).split()
         } else {
-            edits.delete(comma.data.span.to_owned());
+            edits.delete(comma.data.span.clone());
             (
                 Width::default(),
                 ExistingWhitespace::empty(comma.data.span.end),

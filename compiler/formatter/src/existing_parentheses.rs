@@ -74,7 +74,7 @@ impl<'a> ExistingParentheses<'a> {
                                 right_parenthesis: UnformattedCst<'a>,
                             ) -> UnformattedCst<'a> {
                                 if left_parenthesis.whitespace.has_comments() {
-                                    edits.delete(right_parenthesis.child.data.span.to_owned());
+                                    edits.delete(right_parenthesis.child.data.span.clone());
                                     right_parenthesis
                                         .whitespace
                                         .into_empty_and_move_comments_to(
@@ -83,7 +83,7 @@ impl<'a> ExistingParentheses<'a> {
                                         );
                                     left_parenthesis
                                 } else {
-                                    edits.delete(left_parenthesis.child.data.span.to_owned());
+                                    edits.delete(left_parenthesis.child.data.span.clone());
                                     left_parenthesis.whitespace.into_empty_trailing(edits);
                                     right_parenthesis
                                 }
@@ -129,13 +129,13 @@ impl<'a> ExistingParentheses<'a> {
                 opening,
                 mut closing,
             } => {
-                edits.delete(opening.child.data.span.to_owned());
+                edits.delete(opening.child.data.span.clone());
                 opening.whitespace.into_empty_trailing(edits);
 
                 let (child_width, child_whitespace) = child.split();
                 child_whitespace.into_empty_and_move_comments_to(edits, &mut closing.whitespace);
 
-                edits.delete(closing.child.data.span.to_owned());
+                edits.delete(closing.child.data.span.clone());
 
                 FormattedCst::new(child_width, closing.whitespace)
             }

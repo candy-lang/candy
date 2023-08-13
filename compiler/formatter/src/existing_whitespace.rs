@@ -124,7 +124,7 @@ impl<'a> ExistingWhitespace<'a> {
                 Cow::Borrowed(whitespace) => {
                     let (first, remaining) = whitespace.split_first().unwrap();
                     *whitespace = remaining;
-                    first.data.span.to_owned()
+                    first.data.span.clone()
                 },
                 Cow::Owned(whitespace) => whitespace.remove(0).data.span,
             };
@@ -224,7 +224,7 @@ impl<'a> ExistingWhitespace<'a> {
         assert!(!self.has_comments());
 
         for whitespace in self.whitespace_ref() {
-            edits.delete(whitespace.data.span.to_owned());
+            edits.delete(whitespace.data.span.clone());
         }
 
         SinglelineWidth::default()
@@ -339,7 +339,7 @@ impl<'a> ExistingWhitespace<'a> {
                 TrailingWithIndentationConfig::Trailing {
                     previous_width,
                     indentation,
-                } => (previous_width.to_owned(), *indentation, true, 1),
+                } => (previous_width.clone(), *indentation, true, 1),
             };
 
         let mut width = Width::default();
@@ -368,7 +368,7 @@ impl<'a> ExistingWhitespace<'a> {
                         if let Some(range) = last_reusable_whitespace_range {
                             edits.delete(range);
                         }
-                        last_reusable_whitespace_range = Some(item.data.span.to_owned());
+                        last_reusable_whitespace_range = Some(item.data.span.clone());
                     }
                 }
                 CstKind::Newline(_) => match &mut comment_position {
@@ -382,7 +382,7 @@ impl<'a> ExistingWhitespace<'a> {
                         let newline_count = if is_adopted {
                             NewlineCount::NoneOrAdopted
                         } else {
-                            edits.change(item.data.span.to_owned(), NEWLINE);
+                            edits.change(item.data.span.clone(), NEWLINE);
                             NewlineCount::Owned(NonZeroUsize::new(1).unwrap())
                         };
 
@@ -411,7 +411,7 @@ impl<'a> ExistingWhitespace<'a> {
                     CommentPosition::NextLine(NewlineCount::Owned(count)) => {
                         // We already encountered and kept at least one newline.
                         if count.get() >= inner_newline_limit {
-                            edits.delete(item.data.span.to_owned());
+                            edits.delete(item.data.span.clone());
                         } else {
                             *count = count.checked_add(1).unwrap();
                             width += Width::NEWLINE;
