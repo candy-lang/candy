@@ -238,18 +238,23 @@ impl Sum for Width {
 #[extension_trait]
 pub impl StringWidth for str {
     fn width(&self) -> Width {
-        if let Some(first_index) = self.find('\n') {
-            let last_index = self.rfind('\n').unwrap();
-            Width::multiline(
-                SinglelineWidth::from(unicode_width::UnicodeWidthStr::width(&self[..first_index])),
-                SinglelineWidth::from(unicode_width::UnicodeWidthStr::width(
-                    &self[last_index + 1..],
-                )),
-            )
-        } else {
-            Width::Singleline(SinglelineWidth::from(
-                unicode_width::UnicodeWidthStr::width(self),
-            ))
-        }
+        self.find('\n').map_or_else(
+            || {
+                Width::Singleline(SinglelineWidth::from(
+                    unicode_width::UnicodeWidthStr::width(self),
+                ))
+            },
+            |first_index| {
+                let last_index = self.rfind('\n').unwrap();
+                Width::multiline(
+                    SinglelineWidth::from(unicode_width::UnicodeWidthStr::width(
+                        &self[..first_index],
+                    )),
+                    SinglelineWidth::from(unicode_width::UnicodeWidthStr::width(
+                        &self[last_index + 1..],
+                    )),
+                )
+            },
+        )
     }
 }
