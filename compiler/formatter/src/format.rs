@@ -743,7 +743,7 @@ pub(crate) fn format_cst<'a>(
                     let last_parameter = parameters.pop();
                     let parameters_width = parameters
                         .into_iter()
-                        .map(|it| it.into_trailing(edits, parameters_trailing.clone()))
+                        .map(|it| it.into_trailing(edits, parameters_trailing))
                         .sum::<Width>();
 
                     let last_parameter_width = last_parameter
@@ -1094,7 +1094,7 @@ enum MaybeSandwichLikeArgument<'a> {
     },
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum PrecedenceCategory {
     /// Literals, parenthesized, struct access, etc.
     High,

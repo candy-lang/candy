@@ -12,7 +12,7 @@ use derive_more::From;
 use itertools::Itertools;
 use std::{borrow::Cow, num::NonZeroUsize};
 
-#[derive(Clone, Debug, From)]
+#[derive(Clone, Copy, Debug, Eq, Hash, From, PartialEq)]
 pub enum TrailingWhitespace {
     None,
     Space,
@@ -29,7 +29,7 @@ pub enum TrailingWithIndentationConfig {
         indentation: Indentation,
     },
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum WhitespacePositionInBody {
     Start,
     Middle,

@@ -6,7 +6,7 @@ use std::{
     ops::{Add, AddAssign},
 };
 
-#[derive(Clone, Copy, Debug, Default, From)]
+#[derive(Clone, Copy, Debug, Default, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Indentation(usize);
 impl Indentation {
     pub fn width(self) -> SinglelineWidth {
@@ -32,7 +32,7 @@ impl Display for Indentation {
 
 // SinglelineWidth
 
-#[derive(Add, Clone, Copy, Debug, Default, Eq, From, Ord, PartialEq, PartialOrd, Sub)]
+#[derive(Add, Clone, Copy, Debug, Default, Eq, From, Hash, Ord, PartialEq, PartialOrd, Sub)]
 pub struct SinglelineWidth(usize);
 impl SinglelineWidth {
     pub const SPACE: SinglelineWidth = SinglelineWidth(1);
@@ -55,7 +55,7 @@ impl Add<Width> for SinglelineWidth {
 
 // Width
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Width {
     Singleline(SinglelineWidth),
     Multiline {

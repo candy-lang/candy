@@ -109,9 +109,9 @@ pub fn format_collection<'a>(
                     item.into_trailing(
                         edits,
                         if last_item_index == Some(index) {
-                            last_item_trailing.clone()
+                            last_item_trailing
                         } else {
-                            item_trailing.clone()
+                            item_trailing
                         },
                     )
                 })
@@ -121,7 +121,7 @@ pub fn format_collection<'a>(
     )
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum TrailingCommaCondition {
     Always,
 
