@@ -28,28 +28,28 @@ pub struct FormattingInfo {
     pub is_single_expression_in_assignment_body: bool,
 }
 impl FormattingInfo {
-    pub fn with_indent(&self) -> Self {
+    pub const fn with_indent(&self) -> Self {
         Self {
             indentation: self.indentation.with_indent(),
             trailing_comma_condition: None,
             is_single_expression_in_assignment_body: false,
         }
     }
-    pub fn with_dedent(&self) -> Self {
+    pub const fn with_dedent(&self) -> Self {
         Self {
             indentation: self.indentation.with_dedent(),
             trailing_comma_condition: None,
             is_single_expression_in_assignment_body: false,
         }
     }
-    pub fn with_trailing_comma_condition(&self, condition: TrailingCommaCondition) -> Self {
+    pub const fn with_trailing_comma_condition(&self, condition: TrailingCommaCondition) -> Self {
         Self {
             indentation: self.indentation,
             trailing_comma_condition: Some(condition),
             is_single_expression_in_assignment_body: false,
         }
     }
-    pub fn for_single_expression_in_assignment_body(&self) -> Self {
+    pub const fn for_single_expression_in_assignment_body(&self) -> Self {
         Self {
             indentation: self.indentation.with_indent(),
             trailing_comma_condition: None,

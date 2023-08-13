@@ -12,14 +12,14 @@ impl Indentation {
     pub fn width(self) -> SinglelineWidth {
         SinglelineWidth::from(self.0 * 2)
     }
-    pub fn is_indented(self) -> bool {
+    pub const fn is_indented(self) -> bool {
         self.0 > 0
     }
 
-    pub fn with_indent(self) -> Self {
+    pub const fn with_indent(self) -> Self {
         Self(self.0 + 1)
     }
-    pub fn with_dedent(self) -> Self {
+    pub const fn with_dedent(self) -> Self {
         Self(self.0 - 1)
     }
 }
@@ -99,13 +99,13 @@ impl Width {
             Self::Multiline { .. } => false,
         }
     }
-    pub fn is_singleline(&self) -> bool {
+    pub const fn is_singleline(&self) -> bool {
         match self {
             Self::Singleline(_) => true,
             Self::Multiline { .. } => false,
         }
     }
-    pub fn first_line_width(&self) -> Option<SinglelineWidth> {
+    pub const fn first_line_width(&self) -> Option<SinglelineWidth> {
         match self {
             Self::Singleline(width) => Some(*width),
             Self::Multiline {
@@ -113,7 +113,7 @@ impl Width {
             } => *first_line_width,
         }
     }
-    pub fn without_first_line_width(&self) -> Self {
+    pub const fn without_first_line_width(&self) -> Self {
         match self {
             Self::Singleline(width) => Self::Singleline(*width),
             Self::Multiline {

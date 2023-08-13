@@ -66,7 +66,7 @@ pub struct ExistingWhitespace<'a> {
     adopted_whitespace_after: Cow<'a, [Cst]>,
 }
 impl<'a> ExistingWhitespace<'a> {
-    pub fn empty(start_offset: Offset) -> Self {
+    pub const fn empty(start_offset: Offset) -> Self {
         Self {
             start_offset,
             adopted_whitespace_before: Cow::Borrowed(&[]),

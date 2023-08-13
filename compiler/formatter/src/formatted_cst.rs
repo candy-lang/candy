@@ -25,7 +25,7 @@ pub struct FormattedCst<'a> {
     pub whitespace: ExistingWhitespace<'a>,
 }
 impl<'a> FormattedCst<'a> {
-    pub fn new(child_width: Width, whitespace: ExistingWhitespace<'a>) -> Self {
+    pub const fn new(child_width: Width, whitespace: ExistingWhitespace<'a>) -> Self {
         Self {
             child_width,
             whitespace,
@@ -33,7 +33,7 @@ impl<'a> FormattedCst<'a> {
     }
 
     #[must_use]
-    pub fn child_width(&self) -> Width {
+    pub const fn child_width(&self) -> Width {
         self.child_width
     }
     #[must_use]

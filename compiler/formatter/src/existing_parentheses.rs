@@ -110,7 +110,7 @@ impl<'a> ExistingParentheses<'a> {
         (cst, parentheses)
     }
 
-    pub fn is_some(&self) -> bool {
+    pub const fn is_some(&self) -> bool {
         match self {
             ExistingParentheses::None { .. } => false,
             ExistingParentheses::Some { .. } => true,
