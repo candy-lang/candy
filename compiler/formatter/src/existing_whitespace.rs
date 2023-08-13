@@ -612,7 +612,7 @@ mod test {
                         previous_width: child_width,
                         indentation,
                     },
-                )
+                );
             }
         };
         assert_eq!(edits.apply(), expected);
