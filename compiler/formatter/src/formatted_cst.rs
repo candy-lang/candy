@@ -10,7 +10,7 @@ pub struct UnformattedCst<'a> {
     pub whitespace: ExistingWhitespace<'a>,
 }
 
-/// When a CST node is formatted, it returns a [FormattedCst] with its own width and whatever
+/// When a CST node is formatted, it returns a [`FormattedCst`] with its own width and whatever
 /// trailing whitespace it contained.
 ///
 /// The parent must later decide what to do with the trailing whitespace and call either of the

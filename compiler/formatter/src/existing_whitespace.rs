@@ -44,7 +44,7 @@ pub const NEWLINE: &str = "\n";
 
 /// Captures the existing trailing whitespace of CST nodes for later formatting.
 ///
-/// The CST node ends at [start_offset], which is also where [whitespace] begins.
+/// The CST node ends at [`start_offset`], which is also where [`whitespace`] begins.
 ///
 /// The three whitespace fields can contain singleline whitespace, linebreaks, and comments.
 ///

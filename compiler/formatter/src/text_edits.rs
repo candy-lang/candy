@@ -20,7 +20,7 @@ impl TextEdit {
 /// inserts have the same position, the order in the array defines the order in which the inserted
 /// strings appear in the resulting text.
 ///
-/// https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textEditArray
+/// <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textEditArray>
 pub struct TextEdits {
     source: String,
 
