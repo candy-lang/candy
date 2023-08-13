@@ -143,11 +143,10 @@ fn split_leading_whitespace(start_offset: Offset, csts: &[Cst]) -> (ExistingWhit
                 | CstKind::Comment { .. },
         )
     });
-    let (leading_whitespace, rest) = if let Some(first_expression_index) = first_expression_index {
-        csts.split_at(first_expression_index)
-    } else {
-        (csts, [].as_slice())
-    };
+    let (leading_whitespace, rest) = first_expression_index.map_or_else(
+        || (csts, [].as_slice()),
+        |first_expression_index| csts.split_at(first_expression_index),
+    );
     let leading_whitespace = ExistingWhitespace::new(start_offset, leading_whitespace);
     (leading_whitespace, rest)
 }
