@@ -7,8 +7,6 @@
 #![warn(clippy::nursery, clippy::pedantic)]
 #![allow(
     clippy::cognitive_complexity,
-    clippy::borrow_interior_mutable_const,
-    clippy::declare_interior_mutable_const,
     clippy::match_same_arms,
     clippy::module_name_repetitions,
     clippy::too_many_lines
