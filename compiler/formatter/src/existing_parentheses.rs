@@ -52,10 +52,11 @@ impl<'a> ExistingParentheses<'a> {
                         trailing_whitespace.push(whitespace);
 
                         let mut whitespace = trailing_whitespace.remove(0);
-                        for trailing_whitespace in trailing_whitespace.drain(..) {
+                        for trailing_whitespace in trailing_whitespace {
                             trailing_whitespace
                                 .into_empty_and_move_comments_to(edits, &mut whitespace);
                         }
+                        trailing_whitespace = vec![];
                         UnformattedCst { child, whitespace }
                     };
 
