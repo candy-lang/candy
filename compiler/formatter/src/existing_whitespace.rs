@@ -92,8 +92,7 @@ impl<'a> ExistingWhitespace<'a> {
         self.whitespace
             .as_ref()
             .last()
-            .map(|it| it.data.span.end)
-            .unwrap_or(self.start_offset)
+            .map_or(self.start_offset, |it| it.data.span.end)
     }
     pub fn is_empty(&self) -> bool {
         self.adopted_whitespace_before.is_empty()
@@ -178,8 +177,7 @@ impl<'a> ExistingWhitespace<'a> {
             let other_end_offset = other
                 .whitespace
                 .last()
-                .map(|it| it.data.span.end)
-                .unwrap_or_else(|| other.start_offset);
+                .map_or(other.start_offset, |it| it.data.span.end);
             if self.start_offset == other_end_offset
                 && other.adopted_whitespace_after.is_empty()
                 && self.adopted_whitespace_before.is_empty()
@@ -535,7 +533,7 @@ where
 {
     let mut result = None;
     for item in iterator {
-        let first = result.map(|(first, _)| first).unwrap_or(item);
+        let first = result.map_or(item, |(first, _)| first);
         result = Some((first, item));
     }
     result

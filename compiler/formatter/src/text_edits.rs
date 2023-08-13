@@ -41,6 +41,7 @@ impl TextEdits {
     pub fn has_edits(&self) -> bool {
         !self.edits.is_empty()
     }
+    #[allow(clippy::map_unwrap_or)]
     pub fn has_edit_at(&self, offset: Offset) -> bool {
         self.edits
             .binary_search_by_key(&offset, |it| it.range.start)

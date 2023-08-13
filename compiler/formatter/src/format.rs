@@ -766,10 +766,10 @@ pub(crate) fn format_cst<'a>(
                     (parameters_width + last_parameter_width, arrow)
                 });
 
-            let body_fallback_offset = parameters_width_and_arrow
-                .as_ref()
-                .map(|(_, arrow)| arrow.whitespace.end_offset())
-                .unwrap_or_else(|| opening_curly_brace.whitespace.end_offset());
+            let body_fallback_offset = parameters_width_and_arrow.as_ref().map_or_else(
+                || opening_curly_brace.whitespace.end_offset(),
+                |(_, arrow)| arrow.whitespace.end_offset(),
+            );
             let body = format_csts(
                 edits,
                 previous_width_for_inner,
