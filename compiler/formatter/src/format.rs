@@ -168,7 +168,7 @@ fn split_leading_whitespace(start_offset: Offset, csts: &[Cst]) -> (ExistingWhit
 /// [`previous_width`] is relevant for the minimum width that is reserved on the first line: E.g.,
 /// when formatting the call within `foo | bar baz`, [`previous_width`] would indicate that a width of
 /// two is reserved in the first line (for the bar and the space that follows it).
-pub(crate) fn format_cst<'a>(
+pub fn format_cst<'a>(
     edits: &mut TextEdits,
     previous_width: Width,
     cst: &'a Cst,
