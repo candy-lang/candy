@@ -142,7 +142,7 @@ impl Heap {
     }
 
     pub fn clear(&mut self) {
-        for object in mem::take(&mut self.objects).iter() {
+        for object in mem::take(&mut self.objects) {
             self.deallocate(HeapData::from(object.0));
         }
         self.handle_refcounts.clear();
