@@ -88,6 +88,7 @@ impl HeapFunction {
         self.content_word_pointer(0)
     }
     pub fn body(self) -> InstructionPointer {
+        #[allow(clippy::cast_possible_truncation)]
         unsafe { *self.body_pointer().as_ref() as usize }.into()
     }
     pub fn set_body(self, body: InstructionPointer) {

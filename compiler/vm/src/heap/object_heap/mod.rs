@@ -93,8 +93,12 @@ impl HeapObject {
         }
     }
     pub fn reference_count(&self) -> Option<usize> {
-        self.reference_count_pointer()
-            .map(|it| unsafe { *it.as_ref() as usize })
+        self.reference_count_pointer().map(|it| {
+            #[allow(clippy::cast_possible_truncation)]
+            unsafe {
+                *it.as_ref() as usize
+            }
+        })
     }
     pub(super) fn set_reference_count(&self, value: usize) {
         let mut pointer = self.reference_count_pointer().unwrap();
