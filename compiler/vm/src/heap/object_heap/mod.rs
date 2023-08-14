@@ -108,7 +108,7 @@ impl HeapObject {
             }
         })
     }
-    pub(super) fn set_reference_count(&self, value: usize) {
+    pub(super) fn set_reference_count(self, value: usize) {
         let mut pointer = self.reference_count_pointer().unwrap();
         unsafe { *pointer.as_mut() = value as u64 }
     }

@@ -44,7 +44,7 @@ impl InlineInt {
     pub fn get(self) -> i64 {
         self.raw_word().get() as i64 >> Self::VALUE_SHIFT
     }
-    pub fn try_get<T: TryFrom<i64>>(&self) -> Option<T> {
+    pub fn try_get<T: TryFrom<i64>>(self) -> Option<T> {
         self.get().try_into().ok()
     }
 
