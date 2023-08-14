@@ -69,7 +69,7 @@ where
     let start = compile_function(
         &mut lir,
         &mut FxHashMap::default(),
-        FxHashSet::from_iter([hir::Id::new(module, vec![])]),
+        &FxHashSet::from_iter([hir::Id::new(module, vec![])]),
         &FxHashSet::default(),
         &[],
         Id::from_usize(0),
@@ -83,7 +83,7 @@ where
 fn compile_function(
     lir: &mut Lir,
     constants: &mut FxHashMap<Id, InlineObject>,
-    original_hirs: FxHashSet<hir::Id>,
+    original_hirs: &FxHashSet<hir::Id>,
     captured: &FxHashSet<Id>,
     parameters: &[Id],
     responsible_parameter: Id,
@@ -253,7 +253,7 @@ impl<'c> LoweringContext<'c> {
                 let instructions = compile_function(
                     self.lir,
                     self.constants,
-                    original_hirs.clone(),
+                    original_hirs,
                     &captured,
                     parameters,
                     *responsible_parameter,
