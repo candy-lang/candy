@@ -53,15 +53,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
-name = "backend_inkwell"
-version = "0.1.0"
-dependencies = [
- "candy_frontend",
- "inkwell",
- "llvm-sys",
-]
-
-[[package]]
 name = "base64"
 version = "0.21.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -107,10 +98,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec8a7b6a70fde80372154c65702f00a0f56f3e1c36abbc6c440484be248856db"
 
 [[package]]
+name = "candy_backend_inkwell"
+version = "0.1.0"
+dependencies = [
+ "candy_frontend",
+ "inkwell",
+ "itertools 0.11.0",
+ "llvm-sys",
+]
+
+[[package]]
 name = "candy_cli"
 version = "0.1.0"
 dependencies = [
- "backend_inkwell",
+ "candy_backend_inkwell",
  "candy_frontend",
  "candy_fuzzer",
  "candy_language_server",
