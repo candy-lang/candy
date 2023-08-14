@@ -167,8 +167,8 @@ impl TryFrom<i64> for InlineInt {
     type Error = ();
 
     fn try_from(value: i64) -> Result<Self, Self::Error> {
-        if InlineInt::fits(value) {
-            Ok(InlineInt::from_unchecked(value))
+        if Self::fits(value) {
+            Ok(Self::from_unchecked(value))
         } else {
             Err(())
         }
@@ -189,6 +189,6 @@ impl_ord_with_symbol_table_via_ord!(InlineInt);
 #[extension_trait]
 pub impl I64BitLength for i64 {
     fn bit_length(self) -> u32 {
-        i64::BITS - self.unsigned_abs().leading_zeros()
+        Self::BITS - self.unsigned_abs().leading_zeros()
     }
 }

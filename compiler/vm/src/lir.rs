@@ -128,39 +128,39 @@ impl Instruction {
     /// this instruction.
     pub fn apply_to_stack(&self, stack: &mut Vec<Id>, result: Id) {
         match self {
-            Instruction::CreateTag { .. } => {
+            Self::CreateTag { .. } => {
                 stack.pop();
                 stack.push(result);
             }
-            Instruction::CreateList { num_items } => {
+            Self::CreateList { num_items } => {
                 stack.pop_multiple(*num_items);
                 stack.push(result);
             }
-            Instruction::CreateStruct { num_fields } => {
+            Self::CreateStruct { num_fields } => {
                 stack.pop_multiple(2 * num_fields); // fields
                 stack.push(result);
             }
-            Instruction::CreateFunction { .. } => {
+            Self::CreateFunction { .. } => {
                 stack.push(result);
             }
-            Instruction::PushConstant(_) => {
+            Self::PushConstant(_) => {
                 stack.push(result);
             }
-            Instruction::PushFromStack(_) => {
+            Self::PushFromStack(_) => {
                 stack.push(result);
             }
-            Instruction::PopMultipleBelowTop(n) => {
+            Self::PopMultipleBelowTop(n) => {
                 let top = stack.pop().unwrap();
                 stack.pop_multiple(*n);
                 stack.push(top);
             }
-            Instruction::Call { num_args } => {
+            Self::Call { num_args } => {
                 stack.pop(); // responsible
                 stack.pop_multiple(*num_args);
                 stack.pop(); // function/builtin
                 stack.push(result); // return value
             }
-            Instruction::TailCall {
+            Self::TailCall {
                 num_locals_to_pop,
                 num_args,
             } => {
@@ -170,29 +170,29 @@ impl Instruction {
                 stack.pop_multiple(*num_locals_to_pop);
                 stack.push(result); // return value
             }
-            Instruction::Return => {
+            Self::Return => {
                 // Only modifies the call stack and the instruction pointer.
                 // Leaves the return value untouched on the stack.
             }
-            Instruction::Panic => {
+            Self::Panic => {
                 stack.pop(); // responsible
                 stack.pop(); // reason
                 stack.push(result);
             }
-            Instruction::TraceCallStarts { num_args } => {
+            Self::TraceCallStarts { num_args } => {
                 stack.pop(); // HIR ID
                 stack.pop(); // responsible
                 stack.pop_multiple(*num_args);
                 stack.pop(); // callee
             }
-            Instruction::TraceCallEnds => {
+            Self::TraceCallEnds => {
                 stack.pop(); // return value
             }
-            Instruction::TraceExpressionEvaluated => {
+            Self::TraceExpressionEvaluated => {
                 stack.pop(); // HIR ID
                 stack.pop(); // value
             }
-            Instruction::TraceFoundFuzzableFunction => {
+            Self::TraceFoundFuzzableFunction => {
                 stack.pop(); // HIR ID
                 stack.pop(); // value
             }
@@ -310,7 +310,7 @@ impl Instruction {
         );
 
         match self {
-            Instruction::CreateTag { symbol_id } => {
+            Self::CreateTag { symbol_id } => {
                 builder.push(" ", None, EnumSet::empty());
                 let symbol_range = builder.push(
                     DisplayWithSymbolTable::to_string(symbol_id, symbol_table),
@@ -322,15 +322,15 @@ impl Instruction {
                     symbol_range,
                 );
             }
-            Instruction::CreateList { num_items } => {
+            Self::CreateList { num_items } => {
                 builder.push(" ", None, EnumSet::empty());
                 builder.push(ToString::to_string(num_items), None, EnumSet::empty());
             }
-            Instruction::CreateStruct { num_fields } => {
+            Self::CreateStruct { num_fields } => {
                 builder.push(" ", None, EnumSet::empty());
                 builder.push(ToString::to_string(num_fields), None, EnumSet::empty());
             }
-            Instruction::CreateFunction {
+            Self::CreateFunction {
                 captured,
                 num_args,
                 body,
@@ -349,7 +349,7 @@ impl Instruction {
                     EnumSet::empty(),
                 );
             }
-            Instruction::PushConstant(constant) => {
+            Self::PushConstant(constant) => {
                 builder.push(" ", None, EnumSet::empty());
                 if let InlineData::Pointer(pointer) = InlineData::from(*constant) {
                     builder.push(
@@ -367,22 +367,22 @@ impl Instruction {
                     EnumSet::empty(),
                 );
             }
-            Instruction::PushFromStack(offset) => {
+            Self::PushFromStack(offset) => {
                 builder.push(" ", None, EnumSet::empty());
                 builder.push(ToString::to_string(offset), None, EnumSet::empty());
             }
-            Instruction::PopMultipleBelowTop(count) => {
+            Self::PopMultipleBelowTop(count) => {
                 builder.push(" ", None, EnumSet::empty());
                 builder.push(ToString::to_string(count), None, EnumSet::empty());
             }
-            Instruction::Call { num_args } => {
+            Self::Call { num_args } => {
                 builder.push(
                     format!(" with {num_args} {}", arguments_plural(*num_args)),
                     None,
                     EnumSet::empty(),
                 );
             }
-            Instruction::TailCall {
+            Self::TailCall {
                 num_locals_to_pop,
                 num_args,
             } => {
@@ -395,18 +395,18 @@ impl Instruction {
                     EnumSet::empty(),
                 );
             }
-            Instruction::Return => {}
-            Instruction::Panic => {}
-            Instruction::TraceCallStarts { num_args } => {
+            Self::Return => {}
+            Self::Panic => {}
+            Self::TraceCallStarts { num_args } => {
                 builder.push(
                     format!(" ({num_args} {})", arguments_plural(*num_args)),
                     None,
                     EnumSet::empty(),
                 );
             }
-            Instruction::TraceCallEnds => {}
-            Instruction::TraceExpressionEvaluated => {}
-            Instruction::TraceFoundFuzzableFunction => {}
+            Self::TraceCallEnds => {}
+            Self::TraceExpressionEvaluated => {}
+            Self::TraceFoundFuzzableFunction => {}
         }
     }
 }

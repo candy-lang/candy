@@ -20,7 +20,7 @@ impl HeapHirId {
         Self(object)
     }
     pub fn create(heap: &mut Heap, is_reference_counted: bool, value: Id) -> Self {
-        let id = HeapHirId(heap.allocate(
+        let id = Self(heap.allocate(
             HeapObject::KIND_HIR_ID,
             is_reference_counted,
             0,

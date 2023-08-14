@@ -70,7 +70,7 @@ impl HeapObject {
         self.0
     }
     #[must_use]
-    pub fn pointer_equals(self, other: HeapObject) -> bool {
+    pub fn pointer_equals(self, other: Self) -> bool {
         self.0 == other.0
     }
     #[must_use]
@@ -155,7 +155,7 @@ impl HeapObject {
     pub fn clone_to_heap_with_mapping(
         self,
         heap: &mut Heap,
-        address_map: &mut FxHashMap<HeapObject, HeapObject>,
+        address_map: &mut FxHashMap<Self, Self>,
     ) -> Self {
         match address_map.entry(self) {
             hash_map::Entry::Occupied(entry) => {
@@ -307,19 +307,19 @@ impl From<HeapObject> for HeapData {
                     header_word & !HeapObject::IS_REFERENCE_COUNTED_MASK,
                     HeapObject::KIND_INT,
                 );
-                HeapData::Int(HeapInt::new_unchecked(object))
+                Self::Int(HeapInt::new_unchecked(object))
             }
-            HeapObject::KIND_LIST => HeapData::List(HeapList::new_unchecked(object)),
-            HeapObject::KIND_STRUCT => HeapData::Struct(HeapStruct::new_unchecked(object)),
-            HeapObject::KIND_TAG => HeapData::Tag(HeapTag::new_unchecked(object)),
-            HeapObject::KIND_TEXT => HeapData::Text(HeapText::new_unchecked(object)),
-            HeapObject::KIND_FUNCTION => HeapData::Function(HeapFunction::new_unchecked(object)),
+            HeapObject::KIND_LIST => Self::List(HeapList::new_unchecked(object)),
+            HeapObject::KIND_STRUCT => Self::Struct(HeapStruct::new_unchecked(object)),
+            HeapObject::KIND_TAG => Self::Tag(HeapTag::new_unchecked(object)),
+            HeapObject::KIND_TEXT => Self::Text(HeapText::new_unchecked(object)),
+            HeapObject::KIND_FUNCTION => Self::Function(HeapFunction::new_unchecked(object)),
             HeapObject::KIND_HIR_ID => {
                 assert_eq!(
                     header_word & !HeapObject::IS_REFERENCE_COUNTED_MASK,
                     HeapObject::KIND_HIR_ID,
                 );
-                HeapData::HirId(HeapHirId::new_unchecked(object))
+                Self::HirId(HeapHirId::new_unchecked(object))
             }
             tag => panic!("Invalid tag: {tag:b}"),
         }
@@ -330,13 +330,13 @@ impl Deref for HeapData {
 
     fn deref(&self) -> &Self::Target {
         match &self {
-            HeapData::Int(int) => int,
-            HeapData::List(list) => list,
-            HeapData::Struct(struct_) => struct_,
-            HeapData::Text(text) => text,
-            HeapData::Tag(tag) => tag,
-            HeapData::Function(function) => function,
-            HeapData::HirId(hir_id) => hir_id,
+            Self::Int(int) => int,
+            Self::List(list) => list,
+            Self::Struct(struct_) => struct_,
+            Self::Text(text) => text,
+            Self::Tag(tag) => tag,
+            Self::Function(function) => function,
+            Self::HirId(hir_id) => hir_id,
         }
     }
 }

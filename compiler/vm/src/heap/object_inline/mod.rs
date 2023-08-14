@@ -163,7 +163,7 @@ pub enum InlineData {
 impl InlineData {
     fn handle_id(&self) -> Option<HandleId> {
         match self {
-            InlineData::Handle(handle) => Some(handle.handle_id()),
+            Self::Handle(handle) => Some(handle.handle_id()),
             _ => None,
         }
     }
@@ -173,11 +173,11 @@ impl From<InlineObject> for InlineData {
     fn from(object: InlineObject) -> Self {
         let value = object.0.get();
         match value & InlineObject::KIND_MASK {
-            InlineObject::KIND_POINTER => InlineData::Pointer(InlinePointer::new_unchecked(object)),
-            InlineObject::KIND_INT => InlineData::Int(InlineInt::new_unchecked(object)),
-            InlineObject::KIND_BUILTIN => InlineData::Builtin(InlineBuiltin::new_unchecked(object)),
-            InlineObject::KIND_TAG => InlineData::Tag(InlineTag::new_unchecked(object)),
-            InlineObject::KIND_HANDLE => InlineData::Handle(InlineHandle::new_unchecked(object)),
+            InlineObject::KIND_POINTER => Self::Pointer(InlinePointer::new_unchecked(object)),
+            InlineObject::KIND_INT => Self::Int(InlineInt::new_unchecked(object)),
+            InlineObject::KIND_BUILTIN => Self::Builtin(InlineBuiltin::new_unchecked(object)),
+            InlineObject::KIND_TAG => Self::Tag(InlineTag::new_unchecked(object)),
+            InlineObject::KIND_HANDLE => Self::Handle(InlineHandle::new_unchecked(object)),
             _ => panic!("Unknown inline value type: {value:016x}"),
         }
     }
@@ -186,22 +186,22 @@ impl From<InlineObject> for InlineData {
 impl Debug for InlineData {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            InlineData::Pointer(value) => Debug::fmt(value, f),
-            InlineData::Int(value) => Debug::fmt(value, f),
-            InlineData::Builtin(value) => Debug::fmt(value, f),
-            InlineData::Tag(value) => Debug::fmt(value, f),
-            InlineData::Handle(value) => Debug::fmt(value, f),
+            Self::Pointer(value) => Debug::fmt(value, f),
+            Self::Int(value) => Debug::fmt(value, f),
+            Self::Builtin(value) => Debug::fmt(value, f),
+            Self::Tag(value) => Debug::fmt(value, f),
+            Self::Handle(value) => Debug::fmt(value, f),
         }
     }
 }
 impl DisplayWithSymbolTable for InlineData {
     fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
         match self {
-            InlineData::Pointer(value) => DisplayWithSymbolTable::fmt(value, f, symbol_table),
-            InlineData::Int(value) => Display::fmt(value, f),
-            InlineData::Builtin(value) => Display::fmt(value, f),
-            InlineData::Tag(value) => DisplayWithSymbolTable::fmt(value, f, symbol_table),
-            InlineData::Handle(value) => Display::fmt(value, f),
+            Self::Pointer(value) => DisplayWithSymbolTable::fmt(value, f, symbol_table),
+            Self::Int(value) => Display::fmt(value, f),
+            Self::Builtin(value) => Display::fmt(value, f),
+            Self::Tag(value) => DisplayWithSymbolTable::fmt(value, f, symbol_table),
+            Self::Handle(value) => Display::fmt(value, f),
         }
     }
 }
@@ -211,11 +211,11 @@ impl Deref for InlineData {
 
     fn deref(&self) -> &Self::Target {
         match self {
-            InlineData::Pointer(value) => value,
-            InlineData::Int(value) => value,
-            InlineData::Builtin(value) => value,
-            InlineData::Tag(value) => value,
-            InlineData::Handle(value) => value,
+            Self::Pointer(value) => value,
+            Self::Int(value) => value,
+            Self::Builtin(value) => value,
+            Self::Tag(value) => value,
+            Self::Handle(value) => value,
         }
     }
 }

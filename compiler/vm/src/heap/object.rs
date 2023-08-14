@@ -47,7 +47,7 @@ pub enum Data {
 impl Data {
     #[must_use]
     pub fn function(&self) -> Option<&Function> {
-        if let Data::Function(function) = self {
+        if let Self::Function(function) = self {
             Some(function)
         } else {
             None
@@ -59,23 +59,23 @@ impl From<InlineObject> for Data {
     fn from(object: InlineObject) -> Self {
         match object.into() {
             InlineData::Pointer(pointer) => pointer.get().into(),
-            InlineData::Int(int) => Data::Int(Int::Inline(int)),
-            InlineData::Builtin(builtin) => Data::Builtin(Builtin(builtin)),
-            InlineData::Tag(symbol_id) => Data::Tag(Tag::Inline(symbol_id)),
-            InlineData::Handle(handle) => Data::Handle(Handle(handle)),
+            InlineData::Int(int) => Self::Int(Int::Inline(int)),
+            InlineData::Builtin(builtin) => Self::Builtin(Builtin(builtin)),
+            InlineData::Tag(symbol_id) => Self::Tag(Tag::Inline(symbol_id)),
+            InlineData::Handle(handle) => Self::Handle(Handle(handle)),
         }
     }
 }
 impl From<HeapObject> for Data {
     fn from(object: HeapObject) -> Self {
         match object.into() {
-            HeapData::Int(int) => Data::Int(Int::Heap(int)),
-            HeapData::List(list) => Data::List(List(list)),
-            HeapData::Struct(struct_) => Data::Struct(Struct(struct_)),
-            HeapData::Tag(tag) => Data::Tag(Tag::Heap(tag)),
-            HeapData::Text(text) => Data::Text(Text(text)),
-            HeapData::Function(function) => Data::Function(Function(function)),
-            HeapData::HirId(hir_id) => Data::HirId(HirId(hir_id)),
+            HeapData::Int(int) => Self::Int(Int::Heap(int)),
+            HeapData::List(list) => Self::List(List(list)),
+            HeapData::Struct(struct_) => Self::Struct(Struct(struct_)),
+            HeapData::Tag(tag) => Self::Tag(Tag::Heap(tag)),
+            HeapData::Text(text) => Self::Text(Text(text)),
+            HeapData::Function(function) => Self::Function(Function(function)),
+            HeapData::HirId(hir_id) => Self::HirId(HirId(hir_id)),
         }
     }
 }
@@ -83,15 +83,15 @@ impl From<HeapObject> for Data {
 impl Debug for Data {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Data::Int(int) => Debug::fmt(int, f),
-            Data::Tag(tag) => Debug::fmt(tag, f),
-            Data::Text(text) => Debug::fmt(text, f),
-            Data::List(list) => Debug::fmt(list, f),
-            Data::Struct(struct_) => Debug::fmt(struct_, f),
-            Data::HirId(hir_id) => Debug::fmt(hir_id, f),
-            Data::Function(function) => Debug::fmt(function, f),
-            Data::Builtin(builtin) => Debug::fmt(builtin, f),
-            Data::Handle(handle) => Debug::fmt(handle, f),
+            Self::Int(int) => Debug::fmt(int, f),
+            Self::Tag(tag) => Debug::fmt(tag, f),
+            Self::Text(text) => Debug::fmt(text, f),
+            Self::List(list) => Debug::fmt(list, f),
+            Self::Struct(struct_) => Debug::fmt(struct_, f),
+            Self::HirId(hir_id) => Debug::fmt(hir_id, f),
+            Self::Function(function) => Debug::fmt(function, f),
+            Self::Builtin(builtin) => Debug::fmt(builtin, f),
+            Self::Handle(handle) => Debug::fmt(handle, f),
         }
     }
 }
@@ -99,15 +99,15 @@ impl Debug for Data {
 impl DisplayWithSymbolTable for Data {
     fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
         match self {
-            Data::Int(int) => DisplayWithSymbolTable::fmt(int, f, symbol_table),
-            Data::Tag(tag) => DisplayWithSymbolTable::fmt(tag, f, symbol_table),
-            Data::Text(text) => DisplayWithSymbolTable::fmt(text, f, symbol_table),
-            Data::List(list) => DisplayWithSymbolTable::fmt(list, f, symbol_table),
-            Data::Struct(struct_) => DisplayWithSymbolTable::fmt(struct_, f, symbol_table),
-            Data::HirId(hir_id) => DisplayWithSymbolTable::fmt(hir_id, f, symbol_table),
-            Data::Function(function) => DisplayWithSymbolTable::fmt(function, f, symbol_table),
-            Data::Builtin(builtin) => DisplayWithSymbolTable::fmt(builtin, f, symbol_table),
-            Data::Handle(handle) => DisplayWithSymbolTable::fmt(handle, f, symbol_table),
+            Self::Int(int) => DisplayWithSymbolTable::fmt(int, f, symbol_table),
+            Self::Tag(tag) => DisplayWithSymbolTable::fmt(tag, f, symbol_table),
+            Self::Text(text) => DisplayWithSymbolTable::fmt(text, f, symbol_table),
+            Self::List(list) => DisplayWithSymbolTable::fmt(list, f, symbol_table),
+            Self::Struct(struct_) => DisplayWithSymbolTable::fmt(struct_, f, symbol_table),
+            Self::HirId(hir_id) => DisplayWithSymbolTable::fmt(hir_id, f, symbol_table),
+            Self::Function(function) => DisplayWithSymbolTable::fmt(function, f, symbol_table),
+            Self::Builtin(builtin) => DisplayWithSymbolTable::fmt(builtin, f, symbol_table),
+            Self::Handle(handle) => DisplayWithSymbolTable::fmt(handle, f, symbol_table),
         }
     }
 }
@@ -115,21 +115,21 @@ impl DisplayWithSymbolTable for Data {
 impl OrdWithSymbolTable for Data {
     fn cmp(&self, symbol_table: &SymbolTable, other: &Self) -> Ordering {
         match (self, other) {
-            (Data::Int(this), Data::Int(other)) => Ord::cmp(this, other),
-            (Data::Tag(this), Data::Tag(other)) => {
+            (Self::Int(this), Self::Int(other)) => Ord::cmp(this, other),
+            (Self::Tag(this), Self::Tag(other)) => {
                 OrdWithSymbolTable::cmp(this, symbol_table, other)
             }
-            (Data::Text(this), Data::Text(other)) => Ord::cmp(this, other),
-            (Data::List(this), Data::List(other)) => {
+            (Self::Text(this), Self::Text(other)) => Ord::cmp(this, other),
+            (Self::List(this), Self::List(other)) => {
                 OrdWithSymbolTable::cmp(this, symbol_table, other)
             }
-            (Data::Struct(this), Data::Struct(other)) => {
+            (Self::Struct(this), Self::Struct(other)) => {
                 OrdWithSymbolTable::cmp(this, symbol_table, other)
             }
-            (Data::HirId(this), Data::HirId(other)) => Ord::cmp(this, other),
-            (Data::Function(this), Data::Function(other)) => Ord::cmp(this, other),
-            (Data::Builtin(this), Data::Builtin(other)) => Ord::cmp(this, other),
-            (Data::Handle(this), Data::Handle(other)) => Ord::cmp(this, other),
+            (Self::HirId(this), Self::HirId(other)) => Ord::cmp(this, other),
+            (Self::Function(this), Self::Function(other)) => Ord::cmp(this, other),
+            (Self::Builtin(this), Self::Builtin(other)) => Ord::cmp(this, other),
+            (Self::Handle(this), Self::Handle(other)) => Ord::cmp(this, other),
             _ => intrinsics::discriminant_value(self).cmp(&intrinsics::discriminant_value(other)),
         }
     }
@@ -173,8 +173,8 @@ impl Int {
     #[must_use]
     pub fn get<'a>(self) -> Cow<'a, BigInt> {
         match self {
-            Int::Inline(int) => Cow::Owned(int.get().into()),
-            Int::Heap(int) => Cow::Borrowed(int.get()),
+            Self::Inline(int) => Cow::Owned(int.get().into()),
+            Self::Heap(int) => Cow::Borrowed(int.get()),
         }
     }
     #[must_use]
@@ -183,8 +183,8 @@ impl Int {
         T: TryFrom<i64> + for<'a> TryFrom<&'a BigInt>,
     {
         match self {
-            Int::Inline(int) => int.try_get(),
-            Int::Heap(int) => int.get().try_into().ok(),
+            Self::Inline(int) => int.try_get(),
+            Self::Heap(int) => int.get().try_into().ok(),
         }
     }
 
@@ -194,23 +194,23 @@ impl Int {
     operator_fn!(int_divide_truncating);
     operator_fn!(remainder);
     #[must_use]
-    pub fn modulo(self, heap: &mut Heap, rhs: Int) -> Self {
+    pub fn modulo(self, heap: &mut Heap, rhs: Self) -> Self {
         match (self, rhs) {
-            (Int::Inline(lhs), Int::Inline(rhs)) => lhs.modulo(heap, rhs),
-            (Int::Heap(on_heap), Int::Inline(inline))
-            | (Int::Inline(inline), Int::Heap(on_heap)) => {
+            (Self::Inline(lhs), Self::Inline(rhs)) => lhs.modulo(heap, rhs),
+            (Self::Heap(on_heap), Self::Inline(inline))
+            | (Self::Inline(inline), Self::Heap(on_heap)) => {
                 on_heap.modulo(heap, &inline.get().into())
             }
-            (Int::Heap(lhs), Int::Heap(rhs)) => lhs.modulo(heap, rhs.get()),
+            (Self::Heap(lhs), Self::Heap(rhs)) => lhs.modulo(heap, rhs.get()),
         }
     }
 
     #[must_use]
-    pub fn compare_to(self, rhs: Int) -> Tag {
+    pub fn compare_to(self, rhs: Self) -> Tag {
         match (self, rhs) {
-            (Int::Inline(lhs), rhs) => lhs.compare_to(rhs),
-            (Int::Heap(lhs), Int::Inline(rhs)) => lhs.compare_to(&rhs.get().into()),
-            (Int::Heap(lhs), Int::Heap(rhs)) => lhs.compare_to(rhs.get()),
+            (Self::Inline(lhs), rhs) => lhs.compare_to(rhs),
+            (Self::Heap(lhs), Self::Inline(rhs)) => lhs.compare_to(&rhs.get().into()),
+            (Self::Heap(lhs), Self::Heap(rhs)) => lhs.compare_to(rhs.get()),
         }
     }
 
@@ -220,8 +220,8 @@ impl Int {
     #[must_use]
     pub fn bit_length(self, heap: &mut Heap) -> Self {
         match self {
-            Int::Inline(int) => int.bit_length().into(),
-            Int::Heap(int) => int.bit_length(heap),
+            Self::Inline(int) => int.bit_length().into(),
+            Self::Heap(int) => int.bit_length(heap),
         }
     }
 
@@ -279,8 +279,8 @@ use {bitwise_fn, operator_fn, shift_fn};
 impl DebugDisplay for Int {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         match self {
-            Int::Inline(int) => DebugDisplay::fmt(int, f, is_debug),
-            Int::Heap(int) => DebugDisplay::fmt(int, f, is_debug),
+            Self::Inline(int) => DebugDisplay::fmt(int, f, is_debug),
+            Self::Heap(int) => DebugDisplay::fmt(int, f, is_debug),
         }
     }
 }
@@ -300,16 +300,16 @@ impl_try_from_heap_object!(Int, "Expected an int.");
 impl Ord for Int {
     fn cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
-            (Int::Inline(this), Int::Inline(other)) => Ord::cmp(this, other),
-            (Int::Inline(_), Int::Heap(other)) => {
+            (Self::Inline(this), Self::Inline(other)) => Ord::cmp(this, other),
+            (Self::Inline(_), Self::Heap(other)) => {
                 if other.get().is_positive() {
                     Ordering::Less
                 } else {
                     Ordering::Greater
                 }
             }
-            (Int::Heap(this), Int::Heap(other)) => Ord::cmp(this, other),
-            (Int::Heap(this), Int::Inline(_)) => {
+            (Self::Heap(this), Self::Heap(other)) => Ord::cmp(this, other),
+            (Self::Heap(this), Self::Inline(_)) => {
                 if this.get().is_positive() {
                     Ordering::Greater
                 } else {
@@ -339,7 +339,7 @@ pub enum Tag {
 impl Tag {
     #[must_use]
     pub fn create(symbol_id: SymbolId) -> Self {
-        Tag::Inline(symbol_id.into())
+        Self::Inline(symbol_id.into())
     }
     #[must_use]
     pub fn create_with_value(
@@ -400,44 +400,44 @@ impl Tag {
     #[must_use]
     pub fn symbol_id(&self) -> SymbolId {
         match self {
-            Tag::Inline(tag) => tag.get(),
-            Tag::Heap(tag) => tag.symbol_id(),
+            Self::Inline(tag) => tag.get(),
+            Self::Heap(tag) => tag.symbol_id(),
         }
     }
     #[must_use]
     pub fn has_value(&self) -> bool {
         match self {
-            Tag::Inline(_) => false,
-            Tag::Heap(_) => true,
+            Self::Inline(_) => false,
+            Self::Heap(_) => true,
         }
     }
     #[must_use]
     pub fn value(&self) -> Option<InlineObject> {
         match self {
-            Tag::Inline(_) => None,
-            Tag::Heap(tag) => Some(tag.value()),
+            Self::Inline(_) => None,
+            Self::Heap(tag) => Some(tag.value()),
         }
     }
 
     #[must_use]
-    pub fn without_value(self) -> Tag {
-        Tag::create(self.symbol_id())
+    pub fn without_value(self) -> Self {
+        Self::create(self.symbol_id())
     }
 }
 
 impl Debug for Tag {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Tag::Inline(tag) => Debug::fmt(tag, f),
-            Tag::Heap(tag) => Debug::fmt(tag, f),
+            Self::Inline(tag) => Debug::fmt(tag, f),
+            Self::Heap(tag) => Debug::fmt(tag, f),
         }
     }
 }
 impl DisplayWithSymbolTable for Tag {
     fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
         match self {
-            Tag::Inline(tag) => DisplayWithSymbolTable::fmt(tag, f, symbol_table),
-            Tag::Heap(tag) => DisplayWithSymbolTable::fmt(tag, f, symbol_table),
+            Self::Inline(tag) => DisplayWithSymbolTable::fmt(tag, f, symbol_table),
+            Self::Heap(tag) => DisplayWithSymbolTable::fmt(tag, f, symbol_table),
         }
     }
 }
@@ -498,8 +498,8 @@ impl Text {
     #[must_use]
     pub fn create_from_utf8(heap: &mut Heap, is_reference_counted: bool, bytes: &[u8]) -> Tag {
         let result = str::from_utf8(bytes)
-            .map(|it| Text::create(heap, is_reference_counted, it).into())
-            .map_err(|_| Text::create(heap, is_reference_counted, "Invalid UTF-8.").into());
+            .map(|it| Self::create(heap, is_reference_counted, it).into())
+            .map_err(|_| Self::create(heap, is_reference_counted, "Invalid UTF-8.").into());
         Tag::create_result(heap, is_reference_counted, result)
     }
 }
@@ -588,7 +588,7 @@ pub struct HirId(HeapHirId);
 
 impl HirId {
     #[must_use]
-    pub fn create(heap: &mut Heap, is_reference_counted: bool, id: Id) -> HirId {
+    pub fn create(heap: &mut Heap, is_reference_counted: bool, id: Id) -> Self {
         HeapHirId::create(heap, is_reference_counted, id).into()
     }
 }

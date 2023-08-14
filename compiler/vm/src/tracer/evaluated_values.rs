@@ -11,7 +11,7 @@ pub struct EvaluatedValuesTracer {
 impl EvaluatedValuesTracer {
     #[must_use]
     pub fn new(module: Module) -> Self {
-        EvaluatedValuesTracer {
+        Self {
             module,
             evaluated_values: FxHashMap::default(),
         }

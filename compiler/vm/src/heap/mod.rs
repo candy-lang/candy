@@ -103,7 +103,7 @@ impl Heap {
         }
     }
 
-    pub fn adopt(&mut self, mut other: Heap) {
+    pub fn adopt(&mut self, mut other: Self) {
         self.objects.extend(mem::take(&mut other.objects));
         for (handle_id, refcount) in mem::take(&mut other.handle_refcounts) {
             *self.handle_refcounts.entry(handle_id).or_default() += refcount;
@@ -126,8 +126,8 @@ impl Heap {
     // We do not confuse this with the `std::Clone::clone` method.
     #[allow(clippy::should_implement_trait)]
     #[must_use]
-    pub fn clone(&self) -> (Heap, FxHashMap<HeapObject, HeapObject>) {
-        let mut cloned = Heap {
+    pub fn clone(&self) -> (Self, FxHashMap<HeapObject, HeapObject>) {
+        let mut cloned = Self {
             objects: FxHashSet::default(),
             handle_id_generator: self.handle_id_generator.clone(),
             handle_refcounts: self.handle_refcounts.clone(),
