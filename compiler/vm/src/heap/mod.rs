@@ -157,14 +157,12 @@ impl Debug for Heap {
             writeln!(
                 f,
                 "  {object:p}{}: {object:?}",
-                if let Some(reference_count) = object.reference_count() {
-                    format!(
+                object
+                    .reference_count()
+                    .map_or_else(String::new, |reference_count| format!(
                         " ({reference_count} {})",
                         if reference_count == 1 { "ref" } else { "refs" },
-                    )
-                } else {
-                    String::new()
-                },
+                    )),
             )?;
         }
         write!(f, "}}")

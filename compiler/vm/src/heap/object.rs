@@ -357,10 +357,10 @@ impl Tag {
         symbol_id: SymbolId,
         value: impl Into<Option<InlineObject>>,
     ) -> Self {
-        match value.into() {
-            Some(value) => Self::create_with_value(heap, is_reference_counted, symbol_id, value),
-            None => Self::create(symbol_id),
-        }
+        value.into().map_or_else(
+            || Self::create(symbol_id),
+            |value| Self::create_with_value(heap, is_reference_counted, symbol_id, value),
+        )
     }
     #[must_use]
     pub fn create_nothing() -> Self {
