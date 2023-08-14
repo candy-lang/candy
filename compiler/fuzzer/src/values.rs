@@ -161,7 +161,7 @@ impl InlineObjectGeneration for InlineObject {
         match self.into() {
             Data::Int(int) => match int {
                 Int::Inline(int) => int.get().bit_length() as usize,
-                Int::Heap(int) => int.get().bits() as usize,
+                Int::Heap(int) => int.get().bits().try_into().unwrap_or(usize::MAX),
             },
             Data::Text(text) => text.byte_len() + 1,
             Data::Tag(tag) => {
