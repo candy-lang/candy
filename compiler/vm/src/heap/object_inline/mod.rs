@@ -55,9 +55,11 @@ impl InlineObject {
     pub const KIND_TAG: u64 = 0b011;
     pub const KIND_HANDLE: u64 = 0b100;
 
+    #[must_use]
     pub fn new(value: NonZeroU64) -> Self {
         Self(value)
     }
+    #[must_use]
     pub fn raw_word(self) -> NonZeroU64 {
         self.0
     }

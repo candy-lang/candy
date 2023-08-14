@@ -110,6 +110,7 @@ impl Heap {
         }
     }
 
+    #[must_use]
     pub fn objects(&self) -> &FxHashSet<ObjectInHeap> {
         &self.objects
     }
@@ -117,12 +118,14 @@ impl Heap {
         self.objects.iter().map(|it| **it)
     }
 
+    #[must_use]
     pub fn known_handles(&self) -> impl IntoIterator<Item = HandleId> + '_ {
         self.handle_refcounts.keys().copied()
     }
 
     // We do not confuse this with the `std::Clone::clone` method.
     #[allow(clippy::should_implement_trait)]
+    #[must_use]
     pub fn clone(&self) -> (Heap, FxHashMap<HeapObject, HeapObject>) {
         let mut cloned = Heap {
             objects: FxHashSet::default(),
@@ -132,7 +135,7 @@ impl Heap {
 
         let mut mapping = FxHashMap::default();
         for object in &self.objects {
-            object.clone_to_heap_with_mapping(&mut cloned, &mut mapping);
+            _ = object.clone_to_heap_with_mapping(&mut cloned, &mut mapping);
         }
 
         (cloned, mapping)

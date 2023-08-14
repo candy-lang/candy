@@ -60,28 +60,35 @@ impl HeapObject {
     pub const IS_REFERENCE_COUNTED_SHIFT: usize = 3;
     pub const IS_REFERENCE_COUNTED_MASK: u64 = 0b1 << Self::IS_REFERENCE_COUNTED_SHIFT;
 
+    #[must_use]
     pub fn new(address: NonNull<u64>) -> Self {
         Self(address)
     }
 
+    #[must_use]
     pub fn address(self) -> NonNull<u64> {
         self.0
     }
+    #[must_use]
     pub fn pointer_equals(self, other: HeapObject) -> bool {
         self.0 == other.0
     }
+    #[must_use]
     pub fn unsafe_get_word(self, offset: usize) -> u64 {
         unsafe { *self.word_pointer(offset).as_ref() }
     }
+    #[must_use]
     pub fn word_pointer(self, offset: usize) -> NonNull<u64> {
         self.0
             .map_addr(|it| it.checked_add(offset * Self::WORD_SIZE).unwrap())
     }
+    #[must_use]
     pub fn header_word(self) -> u64 {
         self.unsafe_get_word(0)
     }
 
     // Reference Counting
+    #[must_use]
     pub(super) fn is_reference_counted(self) -> bool {
         self.header_word() & Self::IS_REFERENCE_COUNTED_MASK != 0
     }
@@ -92,6 +99,7 @@ impl HeapObject {
             None
         }
     }
+    #[must_use]
     pub fn reference_count(&self) -> Option<usize> {
         self.reference_count_pointer().map(|it| {
             #[allow(clippy::cast_possible_truncation)]
@@ -168,6 +176,7 @@ impl HeapObject {
     }
 
     // Content
+    #[must_use]
     pub fn content_word_pointer(self, offset: usize) -> NonNull<u64> {
         let offset = if self.is_reference_counted() {
             offset + 2
@@ -176,6 +185,7 @@ impl HeapObject {
         };
         self.word_pointer(offset)
     }
+    #[must_use]
     pub fn unsafe_get_content_word(self, offset: usize) -> u64 {
         unsafe { *self.content_word_pointer(offset).as_ref() }
     }

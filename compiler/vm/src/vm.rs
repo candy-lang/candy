@@ -93,18 +93,23 @@ where
         Self::for_function(lir, Heap::default(), function, &[], responsible, tracer)
     }
 
+    #[must_use]
     pub fn lir(&self) -> &L {
         &self.inner.lir
     }
+    #[must_use]
     pub fn tracer(&self) -> &T {
         &self.inner.tracer
     }
+    #[must_use]
     pub fn next_instruction(&self) -> Option<InstructionPointer> {
         self.inner.state.next_instruction
     }
+    #[must_use]
     pub fn call_stack(&self) -> &[InstructionPointer] {
         &self.inner.state.call_stack
     }
+    #[must_use]
     pub fn heap(&self) -> &Heap {
         &self.inner.state.heap
     }
@@ -116,12 +121,14 @@ pub struct VmHandleCall<L: Borrow<Lir>, T: Tracer> {
     pub call: CallHandle,
     vm: Vm<L, T>,
 }
+#[must_use]
 pub struct VmFinished<T: Tracer> {
     pub heap: Heap,
     pub tracer: T,
     pub result: Result<InlineObject, Panic>,
 }
 
+#[must_use]
 pub enum StateAfterRun<L: Borrow<Lir>, T: Tracer> {
     Running(Vm<L, T>),
     CallingHandle(VmHandleCall<L, T>),
@@ -201,6 +208,7 @@ where
     }
 }
 
+#[must_use]
 pub enum StateAfterRunForever<L: Borrow<Lir>, T: Tracer> {
     CallingHandle(VmHandleCall<L, T>),
     Finished(VmFinished<T>),
@@ -228,6 +236,7 @@ where
     }
 }
 
+#[must_use]
 pub enum StateAfterRunWithoutHandles<L: Borrow<Lir>, T: Tracer> {
     Running(Vm<L, T>),
     Finished(VmFinished<T>),

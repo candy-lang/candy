@@ -9,6 +9,7 @@ pub struct EvaluatedValuesTracer {
     evaluated_values: FxHashMap<Id, InlineObject>,
 }
 impl EvaluatedValuesTracer {
+    #[must_use]
     pub fn new(module: Module) -> Self {
         EvaluatedValuesTracer {
             module,
@@ -16,6 +17,7 @@ impl EvaluatedValuesTracer {
         }
     }
 
+    #[must_use]
     pub fn values(&self) -> &FxHashMap<Id, InlineObject> {
         &self.evaluated_values
     }

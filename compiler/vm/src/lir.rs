@@ -212,9 +212,11 @@ impl StackExt for Vec<Id> {
 }
 
 impl Lir {
+    #[must_use]
     pub fn functions_behind(&self, ip: InstructionPointer) -> &FxHashSet<hir::Id> {
         &self.origins[*ip]
     }
+    #[must_use]
     pub fn range_of_function(&self, function: &hir::Id) -> Range<InstructionPointer> {
         let start = self
             .origins

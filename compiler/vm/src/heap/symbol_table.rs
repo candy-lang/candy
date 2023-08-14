@@ -13,9 +13,11 @@ pub struct SymbolTable {
 }
 
 impl SymbolTable {
+    #[must_use]
     pub fn get(&self, id: SymbolId) -> &str {
         &self.symbols[id.0]
     }
+    #[must_use]
     pub fn find_or_add(&mut self, symbol: impl Into<Cow<str>>) -> SymbolId {
         let symbol: Cow<str> = symbol.into();
         if let Some(index) = self.symbols.iter().position(|it| it == symbol.as_ref()) {
@@ -26,15 +28,18 @@ impl SymbolTable {
         id
     }
 
+    #[must_use]
     pub fn symbols(&self) -> &[String] {
         &self.symbols
     }
+    #[must_use]
     pub fn ids_and_symbols(&self) -> impl Iterator<Item = (SymbolId, &str)> {
         self.symbols
             .iter()
             .enumerate()
             .map(|(index, it)| (SymbolId(index), it.as_str()))
     }
+    #[must_use]
     pub fn choose(&self, rng: &mut impl Rng) -> SymbolId {
         SymbolId(rng.gen_range(0..self.symbols.len()))
     }
@@ -102,6 +107,7 @@ impl SymbolId {
     pub const TEXT: SymbolId = SymbolId(16);
     pub const TRUE: SymbolId = SymbolId(17);
 
+    #[must_use]
     pub fn value(self) -> usize {
         self.0
     }

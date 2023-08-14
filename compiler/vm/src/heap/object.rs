@@ -45,6 +45,7 @@ pub enum Data {
     Handle(Handle),
 }
 impl Data {
+    #[must_use]
     pub fn function(&self) -> Option<&Function> {
         if let Data::Function(function) = self {
             Some(function)
@@ -144,6 +145,7 @@ pub enum Int {
 }
 
 impl Int {
+    #[must_use]
     pub fn create<T>(heap: &mut Heap, is_reference_counted: bool, value: T) -> Self
     where
         T: Copy + TryInto<i64> + Into<BigInt>,
@@ -157,6 +159,7 @@ impl Int {
                 Into::into,
             )
     }
+    #[must_use]
     pub fn create_from_bigint(heap: &mut Heap, is_reference_counted: bool, value: BigInt) -> Self {
         i64::try_from(&value)
             .map_err(|_| ())
@@ -167,12 +170,14 @@ impl Int {
             )
     }
 
+    #[must_use]
     pub fn get<'a>(self) -> Cow<'a, BigInt> {
         match self {
             Int::Inline(int) => Cow::Owned(int.get().into()),
             Int::Heap(int) => Cow::Borrowed(int.get()),
         }
     }
+    #[must_use]
     pub fn try_get<T>(self) -> Option<T>
     where
         T: TryFrom<i64> + for<'a> TryFrom<&'a BigInt>,
@@ -200,6 +205,7 @@ impl Int {
         }
     }
 
+    #[must_use]
     pub fn compare_to(self, rhs: Int) -> Tag {
         match (self, rhs) {
             (Int::Inline(lhs), rhs) => lhs.compare_to(rhs),
@@ -331,9 +337,11 @@ pub enum Tag {
 }
 
 impl Tag {
+    #[must_use]
     pub fn create(symbol_id: SymbolId) -> Self {
         Tag::Inline(symbol_id.into())
     }
+    #[must_use]
     pub fn create_with_value(
         heap: &mut Heap,
         is_reference_counted: bool,
@@ -342,6 +350,7 @@ impl Tag {
     ) -> Self {
         HeapTag::create(heap, is_reference_counted, symbol_id, value).into()
     }
+    #[must_use]
     pub fn create_with_value_option(
         heap: &mut Heap,
         is_reference_counted: bool,
@@ -353,9 +362,11 @@ impl Tag {
             None => Self::create(symbol_id),
         }
     }
+    #[must_use]
     pub fn create_nothing() -> Self {
         Self::create(SymbolId::NOTHING)
     }
+    #[must_use]
     pub fn create_bool(value: bool) -> Self {
         let symbol_id = if value {
             SymbolId::TRUE
@@ -364,6 +375,7 @@ impl Tag {
         };
         Self::create(symbol_id)
     }
+    #[must_use]
     pub fn create_ordering(value: Ordering) -> Self {
         let value = match value {
             Ordering::Less => SymbolId::LESS,
@@ -372,6 +384,7 @@ impl Tag {
         };
         Self::create(value)
     }
+    #[must_use]
     pub fn create_result(
         heap: &mut Heap,
         is_reference_counted: bool,
@@ -384,18 +397,21 @@ impl Tag {
         Self::create_with_value(heap, is_reference_counted, symbol, value)
     }
 
+    #[must_use]
     pub fn symbol_id(&self) -> SymbolId {
         match self {
             Tag::Inline(tag) => tag.get(),
             Tag::Heap(tag) => tag.symbol_id(),
         }
     }
+    #[must_use]
     pub fn has_value(&self) -> bool {
         match self {
             Tag::Inline(_) => false,
             Tag::Heap(_) => true,
         }
     }
+    #[must_use]
     pub fn value(&self) -> Option<InlineObject> {
         match self {
             Tag::Inline(_) => None,
@@ -475,9 +491,11 @@ impl TryFrom<Data> for bool {
 pub struct Text(HeapText);
 
 impl Text {
+    #[must_use]
     pub fn create(heap: &mut Heap, is_reference_counted: bool, value: &str) -> Self {
         HeapText::create(heap, is_reference_counted, value).into()
     }
+    #[must_use]
     pub fn create_from_utf8(heap: &mut Heap, is_reference_counted: bool, bytes: &[u8]) -> Tag {
         let result = str::from_utf8(bytes)
             .map(|it| Text::create(heap, is_reference_counted, it).into())
@@ -497,6 +515,7 @@ impl_ord_with_symbol_table_via_ord!(Text);
 pub struct List(HeapList);
 
 impl List {
+    #[must_use]
     pub fn create(heap: &mut Heap, is_reference_counted: bool, items: &[InlineObject]) -> Self {
         HeapList::create(heap, is_reference_counted, items).into()
     }
@@ -512,6 +531,7 @@ impl_try_from_heap_object!(List, "Expected a list.");
 pub struct Struct(HeapStruct);
 
 impl Struct {
+    #[must_use]
     pub fn create(
         heap: &mut Heap,
         is_reference_counted: bool,
@@ -519,6 +539,7 @@ impl Struct {
     ) -> Self {
         HeapStruct::create(heap, is_reference_counted, fields).into()
     }
+    #[must_use]
     pub fn create_with_symbol_keys(
         heap: &mut Heap,
         is_reference_counted: bool,
@@ -542,6 +563,7 @@ impl_try_from_heap_object!(Struct, "Expected a struct.");
 pub struct Function(HeapFunction);
 
 impl Function {
+    #[must_use]
     pub fn create(
         heap: &mut Heap,
         is_reference_counted: bool,
@@ -565,6 +587,7 @@ impl_ord_with_symbol_table_via_ord!(Function);
 pub struct HirId(HeapHirId);
 
 impl HirId {
+    #[must_use]
     pub fn create(heap: &mut Heap, is_reference_counted: bool, id: Id) -> HirId {
         HeapHirId::create(heap, is_reference_counted, id).into()
     }
@@ -581,6 +604,7 @@ impl_ord_with_symbol_table_via_ord!(HirId);
 pub struct Builtin(InlineBuiltin);
 
 impl Builtin {
+    #[must_use]
     pub fn create(builtin: BuiltinFunction) -> Self {
         InlineBuiltin::from(builtin).into()
     }
@@ -595,10 +619,12 @@ impl_ord_with_symbol_table_via_ord!(Builtin);
 pub struct Handle(InlineHandle);
 
 impl Handle {
+    #[must_use]
     pub fn new(heap: &mut Heap, argument_count: usize) -> Self {
         let id = heap.handle_id_generator.generate();
         Self::create(heap, id, argument_count)
     }
+    #[must_use]
     pub fn create(heap: &mut Heap, handle_id: HandleId, argument_count: usize) -> Self {
         InlineHandle::create(heap, handle_id, argument_count).into()
     }
