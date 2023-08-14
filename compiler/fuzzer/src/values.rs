@@ -164,7 +164,12 @@ impl InlineObjectGeneration for InlineObject {
                 Int::Heap(int) => int.get().bits() as usize,
             },
             Data::Text(text) => text.byte_len() + 1,
-            Data::Tag(tag) => 1 + tag.value().map(|it| it.complexity()).unwrap_or_default(),
+            Data::Tag(tag) => {
+                1 + tag
+                    .value()
+                    .map(InlineObjectGeneration::complexity)
+                    .unwrap_or_default()
+            }
             Data::List(list) => {
                 list.items()
                     .iter()
