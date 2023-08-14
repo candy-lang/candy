@@ -17,6 +17,6 @@ impl Tracer for FuzzablesFinder {
         function: Function,
     ) {
         function.dup();
-        self.fuzzables.insert(definition.get().to_owned(), function);
+        self.fuzzables.insert(definition.get().clone(), function);
     }
 }
