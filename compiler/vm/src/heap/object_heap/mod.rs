@@ -247,8 +247,8 @@ pub trait HeapObjectTrait: Copy + Into<HeapObject> {
         address_map: &mut FxHashMap<HeapObject, HeapObject>,
     );
 
-    /// Calls [Heap::drop] for all referenced [HeapObject]s and drops allocated
-    /// Rust objects owned by this object.
+    /// Calls [`Heap::drop`] for all referenced [`HeapObject`]s and drops
+    /// allocated Rust objects owned by this object.
     ///
     /// This method is called by [free] prior to deallocating the object's
     /// memory.
