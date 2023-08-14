@@ -27,7 +27,7 @@ pub impl InputGeneration for Input {
             );
             arguments.push(address);
         }
-        Input { heap, arguments }
+        Self { heap, arguments }
     }
     fn mutate(&mut self, rng: &mut ThreadRng, symbol_table: &SymbolTable) {
         let mut heap = self.heap.borrow_mut();

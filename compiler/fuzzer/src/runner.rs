@@ -52,15 +52,15 @@ impl RunResult {
     #[must_use]
     pub fn to_string(&self, symbol_table: &SymbolTable, call: &str) -> String {
         match self {
-            RunResult::Timeout => format!("{call} timed out."),
-            RunResult::Done { return_value, .. } => format!(
+            Self::Timeout => format!("{call} timed out."),
+            Self::Done { return_value, .. } => format!(
                 "{call} returned {}.",
                 DisplayWithSymbolTable::to_string(return_value, symbol_table),
             ),
-            RunResult::NeedsUnfulfilled { reason } => {
+            Self::NeedsUnfulfilled { reason } => {
                 format!("{call} panicked and it's our fault: {reason}")
             }
-            RunResult::Panicked { panic, .. } => {
+            Self::Panicked { panic, .. } => {
                 format!("{call} panicked internally: {}", panic.reason)
             }
         }
@@ -91,7 +91,7 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
             StackTracer::default(),
         );
 
-        Runner {
+        Self {
             lir,
             vm: Some(vm),
             input,
