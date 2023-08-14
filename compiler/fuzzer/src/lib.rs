@@ -59,7 +59,7 @@ where
     for (id, function) in fuzzables {
         info!("Fuzzing {id}.");
         let mut fuzzer = Fuzzer::new(lir.clone(), function, id.clone());
-        fuzzer.run(100000);
+        fuzzer.run(100_000);
 
         match fuzzer.into_status() {
             Status::StillFuzzing { total_coverage, .. } => {
