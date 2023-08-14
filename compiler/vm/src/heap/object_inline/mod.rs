@@ -86,9 +86,11 @@ impl InlineObject {
     }
 
     // Cloning
+    #[must_use]
     pub fn clone_to_heap(self, heap: &mut Heap) -> Self {
         self.clone_to_heap_with_mapping(heap, &mut FxHashMap::default())
     }
+    #[must_use]
     pub fn clone_to_heap_with_mapping(
         self,
         heap: &mut Heap,
@@ -139,6 +141,7 @@ impl TryFrom<InlineObject> for HeapObject {
 
 #[enum_dispatch]
 pub trait InlineObjectTrait: Copy + Debug + DisplayWithSymbolTable + Eq + Hash {
+    #[must_use]
     fn clone_to_heap_with_mapping(
         self,
         heap: &mut Heap,

@@ -139,9 +139,11 @@ impl HeapObject {
     }
 
     // Cloning
+    #[must_use]
     pub fn clone_to_heap(self, heap: &mut Heap) -> Self {
         self.clone_to_heap_with_mapping(heap, &mut FxHashMap::default())
     }
+    #[must_use]
     pub fn clone_to_heap_with_mapping(
         self,
         heap: &mut Heap,

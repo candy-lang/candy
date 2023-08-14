@@ -188,6 +188,7 @@ impl Int {
     operator_fn!(multiply);
     operator_fn!(int_divide_truncating);
     operator_fn!(remainder);
+    #[must_use]
     pub fn modulo(self, heap: &mut Heap, rhs: Int) -> Self {
         match (self, rhs) {
             (Int::Inline(lhs), Int::Inline(rhs)) => lhs.modulo(heap, rhs),
@@ -210,6 +211,7 @@ impl Int {
     shift_fn!(shift_left, shl);
     shift_fn!(shift_right, shr);
 
+    #[must_use]
     pub fn bit_length(self, heap: &mut Heap) -> Self {
         match self {
             Int::Inline(int) => int.bit_length().into(),
@@ -224,6 +226,7 @@ impl Int {
 
 macro_rules! bitwise_fn {
     ($name:ident) => {
+        #[must_use]
         pub fn $name(self, heap: &mut Heap, rhs: Int) -> Self {
             match (self, rhs) {
                 (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(rhs).into(),
@@ -238,6 +241,7 @@ macro_rules! bitwise_fn {
 }
 macro_rules! operator_fn {
     ($name:ident) => {
+        #[must_use]
         pub fn $name(self, heap: &mut Heap, rhs: Int) -> Self {
             match (self, rhs) {
                 (Int::Inline(lhs), _) => lhs.$name(heap, rhs),
@@ -249,6 +253,7 @@ macro_rules! operator_fn {
 }
 macro_rules! shift_fn {
     ($name:ident, $function:ident) => {
+        #[must_use]
         pub fn $name(self, heap: &mut Heap, rhs: Int) -> Self {
             match (self, rhs) {
                 (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(heap, rhs),
@@ -398,6 +403,7 @@ impl Tag {
         }
     }
 
+    #[must_use]
     pub fn without_value(self) -> Tag {
         Tag::create(self.symbol_id())
     }
