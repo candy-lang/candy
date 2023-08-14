@@ -36,11 +36,13 @@ impl InlineInt {
             value,
             "Integer is too large.",
         );
+        #[allow(clippy::cast_sign_loss)]
         let header_word = InlineObject::KIND_INT | ((value as u64) << Self::VALUE_SHIFT);
         let header_word = unsafe { NonZeroU64::new_unchecked(header_word) };
         Self(InlineObject(header_word))
     }
 
+    #[allow(clippy::cast_possible_wrap)]
     pub fn get(self) -> i64 {
         self.raw_word().get() as i64 >> Self::VALUE_SHIFT
     }
