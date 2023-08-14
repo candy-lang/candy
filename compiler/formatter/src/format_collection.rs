@@ -109,9 +109,9 @@ pub fn format_collection<'a>(
                     item.into_trailing(
                         edits,
                         if last_item_index == Some(index) {
-                            last_item_trailing.clone()
+                            last_item_trailing
                         } else {
-                            item_trailing.clone()
+                            item_trailing
                         },
                     )
                 })
@@ -121,7 +121,7 @@ pub fn format_collection<'a>(
     )
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum TrailingCommaCondition {
     Always,
 
@@ -160,7 +160,7 @@ pub fn apply_trailing_comma_condition<'a>(
             // This last item can't fit on one line, so we do have to keep the comma.
             format_cst(edits, previous_width, comma, info).split()
         } else {
-            edits.delete(comma.data.span.to_owned());
+            edits.delete(comma.data.span.clone());
             (
                 Width::default(),
                 ExistingWhitespace::empty(comma.data.span.end),
@@ -172,5 +172,5 @@ pub fn apply_trailing_comma_condition<'a>(
 }
 
 impl SinglelineWidth {
-    const COMMA: SinglelineWidth = SinglelineWidth::new_const(1);
+    const COMMA: Self = Self::new_const(1);
 }
