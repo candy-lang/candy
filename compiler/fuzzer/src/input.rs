@@ -43,6 +43,6 @@ impl PartialEq for Input {
 }
 impl Hash for Input {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.arguments.hash(state)
+        self.arguments.hash(state);
     }
 }

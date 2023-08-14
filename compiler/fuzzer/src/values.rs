@@ -188,7 +188,7 @@ fn mutate_string(rng: &mut ThreadRng, heap: &mut Heap, mut string: String) -> Te
     if rng.gen_bool(0.5) && !string.is_empty() {
         let start = string.floor_char_boundary(rng.gen_range(0..=string.len()));
         let end = string.floor_char_boundary(start + rng.gen_range(0..=(string.len() - start)));
-        string.replace_range(start..end, "")
+        string.replace_range(start..end, "");
     } else {
         let insertion_point = string.floor_char_boundary(rng.gen_range(0..=string.len()));
         let string_to_insert = (0..rng.gen_range(0..10))
@@ -199,7 +199,7 @@ fn mutate_string(rng: &mut ThreadRng, heap: &mut Heap, mut string: String) -> Te
                     .unwrap()
             })
             .join("");
-        string.insert_str(insertion_point, &string_to_insert)
+        string.insert_str(insertion_point, &string_to_insert);
     }
     Text::create(heap, true, &string)
 }

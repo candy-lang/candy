@@ -144,7 +144,7 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
             }
 
             if self.num_instructions > MAX_INSTRUCTIONS {
-                self.result = Some(RunResult::Timeout)
+                self.result = Some(RunResult::Timeout);
             }
         }
     }
