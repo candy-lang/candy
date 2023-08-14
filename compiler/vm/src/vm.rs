@@ -25,7 +25,7 @@ struct VmInner<L: Borrow<Lir>, T: Tracer> {
     state: MachineState,
     tracer: T,
 }
-pub(super) struct MachineState {
+pub struct MachineState {
     pub next_instruction: Option<InstructionPointer>,
     pub data_stack: Vec<InlineObject>,
     pub call_stack: Vec<InstructionPointer>,
