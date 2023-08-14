@@ -62,6 +62,7 @@ impl<'a> RangeCoverage<'a> {
             .count()
     }
 
+    #[allow(clippy::cast_precision_loss)]
     pub fn relative_coverage(&self) -> f64 {
         assert!(!self.coverage.is_empty());
         let num_covered = self.coverage.count_ones();

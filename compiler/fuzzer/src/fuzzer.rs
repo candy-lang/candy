@@ -149,6 +149,7 @@ impl Fuzzer {
                 let function_coverage = total_coverage.in_range(&function_range);
 
                 // We favor small inputs with good code coverage.
+                #[allow(clippy::cast_precision_loss)]
                 let score = {
                     let complexity = runner.input.complexity() as Score;
                     let new_function_coverage = runner.coverage.in_range(&function_range);
