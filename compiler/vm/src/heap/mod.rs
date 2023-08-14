@@ -48,7 +48,7 @@ impl Heap {
             0,
         );
         let header_word = kind_bits
-            | ((is_reference_counted as u64) << HeapObject::IS_REFERENCE_COUNTED_SHIFT)
+            | (u64::from(is_reference_counted) << HeapObject::IS_REFERENCE_COUNTED_SHIFT)
             | remaining_header_word;
         self.allocate_raw(header_word, content_size)
     }
