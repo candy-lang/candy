@@ -153,9 +153,12 @@ impl Fuzzer {
                 let score = {
                     let complexity = runner.input.complexity() as Score;
                     let new_function_coverage = runner.coverage.in_range(&function_range);
-                    let score: Score = (1.5 * runner.num_instructions as f64)
-                        + (0.1 * new_function_coverage.improvement_on(&function_coverage) as f64)
-                        - 0.4 * complexity;
+                    let coverage_improvement =
+                        new_function_coverage.improvement_on(&function_coverage);
+
+                    let score = (runner.num_instructions as f64)
+                        .mul_add(1.5, 0.1 * coverage_improvement as f64);
+                    let score: Score = complexity.mul_add(-0.4, score);
                     score.clamp(0.1, Score::MAX)
                 };
                 self.pool.add(runner.input, result, score);
