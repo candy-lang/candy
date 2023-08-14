@@ -152,14 +152,14 @@ impl Int {
             .try_into()
             .map_err(|_| ())
             .and_then(InlineInt::try_from)
-            .map(|it| it.into())
+            .map(Into::into)
             .unwrap_or_else(|_| HeapInt::create(heap, is_reference_counted, value.into()).into())
     }
     pub fn create_from_bigint(heap: &mut Heap, is_reference_counted: bool, value: BigInt) -> Self {
         i64::try_from(&value)
             .map_err(|_| ())
             .and_then(InlineInt::try_from)
-            .map(|it| it.into())
+            .map(Into::into)
             .unwrap_or_else(|_| HeapInt::create(heap, is_reference_counted, value).into())
     }
 

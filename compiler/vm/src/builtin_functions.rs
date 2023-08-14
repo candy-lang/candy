@@ -434,7 +434,7 @@ impl Heap {
                 .map(|&it| {
                     Int::try_from(it)
                         .ok()
-                        .and_then(|it| it.try_get())
+                        .and_then(Int::try_get)
                         .ok_or_else(|| {
                             format!(
                                 "Value is not a byte: {}.",

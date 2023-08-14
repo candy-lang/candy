@@ -157,7 +157,7 @@ impl TryFrom<&BigInt> for InlineInt {
     fn try_from(value: &BigInt) -> Result<Self, Self::Error> {
         i64::try_from(value)
             .map_err(|_| ())
-            .and_then(|value| value.try_into())
+            .and_then(TryInto::try_into)
     }
 }
 impl TryFrom<i64> for InlineInt {

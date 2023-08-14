@@ -390,11 +390,6 @@ impl StackExt for Vec<Id> {
         self.iter()
             .rev()
             .position(|it| *it == id)
-            .unwrap_or_else(|| {
-                panic!(
-                    "Id {id} not found in stack: {}",
-                    self.iter().map(|it| it.to_string()).join(" "),
-                )
-            })
+            .unwrap_or_else(|| panic!("Id {id} not found in stack: {}", self.iter().join(" "),))
     }
 }
