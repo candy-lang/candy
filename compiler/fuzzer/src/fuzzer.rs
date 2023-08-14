@@ -129,14 +129,13 @@ impl Fuzzer {
 
         let call_string = format!(
             "`{} {}`",
-            self.function_id
-                .keys
-                .last()
-                .map(|function_name| DisplayWithSymbolTable::to_string(
+            self.function_id.keys.last().map_or_else(
+                || "{…}".to_string(),
+                |function_name| DisplayWithSymbolTable::to_string(
                     function_name,
                     &runner.lir.symbol_table
-                ))
-                .unwrap_or_else(|| "{…}".to_string()),
+                )
+            ),
             runner.input.to_string(&runner.lir.symbol_table),
         );
         debug!(
