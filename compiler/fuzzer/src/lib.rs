@@ -1,4 +1,6 @@
 #![feature(let_chains, round_char_boundary)]
+#![warn(clippy::nursery, clippy::pedantic)]
+#![allow(clippy::missing_panics_doc, clippy::module_name_repetitions)]
 
 mod coverage;
 mod fuzzer;
