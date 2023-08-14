@@ -27,7 +27,7 @@ impl MachineState {
     ) -> InstructionResult {
         let result = span!(Level::TRACE, "Running builtin").in_scope(|| match &builtin_function {
             BuiltinFunction::Equals => self.heap.equals(args),
-            BuiltinFunction::FunctionRun => self.heap.function_run(args, responsible),
+            BuiltinFunction::FunctionRun => Heap::function_run(args, responsible),
             BuiltinFunction::GetArgumentCount => self.heap.get_argument_count(args),
             BuiltinFunction::IfElse => self.heap.if_else(args, responsible),
             BuiltinFunction::IntAdd => self.heap.int_add(args),
@@ -162,7 +162,7 @@ impl Heap {
         })
     }
 
-    fn function_run(&mut self, args: &[InlineObject], responsible: HirId) -> BuiltinResult {
+    fn function_run(args: &[InlineObject], responsible: HirId) -> BuiltinResult {
         unpack!(self, args, |function: Any| {
             match **function {
                 Data::Builtin(_) => {
