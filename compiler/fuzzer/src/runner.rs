@@ -25,6 +25,7 @@ pub struct Runner<L: Borrow<Lir>> {
     pub result: Option<RunResult>,
 }
 
+#[must_use]
 pub enum RunResult {
     /// Executing the function with the input took more than `MAX_INSTRUCTIONS`.
     Timeout,
@@ -48,6 +49,7 @@ pub enum RunResult {
     },
 }
 impl RunResult {
+    #[must_use]
     pub fn to_string(&self, symbol_table: &SymbolTable, call: &str) -> String {
         match self {
             RunResult::Timeout => format!("{call} timed out."),

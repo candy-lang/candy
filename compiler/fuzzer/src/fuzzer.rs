@@ -41,6 +41,7 @@ pub enum Status {
 }
 
 impl Fuzzer {
+    #[must_use]
     pub fn new(lir: Rc<Lir>, function: Function, function_id: Id) -> Self {
         let mut heap = Heap::default();
         let function: Function = Data::from(function.clone_to_heap(&mut heap))
@@ -65,17 +66,21 @@ impl Fuzzer {
         }
     }
 
+    #[must_use]
     pub fn lir(&self) -> Rc<Lir> {
         self.lir.clone()
     }
 
+    #[must_use]
     pub fn status(&self) -> &Status {
         self.status.as_ref().unwrap()
     }
+    #[must_use]
     pub fn into_status(self) -> Status {
         self.status.unwrap()
     }
 
+    #[must_use]
     pub fn input_pool(&self) -> &InputPool {
         &self.pool
     }
