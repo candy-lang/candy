@@ -188,6 +188,6 @@ impl PartialEq for ObjectInHeap {
 
 impl Hash for ObjectInHeap {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.address().hash(state)
+        self.0.address().hash(state);
     }
 }

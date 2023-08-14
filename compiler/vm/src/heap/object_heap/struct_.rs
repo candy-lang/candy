@@ -261,7 +261,7 @@ impl HeapObjectTrait for HeapStruct {
                 self.content_word_pointer(0).as_ptr(),
                 clone.content_word_pointer(0).as_ptr(),
                 self.len(),
-            )
+            );
         };
         for (index, &key) in self.keys().iter().enumerate() {
             clone.unsafe_set_content_word(

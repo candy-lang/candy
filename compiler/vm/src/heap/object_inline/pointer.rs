@@ -45,7 +45,7 @@ impl PartialEq for InlinePointer {
 
 impl Hash for InlinePointer {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get().hash(state)
+        self.get().hash(state);
     }
 }
 

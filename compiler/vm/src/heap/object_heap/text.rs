@@ -132,7 +132,7 @@ impl HeapObjectTrait for HeapText {
                 self.text_pointer().as_ptr(),
                 clone.text_pointer().as_ptr(),
                 self.byte_len(),
-            )
+            );
         };
     }
 

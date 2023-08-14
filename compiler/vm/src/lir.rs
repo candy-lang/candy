@@ -244,7 +244,7 @@ impl ToRichIr for Lir {
             );
             builder.push(": ", None, EnumSet::empty());
             let symbol_range = builder.push(symbol, TokenType::Symbol, EnumSet::empty());
-            builder.push_reference(ReferenceKey::Symbol(symbol.to_string()), symbol_range)
+            builder.push_reference(ReferenceKey::Symbol(symbol.to_string()), symbol_range);
         }
         builder.push_newline();
         builder.push_newline();

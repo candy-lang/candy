@@ -70,7 +70,7 @@ impl PartialEq for InlineHandle {
 }
 impl Hash for InlineHandle {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.handle_id().hash(state)
+        self.handle_id().hash(state);
     }
 }
 impl Ord for InlineHandle {

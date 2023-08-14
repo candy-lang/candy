@@ -72,7 +72,7 @@ impl InlineObject {
         };
 
         if let Ok(it) = HeapObject::try_from(self) {
-            it.dup_by(amount)
+            it.dup_by(amount);
         }
     }
     pub fn drop(self, heap: &mut Heap) {
@@ -81,7 +81,7 @@ impl InlineObject {
         };
 
         if let Ok(it) = HeapObject::try_from(self) {
-            it.drop(heap)
+            it.drop(heap);
         }
     }
 
@@ -117,7 +117,7 @@ impl PartialEq for InlineObject {
 }
 impl Hash for InlineObject {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        InlineData::from(*self).hash(state)
+        InlineData::from(*self).hash(state);
     }
 }
 impl OrdWithSymbolTable for InlineObject {
