@@ -28,6 +28,7 @@ pub fn compile_lir<Db>(
 where
     Db: CstDb + OptimizeMir,
 {
+    #[allow(clippy::map_unwrap_or)]
     let (mir, errors) = db
         .optimized_mir(module.clone(), tracing)
         .map(|(mir, _, errors)| (mir, errors))

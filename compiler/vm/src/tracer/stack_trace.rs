@@ -86,11 +86,13 @@ impl StackTracer {
             let span = cst.map(|cst| db.range_to_positions(module.clone(), cst.data.span));
             let caller_location_string = format!(
                 "{hir_id} {}",
-                span.map(|it| format!(
-                    "{}:{} – {}:{}",
-                    it.start.line, it.start.character, it.end.line, it.end.character,
-                ))
-                .unwrap_or_else(|| "<no location>".to_owned()),
+                span.map_or_else(
+                    || "<no location>".to_owned(),
+                    |it| format!(
+                        "{}:{} – {}:{}",
+                        it.start.line, it.start.character, it.end.line, it.end.character,
+                    )
+                ),
             );
             let call_string = format!(
                 "{} {}",

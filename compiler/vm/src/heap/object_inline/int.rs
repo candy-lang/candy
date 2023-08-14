@@ -56,6 +56,7 @@ impl InlineInt {
     pub fn modulo(self, heap: &mut Heap, rhs: Self) -> Int {
         let lhs = self.get();
         let rhs = rhs.get();
+        #[allow(clippy::map_unwrap_or)]
         lhs.checked_rem_euclid(rhs)
             .map(|it| Int::create(heap, true, it))
             .unwrap_or_else(|| {
