@@ -81,7 +81,7 @@ impl Fuzzer {
     }
 
     #[must_use]
-    pub fn input_pool(&self) -> &InputPool {
+    pub const fn input_pool(&self) -> &InputPool {
         &self.pool
     }
 
