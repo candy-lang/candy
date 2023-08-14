@@ -32,7 +32,6 @@ impl SymbolTable {
     pub fn symbols(&self) -> &[String] {
         &self.symbols
     }
-    #[must_use]
     pub fn ids_and_symbols(&self) -> impl Iterator<Item = (SymbolId, &str)> {
         self.symbols
             .iter()
@@ -88,27 +87,27 @@ impl SymbolId {
     //
     // Sorted alphabetically and must be kept in sync with
     // `SymbolTable::default()`.
-    pub const BUILTIN: SymbolId = SymbolId(0);
-    pub const EQUAL: SymbolId = SymbolId(1);
-    pub const ERROR: SymbolId = SymbolId(2);
-    pub const FALSE: SymbolId = SymbolId(3);
-    pub const FUNCTION: SymbolId = SymbolId(4);
-    pub const GREATER: SymbolId = SymbolId(5);
-    pub const INT: SymbolId = SymbolId(6);
-    pub const LESS: SymbolId = SymbolId(7);
-    pub const LIST: SymbolId = SymbolId(8);
-    pub const MAIN: SymbolId = SymbolId(9);
-    pub const NOTHING: SymbolId = SymbolId(10);
-    pub const OK: SymbolId = SymbolId(11);
-    pub const STDIN: SymbolId = SymbolId(12);
-    pub const STDOUT: SymbolId = SymbolId(13);
-    pub const STRUCT: SymbolId = SymbolId(14);
-    pub const TAG: SymbolId = SymbolId(15);
-    pub const TEXT: SymbolId = SymbolId(16);
-    pub const TRUE: SymbolId = SymbolId(17);
+    pub const BUILTIN: Self = Self(0);
+    pub const EQUAL: Self = Self(1);
+    pub const ERROR: Self = Self(2);
+    pub const FALSE: Self = Self(3);
+    pub const FUNCTION: Self = Self(4);
+    pub const GREATER: Self = Self(5);
+    pub const INT: Self = Self(6);
+    pub const LESS: Self = Self(7);
+    pub const LIST: Self = Self(8);
+    pub const MAIN: Self = Self(9);
+    pub const NOTHING: Self = Self(10);
+    pub const OK: Self = Self(11);
+    pub const STDIN: Self = Self(12);
+    pub const STDOUT: Self = Self(13);
+    pub const STRUCT: Self = Self(14);
+    pub const TAG: Self = Self(15);
+    pub const TEXT: Self = Self(16);
+    pub const TRUE: Self = Self(17);
 
     #[must_use]
-    pub fn value(self) -> usize {
+    pub const fn value(self) -> usize {
         self.0
     }
 }
@@ -145,8 +144,8 @@ pub trait OrdWithSymbolTable {
 impl<T: OrdWithSymbolTable> OrdWithSymbolTable for Option<T> {
     fn cmp(&self, symbol_table: &SymbolTable, other: &Self) -> Ordering {
         match (self, other) {
-            (Option::None, Option::None) => Ordering::Equal,
-            (Option::Some(this), Option::Some(other)) => this.cmp(symbol_table, other),
+            (None, None) => Ordering::Equal,
+            (Some(this), Some(other)) => this.cmp(symbol_table, other),
             _ => intrinsics::discriminant_value(self).cmp(&intrinsics::discriminant_value(other)),
         }
     }
