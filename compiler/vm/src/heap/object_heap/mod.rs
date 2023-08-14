@@ -298,6 +298,7 @@ impl DisplayWithSymbolTable for HeapData {
     }
 }
 
+#[allow(clippy::fallible_impl_from)]
 impl From<HeapObject> for HeapData {
     fn from(object: HeapObject) -> Self {
         let header_word = object.header_word();

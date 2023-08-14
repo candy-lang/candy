@@ -169,6 +169,7 @@ impl InlineData {
     }
 }
 
+#[allow(clippy::fallible_impl_from)]
 impl From<InlineObject> for InlineData {
     fn from(object: InlineObject) -> Self {
         let value = object.0.get();
