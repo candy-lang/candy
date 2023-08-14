@@ -153,6 +153,7 @@ macro_rules! unpack_and_later_drop {
     };
 }
 
+#[allow(clippy::enum_glob_use)]
 use SuccessfulBehavior::*;
 
 impl Heap {
