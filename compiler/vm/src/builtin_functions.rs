@@ -84,7 +84,7 @@ impl MachineState {
             Ok(CallHandle(call)) => InstructionResult::CallHandle(call),
             Err(reason) => InstructionResult::Panic(Panic {
                 reason,
-                responsible: responsible.get().to_owned(),
+                responsible: responsible.get().clone(),
             }),
         }
     }

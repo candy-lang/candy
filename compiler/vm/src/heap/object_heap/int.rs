@@ -105,7 +105,7 @@ impl HeapObjectTrait for HeapInt {
         _address_map: &mut FxHashMap<HeapObject, HeapObject>,
     ) {
         let clone = Self(clone);
-        let value = self.get().to_owned();
+        let value = self.get().clone();
         unsafe { ptr::write(clone.int_pointer().as_ptr(), value) };
     }
 

@@ -28,6 +28,6 @@ impl Tracer for EvaluatedValuesTracer {
         }
 
         value.dup(heap);
-        self.evaluated_values.insert(id.to_owned(), value);
+        self.evaluated_values.insert(id.clone(), value);
     }
 }
