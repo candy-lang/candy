@@ -11,6 +11,15 @@
     strict_provenance,
     try_blocks
 )]
+#![warn(clippy::nursery, clippy::pedantic)]
+#![allow(
+    clippy::match_same_arms,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::module_name_repetitions,
+    clippy::similar_names,
+    clippy::too_many_lines
+)]
 
 use crate::heap::{DisplayWithSymbolTable, Struct, SymbolId, Tag};
 use heap::{Function, InlineObject, SymbolTable};
