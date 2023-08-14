@@ -22,7 +22,7 @@ pub struct InlineBuiltin(InlineObject);
 impl InlineBuiltin {
     const INDEX_SHIFT: usize = 3;
 
-    pub fn new_unchecked(object: InlineObject) -> Self {
+    pub const fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
     }
 

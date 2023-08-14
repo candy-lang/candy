@@ -20,7 +20,7 @@ pub struct HeapText(HeapObject);
 impl HeapText {
     const BYTE_LEN_SHIFT: usize = 4;
 
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
     pub fn create(heap: &mut Heap, is_reference_counted: bool, value: &str) -> Self {

@@ -18,7 +18,7 @@ use std::{
 pub struct HeapInt(HeapObject);
 
 impl HeapInt {
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
     pub fn create(heap: &mut Heap, is_reference_counted: bool, value: BigInt) -> Self {

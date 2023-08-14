@@ -111,7 +111,7 @@ impl Heap {
     }
 
     #[must_use]
-    pub fn objects(&self) -> &FxHashSet<ObjectInHeap> {
+    pub const fn objects(&self) -> &FxHashSet<ObjectInHeap> {
         &self.objects
     }
     pub fn iter(&self) -> impl Iterator<Item = HeapObject> + '_ {

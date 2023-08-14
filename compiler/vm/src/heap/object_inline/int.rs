@@ -23,11 +23,11 @@ pub struct InlineInt(InlineObject);
 impl InlineInt {
     const VALUE_SHIFT: usize = 3;
 
-    pub fn new_unchecked(object: InlineObject) -> Self {
+    pub const fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
     }
 
-    pub fn fits(value: i64) -> bool {
+    pub const fn fits(value: i64) -> bool {
         (value << Self::VALUE_SHIFT) >> Self::VALUE_SHIFT == value
     }
     pub fn from_unchecked(value: i64) -> Self {

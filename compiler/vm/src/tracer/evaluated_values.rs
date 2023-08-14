@@ -18,7 +18,7 @@ impl EvaluatedValuesTracer {
     }
 
     #[must_use]
-    pub fn values(&self) -> &FxHashMap<Id, InlineObject> {
+    pub const fn values(&self) -> &FxHashMap<Id, InlineObject> {
         &self.evaluated_values
     }
 }

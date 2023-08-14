@@ -8,11 +8,11 @@ use std::{
 pub struct InstructionPointer(usize);
 impl InstructionPointer {
     #[must_use]
-    pub fn null_pointer() -> Self {
+    pub const fn null_pointer() -> Self {
         Self(0)
     }
     #[must_use]
-    pub fn next(&self) -> Self {
+    pub const fn next(&self) -> Self {
         Self(self.0 + 1)
     }
 }

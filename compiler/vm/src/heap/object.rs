@@ -46,7 +46,7 @@ pub enum Data {
 }
 impl Data {
     #[must_use]
-    pub fn function(&self) -> Option<&Function> {
+    pub const fn function(&self) -> Option<&Function> {
         if let Self::Function(function) = self {
             Some(function)
         } else {
@@ -405,7 +405,7 @@ impl Tag {
         }
     }
     #[must_use]
-    pub fn has_value(&self) -> bool {
+    pub const fn has_value(&self) -> bool {
         match self {
             Self::Inline(_) => false,
             Self::Heap(_) => true,

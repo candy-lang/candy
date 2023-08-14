@@ -16,7 +16,7 @@ use std::{
 pub struct HeapHirId(HeapObject);
 
 impl HeapHirId {
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
     pub fn create(heap: &mut Heap, is_reference_counted: bool, value: Id) -> Self {

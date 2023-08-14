@@ -19,7 +19,7 @@ pub struct InlineTag(InlineObject);
 impl InlineTag {
     const SYMBOL_ID_SHIFT: usize = 3;
 
-    pub fn new_unchecked(object: InlineObject) -> Self {
+    pub const fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
     }
 

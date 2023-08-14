@@ -61,12 +61,12 @@ impl HeapObject {
     pub const IS_REFERENCE_COUNTED_MASK: u64 = 0b1 << Self::IS_REFERENCE_COUNTED_SHIFT;
 
     #[must_use]
-    pub fn new(address: NonNull<u64>) -> Self {
+    pub const fn new(address: NonNull<u64>) -> Self {
         Self(address)
     }
 
     #[must_use]
-    pub fn address(self) -> NonNull<u64> {
+    pub const fn address(self) -> NonNull<u64> {
         self.0
     }
     #[must_use]

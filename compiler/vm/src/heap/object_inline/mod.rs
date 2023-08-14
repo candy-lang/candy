@@ -56,11 +56,11 @@ impl InlineObject {
     pub const KIND_HANDLE: u64 = 0b100;
 
     #[must_use]
-    pub fn new(value: NonZeroU64) -> Self {
+    pub const fn new(value: NonZeroU64) -> Self {
         Self(value)
     }
     #[must_use]
-    pub fn raw_word(self) -> NonZeroU64 {
+    pub const fn raw_word(self) -> NonZeroU64 {
         self.0
     }
 

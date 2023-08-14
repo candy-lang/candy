@@ -411,7 +411,7 @@ impl Instruction {
     }
 }
 
-fn arguments_plural(num_args: usize) -> &'static str {
+const fn arguments_plural(num_args: usize) -> &'static str {
     if num_args == 1 {
         "argument"
     } else {
