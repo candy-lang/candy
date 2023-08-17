@@ -310,7 +310,7 @@ impl DefaultSymbols {
             .ok()
             .map(|it| symbols[it])
     }
-    fn all_symbols(&self) -> [Text; 18] {
+    pub fn all_symbols(&self) -> [Text; 18] {
         [
             self.builtin,
             self.equal,
