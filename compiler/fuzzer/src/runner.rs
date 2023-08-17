@@ -113,7 +113,7 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
                     ..
                 }) => {
                     self.result = Some(RunResult::Done { heap, return_value });
-                    break;
+                    return;
                 }
                 StateAfterRunWithoutHandles::Finished(VmFinished {
                     heap,
@@ -131,7 +131,7 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
                             panic,
                         }
                     });
-                    break;
+                    return;
                 }
             }
 
@@ -139,5 +139,6 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
                 self.result = Some(RunResult::Timeout)
             }
         }
+        self.vm = Some(vm);
     }
 }
