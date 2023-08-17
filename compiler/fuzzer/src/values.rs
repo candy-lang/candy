@@ -25,7 +25,7 @@ pub impl InputGeneration for Input {
             );
             arguments.push(address);
         }
-        Input { heap, arguments }
+        Self { heap, arguments }
     }
     fn mutate(&mut self, rng: &mut ThreadRng, symbols: &[Text]) {
         let mut heap = self.heap.borrow_mut();
@@ -164,10 +164,15 @@ impl InlineObjectGeneration for InlineObject {
         match self.into() {
             Data::Int(int) => match int {
                 Int::Inline(int) => int.get().bit_length() as usize,
-                Int::Heap(int) => int.get().bits() as usize,
+                Int::Heap(int) => int.get().bits().try_into().unwrap_or(usize::MAX),
             },
             Data::Text(text) => text.byte_len() + 1,
-            Data::Tag(tag) => 1 + tag.value().map(|it| it.complexity()).unwrap_or_default(),
+            Data::Tag(tag) => {
+                1 + tag
+                    .value()
+                    .map(InlineObjectGeneration::complexity)
+                    .unwrap_or_default()
+            }
             Data::List(list) => {
                 list.items()
                     .iter()
@@ -191,7 +196,7 @@ fn mutate_string(rng: &mut ThreadRng, heap: &mut Heap, mut string: String) -> Te
     if rng.gen_bool(0.5) && !string.is_empty() {
         let start = string.floor_char_boundary(rng.gen_range(0..=string.len()));
         let end = string.floor_char_boundary(start + rng.gen_range(0..=(string.len() - start)));
-        string.replace_range(start..end, "")
+        string.replace_range(start..end, "");
     } else {
         let insertion_point = string.floor_char_boundary(rng.gen_range(0..=string.len()));
         let string_to_insert = (0..rng.gen_range(0..10))
@@ -202,7 +207,7 @@ fn mutate_string(rng: &mut ThreadRng, heap: &mut Heap, mut string: String) -> Te
                     .unwrap()
             })
             .join("");
-        string.insert_str(insertion_point, &string_to_insert)
+        string.insert_str(insertion_point, &string_to_insert);
     }
     Text::create(heap, true, &string)
 }

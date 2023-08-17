@@ -16,6 +16,7 @@ pub struct InputPool {
 }
 
 impl InputPool {
+    #[must_use]
     pub fn new(num_args: usize, symbols: Vec<Text>) -> Self {
         Self {
             heap: Rc::default(),
@@ -25,6 +26,7 @@ impl InputPool {
         }
     }
 
+    #[must_use]
     pub fn generate_new_input(&self) -> Input {
         loop {
             let input = self.generate_input();
@@ -33,6 +35,7 @@ impl InputPool {
             }
         }
     }
+    #[must_use]
     pub fn generate_input(&self) -> Input {
         let mut rng = ThreadRng::default();
 
@@ -53,6 +56,7 @@ impl InputPool {
         self.results_and_scores.insert(input, (result, score));
     }
 
+    #[must_use]
     pub fn interesting_inputs(&self) -> Vec<Input> {
         self.results_and_scores
             .iter()

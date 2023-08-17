@@ -43,6 +43,7 @@ pub enum Status {
 }
 
 impl Fuzzer {
+    #[must_use]
     pub fn new(lir: Rc<Lir>, function: Function, function_id: Id) -> Self {
         let mut heap = Heap::default();
         let function: Function = Data::from(function.clone_to_heap(&mut heap))
@@ -70,18 +71,22 @@ impl Fuzzer {
         }
     }
 
+    #[must_use]
     pub fn lir(&self) -> Rc<Lir> {
         self.lir.clone()
     }
 
+    #[must_use]
     pub fn status(&self) -> &Status {
         self.status.as_ref().unwrap()
     }
+    #[must_use]
     pub fn into_status(self) -> Status {
         self.status.unwrap()
     }
 
-    pub fn input_pool(&self) -> &InputPool {
+    #[must_use]
+    pub const fn input_pool(&self) -> &InputPool {
         &self.pool
     }
 
@@ -132,8 +137,7 @@ impl Fuzzer {
             self.function_id
                 .keys
                 .last()
-                .map(|function_name| function_name.to_string())
-                .unwrap_or_else(|| "{…}".to_string()),
+                .map_or_else(|| "{…}".to_string(), ToString::to_string),
             runner.input,
         );
         debug!("{}", result.to_string(&call_string));
@@ -144,12 +148,16 @@ impl Fuzzer {
                 let function_coverage = total_coverage.in_range(&function_range);
 
                 // We favor small inputs with good code coverage.
+                #[allow(clippy::cast_precision_loss)]
                 let score = {
                     let complexity = runner.input.complexity() as Score;
                     let new_function_coverage = runner.coverage.in_range(&function_range);
-                    let score: Score = (1.5 * runner.num_instructions as f64)
-                        + (0.1 * new_function_coverage.improvement_on(&function_coverage) as f64)
-                        - 0.4 * complexity;
+                    let coverage_improvement =
+                        new_function_coverage.improvement_on(&function_coverage);
+
+                    let score = (runner.num_instructions as f64)
+                        .mul_add(1.5, 0.1 * coverage_improvement as f64);
+                    let score: Score = complexity.mul_add(-0.4, score);
                     score.clamp(0.1, Score::MAX)
                 };
                 self.pool.add(runner.input, result, score);

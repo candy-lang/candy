@@ -1,4 +1,6 @@
 #![feature(let_chains, round_char_boundary)]
+#![warn(clippy::nursery, clippy::pedantic)]
+#![allow(clippy::missing_panics_doc, clippy::module_name_repetitions)]
 
 mod coverage;
 mod fuzzer;
@@ -56,7 +58,7 @@ where
     for (id, function) in fuzzables {
         info!("Fuzzing {id}.");
         let mut fuzzer = Fuzzer::new(lir.clone(), function, id.clone());
-        fuzzer.run(100000);
+        fuzzer.run(100_000);
 
         match fuzzer.into_status() {
             Status::StillFuzzing { total_coverage, .. } => {

@@ -11,7 +11,7 @@ use candy_vm::{StateAfterRunWithoutHandles, VmFinished};
 use rustc_hash::FxHashMap;
 use std::borrow::Borrow;
 
-const MAX_INSTRUCTIONS: usize = 1000000;
+const MAX_INSTRUCTIONS: usize = 1_000_000;
 
 pub struct Runner<L: Borrow<Lir>> {
     pub lir: L,
@@ -22,6 +22,7 @@ pub struct Runner<L: Borrow<Lir>> {
     pub result: Option<RunResult>,
 }
 
+#[must_use]
 pub enum RunResult {
     /// Executing the function with the input took more than `MAX_INSTRUCTIONS`.
     Timeout,
@@ -45,14 +46,15 @@ pub enum RunResult {
     },
 }
 impl RunResult {
+    #[must_use]
     pub fn to_string(&self, call: &str) -> String {
         match self {
-            RunResult::Timeout => format!("{call} timed out."),
-            RunResult::Done { return_value, .. } => format!("{call} returned {return_value}."),
-            RunResult::NeedsUnfulfilled { reason } => {
+            Self::Timeout => format!("{call} timed out."),
+            Self::Done { return_value, .. } => format!("{call} returned {return_value}."),
+            Self::NeedsUnfulfilled { reason } => {
                 format!("{call} panicked and it's our fault: {reason}")
             }
-            RunResult::Panicked { panic, .. } => {
+            Self::Panicked { panic, .. } => {
                 format!("{call} panicked internally: {}", panic.reason)
             }
         }
@@ -83,7 +85,7 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
             StackTracer::default(),
         );
 
-        Runner {
+        Self {
             lir,
             vm: Some(vm),
             input,
@@ -136,7 +138,7 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
             }
 
             if self.num_instructions > MAX_INSTRUCTIONS {
-                self.result = Some(RunResult::Timeout)
+                self.result = Some(RunResult::Timeout);
             }
         }
         self.vm = Some(vm);
