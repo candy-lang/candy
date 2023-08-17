@@ -360,10 +360,6 @@ impl LoweringContext {
                 receiver,
                 arguments,
             } => {
-                if lowering_type != LoweringType::Expression {
-                    return self.create_ast_for_invalid_expression_in_pattern(cst);
-                };
-
                 let mut receiver_kind = &receiver.kind;
                 loop {
                     receiver_kind = match receiver_kind {

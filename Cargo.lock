@@ -256,6 +256,7 @@ dependencies = [
  "salsa",
  "strum",
  "tracing",
+ "tracing-subscriber",
  "unicode-segmentation",
  "walkdir",
 ]
