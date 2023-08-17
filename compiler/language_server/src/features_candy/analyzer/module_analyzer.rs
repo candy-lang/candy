@@ -34,6 +34,7 @@ enum State {
     EvaluateConstants {
         static_panics: Vec<Panic>,
         lir: Rc<Lir>,
+        heap: Heap,
         vm: Vm<Rc<Lir>, (StackTracer, EvaluatedValuesTracer)>,
     },
     /// Next, we run the module again to finds fuzzable functions. This time, we
@@ -49,6 +50,7 @@ enum State {
         evaluated_values_lir: Rc<Lir>,
         evaluated_values: EvaluatedValuesTracer,
         lir: Rc<Lir>,
+        heap: Heap,
         vm: Vm<Rc<Lir>, FuzzablesFinder>,
     },
     /// Then, the functions are actually fuzzed.
@@ -110,38 +112,40 @@ impl ModuleAnalyzer {
                 let (lir, _) = compile_lir(db, self.module.clone(), tracing);
                 let lir = Rc::new(lir);
 
+                let mut heap = Heap::default();
                 let tracer = (
                     StackTracer::default(),
                     EvaluatedValuesTracer::new(self.module.clone()),
                 );
-                let vm = Vm::for_module(lir.clone(), tracer);
+                let vm = Vm::for_module(lir.clone(), &mut heap, tracer);
 
                 State::EvaluateConstants {
                     static_panics,
                     lir,
+                    heap,
                     vm,
                 }
             }
             State::EvaluateConstants {
                 static_panics,
                 lir,
+                heap: mut heap_for_constants,
                 vm,
             } => {
                 client
                     .update_status(Some(format!("Evaluating {}", self.module)))
                     .await;
 
-                let (heap, tracer) = match vm.run_n_without_handles(500) {
+                let tracer = match vm.run_n_without_handles(&mut heap_for_constants, 500) {
                     StateAfterRunWithoutHandles::Running(vm) => {
                         return State::EvaluateConstants {
                             static_panics,
                             lir,
+                            heap: heap_for_constants,
                             vm,
                         }
                     }
-                    StateAfterRunWithoutHandles::Finished(VmFinished { heap, tracer, .. }) => {
-                        (heap, tracer)
-                    }
+                    StateAfterRunWithoutHandles::Finished(VmFinished { tracer, .. }) => tracer,
                 };
                 let (stack_tracer, evaluated_values) = tracer;
 
@@ -153,14 +157,16 @@ impl ModuleAnalyzer {
                 let (fuzzing_lir, _) = compile_lir(db, self.module.clone(), tracing);
                 let fuzzing_lir = Rc::new(fuzzing_lir);
 
-                let vm = Vm::for_module(fuzzing_lir.clone(), FuzzablesFinder::default());
+                let mut heap = Heap::default();
+                let vm = Vm::for_module(fuzzing_lir.clone(), &mut heap, FuzzablesFinder::default());
                 State::FindFuzzables {
                     static_panics,
-                    heap_for_constants: heap,
+                    heap_for_constants,
                     stack_tracer,
                     evaluated_values_lir: lir,
                     evaluated_values,
                     lir: fuzzing_lir,
+                    heap,
                     vm,
                 }
             }
@@ -171,13 +177,14 @@ impl ModuleAnalyzer {
                 evaluated_values_lir,
                 evaluated_values,
                 lir,
+                mut heap,
                 vm,
             } => {
                 client
                     .update_status(Some(format!("Evaluating {}", self.module)))
                     .await;
 
-                let (heap, tracer) = match vm.run_n_without_handles(500) {
+                let (heap, tracer) = match vm.run_n_without_handles(&mut heap, 500) {
                     StateAfterRunWithoutHandles::Running(vm) => {
                         return State::FindFuzzables {
                             static_panics,
@@ -186,10 +193,11 @@ impl ModuleAnalyzer {
                             evaluated_values_lir,
                             evaluated_values,
                             lir,
+                            heap,
                             vm,
                         }
                     }
-                    StateAfterRunWithoutHandles::Finished(VmFinished { heap, tracer, .. }) => {
+                    StateAfterRunWithoutHandles::Finished(VmFinished { tracer, .. }) => {
                         (heap, tracer)
                     }
                 };

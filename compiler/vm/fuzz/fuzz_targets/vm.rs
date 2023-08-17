@@ -18,7 +18,7 @@ use candy_frontend::{
     TracingConfig,
 };
 use candy_vm::{
-    heap::{HirId, Struct},
+    heap::{Heap, HirId, Struct},
     mir_to_lir::compile_lir,
     tracer::DummyTracer,
     PopulateInMemoryProviderFromFileSystem, Vm, VmFinished,
@@ -68,9 +68,9 @@ fuzz_target!(|data: &[u8]| {
 
     let lir = compile_lir(&db, MODULE.clone(), TRACING.clone()).0;
 
-    let VmFinished {
-        mut heap, result, ..
-    } = Vm::for_module(&lir, DummyTracer).run_forever_without_handles();
+    let mut heap = Heap::default();
+    let VmFinished { result, .. } =
+        Vm::for_module(&lir, &mut heap, DummyTracer).run_forever_without_handles(&mut heap);
     let Ok(exports) = result else {
         println!("The module panicked.");
         return;
@@ -85,13 +85,13 @@ fuzz_target!(|data: &[u8]| {
     let responsible = HirId::create(&mut heap, true, hir::Id::user());
     let VmFinished { result, .. } = Vm::for_function(
         &lir,
-        heap,
+        &mut heap,
         main,
         &[environment.into()],
         responsible,
         DummyTracer,
     )
-    .run_forever_without_handles();
+    .run_forever_without_handles(&mut heap);
     match result {
         Ok(return_value) => {
             println!("The main function returned: {return_value:?}")

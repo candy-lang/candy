@@ -1,6 +1,7 @@
 use super::{
-    paused::PausedState, tracer::DebugTracer, DebugVm, ServerToClient, ServerToClientMessage,
-    SessionId,
+    paused::{PausedState, PausedVm},
+    tracer::DebugTracer,
+    DebugVm, ServerToClient, ServerToClientMessage, SessionId,
 };
 use crate::database::Database;
 use candy_frontend::{
@@ -10,7 +11,7 @@ use candy_frontend::{
 };
 use candy_vm::{
     environment::StateAfterRunWithoutHandles,
-    heap::{HirId, Struct},
+    heap::{Heap, HirId, Struct},
     lir::Instruction,
     mir_to_lir::compile_lir,
     tracer::DummyTracer,
@@ -190,9 +191,9 @@ impl DebugSession {
                     evaluated_expressions: TracingMode::All,
                 };
                 let lir = compile_lir(&self.db, module.clone(), tracing.clone()).0;
-                let VmFinished {
-                    mut heap, result, ..
-                } = Vm::for_module(&lir, DummyTracer).run_forever_without_handles();
+                let mut heap = Heap::default();
+                let VmFinished { result, .. } = Vm::for_module(&lir, &mut heap, DummyTracer)
+                    .run_forever_without_handles(&mut heap);
                 let result = match result {
                     Ok(result) => result,
                     Err(error) => {
@@ -215,11 +216,17 @@ impl DebugSession {
                 let environment = Struct::create(&mut heap, true, &FxHashMap::default()).into();
                 let platform = HirId::create(&mut heap, true, Id::platform());
                 let tracer = DebugTracer::default();
-                let vm =
-                    Vm::for_function(Rc::new(lir), heap, main, &[environment], platform, tracer);
+                let vm = Vm::for_function(
+                    Rc::new(lir),
+                    &mut heap,
+                    main,
+                    &[environment],
+                    platform,
+                    tracer,
+                );
 
                 // TODO: remove when we support pause and continue
-                let vm = match vm.run_n_without_handles(10000) {
+                let vm = match vm.run_n_without_handles(&mut heap, 10000) {
                     StateAfterRunWithoutHandles::Running(vm) => Some(vm),
                     StateAfterRunWithoutHandles::Finished(_) => None,
                 };
@@ -227,7 +234,7 @@ impl DebugSession {
                 if let Some(vm) = vm {
                     self.state = State::Launched {
                         initialize_arguments,
-                        execution_state: ExecutionState::Paused(PausedState::new(vm)),
+                        execution_state: ExecutionState::Paused(PausedState::new(heap, vm)),
                     };
 
                     self.send(EventBody::Stopped(StoppedEventBody {
@@ -344,7 +351,7 @@ impl DebugSession {
         let state = self.state.require_paused_mut().unwrap();
 
         // TODO: honor `args.granularity`
-        let mut vm = state.vm.take().unwrap();
+        let PausedVm { mut heap, mut vm } = state.vm.take().unwrap();
         let initial_stack_size = vm.call_stack().len();
         let vm_after_stepping = loop {
             let Some(instruction_pointer) = vm.next_instruction() else {
@@ -355,7 +362,7 @@ impl DebugSession {
                 Instruction::TraceCallEnds | Instruction::TraceExpressionEvaluated,
             );
 
-            match vm.run_without_handles() {
+            match vm.run_without_handles(&mut heap) {
                 StateAfterRunWithoutHandles::Running(new_vm) => {
                     vm = new_vm;
                 }
@@ -377,7 +384,7 @@ impl DebugSession {
         };
 
         if let Some(vm) = vm_after_stepping {
-            state.vm = Some(vm);
+            state.vm = Some(PausedVm::new(heap, vm));
 
             self.send(EventBody::Stopped(StoppedEventBody {
                 reason: StoppedEventReason::Step,

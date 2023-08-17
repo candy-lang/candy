@@ -43,10 +43,12 @@ where
     let (lir, _) = compile_lir(db, module, tracing);
     let lir = Rc::new(lir);
 
+    let mut heap = Heap::default();
     let VmFinished {
         tracer: FuzzablesFinder { fuzzables },
         ..
-    } = Vm::for_module(lir.clone(), FuzzablesFinder::default()).run_forever_without_handles();
+    } = Vm::for_module(lir.clone(), &mut heap, FuzzablesFinder::default())
+        .run_forever_without_handles(&mut heap);
 
     info!(
         "Now, the fuzzing begins. So far, we have {} functions to fuzz.",
