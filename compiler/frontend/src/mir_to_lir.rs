@@ -92,7 +92,14 @@ impl CurrentBody {
             .enumerate()
             .map(|(index, id)| (id, lir::Id::from_usize(index)))
             .collect();
-        let ids_to_drop = id_mapping.values().copied().collect();
+
+        // Don't drop responsible parameters because they are guaranteed to be
+        // constant and thereby not reference-counted.
+        let mut ids_to_drop: FxHashSet<lir::Id> = id_mapping.values().copied().collect();
+        if let Some(responsible_id) = parameters.last() {
+            ids_to_drop.remove(&id_mapping[responsible_id]);
+        }
+
         Self {
             id_mapping,
             captured_count,
