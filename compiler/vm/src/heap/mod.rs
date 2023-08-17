@@ -221,6 +221,9 @@ pub struct DefaultSymbols {
     // program (main and environment keys). They are created once so that they
     // can be used in the VM without new allocations.
     //
+    // When adding a new default symbol, you have to update `new(…)`,
+    // `clone_to_heap_with_mapping(…)`, and `all_symbols(…)`.
+    //
     // Sorted alphabetically
     pub builtin: Text,
     pub equal: Text,
@@ -298,5 +301,35 @@ impl DefaultSymbols {
             text: clone_to_heap(heap, address_map, self.text),
             true_: clone_to_heap(heap, address_map, self.true_),
         }
+    }
+
+    pub fn get(&self, text: &str) -> Option<Text> {
+        let symbols = self.all_symbols();
+        symbols
+            .binary_search_by_key(&text, |it| it.get())
+            .ok()
+            .map(|it| symbols[it])
+    }
+    fn all_symbols(&self) -> [Text; 18] {
+        [
+            self.builtin,
+            self.equal,
+            self.error,
+            self.false_,
+            self.function,
+            self.greater,
+            self.int,
+            self.less,
+            self.list,
+            self.main,
+            self.nothing,
+            self.ok,
+            self.stdin,
+            self.stdout,
+            self.struct_,
+            self.tag,
+            self.text,
+            self.true_,
+        ]
     }
 }

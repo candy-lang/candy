@@ -163,7 +163,12 @@ impl<'c> LoweringContext<'c> {
                 }
             }
             Expression::Tag { symbol, value } => {
-                let symbol = Text::create(&mut self.lir.constant_heap, false, symbol);
+                let symbol = self
+                    .lir
+                    .constant_heap
+                    .default_symbols()
+                    .get(symbol)
+                    .unwrap_or_else(|| Text::create(&mut self.lir.constant_heap, false, symbol));
 
                 if let Some(value) = value {
                     if let Some(value) = self.constants.get(value) {
