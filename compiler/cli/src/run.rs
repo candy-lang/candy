@@ -6,19 +6,18 @@ use crate::{
 use candy_frontend::{ast_to_hir::AstToHir, hir, TracingConfig};
 use candy_vm::{
     environment::{DefaultEnvironment, Environment},
-    heap::{Data, Handle, HirId, Struct, Tag, Text},
+    heap::HirId,
     mir_to_lir::compile_lir,
     tracer::stack_trace::StackTracer,
-    StateAfterRunForever, Vm, VmFinished,
+    Vm, VmFinished,
 };
 use clap::{Parser, ValueHint};
 use std::{
-    io::{self, BufRead, Write},
     path::PathBuf,
     rc::Rc,
     time::{Duration, Instant},
 };
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 
 /// Run a Candy program.
 ///

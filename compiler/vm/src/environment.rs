@@ -73,9 +73,10 @@ impl Environment for DefaultEnvironment {
         } else if call.handle == self.stdout_handle {
             let message = call.arguments[0];
 
-            match message.into() {
-                Data::Text(text) => println!("{}", text.get()),
-                _ => info!("Non-text value sent to stdout: {message:?}"),
+            if let Data::Text(text) = message.into() {
+                println!("{}", text.get());
+            } else {
+                info!("Non-text value sent to stdout: {message:?}");
             }
             let nothing = Tag::create_nothing(call.heap());
             call.complete(nothing)
@@ -85,6 +86,7 @@ impl Environment for DefaultEnvironment {
     }
 }
 
+#[must_use]
 pub enum StateAfterRunWithoutHandles<L: Borrow<Lir>, T: Tracer> {
     Running(Vm<L, T>),
     Finished(VmFinished<T>),
@@ -111,7 +113,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
         for _ in 0..max_instructions {
             match self.run_with_environment(environment) {
                 StateAfterRunWithoutHandles::Running(vm) => self = vm,
-                a => return a,
+                finished @ StateAfterRunWithoutHandles::Finished(_) => return finished,
             }
         }
         StateAfterRunWithoutHandles::Running(self)
