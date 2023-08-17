@@ -166,11 +166,11 @@ impl Int {
     }
 
     #[must_use]
-    pub fn compare_to(self, heap: &Heap, rhs: Int) -> Tag {
+    pub fn compare_to(self, heap: &Heap, rhs: Self) -> Tag {
         match (self, rhs) {
-            (Int::Inline(lhs), rhs) => lhs.compare_to(heap, rhs),
-            (Int::Heap(lhs), Int::Inline(rhs)) => lhs.compare_to(heap, &rhs.get().into()),
-            (Int::Heap(lhs), Int::Heap(rhs)) => lhs.compare_to(heap, rhs.get()),
+            (Self::Inline(lhs), rhs) => lhs.compare_to(heap, rhs),
+            (Self::Heap(lhs), Self::Inline(rhs)) => lhs.compare_to(heap, &rhs.get().into()),
+            (Self::Heap(lhs), Self::Heap(rhs)) => lhs.compare_to(heap, rhs.get()),
         }
     }
 
@@ -297,7 +297,7 @@ pub enum Tag {
 impl Tag {
     #[must_use]
     pub fn create(symbol: Text) -> Self {
-        Tag::Inline(InlineTag::new(symbol))
+        Self::Inline(InlineTag::new(symbol))
     }
     #[must_use]
     pub fn create_with_value(
@@ -315,10 +315,10 @@ impl Tag {
         symbol: Text,
         value: impl Into<Option<InlineObject>>,
     ) -> Self {
-        match value.into() {
-            Some(value) => Self::create_with_value(heap, is_reference_counted, symbol, value),
-            None => Self::create(symbol),
-        }
+        value.into().map_or_else(
+            || Self::create(symbol),
+            |value| Self::create_with_value(heap, is_reference_counted, symbol, value),
+        )
     }
     #[must_use]
     pub fn create_nothing(heap: &Heap) -> Self {
@@ -358,13 +358,13 @@ impl Tag {
     #[must_use]
     pub fn symbol(&self) -> Text {
         match self {
-            Tag::Inline(tag) => tag.get(),
-            Tag::Heap(tag) => tag.symbol(),
+            Self::Inline(tag) => tag.get(),
+            Self::Heap(tag) => tag.symbol(),
         }
     }
     pub fn try_into_bool(self, heap: &Heap) -> Result<bool, &'static str> {
         match self {
-            Tag::Inline(tag) => {
+            Self::Inline(tag) => {
                 let symbol = tag.get();
                 if symbol == heap.default_symbols().true_ {
                     Ok(true)
@@ -374,12 +374,12 @@ impl Tag {
                     Err("Expected `True` or `False`.")
                 }
             }
-            Tag::Heap(_) => Err("Expected a tag without a value, found {value:?}."),
+            Self::Heap(_) => Err("Expected a tag without a value, found {value:?}."),
         }
     }
 
     #[must_use]
-    pub fn has_value(&self) -> bool {
+    pub const fn has_value(&self) -> bool {
         match self {
             Self::Inline(_) => false,
             Self::Heap(_) => true,
@@ -394,16 +394,16 @@ impl Tag {
     }
 
     #[must_use]
-    pub fn without_value(self) -> Tag {
-        Tag::create(self.symbol())
+    pub fn without_value(self) -> Self {
+        Self::create(self.symbol())
     }
 }
 
 impl DebugDisplay for Tag {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         match self {
-            Tag::Inline(tag) => DebugDisplay::fmt(tag, f, is_debug),
-            Tag::Heap(tag) => DebugDisplay::fmt(tag, f, is_debug),
+            Self::Inline(tag) => DebugDisplay::fmt(tag, f, is_debug),
+            Self::Heap(tag) => DebugDisplay::fmt(tag, f, is_debug),
         }
     }
 }

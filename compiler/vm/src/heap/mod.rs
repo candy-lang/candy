@@ -117,6 +117,7 @@ impl Heap {
         self.objects.iter().map(|it| **it)
     }
 
+    #[must_use]
     pub fn default_symbols(&self) -> &DefaultSymbols {
         self.default_symbols.as_ref().unwrap()
     }
@@ -247,7 +248,7 @@ pub struct DefaultSymbols {
 }
 impl DefaultSymbols {
     pub fn new(heap: &mut Heap) -> Self {
-        DefaultSymbols {
+        Self {
             builtin: Text::create(heap, false, "Builtin"),
             equal: Text::create(heap, false, "Equal"),
             error: Text::create(heap, false, "Error"),
@@ -282,7 +283,7 @@ impl DefaultSymbols {
             HeapText::new_unchecked(cloned).into()
         }
 
-        DefaultSymbols {
+        Self {
             builtin: clone_to_heap(heap, address_map, self.builtin),
             equal: clone_to_heap(heap, address_map, self.equal),
             error: clone_to_heap(heap, address_map, self.error),
@@ -304,6 +305,7 @@ impl DefaultSymbols {
         }
     }
 
+    #[must_use]
     pub fn get(&self, text: &str) -> Option<Text> {
         let symbols = self.all_symbols();
         symbols
@@ -311,7 +313,8 @@ impl DefaultSymbols {
             .ok()
             .map(|it| symbols[it])
     }
-    pub fn all_symbols(&self) -> [Text; 18] {
+    #[must_use]
+    pub const fn all_symbols(&self) -> [Text; 18] {
         [
             self.builtin,
             self.equal,
