@@ -81,7 +81,7 @@ pub fn function(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
             }
             None => input,
         };
-        let (input, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
+        let (input, mut whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
 
         if let Some((input, curly_brace)) = closing_curly_brace(input) {
             (input, whitespace, curly_brace)
@@ -94,6 +94,7 @@ pub fn function(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
             // For example, for the function `{ 2 }`, the body parser would have
             // already consumed the `}`. The body parser works great for
             // multiline bodies, though.
+            body_expressions.append(&mut whitespace);
             let (input, mut body) = body(input, indentation + 1);
             body_expressions.append(&mut body);
 
