@@ -43,8 +43,9 @@ pub enum Data {
     Handle(Handle),
 }
 impl Data {
-    pub fn function(&self) -> Option<&Function> {
-        if let Data::Function(function) = self {
+    #[must_use]
+    pub const fn function(&self) -> Option<&Function> {
+        if let Self::Function(function) = self {
             Some(function)
         } else {
             None
@@ -56,23 +57,23 @@ impl From<InlineObject> for Data {
     fn from(object: InlineObject) -> Self {
         match object.into() {
             InlineData::Pointer(pointer) => pointer.get().into(),
-            InlineData::Int(int) => Data::Int(Int::Inline(int)),
-            InlineData::Builtin(builtin) => Data::Builtin(Builtin(builtin)),
-            InlineData::Tag(symbol_id) => Data::Tag(Tag::Inline(symbol_id)),
-            InlineData::Handle(handle) => Data::Handle(Handle(handle)),
+            InlineData::Int(int) => Self::Int(Int::Inline(int)),
+            InlineData::Builtin(builtin) => Self::Builtin(Builtin(builtin)),
+            InlineData::Tag(symbol_id) => Self::Tag(Tag::Inline(symbol_id)),
+            InlineData::Handle(handle) => Self::Handle(Handle(handle)),
         }
     }
 }
 impl From<HeapObject> for Data {
     fn from(object: HeapObject) -> Self {
         match object.into() {
-            HeapData::Int(int) => Data::Int(Int::Heap(int)),
-            HeapData::List(list) => Data::List(List(list)),
-            HeapData::Struct(struct_) => Data::Struct(Struct(struct_)),
-            HeapData::Tag(tag) => Data::Tag(Tag::Heap(tag)),
-            HeapData::Text(text) => Data::Text(Text(text)),
-            HeapData::Function(function) => Data::Function(Function(function)),
-            HeapData::HirId(hir_id) => Data::HirId(HirId(hir_id)),
+            HeapData::Int(int) => Self::Int(Int::Heap(int)),
+            HeapData::List(list) => Self::List(List(list)),
+            HeapData::Struct(struct_) => Self::Struct(Struct(struct_)),
+            HeapData::Tag(tag) => Self::Tag(Tag::Heap(tag)),
+            HeapData::Text(text) => Self::Text(Text(text)),
+            HeapData::Function(function) => Self::Function(Function(function)),
+            HeapData::HirId(hir_id) => Self::HirId(HirId(hir_id)),
         }
     }
 }
@@ -80,15 +81,15 @@ impl From<HeapObject> for Data {
 impl DebugDisplay for Data {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         match self {
-            Data::Int(int) => DebugDisplay::fmt(int, f, is_debug),
-            Data::Tag(tag) => DebugDisplay::fmt(tag, f, is_debug),
-            Data::Text(text) => DebugDisplay::fmt(text, f, is_debug),
-            Data::List(list) => DebugDisplay::fmt(list, f, is_debug),
-            Data::Struct(struct_) => DebugDisplay::fmt(struct_, f, is_debug),
-            Data::HirId(hir_id) => DebugDisplay::fmt(hir_id, f, is_debug),
-            Data::Function(function) => DebugDisplay::fmt(function, f, is_debug),
-            Data::Builtin(builtin) => DebugDisplay::fmt(builtin, f, is_debug),
-            Data::Handle(send_port) => DebugDisplay::fmt(send_port, f, is_debug),
+            Self::Int(int) => DebugDisplay::fmt(int, f, is_debug),
+            Self::Tag(tag) => DebugDisplay::fmt(tag, f, is_debug),
+            Self::Text(text) => DebugDisplay::fmt(text, f, is_debug),
+            Self::List(list) => DebugDisplay::fmt(list, f, is_debug),
+            Self::Struct(struct_) => DebugDisplay::fmt(struct_, f, is_debug),
+            Self::HirId(hir_id) => DebugDisplay::fmt(hir_id, f, is_debug),
+            Self::Function(function) => DebugDisplay::fmt(function, f, is_debug),
+            Self::Builtin(builtin) => DebugDisplay::fmt(builtin, f, is_debug),
+            Self::Handle(send_port) => DebugDisplay::fmt(send_port, f, is_debug),
         }
     }
 }
@@ -104,6 +105,7 @@ pub enum Int {
 }
 
 impl Int {
+    #[must_use]
     pub fn create<T>(heap: &mut Heap, is_reference_counted: bool, value: T) -> Self
     where
         T: Copy + TryInto<i64> + Into<BigInt>,
@@ -112,30 +114,37 @@ impl Int {
             .try_into()
             .map_err(|_| ())
             .and_then(InlineInt::try_from)
-            .map(|it| it.into())
-            .unwrap_or_else(|_| HeapInt::create(heap, is_reference_counted, value.into()).into())
+            .map_or_else(
+                |_| HeapInt::create(heap, is_reference_counted, value.into()).into(),
+                Into::into,
+            )
     }
+    #[must_use]
     pub fn create_from_bigint(heap: &mut Heap, is_reference_counted: bool, value: BigInt) -> Self {
         i64::try_from(&value)
             .map_err(|_| ())
             .and_then(InlineInt::try_from)
-            .map(|it| it.into())
-            .unwrap_or_else(|_| HeapInt::create(heap, is_reference_counted, value).into())
+            .map_or_else(
+                |_| HeapInt::create(heap, is_reference_counted, value).into(),
+                Into::into,
+            )
     }
 
+    #[must_use]
     pub fn get<'a>(self) -> Cow<'a, BigInt> {
         match self {
-            Int::Inline(int) => Cow::Owned(int.get().into()),
-            Int::Heap(int) => Cow::Borrowed(int.get()),
+            Self::Inline(int) => Cow::Owned(int.get().into()),
+            Self::Heap(int) => Cow::Borrowed(int.get()),
         }
     }
+    #[must_use]
     pub fn try_get<T>(self) -> Option<T>
     where
         T: TryFrom<i64> + for<'a> TryFrom<&'a BigInt>,
     {
         match self {
-            Int::Inline(int) => int.try_get(),
-            Int::Heap(int) => int.get().try_into().ok(),
+            Self::Inline(int) => int.try_get(),
+            Self::Heap(int) => int.get().try_into().ok(),
         }
     }
 
@@ -144,32 +153,35 @@ impl Int {
     operator_fn!(multiply);
     operator_fn!(int_divide_truncating);
     operator_fn!(remainder);
-    pub fn modulo(self, heap: &mut Heap, rhs: Int) -> Self {
+    #[must_use]
+    pub fn modulo(self, heap: &mut Heap, rhs: Self) -> Self {
         match (self, rhs) {
-            (Int::Inline(lhs), Int::Inline(rhs)) => lhs.modulo(heap, rhs),
-            (Int::Heap(on_heap), Int::Inline(inline))
-            | (Int::Inline(inline), Int::Heap(on_heap)) => {
+            (Self::Inline(lhs), Self::Inline(rhs)) => lhs.modulo(heap, rhs),
+            (Self::Heap(on_heap), Self::Inline(inline))
+            | (Self::Inline(inline), Self::Heap(on_heap)) => {
                 on_heap.modulo(heap, &inline.get().into())
             }
-            (Int::Heap(lhs), Int::Heap(rhs)) => lhs.modulo(heap, rhs.get()),
+            (Self::Heap(lhs), Self::Heap(rhs)) => lhs.modulo(heap, rhs.get()),
         }
     }
 
-    pub fn compare_to(self, heap: &Heap, rhs: Int) -> Tag {
+    #[must_use]
+    pub fn compare_to(self, heap: &Heap, rhs: Self) -> Tag {
         match (self, rhs) {
-            (Int::Inline(lhs), rhs) => lhs.compare_to(heap, rhs),
-            (Int::Heap(lhs), Int::Inline(rhs)) => lhs.compare_to(heap, &rhs.get().into()),
-            (Int::Heap(lhs), Int::Heap(rhs)) => lhs.compare_to(heap, rhs.get()),
+            (Self::Inline(lhs), rhs) => lhs.compare_to(heap, rhs),
+            (Self::Heap(lhs), Self::Inline(rhs)) => lhs.compare_to(heap, &rhs.get().into()),
+            (Self::Heap(lhs), Self::Heap(rhs)) => lhs.compare_to(heap, rhs.get()),
         }
     }
 
     shift_fn!(shift_left, shl);
     shift_fn!(shift_right, shr);
 
+    #[must_use]
     pub fn bit_length(self, heap: &mut Heap) -> Self {
         match self {
-            Int::Inline(int) => int.bit_length().into(),
-            Int::Heap(int) => int.bit_length(heap),
+            Self::Inline(int) => int.bit_length().into(),
+            Self::Heap(int) => int.bit_length(heap),
         }
     }
 
@@ -180,6 +192,7 @@ impl Int {
 
 macro_rules! bitwise_fn {
     ($name:ident) => {
+        #[must_use]
         pub fn $name(self, heap: &mut Heap, rhs: Int) -> Self {
             match (self, rhs) {
                 (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(rhs).into(),
@@ -194,6 +207,7 @@ macro_rules! bitwise_fn {
 }
 macro_rules! operator_fn {
     ($name:ident) => {
+        #[must_use]
         pub fn $name(self, heap: &mut Heap, rhs: Int) -> Self {
             match (self, rhs) {
                 (Int::Inline(lhs), _) => lhs.$name(heap, rhs),
@@ -205,6 +219,7 @@ macro_rules! operator_fn {
 }
 macro_rules! shift_fn {
     ($name:ident, $function:ident) => {
+        #[must_use]
         pub fn $name(self, heap: &mut Heap, rhs: Int) -> Self {
             match (self, rhs) {
                 (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(heap, rhs),
@@ -224,8 +239,8 @@ use {bitwise_fn, operator_fn, shift_fn};
 impl DebugDisplay for Int {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         match self {
-            Int::Inline(int) => DebugDisplay::fmt(int, f, is_debug),
-            Int::Heap(int) => DebugDisplay::fmt(int, f, is_debug),
+            Self::Inline(int) => DebugDisplay::fmt(int, f, is_debug),
+            Self::Heap(int) => DebugDisplay::fmt(int, f, is_debug),
         }
     }
 }
@@ -245,16 +260,16 @@ impl_try_from_heap_object!(Int, "Expected an int.");
 impl Ord for Int {
     fn cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
-            (Int::Inline(this), Int::Inline(other)) => Ord::cmp(this, other),
-            (Int::Inline(_), Int::Heap(other)) => {
+            (Self::Inline(this), Self::Inline(other)) => Ord::cmp(this, other),
+            (Self::Inline(_), Self::Heap(other)) => {
                 if other.get().is_positive() {
                     Ordering::Less
                 } else {
                     Ordering::Greater
                 }
             }
-            (Int::Heap(this), Int::Heap(other)) => Ord::cmp(this, other),
-            (Int::Heap(this), Int::Inline(_)) => {
+            (Self::Heap(this), Self::Heap(other)) => Ord::cmp(this, other),
+            (Self::Heap(this), Self::Inline(_)) => {
                 if this.get().is_positive() {
                     Ordering::Greater
                 } else {
@@ -280,9 +295,11 @@ pub enum Tag {
 }
 
 impl Tag {
+    #[must_use]
     pub fn create(symbol: Text) -> Self {
-        Tag::Inline(InlineTag::new(symbol))
+        Self::Inline(InlineTag::new(symbol))
     }
+    #[must_use]
     pub fn create_with_value(
         heap: &mut Heap,
         is_reference_counted: bool,
@@ -291,20 +308,23 @@ impl Tag {
     ) -> Self {
         HeapTag::create(heap, is_reference_counted, symbol, value).into()
     }
+    #[must_use]
     pub fn create_with_value_option(
         heap: &mut Heap,
         is_reference_counted: bool,
         symbol: Text,
         value: impl Into<Option<InlineObject>>,
     ) -> Self {
-        match value.into() {
-            Some(value) => Self::create_with_value(heap, is_reference_counted, symbol, value),
-            None => Self::create(symbol),
-        }
+        value.into().map_or_else(
+            || Self::create(symbol),
+            |value| Self::create_with_value(heap, is_reference_counted, symbol, value),
+        )
     }
+    #[must_use]
     pub fn create_nothing(heap: &Heap) -> Self {
         Self::create(heap.default_symbols().nothing)
     }
+    #[must_use]
     pub fn create_bool(heap: &Heap, value: bool) -> Self {
         let symbol = if value {
             heap.default_symbols().true_
@@ -313,6 +333,7 @@ impl Tag {
         };
         Self::create(symbol)
     }
+    #[must_use]
     pub fn create_ordering(heap: &Heap, value: Ordering) -> Self {
         let value = match value {
             Ordering::Less => heap.default_symbols().less,
@@ -321,6 +342,7 @@ impl Tag {
         };
         Self::create(value)
     }
+    #[must_use]
     pub fn create_result(
         heap: &mut Heap,
         is_reference_counted: bool,
@@ -333,15 +355,16 @@ impl Tag {
         Self::create_with_value(heap, is_reference_counted, symbol, value)
     }
 
+    #[must_use]
     pub fn symbol(&self) -> Text {
         match self {
-            Tag::Inline(tag) => tag.get(),
-            Tag::Heap(tag) => tag.symbol(),
+            Self::Inline(tag) => tag.get(),
+            Self::Heap(tag) => tag.symbol(),
         }
     }
     pub fn try_into_bool(self, heap: &Heap) -> Result<bool, &'static str> {
         match self {
-            Tag::Inline(tag) => {
+            Self::Inline(tag) => {
                 let symbol = tag.get();
                 if symbol == heap.default_symbols().true_ {
                     Ok(true)
@@ -351,33 +374,36 @@ impl Tag {
                     Err("Expected `True` or `False`.")
                 }
             }
-            Tag::Heap(_) => Err("Expected a tag without a value, found {value:?}."),
+            Self::Heap(_) => Err("Expected a tag without a value, found {value:?}."),
         }
     }
 
-    pub fn has_value(&self) -> bool {
+    #[must_use]
+    pub const fn has_value(&self) -> bool {
         match self {
-            Tag::Inline(_) => false,
-            Tag::Heap(_) => true,
+            Self::Inline(_) => false,
+            Self::Heap(_) => true,
         }
     }
+    #[must_use]
     pub fn value(&self) -> Option<InlineObject> {
         match self {
-            Tag::Inline(_) => None,
-            Tag::Heap(tag) => Some(tag.value()),
+            Self::Inline(_) => None,
+            Self::Heap(tag) => Some(tag.value()),
         }
     }
 
-    pub fn without_value(self) -> Tag {
-        Tag::create(self.symbol())
+    #[must_use]
+    pub fn without_value(self) -> Self {
+        Self::create(self.symbol())
     }
 }
 
 impl DebugDisplay for Tag {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         match self {
-            Tag::Inline(tag) => DebugDisplay::fmt(tag, f, is_debug),
-            Tag::Heap(tag) => DebugDisplay::fmt(tag, f, is_debug),
+            Self::Inline(tag) => DebugDisplay::fmt(tag, f, is_debug),
+            Self::Heap(tag) => DebugDisplay::fmt(tag, f, is_debug),
         }
     }
 }
@@ -414,13 +440,15 @@ impl_try_from_heap_object!(Tag, "Expected a tag.");
 pub struct Text(HeapText);
 
 impl Text {
+    #[must_use]
     pub fn create(heap: &mut Heap, is_reference_counted: bool, value: &str) -> Self {
         HeapText::create(heap, is_reference_counted, value).into()
     }
+    #[must_use]
     pub fn create_from_utf8(heap: &mut Heap, is_reference_counted: bool, bytes: &[u8]) -> Tag {
         let result = str::from_utf8(bytes)
-            .map(|it| Text::create(heap, is_reference_counted, it).into())
-            .map_err(|_| Text::create(heap, is_reference_counted, "Invalid UTF-8.").into());
+            .map(|it| Self::create(heap, is_reference_counted, it).into())
+            .map_err(|_| Self::create(heap, is_reference_counted, "Invalid UTF-8.").into());
         Tag::create_result(heap, is_reference_counted, result)
     }
 }
@@ -435,6 +463,7 @@ impl_try_from_heap_object!(Text, "Expected a text.");
 pub struct List(HeapList);
 
 impl List {
+    #[must_use]
     pub fn create(heap: &mut Heap, is_reference_counted: bool, items: &[InlineObject]) -> Self {
         HeapList::create(heap, is_reference_counted, items).into()
     }
@@ -450,6 +479,7 @@ impl_try_from_heap_object!(List, "Expected a list.");
 pub struct Struct(HeapStruct);
 
 impl Struct {
+    #[must_use]
     pub fn create(
         heap: &mut Heap,
         is_reference_counted: bool,
@@ -457,6 +487,7 @@ impl Struct {
     ) -> Self {
         HeapStruct::create(heap, is_reference_counted, fields).into()
     }
+    #[must_use]
     pub fn create_with_symbol_keys(
         heap: &mut Heap,
         is_reference_counted: bool,
@@ -480,6 +511,7 @@ impl_try_from_heap_object!(Struct, "Expected a struct.");
 pub struct Function(HeapFunction);
 
 impl Function {
+    #[must_use]
     pub fn create(
         heap: &mut Heap,
         is_reference_counted: bool,
@@ -502,7 +534,8 @@ impl_try_from_heap_object!(Function, "Expected a function.");
 pub struct HirId(HeapHirId);
 
 impl HirId {
-    pub fn create(heap: &mut Heap, is_reference_counted: bool, id: Id) -> HirId {
+    #[must_use]
+    pub fn create(heap: &mut Heap, is_reference_counted: bool, id: Id) -> Self {
         HeapHirId::create(heap, is_reference_counted, id).into()
     }
 }
@@ -517,6 +550,7 @@ impl_try_from_heap_object!(HirId, "Expected a HIR ID.");
 pub struct Builtin(InlineBuiltin);
 
 impl Builtin {
+    #[must_use]
     pub fn create(builtin: BuiltinFunction) -> Self {
         InlineBuiltin::from(builtin).into()
     }
@@ -530,10 +564,12 @@ impls_via_0!(Builtin);
 pub struct Handle(InlineHandle);
 
 impl Handle {
+    #[must_use]
     pub fn new(heap: &mut Heap, argument_count: usize) -> Self {
         let id = heap.handle_id_generator.generate();
         Self::create(heap, id, argument_count)
     }
+    #[must_use]
     pub fn create(heap: &mut Heap, handle_id: HandleId, argument_count: usize) -> Self {
         InlineHandle::create(heap, handle_id, argument_count).into()
     }

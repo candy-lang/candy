@@ -47,7 +47,7 @@ impl Heap {
             0,
         );
         let header_word = kind_bits
-            | ((is_reference_counted as u64) << HeapObject::IS_REFERENCE_COUNTED_SHIFT)
+            | (u64::from(is_reference_counted) << HeapObject::IS_REFERENCE_COUNTED_SHIFT)
             | remaining_header_word;
         self.allocate_raw(header_word, content_size)
     }
@@ -102,32 +102,36 @@ impl Heap {
         }
     }
 
-    pub fn adopt(&mut self, mut other: Heap) {
+    pub fn adopt(&mut self, mut other: Self) {
         self.objects.extend(mem::take(&mut other.objects));
         for (handle_id, refcount) in mem::take(&mut other.handle_refcounts) {
             *self.handle_refcounts.entry(handle_id).or_default() += refcount;
         }
     }
 
-    pub fn objects(&self) -> &FxHashSet<ObjectInHeap> {
+    #[must_use]
+    pub const fn objects(&self) -> &FxHashSet<ObjectInHeap> {
         &self.objects
     }
     pub fn iter(&self) -> impl Iterator<Item = HeapObject> + '_ {
         self.objects.iter().map(|it| **it)
     }
 
+    #[must_use]
     pub fn default_symbols(&self) -> &DefaultSymbols {
         self.default_symbols.as_ref().unwrap()
     }
 
+    #[must_use]
     pub fn known_handles(&self) -> impl IntoIterator<Item = HandleId> + '_ {
         self.handle_refcounts.keys().copied()
     }
 
     // We do not confuse this with the `std::Clone::clone` method.
     #[allow(clippy::should_implement_trait)]
-    pub fn clone(&self) -> (Heap, FxHashMap<HeapObject, HeapObject>) {
-        let mut cloned = Heap {
+    #[must_use]
+    pub fn clone(&self) -> (Self, FxHashMap<HeapObject, HeapObject>) {
+        let mut cloned = Self {
             objects: FxHashSet::default(),
             default_symbols: None,
             handle_id_generator: self.handle_id_generator.clone(),
@@ -143,14 +147,14 @@ impl Heap {
         );
 
         for object in &self.objects {
-            object.clone_to_heap_with_mapping(&mut cloned, &mut mapping);
+            _ = object.clone_to_heap_with_mapping(&mut cloned, &mut mapping);
         }
 
         (cloned, mapping)
     }
 
     pub fn clear(&mut self) {
-        for object in mem::take(&mut self.objects).iter() {
+        for object in mem::take(&mut self.objects) {
             self.deallocate(HeapData::from(object.0));
         }
         self.handle_refcounts.clear();
@@ -165,14 +169,12 @@ impl Debug for Heap {
             writeln!(
                 f,
                 "  {object:p}{}: {object:?}",
-                if let Some(reference_count) = object.reference_count() {
-                    format!(
+                object
+                    .reference_count()
+                    .map_or_else(String::new, |reference_count| format!(
                         " ({reference_count} {})",
                         if reference_count == 1 { "ref" } else { "refs" },
-                    )
-                } else {
-                    String::new()
-                },
+                    )),
             )?;
         }
         write!(f, "}}")
@@ -212,7 +214,7 @@ impl PartialEq for ObjectInHeap {
 
 impl Hash for ObjectInHeap {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.address().hash(state)
+        self.0.address().hash(state);
     }
 }
 
@@ -246,7 +248,7 @@ pub struct DefaultSymbols {
 }
 impl DefaultSymbols {
     pub fn new(heap: &mut Heap) -> Self {
-        DefaultSymbols {
+        Self {
             builtin: Text::create(heap, false, "Builtin"),
             equal: Text::create(heap, false, "Equal"),
             error: Text::create(heap, false, "Error"),
@@ -281,7 +283,7 @@ impl DefaultSymbols {
             HeapText::new_unchecked(cloned).into()
         }
 
-        DefaultSymbols {
+        Self {
             builtin: clone_to_heap(heap, address_map, self.builtin),
             equal: clone_to_heap(heap, address_map, self.equal),
             error: clone_to_heap(heap, address_map, self.error),
@@ -303,6 +305,7 @@ impl DefaultSymbols {
         }
     }
 
+    #[must_use]
     pub fn get(&self, text: &str) -> Option<Text> {
         let symbols = self.all_symbols();
         symbols
@@ -310,7 +313,8 @@ impl DefaultSymbols {
             .ok()
             .map(|it| symbols[it])
     }
-    pub fn all_symbols(&self) -> [Text; 18] {
+    #[must_use]
+    pub const fn all_symbols(&self) -> [Text; 18] {
         [
             self.builtin,
             self.equal,

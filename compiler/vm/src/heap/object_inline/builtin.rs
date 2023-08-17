@@ -19,7 +19,7 @@ pub struct InlineBuiltin(InlineObject);
 impl InlineBuiltin {
     const INDEX_SHIFT: usize = 3;
 
-    pub fn new_unchecked(object: InlineObject) -> Self {
+    pub const fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
     }
 
@@ -46,7 +46,7 @@ impl PartialEq for InlineBuiltin {
 }
 impl Hash for InlineBuiltin {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.index().hash(state)
+        self.index().hash(state);
     }
 }
 impl Ord for InlineBuiltin {

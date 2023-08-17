@@ -19,7 +19,7 @@ pub impl PopulateInMemoryProviderFromFileSystem for InMemoryModuleProvider {
 
         for file in WalkDir::new(&package_path)
             .into_iter()
-            .map(|it| it.unwrap())
+            .map(Result::unwrap)
             .filter(|it| it.file_type().is_file())
         {
             let module = Module::from_package_and_path(

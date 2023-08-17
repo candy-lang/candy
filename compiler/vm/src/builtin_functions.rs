@@ -23,7 +23,7 @@ impl MachineState {
     ) -> InstructionResult {
         let result = span!(Level::TRACE, "Running builtin").in_scope(|| match &builtin_function {
             BuiltinFunction::Equals => self.heap.equals(args),
-            BuiltinFunction::FunctionRun => self.heap.function_run(args, responsible),
+            BuiltinFunction::FunctionRun => Heap::function_run(args, responsible),
             BuiltinFunction::GetArgumentCount => self.heap.get_argument_count(args),
             BuiltinFunction::IfElse => self.heap.if_else(args, responsible),
             BuiltinFunction::IntAdd => self.heap.int_add(args),
@@ -80,7 +80,7 @@ impl MachineState {
             Ok(CallHandle(call)) => InstructionResult::CallHandle(call),
             Err(reason) => InstructionResult::Panic(Panic {
                 reason,
-                responsible: responsible.get().to_owned(),
+                responsible: responsible.get().clone(),
             }),
         }
     }
@@ -149,6 +149,7 @@ macro_rules! unpack_and_later_drop {
     };
 }
 
+#[allow(clippy::enum_glob_use)]
 use SuccessfulBehavior::*;
 
 impl Heap {
@@ -158,7 +159,7 @@ impl Heap {
         })
     }
 
-    fn function_run(&mut self, args: &[InlineObject], responsible: HirId) -> BuiltinResult {
+    fn function_run(args: &[InlineObject], responsible: HirId) -> BuiltinResult {
         unpack!(self, args, |function: Any| {
             match **function {
                 Data::Builtin(_) => {
@@ -426,7 +427,7 @@ impl Heap {
                 .map(|&it| {
                     Int::try_from(it)
                         .ok()
-                        .and_then(|it| it.try_get())
+                        .and_then(Int::try_get)
                         .ok_or_else(|| format!("Value is not a byte: {it}.",))
                 })
                 .try_collect()?;

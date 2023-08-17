@@ -16,11 +16,11 @@ use std::{
 pub struct HeapHirId(HeapObject);
 
 impl HeapHirId {
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
     pub fn create(heap: &mut Heap, is_reference_counted: bool, value: Id) -> Self {
-        let id = HeapHirId(heap.allocate(
+        let id = Self(heap.allocate(
             HeapObject::KIND_HIR_ID,
             is_reference_counted,
             0,
@@ -61,7 +61,7 @@ impl HeapObjectTrait for HeapHirId {
         _address_map: &mut FxHashMap<HeapObject, HeapObject>,
     ) {
         let clone = Self(clone);
-        let value = self.get().to_owned();
+        let value = self.get().clone();
         unsafe { ptr::write(clone.id_pointer().as_ptr(), value) };
     }
 

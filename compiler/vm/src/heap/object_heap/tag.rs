@@ -18,7 +18,7 @@ use std::{
 pub struct HeapTag(HeapObject);
 
 impl HeapTag {
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
     pub fn create(

@@ -20,7 +20,7 @@ pub struct HeapStruct(HeapObject);
 impl HeapStruct {
     const LEN_SHIFT: usize = 4;
 
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
     pub fn create(
@@ -268,7 +268,7 @@ impl HeapObjectTrait for HeapStruct {
                 self.content_word_pointer(0).as_ptr(),
                 clone.content_word_pointer(0).as_ptr(),
                 self.len(),
-            )
+            );
         };
         for (index, &key) in self.keys().iter().enumerate() {
             clone.unsafe_set_content_word(

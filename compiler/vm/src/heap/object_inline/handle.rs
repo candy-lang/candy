@@ -21,7 +21,7 @@ impl InlineHandle {
     const HANDLE_ID_SHIFT: usize = 32;
     const ARGUMENT_COUNT_SHIFT: usize = 4;
 
-    pub fn new_unchecked(object: InlineObject) -> Self {
+    pub const fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
     }
 
@@ -70,7 +70,7 @@ impl PartialEq for InlineHandle {
 }
 impl Hash for InlineHandle {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.handle_id().hash(state)
+        self.handle_id().hash(state);
     }
 }
 impl Ord for InlineHandle {
