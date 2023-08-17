@@ -42,7 +42,7 @@ impl PausedState {
         let mut variables = vec![];
         match &key {
             VariablesKey::Arguments(stack_frame_key) => {
-                let call = &stack_frame_key.get(self.vm.as_ref().unwrap()).unwrap().call;
+                let call = &stack_frame_key.get(self.vm_ref()).unwrap().call;
                 match Data::from(call.callee) {
                     Data::Function(function) => {
                         if should_include_named {
@@ -50,10 +50,11 @@ impl PausedState {
                                 .vm
                                 .as_ref()
                                 .unwrap()
+                                .vm
                                 .lir()
                                 .functions_behind(function.body());
                             assert_eq!(functions.len(), 1);
-                            let function = functions.iter().next().unwrap();
+                            let function: &hir::Id = functions.iter().next().unwrap();
 
                             let Expression::Function(hir::Function { parameters, .. }) =
                                 db.find_expression(function.to_owned()).unwrap()
@@ -99,7 +100,7 @@ impl PausedState {
                 };
             }
             VariablesKey::Locals(stack_frame_key) => {
-                let locals = stack_frame_key.get_locals(self.vm.as_ref().unwrap());
+                let locals = stack_frame_key.get_locals(self.vm_ref());
                 if should_include_named && !locals.is_empty() {
                     let body = db.containing_body_of(locals.first().unwrap().0.clone());
                     let locals = locals
@@ -138,7 +139,7 @@ impl PausedState {
             }
             VariablesKey::Heap => {
                 if should_include_named {
-                    let mut vars = self.vm.as_ref().unwrap().heap().iter().collect_vec();
+                    let mut vars = self.heap_ref().iter().collect_vec();
                     vars.sort_by_key(|it| it.address());
                     variables.extend(vars[start..].iter().take(count).map(|object| {
                         self.create_variable(

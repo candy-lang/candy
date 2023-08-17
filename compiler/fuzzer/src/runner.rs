@@ -16,11 +16,14 @@ const MAX_INSTRUCTIONS: usize = 1_000_000;
 
 pub struct Runner<L: Borrow<Lir>> {
     pub lir: L,
-    pub vm: Option<Vm<L, StackTracer>>, // Is consumed when the runner is finished.
+    state: Option<State<L>>,
     pub input: Input,
     pub num_instructions: usize,
     pub coverage: Coverage,
-    pub result: Option<RunResult>,
+}
+enum State<L: Borrow<Lir>> {
+    Running { heap: Heap, vm: Vm<L, StackTracer> },
+    Finished(RunResult),
 }
 
 #[must_use]
@@ -79,7 +82,7 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
 
         let vm = Vm::for_function(
             lir.clone(),
-            heap,
+            &mut heap,
             function,
             &arguments,
             responsible,
@@ -88,19 +91,18 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
 
         Self {
             lir,
-            vm: Some(vm),
+            state: Some(State::Running { heap, vm }),
             input,
             num_instructions: 0,
             coverage: Coverage::none(num_instructions),
-            result: None,
         }
     }
 
     pub fn run(&mut self, instructions_left: &mut usize) {
-        assert!(self.vm.is_some());
-        assert!(self.result.is_none());
+        let State::Running { mut heap, mut vm } = self.state.take().unwrap() else {
+            panic!("Runner is not running anymore.");
+        };
 
-        let mut vm = self.vm.take().unwrap();
         while *instructions_left > 0 {
             if let Some(ip) = vm.next_instruction() {
                 self.coverage.add(ip);
@@ -108,22 +110,20 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
             self.num_instructions += 1;
             *instructions_left -= 1;
 
-            match vm.run_without_handles() {
+            match vm.run_without_handles(&mut heap) {
                 StateAfterRunWithoutHandles::Running(new_vm) => vm = new_vm,
                 StateAfterRunWithoutHandles::Finished(VmFinished {
-                    heap,
                     result: Ok(return_value),
                     ..
                 }) => {
-                    self.result = Some(RunResult::Done { heap, return_value });
+                    self.state = Some(State::Finished(RunResult::Done { heap, return_value }));
                     return;
                 }
                 StateAfterRunWithoutHandles::Finished(VmFinished {
-                    heap,
                     tracer,
                     result: Err(panic),
                 }) => {
-                    self.result = Some(if panic.responsible == Id::fuzzer() {
+                    let result = if panic.responsible == Id::fuzzer() {
                         RunResult::NeedsUnfulfilled {
                             reason: panic.reason,
                         }
@@ -133,15 +133,26 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
                             tracer,
                             panic,
                         }
-                    });
+                    };
+                    self.state = Some(State::Finished(result));
                     return;
                 }
             }
 
             if self.num_instructions > MAX_INSTRUCTIONS {
-                self.result = Some(RunResult::Timeout);
+                self.state = Some(State::Finished(RunResult::Timeout));
             }
         }
-        self.vm = Some(vm);
+        self.state = Some(State::Running { heap, vm });
+    }
+
+    pub fn take_result(&mut self) -> Option<RunResult> {
+        match self.state.take().unwrap() {
+            running @ State::Running { .. } => {
+                self.state = Some(running);
+                None
+            }
+            State::Finished(result) => Some(result),
+        }
     }
 }

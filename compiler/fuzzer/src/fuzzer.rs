@@ -125,7 +125,7 @@ impl Fuzzer {
         mut runner: Runner<Rc<Lir>>,
     ) -> Status {
         runner.run(instructions_left);
-        let Some(result) = runner.result else {
+        let Some(result) = runner.take_result() else {
             return Status::StillFuzzing {
                 total_coverage,
                 runner,

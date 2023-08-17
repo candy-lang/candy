@@ -28,8 +28,7 @@ impl PausedState {
         start_at_1_config: StartAt1Config,
         args: StackTraceArguments,
     ) -> Result<StackTraceResponse, &'static str> {
-        let vm = &self.vm.as_ref().unwrap();
-        let tracer = vm.tracer();
+        let tracer = self.vm.as_ref().unwrap().vm.tracer();
 
         let start_frame = args.start_frame.unwrap_or_default();
         let levels = args
@@ -51,7 +50,7 @@ impl PausedState {
                     start_at_1_config,
                     id,
                     frame,
-                    self.vm.as_ref().unwrap().lir(),
+                    self.vm.as_ref().unwrap().vm.lir(),
                 )
             },
         ));

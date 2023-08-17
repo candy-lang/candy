@@ -25,10 +25,8 @@ impl PausedState {
                 (0, range, Cow::Owned(bytes.to_vec()))
             }
             MemoryReference::Heap { address } => {
-                let vm = self.vm.as_ref().unwrap();
-
                 let object = HeapObject::new(NonNull::new(address.get() as *mut u64).unwrap());
-                if !vm.heap().objects().contains(&ObjectInHeap(object)) {
+                if !self.heap_ref().objects().contains(&ObjectInHeap(object)) {
                     return Err("memory-reference-invalid");
                 }
                 let range = HeapData::from(object).address_range();

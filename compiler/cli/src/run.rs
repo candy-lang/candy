@@ -6,7 +6,7 @@ use crate::{
 use candy_frontend::{ast_to_hir::AstToHir, hir, TracingConfig};
 use candy_vm::{
     environment::{DefaultEnvironment, Environment},
-    heap::HirId,
+    heap::{Heap, HirId},
     mir_to_lir::compile_lir,
     tracer::stack_trace::StackTracer,
     Vm, VmFinished,
@@ -50,11 +50,9 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         format_duration(compilation_end - compilation_start),
     );
 
-    let VmFinished {
-        mut heap,
-        tracer,
-        result,
-    } = Vm::for_module(&*lir, StackTracer::default()).run_forever_without_handles();
+    let mut heap = Heap::default();
+    let VmFinished { tracer, result } = Vm::for_module(&*lir, &mut heap, StackTracer::default())
+        .run_forever_without_handles(&mut heap);
     let exports = match result {
         Ok(exports) => exports,
         Err(panic) => {
@@ -63,7 +61,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
             if let Some(span) = db.hir_id_to_span(&panic.responsible) {
                 error!("Responsible is at {span:?}.");
             }
-            error!("This is the stack trace:\n{}", tracer.format(&db),);
+            error!("This is the stack trace:\n{}", tracer.format(&db));
             return Err(Exit::CodePanicked);
         }
     };
@@ -85,13 +83,13 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     let platform = HirId::create(&mut heap, true, hir::Id::platform());
     let vm = Vm::for_function(
         lir.clone(),
-        heap,
+        &mut heap,
         main,
         &[environment_object],
         platform,
         StackTracer::default(),
     );
-    let VmFinished { result, .. } = vm.run_forever_with_environment(&mut environment);
+    let VmFinished { result, .. } = vm.run_forever_with_environment(&mut heap, &mut environment);
     let result = match result {
         Ok(return_value) => {
             debug!("The main function returned: {return_value:?}");

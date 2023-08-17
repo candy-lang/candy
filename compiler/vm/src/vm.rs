@@ -29,9 +29,9 @@ pub struct MachineState {
     pub next_instruction: Option<InstructionPointer>,
     pub data_stack: Vec<InlineObject>,
     pub call_stack: Vec<InstructionPointer>,
-    pub heap: Heap,
 }
 
+#[derive(Debug)]
 pub struct CallHandle {
     pub handle: Handle,
     pub arguments: Vec<InlineObject>,
@@ -51,14 +51,14 @@ where
 {
     pub fn for_function(
         lir: L,
-        mut heap: Heap,
+        heap: &mut Heap,
         function: Function,
         arguments: &[InlineObject],
         responsible: HirId,
         mut tracer: T,
     ) -> Self {
         tracer.call_started(
-            &mut heap,
+            heap,
             responsible,
             function.into(),
             arguments.to_vec(),
@@ -69,14 +69,13 @@ where
             next_instruction: None,
             data_stack: vec![],
             call_stack: vec![],
-            heap,
         };
-        state.call_function(function, arguments, responsible);
+        state.call_function(heap, function, arguments, responsible);
 
         let inner = Box::new(VmInner { lir, state, tracer });
         Self { inner }
     }
-    pub fn for_module(lir: L, tracer: T) -> Self {
+    pub fn for_module(lir: L, heap: &mut Heap, tracer: T) -> Self {
         let actual_lir = lir.borrow();
         let function = actual_lir.module_function;
         let responsible = actual_lir.responsible_module;
@@ -90,7 +89,7 @@ where
             0,
             "Function is not a module function because it has arguments.",
         );
-        Self::for_function(lir, Heap::default(), function, &[], responsible, tracer)
+        Self::for_function(lir, heap, function, &[], responsible, tracer)
     }
 
     #[must_use]
@@ -109,10 +108,6 @@ where
     pub fn call_stack(&self) -> &[InstructionPointer] {
         &self.inner.state.call_stack
     }
-    #[must_use]
-    pub fn heap(&self) -> &Heap {
-        &self.inner.state.heap
-    }
 }
 
 #[derive(Deref)]
@@ -123,7 +118,6 @@ pub struct VmHandleCall<L: Borrow<Lir>, T: Tracer> {
 }
 #[must_use]
 pub struct VmFinished<T: Tracer> {
-    pub heap: Heap,
     pub tracer: T,
     pub result: Result<InlineObject, Panic>,
 }
@@ -140,11 +134,12 @@ where
     L: Borrow<Lir>,
     T: Tracer,
 {
-    pub fn heap(&mut self) -> &mut Heap {
-        &mut self.vm.inner.state.heap
-    }
+    pub fn complete(mut self, heap: &mut Heap, return_value: impl Into<InlineObject>) -> Vm<L, T> {
+        self.handle.drop(heap);
+        for argument in &self.call.arguments {
+            argument.drop(heap);
+        }
 
-    pub fn complete(mut self, return_value: impl Into<InlineObject>) -> Vm<L, T> {
         self.vm.inner.state.data_stack.push(return_value.into());
         self.vm
     }
@@ -156,14 +151,11 @@ where
     T: Tracer,
 {
     /// Runs one instruction in the VM and returns its new state.
-    pub fn run(mut self) -> StateAfterRun<L, T> {
+    pub fn run(mut self, heap: &mut Heap) -> StateAfterRun<L, T> {
         let Some(current_instruction) = self.inner.state.next_instruction else {
             let return_value = self.inner.state.data_stack.pop().unwrap();
-            self.inner
-                .tracer
-                .call_ended(&mut self.inner.state.heap, return_value);
+            self.inner.tracer.call_ended(heap, return_value);
             return StateAfterRun::Finished(VmFinished {
-                heap: self.inner.state.heap,
                 tracer: self.inner.tracer,
                 result: Ok(return_value),
             });
@@ -181,14 +173,13 @@ where
         let result = self
             .inner
             .state
-            .run_instruction(instruction, &mut self.inner.tracer);
+            .run_instruction(heap, instruction, &mut self.inner.tracer);
         match result {
             InstructionResult::Done => StateAfterRun::Running(self),
             InstructionResult::CallHandle(call) => {
                 StateAfterRun::CallingHandle(VmHandleCall { vm: self, call })
             }
             InstructionResult::Panic(panic) => StateAfterRun::Finished(VmFinished {
-                heap: self.inner.state.heap,
                 tracer: self.inner.tracer,
                 result: Err(panic),
             }),
@@ -196,9 +187,9 @@ where
     }
 
     /// Runs at most `max_instructions` in the VM.
-    pub fn run_n(mut self, max_instructions: usize) -> StateAfterRun<L, T> {
+    pub fn run_n(mut self, heap: &mut Heap, max_instructions: usize) -> StateAfterRun<L, T> {
         for _ in 0..max_instructions {
-            match self.run() {
+            match self.run(heap) {
                 StateAfterRun::Running(vm) => self = vm,
                 a => return a,
             }
@@ -220,9 +211,9 @@ where
 {
     /// Runs the VM until a handle call is performed, the VM returns, or it
     /// panics.
-    pub fn run_forever(mut self) -> StateAfterRunForever<L, T> {
+    pub fn run_forever(mut self, heap: &mut Heap) -> StateAfterRunForever<L, T> {
         loop {
-            match self.run() {
+            match self.run(heap) {
                 StateAfterRun::Running(vm) => self = vm,
                 StateAfterRun::CallingHandle(call) => {
                     break StateAfterRunForever::CallingHandle(call)
