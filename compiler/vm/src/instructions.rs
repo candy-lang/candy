@@ -1,8 +1,5 @@
 use crate::{
-    heap::{
-        Data, DisplayWithSymbolTable, Function, HirId, InlineObject, List, Pointer, Struct,
-        SymbolTable, Tag, Text,
-    },
+    heap::{Data, Function, HirId, InlineObject, List, Pointer, Struct, Tag, Text},
     lir::Instruction,
     tracer::Tracer,
     vm::{CallHandle, MachineState, Panic},
@@ -23,7 +20,6 @@ impl MachineState {
     pub fn run_instruction(
         &mut self,
         instruction: &Instruction,
-        symbol_table: &SymbolTable,
         tracer: &mut impl Tracer,
     ) -> InstructionResult {
         if TRACE {
@@ -55,9 +51,9 @@ impl MachineState {
         }
 
         match instruction {
-            Instruction::CreateTag { symbol_id } => {
+            Instruction::CreateTag { symbol } => {
                 let value = self.pop_from_data_stack();
-                let tag = Tag::create_with_value(&mut self.heap, true, *symbol_id, value);
+                let tag = Tag::create_with_value(&mut self.heap, true, *symbol, value);
                 self.push_to_data_stack(tag);
                 InstructionResult::Done
             }
@@ -126,7 +122,7 @@ impl MachineState {
                 arguments.reverse();
                 let callee = self.pop_from_data_stack();
 
-                self.call(callee, &arguments, responsible, symbol_table)
+                self.call(callee, &arguments, responsible)
             }
             Instruction::TailCall {
                 num_locals_to_pop,
@@ -146,7 +142,7 @@ impl MachineState {
                 // Tail calling a function is basically just a normal call, but
                 // pretending we are our caller.
                 self.next_instruction = self.call_stack.pop();
-                self.call(callee, &arguments, responsible, symbol_table)
+                self.call(callee, &arguments, responsible)
             }
             Instruction::Return => {
                 self.next_instruction = self.call_stack.pop();
@@ -213,13 +209,12 @@ impl MachineState {
         callee: InlineObject,
         arguments: &[InlineObject],
         responsible: HirId,
-        symbol_table: &SymbolTable,
     ) -> InstructionResult {
         match callee.into() {
             Data::Function(function) => self.call_function(function, arguments, responsible),
             Data::Builtin(builtin) => {
                 callee.drop(&mut self.heap);
-                self.run_builtin_function(builtin.get(), arguments, responsible, symbol_table)
+                self.run_builtin_function(builtin.get(), arguments, responsible)
             }
             Data::Handle(handle) => {
                 if arguments.len() != handle.argument_count() {
@@ -247,7 +242,7 @@ impl MachineState {
                 }
 
                 if let [value] = arguments {
-                    let tag = Tag::create_with_value(&mut self.heap, true, tag.symbol_id(), *value);
+                    let tag = Tag::create_with_value(&mut self.heap, true, tag.symbol(), *value);
                     self.push_to_data_stack(tag);
                     value.dup(&mut self.heap);
                     InstructionResult::Done
@@ -263,8 +258,7 @@ impl MachineState {
             }
             _ => InstructionResult::Panic(Panic {
                 reason: format!(
-                    "You can only call functions, builtins, tags, and handles, but you tried to call {}.",
-                    DisplayWithSymbolTable::to_string(&callee, symbol_table),
+                    "You can only call functions, builtins, tags, and handles, but you tried to call {callee}.",
                 ),
                 responsible: responsible.get().to_owned(),
             }),

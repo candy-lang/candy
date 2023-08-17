@@ -3,15 +3,17 @@ use crate::{
     input::Input,
     input_pool::{InputPool, Score},
     runner::{RunResult, Runner},
+    utils::collect_symbols_in_heap,
     values::InputGeneration,
 };
 use candy_frontend::hir::Id;
 use candy_vm::{
-    heap::{Data, DisplayWithSymbolTable, Function, Heap},
+    heap::{Data, Function, Heap},
     lir::Lir,
     tracer::stack_trace::StackTracer,
     Panic,
 };
+use itertools::Itertools;
 use std::rc::Rc;
 use tracing::debug;
 
@@ -47,8 +49,11 @@ impl Fuzzer {
             .try_into()
             .unwrap();
 
-        // PERF: Avoid collecting the symbols into a hash set of owned strings that we then copy again.
-        let pool = InputPool::new(function.argument_count(), lir.symbol_table.clone());
+        // TODO: Collect `InlineTag`s by walking `function`
+        let pool = InputPool::new(
+            function.argument_count(),
+            collect_symbols_in_heap(&heap).into_iter().collect_vec(),
+        );
         let runner = Runner::new(lir.clone(), function, pool.generate_new_input());
 
         let num_instructions = lir.instructions.len();
@@ -127,17 +132,11 @@ impl Fuzzer {
             self.function_id
                 .keys
                 .last()
-                .map(|function_name| DisplayWithSymbolTable::to_string(
-                    function_name,
-                    &runner.lir.symbol_table
-                ))
+                .map(|function_name| function_name.to_string())
                 .unwrap_or_else(|| "{…}".to_string()),
-            runner.input.to_string(&runner.lir.symbol_table),
+            runner.input,
         );
-        debug!(
-            "{}",
-            result.to_string(&runner.lir.symbol_table, &call_string)
-        );
+        debug!("{}", result.to_string(&call_string));
         match result {
             RunResult::Timeout => self.create_new_fuzzing_case(total_coverage),
             RunResult::Done { .. } | RunResult::NeedsUnfulfilled { .. } => {

@@ -199,7 +199,7 @@ impl DebugSession {
                         return Err("module-panicked");
                     }
                 };
-                let main = match result.into_main_function(&lir.symbol_table) {
+                let main = match result.into_main_function(&heap) {
                     Ok(main) => main,
                     Err(error) => {
                         error!("Failed to find main function: {error}");
