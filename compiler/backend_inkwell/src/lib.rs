@@ -696,12 +696,17 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                 }
                 candy_frontend::mir::Expression::UseModule { .. } => unreachable!(),
-                candy_frontend::mir::Expression::Panic { reason, .. } => {
+                candy_frontend::mir::Expression::Panic {
+                    reason,
+                    responsible,
+                } => {
                     let panic_fn = self.module.get_function("candy_panic").unwrap();
 
                     let reason = self.get_value_with_id(function_ctx, reason).unwrap();
+                    let responsible = self.get_value_with_id(function_ctx, responsible).unwrap();
 
-                    self.builder.build_call(panic_fn, &[reason.into()], "");
+                    self.builder
+                        .build_call(panic_fn, &[reason.into(), responsible.into()], "");
 
                     self.builder.build_unreachable();
                 }
