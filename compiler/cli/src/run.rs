@@ -5,19 +5,19 @@ use crate::{
 };
 use candy_frontend::{ast_to_hir::AstToHir, hir, TracingConfig};
 use candy_vm::{
-    heap::{Data, Handle, HirId, Struct, Tag, Text},
+    environment::{DefaultEnvironment, Environment},
+    heap::HirId,
     mir_to_lir::compile_lir,
     tracer::stack_trace::StackTracer,
-    StateAfterRunForever, Vm, VmFinished,
+    Vm, VmFinished,
 };
 use clap::{Parser, ValueHint};
 use std::{
-    io::{self, BufRead, Write},
     path::PathBuf,
     rc::Rc,
     time::{Duration, Instant},
 };
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 
 /// Run a Candy program.
 ///
@@ -81,64 +81,27 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     );
 
     debug!("Running main function.");
-    // TODO: Add more environment stuff.
-    let stdout_symbol = heap.default_symbols().stdout;
-    let stdout = Handle::new(&mut heap, 1);
-    let stdin_symbol = heap.default_symbols().stdin;
-    let stdin = Handle::new(&mut heap, 0);
-    let environment = Struct::create_with_symbol_keys(
-        &mut heap,
-        true,
-        [(stdout_symbol, **stdout), (stdin_symbol, **stdin)],
-    )
-    .into();
+    let (environment_object, mut environment) = DefaultEnvironment::new(&mut heap);
     let platform = HirId::create(&mut heap, true, hir::Id::platform());
-    let mut vm = Vm::for_function(
+    let vm = Vm::for_function(
         lir.clone(),
         heap,
         main,
-        &[environment],
+        &[environment_object],
         platform,
         StackTracer::default(),
     );
-
-    let result = loop {
-        match vm.run_forever() {
-            StateAfterRunForever::CallingHandle(mut call) => {
-                if call.handle == stdout {
-                    let message = call.arguments[0];
-
-                    match message.into() {
-                        Data::Text(text) => println!("{}", text.get()),
-                        _ => info!("Non-text value sent to stdout: {message:?}"),
-                    }
-                    let nothing = Tag::create_nothing(call.heap());
-                    vm = call.complete(nothing);
-                } else if call.handle == stdin {
-                    print!(">> ");
-                    io::stdout().flush().unwrap();
-                    let input = {
-                        let stdin = io::stdin();
-                        stdin.lock().lines().next().unwrap().unwrap()
-                    };
-                    let text = Text::create(call.heap(), true, &input);
-                    vm = call.complete(text);
-                } else {
-                    unreachable!()
-                }
-            }
-            StateAfterRunForever::Finished(VmFinished { result, .. }) => match result {
-                Ok(return_value) => {
-                    debug!("The main function returned: {return_value:?}");
-                    break Ok(());
-                }
-                Err(panic) => {
-                    error!("The main function panicked: {}", panic.reason);
-                    error!("{} is responsible.", panic.responsible);
-                    error!("This is the stack trace:\n{}", tracer.format(&db));
-                    break Err(Exit::CodePanicked);
-                }
-            },
+    let VmFinished { result, .. } = vm.run_forever_with_environment(&mut environment);
+    let result = match result {
+        Ok(return_value) => {
+            debug!("The main function returned: {return_value:?}");
+            Ok(())
+        }
+        Err(panic) => {
+            error!("The main function panicked: {}", panic.reason);
+            error!("{} is responsible.", panic.responsible);
+            error!("This is the stack trace:\n{}", tracer.format(&db));
+            Err(Exit::CodePanicked)
         }
     };
     let execution_end = Instant::now();

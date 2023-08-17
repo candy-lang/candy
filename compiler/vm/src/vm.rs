@@ -235,58 +235,6 @@ where
     }
 }
 
-#[must_use]
-pub enum StateAfterRunWithoutHandles<L: Borrow<Lir>, T: Tracer> {
-    Running(Vm<L, T>),
-    Finished(VmFinished<T>),
-}
-impl<L, T> StateAfterRunWithoutHandles<L, T>
-where
-    L: Borrow<Lir>,
-    T: Tracer,
-{
-    fn unwrap_from(state: StateAfterRun<L, T>) -> Self {
-        match state {
-            StateAfterRun::Running(vm) => Self::Running(vm),
-            StateAfterRun::CallingHandle(_) => panic!("A handle was called."),
-            StateAfterRun::Finished(finished) => Self::Finished(finished),
-        }
-    }
-}
-impl<L, T> Vm<L, T>
-where
-    L: Borrow<Lir>,
-    T: Tracer,
-{
-    pub fn run_without_handles(self) -> StateAfterRunWithoutHandles<L, T> {
-        StateAfterRunWithoutHandles::unwrap_from(self.run())
-    }
-
-    pub fn run_n_without_handles(
-        self,
-        max_instructions: usize,
-    ) -> StateAfterRunWithoutHandles<L, T> {
-        StateAfterRunWithoutHandles::unwrap_from(self.run_n(max_instructions))
-    }
-}
-
-impl<L, T> Vm<L, T>
-where
-    L: Borrow<Lir>,
-    T: Tracer,
-{
-    /// Runs this VM until completion. Only call this if you are sure the VM
-    /// won't call any handles.
-    pub fn run_forever_without_handles(self) -> VmFinished<T> {
-        match self.run_forever() {
-            StateAfterRunForever::CallingHandle(_) => {
-                panic!("A handle was called.")
-            }
-            StateAfterRunForever::Finished(finished) => finished,
-        }
-    }
-}
-
 #[extension_trait]
 impl<K: Eq + Hash, V> ReplaceHashMapValue<K, V> for HashMap<K, V> {
     fn replace<F: FnOnce(V) -> V>(&mut self, key: K, replacer: F) {

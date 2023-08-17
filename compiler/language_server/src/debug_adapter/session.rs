@@ -9,11 +9,12 @@ use candy_frontend::{
     TracingConfig, TracingMode,
 };
 use candy_vm::{
+    environment::StateAfterRunWithoutHandles,
     heap::{HirId, Struct},
     lir::Instruction,
     mir_to_lir::compile_lir,
     tracer::DummyTracer,
-    StateAfterRunWithoutHandles, Vm, VmFinished,
+    Vm, VmFinished,
 };
 use dap::{
     events::StoppedEventBody,
