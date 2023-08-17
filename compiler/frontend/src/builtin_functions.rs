@@ -41,6 +41,7 @@ pub enum BuiltinFunction {
     TagGetValue,         // tag -> any
     TagHasValue,         // tag -> booleanTag
     TagWithoutValue,     // tag -> tag
+    TagWithValue,        // tag value -> tag
     TextCharacters,      // text -> (listOfText: list)
     TextConcatenate,     // (textA: text) (textB: text) -> (concatenated: text)
     TextContains,        // text (pattern: text) -> booleanTag
@@ -94,6 +95,7 @@ impl BuiltinFunction {
             Self::TagGetValue => true,
             Self::TagHasValue => true,
             Self::TagWithoutValue => true,
+            Self::TagWithValue => true,
             Self::TextCharacters => true,
             Self::TextConcatenate => true,
             Self::TextContains => true,
@@ -145,6 +147,7 @@ impl BuiltinFunction {
             Self::TagGetValue => 1,
             Self::TagHasValue => 1,
             Self::TagWithoutValue => 1,
+            Self::TagWithValue => 2,
             Self::TextCharacters => 1,
             Self::TextConcatenate => 2,
             Self::TextContains => 2,

@@ -412,6 +412,18 @@ fn run_builtin(
                 value: None,
             }
         }
+        BuiltinFunction::TagWithValue => {
+            let [tag, value] = arguments else {
+                unreachable!()
+            };
+            let Expression::Tag { symbol, .. } = visible.get(*tag) else {
+                return None;
+            };
+            Expression::Tag {
+                symbol: symbol.clone(),
+                value: Some(*value),
+            }
+        }
         BuiltinFunction::TextCharacters => {
             let [text] = arguments else { unreachable!() };
             let Expression::Text(text) = visible.get(*text) else {
@@ -658,6 +670,7 @@ fn run_builtin(
                         BuiltinFunction::TagGetValue => return None,
                         BuiltinFunction::TagHasValue => "Tag",
                         BuiltinFunction::TagWithoutValue => "Tag",
+                        BuiltinFunction::TagWithValue => "Tag",
                         BuiltinFunction::TextCharacters => "List",
                         BuiltinFunction::TextConcatenate => "Text",
                         BuiltinFunction::TextContains => "Tag",
