@@ -101,7 +101,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         Err(panic) => {
             error!("The main function panicked: {}", panic.reason);
             error!("{} is responsible.", panic.responsible);
-            error!("This is the stack trace:\n{}", tracer.format(&db),);
+            error!("This is the stack trace:\n{}", tracer.format(&db));
             Err(Exit::CodePanicked)
         }
     };

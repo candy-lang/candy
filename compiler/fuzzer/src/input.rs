@@ -21,7 +21,7 @@ impl Display for Input {
             "{}",
             self.arguments
                 .iter()
-                .map(|argument| argument.to_debug_text(Precedence::High, MaxLength::Limited(40),))
+                .map(|argument| argument.to_debug_text(Precedence::High, MaxLength::Limited(40)))
                 .join(" "),
         )
     }
