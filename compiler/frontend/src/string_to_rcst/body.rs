@@ -14,9 +14,8 @@ use tracing::instrument;
 pub fn body(mut input: &str, indentation: usize) -> (&str, Vec<Rcst>) {
     let mut expressions = vec![];
 
-    let mut number_of_expressions_in_last_iteration = usize::MAX;
-    while number_of_expressions_in_last_iteration < expressions.len() {
-        number_of_expressions_in_last_iteration = expressions.len();
+    loop {
+        let num_expressions_before = expressions.len();
 
         let (new_input, mut whitespace) = whitespaces_and_newlines(input, indentation, true);
         input = new_input;
@@ -71,6 +70,11 @@ pub fn body(mut input: &str, indentation: usize) -> (&str, Vec<Rcst>) {
                 input = new_input;
                 expressions.push(cst);
             }
+        }
+
+        let num_expressions_after = expressions.len();
+        if num_expressions_before == num_expressions_after {
+            break;
         }
     }
     (input, expressions)
