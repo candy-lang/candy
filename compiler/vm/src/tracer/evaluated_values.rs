@@ -9,14 +9,16 @@ pub struct EvaluatedValuesTracer {
     evaluated_values: FxHashMap<Id, InlineObject>,
 }
 impl EvaluatedValuesTracer {
+    #[must_use]
     pub fn new(module: Module) -> Self {
-        EvaluatedValuesTracer {
+        Self {
             module,
             evaluated_values: FxHashMap::default(),
         }
     }
 
-    pub fn values(&self) -> &FxHashMap<Id, InlineObject> {
+    #[must_use]
+    pub const fn values(&self) -> &FxHashMap<Id, InlineObject> {
         &self.evaluated_values
     }
 }
@@ -28,6 +30,6 @@ impl Tracer for EvaluatedValuesTracer {
         }
 
         value.dup(heap);
-        self.evaluated_values.insert(id.to_owned(), value);
+        self.evaluated_values.insert(id.clone(), value);
     }
 }

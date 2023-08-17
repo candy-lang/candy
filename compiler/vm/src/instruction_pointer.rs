@@ -7,10 +7,12 @@ use std::{
 #[derive(Clone, Copy, Deref, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
 pub struct InstructionPointer(usize);
 impl InstructionPointer {
-    pub fn null_pointer() -> Self {
+    #[must_use]
+    pub const fn null_pointer() -> Self {
         Self(0)
     }
-    pub fn next(&self) -> Self {
+    #[must_use]
+    pub const fn next(&self) -> Self {
         Self(self.0 + 1)
     }
 }

@@ -20,7 +20,7 @@ pub struct HeapList(HeapObject);
 impl HeapList {
     const LEN_SHIFT: usize = 4;
 
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
     pub fn create(heap: &mut Heap, is_reference_counted: bool, value: &[InlineObject]) -> Self {
@@ -139,7 +139,7 @@ impl PartialEq for HeapList {
 
 impl Hash for HeapList {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.items().hash(state)
+        self.items().hash(state);
     }
 }
 
@@ -180,7 +180,7 @@ impl HeapObjectTrait for HeapList {
 
     fn drop_children(self, heap: &mut Heap) {
         for item in self.items() {
-            item.drop(heap)
+            item.drop(heap);
         }
     }
 

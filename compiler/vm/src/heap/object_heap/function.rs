@@ -22,7 +22,7 @@ impl HeapFunction {
     const CAPTURED_LEN_SHIFT: usize = 32;
     const ARGUMENT_COUNT_SHIFT: usize = 4;
 
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
     pub fn create(
@@ -85,6 +85,7 @@ impl HeapFunction {
         self.content_word_pointer(0)
     }
     pub fn body(self) -> InstructionPointer {
+        #[allow(clippy::cast_possible_truncation)]
         unsafe { *self.body_pointer().as_ref() as usize }.into()
     }
     pub fn set_body(self, body: InstructionPointer) {

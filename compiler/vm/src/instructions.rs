@@ -162,8 +162,8 @@ impl MachineState {
                 let responsible: HirId = responsible_for_panic.try_into().unwrap();
 
                 InstructionResult::Panic(Panic {
-                    reason: reason.get().to_owned(),
-                    responsible: responsible.get().to_owned(),
+                    reason: reason.get().to_string(),
+                    responsible: responsible.get().clone(),
                 })
             }
             Instruction::TraceCallStarts { num_args } => {
@@ -237,7 +237,7 @@ impl MachineState {
                 if tag.has_value() {
                     return InstructionResult::Panic(Panic {
                         reason: "A tag's value cannot be overwritten by calling it. Use `tag.withValue` instead.".to_string(),
-                        responsible: responsible.get().to_owned(),
+                        responsible: responsible.get().clone(),
                     });
                 }
 
@@ -252,7 +252,7 @@ impl MachineState {
                             "A tag can only hold exactly one value, but you called it with {} arguments.",
                             arguments.len(),
                         ),
-                        responsible: responsible.get().to_owned(),
+                        responsible: responsible.get().clone(),
                 })
                 }
             }
@@ -260,7 +260,7 @@ impl MachineState {
                 reason: format!(
                     "You can only call functions, builtins, tags, and handles, but you tried to call {callee}.",
                 ),
-                responsible: responsible.get().to_owned(),
+                responsible: responsible.get().clone(),
             }),
         }
     }

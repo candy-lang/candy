@@ -11,7 +11,16 @@
     strict_provenance,
     try_blocks
 )]
-#![allow(clippy::large_enum_variant)]
+#![warn(clippy::nursery, clippy::pedantic)]
+#![allow(
+    clippy::large_enum_variant,
+    clippy::match_same_arms,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::module_name_repetitions,
+    clippy::similar_names,
+    clippy::too_many_lines
+)]
 
 use crate::heap::{Struct, Tag};
 use heap::{Function, Heap, InlineObject};

@@ -20,7 +20,7 @@ pub struct InlineTag(InlineObject);
 impl InlineTag {
     const SYMBOL_POINTER_MASK: u64 = !0b111;
 
-    pub fn new_unchecked(object: InlineObject) -> Self {
+    pub const fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
     }
     pub fn new(symbol: Text) -> Self {
