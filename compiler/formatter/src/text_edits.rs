@@ -20,7 +20,7 @@ impl TextEdit {
 /// inserts have the same position, the order in the array defines the order in which the inserted
 /// strings appear in the resulting text.
 ///
-/// https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textEditArray
+/// <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textEditArray>
 pub struct TextEdits {
     source: String,
 
@@ -41,6 +41,7 @@ impl TextEdits {
     pub fn has_edits(&self) -> bool {
         !self.edits.is_empty()
     }
+    #[allow(clippy::map_unwrap_or)]
     pub fn has_edit_at(&self, offset: Offset) -> bool {
         self.edits
             .binary_search_by_key(&offset, |it| it.range.start)
