@@ -6,7 +6,7 @@ use crate::{
 use candy_frontend::{ast_to_hir::AstToHir, hir, TracingConfig};
 use candy_language_server::utils::LspPositionConversion;
 use candy_vm::{
-    environment::{DefaultEnvironment, Environment},
+    environment::DefaultEnvironment,
     heap::{Heap, HirId},
     mir_to_lir::compile_lir,
     tracer::stack_trace::StackTracer,
@@ -31,6 +31,9 @@ pub(crate) struct Options {
     /// current working directory will be run.
     #[arg(value_hint = ValueHint::FilePath)]
     path: Option<PathBuf>,
+
+    #[arg(last(true))]
+    arguments: Vec<String>,
 }
 
 pub(crate) fn run(options: Options) -> ProgramResult {
@@ -96,7 +99,8 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     );
 
     debug!("Running main function.");
-    let (environment_object, mut environment) = DefaultEnvironment::new(&mut heap);
+    let (environment_object, mut environment) =
+        DefaultEnvironment::new(&mut heap, &options.arguments);
     let platform = HirId::create(&mut heap, true, hir::Id::platform());
     let vm = Vm::for_function(
         lir.clone(),
