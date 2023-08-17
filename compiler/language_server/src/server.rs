@@ -26,7 +26,7 @@ use lsp_types::{
 };
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::mem;
+use std::{borrow::Cow, mem};
 use tokio::sync::{Mutex, RwLock, RwLockMappedWriteGuard, RwLockReadGuard, RwLockWriteGuard};
 use tower_lsp::{jsonrpc, Client, ClientSocket, LanguageServer, LspService};
 use tracing::{debug, span, Level};
@@ -583,7 +583,7 @@ impl LanguageServer for Server {
             })),
             Err(RenameError::NewNameInvalid) => Err(jsonrpc::Error {
                 code: jsonrpc::ErrorCode::InvalidParams,
-                message: "The new name is not valid.".to_string(),
+                message: Cow::Borrowed("The new name is not valid."),
                 data: None,
             }),
         }
