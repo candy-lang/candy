@@ -498,11 +498,9 @@ impl LoweringContext {
                             self.lower_cst(key, key_lowering_type)
                         } else {
                             self.create_error_ast(
-                               colon,
-                               vec![self.create_error(colon,
-                               AstError::StructKeyMissesColon,
-                               )],
-                           )
+                                colon,
+                                vec![self.create_error(colon, AstError::StructKeyMissesColon)],
+                            )
                         };
 
                         let mut value = self.lower_cst(&value.clone(), lowering_type);
@@ -510,9 +508,7 @@ impl LoweringContext {
                         if let Some(comma) = comma && !comma.kind.is_comma() {
                             value = self.create_error_ast(
                                 comma,
-                                vec![self.create_error(comma, 
-                                AstError::StructValueMissesComma,
-                                )],
+                                vec![self.create_error(comma, AstError::StructValueMissesComma)],
                             );
                         }
 
@@ -769,8 +765,7 @@ impl LoweringContext {
             let identifier = self.create_string(cst.data.id, identifier.clone());
             self.create_ast(cst.data.id, Identifier(identifier))
         } else {
-            let identifier =
-                self.create_string(cst.data.id, format!("<invalid#{index}>"));
+            let identifier = self.create_string(cst.data.id, format!("<invalid#{index}>"));
             self.create_ast(cst.data.id, Identifier(identifier));
             self.create_error_ast(
                 cst,
