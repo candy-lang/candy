@@ -1,10 +1,11 @@
 use crate::{
-    heap::{Data, Handle, Heap, InlineObject, Struct, Tag, Text},
+    heap::{Data, Handle, Heap, InlineObject, List, Struct, Tag, Text},
     lir::Lir,
     tracer::Tracer,
     vm::VmHandleCall,
     StateAfterRun, StateAfterRunForever, Vm, VmFinished,
 };
+use itertools::Itertools;
 use std::{
     borrow::Borrow,
     io::{self, BufRead},
@@ -12,7 +13,6 @@ use std::{
 use tracing::info;
 
 pub trait Environment {
-    fn new(heap: &mut Heap) -> (InlineObject, Self);
     fn handle<L: Borrow<Lir>, T: Tracer>(
         &mut self,
         heap: &mut Heap,
@@ -22,9 +22,6 @@ pub trait Environment {
 
 pub struct EmptyEnvironment;
 impl Environment for EmptyEnvironment {
-    fn new(heap: &mut Heap) -> (InlineObject, Self) {
-        (Tag::create_nothing(heap).into(), Self)
-    }
     fn handle<L: Borrow<Lir>, T: Tracer>(
         &mut self,
         _heap: &mut Heap,
@@ -53,14 +50,20 @@ pub struct DefaultEnvironment {
     stdin_handle: Handle,
     stdout_handle: Handle,
 }
-impl Environment for DefaultEnvironment {
-    fn new(heap: &mut Heap) -> (InlineObject, Self) {
+impl DefaultEnvironment {
+    pub fn new(heap: &mut Heap, args: &[String]) -> (InlineObject, Self) {
+        let arguments = args
+            .iter()
+            .map(|it| Text::create(heap, true, it).into())
+            .collect_vec();
+        let arguments = List::create(heap, true, arguments.as_slice());
         let stdin_handle = Handle::new(heap, 0);
         let stdout_handle = Handle::new(heap, 1);
         let environment_object = Struct::create_with_symbol_keys(
             heap,
             true,
             [
+                (heap.default_symbols().arguments, arguments.into()),
                 (heap.default_symbols().stdout, **stdout_handle),
                 (heap.default_symbols().stdin, **stdin_handle),
             ],
@@ -71,6 +74,8 @@ impl Environment for DefaultEnvironment {
         };
         (environment_object.into(), environment)
     }
+}
+impl Environment for DefaultEnvironment {
     fn handle<L: Borrow<Lir>, T: Tracer>(
         &mut self,
         heap: &mut Heap,

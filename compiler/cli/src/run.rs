@@ -4,8 +4,9 @@ use crate::{
     Exit, ProgramResult,
 };
 use candy_frontend::{ast_to_hir::AstToHir, hir, TracingConfig};
+use candy_language_server::utils::LspPositionConversion;
 use candy_vm::{
-    environment::{DefaultEnvironment, Environment},
+    environment::DefaultEnvironment,
     heap::{Heap, HirId},
     mir_to_lir::compile_lir,
     tracer::stack_trace::StackTracer,
@@ -30,11 +31,14 @@ pub(crate) struct Options {
     /// current working directory will be run.
     #[arg(value_hint = ValueHint::FilePath)]
     path: Option<PathBuf>,
+
+    #[arg(last(true))]
+    arguments: Vec<String>,
 }
 
 pub(crate) fn run(options: Options) -> ProgramResult {
     let packages_path = packages_path();
-    let db = Database::new_with_file_system_module_provider(packages_path);
+    let db = Database::new_with_file_system_module_provider(packages_path.clone());
     let module = module_for_path(options.path)?;
 
     let tracing = TracingConfig::off();
@@ -42,7 +46,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     debug!("Running {module}.");
 
     let compilation_start = Instant::now();
-    let lir = Rc::new(compile_lir(&db, module, tracing).0);
+    let lir = Rc::new(compile_lir(&db, module.clone(), tracing).0);
 
     let compilation_end = Instant::now();
     debug!(
@@ -59,7 +63,23 @@ pub(crate) fn run(options: Options) -> ProgramResult {
             error!("The module panicked: {}", panic.reason);
             error!("{} is responsible.", panic.responsible);
             if let Some(span) = db.hir_id_to_span(&panic.responsible) {
-                error!("Responsible is at {span:?}.");
+                let current_package_path = module.package.to_path(&packages_path).unwrap();
+                let file = panic
+                    .responsible
+                    .module
+                    .try_to_path(&packages_path)
+                    .and_then(|it| {
+                        it.strip_prefix(current_package_path)
+                            .unwrap_or(&it)
+                            .to_str()
+                            .map(|it| it.to_string())
+                    })
+                    .unwrap_or_else(|| panic.responsible.module.to_string());
+                let range = db.range_to_lsp_range(panic.responsible.module.clone(), span);
+                error!(
+                    "{file}:{}:{} – {}:{}",
+                    range.start.line, range.start.character, range.end.line, range.end.character,
+                );
             }
             error!("This is the stack trace:\n{}", tracer.format(&db));
             return Err(Exit::CodePanicked);
@@ -79,7 +99,8 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     );
 
     debug!("Running main function.");
-    let (environment_object, mut environment) = DefaultEnvironment::new(&mut heap);
+    let (environment_object, mut environment) =
+        DefaultEnvironment::new(&mut heap, &options.arguments);
     let platform = HirId::create(&mut heap, true, hir::Id::platform());
     let vm = Vm::for_function(
         lir.clone(),
