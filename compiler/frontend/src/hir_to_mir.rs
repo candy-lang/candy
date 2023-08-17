@@ -62,7 +62,7 @@ fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> MirResult {
 /// Here's a high-level pseudocode of the generated `needs` function:
 ///
 /// ```pseudocode
-/// needs = { condition reason responsibleForCondition (responsibleForCall) ->
+/// needs = { condition reason responsibleForCondition responsibleForCall ->
 ///   isConditionBool = builtinIfElse
 ///     builtinEquals condition True
 ///     { True }
@@ -345,25 +345,118 @@ impl<'a> LoweringContext<'a> {
                 arguments,
             } => {
                 let call_site = body.push_hir_id(hir_id.clone());
+                let callee = self.mapping[function];
                 let arguments = arguments
                     .iter()
                     .map(|argument| self.mapping[argument])
-                    .chain([call_site])
                     .collect_vec();
 
                 if self.tracing.calls.is_enabled() {
                     body.push(Expression::TraceCallStarts {
                         hir_call: call_site,
-                        function: self.mapping[function],
-                        arguments: arguments.clone(),
+                        function: callee,
+                        arguments: arguments.iter().copied().chain([call_site]).collect(),
                     });
                 }
-                let call = body.push_call(self.mapping[function], arguments);
+
+                let result = {
+                    let type_of = body.push_builtin(BuiltinFunction::TypeOf);
+                    let equals = body.push_builtin(BuiltinFunction::Equals);
+                    let type_of_callee = body.push_call(type_of, vec![callee, call_site]);
+                    let tag_tag = body.push_tag("Tag".to_string(), None);
+                    let is_callee_tag =
+                        body.push_call(equals, vec![type_of_callee, tag_tag, call_site]);
+
+                    body.push_if_else(
+                        hir_id,
+                        is_callee_tag,
+                        |body| {
+                            if arguments.len() == 1 {
+                                let tag_has_value = body.push_builtin(BuiltinFunction::TagHasValue);
+                                let tag_has_value =
+                                    body.push_call(tag_has_value, vec![callee, call_site]);
+                                body.push_if_else(
+                                    hir_id,
+                                    tag_has_value,
+                                    |body| {
+                                        let reason = body
+                                            .push_text("The tag already has a value.".to_string());
+                                        body.push_panic(reason, call_site);
+                                    },
+                                    |body| {
+                                        let tag_with_value =
+                                            body.push_builtin(BuiltinFunction::TagWithValue);
+                                        body.push_call(
+                                            tag_with_value,
+                                            vec![callee, arguments[0], call_site],
+                                        );
+                                    },
+                                    call_site,
+                                );
+                            } else {
+                                let reason = body.push_text(
+                                    "Tags can only have one associated value.".to_string(),
+                                );
+                                body.push_panic(reason, call_site);
+                            }
+                        },
+                        |body| {
+                            let function_tag = body.push_tag("Function".to_string(), None);
+                            let is_callee_function = body
+                                .push_call(equals, vec![type_of_callee, function_tag, call_site]);
+
+                            body.push_if_else(
+                                hir_id,
+                                is_callee_function,
+                                |body| {
+                                    let get_argument_count =
+                                        body.push_builtin(BuiltinFunction::GetArgumentCount);
+                                    let expected_argument_count =
+                                        body.push_call(get_argument_count, vec![callee, call_site]);
+                                    let actual_argument_count =
+                                        body.push_int(arguments.len().into());
+                                    let has_correct_argument_count = body.push_call(
+                                        equals,
+                                        vec![
+                                            actual_argument_count,
+                                            expected_argument_count,
+                                            call_site,
+                                        ],
+                                    );
+                                    body.push_if_else(
+                                        hir_id,
+                                        has_correct_argument_count,
+                                        |body| {
+                                            body.push_call(callee, arguments.iter().copied().chain([call_site]).collect());
+                                        },
+                                        |body| {
+                                            let reason = body.push_text("You called the function with the wrong number of arguments.".to_string());
+                                            body.push_panic(reason, call_site);
+                                        },
+                                        call_site,
+                                    );
+                                },
+                                |body| {
+                                    let reason = body.push_text(
+                                        "You tried to call something that's not a function."
+                                            .to_string(),
+                                    );
+                                    body.push_panic(reason, call_site);
+                                },
+                                call_site,
+                            );
+                        },
+                        call_site,
+                    )
+                };
+
                 if self.tracing.calls.is_enabled() {
-                    body.push(Expression::TraceCallEnds { return_value: call });
-                    body.push_reference(call)
+                    body.push(Expression::TraceCallEnds {
+                        return_value: result,
+                    });
+                    body.push_reference(result)
                 } else {
-                    call
+                    result
                 }
             }
             hir::Expression::UseModule {
