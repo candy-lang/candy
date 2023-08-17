@@ -212,7 +212,7 @@ impl Context<'_> {
         if let Expression::Call { function, arguments, .. } = &**expression
             && let Expression::Function { original_hirs, .. } = self.visible.get(*function)
             && original_hirs.contains(&hir::Id::needs())
-            && arguments.len() == 3
+            && arguments.len() == 4
             && let Expression::Tag { symbol, value: None  } = self.visible.get(arguments[0])
             && symbol == "True" {
             **expression = Expression::nothing();
