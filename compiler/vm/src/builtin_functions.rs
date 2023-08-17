@@ -266,9 +266,11 @@ impl Heap {
     }
     fn int_parse(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text| {
-            let result = match BigInt::from_str(text.get()) {
-                Ok(int) => Ok(Int::create_from_bigint(self, true, int).into()),
-                Err(err) => Err(Text::create(self, true, &ToString::to_string(&err)).into()),
+            let result = if let Ok(int) = BigInt::from_str(text.get()) {
+                Ok(Int::create_from_bigint(self, true, int).into())
+            } else {
+                let not_an_integer = Text::create(self, true, "NotAnInteger");
+                Err(Tag::create_with_value_option(self, true, not_an_integer, None).into())
             };
             Return(Tag::create_result(self, true, result).into())
         })
@@ -428,7 +430,7 @@ impl Heap {
                     Int::try_from(it)
                         .ok()
                         .and_then(Int::try_get)
-                        .ok_or_else(|| format!("Value is not a byte: {it}.",))
+                        .ok_or_else(|| format!("Value is not a byte: {it}."))
                 })
                 .try_collect()?;
             Return(Text::create_from_utf8(self, true, &bytes).into())
