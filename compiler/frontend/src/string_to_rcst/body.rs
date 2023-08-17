@@ -14,9 +14,9 @@ use tracing::instrument;
 pub fn body(mut input: &str, indentation: usize) -> (&str, Vec<Rcst>) {
     let mut expressions = vec![];
 
-    let mut number_of_expressions_in_last_iteration = -1i64;
-    while number_of_expressions_in_last_iteration < expressions.len() as i64 {
-        number_of_expressions_in_last_iteration = expressions.len() as i64;
+    let mut number_of_expressions_in_last_iteration = usize::MAX;
+    while number_of_expressions_in_last_iteration < expressions.len() {
+        number_of_expressions_in_last_iteration = expressions.len();
 
         let (new_input, mut whitespace) = whitespaces_and_newlines(input, indentation, true);
         input = new_input;
@@ -44,7 +44,7 @@ pub fn body(mut input: &str, indentation: usize) -> (&str, Vec<Rcst>) {
             );
         }
 
-        match expression(
+        let parsed_expression = expression(
             input,
             indentation,
             ExpressionParsingOptions {
@@ -53,25 +53,23 @@ pub fn body(mut input: &str, indentation: usize) -> (&str, Vec<Rcst>) {
                 allow_bar: true,
                 allow_function: true,
             },
-        ) {
-            Some((new_input, expression)) => {
-                input = new_input;
+        );
+        if let Some((new_input, expression)) = parsed_expression {
+            input = new_input;
 
-                let (mut whitespace, expression) = expression.split_outer_trailing_whitespace();
-                expressions.push(expression);
-                expressions.append(&mut whitespace);
-            }
-            None => {
-                let fallback = colon(new_input)
-                    .or_else(|| comma(new_input))
-                    .or_else(|| closing_parenthesis(new_input))
-                    .or_else(|| closing_bracket(new_input))
-                    .or_else(|| closing_curly_brace(new_input))
-                    .or_else(|| arrow(new_input));
-                if let Some((new_input, cst)) = fallback {
-                    input = new_input;
-                    expressions.push(cst);
-                }
+            let (mut whitespace, expression) = expression.split_outer_trailing_whitespace();
+            expressions.push(expression);
+            expressions.append(&mut whitespace);
+        } else {
+            let fallback = colon(new_input)
+                .or_else(|| comma(new_input))
+                .or_else(|| closing_parenthesis(new_input))
+                .or_else(|| closing_bracket(new_input))
+                .or_else(|| closing_curly_brace(new_input))
+                .or_else(|| arrow(new_input));
+            if let Some((new_input, cst)) = fallback {
+                input = new_input;
+                expressions.push(cst);
             }
         }
     }

@@ -61,7 +61,7 @@ pub fn struct_(input: &str, indentation: usize, allow_function: bool) -> Option<
             _ => (
                 input,
                 CstKind::Error {
-                    unparsable_input: "".to_string(),
+                    unparsable_input: String::new(),
                     error: CstError::StructFieldMissesColon,
                 }
                 .into(),
@@ -91,7 +91,7 @@ pub fn struct_(input: &str, indentation: usize, allow_function: bool) -> Option<
             None => (
                 input,
                 CstKind::Error {
-                    unparsable_input: "".to_string(),
+                    unparsable_input: String::new(),
                     error: CstError::StructFieldMissesValue,
                 }
                 .into(),
@@ -119,7 +119,7 @@ pub fn struct_(input: &str, indentation: usize, allow_function: bool) -> Option<
         let is_using_shorthand = key_or_value.is_some() && !has_colon && !has_value;
         let key_or_value = key_or_value.unwrap_or_else(|| {
             CstKind::Error {
-                unparsable_input: "".to_string(),
+                unparsable_input: String::new(),
                 error: if is_using_shorthand {
                     CstError::StructFieldMissesValue
                 } else {
@@ -164,7 +164,7 @@ pub fn struct_(input: &str, indentation: usize, allow_function: bool) -> Option<
         None => (
             input,
             CstKind::Error {
-                unparsable_input: "".to_string(),
+                unparsable_input: String::new(),
                 error: CstError::StructNotClosed,
             }
             .into(),
@@ -276,7 +276,7 @@ mod test {
                     .into()],
                     closing_bracket: Box::new(
                         CstKind::Error {
-                            unparsable_input: "".to_string(),
+                            unparsable_input: String::new(),
                             error: CstError::StructNotClosed,
                         }
                         .into()

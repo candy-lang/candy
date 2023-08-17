@@ -80,7 +80,7 @@ pub fn list(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
             None => (
                 new_input,
                 CstKind::Error {
-                    unparsable_input: "".to_string(),
+                    unparsable_input: String::new(),
                     error: CstError::ListItemMissesValue,
                 }
                 .into(),
@@ -135,7 +135,7 @@ pub fn list(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
         None => (
             input,
             CstKind::Error {
-                unparsable_input: "".to_string(),
+                unparsable_input: String::new(),
                 error: CstError::ListNotClosed,
             }
             .into(),

@@ -47,22 +47,21 @@ pub fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
                 }
             }
             Some('{') => {
-                match text_interpolation(input, indentation, opening_single_quotes.len() + 1) {
-                    Some((input_after_interpolation, interpolation)) => {
-                        push_line_to_parts(&mut line, &mut parts);
-                        input = input_after_interpolation;
-                        parts.push(interpolation);
-                    }
-                    None => {
-                        input = &input[1..];
-                        line.push('{');
-                    }
+                if let Some((input_after_interpolation, interpolation)) =
+                    text_interpolation(input, indentation, opening_single_quotes.len() + 1)
+                {
+                    push_line_to_parts(&mut line, &mut parts);
+                    input = input_after_interpolation;
+                    parts.push(interpolation);
+                } else {
+                    input = &input[1..];
+                    line.push('{');
                 }
             }
             None => {
                 push_line_to_parts(&mut line, &mut parts);
                 break CstKind::Error {
-                    unparsable_input: "".to_string(),
+                    unparsable_input: String::new(),
                     error: CstError::TextNotClosed,
                 };
             }
@@ -71,9 +70,9 @@ pub fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
                 let (i, mut whitespace) = whitespaces_and_newlines(input, indentation + 1, false);
                 input = i;
                 parts.append(&mut whitespace);
-                if let Some('\n') = input.chars().next() {
+                if input.starts_with('\n') {
                     break CstKind::Error {
-                        unparsable_input: "".to_string(),
+                        unparsable_input: String::new(),
                         error: CstError::TextNotSufficientlyIndented,
                     };
                 }
@@ -127,7 +126,7 @@ fn text_interpolation(
     .unwrap_or((
         input,
         CstKind::Error {
-            unparsable_input: "".to_string(),
+            unparsable_input: String::new(),
             error: CstError::TextInterpolationMissesExpression,
         }
         .into(),
@@ -140,7 +139,7 @@ fn text_interpolation(
         parse_multiple(input, closing_curly_brace, Some((curly_brace_count, false))).unwrap_or((
             input,
             vec![CstKind::Error {
-                unparsable_input: "".to_string(),
+                unparsable_input: String::new(),
                 error: CstError::TextInterpolationNotClosed,
             }
             .into()],
@@ -219,7 +218,7 @@ mod test {
                     parts: vec![CstKind::TextPart("foo".to_string()).into()],
                     closing: Box::new(
                         CstKind::Error {
-                            unparsable_input: "".to_string(),
+                            unparsable_input: String::new(),
                             error: CstError::TextNotSufficientlyIndented,
                         }
                         .into(),
@@ -243,7 +242,7 @@ mod test {
                     parts: vec![CstKind::TextPart("foo".to_string()).into()],
                     closing: Box::new(
                         CstKind::Error {
-                            unparsable_input: "".to_string(),
+                            unparsable_input: String::new(),
                             error: CstError::TextNotClosed,
                         }
                         .into(),
@@ -554,7 +553,7 @@ mod test {
                             opening_curly_braces: vec![CstKind::OpeningCurlyBrace.into()],
                             expression: Box::new(
                                 CstKind::Error {
-                                    unparsable_input: "".to_string(),
+                                    unparsable_input: String::new(),
                                     error: CstError::TextInterpolationMissesExpression,
                                 }
                                 .into(),
@@ -611,7 +610,7 @@ mod test {
                                             parts: vec![],
                                             closing: Box::new(
                                                 CstKind::Error {
-                                                    unparsable_input: "".to_string(),
+                                                    unparsable_input: String::new(),
                                                     error: CstError::TextNotClosed,
                                                 }
                                                 .into()
@@ -623,7 +622,7 @@ mod test {
                                 .into(),
                             ),
                             closing_curly_braces: vec![CstKind::Error {
-                                unparsable_input: "".to_string(),
+                                unparsable_input: String::new(),
                                 error: CstError::TextInterpolationNotClosed,
                             }
                             .into()],
@@ -632,7 +631,7 @@ mod test {
                     ],
                     closing: Box::new(
                         CstKind::Error {
-                            unparsable_input: "".to_string(),
+                            unparsable_input: String::new(),
                             error: CstError::TextNotClosed,
                         }
                         .into(),

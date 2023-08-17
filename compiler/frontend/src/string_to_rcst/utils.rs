@@ -4,12 +4,14 @@ pub static MEANINGFUL_PUNCTUATION: &str = r#"=,.:|()[]{}->'"%#"#;
 pub static SUPPORTED_WHITESPACE: &str = " \r\n\t";
 
 impl CstKind<()> {
+    #[must_use]
     pub fn wrap_in_whitespace(self, whitespace: Vec<Rcst>) -> Rcst {
         Rcst::from(self).wrap_in_whitespace(whitespace)
     }
 }
 impl Rcst {
-    pub fn wrap_in_whitespace(mut self, mut whitespace: Vec<Rcst>) -> Rcst {
+    #[must_use]
+    pub fn wrap_in_whitespace(mut self, mut whitespace: Vec<Self>) -> Self {
         if whitespace.is_empty() {
             return self;
         }
@@ -119,26 +121,27 @@ pub fn build_newline() -> Rcst {
 
 #[cfg(test)]
 impl Rcst {
-    pub fn with_trailing_space(self) -> Rcst {
+    #[must_use]
+    pub fn with_trailing_space(self) -> Self {
         self.with_trailing_whitespace(vec![CstKind::Whitespace(" ".to_string())])
     }
-    pub fn with_trailing_whitespace(self, trailing_whitespace: Vec<CstKind<()>>) -> Rcst {
+    #[must_use]
+    pub fn with_trailing_whitespace(self, trailing_whitespace: Vec<CstKind<()>>) -> Self {
         CstKind::TrailingWhitespace {
             child: Box::new(self),
-            whitespace: trailing_whitespace
-                .into_iter()
-                .map(|it| it.into())
-                .collect(),
+            whitespace: trailing_whitespace.into_iter().map(Into::into).collect(),
         }
         .into()
     }
 }
 #[cfg(test)]
 impl CstKind<()> {
+    #[must_use]
     pub fn with_trailing_space(self) -> Rcst {
         Rcst::from(self).with_trailing_space()
     }
-    pub fn with_trailing_whitespace(self, trailing_whitespace: Vec<CstKind<()>>) -> Rcst {
+    #[must_use]
+    pub fn with_trailing_whitespace(self, trailing_whitespace: Vec<Self>) -> Rcst {
         Rcst::from(self).with_trailing_whitespace(trailing_whitespace)
     }
 }

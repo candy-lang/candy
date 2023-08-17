@@ -632,7 +632,7 @@ impl ToRichIr for Expression {
                 builder.push(" with reason ", None, EnumSet::empty());
                 reason.build_rich_ir(builder);
             }
-            Expression::Error { errors } => {
+            Self::Error { errors } => {
                 build_errors_rich_ir(builder, errors);
             }
         }

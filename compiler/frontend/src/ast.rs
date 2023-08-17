@@ -303,7 +303,7 @@ impl AstKind {
                     pattern.captured_identifiers_helper(captured_identifiers);
                 }
             }
-            AstKind::Error { .. } => {}
+            Self::Error { .. } => {}
         }
     }
 }

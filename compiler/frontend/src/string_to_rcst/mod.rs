@@ -54,6 +54,7 @@ fn rcst(db: &dyn StringToRcst, module: Module) -> RcstResult {
     };
     Ok(Arc::new(parse_rcst(source)))
 }
+#[must_use]
 pub fn parse_rcst(source: &str) -> Vec<Rcst> {
     let (mut rest, mut rcsts) = body::body(source, 0);
     if !rest.is_empty() {
@@ -92,10 +93,10 @@ pub enum ModuleError {
 impl ToRichIr for ModuleError {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         let text = match self {
-            ModuleError::DoesNotExist => return,
-            ModuleError::InvalidUtf8 => "# Invalid UTF-8",
-            ModuleError::IsNotCandy => "# Is not Candy code",
-            ModuleError::IsToolingModule => "# Is a tooling module",
+            Self::DoesNotExist => return,
+            Self::InvalidUtf8 => "# Invalid UTF-8",
+            Self::IsNotCandy => "# Is not Candy code",
+            Self::IsToolingModule => "# Is a tooling module",
         };
         builder.push(text, TokenType::Comment, EnumSet::empty());
     }

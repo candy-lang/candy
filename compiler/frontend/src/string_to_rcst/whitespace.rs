@@ -49,7 +49,7 @@ pub fn comment(input: &str) -> Option<(&str, Rcst)> {
     let mut comment = vec![];
     loop {
         match input.chars().next() {
-            Some('\n') | Some('\r') | None => {
+            Some('\n' | '\r') | None => {
                 break;
             }
             Some(c) => {
@@ -189,7 +189,7 @@ mod test {
     fn test_leading_indentation() {
         assert_eq!(
             leading_indentation("foo", 0),
-            Some(("foo", CstKind::Whitespace("".to_string()).into())),
+            Some(("foo", CstKind::Whitespace(String::new()).into())),
         );
         assert_eq!(
             leading_indentation("  foo", 1),

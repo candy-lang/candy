@@ -19,7 +19,8 @@ use crate::{
 };
 use tracing::instrument;
 
-#[derive(Debug)]
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Clone, Copy, Debug)]
 pub struct ExpressionParsingOptions {
     pub allow_assignment: bool,
     pub allow_call: bool,
@@ -64,8 +65,6 @@ pub fn expression(
         })?;
 
     loop {
-        let mut did_make_progress = false;
-
         fn parse_suffix<'input>(
             input: &mut &'input str,
             indentation: usize,
@@ -80,6 +79,8 @@ pub fn expression(
                 false
             }
         }
+
+        let mut did_make_progress = false;
 
         did_make_progress |= parse_suffix(
             &mut input,
@@ -164,7 +165,7 @@ fn expression_suffix_call<'a>(
         let last = expressions.pop().unwrap();
         expressions.push(last.wrap_in_whitespace(whitespace));
 
-        let (i, expr) = match expression(
+        let parsed_expression = expression(
             i,
             indentation,
             ExpressionParsingOptions {
@@ -173,20 +174,20 @@ fn expression_suffix_call<'a>(
                 allow_bar: has_multiline_whitespace,
                 allow_function: true,
             },
-        ) {
-            Some(it) => it,
-            None => {
-                let fallback = closing_parenthesis(i)
-                    .or_else(|| closing_bracket(i))
-                    .or_else(|| closing_curly_brace(i))
-                    .or_else(|| arrow(i));
-                if let Some((i, cst)) = fallback && has_multiline_whitespace {
+        );
+        let (i, expr) = if let Some(it) = parsed_expression {
+            it
+        } else {
+            let fallback = closing_parenthesis(i)
+                .or_else(|| closing_bracket(i))
+                .or_else(|| closing_curly_brace(i))
+                .or_else(|| arrow(i));
+            if let Some((i, cst)) = fallback && has_multiline_whitespace {
                         (i, cst)
                     } else {
                         input = i;
                         break;
                     }
-            }
         };
 
         expressions.push(expr);
@@ -240,7 +241,7 @@ fn expression_suffix_bar<'a>(
     )
     .unwrap_or_else(|| {
         let error = CstKind::Error {
-            unparsable_input: "".to_string(),
+            unparsable_input: String::new(),
             error: CstError::BinaryBarMissesRight,
         };
         (input, error.into())
@@ -289,7 +290,7 @@ fn expression_suffix_match<'a>(
     if cases.is_empty() {
         cases.push(
             CstKind::Error {
-                unparsable_input: "".to_string(),
+                unparsable_input: String::new(),
                 error: CstError::MatchMissesCases,
             }
             .into(),
@@ -411,7 +412,7 @@ fn match_case(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
         (input, arrow.wrap_in_whitespace(whitespace))
     } else {
         let error = CstKind::Error {
-            unparsable_input: "".to_string(),
+            unparsable_input: String::new(),
             error: CstError::MatchCaseMissesArrow,
         };
         (input, error.into())
@@ -421,7 +422,7 @@ fn match_case(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
     if body.is_empty() {
         body.push(
             CstKind::Error {
-                unparsable_input: "".to_string(),
+                unparsable_input: String::new(),
                 error: CstError::MatchCaseMissesBody,
             }
             .into(),
@@ -954,7 +955,7 @@ mod test {
                     expression: Box::new(build_identifier("foo").with_trailing_space()),
                     percent: Box::new(CstKind::Percent.into()),
                     cases: vec![CstKind::Error {
-                        unparsable_input: "".to_string(),
+                        unparsable_input: String::new(),
                         error: CstError::MatchMissesCases,
                     }
                     .into()],
@@ -979,7 +980,7 @@ mod test {
                     expression: Box::new(build_identifier("foo").with_trailing_space()),
                     percent: Box::new(CstKind::Percent.into()),
                     cases: vec![CstKind::Error {
-                        unparsable_input: "".to_string(),
+                        unparsable_input: String::new(),
                         error: CstError::MatchMissesCases,
                     }
                     .into()],

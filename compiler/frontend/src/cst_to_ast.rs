@@ -771,7 +771,7 @@ impl LoweringContext {
         } else {
             let identifier =
                 self.create_string(cst.data.id, format!("<invalid#{index}>"));
-            self.create_ast(cst.data.id.to_owned(), Identifier(identifier));
+            self.create_ast(cst.data.id, Identifier(identifier));
             self.create_error_ast(
                 cst,
                 vec![self.create_error(cst, AstError::ExpectedParameter)],
@@ -832,7 +832,7 @@ impl LoweringContext {
         self.create_errors_or_use_ast(cst, errors, ast)
     }
     fn create_error_ast(&mut self, cst: &Cst, errors: Vec<CompilerError>) -> Ast {
-        self.create_ast(cst.data.id.to_owned(), AstKind::Error { errors })
+        self.create_ast(cst.data.id, AstKind::Error { errors })
     }
     fn create_error(&self, cst: &Cst, error: impl Into<CompilerErrorPayload>) -> CompilerError {
         CompilerError {

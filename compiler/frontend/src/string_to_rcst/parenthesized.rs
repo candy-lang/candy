@@ -38,7 +38,7 @@ pub fn parenthesized(
     .unwrap_or((
         input,
         CstKind::Error {
-            unparsable_input: "".to_string(),
+            unparsable_input: String::new(),
             error: CstError::OpeningParenthesisMissesExpression,
         }
         .into(),
@@ -50,7 +50,7 @@ pub fn parenthesized(
     let (input, closing_parenthesis) = closing_parenthesis(input).unwrap_or((
         input,
         CstKind::Error {
-            unparsable_input: "".to_string(),
+            unparsable_input: String::new(),
             error: CstError::ParenthesisNotClosed,
         }
         .into(),
@@ -96,7 +96,7 @@ mod test {
                     inner: Box::new(build_identifier("foo")),
                     closing_parenthesis: Box::new(
                         CstKind::Error {
-                            unparsable_input: "".to_string(),
+                            unparsable_input: String::new(),
                             error: CstError::ParenthesisNotClosed
                         }
                         .into()

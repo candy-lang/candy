@@ -105,7 +105,7 @@ pub fn function(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
                     input_after_body,
                     vec![],
                     CstKind::Error {
-                        unparsable_input: "".to_string(),
+                        unparsable_input: String::new(),
                         error: CstError::CurlyBraceNotClosed,
                     }
                     .into(),
@@ -197,7 +197,7 @@ mod test {
                     body: vec![],
                     closing_curly_brace: Box::new(
                         CstKind::Error {
-                            unparsable_input: "".to_string(),
+                            unparsable_input: String::new(),
                             error: CstError::CurlyBraceNotClosed
                         }
                         .into()
@@ -218,7 +218,7 @@ mod test {
                     body: vec![],
                     closing_curly_brace: Box::new(
                         CstKind::Error {
-                            unparsable_input: "".to_string(),
+                            unparsable_input: String::new(),
                             error: CstError::CurlyBraceNotClosed
                         }
                         .into()
