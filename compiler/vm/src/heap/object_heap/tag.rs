@@ -50,7 +50,7 @@ impl HeapTag {
     }
 
     fn value_pointer(self) -> NonNull<u64> {
-        self.content_word_pointer(0)
+        self.content_word_pointer(1)
     }
     pub fn value(self) -> InlineObject {
         let value = unsafe { *self.value_pointer().as_ref() };
