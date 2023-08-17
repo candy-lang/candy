@@ -104,7 +104,7 @@ impl Insight {
         insights.push(Insight::Hint(Hint {
             kind: HintKind::FuzzingStatus,
             position: end_of_line,
-            text: format!("{:.0} % fuzzed", 100. * coverage),
+            text: format!("{:.0} % fuzzed", 100. * coverage),
         }));
 
         if let Status::FoundPanic { input, .. } = fuzzer.status() {
