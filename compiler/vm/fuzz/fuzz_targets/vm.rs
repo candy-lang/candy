@@ -75,7 +75,7 @@ fuzz_target!(|data: &[u8]| {
         println!("The module panicked.");
         return;
     };
-    let Ok(main) = exports.into_main_function(&lir.symbol_table) else {
+    let Ok(main) = exports.into_main_function(&heap) else {
         println!("The module doesn't export a main function.");
         return;
     };

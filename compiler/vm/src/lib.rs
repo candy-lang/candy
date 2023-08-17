@@ -13,6 +13,7 @@
 )]
 #![warn(clippy::nursery, clippy::pedantic)]
 #![allow(
+    clippy::large_enum_variant,
     clippy::match_same_arms,
     clippy::missing_errors_doc,
     clippy::missing_panics_doc,
@@ -21,8 +22,8 @@
     clippy::too_many_lines
 )]
 
-use crate::heap::{DisplayWithSymbolTable, Struct, SymbolId, Tag};
-use heap::{Function, InlineObject, SymbolTable};
+use crate::heap::{Struct, Tag};
+use heap::{Function, Heap, InlineObject};
 pub use instruction_pointer::InstructionPointer;
 use tracing::debug;
 pub use utils::PopulateInMemoryProviderFromFileSystem;
@@ -42,15 +43,12 @@ mod utils;
 mod vm;
 
 impl InlineObject {
-    pub fn into_main_function(self, symbol_table: &SymbolTable) -> Result<Function, &'static str> {
+    pub fn into_main_function(self, heap: &Heap) -> Result<Function, &'static str> {
         let exported_definitions: Struct = self.try_into().unwrap();
-        debug!(
-            "The module exports these definitions: {}",
-            DisplayWithSymbolTable::to_string(&exported_definitions, symbol_table),
-        );
+        debug!("The module exports these definitions: {exported_definitions}",);
 
         exported_definitions
-            .get(Tag::create(SymbolId::MAIN))
+            .get(Tag::create(heap.default_symbols().main))
             .ok_or("The module doesn't export a main function.")
             .and_then(|main| {
                 main.try_into()

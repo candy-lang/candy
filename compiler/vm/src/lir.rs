@@ -1,7 +1,5 @@
-use crate::heap::Heap;
-use crate::heap::{
-    DisplayWithSymbolTable, Function, HirId, InlineData, InlineObject, SymbolId, SymbolTable,
-};
+use crate::heap::{Function, HirId, InlineData, InlineObject};
+use crate::heap::{Heap, Text};
 use crate::instruction_pointer::InstructionPointer;
 use candy_frontend::hir;
 use candy_frontend::rich_ir::ReferenceKey;
@@ -22,7 +20,6 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 pub struct Lir {
     pub module: Module,
     pub constant_heap: Heap,
-    pub symbol_table: SymbolTable,
     pub instructions: Vec<Instruction>,
     pub(super) origins: Vec<FxHashSet<hir::Id>>,
     pub module_function: Function,
@@ -38,7 +35,7 @@ pub enum Instruction {
     ///
     /// a, value -> a, tag
     CreateTag {
-        symbol_id: SymbolId,
+        symbol: Text,
     },
 
     /// Pops num_items items, pushes a list.
@@ -236,21 +233,6 @@ impl Lir {
 
 impl ToRichIr for Lir {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        builder.push("# Symbol Table", TokenType::Comment, EnumSet::empty());
-        for (symbol_id, symbol) in self.symbol_table.ids_and_symbols() {
-            builder.push_newline();
-            builder.push(
-                format!("{:?}", symbol_id),
-                TokenType::Address,
-                EnumSet::empty(),
-            );
-            builder.push(": ", None, EnumSet::empty());
-            let symbol_range = builder.push(symbol, TokenType::Symbol, EnumSet::empty());
-            builder.push_reference(ReferenceKey::Symbol(symbol.to_string()), symbol_range);
-        }
-        builder.push_newline();
-        builder.push_newline();
-
         builder.push("# Constant heap", TokenType::Comment, EnumSet::empty());
         for constant in self.constant_heap.iter() {
             builder.push_newline();
@@ -289,19 +271,19 @@ impl ToRichIr for Lir {
             builder.push(
                 format!(
                     "{}: ",
-                    ToString::to_string(&i)
+                    i.to_string()
                         .pad_to_width_with_alignment(instruction_index_width, Alignment::Right),
                 ),
                 TokenType::Comment,
                 EnumSet::empty(),
             );
 
-            instruction.build_rich_ir(builder, &self.symbol_table);
+            instruction.build_rich_ir(builder);
         }
     }
 }
 impl Instruction {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder, symbol_table: &SymbolTable) {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         let discriminant: InstructionDiscriminants = self.into();
         builder.push(
             Into::<&'static str>::into(discriminant),
@@ -310,25 +292,18 @@ impl Instruction {
         );
 
         match self {
-            Self::CreateTag { symbol_id } => {
+            Self::CreateTag { symbol } => {
                 builder.push(" ", None, EnumSet::empty());
-                let symbol_range = builder.push(
-                    DisplayWithSymbolTable::to_string(symbol_id, symbol_table),
-                    None,
-                    EnumSet::empty(),
-                );
-                builder.push_reference(
-                    ReferenceKey::Symbol(symbol_table.get(*symbol_id).to_string()),
-                    symbol_range,
-                );
+                let symbol_range = builder.push(symbol.get(), None, EnumSet::empty());
+                builder.push_reference(ReferenceKey::Symbol(symbol.to_string()), symbol_range);
             }
             Self::CreateList { num_items } => {
                 builder.push(" ", None, EnumSet::empty());
-                builder.push(ToString::to_string(num_items), None, EnumSet::empty());
+                builder.push(num_items.to_string(), None, EnumSet::empty());
             }
             Self::CreateStruct { num_fields } => {
                 builder.push(" ", None, EnumSet::empty());
-                builder.push(ToString::to_string(num_fields), None, EnumSet::empty());
+                builder.push(num_fields.to_string(), None, EnumSet::empty());
             }
             Self::CreateFunction {
                 captured,
@@ -369,11 +344,11 @@ impl Instruction {
             }
             Self::PushFromStack(offset) => {
                 builder.push(" ", None, EnumSet::empty());
-                builder.push(ToString::to_string(offset), None, EnumSet::empty());
+                builder.push(offset.to_string(), None, EnumSet::empty());
             }
             Self::PopMultipleBelowTop(count) => {
                 builder.push(" ", None, EnumSet::empty());
-                builder.push(ToString::to_string(count), None, EnumSet::empty());
+                builder.push(count.to_string(), None, EnumSet::empty());
             }
             Self::Call { num_args } => {
                 builder.push(

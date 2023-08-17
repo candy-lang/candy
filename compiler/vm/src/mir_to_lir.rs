@@ -1,7 +1,5 @@
 use crate::{
-    heap::{
-        Builtin, Function, Heap, HirId, InlineObject, Int, List, Struct, SymbolTable, Tag, Text,
-    },
+    heap::{Builtin, Function, Heap, HirId, InlineObject, Int, List, Struct, Tag, Text},
     instruction_pointer::InstructionPointer,
     lir::{Instruction, Lir, StackOffset},
 };
@@ -59,7 +57,6 @@ where
     let mut lir = Lir {
         module: module.clone(),
         constant_heap,
-        symbol_table: SymbolTable::default(),
         instructions: vec![],
         origins: vec![],
         module_function,
@@ -167,23 +164,28 @@ impl<'c> LoweringContext<'c> {
                 }
             }
             Expression::Tag { symbol, value } => {
-                let symbol_id = self.lir.symbol_table.find_or_add(symbol);
+                let symbol = self
+                    .lir
+                    .constant_heap
+                    .default_symbols()
+                    .get(symbol)
+                    .unwrap_or_else(|| Text::create(&mut self.lir.constant_heap, false, symbol));
 
                 if let Some(value) = value {
                     if let Some(value) = self.constants.get(value) {
                         let tag = Tag::create_with_value(
                             &mut self.lir.constant_heap,
                             false,
-                            symbol_id,
+                            symbol,
                             *value,
                         );
                         self.constants.insert(id, tag.into());
                     } else {
                         self.emit_reference_to(*value);
-                        self.emit(id, Instruction::CreateTag { symbol_id });
+                        self.emit(id, Instruction::CreateTag { symbol });
                     }
                 } else {
-                    let tag = Tag::create(symbol_id);
+                    let tag = Tag::create(symbol);
                     self.constants.insert(id, tag.into());
                 }
             }

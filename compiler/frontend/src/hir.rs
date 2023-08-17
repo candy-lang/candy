@@ -347,7 +347,6 @@ pub enum Expression {
         reason: Id,
     },
     Error {
-        child: Option<Id>,
         errors: Vec<CompilerError>,
     },
 }
@@ -398,7 +397,6 @@ pub enum Pattern {
     Struct(Vec<(Pattern, Pattern)>),
     Or(Vec<Pattern>),
     Error {
-        child: Option<Box<Pattern>>,
         errors: Vec<CompilerError>,
     },
 }
@@ -422,10 +420,7 @@ impl Pattern {
                 .iter()
                 .any(|(_, value_pattern)| value_pattern.contains_captured_identifiers()),
             Self::Or(patterns) => patterns.first().unwrap().contains_captured_identifiers(),
-            Self::Error { child, .. } => child
-                .as_ref()
-                .map(|child| child.contains_captured_identifiers())
-                .unwrap_or_default(),
+            Self::Error { .. } => false,
         }
     }
     pub fn captured_identifier_count(&self) -> usize {
@@ -446,15 +441,7 @@ impl Pattern {
             // If the number or captured identifiers isn't the same in both
             // sides, the pattern is invalid and the generated code will panic.
             Self::Or(patterns) => patterns.first().unwrap().captured_identifier_count(),
-            Self::Error { child, .. } => {
-                // Since generated code panics in this case, it doesn't matter
-                // whether the child captured any identifiers since they can't
-                // be accessed anyway.
-                child
-                    .as_ref()
-                    .map(|child| child.captured_identifier_count())
-                    .unwrap_or_default()
-            }
+            Self::Error { .. } => 0,
         }
     }
 
@@ -645,8 +632,8 @@ impl ToRichIr for Expression {
                 builder.push(" with reason ", None, EnumSet::empty());
                 reason.build_rich_ir(builder);
             }
-            Self::Error { child, errors } => {
-                build_errors_rich_ir(builder, errors, child);
+            Self::Error { errors } => {
+                build_errors_rich_ir(builder, errors);
             }
         }
     }
@@ -691,17 +678,13 @@ impl ToRichIr for Pattern {
                 builder.push("]", None, EnumSet::empty());
             }
             Self::Or(patterns) => builder.push_children(patterns, " | "),
-            Self::Error { child, errors } => {
-                build_errors_rich_ir(builder, errors, child);
+            Self::Error { errors } => {
+                build_errors_rich_ir(builder, errors);
             }
         }
     }
 }
-fn build_errors_rich_ir<C: ToRichIr>(
-    builder: &mut RichIrBuilder,
-    errors: &[CompilerError],
-    child: &Option<C>,
-) {
+fn build_errors_rich_ir(builder: &mut RichIrBuilder, errors: &[CompilerError]) {
     builder.push(
         if errors.len() == 1 { "error" } else { "errors" },
         None,
@@ -709,13 +692,6 @@ fn build_errors_rich_ir<C: ToRichIr>(
     );
     builder.push_foldable(|builder| {
         builder.push_children_multiline(errors);
-        if let Some(child) = child {
-            builder.indent();
-            builder.push_newline();
-            builder.push("fallback: ", None, EnumSet::empty());
-            child.build_rich_ir(builder);
-            builder.dedent();
-        }
     });
 }
 impl ToRichIr for Function {

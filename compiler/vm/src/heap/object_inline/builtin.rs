@@ -1,9 +1,6 @@
 use super::InlineObjectTrait;
 use crate::{
-    heap::{
-        object_heap::HeapObject, symbol_table::impl_ord_with_symbol_table_via_ord, Heap,
-        InlineObject,
-    },
+    heap::{object_heap::HeapObject, Heap, InlineObject},
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
 use candy_frontend::builtin_functions::{self, BuiltinFunction};
@@ -91,5 +88,3 @@ impl InlineObjectTrait for InlineBuiltin {
         self
     }
 }
-
-impl_ord_with_symbol_table_via_ord!(InlineBuiltin);
