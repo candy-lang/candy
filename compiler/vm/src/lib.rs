@@ -18,11 +18,10 @@ use heap::{Function, Heap, InlineObject};
 pub use instruction_pointer::InstructionPointer;
 use tracing::debug;
 pub use utils::PopulateInMemoryProviderFromFileSystem;
-pub use vm::{
-    Panic, StateAfterRun, StateAfterRunForever, StateAfterRunWithoutHandles, Vm, VmFinished,
-};
+pub use vm::{Panic, StateAfterRun, StateAfterRunForever, Vm, VmFinished};
 
 mod builtin_functions;
+pub mod environment;
 mod handle_id;
 pub mod heap;
 mod instruction_pointer;

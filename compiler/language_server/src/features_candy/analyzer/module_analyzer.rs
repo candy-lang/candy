@@ -8,11 +8,12 @@ use candy_frontend::{
 };
 use candy_fuzzer::{FuzzablesFinder, Fuzzer, Status};
 use candy_vm::{
+    environment::StateAfterRunWithoutHandles,
     heap::Heap,
     lir::Lir,
     mir_to_lir::compile_lir,
     tracer::{evaluated_values::EvaluatedValuesTracer, stack_trace::StackTracer},
-    Panic, StateAfterRunWithoutHandles, Vm, VmFinished,
+    Panic, Vm, VmFinished,
 };
 use extension_trait::extension_trait;
 use itertools::Itertools;

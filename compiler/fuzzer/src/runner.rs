@@ -1,13 +1,14 @@
 use super::input::Input;
 use crate::coverage::Coverage;
 use candy_frontend::hir::Id;
+use candy_vm::VmFinished;
 use candy_vm::{
+    environment::StateAfterRunWithoutHandles,
     heap::{Function, Heap, HirId, InlineObject, InlineObjectSliceCloneToHeap},
     lir::Lir,
     tracer::stack_trace::StackTracer,
     Panic, Vm,
 };
-use candy_vm::{StateAfterRunWithoutHandles, VmFinished};
 use rustc_hash::FxHashMap;
 use std::borrow::Borrow;
 
