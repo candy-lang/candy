@@ -11,17 +11,17 @@ use std::{
 };
 use tracing::info;
 
-pub trait Environment<L: Borrow<Lir>, T: Tracer> {
+pub trait Environment {
     fn new(heap: &mut Heap) -> (InlineObject, Self);
-    fn handle(&mut self, call: VmHandleCall<L, T>) -> Vm<L, T>;
+    fn handle<L: Borrow<Lir>, T: Tracer>(&mut self, call: VmHandleCall<L, T>) -> Vm<L, T>;
 }
 
 pub struct EmptyEnvironment;
-impl<L: Borrow<Lir>, T: Tracer> Environment<L, T> for EmptyEnvironment {
+impl Environment for EmptyEnvironment {
     fn new(heap: &mut Heap) -> (InlineObject, Self) {
         (Tag::create_nothing(heap).into(), Self)
     }
-    fn handle(&mut self, _call: VmHandleCall<L, T>) -> Vm<L, T> {
+    fn handle<L: Borrow<Lir>, T: Tracer>(&mut self, _call: VmHandleCall<L, T>) -> Vm<L, T> {
         panic!("A handle was called.")
     }
 }
@@ -44,7 +44,7 @@ pub struct DefaultEnvironment {
     stdin_handle: Handle,
     stdout_handle: Handle,
 }
-impl<L: Borrow<Lir>, T: Tracer> Environment<L, T> for DefaultEnvironment {
+impl Environment for DefaultEnvironment {
     fn new(heap: &mut Heap) -> (InlineObject, Self) {
         let stdin_handle = Handle::new(heap, 0);
         let stdout_handle = Handle::new(heap, 1);
@@ -62,7 +62,7 @@ impl<L: Borrow<Lir>, T: Tracer> Environment<L, T> for DefaultEnvironment {
         };
         (environment_object.into(), environment)
     }
-    fn handle(&mut self, mut call: VmHandleCall<L, T>) -> Vm<L, T> {
+    fn handle<L: Borrow<Lir>, T: Tracer>(&mut self, mut call: VmHandleCall<L, T>) -> Vm<L, T> {
         if call.handle == self.stdin_handle {
             let input = {
                 let stdin = io::stdin();
@@ -92,7 +92,7 @@ pub enum StateAfterRunWithoutHandles<L: Borrow<Lir>, T: Tracer> {
 impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
     pub fn run_with_environment(
         self,
-        environment: &mut impl Environment<L, T>,
+        environment: &mut impl Environment,
     ) -> StateAfterRunWithoutHandles<L, T> {
         match self.run() {
             StateAfterRun::Running(vm) => StateAfterRunWithoutHandles::Running(vm),
@@ -105,7 +105,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
 
     pub fn run_n_with_environment(
         mut self,
-        environment: &mut impl Environment<L, T>,
+        environment: &mut impl Environment,
         max_instructions: usize,
     ) -> StateAfterRunWithoutHandles<L, T> {
         for _ in 0..max_instructions {
@@ -119,7 +119,7 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
 
     pub fn run_forever_with_environment(
         mut self,
-        environment: &mut impl Environment<L, T>,
+        environment: &mut impl Environment,
     ) -> VmFinished<T> {
         loop {
             match self.run_forever() {
