@@ -1,7 +1,7 @@
 use super::{InlineObject, InlineObjectTrait};
 use crate::{
     handle_id::HandleId,
-    heap::{object_heap::HeapObject, symbol_table::impl_ord_with_symbol_table_via_ord, Heap},
+    heap::{object_heap::HeapObject, Heap},
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
 use candy_frontend::id::CountableId;
@@ -101,5 +101,3 @@ impl InlineObjectTrait for InlineHandle {
         self
     }
 }
-
-impl_ord_with_symbol_table_via_ord!(InlineHandle);

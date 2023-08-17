@@ -1,3 +1,4 @@
+use self::object_heap::text::HeapText;
 pub use self::{
     object::{
         Builtin, Data, DataDiscriminants, Function, Handle, HirId, Int, List, Struct, Tag, Text,
@@ -8,7 +9,6 @@ pub use self::{
         InlineObjectTrait, ToDebugText,
     },
     pointer::Pointer,
-    symbol_table::{DisplayWithSymbolTable, OrdWithSymbolTable, SymbolId, SymbolTable},
 };
 use crate::handle_id::HandleId;
 use candy_frontend::id::IdGenerator;
@@ -25,11 +25,10 @@ mod object;
 mod object_heap;
 mod object_inline;
 mod pointer;
-mod symbol_table;
 
-#[derive(Default)]
 pub struct Heap {
     objects: FxHashSet<ObjectInHeap>,
+    default_symbols: Option<DefaultSymbols>,
     handle_id_generator: IdGenerator<HandleId>,
     handle_refcounts: FxHashMap<HandleId, usize>,
 }
@@ -119,6 +118,11 @@ impl Heap {
     }
 
     #[must_use]
+    pub fn default_symbols(&self) -> &DefaultSymbols {
+        self.default_symbols.as_ref().unwrap()
+    }
+
+    #[must_use]
     pub fn known_handles(&self) -> impl IntoIterator<Item = HandleId> + '_ {
         self.handle_refcounts.keys().copied()
     }
@@ -129,11 +133,19 @@ impl Heap {
     pub fn clone(&self) -> (Self, FxHashMap<HeapObject, HeapObject>) {
         let mut cloned = Self {
             objects: FxHashSet::default(),
+            default_symbols: None,
             handle_id_generator: self.handle_id_generator.clone(),
             handle_refcounts: self.handle_refcounts.clone(),
         };
 
         let mut mapping = FxHashMap::default();
+        cloned.default_symbols = Some(
+            self.default_symbols
+                .as_ref()
+                .unwrap()
+                .clone_to_heap_with_mapping(&mut cloned, &mut mapping),
+        );
+
         for object in &self.objects {
             _ = object.clone_to_heap_with_mapping(&mut cloned, &mut mapping);
         }
@@ -169,6 +181,19 @@ impl Debug for Heap {
     }
 }
 
+impl Default for Heap {
+    fn default() -> Self {
+        let mut heap = Self {
+            objects: FxHashSet::default(),
+            default_symbols: None,
+            handle_id_generator: IdGenerator::default(),
+            handle_refcounts: FxHashMap::default(),
+        };
+        heap.default_symbols = Some(DefaultSymbols::new(&mut heap));
+        heap
+    }
+}
+
 impl Drop for Heap {
     fn drop(&mut self) {
         self.clear();
@@ -190,5 +215,125 @@ impl PartialEq for ObjectInHeap {
 impl Hash for ObjectInHeap {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.address().hash(state);
+    }
+}
+
+pub struct DefaultSymbols {
+    // These symbols are created by built-in functions or used for starting the
+    // program (main and environment keys). They are created once so that they
+    // can be used in the VM without new allocations.
+    //
+    // When adding a new default symbol, you have to update `new(…)`,
+    // `clone_to_heap_with_mapping(…)`, and `all_symbols(…)`.
+    //
+    // Sorted alphabetically
+    pub builtin: Text,
+    pub equal: Text,
+    pub error: Text,
+    pub false_: Text,
+    pub function: Text,
+    pub greater: Text,
+    pub int: Text,
+    pub less: Text,
+    pub list: Text,
+    pub main: Text,
+    pub nothing: Text,
+    pub ok: Text,
+    pub stdin: Text,
+    pub stdout: Text,
+    pub struct_: Text,
+    pub tag: Text,
+    pub text: Text,
+    pub true_: Text,
+}
+impl DefaultSymbols {
+    pub fn new(heap: &mut Heap) -> Self {
+        Self {
+            builtin: Text::create(heap, false, "Builtin"),
+            equal: Text::create(heap, false, "Equal"),
+            error: Text::create(heap, false, "Error"),
+            false_: Text::create(heap, false, "False"),
+            function: Text::create(heap, false, "Function"),
+            greater: Text::create(heap, false, "Greater"),
+            int: Text::create(heap, false, "Int"),
+            less: Text::create(heap, false, "Less"),
+            list: Text::create(heap, false, "List"),
+            main: Text::create(heap, false, "Main"),
+            nothing: Text::create(heap, false, "Nothing"),
+            ok: Text::create(heap, false, "Ok"),
+            stdin: Text::create(heap, false, "Stdin"),
+            stdout: Text::create(heap, false, "Stdout"),
+            struct_: Text::create(heap, false, "Struct"),
+            tag: Text::create(heap, false, "Tag"),
+            text: Text::create(heap, false, "Text"),
+            true_: Text::create(heap, false, "True"),
+        }
+    }
+    fn clone_to_heap_with_mapping(
+        &self,
+        heap: &mut Heap,
+        address_map: &mut FxHashMap<HeapObject, HeapObject>,
+    ) -> Self {
+        fn clone_to_heap(
+            heap: &mut Heap,
+            address_map: &mut FxHashMap<HeapObject, HeapObject>,
+            text: Text,
+        ) -> Text {
+            let cloned = text.clone_to_heap_with_mapping(heap, address_map);
+            HeapText::new_unchecked(cloned).into()
+        }
+
+        Self {
+            builtin: clone_to_heap(heap, address_map, self.builtin),
+            equal: clone_to_heap(heap, address_map, self.equal),
+            error: clone_to_heap(heap, address_map, self.error),
+            false_: clone_to_heap(heap, address_map, self.false_),
+            function: clone_to_heap(heap, address_map, self.function),
+            greater: clone_to_heap(heap, address_map, self.greater),
+            int: clone_to_heap(heap, address_map, self.int),
+            less: clone_to_heap(heap, address_map, self.less),
+            list: clone_to_heap(heap, address_map, self.list),
+            main: clone_to_heap(heap, address_map, self.main),
+            nothing: clone_to_heap(heap, address_map, self.nothing),
+            ok: clone_to_heap(heap, address_map, self.ok),
+            stdin: clone_to_heap(heap, address_map, self.stdin),
+            stdout: clone_to_heap(heap, address_map, self.stdout),
+            struct_: clone_to_heap(heap, address_map, self.struct_),
+            tag: clone_to_heap(heap, address_map, self.tag),
+            text: clone_to_heap(heap, address_map, self.text),
+            true_: clone_to_heap(heap, address_map, self.true_),
+        }
+    }
+
+    #[must_use]
+    pub fn get(&self, text: &str) -> Option<Text> {
+        let symbols = self.all_symbols();
+        symbols
+            .binary_search_by_key(&text, |it| it.get())
+            .ok()
+            .map(|it| symbols[it])
+    }
+    #[must_use]
+    pub const fn all_symbols(&self) -> [Text; 18] {
+        [
+            self.builtin,
+            self.equal,
+            self.error,
+            self.false_,
+            self.function,
+            self.greater,
+            self.int,
+            self.less,
+            self.list,
+            self.main,
+            self.nothing,
+            self.ok,
+            self.stdin,
+            self.stdout,
+            self.struct_,
+            self.tag,
+            self.text,
+            self.true_,
+        ]
     }
 }

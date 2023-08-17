@@ -1,6 +1,6 @@
 use super::input::Input;
 use crate::{runner::RunResult, values::InputGeneration};
-use candy_vm::heap::{Heap, SymbolTable};
+use candy_vm::heap::{Heap, Text};
 use itertools::Itertools;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use rustc_hash::FxHashMap;
@@ -11,17 +11,17 @@ pub type Score = f64;
 pub struct InputPool {
     heap: Rc<RefCell<Heap>>,
     num_args: usize,
-    symbol_table: SymbolTable,
+    symbols: Vec<Text>,
     results_and_scores: FxHashMap<Input, (RunResult, Score)>,
 }
 
 impl InputPool {
     #[must_use]
-    pub fn new(num_args: usize, symbol_table: SymbolTable) -> Self {
+    pub fn new(num_args: usize, symbols: Vec<Text>) -> Self {
         Self {
             heap: Rc::default(),
             num_args,
-            symbol_table,
+            symbols,
             results_and_scores: FxHashMap::default(),
         }
     }
@@ -40,7 +40,7 @@ impl InputPool {
         let mut rng = ThreadRng::default();
 
         if rng.gen_bool(0.1) || self.results_and_scores.len() < 20 {
-            return Input::generate(self.heap.clone(), self.num_args, &self.symbol_table);
+            return Input::generate(self.heap.clone(), self.num_args, &self.symbols);
         }
 
         let inputs_and_scores = self.results_and_scores.iter().collect_vec();
@@ -48,7 +48,7 @@ impl InputPool {
             .choose_weighted(&mut rng, |(_, (_, score))| *score)
             .unwrap();
         let mut input = (**input).clone();
-        input.mutate(&mut rng, &self.symbol_table);
+        input.mutate(&mut rng, &self.symbols);
         input
     }
 

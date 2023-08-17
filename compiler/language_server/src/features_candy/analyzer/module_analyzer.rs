@@ -8,7 +8,7 @@ use candy_frontend::{
 };
 use candy_fuzzer::{FuzzablesFinder, Fuzzer, Status};
 use candy_vm::{
-    heap::{DisplayWithSymbolTable, Heap},
+    heap::Heap,
     lir::Lir,
     mir_to_lir::compile_lir,
     tracer::{evaluated_values::EvaluatedValuesTracer, stack_trace::StackTracer},
@@ -268,26 +268,30 @@ impl ModuleAnalyzer {
             }
             State::FindFuzzables {
                 static_panics,
-                evaluated_values_lir,
                 evaluated_values,
                 ..
             } => {
                 insights.extend(static_panics.to_insights(db, &self.module));
-                insights.extend(evaluated_values.values().iter().flat_map(|(id, value)| {
-                    Insight::for_value(db, &evaluated_values_lir.symbol_table, id.clone(), *value)
-                }));
+                insights.extend(
+                    evaluated_values
+                        .values()
+                        .iter()
+                        .flat_map(|(id, value)| Insight::for_value(db, id.clone(), *value)),
+                );
             }
             State::Fuzz {
                 static_panics,
-                evaluated_values_lir,
                 evaluated_values,
                 fuzzers,
                 ..
             } => {
                 insights.extend(static_panics.to_insights(db, &self.module));
-                insights.extend(evaluated_values.values().iter().flat_map(|(id, value)| {
-                    Insight::for_value(db, &evaluated_values_lir.symbol_table, id.clone(), *value)
-                }));
+                insights.extend(
+                    evaluated_values
+                        .values()
+                        .iter()
+                        .flat_map(|(id, value)| Insight::for_value(db, id.clone(), *value)),
+                );
 
                 for fuzzer in fuzzers {
                     insights.append(&mut Insight::for_fuzzer_status(db, fuzzer));
@@ -325,14 +329,7 @@ impl ModuleAnalyzer {
                         format!(
                             "For `{} {}`, this call panics: {}",
                             fuzzer.function_id.function_name(),
-                            input
-                                .arguments
-                                .iter()
-                                .map(|argument| DisplayWithSymbolTable::to_string(
-                                    argument,
-                                    &fuzzer.lir().symbol_table,
-                                ))
-                                .join(" "),
+                            input.arguments.iter().join(" "),
                             panic.reason,
                         ),
                     )));

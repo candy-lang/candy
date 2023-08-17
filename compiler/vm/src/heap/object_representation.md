@@ -34,8 +34,7 @@ For larger values, a pointer to a heap object containing an integer of (practica
 
 ### Tag without Value
 
-`x` stores the symbol ID that can be resolved via the symbol table.
-The symbol table is currently generated when creating the LIR and no longer changed after that.
+When setting the lowest three bits to zero, the word is a pointer to a heap text representing the symbol.
 
 ### Handle
 
@@ -56,7 +55,7 @@ The header word is a tagged union of different types of values:
 |                                                                     Value | Meaning  |
 | ------------------------------------------------------------------------: | :------- |
 | `00000000 00000000 00000000 00000000 00000000 00000000 00000000 0000r000` | Int      |
-| `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaar001` | Tag      |
+| `00000000 00000000 00000000 00000000 00000000 00000000 00000000 0000r001` | Tag      |
 | `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaar010` | Text     |
 | `cccccccc cccccccc cccccccc cccccccc aaaaaaaa aaaaaaaa aaaaaaaa aaaar011` | Function |
 | `aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa aaaar100` | List     |
@@ -75,13 +74,12 @@ Values that fit into an inline word _must_ be stored inline.
 
 ### Tag
 
-`a` stores the symbol ID that can be resolved via the symbol table.
-
-| Word                  |
-| :-------------------- |
-| Header Word (tag)     |
-| Reference count       |
-| InlineWord with value |
+| Word                          |
+| :---------------------------- |
+| Header Word (tag)             |
+| Reference count               |
+| Pointer to symbol (heap text) |
+| InlineWord with value         |
 
 ### Text
 

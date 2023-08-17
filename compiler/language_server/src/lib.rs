@@ -5,6 +5,7 @@
     let_chains,
     strict_provenance
 )]
+#![allow(clippy::large_enum_variant)]
 
 pub mod database;
 pub mod debug_adapter;

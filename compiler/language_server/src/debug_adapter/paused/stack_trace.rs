@@ -9,7 +9,7 @@ use crate::{
 };
 use candy_frontend::{ast_to_hir::AstToHir, hir::Id, utils::AdjustCasingOfFirstLetter};
 use candy_vm::{
-    heap::{Data, DisplayWithSymbolTable, InlineObject},
+    heap::{Data, InlineObject},
     lir::Lir,
     Vm,
 };
@@ -122,10 +122,7 @@ impl PausedState {
                 );
                 (name, None, None)
             }
-            it => panic!(
-                "Unexpected callee: {}",
-                DisplayWithSymbolTable::to_string(&it, &lir.symbol_table),
-            ),
+            it => panic!("Unexpected callee: {it}"),
         };
         dap::types::StackFrame {
             id,

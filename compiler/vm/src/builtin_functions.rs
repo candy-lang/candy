@@ -1,8 +1,5 @@
 use crate::{
-    heap::{
-        Data, DisplayWithSymbolTable, Function, Heap, HirId, InlineObject, Int, List, Struct,
-        SymbolId, SymbolTable, Tag, Text, ToDebugText,
-    },
+    heap::{Data, Function, Heap, HirId, InlineObject, Int, List, Struct, Tag, Text, ToDebugText},
     instructions::InstructionResult,
     vm::{CallHandle, MachineState, Panic},
 };
@@ -23,7 +20,6 @@ impl MachineState {
         builtin_function: BuiltinFunction,
         args: &[InlineObject],
         responsible: HirId,
-        symbol_table: &SymbolTable,
     ) -> InstructionResult {
         let result = span!(Level::TRACE, "Running builtin").in_scope(|| match &builtin_function {
             BuiltinFunction::Equals => self.heap.equals(args),
@@ -50,7 +46,7 @@ impl MachineState {
             BuiltinFunction::ListLength => self.heap.list_length(args),
             BuiltinFunction::ListRemoveAt => self.heap.list_remove_at(args),
             BuiltinFunction::ListReplace => self.heap.list_replace(args),
-            BuiltinFunction::Print => self.heap.print(args, symbol_table),
+            BuiltinFunction::Print => self.heap.print(args),
             BuiltinFunction::StructGet => self.heap.struct_get(args),
             BuiltinFunction::StructGetKeys => self.heap.struct_get_keys(args),
             BuiltinFunction::StructHasKey => self.heap.struct_has_key(args),
@@ -61,14 +57,14 @@ impl MachineState {
             BuiltinFunction::TextConcatenate => self.heap.text_concatenate(args),
             BuiltinFunction::TextContains => self.heap.text_contains(args),
             BuiltinFunction::TextEndsWith => self.heap.text_ends_with(args),
-            BuiltinFunction::TextFromUtf8 => self.heap.text_from_utf8(symbol_table, args),
+            BuiltinFunction::TextFromUtf8 => self.heap.text_from_utf8(args),
             BuiltinFunction::TextGetRange => self.heap.text_get_range(args),
             BuiltinFunction::TextIsEmpty => self.heap.text_is_empty(args),
             BuiltinFunction::TextLength => self.heap.text_length(args),
             BuiltinFunction::TextStartsWith => self.heap.text_starts_with(args),
             BuiltinFunction::TextTrimEnd => self.heap.text_trim_end(args),
             BuiltinFunction::TextTrimStart => self.heap.text_trim_start(args),
-            BuiltinFunction::ToDebugText => self.heap.to_debug_text(args, symbol_table),
+            BuiltinFunction::ToDebugText => self.heap.to_debug_text(args),
             BuiltinFunction::TypeOf => self.heap.type_of(args),
         });
 
@@ -159,7 +155,7 @@ use SuccessfulBehavior::*;
 impl Heap {
     fn equals(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |a: Any, b: Any| {
-            Return(Tag::create_bool(**a == **b).into())
+            Return(Tag::create_bool(self, **a == **b).into())
         })
     }
 
@@ -206,10 +202,10 @@ impl Heap {
     }
 
     fn if_else(&mut self, args: &[InlineObject], responsible: HirId) -> BuiltinResult {
-        unpack!(self, args, |condition: bool,
+        unpack!(self, args, |condition: Tag,
                              then: Function,
                              else_: Function| {
-            let (run, dont_run) = if *condition {
+            let (run, dont_run) = if condition.try_into_bool(self).unwrap() {
                 (then, else_)
             } else {
                 (else_, then)
@@ -250,7 +246,7 @@ impl Heap {
     }
     fn int_compare_to(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |a: Int, b: Int| {
-            Return(a.compare_to(*b).into())
+            Return(a.compare_to(self, *b).into())
         })
     }
     fn int_divide_truncating(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -354,15 +350,15 @@ impl Heap {
         })
     }
 
-    fn print(&mut self, args: &[InlineObject], symbol_table: &SymbolTable) -> BuiltinResult {
+    fn print(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |message: Any| {
             info!(
                 "{}",
                 message
                     .object
-                    .to_debug_text(Precedence::Low, MaxLength::Unlimited, symbol_table)
+                    .to_debug_text(Precedence::Low, MaxLength::Unlimited)
             );
-            Return(Tag::create_nothing().into())
+            Return(Tag::create_nothing(self).into())
         })
     }
 
@@ -380,7 +376,7 @@ impl Heap {
     }
     fn struct_has_key(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |struct_: Struct, key: Any| {
-            Return(Tag::create_bool(struct_.contains(key.object)).into())
+            Return(Tag::create_bool(self, struct_.contains(key.object)).into())
         })
     }
 
@@ -393,7 +389,7 @@ impl Heap {
     }
     fn tag_has_value(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |tag: Tag| {
-            Return(Tag::create_bool(tag.value().is_some()).into())
+            Return(Tag::create_bool(self, tag.value().is_some()).into())
         })
     }
     fn tag_without_value(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -414,19 +410,15 @@ impl Heap {
     }
     fn text_contains(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text, pattern: Text| {
-            Return(text.contains(*pattern).into())
+            Return(text.contains(self, *pattern).into())
         })
     }
     fn text_ends_with(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text, suffix: Text| {
-            Return(text.ends_with(*suffix).into())
+            Return(text.ends_with(self, *suffix).into())
         })
     }
-    fn text_from_utf8(
-        &mut self,
-        symbol_table: &SymbolTable,
-        args: &[InlineObject],
-    ) -> BuiltinResult {
+    fn text_from_utf8(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |bytes: List| {
             // TODO: Remove `u8` checks once we have `needs` ensuring that the bytes are valid.
             let bytes: Vec<_> = bytes
@@ -436,12 +428,7 @@ impl Heap {
                     Int::try_from(it)
                         .ok()
                         .and_then(Int::try_get)
-                        .ok_or_else(|| {
-                            format!(
-                                "Value is not a byte: {}.",
-                                DisplayWithSymbolTable::to_string(&it, symbol_table),
-                            )
-                        })
+                        .ok_or_else(|| format!("Value is not a byte: {it}.",))
                 })
                 .try_collect()?;
             Return(Text::create_from_utf8(self, true, &bytes).into())
@@ -460,7 +447,9 @@ impl Heap {
         )
     }
     fn text_is_empty(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |text: Text| { Return(text.is_empty().into()) })
+        unpack_and_later_drop!(self, args, |text: Text| {
+            Return(text.is_empty(self).into())
+        })
     }
     fn text_length(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text| {
@@ -469,7 +458,7 @@ impl Heap {
     }
     fn text_starts_with(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text, prefix: Text| {
-            Return(text.starts_with(*prefix).into())
+            Return(text.starts_with(self, *prefix).into())
         })
     }
     fn text_trim_end(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -484,36 +473,31 @@ impl Heap {
     }
 
     #[allow(clippy::wrong_self_convention)]
-    fn to_debug_text(
-        &mut self,
-        args: &[InlineObject],
-        symbol_table: &SymbolTable,
-    ) -> BuiltinResult {
+    fn to_debug_text(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Any| {
-            let formatted =
-                value
-                    .object
-                    .to_debug_text(Precedence::Low, MaxLength::Unlimited, symbol_table);
+            let formatted = value
+                .object
+                .to_debug_text(Precedence::Low, MaxLength::Unlimited);
             Return(Text::create(self, true, &formatted).into())
         })
     }
 
     fn type_of(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Any| {
-            let type_symbol_id = match **value {
-                Data::Int(_) => SymbolId::INT,
-                Data::Text(_) => SymbolId::TEXT,
-                Data::Tag(_) => SymbolId::TAG,
-                Data::List(_) => SymbolId::LIST,
-                Data::Struct(_) => SymbolId::STRUCT,
+            let type_text = match **value {
+                Data::Int(_) => self.default_symbols().int,
+                Data::Text(_) => self.default_symbols().text,
+                Data::Tag(_) => self.default_symbols().tag,
+                Data::List(_) => self.default_symbols().list,
+                Data::Struct(_) => self.default_symbols().struct_,
                 Data::HirId(_) => panic!(
                     "HIR ID shouldn't occurr in Candy programs except in VM-controlled places."
                 ),
-                Data::Function(_) => SymbolId::FUNCTION,
-                Data::Builtin(_) => SymbolId::BUILTIN,
-                Data::Handle(_) => SymbolId::FUNCTION,
+                Data::Function(_) => self.default_symbols().function,
+                Data::Builtin(_) => self.default_symbols().builtin,
+                Data::Handle(_) => self.default_symbols().function,
             };
-            Return(Tag::create(type_symbol_id).into())
+            Return(Tag::create(type_text).into())
         })
     }
 }

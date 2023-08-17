@@ -106,7 +106,7 @@ pub fn run(lir: impl Borrow<Lir>) -> (Heap, InlineObject) {
     } = Vm::for_module(lir.borrow(), DummyTracer).run_forever_without_handles();
     let main = result
         .expect("Module panicked.")
-        .into_main_function(&lir.borrow().symbol_table)
+        .into_main_function(&heap)
         .unwrap();
 
     // Run the `main` function.

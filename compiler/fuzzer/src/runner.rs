@@ -2,10 +2,7 @@ use super::input::Input;
 use crate::coverage::Coverage;
 use candy_frontend::hir::Id;
 use candy_vm::{
-    heap::{
-        DisplayWithSymbolTable, Function, Heap, HirId, InlineObject, InlineObjectSliceCloneToHeap,
-        SymbolTable,
-    },
+    heap::{Function, Heap, HirId, InlineObject, InlineObjectSliceCloneToHeap},
     lir::Lir,
     tracer::stack_trace::StackTracer,
     Panic, Vm,
@@ -50,13 +47,10 @@ pub enum RunResult {
 }
 impl RunResult {
     #[must_use]
-    pub fn to_string(&self, symbol_table: &SymbolTable, call: &str) -> String {
+    pub fn to_string(&self, call: &str) -> String {
         match self {
             Self::Timeout => format!("{call} timed out."),
-            Self::Done { return_value, .. } => format!(
-                "{call} returned {}.",
-                DisplayWithSymbolTable::to_string(return_value, symbol_table),
-            ),
+            Self::Done { return_value, .. } => format!("{call} returned {return_value}."),
             Self::NeedsUnfulfilled { reason } => {
                 format!("{call} panicked and it's our fault: {reason}")
             }
@@ -121,7 +115,7 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
                     ..
                 }) => {
                     self.result = Some(RunResult::Done { heap, return_value });
-                    break;
+                    return;
                 }
                 StateAfterRunWithoutHandles::Finished(VmFinished {
                     heap,
@@ -139,7 +133,7 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
                             panic,
                         }
                     });
-                    break;
+                    return;
                 }
             }
 
@@ -147,5 +141,6 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
                 self.result = Some(RunResult::Timeout);
             }
         }
+        self.vm = Some(vm);
     }
 }
