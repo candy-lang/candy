@@ -10,7 +10,7 @@ pub struct UnformattedCst<'a> {
     pub whitespace: ExistingWhitespace<'a>,
 }
 
-/// When a CST node is formatted, it returns a [FormattedCst] with its own width and whatever
+/// When a CST node is formatted, it returns a [`FormattedCst`] with its own width and whatever
 /// trailing whitespace it contained.
 ///
 /// The parent must later decide what to do with the trailing whitespace and call either of the
@@ -25,7 +25,7 @@ pub struct FormattedCst<'a> {
     pub whitespace: ExistingWhitespace<'a>,
 }
 impl<'a> FormattedCst<'a> {
-    pub fn new(child_width: Width, whitespace: ExistingWhitespace<'a>) -> Self {
+    pub const fn new(child_width: Width, whitespace: ExistingWhitespace<'a>) -> Self {
         Self {
             child_width,
             whitespace,
@@ -33,7 +33,7 @@ impl<'a> FormattedCst<'a> {
     }
 
     #[must_use]
-    pub fn child_width(&self) -> Width {
+    pub const fn child_width(&self) -> Width {
         self.child_width
     }
     #[must_use]
