@@ -8,7 +8,6 @@ use crate::{
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use std::{collections::hash_map::Entry, sync::Arc};
-use tracing::debug;
 
 #[salsa::query_group(OptimizeLirStorage)]
 pub trait OptimizeLir: MirToLir {
@@ -21,7 +20,6 @@ fn optimized_lir(db: &dyn OptimizeLir, module: Module, tracing: TracingConfig) -
 
     let mut bodies = Bodies::default();
     for (id, body) in lir.bodies().ids_and_bodies() {
-        debug!("Optimizing body {id}");
         let new_id = bodies.push(body.optimize());
         assert_eq!(id, new_id);
     }
