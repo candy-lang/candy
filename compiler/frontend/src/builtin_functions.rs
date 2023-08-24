@@ -21,7 +21,9 @@ use strum_macros::{AsRefStr, EnumIter};
 /// parameter as the last argument. Because built-ins are only called through
 /// corresponding functions from the `Builtins` package, all preconditions are
 /// guaranteed to be true and built-ins can ignore the responsibility parameter.
-/// The documentation below also omits the parameter.
+///
+/// See the source code of the `Builtins` package for documentation on what
+/// these functions do.
 #[derive(AsRefStr, Clone, Copy, Debug, EnumIter, Eq, Hash, PartialEq)]
 #[strum(serialize_all = "snake_case")]
 pub enum BuiltinFunction {
