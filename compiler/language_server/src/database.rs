@@ -5,6 +5,7 @@ use candy_frontend::{
     cst_to_ast::CstToAstStorage,
     hir::HirDbStorage,
     hir_to_mir::HirToMirStorage,
+    lir_optimize::OptimizeLirStorage,
     mir_optimize::OptimizeMirStorage,
     mir_to_lir::MirToLirStorage,
     module::{
@@ -14,7 +15,7 @@ use candy_frontend::{
     },
     position::PositionConversionStorage,
     rcst_to_cst::RcstToCstStorage,
-    string_to_rcst::StringToRcstStorage, lir_optimize::OptimizeLirStorage,
+    string_to_rcst::StringToRcstStorage,
 };
 
 #[salsa::database(
