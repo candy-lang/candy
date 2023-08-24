@@ -8,10 +8,10 @@ use candy_frontend::{
 };
 use candy_fuzzer::{FuzzablesFinder, Fuzzer, Status};
 use candy_vm::{
+    byte_code::ByteCode,
     environment::StateAfterRunWithoutHandles,
     heap::Heap,
-    lir::Lir,
-    mir_to_lir::compile_lir,
+    mir_to_byte_code::compile_byte_code,
     tracer::{evaluated_values::EvaluatedValuesTracer, stack_trace::StackTracer},
     Panic, Vm, VmFinished,
 };
@@ -33,33 +33,33 @@ enum State {
     /// This enables us to show hints for constants.
     EvaluateConstants {
         static_panics: Vec<Panic>,
-        lir: Rc<Lir>,
+        byte_code: Rc<ByteCode>,
         heap: Heap,
-        vm: Vm<Rc<Lir>, (StackTracer, EvaluatedValuesTracer)>,
+        vm: Vm<Rc<ByteCode>, (StackTracer, EvaluatedValuesTracer)>,
     },
     /// Next, we run the module again to finds fuzzable functions. This time, we
     /// disable tracing of evaluated expressions, but we enable registration of
     /// fuzzable functions. Thus, the found functions to fuzz have the most
-    /// efficient LIR possible.
+    /// efficient byte code possible.
     FindFuzzables {
         static_panics: Vec<Panic>,
         heap_for_constants: Heap,
         stack_tracer: StackTracer,
-        /// We need to keep a reference to this LIR for its constant heap and
-        /// symbol table since objects in `evaluated_values` refer to it.
-        evaluated_values_lir: Rc<Lir>,
+        /// We need to keep a reference to this byte code for its constant heap
+        /// since objects in `evaluated_values` refer to it.
+        evaluated_values_byte_code: Rc<ByteCode>,
         evaluated_values: EvaluatedValuesTracer,
-        lir: Rc<Lir>,
+        byte_code: Rc<ByteCode>,
         heap: Heap,
-        vm: Vm<Rc<Lir>, FuzzablesFinder>,
+        vm: Vm<Rc<ByteCode>, FuzzablesFinder>,
     },
     /// Then, the functions are actually fuzzed.
     Fuzz {
-        lir: Rc<Lir>,
+        byte_code: Rc<ByteCode>,
         static_panics: Vec<Panic>,
         heap_for_constants: Heap,
         stack_tracer: StackTracer,
-        evaluated_values_lir: Rc<Lir>,
+        evaluated_values_byte_code: Rc<ByteCode>,
         evaluated_values: EvaluatedValuesTracer,
         heap_for_fuzzables: Heap,
         fuzzers: Vec<Fuzzer>,
@@ -109,26 +109,26 @@ impl ModuleAnalyzer {
                     calls: TracingMode::Off,
                     evaluated_expressions: TracingMode::OnlyCurrent,
                 };
-                let (lir, _) = compile_lir(db, self.module.clone(), tracing);
-                let lir = Rc::new(lir);
+                let (byte_code, _) = compile_byte_code(db, self.module.clone(), tracing);
+                let byte_code = Rc::new(byte_code);
 
                 let mut heap = Heap::default();
                 let tracer = (
                     StackTracer::default(),
                     EvaluatedValuesTracer::new(self.module.clone()),
                 );
-                let vm = Vm::for_module(lir.clone(), &mut heap, tracer);
+                let vm = Vm::for_module(byte_code.clone(), &mut heap, tracer);
 
                 State::EvaluateConstants {
                     static_panics,
-                    lir,
+                    byte_code,
                     heap,
                     vm,
                 }
             }
             State::EvaluateConstants {
                 static_panics,
-                lir,
+                byte_code,
                 heap: mut heap_for_constants,
                 vm,
             } => {
@@ -140,7 +140,7 @@ impl ModuleAnalyzer {
                     StateAfterRunWithoutHandles::Running(vm) => {
                         return State::EvaluateConstants {
                             static_panics,
-                            lir,
+                            byte_code,
                             heap: heap_for_constants,
                             vm,
                         }
@@ -154,18 +154,22 @@ impl ModuleAnalyzer {
                     calls: TracingMode::Off,
                     evaluated_expressions: TracingMode::Off,
                 };
-                let (fuzzing_lir, _) = compile_lir(db, self.module.clone(), tracing);
-                let fuzzing_lir = Rc::new(fuzzing_lir);
+                let (fuzzing_byte_code, _) = compile_byte_code(db, self.module.clone(), tracing);
+                let fuzzing_byte_code = Rc::new(fuzzing_byte_code);
 
                 let mut heap = Heap::default();
-                let vm = Vm::for_module(fuzzing_lir.clone(), &mut heap, FuzzablesFinder::default());
+                let vm = Vm::for_module(
+                    fuzzing_byte_code.clone(),
+                    &mut heap,
+                    FuzzablesFinder::default(),
+                );
                 State::FindFuzzables {
                     static_panics,
                     heap_for_constants,
                     stack_tracer,
-                    evaluated_values_lir: lir,
+                    evaluated_values_byte_code: byte_code,
                     evaluated_values,
-                    lir: fuzzing_lir,
+                    byte_code: fuzzing_byte_code,
                     heap,
                     vm,
                 }
@@ -174,9 +178,9 @@ impl ModuleAnalyzer {
                 static_panics,
                 heap_for_constants,
                 stack_tracer,
-                evaluated_values_lir,
+                evaluated_values_byte_code,
                 evaluated_values,
-                lir,
+                byte_code,
                 mut heap,
                 vm,
             } => {
@@ -190,9 +194,9 @@ impl ModuleAnalyzer {
                             static_panics,
                             heap_for_constants,
                             stack_tracer,
-                            evaluated_values_lir,
+                            evaluated_values_byte_code,
                             evaluated_values,
-                            lir,
+                            byte_code,
                             heap,
                             vm,
                         }
@@ -205,25 +209,25 @@ impl ModuleAnalyzer {
                 let fuzzers = tracer
                     .fuzzables
                     .iter()
-                    .map(|(id, function)| Fuzzer::new(lir.clone(), *function, id.clone()))
+                    .map(|(id, function)| Fuzzer::new(byte_code.clone(), *function, id.clone()))
                     .collect();
                 State::Fuzz {
-                    lir,
+                    byte_code,
                     static_panics,
                     heap_for_constants,
                     stack_tracer,
-                    evaluated_values_lir,
+                    evaluated_values_byte_code,
                     evaluated_values,
                     heap_for_fuzzables: heap,
                     fuzzers,
                 }
             }
             State::Fuzz {
-                lir,
+                byte_code,
                 static_panics,
                 heap_for_constants,
                 stack_tracer,
-                evaluated_values_lir,
+                evaluated_values_byte_code,
                 evaluated_values,
                 heap_for_fuzzables,
                 mut fuzzers,
@@ -235,11 +239,11 @@ impl ModuleAnalyzer {
                 let Some(fuzzer) = running_fuzzers.choose_mut(&mut thread_rng()) else {
                     client.update_status(None).await;
                     return State::Fuzz {
-                        lir,
+                        byte_code,
                         static_panics,
                         heap_for_constants,
                         stack_tracer,
-                        evaluated_values_lir,
+                        evaluated_values_byte_code,
                         evaluated_values,
                         heap_for_fuzzables,
                         fuzzers,
@@ -253,11 +257,11 @@ impl ModuleAnalyzer {
                 fuzzer.run(500);
 
                 State::Fuzz {
-                    lir,
+                    byte_code,
                     static_panics,
                     heap_for_constants,
                     stack_tracer,
-                    evaluated_values_lir,
+                    evaluated_values_byte_code,
                     evaluated_values,
                     heap_for_fuzzables,
                     fuzzers,

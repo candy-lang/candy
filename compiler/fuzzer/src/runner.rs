@@ -3,9 +3,9 @@ use crate::coverage::Coverage;
 use candy_frontend::hir::Id;
 use candy_vm::VmFinished;
 use candy_vm::{
+    byte_code::ByteCode,
     environment::StateAfterRunWithoutHandles,
     heap::{Function, Heap, HirId, InlineObject, InlineObjectSliceCloneToHeap},
-    lir::Lir,
     tracer::stack_trace::StackTracer,
     Panic, Vm,
 };
@@ -14,15 +14,15 @@ use std::borrow::Borrow;
 
 const MAX_INSTRUCTIONS: usize = 1_000_000;
 
-pub struct Runner<L: Borrow<Lir>> {
-    pub lir: L,
-    state: Option<State<L>>,
+pub struct Runner<B: Borrow<ByteCode>> {
+    pub byte_code: B,
+    state: Option<State<B>>,
     pub input: Input,
     pub num_instructions: usize,
     pub coverage: Coverage,
 }
-enum State<L: Borrow<Lir>> {
-    Running { heap: Heap, vm: Vm<L, StackTracer> },
+enum State<B: Borrow<ByteCode>> {
+    Running { heap: Heap, vm: Vm<B, StackTracer> },
     Finished(RunResult),
 }
 
@@ -65,10 +65,10 @@ impl RunResult {
     }
 }
 
-impl<L: Borrow<Lir> + Clone> Runner<L> {
-    pub fn new(lir: L, function: Function, input: Input) -> Self {
+impl<B: Borrow<ByteCode> + Clone> Runner<B> {
+    pub fn new(byte_code: B, function: Function, input: Input) -> Self {
         let mut heap = Heap::default();
-        let num_instructions = lir.borrow().instructions.len();
+        let num_instructions = byte_code.borrow().instructions.len();
 
         let mut mapping = FxHashMap::default();
         let function = function
@@ -81,7 +81,7 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
         let responsible = HirId::create(&mut heap, true, Id::fuzzer());
 
         let vm = Vm::for_function(
-            lir.clone(),
+            byte_code.clone(),
             &mut heap,
             function,
             &arguments,
@@ -90,7 +90,7 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
         );
 
         Self {
-            lir,
+            byte_code,
             state: Some(State::Running { heap, vm }),
             input,
             num_instructions: 0,

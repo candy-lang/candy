@@ -10,10 +10,10 @@ use candy_frontend::{
     TracingConfig, TracingMode,
 };
 use candy_vm::{
+    byte_code::Instruction,
     environment::StateAfterRunWithoutHandles,
     heap::{Heap, HirId, Struct},
-    lir::Instruction,
-    mir_to_lir::compile_lir,
+    mir_to_byte_code::compile_byte_code,
     tracer::DummyTracer,
     Vm, VmFinished,
 };
@@ -190,9 +190,9 @@ impl DebugSession {
                     calls: TracingMode::All,
                     evaluated_expressions: TracingMode::All,
                 };
-                let lir = compile_lir(&self.db, module.clone(), tracing.clone()).0;
+                let byte_code = compile_byte_code(&self.db, module.clone(), tracing.clone()).0;
                 let mut heap = Heap::default();
-                let VmFinished { result, .. } = Vm::for_module(&lir, &mut heap, DummyTracer)
+                let VmFinished { result, .. } = Vm::for_module(&byte_code, &mut heap, DummyTracer)
                     .run_forever_without_handles(&mut heap);
                 let result = match result {
                     Ok(result) => result,
@@ -217,7 +217,7 @@ impl DebugSession {
                 let platform = HirId::create(&mut heap, true, Id::platform());
                 let tracer = DebugTracer::default();
                 let vm = Vm::for_function(
-                    Rc::new(lir),
+                    Rc::new(byte_code),
                     &mut heap,
                     main,
                     &[environment],
@@ -358,7 +358,7 @@ impl DebugSession {
                 break None; // The VM finished executing anyways.
             };
             let is_trace_instruction = matches!(
-                vm.lir().instructions[*instruction_pointer],
+                vm.byte_code().instructions[*instruction_pointer],
                 Instruction::TraceCallEnds | Instruction::TraceExpressionEvaluated,
             );
 

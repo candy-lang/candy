@@ -8,7 +8,7 @@ use candy_language_server::utils::LspPositionConversion;
 use candy_vm::{
     environment::DefaultEnvironment,
     heap::{Heap, HirId},
-    mir_to_lir::compile_lir,
+    mir_to_byte_code::compile_byte_code,
     tracer::stack_trace::StackTracer,
     Vm, VmFinished,
 };
@@ -46,7 +46,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     debug!("Running {module}.");
 
     let compilation_start = Instant::now();
-    let lir = Rc::new(compile_lir(&db, module.clone(), tracing).0);
+    let byte_code = Rc::new(compile_byte_code(&db, module.clone(), tracing).0);
 
     let compilation_end = Instant::now();
     debug!(
@@ -55,8 +55,9 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     );
 
     let mut heap = Heap::default();
-    let VmFinished { tracer, result } = Vm::for_module(&*lir, &mut heap, StackTracer::default())
-        .run_forever_without_handles(&mut heap);
+    let VmFinished { tracer, result } =
+        Vm::for_module(&*byte_code, &mut heap, StackTracer::default())
+            .run_forever_without_handles(&mut heap);
     let exports = match result {
         Ok(exports) => exports,
         Err(panic) => {
@@ -103,7 +104,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         DefaultEnvironment::new(&mut heap, &options.arguments);
     let platform = HirId::create(&mut heap, true, hir::Id::platform());
     let vm = Vm::for_function(
-        lir.clone(),
+        byte_code.clone(),
         &mut heap,
         main,
         &[environment_object],
@@ -129,7 +130,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         format_duration(execution_end - discovery_end),
     );
 
-    drop(lir); // Make sure the LIR is kept around until here.
+    drop(byte_code); // Make sure the byte code is kept around until here.
     result
 }
 

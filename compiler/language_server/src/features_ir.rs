@@ -117,7 +117,7 @@ impl IrFeatures {
             ),
             Ir::VmByteCode(tracing_config) => Self::rich_ir_for_vm_byte_code(
                 &config.module,
-                &candy_vm::mir_to_lir::compile_lir(
+                &candy_vm::mir_to_byte_code::compile_byte_code(
                     db,
                     config.module.clone(),
                     tracing_config.to_owned(),
@@ -181,7 +181,7 @@ impl IrFeatures {
     }
     fn rich_ir_for_vm_byte_code(
         module: &Module,
-        byte_code: &candy_vm::lir::Lir,
+        byte_code: &candy_vm::byte_code::ByteCode,
         tracing_config: &TracingConfig,
     ) -> RichIr {
         Self::rich_ir_for("VM Byte Code", module, tracing_config, |builder| {
