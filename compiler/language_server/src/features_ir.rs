@@ -3,6 +3,7 @@ use candy_frontend::{
     ast_to_hir::{AstToHir, HirResult},
     cst_to_ast::{AstResult, CstToAst},
     hir_to_mir::{HirToMir, MirResult},
+    lir_optimize::OptimizeLir,
     mir_optimize::{OptimizeMir, OptimizedMirResult},
     mir_to_lir::{LirResult, MirToLir},
     module::{Module, ModuleKind, PackagesPath},
@@ -115,6 +116,11 @@ impl IrFeatures {
                 &db.lir(config.module.clone(), tracing_config.to_owned()),
                 tracing_config,
             ),
+            Ir::OptimizedLir(tracing_config) => Self::rich_ir_for_optimized_lir(
+                &config.module,
+                db.optimized_lir(config.module.clone(), tracing_config.to_owned()),
+                tracing_config,
+            ),
             Ir::VmByteCode(tracing_config) => Self::rich_ir_for_vm_byte_code(
                 &config.module,
                 &candy_vm::mir_to_lir::compile_lir(
@@ -178,6 +184,21 @@ impl IrFeatures {
             Ok((lir, _)) => lir.build_rich_ir(builder),
             Err(error) => Self::build_rich_ir_for_module_error(builder, module, error),
         })
+    }
+    fn rich_ir_for_optimized_lir(
+        module: &Module,
+        lir: LirResult,
+        tracing_config: &TracingConfig,
+    ) -> RichIr {
+        Self::rich_ir_for(
+            "Optimized LIR",
+            module,
+            tracing_config,
+            |builder| match lir {
+                Ok((lir, _)) => lir.build_rich_ir(builder),
+                Err(error) => Self::build_rich_ir_for_module_error(builder, module, &error),
+            },
+        )
     }
     fn rich_ir_for_vm_byte_code(
         module: &Module,
@@ -275,6 +296,7 @@ impl IrConfig {
             IrDiscriminants::Mir => Ir::Mir(tracing_config.unwrap()),
             IrDiscriminants::OptimizedMir => Ir::OptimizedMir(tracing_config.unwrap()),
             IrDiscriminants::Lir => Ir::Lir(tracing_config.unwrap()),
+            IrDiscriminants::OptimizedLir => Ir::OptimizedLir(tracing_config.unwrap()),
             IrDiscriminants::VmByteCode => Ir::VmByteCode(tracing_config.unwrap()),
         };
 
@@ -329,6 +351,7 @@ pub enum Ir {
     Mir(TracingConfig),
     OptimizedMir(TracingConfig),
     Lir(TracingConfig),
+    OptimizedLir(TracingConfig),
     VmByteCode(TracingConfig),
 }
 impl Ir {
@@ -338,6 +361,7 @@ impl Ir {
             Ir::Mir(tracing_config)
             | Ir::OptimizedMir(tracing_config)
             | Ir::Lir(tracing_config)
+            | Ir::OptimizedLir(tracing_config)
             | Ir::VmByteCode(tracing_config) => Some(tracing_config),
         }
     }

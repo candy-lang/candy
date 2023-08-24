@@ -376,7 +376,7 @@ impl CurrentBody {
             return;
         }
 
-        self.body.push(lir::Expression::Dup(id));
+        self.body.push(lir::Expression::Dup { id, amount: 1 });
     }
     fn finish(mut self, constant_mapping: &FxHashMap<mir::Id, lir::ConstantId>) -> lir::Body {
         if self.body.expressions().is_empty() {

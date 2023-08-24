@@ -7,6 +7,7 @@ use candy_frontend::{
     ast_to_hir::AstToHir,
     cst_to_ast::CstToAst,
     hir_to_mir::HirToMir,
+    lir_optimize::OptimizeLir,
     mir_optimize::OptimizeMir,
     mir_to_lir::MirToLir,
     position::Offset,
@@ -56,6 +57,9 @@ pub(crate) enum Options {
 
     /// Low-Level Intermediate Representation
     Lir(PathAndTracing),
+
+    /// Optimized Low-Level Intermediate Representation
+    OptimizedLir(PathAndTracing),
 
     /// VM Byte Code
     VmByteCode(PathAndTracing),
@@ -137,6 +141,13 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
             let module = module_for_path(options.path.clone())?;
             let tracing = options.to_tracing_config();
             let lir = db.lir(module.clone(), tracing.clone());
+            lir.ok()
+                .map(|(lir, _)| RichIr::for_lir(&module, &lir, &tracing))
+        }
+        Options::OptimizedLir(options) => {
+            let module = module_for_path(options.path.clone())?;
+            let tracing = options.to_tracing_config();
+            let lir = db.optimized_lir(module.clone(), tracing.clone());
             lir.ok()
                 .map(|(lir, _)| RichIr::for_lir(&module, &lir, &tracing))
         }
@@ -332,6 +343,12 @@ impl GoldOptions {
                 .unwrap();
             let lir = RichIr::for_lir(&module, &lir, &Self::TRACING_CONFIG);
             visit("LIR", lir.text);
+
+            let (optimized_lir, _) = db
+                .optimized_lir(module.clone(), Self::TRACING_CONFIG.clone())
+                .unwrap();
+            let optimized_lir = RichIr::for_lir(&module, &optimized_lir, &Self::TRACING_CONFIG);
+            visit("Optimized LIR", optimized_lir.text);
 
             let (vm_byte_code, _) = compile_lir(db, module.clone(), Self::TRACING_CONFIG.clone());
             let vm_byte_code_rich_ir =
