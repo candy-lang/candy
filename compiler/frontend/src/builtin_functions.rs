@@ -14,7 +14,8 @@ use strum_macros::{AsRefStr, EnumIter};
 /// functions with an implementation that's provided by the runtime.
 ///
 /// TODO: Re-evaluate whether builtins should instead be lowered into
-/// instructions directly (i.e. we would have an `IntAdd` instruction).
+/// instructions directly (i.e. we would have an `IntAdd` instruction instead of
+/// a builtin `IntAdd` that can be called).
 ///
 /// Like all callable values, builtins are being passed a responsibility
 /// parameter as the last argument. Because built-ins are only called through
