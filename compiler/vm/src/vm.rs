@@ -1,8 +1,8 @@
 use crate::{
+    byte_code::ByteCode,
     heap::{Function, Handle, Heap, HirId, InlineObject},
     instruction_pointer::InstructionPointer,
     instructions::InstructionResult,
-    lir::Lir,
     tracer::Tracer,
 };
 use candy_frontend::hir::Id;
@@ -13,15 +13,15 @@ use std::{borrow::Borrow, collections::HashMap, fmt::Debug, hash::Hash};
 /// A VM represents a Candy program that thinks it's currently running. Because
 /// VMs are first-class Rust structs, they enable other code to store "freezed"
 /// programs and to remain in control about when and for how long code runs.
-pub struct Vm<L: Borrow<Lir>, T: Tracer> {
+pub struct Vm<B: Borrow<ByteCode>, T: Tracer> {
     // For type-safety, the VM has an API that takes ownership of the VM and
     // returns a new VM. If the VM is big, this causes lots of memcopies of
     // stack memory. So, we instead only store a pointer to the actual VM state.
-    inner: Box<VmInner<L, T>>,
+    inner: Box<VmInner<B, T>>,
 }
 
-struct VmInner<L: Borrow<Lir>, T: Tracer> {
-    lir: L,
+struct VmInner<B: Borrow<ByteCode>, T: Tracer> {
+    byte_code: B,
     state: MachineState,
     tracer: T,
 }
@@ -44,13 +44,13 @@ pub struct Panic {
     pub responsible: Id,
 }
 
-impl<L, T> Vm<L, T>
+impl<B, T> Vm<B, T>
 where
-    L: Borrow<Lir>,
+    B: Borrow<ByteCode>,
     T: Tracer,
 {
     pub fn for_function(
-        lir: L,
+        byte_code: B,
         heap: &mut Heap,
         function: Function,
         arguments: &[InlineObject],
@@ -72,13 +72,17 @@ where
         };
         state.call_function(heap, function, arguments, responsible);
 
-        let inner = Box::new(VmInner { lir, state, tracer });
+        let inner = Box::new(VmInner {
+            byte_code,
+            state,
+            tracer,
+        });
         Self { inner }
     }
-    pub fn for_module(lir: L, heap: &mut Heap, tracer: T) -> Self {
-        let actual_lir = lir.borrow();
-        let function = actual_lir.module_function;
-        let responsible = actual_lir.responsible_module;
+    pub fn for_module(byte_code: B, heap: &mut Heap, tracer: T) -> Self {
+        let actual_byte_code = byte_code.borrow();
+        let function = actual_byte_code.module_function;
+        let responsible = actual_byte_code.responsible_module;
         assert_eq!(
             function.captured_len(),
             0,
@@ -89,12 +93,12 @@ where
             0,
             "Function is not a module function because it has arguments.",
         );
-        Self::for_function(lir, heap, function, &[], responsible, tracer)
+        Self::for_function(byte_code, heap, function, &[], responsible, tracer)
     }
 
     #[must_use]
-    pub fn lir(&self) -> &L {
-        &self.inner.lir
+    pub fn byte_code(&self) -> &B {
+        &self.inner.byte_code
     }
     #[must_use]
     pub fn tracer(&self) -> &T {
@@ -111,10 +115,10 @@ where
 }
 
 #[derive(Deref)]
-pub struct VmHandleCall<L: Borrow<Lir>, T: Tracer> {
+pub struct VmHandleCall<B: Borrow<ByteCode>, T: Tracer> {
     #[deref]
     pub call: CallHandle,
-    vm: Vm<L, T>,
+    vm: Vm<B, T>,
 }
 #[must_use]
 pub struct VmFinished<T: Tracer> {
@@ -123,18 +127,18 @@ pub struct VmFinished<T: Tracer> {
 }
 
 #[must_use]
-pub enum StateAfterRun<L: Borrow<Lir>, T: Tracer> {
-    Running(Vm<L, T>),
-    CallingHandle(VmHandleCall<L, T>),
+pub enum StateAfterRun<B: Borrow<ByteCode>, T: Tracer> {
+    Running(Vm<B, T>),
+    CallingHandle(VmHandleCall<B, T>),
     Finished(VmFinished<T>),
 }
 
-impl<L, T> VmHandleCall<L, T>
+impl<B, T> VmHandleCall<B, T>
 where
-    L: Borrow<Lir>,
+    B: Borrow<ByteCode>,
     T: Tracer,
 {
-    pub fn complete(mut self, heap: &mut Heap, return_value: impl Into<InlineObject>) -> Vm<L, T> {
+    pub fn complete(mut self, heap: &mut Heap, return_value: impl Into<InlineObject>) -> Vm<B, T> {
         self.handle.drop(heap);
         for argument in &self.call.arguments {
             argument.drop(heap);
@@ -145,13 +149,13 @@ where
     }
 }
 
-impl<L, T> Vm<L, T>
+impl<B, T> Vm<B, T>
 where
-    L: Borrow<Lir>,
+    B: Borrow<ByteCode>,
     T: Tracer,
 {
     /// Runs one instruction in the VM and returns its new state.
-    pub fn run(mut self, heap: &mut Heap) -> StateAfterRun<L, T> {
+    pub fn run(mut self, heap: &mut Heap) -> StateAfterRun<B, T> {
         let Some(current_instruction) = self.inner.state.next_instruction else {
             let return_value = self.inner.state.data_stack.pop().unwrap();
             self.inner.tracer.call_ended(heap, return_value);
@@ -163,7 +167,7 @@ where
 
         let instruction = self
             .inner
-            .lir
+            .byte_code
             .borrow()
             .instructions
             .get(*current_instruction)
@@ -187,7 +191,7 @@ where
     }
 
     /// Runs at most `max_instructions` in the VM.
-    pub fn run_n(mut self, heap: &mut Heap, max_instructions: usize) -> StateAfterRun<L, T> {
+    pub fn run_n(mut self, heap: &mut Heap, max_instructions: usize) -> StateAfterRun<B, T> {
         for _ in 0..max_instructions {
             match self.run(heap) {
                 StateAfterRun::Running(vm) => self = vm,
@@ -199,19 +203,19 @@ where
 }
 
 #[must_use]
-pub enum StateAfterRunForever<L: Borrow<Lir>, T: Tracer> {
-    CallingHandle(VmHandleCall<L, T>),
+pub enum StateAfterRunForever<B: Borrow<ByteCode>, T: Tracer> {
+    CallingHandle(VmHandleCall<B, T>),
     Finished(VmFinished<T>),
 }
 
-impl<L, T> Vm<L, T>
+impl<B, T> Vm<B, T>
 where
-    L: Borrow<Lir>,
+    B: Borrow<ByteCode>,
     T: Tracer,
 {
     /// Runs the VM until a handle call is performed, the VM returns, or it
     /// panics.
-    pub fn run_forever(mut self, heap: &mut Heap) -> StateAfterRunForever<L, T> {
+    pub fn run_forever(mut self, heap: &mut Heap) -> StateAfterRunForever<B, T> {
         loop {
             match self.run(heap) {
                 StateAfterRun::Running(vm) => self = vm,

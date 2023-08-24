@@ -19,7 +19,7 @@ use candy_frontend::{
 };
 use candy_vm::{
     heap::{Heap, HirId, Struct},
-    mir_to_lir::compile_lir,
+    mir_to_byte_code::compile_byte_code,
     tracer::DummyTracer,
     PopulateInMemoryProviderFromFileSystem, Vm, VmFinished,
 };
@@ -66,11 +66,11 @@ fuzz_target!(|data: &[u8]| {
     db.module_provider.load_package_from_file_system("Builtins");
     db.module_provider.add(&MODULE, data.to_vec());
 
-    let lir = compile_lir(&db, MODULE.clone(), TRACING.clone()).0;
+    let byte_code = compile_byte_code(&db, MODULE.clone(), TRACING.clone()).0;
 
     let mut heap = Heap::default();
     let VmFinished { result, .. } =
-        Vm::for_module(&lir, &mut heap, DummyTracer).run_forever_without_handles(&mut heap);
+        Vm::for_module(&byte_code, &mut heap, DummyTracer).run_forever_without_handles(&mut heap);
     let Ok(exports) = result else {
         println!("The module panicked.");
         return;
@@ -84,7 +84,7 @@ fuzz_target!(|data: &[u8]| {
     let environment = Struct::create(&mut heap, true, &Default::default());
     let responsible = HirId::create(&mut heap, true, hir::Id::user());
     let VmFinished { result, .. } = Vm::for_function(
-        &lir,
+        &byte_code,
         &mut heap,
         main,
         &[environment.into()],

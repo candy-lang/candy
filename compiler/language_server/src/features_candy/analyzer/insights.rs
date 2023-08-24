@@ -93,7 +93,7 @@ impl Insight {
 
         let coverage = match fuzzer.status() {
             Status::StillFuzzing { total_coverage, .. } => {
-                let function_range = fuzzer.lir().range_of_function(&id);
+                let function_range = fuzzer.byte_code().range_of_function(&id);
                 let function_coverage = total_coverage.in_range(&function_range);
                 function_coverage.relative_coverage()
             }

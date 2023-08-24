@@ -1,6 +1,6 @@
 use crate::{
+    byte_code::Instruction,
     heap::{Data, Function, Heap, HirId, InlineObject, List, Pointer, Struct, Tag, Text},
-    lir::Instruction,
     tracer::Tracer,
     vm::{CallHandle, MachineState, Panic},
 };
@@ -158,7 +158,7 @@ impl MachineState {
                     // where we have validated the inputs before calling the
                     // instructions, or when lowering compiler errors from the
                     // HIR to the MIR.
-                    panic!("We should never generate a LIR where the reason is not a text.");
+                    panic!("We should never generate byte code where the reason is not a text.");
                 };
                 let responsible: HirId = responsible_for_panic.try_into().unwrap();
 
