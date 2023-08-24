@@ -444,16 +444,6 @@ impl Text {
     pub fn create(heap: &mut Heap, is_reference_counted: bool, value: &str) -> Self {
         HeapText::create(heap, is_reference_counted, value).into()
     }
-    #[must_use]
-    pub fn create_from_utf8(heap: &mut Heap, is_reference_counted: bool, bytes: &[u8]) -> Tag {
-        let result = str::from_utf8(bytes)
-            .map(|it| Self::create(heap, is_reference_counted, it).into())
-            .map_err(|_| {
-                let not_utf8 = Self::create(heap, true, "NotUtf8");
-                Tag::create_with_value_option(heap, true, not_utf8, None).into()
-            });
-        Tag::create_result(heap, is_reference_counted, result)
-    }
 }
 
 impls_via_0!(Text);

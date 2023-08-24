@@ -237,6 +237,8 @@ pub struct DefaultSymbols {
     pub less: Text,
     pub list: Text,
     pub main: Text,
+    pub not_an_integer: Text,
+    pub not_utf8: Text,
     pub nothing: Text,
     pub ok: Text,
     pub stdin: Text,
@@ -259,6 +261,8 @@ impl DefaultSymbols {
             less: Text::create(heap, false, "Less"),
             list: Text::create(heap, false, "List"),
             main: Text::create(heap, false, "Main"),
+            not_an_integer: Text::create(heap, false, "NotAnInteger"),
+            not_utf8: Text::create(heap, false, "NotUtf8"),
             nothing: Text::create(heap, false, "Nothing"),
             ok: Text::create(heap, false, "Ok"),
             stdin: Text::create(heap, false, "Stdin"),
@@ -294,6 +298,8 @@ impl DefaultSymbols {
             less: clone_to_heap(heap, address_map, self.less),
             list: clone_to_heap(heap, address_map, self.list),
             main: clone_to_heap(heap, address_map, self.main),
+            not_an_integer: clone_to_heap(heap, address_map, self.not_an_integer),
+            not_utf8: clone_to_heap(heap, address_map, self.not_utf8),
             nothing: clone_to_heap(heap, address_map, self.nothing),
             ok: clone_to_heap(heap, address_map, self.ok),
             stdin: clone_to_heap(heap, address_map, self.stdin),
@@ -314,7 +320,7 @@ impl DefaultSymbols {
             .map(|it| symbols[it])
     }
     #[must_use]
-    pub const fn all_symbols(&self) -> [Text; 18] {
+    pub const fn all_symbols(&self) -> [Text; 20] {
         [
             self.builtin,
             self.equal,
@@ -326,6 +332,8 @@ impl DefaultSymbols {
             self.less,
             self.list,
             self.main,
+            self.not_an_integer,
+            self.not_utf8,
             self.nothing,
             self.ok,
             self.stdin,

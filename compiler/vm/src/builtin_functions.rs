@@ -265,13 +265,21 @@ impl Heap {
         })
     }
     fn int_parse(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |text: Text| {
-            let result = if let Ok(int) = BigInt::from_str(text.get()) {
-                Ok(Int::create_from_bigint(self, true, int).into())
-            } else {
-                let not_an_integer = Text::create(self, true, "NotAnInteger");
-                Err(Tag::create_with_value_option(self, true, not_an_integer, None).into())
-            };
+        unpack!(self, args, |text: Text| {
+            let result = BigInt::from_str(text.get())
+                .map(|int| {
+                    text.drop(self);
+                    Int::create_from_bigint(self, true, int).into()
+                })
+                .map_err(|_| {
+                    Tag::create_with_value(
+                        self,
+                        true,
+                        self.default_symbols().not_an_integer,
+                        text.object,
+                    )
+                    .into()
+                });
             Return(Tag::create_result(self, true, result).into())
         })
     }
@@ -421,9 +429,9 @@ impl Heap {
         })
     }
     fn text_from_utf8(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |bytes: List| {
+        unpack!(self, args, |bytes: List| {
             // TODO: Remove `u8` checks once we have `needs` ensuring that the bytes are valid.
-            let bytes: Vec<_> = bytes
+            let real_bytes: Vec<_> = bytes
                 .items()
                 .iter()
                 .map(|&it| {
@@ -433,7 +441,21 @@ impl Heap {
                         .ok_or_else(|| format!("Value is not a byte: {it}."))
                 })
                 .try_collect()?;
-            Return(Text::create_from_utf8(self, true, &bytes).into())
+            let text = String::from_utf8(real_bytes)
+                .map(|it| {
+                    bytes.drop(self);
+                    Text::create(self, true, &it).into()
+                })
+                .map_err(|_| {
+                    Tag::create_with_value(
+                        self,
+                        true,
+                        self.default_symbols().not_utf8,
+                        bytes.object,
+                    )
+                    .into()
+                });
+            Return(Tag::create_result(self, true, text).into())
         })
     }
     fn text_get_range(&mut self, args: &[InlineObject]) -> BuiltinResult {
