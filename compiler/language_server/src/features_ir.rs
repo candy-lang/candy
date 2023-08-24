@@ -486,9 +486,11 @@ impl LanguageFeatures for IrFeatures {
     }
     async fn folding_ranges(&self, _db: &Mutex<Database>, uri: Url) -> Vec<FoldingRange> {
         let open_irs = self.open_irs.read().await;
-        dbg!(&uri);
-        dbg!(&open_irs.keys());
-        let open_ir = open_irs.get(&uri).unwrap();
+        let Some(open_ir) = open_irs.get(&uri) else {
+            // After the folding ranges were requested, the corresponding editor
+            // tab was closed. We just report nothing.
+            return vec![];
+        };
         open_ir.folding_ranges()
     }
 
