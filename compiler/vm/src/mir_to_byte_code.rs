@@ -1,7 +1,7 @@
 use crate::{
+    byte_code::{ByteCode, Instruction, StackOffset},
     heap::{Builtin, Function, Heap, HirId, InlineObject, Int, List, Struct, Tag, Text},
     instruction_pointer::InstructionPointer,
-    lir::{Instruction, Lir, StackOffset},
 };
 use candy_frontend::{
     cst::CstDb,
@@ -18,11 +18,11 @@ use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 
-pub fn compile_lir<Db>(
+pub fn compile_byte_code<Db>(
     db: &Db,
     module: Module,
     tracing: TracingConfig,
-) -> (Lir, Arc<FxHashSet<CompilerError>>)
+) -> (ByteCode, Arc<FxHashSet<CompilerError>>)
 where
     Db: CstDb + OptimizeMir,
 {
@@ -54,7 +54,7 @@ where
         hir::Id::new(module.clone(), vec![]),
     );
 
-    let mut lir = Lir {
+    let mut byte_code = ByteCode {
         module: module.clone(),
         constant_heap,
         instructions: vec![],
@@ -64,7 +64,7 @@ where
     };
 
     let start = compile_function(
-        &mut lir,
+        &mut byte_code,
         &mut FxHashMap::default(),
         &FxHashSet::from_iter([hir::Id::new(module, vec![])]),
         &FxHashSet::default(),
@@ -74,11 +74,11 @@ where
     );
     module_function.set_body(start);
 
-    (lir, errors)
+    (byte_code, errors)
 }
 
 fn compile_function(
-    lir: &mut Lir,
+    byte_code: &mut ByteCode,
     constants: &mut FxHashMap<Id, InlineObject>,
     original_hirs: &FxHashSet<hir::Id>,
     captured: &FxHashSet<Id>,
@@ -87,7 +87,7 @@ fn compile_function(
     body: &Body,
 ) -> InstructionPointer {
     let mut context = LoweringContext {
-        lir,
+        byte_code,
         constants,
         stack: vec![],
         instructions: vec![],
@@ -131,15 +131,16 @@ fn compile_function(
 
     let mut instructions = context.instructions;
     let num_instructions = instructions.len();
-    let start = lir.instructions.len().into();
-    lir.instructions.append(&mut instructions);
-    lir.origins
+    let start = byte_code.instructions.len().into();
+    byte_code.instructions.append(&mut instructions);
+    byte_code
+        .origins
         .extend((0..num_instructions).map(|_| original_hirs.clone()));
     start
 }
 
 struct LoweringContext<'c> {
-    lir: &'c mut Lir,
+    byte_code: &'c mut ByteCode,
     constants: &'c mut FxHashMap<Id, InlineObject>,
     stack: Vec<Id>,
     instructions: Vec<Instruction>,
@@ -148,11 +149,12 @@ impl<'c> LoweringContext<'c> {
     fn compile_expression(&mut self, id: Id, expression: &Expression) {
         match expression {
             Expression::Int(int) => {
-                let int = Int::create_from_bigint(&mut self.lir.constant_heap, false, int.clone());
+                let int =
+                    Int::create_from_bigint(&mut self.byte_code.constant_heap, false, int.clone());
                 self.constants.insert(id, int.into());
             }
             Expression::Text(text) => {
-                let text = Text::create(&mut self.lir.constant_heap, false, text);
+                let text = Text::create(&mut self.byte_code.constant_heap, false, text);
                 self.constants.insert(id, text.into());
             }
             Expression::Reference(referenced) => {
@@ -165,16 +167,18 @@ impl<'c> LoweringContext<'c> {
             }
             Expression::Tag { symbol, value } => {
                 let symbol = self
-                    .lir
+                    .byte_code
                     .constant_heap
                     .default_symbols()
                     .get(symbol)
-                    .unwrap_or_else(|| Text::create(&mut self.lir.constant_heap, false, symbol));
+                    .unwrap_or_else(|| {
+                        Text::create(&mut self.byte_code.constant_heap, false, symbol)
+                    });
 
                 if let Some(value) = value {
                     if let Some(value) = self.constants.get(value) {
                         let tag = Tag::create_with_value(
-                            &mut self.lir.constant_heap,
+                            &mut self.byte_code.constant_heap,
                             false,
                             symbol,
                             *value,
@@ -199,7 +203,7 @@ impl<'c> LoweringContext<'c> {
                     .map(|item| self.constants.get(item).copied())
                     .collect::<Option<Vec<_>>>()
                 {
-                    let list = List::create(&mut self.lir.constant_heap, false, &items);
+                    let list = List::create(&mut self.byte_code.constant_heap, false, &items);
                     self.constants.insert(id, list.into());
                 } else {
                     for item in items {
@@ -221,7 +225,7 @@ impl<'c> LoweringContext<'c> {
                     })
                     .collect::<Option<FxHashMap<_, _>>>()
                 {
-                    let struct_ = Struct::create(&mut self.lir.constant_heap, false, &fields);
+                    let struct_ = Struct::create(&mut self.byte_code.constant_heap, false, &fields);
                     self.constants.insert(id, struct_.into());
                 } else {
                     for (key, value) in fields {
@@ -237,7 +241,8 @@ impl<'c> LoweringContext<'c> {
                 }
             }
             Expression::HirId(hir_id) => {
-                let hir_id = HirId::create(&mut self.lir.constant_heap, false, hir_id.clone());
+                let hir_id =
+                    HirId::create(&mut self.byte_code.constant_heap, false, hir_id.clone());
                 self.constants.insert(id, hir_id.into());
             }
             Expression::Function {
@@ -253,7 +258,7 @@ impl<'c> LoweringContext<'c> {
                     .collect();
 
                 let instructions = compile_function(
-                    self.lir,
+                    self.byte_code,
                     self.constants,
                     original_hirs,
                     &captured,
@@ -264,7 +269,7 @@ impl<'c> LoweringContext<'c> {
 
                 if captured.is_empty() {
                     let list = Function::create(
-                        &mut self.lir.constant_heap,
+                        &mut self.byte_code.constant_heap,
                         false,
                         &[],
                         parameters.len(),

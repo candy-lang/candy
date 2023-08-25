@@ -30,13 +30,13 @@ pub use utils::PopulateInMemoryProviderFromFileSystem;
 pub use vm::{Panic, StateAfterRun, StateAfterRunForever, Vm, VmFinished};
 
 mod builtin_functions;
+pub mod byte_code;
 pub mod environment;
 mod handle_id;
 pub mod heap;
 mod instruction_pointer;
 mod instructions;
-pub mod lir;
-pub mod mir_to_lir;
+pub mod mir_to_byte_code;
 pub mod tracer;
 mod utils;
 mod vm;

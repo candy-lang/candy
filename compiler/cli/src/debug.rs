@@ -17,7 +17,7 @@ use candy_frontend::{
     utils::DoHash,
     TracingConfig, TracingMode,
 };
-use candy_vm::{heap::HeapData, lir::RichIrForLir, mir_to_lir::compile_lir};
+use candy_vm::{byte_code::RichIrForByteCode, heap::HeapData, mir_to_byte_code::compile_byte_code};
 use clap::{Parser, ValueHint};
 use colored::{Color, Colorize};
 use diffy::{create_patch, PatchFormatter};
@@ -154,7 +154,7 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
         Options::VmByteCode(options) => {
             let module = module_for_path(options.path.clone())?;
             let tracing = options.to_tracing_config();
-            let (vm_byte_code, _) = compile_lir(&db, module.clone(), tracing.clone());
+            let (vm_byte_code, _) = compile_byte_code(&db, module.clone(), tracing.clone());
             Some(RichIr::for_byte_code(&module, &vm_byte_code, &tracing))
         }
         Options::Gold(options) => return options.run(&db),
@@ -350,19 +350,20 @@ impl GoldOptions {
             let optimized_lir = RichIr::for_lir(&module, &optimized_lir, &Self::TRACING_CONFIG);
             visit("Optimized LIR", optimized_lir.text);
 
-            let (vm_byte_code, _) = compile_lir(db, module.clone(), Self::TRACING_CONFIG.clone());
+            let (vm_byte_code, _) =
+                compile_byte_code(db, module.clone(), Self::TRACING_CONFIG.clone());
             let vm_byte_code_rich_ir =
                 RichIr::for_byte_code(&module, &vm_byte_code, &Self::TRACING_CONFIG);
             visit(
                 "VM Byte Code",
-                Self::format_lir(&vm_byte_code, &vm_byte_code_rich_ir),
+                Self::format_byte_code(&vm_byte_code, &vm_byte_code_rich_ir),
             );
         }
         Ok(())
     }
 
-    fn format_lir(lir: &candy_vm::lir::Lir, rich_ir: &RichIr) -> String {
-        let address_replacements: FxHashMap<_, _> = lir
+    fn format_byte_code(byte_code: &candy_vm::byte_code::ByteCode, rich_ir: &RichIr) -> String {
+        let address_replacements: FxHashMap<_, _> = byte_code
             .constant_heap
             .iter()
             .map(|constant| {
@@ -378,7 +379,7 @@ impl GoldOptions {
 
         // Replace addresses of constants with content hashes since addresses
         // are random.
-        let lir = ADDRESS_REGEX.replace_all(&rich_ir.text, |captures: &Captures| {
+        let byte_code = ADDRESS_REGEX.replace_all(&rich_ir.text, |captures: &Captures| {
             let full_match = captures.get(0).unwrap();
             let full_match_str = full_match.as_str();
             let address = captures.iter().skip(1).find_map(|it| it).unwrap();
@@ -392,7 +393,7 @@ impl GoldOptions {
 
         // Sort the constant heap alphabetically to make the output more
         // stable.
-        let mut lines = lir.lines().collect_vec();
+        let mut lines = byte_code.lines().collect_vec();
         let (constants_start, _) = lines
             .iter()
             .find_position(|&&it| it == "# Constant heap")

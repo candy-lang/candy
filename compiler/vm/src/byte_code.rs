@@ -17,7 +17,7 @@ use rustc_hash::FxHashSet;
 use std::ops::Range;
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-pub struct Lir {
+pub struct ByteCode {
     pub module: Module,
     pub constant_heap: Heap,
     pub instructions: Vec<Instruction>,
@@ -208,7 +208,7 @@ impl StackExt for Vec<Id> {
     }
 }
 
-impl Lir {
+impl ByteCode {
     #[must_use]
     pub fn functions_behind(&self, ip: InstructionPointer) -> &FxHashSet<hir::Id> {
         &self.origins[*ip]
@@ -231,7 +231,7 @@ impl Lir {
     }
 }
 
-impl ToRichIr for Lir {
+impl ToRichIr for ByteCode {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         builder.push("# Constant heap", TokenType::Comment, EnumSet::empty());
         for constant in self.constant_heap.iter() {
@@ -395,8 +395,12 @@ const fn arguments_plural(num_args: usize) -> &'static str {
 }
 
 #[extension_trait]
-pub impl RichIrForLir for RichIr {
-    fn for_byte_code(module: &Module, byte_code: &Lir, tracing_config: &TracingConfig) -> RichIr {
+pub impl RichIrForByteCode for RichIr {
+    fn for_byte_code(
+        module: &Module,
+        byte_code: &ByteCode,
+        tracing_config: &TracingConfig,
+    ) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
             format!("# VM Byte Code for module {module}"),

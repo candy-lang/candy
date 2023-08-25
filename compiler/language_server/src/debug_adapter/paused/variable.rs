@@ -51,7 +51,7 @@ impl PausedState {
                                 .as_ref()
                                 .unwrap()
                                 .vm
-                                .lir()
+                                .byte_code()
                                 .functions_behind(function.body());
                             assert_eq!(functions.len(), 1);
                             let function: &hir::Id = functions.iter().next().unwrap();
