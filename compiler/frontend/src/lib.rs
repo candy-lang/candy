@@ -32,6 +32,7 @@ pub mod hir;
 pub mod hir_to_mir;
 pub mod id;
 pub mod lir;
+pub mod lir_optimize;
 pub mod mir;
 pub mod mir_optimize;
 pub mod mir_to_lir;
