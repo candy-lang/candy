@@ -154,14 +154,15 @@ impl LoweringContext {
                     _ => panic!("Text needs to start with any number of single quotes followed by a double quote, but started with {}.", opening)
                 };
 
-                let mut lowered_parts = vec![];
-                for part in parts {
+                let lowered_parts = parts.iter().filter_map(|part| {
                     match &part.kind {
+                        CstKind::TextNewline(_) => {
+                            let newline = self.create_string(part.data.id, "\n".to_string());
+                            Some(self.create_ast(part.data.id, AstKind::TextPart(TextPart(newline))))
+                        },
                         CstKind::TextPart(text) => {
                             let string = self.create_string(part.data.id, text.clone());
-                            let text_part =
-                                self.create_ast(part.data.id, TextPart(string));
-                            lowered_parts.push(text_part);
+                            Some(self.create_ast(part.data.id, AstKind::TextPart(TextPart(string))))
                         },
                         CstKind::TextInterpolation {
                             opening_curly_braces,
@@ -169,7 +170,7 @@ impl LoweringContext {
                             closing_curly_braces,
                         } => {
                             if lowering_type != LoweringType::Expression {
-                                return self.create_ast_for_invalid_expression_in_pattern(cst);
+                                return Some(self.create_ast_for_invalid_expression_in_pattern(cst));
                             };
 
                             if opening_curly_braces.len() != (opening_single_quote_count + 1)
@@ -185,24 +186,23 @@ impl LoweringContext {
                             }
 
                             let ast = self.lower_cst(expression, LoweringType::Expression);
-
                             if closing_curly_braces.len() == opening_single_quote_count + 1
                                 && closing_curly_braces
                                     .iter()
                                     .all(|closing_curly_brace| closing_curly_brace.kind.is_closing_curly_brace())
                             {
-                                lowered_parts.push(ast);
+                                Some(ast)
                             } else {
                                 errors.push(self.create_error(
                                     part,
                                     AstError::TextInterpolationMissesClosingCurlyBraces,
                                 ));
+                                None
                             }
                         },
-                        CstKind::Error { error, .. } => errors.push(self.create_error(part, *error)),
-                        _ => panic!("Text contains non-TextPart. Whitespaces should have been removed already."),
+                        _ => panic!("TextLine contains non-TextPart. Whitespaces should have been removed already."),
                     }
-                }
+                }).collect_vec();
 
                 if !matches!(
                     &closing.kind,
@@ -224,6 +224,7 @@ impl LoweringContext {
             }
             CstKind::OpeningText { .. } => panic!("OpeningText should only occur in Text."),
             CstKind::ClosingText { .. } => panic!("ClosingText should only occur in Text."),
+            CstKind::TextNewline(_) => panic!("TextNewline should only occur in Text."),
             CstKind::TextPart(_) => panic!("TextPart should only occur in Text."),
             CstKind::TextInterpolation { .. } => {
                 panic!("TextInterpolation should only occur in Text.")

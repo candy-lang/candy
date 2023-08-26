@@ -247,16 +247,75 @@ pub fn format_cst<'a>(
             parts,
             closing,
         } => {
-            // TODO: Format text
-            let mut width =
-                format_cst(edits, previous_width, opening, info).min_width(info.indentation);
-            for part in parts {
-                width += format_cst(edits, previous_width + width, part, info)
-                    .min_width(info.indentation);
-            }
-            width += format_cst(edits, previous_width + width, closing, info)
+            let info = info.resolve_for_expression_with_indented_lines(
+                previous_width,
+                SinglelineWidth::PARENTHESIS.into(),
+            );
+
+            let opening = format_cst(edits, previous_width, opening, &info);
+            let closing = format_cst(
+                edits,
+                Width::multiline(None, info.indentation.width()),
+                closing,
+                &info,
+            );
+
+            let (closing_width, whitespace) = closing.split();
+            let quotes_width =
+                info.indentation.width() + opening.min_width(info.indentation) + closing_width;
+
+            let Some((last_part, first_parts)) = parts.split_last() else {
+                return FormattedCst::new(
+                    opening.into_empty_trailing(edits) + closing_width,
+                    whitespace,
+                );
+            };
+            let previous_width_for_lines =
+                Width::multiline(None, info.indentation.with_indent().width());
+            let mut first_parts_width = Width::default();
+            for part in first_parts {
+                first_parts_width += format_cst(
+                    edits,
+                    previous_width_for_lines + first_parts_width,
+                    part,
+                    &info,
+                )
                 .min_width(info.indentation);
-            width
+            }
+
+            let last_part = format_cst(edits, previous_width + first_parts_width, last_part, &info);
+            let total_parts_width = first_parts_width + last_part.min_width(info.indentation);
+            return if total_parts_width.is_singleline()
+                && (quotes_width + total_parts_width).fits(info.indentation)
+            {
+                FormattedCst::new(
+                    opening.into_empty_trailing(edits)
+                        + first_parts_width
+                        + last_part.into_empty_trailing(edits)
+                        + closing_width,
+                    whitespace,
+                )
+            } else {
+                FormattedCst::new(
+                    opening.into_trailing(
+                        edits,
+                        TrailingWhitespace::Indentation(info.indentation.with_indent()),
+                    ) + first_parts_width
+                        + last_part.into_trailing(
+                            edits,
+                            TrailingWhitespace::Indentation(info.indentation),
+                        )
+                        + closing_width,
+                    whitespace,
+                )
+            };
+        }
+        CstKind::TextNewline(_) => {
+            let whitespace = vec![cst.clone()];
+            let whitespace: ExistingWhitespace<'_> =
+                ExistingWhitespace::new(cst.data.span.start, &whitespace);
+            FormattedCst::new(Width::default(), whitespace)
+                .into_trailing(edits, TrailingWhitespace::Indentation(info.indentation))
         }
         CstKind::TextPart(text) => text.width(),
         CstKind::TextInterpolation {
@@ -1149,7 +1208,9 @@ pub impl<D> CstExtension for Cst<D> {
             }
             CstKind::OpeningText { .. } | CstKind::ClosingText { .. } => None,
             CstKind::Text { .. } => Some(PrecedenceCategory::High),
-            CstKind::TextPart(_) | CstKind::TextInterpolation { .. } => None,
+            CstKind::TextNewline(_) | CstKind::TextPart(_) | CstKind::TextInterpolation { .. } => {
+                None
+            }
             CstKind::BinaryBar { .. } => Some(PrecedenceCategory::Low),
             CstKind::Parenthesized { .. } => Some(PrecedenceCategory::High),
             CstKind::Call { .. } => Some(PrecedenceCategory::Low),
@@ -1270,6 +1331,36 @@ mod test {
     fn test_int() {
         test("1", "1\n");
         test("123", "123\n");
+    }
+    #[test]
+    fn test_text() {
+        // Empty
+        test("\"\"", "\"\"\n");
+        test("\"\n\"", "\"\"\n");
+        test("\"\n  \n\"", "\"\"\n");
+
+        // Single line
+        test("\"\n  foo\"", "\"foo\"\n");
+        test("\"foo{0}bar\"", "\"foo{0}bar\"\n");
+        test(
+            "\"loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong Text\"", 
+            "\"\n  loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong Text\n\"\n"
+        );
+        test(
+            "\"\n  loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong Text\"", 
+            "\"\n  loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong Text\n\"\n"
+        );
+        test(
+            "\"\n  loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong Text\n\"", 
+            "\"\n  loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong Text\n\"\n"
+        );
+
+        // Multiple lines
+        test("\"\n  foo\n  bar\"", "\"\n  foo\n  bar\n\"\n");
+        test("\"\n  foo\n  bar\n\"", "\"\n  foo\n  bar\n\"\n");
+        test("\"foo\n  bar\"", "\"\n  foo\n  bar\n\"\n");
+        test("\"foo\n  bar\n\"", "\"\n  foo\n  bar\n\"\n");
+        test("\"foo\n  {0}\n  bar\n\"", "\"\n  foo\n  {0}\n  bar\n\"\n");
     }
     #[test]
     fn test_binary_bar() {
