@@ -18,15 +18,20 @@ use std::{
 pub struct HeapInt(HeapObject);
 
 impl HeapInt {
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
-    pub fn create(heap: &mut Heap, value: BigInt) -> Self {
+    pub fn create(heap: &mut Heap, is_reference_counted: bool, value: BigInt) -> Self {
         if let Ok(value) = i64::try_from(&value) {
             debug_assert!(!InlineInt::fits(value));
         }
 
-        let int = Self(heap.allocate(HeapObject::KIND_INT, mem::size_of::<BigInt>()));
+        let int = Self(heap.allocate(
+            HeapObject::KIND_INT,
+            is_reference_counted,
+            0,
+            mem::size_of::<BigInt>(),
+        ));
         unsafe { ptr::write(int.int_pointer().as_ptr(), value) };
         int
     }
@@ -44,10 +49,10 @@ impl HeapInt {
     operator_fn!(int_divide_truncating, Div, div);
     operator_fn!(remainder, Rem, rem);
     pub fn modulo(self, heap: &mut Heap, rhs: &BigInt) -> Int {
-        Int::create_from_bigint(heap, self.get().mod_floor(rhs))
+        Int::create_from_bigint(heap, true, self.get().mod_floor(rhs))
     }
 
-    pub fn compare_to(self, heap: &mut Heap, rhs: &BigInt) -> Tag {
+    pub fn compare_to(self, heap: &Heap, rhs: &BigInt) -> Tag {
         // PERF: Add manual check if the `rhs` is an [InlineInt]?
         Tag::create_ordering(heap, self.get().cmp(rhs))
     }
@@ -56,7 +61,7 @@ impl HeapInt {
     operator_fn!(shift_right, Shr, shr);
 
     pub fn bit_length(self, heap: &mut Heap) -> Int {
-        Int::create(heap, self.get().bits())
+        Int::create(heap, true, self.get().bits())
     }
 
     operator_fn!(bitwise_and, BitAnd, bitand);
@@ -71,7 +76,7 @@ macro_rules! operator_fn {
             for<'a> &'a BigInt: $trait<T, Output = BigInt>,
         {
             let result = $trait::$function(self.get(), rhs);
-            Int::create_from_bigint(heap, result)
+            Int::create_from_bigint(heap, true, result)
         }
     };
 }
@@ -100,7 +105,7 @@ impl HeapObjectTrait for HeapInt {
         _address_map: &mut FxHashMap<HeapObject, HeapObject>,
     ) {
         let clone = Self(clone);
-        let value = self.get().to_owned();
+        let value = self.get().clone();
         unsafe { ptr::write(clone.int_pointer().as_ptr(), value) };
     }
 

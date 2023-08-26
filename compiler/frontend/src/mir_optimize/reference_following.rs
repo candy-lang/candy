@@ -10,7 +10,7 @@
 //! ```
 //!
 //! This is useful for [constant folding], which tests for specific expression
-//! types. For example, to constant-fold a `builtinIntAdd', it tests whether
+//! types. For example, to constant-fold a `builtinIntAdd`, it tests whether
 //! both arguments are an `Expression::Int`. An `Expression::Reference` prevents
 //! that optimization.
 //!
@@ -28,15 +28,8 @@ pub fn follow_references(context: &mut Context, expression: &mut CurrentExpressi
 }
 
 pub fn remove_redundant_return_references(body: &mut Body) {
-    while body.expressions.len() > 1 {
-        let [.., (second_last_id, _), (_, last_expression)] = &body.expressions[..] else {
-            unreachable!()
-        };
-
-        if let Expression::Reference(referenced) = last_expression && referenced == second_last_id {
-            body.expressions.pop();
-        } else {
-            break;
-        }
+    while let [.., (second_last_id, _), (_, Expression::Reference(referenced))] = &body.expressions[..]
+        && referenced == second_last_id {
+        body.expressions.pop();
     }
 }

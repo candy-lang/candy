@@ -23,7 +23,7 @@ impl Mir {
         let mut builder = BodyBuilder::new(IdGenerator::start_at(1));
         function(&mut builder);
         let (id_generator, body) = builder.finish();
-        Mir { id_generator, body }
+        Self { id_generator, body }
     }
 }
 impl_debug_via_richir!(Mir);

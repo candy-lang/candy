@@ -1,3 +1,22 @@
+# This package is special to the compiler and code in here behaves somewhat
+# different than other code. Be careful when editing the code in here. These are
+# the peculiarities you need to worry about:
+#
+# - There's a magic variable called `✨` in scope. It's a struct containing
+#   entry points to compiler builtins – functions that are implemented directly
+#   in the Rust compiler rather than in Candy code.
+#   For the VM implementations, see `vm/src/builtin_functions.rs`.
+#
+# - You need to make sure the builtin functions from `✨` are called with valid
+#   arguments, so make sure to guard all calls with appropriate needs. If you
+#   don't, the underlying Rust code may panic.
+#
+# - Invalid struct accesses cause panics, so make sure you know a key is in a
+#   struct when you access it using the dot syntax.
+#
+# - Don't remove the `structGet` function! All struct accesses from other
+#   packages refer to this function.
+
 typeIs value type =
   needs (type | ✨.typeOf | ✨.equals Tag)
   value | ✨.typeOf | ✨.equals type
@@ -16,28 +35,6 @@ isLessThanOrEqualTo a b =
   a | ✨.intCompareTo b %
     Less | Equal -> True
     Greater -> False
-
-channelCreate capacity :=
-  # Creates a new channel with the specified `capacity`.
-  #
-  # This function returns a struct `[sendPort, receivePort]`.
-  needs
-    capacity | typeIs Int
-    "`capacity` is not an integer. Channels need a capacity because otherwise, there would be no backpressure among fibers, and memory leaks would go unnoticed."
-  needs (capacity | isNonNegative)
-  ✨.channelCreate capacity
-channelSend sendPort packet :=
-  # Sends the `packet` to the channel specified by the `sendPort`.
-  #
-  # If the channel is full, this function blocks until there is space available.
-  needs (sendPort | typeIs SendPort)
-  ✨.channelSend sendPort packet
-channelReceive receivePort :=
-  # Receives a packet from the specified `receivePort`.
-  #
-  # If the channel is empty, this function blocks until there is a packet available.
-  needs (receivePort | typeIs ReceivePort)
-  ✨.channelReceive receivePort
 
 equals a b :=
   # Returns `True` or `False` depending on whether `a` and `b` are equal.
@@ -193,19 +190,7 @@ listReplace list index newItem :=
   needs (index | intCompareTo (list | listLength) | equals Less)
   ✨.listReplace list index newItem
 
-parallel body :=
-  # Executes `body`, which accepts a nursery to spawn fibers that can run in parallel.
-  #
-  # This call exits with `body`'s return value once all fibers spawned within body have exited.
-  ## TODO: Propagate the responsibility here. `body` may contain a `needs` that always fails. That
-  ## shouldn't be our fault, but our caller's.
-  needs (body | typeIs Function)
-  needs (body | getArgumentCount | equals 1) "The `body` should be a function taking a nursery."
-  ✨.parallel body
-
-print message :=
-  needs (message | typeIs Text)
-  ✨.print message
+print message := ✨.print message
 
 structGet struct key :=
   needs (struct | typeIs Struct)
@@ -262,7 +247,7 @@ textGetRange text startInclusive endExclusive :=
   needs (text | typeIs Text)
   needs (startInclusive | typeIs Int)
   needs (startInclusive | isNonNegative)
-  needs (startInclusive | intCompareTo (text | ✨.textLength) | equals Less)
+  needs (startInclusive | isLessThanOrEqualTo (text | ✨.textLength))
   needs (endExclusive | typeIs Int)
   needs (endExclusive | isNonNegative)
   needs (endExclusive | isLessThanOrEqualTo (text | ✨.textLength))
@@ -289,12 +274,5 @@ textTrimStart text :=
   ✨.textTrimStart text
 
 toDebugText any := ✨.toDebugText any
-
-try function :=
-  # Returns `Ok result` if `function` returns normally and `Error panicReason` if the `function`
-  # panics.
-  needs (function | typeIs Function)
-  needs (function | getArgumentCount | equals 0)
-  ✨.try function
 
 typeOf any := ✨.typeOf any

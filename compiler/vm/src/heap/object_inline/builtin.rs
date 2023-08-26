@@ -17,9 +17,9 @@ use std::{
 pub struct InlineBuiltin(InlineObject);
 
 impl InlineBuiltin {
-    const INDEX_SHIFT: usize = 2;
+    const INDEX_SHIFT: usize = 3;
 
-    pub fn new_unchecked(object: InlineObject) -> Self {
+    pub const fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
     }
 
@@ -33,7 +33,7 @@ impl InlineBuiltin {
 
 impl DebugDisplay for InlineBuiltin {
     fn fmt(&self, f: &mut Formatter, _is_debug: bool) -> fmt::Result {
-        write!(f, "builtin{:?}", self.get())
+        write!(f, "{}", self.get())
     }
 }
 impl_debug_display_via_debugdisplay!(InlineBuiltin);
@@ -46,7 +46,7 @@ impl PartialEq for InlineBuiltin {
 }
 impl Hash for InlineBuiltin {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.index().hash(state)
+        self.index().hash(state);
     }
 }
 impl Ord for InlineBuiltin {

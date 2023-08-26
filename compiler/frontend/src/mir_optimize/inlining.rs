@@ -116,7 +116,7 @@ impl Context<'_> {
             .collect();
 
         expression.replace_with_multiple(body.iter().map(|(id, expression)| {
-            let mut expression = expression.to_owned();
+            let mut expression = expression.clone();
             expression.replace_ids(&mut |id| {
                 if let Some(replacement) = id_mapping.get(id) {
                     *id = *replacement;

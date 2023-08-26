@@ -1,0 +1,13 @@
+# Echoes whatever you send to it on stdin.
+
+[function, text] = use "Core"
+
+main := { environment ->
+  print message = environment.stdout message
+  read = environment.stdin
+
+  print "Hello, world!"
+  foo = function.run read
+  print "Echo:"
+  print foo
+}

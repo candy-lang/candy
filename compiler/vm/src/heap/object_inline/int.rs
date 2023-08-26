@@ -19,13 +19,13 @@ use std::{
 #[derive(Clone, Copy, Deref)]
 pub struct InlineInt(InlineObject);
 impl InlineInt {
-    const VALUE_SHIFT: usize = 2;
+    const VALUE_SHIFT: usize = 3;
 
-    pub fn new_unchecked(object: InlineObject) -> Self {
+    pub const fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
     }
 
-    pub fn fits(value: i64) -> bool {
+    pub const fn fits(value: i64) -> bool {
         (value << Self::VALUE_SHIFT) >> Self::VALUE_SHIFT == value
     }
     pub fn from_unchecked(value: i64) -> Self {
@@ -34,15 +34,17 @@ impl InlineInt {
             value,
             "Integer is too large.",
         );
+        #[allow(clippy::cast_sign_loss)]
         let header_word = InlineObject::KIND_INT | ((value as u64) << Self::VALUE_SHIFT);
         let header_word = unsafe { NonZeroU64::new_unchecked(header_word) };
         Self(InlineObject(header_word))
     }
 
+    #[allow(clippy::cast_possible_wrap)]
     pub fn get(self) -> i64 {
         self.raw_word().get() as i64 >> Self::VALUE_SHIFT
     }
-    pub fn try_get<T: TryFrom<i64>>(&self) -> Option<T> {
+    pub fn try_get<T: TryFrom<i64>>(self) -> Option<T> {
         self.get().try_into().ok()
     }
 
@@ -54,14 +56,15 @@ impl InlineInt {
     pub fn modulo(self, heap: &mut Heap, rhs: Self) -> Int {
         let lhs = self.get();
         let rhs = rhs.get();
+        #[allow(clippy::map_unwrap_or)]
         lhs.checked_rem_euclid(rhs)
-            .map(|it| Int::create(heap, it))
+            .map(|it| Int::create(heap, true, it))
             .unwrap_or_else(|| {
-                Int::create_from_bigint(heap, BigInt::from(lhs).mod_floor(&rhs.into()))
+                Int::create_from_bigint(heap, true, BigInt::from(lhs).mod_floor(&rhs.into()))
             })
     }
 
-    pub fn compare_to(self, heap: &mut Heap, rhs: Int) -> Tag {
+    pub fn compare_to(self, heap: &Heap, rhs: Int) -> Tag {
         let ordering = match rhs {
             Int::Inline(rhs) => self.get().cmp(&rhs.get()),
             Int::Heap(rhs) => {
@@ -75,11 +78,11 @@ impl InlineInt {
         Tag::create_ordering(heap, ordering)
     }
 
-    operator_fn!(shift_left, i64::checked_shl, Shl::shl);
-    operator_fn!(shift_right, i64::checked_shr, Shr::shr);
+    shift_fn!(shift_left, i64::checked_shl, Shl::shl);
+    shift_fn!(shift_right, i64::checked_shr, Shr::shr);
 
     pub fn bit_length(self) -> Self {
-        // SAFETY: The `bit_length` can be at most 62 since that's how large an [InlineInt] can get.
+        // SAFETY: The `bit_length` can be at most 61 since that's how large an [InlineInt] can get.
         Self::from_unchecked(self.get().bit_length().into())
     }
 
@@ -90,13 +93,42 @@ impl InlineInt {
 
 macro_rules! operator_fn {
     ($name:ident, $inline_operation:expr, $bigint_operation:expr) => {
-        pub fn $name(self, heap: &mut Heap, rhs: Self) -> Int {
+        pub fn $name(self, heap: &mut Heap, rhs: Int) -> Int {
+            let lhs = self.get();
+            match rhs {
+                Int::Inline(rhs) => rhs
+                    .try_get()
+                    .and_then(|rhs| $inline_operation(lhs, rhs))
+                    .map(|it| Int::create(heap, true, it))
+                    .unwrap_or_else(|| {
+                        Int::create_from_bigint(
+                            heap,
+                            true,
+                            $bigint_operation(BigInt::from(lhs), rhs.get()),
+                        )
+                    }),
+                Int::Heap(rhs) => Int::create_from_bigint(
+                    heap,
+                    true,
+                    $bigint_operation(BigInt::from(lhs), rhs.get()),
+                ),
+            }
+        }
+    };
+}
+macro_rules! shift_fn {
+    ($name:ident, $inline_operation:expr, $bigint_operation:expr) => {
+        pub fn $name(self, heap: &mut Heap, rhs: InlineInt) -> Int {
             let lhs = self.get();
             rhs.try_get()
                 .and_then(|rhs| $inline_operation(lhs, rhs))
-                .map(|it| Int::create(heap, it))
+                .map(|it| Int::create(heap, true, it))
                 .unwrap_or_else(|| {
-                    Int::create_from_bigint(heap, $bigint_operation(BigInt::from(lhs), rhs.get()))
+                    Int::create_from_bigint(
+                        heap,
+                        true,
+                        $bigint_operation(BigInt::from(lhs), rhs.get()),
+                    )
                 })
         }
     };
@@ -109,7 +141,7 @@ macro_rules! operator_fn_closed {
         }
     };
 }
-use {operator_fn, operator_fn_closed};
+use {operator_fn, operator_fn_closed, shift_fn};
 
 impl DebugDisplay for InlineInt {
     fn fmt(&self, f: &mut Formatter, _is_debug: bool) -> fmt::Result {
@@ -126,15 +158,15 @@ impl TryFrom<&BigInt> for InlineInt {
     fn try_from(value: &BigInt) -> Result<Self, Self::Error> {
         i64::try_from(value)
             .map_err(|_| ())
-            .and_then(|value| value.try_into())
+            .and_then(TryInto::try_into)
     }
 }
 impl TryFrom<i64> for InlineInt {
     type Error = ();
 
     fn try_from(value: i64) -> Result<Self, Self::Error> {
-        if InlineInt::fits(value) {
-            Ok(InlineInt::from_unchecked(value))
+        if Self::fits(value) {
+            Ok(Self::from_unchecked(value))
         } else {
             Err(())
         }
@@ -154,6 +186,6 @@ impl InlineObjectTrait for InlineInt {
 #[extension_trait]
 pub impl I64BitLength for i64 {
     fn bit_length(self) -> u32 {
-        i64::BITS - self.unsigned_abs().leading_zeros()
+        Self::BITS - self.unsigned_abs().leading_zeros()
     }
 }

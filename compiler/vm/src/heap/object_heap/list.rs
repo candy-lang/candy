@@ -4,7 +4,6 @@ use crate::{
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
 use derive_more::Deref;
-use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use std::{
     cmp::Ordering,
@@ -19,25 +18,27 @@ use std::{
 pub struct HeapList(HeapObject);
 
 impl HeapList {
-    const LEN_SHIFT: usize = 3;
+    const LEN_SHIFT: usize = 4;
 
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
-    pub fn create(heap: &mut Heap, value: &[InlineObject]) -> Self {
+    pub fn create(heap: &mut Heap, is_reference_counted: bool, value: &[InlineObject]) -> Self {
         let len = value.len();
-        let list = Self::create_uninitialized(heap, len);
+        let list = Self::create_uninitialized(heap, is_reference_counted, len);
         unsafe { ptr::copy_nonoverlapping(value.as_ptr(), list.items_pointer().as_ptr(), len) };
         list
     }
-    fn create_uninitialized(heap: &mut Heap, len: usize) -> Self {
+    fn create_uninitialized(heap: &mut Heap, is_reference_counted: bool, len: usize) -> Self {
         assert_eq!(
             (len << Self::LEN_SHIFT) >> Self::LEN_SHIFT,
             len,
             "List is too long.",
         );
         Self(heap.allocate(
-            HeapObject::KIND_LIST | ((len as u64) << Self::LEN_SHIFT),
+            HeapObject::KIND_LIST,
+            is_reference_counted,
+            (len as u64) << Self::LEN_SHIFT,
             len * HeapObject::WORD_SIZE,
         ))
     }
@@ -65,7 +66,7 @@ impl HeapList {
         assert!(index <= self.len());
 
         let len = self.len() + 1;
-        let new_list = Self::create_uninitialized(heap, len);
+        let new_list = Self::create_uninitialized(heap, true, len);
         unsafe {
             ptr::copy_nonoverlapping(
                 self.content_word_pointer(0).as_ptr(),
@@ -86,7 +87,7 @@ impl HeapList {
         assert!(index < self.len());
 
         let len = self.len() - 1;
-        let new_list = Self::create_uninitialized(heap, len);
+        let new_list = Self::create_uninitialized(heap, true, len);
         unsafe {
             ptr::copy_nonoverlapping(
                 self.content_word_pointer(0).as_ptr(),
@@ -105,7 +106,7 @@ impl HeapList {
     pub fn replace(self, heap: &mut Heap, index: usize, value: InlineObject) -> Self {
         assert!(index < self.len());
 
-        let new_list = Self::create(heap, self.items());
+        let new_list = Self::create(heap, true, self.items());
         unsafe { ptr::write(new_list.content_word_pointer(index).cast().as_ptr(), value) };
         new_list
     }
@@ -114,18 +115,17 @@ impl HeapList {
 impl DebugDisplay for HeapList {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         let items = self.items();
-        write!(
-            f,
-            "({})",
-            if items.is_empty() {
-                ",".to_owned()
-            } else {
-                items
-                    .iter()
-                    .map(|item| DebugDisplay::to_string(item, is_debug))
-                    .join(", ")
-            },
-        )
+        write!(f, "(")?;
+        for (index, item) in items.iter().enumerate() {
+            if index > 0 {
+                write!(f, ", ")?;
+            }
+            DebugDisplay::fmt(item, f, is_debug)?;
+        }
+        if self.len() <= 1 {
+            write!(f, ",")?;
+        }
+        write!(f, ")")
     }
 }
 impl_debug_display_via_debugdisplay!(HeapList);
@@ -139,7 +139,7 @@ impl PartialEq for HeapList {
 
 impl Hash for HeapList {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.items().hash(state)
+        self.items().hash(state);
     }
 }
 
@@ -180,7 +180,7 @@ impl HeapObjectTrait for HeapList {
 
     fn drop_children(self, heap: &mut Heap) {
         for item in self.items() {
-            item.drop(heap)
+            item.drop(heap);
         }
     }
 

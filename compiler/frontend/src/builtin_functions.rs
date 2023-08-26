@@ -1,12 +1,15 @@
+use crate::{
+    impl_display_via_richir,
+    rich_ir::{RichIrBuilder, ToRichIr, TokenModifier, TokenType},
+};
+use enumset::EnumSet;
 use lazy_static::lazy_static;
 use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
+use strum_macros::{AsRefStr, EnumIter};
 
-#[derive(Clone, Copy, Debug, EnumIter, Eq, Hash, PartialEq)]
+#[derive(AsRefStr, Clone, Copy, Debug, EnumIter, Eq, Hash, PartialEq)]
+#[strum(serialize_all = "snake_case")]
 pub enum BuiltinFunction {
-    ChannelCreate,       // capacity -> [sendPort, receivePort]
-    ChannelSend,         // channel any -> Nothing
-    ChannelReceive,      // channel -> any
     Equals,              // any any -> booleanTag
     FunctionRun,         // (functionWith0Arguments) -> (returnValue: any)
     GetArgumentCount,    // function -> argumentCount
@@ -31,7 +34,6 @@ pub enum BuiltinFunction {
     ListLength,          // list -> int
     ListRemoveAt,        // list (index: int) -> (list, item)
     ListReplace,         // list (index: int) newItem -> list
-    Parallel,            // body: Function -> returnValueOfFunction
     Print,               // message -> Nothing
     StructGet,           // struct key -> value
     StructGetKeys,       // struct -> listOfKeys
@@ -51,7 +53,6 @@ pub enum BuiltinFunction {
     TextTrimEnd,         // text -> text
     TextTrimStart,       // text -> text
     ToDebugText,         // any -> text
-    Try,                 // function -> okWithFunctionResultOrErrorWithPanicReason
     TypeOf,              // any -> typeTag
 }
 lazy_static! {
@@ -59,111 +60,115 @@ lazy_static! {
 }
 
 impl BuiltinFunction {
-    pub fn is_pure(&self) -> bool {
+    #[must_use]
+    pub const fn is_pure(&self) -> bool {
         match self {
-            BuiltinFunction::ChannelCreate => false,
-            BuiltinFunction::ChannelSend => false,
-            BuiltinFunction::ChannelReceive => false,
-            BuiltinFunction::Equals => true,
-            BuiltinFunction::FunctionRun => false,
-            BuiltinFunction::GetArgumentCount => true,
-            BuiltinFunction::IfElse => false,
-            BuiltinFunction::IntAdd => true,
-            BuiltinFunction::IntBitLength => true,
-            BuiltinFunction::IntBitwiseAnd => true,
-            BuiltinFunction::IntBitwiseOr => true,
-            BuiltinFunction::IntBitwiseXor => true,
-            BuiltinFunction::IntCompareTo => true,
-            BuiltinFunction::IntDivideTruncating => true,
-            BuiltinFunction::IntModulo => true,
-            BuiltinFunction::IntMultiply => true,
-            BuiltinFunction::IntParse => true,
-            BuiltinFunction::IntRemainder => true,
-            BuiltinFunction::IntShiftLeft => true,
-            BuiltinFunction::IntShiftRight => true,
-            BuiltinFunction::IntSubtract => true,
-            BuiltinFunction::ListFilled => true,
-            BuiltinFunction::ListGet => true,
-            BuiltinFunction::ListInsert => true,
-            BuiltinFunction::ListLength => true,
-            BuiltinFunction::ListRemoveAt => true,
-            BuiltinFunction::ListReplace => true,
-            BuiltinFunction::Parallel => false,
-            BuiltinFunction::Print => false,
-            BuiltinFunction::StructGet => true,
-            BuiltinFunction::StructGetKeys => true,
-            BuiltinFunction::StructHasKey => true,
-            BuiltinFunction::TagGetValue => true,
-            BuiltinFunction::TagHasValue => true,
-            BuiltinFunction::TagWithoutValue => true,
-            BuiltinFunction::TextCharacters => true,
-            BuiltinFunction::TextConcatenate => true,
-            BuiltinFunction::TextContains => true,
-            BuiltinFunction::TextEndsWith => true,
-            BuiltinFunction::TextFromUtf8 => true,
-            BuiltinFunction::TextGetRange => true,
-            BuiltinFunction::TextIsEmpty => true,
-            BuiltinFunction::TextLength => true,
-            BuiltinFunction::TextStartsWith => true,
-            BuiltinFunction::TextTrimEnd => true,
-            BuiltinFunction::TextTrimStart => true,
-            BuiltinFunction::ToDebugText => true,
-            BuiltinFunction::Try => false,
-            BuiltinFunction::TypeOf => true,
+            Self::Equals => true,
+            Self::FunctionRun => false,
+            Self::GetArgumentCount => true,
+            Self::IfElse => false,
+            Self::IntAdd => true,
+            Self::IntBitLength => true,
+            Self::IntBitwiseAnd => true,
+            Self::IntBitwiseOr => true,
+            Self::IntBitwiseXor => true,
+            Self::IntCompareTo => true,
+            Self::IntDivideTruncating => true,
+            Self::IntModulo => true,
+            Self::IntMultiply => true,
+            Self::IntParse => true,
+            Self::IntRemainder => true,
+            Self::IntShiftLeft => true,
+            Self::IntShiftRight => true,
+            Self::IntSubtract => true,
+            Self::ListFilled => true,
+            Self::ListGet => true,
+            Self::ListInsert => true,
+            Self::ListLength => true,
+            Self::ListRemoveAt => true,
+            Self::ListReplace => true,
+            Self::Print => false,
+            Self::StructGet => true,
+            Self::StructGetKeys => true,
+            Self::StructHasKey => true,
+            Self::TagGetValue => true,
+            Self::TagHasValue => true,
+            Self::TagWithoutValue => true,
+            Self::TextCharacters => true,
+            Self::TextConcatenate => true,
+            Self::TextContains => true,
+            Self::TextEndsWith => true,
+            Self::TextFromUtf8 => true,
+            Self::TextGetRange => true,
+            Self::TextIsEmpty => true,
+            Self::TextLength => true,
+            Self::TextStartsWith => true,
+            Self::TextTrimEnd => true,
+            Self::TextTrimStart => true,
+            Self::ToDebugText => true,
+            Self::TypeOf => true,
         }
     }
 
-    pub fn num_parameters(&self) -> usize {
+    #[must_use]
+    pub const fn num_parameters(&self) -> usize {
         match self {
-            BuiltinFunction::ChannelCreate => 1,
-            BuiltinFunction::ChannelSend => 2,
-            BuiltinFunction::ChannelReceive => 1,
-            BuiltinFunction::Equals => 2,
-            BuiltinFunction::FunctionRun => 1,
-            BuiltinFunction::GetArgumentCount => 1,
-            BuiltinFunction::IfElse => 3,
-            BuiltinFunction::IntAdd => 2,
-            BuiltinFunction::IntBitLength => 1,
-            BuiltinFunction::IntBitwiseAnd => 2,
-            BuiltinFunction::IntBitwiseOr => 2,
-            BuiltinFunction::IntBitwiseXor => 2,
-            BuiltinFunction::IntCompareTo => 2,
-            BuiltinFunction::IntDivideTruncating => 2,
-            BuiltinFunction::IntModulo => 2,
-            BuiltinFunction::IntMultiply => 2,
-            BuiltinFunction::IntParse => 1,
-            BuiltinFunction::IntRemainder => 2,
-            BuiltinFunction::IntShiftLeft => 2,
-            BuiltinFunction::IntShiftRight => 2,
-            BuiltinFunction::IntSubtract => 2,
-            BuiltinFunction::ListFilled => 2,
-            BuiltinFunction::ListGet => 2,
-            BuiltinFunction::ListInsert => 3,
-            BuiltinFunction::ListLength => 1,
-            BuiltinFunction::ListRemoveAt => 2,
-            BuiltinFunction::ListReplace => 3,
-            BuiltinFunction::Parallel => 1,
-            BuiltinFunction::Print => 1,
-            BuiltinFunction::StructGet => 2,
-            BuiltinFunction::StructGetKeys => 1,
-            BuiltinFunction::StructHasKey => 2,
-            BuiltinFunction::TagGetValue => 1,
-            BuiltinFunction::TagHasValue => 1,
-            BuiltinFunction::TagWithoutValue => 1,
-            BuiltinFunction::TextCharacters => 1,
-            BuiltinFunction::TextConcatenate => 2,
-            BuiltinFunction::TextContains => 2,
-            BuiltinFunction::TextEndsWith => 2,
-            BuiltinFunction::TextFromUtf8 => 1,
-            BuiltinFunction::TextGetRange => 3,
-            BuiltinFunction::TextIsEmpty => 1,
-            BuiltinFunction::TextLength => 1,
-            BuiltinFunction::TextStartsWith => 2,
-            BuiltinFunction::TextTrimEnd => 1,
-            BuiltinFunction::TextTrimStart => 1,
-            BuiltinFunction::ToDebugText => 1,
-            BuiltinFunction::Try => 1,
-            BuiltinFunction::TypeOf => 1,
+            Self::Equals => 2,
+            Self::FunctionRun => 1,
+            Self::GetArgumentCount => 1,
+            Self::IfElse => 3,
+            Self::IntAdd => 2,
+            Self::IntBitLength => 1,
+            Self::IntBitwiseAnd => 2,
+            Self::IntBitwiseOr => 2,
+            Self::IntBitwiseXor => 2,
+            Self::IntCompareTo => 2,
+            Self::IntDivideTruncating => 2,
+            Self::IntModulo => 2,
+            Self::IntMultiply => 2,
+            Self::IntParse => 1,
+            Self::IntRemainder => 2,
+            Self::IntShiftLeft => 2,
+            Self::IntShiftRight => 2,
+            Self::IntSubtract => 2,
+            Self::ListFilled => 2,
+            Self::ListGet => 2,
+            Self::ListInsert => 3,
+            Self::ListLength => 1,
+            Self::ListRemoveAt => 2,
+            Self::ListReplace => 3,
+            Self::Print => 1,
+            Self::StructGet => 2,
+            Self::StructGetKeys => 1,
+            Self::StructHasKey => 2,
+            Self::TagGetValue => 1,
+            Self::TagHasValue => 1,
+            Self::TagWithoutValue => 1,
+            Self::TextCharacters => 1,
+            Self::TextConcatenate => 2,
+            Self::TextContains => 2,
+            Self::TextEndsWith => 2,
+            Self::TextFromUtf8 => 1,
+            Self::TextGetRange => 3,
+            Self::TextIsEmpty => 1,
+            Self::TextLength => 1,
+            Self::TextStartsWith => 2,
+            Self::TextTrimEnd => 1,
+            Self::TextTrimStart => 1,
+            Self::ToDebugText => 1,
+            Self::TypeOf => 1,
         }
+    }
+}
+
+impl_display_via_richir!(BuiltinFunction);
+impl ToRichIr for BuiltinFunction {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        let range = builder.push(
+            format!("builtin{self:?}"),
+            TokenType::Function,
+            EnumSet::only(TokenModifier::Builtin),
+        );
+        builder.push_reference(*self, range);
     }
 }

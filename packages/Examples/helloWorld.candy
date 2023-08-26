@@ -1,0 +1,5 @@
+# A self-contained hello world example that doesn't even use the Core library.
+
+main := { environment ->
+  environment.stdout "Hello, world!"
+}

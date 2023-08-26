@@ -3,7 +3,7 @@ use crate::position::Offset;
 
 pub trait TreeWithIds {
     fn first_id(&self) -> Option<Id>;
-    fn find(&self, id: &Id) -> Option<&Cst>;
+    fn find(&self, id: Id) -> Option<&Cst>;
 
     fn first_offset(&self) -> Option<Offset>;
     fn find_by_offset(&self, offset: Offset) -> Option<&Cst>;
@@ -12,8 +12,8 @@ impl TreeWithIds for Cst {
     fn first_id(&self) -> Option<Id> {
         Some(self.data.id)
     }
-    fn find(&self, id: &Id) -> Option<&Cst> {
-        if id == &self.data.id {
+    fn find(&self, id: Id) -> Option<&Cst> {
+        if id == self.data.id {
             return Some(self);
         };
 
@@ -329,14 +329,14 @@ impl TreeWithIds for Cst {
 }
 impl<T: TreeWithIds> TreeWithIds for Option<T> {
     fn first_id(&self) -> Option<Id> {
-        self.as_ref().and_then(|it| it.first_id())
+        self.as_ref().and_then(TreeWithIds::first_id)
     }
-    fn find(&self, id: &Id) -> Option<&Cst> {
+    fn find(&self, id: Id) -> Option<&Cst> {
         self.as_ref().and_then(|it| it.find(id))
     }
 
     fn first_offset(&self) -> Option<Offset> {
-        self.as_ref().and_then(|it| it.first_offset())
+        self.as_ref().and_then(TreeWithIds::first_offset)
     }
     fn find_by_offset(&self, offset: Offset) -> Option<&Cst> {
         self.as_ref().and_then(|it| it.find_by_offset(offset))
@@ -346,7 +346,7 @@ impl<T: TreeWithIds> TreeWithIds for Box<T> {
     fn first_id(&self) -> Option<Id> {
         self.as_ref().first_id()
     }
-    fn find(&self, id: &Id) -> Option<&Cst> {
+    fn find(&self, id: Id) -> Option<&Cst> {
         self.as_ref().find(id)
     }
 
@@ -359,26 +359,18 @@ impl<T: TreeWithIds> TreeWithIds for Box<T> {
 }
 impl<T: TreeWithIds> TreeWithIds for [T] {
     fn first_id(&self) -> Option<Id> {
-        self.iter()
-            .map(|it| it.first_id())
-            .filter_map(Some)
-            .next()
-            .flatten()
+        self.iter().find_map(TreeWithIds::first_id)
     }
-    fn find(&self, id: &Id) -> Option<&Cst> {
+    fn find(&self, id: Id) -> Option<&Cst> {
         let child_index = self
-            .binary_search_by_key(id, |it| it.first_id().unwrap())
+            .binary_search_by_key(&id, |it| it.first_id().unwrap())
             .or_else(|err| if err == 0 { Err(()) } else { Ok(err - 1) })
             .ok()?;
         self[child_index].find(id)
     }
 
     fn first_offset(&self) -> Option<Offset> {
-        self.iter()
-            .map(|it| it.first_offset())
-            .filter_map(Some)
-            .next()
-            .flatten()
+        self.iter().find_map(TreeWithIds::first_offset)
     }
     fn find_by_offset(&self, offset: Offset) -> Option<&Cst> {
         let child_index = self

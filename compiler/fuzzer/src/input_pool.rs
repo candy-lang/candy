@@ -3,7 +3,7 @@ use crate::{runner::RunResult, values::InputGeneration};
 use candy_vm::heap::{Heap, Text};
 use itertools::Itertools;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use std::{cell::RefCell, rc::Rc};
 
 pub type Score = f64;
@@ -16,24 +16,17 @@ pub struct InputPool {
 }
 
 impl InputPool {
-    pub fn new(num_args: usize, symbols_in_heap: &FxHashSet<Text>) -> Self {
-        let mut heap = Heap::default();
-
-        let mut symbols = symbols_in_heap
-            .iter()
-            .map(|symbol| symbol.clone_to_heap(&mut heap).try_into().unwrap())
-            .collect_vec();
-        symbols.push(Text::create(&mut heap, "True"));
-        symbols.push(Text::create(&mut heap, "False"));
-
+    #[must_use]
+    pub fn new(num_args: usize, symbols: Vec<Text>) -> Self {
         Self {
-            heap: Rc::new(RefCell::new(heap)),
+            heap: Rc::default(),
             num_args,
             symbols,
             results_and_scores: FxHashMap::default(),
         }
     }
 
+    #[must_use]
     pub fn generate_new_input(&self) -> Input {
         loop {
             let input = self.generate_input();
@@ -42,6 +35,7 @@ impl InputPool {
             }
         }
     }
+    #[must_use]
     pub fn generate_input(&self) -> Input {
         let mut rng = ThreadRng::default();
 
@@ -62,6 +56,7 @@ impl InputPool {
         self.results_and_scores.insert(input, (result, score));
     }
 
+    #[must_use]
     pub fn interesting_inputs(&self) -> Vec<Input> {
         self.results_and_scores
             .iter()

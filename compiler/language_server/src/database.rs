@@ -5,7 +5,9 @@ use candy_frontend::{
     cst_to_ast::CstToAstStorage,
     hir::HirDbStorage,
     hir_to_mir::HirToMirStorage,
+    lir_optimize::OptimizeLirStorage,
     mir_optimize::OptimizeMirStorage,
+    mir_to_lir::MirToLirStorage,
     module::{
         FileSystemModuleProvider, GetModuleContentQuery, InMemoryModuleProvider, Module,
         ModuleDbStorage, ModuleProvider, ModuleProviderOwner, MutableModuleProviderOwner,
@@ -23,8 +25,10 @@ use candy_frontend::{
     CstToAstStorage,
     HirDbStorage,
     HirToMirStorage,
+    MirToLirStorage,
     ModuleDbStorage,
     OptimizeMirStorage,
+    OptimizeLirStorage,
     PositionConversionStorage,
     RcstToCstStorage,
     StringToRcstStorage

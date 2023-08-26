@@ -28,28 +28,28 @@ pub struct FormattingInfo {
     pub is_single_expression_in_assignment_body: bool,
 }
 impl FormattingInfo {
-    pub fn with_indent(&self) -> Self {
+    pub const fn with_indent(&self) -> Self {
         Self {
             indentation: self.indentation.with_indent(),
             trailing_comma_condition: None,
             is_single_expression_in_assignment_body: false,
         }
     }
-    pub fn with_dedent(&self) -> Self {
+    pub const fn with_dedent(&self) -> Self {
         Self {
             indentation: self.indentation.with_dedent(),
             trailing_comma_condition: None,
             is_single_expression_in_assignment_body: false,
         }
     }
-    pub fn with_trailing_comma_condition(&self, condition: TrailingCommaCondition) -> Self {
+    pub const fn with_trailing_comma_condition(&self, condition: TrailingCommaCondition) -> Self {
         Self {
             indentation: self.indentation,
             trailing_comma_condition: Some(condition),
             is_single_expression_in_assignment_body: false,
         }
     }
-    pub fn for_single_expression_in_assignment_body(&self) -> Self {
+    pub const fn for_single_expression_in_assignment_body(&self) -> Self {
         Self {
             indentation: self.indentation.with_indent(),
             trailing_comma_condition: None,
@@ -131,7 +131,7 @@ pub fn format_csts<'a>(
 }
 
 fn split_leading_whitespace(start_offset: Offset, csts: &[Cst]) -> (ExistingWhitespace, &[Cst]) {
-    let first_expression_index = csts.iter().find_position(|cst| {
+    let first_expression_index = csts.iter().position(|cst| {
         !matches!(
             cst.kind,
             CstKind::Whitespace(_)
@@ -143,33 +143,31 @@ fn split_leading_whitespace(start_offset: Offset, csts: &[Cst]) -> (ExistingWhit
                 | CstKind::Comment { .. },
         )
     });
-    let (leading_whitespace, rest) =
-        if let Some((first_expression_index, _)) = first_expression_index {
-            csts.split_at(first_expression_index)
-        } else {
-            (csts, [].as_slice())
-        };
+    let (leading_whitespace, rest) = first_expression_index.map_or_else(
+        || (csts, [].as_slice()),
+        |first_expression_index| csts.split_at(first_expression_index),
+    );
     let leading_whitespace = ExistingWhitespace::new(start_offset, leading_whitespace);
     (leading_whitespace, rest)
 }
 
 /// The non-trivial cases usually work in three steps, though these are often not clearly separated:
 ///
-/// 0. Lay out children, giving us a [FormattedCst] containing the child's width and their
-///    [ExistingWhitespace]. In many places (e.g., [CstKind::BinaryBar] and [CstKind::Call]), we lay
+/// 0. Lay out children, giving us a [`FormattedCst`] containing the child's width and their
+///    [`ExistingWhitespace`]. In many places (e.g., [`CstKind::BinaryBar`] and [`CstKind::Call`]), we lay
 ///    out the right side as if a line break was necessary since that's the worst case.
-/// 1. Check whether we fit in one or multiple lines (based on the [previous_width], child widths,
+/// 1. Check whether we fit in one or multiple lines (based on the [`previous_width`], child widths,
 ///    and whether there are comments).
-/// 2. Tell each [ExistingWhitespace] (often through [FormattedCst]) whether it should be empty,
+/// 2. Tell each [`ExistingWhitespace`] (often through [`FormattedCst`]) whether it should be empty,
 ///    become a single space, or become a newline with indentation.
 ///
-/// See the case of [CstKind::StructAccess] for a simple example and [CstKind::Function] for the
+/// See the case of [`CstKind::StructAccess`] for a simple example and [`CstKind::Function`] for the
 /// opposite.
 ///
-/// [previous_width] is relevant for the minimum width that is reserved on the first line: E.g.,
-/// when formatting the call within `foo | bar baz`, [previous_width] would indicate that a width of
+/// [`previous_width`] is relevant for the minimum width that is reserved on the first line: E.g.,
+/// when formatting the call within `foo | bar baz`, [`previous_width`] would indicate that a width of
 /// two is reserved in the first line (for the bar and the space that follows it).
-pub(crate) fn format_cst<'a>(
+pub fn format_cst<'a>(
     edits: &mut TextEdits,
     previous_width: Width,
     cst: &'a Cst,
@@ -371,7 +369,7 @@ pub(crate) fn format_cst<'a>(
                         info.with_indent(),
                     )
                 } else {
-                    (width_for_right_side + bar_width, info.to_owned())
+                    (width_for_right_side + bar_width, info.clone())
                 };
                 let right = format_cst(edits, previous_width_for_right, right, &info_for_right);
                 if right_needs_parentheses {
@@ -459,7 +457,7 @@ pub(crate) fn format_cst<'a>(
                     .sum::<Width>();
             let (is_singleline, argument_info, trailing) =
                 if previous_width.last_line_fits(info.indentation, min_width) {
-                    (true, info.to_owned(), TrailingWhitespace::Space)
+                    (true, info.clone(), TrailingWhitespace::Space)
                 } else {
                     (
                         false,
@@ -633,7 +631,7 @@ pub(crate) fn format_cst<'a>(
                 };
                 (previous_width_for_struct, info.with_indent())
             } else {
-                (previous_width, info.to_owned())
+                (previous_width, info.clone())
             };
             let struct_ = format_cst(edits, previous_width_for_struct, struct_, &info_for_struct);
             let mut struct_ = if struct_needs_parentheses {
@@ -803,7 +801,7 @@ pub(crate) fn format_cst<'a>(
                     let last_parameter = parameters.pop();
                     let parameters_width = parameters
                         .into_iter()
-                        .map(|it| it.into_trailing(edits, parameters_trailing.clone()))
+                        .map(|it| it.into_trailing(edits, parameters_trailing))
                         .sum::<Width>();
 
                     let last_parameter_width = last_parameter
@@ -826,10 +824,10 @@ pub(crate) fn format_cst<'a>(
                     (parameters_width + last_parameter_width, arrow)
                 });
 
-            let body_fallback_offset = parameters_width_and_arrow
-                .as_ref()
-                .map(|(_, arrow)| arrow.whitespace.end_offset())
-                .unwrap_or_else(|| opening_curly_brace.whitespace.end_offset());
+            let body_fallback_offset = parameters_width_and_arrow.as_ref().map_or_else(
+                || opening_curly_brace.whitespace.end_offset(),
+                |(_, arrow)| arrow.whitespace.end_offset(),
+            );
             let body = format_csts(
                 edits,
                 previous_width_for_inner,
@@ -1004,6 +1002,7 @@ pub(crate) fn format_cst<'a>(
     FormattedCst::new(width, ExistingWhitespace::empty(cst.data.span.end))
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum ReceiverParent {
     BinaryBar,
     Call,
@@ -1153,7 +1152,7 @@ enum MaybeSandwichLikeArgument<'a> {
     },
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum PrecedenceCategory {
     /// Literals, parenthesized, struct access, etc.
     High,

@@ -1,3 +1,5 @@
+#![feature(lazy_cell)]
+
 use clap::Parser;
 use tracing::{debug, Level, Metadata};
 use tracing_subscriber::{
@@ -10,9 +12,10 @@ mod check;
 mod database;
 mod debug;
 mod fuzz;
+#[cfg(feature = "inkwell")]
+mod inkwell;
 mod lsp;
 mod run;
-mod services;
 mod utils;
 
 #[derive(Parser, Debug)]
@@ -29,6 +32,9 @@ enum CandyOptions {
 
     /// Start a Language Server.
     Lsp,
+
+    #[cfg(feature = "inkwell")]
+    Inkwell(inkwell::Options),
 }
 
 #[tokio::main]
@@ -39,11 +45,13 @@ async fn main() -> ProgramResult {
     init_logger(should_log_to_stdout);
 
     match options {
-        CandyOptions::Debug(options) => debug::debug(options),
-        CandyOptions::Check(options) => check::check(options),
         CandyOptions::Run(options) => run::run(options),
+        CandyOptions::Check(options) => check::check(options),
         CandyOptions::Fuzz(options) => fuzz::fuzz(options),
+        CandyOptions::Debug(options) => debug::debug(options),
         CandyOptions::Lsp => lsp::lsp().await,
+        #[cfg(feature = "inkwell")]
+        CandyOptions::Inkwell(options) => inkwell::compile(options),
     }
 }
 
@@ -51,10 +59,17 @@ type ProgramResult = Result<(), Exit>;
 #[derive(Debug)]
 enum Exit {
     CodePanicked,
+    DirectoryNotFound,
+    #[cfg(feature = "inkwell")]
+    ExternalError,
     FileNotFound,
     FuzzingFoundFailingCases,
+    NoMainFunction,
     NotInCandyPackage,
     CodeContainsErrors,
+    #[cfg(feature = "inkwell")]
+    LlvmError(String),
+    GoldOutdated,
 }
 
 fn init_logger(use_stdout: bool) {

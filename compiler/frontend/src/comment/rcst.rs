@@ -81,24 +81,24 @@ pub enum RcstError {
 impl Display for Rcst {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Rcst::Whitespace(whitespace) => whitespace.fmt(f),
-            Rcst::Newline => '\n'.fmt(f),
-            Rcst::TrailingWhitespace { child, whitespace } => {
+            Self::Whitespace(whitespace) => whitespace.fmt(f),
+            Self::Newline => '\n'.fmt(f),
+            Self::TrailingWhitespace { child, whitespace } => {
                 child.fmt(f)?;
                 for w in whitespace {
                     w.fmt(f)?;
                 }
                 Ok(())
             }
-            Rcst::TextPart(text) => text.fmt(f),
-            Rcst::EscapedChar(character) => {
+            Self::TextPart(text) => text.fmt(f),
+            Self::EscapedChar(character) => {
                 '\\'.fmt(f)?;
                 if let Some(character) = character {
                     character.fmt(f)?;
                 }
                 Ok(())
             }
-            Rcst::Emphasized {
+            Self::Emphasized {
                 has_opening_underscore,
                 text,
                 has_closing_underscore,
@@ -114,7 +114,7 @@ impl Display for Rcst {
                 }
                 Ok(())
             }
-            Rcst::Link {
+            Self::Link {
                 has_opening_bracket,
                 text,
                 has_closing_bracket,
@@ -130,7 +130,7 @@ impl Display for Rcst {
                 }
                 Ok(())
             }
-            Rcst::InlineCode {
+            Self::InlineCode {
                 has_opening_backtick,
                 code,
                 has_closing_backtick,
@@ -146,13 +146,13 @@ impl Display for Rcst {
                 }
                 Ok(())
             }
-            Rcst::Title(lines) => {
+            Self::Title(lines) => {
                 for line in lines {
                     line.fmt(f)?;
                 }
                 Ok(())
             }
-            Rcst::TitleLine {
+            Self::TitleLine {
                 octothorpe_count,
                 text,
             } => {
@@ -164,20 +164,20 @@ impl Display for Rcst {
                 }
                 Ok(())
             }
-            Rcst::Paragraph(text) => {
+            Self::Paragraph(text) => {
                 for rcst in text {
                     rcst.fmt(f)?;
                 }
                 Ok(())
             }
-            Rcst::Urls(urls) => {
+            Self::Urls(urls) => {
                 for url in urls {
                     url.fmt(f)?;
                 }
                 Ok(())
             }
-            Rcst::UrlLine(url) => url.fmt(f),
-            Rcst::CodeBlock {
+            Self::UrlLine(url) => url.fmt(f),
+            Self::CodeBlock {
                 code,
                 has_closing_backticks,
             } => {
@@ -190,20 +190,20 @@ impl Display for Rcst {
                 }
                 Ok(())
             }
-            Rcst::List(items) => {
+            Self::List(items) => {
                 for item in items {
                     item.fmt(f)?;
                 }
                 Ok(())
             }
-            Rcst::ListItem { marker, content } => {
+            Self::ListItem { marker, content } => {
                 marker.fmt(f)?;
                 for rcst in content {
                     rcst.fmt(f)?;
                 }
                 Ok(())
             }
-            Rcst::Error { child, .. } => {
+            Self::Error { child, .. } => {
                 if let Some(child) = child {
                     child.fmt(f)?;
                 }
@@ -216,14 +216,14 @@ impl Display for Rcst {
 impl Display for RcstListItemMarker {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            RcstListItemMarker::Unordered { has_trailing_space } => {
+            Self::Unordered { has_trailing_space } => {
                 '-'.fmt(f)?;
                 if *has_trailing_space {
                     ' '.fmt(f)?;
                 }
                 Ok(())
             }
-            RcstListItemMarker::Ordered {
+            Self::Ordered {
                 number,
                 has_trailing_space,
             } => {

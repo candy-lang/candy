@@ -9,6 +9,7 @@
     "url": "https://github.com/candy-lang/candy.git",
     "directory": "new-new-packages/vscode_extension"
   },
+  "//": "Keep in sync with `devDependencies`.`@types/vscode`",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -144,6 +145,11 @@
         "category": "Candy Compiler Debugging",
         "command": "candy.debug.viewLir",
         "title": "View LIR"
+      },
+      {
+        "category": "Candy Compiler Debugging",
+        "command": "candy.debug.viewVmByteCode",
+        "title": "View VM Byte Code"
       }
     ],
     "configuration": {
@@ -153,13 +159,13 @@
           "type": "string",
           "default": "",
           "markdownDescription": "Command to start the 🍭 Candy language server. If empty, we'll attempt to find the 🍭 Candy executable in the `PATH` environment variable.",
-          "scope": "machine"
+          "scope": "machine-overridable"
         },
         "candy.packagesPath": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Path of a folder containing all packages.",
-          "scope": "machine"
+          "markdownDescription": "Path of a folder containing all 🍭 Candy packages.",
+          "scope": "machine-overridable"
         }
       }
     },
@@ -231,17 +237,17 @@
   "devDependencies": {
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.1",
-    "@types/node": "^20.4.5",
-    "@types/vscode": "^1.80.0",
-    "@typescript-eslint/eslint-plugin": "^6.2.0",
-    "@typescript-eslint/parser": "^6.2.0",
-    "eslint": "^8.45.0",
-    "eslint-config-prettier": "^8.8.0",
+    "@types/node": "^20.5.6",
+    "@types/vscode": "^1.81.0",
+    "@typescript-eslint/eslint-plugin": "^6.4.1",
+    "@typescript-eslint/parser": "^6.4.1",
+    "eslint": "^8.47.0",
+    "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-prettier": "^5.0.0",
     "glob": "^10.3.3",
     "mocha": "^10.2.0",
-    "prettier": "^3.0.0",
-    "typescript": "^5.1.6",
+    "prettier": "^3.0.2",
+    "typescript": "^5.2.2",
     "vscode-test": "^1.4.0"
   },
   "eslintConfig": {

@@ -124,43 +124,45 @@ pub enum CstKind<D = CstData> {
 }
 pub type FunctionParametersAndArrow<D> = (Vec<Cst<D>>, Box<Cst<D>>);
 impl<D> CstKind<D> {
+    #[must_use]
     pub fn is_whitespace_or_comment(&self) -> bool {
         match self {
-            CstKind::Whitespace(_) | CstKind::Newline(_) | CstKind::Comment { .. } => true,
-            CstKind::TrailingWhitespace { child, .. } => (**child).is_whitespace_or_comment(),
+            Self::Whitespace(_) | Self::Newline(_) | Self::Comment { .. } => true,
+            Self::TrailingWhitespace { child, .. } => (**child).is_whitespace_or_comment(),
             _ => false,
         }
     }
 
+    #[must_use]
     pub fn children(&self) -> Vec<&Cst<D>> {
         match self {
-            CstKind::EqualsSign
-            | CstKind::Comma
-            | CstKind::Dot
-            | CstKind::Colon
-            | CstKind::ColonEqualsSign
-            | CstKind::Bar
-            | CstKind::OpeningParenthesis
-            | CstKind::ClosingParenthesis
-            | CstKind::OpeningBracket
-            | CstKind::ClosingBracket
-            | CstKind::OpeningCurlyBrace
-            | CstKind::ClosingCurlyBrace
-            | CstKind::Arrow
-            | CstKind::SingleQuote
-            | CstKind::DoubleQuote
-            | CstKind::Percent
-            | CstKind::Octothorpe
-            | CstKind::Whitespace(_)
-            | CstKind::Newline(_) => vec![],
-            CstKind::Comment { octothorpe, .. } => vec![octothorpe],
-            CstKind::TrailingWhitespace { child, whitespace } => {
+            Self::EqualsSign
+            | Self::Comma
+            | Self::Dot
+            | Self::Colon
+            | Self::ColonEqualsSign
+            | Self::Bar
+            | Self::OpeningParenthesis
+            | Self::ClosingParenthesis
+            | Self::OpeningBracket
+            | Self::ClosingBracket
+            | Self::OpeningCurlyBrace
+            | Self::ClosingCurlyBrace
+            | Self::Arrow
+            | Self::SingleQuote
+            | Self::DoubleQuote
+            | Self::Percent
+            | Self::Octothorpe
+            | Self::Whitespace(_)
+            | Self::Newline(_) => vec![],
+            Self::Comment { octothorpe, .. } => vec![octothorpe],
+            Self::TrailingWhitespace { child, whitespace } => {
                 let mut children = vec![child.as_ref()];
                 children.extend(whitespace);
                 children
             }
-            CstKind::Identifier(_) | CstKind::Symbol(_) | CstKind::Int { .. } => vec![],
-            CstKind::OpeningText {
+            Self::Identifier(_) | Self::Symbol(_) | Self::Int { .. } => vec![],
+            Self::OpeningText {
                 opening_single_quotes,
                 opening_double_quote,
             } => {
@@ -169,7 +171,7 @@ impl<D> CstKind<D> {
                 children.push(opening_double_quote);
                 children
             }
-            CstKind::ClosingText {
+            Self::ClosingText {
                 closing_double_quote,
                 closing_single_quotes,
             } => {
@@ -177,7 +179,7 @@ impl<D> CstKind<D> {
                 children.extend(closing_single_quotes);
                 children
             }
-            CstKind::Text {
+            Self::Text {
                 opening,
                 parts,
                 closing,
@@ -187,8 +189,8 @@ impl<D> CstKind<D> {
                 children.push(closing);
                 children
             }
-            CstKind::TextNewline(_) | CstKind::TextPart(_) => vec![],
-            CstKind::TextInterpolation {
+            Self::TextNewline(_) | Self::TextPart(_) => vec![],
+            Self::TextInterpolation {
                 opening_curly_braces,
                 expression,
                 closing_curly_braces,
@@ -199,13 +201,13 @@ impl<D> CstKind<D> {
                 children.extend(closing_curly_braces);
                 children
             }
-            CstKind::BinaryBar { left, bar, right } => {
+            Self::BinaryBar { left, bar, right } => {
                 let mut children = vec![left.as_ref()];
                 children.push(bar);
                 children.push(right);
                 children
             }
-            CstKind::Parenthesized {
+            Self::Parenthesized {
                 opening_parenthesis,
                 inner,
                 closing_parenthesis,
@@ -215,7 +217,7 @@ impl<D> CstKind<D> {
                 children.push(closing_parenthesis);
                 children
             }
-            CstKind::Call {
+            Self::Call {
                 receiver,
                 arguments,
             } => {
@@ -223,7 +225,7 @@ impl<D> CstKind<D> {
                 children.extend(arguments);
                 children
             }
-            CstKind::List {
+            Self::List {
                 opening_parenthesis,
                 items,
                 closing_parenthesis,
@@ -233,14 +235,14 @@ impl<D> CstKind<D> {
                 children.push(closing_parenthesis);
                 children
             }
-            CstKind::ListItem { value, comma } => {
+            Self::ListItem { value, comma } => {
                 let mut children = vec![value.as_ref()];
                 if let Some(comma) = comma {
                     children.push(comma);
                 }
                 children
             }
-            CstKind::Struct {
+            Self::Struct {
                 opening_bracket,
                 fields,
                 closing_bracket,
@@ -250,7 +252,7 @@ impl<D> CstKind<D> {
                 children.push(closing_bracket);
                 children
             }
-            CstKind::StructField {
+            Self::StructField {
                 key_and_colon,
                 value,
                 comma,
@@ -266,10 +268,10 @@ impl<D> CstKind<D> {
                 }
                 children
             }
-            CstKind::StructAccess { struct_, dot, key } => {
+            Self::StructAccess { struct_, dot, key } => {
                 vec![struct_.as_ref(), dot.as_ref(), key.as_ref()]
             }
-            CstKind::Match {
+            Self::Match {
                 expression,
                 percent,
                 cases,
@@ -278,7 +280,7 @@ impl<D> CstKind<D> {
                 children.extend(cases);
                 children
             }
-            CstKind::MatchCase {
+            Self::MatchCase {
                 pattern,
                 arrow,
                 body,
@@ -287,7 +289,7 @@ impl<D> CstKind<D> {
                 children.extend(body);
                 children
             }
-            CstKind::Function {
+            Self::Function {
                 opening_curly_brace,
                 parameters_and_arrow,
                 body,
@@ -302,7 +304,7 @@ impl<D> CstKind<D> {
                 children.push(closing_curly_brace);
                 children
             }
-            CstKind::Assignment {
+            Self::Assignment {
                 left,
                 assignment_sign,
                 body,
@@ -312,7 +314,7 @@ impl<D> CstKind<D> {
                 children.extend(body);
                 children
             }
-            CstKind::Error { .. } => vec![],
+            Self::Error { .. } => vec![],
         }
     }
 }
@@ -320,43 +322,43 @@ impl<D> CstKind<D> {
 impl<D> Display for CstKind<D> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match &self {
-            CstKind::EqualsSign => '='.fmt(f),
-            CstKind::Comma => ','.fmt(f),
-            CstKind::Dot => '.'.fmt(f),
-            CstKind::Colon => ':'.fmt(f),
-            CstKind::ColonEqualsSign => ":=".fmt(f),
-            CstKind::Bar => '|'.fmt(f),
-            CstKind::OpeningParenthesis => '('.fmt(f),
-            CstKind::ClosingParenthesis => ')'.fmt(f),
-            CstKind::OpeningBracket => '['.fmt(f),
-            CstKind::ClosingBracket => ']'.fmt(f),
-            CstKind::OpeningCurlyBrace => '{'.fmt(f),
-            CstKind::ClosingCurlyBrace => '}'.fmt(f),
-            CstKind::Arrow => "->".fmt(f),
-            CstKind::SingleQuote => '\''.fmt(f),
-            CstKind::DoubleQuote => '"'.fmt(f),
-            CstKind::Percent => '%'.fmt(f),
-            CstKind::Octothorpe => '#'.fmt(f),
-            CstKind::Whitespace(whitespace) => whitespace.fmt(f),
-            CstKind::Newline(newline) => newline.fmt(f),
-            CstKind::Comment {
+            Self::EqualsSign => '='.fmt(f),
+            Self::Comma => ','.fmt(f),
+            Self::Dot => '.'.fmt(f),
+            Self::Colon => ':'.fmt(f),
+            Self::ColonEqualsSign => ":=".fmt(f),
+            Self::Bar => '|'.fmt(f),
+            Self::OpeningParenthesis => '('.fmt(f),
+            Self::ClosingParenthesis => ')'.fmt(f),
+            Self::OpeningBracket => '['.fmt(f),
+            Self::ClosingBracket => ']'.fmt(f),
+            Self::OpeningCurlyBrace => '{'.fmt(f),
+            Self::ClosingCurlyBrace => '}'.fmt(f),
+            Self::Arrow => "->".fmt(f),
+            Self::SingleQuote => '\''.fmt(f),
+            Self::DoubleQuote => '"'.fmt(f),
+            Self::Percent => '%'.fmt(f),
+            Self::Octothorpe => '#'.fmt(f),
+            Self::Whitespace(whitespace) => whitespace.fmt(f),
+            Self::Newline(newline) => newline.fmt(f),
+            Self::Comment {
                 octothorpe,
                 comment,
             } => {
                 octothorpe.fmt(f)?;
                 comment.fmt(f)
             }
-            CstKind::TrailingWhitespace { child, whitespace } => {
+            Self::TrailingWhitespace { child, whitespace } => {
                 child.fmt(f)?;
                 for w in whitespace {
                     w.fmt(f)?;
                 }
                 Ok(())
             }
-            CstKind::Identifier(identifier) => identifier.fmt(f),
-            CstKind::Symbol(symbol) => symbol.fmt(f),
-            CstKind::Int { string, .. } => string.fmt(f),
-            CstKind::OpeningText {
+            Self::Identifier(identifier) => identifier.fmt(f),
+            Self::Symbol(symbol) => symbol.fmt(f),
+            Self::Int { string, .. } => string.fmt(f),
+            Self::OpeningText {
                 opening_single_quotes,
                 opening_double_quote,
             } => {
@@ -365,7 +367,7 @@ impl<D> Display for CstKind<D> {
                 }
                 opening_double_quote.fmt(f)
             }
-            CstKind::ClosingText {
+            Self::ClosingText {
                 closing_double_quote,
                 closing_single_quotes,
             } => {
@@ -375,7 +377,7 @@ impl<D> Display for CstKind<D> {
                 }
                 Ok(())
             }
-            CstKind::Text {
+            Self::Text {
                 opening,
                 parts,
                 closing,
@@ -386,9 +388,9 @@ impl<D> Display for CstKind<D> {
                 }
                 closing.fmt(f)
             }
-            CstKind::TextNewline(newline) => newline.fmt(f),
-            CstKind::TextPart(literal) => literal.fmt(f),
-            CstKind::TextInterpolation {
+            Self::TextNewline(newline) => newline.fmt(f),
+            Self::TextPart(literal) => literal.fmt(f),
+            Self::TextInterpolation {
                 opening_curly_braces,
                 expression,
                 closing_curly_braces,
@@ -402,10 +404,10 @@ impl<D> Display for CstKind<D> {
                 }
                 Ok(())
             }
-            CstKind::BinaryBar { left, bar, right } => {
+            Self::BinaryBar { left, bar, right } => {
                 write!(f, "{}{}{}", left.kind, bar.kind, right.kind)
             }
-            CstKind::Parenthesized {
+            Self::Parenthesized {
                 opening_parenthesis,
                 inner,
                 closing_parenthesis,
@@ -414,7 +416,7 @@ impl<D> Display for CstKind<D> {
                 "{}{}{}",
                 opening_parenthesis.kind, inner.kind, closing_parenthesis.kind,
             ),
-            CstKind::Call {
+            Self::Call {
                 receiver,
                 arguments,
             } => {
@@ -424,7 +426,7 @@ impl<D> Display for CstKind<D> {
                 }
                 Ok(())
             }
-            CstKind::List {
+            Self::List {
                 opening_parenthesis,
                 items,
                 closing_parenthesis,
@@ -435,14 +437,14 @@ impl<D> Display for CstKind<D> {
                 }
                 closing_parenthesis.fmt(f)
             }
-            CstKind::ListItem { value, comma } => {
+            Self::ListItem { value, comma } => {
                 value.fmt(f)?;
                 if let Some(comma) = comma {
                     comma.fmt(f)?;
                 }
                 Ok(())
             }
-            CstKind::Struct {
+            Self::Struct {
                 opening_bracket,
                 fields,
                 closing_bracket,
@@ -453,7 +455,7 @@ impl<D> Display for CstKind<D> {
                 }
                 closing_bracket.fmt(f)
             }
-            CstKind::StructField {
+            Self::StructField {
                 key_and_colon,
                 value,
                 comma,
@@ -468,12 +470,12 @@ impl<D> Display for CstKind<D> {
                 }
                 Ok(())
             }
-            CstKind::StructAccess { struct_, dot, key } => {
+            Self::StructAccess { struct_, dot, key } => {
                 struct_.fmt(f)?;
                 dot.fmt(f)?;
                 key.fmt(f)
             }
-            CstKind::Match {
+            Self::Match {
                 expression,
                 percent,
                 cases,
@@ -485,7 +487,7 @@ impl<D> Display for CstKind<D> {
                 }
                 Ok(())
             }
-            CstKind::MatchCase {
+            Self::MatchCase {
                 pattern,
                 arrow,
                 body,
@@ -497,7 +499,7 @@ impl<D> Display for CstKind<D> {
                 }
                 Ok(())
             }
-            CstKind::Function {
+            Self::Function {
                 opening_curly_brace,
                 parameters_and_arrow,
                 body,
@@ -515,7 +517,7 @@ impl<D> Display for CstKind<D> {
                 }
                 closing_curly_brace.fmt(f)
             }
-            CstKind::Assignment {
+            Self::Assignment {
                 left,
                 assignment_sign,
                 body,
@@ -527,7 +529,7 @@ impl<D> Display for CstKind<D> {
                 }
                 Ok(())
             }
-            CstKind::Error {
+            Self::Error {
                 unparsable_input, ..
             } => unparsable_input.fmt(f),
         }

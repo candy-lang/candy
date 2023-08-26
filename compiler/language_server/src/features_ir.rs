@@ -3,7 +3,9 @@ use candy_frontend::{
     ast_to_hir::{AstToHir, HirResult},
     cst_to_ast::{AstResult, CstToAst},
     hir_to_mir::{HirToMir, MirResult},
+    lir_optimize::OptimizeLir,
     mir_optimize::{OptimizeMir, OptimizedMirResult},
+    mir_to_lir::{LirResult, MirToLir},
     module::{Module, ModuleKind, PackagesPath},
     position::{line_start_offsets_raw, Offset},
     rich_ir::{
@@ -13,7 +15,6 @@ use candy_frontend::{
     string_to_rcst::{ModuleError, RcstResult, StringToRcst},
     TracingConfig,
 };
-use candy_vm::{lir::Lir, mir_to_lir::compile_lir};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, hash::Hash, ops::Range, sync::Arc};
@@ -112,7 +113,22 @@ impl IrFeatures {
             ),
             Ir::Lir(tracing_config) => Self::rich_ir_for_lir(
                 &config.module,
-                &compile_lir(db, config.module.clone(), tracing_config.to_owned()).0,
+                &db.lir(config.module.clone(), tracing_config.to_owned()),
+                tracing_config,
+            ),
+            Ir::OptimizedLir(tracing_config) => Self::rich_ir_for_optimized_lir(
+                &config.module,
+                db.optimized_lir(config.module.clone(), tracing_config.to_owned()),
+                tracing_config,
+            ),
+            Ir::VmByteCode(tracing_config) => Self::rich_ir_for_vm_byte_code(
+                &config.module,
+                &candy_vm::mir_to_byte_code::compile_byte_code(
+                    db,
+                    config.module.clone(),
+                    tracing_config.to_owned(),
+                )
+                .0,
                 tracing_config,
             ),
         };
@@ -125,95 +141,91 @@ impl IrFeatures {
         }
     }
     fn rich_ir_for_rcst(module: &Module, rcst: RcstResult) -> RichIr {
-        let mut builder = RichIrBuilder::default();
-        builder.push(
-            format!("# RCST for module {module}"),
-            TokenType::Comment,
-            EnumSet::empty(),
-        );
-        builder.push_newline();
-        match rcst {
-            Ok(rcst) => rcst.build_rich_ir(&mut builder),
-            Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
-        }
-        builder.finish()
+        Self::rich_ir_for("RCST", module, None, |builder| match rcst {
+            Ok(rcst) => rcst.build_rich_ir(builder),
+            Err(error) => Self::build_rich_ir_for_module_error(builder, module, &error),
+        })
     }
     fn rich_ir_for_ast(module: &Module, asts: AstResult) -> RichIr {
-        let mut builder = RichIrBuilder::default();
-        builder.push(
-            format!("# AST for module {module}"),
-            TokenType::Comment,
-            EnumSet::empty(),
-        );
-        builder.push_newline();
-        match asts {
-            Ok((asts, _)) => asts.build_rich_ir(&mut builder),
-            Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
-        }
-        builder.finish()
+        Self::rich_ir_for("AST", module, None, |builder| match asts {
+            Ok((asts, _)) => asts.build_rich_ir(builder),
+            Err(error) => Self::build_rich_ir_for_module_error(builder, module, &error),
+        })
     }
     fn rich_ir_for_hir(module: &Module, hir: HirResult) -> RichIr {
-        let mut builder = RichIrBuilder::default();
-        builder.push(
-            format!("# HIR for module {module}"),
-            TokenType::Comment,
-            EnumSet::empty(),
-        );
-        builder.push_newline();
-        match hir {
-            Ok((hir, _)) => hir.build_rich_ir(&mut builder),
-            Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
-        }
-        builder.finish()
+        Self::rich_ir_for("HIR", module, None, |builder| match hir {
+            Ok((hir, _)) => hir.build_rich_ir(builder),
+            Err(error) => Self::build_rich_ir_for_module_error(builder, module, &error),
+        })
     }
     fn rich_ir_for_mir(module: &Module, mir: MirResult, tracing_config: &TracingConfig) -> RichIr {
-        let mut builder = RichIrBuilder::default();
-        builder.push(
-            format!("# MIR for module {module}"),
-            TokenType::Comment,
-            EnumSet::empty(),
-        );
-        builder.push_newline();
-        builder.push_tracing_config(tracing_config);
-        builder.push_newline();
-        match mir {
-            Ok((mir, _)) => mir.build_rich_ir(&mut builder),
-            Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
-        }
-        builder.finish()
+        Self::rich_ir_for("MIR", module, tracing_config, |builder| match mir {
+            Ok((mir, _)) => mir.build_rich_ir(builder),
+            Err(error) => Self::build_rich_ir_for_module_error(builder, module, &error),
+        })
     }
     fn rich_ir_for_optimized_mir(
         module: &Module,
         mir: OptimizedMirResult,
         tracing_config: &TracingConfig,
     ) -> RichIr {
-        let mut builder = RichIrBuilder::default();
-        builder.push(
-            format!("# Optimized MIR for module {module}"),
-            TokenType::Comment,
-            EnumSet::empty(),
-        );
-        builder.push_newline();
-        builder.push_tracing_config(tracing_config);
-        builder.push_newline();
-        match mir {
-            Ok((mir, _, _)) => mir.build_rich_ir(&mut builder),
-            Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
-        }
-        builder.finish()
+        Self::rich_ir_for(
+            "Optimized MIR",
+            module,
+            tracing_config,
+            |builder| match mir {
+                Ok((mir, _, _)) => mir.build_rich_ir(builder),
+                Err(error) => Self::build_rich_ir_for_module_error(builder, module, &error),
+            },
+        )
     }
-    fn rich_ir_for_lir(module: &Module, lir: &Lir, tracing_config: &TracingConfig) -> RichIr {
+    fn rich_ir_for_lir(module: &Module, lir: &LirResult, tracing_config: &TracingConfig) -> RichIr {
+        Self::rich_ir_for("LIR", module, tracing_config, |builder| match lir {
+            Ok((lir, _)) => lir.build_rich_ir(builder),
+            Err(error) => Self::build_rich_ir_for_module_error(builder, module, error),
+        })
+    }
+    fn rich_ir_for_optimized_lir(
+        module: &Module,
+        lir: LirResult,
+        tracing_config: &TracingConfig,
+    ) -> RichIr {
+        Self::rich_ir_for(
+            "Optimized LIR",
+            module,
+            tracing_config,
+            |builder| match lir {
+                Ok((lir, _)) => lir.build_rich_ir(builder),
+                Err(error) => Self::build_rich_ir_for_module_error(builder, module, &error),
+            },
+        )
+    }
+    fn rich_ir_for_vm_byte_code(
+        module: &Module,
+        byte_code: &candy_vm::byte_code::ByteCode,
+        tracing_config: &TracingConfig,
+    ) -> RichIr {
+        Self::rich_ir_for("VM Byte Code", module, tracing_config, |builder| {
+            byte_code.build_rich_ir(builder)
+        })
+    }
+    fn rich_ir_for(
+        ir_name: &str,
+        module: &Module,
+        tracing_config: impl Into<Option<&TracingConfig>>,
+        build_rich_ir: impl FnOnce(&mut RichIrBuilder),
+    ) -> RichIr {
         let mut builder = RichIrBuilder::default();
-        builder.push(
-            format!("# LIR for module {module}"),
-            TokenType::Comment,
-            EnumSet::empty(),
-        );
+        builder.push_comment_line(format!("{ir_name} for module {module}"));
+        if let Some(tracing_config) = tracing_config.into() {
+            builder.push_newline();
+            builder.push_tracing_config(tracing_config);
+        }
         builder.push_newline();
-        builder.push_tracing_config(tracing_config);
-        builder.push_newline();
-        lir.build_rich_ir(&mut builder);
-        builder.finish()
+
+        build_rich_ir(&mut builder);
+
+        builder.finish(true)
     }
     fn build_rich_ir_for_module_error(
         builder: &mut RichIrBuilder,
@@ -284,6 +296,8 @@ impl IrConfig {
             IrDiscriminants::Mir => Ir::Mir(tracing_config.unwrap()),
             IrDiscriminants::OptimizedMir => Ir::OptimizedMir(tracing_config.unwrap()),
             IrDiscriminants::Lir => Ir::Lir(tracing_config.unwrap()),
+            IrDiscriminants::OptimizedLir => Ir::OptimizedLir(tracing_config.unwrap()),
+            IrDiscriminants::VmByteCode => Ir::VmByteCode(tracing_config.unwrap()),
         };
 
         IrConfig {
@@ -337,6 +351,8 @@ pub enum Ir {
     Mir(TracingConfig),
     OptimizedMir(TracingConfig),
     Lir(TracingConfig),
+    OptimizedLir(TracingConfig),
+    VmByteCode(TracingConfig),
 }
 impl Ir {
     fn tracing_config(&self) -> Option<&TracingConfig> {
@@ -344,7 +360,9 @@ impl Ir {
             Ir::Rcst | Ir::Ast | Ir::Hir => None,
             Ir::Mir(tracing_config)
             | Ir::OptimizedMir(tracing_config)
-            | Ir::Lir(tracing_config) => Some(tracing_config),
+            | Ir::Lir(tracing_config)
+            | Ir::OptimizedLir(tracing_config)
+            | Ir::VmByteCode(tracing_config) => Some(tracing_config),
         }
     }
 }
@@ -463,6 +481,21 @@ impl LanguageFeatures for IrFeatures {
                 };
                 find_in_other_ir(config, &key).await
             }
+            ReferenceKey::LirId(_)
+            | ReferenceKey::LirConstantId(_)
+            | ReferenceKey::LirBodyId(_) => {
+                let config = IrConfig {
+                    module: config.module.to_owned(),
+                    ir: Ir::Lir(
+                        config
+                            .ir
+                            .tracing_config()
+                            .map(|it| it.to_owned())
+                            .unwrap_or_else(TracingConfig::off),
+                    ),
+                };
+                find_in_other_ir(config, &key).await
+            }
         };
         Some(LocationLink {
             origin_selection_range: Some(origin_selection_range),
@@ -477,9 +510,11 @@ impl LanguageFeatures for IrFeatures {
     }
     async fn folding_ranges(&self, _db: &Mutex<Database>, uri: Url) -> Vec<FoldingRange> {
         let open_irs = self.open_irs.read().await;
-        dbg!(&uri);
-        dbg!(&open_irs.keys());
-        let open_ir = open_irs.get(&uri).unwrap();
+        let Some(open_ir) = open_irs.get(&uri) else {
+            // After the folding ranges were requested, the corresponding editor
+            // tab was closed. We just report nothing.
+            return vec![];
+        };
         open_ir.folding_ranges()
     }
 

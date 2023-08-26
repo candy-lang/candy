@@ -85,7 +85,7 @@ impl<T: NormalizeSpans> NormalizeSpans for [T] {
 impl NormalizeSpans for Ast {
     fn normalize_spans(&mut self) {
         match &mut self.kind {
-            AstKind::Int(_) => todo!(),
+            AstKind::Int(_) => {}
             AstKind::Text(Text(parts)) => parts.normalize_spans(),
             AstKind::TextPart(_) | AstKind::Identifier(_) | AstKind::Symbol(_) => {}
             AstKind::List(List(items)) => items.normalize_spans(),
@@ -123,10 +123,7 @@ impl NormalizeSpans for Ast {
                 body.normalize_spans();
             }
             AstKind::OrPattern(OrPattern(patterns)) => patterns.normalize_spans(),
-            AstKind::Error { child, errors } => {
-                if let Some(child) = child {
-                    child.normalize_spans();
-                }
+            AstKind::Error { errors } => {
                 for error in errors {
                     error.span = Offset(0)..Offset(error.span.end.0 - error.span.start.0);
                 }

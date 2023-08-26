@@ -118,9 +118,10 @@ sum iterableOfInt :=
     needs (int.is b)
     a | int.add b
   }
+  | result.unwrapOr 0
 length iterable :=
   needs (is iterable)
-  iterable | map { _ -> 1 } | sum | result.unwrapOr 0
+  iterable | map { _ -> 1 } | sum
 
 all iterable tester :=
   needs (is iterable)
@@ -213,8 +214,7 @@ fromList l :=
   # () => Result[(Item, Iterable[Item]), Any]
   # iterable | function.run | result.map { it -> it | list.get 0 }
   # The state contains the list and an index.
-  generateWithState [l, Index: 0] { state ->
-    [l, index] = state
+  generateWithState [l, Index: 0] { [l, index] ->
     ifElse
       l | list.isValidIndex index
       { Ok [Item: l | list.get index, State: [l, Index: index | int.add 1]] }
