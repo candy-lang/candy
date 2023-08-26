@@ -56,14 +56,13 @@ impl TreeWithIds for Cst {
                 .or_else(|| closing_single_quotes.find(id)),
             CstKind::Text {
                 opening,
-                lines,
+                parts,
                 closing,
             } => opening
                 .find(id)
-                .or_else(|| lines.find(id))
+                .or_else(|| parts.find(id))
                 .or_else(|| closing.find(id)),
-            CstKind::TextLine(parts) => parts.find(id),
-            CstKind::TextPart(_) => None,
+            CstKind::TextNewline(_) | CstKind::TextPart(_) => None,
             CstKind::TextInterpolation {
                 opening_curly_braces,
                 expression,
@@ -193,13 +192,13 @@ impl TreeWithIds for Cst {
             CstKind::Identifier { .. } | CstKind::Symbol { .. } | CstKind::Int { .. } => {
                 (None, true)
             }
-            CstKind::Text { lines, .. } => {
-                let interpolation_index = lines
+            CstKind::Text { parts, .. } => {
+                let interpolation_index = parts
                     .binary_search_by_key(&offset, |it| it.first_offset().unwrap())
                     .or_else(|err| if err == 0 { Err(()) } else { Ok(err - 1) })
                     .ok();
 
-                if let Some(part) = interpolation_index.map(|index| &lines[index])
+                if let Some(part) = interpolation_index.map(|index| &parts[index])
                     && part.kind.is_text_interpolation()
                     && let Some(child) = part.find_by_offset(offset)
                     && !child.kind.is_text_interpolation() {
@@ -208,10 +207,10 @@ impl TreeWithIds for Cst {
                     (None, false)
                 }
             }
-            CstKind::TextLine(parts) => (parts.find_by_offset(offset), false),
-            CstKind::OpeningText { .. } | CstKind::ClosingText { .. } | CstKind::TextPart(_) => {
-                (None, false)
-            }
+            CstKind::OpeningText { .. }
+            | CstKind::ClosingText { .. }
+            | CstKind::TextNewline(_)
+            | CstKind::TextPart(_) => (None, false),
             CstKind::TextInterpolation { expression, .. } => {
                 (expression.find_by_offset(offset), false)
             }

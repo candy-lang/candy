@@ -129,20 +129,16 @@ fn visit_cst(
         }
         CstKind::Text {
             opening,
-            lines,
+            parts,
             closing,
         } => {
             visit_cst(builder, opening, None);
-            for line in lines {
+            for line in parts {
                 visit_cst(builder, line, None);
             }
             visit_cst(builder, closing, None);
         }
-        CstKind::TextLine(parts) => {
-            for part in parts {
-                visit_cst(builder, part, None);
-            }
-        }
+        CstKind::TextNewline(_) => {}
         CstKind::TextPart(_) => builder.add(
             cst.data.span.clone(),
             SemanticTokenType::Text,

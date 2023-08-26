@@ -168,14 +168,17 @@ impl Rcst {
             },
             CstKind::Text {
                 opening,
-                lines,
+                parts,
                 closing,
             } => CstKind::Text {
                 opening: Box::new(opening.to_cst(state)),
-                lines: lines.to_csts_helper(state),
+                parts: parts.to_csts_helper(state),
                 closing: Box::new(closing.to_cst(state)),
             },
-            CstKind::TextLine(parts) => CstKind::TextLine(parts.to_csts_helper(state)),
+            CstKind::TextNewline(newline) => {
+                *state.offset += newline.len();
+                CstKind::TextNewline(newline.to_owned())
+            }
             CstKind::TextPart(text) => {
                 *state.offset += text.len();
                 CstKind::TextPart(text.to_owned())

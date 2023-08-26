@@ -48,10 +48,10 @@ pub enum CstKind<D = CstData> {
     },
     Text {
         opening: Box<Cst<D>>,
-        lines: Vec<Cst<D>>,
+        parts: Vec<Cst<D>>,
         closing: Box<Cst<D>>,
     },
-    TextLine(Vec<Cst<D>>),
+    TextNewline(String), // special newline for text because line breaks have semantic meaning there
     TextPart(String),
     TextInterpolation {
         opening_curly_braces: Vec<Cst<D>>,
@@ -179,20 +179,15 @@ impl<D> CstKind<D> {
             }
             CstKind::Text {
                 opening,
-                lines,
+                parts,
                 closing,
             } => {
                 let mut children = vec![opening.as_ref()];
-                children.extend(lines);
+                children.extend(parts);
                 children.push(closing);
                 children
             }
-            CstKind::TextLine(parts) => {
-                let mut children = vec![];
-                children.extend(parts);
-                children
-            }
-            CstKind::TextPart(_) => vec![],
+            CstKind::TextNewline(_) | CstKind::TextPart(_) => vec![],
             CstKind::TextInterpolation {
                 opening_curly_braces,
                 expression,
@@ -382,21 +377,16 @@ impl<D> Display for CstKind<D> {
             }
             CstKind::Text {
                 opening,
-                lines,
+                parts,
                 closing,
             } => {
                 opening.fmt(f)?;
-                for line in lines {
+                for line in parts {
                     line.fmt(f)?;
                 }
                 closing.fmt(f)
             }
-            CstKind::TextLine(parts) => {
-                for part in parts {
-                    part.fmt(f)?;
-                }
-                Ok(())
-            }
+            CstKind::TextNewline(newline) => newline.fmt(f),
             CstKind::TextPart(literal) => literal.fmt(f),
             CstKind::TextInterpolation {
                 opening_curly_braces,

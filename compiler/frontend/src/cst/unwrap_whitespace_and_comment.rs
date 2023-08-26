@@ -49,15 +49,14 @@ impl<D: Clone> UnwrapWhitespaceAndComment for Cst<D> {
             },
             CstKind::Text {
                 opening,
-                lines,
+                parts,
                 closing,
             } => CstKind::Text {
                 opening: opening.unwrap_whitespace_and_comment(),
-                lines: lines.unwrap_whitespace_and_comment(),
+                parts: parts.unwrap_whitespace_and_comment(),
                 closing: closing.unwrap_whitespace_and_comment(),
             },
-            CstKind::TextLine(parts) => CstKind::TextLine(parts.unwrap_whitespace_and_comment()),
-            kind @ CstKind::TextPart(_) => kind.clone(),
+            kind @ CstKind::TextNewline(_) | kind @ CstKind::TextPart(_) => kind.clone(),
             CstKind::TextInterpolation {
                 opening_curly_braces,
                 expression,

@@ -246,7 +246,7 @@ pub(crate) fn format_cst<'a>(
         }
         CstKind::Text {
             opening,
-            lines,
+            parts,
             closing,
         } => {
             let info = info.resolve_for_expression_with_indented_lines(
@@ -262,61 +262,62 @@ pub(crate) fn format_cst<'a>(
                 &info,
             );
 
-            let quotes_width = info.indentation.width()
-                + opening.min_width(info.indentation)
-                + closing.min_width(info.indentation);
+            let (closing_width, whitespace) = closing.split();
+            let quotes_width =
+                info.indentation.width() + opening.min_width(info.indentation) + closing_width;
 
+            let Some((last_part, first_parts)) = parts.split_last() else {
+                return FormattedCst::new(
+                    opening.into_empty_trailing(edits) + closing_width,
+                    whitespace,
+                );
+            };
             let previous_width_for_lines =
                 Width::multiline(None, info.indentation.with_indent().width());
-            let lines = lines
-                .iter()
-                .map(|line| format_cst(edits, previous_width_for_lines, line, &info.with_indent()))
-                .collect_vec();
+            let mut first_parts_width = Width::default();
+            for part in first_parts {
+                first_parts_width += format_cst(
+                    edits,
+                    previous_width_for_lines + first_parts_width,
+                    part,
+                    &info,
+                )
+                .min_width(info.indentation);
+            }
 
-            let (closing_width, whitespace) = closing.split();
-            return if lines.len() == 1
-                && (quotes_width + lines.first().unwrap().min_width(info.indentation))
-                    .fits(info.indentation)
+            let last_part = format_cst(edits, previous_width + first_parts_width, last_part, &info);
+            let total_parts_width = first_parts_width + last_part.min_width(info.indentation);
+            return if total_parts_width.is_singleline()
+                && (quotes_width + total_parts_width).fits(info.indentation)
             {
                 FormattedCst::new(
                     opening.into_empty_trailing(edits)
-                        + lines.into_iter().next().unwrap().into_empty_trailing(edits)
+                        + first_parts_width
+                        + last_part.into_empty_trailing(edits)
                         + closing_width,
                     whitespace,
                 )
             } else {
-                let last_line_index = lines.len() - 1;
                 FormattedCst::new(
                     opening.into_trailing(
                         edits,
                         TrailingWhitespace::Indentation(info.indentation.with_indent()),
-                    ) + lines
-                        .into_iter()
-                        .enumerate()
-                        .map(|(index, line)| {
-                            line.into_trailing(
-                                edits,
-                                TrailingWhitespace::Indentation(if index == last_line_index {
-                                    info.indentation
-                                } else {
-                                    info.indentation.with_indent()
-                                }),
-                            )
-                        })
-                        .sum::<Width>()
+                    ) + first_parts_width
+                        + last_part.into_trailing(
+                            edits,
+                            TrailingWhitespace::Indentation(info.indentation),
+                        )
                         + closing_width,
                     whitespace,
                 )
             };
         }
-        CstKind::TextLine(parts) => {
-            // TODO: Format text
-            let mut width = Width::default();
-            for part in parts {
-                width += format_cst(edits, previous_width + width, part, info)
-                    .min_width(info.indentation);
-            }
-            width
+        CstKind::TextNewline(_) => {
+            let whitespace = vec![cst.clone()];
+            let whitespace: ExistingWhitespace<'_> =
+                ExistingWhitespace::new(cst.data.span.start, &whitespace);
+            FormattedCst::new(Width::default(), whitespace)
+                .into_trailing(edits, TrailingWhitespace::Indentation(info.indentation))
         }
         CstKind::TextPart(text) => text.width(),
         CstKind::TextInterpolation {
@@ -1208,7 +1209,9 @@ pub impl<D> CstExtension for Cst<D> {
             }
             CstKind::OpeningText { .. } | CstKind::ClosingText { .. } => None,
             CstKind::Text { .. } => Some(PrecedenceCategory::High),
-            CstKind::TextLine(_) | CstKind::TextPart(_) | CstKind::TextInterpolation { .. } => None,
+            CstKind::TextNewline(_) | CstKind::TextPart(_) | CstKind::TextInterpolation { .. } => {
+                None
+            }
             CstKind::BinaryBar { .. } => Some(PrecedenceCategory::Low),
             CstKind::Parenthesized { .. } => Some(PrecedenceCategory::High),
             CstKind::Call { .. } => Some(PrecedenceCategory::Low),
