@@ -1334,6 +1334,36 @@ mod test {
         test("123", "123\n");
     }
     #[test]
+    fn test_text() {
+        // Empty
+        test("\"\"", "\"\"\n");
+        test("\"\n\"", "\"\"\n");
+        test("\"\n  \n\"", "\"\"\n");
+
+        // Single line
+        test("\"\n  foo\"", "\"foo\"\n");
+        test("\"foo{0}bar\"", "\"foo{0}bar\"\n");
+        test(
+            "\"loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong Text\"", 
+            "\"\n  loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong Text\n\"\n"
+        );
+        test(
+            "\"\n  loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong Text\"", 
+            "\"\n  loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong Text\n\"\n"
+        );
+        test(
+            "\"\n  loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong Text\n\"", 
+            "\"\n  loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong Text\n\"\n"
+        );
+
+        // Multiple lines
+        test("\"\n  foo\n  bar\"", "\"\n  foo\n  bar\n\"\n");
+        test("\"\n  foo\n  bar\n\"", "\"\n  foo\n  bar\n\"\n");
+        test("\"foo\n  bar\"", "\"\n  foo\n  bar\n\"\n");
+        test("\"foo\n  bar\n\"", "\"\n  foo\n  bar\n\"\n");
+        test("\"foo\n  {0}\n  bar\n\"", "\"\n  foo\n  {0}\n  bar\n\"\n");
+    }
+    #[test]
     fn test_binary_bar() {
         test("foo | bar", "foo | bar\n");
         test("foo|bar", "foo | bar\n");
