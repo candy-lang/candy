@@ -561,7 +561,7 @@ impl LoweringContext {
                 cases,
             } => {
                 if lowering_type != LoweringType::Expression {
-                    return self.create_ast_for_invalid_expression_in_pattern(expression);
+                    return self.create_ast_for_invalid_expression_in_pattern(cst);
                 };
 
                 let expression = self.lower_cst(expression, LoweringType::Expression);
@@ -587,7 +587,7 @@ impl LoweringContext {
                 body,
             } => {
                 if lowering_type != LoweringType::Expression {
-                    return self.create_ast_for_invalid_expression_in_pattern(pattern);
+                    return self.create_ast_for_invalid_expression_in_pattern(cst);
                 };
 
                 let pattern = self.lower_cst(pattern, LoweringType::Pattern);
