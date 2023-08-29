@@ -67,7 +67,7 @@ enum State {
 }
 
 impl ModuleAnalyzer {
-    pub fn for_module(module: Module) -> Self {
+    pub const fn for_module(module: Module) -> Self {
         Self {
             module,
             state: Some(State::Initial),
@@ -289,7 +289,7 @@ impl ModuleAnalyzer {
                     evaluated_values
                         .values()
                         .iter()
-                        .flat_map(|(id, value)| Insight::for_value(db, id.clone(), *value)),
+                        .filter_map(|(id, value)| Insight::for_value(db, id.clone(), *value)),
                 );
             }
             State::Fuzz {
@@ -303,7 +303,7 @@ impl ModuleAnalyzer {
                     evaluated_values
                         .values()
                         .iter()
-                        .flat_map(|(id, value)| Insight::for_value(db, id.clone(), *value)),
+                        .filter_map(|(id, value)| Insight::for_value(db, id.clone(), *value)),
                 );
 
                 for fuzzer in fuzzers {
@@ -326,12 +326,11 @@ impl ModuleAnalyzer {
                         // future.
                         continue;
                     }
-                    if db.hir_to_cst_id(&id).is_none() {
-                        panic!(
-                            "It looks like the generated code {} is at fault for a panic.",
-                            panic.responsible,
-                        );
-                    }
+                    assert!(
+                        db.hir_to_cst_id(&id).is_some(),
+                        "It looks like the generated code {} is at fault for a panic.",
+                        panic.responsible,
+                    );
 
                     // TODO: In the future, re-run only the failing case with
                     // tracing enabled and also show the arguments to the failing

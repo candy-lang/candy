@@ -55,7 +55,7 @@ pub async fn run_debug_session(
             Err(message) => {
                 session
                     .send_response_err(seq, ResponseMessage::Error(message.to_string()))
-                    .await
+                    .await;
             }
         }
     }
@@ -259,7 +259,7 @@ impl DebugSession {
             Command::Pause(_) => todo!(),
             Command::ReadMemory(args) => {
                 let state = self.state.require_paused_mut()?;
-                let response = state.read_memory(args)?;
+                let response = state.read_memory(&args)?;
                 self.send_response_ok(request.seq, ResponseBody::ReadMemory(Some(response)))
                     .await;
                 Ok(())
@@ -268,7 +268,7 @@ impl DebugSession {
             Command::RestartFrame(_) => todo!(),
             Command::ReverseContinue(_) => todo!(),
             Command::Scopes(args) => {
-                let scopes = self.state.require_paused_mut()?.scopes(args);
+                let scopes = self.state.require_paused_mut()?.scopes(&args);
                 self.send_response_ok(request.seq, ResponseBody::Scopes(scopes))
                     .await;
                 Ok(())
@@ -293,7 +293,7 @@ impl DebugSession {
             Command::StackTrace(args) => {
                 let start_at_1_config = self.state.require_initialized()?.into();
                 let state = self.state.require_paused_mut()?;
-                let stack_trace = state.stack_trace(&self.db, start_at_1_config, args)?;
+                let stack_trace = state.stack_trace(&self.db, start_at_1_config, &args);
                 self.send_response_ok(request.seq, ResponseBody::StackTrace(stack_trace))
                     .await;
                 Ok(())
@@ -324,7 +324,7 @@ impl DebugSession {
                     .unwrap_or_default();
                 let variables = self.state.require_paused_mut()?.variables(
                     &self.db,
-                    args,
+                    &args,
                     supports_variable_type,
                 );
                 self.send_response_ok(request.seq, ResponseBody::Variables(variables))
@@ -442,7 +442,7 @@ impl DebugSession {
     }
     async fn send(&self, message: impl Into<ServerToClientMessage>) {
         let message = ServerToClient {
-            session_id: self.session_id.to_owned(),
+            session_id: self.session_id.clone(),
             message: message.into(),
         };
         self.client
@@ -452,19 +452,19 @@ impl DebugSession {
 }
 
 impl State {
-    fn require_initialized(&self) -> Result<&InitializeArguments, &'static str> {
+    const fn require_initialized(&self) -> Result<&InitializeArguments, &'static str> {
         match &self {
-            State::Initial => Err("not-initialized"),
-            State::Initialized(initialize_arguments)
-            | State::Launched {
+            Self::Initial => Err("not-initialized"),
+            Self::Initialized(initialize_arguments)
+            | Self::Launched {
                 initialize_arguments,
                 ..
             } => Ok(initialize_arguments),
         }
     }
-    fn require_paused(&self) -> Result<&PausedState, &'static str> {
+    const fn require_paused(&self) -> Result<&PausedState, &'static str> {
         match self {
-            State::Launched {
+            Self::Launched {
                 execution_state: ExecutionState::Paused(state),
                 ..
             } => Ok(state),
@@ -473,7 +473,7 @@ impl State {
     }
     fn require_paused_mut(&mut self) -> Result<&mut PausedState, &'static str> {
         match self {
-            State::Launched {
+            Self::Launched {
                 execution_state: ExecutionState::Paused(state),
                 ..
             } => Ok(state),
@@ -488,13 +488,13 @@ pub struct StartAt1Config {
     columns_start_at_1: bool,
 }
 impl StartAt1Config {
-    pub fn range_to_dap(&self, range: Range) -> Range {
+    pub const fn range_to_dap(self, range: Range) -> Range {
         let start = self.position_to_dap(range.start);
         let end = self.position_to_dap(range.end);
         Range { start, end }
     }
-    fn position_to_dap(&self, position: Position) -> Position {
-        fn apply(start_at_1: bool, value: u32) -> u32 {
+    const fn position_to_dap(self, position: Position) -> Position {
+        const fn apply(start_at_1: bool, value: u32) -> u32 {
             if start_at_1 {
                 value + 1
             } else {

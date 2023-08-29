@@ -25,7 +25,7 @@ impl<T: Clone + Eq + Hash> Default for IdMapping<T> {
     fn default() -> Self {
         Self {
             keys: vec![],
-            key_to_id: Default::default(),
+            key_to_id: FxHashMap::default(),
         }
     }
 }

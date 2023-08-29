@@ -26,8 +26,8 @@ impl PausedState {
         &mut self,
         db: &Database,
         start_at_1_config: StartAt1Config,
-        args: StackTraceArguments,
-    ) -> Result<StackTraceResponse, &'static str> {
+        args: &StackTraceArguments,
+    ) -> StackTraceResponse {
         let tracer = self.vm.as_ref().unwrap().vm.tracer();
 
         let start_frame = args.start_frame.unwrap_or_default();
@@ -74,10 +74,10 @@ impl PausedState {
             });
         }
 
-        Ok(StackTraceResponse {
+        StackTraceResponse {
             stack_frames,
             total_frames: Some(total_frames),
-        })
+        }
     }
 
     fn stack_frame(
@@ -110,7 +110,7 @@ impl PausedState {
                     checksums: None,
                 };
                 let range = db.hir_id_to_span(function).unwrap();
-                let range = db.range_to_lsp_range(function.module.to_owned(), range);
+                let range = db.range_to_lsp_range(function.module.clone(), range);
                 let range = start_at_1_config.range_to_dap(range);
                 (function.function_name(), Some(source), Some(range))
             }
@@ -127,8 +127,8 @@ impl PausedState {
             id,
             name,
             source,
-            line: range.map(|it| it.start.line as usize).unwrap_or(1),
-            column: range.map(|it| it.start.character as usize).unwrap_or(1),
+            line: range.map_or(1, |it| it.start.line as usize),
+            column: range.map_or(1, |it| it.start.character as usize),
             end_line: range.map(|it| it.end.line as usize),
             end_column: range.map(|it| it.end.character as usize),
             can_restart: Some(false),

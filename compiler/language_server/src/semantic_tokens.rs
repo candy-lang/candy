@@ -27,24 +27,24 @@ pub enum SemanticTokenType {
 lazy_static! {
     static ref TOKEN_TYPE_MAPPING: FxHashMap<SemanticTokenType, u32> = SemanticTokenType::iter()
         .enumerate()
-        .map(|(index, it)| (it, index as u32))
+        .map(|(index, it)| (it, index.try_into().unwrap()))
         .collect();
 }
 
 impl SemanticTokenType {
-    pub fn as_lsp(&self) -> lsp_types::SemanticTokenType {
+    pub const fn as_lsp(self) -> lsp_types::SemanticTokenType {
         match self {
-            SemanticTokenType::Module => lsp_types::SemanticTokenType::NAMESPACE,
-            SemanticTokenType::Parameter => lsp_types::SemanticTokenType::PARAMETER,
-            SemanticTokenType::Variable => lsp_types::SemanticTokenType::VARIABLE,
-            SemanticTokenType::Symbol => lsp_types::SemanticTokenType::ENUM_MEMBER,
-            SemanticTokenType::Function => lsp_types::SemanticTokenType::FUNCTION,
-            SemanticTokenType::Comment => lsp_types::SemanticTokenType::COMMENT,
-            SemanticTokenType::Text => lsp_types::SemanticTokenType::STRING,
-            SemanticTokenType::Int => lsp_types::SemanticTokenType::NUMBER,
-            SemanticTokenType::Operator => lsp_types::SemanticTokenType::OPERATOR,
-            SemanticTokenType::Address => lsp_types::SemanticTokenType::EVENT,
-            SemanticTokenType::Constant => lsp_types::SemanticTokenType::VARIABLE,
+            Self::Module => lsp_types::SemanticTokenType::NAMESPACE,
+            Self::Parameter => lsp_types::SemanticTokenType::PARAMETER,
+            Self::Variable => lsp_types::SemanticTokenType::VARIABLE,
+            Self::Symbol => lsp_types::SemanticTokenType::ENUM_MEMBER,
+            Self::Function => lsp_types::SemanticTokenType::FUNCTION,
+            Self::Comment => lsp_types::SemanticTokenType::COMMENT,
+            Self::Text => lsp_types::SemanticTokenType::STRING,
+            Self::Int => lsp_types::SemanticTokenType::NUMBER,
+            Self::Operator => lsp_types::SemanticTokenType::OPERATOR,
+            Self::Address => lsp_types::SemanticTokenType::EVENT,
+            Self::Constant => lsp_types::SemanticTokenType::VARIABLE,
         }
     }
 }
@@ -58,18 +58,20 @@ pub enum SemanticTokenModifier {
 }
 lazy_static! {
     pub static ref LEGEND: SemanticTokensLegend = SemanticTokensLegend {
-        token_types: SemanticTokenType::iter().map(|it| it.as_lsp()).collect(),
+        token_types: SemanticTokenType::iter()
+            .map(SemanticTokenType::as_lsp)
+            .collect(),
         token_modifiers: SemanticTokenModifier::iter()
-            .map(|it| it.as_lsp())
+            .map(SemanticTokenModifier::as_lsp)
             .collect(),
     };
 }
 impl SemanticTokenModifier {
-    pub fn as_lsp(&self) -> lsp_types::SemanticTokenModifier {
+    pub const fn as_lsp(self) -> lsp_types::SemanticTokenModifier {
         match self {
-            SemanticTokenModifier::Definition => lsp_types::SemanticTokenModifier::DEFINITION,
-            SemanticTokenModifier::Readonly => lsp_types::SemanticTokenModifier::READONLY,
-            SemanticTokenModifier::Builtin => lsp_types::SemanticTokenModifier::DEFAULT_LIBRARY,
+            Self::Definition => lsp_types::SemanticTokenModifier::DEFINITION,
+            Self::Readonly => lsp_types::SemanticTokenModifier::READONLY,
+            Self::Builtin => lsp_types::SemanticTokenModifier::DEFAULT_LIBRARY,
         }
     }
 }
@@ -110,7 +112,12 @@ impl<'a> SemanticTokensBuilder<'a> {
                 let line_length = *self.line_start_offsets[(range.start.line as usize) + 1]
                     - *self.line_start_offsets[range.start.line as usize]
                     - 1;
-                self.add_single_line(range.start, line_length as u32, type_, modifiers);
+                self.add_single_line(
+                    range.start,
+                    line_length.try_into().unwrap(),
+                    type_,
+                    modifiers,
+                );
                 range.start = Position {
                     line: range.start.line + 1,
                     character: 0,

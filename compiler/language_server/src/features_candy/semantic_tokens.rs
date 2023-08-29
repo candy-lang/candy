@@ -27,7 +27,7 @@ fn visit_csts(
     token_type_for_identifier: Option<SemanticTokenType>,
 ) {
     for cst in csts {
-        visit_cst(builder, cst, token_type_for_identifier)
+        visit_cst(builder, cst, token_type_for_identifier);
     }
 }
 fn visit_cst(
