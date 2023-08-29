@@ -38,7 +38,7 @@ impl PausedState {
         let key = self
             .variables_ids
             .id_to_key(args.variables_reference.try_into().unwrap())
-            .to_owned();
+            .clone();
         let mut variables = vec![];
         match &key {
             VariablesKey::Arguments(stack_frame_key) => {
@@ -57,7 +57,7 @@ impl PausedState {
                             let function: &hir::Id = functions.iter().next().unwrap();
 
                             let Expression::Function(hir::Function { parameters, .. }) =
-                                db.find_expression(function.to_owned()).unwrap()
+                                db.find_expression(function.clone()).unwrap()
                             else {
                                 panic!("Function's HIR is not a function: {function}");
                             };
@@ -66,7 +66,7 @@ impl PausedState {
                                 parameters
                                     .iter()
                                     .map(|it| ToString::to_string(&it.keys.last().unwrap()))
-                                    .zip_eq(call.arguments.to_owned())
+                                    .zip_eq(call.arguments.clone())
                                     .skip(start)
                                     .take(count)
                                     .map(|(parameter, argument)| {
@@ -81,7 +81,7 @@ impl PausedState {
                     }
                     Data::Builtin(_) => {
                         if should_include_indexed {
-                            let arguments = call.arguments.to_owned();
+                            let arguments = call.arguments.clone();
                             variables.extend(
                                 arguments[start..].iter().take(count).enumerate().map(
                                     |(index, object)| {
@@ -126,7 +126,7 @@ impl PausedState {
                         .map(|(name, value, count)| {
                             self.create_variable(
                                 if count == *total_name_counts.get(name).unwrap() - 1 {
-                                    name.to_owned()
+                                    name.to_string()
                                 } else {
                                     format!("{name} v{count}")
                                 },

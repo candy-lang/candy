@@ -89,9 +89,9 @@ where
     // TODO: search all files
     let module = match &query {
         ReferenceQuery::Id(id) => id.module.clone(),
-        ReferenceQuery::Int(module, _) => module.to_owned(),
-        ReferenceQuery::Symbol(module, _) => module.to_owned(),
-        ReferenceQuery::Needs(module) => module.to_owned(),
+        ReferenceQuery::Int(module, _) => module.clone(),
+        ReferenceQuery::Symbol(module, _) => module.clone(),
+        ReferenceQuery::Needs(module) => module.clone(),
     };
     let (hir, _) = db.hir(module).unwrap();
 
@@ -135,16 +135,16 @@ where
             }
         }
         for (id, expression) in &body.expressions {
-            self.visit_expression(id.to_owned(), expression);
+            self.visit_expression(id.clone(), expression);
         }
     }
     fn visit_ids(&mut self, ids: &[hir::Id]) {
         for id in ids {
-            self.visit_id(id.to_owned());
+            self.visit_id(id.clone());
         }
     }
     fn visit_id(&mut self, id: hir::Id) {
-        let expression = match self.db.find_expression(id.to_owned()) {
+        let expression = match self.db.find_expression(id.clone()) {
             Some(expression) => expression,
             None => return, // Generated code
         };

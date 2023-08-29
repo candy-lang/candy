@@ -54,7 +54,7 @@ impl Server {
         features.ir.open(&self.db, config, params.uri.clone()).await;
 
         let open_irs = features.ir.open_irs.read().await;
-        Ok(open_irs.get(&params.uri).unwrap().ir.text.to_owned())
+        Ok(open_irs.get(&params.uri).unwrap().ir.text.clone())
     }
 }
 
@@ -78,7 +78,7 @@ impl IrFeatures {
     async fn ensure_is_open(&self, db: &Mutex<Database>, config: IrConfig) {
         let packages_path = {
             let db = db.lock().await;
-            db.packages_path.to_owned()
+            db.packages_path.clone()
         };
         let uri = Url::from_config(&config, &packages_path);
         {
@@ -103,22 +103,22 @@ impl IrFeatures {
             Ir::Hir => Self::rich_ir_for_hir(&config.module, db.hir(config.module.clone())),
             Ir::Mir(tracing_config) => Self::rich_ir_for_mir(
                 &config.module,
-                db.mir(config.module.clone(), tracing_config.to_owned()),
+                db.mir(config.module.clone(), tracing_config.clone()),
                 tracing_config,
             ),
             Ir::OptimizedMir(tracing_config) => Self::rich_ir_for_optimized_mir(
                 &config.module,
-                db.optimized_mir(config.module.clone(), tracing_config.to_owned()),
+                db.optimized_mir(config.module.clone(), tracing_config.clone()),
                 tracing_config,
             ),
             Ir::Lir(tracing_config) => Self::rich_ir_for_lir(
                 &config.module,
-                &db.lir(config.module.clone(), tracing_config.to_owned()),
+                &db.lir(config.module.clone(), tracing_config.clone()),
                 tracing_config,
             ),
             Ir::OptimizedLir(tracing_config) => Self::rich_ir_for_optimized_lir(
                 &config.module,
-                db.optimized_lir(config.module.clone(), tracing_config.to_owned()),
+                db.optimized_lir(config.module.clone(), tracing_config.clone()),
                 tracing_config,
             ),
             Ir::VmByteCode(tracing_config) => Self::rich_ir_for_vm_byte_code(
@@ -126,7 +126,7 @@ impl IrFeatures {
                 &candy_vm::mir_to_byte_code::compile_byte_code(
                     db,
                     config.module.clone(),
-                    tracing_config.to_owned(),
+                    tracing_config.clone(),
                 )
                 .0,
                 tracing_config,
@@ -419,16 +419,12 @@ impl LanguageFeatures for IrFeatures {
                 });
             }
 
-            (
-                origin_selection_range,
-                key.to_owned(),
-                open_ir.config.to_owned(),
-            )
+            (origin_selection_range, key.clone(), open_ir.config.clone())
         };
 
         let packages_path = {
             let db = db.lock().await;
-            db.packages_path.to_owned()
+            db.packages_path.clone()
         };
 
         let packages_path_for_function = packages_path.clone();
@@ -458,24 +454,24 @@ impl LanguageFeatures for IrFeatures {
             ),
             ReferenceKey::ModuleWithSpan(module, span) => {
                 let db = db.lock().await;
-                let range = db.range_to_lsp_range(module.to_owned(), span.to_owned());
+                let range = db.range_to_lsp_range(module.clone(), span.clone());
                 (module_to_url(module, &packages_path).unwrap(), range)
             }
             ReferenceKey::HirId(id) => {
                 let config = IrConfig {
-                    module: id.module.to_owned(),
+                    module: id.module.clone(),
                     ir: Ir::Hir,
                 };
                 find_in_other_ir(config, &key).await
             }
             ReferenceKey::MirId(_) => {
                 let config = IrConfig {
-                    module: config.module.to_owned(),
+                    module: config.module.clone(),
                     ir: Ir::Mir(
                         config
                             .ir
                             .tracing_config()
-                            .map(|it| it.to_owned())
+                            .map(|it| it.clone())
                             .unwrap_or_else(TracingConfig::off),
                     ),
                 };
@@ -485,12 +481,12 @@ impl LanguageFeatures for IrFeatures {
             | ReferenceKey::LirConstantId(_)
             | ReferenceKey::LirBodyId(_) => {
                 let config = IrConfig {
-                    module: config.module.to_owned(),
+                    module: config.module.clone(),
                     ir: Ir::Lir(
                         config
                             .ir
                             .tracing_config()
-                            .map(|it| it.to_owned())
+                            .map(|it| it.clone())
                             .unwrap_or_else(TracingConfig::off),
                     ),
                 };
@@ -546,7 +542,7 @@ impl LanguageFeatures for IrFeatures {
                 .iter()
                 .map(|(uri, ir)| {
                     (
-                        uri.to_owned(),
+                        uri.clone(),
                         ir.find_references(reference_key, include_declaration),
                     )
                 })

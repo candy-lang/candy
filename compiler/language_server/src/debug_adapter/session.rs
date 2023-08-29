@@ -442,7 +442,7 @@ impl DebugSession {
     }
     async fn send(&self, message: impl Into<ServerToClientMessage>) {
         let message = ServerToClient {
-            session_id: self.session_id.to_owned(),
+            session_id: self.session_id.clone(),
             message: message.into(),
         };
         self.client

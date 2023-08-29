@@ -19,7 +19,7 @@ impl PausedState {
                 presentation_hint: Some(ScopePresentationhint::Arguments),
                 variables_reference: self
                     .variables_ids
-                    .key_to_id(VariablesKey::Arguments(stack_frame_key.to_owned())),
+                    .key_to_id(VariablesKey::Arguments(stack_frame_key.clone())),
                 named_variables: Some(stack_frame.call.arguments.len()),
                 indexed_variables: Some(0),
                 expensive: false,
@@ -37,7 +37,7 @@ impl PausedState {
             presentation_hint: Some(ScopePresentationhint::Locals),
             variables_reference: self
                 .variables_ids
-                .key_to_id(VariablesKey::Locals(stack_frame_key.to_owned())),
+                .key_to_id(VariablesKey::Locals(stack_frame_key.clone())),
             named_variables: Some(locals.len()),
             indexed_variables: Some(0),
             expensive: false,

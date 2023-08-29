@@ -110,7 +110,7 @@ impl PausedState {
                     checksums: None,
                 };
                 let range = db.hir_id_to_span(function).unwrap();
-                let range = db.range_to_lsp_range(function.module.to_owned(), range);
+                let range = db.range_to_lsp_range(function.module.clone(), range);
                 let range = start_at_1_config.range_to_dap(range);
                 (function.function_name(), Some(source), Some(range))
             }

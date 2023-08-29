@@ -285,7 +285,7 @@ fn apply_text_changes(
         .get_module_content_as_string(module)
         .unwrap()
         .as_ref()
-        .to_owned();
+        .clone();
     for change in changes {
         match change.range {
             Some(range) => {
