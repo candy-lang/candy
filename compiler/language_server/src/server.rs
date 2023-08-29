@@ -283,8 +283,6 @@ impl LanguageServer for Server {
     }
 
     async fn initialized(&self, _: InitializedParams) {
-        debug!("LSP: initialized");
-
         fn registration(method: &'static str, options: impl Serialize) -> Registration {
             Registration {
                 id: method.to_string(),
@@ -292,6 +290,9 @@ impl LanguageServer for Server {
                 register_options: Some(serde_json::to_value(options).unwrap()),
             }
         }
+
+        debug!("LSP: initialized");
+
         let state = self.state.read().await;
         let features = state.require_features();
 
