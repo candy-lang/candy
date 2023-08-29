@@ -92,11 +92,11 @@ impl IrFeatures {
     }
     async fn open(&self, db: &Mutex<Database>, config: IrConfig, uri: Url) {
         let db = db.lock().await;
-        let open_ir = self.create(&db, config);
+        let open_ir = Self::create(&db, config);
         let mut open_irs = self.open_irs.write().await;
         open_irs.insert(uri, open_ir);
     }
-    fn create(&self, db: &Database, config: IrConfig) -> OpenIr {
+    fn create(db: &Database, config: IrConfig) -> OpenIr {
         let ir = match &config.ir {
             Ir::Rcst => Self::rich_ir_for_rcst(&config.module, db.rcst(config.module.clone())),
             Ir::Ast => Self::rich_ir_for_ast(&config.module, db.ast(config.module.clone())),
