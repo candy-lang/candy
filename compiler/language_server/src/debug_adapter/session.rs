@@ -259,7 +259,7 @@ impl DebugSession {
             Command::Pause(_) => todo!(),
             Command::ReadMemory(args) => {
                 let state = self.state.require_paused_mut()?;
-                let response = state.read_memory(args)?;
+                let response = state.read_memory(&args)?;
                 self.send_response_ok(request.seq, ResponseBody::ReadMemory(Some(response)))
                     .await;
                 Ok(())
@@ -268,7 +268,7 @@ impl DebugSession {
             Command::RestartFrame(_) => todo!(),
             Command::ReverseContinue(_) => todo!(),
             Command::Scopes(args) => {
-                let scopes = self.state.require_paused_mut()?.scopes(args);
+                let scopes = self.state.require_paused_mut()?.scopes(&args);
                 self.send_response_ok(request.seq, ResponseBody::Scopes(scopes))
                     .await;
                 Ok(())
@@ -293,7 +293,7 @@ impl DebugSession {
             Command::StackTrace(args) => {
                 let start_at_1_config = self.state.require_initialized()?.into();
                 let state = self.state.require_paused_mut()?;
-                let stack_trace = state.stack_trace(&self.db, start_at_1_config, args);
+                let stack_trace = state.stack_trace(&self.db, start_at_1_config, &args);
                 self.send_response_ok(request.seq, ResponseBody::StackTrace(stack_trace))
                     .await;
                 Ok(())
@@ -324,7 +324,7 @@ impl DebugSession {
                     .unwrap_or_default();
                 let variables = self.state.require_paused_mut()?.variables(
                     &self.db,
-                    args,
+                    &args,
                     supports_variable_type,
                 );
                 self.send_response_ok(request.seq, ResponseBody::Variables(variables))

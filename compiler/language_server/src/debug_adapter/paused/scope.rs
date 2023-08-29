@@ -6,7 +6,7 @@ use dap::{
 };
 
 impl PausedState {
-    pub fn scopes(&mut self, args: ScopesArguments) -> ScopesResponse {
+    pub fn scopes(&mut self, args: &ScopesArguments) -> ScopesResponse {
         let stack_frame_key = self
             .stack_frame_ids
             .id_to_key(args.frame_id.try_into().unwrap());

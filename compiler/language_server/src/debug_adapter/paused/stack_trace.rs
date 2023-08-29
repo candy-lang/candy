@@ -26,7 +26,7 @@ impl PausedState {
         &mut self,
         db: &Database,
         start_at_1_config: StartAt1Config,
-        args: StackTraceArguments,
+        args: &StackTraceArguments,
     ) -> StackTraceResponse {
         let tracer = self.vm.as_ref().unwrap().vm.tracer();
 

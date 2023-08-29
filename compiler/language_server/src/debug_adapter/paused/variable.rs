@@ -19,7 +19,7 @@ impl PausedState {
     pub fn variables(
         &mut self,
         db: &Database,
-        args: VariablesArguments,
+        args: &VariablesArguments,
         supports_variable_type: bool,
     ) -> VariablesResponse {
         let should_include_indexed = matches!(

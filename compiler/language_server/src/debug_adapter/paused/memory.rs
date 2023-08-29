@@ -15,9 +15,9 @@ impl PausedState {
     #[allow(unused_parens)]
     pub fn read_memory(
         &mut self,
-        args: ReadMemoryArguments,
+        args: &ReadMemoryArguments,
     ) -> Result<ReadMemoryResponse, &'static str> {
-        let reference = MemoryReference::from_dap(args.memory_reference)?;
+        let reference = MemoryReference::from_dap(&args.memory_reference)?;
         let (base_offset, actual_range, data) = match reference {
             MemoryReference::Inline { value } => {
                 let bytes = value.raw_word().get().to_ne_bytes();
@@ -86,7 +86,7 @@ impl MemoryReference {
         }
     }
 
-    pub fn from_dap(value: String) -> Result<Self, &'static str> {
+    pub fn from_dap(value: &str) -> Result<Self, &'static str> {
         let mut parts = value.split('-');
 
         match parts.next().ok_or("heap-inline-disambiguator-missing")? {
