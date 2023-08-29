@@ -130,10 +130,7 @@ impl AnalyzerClient {
     pub async fn update_status(&self, status: Option<String>) {
         self.client
             .send_notification::<ServerStatusNotification>(ServerStatusNotification {
-                text: match status {
-                    Some(status) => format!("🍭 {status}"),
-                    None => "🍭".to_string(),
-                },
+                text: status.map_or_else(|| "🍭".to_string(), |status| format!("🍭 {status}")),
             })
             .await;
     }

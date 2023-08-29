@@ -75,10 +75,7 @@ pub enum MemoryReference {
 }
 impl MemoryReference {
     pub fn new(value: InlineObject) -> Self {
-        match HeapObject::try_from(value) {
-            Ok(object) => Self::heap(object),
-            Err(_) => Self::Inline { value },
-        }
+        HeapObject::try_from(value).map_or_else(|_| Self::Inline { value }, Self::heap)
     }
     pub fn heap(object: HeapObject) -> Self {
         Self::Heap {
