@@ -326,12 +326,11 @@ impl ModuleAnalyzer {
                         // future.
                         continue;
                     }
-                    if db.hir_to_cst_id(&id).is_none() {
-                        panic!(
-                            "It looks like the generated code {} is at fault for a panic.",
-                            panic.responsible,
-                        );
-                    }
+                    assert!(
+                        db.hir_to_cst_id(&id).is_some(),
+                        "It looks like the generated code {} is at fault for a panic.",
+                        panic.responsible,
+                    );
 
                     // TODO: In the future, re-run only the failing case with
                     // tracing enabled and also show the arguments to the failing
