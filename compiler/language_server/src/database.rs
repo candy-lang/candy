@@ -41,6 +41,7 @@ pub struct Database {
 impl salsa::Database for Database {}
 
 impl Database {
+    #[must_use]
     pub fn new_with_file_system_module_provider(packages_path: PackagesPath) -> Self {
         Self::new(
             packages_path.clone(),
@@ -48,6 +49,7 @@ impl Database {
         )
     }
 
+    #[must_use]
     pub fn new(
         packages_path: PackagesPath,
         module_provider: Box<dyn ModuleProvider + Send>,

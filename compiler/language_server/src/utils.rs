@@ -10,6 +10,7 @@ use itertools::Itertools;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Url};
 use std::ops::Range;
 
+#[must_use]
 pub fn error_to_diagnostic(db: &Database, module: Module, error: &CompilerError) -> Diagnostic {
     let related_information = error
         .to_related_information()
@@ -62,6 +63,7 @@ pub fn module_from_url(
     }
 }
 
+#[must_use]
 pub fn module_to_url(module: &Module, packages_path: &PackagesPath) -> Option<Url> {
     match &module.package {
         Package::User(_) | Package::Managed(_) => Some(
@@ -103,12 +105,14 @@ pub impl<DB: ModuleDb + PositionConversionDb + ?Sized> LspPositionConversion for
     }
 }
 
+#[must_use]
 pub fn lsp_range_to_range_raw(text: &str, range: lsp_types::Range) -> Range<Offset> {
     let line_start_offsets = line_start_offsets_raw(text);
     let start = lsp_position_to_offset_raw(text, &line_start_offsets, range.start);
     let end = lsp_position_to_offset_raw(text, &line_start_offsets, range.end);
     start..end
 }
+#[must_use]
 pub fn lsp_position_to_offset_raw(
     text: &str,
     line_start_offsets: &[Offset],
@@ -135,6 +139,7 @@ pub fn lsp_position_to_offset_raw(
     Offset(*line_offset + char_offset)
 }
 
+#[must_use]
 pub fn range_to_lsp_range_raw<S, L>(
     text: S,
     line_start_offsets: L,
@@ -151,6 +156,7 @@ where
         end: offset_to_lsp_position_raw(text, line_start_offsets, range.end),
     }
 }
+#[must_use]
 pub fn offset_to_lsp_position_raw<S, L>(
     text: S,
     line_start_offsets: L,
@@ -183,6 +189,7 @@ pub trait JoinWithCommasAndAnd {
     fn join_with_commas_and_and(&self) -> String;
 }
 impl<S: AsRef<str>> JoinWithCommasAndAnd for [S] {
+    #[must_use]
     fn join_with_commas_and_and(&self) -> String {
         match self {
             [] => panic!("Joining no parts."),

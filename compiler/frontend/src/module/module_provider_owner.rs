@@ -1,10 +1,12 @@
 use super::{InMemoryModuleProvider, Module, ModuleProvider};
 
 pub trait ModuleProviderOwner {
+    #[must_use]
     fn get_module_provider(&self) -> &dyn ModuleProvider;
 }
 
 pub trait MutableModuleProviderOwner: ModuleProviderOwner {
+    #[must_use]
     fn get_in_memory_module_provider(&mut self) -> &mut InMemoryModuleProvider;
     fn invalidate_module(&mut self, module: &Module);
 
@@ -20,6 +22,7 @@ pub trait MutableModuleProviderOwner: ModuleProviderOwner {
         self.get_in_memory_module_provider().remove(module);
         self.invalidate_module(module);
     }
+    #[must_use]
     fn get_open_modules(&mut self) -> Vec<Module> {
         self.get_in_memory_module_provider()
             .get_all_modules()

@@ -47,6 +47,7 @@ pub struct CandyFeatures {
     hints_events_sender: Sender<analyzer::Message>,
 }
 impl CandyFeatures {
+    #[must_use]
     pub fn new(packages_path: PackagesPath, client: AnalyzerClient) -> Self {
         let (hints_events_sender, hints_events_receiver) = tokio::sync::mpsc::channel(1024);
         thread::spawn(move || {
