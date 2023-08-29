@@ -32,7 +32,7 @@ lazy_static! {
 }
 
 impl SemanticTokenType {
-    pub fn as_lsp(&self) -> lsp_types::SemanticTokenType {
+    pub fn as_lsp(self) -> lsp_types::SemanticTokenType {
         match self {
             SemanticTokenType::Module => lsp_types::SemanticTokenType::NAMESPACE,
             SemanticTokenType::Parameter => lsp_types::SemanticTokenType::PARAMETER,
@@ -65,7 +65,7 @@ lazy_static! {
     };
 }
 impl SemanticTokenModifier {
-    pub fn as_lsp(&self) -> lsp_types::SemanticTokenModifier {
+    pub fn as_lsp(self) -> lsp_types::SemanticTokenModifier {
         match self {
             SemanticTokenModifier::Definition => lsp_types::SemanticTokenModifier::DEFINITION,
             SemanticTokenModifier::Readonly => lsp_types::SemanticTokenModifier::READONLY,

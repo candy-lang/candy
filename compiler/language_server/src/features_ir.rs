@@ -143,25 +143,25 @@ impl IrFeatures {
     fn rich_ir_for_rcst(module: &Module, rcst: RcstResult) -> RichIr {
         Self::rich_ir_for("RCST", module, None, |builder| match rcst {
             Ok(rcst) => rcst.build_rich_ir(builder),
-            Err(error) => Self::build_rich_ir_for_module_error(builder, module, &error),
+            Err(error) => Self::build_rich_ir_for_module_error(builder, module, error),
         })
     }
     fn rich_ir_for_ast(module: &Module, asts: AstResult) -> RichIr {
         Self::rich_ir_for("AST", module, None, |builder| match asts {
             Ok((asts, _)) => asts.build_rich_ir(builder),
-            Err(error) => Self::build_rich_ir_for_module_error(builder, module, &error),
+            Err(error) => Self::build_rich_ir_for_module_error(builder, module, error),
         })
     }
     fn rich_ir_for_hir(module: &Module, hir: HirResult) -> RichIr {
         Self::rich_ir_for("HIR", module, None, |builder| match hir {
             Ok((hir, _)) => hir.build_rich_ir(builder),
-            Err(error) => Self::build_rich_ir_for_module_error(builder, module, &error),
+            Err(error) => Self::build_rich_ir_for_module_error(builder, module, error),
         })
     }
     fn rich_ir_for_mir(module: &Module, mir: MirResult, tracing_config: &TracingConfig) -> RichIr {
         Self::rich_ir_for("MIR", module, tracing_config, |builder| match mir {
             Ok((mir, _)) => mir.build_rich_ir(builder),
-            Err(error) => Self::build_rich_ir_for_module_error(builder, module, &error),
+            Err(error) => Self::build_rich_ir_for_module_error(builder, module, error),
         })
     }
     fn rich_ir_for_optimized_mir(
@@ -175,14 +175,14 @@ impl IrFeatures {
             tracing_config,
             |builder| match mir {
                 Ok((mir, _, _)) => mir.build_rich_ir(builder),
-                Err(error) => Self::build_rich_ir_for_module_error(builder, module, &error),
+                Err(error) => Self::build_rich_ir_for_module_error(builder, module, error),
             },
         )
     }
     fn rich_ir_for_lir(module: &Module, lir: &LirResult, tracing_config: &TracingConfig) -> RichIr {
         Self::rich_ir_for("LIR", module, tracing_config, |builder| match lir {
             Ok((lir, _)) => lir.build_rich_ir(builder),
-            Err(error) => Self::build_rich_ir_for_module_error(builder, module, error),
+            Err(error) => Self::build_rich_ir_for_module_error(builder, module, *error),
         })
     }
     fn rich_ir_for_optimized_lir(
@@ -196,7 +196,7 @@ impl IrFeatures {
             tracing_config,
             |builder| match lir {
                 Ok((lir, _)) => lir.build_rich_ir(builder),
-                Err(error) => Self::build_rich_ir_for_module_error(builder, module, &error),
+                Err(error) => Self::build_rich_ir_for_module_error(builder, module, error),
             },
         )
     }
@@ -230,7 +230,7 @@ impl IrFeatures {
     fn build_rich_ir_for_module_error(
         builder: &mut RichIrBuilder,
         module: &Module,
-        module_error: &ModuleError,
+        module_error: ModuleError,
     ) {
         match module_error {
             ModuleError::DoesNotExist => {

@@ -488,12 +488,12 @@ pub struct StartAt1Config {
     columns_start_at_1: bool,
 }
 impl StartAt1Config {
-    pub fn range_to_dap(&self, range: Range) -> Range {
+    pub fn range_to_dap(self, range: Range) -> Range {
         let start = self.position_to_dap(range.start);
         let end = self.position_to_dap(range.end);
         Range { start, end }
     }
-    fn position_to_dap(&self, position: Position) -> Position {
+    fn position_to_dap(self, position: Position) -> Position {
         fn apply(start_at_1: bool, value: u32) -> u32 {
             if start_at_1 {
                 value + 1
