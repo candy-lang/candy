@@ -34,17 +34,17 @@ lazy_static! {
 impl SemanticTokenType {
     pub fn as_lsp(self) -> lsp_types::SemanticTokenType {
         match self {
-            SemanticTokenType::Module => lsp_types::SemanticTokenType::NAMESPACE,
-            SemanticTokenType::Parameter => lsp_types::SemanticTokenType::PARAMETER,
-            SemanticTokenType::Variable => lsp_types::SemanticTokenType::VARIABLE,
-            SemanticTokenType::Symbol => lsp_types::SemanticTokenType::ENUM_MEMBER,
-            SemanticTokenType::Function => lsp_types::SemanticTokenType::FUNCTION,
-            SemanticTokenType::Comment => lsp_types::SemanticTokenType::COMMENT,
-            SemanticTokenType::Text => lsp_types::SemanticTokenType::STRING,
-            SemanticTokenType::Int => lsp_types::SemanticTokenType::NUMBER,
-            SemanticTokenType::Operator => lsp_types::SemanticTokenType::OPERATOR,
-            SemanticTokenType::Address => lsp_types::SemanticTokenType::EVENT,
-            SemanticTokenType::Constant => lsp_types::SemanticTokenType::VARIABLE,
+            Self::Module => lsp_types::SemanticTokenType::NAMESPACE,
+            Self::Parameter => lsp_types::SemanticTokenType::PARAMETER,
+            Self::Variable => lsp_types::SemanticTokenType::VARIABLE,
+            Self::Symbol => lsp_types::SemanticTokenType::ENUM_MEMBER,
+            Self::Function => lsp_types::SemanticTokenType::FUNCTION,
+            Self::Comment => lsp_types::SemanticTokenType::COMMENT,
+            Self::Text => lsp_types::SemanticTokenType::STRING,
+            Self::Int => lsp_types::SemanticTokenType::NUMBER,
+            Self::Operator => lsp_types::SemanticTokenType::OPERATOR,
+            Self::Address => lsp_types::SemanticTokenType::EVENT,
+            Self::Constant => lsp_types::SemanticTokenType::VARIABLE,
         }
     }
 }
@@ -69,9 +69,9 @@ lazy_static! {
 impl SemanticTokenModifier {
     pub fn as_lsp(self) -> lsp_types::SemanticTokenModifier {
         match self {
-            SemanticTokenModifier::Definition => lsp_types::SemanticTokenModifier::DEFINITION,
-            SemanticTokenModifier::Readonly => lsp_types::SemanticTokenModifier::READONLY,
-            SemanticTokenModifier::Builtin => lsp_types::SemanticTokenModifier::DEFAULT_LIBRARY,
+            Self::Definition => lsp_types::SemanticTokenModifier::DEFINITION,
+            Self::Readonly => lsp_types::SemanticTokenModifier::READONLY,
+            Self::Builtin => lsp_types::SemanticTokenModifier::DEFAULT_LIBRARY,
         }
     }
 }

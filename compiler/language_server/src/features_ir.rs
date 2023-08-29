@@ -300,7 +300,7 @@ impl IrConfig {
             IrDiscriminants::VmByteCode => Ir::VmByteCode(tracing_config.unwrap()),
         };
 
-        IrConfig {
+        Self {
             module: module_from_url(&original_uri, module_kind, packages_path).unwrap(),
             ir,
         }
@@ -327,7 +327,7 @@ impl UrlFromIrConfig for Url {
             _ => {}
         }
 
-        Url::parse(
+        Self::parse(
             format!(
                 "candy-ir:{}.{ir}#{}",
                 original_url.path(),
@@ -357,12 +357,12 @@ pub enum Ir {
 impl Ir {
     fn tracing_config(&self) -> Option<&TracingConfig> {
         match self {
-            Ir::Rcst | Ir::Ast | Ir::Hir => None,
-            Ir::Mir(tracing_config)
-            | Ir::OptimizedMir(tracing_config)
-            | Ir::Lir(tracing_config)
-            | Ir::OptimizedLir(tracing_config)
-            | Ir::VmByteCode(tracing_config) => Some(tracing_config),
+            Self::Rcst | Self::Ast | Self::Hir => None,
+            Self::Mir(tracing_config)
+            | Self::OptimizedMir(tracing_config)
+            | Self::Lir(tracing_config)
+            | Self::OptimizedLir(tracing_config)
+            | Self::VmByteCode(tracing_config) => Some(tracing_config),
         }
     }
 }
@@ -650,16 +650,16 @@ impl OpenIr {
 impl TokenTypeToSemantic for TokenType {
     fn to_semantic(&self) -> SemanticTokenType {
         match self {
-            TokenType::Module => SemanticTokenType::Module,
-            TokenType::Parameter => SemanticTokenType::Parameter,
-            TokenType::Variable => SemanticTokenType::Variable,
-            TokenType::Function => SemanticTokenType::Function,
-            TokenType::Comment => SemanticTokenType::Comment,
-            TokenType::Symbol => SemanticTokenType::Symbol,
-            TokenType::Text => SemanticTokenType::Text,
-            TokenType::Int => SemanticTokenType::Int,
-            TokenType::Address => SemanticTokenType::Address,
-            TokenType::Constant => SemanticTokenType::Constant,
+            Self::Module => SemanticTokenType::Module,
+            Self::Parameter => SemanticTokenType::Parameter,
+            Self::Variable => SemanticTokenType::Variable,
+            Self::Function => SemanticTokenType::Function,
+            Self::Comment => SemanticTokenType::Comment,
+            Self::Symbol => SemanticTokenType::Symbol,
+            Self::Text => SemanticTokenType::Text,
+            Self::Int => SemanticTokenType::Int,
+            Self::Address => SemanticTokenType::Address,
+            Self::Constant => SemanticTokenType::Constant,
         }
     }
 }
@@ -668,7 +668,7 @@ impl TokenTypeToSemantic for TokenType {
 impl TokenModifierToSemantic for TokenModifier {
     fn to_semantic(&self) -> SemanticTokenModifier {
         match self {
-            TokenModifier::Builtin => SemanticTokenModifier::Builtin,
+            Self::Builtin => SemanticTokenModifier::Builtin,
         }
     }
 }

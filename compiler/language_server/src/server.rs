@@ -54,20 +54,20 @@ pub struct RunningServerState {
 impl ServerState {
     pub fn require_features(&self) -> &ServerFeatures {
         match self {
-            ServerState::Initial { features, .. } => features,
-            ServerState::Running(RunningServerState { features, .. }) => features,
-            ServerState::Shutdown => panic!("Server is shut down."),
+            Self::Initial { features, .. } => features,
+            Self::Running(RunningServerState { features, .. }) => features,
+            Self::Shutdown => panic!("Server is shut down."),
         }
     }
     pub fn require_running(&self) -> &RunningServerState {
         match self {
-            ServerState::Running(state) => state,
+            Self::Running(state) => state,
             _ => panic!("Server is not running."),
         }
     }
     pub fn require_running_mut(&mut self) -> &mut RunningServerState {
         match self {
-            ServerState::Running(state) => state,
+            Self::Running(state) => state,
             _ => panic!("Server is not running."),
         }
     }
@@ -183,13 +183,13 @@ impl Server {
         })
         .custom_method(
             "candy/debugAdapter/create",
-            Server::candy_debug_adapter_create,
+            Self::candy_debug_adapter_create,
         )
         .custom_method(
             "candy/debugAdapter/message",
-            Server::candy_debug_adapter_message,
+            Self::candy_debug_adapter_message,
         )
-        .custom_method("candy/viewIr", Server::candy_view_ir)
+        .custom_method("candy/viewIr", Self::candy_view_ir)
         .finish();
 
         (service, client)

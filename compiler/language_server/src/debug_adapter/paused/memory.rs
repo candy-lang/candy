@@ -77,7 +77,7 @@ impl MemoryReference {
     pub fn new(value: InlineObject) -> Self {
         match HeapObject::try_from(value) {
             Ok(object) => Self::heap(object),
-            Err(_) => MemoryReference::Inline { value },
+            Err(_) => Self::Inline { value },
         }
     }
     pub fn heap(object: HeapObject) -> Self {
@@ -114,12 +114,12 @@ impl MemoryReference {
     }
     pub fn to_dap(self) -> String {
         match self {
-            MemoryReference::Inline { value } => format!(
+            Self::Inline { value } => format!(
                 "inline-{:0width$X}",
                 value.raw_word(),
                 width = 2 * size_of::<usize>(),
             ),
-            MemoryReference::Heap { address } => {
+            Self::Heap { address } => {
                 format!("heap-{address:016X}")
             }
         }
@@ -128,7 +128,7 @@ impl MemoryReference {
 
 #[extension_trait]
 impl<T: Copy + Ord> RangeExtension<T> for Range<T> {
-    fn intersection(&self, other: &Range<T>) -> Range<T> {
+    fn intersection(&self, other: &Self) -> Self {
         self.start.max(other.start)..self.end.min(other.end)
     }
 }

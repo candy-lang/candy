@@ -454,9 +454,9 @@ impl DebugSession {
 impl State {
     fn require_initialized(&self) -> Result<&InitializeArguments, &'static str> {
         match &self {
-            State::Initial => Err("not-initialized"),
-            State::Initialized(initialize_arguments)
-            | State::Launched {
+            Self::Initial => Err("not-initialized"),
+            Self::Initialized(initialize_arguments)
+            | Self::Launched {
                 initialize_arguments,
                 ..
             } => Ok(initialize_arguments),
@@ -464,7 +464,7 @@ impl State {
     }
     fn require_paused(&self) -> Result<&PausedState, &'static str> {
         match self {
-            State::Launched {
+            Self::Launched {
                 execution_state: ExecutionState::Paused(state),
                 ..
             } => Ok(state),
@@ -473,7 +473,7 @@ impl State {
     }
     fn require_paused_mut(&mut self) -> Result<&mut PausedState, &'static str> {
         match self {
-            State::Launched {
+            Self::Launched {
                 execution_state: ExecutionState::Paused(state),
                 ..
             } => Ok(state),
