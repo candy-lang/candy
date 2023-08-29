@@ -413,7 +413,10 @@ impl LanguageServer for Server {
 
         let module_result = module_from_url(
             &params.text_document.uri,
-            if params.text_document.uri.path().ends_with(".candy") {
+            if std::path::Path::new(params.text_document.uri.path())
+                .extension()
+                .map_or(false, |ext| ext.eq_ignore_ascii_case("candy"))
+            {
                 ModuleKind::Code
             } else {
                 ModuleKind::Asset
