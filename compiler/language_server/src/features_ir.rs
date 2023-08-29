@@ -206,7 +206,7 @@ impl IrFeatures {
         tracing_config: &TracingConfig,
     ) -> RichIr {
         Self::rich_ir_for("VM Byte Code", module, tracing_config, |builder| {
-            byte_code.build_rich_ir(builder)
+            byte_code.build_rich_ir(builder);
         })
     }
     fn rich_ir_for(
@@ -599,13 +599,13 @@ impl OpenIr {
             references.push(Reference {
                 range: self.range_to_lsp_range(definition),
                 is_write: true,
-            })
+            });
         }
         for reference in &result.references {
             references.push(Reference {
                 range: self.range_to_lsp_range(reference),
                 is_write: true,
-            })
+            });
         }
         references
     }

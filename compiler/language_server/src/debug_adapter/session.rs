@@ -55,7 +55,7 @@ pub async fn run_debug_session(
             Err(message) => {
                 session
                     .send_response_err(seq, ResponseMessage::Error(message.to_string()))
-                    .await
+                    .await;
             }
         }
     }

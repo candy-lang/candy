@@ -55,7 +55,7 @@ impl DebugSessionManager {
         }
 
         thread::spawn(|| {
-            run_debug_session(session_id, client, packages_path, client_to_server_receiver)
+            run_debug_session(session_id, client, packages_path, client_to_server_receiver);
         });
     }
     async fn handle_message(&self, request: RequestNotification) {

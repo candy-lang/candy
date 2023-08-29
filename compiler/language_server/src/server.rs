@@ -105,7 +105,7 @@ impl ServerFeatures {
                 language: language_id.clone(),
                 scheme: Some(scheme.to_owned()),
                 pattern: None,
-            }))
+            }));
         };
         for features in self.all_features() {
             add_selectors_for(&mut selectors, features);
