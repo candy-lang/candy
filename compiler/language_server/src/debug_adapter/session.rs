@@ -293,7 +293,7 @@ impl DebugSession {
             Command::StackTrace(args) => {
                 let start_at_1_config = self.state.require_initialized()?.into();
                 let state = self.state.require_paused_mut()?;
-                let stack_trace = state.stack_trace(&self.db, start_at_1_config, args)?;
+                let stack_trace = state.stack_trace(&self.db, start_at_1_config, args);
                 self.send_response_ok(request.seq, ResponseBody::StackTrace(stack_trace))
                     .await;
                 Ok(())

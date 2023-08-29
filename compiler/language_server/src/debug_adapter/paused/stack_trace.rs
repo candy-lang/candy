@@ -27,7 +27,7 @@ impl PausedState {
         db: &Database,
         start_at_1_config: StartAt1Config,
         args: StackTraceArguments,
-    ) -> Result<StackTraceResponse, &'static str> {
+    ) -> StackTraceResponse {
         let tracer = self.vm.as_ref().unwrap().vm.tracer();
 
         let start_frame = args.start_frame.unwrap_or_default();
@@ -74,10 +74,10 @@ impl PausedState {
             });
         }
 
-        Ok(StackTraceResponse {
+        StackTraceResponse {
             stack_frames,
             total_frames: Some(total_frames),
-        })
+        }
     }
 
     fn stack_frame(
