@@ -289,7 +289,7 @@ impl ModuleAnalyzer {
                     evaluated_values
                         .values()
                         .iter()
-                        .flat_map(|(id, value)| Insight::for_value(db, id.clone(), *value)),
+                        .filter_map(|(id, value)| Insight::for_value(db, id.clone(), *value)),
                 );
             }
             State::Fuzz {
@@ -303,7 +303,7 @@ impl ModuleAnalyzer {
                     evaluated_values
                         .values()
                         .iter()
-                        .flat_map(|(id, value)| Insight::for_value(db, id.clone(), *value)),
+                        .filter_map(|(id, value)| Insight::for_value(db, id.clone(), *value)),
                 );
 
                 for fuzzer in fuzzers {
