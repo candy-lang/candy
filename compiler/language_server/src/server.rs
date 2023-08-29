@@ -207,7 +207,7 @@ impl Server {
             state.require_running_mut()
         })
     }
-    pub async fn features_from_url<'a>(
+    pub fn features_from_url<'a>(
         &self,
         server_features: &'a ServerFeatures,
         url: &Url,
@@ -389,9 +389,7 @@ impl LanguageServer for Server {
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         let state = self.require_running_state().await;
-        let features = self
-            .features_from_url(&state.features, &params.text_document.uri)
-            .await;
+        let features = self.features_from_url(&state.features, &params.text_document.uri);
         assert!(features.supports_did_open());
         let content = params.text_document.text.into_bytes();
         features
@@ -401,9 +399,7 @@ impl LanguageServer for Server {
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         let state = self.require_running_state().await;
         {
-            let features = self
-                .features_from_url(&state.features, &params.text_document.uri)
-                .await;
+            let features = self.features_from_url(&state.features, &params.text_document.uri);
             assert!(features.supports_did_change());
             features
                 .did_change(
@@ -441,9 +437,7 @@ impl LanguageServer for Server {
     }
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         let state = self.require_running_state().await;
-        let features = self
-            .features_from_url(&state.features, &params.text_document.uri)
-            .await;
+        let features = self.features_from_url(&state.features, &params.text_document.uri);
         assert!(features.supports_did_close());
         features.did_close(&self.db, params.text_document.uri).await;
     }
@@ -453,12 +447,10 @@ impl LanguageServer for Server {
         params: GotoDefinitionParams,
     ) -> jsonrpc::Result<Option<GotoDefinitionResponse>> {
         let state = self.require_running_state().await;
-        let features = self
-            .features_from_url(
-                &state.features,
-                &params.text_document_position_params.text_document.uri,
-            )
-            .await;
+        let features = self.features_from_url(
+            &state.features,
+            &params.text_document_position_params.text_document.uri,
+        );
         assert!(features.supports_find_definition());
         let response = features
             .find_definition(
@@ -529,9 +521,7 @@ impl LanguageServer for Server {
         params: FoldingRangeParams,
     ) -> jsonrpc::Result<Option<Vec<FoldingRange>>> {
         let state = self.require_running_state().await;
-        let features = self
-            .features_from_url(&state.features, &params.text_document.uri)
-            .await;
+        let features = self.features_from_url(&state.features, &params.text_document.uri);
         assert!(features.supports_folding_ranges());
         Ok(Some(
             features
@@ -545,9 +535,7 @@ impl LanguageServer for Server {
         params: DocumentFormattingParams,
     ) -> jsonrpc::Result<Option<Vec<TextEdit>>> {
         let state = self.require_running_state().await;
-        let features = self
-            .features_from_url(&state.features, &params.text_document.uri)
-            .await;
+        let features = self.features_from_url(&state.features, &params.text_document.uri);
         assert!(features.supports_format());
         Ok(Some(
             features.format(&self.db, params.text_document.uri).await,
@@ -560,7 +548,7 @@ impl LanguageServer for Server {
     ) -> jsonrpc::Result<Option<PrepareRenameResponse>> {
         let state = self.require_running_state().await;
         let uri = params.text_document.uri;
-        let features = self.features_from_url(&state.features, &uri).await;
+        let features = self.features_from_url(&state.features, &uri);
         let result = features
             .prepare_rename(&self.db, uri, params.position)
             .await;
@@ -569,7 +557,7 @@ impl LanguageServer for Server {
     async fn rename(&self, params: RenameParams) -> jsonrpc::Result<Option<WorkspaceEdit>> {
         let state = self.require_running_state().await;
         let uri = params.text_document_position.text_document.uri;
-        let features = self.features_from_url(&state.features, &uri).await;
+        let features = self.features_from_url(&state.features, &uri);
         let result = features
             .rename(
                 &self.db,
@@ -597,7 +585,7 @@ impl LanguageServer for Server {
     ) -> jsonrpc::Result<Option<SemanticTokensResult>> {
         let state = self.require_running_state().await;
         let uri = params.text_document.uri;
-        let features = self.features_from_url(&state.features, &uri).await;
+        let features = self.features_from_url(&state.features, &uri);
         let tokens = features.semantic_tokens(&self.db, uri);
         let tokens = tokens.await;
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
@@ -616,7 +604,7 @@ impl Server {
     ) -> FxHashMap<Url, Vec<Reference>> {
         let state = self.state.read().await;
         let state = state.require_running();
-        let features = self.features_from_url(&state.features, &uri).await;
+        let features = self.features_from_url(&state.features, &uri);
         assert!(features.supports_references());
         features
             .references(
