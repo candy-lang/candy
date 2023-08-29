@@ -452,7 +452,7 @@ impl DebugSession {
 }
 
 impl State {
-    fn require_initialized(&self) -> Result<&InitializeArguments, &'static str> {
+    const fn require_initialized(&self) -> Result<&InitializeArguments, &'static str> {
         match &self {
             Self::Initial => Err("not-initialized"),
             Self::Initialized(initialize_arguments)
@@ -462,7 +462,7 @@ impl State {
             } => Ok(initialize_arguments),
         }
     }
-    fn require_paused(&self) -> Result<&PausedState, &'static str> {
+    const fn require_paused(&self) -> Result<&PausedState, &'static str> {
         match self {
             Self::Launched {
                 execution_state: ExecutionState::Paused(state),
@@ -488,13 +488,13 @@ pub struct StartAt1Config {
     columns_start_at_1: bool,
 }
 impl StartAt1Config {
-    pub fn range_to_dap(self, range: Range) -> Range {
+    pub const fn range_to_dap(self, range: Range) -> Range {
         let start = self.position_to_dap(range.start);
         let end = self.position_to_dap(range.end);
         Range { start, end }
     }
-    fn position_to_dap(self, position: Position) -> Position {
-        fn apply(start_at_1: bool, value: u32) -> u32 {
+    const fn position_to_dap(self, position: Position) -> Position {
+        const fn apply(start_at_1: bool, value: u32) -> u32 {
             if start_at_1 {
                 value + 1
             } else {

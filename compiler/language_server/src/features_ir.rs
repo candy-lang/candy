@@ -355,7 +355,7 @@ pub enum Ir {
     VmByteCode(TracingConfig),
 }
 impl Ir {
-    fn tracing_config(&self) -> Option<&TracingConfig> {
+    const fn tracing_config(&self) -> Option<&TracingConfig> {
         match self {
             Self::Rcst | Self::Ast | Self::Hir => None,
             Self::Mir(tracing_config)

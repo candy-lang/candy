@@ -67,7 +67,7 @@ enum State {
 }
 
 impl ModuleAnalyzer {
-    pub fn for_module(module: Module) -> Self {
+    pub const fn for_module(module: Module) -> Self {
         Self {
             module,
             state: Some(State::Initial),
