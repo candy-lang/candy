@@ -471,7 +471,7 @@ impl LanguageFeatures for IrFeatures {
                         config
                             .ir
                             .tracing_config()
-                            .map(|it| it.clone())
+                            .cloned()
                             .unwrap_or_else(TracingConfig::off),
                     ),
                 };
@@ -486,7 +486,7 @@ impl LanguageFeatures for IrFeatures {
                         config
                             .ir
                             .tracing_config()
-                            .map(|it| it.clone())
+                            .cloned()
                             .unwrap_or_else(TracingConfig::off),
                     ),
                 };

@@ -197,7 +197,7 @@ impl<S: AsRef<str>> JoinWithCommasAndAnd for [S] {
             [first, second] => format!("{} and {}", first.as_ref(), second.as_ref()),
             [rest @ .., last] => format!(
                 "{}, and {}",
-                rest.iter().map(|it| it.as_ref()).join(", "),
+                rest.iter().map(AsRef::as_ref).join(", "),
                 last.as_ref(),
             ),
         }

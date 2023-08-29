@@ -295,6 +295,8 @@ impl LanguageServer for Server {
         let state = self.state.read().await;
         let features = state.require_features();
 
+        // TODO: Fix lifetimes and remove this allow
+        #[allow(clippy::redundant_closure_for_method_calls)]
         self.client
             .register_capability(vec![
                 registration(

@@ -82,7 +82,7 @@ pub async fn run_server(
                     outgoing_hints.send(module.clone(), vec![]).await;
                     analyzers
                         .entry(module.clone())
-                        .and_modify(|it| it.module_changed())
+                        .and_modify(ModuleAnalyzer::module_changed)
                         .or_insert_with(|| ModuleAnalyzer::for_module(module.clone()));
                 }
                 Message::CloseModule(module) => {
