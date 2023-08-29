@@ -58,9 +58,11 @@ pub enum SemanticTokenModifier {
 }
 lazy_static! {
     pub static ref LEGEND: SemanticTokensLegend = SemanticTokensLegend {
-        token_types: SemanticTokenType::iter().map(|it| it.as_lsp()).collect(),
+        token_types: SemanticTokenType::iter()
+            .map(SemanticTokenType::as_lsp)
+            .collect(),
         token_modifiers: SemanticTokenModifier::iter()
-            .map(|it| it.as_lsp())
+            .map(SemanticTokenModifier::as_lsp)
             .collect(),
     };
 }
