@@ -52,7 +52,7 @@ impl Notification for HintsNotification {
 }
 
 #[tokio::main(worker_threads = 1)]
-#[allow(unused_must_use)]
+#[allow(clippy::needless_pass_by_value, unused_must_use)]
 pub async fn run_server(
     packages_path: PackagesPath,
     mut incoming_events: mpsc::Receiver<Message>,
