@@ -57,7 +57,7 @@ impl StaticPanicsOfExpression for Expression {
             } => {
                 let is_fuzzable = referenced.contains(responsible_parameter);
 
-                for parameter in parameters.iter() {
+                for parameter in &*parameters {
                     visible.insert(*parameter, Expression::Parameter);
                 }
                 visible.insert(*responsible_parameter, Expression::Parameter);
