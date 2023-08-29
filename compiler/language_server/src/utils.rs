@@ -180,8 +180,8 @@ where
     let line_start = line_start_offsets[line];
     let character_utf16_offset = text[*line_start..*offset].encode_utf16().count();
     Position {
-        line: line as u32,
-        character: character_utf16_offset as u32,
+        line: line.try_into().unwrap(),
+        character: character_utf16_offset.try_into().unwrap(),
     }
 }
 

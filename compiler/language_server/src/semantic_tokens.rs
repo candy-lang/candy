@@ -27,7 +27,7 @@ pub enum SemanticTokenType {
 lazy_static! {
     static ref TOKEN_TYPE_MAPPING: FxHashMap<SemanticTokenType, u32> = SemanticTokenType::iter()
         .enumerate()
-        .map(|(index, it)| (it, index as u32))
+        .map(|(index, it)| (it, index.try_into().unwrap()))
         .collect();
 }
 
@@ -110,7 +110,12 @@ impl<'a> SemanticTokensBuilder<'a> {
                 let line_length = *self.line_start_offsets[(range.start.line as usize) + 1]
                     - *self.line_start_offsets[range.start.line as usize]
                     - 1;
-                self.add_single_line(range.start, line_length as u32, type_, modifiers);
+                self.add_single_line(
+                    range.start,
+                    line_length.try_into().unwrap(),
+                    type_,
+                    modifiers,
+                );
                 range.start = Position {
                     line: range.start.line + 1,
                     character: 0,
