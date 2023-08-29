@@ -622,7 +622,7 @@ impl Server {
     }
 }
 
-/// https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#renameRegistrationOptions
+/// <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#renameRegistrationOptions>
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RenameRegistrationOptions {
