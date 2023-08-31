@@ -103,7 +103,6 @@ impl VisibleExpressions {
         }
     }
     pub fn insert(&mut self, id: Id, expression: Expression) {
-        println!("Insert {id}: {expression:?}");
         self.expressions.insert(id, expression);
     }
     pub fn remove(&mut self, id: Id) -> Expression {
