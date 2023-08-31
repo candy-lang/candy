@@ -1,0 +1,10 @@
+[ifElse, int] = use "Core"
+
+foo value =
+  needs (int.is value)
+  ifElse (value | int.isLessThan 5) { Ok value } { Error "NOPE" }
+
+main = foo 2 %
+  Ok value, value | int.isGreaterThan 5 -> value
+  Error value -> 10
+  _ -> 20
