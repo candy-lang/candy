@@ -335,7 +335,9 @@ impl ModuleAnalyzer {
                     // TODO: In the future, re-run only the failing case with
                     // tracing enabled and also show the arguments to the failing
                     // function in the hint.
-                    let call_span = db.hir_id_to_display_span(&panic.responsible).unwrap();
+                    let call_span = db
+                        .hir_id_to_display_span(&panic.responsible)
+                        .unwrap_or_else(|| panic!("Couldn't find the span for {panic:?}."));
                     insights.push(Insight::Diagnostic(Diagnostic::error(
                         db.range_to_lsp_range(self.module.clone(), call_span),
                         format!(

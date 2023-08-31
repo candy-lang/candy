@@ -3,7 +3,8 @@
     { "open": "(", "close": ")" },
     { "open": "[", "close": "]" },
     { "open": "{", "close": "}" },
-    { "open": "\"", "close": "\"", "notIn": ["string"] }
+    { "open": "\"", "close": "\"", "notIn": ["string"] },
+    { "open": "'", "close": "'", "notIn": ["string"] }
   ],
   "brackets": [
     ["(", ")"],
@@ -66,7 +67,8 @@
     ["(", ")"],
     ["[", "]"],
     ["{", "}"],
-    ["\"", "\""]
+    ["\"", "\""],
+    ["'", "'"]
   ],
   "wordPattern": "(\\d[\\d_]*)|([a-zA-Z][a-zA-Z0-9_]*)"
 }

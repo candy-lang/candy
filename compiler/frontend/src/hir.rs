@@ -645,7 +645,7 @@ impl ToRichIr for Pattern {
                 builder.push(format!("{int}"), TokenType::Int, EnumSet::empty());
             }
             Self::Text(text) => {
-                builder.push(format!(r#""{text:?}\""#), TokenType::Text, EnumSet::empty());
+                builder.push(format!(r#""{text}""#), TokenType::Text, EnumSet::empty());
             }
             Self::NewIdentifier(reference) => reference.build_rich_ir(builder),
             Self::Tag { symbol, value } => {
