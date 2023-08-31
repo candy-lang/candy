@@ -14,10 +14,17 @@
     "lineComment": "#"
   },
   "indentationRules": {
-    "increaseIndentPattern": "^[^#]*(\\([^)]*|\\[[^\\]]*|\\{[^}]*|=\\s*(#.*)?|\"[^\"]*)$",
+    "increaseIndentPattern": "^[^#]*(\\([^)]*|\\[[^\\]]*|\\{[^}]*|\"[^\"]*)$",
     "decreaseIndentPattern": "^[\\)\\]\\}].*$"
   },
   "onEnterRules": [
+    {
+      // Assignment start with optional comment but no actual content.
+      "beforeText": "^[^#]*=\\s*(?:#.*)?$",
+      "action": {
+        "indent": "indent"
+      }
+    },
     {
       // Octothorpes without space when there's already an existing space after
       // so we don't need to insert one.
