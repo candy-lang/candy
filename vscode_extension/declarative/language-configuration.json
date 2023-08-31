@@ -14,7 +14,7 @@
     "lineComment": "#"
   },
   "indentationRules": {
-    "increaseIndentPattern": "^[^#]*(\\([^)#]*|\\[[^\\]#]*|\\{[^}#]*|=\\s*(#.*)?|\"[^\"]*)$",
+    "increaseIndentPattern": "^[^#]*(\\([^)]*|\\[[^\\]]*|\\{[^}]*|=\\s*(#.*)?|\"[^\"]*)$",
     "decreaseIndentPattern": "^[\\)\\]\\}].*$"
   },
   "onEnterRules": [
