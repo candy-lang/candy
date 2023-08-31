@@ -16,7 +16,7 @@ impl From<CstKind<()>> for Rcst {
 
 impl ToRichIr for Rcst {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        self.kind.build_rich_ir(builder);
+        builder.push(format!("{self:#?}"), None, EnumSet::empty());
     }
 }
 
