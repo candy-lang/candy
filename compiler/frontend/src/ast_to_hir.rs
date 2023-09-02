@@ -7,7 +7,10 @@ use crate::{
     cst::{self, CstDb},
     cst_to_ast::CstToAst,
     error::{CompilerError, CompilerErrorPayload},
-    hir::{self, Body, Expression, Function, HirError, IdKey, Pattern, PatternIdentifierId},
+    hir::{
+        self, Body, Expression, Function, FunctionKind, HirError, IdKey, Pattern,
+        PatternIdentifierId,
+    },
     id::IdGenerator,
     module::{Module, Package},
     position::Offset,
@@ -429,7 +432,7 @@ impl Context<'_> {
                     Expression::Function(Function {
                         parameters: vec![],
                         body: then_body,
-                        fuzzable: false,
+                        kind: FunctionKind::CurlyBraces,
                     }),
                     None,
                 );
@@ -451,7 +454,7 @@ impl Context<'_> {
                     Expression::Function(Function {
                         parameters: vec![],
                         body: else_body,
-                        fuzzable: false,
+                        kind: FunctionKind::CurlyBraces,
                     }),
                     None,
                 );
@@ -538,7 +541,11 @@ impl Context<'_> {
             Expression::Function(Function {
                 parameters,
                 body: inner_body,
-                fuzzable: function.fuzzable,
+                kind: if function.fuzzable {
+                    FunctionKind::Normal
+                } else {
+                    FunctionKind::CurlyBraces
+                },
             }),
             None,
         )
@@ -766,7 +773,7 @@ impl Context<'_> {
         //   HirId(~:test.candy:use:importedFileContent) = useModule
         //     currently in ~:test.candy:use:importedFileContent
         //     relative path: HirId(~:test.candy:use:relativePath)
-        //  }
+        // }
 
         assert!(self.use_id.is_none());
 
@@ -791,7 +798,7 @@ impl Context<'_> {
             Expression::Function(Function {
                 parameters: vec![relative_path],
                 body: inner_body,
-                fuzzable: false,
+                kind: FunctionKind::Use,
             }),
             "use".to_string(),
         );
