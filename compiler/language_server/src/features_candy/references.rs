@@ -45,7 +45,7 @@ where
             assert_eq!(
                 hir_ids.len(),
                 1,
-                "The CST ID of an identifier should map to exactly one HIR ID.",
+                "The CST ID of an identifier should map to exactly one HIR ID, but it mapped to {hir_ids:?}.",
             );
             let hir_id = hir_ids.into_iter().next().unwrap();
 

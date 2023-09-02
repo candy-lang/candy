@@ -94,7 +94,9 @@ impl Insight {
         let mut insights = vec![];
 
         let id = fuzzer.function_id.clone();
-        let end_of_line = db.id_to_end_of_line(id.clone()).unwrap();
+        let end_of_line = db
+            .id_to_end_of_line(id.clone())
+            .unwrap_or_else(|| panic!("Can't resolve end of line for {id}"));
 
         let coverage = match fuzzer.status() {
             Status::StillFuzzing { total_coverage, .. } => {
@@ -145,7 +147,9 @@ impl Insight {
     }
 
     pub fn for_static_panic(db: &Database, module: Module, panic: &Panic) -> Self {
-        let call_span = db.hir_id_to_display_span(&panic.responsible).unwrap();
+        let call_span = db
+            .hir_id_to_display_span(&panic.responsible)
+            .unwrap_or_else(|| panic!("Can't resolve responsible ID for panic: {:?}", panic));
         let call_span = db.range_to_lsp_range(module, call_span);
 
         Self::Diagnostic(Diagnostic::error(
