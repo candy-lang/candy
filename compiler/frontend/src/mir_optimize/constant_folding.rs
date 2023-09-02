@@ -106,7 +106,7 @@ fn run_builtin(
     debug_assert_eq!(
         arguments.len(),
         builtin.num_parameters(),
-        "wrong number of arguments for calling builtin function {builtin:?}",
+        "Wrong number of arguments for calling {builtin}",
     );
 
     let result = match builtin {
