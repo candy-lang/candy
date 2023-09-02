@@ -149,7 +149,7 @@ impl Id {
     /// An ID that can be used to blame the tooling. For example, when calling
     /// the `main` function, we want to be able to blame the platform for
     /// passing a wrong environment.
-    fn tooling(name: String) -> Self {
+    const fn tooling(name: String) -> Self {
         Self {
             module: Module {
                 package: Package::Tooling(name),
