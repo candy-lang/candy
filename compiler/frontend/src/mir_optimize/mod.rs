@@ -196,6 +196,7 @@ impl Context<'_> {
 
                 let is_call = matches!(**expression, Expression::Call { .. });
                 inlining::inline_tiny_functions(self, expression);
+                inlining::inline_needs_function(self, expression);
                 inlining::inline_functions_containing_use(self, expression);
                 if is_call && matches!(**expression, Expression::Function { .. }) {
                     // We inlined a function call and the resulting code starts with
@@ -210,19 +211,6 @@ impl Context<'_> {
                     break 'outer;
                 }
             }
-        }
-
-        // TODO: If this is a call to the `needs` function with `True` as the
-        // first argument, optimize it away. This is not correct – calling
-        // `needs True 3 4` should panic instead. But we figured this is
-        // temporarily fine until we have data flow.
-        if let Expression::Call { function, arguments, .. } = &**expression
-            && let Expression::Function { original_hirs, .. } = self.visible.get(*function)
-            && original_hirs.contains(&hir::Id::needs())
-            && arguments.len() == 3
-            && let Expression::Tag { symbol, value: None  } = self.visible.get(arguments[0])
-            && symbol == "True" {
-            **expression = Expression::nothing();
         }
     }
 }
