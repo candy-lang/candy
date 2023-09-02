@@ -6,7 +6,6 @@ use crate::{
     module::{Module, ModuleKind, Package},
     rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr, TokenType},
 };
-
 use derive_more::From;
 use enumset::EnumSet;
 use itertools::Itertools;
@@ -180,17 +179,6 @@ impl Id {
     #[must_use]
     pub fn dummy() -> Self {
         Self::tooling("dummy".to_string())
-    }
-    /// TODO: Currently, when a higher-order function calls a function passed as
-    /// a parameter, that's registered as a normal call instruction, making the
-    /// callsite in the higher-order function responsible for the successful
-    /// fulfillment of the passed function's `needs`. We probably want to change
-    /// how that works so that the caller of the higher-order function is at
-    /// fault when passing a panicking function. After we did that, we should be
-    /// able to remove this ID.
-    #[must_use]
-    pub fn complicated_responsibility() -> Self {
-        Self::tooling("complicated-responsibility".to_string())
     }
 
     #[must_use]
