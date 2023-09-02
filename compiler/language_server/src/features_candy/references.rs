@@ -42,12 +42,11 @@ where
         }
         CstKind::Identifier { .. } => {
             let hir_ids = db.cst_to_hir_id(module, origin_cst.data.id);
-            assert_eq!(
-                hir_ids.len(),
-                1,
-                "The CST ID of an identifier should map to exactly one HIR ID, but it mapped to {hir_ids:?}.",
+            assert!(
+                hir_ids.len() <= 1,
+                "The CST ID of an identifier should map to at most one HIR ID, but it mapped to {hir_ids:?}.",
             );
-            let hir_id = hir_ids.into_iter().next().unwrap();
+            let hir_id = hir_ids.into_iter().next()?;
 
             let target_id: Option<hir::Id> =
                 if let Some(hir_expr) = db.find_expression(hir_id.clone()) {
