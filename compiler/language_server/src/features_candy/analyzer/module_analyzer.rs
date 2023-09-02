@@ -20,7 +20,7 @@ use itertools::Itertools;
 use lsp_types::Diagnostic;
 use rand::{prelude::SliceRandom, thread_rng};
 use std::rc::Rc;
-use tracing::info;
+use tracing::debug;
 
 /// A hints finder is responsible for finding hints for a single module.
 pub struct ModuleAnalyzer {
@@ -351,7 +351,7 @@ impl ModuleAnalyzer {
             }
         }
 
-        info!("Insights: {insights:?}");
+        debug!("Insights: {insights:?}");
 
         insights
     }
