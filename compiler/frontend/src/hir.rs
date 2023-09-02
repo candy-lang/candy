@@ -625,7 +625,7 @@ impl ToRichIr for Expression {
                         "{{ ({}) ",
                         match function.kind {
                             FunctionKind::Normal => "fuzzable",
-                            FunctionKind::Use => "non-fuzzable but passes on responsibility",
+                            FunctionKind::Use => "non-fuzzable, but passes on responsibility",
                             FunctionKind::CurlyBraces => "non-fuzzable",
                         },
                     ),
