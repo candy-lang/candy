@@ -247,6 +247,15 @@ impl Context<'_> {
             AstKind::Function(function) => self.compile_function(ast.id.clone(), function, None),
             AstKind::Call(call) => self.lower_call(Some(ast.id.clone()), call),
             AstKind::Assignment(Assignment { is_public, body }) => {
+                // An assignment to a single identifier (i.e., no destructuring)
+                // gets converted to at least two HIR expressions:
+                //
+                // - The penultimate one is mapped to the whole AST
+                // - The last is a reference to the penultimate one and gets
+                //   mapped to the identifier's AST.
+                //
+                // This is necessary to differentiate assignments and references
+                // for IDE features.
                 let (names, body) = match body {
                     ast::AssignmentBody::Function { name, function } => {
                         let body = self.compile_function(ast.id.clone(), function, &***name);
@@ -262,36 +271,51 @@ impl Context<'_> {
                         let body = self.compile(body);
                         self.end_non_top_level(reset_state);
 
-                        let (pattern, identifier_ids) = self.lower_pattern(pattern);
-                        let body = self.push(
-                            None,
-                            Expression::Destructure {
-                                expression: body,
-                                pattern,
-                            },
-                            None,
-                        );
+                        let names = if let AstKind::Identifier(Identifier(name)) = &pattern.kind {
+                            let body_reference_id = self.push(
+                                ast.id.clone(),
+                                Expression::Reference(body),
+                                name.value.clone(),
+                            );
+                            let assignment_reference_id = self.push(
+                                name.id.clone(),
+                                Expression::Reference(body_reference_id),
+                                name.value.clone(),
+                            );
+                            vec![(name.value.clone(), assignment_reference_id)]
+                        } else {
+                            let pattern_id = pattern.id.clone();
+                            let (pattern, identifier_ids) = self.lower_pattern(pattern);
+                            self.push(
+                                pattern_id,
+                                Expression::Destructure {
+                                    expression: body,
+                                    pattern,
+                                },
+                                None,
+                            );
 
-                        let names = identifier_ids
-                            .into_iter()
-                            .sorted_by_key(|(_, (_, identifier_id))| identifier_id.0)
-                            .map(|(name, (ast_id, identifier_id))| {
-                                let id = self.push(
-                                    ast_id,
-                                    Expression::PatternIdentifierReference(identifier_id),
-                                    name.clone(),
-                                );
-                                (name, id)
-                            })
-                            .collect_vec();
+                            identifier_ids
+                                .into_iter()
+                                .sorted_by_key(|(_, (_, identifier_id))| identifier_id.0)
+                                .map(|(name, (ast_id, identifier_id))| {
+                                    let id = self.push(
+                                        ast_id,
+                                        Expression::PatternIdentifierReference(identifier_id),
+                                        name.clone(),
+                                    );
+                                    (name, id)
+                                })
+                                .collect_vec()
+                        };
 
-                        self.push(
+                        let nothing_id = self.push(
                             ast.id.clone(),
                             Expression::Symbol("Nothing".to_string()),
                             None,
                         );
 
-                        (names, body)
+                        (names, nothing_id)
                     }
                 };
                 if *is_public {
