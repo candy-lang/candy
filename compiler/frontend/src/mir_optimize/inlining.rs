@@ -38,7 +38,10 @@ use super::{
     complexity::Complexity,
     current_expression::{Context, CurrentExpression},
 };
-use crate::mir::{Expression, Id};
+use crate::{
+    hir,
+    mir::{Expression, Id},
+};
 use rustc_hash::FxHashMap;
 
 pub fn inline_tiny_functions(context: &mut Context, expression: &mut CurrentExpression) {
@@ -51,8 +54,7 @@ pub fn inline_tiny_functions(context: &mut Context, expression: &mut CurrentExpr
         },
     );
 }
-
-pub fn inline_functions_of_maximum_complexity(
+fn inline_functions_of_maximum_complexity(
     context: &mut Context,
     expression: &mut CurrentExpression,
     complexity: Complexity,
@@ -60,6 +62,15 @@ pub fn inline_functions_of_maximum_complexity(
     if let Expression::Call { function, .. } = **expression
         && let Expression::Function { body, .. } = context.visible.get(function)
         && body.complexity() <= complexity {
+        context.inline_call(expression);
+    }
+}
+
+pub fn inline_needs_function(context: &mut Context, expression: &mut CurrentExpression) {
+    if let Expression::Call { function, arguments, .. } = &**expression
+        && arguments.iter().all(|it| context.pureness.is_definition_const(context.visible.get(*it)))
+        && let Expression::Function { original_hirs, .. } = context.visible.get(*function)
+        && original_hirs.contains(&hir::Id::needs()) {
         context.inline_call(expression);
     }
 }
@@ -73,7 +84,7 @@ pub fn inline_functions_containing_use(context: &mut Context, expression: &mut C
 }
 
 impl Context<'_> {
-    pub fn inline_call(&mut self, expression: &mut CurrentExpression) {
+    fn inline_call(&mut self, expression: &mut CurrentExpression) {
         let Expression::Call {
             function,
             arguments,

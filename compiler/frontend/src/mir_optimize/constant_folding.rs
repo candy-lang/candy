@@ -60,30 +60,34 @@ pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression)
         return;
     };
 
-    let function = context.visible.get(*function);
-    if let Expression::Tag { symbol, value: None } = function && arguments.len() == 1 {
-        **expression = Expression::Tag { symbol: symbol.clone(), value: Some(arguments[0]) };
-        return;
+    match context.visible.get(*function) {
+        Expression::Tag {
+            symbol,
+            value: None,
+        } if arguments.len() == 1 => {
+            **expression = Expression::Tag {
+                symbol: symbol.clone(),
+                value: Some(arguments[0]),
+            };
+        }
+        Expression::Builtin(builtin) => {
+            let arguments = arguments.clone();
+            let responsible = *responsible;
+            let Some(result) = run_builtin(
+                &mut *expression,
+                *builtin,
+                &arguments,
+                responsible,
+                context.visible,
+                context.id_generator,
+                context.pureness,
+            ) else {
+                return;
+            };
+            **expression = result;
+        }
+        _ => {}
     }
-
-    let Expression::Builtin(builtin) = function else {
-        return;
-    };
-
-    let arguments = arguments.clone();
-    let responsible = *responsible;
-    let Some(result) = run_builtin(
-        &mut *expression,
-        *builtin,
-        &arguments,
-        responsible,
-        context.visible,
-        context.id_generator,
-        context.pureness,
-    ) else {
-        return;
-    };
-    **expression = result;
 }
 /// This function tries to run a builtin, requiring a minimal amount of static
 /// knowledge. For example, it can find out that the result of `✨.equals $3 $3`
@@ -102,7 +106,7 @@ fn run_builtin(
     debug_assert_eq!(
         arguments.len(),
         builtin.num_parameters(),
-        "wrong number of arguments for calling builtin function {builtin:?}",
+        "Wrong number of arguments for calling {builtin}",
     );
 
     let result = match builtin {

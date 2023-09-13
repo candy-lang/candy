@@ -21,12 +21,11 @@ pub fn find_definition(db: &Database, module: Module, offset: Offset) -> Option<
     }
 
     let origin_hir_ids = db.cst_to_hir_id(module.clone(), origin_cst.data.id);
-    assert_eq!(
-        origin_hir_ids.len(),
-        1,
-        "The CST ID of an identifier should map to exactly one HIR ID.",
+    assert!(
+        origin_hir_ids.len() <= 1,
+        "The CST ID of an identifier should map to at most one HIR ID, but it mapped to {origin_hir_ids:?}.",
     );
-    let origin_hir_id = origin_hir_ids.into_iter().next().unwrap();
+    let origin_hir_id = origin_hir_ids.into_iter().next()?;
     let origin_expression = db.find_expression(origin_hir_id)?;
     debug!("Origin HIR: {origin_expression}");
     let target_hir_id = match origin_expression {
