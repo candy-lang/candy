@@ -234,12 +234,15 @@ intDivideTruncating dividend divisor :=
 intModulo dividend divisor :=
   # Returns `dividend` % `divisor`.
   #
+  # The result of a modulo operation is the smallest possible number x such that
+  # there exists a y with dividend = y * divisor + x.
+  #
   # ```
   # intModulo 6 3 => 0
   # intModulo 5 3 => 2
-  # intModulo -5 3 => -2
   # intModulo 5 -3 => 2
-  # intModulo -5 -3 => -2
+  # intModulo -5 3 => 1
+  # intModulo -5 -3 => 1
   # ```
   needs (dividend | typeIs Int)
   needs (divisor | typeIs Int)
@@ -258,7 +261,7 @@ intMultiply factorA factorB :=
 
 intParse text :=
   # Parses `text` into an integer.
-  # 
+  #
   # `text` must be a string of decimal digits, optionally preceded by a minus
   # sign. If the text is the textual representation of an integer, returns `Ok`
   # and the parsed integer. Otherwise, returns `Error NotAnInteger`.
@@ -274,9 +277,14 @@ intParse text :=
 intRemainder dividend divisor :=
   # Returns the remainder you get when dividing the dividend by the divisor.
   #
+  # The result has the same sign as the `dividend`.
+  #
   # ```
-  # intRemainder 12 6 => 0
-  # intRemainder 13 6 => 1
+  # intRemainder 6 3 => 0
+  # intRemainder 5 3 => 2
+  # intRemainder -5 3 => -2
+  # intRemainder 5 -3 => 2
+  # intRemainder -5 -3 => -2
   # ```
   needs (dividend | typeIs Int)
   needs (divisor | typeIs Int)
@@ -354,7 +362,7 @@ listGet list index :=
 listInsert list index item :=
   # Returns a new list that is like the given `list` except the `item` is
   # inserted at the given `index`.
-  # 
+  #
   # The index can point one past the end of the list (0 <= index <= length).
   #
   # ```
@@ -483,7 +491,7 @@ textCharacters text :=
   # ```
   # textCharacters "Hello" => ("H", "e", "l", "l", "o")
   # ```
-  # 
+  #
   needs (text | typeIs Text)
   ✨.textCharacters text
 
