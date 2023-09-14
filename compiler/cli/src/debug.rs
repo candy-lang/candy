@@ -60,13 +60,12 @@ pub(crate) enum Options {
     /// Low-Level Intermediate Representation
     Lir(PathAndTracing),
 
-    
     /// Optimized Low-Level Intermediate Representation
     OptimizedLir(PathAndTracing),
-    
+
     /// VM Byte Code
     VmByteCode(PathAndTracing),
-    
+
     /// LLVM Intermediate Representation
     #[cfg(feature = "inkwell")]
     LlvmIr(OnlyPath),
@@ -156,7 +155,7 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
             let tracing = options.to_tracing_config();
             let lir = db.optimized_lir(module.clone(), tracing.clone());
             lir.ok()
-            .map(|(lir, _)| RichIr::for_lir(&module, &lir, &tracing))
+                .map(|(lir, _)| RichIr::for_lir(&module, &lir, &tracing))
         }
         Options::VmByteCode(options) => {
             let module = module_for_path(options.path.clone())?;
