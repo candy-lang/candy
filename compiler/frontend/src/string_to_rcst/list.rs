@@ -11,52 +11,27 @@ use tracing::instrument;
 
 #[instrument(level = "trace")]
 pub fn list(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
-    let (input, mut opening_parenthesis) = opening_parenthesis(input)?;
+    let (mut input_before_closing, mut opening_parenthesis) = opening_parenthesis(input)?;
 
-    // Empty list `(,)` - TODO: Somehow optimize this
-    'handleEmptyList: {
-        // Whitespace before comma.
-        let (input, leading_whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
-        let opening_parenthesis = opening_parenthesis
-            .clone()
-            .wrap_in_whitespace(leading_whitespace);
-
-        // Comma.
-        let Some((input, comma)) = comma(input) else {
-            break 'handleEmptyList;
-        };
-
-        // Whitespace after comma.
-        let (input, trailing_whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
-        let comma = comma.wrap_in_whitespace(trailing_whitespace);
-
-        // Closing parenthesis.
-        let Some((input, closing_parenthesis)) = closing_parenthesis(input) else {
-            break 'handleEmptyList;
-        };
-
-        return Some((
-            input,
-            CstKind::List {
-                opening_parenthesis: Box::new(opening_parenthesis),
-                items: vec![comma],
-                closing_parenthesis: Box::new(closing_parenthesis),
-            }
-            .into(),
-        ));
-    }
-
-    let (input, mut items) = 'handleItems: {
-        // Parse first item and check if this is a parenthesized expression
-        let (input, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
+    let mut items: Vec<Rcst> = vec![];
+    loop {
+        // Whitespace before value.
+        let (input, whitespace) =
+            whitespaces_and_newlines(input_before_closing, indentation + 1, true);
         let item_indentation = if whitespace.is_multiline() {
             indentation + 1
         } else {
             indentation
         };
-        opening_parenthesis = opening_parenthesis.wrap_in_whitespace(whitespace);
+        if items.is_empty() {
+            opening_parenthesis = opening_parenthesis.wrap_in_whitespace(whitespace);
+        } else {
+            let last = items.pop().unwrap();
+            items.push(last.wrap_in_whitespace(whitespace));
+        }
 
-        let (input, first_expression) = expression(
+        // Value.
+        let (input_after_expression, value) = expression(
             input,
             item_indentation,
             ExpressionParsingOptions {
@@ -70,125 +45,96 @@ pub fn list(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
             (input, Some(expression))
         });
 
-        let (new_input, whitespace) = whitespaces_and_newlines(input, item_indentation + 1, true);
+        // Whitespace between value and comma.
+        let (input, whitespace) =
+            whitespaces_and_newlines(input_after_expression, item_indentation + 1, true);
 
-        // It is a parenthesized expression if there is no comma
-        let Some((mut input, first_comma)) = comma(new_input) else {
-            let (input, whitespace) = whitespaces_and_newlines(input, indentation, true);
-            let (input, closing_parenthesis) = closing_parenthesis(input).unwrap_or((
-                input,
-                CstKind::Error {
-                    unparsable_input: String::new(),
-                    error: CstError::ParenthesisNotClosed,
-                }
-                .into(),
-            ));
+        // Comma.
+        let (input, comma) = match comma(input) {
+            // It is an empty list if there is no first expression but a comma
+            Some((input, comma)) if items.is_empty() && value.is_none() => {
+                let (input, trailing_whitespace) =
+                    whitespaces_and_newlines(input, indentation + 1, true);
+                let comma = comma.wrap_in_whitespace(trailing_whitespace);
 
-            return Some((
-                input,
-                CstKind::Parenthesized {
-                    opening_parenthesis: Box::new(opening_parenthesis),
-                    inner: Box::new(
-                        first_expression
-                            .unwrap_or_else(|| {
-                                CstKind::Error {
-                                    unparsable_input: String::new(),
-                                    error: CstError::OpeningParenthesisMissesExpression,
-                                }
-                                .into()
-                            })
-                            .wrap_in_whitespace(whitespace),
-                    ),
-                    closing_parenthesis: Box::new(closing_parenthesis),
-                }
-                .into(),
-            ));
-        };
-
-        let mut items: Vec<Rcst> = vec![CstKind::ListItem {
-            value: Box::new(
-                first_expression
-                    .unwrap_or_else(|| {
-                        CstKind::Error {
-                            unparsable_input: String::new(),
-                            error: CstError::ListItemMissesValue,
+                // Closing parenthesis.
+                if let Some((input, closing_parenthesis)) = closing_parenthesis(input) {
+                    return Some((
+                        input,
+                        CstKind::List {
+                            opening_parenthesis: Box::new(opening_parenthesis),
+                            items: vec![comma],
+                            closing_parenthesis: Box::new(closing_parenthesis),
                         }
-                        .into()
-                    })
-                    .wrap_in_whitespace(whitespace),
-            ),
-            comma: Some(Box::new(first_comma)),
-        }
-        .into()];
+                        .into(),
+                    ));
+                };
 
-        // Parse rest
-        loop {
-            let new_input = input;
-
-            // Whitespace before value.
-            let (new_input, whitespace) =
-                whitespaces_and_newlines(new_input, indentation + 1, true);
-            let item_indentation = if whitespace.is_multiline() {
-                indentation + 1
-            } else {
-                indentation
-            };
-            let last = items.pop().unwrap();
-            items.push(last.wrap_in_whitespace(whitespace));
-            input = new_input;
-
-            // Value.
-            let (new_input, value, has_value) = match expression(
-                new_input,
-                item_indentation,
-                ExpressionParsingOptions {
-                    allow_assignment: false,
-                    allow_call: true,
-                    allow_bar: true,
-                    allow_function: true,
-                },
-            ) {
-                Some((new_input, value)) => (new_input, value, true),
-                None => (
-                    new_input,
+                (input, Some(comma))
+            }
+            Some((input, comma)) => (input, Some(comma)),
+            // It is a parenthesized expression if there is no comma after the first expression
+            None if items.is_empty() => {
+                let (input, whitespace) =
+                    whitespaces_and_newlines(input_after_expression, indentation, true);
+                let (input, closing_parenthesis) = closing_parenthesis(input).unwrap_or((
+                    input,
                     CstKind::Error {
                         unparsable_input: String::new(),
-                        error: CstError::ListItemMissesValue,
+                        error: CstError::ParenthesisNotClosed,
                     }
                     .into(),
-                    false,
-                ),
-            };
+                ));
 
-            // Whitespace between value and comma.
-            let (new_input, whitespace) =
-                whitespaces_and_newlines(new_input, item_indentation + 1, true);
-            let value = value.wrap_in_whitespace(whitespace);
-
-            // Comma.
-            let (new_input, comma) = match comma(new_input) {
-                Some((new_input, comma)) => (new_input, Some(comma)),
-                None => (new_input, None),
-            };
-
-            if !has_value && comma.is_none() {
-                break 'handleItems (input, items);
+                return Some((
+                    input,
+                    CstKind::Parenthesized {
+                        opening_parenthesis: Box::new(opening_parenthesis),
+                        inner: Box::new(
+                            value
+                                .unwrap_or_else(|| {
+                                    CstKind::Error {
+                                        unparsable_input: String::new(),
+                                        error: CstError::OpeningParenthesisMissesExpression,
+                                    }
+                                    .into()
+                                })
+                                .wrap_in_whitespace(whitespace),
+                        ),
+                        closing_parenthesis: Box::new(closing_parenthesis),
+                    }
+                    .into(),
+                ));
             }
+            None => (input, None),
+        };
 
-            input = new_input;
-            items.push(
-                CstKind::ListItem {
-                    value: Box::new(value),
-                    comma: comma.map(Box::new),
-                }
-                .into(),
-            );
+        input_before_closing = input;
+        if value.is_none() && comma.is_none() {
+            break;
         }
-    };
+        items.push(
+            CstKind::ListItem {
+                value: Box::new(
+                    value
+                        .unwrap_or_else(|| {
+                            CstKind::Error {
+                                unparsable_input: String::new(),
+                                error: CstError::ListItemMissesValue,
+                            }
+                            .into()
+                        })
+                        .wrap_in_whitespace(whitespace),
+                ),
+                comma: comma.map(Box::new),
+            }
+            .into(),
+        );
+    }
 
-    let (new_input, whitespace) = whitespaces_and_newlines(input, indentation, true);
+    let (input, whitespace) = whitespaces_and_newlines(input_before_closing, indentation, true);
 
-    let (input, closing_parenthesis) = match closing_parenthesis(new_input) {
+    let (input, closing_parenthesis) = match closing_parenthesis(input) {
         Some((input, closing_parenthesis)) => {
             if items.is_empty() {
                 opening_parenthesis = opening_parenthesis.wrap_in_whitespace(whitespace);
