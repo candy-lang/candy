@@ -14,13 +14,22 @@ pub fn int(input: &str) -> Option<(&str, Rcst)> {
         return None;
     }
 
-    let rcst = if (w.starts_with("0x") || w.starts_with("0X"))
+    let rcst = if (w.starts_with("0b") || w.starts_with("0B"))
+        && w.len() >= 3
+        && w.chars().skip(2).all(|c| c == '0' || c == '1')
+    {
+        // Binary
+        let value = BigUint::from_str_radix(&w[2..], 2).expect("Couldn't parse binary int.");
+        CstKind::Int { value, string: w }.into()
+    } else if (w.starts_with("0x") || w.starts_with("0X"))
         && w.len() >= 3
         && w.chars().skip(2).all(|c| c.is_ascii_hexdigit())
     {
+        // Hexadecimal
         let value = BigUint::from_str_radix(&w[2..], 16).expect("Couldn't parse hexadecimal int.");
         CstKind::Int { value, string: w }.into()
     } else if w.chars().all(|c| c.is_ascii_digit()) {
+        // Decimal
         let value = str::parse(&w).expect("Couldn't parse decimal int.");
         CstKind::Int { value, string: w }.into()
     } else {
@@ -40,6 +49,41 @@ mod test {
 
     #[test]
     fn test_int() {
+        // Binary
+        assert_eq!(
+            int("0b10"),
+            Some((
+                "",
+                CstKind::Int {
+                    value: 0b10u8.into(),
+                    string: "0b10".to_string()
+                }
+                .into(),
+            )),
+        );
+        assert_eq!(
+            int("0B101"),
+            Some((
+                "",
+                CstKind::Int {
+                    value: 0b101u8.into(),
+                    string: "0B101".to_string()
+                }
+                .into(),
+            )),
+        );
+        assert_eq!(
+            int("0b10100101"),
+            Some((
+                "",
+                CstKind::Int {
+                    value: 0b1010_0101u32.into(),
+                    string: "0b10100101".to_string()
+                }
+                .into(),
+            )),
+        );
+        // Decimal
         assert_eq!(int("42 "), Some((" ", build_simple_int(42))));
         assert_eq!(
             int("012"),
@@ -52,6 +96,7 @@ mod test {
                 .into(),
             )),
         );
+        // Hexadecimal
         assert_eq!(
             int("0x12"),
             Some((
@@ -85,6 +130,7 @@ mod test {
                 .into(),
             )),
         );
+
         assert_eq!(int("123 years"), Some((" years", build_simple_int(123))));
         assert_eq!(int("foo"), None);
         assert_eq!(
