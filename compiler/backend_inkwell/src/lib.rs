@@ -37,34 +37,12 @@ pub trait LlvmIrDb: OptimizeMir {
 
 #[allow(clippy::needless_pass_by_value)]
 fn llvm_ir(db: &dyn LlvmIrDb, module: CandyModule) -> Result<RichIr, ModuleError> {
-    //debug!("{module}: Compiling.");
-    let (mir, errors) = db
-        .optimized_mir(module.clone(), TracingConfig::off())
-        .map(|(mir, _, errors)| (mir, errors))
-        .unwrap_or_else(|error| {
-            let payload = CompilerErrorPayload::Module(error);
-            let mir = Mir::build(|body| {
-                let reason = body.push_text(payload.to_string());
-                let responsible = body.push_hir_id(hir::Id::user());
-                body.push_panic(reason, responsible);
-            });
-            let errors =
-                FxHashSet::from_iter([CompilerError::for_whole_module(module.clone(), payload)]);
-            (Arc::new(mir), Arc::new(errors))
-        });
-
-    if !errors.is_empty() {
-        for error in errors.iter() {
-            println!("{:?}", error);
-        }
-        std::process::exit(1);
-    }
+    let (mir, errors) = db.optimized_mir(module.clone(), TracingConfig::off())?;
 
     let context = Context::create();
     let mut codegen = CodeGen::new(&context, "module", mir);
     let llvm_ir = codegen.compile("", false, true).unwrap();
 
-    //debug!("{module}: Done. Optimized from {complexity_before} to {complexity_after}");
     Ok(llvm_ir.to_str().unwrap().to_rich_ir(true))
 }
 

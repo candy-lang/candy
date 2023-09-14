@@ -62,7 +62,7 @@ pub(crate) enum Options {
 
     /// LLVM Intermediate Representation
     #[cfg(feature = "inkwell")]
-    LlvmIr(PathAndTracing),
+    LlvmIr(OnlyPath),
 
     /// Optimized Low-Level Intermediate Representation
     OptimizedLir(PathAndTracing),

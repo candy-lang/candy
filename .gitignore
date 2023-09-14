@@ -2,7 +2,7 @@ generated/
 local/
 
 *.candy.*
-**/.goldens/
+.goldens/
 
 # ANTLR
 .antlr/
