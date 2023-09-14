@@ -3,6 +3,8 @@ use crate::{
     cst::{CstError, CstKind},
     rcst::Rcst,
 };
+use num_bigint::BigUint;
+use num_traits::Num;
 use tracing::instrument;
 
 #[instrument(level = "trace")]
@@ -12,19 +14,23 @@ pub fn int(input: &str) -> Option<(&str, Rcst)> {
         return None;
     }
 
-    if w.chars().all(|c| c.is_ascii_digit()) {
-        let value = str::parse(&w).expect("Couldn't parse int.");
-        Some((input, CstKind::Int { value, string: w }.into()))
+    let rcst = if (w.starts_with("0x") || w.starts_with("0X"))
+        && w.len() >= 3
+        && w.chars().skip(2).all(|c| c.is_ascii_hexdigit())
+    {
+        let value = BigUint::from_str_radix(&w[2..], 16).expect("Couldn't parse hexadecimal int.");
+        CstKind::Int { value, string: w }.into()
+    } else if w.chars().all(|c| c.is_ascii_digit()) {
+        let value = str::parse(&w).expect("Couldn't parse decimal int.");
+        CstKind::Int { value, string: w }.into()
     } else {
-        Some((
-            input,
-            CstKind::Error {
-                unparsable_input: w,
-                error: CstError::IntContainsNonDigits,
-            }
-            .into(),
-        ))
-    }
+        CstKind::Error {
+            unparsable_input: w,
+            error: CstError::IntContainsNonDigits,
+        }
+        .into()
+    };
+    Some((input, rcst))
 }
 
 #[cfg(test)]
@@ -42,6 +48,39 @@ mod test {
                 CstKind::Int {
                     value: 12u8.into(),
                     string: "012".to_string()
+                }
+                .into(),
+            )),
+        );
+        assert_eq!(
+            int("0x12"),
+            Some((
+                "",
+                CstKind::Int {
+                    value: 0x12u8.into(),
+                    string: "0x12".to_string()
+                }
+                .into(),
+            )),
+        );
+        assert_eq!(
+            int("0X012"),
+            Some((
+                "",
+                CstKind::Int {
+                    value: 0x12u8.into(),
+                    string: "0X012".to_string()
+                }
+                .into(),
+            )),
+        );
+        assert_eq!(
+            int("0xDEADc0de"),
+            Some((
+                "",
+                CstKind::Int {
+                    value: 0xDEAD_C0DEu32.into(),
+                    string: "0xDEADc0de".to_string()
                 }
                 .into(),
             )),
