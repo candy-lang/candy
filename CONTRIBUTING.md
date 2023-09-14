@@ -40,7 +40,12 @@ You can then solve these smaller issue(s) on new branches.
    - Commit messages should be in imperative mood and start with a capital letter, e.g., “Add contributing guide”
 4. Push your changes to GitHub.
 5. When you're done, file a pull request (PR).
-   We will take a look at your code, and, once all checks pass, your code can get merged 🏖️
+   - Please give it a meaningful title and enter the corresponding issue number in the description.
+   - On the right side, please select the corresponding type label(s) (called <kbd>T: …</kbd>, e.g., <kbd>T: Feature</kbd>).
+   - Optionally, on the right side select reviewer(s).
+   - The remaining fields will be filled out automatically.
+
+We will take a look at your code, and, once all checks pass, your code can get merged 🏖️
 
 ## Pull Request Conversations
 
