@@ -39,13 +39,58 @@ isLessThanOrEqualTo a b =
 equals a b :=
   # Returns `True` if both values are equal, otherwise `False`.
   #
-  # TODO: Document how equality works. Also, change how equality for
-  # functions works.
+  # These are the rules for equality in Candy:
   #
-  # ```
-  # equals 5 5 => True
-  # equals 5 2 => False
-  # ```
+  # - Values of different types are different.
+  #   ```
+  #   equals 3 "Hey" => False
+  #   ```
+  #
+  # - Integers and texts are equal if they are the same.
+  #   ```
+  #   equals 5 5 => True
+  #   equals 3 5 => False
+  #   equals "Hey" "Hey" => True
+  #   equals "A" "B" => False
+  #   ```
+  #
+  # - Handles are equal if they share the same underlying handle ID.
+  #
+  # - Tags are equal if their symbol is equal and either both don't have a value
+  #   or both have values that are equal.
+  #   ```
+  #   equals Kiwi Kiwi => True
+  #   equals Kiwi Banana => False
+  #   equals Kiwi (Kiwi 3) => False
+  #   equals (Kiwi 3) (Kiwi 3) => True
+  #   equals (Kiwi 5) (Kiwi 3) => False
+  #   ```
+  #
+  # - Functions are equal if they are defined at the same position in the source
+  #   code.
+  #   ```
+  #   foo = { a -> 4 }
+  #   equals foo foo => True
+  #   equals foo { a -> 4 } => False
+  #   ```
+  #   Note: Currently, this is not correctly implemented in the VM.
+  #
+  # - Lists are equal if they have the same length and all their items are
+  #   equal.
+  #   ```
+  #   equals (1, 2, 3) (1, 2, 3) => True
+  #   equals (1, 2, 3) (1, 2) => False
+  #   equals (1, 2, 3) (1, 2, 30) => False
+  #   ```
+  #
+  # - Structs are equal if their sets of keys are equal and the corresponding
+  #   values are equal.
+  #   ```
+  #   equals [Foo: 2] [Foo: 2] => True
+  #   equals [Foo: 2] [Bar: 2] => False
+  #   equals [Foo: 2] [] => False
+  #   equals [Foo: 2] [Foo: 3] => False
+  #   ```
   ✨.equals a b
 
 functionRun function :=
@@ -174,7 +219,7 @@ intCompareTo a b :=
 intDivideTruncating dividend divisor :=
   # Returns `dividend` ÷ `divisor`.
   #
-  # This operation rounds towards zero, truncating any fractional part of the
+  # This division rounds towards zero, truncating any fractional part of the
   # exact result.
   #
   # ```
@@ -187,11 +232,14 @@ intDivideTruncating dividend divisor :=
   ✨.intDivideTruncating dividend divisor
 
 intModulo dividend divisor :=
-  # Returns `modulo` % `divisor`.
+  # Returns `dividend` % `divisor`.
   #
   # ```
-  # intModulo 6 2 => 0
-  # intModulo 5 2 => 1
+  # intModulo 6 3 => 0
+  # intModulo 5 3 => 2
+  # intModulo -5 3 => -2
+  # intModulo 5 -3 => 2
+  # intModulo -5 -3 => -2
   # ```
   needs (dividend | typeIs Int)
   needs (divisor | typeIs Int)
@@ -213,7 +261,7 @@ intParse text :=
   # 
   # `text` must be a string of decimal digits, optionally preceded by a minus
   # sign. If the text is the textual representation of an integer, returns `Ok`
-  # `Ok` and the parsed integer. Otherwise, returns `Error NotAnInteger`.
+  # and the parsed integer. Otherwise, returns `Error NotAnInteger`.
   #
   # ```
   # intParse "6" => Ok 6
@@ -288,7 +336,7 @@ listFilled length item :=
   ✨.listFilled length item
 
 listGet list index :=
-  # Returns the item that's at the `index` in the `list`.
+  # Returns the item at position `index` in the `list`.
   #
   # Indexing is zero-based.
   #
@@ -450,7 +498,10 @@ textConcatenate a b :=
   ✨.textConcatenate a b
 
 textContains text pattern :=
-  # Returns whether the `text` contains the `pattern`.
+  # Returns whether the `text` contains the `pattern` string.
+  #
+  # This does _not_ support patterns such as regexes – it just looks for the
+  # literal `pattern`.
   #
   # ```
   # textContains "Hello" "H" => True
