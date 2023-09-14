@@ -3,6 +3,8 @@ use criterion::{
     Criterion,
 };
 use criterion_cycles_per_byte::CyclesPerByte;
+use criterion_perf_events::Perf;
+use perfcnt::linux::{HardwareEventType, PerfCounterBuilderLinux};
 use tracing::Level;
 use tracing_subscriber::{
     filter,
@@ -153,10 +155,24 @@ criterion_group!(
     targets = run_cycle_benchmarks,
 );
 
+fn init_criterion_with_perf() -> Criterion<Perf> {
+    Criterion::default().with_measurement(Perf::new(PerfCounterBuilderLinux::from_hardware_event(
+        HardwareEventType::CPUCycles,
+    )))
+}
+fn run_perf_benchmarks(c: &mut Criterion<Perf>) {
+    run_benchmarks(c, "Perf");
+}
+criterion_group!(
+    name = perf_benchmarks;
+    config = init_criterion_with_perf();
+    targets = run_perf_benchmarks,
+);
+
 fn run_time_benchmarks(c: &mut Criterion) {
     run_benchmarks(c, "Time");
 }
 criterion_group!(time_benchmarks, run_time_benchmarks);
 
-// criterion_main!(cycle_benchmarks, time_benchmarks);
-criterion_main!(time_benchmarks);
+// criterion_main!(cycle_benchmarks, perf_benchmarks, time_benchmarks);
+criterion_main!(perf_benchmarks, time_benchmarks);
