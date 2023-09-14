@@ -12,7 +12,7 @@ use crate::{
     width::{Indentation, SinglelineWidth, StringWidth, Width},
 };
 use candy_frontend::{
-    cst::{Cst, CstError, CstKind, UnwrapWhitespaceAndComment},
+    cst::{Cst, CstError, CstKind, IntRadix, UnwrapWhitespaceAndComment},
     position::Offset,
 };
 use extension_trait::extension_trait;
@@ -212,8 +212,29 @@ pub fn format_cst<'a>(
             let child_width = child.into_empty_and_move_comments_to(edits, &mut whitespace);
             return FormattedCst::new(child_width, whitespace);
         }
-        CstKind::Identifier(string) | CstKind::Symbol(string) | CstKind::Int { string, .. } => {
-            string.width()
+        CstKind::Identifier(string) | CstKind::Symbol(string) => string.width(),
+        CstKind::Int {
+            radix_prefix,
+            string,
+            ..
+        } => {
+            if let Some((radix, radix_string)) = radix_prefix {
+                let span_end = Offset(cst.data.span.start.0 + radix_string.len());
+                let span = cst.data.span.start..span_end;
+                match radix {
+                    IntRadix::Binary => edits.change(span, "0b"),
+                    IntRadix::Hexadecimal => {
+                        edits.change(span, "0x");
+                        edits.change(span_end..cst.data.span.end, string.to_uppercase());
+                    }
+                }
+            }
+
+            radix_prefix
+                .as_ref()
+                .map(|(_, string)| string.width())
+                .unwrap_or_default()
+                + string.width()
         }
         CstKind::OpeningText {
             opening_single_quotes,
@@ -1329,8 +1350,17 @@ mod test {
     }
     #[test]
     fn test_int() {
+        // Binary
+        test("0b10", "0b10\n");
+        test("0B10100101", "0b10100101\n");
+
+        // Decimal
         test("1", "1\n");
         test("123", "123\n");
+
+        // Hexadecimal
+        test("0x123", "0x123\n");
+        test("0XDEADc0de", "0xDEADC0DE\n");
     }
     #[test]
     fn test_text() {

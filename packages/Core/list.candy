@@ -87,6 +87,19 @@ generate length valueGetter :=
     }
   }
 
+getRange list startInclusive endExclusive :=
+  needs (is list)
+  needs (int.is startInclusive)
+  needs (startInclusive | int.isNonNegative)
+  needs (startInclusive | int.isLessThanOrEqualTo (list | length))
+  needs (int.is endExclusive)
+  needs (endExclusive | int.isNonNegative)
+  needs (endExclusive | int.isLessThanOrEqualTo (list | length))
+  needs (startInclusive | int.isLessThanOrEqualTo endExclusive)
+  generate (endExclusive | int.subtract startInclusive) { index ->
+    list | get (startInclusive | int.add index)
+  }
+
 concatenate listA listB :=
   needs (is listA)
   needs (is listB)

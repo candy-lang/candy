@@ -59,6 +59,12 @@ generate length valueGetter :=
       Ok [item, State: index | int.add 1]
     }
   }
+range length :=
+  # Creates a new iterable of the given `length`, where each slot is filled by the index.
+  needs (int.is length)
+  needs (int.isNonNegative length)
+  needs (int.fitsInRustU32 length)
+  generate length { index -> index }
 
 ## Mapping Transformation
 ##
