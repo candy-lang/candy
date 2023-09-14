@@ -11,9 +11,9 @@ use tracing::instrument;
 
 #[instrument(level = "trace")]
 pub fn list(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
-    let (mut input, mut opening_parenthesis) = opening_parenthesis(input)?;
+    let (input, mut opening_parenthesis) = opening_parenthesis(input)?;
 
-    // Empty list `(,)`
+    // Empty list `(,)` - TODO: Somehow optimize this
     'handleEmptyList: {
         // Whitespace before comma.
         let (input, leading_whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
@@ -46,79 +46,145 @@ pub fn list(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
         ));
     }
 
-    let mut items: Vec<Rcst> = vec![];
-    let mut items_indentation = indentation;
-    let mut has_at_least_one_comma = false;
-    loop {
-        let new_input = input;
-
-        // Whitespace before value.
-        let (new_input, whitespace) = whitespaces_and_newlines(new_input, indentation + 1, true);
-        if whitespace.is_multiline() {
-            items_indentation = indentation + 1;
-        }
-        if items.is_empty() {
-            opening_parenthesis = opening_parenthesis.wrap_in_whitespace(whitespace);
+    let (input, mut items) = 'handleItems: {
+        // Parse first item and check if this is a parenthesized expression
+        let (input, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
+        let item_indentation = if whitespace.is_multiline() {
+            indentation + 1
         } else {
-            let last = items.pop().unwrap();
-            items.push(last.wrap_in_whitespace(whitespace));
-        }
-        input = new_input;
+            indentation
+        };
+        opening_parenthesis = opening_parenthesis.wrap_in_whitespace(whitespace);
 
-        // Value.
-        let (new_input, value, has_value) = match expression(
-            new_input,
-            items_indentation,
+        let (input, first_expression) = expression(
+            input,
+            item_indentation,
             ExpressionParsingOptions {
                 allow_assignment: false,
                 allow_call: true,
                 allow_bar: true,
                 allow_function: true,
             },
-        ) {
-            Some((new_input, value)) => (new_input, value, true),
-            None => (
-                new_input,
+        )
+        .map_or((input, None), |(input, expression)| {
+            (input, Some(expression))
+        });
+
+        let (new_input, whitespace) = whitespaces_and_newlines(input, item_indentation + 1, true);
+
+        // It is a parenthesized expression if there is no comma
+        let Some((mut input, first_comma)) = comma(new_input) else {
+            let (input, whitespace) = whitespaces_and_newlines(input, indentation, true);
+            let (input, closing_parenthesis) = closing_parenthesis(input).unwrap_or((
+                input,
                 CstKind::Error {
                     unparsable_input: String::new(),
-                    error: CstError::ListItemMissesValue,
+                    error: CstError::ParenthesisNotClosed,
                 }
                 .into(),
-                false,
+            ));
+
+            return Some((
+                input,
+                CstKind::Parenthesized {
+                    opening_parenthesis: Box::new(opening_parenthesis),
+                    inner: Box::new(
+                        first_expression
+                            .unwrap_or_else(|| {
+                                CstKind::Error {
+                                    unparsable_input: String::new(),
+                                    error: CstError::OpeningParenthesisMissesExpression,
+                                }
+                                .into()
+                            })
+                            .wrap_in_whitespace(whitespace),
+                    ),
+                    closing_parenthesis: Box::new(closing_parenthesis),
+                }
+                .into(),
+            ));
+        };
+
+        let mut items: Vec<Rcst> = vec![CstKind::ListItem {
+            value: Box::new(
+                first_expression
+                    .unwrap_or_else(|| {
+                        CstKind::Error {
+                            unparsable_input: String::new(),
+                            error: CstError::ListItemMissesValue,
+                        }
+                        .into()
+                    })
+                    .wrap_in_whitespace(whitespace),
             ),
-        };
-
-        // Whitespace between value and comma.
-        let (new_input, whitespace) =
-            whitespaces_and_newlines(new_input, items_indentation + 1, true);
-        if whitespace.is_multiline() {
-            items_indentation = indentation + 1;
+            comma: Some(Box::new(first_comma)),
         }
-        let value = value.wrap_in_whitespace(whitespace);
+        .into()];
 
-        // Comma.
-        let (new_input, comma) = match comma(new_input) {
-            Some((new_input, comma)) => (new_input, Some(comma)),
-            None => (new_input, None),
-        };
+        // Parse rest
+        loop {
+            let new_input = input;
 
-        if !has_value && comma.is_none() {
-            break;
-        }
-        has_at_least_one_comma |= comma.is_some();
+            // Whitespace before value.
+            let (new_input, whitespace) =
+                whitespaces_and_newlines(new_input, indentation + 1, true);
+            let item_indentation = if whitespace.is_multiline() {
+                indentation + 1
+            } else {
+                indentation
+            };
+            let last = items.pop().unwrap();
+            items.push(last.wrap_in_whitespace(whitespace));
+            input = new_input;
 
-        input = new_input;
-        items.push(
-            CstKind::ListItem {
-                value: Box::new(value),
-                comma: comma.map(Box::new),
+            // Value.
+            let (new_input, value, has_value) = match expression(
+                new_input,
+                item_indentation,
+                ExpressionParsingOptions {
+                    allow_assignment: false,
+                    allow_call: true,
+                    allow_bar: true,
+                    allow_function: true,
+                },
+            ) {
+                Some((new_input, value)) => (new_input, value, true),
+                None => (
+                    new_input,
+                    CstKind::Error {
+                        unparsable_input: String::new(),
+                        error: CstError::ListItemMissesValue,
+                    }
+                    .into(),
+                    false,
+                ),
+            };
+
+            // Whitespace between value and comma.
+            let (new_input, whitespace) =
+                whitespaces_and_newlines(new_input, item_indentation + 1, true);
+            let value = value.wrap_in_whitespace(whitespace);
+
+            // Comma.
+            let (new_input, comma) = match comma(new_input) {
+                Some((new_input, comma)) => (new_input, Some(comma)),
+                None => (new_input, None),
+            };
+
+            if !has_value && comma.is_none() {
+                break 'handleItems (input, items);
             }
-            .into(),
-        );
-    }
-    if !has_at_least_one_comma {
-        return None;
-    }
+
+            input = new_input;
+            items.push(
+                CstKind::ListItem {
+                    value: Box::new(value),
+                    comma: comma.map(Box::new),
+                }
+                .into(),
+            );
+        }
+    };
 
     let (new_input, whitespace) = whitespaces_and_newlines(input, indentation, true);
 
@@ -161,7 +227,24 @@ mod test {
     #[test]
     fn test_list() {
         assert_eq!(list("hello", 0), None);
-        assert_eq!(list("()", 0), None);
+        assert_eq!(
+            list("()", 0),
+            Some((
+                "",
+                CstKind::Parenthesized {
+                    opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
+                    inner: Box::new(
+                        CstKind::Error {
+                            unparsable_input: String::new(),
+                            error: CstError::OpeningParenthesisMissesExpression,
+                        }
+                        .into()
+                    ),
+                    closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
+                }
+                .into(),
+            ))
+        );
         assert_eq!(
             list("(,)", 0),
             Some((
@@ -174,7 +257,18 @@ mod test {
                 .into(),
             )),
         );
-        assert_eq!(list("(foo)", 0), None);
+        assert_eq!(
+            list("(foo)", 0),
+            Some((
+                "",
+                CstKind::Parenthesized {
+                    opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
+                    inner: Box::new(build_identifier("foo")),
+                    closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
+                }
+                .into(),
+            )),
+        );
         assert_eq!(
             list("(foo,)", 0),
             Some((
