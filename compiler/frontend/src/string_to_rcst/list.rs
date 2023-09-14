@@ -225,8 +225,38 @@ mod test {
     use crate::string_to_rcst::utils::{build_identifier, build_simple_int, build_simple_text};
 
     #[test]
-    fn test_list() {
-        assert_eq!(list("hello", 0), None);
+    fn test_parenthesized() {
+        assert_eq!(
+            list("(foo)", 0),
+            Some((
+                "",
+                CstKind::Parenthesized {
+                    opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
+                    inner: Box::new(build_identifier("foo")),
+                    closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
+                }
+                .into(),
+            )),
+        );
+        assert_eq!(list("foo", 0), None);
+        assert_eq!(
+            list("(foo", 0),
+            Some((
+                "",
+                CstKind::Parenthesized {
+                    opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
+                    inner: Box::new(build_identifier("foo")),
+                    closing_parenthesis: Box::new(
+                        CstKind::Error {
+                            unparsable_input: String::new(),
+                            error: CstError::ParenthesisNotClosed
+                        }
+                        .into()
+                    ),
+                }
+                .into(),
+            )),
+        );
         assert_eq!(
             list("()", 0),
             Some((
@@ -245,6 +275,11 @@ mod test {
                 .into(),
             ))
         );
+    }
+
+    #[test]
+    fn test_list() {
+        assert_eq!(list("hello", 0), None);
         assert_eq!(
             list("(,)", 0),
             Some((
@@ -252,18 +287,6 @@ mod test {
                 CstKind::List {
                     opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
                     items: vec![CstKind::Comma.into()],
-                    closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
-                }
-                .into(),
-            )),
-        );
-        assert_eq!(
-            list("(foo)", 0),
-            Some((
-                "",
-                CstKind::Parenthesized {
-                    opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
-                    inner: Box::new(build_identifier("foo")),
                     closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
                 }
                 .into(),

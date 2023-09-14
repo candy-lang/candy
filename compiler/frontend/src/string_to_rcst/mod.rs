@@ -12,7 +12,6 @@ mod function;
 mod int;
 mod list;
 mod literal;
-mod parenthesized;
 mod struct_;
 mod text;
 mod utils;
