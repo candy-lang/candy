@@ -5,14 +5,6 @@ use criterion::{
 use criterion_cycles_per_byte::CyclesPerByte;
 use criterion_perf_events::Perf;
 use perfcnt::linux::{HardwareEventType, PerfCounterBuilderLinux};
-use tracing::Level;
-use tracing_subscriber::{
-    filter,
-    fmt::{format::FmtSpan, writer::BoxMakeWriter},
-    prelude::__tracing_subscriber_SubscriberExt,
-    util::SubscriberInitExt,
-    Layer,
-};
 use utils::{compile, run, setup, setup_and_compile};
 
 mod utils;
