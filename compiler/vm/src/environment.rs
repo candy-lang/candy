@@ -1,10 +1,11 @@
 use crate::{
-    heap::{Data, Handle, Heap, InlineObject, Struct, Tag, Text},
-    lir::Lir,
+    byte_code::ByteCode,
+    heap::{Data, Handle, Heap, InlineObject, List, Struct, Tag, Text},
     tracer::Tracer,
     vm::VmHandleCall,
     StateAfterRun, StateAfterRunForever, Vm, VmFinished,
 };
+use itertools::Itertools;
 use std::{
     borrow::Borrow,
     io::{self, BufRead},
@@ -12,31 +13,36 @@ use std::{
 use tracing::info;
 
 pub trait Environment {
-    fn new(heap: &mut Heap) -> (InlineObject, Self);
-    fn handle<L: Borrow<Lir>, T: Tracer>(&mut self, call: VmHandleCall<L, T>) -> Vm<L, T>;
+    fn handle<B: Borrow<ByteCode>, T: Tracer>(
+        &mut self,
+        heap: &mut Heap,
+        call: VmHandleCall<B, T>,
+    ) -> Vm<B, T>;
 }
 
 pub struct EmptyEnvironment;
 impl Environment for EmptyEnvironment {
-    fn new(heap: &mut Heap) -> (InlineObject, Self) {
-        (Tag::create_nothing(heap).into(), Self)
-    }
-    fn handle<L: Borrow<Lir>, T: Tracer>(&mut self, _call: VmHandleCall<L, T>) -> Vm<L, T> {
+    fn handle<B: Borrow<ByteCode>, T: Tracer>(
+        &mut self,
+        _heap: &mut Heap,
+        _call: VmHandleCall<B, T>,
+    ) -> Vm<B, T> {
         panic!("A handle was called.")
     }
 }
-impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
-    pub fn run_without_handles(self) -> StateAfterRunWithoutHandles<L, T> {
-        self.run_with_environment(&mut EmptyEnvironment)
+impl<B: Borrow<ByteCode>, T: Tracer> Vm<B, T> {
+    pub fn run_without_handles(self, heap: &mut Heap) -> StateAfterRunWithoutHandles<B, T> {
+        self.run_with_environment(heap, &mut EmptyEnvironment)
     }
     pub fn run_n_without_handles(
         self,
+        heap: &mut Heap,
         max_instructions: usize,
-    ) -> StateAfterRunWithoutHandles<L, T> {
-        self.run_n_with_environment(&mut EmptyEnvironment, max_instructions)
+    ) -> StateAfterRunWithoutHandles<B, T> {
+        self.run_n_with_environment(heap, &mut EmptyEnvironment, max_instructions)
     }
-    pub fn run_forever_without_handles(self) -> VmFinished<T> {
-        self.run_forever_with_environment(&mut EmptyEnvironment)
+    pub fn run_forever_without_handles(self, heap: &mut Heap) -> VmFinished<T> {
+        self.run_forever_with_environment(heap, &mut EmptyEnvironment)
     }
 }
 
@@ -44,14 +50,20 @@ pub struct DefaultEnvironment {
     stdin_handle: Handle,
     stdout_handle: Handle,
 }
-impl Environment for DefaultEnvironment {
-    fn new(heap: &mut Heap) -> (InlineObject, Self) {
+impl DefaultEnvironment {
+    pub fn new(heap: &mut Heap, args: &[String]) -> (InlineObject, Self) {
+        let arguments = args
+            .iter()
+            .map(|it| Text::create(heap, true, it).into())
+            .collect_vec();
+        let arguments = List::create(heap, true, arguments.as_slice());
         let stdin_handle = Handle::new(heap, 0);
         let stdout_handle = Handle::new(heap, 1);
         let environment_object = Struct::create_with_symbol_keys(
             heap,
             true,
             [
+                (heap.default_symbols().arguments, arguments.into()),
                 (heap.default_symbols().stdout, **stdout_handle),
                 (heap.default_symbols().stdin, **stdin_handle),
             ],
@@ -62,14 +74,20 @@ impl Environment for DefaultEnvironment {
         };
         (environment_object.into(), environment)
     }
-    fn handle<L: Borrow<Lir>, T: Tracer>(&mut self, mut call: VmHandleCall<L, T>) -> Vm<L, T> {
+}
+impl Environment for DefaultEnvironment {
+    fn handle<B: Borrow<ByteCode>, T: Tracer>(
+        &mut self,
+        heap: &mut Heap,
+        call: VmHandleCall<B, T>,
+    ) -> Vm<B, T> {
         if call.handle == self.stdin_handle {
             let input = {
                 let stdin = io::stdin();
                 stdin.lock().lines().next().unwrap().unwrap()
             };
-            let text = Text::create(call.heap(), true, &input);
-            call.complete(text)
+            let text = Text::create(heap, true, &input);
+            call.complete(heap, text)
         } else if call.handle == self.stdout_handle {
             let message = call.arguments[0];
 
@@ -78,8 +96,8 @@ impl Environment for DefaultEnvironment {
             } else {
                 info!("Non-text value sent to stdout: {message:?}");
             }
-            let nothing = Tag::create_nothing(call.heap());
-            call.complete(nothing)
+            let nothing = Tag::create_nothing(heap);
+            call.complete(heap, nothing)
         } else {
             unreachable!()
         }
@@ -87,19 +105,20 @@ impl Environment for DefaultEnvironment {
 }
 
 #[must_use]
-pub enum StateAfterRunWithoutHandles<L: Borrow<Lir>, T: Tracer> {
-    Running(Vm<L, T>),
+pub enum StateAfterRunWithoutHandles<B: Borrow<ByteCode>, T: Tracer> {
+    Running(Vm<B, T>),
     Finished(VmFinished<T>),
 }
-impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
+impl<B: Borrow<ByteCode>, T: Tracer> Vm<B, T> {
     pub fn run_with_environment(
         self,
+        heap: &mut Heap,
         environment: &mut impl Environment,
-    ) -> StateAfterRunWithoutHandles<L, T> {
-        match self.run() {
+    ) -> StateAfterRunWithoutHandles<B, T> {
+        match self.run(heap) {
             StateAfterRun::Running(vm) => StateAfterRunWithoutHandles::Running(vm),
             StateAfterRun::CallingHandle(call) => {
-                StateAfterRunWithoutHandles::Running(environment.handle(call))
+                StateAfterRunWithoutHandles::Running(environment.handle(heap, call))
             }
             StateAfterRun::Finished(finished) => StateAfterRunWithoutHandles::Finished(finished),
         }
@@ -107,11 +126,12 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
 
     pub fn run_n_with_environment(
         mut self,
+        heap: &mut Heap,
         environment: &mut impl Environment,
         max_instructions: usize,
-    ) -> StateAfterRunWithoutHandles<L, T> {
+    ) -> StateAfterRunWithoutHandles<B, T> {
         for _ in 0..max_instructions {
-            match self.run_with_environment(environment) {
+            match self.run_with_environment(heap, environment) {
                 StateAfterRunWithoutHandles::Running(vm) => self = vm,
                 finished @ StateAfterRunWithoutHandles::Finished(_) => return finished,
             }
@@ -121,11 +141,12 @@ impl<L: Borrow<Lir>, T: Tracer> Vm<L, T> {
 
     pub fn run_forever_with_environment(
         mut self,
+        heap: &mut Heap,
         environment: &mut impl Environment,
     ) -> VmFinished<T> {
         loop {
-            match self.run_forever() {
-                StateAfterRunForever::CallingHandle(call) => self = environment.handle(call),
+            match self.run_forever(heap) {
+                StateAfterRunForever::CallingHandle(call) => self = environment.handle(heap, call),
                 StateAfterRunForever::Finished(finished) => return finished,
             }
         }

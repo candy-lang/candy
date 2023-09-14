@@ -52,7 +52,7 @@ impl Notification for HintsNotification {
 }
 
 #[tokio::main(worker_threads = 1)]
-#[allow(unused_must_use)]
+#[allow(clippy::needless_pass_by_value, unused_must_use)]
 pub async fn run_server(
     packages_path: PackagesPath,
     mut incoming_events: mpsc::Receiver<Message>,
@@ -82,7 +82,7 @@ pub async fn run_server(
                     outgoing_hints.send(module.clone(), vec![]).await;
                     analyzers
                         .entry(module.clone())
-                        .and_modify(|it| it.module_changed())
+                        .and_modify(ModuleAnalyzer::module_changed)
                         .or_insert_with(|| ModuleAnalyzer::for_module(module.clone()));
                 }
                 Message::CloseModule(module) => {

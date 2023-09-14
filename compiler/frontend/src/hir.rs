@@ -486,14 +486,45 @@ impl Pattern {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Function {
     pub parameters: Vec<Id>,
     pub body: Body,
-    pub fuzzable: bool,
+    pub kind: FunctionKind,
+}
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum FunctionKind {
+    /// A normal function (e.g., `foo a = …`).
+    Normal,
+
+    /// The generated use function, which is not fuzzable but otherwise behaves
+    /// like a normal function (i.e., it passes on its responsibility
+    /// parameter).
+    Use,
+
+    /// A function defined using curly braces (e.g., `foo = { a -> … }`).
+    CurlyBraces,
+}
+impl FunctionKind {
+    #[must_use]
+    pub const fn is_fuzzable(self) -> bool {
+        match self {
+            Self::Normal => true,
+            Self::Use | Self::CurlyBraces => false,
+        }
+    }
+    /// For functions with curly braces, whoever is responsible for `needs` in
+    /// the outer scope is also responsible for `needs` in this function.
+    #[must_use]
+    pub const fn uses_own_responsibility(self) -> bool {
+        match self {
+            Self::Normal | Self::Use => true,
+            Self::CurlyBraces => false,
+        }
+    }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, Eq, Default, PartialEq)]
 pub struct Body {
     pub expressions: LinkedHashMap<Id, Expression>,
     pub identifiers: FxHashMap<Id, String>,
@@ -505,7 +536,7 @@ impl Hash for Body {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum HirError {
     NeedsWithWrongNumberOfArguments { num_args: usize },
     PatternContainsCall,
@@ -592,10 +623,10 @@ impl ToRichIr for Expression {
                 builder.push(
                     format!(
                         "{{ ({}) ",
-                        if function.fuzzable {
-                            "fuzzable"
-                        } else {
-                            "non-fuzzable"
+                        match function.kind {
+                            FunctionKind::Normal => "fuzzable",
+                            FunctionKind::Use => "non-fuzzable, but passes on responsibility",
+                            FunctionKind::CurlyBraces => "non-fuzzable",
                         },
                     ),
                     None,
@@ -645,7 +676,7 @@ impl ToRichIr for Pattern {
                 builder.push(format!("{int}"), TokenType::Int, EnumSet::empty());
             }
             Self::Text(text) => {
-                builder.push(format!(r#""{text:?}\""#), TokenType::Text, EnumSet::empty());
+                builder.push(format!(r#""{text}""#), TokenType::Text, EnumSet::empty());
             }
             Self::NewIdentifier(reference) => reference.build_rich_ir(builder),
             Self::Tag { symbol, value } => {

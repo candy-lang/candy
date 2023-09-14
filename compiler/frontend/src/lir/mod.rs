@@ -19,6 +19,15 @@ impl Lir {
     pub const fn new(constants: Constants, bodies: Bodies) -> Self {
         Self { constants, bodies }
     }
+
+    #[must_use]
+    pub const fn constants(&self) -> &Constants {
+        &self.constants
+    }
+    #[must_use]
+    pub const fn bodies(&self) -> &Bodies {
+        &self.bodies
+    }
 }
 
 impl ToRichIr for Lir {

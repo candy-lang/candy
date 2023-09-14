@@ -4,10 +4,11 @@ use crate::{
     Exit, ProgramResult,
 };
 use candy_frontend::{ast_to_hir::AstToHir, hir, TracingConfig};
+use candy_language_server::utils::LspPositionConversion;
 use candy_vm::{
-    environment::{DefaultEnvironment, Environment},
-    heap::HirId,
-    mir_to_lir::compile_lir,
+    environment::DefaultEnvironment,
+    heap::{Heap, HirId},
+    mir_to_byte_code::compile_byte_code,
     tracer::stack_trace::StackTracer,
     Vm, VmFinished,
 };
@@ -30,11 +31,14 @@ pub(crate) struct Options {
     /// current working directory will be run.
     #[arg(value_hint = ValueHint::FilePath)]
     path: Option<PathBuf>,
+
+    #[arg(last(true))]
+    arguments: Vec<String>,
 }
 
 pub(crate) fn run(options: Options) -> ProgramResult {
     let packages_path = packages_path();
-    let db = Database::new_with_file_system_module_provider(packages_path);
+    let db = Database::new_with_file_system_module_provider(packages_path.clone());
     let module = module_for_path(options.path)?;
 
     let tracing = TracingConfig::off();
@@ -42,7 +46,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     debug!("Running {module}.");
 
     let compilation_start = Instant::now();
-    let lir = Rc::new(compile_lir(&db, module, tracing).0);
+    let byte_code = Rc::new(compile_byte_code(&db, module.clone(), tracing).0);
 
     let compilation_end = Instant::now();
     debug!(
@@ -50,20 +54,35 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         format_duration(compilation_end - compilation_start),
     );
 
-    let VmFinished {
-        mut heap,
-        tracer,
-        result,
-    } = Vm::for_module(&*lir, StackTracer::default()).run_forever_without_handles();
+    let mut heap = Heap::default();
+    let VmFinished { tracer, result } =
+        Vm::for_module(&*byte_code, &mut heap, StackTracer::default())
+            .run_forever_without_handles(&mut heap);
     let exports = match result {
         Ok(exports) => exports,
         Err(panic) => {
             error!("The module panicked: {}", panic.reason);
             error!("{} is responsible.", panic.responsible);
             if let Some(span) = db.hir_id_to_span(&panic.responsible) {
-                error!("Responsible is at {span:?}.");
+                let current_package_path = module.package.to_path(&packages_path).unwrap();
+                let file = panic
+                    .responsible
+                    .module
+                    .try_to_path(&packages_path)
+                    .and_then(|it| {
+                        it.strip_prefix(current_package_path)
+                            .unwrap_or(&it)
+                            .to_str()
+                            .map(|it| it.to_string())
+                    })
+                    .unwrap_or_else(|| panic.responsible.module.to_string());
+                let range = db.range_to_lsp_range(panic.responsible.module.clone(), span);
+                error!(
+                    "{file}:{}:{} – {}:{}",
+                    range.start.line, range.start.character, range.end.line, range.end.character,
+                );
             }
-            error!("This is the stack trace:\n{}", tracer.format(&db),);
+            error!("This is the stack trace:\n{}", tracer.format(&db));
             return Err(Exit::CodePanicked);
         }
     };
@@ -81,17 +100,18 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     );
 
     debug!("Running main function.");
-    let (environment_object, mut environment) = DefaultEnvironment::new(&mut heap);
+    let (environment_object, mut environment) =
+        DefaultEnvironment::new(&mut heap, &options.arguments);
     let platform = HirId::create(&mut heap, true, hir::Id::platform());
     let vm = Vm::for_function(
-        lir.clone(),
-        heap,
+        byte_code.clone(),
+        &mut heap,
         main,
         &[environment_object],
         platform,
         StackTracer::default(),
     );
-    let VmFinished { result, .. } = vm.run_forever_with_environment(&mut environment);
+    let VmFinished { result, .. } = vm.run_forever_with_environment(&mut heap, &mut environment);
     let result = match result {
         Ok(return_value) => {
             debug!("The main function returned: {return_value:?}");
@@ -110,7 +130,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         format_duration(execution_end - discovery_end),
     );
 
-    drop(lir); // Make sure the LIR is kept around until here.
+    drop(byte_code); // Make sure the byte code is kept around until here.
     result
 }
 

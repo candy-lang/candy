@@ -101,6 +101,10 @@ fn init_logger(use_stdout: bool) {
         .with_filter(filter::filter_fn(level_for("candy_frontend", Level::DEBUG)))
         .with_filter(filter::filter_fn(level_for("candy_fuzzer", Level::DEBUG)))
         .with_filter(filter::filter_fn(level_for(
+            "candy_fuzzer::fuzzer",
+            Level::INFO,
+        )))
+        .with_filter(filter::filter_fn(level_for(
             "candy_language_server",
             Level::TRACE,
         )))

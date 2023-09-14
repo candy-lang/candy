@@ -175,6 +175,10 @@ impl Rcst {
                 parts: parts.to_csts_helper(state),
                 closing: Box::new(closing.to_cst(state)),
             },
+            CstKind::TextNewline(newline) => {
+                *state.offset += newline.len();
+                CstKind::TextNewline(newline.clone())
+            }
             CstKind::TextPart(text) => {
                 *state.offset += text.len();
                 CstKind::TextPart(text.clone())

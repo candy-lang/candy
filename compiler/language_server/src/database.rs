@@ -5,6 +5,7 @@ use candy_frontend::{
     cst_to_ast::CstToAstStorage,
     hir::HirDbStorage,
     hir_to_mir::HirToMirStorage,
+    lir_optimize::OptimizeLirStorage,
     mir_optimize::OptimizeMirStorage,
     mir_to_lir::MirToLirStorage,
     module::{
@@ -27,6 +28,7 @@ use candy_frontend::{
     MirToLirStorage,
     ModuleDbStorage,
     OptimizeMirStorage,
+    OptimizeLirStorage,
     PositionConversionStorage,
     RcstToCstStorage,
     StringToRcstStorage
@@ -39,6 +41,7 @@ pub struct Database {
 impl salsa::Database for Database {}
 
 impl Database {
+    #[must_use]
     pub fn new_with_file_system_module_provider(packages_path: PackagesPath) -> Self {
         Self::new(
             packages_path.clone(),
@@ -46,6 +49,7 @@ impl Database {
         )
     }
 
+    #[must_use]
     pub fn new(
         packages_path: PackagesPath,
         module_provider: Box<dyn ModuleProvider + Send>,

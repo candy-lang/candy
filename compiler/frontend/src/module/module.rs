@@ -113,7 +113,7 @@ impl Module {
         })
     }
     #[must_use]
-    fn try_to_path(&self, packages_path: &PackagesPath) -> Option<PathBuf> {
+    pub fn try_to_path(&self, packages_path: &PackagesPath) -> Option<PathBuf> {
         let paths = self.to_possible_paths(packages_path).unwrap_or_else(|| {
             panic!(
                 "Tried to get content of anonymous module {self} that is not cached by the language server.",

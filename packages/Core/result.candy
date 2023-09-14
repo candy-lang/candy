@@ -5,10 +5,13 @@ function = use "..function"
 struct = use "..struct"
 tag = use "..tag"
 
-is value :=
-  value %
-    Ok _ | Error _ -> True
-    _ -> False
+is value := value %
+  Ok _ | Error _ -> True
+  _ -> False
+
+getValue result :=
+  needs (is result)
+  result | tag.getValue
 
 isOk result :=
   needs (is result)
@@ -16,11 +19,11 @@ isOk result :=
 unwrap result :=
   needs (is result)
   needs (isOk result)
-  result | tag.getValue
+  result | result.getValue
 expect result message :=
   needs (is result)
   needs (isOk result) message
-  result | tag.getValue
+  result | result.getValue
 
 isError result :=
   needs (is result)
@@ -28,11 +31,11 @@ isError result :=
 unwrapError result :=
   needs (is result)
   needs (isError result)
-  result | tag.getValue
+  result | result.getValue
 expectError result message :=
   needs (is result)
   needs (isError result) message
-  result | tag.getValue
+  result | result.getValue
 
 mapOrElse result okMapper errorMapper :=
   # Returns `okMapper result.value` if `isOk result` and

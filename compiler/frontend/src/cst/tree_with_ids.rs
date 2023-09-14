@@ -62,7 +62,7 @@ impl TreeWithIds for Cst {
                 .find(id)
                 .or_else(|| parts.find(id))
                 .or_else(|| closing.find(id)),
-            CstKind::TextPart(_) => None,
+            CstKind::TextNewline(_) | CstKind::TextPart(_) => None,
             CstKind::TextInterpolation {
                 opening_curly_braces,
                 expression,
@@ -207,9 +207,10 @@ impl TreeWithIds for Cst {
                     (None, false)
                 }
             }
-            CstKind::OpeningText { .. } | CstKind::ClosingText { .. } | CstKind::TextPart(_) => {
-                (None, false)
-            }
+            CstKind::OpeningText { .. }
+            | CstKind::ClosingText { .. }
+            | CstKind::TextNewline(_)
+            | CstKind::TextPart(_) => (None, false),
             CstKind::TextInterpolation { expression, .. } => {
                 (expression.find_by_offset(offset), false)
             }

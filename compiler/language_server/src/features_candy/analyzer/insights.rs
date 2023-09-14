@@ -78,10 +78,15 @@ impl Insight {
             }
             _ => return None,
         };
-        Some(Insight::Hint(Hint {
+        Some(Self::Hint(Hint {
             kind: HintKind::Value,
             position: db.id_to_end_of_line(id).unwrap(),
-            text,
+            text: if let Some(i) = text.find('\n') {
+                // TODO: Show all lines when hovering the hint
+                format!("{}...", &text[0..i])
+            } else {
+                text
+            },
         }))
     }
 
@@ -89,11 +94,13 @@ impl Insight {
         let mut insights = vec![];
 
         let id = fuzzer.function_id.clone();
-        let end_of_line = db.id_to_end_of_line(id.clone()).unwrap();
+        let end_of_line = db
+            .id_to_end_of_line(id.clone())
+            .unwrap_or_else(|| panic!("Can't resolve end of line for {id}"));
 
         let coverage = match fuzzer.status() {
             Status::StillFuzzing { total_coverage, .. } => {
-                let function_range = fuzzer.lir().range_of_function(&id);
+                let function_range = fuzzer.byte_code().range_of_function(&id);
                 let function_coverage = total_coverage.in_range(&function_range);
                 function_coverage.relative_coverage()
             }
@@ -101,14 +108,14 @@ impl Insight {
         };
         let function_name = id.function_name();
         let interesting_inputs = fuzzer.input_pool().interesting_inputs();
-        insights.push(Insight::Hint(Hint {
+        insights.push(Self::Hint(Hint {
             kind: HintKind::FuzzingStatus,
             position: end_of_line,
             text: format!("{:.0} % fuzzed", 100. * coverage),
         }));
 
         if let Status::FoundPanic { input, .. } = fuzzer.status() {
-            insights.push(Insight::Hint(Hint {
+            insights.push(Self::Hint(Hint {
                 kind: HintKind::SampleInputPanickingWithInternalCodeResponsible,
                 position: end_of_line,
                 text: format!("{function_name} {input}"),
@@ -116,7 +123,7 @@ impl Insight {
         }
 
         insights.extend(interesting_inputs.into_iter().map(|input| {
-            Insight::Hint(match fuzzer.input_pool().result_of(&input) {
+            Self::Hint(match fuzzer.input_pool().result_of(&input) {
                 RunResult::Timeout => unreachable!(),
                 RunResult::Done { return_value, .. } => Hint {
                     kind: HintKind::SampleInputReturningNormally,
@@ -140,10 +147,12 @@ impl Insight {
     }
 
     pub fn for_static_panic(db: &Database, module: Module, panic: &Panic) -> Self {
-        let call_span = db.hir_id_to_display_span(&panic.responsible).unwrap();
+        let call_span = db
+            .hir_id_to_display_span(&panic.responsible)
+            .unwrap_or_else(|| panic!("Can't resolve responsible ID for panic: {:?}", panic));
         let call_span = db.range_to_lsp_range(module, call_span);
 
-        Insight::Diagnostic(Diagnostic::error(
+        Self::Diagnostic(Diagnostic::error(
             call_span,
             ToString::to_string(&panic.reason),
         ))

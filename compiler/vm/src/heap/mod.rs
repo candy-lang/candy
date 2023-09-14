@@ -227,6 +227,7 @@ pub struct DefaultSymbols {
     // `clone_to_heap_with_mapping(…)`, and `all_symbols(…)`.
     //
     // Sorted alphabetically
+    pub arguments: Text,
     pub builtin: Text,
     pub equal: Text,
     pub error: Text,
@@ -251,6 +252,7 @@ pub struct DefaultSymbols {
 impl DefaultSymbols {
     pub fn new(heap: &mut Heap) -> Self {
         Self {
+            arguments: Text::create(heap, false, "Arguments"),
             builtin: Text::create(heap, false, "Builtin"),
             equal: Text::create(heap, false, "Equal"),
             error: Text::create(heap, false, "Error"),
@@ -288,6 +290,7 @@ impl DefaultSymbols {
         }
 
         Self {
+            arguments: clone_to_heap(heap, address_map, self.arguments),
             builtin: clone_to_heap(heap, address_map, self.builtin),
             equal: clone_to_heap(heap, address_map, self.equal),
             error: clone_to_heap(heap, address_map, self.error),
@@ -322,6 +325,7 @@ impl DefaultSymbols {
     #[must_use]
     pub const fn all_symbols(&self) -> [Text; 20] {
         [
+            self.arguments,
             self.builtin,
             self.equal,
             self.error,

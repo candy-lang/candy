@@ -51,6 +51,7 @@ pub enum CstKind<D = CstData> {
         parts: Vec<Cst<D>>,
         closing: Box<Cst<D>>,
     },
+    TextNewline(String), // special newline for text because line breaks have semantic meaning there
     TextPart(String),
     TextInterpolation {
         opening_curly_braces: Vec<Cst<D>>,
@@ -188,7 +189,7 @@ impl<D> CstKind<D> {
                 children.push(closing);
                 children
             }
-            Self::TextPart(_) => vec![],
+            Self::TextNewline(_) | Self::TextPart(_) => vec![],
             Self::TextInterpolation {
                 opening_curly_braces,
                 expression,
@@ -382,11 +383,12 @@ impl<D> Display for CstKind<D> {
                 closing,
             } => {
                 opening.fmt(f)?;
-                for part in parts {
-                    part.fmt(f)?;
+                for line in parts {
+                    line.fmt(f)?;
                 }
                 closing.fmt(f)
             }
+            Self::TextNewline(newline) => newline.fmt(f),
             Self::TextPart(literal) => literal.fmt(f),
             Self::TextInterpolation {
                 opening_curly_braces,

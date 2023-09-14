@@ -71,6 +71,7 @@ where
             CstKind::OpeningText { .. }
             | CstKind::ClosingText { .. }
             | CstKind::Text { .. }
+            | CstKind::TextNewline(_)
             | CstKind::TextPart(_)
             | CstKind::TextInterpolation { .. } => {}
             CstKind::BinaryBar { left, bar, right } => {

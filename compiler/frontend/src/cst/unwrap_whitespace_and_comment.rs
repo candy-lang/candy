@@ -57,7 +57,7 @@ impl<D: Clone> UnwrapWhitespaceAndComment for Cst<D> {
                 parts: parts.unwrap_whitespace_and_comment(),
                 closing: closing.unwrap_whitespace_and_comment(),
             },
-            kind @ CstKind::TextPart(_) => kind.clone(),
+            kind @ (CstKind::TextNewline(_) | CstKind::TextPart(_)) => kind.clone(),
             CstKind::TextInterpolation {
                 opening_curly_braces,
                 expression,
