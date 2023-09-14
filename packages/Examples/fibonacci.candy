@@ -32,7 +32,6 @@ fibonacci n =
   }
 
 main := { environment ->
-  a = foo
   environment.arguments %
     (n,) -> n | int.parse | result.map { it -> fibonacci it | toDebugText } | result.getValue
     _ -> "Usage: `cargo run -- run fibonacci.candy -- <number>`"
