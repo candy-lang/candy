@@ -111,7 +111,11 @@ jobs:
       - uses: dsherret/rust-toolchain-file@v1
       - uses: Swatinem/rust-cache@v2.7.0
 
+      - run: perf stat ls
       - run: sudo sh -c 'echo 1 > /proc/sys/kernel/perf_event_paranoid'
+      - run: perf stat ls
+      - run: sudo sysctl -w kernel.perf_event_paranoid=1
+      - run: perf stat ls
 
       - name: Run benchmark
         working-directory: compiler/vm/
