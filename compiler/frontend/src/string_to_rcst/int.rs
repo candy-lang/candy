@@ -1,6 +1,6 @@
 use super::word::word;
 use crate::{
-    cst::{CstError, CstKind},
+    cst::{CstError, CstKind, IntRadix},
     rcst::Rcst,
 };
 use num_bigint::BigUint;
@@ -9,32 +9,48 @@ use tracing::instrument;
 
 #[instrument(level = "trace")]
 pub fn int(input: &str) -> Option<(&str, Rcst)> {
-    let (input, w) = word(input)?;
-    if !w.chars().next().unwrap().is_ascii_digit() {
+    let (input, string) = word(input)?;
+    if !string.chars().next().unwrap().is_ascii_digit() {
         return None;
     }
 
-    let rcst = if (w.starts_with("0b") || w.starts_with("0B"))
-        && w.len() >= 3
-        && w.chars().skip(2).all(|c| c == '0' || c == '1')
+    let rcst = if (string.starts_with("0b") || string.starts_with("0B"))
+        && string.len() >= 3
+        && string.chars().skip(2).all(|c| c == '0' || c == '1')
     {
         // Binary
-        let value = BigUint::from_str_radix(&w[2..], 2).expect("Couldn't parse binary int.");
-        CstKind::Int { value, string: w }.into()
-    } else if (w.starts_with("0x") || w.starts_with("0X"))
-        && w.len() >= 3
-        && w.chars().skip(2).all(|c| c.is_ascii_hexdigit())
+        let value = BigUint::from_str_radix(&string[2..], 2).expect("Couldn't parse binary int.");
+        CstKind::Int {
+            radix_prefix: Some((IntRadix::Binary, string[..2].to_string())),
+            value,
+            string: string[2..].to_string(),
+        }
+        .into()
+    } else if (string.starts_with("0x") || string.starts_with("0X"))
+        && string.len() >= 3
+        && string.chars().skip(2).all(|c| c.is_ascii_hexdigit())
     {
         // Hexadecimal
-        let value = BigUint::from_str_radix(&w[2..], 16).expect("Couldn't parse hexadecimal int.");
-        CstKind::Int { value, string: w }.into()
-    } else if w.chars().all(|c| c.is_ascii_digit()) {
+        let value =
+            BigUint::from_str_radix(&string[2..], 16).expect("Couldn't parse hexadecimal int.");
+        CstKind::Int {
+            radix_prefix: Some((IntRadix::Hexadecimal, string[..2].to_string())),
+            value,
+            string: string[2..].to_string(),
+        }
+        .into()
+    } else if string.chars().all(|c| c.is_ascii_digit()) {
         // Decimal
-        let value = str::parse(&w).expect("Couldn't parse decimal int.");
-        CstKind::Int { value, string: w }.into()
+        let value = str::parse(&string).expect("Couldn't parse decimal int.");
+        CstKind::Int {
+            radix_prefix: None,
+            value,
+            string,
+        }
+        .into()
     } else {
         CstKind::Error {
-            unparsable_input: w,
+            unparsable_input: string,
             error: CstError::IntContainsNonDigits,
         }
         .into()
@@ -55,8 +71,9 @@ mod test {
             Some((
                 "",
                 CstKind::Int {
+                    radix_prefix: Some((IntRadix::Binary, "0b".to_string())),
                     value: 0b10u8.into(),
-                    string: "0b10".to_string()
+                    string: "10".to_string()
                 }
                 .into(),
             )),
@@ -66,8 +83,9 @@ mod test {
             Some((
                 "",
                 CstKind::Int {
+                    radix_prefix: Some((IntRadix::Binary, "0B".to_string())),
                     value: 0b101u8.into(),
-                    string: "0B101".to_string()
+                    string: "101".to_string()
                 }
                 .into(),
             )),
@@ -77,8 +95,9 @@ mod test {
             Some((
                 "",
                 CstKind::Int {
+                    radix_prefix: Some((IntRadix::Binary, "0b".to_string())),
                     value: 0b1010_0101u32.into(),
-                    string: "0b10100101".to_string()
+                    string: "10100101".to_string()
                 }
                 .into(),
             )),
@@ -90,6 +109,7 @@ mod test {
             Some((
                 "",
                 CstKind::Int {
+                    radix_prefix: None,
                     value: 12u8.into(),
                     string: "012".to_string()
                 }
@@ -102,8 +122,9 @@ mod test {
             Some((
                 "",
                 CstKind::Int {
+                    radix_prefix: Some((IntRadix::Hexadecimal, "0x".to_string())),
                     value: 0x12u8.into(),
-                    string: "0x12".to_string()
+                    string: "12".to_string()
                 }
                 .into(),
             )),
@@ -113,8 +134,9 @@ mod test {
             Some((
                 "",
                 CstKind::Int {
+                    radix_prefix: Some((IntRadix::Hexadecimal, "0X".to_string())),
                     value: 0x12u8.into(),
-                    string: "0X012".to_string()
+                    string: "012".to_string()
                 }
                 .into(),
             )),
@@ -124,8 +146,9 @@ mod test {
             Some((
                 "",
                 CstKind::Int {
+                    radix_prefix: Some((IntRadix::Hexadecimal, "0x".to_string())),
                     value: 0xDEAD_C0DEu32.into(),
-                    string: "0xDEADc0de".to_string()
+                    string: "DEADc0de".to_string()
                 }
                 .into(),
             )),
