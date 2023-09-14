@@ -498,10 +498,10 @@ textConcatenate a b :=
   ✨.textConcatenate a b
 
 textContains text pattern :=
-  # Returns whether the `text` contains the `pattern` string.
+  # Returns whether the `text` contains the `pattern` text.
   #
-  # This does _not_ support patterns such as regexes – it just looks for the
-  # literal `pattern`.
+  # This does _not_ support patterns such as regular expressions – it just looks
+  # for the literal `pattern`.
   #
   # ```
   # textContains "Hello" "H" => True
