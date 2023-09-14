@@ -60,15 +60,16 @@ pub(crate) enum Options {
     /// Low-Level Intermediate Representation
     Lir(PathAndTracing),
 
+    
+    /// Optimized Low-Level Intermediate Representation
+    OptimizedLir(PathAndTracing),
+    
+    /// VM Byte Code
+    VmByteCode(PathAndTracing),
+    
     /// LLVM Intermediate Representation
     #[cfg(feature = "inkwell")]
     LlvmIr(OnlyPath),
-
-    /// Optimized Low-Level Intermediate Representation
-    OptimizedLir(PathAndTracing),
-
-    /// VM Byte Code
-    VmByteCode(PathAndTracing),
 
     #[command(subcommand)]
     Gold(Gold),
@@ -150,24 +151,24 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
             lir.ok()
                 .map(|(lir, _)| RichIr::for_lir(&module, &lir, &tracing))
         }
-        #[cfg(feature = "inkwell")]
-        Options::LlvmIr(options) => {
-            let module = module_for_path(options.path.clone())?;
-            let llvm_ir = db.llvm_ir(module.clone());
-            llvm_ir.ok()
-        }
         Options::OptimizedLir(options) => {
             let module = module_for_path(options.path.clone())?;
             let tracing = options.to_tracing_config();
             let lir = db.optimized_lir(module.clone(), tracing.clone());
             lir.ok()
-                .map(|(lir, _)| RichIr::for_lir(&module, &lir, &tracing))
+            .map(|(lir, _)| RichIr::for_lir(&module, &lir, &tracing))
         }
         Options::VmByteCode(options) => {
             let module = module_for_path(options.path.clone())?;
             let tracing = options.to_tracing_config();
             let (vm_byte_code, _) = compile_byte_code(&db, module.clone(), tracing.clone());
             Some(RichIr::for_byte_code(&module, &vm_byte_code, &tracing))
+        }
+        #[cfg(feature = "inkwell")]
+        Options::LlvmIr(options) => {
+            let module = module_for_path(options.path.clone())?;
+            let llvm_ir = db.llvm_ir(module.clone());
+            llvm_ir.ok()
         }
         Options::Gold(options) => return options.run(&db),
     };
@@ -356,12 +357,6 @@ impl GoldOptions {
             let lir = RichIr::for_lir(&module, &lir, &Self::TRACING_CONFIG);
             visit("LIR", lir.text);
 
-            #[cfg(feature = "inkwell")]
-            {
-                let llvm_ir = db.llvm_ir(module.clone()).unwrap();
-                visit("LLVM IR", llvm_ir.text);
-            }
-
             let (optimized_lir, _) = db
                 .optimized_lir(module.clone(), Self::TRACING_CONFIG.clone())
                 .unwrap();
@@ -376,6 +371,12 @@ impl GoldOptions {
                 "VM Byte Code",
                 Self::format_byte_code(&vm_byte_code, &vm_byte_code_rich_ir),
             );
+
+            #[cfg(feature = "inkwell")]
+            {
+                let llvm_ir = db.llvm_ir(module.clone()).unwrap();
+                visit("LLVM IR", llvm_ir.text);
+            }
         }
         Ok(())
     }
