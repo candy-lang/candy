@@ -323,7 +323,7 @@ impl DefaultSymbols {
             .map(|it| symbols[it])
     }
     #[must_use]
-    pub const fn all_symbols(&self) -> [Text; 20] {
+    pub const fn all_symbols(&self) -> [Text; 21] {
         [
             self.arguments,
             self.builtin,
