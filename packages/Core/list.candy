@@ -89,10 +89,10 @@ generate length valueGetter :=
 
 getRange list startInclusive endExclusive :=
   needs (is list)
-  needs (startInclusive | int.is)
+  needs (int.is startInclusive)
   needs (startInclusive | int.isNonNegative)
   needs (startInclusive | int.isLessThanOrEqualTo (list | length))
-  needs (endExclusive | int.is)
+  needs (int.is endExclusive)
   needs (endExclusive | int.isNonNegative)
   needs (endExclusive | int.isLessThanOrEqualTo (list | length))
   needs (startInclusive | int.isLessThanOrEqualTo endExclusive)
