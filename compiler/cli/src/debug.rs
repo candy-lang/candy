@@ -3,6 +3,7 @@ use crate::{
     utils::{module_for_path, packages_path},
     Exit, ProgramResult,
 };
+use candy_backend_inkwell::LlvmIrDb;
 use candy_frontend::{
     ast_to_hir::AstToHir,
     cst_to_ast::CstToAst,
@@ -54,6 +55,10 @@ pub(crate) enum Options {
 
     /// Optimized Mid-Level Intermediate Representation
     OptimizedMir(PathAndTracing),
+
+    #[cfg(feature = "inkwell")]
+    /// LLVM Intermediate Representation
+    LlvmIr(PathAndTracing),
 
     /// Low-Level Intermediate Representation
     Lir(PathAndTracing),
@@ -136,6 +141,12 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
             let mir = db.optimized_mir(module.clone(), tracing.clone());
             mir.ok()
                 .map(|(mir, _, _)| RichIr::for_optimized_mir(&module, &mir, &tracing))
+        }
+        #[cfg(feature = "inkwell")]
+        Options::LlvmIr(options) => {
+            let module = module_for_path(options.path.clone())?;
+            let llvm_ir = db.llvm_ir(module.clone());
+            llvm_ir.ok()
         }
         Options::Lir(options) => {
             let module = module_for_path(options.path.clone())?;
@@ -337,6 +348,9 @@ impl GoldOptions {
             let optimized_mir =
                 RichIr::for_optimized_mir(&module, &optimized_mir, &Self::TRACING_CONFIG);
             visit("Optimized MIR", optimized_mir.text);
+
+            let llvm_ir = db.llvm_ir(module.clone()).unwrap();
+            visit("LLVM IR", llvm_ir.text);
 
             let (lir, _) = db
                 .lir(module.clone(), Self::TRACING_CONFIG.clone())
