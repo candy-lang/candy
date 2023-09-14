@@ -77,14 +77,17 @@ pub fn list(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
             None if items.is_empty() => {
                 let (input, whitespace) =
                     whitespaces_and_newlines(input_after_expression, indentation, true);
-                let (input, closing_parenthesis) = closing_parenthesis(input).unwrap_or((
-                    input,
-                    CstKind::Error {
-                        unparsable_input: String::new(),
-                        error: CstError::ParenthesisNotClosed,
-                    }
-                    .into(),
-                ));
+                let (input, closing_parenthesis) =
+                    closing_parenthesis(input).unwrap_or_else(|| {
+                        (
+                            input,
+                            CstKind::Error {
+                                unparsable_input: String::new(),
+                                error: CstError::ParenthesisNotClosed,
+                            }
+                            .into(),
+                        )
+                    });
 
                 return Some((
                     input,
