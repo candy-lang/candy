@@ -143,11 +143,6 @@
       },
       {
         "category": "Candy Compiler Debugging",
-        "command": "candy.debug.viewLlvmIr",
-        "title": "View LLVM IR"
-      },
-      {
-        "category": "Candy Compiler Debugging",
         "command": "candy.debug.viewLir",
         "title": "View LIR"
       },
@@ -155,6 +150,11 @@
         "category": "Candy Compiler Debugging",
         "command": "candy.debug.viewVmByteCode",
         "title": "View VM Byte Code"
+      },
+      {
+        "category": "Candy Compiler Debugging",
+        "command": "candy.debug.viewLlvmIr",
+        "title": "View LLVM IR"
       }
     ],
     "configuration": {

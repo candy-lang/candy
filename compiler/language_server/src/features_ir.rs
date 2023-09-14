@@ -118,8 +118,6 @@ impl IrFeatures {
                 &db.lir(config.module.clone(), tracing_config.clone()),
                 tracing_config,
             ),
-            #[cfg(feature = "inkwell")]
-            Ir::LlvmIr => db.llvm_ir(config.module.clone()).unwrap(),
             Ir::OptimizedLir(tracing_config) => Self::rich_ir_for_optimized_lir(
                 &config.module,
                 db.optimized_lir(config.module.clone(), tracing_config.clone()),
@@ -135,6 +133,8 @@ impl IrFeatures {
                 .0,
                 tracing_config,
             ),
+            #[cfg(feature = "inkwell")]
+            Ir::LlvmIr => db.llvm_ir(config.module.clone()).unwrap(),
         };
 
         let line_start_offsets = line_start_offsets_raw(&ir.text);
@@ -300,10 +300,10 @@ impl IrConfig {
             IrDiscriminants::Mir => Ir::Mir(tracing_config.unwrap()),
             IrDiscriminants::OptimizedMir => Ir::OptimizedMir(tracing_config.unwrap()),
             IrDiscriminants::Lir => Ir::Lir(tracing_config.unwrap()),
-            #[cfg(feature = "inkwell")]
-            IrDiscriminants::LlvmIr => Ir::LlvmIr,
             IrDiscriminants::OptimizedLir => Ir::OptimizedLir(tracing_config.unwrap()),
             IrDiscriminants::VmByteCode => Ir::VmByteCode(tracing_config.unwrap()),
+            #[cfg(feature = "inkwell")]
+            IrDiscriminants::LlvmIr => Ir::LlvmIr,
         };
 
         Self {
@@ -357,22 +357,22 @@ pub enum Ir {
     Mir(TracingConfig),
     OptimizedMir(TracingConfig),
     Lir(TracingConfig),
-    #[cfg(feature = "inkwell")]
-    LlvmIr,
     OptimizedLir(TracingConfig),
     VmByteCode(TracingConfig),
+    #[cfg(feature = "inkwell")]
+    LlvmIr,
 }
 impl Ir {
     const fn tracing_config(&self) -> Option<&TracingConfig> {
         match self {
             Self::Rcst | Self::Ast | Self::Hir => None,
-            #[cfg(feature = "inkwell")]
-            Self::LlvmIr => None,
             Self::Mir(tracing_config)
             | Self::OptimizedMir(tracing_config)
             | Self::Lir(tracing_config)
             | Self::OptimizedLir(tracing_config)
             | Self::VmByteCode(tracing_config) => Some(tracing_config),
+            #[cfg(feature = "inkwell")]
+            Self::LlvmIr => None,
         }
     }
 }

@@ -37,7 +37,7 @@ pub trait LlvmIrDb: OptimizeMir {
 
 #[allow(clippy::needless_pass_by_value)]
 fn llvm_ir(db: &dyn LlvmIrDb, module: CandyModule) -> Result<RichIr, ModuleError> {
-    let (mir, errors) = db.optimized_mir(module.clone(), TracingConfig::off())?;
+    let (mir, _, _) = db.optimized_mir(module.clone(), TracingConfig::off())?;
 
     let context = Context::create();
     let mut codegen = CodeGen::new(&context, "module", mir);
