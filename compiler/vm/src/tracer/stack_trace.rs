@@ -105,7 +105,7 @@ impl StackTracer {
                         }
                     })
                     .unwrap_or_else(|| callee.to_string()),
-                arguments.iter().map(|arg| format!("{arg:?}")).join(" "),
+                arguments.iter().join(" "),
             );
             caller_locations_and_calls.push((caller_location_string, call_string));
         }

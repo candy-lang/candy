@@ -3,7 +3,7 @@ use crate::{
     utils::{module_for_path, packages_path},
     Exit, ProgramResult,
 };
-use candy_frontend::{ast_to_hir::AstToHir, hir, TracingConfig};
+use candy_frontend::{ast_to_hir::AstToHir, hir, TracingConfig, TracingMode};
 use candy_language_server::utils::LspPositionConversion;
 use candy_vm::{
     environment::DefaultEnvironment,
@@ -41,7 +41,11 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     let db = Database::new_with_file_system_module_provider(packages_path.clone());
     let module = module_for_path(options.path)?;
 
-    let tracing = TracingConfig::off();
+    let tracing = TracingConfig {
+        register_fuzzables: TracingMode::Off,
+        calls: TracingMode::All,
+        evaluated_expressions: TracingMode::Off,
+    };
 
     debug!("Running {module}.");
 
