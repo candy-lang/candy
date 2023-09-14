@@ -16,13 +16,10 @@ use inkwell::{
     AddressSpace,
 };
 
-use candy_frontend::error::{CompilerError, CompilerErrorPayload};
-use candy_frontend::hir;
 use candy_frontend::rich_ir::{RichIr, ToRichIr};
 use candy_frontend::string_to_rcst::ModuleError;
 pub use inkwell;
 use itertools::Itertools;
-use rustc_hash::FxHashSet;
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
