@@ -3,6 +3,7 @@ use crate::{
     utils::{module_for_path, packages_path},
     Exit, ProgramResult,
 };
+#[cfg(feature = "inkwell")]
 use candy_backend_inkwell::LlvmIrDb;
 use candy_frontend::{
     ast_to_hir::AstToHir,
@@ -56,12 +57,12 @@ pub(crate) enum Options {
     /// Optimized Mid-Level Intermediate Representation
     OptimizedMir(PathAndTracing),
 
-    #[cfg(feature = "inkwell")]
-    /// LLVM Intermediate Representation
-    LlvmIr(PathAndTracing),
-
     /// Low-Level Intermediate Representation
     Lir(PathAndTracing),
+
+    /// LLVM Intermediate Representation
+    #[cfg(feature = "inkwell")]
+    LlvmIr(PathAndTracing),
 
     /// Optimized Low-Level Intermediate Representation
     OptimizedLir(PathAndTracing),
@@ -142,18 +143,18 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
             mir.ok()
                 .map(|(mir, _, _)| RichIr::for_optimized_mir(&module, &mir, &tracing))
         }
-        #[cfg(feature = "inkwell")]
-        Options::LlvmIr(options) => {
-            let module = module_for_path(options.path.clone())?;
-            let llvm_ir = db.llvm_ir(module.clone());
-            llvm_ir.ok()
-        }
         Options::Lir(options) => {
             let module = module_for_path(options.path.clone())?;
             let tracing = options.to_tracing_config();
             let lir = db.lir(module.clone(), tracing.clone());
             lir.ok()
                 .map(|(lir, _)| RichIr::for_lir(&module, &lir, &tracing))
+        }
+        #[cfg(feature = "inkwell")]
+        Options::LlvmIr(options) => {
+            let module = module_for_path(options.path.clone())?;
+            let llvm_ir = db.llvm_ir(module.clone());
+            llvm_ir.ok()
         }
         Options::OptimizedLir(options) => {
             let module = module_for_path(options.path.clone())?;
@@ -349,14 +350,17 @@ impl GoldOptions {
                 RichIr::for_optimized_mir(&module, &optimized_mir, &Self::TRACING_CONFIG);
             visit("Optimized MIR", optimized_mir.text);
 
-            let llvm_ir = db.llvm_ir(module.clone()).unwrap();
-            visit("LLVM IR", llvm_ir.text);
-
             let (lir, _) = db
                 .lir(module.clone(), Self::TRACING_CONFIG.clone())
                 .unwrap();
             let lir = RichIr::for_lir(&module, &lir, &Self::TRACING_CONFIG);
             visit("LIR", lir.text);
+
+            #[cfg(feature = "inkwell")]
+            {
+                let llvm_ir = db.llvm_ir(module.clone()).unwrap();
+                visit("LLVM IR", llvm_ir.text);
+            }
 
             let (optimized_lir, _) = db
                 .optimized_lir(module.clone(), Self::TRACING_CONFIG.clone())
