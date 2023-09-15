@@ -7,7 +7,6 @@ use super::{
         arrow, bar, closing_bracket, closing_curly_brace, closing_parenthesis, colon_equals_sign,
         dot, equals_sign, percent,
     },
-    parenthesized::parenthesized,
     struct_::struct_,
     text::text,
     whitespace::{comment, single_line_whitespace, whitespaces_and_newlines},
@@ -42,7 +41,6 @@ pub fn expression(
         .or_else(|| symbol(input))
         .or_else(|| list(input, indentation))
         .or_else(|| struct_(input, indentation, options.allow_function))
-        .or_else(|| parenthesized(input, indentation, options.allow_function))
         .or_else(|| {
             if options.allow_function {
                 function(input, indentation)
