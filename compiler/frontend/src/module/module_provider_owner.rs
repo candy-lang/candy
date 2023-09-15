@@ -102,6 +102,7 @@ mod test {
         assert_eq!(
             db.rcst(module.clone()).unwrap().as_ref().clone(),
             vec![CstKind::Int {
+                radix_prefix: None,
                 value: 123u8.into(),
                 string: "123".to_string(),
             }
@@ -119,6 +120,7 @@ mod test {
         assert_eq!(
             db.rcst(module.clone()).unwrap().as_ref().clone(),
             vec![CstKind::Int {
+                radix_prefix: None,
                 value: 456u16.into(),
                 string: "456".to_string(),
             }

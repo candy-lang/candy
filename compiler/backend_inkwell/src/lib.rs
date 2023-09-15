@@ -1,6 +1,11 @@
 #![feature(let_chains)]
 
-use candy_frontend::mir::{Body, Expression, Id, Mir};
+use candy_frontend::module::Module as CandyModule;
+use candy_frontend::{
+    mir::{Body, Expression, Id, Mir},
+    mir_optimize::OptimizeMir,
+    TracingConfig,
+};
 use inkwell::{
     builder::Builder,
     context::Context,
@@ -11,6 +16,8 @@ use inkwell::{
     AddressSpace,
 };
 
+use candy_frontend::rich_ir::{RichIr, ToRichIr};
+use candy_frontend::string_to_rcst::ModuleError;
 pub use inkwell;
 use itertools::Itertools;
 use std::{
@@ -18,6 +25,23 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
+
+#[salsa::query_group(LlvmIrStorage)]
+pub trait LlvmIrDb: OptimizeMir {
+    #[salsa::transparent]
+    fn llvm_ir(&self, module: CandyModule) -> Result<RichIr, ModuleError>;
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn llvm_ir(db: &dyn LlvmIrDb, module: CandyModule) -> Result<RichIr, ModuleError> {
+    let (mir, _, _) = db.optimized_mir(module.clone(), TracingConfig::off())?;
+
+    let context = Context::create();
+    let mut codegen = CodeGen::new(&context, "module", mir);
+    let llvm_ir = codegen.compile("", false, true).unwrap();
+
+    Ok(llvm_ir.to_str().unwrap().to_rich_ir(true))
+}
 
 #[derive(Clone)]
 struct FunctionInfo<'ctx> {
@@ -58,7 +82,7 @@ impl<'ctx> CodeGen<'ctx> {
         path: &str,
         print_llvm_ir: bool,
         print_main_output: bool,
-    ) -> Result<(), LLVMString> {
+    ) -> Result<LLVMString, LLVMString> {
         let void_type = self.context.void_type();
         let i8_type = self.context.i8_type();
         let i32_type = self.context.i32_type();
@@ -223,9 +247,11 @@ impl<'ctx> CodeGen<'ctx> {
             self.module.print_to_stderr();
         }
         self.module.verify()?;
-        let bc_path = PathBuf::from(format!("{path}.bc"));
-        self.module.write_bitcode_to_path(&bc_path);
-        Ok(())
+        if !path.is_empty() {
+            let bc_path = PathBuf::from(format!("{path}.bc"));
+            self.module.write_bitcode_to_path(&bc_path);
+        }
+        Ok(self.module.print_to_string())
     }
 
     pub fn compile_asm_and_link(
@@ -287,8 +313,15 @@ impl<'ctx> CodeGen<'ctx> {
         for (id, expr) in mir.expressions.iter() {
             let expr_value = match expr {
                 Expression::Int(value) => {
+                    // TODO: Use proper BigInts here
                     let i64_type = self.context.i64_type();
-                    let v = i64_type.const_int(value.try_into().unwrap(), false);
+                    let v = i64_type.const_int(
+                        value
+                            .clamp(&i64::MIN.into(), &i64::MAX.into())
+                            .try_into()
+                            .unwrap(),
+                        false,
+                    );
 
                     let make_candy_int = self.module.get_function("make_candy_int").unwrap();
                     let call = self.builder.build_call(make_candy_int, &[v.into()], "");

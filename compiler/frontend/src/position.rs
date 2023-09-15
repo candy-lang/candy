@@ -1,9 +1,12 @@
-use derive_more::{Deref, DerefMut, From};
-use std::{ops::Range, sync::Arc};
-
-use unicode_segmentation::UnicodeSegmentation;
-
 use crate::module::{Module, ModuleDb};
+use derive_more::{Deref, DerefMut, From};
+use extension_trait::extension_trait;
+use std::{
+    fmt::{self, Display, Formatter},
+    ops::Range,
+    sync::Arc,
+};
+use unicode_segmentation::UnicodeSegmentation;
 
 /// The offset of a character in a string as the number of bytes preceding it in
 /// UTF-8 encoding.
@@ -19,6 +22,17 @@ pub struct Position {
     pub line: usize,
     /// Zero-based character index (counting grapheme clusters)
     pub character: usize,
+}
+impl Display for Position {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}:{}", self.line + 1, self.character + 1)
+    }
+}
+#[extension_trait]
+pub impl RangeOfPosition for Range<Position> {
+    fn format(&self) -> String {
+        format!("{} – {}", self.start, self.end)
+    }
 }
 
 #[salsa::query_group(PositionConversionStorage)]

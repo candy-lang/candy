@@ -84,6 +84,7 @@ pub fn build_symbol(value: impl AsRef<str>) -> Rcst {
 #[cfg(test)]
 pub fn build_simple_int(value: usize) -> Rcst {
     CstKind::Int {
+        radix_prefix: None,
         value: value.into(),
         string: value.to_string(),
     }

@@ -35,6 +35,7 @@ pub enum CstKind<D = CstData> {
     Identifier(String),
     Symbol(String),
     Int {
+        radix_prefix: Option<(IntRadix, String)>,
         value: BigUint,
         string: String,
     },
@@ -122,7 +123,13 @@ pub enum CstKind<D = CstData> {
         error: CstError,
     },
 }
+#[derive(Clone, Debug, EnumIs, Eq, Hash, PartialEq)]
+pub enum IntRadix {
+    Binary,
+    Hexadecimal,
+}
 pub type FunctionParametersAndArrow<D> = (Vec<Cst<D>>, Box<Cst<D>>);
+
 impl<D> CstKind<D> {
     #[must_use]
     pub fn is_whitespace_or_comment(&self) -> bool {
@@ -357,7 +364,16 @@ impl<D> Display for CstKind<D> {
             }
             Self::Identifier(identifier) => identifier.fmt(f),
             Self::Symbol(symbol) => symbol.fmt(f),
-            Self::Int { string, .. } => string.fmt(f),
+            Self::Int {
+                radix_prefix,
+                value: _,
+                string,
+            } => {
+                if let Some((_, radix_string)) = radix_prefix {
+                    radix_string.fmt(f)?;
+                }
+                string.fmt(f)
+            }
             Self::OpeningText {
                 opening_single_quotes,
                 opening_double_quote,
