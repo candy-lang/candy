@@ -4,13 +4,17 @@ use crate::{
     server::AnalyzerClient, utils::LspPositionConversion,
 };
 use candy_frontend::{
-    ast_to_hir::AstToHir, mir_optimize::OptimizeMir, module::Module, TracingConfig, TracingMode,
+    ast_to_hir::AstToHir,
+    format::{MaxLength, Precedence},
+    mir_optimize::OptimizeMir,
+    module::Module,
+    TracingConfig, TracingMode,
 };
 use candy_fuzzer::{FuzzablesFinder, Fuzzer, Status};
 use candy_vm::{
     byte_code::ByteCode,
     environment::StateAfterRunWithoutHandles,
-    heap::Heap,
+    heap::{Heap, ToDebugText},
     mir_to_byte_code::compile_byte_code,
     tracer::{evaluated_values::EvaluatedValuesTracer, stack_trace::StackTracer},
     Panic, Vm, VmFinished,
@@ -343,7 +347,11 @@ impl ModuleAnalyzer {
                         format!(
                             "For `{} {}`, this call panics: {}",
                             fuzzer.function_id.function_name(),
-                            input.arguments.iter().join(" "),
+                            input
+                                .arguments
+                                .iter()
+                                .map(|it| it.to_debug_text(Precedence::High, MaxLength::Unlimited))
+                                .join(" "),
                             panic.reason,
                         ),
                     )));
