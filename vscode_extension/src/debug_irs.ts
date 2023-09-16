@@ -11,7 +11,8 @@ type Ir =
   | { type: "optimizedMir"; tracingConfig: TracingConfig }
   | { type: "lir"; tracingConfig: TracingConfig }
   | { type: "optimizedLir"; tracingConfig: TracingConfig }
-  | { type: "vmByteCode"; tracingConfig: TracingConfig };
+  | { type: "vmByteCode"; tracingConfig: TracingConfig }
+  | { type: "llvmIr" };
 type IrType = Ir["type"];
 function getIrTitle(irType: IrType): string {
   switch (irType) {
@@ -31,6 +32,8 @@ function getIrTitle(irType: IrType): string {
       return "Optimized LIR";
     case "vmByteCode":
       return "VM Byte Code";
+    case "llvmIr":
+      return "LLVM IR";
   }
 }
 
@@ -91,6 +94,7 @@ export function registerDebugIrCommands(client: LanguageClient) {
 
     return { type: "vmByteCode", tracingConfig };
   });
+  registerDebugIrCommand("llvmIr", "viewLlvmIr", () => ({ type: "llvmIr" }));
 }
 
 function registerDocumentProvider(

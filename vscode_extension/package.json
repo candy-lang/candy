@@ -150,6 +150,11 @@
         "category": "Candy Compiler Debugging",
         "command": "candy.debug.viewVmByteCode",
         "title": "View VM Byte Code"
+      },
+      {
+        "category": "Candy Compiler Debugging",
+        "command": "candy.debug.viewLlvmIr",
+        "title": "View LLVM IR"
       }
     ],
     "configuration": {
@@ -158,7 +163,7 @@
         "candy.languageServerCommand": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Command to start the 🍭 Candy language server. If empty, we'll attempt to find the 🍭 Candy executable in the `PATH` environment variable.",
+          "markdownDescription": "Command to start the 🍭 Candy language server. If empty, we'll attempt to find the 🍭 Candy executable in the `PATH` environment variable. If you want LLVM IR support, add the `inkwell` feature flag.",
           "scope": "machine-overridable"
         },
         "candy.packagesPath": {

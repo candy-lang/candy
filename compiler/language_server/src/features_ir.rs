@@ -1,4 +1,6 @@
 use async_trait::async_trait;
+#[cfg(feature = "inkwell")]
+use candy_backend_inkwell::LlvmIrDb;
 use candy_frontend::{
     ast_to_hir::{AstToHir, HirResult},
     cst_to_ast::{AstResult, CstToAst},
@@ -134,6 +136,8 @@ impl IrFeatures {
                 .0,
                 tracing_config,
             ),
+            #[cfg(feature = "inkwell")]
+            Ir::LlvmIr => db.llvm_ir(config.module.clone()).unwrap(),
         };
 
         let line_start_offsets = line_start_offsets_raw(&ir.text);
@@ -323,6 +327,8 @@ impl IrConfig {
             IrDiscriminants::VmByteCode => {
                 Ir::VmByteCode(tracing_config.expect("Tracing config is missing."))
             }
+            #[cfg(feature = "inkwell")]
+            IrDiscriminants::LlvmIr => Ir::LlvmIr,
         };
 
         Self {
@@ -385,6 +391,8 @@ pub enum Ir {
     Lir(TracingConfig),
     OptimizedLir(TracingConfig),
     VmByteCode(TracingConfig),
+    #[cfg(feature = "inkwell")]
+    LlvmIr,
 }
 impl Ir {
     const fn tracing_config(&self) -> Option<&TracingConfig> {
@@ -395,6 +403,8 @@ impl Ir {
             | Self::Lir(tracing_config)
             | Self::OptimizedLir(tracing_config)
             | Self::VmByteCode(tracing_config) => Some(tracing_config),
+            #[cfg(feature = "inkwell")]
+            Self::LlvmIr => None,
         }
     }
 }

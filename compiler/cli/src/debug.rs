@@ -3,6 +3,8 @@ use crate::{
     utils::{module_for_path, packages_path},
     Exit, ProgramResult,
 };
+#[cfg(feature = "inkwell")]
+use candy_backend_inkwell::LlvmIrDb;
 use candy_frontend::{
     ast_to_hir::AstToHir,
     cst_to_ast::CstToAst,
@@ -63,6 +65,10 @@ pub(crate) enum Options {
 
     /// VM Byte Code
     VmByteCode(PathAndTracing),
+
+    /// LLVM Intermediate Representation
+    #[cfg(feature = "inkwell")]
+    LlvmIr(OnlyPath),
 
     #[command(subcommand)]
     Gold(Gold),
@@ -156,6 +162,12 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
             let tracing = options.to_tracing_config();
             let (vm_byte_code, _) = compile_byte_code(&db, module.clone(), tracing.clone());
             Some(RichIr::for_byte_code(&module, &vm_byte_code, &tracing))
+        }
+        #[cfg(feature = "inkwell")]
+        Options::LlvmIr(options) => {
+            let module = module_for_path(options.path.clone())?;
+            let llvm_ir = db.llvm_ir(module.clone());
+            llvm_ir.ok()
         }
         Options::Gold(options) => return options.run(&db),
     };
@@ -358,6 +370,12 @@ impl GoldOptions {
                 "VM Byte Code",
                 Self::format_byte_code(&vm_byte_code, &vm_byte_code_rich_ir),
             );
+
+            #[cfg(feature = "inkwell")]
+            {
+                let llvm_ir = db.llvm_ir(module.clone()).unwrap();
+                visit("LLVM IR", llvm_ir.text);
+            }
         }
         Ok(())
     }
