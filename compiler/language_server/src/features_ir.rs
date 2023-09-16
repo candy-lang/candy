@@ -337,6 +337,13 @@ impl UrlFromIrConfig for Url {
 
         let mut details = serde_json::Map::new();
         details.insert("scheme".to_string(), original_url.scheme().into());
+        details.insert(
+            "moduleKind".to_string(),
+            match config.module.kind {
+                ModuleKind::Code => "code".into(),
+                ModuleKind::Asset => "asset".into(),
+            },
+        );
         match &config.ir {
             Ir::Mir(tracing_config)
             | Ir::OptimizedMir(tracing_config)
