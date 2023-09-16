@@ -430,7 +430,13 @@ structGet struct key :=
   # structGet [Foo: 2] Foo => 2
   # ```
   needs (struct | typeIs Struct)
+
   needs (struct | ✨.structHasKey key)
+  # TODO: Add this message when our optimizations become smarter.
+  # "Struct `{struct}` is missing the key `{key}`."
+  # Diff from the previous attempt:
+  # https://github.com/candy-lang/golden-irs/compare/432eabe0dd6fc5be7d17f6413b4608ae4c870ef6_..06506cc02149e4e29479ee2396824215b3b548ec_
+
   ✨.structGet struct key
 
 structGetKeys struct :=

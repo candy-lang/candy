@@ -13,13 +13,13 @@ use std::{
 };
 use tracing::{error, warn};
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Module {
     pub package: Package,
     pub path: Vec<String>,
     pub kind: ModuleKind,
 }
-#[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ModuleKind {
     Code,
     Asset,

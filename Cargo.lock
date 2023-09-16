@@ -105,6 +105,7 @@ dependencies = [
  "inkwell",
  "itertools 0.11.0",
  "llvm-sys",
+ "salsa",
 ]
 
 [[package]]
@@ -205,6 +206,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "base64",
+ "candy_backend_inkwell",
  "candy_formatter",
  "candy_frontend",
  "candy_fuzzer",
