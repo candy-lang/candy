@@ -217,14 +217,9 @@ forEach iterable action :=
 
 fromList l :=
   needs (list.is l)
-  # () => Result[(Item, Iterable[Item]), Any]
-  # iterable | function.run | result.map { it -> it | list.get 0 }
-  # The state contains the list and an index.
-  generateWithState [l, Index: 0] { [l, index] ->
-    ifElse
-      l | list.isValidIndex index
-      { Ok [Item: l | list.get index, State: [l, Index: index | int.add 1]] }
-      { Error Empty }
+  generate (l | list.length) { index -> l | list.get index }
+fromListReversed l :=
+    l | list.get (l | list.length | int.subtract index | int.subtract 1)
   }
 
 toList iterable :=
