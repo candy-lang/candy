@@ -201,7 +201,12 @@ impl InlineObjectTrait for InlineInt {
 #[extension_trait]
 pub impl I64BitLength for i64 {
     fn bit_length(self) -> u32 {
-        Self::BITS - self.unsigned_abs().leading_zeros()
+        if self.is_negative() {
+            // One 1 is necessary for the sign.
+            Self::BITS - self.leading_ones() + 1
+        } else {
+            Self::BITS - self.leading_zeros()
+        }
     }
 }
 
@@ -242,5 +247,18 @@ mod tests {
                 .as_ref(),
             &(BigInt::from(1) << InlineObject::BITS),
         );
+    }
+
+    #[test]
+    fn bit_length() {
+        assert_eq!(inline_int!(-4).bit_length(), inline_int!(3));
+        assert_eq!(inline_int!(-3).bit_length(), inline_int!(3));
+        assert_eq!(inline_int!(-2).bit_length(), inline_int!(2));
+        assert_eq!(inline_int!(-1).bit_length(), inline_int!(1));
+        assert_eq!(inline_int!(0).bit_length(), inline_int!(0));
+        assert_eq!(inline_int!(1).bit_length(), inline_int!(1));
+        assert_eq!(inline_int!(2).bit_length(), inline_int!(2));
+        assert_eq!(inline_int!(3).bit_length(), inline_int!(2));
+        assert_eq!(inline_int!(4).bit_length(), inline_int!(3));
     }
 }
