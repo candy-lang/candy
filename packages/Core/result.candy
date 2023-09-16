@@ -4,6 +4,7 @@ bool = use "..bool"
 function = use "..function"
 struct = use "..struct"
 tag = use "..tag"
+type = use "..type"
 
 is value := value %
   Ok _ | Error _ -> True
@@ -22,6 +23,7 @@ unwrap result :=
   result | result.getValue
 expect result message :=
   needs (is result)
+  needs (type.is message Text)
   needs (isOk result) message
   result | result.getValue
 
@@ -34,6 +36,7 @@ unwrapError result :=
   result | result.getValue
 expectError result message :=
   needs (is result)
+  needs (type.is message Text)
   needs (isError result) message
   result | result.getValue
 
