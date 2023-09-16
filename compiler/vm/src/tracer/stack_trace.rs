@@ -1,8 +1,9 @@
 use super::Tracer;
-use crate::heap::{Heap, HirId, InlineObject};
+use crate::heap::{Heap, HirId, InlineObject, ToDebugText};
 use candy_frontend::{
     ast_to_hir::AstToHir,
     cst::CstKind,
+    format::{MaxLength, Precedence},
     module::PackagesPath,
     position::{PositionConversionDb, RangeOfPosition},
 };
@@ -155,7 +156,10 @@ impl StackTracer {
                     }
                 })
                 .unwrap_or_else(|| callee.to_string()),
-            arguments.iter().join(" "),
+            arguments
+                .iter()
+                .map(|it| it.to_debug_text(Precedence::High, MaxLength::Unlimited))
+                .join(" "),
         );
         (caller_location_string, call_string)
     }
