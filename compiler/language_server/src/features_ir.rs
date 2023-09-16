@@ -270,34 +270,56 @@ struct IrConfig {
 }
 impl IrConfig {
     fn decode(uri: &Url, packages_path: &PackagesPath) -> Self {
-        let (path, ir) = uri.path().rsplit_once('.').unwrap();
-        let details = urlencoding::decode(uri.fragment().unwrap()).unwrap();
+        let (path, ir) = uri
+            .path()
+            .rsplit_once('.')
+            .expect("URI path is missing a file extension.");
+        let details = urlencoding::decode(uri.fragment().expect("URI is missing a fragment"))
+            .expect("URI Fragment is not URL-encoded.");
         let mut details: serde_json::Map<String, serde_json::Value> =
-            serde_json::from_str(&details).unwrap();
+            serde_json::from_str(&details).expect("Decoded URI fragment is not a valid JSON map.");
 
-        let original_scheme = details.get("scheme").unwrap().as_str().unwrap();
-        let original_uri = format!("{original_scheme}:{path}").parse().unwrap();
+        let original_scheme = details
+            .get("scheme")
+            .expect("Decoded URI fragment is missing the `scheme`.")
+            .as_str()
+            .expect("Decoded URI fragment's `scheme` is not a string.");
+        let original_uri = format!("{original_scheme}:{path}")
+            .parse()
+            .expect("Recreated original URI is not a valid URI.");
 
-        let module_kind = match details.get("moduleKind").unwrap().as_str().unwrap() {
+        let module_kind = match details
+            .get("moduleKind")
+            .expect("Decoded URI fragment is missing the `moduleKind`.")
+            .as_str()
+            .expect("Decoded URI fragment's `moduleKind` is not a string.")
+        {
             "code" => ModuleKind::Code,
             "asset" => ModuleKind::Asset,
             module_kind => panic!("Unknown module kind: `{module_kind}`"),
         };
 
-        let tracing_config = details
-            .remove("tracingConfig")
-            .map(|it| serde_json::from_value(it).unwrap());
+        let tracing_config = details.remove("tracingConfig").map(|it| {
+            serde_json::from_value(it)
+                .expect("Decoded URI fragment's `tracingConfig` is not a valid JSON map.")
+        });
 
         let ir = IrDiscriminants::try_from(ir).unwrap_or_else(|_| panic!("Unsupported IR: {ir}"));
         let ir = match ir {
             IrDiscriminants::Rcst => Ir::Rcst,
             IrDiscriminants::Ast => Ir::Ast,
             IrDiscriminants::Hir => Ir::Hir,
-            IrDiscriminants::Mir => Ir::Mir(tracing_config.unwrap()),
-            IrDiscriminants::OptimizedMir => Ir::OptimizedMir(tracing_config.unwrap()),
-            IrDiscriminants::Lir => Ir::Lir(tracing_config.unwrap()),
-            IrDiscriminants::OptimizedLir => Ir::OptimizedLir(tracing_config.unwrap()),
-            IrDiscriminants::VmByteCode => Ir::VmByteCode(tracing_config.unwrap()),
+            IrDiscriminants::Mir => Ir::Mir(tracing_config.expect("Tracing config is missing.")),
+            IrDiscriminants::OptimizedMir => {
+                Ir::OptimizedMir(tracing_config.expect("Tracing config is missing."))
+            }
+            IrDiscriminants::Lir => Ir::Lir(tracing_config.expect("Tracing config is missing.")),
+            IrDiscriminants::OptimizedLir => {
+                Ir::OptimizedLir(tracing_config.expect("Tracing config is missing."))
+            }
+            IrDiscriminants::VmByteCode => {
+                Ir::VmByteCode(tracing_config.expect("Tracing config is missing."))
+            }
         };
 
         Self {
