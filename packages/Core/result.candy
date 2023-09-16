@@ -99,6 +99,7 @@ or resultA resultB :=
 
 unwrapOrElse result defaultGetter :=
   needs (is result)
+  needs (function.is0 defaultGetter)
   result | mapOrElse { value -> value } { value -> function.run defaultGetter }
 unwrapOr result default :=
   needs (is result)
