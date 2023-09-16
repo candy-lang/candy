@@ -219,6 +219,8 @@ fromList l :=
   needs (list.is l)
   generate (l | list.length) { index -> l | list.get index }
 fromListReversed l :=
+  needs (list.is l)
+  generate (l | list.length) { index ->
     l | list.get (l | list.length | int.subtract index | int.subtract 1)
   }
 
