@@ -60,6 +60,9 @@ impl Server {
 
 #[derive(Debug, Default)]
 pub struct IrFeatures {
+    /// If a tab gets closed just after a request, the IR might be missing in
+    /// this map already while we are still working on requests for it. In that
+    /// case, we return empty responses.
     open_irs: Arc<RwLock<FxHashMap<Url, OpenIr>>>,
 }
 impl IrFeatures {
@@ -426,7 +429,7 @@ impl LanguageFeatures for IrFeatures {
     ) -> Option<LocationLink> {
         let (origin_selection_range, key, config) = {
             let open_irs = self.open_irs.read().await;
-            let open_ir = open_irs.get(&uri).unwrap();
+            let open_ir = open_irs.get(&uri)?;
             let offset = open_ir.lsp_position_to_offset(position);
 
             let (key, result) = open_ir.find_references_entry(offset)?;
@@ -462,11 +465,11 @@ impl LanguageFeatures for IrFeatures {
             self.ensure_is_open(db, config).await;
 
             let rich_irs = self.open_irs.read().await;
-            let other_ir = rich_irs.get(&uri).unwrap();
+            let other_ir = rich_irs.get(&uri)?;
             let result = other_ir.ir.references.get(key).unwrap();
             let target_range = other_ir.range_to_lsp_range(result.definition.as_ref().unwrap());
 
-            (uri, target_range)
+            Some((uri, target_range))
         };
 
         let (uri, target_range) = match &key {
@@ -491,7 +494,7 @@ impl LanguageFeatures for IrFeatures {
                     module: id.module.clone(),
                     ir: Ir::Hir,
                 };
-                find_in_other_ir(config, &key).await
+                find_in_other_ir(config, &key).await?
             }
             ReferenceKey::MirId(_) => {
                 let config = IrConfig {
@@ -504,7 +507,7 @@ impl LanguageFeatures for IrFeatures {
                             .unwrap_or_else(TracingConfig::off),
                     ),
                 };
-                find_in_other_ir(config, &key).await
+                find_in_other_ir(config, &key).await?
             }
             ReferenceKey::LirId(_)
             | ReferenceKey::LirConstantId(_)
@@ -519,7 +522,7 @@ impl LanguageFeatures for IrFeatures {
                             .unwrap_or_else(TracingConfig::off),
                     ),
                 };
-                find_in_other_ir(config, &key).await
+                find_in_other_ir(config, &key).await?
             }
         };
         Some(LocationLink {
@@ -536,8 +539,6 @@ impl LanguageFeatures for IrFeatures {
     async fn folding_ranges(&self, _db: &Mutex<Database>, uri: Url) -> Vec<FoldingRange> {
         let open_irs = self.open_irs.read().await;
         let Some(open_ir) = open_irs.get(&uri) else {
-            // After the folding ranges were requested, the corresponding editor
-            // tab was closed. We just report nothing.
             return vec![];
         };
         open_ir.folding_ranges()
@@ -555,7 +556,9 @@ impl LanguageFeatures for IrFeatures {
         include_declaration: bool,
     ) -> FxHashMap<Url, Vec<Reference>> {
         let open_irs = self.open_irs.read().await;
-        let open_ir = open_irs.get(&uri).unwrap();
+        let Some(open_ir) = open_irs.get(&uri) else {
+            return FxHashMap::default();
+        };
 
         let offset = open_ir.lsp_position_to_offset(position);
         let Some((reference_key, _)) = open_ir.find_references_entry(offset) else {
@@ -585,7 +588,9 @@ impl LanguageFeatures for IrFeatures {
     }
     async fn semantic_tokens(&self, _db: &Mutex<Database>, uri: Url) -> Vec<SemanticToken> {
         let open_irs = self.open_irs.read().await;
-        let open_ir = open_irs.get(&uri).unwrap();
+        let Some(open_ir) = open_irs.get(&uri) else {
+            return vec![];
+        };
         open_ir.semantic_tokens()
     }
 }
