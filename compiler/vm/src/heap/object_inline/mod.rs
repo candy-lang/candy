@@ -48,6 +48,8 @@ pub impl InlineObjectSliceCloneToHeap for [InlineObject] {
 pub struct InlineObject(NonZeroU64);
 
 impl InlineObject {
+    pub const BITS: u32 = NonZeroU64::BITS;
+
     pub const KIND_WIDTH: usize = 3;
     pub const KIND_MASK: u64 = 0b111;
     pub const KIND_POINTER: u64 = 0b000;

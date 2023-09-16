@@ -78,8 +78,40 @@ impl InlineInt {
         Tag::create_ordering(heap, ordering)
     }
 
-    shift_fn!(shift_left, i64::checked_shl, Shl::shl);
-    shift_fn!(shift_right, i64::checked_shr, Shr::shr);
+    pub fn shift_left(self, heap: &mut Heap, rhs: Self) -> Int {
+        let lhs = self.get();
+        #[allow(clippy::map_unwrap_or)]
+        rhs.try_get::<u32>()
+            .and_then(|rhs| {
+                // `checked_shl(…)` only checks that `rhs` doesn't exceed the number of bits in the
+                // type (i.e., `rhs < 64`). However, we need to check that the mathematical result
+                // is completely representable in our available bits and doesn't get truncated.
+
+                #[allow(clippy::cast_possible_truncation)]
+                let value_shift = Self::VALUE_SHIFT as u32;
+
+                if self.get().bit_length() + rhs < InlineObject::BITS - value_shift {
+                    Some(lhs << rhs)
+                } else {
+                    None
+                }
+            })
+            .filter(|it| it.signum() == lhs.signum())
+            .map(|it| Int::create(heap, true, it))
+            .unwrap_or_else(|| {
+                Int::create_from_bigint(heap, true, (Shl::shl)(BigInt::from(lhs), rhs.get()))
+            })
+    }
+    pub fn shift_right(self, heap: &mut Heap, rhs: Self) -> Int {
+        let lhs = self.get();
+        #[allow(clippy::map_unwrap_or)]
+        rhs.try_get()
+            .and_then(|rhs| i64::checked_shr(lhs, rhs))
+            .map(|it| Int::create(heap, true, it))
+            .unwrap_or_else(|| {
+                Int::create_from_bigint(heap, true, (Shr::shr)(BigInt::from(lhs), rhs.get()))
+            })
+    }
 
     pub fn bit_length(self) -> Self {
         // SAFETY: The `bit_length` can be at most 61 since that's how large an [InlineInt] can get.
@@ -116,23 +148,6 @@ macro_rules! operator_fn {
         }
     };
 }
-macro_rules! shift_fn {
-    ($name:ident, $inline_operation:expr, $bigint_operation:expr) => {
-        pub fn $name(self, heap: &mut Heap, rhs: InlineInt) -> Int {
-            let lhs = self.get();
-            rhs.try_get()
-                .and_then(|rhs| $inline_operation(lhs, rhs))
-                .map(|it| Int::create(heap, true, it))
-                .unwrap_or_else(|| {
-                    Int::create_from_bigint(
-                        heap,
-                        true,
-                        $bigint_operation(BigInt::from(lhs), rhs.get()),
-                    )
-                })
-        }
-    };
-}
 macro_rules! operator_fn_closed {
     ($name:ident, $operation:expr) => {
         pub fn $name(self, rhs: Self) -> Self {
@@ -141,7 +156,7 @@ macro_rules! operator_fn_closed {
         }
     };
 }
-use {operator_fn, operator_fn_closed, shift_fn};
+use {operator_fn, operator_fn_closed};
 
 impl DebugDisplay for InlineInt {
     fn fmt(&self, f: &mut Formatter, _is_debug: bool) -> fmt::Result {
@@ -187,5 +202,45 @@ impl InlineObjectTrait for InlineInt {
 pub impl I64BitLength for i64 {
     fn bit_length(self) -> u32 {
         Self::BITS - self.unsigned_abs().leading_zeros()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::InlineInt;
+    use crate::heap::{Heap, InlineObject};
+    use num_bigint::BigInt;
+
+    macro_rules! inline_int {
+        ($value:expr) => {
+            InlineInt::try_from($value).unwrap()
+        };
+    }
+
+    #[test]
+    #[allow(clippy::cast_lossless, clippy::cast_possible_wrap)]
+    fn shift_left() {
+        let mut heap = Heap::default();
+        assert_eq!(
+            inline_int!(1).shift_left(&mut heap, inline_int!(1)),
+            inline_int!(2).into(),
+        );
+
+        let shift = InlineObject::BITS as usize - InlineInt::VALUE_SHIFT;
+        assert_eq!(
+            inline_int!(1)
+                .shift_left(&mut heap, inline_int!(shift as i64))
+                .get()
+                .as_ref(),
+            &(BigInt::from(1) << shift),
+        );
+
+        assert_eq!(
+            inline_int!(1)
+                .shift_left(&mut heap, inline_int!(InlineObject::BITS as i64))
+                .get()
+                .as_ref(),
+            &(BigInt::from(1) << InlineObject::BITS),
+        );
     }
 }
