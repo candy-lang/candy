@@ -20,12 +20,12 @@ isOk result :=
 unwrap result :=
   needs (is result)
   needs (isOk result)
-  result | result.getValue
+  result | getValue
 expect result message :=
   needs (is result)
   needs (type.is message Text)
   needs (isOk result) message
-  result | result.getValue
+  result | getValue
 
 isError result :=
   needs (is result)
@@ -33,12 +33,12 @@ isError result :=
 unwrapError result :=
   needs (is result)
   needs (isError result)
-  result | result.getValue
+  result | getValue
 expectError result message :=
   needs (is result)
   needs (type.is message Text)
   needs (isError result) message
-  result | result.getValue
+  result | getValue
 
 mapOrElse result okMapper errorMapper :=
   # Returns `okMapper result.value` if `isOk result` and
