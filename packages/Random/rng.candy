@@ -6,6 +6,11 @@ is generator :=
     Rng [state, nextBytes] -> function.is2 nextBytes
     _ -> False
 
+getState generator :=
+  needs (is generator)
+  Rng [state] = generator
+  state
+
 nextBytes generator length :=
   needs (is generator)
   needs (int.is length)
