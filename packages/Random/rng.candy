@@ -26,6 +26,8 @@ nextList generator length nextItem :=
   recursive [generator, Values: (,)] { recurse [generator, values] ->
     ifElse (values | list.length | equals length) { [generator, values] } {
       [generator, value] = generator | nextItem
+      needs (is generator)
+
       recurse [generator, Values: values | list.append value]
     }
   }

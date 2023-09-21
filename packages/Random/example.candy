@@ -1,5 +1,5 @@
 [print] = use "Builtins"
-[list] = use "Core"
+[int, list] = use "Core"
 [Distributions: [uniform], rng, Rngs: [Pseudo: [xorshift]]] = use ".."
 
 main _ :=
@@ -7,11 +7,11 @@ main _ :=
   generator = list.filled 16 0 | xorshift.fromSeed | xorshift.asRng
   print "Initial RNG state: {generator}"
 
-  [generator, bytes] = generator | rng.nextBytes 4
-  print "Random bytes: {bytes}"
-
-  [generator, bytes] = generator | rng.nextBytes 4
+  [generator, bytes] = generator | rng.nextBytes 10
   print "Random bytes: {bytes}"
 
   [generator, values] = generator | rng.nextList 10 uniform.nextBool
   print "Random booleans: {values}"
+
+  [generator, values] = generator | rng.nextList 10 { it -> it | uniform.nextIntInRange 1 7 }
+  print "Random dice rolls: {values}"
