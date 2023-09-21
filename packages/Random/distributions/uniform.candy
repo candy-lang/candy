@@ -64,12 +64,12 @@ nextUnsignedInt generator maxExclusive :=
       threshold = 1 | int.shiftLeft bits | int.subtract maxExclusive
 
       # if (t >= range)
-      threshold = ifElse (threshold | int.isLessThan range) { threshold } {
+      threshold = ifElse (threshold | int.isLessThan maxExclusive) { threshold } {
         # t -= range;
-        threshold = threshold | int.subtract range
+        threshold = threshold | int.subtract maxExclusive
 
         # if (t >= range)
-        ifElse (threshold | int.isLessThan range) { threshold } {
+        ifElse (threshold | int.isLessThan maxExclusive) { threshold } {
           # t %= range;
           threshold | int.modulo maxExclusive
         }
