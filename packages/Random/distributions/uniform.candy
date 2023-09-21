@@ -1,0 +1,7 @@
+[int] = use "Core"
+rng = use "...rng"
+
+nextBool generator :=
+  needs (rng.is generator)
+  [generator, Bytes: (byte,)] = generator | rng.nextBytes 1
+  [generator, Value: byte | int.isOdd]

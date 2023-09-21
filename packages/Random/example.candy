@@ -1,6 +1,6 @@
 [print] = use "Builtins"
 [list] = use "Core"
-[rng, Rngs: [Pseudo: [xorshift]]] = use ".."
+[Distributions: [uniform], rng, Rngs: [Pseudo: [xorshift]]] = use ".."
 
 main _ :=
   # TODO: use a random seed
@@ -9,8 +9,9 @@ main _ :=
 
   [generator, bytes] = generator | rng.nextBytes 4
   print "Random bytes: {bytes}"
-  print "New RNG state: {generator}"
 
   [generator, bytes] = generator | rng.nextBytes 4
   print "Random bytes: {bytes}"
-  print "New RNG state: {generator}"
+
+  [generator, values] = generator | rng.nextList 10 uniform.nextBool
+  print "Random booleans: {values}"
