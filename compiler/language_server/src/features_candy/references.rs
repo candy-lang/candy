@@ -41,11 +41,8 @@ where
             Some(ReferenceQuery::Needs(module))
         }
         CstKind::Identifier { .. } => {
-            // For example, an identifier in a struct pattern (`[foo]`) can
-            // correspond to two HIR IDs: The implicit key `Foo` and the
-            // capturing identifier `foo`. We want the latter.
             let hir_id = db.cst_to_last_hir_id(module, origin_cst.data.id)?;
-
+            debug!("HIR ID: {hir_id}");
             let target_id: Option<hir::Id> =
                 if let Some(hir_expr) = db.find_expression(hir_id.clone()) {
                     let containing_body = db.containing_body_of(hir_id.clone());
