@@ -1,1 +1,2 @@
+rng := use ".rng"
 rngs := use ".rngs"

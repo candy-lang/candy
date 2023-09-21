@@ -15,10 +15,11 @@
 # https://github.com/rust-random/rngs/blob/0b59b21942e0ca2843c9b08ec8e0b422c0710876/rand_xorshift/tests/mod.rs
 
 [bool, check, equals, ifElse, int, iterable, list, recursive] = use "Core"
+rng = use "....rng"
 [lowEndianBytesToU32] = use "..utils"
 
-is rng := rng %
-  [x, y, z, w] ->
+is generator := generator %
+  Xorshift [x, y, z, w] ->
     int.is x | bool.lazyAnd { int.is y } | bool.lazyAnd { int.is z } | bool.lazyAnd { int.is w }
   _ -> False
 
@@ -32,86 +33,105 @@ fromSeed seed :=
     | lowEndianBytesToU32
   }
 
-  ifElse
+  state = ifElse
     seed | iterable.fromList | iterable.all { it -> it | equals 0 }
     { [X: 0x0BAD5EED, Y: 0x0BAD5EED, Z: 0x0BAD5EED, W: 0x0BAD5EED] }
     { [X: getU32 0, Y: getU32 1, Z: getU32 2, W: getU32 3] }
+  Xorshift state
 
-nextU32 rng :=
-  needs (is rng)
+nextU32 generator :=
+  needs (is generator)
+  Xorshift [x, y, z, w] = generator
 
   ## These shifts are taken from the example in the Summary section of
   ## the paper “Xorshift RNGs” (on the bottom of page 5).
-  t = rng.x | int.bitwiseXor (rng.x | int.shiftLeft 11 | int.lowestBits 32)
-  rng = [
-    X: rng.y,
-    Y: rng.z,
-    Z: rng.w,
-    W:
-      rng.w | int.bitwiseXor (rng.w | int.shiftRight 19)
-      | int.bitwiseXor (t | int.bitwiseXor (t | int.shiftRight 8)),
-  ]
-  [rng, Value: rng.w]
+  t = x | int.bitwiseXor (x | int.shiftLeft 11 | int.lowestBits 32)
+  newW = w | int.bitwiseXor (w | int.shiftRight 19)
+    | int.bitwiseXor (t | int.bitwiseXor (t | int.shiftRight 8))
+  generator = Xorshift [X: y, Y: z, Z: w, W: newW]
+  [generator, Value: newW]
 
-fromRng rng :=
-  needs (is rng)
-  [rng, Value: x] = rng | nextU32
-  [rng, Value: y] = rng | nextU32
-  [rng, Value: z] = rng | nextU32
-  [rng, Value: w] = rng | nextU32
-  [rng, NewRng: [x, y, z, w]]
+fromRng generator :=
+  needs (is generator)
+  [generator, Value: x] = generator | nextU32
+  [generator, Value: y] = generator | nextU32
+  [generator, Value: z] = generator | nextU32
+  [generator, Value: w] = generator | nextU32
+  [generator, NewGenerator: Xorshift [x, y, z, w]]
 
-nextU32s rng length :=
-  needs (is rng)
+nextU32s generator length :=
+  needs (is generator)
   needs (length | int.isPositive)
-  recursive [rng, Values: (,)] { recurse [rng, values] ->
-    ifElse (values | list.length | equals length) { [rng, values] } {
-      [rng, value] = rng | nextU32
-      recurse [rng, Values: values | list.append value]
+  recursive [generator, Values: (,)] { recurse [generator, values] ->
+    ifElse (values | list.length | equals length) { [generator, values] } {
+      [generator, value] = generator | nextU32
+      recurse [generator, Values: values | list.append value]
     }
   }
 
-nextBytes rng length :=
-  needs (is rng)
+littleEndianBytes value byteCount =
+  needs (int.is value)
+  needs (int.is byteCount)
+  needs (int.isPositive byteCount)
+  iterable.generateWithState [value, RemainingByteCount: byteCount] { [value, remainingByteCount] ->
+    ifElse (remainingByteCount | equals 0) { Error Empty } {
+      Ok [
+        State:
+          [Value: value | int.shiftRight 8, RemainingByteCount: remainingByteCount | int.subtract 1],
+        Item: value | int.lowestBits 8,
+      ]
+    }
+  }
+  | iterable.toList
+
+nextBytes generator length :=
+  needs (is generator)
   needs (int.is length)
   needs (length | int.isPositive)
-  recursive [rng, Values: (,)] { recurse [rng, values] ->
-    remainingBytes = length | int.subtract (values | list.length)
-    # TODO
-    ifElse (values | list.length | equals length) { [rng, values] } {
-      [rng, value] = rng | nextU32
-      recurse [rng, Values: values | list.append value | int.lowestBits 8]
+
+  recursive [generator, Bytes: (,)] { recurse [generator, bytes] ->
+    remainingBytes = length | int.subtract (bytes | list.length)
+    ifElse (remainingBytes | equals 0) { [generator, bytes] } {
+      [generator, value] = generator | nextU32
+      bytes =
+        bytes | list.concatenate (value | littleEndianBytes (remainingBytes | int.coerceAtMost 4))
+      recurse [generator, bytes]
     }
   }
 
-nextU64 rng =
+asRng generator :=
+  needs (is generator)
+  Rng [State: generator, nextBytes]
+
+nextU64 generator =
+  needs (is generator)
   # Implement `nextU64` via `nextU32`, little-endian order.
   #
   # Source: https://github.com/rust-random/rand/blob/f3dd0b885c4597b9617ca79987a0dd899ab29fcb/rand_core/src/impls.rs#L23-L29
-  [rng, Value: x] = rng | nextU32
-  [rng, Value: y] = rng | nextU32
-  [rng, Value: y | int.shiftLeft 32 | int.bitwiseOr x]
+  [generator, Value: x] = generator | nextU32
+  [generator, Value: y] = generator | nextU32
+  [generator, Value: y | int.shiftLeft 32 | int.bitwiseOr x]
 
 test =
   testConstruction =
     seed = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
-    rng1 = fromSeed seed
+    generator1 = fromSeed seed
 
-    [Rng: rng1, value] = rng1 | nextU64
+    [Generator: generator1, value] = generator1 | nextU64
     check (value | equals 4325440999699518727)
 
-    [Rng: rng1, NewRng: rng2] = fromRng rng1
-    ## Yes, this makes rng2 a clone of rng1!
-    [Rng: rng1, value] = rng1 | nextU64
+    [Generator: generator1, NewGenerator: generator2] = fromRng generator1
+    ## Yes, this makes generator2 a clone of generator1!
+    [Generator: generator1, value] = generator1 | nextU64
     # check (value | equals 15614385950550801700)
-    [Rng: rng2, value] = rng2 | nextU64
+    [Generator: generator2, value] = generator2 | nextU64
     # check (value | equals 15614385950550801700)
 
   testTrueValues =
     seed = (16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
-    rng = fromSeed seed
+    generator = fromSeed seed
 
-    [rng, values] = rng | nextU32s 9
+    [generator, values] = generator | nextU32s 9
     expectedValues = (
       2081028795,
       620940381,
@@ -126,7 +146,7 @@ test =
     check (values | equals expectedValues)
 
     # TODO: Implement `nextU64`
-    # [rng, values] = rng | nextU64s 9
+    # [generator, values] = generator | nextU64s 9
     # expectedValues = (
     #   9247529084182843387, 8321512596129439293, 14104136531997710878,
     #   6848554330849612046, 343577296533772213, 17828467390962600268,
@@ -135,7 +155,7 @@ test =
     # check (results | equals expectedValues)
 
     # TODO: Implement `nextBytes`
-    # [rng, values] = rng | nextBytes 32
+    # [generator, values] = generator | nextBytes 32
     # expectedValues = (102, 57, 212, 16, 233, 130, 49, 183,
     #   158, 187, 44, 203, 63, 149, 45, 17,
     #   117, 129, 131, 160, 70, 121, 158, 155,
@@ -147,8 +167,8 @@ test =
     ## Xorshift does not work with an all zero seed.
     ## Assert it does not panic.
     seed = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-    rng = fromSeed seed
-    [rng, Value: a] = rng | nextU32
+    generator = fromSeed seed
+    [generator, Value: a] = generator | nextU32
     check (a | equals 0 | bool.not)
-    [rng, Value: b] = rng | nextU32
+    [generator, Value: b] = generator | nextU32
     check (a | equals b | bool.not)

@@ -1,17 +1,16 @@
 [print] = use "Builtins"
 [list] = use "Core"
-random = use ".."
+[rng, Rngs: [Pseudo: [xorshift]]] = use ".."
 
 main _ :=
-  xorshift = random.rngs.pseudo.xorshift
   # TODO: use a random seed
-  rng = list.filled 16 0 | xorshift.fromSeed
-  print "Initial RNG state: {rng}"
+  generator = list.filled 16 0 | xorshift.fromSeed | xorshift.asRng
+  print "Initial RNG state: {generator}"
 
-  [rng, value] = rng | xorshift.nextU32
-  print "Random number: {value}"
-  print "New RNG state: {rng}"
+  [generator, bytes] = generator | rng.nextBytes 4
+  print "Random bytes: {bytes}"
+  print "New RNG state: {generator}"
 
-  [rng, value] = rng | xorshift.nextU32
-  print "Random number: {value}"
-  print "New RNG state: {rng}"
+  [generator, bytes] = generator | rng.nextBytes 4
+  print "Random bytes: {bytes}"
+  print "New RNG state: {generator}"

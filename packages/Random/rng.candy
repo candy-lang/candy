@@ -1,0 +1,19 @@
+[equals, function, int, iterable, list] = use "Core"
+
+is generator :=
+  # A generator is an `Rng [state, NextBytes: (state, length: int) -> [state, bytes: list[int]]]`
+  generator %
+    Rng [state, nextBytes] -> function.is2 nextBytes
+    _ -> False
+
+nextBytes generator length :=
+  needs (is generator)
+  needs (int.is length)
+  needs (int.isNonNegative length)
+
+  Rng [state, nextBytes] = generator
+  [Generator: state, bytes] = state | nextBytes length
+  needs (list.is bytes)
+  needs (bytes | list.length | equals length)
+  needs (bytes | iterable.fromList | iterable.all { it -> int.isUnsignedByte it })
+  [Generator: Rng [state, nextBytes], bytes]
