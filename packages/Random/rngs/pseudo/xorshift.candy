@@ -58,25 +58,29 @@ nextU32 generator :=
   generator = Xorshift [X: y, Y: z, Z: w, W: newW]
   [generator, Value: newW]
 
-littleEndianBytes value byteCount =
-  needs (int.is value)
-  needs (int.is byteCount)
-  needs (int.isPositive byteCount)
-  iterable.generateWithState [value, RemainingByteCount: byteCount] { [value, remainingByteCount] ->
-    ifElse (remainingByteCount | equals 0) { Error Empty } {
-      Ok [
-        State:
-          [Value: value | int.shiftRight 8, RemainingByteCount: remainingByteCount | int.subtract 1],
-        Item: value | int.lowestBits 8,
-      ]
-    }
-  }
-  | iterable.toList
-
 nextBytes generator length :=
   needs (is generator)
   needs (int.is length)
   needs (length | int.isPositive)
+
+  littleEndianBytes value byteCount =
+    needs (int.is value)
+    needs (int.is byteCount)
+    needs (int.isPositive byteCount)
+    iterable.generateWithState [value, RemainingByteCount: byteCount] {
+      [value, remainingByteCount] ->
+      ifElse (remainingByteCount | equals 0) { Error Empty } {
+        Ok [
+          State:
+            [
+              Value: value | int.shiftRight 8,
+              RemainingByteCount: remainingByteCount | int.subtract 1,
+            ],
+          Item: value | int.lowestBits 8,
+        ]
+      }
+    }
+    | iterable.toList
 
   recursive [generator, Bytes: (,)] { recurse [generator, bytes] ->
     remainingBytes = length | int.subtract (bytes | list.length)
