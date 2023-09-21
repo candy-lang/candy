@@ -12,7 +12,7 @@ use itertools::Itertools;
 use num_bigint::BigInt;
 use paste::paste;
 use std::str::FromStr;
-use tracing::{info, span, Level};
+use tracing::{span, Level};
 
 impl MachineState {
     pub(super) fn run_builtin_function(
@@ -362,13 +362,8 @@ impl Heap {
     }
 
     fn print(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |message: Any| {
-            info!(
-                "{}",
-                message
-                    .object
-                    .to_debug_text(Precedence::Low, MaxLength::Unlimited)
-            );
+        unpack_and_later_drop!(self, args, |message: Text| {
+            println!("{}", message.get());
             Return(Tag::create_nothing(self).into())
         })
     }
