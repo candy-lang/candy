@@ -58,6 +58,8 @@ absolute value :=
   needs (is value)
   ifElse (isNegative value) { negate value } { value }
 
+isUnsignedByte value :=
+  is value | bool.lazyAnd { value | isNonNegative } | bool.lazyAnd { value | isLessThan 256 }
 fitsInRustU32 value :=
   needs (is value)
   needs (isNonNegative value)
