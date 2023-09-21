@@ -33,9 +33,15 @@ pub trait AstToHir: CstDb + CstToAst {
     fn hir_id_to_display_span(&self, id: &hir::Id) -> Option<Range<Offset>>;
 
     #[salsa::transparent]
-    fn ast_to_hir_id(&self, id: &ast::Id) -> Vec<hir::Id>;
+    fn ast_to_hir_ids(&self, id: &ast::Id) -> Vec<hir::Id>;
     #[salsa::transparent]
-    fn cst_to_hir_id(&self, module: Module, id: cst::Id) -> Vec<hir::Id>;
+    fn cst_to_hir_ids(&self, module: Module, id: cst::Id) -> Vec<hir::Id>;
+
+    // For example, an identifier in a struct pattern (`[foo]`) can correspond
+    // to two HIR IDs: The implicit key `Foo` and the capturing identifier
+    // `foo`. This function returns the latter.
+    #[salsa::transparent]
+    fn cst_to_last_hir_id(&self, module: Module, id: cst::Id) -> Option<hir::Id>;
 
     fn hir(&self, module: Module) -> HirResult;
 }
@@ -57,22 +63,27 @@ fn hir_id_to_display_span(db: &dyn AstToHir, id: &hir::Id) -> Option<Range<Offse
     Some(db.find_cst(id.module.clone(), cst_id).display_span())
 }
 
-fn ast_to_hir_id(db: &dyn AstToHir, id: &ast::Id) -> Vec<hir::Id> {
+fn ast_to_hir_ids(db: &dyn AstToHir, id: &ast::Id) -> Vec<hir::Id> {
     if let Ok((_, hir_to_ast_id_mapping)) = db.hir(id.module.clone()) {
         hir_to_ast_id_mapping
             .iter()
             .filter_map(|(key, value)| if value == id { Some(key) } else { None })
             .cloned()
+            .sorted()
             .collect_vec()
     } else {
         vec![]
     }
 }
-fn cst_to_hir_id(db: &dyn AstToHir, module: Module, id: cst::Id) -> Vec<hir::Id> {
-    let ids = db.cst_to_ast_id(module, id);
+fn cst_to_hir_ids(db: &dyn AstToHir, module: Module, id: cst::Id) -> Vec<hir::Id> {
+    let ids = db.cst_to_ast_ids(module, id);
     ids.into_iter()
-        .flat_map(|id| db.ast_to_hir_id(&id))
+        .flat_map(|id| db.ast_to_hir_ids(&id))
+        .sorted()
         .collect_vec()
+}
+fn cst_to_last_hir_id(db: &dyn AstToHir, module: Module, id: cst::Id) -> Option<hir::Id> {
+    db.cst_to_hir_ids(module, id).pop()
 }
 
 fn hir(db: &dyn AstToHir, module: Module) -> HirResult {
