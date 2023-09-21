@@ -1,1 +1,2 @@
 constants := use ".constants"
+duration := use ".duration"

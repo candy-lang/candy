@@ -1,6 +1,6 @@
 builtins = use "Builtins"
 bool = use "..bool"
-[ifElse] = use "..controlFlow"
+[ifElse, recursive] = use "..controlFlow"
 [equals] = use "..equality"
 int = use "..int"
 # iterable = use "..iterable"
@@ -120,3 +120,29 @@ trimEnd := builtins.textTrimEnd
 trim text :=
   needs (is text)
   text | trimStart | trimEnd
+
+firstIndexOf text char :=
+  needs (is text)
+  needs (is char)
+  needs (length char | equals 1)
+  recursive 0 { recurse i ->
+    ifElse (text | length | int.isGreaterThanOrEqualTo i) {ifElse (text | characterAt i | equals char) {i} {i | int.add 1 | recurse}} {int.negate 1}
+  }
+
+padStart text len char :=
+  needs (is text)
+  needs (int.is len)
+  needs (is char)
+  needs (char | length | equals 1)
+  recursive text { recurse text ->
+    ifElse (text | length | int.isGreaterThanOrEqualTo len) {text} {char | concatenate text | recurse}
+  }
+
+padEnd text len char :=
+  needs (is text)
+  needs (int.is len)
+  needs (is char)
+  needs (char | length | equals 1)
+  recursive text { recurse text ->
+    ifElse (text | length | int.isGreaterThanOrEqualTo len) {text} {text | concatenate char | recurse}
+  }
