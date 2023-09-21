@@ -15,6 +15,7 @@
 # https://github.com/rust-random/rngs/blob/0b59b21942e0ca2843c9b08ec8e0b422c0710876/rand_xorshift/tests/mod.rs
 
 [bool, check, equals, ifElse, int, iterable, list, recursive, tag] = use "Core"
+[uniform] = use "....distributions"
 rng = use "....rng"
 [lowEndianBytesToU32] = use "..utils"
 
@@ -39,6 +40,12 @@ fromSeed seed :=
     { [X: getU32 0, Y: getU32 1, Z: getU32 2, W: getU32 3] }
   Xorshift state
 
+fromRng generator :=
+  needs (rng.is generator)
+  [generator, Values: (x, y, z, w)] =
+    generator | rng.nextList 4 { it -> it | uniform.nextUnsignedIntWithBytes 4 }
+  [generator, NewGenerator: Xorshift [x, y, z, w]]
+
 nextU32 generator :=
   needs (is generator)
   Xorshift [x, y, z, w] = generator
@@ -50,14 +57,6 @@ nextU32 generator :=
     | int.bitwiseXor (t | int.bitwiseXor (t | int.shiftRight 8))
   generator = Xorshift [X: y, Y: z, Z: w, W: newW]
   [generator, Value: newW]
-
-fromRng generator :=
-  needs (is generator)
-  [generator, Value: x] = generator | nextU32
-  [generator, Value: y] = generator | nextU32
-  [generator, Value: z] = generator | nextU32
-  [generator, Value: w] = generator | nextU32
-  [generator, NewGenerator: Xorshift [x, y, z, w]]
 
 littleEndianBytes value byteCount =
   needs (int.is value)
@@ -114,12 +113,16 @@ test =
     [Generator: generator1, value] = generator1 | nextU64
     check (value | equals 4325440999699518727)
 
-    [Generator: generator1, NewGenerator: generator2] = fromRng generator1
-    ## Yes, this makes generator2 a clone of generator1!
+    [Generator: generator1, NewGenerator: generator2] = fromRng (generator1 | asRng)
+    generator1 = generator1 | rng.getState
+
+    ## In the original Rust code, these two generators were clones. However, due to the different
+    ## byte order produced by our uniform distribution, this is not the case here.
     [Generator: generator1, value] = generator1 | nextU64
     check (value | equals 15614385950550801700)
     [Generator: generator2, value] = generator2 | nextU64
-    check (value | equals 15614385950550801700)
+    # In Rust, the value was 15614385950550801700.
+    check (value | equals 13321984983912137592)
 
   testTrueValues =
     seed = (16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
