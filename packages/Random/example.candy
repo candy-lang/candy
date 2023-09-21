@@ -1,10 +1,12 @@
 [print] = use "Builtins"
-[int, list] = use "Core"
+[int, list, result] = use "Core"
 [Distributions: [uniform], rng, Rngs: [Pseudo: [xorshift]]] = use ".."
 
-main _ :=
-  # TODO: use a random seed
-  generator = list.filled 16 0 | xorshift.fromSeed | xorshift.asRng
+main := { environment ->
+  seed = environment.getRandomBytes 16 | result.unwrap
+  print "Seed from OS: {seed}"
+
+  generator = xorshift.fromSeed seed | xorshift.asRng
   print "Initial RNG: {generator}"
 
   [generator, bytes] = generator | rng.nextBytes 10
@@ -28,3 +30,4 @@ main _ :=
     it | uniform.nextResult { it -> it | uniform.nextUnsignedByte } { it -> it | uniform.nextBool }
   }
   print "Random results of int or bool: {values}"
+}
