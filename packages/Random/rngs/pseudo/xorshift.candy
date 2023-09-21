@@ -1,0 +1,154 @@
+# A Xorshift random number generator.
+#
+# The Xorshift[^1] algorithm is not suitable for cryptographic purposes, but is very fast. If you do
+# not know for sure that it fits your requirements, use a more secure one.
+#
+# When seeded with zero (i.e. `fromSeed 0` is called), this implementation actually uses
+# `0xBAD_5EED_0BAD_5EED_0BAD_5EED_0BAD_5EED` for the seed. This arbitrary value is used because the
+# underlying algorithm can't escape from an all-zero state.
+#
+# [^1]: George Marsaglia (July 2003): ["Xorshift RNGs"](https://www.jstatsoft.org/v08/i14/paper),
+#       _Journal of Statistical Software_, Vol. 8, Issue 14
+#
+# Port of Rust's Xorshift implementation:
+# https://github.com/rust-random/rngs/blob/0b59b21942e0ca2843c9b08ec8e0b422c0710876/rand_xorshift/src/lib.rs
+# https://github.com/rust-random/rngs/blob/0b59b21942e0ca2843c9b08ec8e0b422c0710876/rand_xorshift/tests/mod.rs
+
+[bool, check, equals, ifElse, int, iterable, list, recursive] = use "Core"
+[lowEndianBytesToU32] = use "..utils"
+
+is rng := rng %
+  [x, y, z, w] ->
+    int.is x | bool.lazyAnd { int.is y } | bool.lazyAnd { int.is z } | bool.lazyAnd { int.is w }
+  _ -> False
+
+fromSeed seed :=
+  needs (list.is seed)
+  needs (seed | list.length | equals 16)
+  needs (seed | iterable.fromList | iterable.all { it -> int.isUnsignedByte it })
+
+  getU32 = { index ->
+    seed | list.getRange (index | int.multiply 4) (index | int.add 1 | int.multiply 4)
+    | lowEndianBytesToU32
+  }
+
+  ifElse
+    seed | iterable.fromList | iterable.all { it -> it | equals 0 }
+    { [X: 0x0BAD5EED, Y: 0x0BAD5EED, Z: 0x0BAD5EED, W: 0x0BAD5EED] }
+    { [X: getU32 0, Y: getU32 1, Z: getU32 2, W: getU32 3] }
+
+nextU32 rng :=
+  needs (is rng)
+
+  ## These shifts are taken from the example in the Summary section of
+  ## the paper “Xorshift RNGs” (on the bottom of page 5).
+  t = rng.x | int.bitwiseXor (rng.x | int.shiftLeft 11 | int.lowestBits 32)
+  rng = [
+    X: rng.y,
+    Y: rng.z,
+    Z: rng.w,
+    W:
+      rng.w | int.bitwiseXor (rng.w | int.shiftRight 19)
+      | int.bitwiseXor (t | int.bitwiseXor (t | int.shiftRight 8)),
+  ]
+  [rng, Value: rng.w]
+
+fromRng rng :=
+  needs (is rng)
+  [rng, Value: x] = rng | nextU32
+  [rng, Value: y] = rng | nextU32
+  [rng, Value: z] = rng | nextU32
+  [rng, Value: w] = rng | nextU32
+  [rng, NewRng: [x, y, z, w]]
+
+nextU32s rng length :=
+  needs (is rng)
+  needs (length | int.isPositive)
+  recursive [rng, Values: (,)] { recurse [rng, values] ->
+    ifElse (values | list.length | equals length) { [rng, values] } {
+      [rng, value] = rng | nextU32
+      recurse [rng, Values: values | list.append value]
+    }
+  }
+
+nextBytes rng length :=
+  needs (is rng)
+  needs (int.is length)
+  needs (length | int.isPositive)
+  recursive [rng, Values: (,)] { recurse [rng, values] ->
+    remainingBytes = length | int.subtract (values | list.length)
+    # TODO
+    ifElse (values | list.length | equals length) { [rng, values] } {
+      [rng, value] = rng | nextU32
+      recurse [rng, Values: values | list.append value | int.lowestBits 8]
+    }
+  }
+
+nextU64 rng =
+  # Implement `nextU64` via `nextU32`, little-endian order.
+  #
+  # Source: https://github.com/rust-random/rand/blob/f3dd0b885c4597b9617ca79987a0dd899ab29fcb/rand_core/src/impls.rs#L23-L29
+  [rng, Value: x] = rng | nextU32
+  [rng, Value: y] = rng | nextU32
+  [rng, Value: y | int.shiftLeft 32 | int.bitwiseOr x]
+
+test =
+  testConstruction =
+    seed = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
+    rng1 = fromSeed seed
+
+    [Rng: rng1, value] = rng1 | nextU64
+    check (value | equals 4325440999699518727)
+
+    [Rng: rng1, NewRng: rng2] = fromRng rng1
+    ## Yes, this makes rng2 a clone of rng1!
+    [Rng: rng1, value] = rng1 | nextU64
+    # check (value | equals 15614385950550801700)
+    [Rng: rng2, value] = rng2 | nextU64
+    # check (value | equals 15614385950550801700)
+
+  testTrueValues =
+    seed = (16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
+    rng = fromSeed seed
+
+    [rng, values] = rng | nextU32s 9
+    expectedValues = (
+      2081028795,
+      620940381,
+      269070770,
+      16943764,
+      854422573,
+      29242889,
+      1550291885,
+      1227154591,
+      271695242,
+    )
+    check (values | equals expectedValues)
+
+    # TODO: Implement `nextU64`
+    # [rng, values] = rng | nextU64s 9
+    # expectedValues = (
+    #   9247529084182843387, 8321512596129439293, 14104136531997710878,
+    #   6848554330849612046, 343577296533772213, 17828467390962600268,
+    #   9847333257685787782, 7717352744383350108, 1133407547287910111,
+    # )
+    # check (results | equals expectedValues)
+
+    # TODO: Implement `nextBytes`
+    # [rng, values] = rng | nextBytes 32
+    # expectedValues = (102, 57, 212, 16, 233, 130, 49, 183,
+    #   158, 187, 44, 203, 63, 149, 45, 17,
+    #   117, 129, 131, 160, 70, 121, 158, 155,
+    #   224, 209, 192, 53, 10, 62, 57, 72,
+    # )
+    # check (results | equals expectedValues)
+
+  testZeroSeed =
+    ## Xorshift does not work with an all zero seed.
+    ## Assert it does not panic.
+    seed = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+    rng = fromSeed seed
+    [rng, Value: a] = rng | nextU32
+    check (a | equals 0 | bool.not)
+    [rng, Value: b] = rng | nextU32
+    check (a | equals b | bool.not)
