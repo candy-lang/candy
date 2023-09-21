@@ -5,7 +5,7 @@
 main _ :=
   # TODO: use a random seed
   generator = list.filled 16 0 | xorshift.fromSeed | xorshift.asRng
-  print "Initial RNG state: {generator}"
+  print "Initial RNG: {generator}"
 
   [generator, bytes] = generator | rng.nextBytes 10
   print "Random bytes: {bytes}"
