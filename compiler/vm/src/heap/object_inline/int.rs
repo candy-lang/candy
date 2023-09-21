@@ -13,13 +13,14 @@ use std::{
     cmp::Ordering,
     fmt::{self, Formatter},
     num::NonZeroU64,
-    ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Shl, Shr, Sub},
+    ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Shl, Sub},
 };
 
 #[derive(Clone, Copy, Deref)]
 pub struct InlineInt(InlineObject);
 impl InlineInt {
     const VALUE_SHIFT: usize = 3;
+    pub const VALUE_BITS: usize = InlineObject::BITS as usize - Self::VALUE_SHIFT;
 
     pub const fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
@@ -99,18 +100,13 @@ impl InlineInt {
             .filter(|it| it.signum() == lhs.signum())
             .map(|it| Int::create(heap, true, it))
             .unwrap_or_else(|| {
-                Int::create_from_bigint(heap, true, (Shl::shl)(BigInt::from(lhs), rhs.get()))
+                Int::create_from_bigint(heap, true, BigInt::from(lhs).shl(rhs.get()))
             })
     }
-    pub fn shift_right(self, heap: &mut Heap, rhs: Self) -> Int {
-        let lhs = self.get();
-        #[allow(clippy::map_unwrap_or)]
-        rhs.try_get()
-            .and_then(|rhs| i64::checked_shr(lhs, rhs))
-            .map(|it| Int::create(heap, true, it))
-            .unwrap_or_else(|| {
-                Int::create_from_bigint(heap, true, (Shr::shr)(BigInt::from(lhs), rhs.get()))
-            })
+    pub fn shift_right(self, rhs: Self) -> Self {
+        // SAFETY: The value can only get closer to zero, so it must be covered by our range as
+        // well.
+        Self::from_unchecked(self.get() >> rhs.get())
     }
 
     pub fn bit_length(self) -> Self {
@@ -213,52 +209,87 @@ pub impl I64BitLength for i64 {
 #[cfg(test)]
 mod tests {
     use super::InlineInt;
-    use crate::heap::{Heap, InlineObject};
+    use crate::heap::{Heap, InlineObject, Int};
     use num_bigint::BigInt;
 
-    macro_rules! inline_int {
-        ($value:expr) => {
-            InlineInt::try_from($value).unwrap()
-        };
-    }
-
     #[test]
-    #[allow(clippy::cast_lossless, clippy::cast_possible_wrap)]
     fn shift_left() {
         let mut heap = Heap::default();
         assert_eq!(
-            inline_int!(1).shift_left(&mut heap, inline_int!(1)),
-            inline_int!(2).into(),
+            inline_int(1).shift_left(&mut heap, inline_int(1)),
+            Int::create(&mut heap, true, 2),
+        );
+        assert_eq!(
+            inline_int(2).shift_left(&mut heap, inline_int(1)),
+            Int::create(&mut heap, true, 4),
+        );
+        assert_eq!(
+            inline_int(-1).shift_left(&mut heap, inline_int(1)),
+            Int::create(&mut heap, true, -2),
+        );
+        assert_eq!(
+            inline_int(-2).shift_left(&mut heap, inline_int(1)),
+            Int::create(&mut heap, true, -4),
         );
 
-        let shift = InlineObject::BITS as usize - InlineInt::VALUE_SHIFT;
-        assert_eq!(
-            inline_int!(1)
-                .shift_left(&mut heap, inline_int!(shift as i64))
-                .get()
-                .as_ref(),
-            &(BigInt::from(1) << shift),
-        );
+        {
+            let shift = InlineInt::VALUE_BITS;
+            #[allow(clippy::cast_possible_wrap)]
+            let shift_inline_int = inline_int(shift as i64);
+            assert_eq!(
+                inline_int(1).shift_left(&mut heap, shift_inline_int),
+                Int::create(&mut heap, true, 1i64 << shift),
+            );
+        }
 
-        assert_eq!(
-            inline_int!(1)
-                .shift_left(&mut heap, inline_int!(InlineObject::BITS as i64))
-                .get()
-                .as_ref(),
-            &(BigInt::from(1) << InlineObject::BITS),
-        );
+        {
+            let shift = InlineObject::BITS;
+            #[allow(clippy::cast_lossless)]
+            let shift_inline_int = inline_int(shift as i64);
+            assert_eq!(
+                inline_int(1).shift_left(&mut heap, shift_inline_int),
+                Int::create_from_bigint(&mut heap, true, BigInt::from(1) << shift),
+            );
+        }
+    }
+    #[test]
+    #[allow(clippy::cast_possible_wrap)]
+    fn shift_right() {
+        assert_eq!(inline_int(1).shift_right(inline_int(1)), inline_int(0));
+        assert_eq!(inline_int(-1).shift_right(inline_int(1)), inline_int(-1));
+        assert_eq!(inline_int(2).shift_right(inline_int(1)), inline_int(1));
+        assert_eq!(inline_int(-2).shift_right(inline_int(1)), inline_int(-1));
+
+        {
+            // The leftmost bit must be zero since the number is positive.
+            let shift = InlineInt::VALUE_BITS - 2;
+            assert_eq!(
+                inline_int(1 << shift).shift_right(inline_int(shift as i64)),
+                inline_int(1),
+            );
+        }
+
+        {
+            let shift = inline_int(InlineInt::VALUE_BITS as i64 + 1);
+            assert_eq!(inline_int(1).shift_right(shift), inline_int(0));
+            assert_eq!(inline_int(-1).shift_right(shift), inline_int(-1));
+        }
     }
 
     #[test]
     fn bit_length() {
-        assert_eq!(inline_int!(-4).bit_length(), inline_int!(3));
-        assert_eq!(inline_int!(-3).bit_length(), inline_int!(3));
-        assert_eq!(inline_int!(-2).bit_length(), inline_int!(2));
-        assert_eq!(inline_int!(-1).bit_length(), inline_int!(1));
-        assert_eq!(inline_int!(0).bit_length(), inline_int!(0));
-        assert_eq!(inline_int!(1).bit_length(), inline_int!(1));
-        assert_eq!(inline_int!(2).bit_length(), inline_int!(2));
-        assert_eq!(inline_int!(3).bit_length(), inline_int!(2));
-        assert_eq!(inline_int!(4).bit_length(), inline_int!(3));
+        assert_eq!(inline_int(-4).bit_length(), inline_int(3));
+        assert_eq!(inline_int(-3).bit_length(), inline_int(3));
+        assert_eq!(inline_int(-2).bit_length(), inline_int(2));
+        assert_eq!(inline_int(-1).bit_length(), inline_int(1));
+        assert_eq!(inline_int(0).bit_length(), inline_int(0));
+        assert_eq!(inline_int(1).bit_length(), inline_int(1));
+        assert_eq!(inline_int(2).bit_length(), inline_int(2));
+        assert_eq!(inline_int(3).bit_length(), inline_int(2));
+        assert_eq!(inline_int(4).bit_length(), inline_int(3));
+    }
+
+    fn inline_int(value: i64) -> InlineInt {
+        InlineInt::try_from(value).unwrap()
     }
 }
