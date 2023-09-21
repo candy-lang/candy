@@ -669,6 +669,7 @@ impl LoweringContext {
                     receiver: name,
                     arguments: parameters,
                 } = &left.kind
+                    && !matches!(name.kind, CstKind::Symbol(_))
                 {
                     let name = match &name.kind {
                         CstKind::Identifier(identifier) => {
