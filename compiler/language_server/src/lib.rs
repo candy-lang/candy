@@ -5,7 +5,7 @@
     let_chains,
     strict_provenance
 )]
-#![warn(clippy::nursery, clippy::pedantic)]
+#![warn(clippy::nursery, clippy::pedantic, unused_crate_dependencies)]
 #![allow(
     clippy::future_not_send, // TODO: Fix clippy::future_not_send occurrences
     clippy::large_enum_variant,

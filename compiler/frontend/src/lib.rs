@@ -7,7 +7,7 @@
     let_chains,
     try_blocks
 )]
-#![warn(clippy::nursery, clippy::pedantic)]
+#![warn(clippy::nursery, clippy::pedantic, unused_crate_dependencies)]
 #![allow(
     clippy::cognitive_complexity,
     clippy::match_same_arms,
