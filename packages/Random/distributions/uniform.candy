@@ -1,4 +1,4 @@
-[equals, ifElse, int, iterable, recursive] = use "Core"
+[equals, function, ifElse, int, iterable, recursive] = use "Core"
 rng = use "...rng"
 
 ## Bool
@@ -9,6 +9,11 @@ nextBool generator :=
   [generator, Value: byte | int.isOdd]
 
 ## Int
+
+nextUnsignedByte generator :=
+  needs (rng.is generator)
+  [generator, Bytes: (byte,)] = generator | rng.nextBytes 1
+  [generator, Value: byte]
 
 nextUnsignedIntWithBytes generator numberOfBytes :=
   needs (rng.is generator)
@@ -87,3 +92,21 @@ nextIntInRange generator minInclusive maxExclusive :=
   needs (minInclusive | int.isLessThan maxExclusive)
   [generator, value] = generator | nextUnsignedInt (maxExclusive | int.subtract minInclusive)
   [generator, Value: value | int.add minInclusive]
+
+## Result
+
+nextResult generator nextOk nextError :=
+  needs (rng.is generator)
+  needs (function.is1 nextOk)
+  needs (function.is1 nextError)
+  [generator, Value: isOk] = generator | nextBool
+  ifElse
+    isOk
+    {
+      [generator, value] = generator | nextOk
+      [generator, Value: Ok value]
+    }
+    {
+      [generator, value] = generator | nextError
+      [generator, Value: Error value]
+    }

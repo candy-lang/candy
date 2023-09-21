@@ -15,3 +15,8 @@ main _ :=
 
   [generator, values] = generator | rng.nextList 10 { it -> it | uniform.nextIntInRange 1 7 }
   print "Random dice rolls: {values}"
+
+  [generator, values] = generator | rng.nextList 10 { it ->
+    it | uniform.nextResult { it -> it | uniform.nextUnsignedByte } { it -> it | uniform.nextBool }
+  }
+  print "Random results of int or bool: {values}"
