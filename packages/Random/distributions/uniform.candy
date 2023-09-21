@@ -1,4 +1,4 @@
-[equals, function, ifElse, int, iterable, recursive] = use "Core"
+[bool, equals, function, ifElse, int, iterable, list, recursive] = use "Core"
 rng = use "...rng"
 
 ## Bool
@@ -93,20 +93,36 @@ nextIntInRange generator minInclusive maxExclusive :=
   [generator, value] = generator | nextUnsignedInt (maxExclusive | int.subtract minInclusive)
   [generator, Value: value | int.add minInclusive]
 
-## Result
+## Selections
+
+nextFromList generator items :=
+  # Select a random `item` from `items`.
+  needs (rng.is generator)
+  needs (list.is items)
+  needs (items | list.isEmpty | bool.not)
+  [generator, Value: index] = generator | nextUnsignedInt (items | list.length)
+  [generator, Value: items | list.get index]
+
+nextFromDistributions generator nextItemDistributions :=
+  # Select a random distribution from `nextItemDistributions` and evaluate that against the RNG.
+  needs (rng.is generator)
+  needs (list.is nextItemDistributions)
+  needs (nextItemDistributions | list.isEmpty | bool.not)
+  needs (nextItemDistributions | iterable.fromList | iterable.all { it -> function.is1 it })
+  [generator, Value: distribution] = generator | nextFromList nextItemDistributions
+  generator | distribution
 
 nextResult generator nextOk nextError :=
   needs (rng.is generator)
   needs (function.is1 nextOk)
   needs (function.is1 nextError)
-  [generator, Value: isOk] = generator | nextBool
-  ifElse
-    isOk
-    {
+  generator | nextFromDistributions (
+    { generator ->
       [generator, value] = generator | nextOk
       [generator, Value: Ok value]
-    }
-    {
+    },
+    { generator ->
       [generator, value] = generator | nextError
       [generator, Value: Error value]
-    }
+    },
+  )
