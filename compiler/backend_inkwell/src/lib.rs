@@ -1,4 +1,5 @@
 #![feature(let_chains)]
+#![warn(unused_crate_dependencies)]
 
 use candy_frontend::module::Module as CandyModule;
 use candy_frontend::{
@@ -15,6 +16,8 @@ use inkwell::{
     values::{BasicValue, BasicValueEnum, FunctionValue, GlobalValue},
     AddressSpace,
 };
+// We depend on this package (used by inkwell) to specify a version and configure features.
+use llvm_sys as _;
 
 use candy_frontend::rich_ir::{RichIr, ToRichIr};
 use candy_frontend::string_to_rcst::ModuleError;

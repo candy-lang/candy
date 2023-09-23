@@ -1,4 +1,5 @@
 #![feature(lazy_cell)]
+#![warn(unused_crate_dependencies)]
 
 use clap::Parser;
 use tracing::{debug, Level, Metadata};
