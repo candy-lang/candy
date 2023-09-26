@@ -101,8 +101,8 @@ impl Environment for DefaultEnvironment {
                     true,
                     "Handle `getRandomBytes` was called with a non-integer.",
                 );
-                let empty_list = Tag::create_result(heap, true, Err(message.into()));
-                return call.complete(heap, empty_list);
+                let result = Tag::create_result(heap, true, Err(message.into()));
+                return call.complete(heap, result);
             };
             let Some(length) = length.try_get::<usize>() else {
                 // TODO: Panic
@@ -111,15 +111,15 @@ impl Environment for DefaultEnvironment {
                     true,
                     "Handle `getRandomBytes` was called with a length that doesn't fit in usize.",
                 );
-                let empty_list = Tag::create_result(heap, true, Err(message.into()));
-                return call.complete(heap, empty_list);
+                let result = Tag::create_result(heap, true, Err(message.into()));
+                return call.complete(heap, result);
             };
 
             let mut bytes = vec![0u8; length];
             if let Err(error) = getrandom::getrandom(&mut bytes) {
                 let message = Text::create(heap, true, &error.to_string());
-                let empty_list = Tag::create_result(heap, true, Err(message.into()));
-                return call.complete(heap, empty_list);
+                let result = Tag::create_result(heap, true, Err(message.into()));
+                return call.complete(heap, result);
             }
 
             let bytes = bytes
