@@ -11,8 +11,16 @@ use derive_more::Deref;
 use itertools::Itertools;
 use num_bigint::BigInt;
 use paste::paste;
-use std::str::FromStr;
+use std::{
+    str::FromStr,
+    sync::atomic::{AtomicBool, Ordering},
+};
 use tracing::{span, Level};
+
+/// Our language server talks to clients using the LSP on stdin/stdout. When it
+/// is running, we can't print log messages / etc. on stdout since it messes up
+/// the LSP's messages.
+pub static CAN_USE_STDOUT: AtomicBool = AtomicBool::new(true);
 
 impl MachineState {
     pub(super) fn run_builtin_function(
@@ -363,7 +371,11 @@ impl Heap {
 
     fn print(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |message: Text| {
-            println!("{}", message.get());
+            if CAN_USE_STDOUT.load(Ordering::Relaxed) {
+                println!("{}", message.get());
+            } else {
+                eprintln!("{}", message.get());
+            }
             Return(Tag::create_nothing(self).into())
         })
     }

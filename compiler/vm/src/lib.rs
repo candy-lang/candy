@@ -23,6 +23,7 @@
 )]
 
 use crate::heap::{Struct, Tag};
+pub use builtin_functions::CAN_USE_STDOUT;
 use heap::{Function, Heap, InlineObject};
 pub use instruction_pointer::InstructionPointer;
 use tracing::debug;
