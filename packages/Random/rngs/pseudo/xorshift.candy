@@ -1,4 +1,4 @@
-# A Xorshift random number generator.
+# An Xorshift random number generator.
 #
 # The Xorshift[^1] algorithm is not suitable for cryptographic purposes, but is very fast. If you do
 # not know for sure that it fits your requirements, use a more secure one.
