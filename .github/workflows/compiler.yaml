@@ -7,6 +7,9 @@ on:
 
 env:
   RUST_BACKTRACE: 1
+  # Use LLD as the linker to increase compile times. It's installed together
+  # with LLVM.
+  RUSTFLAGS: -C link-arg=-fuse-ld=lld
 
 jobs:
   check:
@@ -46,6 +49,16 @@ jobs:
   #     - uses: actions/checkout@v4
   #     - uses: dsherret/rust-toolchain-file@v1
   #     - uses: Swatinem/rust-cache@v2.7.0
+  #     - name: Cache LLVM and Clang
+  #       id: cache-llvm
+  #       uses: actions/cache@v3
+  #       with:
+  #         path: ./llvm
+  #         key: llvm-15.0
+  #     - uses: KyleMayes/install-llvm-action@v1.8.3
+  #       with:
+  #         version: "15.0"
+  #         cached: ${{ steps.cache-llvm.outputs.cache-hit }}
 
   #     - run: cargo run --release -- fuzz ./packages/Benchmark.candy
 
@@ -62,7 +75,6 @@ jobs:
       - run: cp candy/rust-toolchain.toml ./
       - uses: dsherret/rust-toolchain-file@v1
       - uses: Swatinem/rust-cache@v2.7.0
-
       - name: Cache LLVM and Clang
         id: cache-llvm
         uses: actions/cache@v3
@@ -128,6 +140,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dsherret/rust-toolchain-file@v1
       - uses: Swatinem/rust-cache@v2.7.0
+      - name: Cache LLVM and Clang
+        id: cache-llvm
+        uses: actions/cache@v3
+        with:
+          path: ./llvm
+          key: llvm-15.0
+      - uses: KyleMayes/install-llvm-action@v1.8.3
+        with:
+          version: "15.0"
+          cached: ${{ steps.cache-llvm.outputs.cache-hit }}
 
       - name: Run benchmark
         working-directory: compiler/vm/
