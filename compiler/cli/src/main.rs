@@ -1,7 +1,9 @@
 #![feature(lazy_cell)]
 #![warn(unused_crate_dependencies)]
 
+use candy_vm::CAN_USE_STDOUT;
 use clap::Parser;
+use std::sync::atomic::Ordering;
 use tracing::{debug, Level, Metadata};
 use tracing_subscriber::{
     filter,
@@ -44,6 +46,7 @@ async fn main() -> ProgramResult {
 
     let should_log_to_stdout = !matches!(options, CandyOptions::Lsp);
     init_logger(should_log_to_stdout);
+    CAN_USE_STDOUT.store(should_log_to_stdout, Ordering::Relaxed);
 
     match options {
         CandyOptions::Run(options) => run::run(options),

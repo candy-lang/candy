@@ -1,3 +1,5 @@
+'P: AdventOfCode':
+  - packages/AdventOfCode/**/*
 'P: Builtins':
   - packages/Builtins/**/*
 'P: Compiler: CLI':
@@ -18,3 +20,11 @@
   - vscode_extension/**/*
 'P: Core':
   - packages/Core/**/*
+'P: Examples':
+  - packages/Examples/**/*
+'P: ProgrammingLanguageBenchmarks':
+  - packages/ProgrammingLanguageBenchmarks/**/*
+'P: Random':
+  - packages/Random/**/*
+'P: RosettaCode':
+  - packages/RosettaCode/**/*

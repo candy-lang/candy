@@ -23,7 +23,7 @@ fn find_ast(db: &dyn AstDb, id: Id) -> Option<Ast> {
     ast.find(&id).cloned()
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Id {
     pub module: Module,
     pub local: usize,

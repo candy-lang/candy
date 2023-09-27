@@ -233,6 +233,7 @@ pub struct DefaultSymbols {
     pub error: Text,
     pub false_: Text,
     pub function: Text,
+    pub get_random_bytes: Text,
     pub greater: Text,
     pub int: Text,
     pub less: Text,
@@ -258,6 +259,7 @@ impl DefaultSymbols {
             error: Text::create(heap, false, "Error"),
             false_: Text::create(heap, false, "False"),
             function: Text::create(heap, false, "Function"),
+            get_random_bytes: Text::create(heap, false, "GetRandomBytes"),
             greater: Text::create(heap, false, "Greater"),
             int: Text::create(heap, false, "Int"),
             less: Text::create(heap, false, "Less"),
@@ -296,6 +298,7 @@ impl DefaultSymbols {
             error: clone_to_heap(heap, address_map, self.error),
             false_: clone_to_heap(heap, address_map, self.false_),
             function: clone_to_heap(heap, address_map, self.function),
+            get_random_bytes: clone_to_heap(heap, address_map, self.get_random_bytes),
             greater: clone_to_heap(heap, address_map, self.greater),
             int: clone_to_heap(heap, address_map, self.int),
             less: clone_to_heap(heap, address_map, self.less),
@@ -323,7 +326,7 @@ impl DefaultSymbols {
             .map(|it| symbols[it])
     }
     #[must_use]
-    pub const fn all_symbols(&self) -> [Text; 21] {
+    pub const fn all_symbols(&self) -> [Text; 22] {
         [
             self.arguments,
             self.builtin,
@@ -331,6 +334,7 @@ impl DefaultSymbols {
             self.error,
             self.false_,
             self.function,
+            self.get_random_bytes,
             self.greater,
             self.int,
             self.less,

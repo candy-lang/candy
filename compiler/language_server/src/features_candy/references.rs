@@ -41,13 +41,8 @@ where
             Some(ReferenceQuery::Needs(module))
         }
         CstKind::Identifier { .. } => {
-            let hir_ids = db.cst_to_hir_id(module, origin_cst.data.id);
-            assert!(
-                hir_ids.len() <= 1,
-                "The CST ID of an identifier should map to at most one HIR ID, but it mapped to {hir_ids:?}.",
-            );
-            let hir_id = hir_ids.into_iter().next()?;
-
+            let hir_id = db.cst_to_last_hir_id(module, origin_cst.data.id)?;
+            debug!("HIR ID: {hir_id}");
             let target_id: Option<hir::Id> =
                 if let Some(hir_expr) = db.find_expression(hir_id.clone()) {
                     let containing_body = db.containing_body_of(hir_id.clone());

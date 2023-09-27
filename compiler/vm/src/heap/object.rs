@@ -24,7 +24,6 @@ use std::{
     cmp::Ordering,
     fmt::{self, Debug, Formatter},
     hash::Hash,
-    ops::{Shl, Shr},
     str,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
@@ -174,8 +173,38 @@ impl Int {
         }
     }
 
-    shift_fn!(shift_left, shl);
-    shift_fn!(shift_right, shr);
+    #[must_use]
+    pub fn shift_left(self, heap: &mut Heap, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Self::Inline(lhs), Self::Inline(rhs)) => lhs.shift_left(heap, rhs),
+            (Self::Inline(lhs), Self::Heap(rhs)) => Self::create_from_bigint(
+                heap,
+                true,
+                // TODO: Support shifting by larger numbers
+                BigInt::from(lhs.get()) << i128::try_from(rhs.get()).unwrap(),
+            ),
+            // TODO: Support shifting by larger numbers
+            (Self::Heap(lhs), rhs) => lhs.shift_left(heap, rhs.try_get::<i128>().unwrap()),
+        }
+    }
+    #[must_use]
+    pub fn shift_right(self, heap: &mut Heap, rhs: Self) -> Self {
+        match self {
+            Self::Inline(lhs) => {
+                let rhs = match rhs {
+                    Self::Inline(rhs) => rhs,
+                    Self::Heap(rhs) => {
+                        debug_assert!(rhs.get().is_positive(), "Shift amount must be positive.");
+                        #[allow(clippy::cast_possible_wrap)]
+                        InlineInt::from_unchecked(InlineInt::VALUE_BITS as i64)
+                    }
+                };
+                Self::Inline(lhs.shift_right(rhs))
+            }
+            // TODO: Support shifting by larger numbers
+            Self::Heap(lhs) => lhs.shift_right(heap, rhs.try_get::<i128>().unwrap()),
+        }
+    }
 
     #[must_use]
     pub fn bit_length(self, heap: &mut Heap) -> Self {
@@ -217,24 +246,7 @@ macro_rules! operator_fn {
         }
     };
 }
-macro_rules! shift_fn {
-    ($name:ident, $function:ident) => {
-        #[must_use]
-        pub fn $name(self, heap: &mut Heap, rhs: Int) -> Self {
-            match (self, rhs) {
-                (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(heap, rhs),
-                // TODO: Support shifting by larger numbers
-                (Int::Inline(lhs), rhs) => Int::create_from_bigint(
-                    heap,
-                    true,
-                    BigInt::from(lhs.get()).$function(rhs.try_get::<i128>().unwrap()),
-                ),
-                (Int::Heap(lhs), rhs) => lhs.$name(heap, rhs.try_get::<i128>().unwrap()),
-            }
-        }
-    };
-}
-use {bitwise_fn, operator_fn, shift_fn};
+use {bitwise_fn, operator_fn};
 
 impl DebugDisplay for Int {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {

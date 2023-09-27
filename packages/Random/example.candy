@@ -1,0 +1,33 @@
+[print] = use "Builtins"
+[int, list, result] = use "Core"
+[Distributions: [uniform], rng, Rngs: [Pseudo: [xorshift]]] = use ".."
+
+main := { environment ->
+  seed = environment.getRandomBytes 16 | result.unwrap
+  print "Seed from OS: {seed}"
+
+  generator = xorshift.fromSeed seed | xorshift.asRng
+  print "Initial RNG: {generator}"
+
+  [generator, bytes] = generator | rng.nextBytes 10
+  print "Random bytes: {bytes}"
+
+  [generator, values] = generator | rng.nextList 10 uniform.nextBool
+  print "Random booleans: {values}"
+
+  [generator, values] = generator | rng.nextList 10 { it -> it | uniform.nextIntInRange 1 7 }
+  print "Random dice rolls: {values}"
+
+  [generator, values] =
+    generator | rng.nextList 10 { it -> it | uniform.nextFromList (Foo, Bar, Baz) }
+  print "Random items from given list: {values}"
+
+  [generator, values] = generator
+    | rng.nextList 10 { it -> it | uniform.nextFromDistributions (uniform.nextUnsignedByte, uniform.nextBool) }
+  print "Random items from given distributions: {values}"
+
+  [generator, values] = generator | rng.nextList 10 { it ->
+    it | uniform.nextResult { it -> it | uniform.nextUnsignedByte } { it -> it | uniform.nextBool }
+  }
+  print "Random results of int or bool: {values}"
+}
