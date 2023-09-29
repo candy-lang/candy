@@ -22,9 +22,7 @@ modulo := builtins.intModulo
 compareTo valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  result = valueA | builtins.intCompareTo valueB
-  check (result | equals Equal | bool.implies (equals valueA valueB))
-  result
+  valueA | builtins.intCompareTo valueB
 isLessThan valueA valueB :=
   needs (is valueA)
   needs (is valueB)
@@ -96,9 +94,7 @@ isEven value :=
   value | bitwiseAnd 1 | equals 0
 isOdd value :=
   needs (is value)
-  isOdd = value | bitwiseAnd 1 | equals 1
-  check (value | isEven | equals (isOdd | bool.not))
-  isOdd
+  value | bitwiseAnd 1 | equals 1
 
 min valueA valueB :=
   needs (is valueA)
