@@ -1,6 +1,5 @@
 builtins = use "Builtins"
 bool = use "..bool"
-[check, checkEquals] = use "..check"
 [ifElse, recursive] = use "..controlFlow"
 [equals] = use "..equality"
 type = use "..type"
@@ -141,6 +140,8 @@ pow base exponent :=
   }
 
 test =
+  [checkEquals] = use "..check"
+
   checkEquals (is 2) True
   checkEquals (is Foo) False
 

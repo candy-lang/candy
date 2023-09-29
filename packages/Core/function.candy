@@ -1,5 +1,4 @@
 builtins = use "Builtins"
-[checkEquals] = use "..check"
 [equals] = use "..equality"
 type = use "..type"
 
@@ -41,6 +40,8 @@ doNotRun body :=
   needs (is0 body)
 
 test =
+  [checkEquals] = use "..check"
+
   checkEquals (is {}) True
   checkEquals (is 4) False
   checkEquals (getArgumentCount {}) 0

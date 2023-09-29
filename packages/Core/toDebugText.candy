@@ -1,9 +1,10 @@
 builtins = use "Builtins"
-[checkEquals] = use "..check"
 
 toDebugText value := builtins.toDebugText value
 
 test =
+  [checkEquals] = use "..check"
+
   checkEquals (3 | toDebugText) "3"
   checkEquals ("Hi" | toDebugText) '""Hi""'
   checkEquals (Foo | toDebugText) "Foo"

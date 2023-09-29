@@ -1,6 +1,5 @@
 builtins = use "Builtins"
 bool = use "..bool"
-[checkEquals] = use "..check"
 [equals] = use "..equality"
 function = use "..function"
 [typeOf] = use "..type"
@@ -46,6 +45,8 @@ repeat times body :=
   }
 
 test =
+  [checkEquals] = use "..check"
+
   checkEquals (ifElse True { Then } { Else }) Then
   checkEquals (ifElse False { Then } { Else }) Else
 

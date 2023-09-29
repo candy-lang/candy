@@ -1,5 +1,4 @@
 builtins = use "Builtins"
-[checkEquals] = use "..check"
 [equals] = use "..equality"
 
 typeOf := builtins.typeOf
@@ -9,6 +8,8 @@ is value type :=
   equals (typeOf value) type
 
 test =
+  [checkEquals] = use "..check"
+
   checkEquals (typeOf 3) Int
   checkEquals (typeOf "Text") Text
   checkEquals (typeOf Foo) Tag

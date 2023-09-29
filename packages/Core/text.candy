@@ -1,6 +1,5 @@
 builtins = use "Builtins"
 bool = use "..bool"
-[checkEquals] = use "..check"
 [ifElse] = use "..controlFlow"
 [equals] = use "..equality"
 int = use "..int"
@@ -123,6 +122,8 @@ trim text :=
   text | trimStart | trimEnd
 
 test =
+  [checkEquals] = use "..check"
+
   checkEquals (is "Hi") True
   checkEquals (is 2) False
 

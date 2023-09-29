@@ -1,9 +1,10 @@
 builtins = use "Builtins"
-[checkEquals] = use "..check"
 
 equals := builtins.equals
 
 test =
+  [checkEquals] = use "..check"
+
   checkEquals (equals 2 Foo) False
 
   ## numbers

@@ -1,4 +1,3 @@
-[checkEquals] = use "..check"
 [equals] = use "..equality"
 function = use "..function"
 type = use "..type"
@@ -52,6 +51,8 @@ implies a b :=
   a | not | or b
 
 test =
+  [checkEquals] = use "..check"
+
   checkEquals (is True) True
   checkEquals (is False) True
   checkEquals (is 3) False
