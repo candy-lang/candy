@@ -17,3 +17,5 @@ get struct key :=
 getKeys struct :=
   needs (is struct)
   struct | builtins.structGetKeys
+
+## TODO: Tests

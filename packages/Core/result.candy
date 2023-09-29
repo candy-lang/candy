@@ -111,3 +111,5 @@ flatten resultOfResult :=
     needs (is innerResult)
     innerResult
   }
+
+## TODO: Tests

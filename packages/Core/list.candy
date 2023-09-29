@@ -108,3 +108,5 @@ concatenate listA listB :=
       listB | get (index | int.subtract (listA | length))
     }
   }
+
+## TODO: Tests
