@@ -148,7 +148,7 @@ joinToText iterable :=
 whereHelper = { whereHelper iterable tester ->
   generateWithState iterable { iterable ->
     iterable | next | result.flatMap { [item, rest] ->
-      ifElse (tester item) { Ok [item, State: rest] } { whereHelper rest tester | next }
+      ifElse (tester item) { Ok [item, State: rest] } { whereHelper whereHelper rest tester | next | result.map { [item, rest] -> [item, State: rest] } }
     }
   }
 }
@@ -175,8 +175,11 @@ take iterable n :=
 
 skipHelper = { skipHelper iterable n ->
   ifElse (equals n 0) { iterable } {
-    remaining = iterable | next | result.map { it -> it.rest } | result.unwrapOr { }
-    skipHelper skipHelper remaining (n | int.subtract 1)
+    {
+      iterable | next | result.flatMap { it ->
+        skipHelper skipHelper it.rest (n | int.subtract 1) | next
+      }
+    }
   }
 }
 skip iterable n :=
@@ -258,7 +261,7 @@ test =
   checkEquals (oneToThree | all { a -> int.isPositive a }) True
   checkEquals (oneToThree | any { a -> equals a 2 }) True
   checkEquals (oneToThree | map { a -> a | toDebugText } | joinToText) "123"
-  checkEquals (oneToTen | where { a -> a.isOdd } | toList) (1, 3, 5, 7, 9)
+  checkEquals (oneToTen | where { a -> a | int.isOdd } | toList) (1, 3, 5, 7, 9)
   checkEquals (oneToTen | takeWhile { a -> a | int.isLessThan 4 } | toList) (1, 2, 3)
   checkEquals (oneToTen | take 4 | toList) (1, 2, 3, 4)
   checkEquals (oneToTen | skip 4 | toList) (5, 6, 7, 8, 9, 10)
