@@ -2,6 +2,7 @@ use super::pure::PurenessInsights;
 use crate::mir::{Body, Expression, Id, VisibleExpressions};
 use rustc_hash::FxHashSet;
 use std::mem;
+use tracing::info;
 
 impl Expression {
     /// All IDs defined inside this expression. For all expressions except
@@ -185,15 +186,62 @@ impl Id {
             return None;
         }
 
-        if self_expr == other_expr {
-            return Some(true);
-        }
-
         if !pureness.is_definition_const(self_expr) || !pureness.is_definition_const(other_expr) {
             return None;
         }
 
-        Some(false)
+        match (self_expr, other_expr) {
+            (Expression::Int(a), Expression::Int(b)) => Some(a == b),
+            (Expression::Text(a), Expression::Text(b)) => Some(a == b),
+            (
+                Expression::Tag {
+                    symbol: symbol_a,
+                    value: value_a,
+                },
+                Expression::Tag {
+                    symbol: symbol_b,
+                    value: value_b,
+                },
+            ) => {
+                if symbol_a != symbol_b || value_a.is_some() != value_b.is_some() {
+                    return Some(false);
+                }
+                if let (Some(a), Some(b)) = (value_a, value_b) {
+                    return a.semantically_equals(*b, visible, pureness);
+                }
+                Some(true)
+            }
+            (Expression::Builtin(a), Expression::Builtin(b)) => Some(a == b),
+            (Expression::List(a), Expression::List(b)) => {
+                if a.len() != b.len() {
+                    return Some(false);
+                }
+                for (a, b) in a.iter().zip(b) {
+                    if !a.semantically_equals(*b, visible, pureness)? {
+                        return Some(false);
+                    }
+                }
+                Some(true)
+            }
+            (Expression::Struct(a), Expression::Struct(b)) => {
+                if a.len() != b.len() {
+                    return Some(false);
+                }
+                // TODO: Match keys and compare values.
+                None
+            }
+            // Expressions have different types.
+            (
+                Expression::Int(_)
+                | Expression::Text(_)
+                | Expression::Tag { .. }
+                | Expression::Builtin(_)
+                | Expression::List(_)
+                | Expression::Struct(_),
+                _,
+            ) => Some(false),
+            _ => None,
+        }
     }
 }
 
