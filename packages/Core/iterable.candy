@@ -203,7 +203,8 @@ fromList l :=
   generate (l | list.length) { index -> l | list.get index }
 fromListReversed l :=
   needs (list.is l)
-  generate (l | list.length) { index -> l | list.get (l | list.length | int.subtract index | int.subtract 1)
+  generate (l | list.length) { index ->
+    l | list.get (l | list.length | int.subtract index | int.subtract 1)
   }
 
 toList iterable :=
@@ -252,7 +253,7 @@ test =
   checkEquals (oneToThree | map { a -> int.multiply a 2 } | toList) (2, 4, 6)
   checkEquals (oneToThree | sum) 6
   checkEquals (oneToThree | length) 3
-  checkEquals (oneToThree | all { a -> int.isPositive }) True
+  checkEquals (oneToThree | all { a -> int.isPositive a }) True
   checkEquals (oneToThree | any { a -> equals a 2 }) True
   checkEquals (oneToThree | joinToText) "123"
   checkEquals (oneToTen | where { a -> a.isOdd } | toList) (1, 3, 5, 7, 9)
