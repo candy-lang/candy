@@ -1,6 +1,6 @@
 builtins = use "Builtins"
 bool = use "..bool"
-[check] = use "..check"
+[check, checkEquals] = use "..check"
 [ifElse, recursive] = use "..controlFlow"
 [equals] = use "..equality"
 type = use "..type"
@@ -143,3 +143,123 @@ pow base exponent :=
               recurse [Base: base | multiply base, Exponent: exponent | subtract 1 | shiftRight 1]
           }
   }
+
+test =
+  checkEquals (is 2) True
+  checkEquals (is Foo) False
+
+  checkEquals (add 2 3) 5
+  checkEquals (subtract 4 1) 3
+  checkEquals (multiply 2 3) 6
+  checkEquals (divideTruncating 7 4) 1
+
+  checkEquals (remainder 6 3) 0
+  checkEquals (remainder 5 3) 2
+  checkEquals (remainder (negate 5) 3) (negate 2)
+  checkEquals (remainder 5 (negate 3)) 2
+  checkEquals (remainder (negate 5) (negate 3)) (negate 2)
+
+  checkEquals (modulo 6 3) 0
+  checkEquals (modulo 5 3) 2
+  checkEquals (modulo 5 (negate 3)) 2
+  checkEquals (modulo (negate 5) 3) 1
+  checkEquals (modulo (negate 5) (negate 3)) 1
+
+  checkEquals (compareTo 6 3) Greater
+  checkEquals (compareTo 6 6) Equal
+  checkEquals (compareTo 6 9) Less
+
+  checkEquals (isLessThan 1 2) True
+  checkEquals (isLessThan 2 2) False
+  checkEquals (isLessThan 2 1) False
+
+  checkEquals (isGreaterThan 1 2) False
+  checkEquals (isGreaterThan 2 2) False
+  checkEquals (isGreaterThan 2 1) True
+
+  checkEquals (isLessThanOrEqualTo 1 2) True
+  checkEquals (isLessThanOrEqualTo 2 2) True
+  checkEquals (isLessThanOrEqualTo 2 1) False
+
+  checkEquals (isGreaterThanOrEqualTo 1 2) False
+  checkEquals (isGreaterThanOrEqualTo 2 2) True
+  checkEquals (isGreaterThanOrEqualTo 2 1) True
+
+  checkEquals (isPositive 1) True
+  checkEquals (isPositive 0) False
+  checkEquals (isPositive (negate 1)) False
+
+  checkEquals (isNonPositive 1) False
+  checkEquals (isNonPositive 0) True
+  checkEquals (isNonPositive (negate 1)) True
+
+  checkEquals (isNegative 1) False
+  checkEquals (isNegative 0) False
+  checkEquals (isNegative (negate 1)) True
+
+  checkEquals (isNonNegative 1) True
+  checkEquals (isNonNegative 0) True
+  checkEquals (isNonNegative (negate 1)) False
+
+  checkEquals (absolute 3) 3
+  checkEquals (absolute 0) 0
+  checkEquals (absolute (negate 3)) 3
+
+  checkEquals (shiftLeft 1 2) 4
+  checkEquals (shiftLeft 3 1) 6
+
+  checkEquals (shiftRight 5 2) 1
+  checkEquals (shiftRight 10 1) 5
+
+  checkEquals (bitLength 0) 0
+  checkEquals (bitLength 1) 1
+  checkEquals (bitLength 3) 2
+  checkEquals (bitLength 10) 4
+
+  checkEquals (bitwiseAnd 2 2) 2  # 10 & 10 = 10
+  checkEquals (bitwiseAnd 2 1) 0  # 10 & 1 = 0
+  checkEquals (bitwiseAnd 3 6) 2  # 11 & 110 = 10
+
+  checkEquals (bitwiseOr 2 2) 2  # 10 | 10 = 10
+  checkEquals (bitwiseOr 2 1) 3  # 10 | 1 = 11
+  checkEquals (bitwiseOr 3 6) 7  # 11 | 110 = 111
+
+  checkEquals (bitwiseXor 2 2) 0  # 10 ^ 10 = 0
+  checkEquals (bitwiseXor 2 1) 3  # 10 ^ 1 = 11
+  checkEquals (bitwiseXor 3 6) 5  # 11 ^ 110 = 101
+
+  checkEquals (isEven 0) True
+  checkEquals (isEven 1) False
+  checkEquals (isEven 2) True
+  checkEquals (isEven 3) False
+  checkEquals (isEven (negate 3)) False
+
+  checkEquals (isOdd 0) False
+  checkEquals (isOdd 1) True
+  checkEquals (isOdd 2) False
+  checkEquals (isOdd 3) True
+  checkEquals (isOdd (negate 3)) True
+
+  checkEquals (min 3 1) 1
+  checkEquals (min 1 2) 1
+
+  checkEquals (max 3 1) 3
+  checkEquals (max 1 2) 2
+
+  checkEquals (coerceAtLeast 2 1) 2
+  checkEquals (coerceAtLeast 2 3) 3
+
+  checkEquals (coerceAtMost 2 1) 1
+  checkEquals (coerceAtMost 2 3) 2
+
+  checkEquals (coerceIn 1 2 4) 2
+  checkEquals (coerceIn 3 2 4) 3
+  checkEquals (coerceIn 5 2 4) 4
+
+  checkEquals (parse "123") (Ok 123)
+  # TODO: Currently, `parse` returns a different error.
+  #checkEquals (parse "Hi") (Error NotAnInteger)
+
+  checkEquals (pow 3 2) 9
+  checkEquals (pow 2 3) 8
+  checkEquals (pow 9 1) 9

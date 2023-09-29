@@ -1,10 +1,16 @@
-bool = use "..bool"
-[if] = use "..controlFlow"
+[equals] = use "Builtins"
 
 check condition :=
   # Panics if the `condition` is `False`.
   #
   # This function is useful for ensuring that your mental model of the state of
   # your program matches its actual state.
-  needs (bool.is condition)
-  needs condition "A check didn't succeed."
+  isConditionBool = condition %
+    True | False -> True
+    _ -> False
+  needs isConditionBool
+  needs condition "A check failed."
+
+checkEquals a b :=
+  # Panics if `a` and `b` are different.
+  needs (equals a b) "A check failed: Expected {a} and {b} to be equal."

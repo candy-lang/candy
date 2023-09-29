@@ -1,3 +1,4 @@
+[checkEquals] = use "..check"
 [equals] = use "..equality"
 function = use "..function"
 type = use "..type"
@@ -49,3 +50,34 @@ implies a b :=
   needs (is a)
   needs (is b)
   a | not | or b
+
+test =
+  checkEquals (is True) True
+  checkEquals (is False) True
+  checkEquals (is 3) False
+
+  checkEquals (not True) False
+  checkEquals (not False) True
+
+  ## `lazyAnd` and `lazyOr` are automatically tested by the tests for the
+  ## non-lazy variants.
+
+  checkEquals (and True True) True
+  checkEquals (and True False) False
+  checkEquals (and False True) False
+  checkEquals (and False False) False
+
+  checkEquals (or True True) True
+  checkEquals (or True False) True
+  checkEquals (or False True) True
+  checkEquals (or False False) False
+
+  checkEquals (xor True True) False
+  checkEquals (xor True False) True
+  checkEquals (xor False True) True
+  checkEquals (xor False False) False
+
+  checkEquals (implies True True) True
+  checkEquals (implies True False) False
+  checkEquals (implies False True) True
+  checkEquals (implies False False) True

@@ -1,4 +1,5 @@
 builtins = use "Builtins"
+[checkEquals] = use "..check"
 [equals] = use "..equality"
 type = use "..type"
 
@@ -38,3 +39,15 @@ doNotRun body :=
   # - Making the code invalid (for example, by deleting needed functions) results in compiler
   #   errors.
   needs (is0 body)
+
+test =
+  checkEquals (is {}) True
+  checkEquals (is 4) False
+  checkEquals (getArgumentCount {}) 0
+  checkEquals (getArgumentCount { a -> }) 1
+
+  checkEquals (is0 {}) True
+  checkEquals (is0 { a -> }) False
+
+  checkEquals (run { 4 }) 4
+  checkEquals (doNotRun { 4 }) Nothing

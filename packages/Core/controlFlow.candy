@@ -1,5 +1,6 @@
 builtins = use "Builtins"
 bool = use "..bool"
+[checkEquals] = use "..check"
 [equals] = use "..equality"
 function = use "..function"
 [typeOf] = use "..type"
@@ -43,3 +44,10 @@ repeat times body :=
       recurse (times | builtins.intSubtract 1)
     }
   }
+
+test =
+  checkEquals (ifElse True { Then } { Else }) Then
+  checkEquals (ifElse False { Then } { Else }) Else
+
+  checkEquals (if True { Then }) Then
+  checkEquals (if False { Then }) Nothing
