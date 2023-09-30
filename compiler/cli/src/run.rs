@@ -7,7 +7,7 @@ use candy_frontend::{hir, TracingConfig, TracingMode};
 use candy_vm::{
     environment::DefaultEnvironment,
     heap::{Heap, HirId},
-    mir_to_byte_code::compile_byte_code,
+    lir_to_byte_code::compile_byte_code,
     tracer::stack_trace::StackTracer,
     Vm, VmFinished,
 };

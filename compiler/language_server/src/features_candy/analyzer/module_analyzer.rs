@@ -15,7 +15,7 @@ use candy_vm::{
     byte_code::ByteCode,
     environment::StateAfterRunWithoutHandles,
     heap::{Heap, ToDebugText},
-    mir_to_byte_code::compile_byte_code,
+    lir_to_byte_code::compile_byte_code,
     tracer::{evaluated_values::EvaluatedValuesTracer, stack_trace::StackTracer},
     Panic, Vm, VmFinished,
 };

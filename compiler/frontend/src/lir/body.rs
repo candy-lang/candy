@@ -178,8 +178,9 @@ impl Body {
         }
     }
 
-    pub fn push(&mut self, expression: Expression) {
+    pub fn push(&mut self, expression: Expression) -> Id {
         self.expressions.push(expression);
+        self.last_expression_id().unwrap()
     }
 }
 impl ToRichIr for Body {

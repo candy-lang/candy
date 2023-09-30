@@ -70,7 +70,7 @@ where
             data_stack: vec![],
             call_stack: vec![],
         };
-        state.call_function(heap, function, arguments, responsible);
+        state.call_function(function, arguments, responsible);
 
         let inner = Box::new(VmInner {
             byte_code,

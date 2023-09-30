@@ -19,7 +19,7 @@ use candy_frontend::{
     utils::DoHash,
     TracingConfig, TracingMode,
 };
-use candy_vm::{byte_code::RichIrForByteCode, heap::HeapData, mir_to_byte_code::compile_byte_code};
+use candy_vm::{byte_code::RichIrForByteCode, heap::HeapData, lir_to_byte_code::compile_byte_code};
 use clap::{Parser, ValueHint};
 use colored::{Color, Colorize};
 use diffy::{create_patch, PatchFormatter};

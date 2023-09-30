@@ -42,7 +42,7 @@ mod handle_id;
 pub mod heap;
 mod instruction_pointer;
 mod instructions;
-pub mod mir_to_byte_code;
+pub mod lir_to_byte_code;
 pub mod tracer;
 mod utils;
 mod vm;

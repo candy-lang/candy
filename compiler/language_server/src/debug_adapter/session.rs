@@ -13,7 +13,7 @@ use candy_vm::{
     byte_code::Instruction,
     environment::StateAfterRunWithoutHandles,
     heap::{Heap, HirId, Struct},
-    mir_to_byte_code::compile_byte_code,
+    lir_to_byte_code::compile_byte_code,
     tracer::DummyTracer,
     Vm, VmFinished,
 };

@@ -361,9 +361,7 @@ impl CurrentBody {
     fn push(&mut self, mir_id: mir::Id, expression: impl Into<lir::Expression>) -> lir::Id {
         let expression = expression.into();
         let is_constant = matches!(expression, lir::Expression::Constant(_));
-        self.body.push(expression);
-
-        let id = self.body.last_expression_id().unwrap();
+        let id = self.body.push(expression);
         assert!(self.id_mapping.insert(mir_id, id).is_none());
         if !is_constant {
             assert!(self.ids_to_drop.insert(id));

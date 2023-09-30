@@ -53,8 +53,8 @@ impl Body {
 
             let mut new_expression = old_expression.clone();
             new_expression.replace_ids(|id| id_mapping.get(&id).copied().unwrap_or(id));
-            new_body.push(new_expression);
-            id_mapping.force_insert(old_id, new_body.last_expression_id().unwrap());
+            let id = new_body.push(new_expression);
+            id_mapping.force_insert(old_id, id);
             new_body.maybe_dup(&mut reference_count_adjustments, old_id, &id_mapping);
         }
 
@@ -63,7 +63,9 @@ impl Body {
             .sorted_by_key(|(id, _)| *id)
         {
             match amount {
-                -1 => new_body.push(Expression::Drop(id)),
+                -1 => {
+                    new_body.push(Expression::Drop(id));
+                }
                 0 => {}
                 _ => panic!("Unexpected reference count adjustment for {id}: {amount}"),
             }

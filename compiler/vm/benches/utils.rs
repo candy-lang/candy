@@ -5,7 +5,9 @@ use candy_frontend::{
     cst_to_ast::CstToAstStorage,
     hir::{self, HirDbStorage},
     hir_to_mir::HirToMirStorage,
+    lir_optimize::OptimizeLirStorage,
     mir_optimize::OptimizeMirStorage,
+    mir_to_lir::MirToLirStorage,
     module::{
         GetModuleContentQuery, InMemoryModuleProvider, Module, ModuleDbStorage, ModuleKind,
         ModuleProvider, ModuleProviderOwner, MutableModuleProviderOwner, Package,
@@ -18,7 +20,7 @@ use candy_frontend::{
 use candy_vm::{
     byte_code::ByteCode,
     heap::{Heap, HirId, InlineObject, Struct},
-    mir_to_byte_code::compile_byte_code,
+    lir_to_byte_code::compile_byte_code,
     tracer::DummyTracer,
     PopulateInMemoryProviderFromFileSystem, Vm, VmFinished,
 };
@@ -44,7 +46,9 @@ lazy_static! {
     CstToAstStorage,
     HirDbStorage,
     HirToMirStorage,
+    MirToLirStorage,
     ModuleDbStorage,
+    OptimizeLirStorage,
     OptimizeMirStorage,
     PositionConversionStorage,
     RcstToCstStorage,
