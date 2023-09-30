@@ -112,4 +112,65 @@ flatten resultOfResult :=
     innerResult
   }
 
-## TODO: Tests
+test =
+  [checkEquals] = use "..check"
+  int = use "..int"
+
+  checkEquals (is (Ok 4)) True
+  checkEquals (is (Error 4)) True
+  checkEquals (is 4) False
+
+  checkEquals (getValue (Ok 4)) 4
+  checkEquals (getValue (Error 4)) 4
+
+  checkEquals (isOk (Error 4)) False
+  checkEquals (isOk (Ok 4)) True
+
+  checkEquals (unwrap (Ok 4)) 4
+  checkEquals (expect (Ok 4) "blub") 4
+
+  checkEquals (isError (Error 4)) True
+  checkEquals (isError (Ok 4)) False
+
+  checkEquals (unwrapError (Error 4)) 4
+  checkEquals (expectError (Error 4) "blub") 4
+
+  checkEquals (mapOrElse (Ok 4) { a -> int.add a 1 } { a -> int.add a 2 }) 5
+  checkEquals (mapOrElse (Error 4) { a -> int.add a 1 } { a -> int.add a 2 }) 6
+
+  checkEquals (mapOr (Ok 4) { a -> int.add a 1 } 2) 5
+  checkEquals (mapOr (Error 4) { a -> int.add a 1 } 2) 2
+
+  checkEquals (flatMap (Ok 1) { a -> Ok (int.add a 1) }) (Ok 2)
+  checkEquals (flatMap (Error 1) { a -> Ok (int.add a 1) }) (Error 1)
+  checkEquals (flatMap (Ok 1) { a -> Error 3 }) (Error 3)
+
+  checkEquals (map (Ok 1) { a -> int.add a 1 }) (Ok 2)
+  checkEquals (map (Error 1) { a -> int.add a 1 }) (Error 1)
+
+  checkEquals (and (Ok 1) (Ok 2)) (Ok 2)
+  checkEquals (and (Ok 1) (Error 2)) (Error 2)
+  checkEquals (and (Error 1) (Ok 2)) (Error 1)
+  checkEquals (and (Error 1) (Error 2)) (Error 1)
+
+  checkEquals (flatMapError (Ok 1) { a -> Ok (int.add a 1) }) (Ok 1)
+  checkEquals (flatMapError (Error 1) { a -> Ok (int.add a 1) }) (Ok 2)
+  checkEquals (flatMapError (Error 1) { a -> Error (int.add a 1) }) (Error 2)
+
+  checkEquals (mapError (Ok 1) { a -> int.add a 1 }) (Ok 1)
+  checkEquals (mapError (Error 1) { a -> int.add a 1 }) (Error 2)
+
+  checkEquals (or (Ok 1) (Ok 2)) (Ok 1)
+  checkEquals (or (Ok 1) (Error 2)) (Ok 1)
+  checkEquals (or (Error 1) (Ok 2)) (Ok 2)
+  checkEquals (or (Error 1) (Error 2)) (Error 2)
+
+  checkEquals (unwrapOrElse (Ok 1) { 2 }) 1
+  checkEquals (unwrapOrElse (Error 1) { 2 }) 2
+
+  checkEquals (unwrapOr (Ok 1) 2) 1
+  checkEquals (unwrapOr (Error 1) 2) 2
+
+  checkEquals (flatten (Error 1)) (Error 1)
+  checkEquals (flatten (Ok (Error 1))) (Error 1)
+  checkEquals (flatten (Ok (Ok 1))) (Ok 1)
