@@ -320,7 +320,7 @@ impl<'ctx> CodeGen<'ctx> {
                     let i64_type = self.context.i64_type();
                     let v = i64_type.const_int(
                         value
-                            .clamp(&i32::MIN.into(), &i32::MAX.into())
+                            .clamp(&u64::MIN.into(), &u64::MAX.into())
                             .try_into()
                             .unwrap(),
                         false,
