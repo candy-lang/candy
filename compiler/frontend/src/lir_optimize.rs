@@ -46,9 +46,29 @@ impl Body {
             new_body.maybe_dup(&mut reference_count_adjustments, id, &id_mapping);
         }
 
+        let return_expression_id =
+            if let Expression::Reference(id) = self.expressions().last().unwrap()
+                && *id == self.ids_and_expressions().rev()
+                    .skip(1)
+                    .find(|(_, expression)| !matches!(expression, Expression::Dup {..} | Expression::Drop(_)))
+                    .unwrap()
+                    .0 {
+                // The last expression is a reference to the last expression
+                // before all drops. We can remove it because we move all drops
+                // before that last expression.
+                *id
+            } else {
+                self.last_expression_id().unwrap()
+            };
+
         for (old_id, old_expression) in self.ids_and_expressions() {
             if matches!(old_expression, Expression::Dup { .. } | Expression::Drop(_)) {
                 continue;
+            }
+            if old_id == return_expression_id {
+                // After the expression whose value is returned, the can only be
+                // drop expressions and maybe a reference to this return value.
+                break;
             }
 
             let mut new_expression = old_expression.clone();
@@ -58,6 +78,7 @@ impl Body {
             new_body.maybe_dup(&mut reference_count_adjustments, old_id, &id_mapping);
         }
 
+        // Add all drops.
         for (id, amount) in reference_count_adjustments
             .into_iter()
             .sorted_by_key(|(id, _)| *id)
@@ -70,6 +91,12 @@ impl Body {
                 _ => panic!("Unexpected reference count adjustment for {id}: {amount}"),
             }
         }
+
+        // Add the last expression.
+        let mut new_expression = self.expression(return_expression_id).unwrap().clone();
+        new_expression.replace_ids(|id| id_mapping.get(&id).copied().unwrap_or(id));
+        let id = new_body.push(new_expression);
+        id_mapping.force_insert(return_expression_id, id);
 
         new_body
     }
