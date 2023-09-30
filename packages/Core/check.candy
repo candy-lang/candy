@@ -11,6 +11,6 @@ check condition :=
   needs isConditionBool
   needs condition "A check failed."
 
-checkEquals a b :=
-  # Panics if `a` and `b` are different.
-  needs (equals a b) "A check failed: Expected {a} and {b} to be equal."
+checkEquals actual expected :=
+  # Panics if `actual` and `expected` are different.
+  needs (equals actual expected) "A check failed: Expected {actual} to be {expected}."
