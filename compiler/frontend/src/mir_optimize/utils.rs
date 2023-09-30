@@ -2,7 +2,6 @@ use super::pure::PurenessInsights;
 use crate::mir::{Body, Expression, Id, VisibleExpressions};
 use rustc_hash::FxHashSet;
 use std::mem;
-use tracing::info;
 
 impl Expression {
     /// All IDs defined inside this expression. For all expressions except
