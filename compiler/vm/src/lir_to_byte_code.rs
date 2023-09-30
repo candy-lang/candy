@@ -65,7 +65,6 @@ where
 struct LoweringContext<'c> {
     lir: &'c Lir,
     byte_code: ByteCode,
-    constant_heap: Heap,
     constant_mapping: FxHashMap<ConstantId, InlineObject>,
     body_mapping: FxHashMap<BodyId, InstructionPointer>,
     stack: Vec<Id>,
@@ -95,7 +94,6 @@ impl<'c> LoweringContext<'c> {
         let mut context = LoweringContext {
             lir,
             byte_code,
-            constant_heap: Heap::default(),
             constant_mapping: FxHashMap::default(),
             body_mapping: FxHashMap::default(),
             stack: vec![],
@@ -307,17 +305,26 @@ impl<'c> LoweringContext<'c> {
     fn compile_constant(&mut self, id: ConstantId) -> InlineObject {
         let constant: InlineObject = match self.lir.constants().get(id) {
             Constant::Int(int) => {
-                Int::create_from_bigint(&mut self.constant_heap, false, int.clone()).into()
+                Int::create_from_bigint(&mut self.byte_code.constant_heap, false, int.clone())
+                    .into()
             }
-            Constant::Text(text) => Text::create(&mut self.constant_heap, false, text).into(),
+            Constant::Text(text) => {
+                Text::create(&mut self.byte_code.constant_heap, false, text).into()
+            }
             Constant::Tag { symbol, value } => {
-                let symbol = Text::create(&mut self.constant_heap, false, symbol);
+                let symbol = Text::create(&mut self.byte_code.constant_heap, false, symbol);
                 let value = value.map(|id| self.constant_mapping[&id]);
-                Tag::create_with_value_option(&mut self.constant_heap, false, symbol, value).into()
+                Tag::create_with_value_option(
+                    &mut self.byte_code.constant_heap,
+                    false,
+                    symbol,
+                    value,
+                )
+                .into()
             }
             Constant::Builtin(builtin) => Builtin::create(*builtin).into(),
             Constant::List(items) => List::create(
-                &mut self.constant_heap,
+                &mut self.byte_code.constant_heap,
                 false,
                 &items
                     .iter()
@@ -326,7 +333,7 @@ impl<'c> LoweringContext<'c> {
             )
             .into(),
             Constant::Struct(fields) => Struct::create(
-                &mut self.constant_heap,
+                &mut self.byte_code.constant_heap,
                 false,
                 &fields
                     .iter()
@@ -335,12 +342,12 @@ impl<'c> LoweringContext<'c> {
             )
             .into(),
             Constant::HirId(hir_id) => {
-                HirId::create(&mut self.constant_heap, false, hir_id.clone()).into()
+                HirId::create(&mut self.byte_code.constant_heap, false, hir_id.clone()).into()
             }
             Constant::Function(body_id) => {
                 let body = self.get_body(*body_id);
                 Function::create(
-                    &mut self.constant_heap,
+                    &mut self.byte_code.constant_heap,
                     false,
                     &[],
                     self.lir.bodies().get(*body_id).parameter_count(),
