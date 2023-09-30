@@ -169,7 +169,7 @@ impl<'c> LoweringContext<'c> {
                     .default_symbols()
                     .get(symbol)
                     .unwrap_or_else(|| {
-                        Text::create(&mut self.byte_code.constant_heap, false, symbol)
+                        Text::create(&mut self.byte_code.constant_heap, true, symbol)
                     });
 
                 self.emit_reference_to(*value);
@@ -312,7 +312,14 @@ impl<'c> LoweringContext<'c> {
                 Text::create(&mut self.byte_code.constant_heap, false, text).into()
             }
             Constant::Tag { symbol, value } => {
-                let symbol = Text::create(&mut self.byte_code.constant_heap, false, symbol);
+                let symbol = self
+                    .byte_code
+                    .constant_heap
+                    .default_symbols()
+                    .get(symbol)
+                    .unwrap_or_else(|| {
+                        Text::create(&mut self.byte_code.constant_heap, false, symbol)
+                    });
                 let value = value.map(|id| self.constant_mapping[&id]);
                 Tag::create_with_value_option(
                     &mut self.byte_code.constant_heap,
