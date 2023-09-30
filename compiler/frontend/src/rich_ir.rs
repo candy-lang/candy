@@ -391,6 +391,12 @@ impl RichIr {
         })
     }
     #[must_use]
+    pub fn for_optimized_lir(module: &Module, lir: &Lir, tracing_config: &TracingConfig) -> Self {
+        Self::for_ir("Optimized LIR", module, tracing_config, |builder| {
+            lir.build_rich_ir(builder);
+        })
+    }
+    #[must_use]
     fn for_ir(
         ir_name: &str,
         module: &Module,

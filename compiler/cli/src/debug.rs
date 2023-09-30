@@ -155,7 +155,7 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
             let tracing = options.to_tracing_config();
             let lir = db.optimized_lir(module.clone(), tracing.clone());
             lir.ok()
-                .map(|(lir, _)| RichIr::for_lir(&module, &lir, &tracing))
+                .map(|(lir, _)| RichIr::for_optimized_lir(&module, &lir, &tracing))
         }
         Options::VmByteCode(options) => {
             let module = module_for_path(options.path.clone())?;
@@ -359,7 +359,8 @@ impl GoldOptions {
             let (optimized_lir, _) = db
                 .optimized_lir(module.clone(), Self::TRACING_CONFIG.clone())
                 .unwrap();
-            let optimized_lir = RichIr::for_lir(&module, &optimized_lir, &Self::TRACING_CONFIG);
+            let optimized_lir =
+                RichIr::for_optimized_lir(&module, &optimized_lir, &Self::TRACING_CONFIG);
             visit("Optimized LIR", optimized_lir.text);
 
             let (vm_byte_code, _) =
