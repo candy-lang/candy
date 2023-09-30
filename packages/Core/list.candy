@@ -16,7 +16,7 @@ isEmpty list :=
 
 lastIndex list :=
   needs (is list)
-  ifElse (list | isEmpty) { Error "Can't get the last index of an empty list." } {
+  ifElse (list | isEmpty) { Error Empty } {
     Ok (list | length | int.subtract 1)
   }
 isValidIndex list index :=
@@ -35,17 +35,17 @@ get := builtins.listGet
 single list :=
   needs (is list)
   list %
-    (,) -> Error "Can't get the single item of an empty list."
+    (,) -> Error Empty
     (item,) -> Ok item
-    _ -> Error "Can't get the single item of a list with more than one item."
+    _ -> Error TooLong
 first list :=
   needs (is list)
   list %
-    (,) -> Error "Can't get the first item of an empty list."
+    (,) -> Error Empty
     _ -> Ok (list | get 0)
 last list :=
   needs (is list)
-  list | lastIndex | result.mapError { _ -> "Can't get the last item of an empty list." }
+  list | lastIndex | result.mapError { _ -> Empty }
   | result.map { index -> list | get index }
 
 insert := builtins.listInsert
@@ -109,4 +109,74 @@ concatenate listA listB :=
     }
   }
 
-## TODO: Tests
+test =
+  [checkEquals] = use "..check"
+
+  checkEquals (is (1, 2, 3)) True
+  checkEquals (is Hello) False
+
+  checkEquals (length (1, 2, 3)) 3
+  checkEquals (length (3, 3)) 2
+
+  checkEquals (isEmpty (,)) True
+
+  checkEquals (lastIndex (1, 2, 3)) (Ok 2)
+  checkEquals (lastIndex (3, 3)) (Ok 1)
+  checkEquals (lastIndex (,)) (Error Empty)
+
+  checkEquals (isValidIndex (1, 2, 3) (int.negate 1)) False
+  checkEquals (isValidIndex (1, 2, 3) 0) True
+  checkEquals (isValidIndex (1, 2, 3) 1) True
+  checkEquals (isValidIndex (1, 2, 3) 2) True
+  checkEquals (isValidIndex (1, 2, 3) 3) False
+  checkEquals (isValidIndex (1, 2, 3) 4) False
+  checkEquals (isValidIndex (1, 2, 3) 100) False
+
+  checkEquals (isValidInsertIndex (1, 2, 3) (int.negate 1)) False
+  checkEquals (isValidInsertIndex (1, 2, 3) 0) True
+  checkEquals (isValidInsertIndex (1, 2, 3) 1) True
+  checkEquals (isValidInsertIndex (1, 2, 3) 2) True
+  checkEquals (isValidInsertIndex (1, 2, 3) 3) True
+  checkEquals (isValidInsertIndex (1, 2, 3) 4) False
+  checkEquals (isValidInsertIndex (1, 2, 3) 100) False
+
+  checkEquals (get (Foo, Bar, Baz) 0) Foo
+  checkEquals (get (Foo, Bar, Baz) 1) Bar
+  checkEquals (get (Foo, Bar, Baz) 2) Baz
+
+  checkEquals (single (,)) (Error Empty)
+  checkEquals (single (Foo,)) (Ok Foo)
+  checkEquals (single (Foo, Bar)) (Error TooLong)
+
+  checkEquals (first (,)) (Error Empty)
+  checkEquals (first (Foo,)) (Ok Foo)
+  checkEquals (first (Foo, Bar)) (Ok Foo)
+
+  checkEquals (last (,)) (Error Empty)
+  checkEquals (last (Foo,)) (Ok Foo)
+  checkEquals (last (Foo, Bar)) (Ok Bar)
+
+  checkEquals (insert (Foo, Bar) 0 Baz) (Baz, Foo, Bar)
+  checkEquals (insert (Foo, Bar) 1 Baz) (Foo, Baz, Bar)
+  checkEquals (insert (Foo, Bar) 2 Baz) (Foo, Bar, Baz)
+
+  checkEquals (prepend (Foo, Bar) Baz) (Baz, Foo, Bar)
+
+  checkEquals (append (Foo, Bar) Baz) (Foo, Bar, Baz)
+
+  checkEquals (replace (Foo, Bar) 0 Baz) (Baz, Bar)
+  checkEquals (replace (Foo, Bar) 1 Baz) (Foo, Baz)
+
+  checkEquals (update (1, 2) 0 { a -> int.add a 1 }) (2, 2)
+
+  checkEquals (removeAt (Foo, Bar) 0) (Bar,)
+  checkEquals (removeAt (Foo, Bar) 1) (Foo,)
+
+  checkEquals (filled 2 Foo) (Foo, Foo)
+  checkEquals (filled 10 1) (1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+
+  checkEquals (generate 5 { a -> a }) (0, 1, 2, 3, 4)
+
+  checkEquals (getRange (1, 2, 3, 4, 5) 1 4) (2, 3, 4)
+
+  checkEquals (concatenate (1, 2, 3) (4, 5)) (1, 2, 3, 4, 5)
