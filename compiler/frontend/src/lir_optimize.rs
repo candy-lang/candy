@@ -37,6 +37,7 @@ impl Body {
         );
         let mut id_mapping = FxHashMap::default();
 
+        // Leading dups
         let mut reference_count_adjustments = self.get_combined_reference_count_adjustments();
         for id in self
             .captured_ids()
@@ -46,6 +47,7 @@ impl Body {
             new_body.maybe_dup(&mut reference_count_adjustments, id, &id_mapping);
         }
 
+        // Determine returned expression
         let return_expression_id =
             if let Expression::Reference(id) = self.expressions().last().unwrap()
                 && *id == self.ids_and_expressions().rev()
@@ -61,6 +63,7 @@ impl Body {
                 self.last_expression_id().unwrap()
             };
 
+        // All expressions except the returned one
         for (old_id, old_expression) in self.ids_and_expressions() {
             if matches!(old_expression, Expression::Dup { .. } | Expression::Drop(_)) {
                 continue;
@@ -72,17 +75,18 @@ impl Body {
             }
 
             let mut new_expression = old_expression.clone();
-            new_expression.replace_ids(|id| id_mapping.get(&id).copied().unwrap_or(id));
+            new_expression.replace_ids(|id| self.get_new_id(&id_mapping, id));
             let id = new_body.push(new_expression);
             id_mapping.force_insert(old_id, id);
             new_body.maybe_dup(&mut reference_count_adjustments, old_id, &id_mapping);
         }
 
-        // Add all drops.
-        for (id, amount) in reference_count_adjustments
+        // All drops
+        for (old_id, amount) in reference_count_adjustments
             .into_iter()
             .sorted_by_key(|(id, _)| *id)
         {
+            let id = self.get_new_id(&id_mapping, old_id);
             match amount {
                 -1 => {
                     new_body.push(Expression::Drop(id));
@@ -92,11 +96,10 @@ impl Body {
             }
         }
 
-        // Add the last expression.
+        // Returned expression
         let mut new_expression = self.expression(return_expression_id).unwrap().clone();
-        new_expression.replace_ids(|id| id_mapping.get(&id).copied().unwrap_or(id));
-        let id = new_body.push(new_expression);
-        id_mapping.force_insert(return_expression_id, id);
+        new_expression.replace_ids(|id| self.get_new_id(&id_mapping, id));
+        new_body.push(new_expression);
 
         new_body
     }
@@ -109,14 +112,24 @@ impl Body {
         if let Entry::Occupied(entry) = reference_count_adjustments.entry(old_id)
             && *entry.get() > 0 {
             self.push(Expression::Dup {
-                id: id_mapping.get(&old_id).copied().unwrap_or(old_id),
+                id: self.get_new_id(id_mapping, old_id),
                 amount: (*entry.get()).try_into().unwrap(),
             });
             entry.remove();
         }
     }
 
-    /// The sum of dups minus drops per Id.
+    fn get_new_id(&self, id_mapping: &FxHashMap<Id, Id>, id: Id) -> Id {
+        if id <= self.responsible_parameter_id() {
+            // Captured variables, parameters, and the responsible parameter
+            // keep their ID.
+            id
+        } else {
+            id_mapping[&id]
+        }
+    }
+
+    /// The sum of dups minus drops per ID.
     fn get_combined_reference_count_adjustments(&self) -> FxHashMap<Id, isize> {
         let mut adjustments: FxHashMap<Id, isize> = FxHashMap::default();
         for expression in self.expressions() {
