@@ -1,9 +1,0 @@
-[duration] = use "Chrono"
-
-main := { environment ->
-  print message = environment.stdout message
-
-  dur = duration.fromSeconds 4 | duration.add (duration.fromMinutes 2)
-
-  print "{duration.toText dur}"
-}

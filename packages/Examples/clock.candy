@@ -1,0 +1,10 @@
+[clock, duration, instant] = use "Chrono"
+[tag, fixedDecimal] = use "Core"
+
+main := { environment ->
+  print message = environment.stdout message
+
+  c = clock.fromSystemClock environment.systemClock
+  now = clock.now c
+  print "It has been {now | instant.toUnixTimeDuration | duration.toText} since the start the of unix epoch"
+}
