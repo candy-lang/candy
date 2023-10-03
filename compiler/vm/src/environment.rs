@@ -1,6 +1,6 @@
 use crate::{
     byte_code::ByteCode,
-    heap::{Data, Handle, Heap, InlineObject, List, Struct, Tag, Text},
+    heap::{Data, Handle, Heap, InlineObject, Int, List, Struct, Tag, Text},
     tracer::Tracer,
     vm::VmHandleCall,
     StateAfterRun, StateAfterRunForever, Vm, VmFinished,
@@ -9,6 +9,7 @@ use itertools::Itertools;
 use std::{
     borrow::Borrow,
     io::{self, BufRead},
+    time::SystemTime,
 };
 use tracing::info;
 
@@ -49,6 +50,7 @@ impl<B: Borrow<ByteCode>, T: Tracer> Vm<B, T> {
 pub struct DefaultEnvironment {
     stdin_handle: Handle,
     stdout_handle: Handle,
+    system_clock_handle: Handle,
 }
 impl DefaultEnvironment {
     pub fn new(heap: &mut Heap, args: &[String]) -> (InlineObject, Self) {
@@ -59,6 +61,7 @@ impl DefaultEnvironment {
         let arguments = List::create(heap, true, arguments.as_slice());
         let stdin_handle = Handle::new(heap, 0);
         let stdout_handle = Handle::new(heap, 1);
+        let system_clock_handle = Handle::new(heap, 0);
         let environment_object = Struct::create_with_symbol_keys(
             heap,
             true,
@@ -66,11 +69,13 @@ impl DefaultEnvironment {
                 (heap.default_symbols().arguments, arguments.into()),
                 (heap.default_symbols().stdout, **stdout_handle),
                 (heap.default_symbols().stdin, **stdin_handle),
+                (heap.default_symbols().system_clock, **system_clock_handle),
             ],
         );
         let environment = Self {
             stdin_handle,
             stdout_handle,
+            system_clock_handle,
         };
         (environment_object.into(), environment)
     }
@@ -81,7 +86,16 @@ impl Environment for DefaultEnvironment {
         heap: &mut Heap,
         call: VmHandleCall<B, T>,
     ) -> Vm<B, T> {
-        if call.handle == self.stdin_handle {
+        if call.handle == self.system_clock_handle {
+            let [] = call.arguments.as_slice() else {
+                unreachable!()
+            };
+
+            let now = SystemTime::now();
+            let since_unix_epoch = now.duration_since(SystemTime::UNIX_EPOCH).unwrap();
+            let nanoseconds = Int::create(heap, true, since_unix_epoch.as_nanos());
+            call.complete(heap, nanoseconds)
+        } else if call.handle == self.stdin_handle {
             let input = {
                 let stdin = io::stdin();
                 stdin.lock().lines().next().unwrap().unwrap()

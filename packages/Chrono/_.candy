@@ -1,2 +1,4 @@
+clock := use ".clock"
 constants := use ".constants"
 duration := use ".duration"
+instant := use ".instant"

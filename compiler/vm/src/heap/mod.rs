@@ -245,6 +245,7 @@ pub struct DefaultSymbols {
     pub stdin: Text,
     pub stdout: Text,
     pub struct_: Text,
+    pub system_clock: Text,
     pub tag: Text,
     pub text: Text,
     pub true_: Text,
@@ -270,6 +271,7 @@ impl DefaultSymbols {
             stdin: Text::create(heap, false, "Stdin"),
             stdout: Text::create(heap, false, "Stdout"),
             struct_: Text::create(heap, false, "Struct"),
+            system_clock: Text::create(heap, false, "SystemClock"),
             tag: Text::create(heap, false, "Tag"),
             text: Text::create(heap, false, "Text"),
             true_: Text::create(heap, false, "True"),
@@ -308,6 +310,7 @@ impl DefaultSymbols {
             stdin: clone_to_heap(heap, address_map, self.stdin),
             stdout: clone_to_heap(heap, address_map, self.stdout),
             struct_: clone_to_heap(heap, address_map, self.struct_),
+            system_clock: clone_to_heap(heap, address_map, self.system_clock),
             tag: clone_to_heap(heap, address_map, self.tag),
             text: clone_to_heap(heap, address_map, self.text),
             true_: clone_to_heap(heap, address_map, self.true_),
@@ -323,7 +326,7 @@ impl DefaultSymbols {
             .map(|it| symbols[it])
     }
     #[must_use]
-    pub const fn all_symbols(&self) -> [Text; 21] {
+    pub const fn all_symbols(&self) -> [Text; 22] {
         [
             self.arguments,
             self.builtin,
@@ -343,6 +346,7 @@ impl DefaultSymbols {
             self.stdin,
             self.stdout,
             self.struct_,
+            self.system_clock,
             self.tag,
             self.text,
             self.true_,

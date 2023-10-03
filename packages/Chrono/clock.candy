@@ -1,0 +1,21 @@
+[tag, function] = use "Core"
+instant = use "..instant"
+duration = use "..duration"
+
+is c := c %
+  Clock f -> function.is0 f
+  _ -> False
+
+fromSystemClock systemClock := 
+  needs (function.is0 systemClock)
+  Clock {
+    systemClock | function.run | duration.fromNanoseconds | instant.fromUnixDuration
+  }
+
+mockFromInstant inst := 
+  needs (instant.is inst)
+  Clock { instant }
+
+now clock :=
+  needs (is clock)
+  function.run (tag.getValue clock)
