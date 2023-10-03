@@ -34,4 +34,3 @@ nanosecondsPerMinute := nanosecondsPerSecond | int.multiply secondsPerMinute
 nanosecondsPerHour := nanosecondsPerMinute | int.multiply minutesPerHour
 nanosecondsPerNormalDay := nanosecondsPerHour | int.multiply hoursPerNormalDay
 nanosecondsPerNormalWeek := nanosecondsPerNormalDay | int.multiply daysPerNormalWeek
-
