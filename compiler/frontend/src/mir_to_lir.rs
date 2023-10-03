@@ -7,6 +7,7 @@ use crate::{
     mir_optimize::OptimizeMir,
     module::Module,
     string_to_rcst::ModuleError,
+    utils::{HashMapExtension, HashSetExtension},
     TracingConfig,
 };
 use itertools::Itertools;
@@ -291,19 +292,16 @@ impl CurrentBody {
                 let function = self.id_for(context, *function);
                 let arguments = self.ids_for(context, arguments);
                 let responsible = self.id_for(context, *responsible);
-                self.push(
-                    id,
-                    lir::Expression::TraceCallStarts {
-                        hir_call,
-                        function,
-                        arguments,
-                        responsible,
-                    },
-                );
+                self.push_without_value(lir::Expression::TraceCallStarts {
+                    hir_call,
+                    function,
+                    arguments,
+                    responsible,
+                });
             }
             mir::Expression::TraceCallEnds { return_value } => {
                 let return_value = self.id_for(context, *return_value);
-                self.push(id, lir::Expression::TraceCallEnds { return_value });
+                self.push_without_value(lir::Expression::TraceCallEnds { return_value });
             }
             mir::Expression::TraceExpressionEvaluated {
                 hir_expression,
@@ -311,13 +309,10 @@ impl CurrentBody {
             } => {
                 let hir_expression = self.id_for(context, *hir_expression);
                 let value = self.id_for(context, *value);
-                self.push(
-                    id,
-                    lir::Expression::TraceExpressionEvaluated {
-                        hir_expression,
-                        value,
-                    },
-                );
+                self.push_without_value(lir::Expression::TraceExpressionEvaluated {
+                    hir_expression,
+                    value,
+                });
             }
             mir::Expression::TraceFoundFuzzableFunction {
                 hir_definition,
@@ -325,13 +320,10 @@ impl CurrentBody {
             } => {
                 let hir_definition = self.id_for(context, *hir_definition);
                 let function = self.id_for(context, *function);
-                self.push(
-                    id,
-                    lir::Expression::TraceFoundFuzzableFunction {
-                        hir_definition,
-                        function,
-                    },
-                );
+                self.push_without_value(lir::Expression::TraceFoundFuzzableFunction {
+                    hir_definition,
+                    function,
+                });
             }
         }
     }
@@ -362,11 +354,16 @@ impl CurrentBody {
         let expression = expression.into();
         let is_constant = matches!(expression, lir::Expression::Constant(_));
         let id = self.body.push(expression);
-        assert!(self.id_mapping.insert(mir_id, id).is_none());
+        self.id_mapping.force_insert(mir_id, id);
         if !is_constant {
-            assert!(self.ids_to_drop.insert(id));
+            self.ids_to_drop.force_insert(id);
         }
         id
+    }
+    /// Push an expression that doesn't produce a return value, i.e., a trace
+    /// expression.
+    fn push_without_value(&mut self, expression: impl Into<lir::Expression>) {
+        self.body.push(expression.into());
     }
 
     fn maybe_dup(&mut self, id: lir::Id) {
