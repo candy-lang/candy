@@ -194,6 +194,5 @@ toText duration :=
   mm = duration | minutes | toDebugText | text.padStart 2 "0"
   ss = duration | seconds | toDebugText | text.padStart 2 "0"
   f = duration | subSecondComponent | tag.getValue | fixedDecimal.toText
-  dotIndex = f | text.firstIndexOf "."
-  f = f | text.getRange (dotIndex | int.add 1) (int.min (dotIndex | int.add 10) (text.length f)) | text.padEnd 9 "0"
+  f = f | text.getRange 0 (f | text.firstIndexOf ".") | text.padEnd 9 "0"
   "{sign}{d}:{hh}:{mm}:{ss}.{f}"
