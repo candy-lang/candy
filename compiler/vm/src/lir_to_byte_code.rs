@@ -99,18 +99,17 @@ impl<'c> LoweringContext<'c> {
             stack: vec![],
             instructions: vec![],
         };
-
-        let start = context.compile_body(BodyId::from_usize(0));
-        module_function.set_body(start);
+        let mut start = None;
+        for (id, _) in lir.bodies().ids_and_bodies() {
+            start = Some(context.compile_body(id));
+        }
+        module_function.set_body(start.expect("LIR doesn't contain any bodies."));
 
         context.byte_code
     }
 
     fn get_body(&mut self, body_id: BodyId) -> InstructionPointer {
-        self.body_mapping
-            .get(&body_id)
-            .copied()
-            .unwrap_or_else(|| self.compile_body(body_id))
+        self.body_mapping.get(&body_id).copied().unwrap()
     }
     fn compile_body(&mut self, body_id: BodyId) -> InstructionPointer {
         let old_stack = mem::take(&mut self.stack);
@@ -213,11 +212,7 @@ impl<'c> LoweringContext<'c> {
                 );
             }
             Expression::Constant(constant_id) => {
-                let value = self
-                    .constant_mapping
-                    .get(constant_id)
-                    .copied()
-                    .unwrap_or_else(|| self.compile_constant(*constant_id));
+                let value = self.get_constant(*constant_id);
                 self.emit(id, Instruction::PushConstant(value));
             }
             Expression::Reference(referenced) => {
@@ -302,6 +297,12 @@ impl<'c> LoweringContext<'c> {
         }
     }
 
+    fn get_constant(&mut self, id: ConstantId) -> InlineObject {
+        self.constant_mapping
+            .get(&id)
+            .copied()
+            .unwrap_or_else(|| self.compile_constant(id))
+    }
     fn compile_constant(&mut self, id: ConstantId) -> InlineObject {
         let constant: InlineObject = match self.lir.constants().get(id) {
             Constant::Int(int) => {
@@ -320,7 +321,7 @@ impl<'c> LoweringContext<'c> {
                     .unwrap_or_else(|| {
                         Text::create(&mut self.byte_code.constant_heap, false, symbol)
                     });
-                let value = value.map(|id| self.constant_mapping[&id]);
+                let value = value.map(|id| self.get_constant(id));
                 Tag::create_with_value_option(
                     &mut self.byte_code.constant_heap,
                     false,
@@ -330,24 +331,17 @@ impl<'c> LoweringContext<'c> {
                 .into()
             }
             Constant::Builtin(builtin) => Builtin::create(*builtin).into(),
-            Constant::List(items) => List::create(
-                &mut self.byte_code.constant_heap,
-                false,
-                &items
+            Constant::List(items) => {
+                let items = items.iter().map(|id| self.get_constant(*id)).collect_vec();
+                List::create(&mut self.byte_code.constant_heap, false, &items).into()
+            }
+            Constant::Struct(fields) => {
+                let fields = fields
                     .iter()
-                    .map(|id| self.constant_mapping[id])
-                    .collect_vec(),
-            )
-            .into(),
-            Constant::Struct(fields) => Struct::create(
-                &mut self.byte_code.constant_heap,
-                false,
-                &fields
-                    .iter()
-                    .map(|(key, value)| (self.constant_mapping[key], self.constant_mapping[value]))
-                    .collect(),
-            )
-            .into(),
+                    .map(|(key, value)| (self.get_constant(*key), self.get_constant(*value)))
+                    .collect();
+                Struct::create(&mut self.byte_code.constant_heap, false, &fields).into()
+            }
             Constant::HirId(hir_id) => {
                 HirId::create(&mut self.byte_code.constant_heap, false, hir_id.clone()).into()
             }
