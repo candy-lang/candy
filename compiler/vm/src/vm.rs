@@ -5,10 +5,7 @@ use crate::{
     instructions::InstructionResult,
     tracer::Tracer,
 };
-use candy_frontend::{
-    hir::{self, Id},
-    hir_to_mir::ExecutionTarget,
-};
+use candy_frontend::hir::{self, Id};
 use derive_more::Deref;
 use extension_trait::extension_trait;
 use std::{borrow::Borrow, collections::HashMap, fmt::Debug, hash::Hash};
