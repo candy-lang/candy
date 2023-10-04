@@ -1,6 +1,6 @@
 use crate::{
     byte_code::ByteCode,
-    heap::{Data, Handle, Heap, InlineObject, Int, List, Struct, Tag, Text},
+    heap::{Data, Handle, Heap,  Int, List, Struct, Tag, Text},
     tracer::Tracer,
     vm::VmHandleCall,
     StateAfterRun, StateAfterRunForever, Vm, VmFinished,
@@ -53,7 +53,7 @@ pub struct DefaultEnvironment {
     stdout_handle: Handle,
 }
 impl DefaultEnvironment {
-    pub fn new(heap: &mut Heap, args: &[String]) -> (InlineObject, Self) {
+    pub fn new(heap: &mut Heap, args: &[String]) -> (Struct, Self) {
         let arguments = args
             .iter()
             .map(|it| Text::create(heap, true, it).into())
@@ -80,7 +80,7 @@ impl DefaultEnvironment {
             stdin_handle,
             stdout_handle,
         };
-        (environment_object.into(), environment)
+        (environment_object, environment)
     }
 }
 impl Environment for DefaultEnvironment {

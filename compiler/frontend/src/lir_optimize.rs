@@ -1,7 +1,7 @@
 use crate::{
+    hir_to_mir::ExecutionTarget,
     lir::{Bodies, Body, Expression, Id, Lir},
     mir_to_lir::{LirResult, MirToLir},
-    module::Module,
     utils::HashMapExtension,
     TracingConfig,
 };
@@ -11,12 +11,16 @@ use std::{collections::hash_map::Entry, sync::Arc};
 
 #[salsa::query_group(OptimizeLirStorage)]
 pub trait OptimizeLir: MirToLir {
-    fn optimized_lir(&self, module: Module, tracing: TracingConfig) -> LirResult;
+    fn optimized_lir(&self, target: ExecutionTarget, tracing: TracingConfig) -> LirResult;
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn optimized_lir(db: &dyn OptimizeLir, module: Module, tracing: TracingConfig) -> LirResult {
-    let (lir, errors) = db.lir(module, tracing)?;
+fn optimized_lir(
+    db: &dyn OptimizeLir,
+    target: ExecutionTarget,
+    tracing: TracingConfig,
+) -> LirResult {
+    let (lir, errors) = db.lir(target, tracing)?;
 
     let mut bodies = Bodies::default();
     for (id, body) in lir.bodies().ids_and_bodies() {

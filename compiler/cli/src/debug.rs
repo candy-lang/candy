@@ -8,7 +8,7 @@ use candy_backend_inkwell::LlvmIrDb;
 use candy_frontend::{
     ast_to_hir::AstToHir,
     cst_to_ast::CstToAst,
-    hir_to_mir::HirToMir,
+    hir_to_mir::{ExecutionTarget, HirToMir},
     lir_optimize::OptimizeLir,
     mir_optimize::OptimizeMir,
     mir_to_lir::MirToLir,
@@ -132,41 +132,45 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
         Options::Mir(options) => {
             let module = module_for_path(options.path.clone())?;
             let tracing = options.to_tracing_config();
-            let mir = db.mir(module.clone(), tracing.clone());
+            let mir = db.mir(ExecutionTarget::Module(module.clone()), tracing.clone());
             mir.ok()
                 .map(|(mir, _)| RichIr::for_mir(&module, &mir, &tracing))
         }
         Options::OptimizedMir(options) => {
             let module = module_for_path(options.path.clone())?;
             let tracing = options.to_tracing_config();
-            let mir = db.optimized_mir(module.clone(), tracing.clone());
+            let mir = db.optimized_mir(ExecutionTarget::Module(module.clone()), tracing.clone());
             mir.ok()
                 .map(|(mir, _, _)| RichIr::for_optimized_mir(&module, &mir, &tracing))
         }
         Options::Lir(options) => {
             let module = module_for_path(options.path.clone())?;
             let tracing = options.to_tracing_config();
-            let lir = db.lir(module.clone(), tracing.clone());
+            let lir = db.lir(ExecutionTarget::Module(module.clone()), tracing.clone());
             lir.ok()
                 .map(|(lir, _)| RichIr::for_lir(&module, &lir, &tracing))
         }
         Options::OptimizedLir(options) => {
             let module = module_for_path(options.path.clone())?;
             let tracing = options.to_tracing_config();
-            let lir = db.optimized_lir(module.clone(), tracing.clone());
+            let lir = db.optimized_lir(ExecutionTarget::Module(module.clone()), tracing.clone());
             lir.ok()
                 .map(|(lir, _)| RichIr::for_lir(&module, &lir, &tracing))
         }
         Options::VmByteCode(options) => {
             let module = module_for_path(options.path.clone())?;
             let tracing = options.to_tracing_config();
-            let (vm_byte_code, _) = compile_byte_code(&db, module.clone(), tracing.clone());
+            let (vm_byte_code, _) = compile_byte_code(
+                &db,
+                ExecutionTarget::Module(module.clone()),
+                tracing.clone(),
+            );
             Some(RichIr::for_byte_code(&module, &vm_byte_code, &tracing))
         }
         #[cfg(feature = "inkwell")]
         Options::LlvmIr(options) => {
             let module = module_for_path(options.path.clone())?;
-            let llvm_ir = db.llvm_ir(module.clone());
+            let llvm_ir = db.llvm_ir(ExecutionTarget::Module(module.clone()));
             llvm_ir.ok()
         }
         Options::Gold(options) => return options.run(&db),
@@ -313,6 +317,7 @@ impl GoldOptions {
         {
             let path = file.path();
             let module = module_for_path(path.to_owned())?;
+            let execution_target = ExecutionTarget::MainFunction(module.clone());
             let directory = output_directory.join(path.strip_prefix(&directory).unwrap());
             fs::create_dir_all(&directory).unwrap();
 
@@ -338,32 +343,32 @@ impl GoldOptions {
             visit("HIR", hir.text);
 
             let (mir, _) = db
-                .mir(module.clone(), Self::TRACING_CONFIG.clone())
+                .mir(execution_target.clone(), Self::TRACING_CONFIG.clone())
                 .unwrap();
             let mir = RichIr::for_mir(&module, &mir, &Self::TRACING_CONFIG);
             visit("MIR", mir.text);
 
             let (optimized_mir, _, _) = db
-                .optimized_mir(module.clone(), Self::TRACING_CONFIG.clone())
+                .optimized_mir(execution_target.clone(), Self::TRACING_CONFIG.clone())
                 .unwrap();
             let optimized_mir =
                 RichIr::for_optimized_mir(&module, &optimized_mir, &Self::TRACING_CONFIG);
             visit("Optimized MIR", optimized_mir.text);
 
             let (lir, _) = db
-                .lir(module.clone(), Self::TRACING_CONFIG.clone())
+                .lir(execution_target.clone(), Self::TRACING_CONFIG.clone())
                 .unwrap();
             let lir = RichIr::for_lir(&module, &lir, &Self::TRACING_CONFIG);
             visit("LIR", lir.text);
 
             let (optimized_lir, _) = db
-                .optimized_lir(module.clone(), Self::TRACING_CONFIG.clone())
+                .optimized_lir(execution_target.clone(), Self::TRACING_CONFIG.clone())
                 .unwrap();
             let optimized_lir = RichIr::for_lir(&module, &optimized_lir, &Self::TRACING_CONFIG);
             visit("Optimized LIR", optimized_lir.text);
 
             let (vm_byte_code, _) =
-                compile_byte_code(db, module.clone(), Self::TRACING_CONFIG.clone());
+                compile_byte_code(db, execution_target.clone(), Self::TRACING_CONFIG.clone());
             let vm_byte_code_rich_ir =
                 RichIr::for_byte_code(&module, &vm_byte_code, &Self::TRACING_CONFIG);
             visit(
@@ -373,7 +378,7 @@ impl GoldOptions {
 
             #[cfg(feature = "inkwell")]
             {
-                let llvm_ir = db.llvm_ir(module.clone()).unwrap();
+                let llvm_ir = db.llvm_ir(execution_target).unwrap();
                 visit("LLVM IR", llvm_ir.text);
             }
         }

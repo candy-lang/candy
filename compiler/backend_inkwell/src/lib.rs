@@ -1,7 +1,6 @@
 #![feature(let_chains)]
 #![warn(unused_crate_dependencies)]
 
-use candy_frontend::module::Module as CandyModule;
 use candy_frontend::{
     mir::{Body, Expression, Id, Mir},
     mir_optimize::OptimizeMir,
@@ -16,13 +15,13 @@ use inkwell::{
     values::{BasicValue, BasicValueEnum, FunctionValue, GlobalValue},
     AddressSpace,
 };
-// We depend on this package (used by inkwell) to specify a version and configure features.
-use llvm_sys as _;
-
+use candy_frontend::hir_to_mir::ExecutionTarget;
 use candy_frontend::rich_ir::{RichIr, ToRichIr};
 use candy_frontend::string_to_rcst::ModuleError;
 pub use inkwell;
 use itertools::Itertools;
+// We depend on this package (used by inkwell) to specify a version and configure features.
+use llvm_sys as _;
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
@@ -32,12 +31,12 @@ use std::{
 #[salsa::query_group(LlvmIrStorage)]
 pub trait LlvmIrDb: OptimizeMir {
     #[salsa::transparent]
-    fn llvm_ir(&self, module: CandyModule) -> Result<RichIr, ModuleError>;
+    fn llvm_ir(&self, target: ExecutionTarget) -> Result<RichIr, ModuleError>;
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn llvm_ir(db: &dyn LlvmIrDb, module: CandyModule) -> Result<RichIr, ModuleError> {
-    let (mir, _, _) = db.optimized_mir(module.clone(), TracingConfig::off())?;
+fn llvm_ir(db: &dyn LlvmIrDb, target: ExecutionTarget) -> Result<RichIr, ModuleError> {
+    let (mir, _, _) = db.optimized_mir(target, TracingConfig::off())?;
 
     let context = Context::create();
     let mut codegen = CodeGen::new(&context, "module", mir);
