@@ -40,8 +40,8 @@ pub(crate) struct Options {
     #[arg(short = 'g', default_value_t = false)]
     debug: bool,
 
-    /// The file or package to run. If none is provided, run the package of your
-    /// current working directory.
+    /// The file or package to compile. If none is provided, compile the package
+    /// of your current working directory.
     #[arg(value_hint = ValueHint::FilePath)]
     path: Option<PathBuf>,
 }
