@@ -13,14 +13,14 @@ use tracing::warn;
 /// This command finds very obvious errors in your program. For more extensive
 /// error reporting, fuzzing the Candy program is recommended instead.
 #[derive(Parser, Debug)]
-pub(crate) struct Options {
+pub struct Options {
     /// The file or package to check. If none is provided, the package of your
     /// current working directory will be checked.
     #[arg(value_hint = ValueHint::FilePath)]
     path: Option<PathBuf>,
 }
 
-pub(crate) fn check(options: Options) -> ProgramResult {
+pub fn check(options: Options) -> ProgramResult {
     let packages_path = packages_path();
     let db = Database::new_with_file_system_module_provider(packages_path);
     let module = module_for_path(options.path)?;

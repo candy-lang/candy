@@ -25,7 +25,7 @@ use tracing::{debug, error};
 /// your current working directory. The module should export a `main` function.
 /// This function is then called with an environment.
 #[derive(Parser, Debug)]
-pub(crate) struct Options {
+pub struct Options {
     /// The file or package to run. If none is provided, the package of your
     /// current working directory will be run.
     #[arg(value_hint = ValueHint::FilePath)]
@@ -35,7 +35,7 @@ pub(crate) struct Options {
     arguments: Vec<String>,
 }
 
-pub(crate) fn run(options: Options) -> ProgramResult {
+pub fn run(options: Options) -> ProgramResult {
     let packages_path = packages_path();
     let db = Database::new_with_file_system_module_provider(packages_path.clone());
     let module = module_for_path(options.path)?;
@@ -49,7 +49,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     debug!("Running {module}.");
 
     let compilation_start = Instant::now();
-    let byte_code = Rc::new(compile_byte_code(&db, module.clone(), tracing).0);
+    let byte_code = Rc::new(compile_byte_code(&db, module, tracing).0);
 
     let compilation_end = Instant::now();
     debug!(
