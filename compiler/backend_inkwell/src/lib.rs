@@ -2,10 +2,14 @@
 #![warn(unused_crate_dependencies)]
 
 use candy_frontend::{
+    hir_to_mir::ExecutionTarget,
     mir::{Body, Expression, Id, Mir},
     mir_optimize::OptimizeMir,
+    rich_ir::{RichIr, ToRichIr},
+    string_to_rcst::ModuleError,
     TracingConfig,
 };
+pub use inkwell;
 use inkwell::{
     builder::Builder,
     context::Context,
@@ -15,10 +19,6 @@ use inkwell::{
     values::{BasicValue, BasicValueEnum, FunctionValue, GlobalValue},
     AddressSpace,
 };
-use candy_frontend::hir_to_mir::ExecutionTarget;
-use candy_frontend::rich_ir::{RichIr, ToRichIr};
-use candy_frontend::string_to_rcst::ModuleError;
-pub use inkwell;
 use itertools::Itertools;
 // We depend on this package (used by inkwell) to specify a version and configure features.
 use llvm_sys as _;
@@ -96,16 +96,6 @@ impl<'ctx> CodeGen<'ctx> {
         let make_int_fn_type = candy_value_ptr.fn_type(&[i64_type.into()], false);
         self.module
             .add_function("make_candy_int", make_int_fn_type, Some(Linkage::External));
-        let make_tag_fn_type = candy_value_ptr.fn_type(
-            &[
-                i8_type.ptr_type(AddressSpace::default()).into(),
-                candy_value_ptr.into(),
-            ],
-            false,
-        );
-        let make_candy_tag =
-            self.module
-                .add_function("make_candy_tag", make_tag_fn_type, Some(Linkage::External));
         let make_text_fn_type =
             candy_value_ptr.fn_type(&[i8_type.ptr_type(AddressSpace::default()).into()], false);
         self.module.add_function(
@@ -140,12 +130,6 @@ impl<'ctx> CodeGen<'ctx> {
             make_struct_fn_type,
             Some(Linkage::External),
         );
-
-        let struct_get_fn_type =
-            candy_value_ptr.fn_type(&[candy_value_ptr.into(), candy_value_ptr.into()], false);
-        let candy_builtin_struct_get =
-            self.module
-                .add_function("candy_builtin_struct_get", struct_get_fn_type, None);
 
         let ptr_to_void_fn_type = void_type.fn_type(
             &[candy_value.ptr_type(AddressSpace::default()).into()],
@@ -190,7 +174,7 @@ impl<'ctx> CodeGen<'ctx> {
         };
 
         self.builder.position_at_end(block);
-        let main_return = self
+        let main_function = self
             .compile_mir(&self.mir.body.clone(), &main_info)
             .unwrap();
         self.builder.position_at_end(block);
@@ -199,38 +183,19 @@ impl<'ctx> CodeGen<'ctx> {
             .module
             .add_global(candy_value_ptr, None, "candy_environment");
 
-        const MAIN_FN_NAME: &str = "Main";
-        let main_text = self.make_str_literal(MAIN_FN_NAME);
-
-        let main_tag = self.builder.build_call(
-            make_candy_tag,
-            &[main_text.into(), candy_value_ptr.const_null().into()],
-            "",
-        );
-
-        let main_fn = self
-            .builder
-            .build_call(
-                candy_builtin_struct_get,
-                &[
-                    main_return.as_basic_value_enum().into(),
-                    main_tag.try_as_basic_value().unwrap_left().into(),
-                ],
-                "",
-            )
-            .try_as_basic_value()
-            .unwrap_left();
-
-        let main_res_ptr = self.builder.build_call(
+        let main_result_ptr = self.builder.build_call(
             run_candy_main,
-            &[main_fn.into(), environment.as_basic_value_enum().into()],
+            &[
+                main_function.as_basic_value_enum().into(),
+                environment.as_basic_value_enum().into(),
+            ],
             "",
         );
 
         if print_main_output {
             self.builder.build_call(
                 print_fn,
-                &[main_res_ptr.try_as_basic_value().unwrap_left().into()],
+                &[main_result_ptr.try_as_basic_value().unwrap_left().into()],
                 "",
             );
             for value in self.module.get_globals() {

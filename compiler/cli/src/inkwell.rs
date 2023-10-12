@@ -1,18 +1,20 @@
-use std::ffi::OsStr;
-use std::path::PathBuf;
-use std::sync::Arc;
-
+use crate::{
+    database::Database,
+    utils::{module_for_path, packages_path},
+    Exit, ProgramResult,
+};
 use candy_backend_inkwell::CodeGen;
-use candy_frontend::error::{CompilerError, CompilerErrorPayload};
-use candy_frontend::mir::Mir;
-use candy_frontend::mir_optimize::OptimizeMir;
-use candy_frontend::{hir, module, TracingConfig};
+use candy_frontend::{
+    error::{CompilerError, CompilerErrorPayload},
+    hir,
+    hir_to_mir::ExecutionTarget,
+    mir::Mir,
+    mir_optimize::OptimizeMir,
+    module, TracingConfig,
+};
 use clap::{Parser, ValueHint};
 use rustc_hash::FxHashSet;
-
-use crate::database::Database;
-use crate::utils::{module_for_path, packages_path};
-use crate::{Exit, ProgramResult};
+use std::{ffi::OsStr, path::PathBuf, sync::Arc};
 
 /// Compile a Candy program to a native binary.
 ///
@@ -61,7 +63,10 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
         .to_string();
 
     let (mir, errors) = db
-        .optimized_mir(module.clone(), TracingConfig::off())
+        .optimized_mir(
+            ExecutionTarget::MainFunction(module.clone()),
+            TracingConfig::off(),
+        )
         .map(|(mir, _, errors)| (mir, errors))
         .unwrap_or_else(|error| {
             let payload = CompilerErrorPayload::Module(error);
