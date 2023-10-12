@@ -96,6 +96,15 @@ impl<'ctx> CodeGen<'ctx> {
         let make_int_fn_type = candy_value_ptr.fn_type(&[i64_type.into()], false);
         self.module
             .add_function("make_candy_int", make_int_fn_type, Some(Linkage::External));
+        let make_tag_fn_type = candy_value_ptr.fn_type(
+            &[
+                i8_type.ptr_type(AddressSpace::default()).into(),
+                candy_value_ptr.into(),
+            ],
+            false,
+        );
+        self.module
+            .add_function("make_candy_tag", make_tag_fn_type, Some(Linkage::External));
         let make_text_fn_type =
             candy_value_ptr.fn_type(&[i8_type.ptr_type(AddressSpace::default()).into()], false);
         self.module.add_function(
@@ -130,6 +139,11 @@ impl<'ctx> CodeGen<'ctx> {
             make_struct_fn_type,
             Some(Linkage::External),
         );
+
+        let struct_get_fn_type =
+            candy_value_ptr.fn_type(&[candy_value_ptr.into(), candy_value_ptr.into()], false);
+        self.module
+            .add_function("candy_builtin_struct_get", struct_get_fn_type, None);
 
         let ptr_to_void_fn_type = void_type.fn_type(
             &[candy_value.ptr_type(AddressSpace::default()).into()],
