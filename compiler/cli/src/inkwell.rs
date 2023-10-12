@@ -37,6 +37,10 @@ pub(crate) struct Options {
     #[arg(short = 'g', default_value_t = false)]
     debug: bool,
 
+    /// The linker to be used. Defaults to `ld.lld`
+    #[arg(long, default_value = "ld.lld")]
+    linker: String,
+
     /// The file or package to run. If none is provided, run the package of your
     /// current working directory.
     #[arg(value_hint = ValueHint::FilePath)]
@@ -84,11 +88,11 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
 
     let context = candy_backend_inkwell::inkwell::context::Context::create();
     let mut codegen = CodeGen::new(&context, &path, mir);
-    codegen
-        .compile(&path, options.print_llvm_ir, options.print_main_output)
+    let llvm_candy_module = codegen
+        .compile(options.print_llvm_ir, options.print_main_output)
         .map_err(|e| Exit::LlvmError(e.to_string()))?;
-    codegen
-        .compile_asm_and_link(&path, options.build_runtime, options.debug)
+    llvm_candy_module
+        .compile_obj_and_link(&path, options.build_runtime, options.debug, &options.linker)
         .map_err(|_| Exit::ExternalError)?;
 
     ProgramResult::Ok(())
