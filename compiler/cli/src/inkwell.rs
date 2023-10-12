@@ -38,7 +38,7 @@ pub(crate) struct Options {
     debug: bool,
 
     /// The linker to be used. Defaults to `ld.lld`
-    #[arg(long = "linker", default_value_t = {"ld.lld".to_string()})]
+    #[arg(long, default_value = "ld.lld")]
     linker: String,
 
     /// The file or package to run. If none is provided, run the package of your

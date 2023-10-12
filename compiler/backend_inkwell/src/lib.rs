@@ -6,7 +6,6 @@ use candy_frontend::{
     mir_optimize::OptimizeMir,
     TracingConfig,
 };
-
 use inkwell::{
     builder::Builder,
     context::Context,
@@ -129,12 +128,12 @@ impl<'ctx> LlvmCandyModule<'ctx> {
                 "/usr/lib/crti.o",
                 "-L/usr/lib",
                 "-lc",
-                o_path.as_str(),
+                &o_path,
                 "compiler/backend_inkwell/candy_runtime/candy_runtime.a",
                 "/usr/lib/crtn.o",
                 if debug { "-g" } else { "" },
                 "-o",
-                &o_path.as_str().replace(".candy.o", ""),
+                &o_path.as_str().strip_suffix(".candy.o"),
             ])
             .spawn()?
             .wait()?;
