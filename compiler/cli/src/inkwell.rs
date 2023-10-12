@@ -15,6 +15,7 @@ use candy_frontend::{
 use clap::{Parser, ValueHint};
 use rustc_hash::FxHashSet;
 use std::{ffi::OsStr, path::PathBuf, sync::Arc};
+use tracing::error;
 
 /// Compile a Candy program to a native binary.
 ///
@@ -94,7 +95,10 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
         .map_err(|e| Exit::LlvmError(e.to_string()))?;
     codegen
         .compile_asm_and_link(&path, options.build_runtime, options.debug)
-        .map_err(|_| Exit::ExternalError)?;
+        .map_err(|err| {
+            error!("Failed to compile and link executable: {}", err);
+            Exit::ExternalError
+        })?;
 
     ProgramResult::Ok(())
 }
