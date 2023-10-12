@@ -21,9 +21,9 @@ use candy_frontend::string_to_rcst::ModuleError;
 pub use inkwell;
 use inkwell::targets::{InitializationConfig, Target, TargetMachine};
 use itertools::Itertools;
-use std::path::Path;
 use std::{
     collections::{HashMap, HashSet},
+    path::Path,
     sync::Arc,
 };
 
