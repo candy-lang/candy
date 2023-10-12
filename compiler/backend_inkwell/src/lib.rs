@@ -2,26 +2,31 @@
 #![warn(unused_crate_dependencies)]
 
 use candy_frontend::{
+    builtin_functions::BuiltinFunction,
     hir_to_mir::ExecutionTarget,
     mir::{Body, Expression, Id, Mir},
     mir_optimize::OptimizeMir,
     rich_ir::{RichIr, ToRichIr},
     string_to_rcst::ModuleError,
+    utils::HashMapExtension,
     TracingConfig,
 };
 pub use inkwell;
 use inkwell::{
     builder::Builder,
     context::Context,
-    module::{Linkage, Module},
+    module::Module,
     support::LLVMString,
-    types::{BasicType, StructType},
+    types::{
+        BasicMetadataTypeEnum, BasicType, FunctionType, IntType, PointerType, StructType, VoidType,
+    },
     values::{BasicValue, BasicValueEnum, FunctionValue, GlobalValue},
     AddressSpace,
 };
 use itertools::Itertools;
 // We depend on this package (used by inkwell) to specify a version and configure features.
 use llvm_sys as _;
+use rustc_hash::FxHashMap;
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
@@ -57,6 +62,8 @@ pub struct CodeGen<'ctx> {
     module: Module<'ctx>,
     builder: Builder<'ctx>,
     mir: Arc<Mir>,
+    candy_value_pointer_type: PointerType<'ctx>,
+    builtins: FxHashMap<BuiltinFunction, FunctionValue<'ctx>>,
     globals: HashMap<Id, GlobalValue<'ctx>>,
     locals: HashMap<Id, BasicValueEnum<'ctx>>,
     functions: HashMap<Id, FunctionInfo<'ctx>>,
@@ -67,11 +74,17 @@ impl<'ctx> CodeGen<'ctx> {
     pub fn new(context: &'ctx Context, module_name: &str, mir: Arc<Mir>) -> Self {
         let module = context.create_module(module_name);
         let builder = context.create_builder();
+
+        let candy_value_type = context.opaque_struct_type("candy_value");
+        let candy_value_pointer_type = candy_value_type.ptr_type(AddressSpace::default());
+
         Self {
             context,
             module,
             builder,
             mir,
+            candy_value_pointer_type,
+            builtins: FxHashMap::default(),
             globals: HashMap::new(),
             locals: HashMap::new(),
             functions: HashMap::new(),
@@ -90,96 +103,95 @@ impl<'ctx> CodeGen<'ctx> {
         let i32_type = self.context.i32_type();
         let i64_type = self.context.i64_type();
 
-        let candy_value = self.context.opaque_struct_type("candy_value");
-        let candy_value_ptr = candy_value.ptr_type(AddressSpace::default());
-
-        let make_int_fn_type = candy_value_ptr.fn_type(&[i64_type.into()], false);
-        self.module
-            .add_function("make_candy_int", make_int_fn_type, Some(Linkage::External));
-        let make_tag_fn_type = candy_value_ptr.fn_type(
+        self.add_function(
+            "make_candy_int",
+            &[i64_type.into()],
+            self.candy_value_pointer_type,
+        );
+        self.add_function(
+            "make_candy_tag",
             &[
                 i8_type.ptr_type(AddressSpace::default()).into(),
-                candy_value_ptr.into(),
+                self.candy_value_pointer_type.into(),
             ],
-            false,
+            self.candy_value_pointer_type,
         );
-        self.module
-            .add_function("make_candy_tag", make_tag_fn_type, Some(Linkage::External));
-        let make_text_fn_type =
-            candy_value_ptr.fn_type(&[i8_type.ptr_type(AddressSpace::default()).into()], false);
-        self.module.add_function(
+        self.add_function(
             "make_candy_text",
-            make_text_fn_type,
-            Some(Linkage::External),
+            &[i8_type.ptr_type(AddressSpace::default()).into()],
+            self.candy_value_pointer_type,
         );
-        let make_list_fn_type = candy_value_ptr.fn_type(&[candy_value_ptr.into()], false);
-        self.module.add_function(
+        self.add_function(
             "make_candy_list",
-            make_list_fn_type,
-            Some(Linkage::External),
+            &[self.candy_value_pointer_type.into()],
+            self.candy_value_pointer_type,
         );
-        let make_function_fn_type = candy_value_ptr.fn_type(
+        self.add_function(
+            "make_candy_function",
             &[
-                candy_value_ptr.into(),
-                candy_value_ptr.into(),
+                self.candy_value_pointer_type.into(),
+                self.candy_value_pointer_type.into(),
                 i64_type.into(),
             ],
-            false,
+            self.candy_value_pointer_type,
         );
-        self.module.add_function(
-            "make_candy_function",
-            make_function_fn_type,
-            Some(Linkage::External),
-        );
-
-        let make_struct_fn_type =
-            candy_value_ptr.fn_type(&[candy_value_ptr.into(), candy_value_ptr.into()], false);
-        self.module.add_function(
+        self.add_function(
             "make_candy_struct",
-            make_struct_fn_type,
-            Some(Linkage::External),
+            &[
+                self.candy_value_pointer_type.into(),
+                self.candy_value_pointer_type.into(),
+            ],
+            self.candy_value_pointer_type,
         );
 
-        let struct_get_fn_type =
-            candy_value_ptr.fn_type(&[candy_value_ptr.into(), candy_value_ptr.into()], false);
-        self.module
-            .add_function("candy_builtin_struct_get", struct_get_fn_type, None);
-
-        let ptr_to_void_fn_type = void_type.fn_type(
-            &[candy_value.ptr_type(AddressSpace::default()).into()],
-            false,
+        self.add_function(
+            "candy_builtin_struct_get",
+            &[
+                self.candy_value_pointer_type.into(),
+                self.candy_value_pointer_type.into(),
+            ],
+            self.candy_value_pointer_type,
         );
-        self.module
-            .add_function("candy_panic", ptr_to_void_fn_type, None);
-        let free_fn = self
-            .module
-            .add_function("free_candy_value", ptr_to_void_fn_type, None);
-        let print_fn = self
-            .module
-            .add_function("print_candy_value", ptr_to_void_fn_type, None);
 
-        let candy_fn_type = candy_value_ptr.fn_type(&[], true);
-        let get_candy_fn_ptr_type = candy_fn_type
-            .ptr_type(AddressSpace::default())
-            .fn_type(&[candy_value_ptr.into()], false);
-        self.module
-            .add_function("get_candy_function_pointer", get_candy_fn_ptr_type, None);
-        let get_candy_fn_env_type = candy_value_ptr.fn_type(&[candy_value_ptr.into()], false);
-        self.module.add_function(
+        self.add_function(
+            "candy_panic",
+            &[self.candy_value_pointer_type.into()],
+            void_type,
+        );
+        let free_fn = self.add_function(
+            "free_candy_value",
+            &[self.candy_value_pointer_type.into()],
+            void_type,
+        );
+        let print_fn = self.add_function(
+            "print_candy_value",
+            &[self.candy_value_pointer_type.into()],
+            void_type,
+        );
+
+        let candy_fn_type = self.candy_value_pointer_type.fn_type(&[], true);
+        self.add_function(
+            "get_candy_function_pointer",
+            &[self.candy_value_pointer_type.into()],
+            candy_fn_type.ptr_type(AddressSpace::default()),
+        );
+        self.add_function(
             "get_candy_function_environment",
-            get_candy_fn_env_type,
-            None,
+            &[self.candy_value_pointer_type.into()],
+            self.candy_value_pointer_type,
         );
 
-        let main_type = i32_type.fn_type(&[], false);
-        let main_fn = self.module.add_function("main", main_type, None);
+        let main_fn = self.add_function("main", &[], i32_type);
         let block = self.context.append_basic_block(main_fn, "entry");
 
-        let run_candy_main_type =
-            candy_value_ptr.fn_type(&[candy_value_ptr.into(), candy_value_ptr.into()], false);
-        let run_candy_main = self
-            .module
-            .add_function("run_candy_main", run_candy_main_type, None);
+        let run_candy_main = self.add_function(
+            "run_candy_main",
+            &[
+                self.candy_value_pointer_type.into(),
+                self.candy_value_pointer_type.into(),
+            ],
+            self.candy_value_pointer_type,
+        );
 
         let main_info = FunctionInfo {
             function_value: main_fn,
@@ -193,9 +205,9 @@ impl<'ctx> CodeGen<'ctx> {
             .unwrap();
         self.builder.position_at_end(block);
 
-        let environment = self
-            .module
-            .add_global(candy_value_ptr, None, "candy_environment");
+        let environment =
+            self.module
+                .add_global(self.candy_value_pointer_type, None, "candy_environment");
 
         let main_result_ptr = self.builder.build_call(
             run_candy_main,
@@ -214,9 +226,11 @@ impl<'ctx> CodeGen<'ctx> {
             );
             for value in self.module.get_globals() {
                 if value != environment {
-                    let val =
-                        self.builder
-                            .build_load(candy_value_ptr, value.as_pointer_value(), "");
+                    let val = self.builder.build_load(
+                        self.candy_value_pointer_type,
+                        value.as_pointer_value(),
+                        "",
+                    );
                     self.builder.build_call(free_fn, &[val.into()], "");
                 }
             }
@@ -283,14 +297,7 @@ impl<'ctx> CodeGen<'ctx> {
         mir: &Body,
         function_ctx: &FunctionInfo<'ctx>,
     ) -> Option<impl BasicValue<'ctx>> {
-        let candy_value_ptr = self
-            .module
-            .get_struct_type("candy_value")
-            .unwrap()
-            .ptr_type(AddressSpace::default());
-
         let mut return_value = None;
-
         for (id, expr) in mir.expressions.iter() {
             let expr_value = match expr {
                 Expression::Int(value) => {
@@ -315,7 +322,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                     Some(global.as_basic_value_enum())
                 }
-                candy_frontend::mir::Expression::Text(text) => {
+                Expression::Text(text) => {
                     let string = self.make_str_literal(text);
                     let make_candy_text = self.module.get_function("make_candy_text").unwrap();
                     let call = self
@@ -330,10 +337,13 @@ impl<'ctx> CodeGen<'ctx> {
 
                     Some(global.as_basic_value_enum())
                 }
-                candy_frontend::mir::Expression::Tag { symbol, value } => {
+                Expression::Tag { symbol, value } => {
                     let tag_value = match value {
                         Some(value) => self.get_value_with_id(function_ctx, value).unwrap(),
-                        None => candy_value_ptr.const_null().as_basic_value_enum(),
+                        None => self
+                            .candy_value_pointer_type
+                            .const_null()
+                            .as_basic_value_enum(),
                     };
 
                     let string = self.make_str_literal(symbol);
@@ -352,11 +362,8 @@ impl<'ctx> CodeGen<'ctx> {
 
                     Some(global.as_basic_value_enum())
                 }
-                candy_frontend::mir::Expression::Builtin(builtin) => {
-                    let builtin_name = format!("candy_builtin_{}", builtin.as_ref());
-                    let args = [candy_value_ptr.into()].repeat(builtin.num_parameters());
-                    let fn_type = candy_value_ptr.fn_type(args.as_slice(), false);
-                    let function = self.module.add_function(&builtin_name, fn_type, None);
+                Expression::Builtin(builtin) => {
+                    let function = self.get_builtin(*builtin);
                     self.functions.insert(
                         *id,
                         FunctionInfo {
@@ -374,25 +381,25 @@ impl<'ctx> CodeGen<'ctx> {
                         make_candy_function,
                         &[
                             function_ptr.into(),
-                            candy_value_ptr.const_null().into(),
+                            self.candy_value_pointer_type.const_null().into(),
                             i64_type.const_zero().into(),
                         ],
                         "",
                     );
 
                     let global = self.create_global(
-                        &format!("fun_{builtin_name}"),
+                        &format!("fun_candy_builtin_{}", builtin.as_ref()),
                         id,
                         call.try_as_basic_value().unwrap_left(),
                     );
 
                     Some(global.as_basic_value_enum())
                 }
-                candy_frontend::mir::Expression::List(list) => {
+                Expression::List(list) => {
                     let i64_type = self.context.i64_type();
 
                     let list_array = self.builder.build_array_alloca(
-                        candy_value_ptr,
+                        self.candy_value_pointer_type,
                         i64_type.const_int(list.len() as u64 + 1, false),
                         "",
                     );
@@ -404,7 +411,7 @@ impl<'ctx> CodeGen<'ctx> {
                     for (idx, value) in values.enumerate() {
                         let value_position = unsafe {
                             self.builder.build_gep(
-                                candy_value_ptr,
+                                self.candy_value_pointer_type,
                                 list_array,
                                 &[i64_type.const_int(idx as u64, false)],
                                 "",
@@ -414,14 +421,14 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                     let end_position = unsafe {
                         self.builder.build_gep(
-                            candy_value_ptr,
+                            self.candy_value_pointer_type,
                             list_array,
                             &[i64_type.const_int(list.len() as u64, false)],
                             "",
                         )
                     };
                     self.builder
-                        .build_store(end_position, candy_value_ptr.const_null());
+                        .build_store(end_position, self.candy_value_pointer_type.const_null());
 
                     let make_candy_list = self.module.get_function("make_candy_list").unwrap();
                     let candy_list =
@@ -433,17 +440,17 @@ impl<'ctx> CodeGen<'ctx> {
 
                     Some(global.as_basic_value_enum())
                 }
-                candy_frontend::mir::Expression::Struct(s) => {
+                Expression::Struct(s) => {
                     let i64_type = self.context.i64_type();
                     let make_candy_struct = self.module.get_function("make_candy_struct").unwrap();
 
                     let keys_array = self.builder.build_array_alloca(
-                        candy_value_ptr,
+                        self.candy_value_pointer_type,
                         i64_type.const_int(s.len() as u64 + 1, false),
                         "",
                     );
                     let values_array = self.builder.build_array_alloca(
-                        candy_value_ptr,
+                        self.candy_value_pointer_type,
                         i64_type.const_int(s.len() as u64 + 1, false),
                         "",
                     );
@@ -459,7 +466,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                         let key_ptr = unsafe {
                             self.builder.build_gep(
-                                candy_value_ptr,
+                                self.candy_value_pointer_type,
                                 keys_array,
                                 &[i64_type.const_int(idx as u64, false)],
                                 "",
@@ -468,7 +475,7 @@ impl<'ctx> CodeGen<'ctx> {
                         self.builder.build_store(key_ptr, key);
                         let value_ptr = unsafe {
                             self.builder.build_gep(
-                                candy_value_ptr,
+                                self.candy_value_pointer_type,
                                 values_array,
                                 &[i64_type.const_int(idx as u64, false)],
                                 "",
@@ -480,24 +487,24 @@ impl<'ctx> CodeGen<'ctx> {
                     // Null-terminate key/value arrays
                     let key_ptr = unsafe {
                         self.builder.build_gep(
-                            candy_value_ptr,
+                            self.candy_value_pointer_type,
                             keys_array,
                             &[i64_type.const_int(s.len() as u64, false)],
                             "",
                         )
                     };
                     self.builder
-                        .build_store(key_ptr, candy_value_ptr.const_null());
+                        .build_store(key_ptr, self.candy_value_pointer_type.const_null());
                     let value_ptr = unsafe {
                         self.builder.build_gep(
-                            candy_value_ptr,
+                            self.candy_value_pointer_type,
                             values_array,
                             &[i64_type.const_int(s.len() as u64, false)],
                             "",
                         )
                     };
                     self.builder
-                        .build_store(value_ptr, candy_value_ptr.const_null());
+                        .build_store(value_ptr, self.candy_value_pointer_type.const_null());
 
                     let struct_value = self
                         .builder
@@ -513,13 +520,13 @@ impl<'ctx> CodeGen<'ctx> {
 
                     Some(struct_value.into_pointer_value().as_basic_value_enum())
                 }
-                candy_frontend::mir::Expression::Reference(ref_id) => {
+                Expression::Reference(ref_id) => {
                     let value = self.get_value_with_id(function_ctx, ref_id).unwrap();
 
                     self.locals.insert(*id, value);
                     Some(value)
                 }
-                candy_frontend::mir::Expression::HirId(hir_id) => {
+                Expression::HirId(hir_id) => {
                     let text = format!("{hir_id}");
 
                     let string = self.make_str_literal(&text);
@@ -533,7 +540,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                     Some(global.as_basic_value_enum())
                 }
-                candy_frontend::mir::Expression::Function {
+                Expression::Function {
                     original_hirs,
                     parameters,
                     body,
@@ -557,7 +564,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                     let env_types: Vec<_> = captured_ids
                         .iter()
-                        .map(|_| candy_value_ptr.as_basic_type_enum())
+                        .map(|_| self.candy_value_pointer_type.as_basic_type_enum())
                         .collect();
 
                     let env_struct_type = self.context.struct_type(&env_types, false);
@@ -574,16 +581,16 @@ impl<'ctx> CodeGen<'ctx> {
                         self.builder.build_store(member, value.unwrap());
                     }
 
-                    let mut params: Vec<_> =
-                        parameters.iter().map(|_| candy_value_ptr.into()).collect();
+                    let mut params: Vec<_> = parameters
+                        .iter()
+                        .map(|_| self.candy_value_pointer_type.into())
+                        .collect();
 
                     if !captured_ids.is_empty() {
-                        params.push(candy_value_ptr.into());
+                        params.push(self.candy_value_pointer_type.into());
                     }
 
-                    let fn_type = candy_value_ptr.fn_type(&params, false);
-
-                    let function = self.module.add_function(&name, fn_type, None);
+                    let function = self.add_function(&name, &params, self.candy_value_pointer_type);
 
                     let function_info = FunctionInfo {
                         function_value: function,
@@ -626,8 +633,8 @@ impl<'ctx> CodeGen<'ctx> {
 
                     Some(global.as_basic_value_enum())
                 }
-                candy_frontend::mir::Expression::Parameter => unreachable!(),
-                candy_frontend::mir::Expression::Call {
+                Expression::Parameter => unreachable!(),
+                Expression::Call {
                     function,
                     arguments,
                     responsible,
@@ -691,7 +698,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                         args.push(fn_env_ptr.try_as_basic_value().unwrap_left().into());
 
-                        let candy_fn_type = candy_value_ptr.fn_type(&[], true);
+                        let candy_fn_type = self.candy_value_pointer_type.fn_type(&[], true);
                         let inner_fn = fn_ptr
                             .try_as_basic_value()
                             .unwrap_left()
@@ -707,8 +714,8 @@ impl<'ctx> CodeGen<'ctx> {
                         Some(call_value.as_basic_value_enum())
                     }
                 }
-                candy_frontend::mir::Expression::UseModule { .. } => unreachable!(),
-                candy_frontend::mir::Expression::Panic { reason, .. } => {
+                Expression::UseModule { .. } => unreachable!(),
+                Expression::Panic { reason, .. } => {
                     let panic_fn = self.module.get_function("candy_panic").unwrap();
 
                     let reason = self.get_value_with_id(function_ctx, reason).unwrap();
@@ -720,12 +727,12 @@ impl<'ctx> CodeGen<'ctx> {
                     // Early return to avoid building a return instruction.
                     return None;
                 }
-                candy_frontend::mir::Expression::TraceCallStarts { .. } => unimplemented!(),
-                candy_frontend::mir::Expression::TraceCallEnds { .. } => unimplemented!(),
-                candy_frontend::mir::Expression::TraceExpressionEvaluated { .. } => {
+                Expression::TraceCallStarts { .. } => unimplemented!(),
+                Expression::TraceCallEnds { .. } => unimplemented!(),
+                Expression::TraceExpressionEvaluated { .. } => {
                     unimplemented!()
                 }
-                candy_frontend::mir::Expression::TraceFoundFuzzableFunction { .. } => {
+                Expression::TraceFoundFuzzableFunction { .. } => {
                     unimplemented!()
                 }
             };
@@ -744,21 +751,40 @@ impl<'ctx> CodeGen<'ctx> {
         return_value
     }
 
+    fn get_builtin(&mut self, builtin: BuiltinFunction) -> FunctionValue<'ctx> {
+        if let Some(function) = self.builtins.get(&builtin) {
+            return *function;
+        }
+
+        let function = self.add_function(
+            &(format!("candy_builtin_{}", builtin.as_ref())),
+            vec![self.candy_value_pointer_type.into(); builtin.num_parameters()].as_slice(),
+            self.candy_value_pointer_type,
+        );
+        self.builtins.force_insert(builtin, function);
+        function
+    }
+    fn add_function(
+        &self,
+        name: &str,
+        parameter_types: &[BasicMetadataTypeEnum<'ctx>],
+        return_type: impl FunctionReturnType<'ctx>,
+    ) -> FunctionValue<'ctx> {
+        let function_type = return_type.function_type(parameter_types, false);
+        self.module.add_function(name, function_type, None)
+    }
     fn create_global(
         &mut self,
         name: &str,
         id: &Id,
         value: impl BasicValue<'ctx>,
     ) -> GlobalValue<'ctx> {
-        let candy_value_ptr = self
+        let global = self
             .module
-            .get_struct_type("candy_value")
-            .unwrap()
-            .ptr_type(AddressSpace::default());
-        let global = self.module.add_global(candy_value_ptr, None, name);
+            .add_global(self.candy_value_pointer_type, None, name);
         self.builder.build_store(global.as_pointer_value(), value);
 
-        global.set_initializer(&candy_value_ptr.const_null());
+        global.set_initializer(&self.candy_value_pointer_type.const_null());
         assert!(self.globals.insert(*id, global).is_none());
         global
     }
@@ -787,14 +813,9 @@ impl<'ctx> CodeGen<'ctx> {
         function_ctx: &FunctionInfo<'ctx>,
         id: &Id,
     ) -> Option<BasicValueEnum<'ctx>> {
-        let candy_value_ptr = self
-            .module
-            .get_struct_type("candy_value")
-            .unwrap()
-            .ptr_type(AddressSpace::default());
         let mut v = self.globals.get(id).map(|a| {
             self.builder
-                .build_load(candy_value_ptr, a.as_pointer_value(), "")
+                .build_load(self.candy_value_pointer_type, a.as_pointer_value(), "")
         });
         if v.is_none() && let Some(i) = function_ctx.captured_ids.iter().position(|i| i == id) {
             let env_ptr = function_ctx.function_value.get_last_param().unwrap();
@@ -809,15 +830,39 @@ impl<'ctx> CodeGen<'ctx> {
                 )
                 .unwrap();
 
-            v.replace(self.builder.build_load(candy_value_ptr, env_value, ""));
+            v.replace(self.builder.build_load(self.candy_value_pointer_type, env_value, ""));
         }
         if v.is_none() && let Some(value) = self.locals.get(id) {
             v.replace(*value);
         }
         if self.unrepresented_ids.contains(id) {
-            v.replace(candy_value_ptr.const_null().as_basic_value_enum());
+            v.replace(
+                self.candy_value_pointer_type
+                    .const_null()
+                    .as_basic_value_enum(),
+            );
         }
         v.unwrap_or_else(|| panic!("{id} should be a real ID"))
             .into()
     }
 }
+
+trait FunctionReturnType<'ctx> {
+    fn function_type(
+        self,
+        param_types: &[BasicMetadataTypeEnum<'ctx>],
+        is_var_args: bool,
+    ) -> FunctionType<'ctx>;
+}
+macro_rules! impl_function_return_type {
+    ($($type:ty),*) => {
+        $(
+            impl<'ctx> FunctionReturnType<'ctx> for $type {
+                fn function_type(self, param_types: &[BasicMetadataTypeEnum<'ctx>], is_var_args: bool) -> FunctionType<'ctx> {
+                    self.fn_type(param_types, is_var_args)
+                }
+            }
+        )*
+    };
+}
+impl_function_return_type!(IntType<'ctx>, PointerType<'ctx>, VoidType<'ctx>);
