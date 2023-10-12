@@ -133,7 +133,7 @@ impl<'ctx> LlvmCandyModule<'ctx> {
                 "/usr/lib/crtn.o",
                 if debug { "-g" } else { "" },
                 "-o",
-                &o_path.as_str().strip_suffix(".candy.o"),
+                &o_path.as_str().strip_suffix(".candy.o").unwrap(),
             ])
             .spawn()?
             .wait()?;
