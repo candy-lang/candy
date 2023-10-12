@@ -145,15 +145,6 @@ impl<'ctx> CodeGen<'ctx> {
         );
 
         self.add_function(
-            "candy_builtin_struct_get",
-            &[
-                self.candy_value_pointer_type.into(),
-                self.candy_value_pointer_type.into(),
-            ],
-            self.candy_value_pointer_type,
-        );
-
-        self.add_function(
             "candy_panic",
             &[self.candy_value_pointer_type.into()],
             void_type,
@@ -200,44 +191,45 @@ impl<'ctx> CodeGen<'ctx> {
         };
 
         self.builder.position_at_end(block);
-        let main_function = self
-            .compile_mir(&self.mir.body.clone(), &main_info)
-            .unwrap();
+        let main_function = self.compile_mir(&self.mir.body.clone(), &main_info);
+        // This is `None` iff there is no exported main function.
         self.builder.position_at_end(block);
+        if let Some(main_function) = main_function {
+            let environment =
+                self.module
+                    .add_global(self.candy_value_pointer_type, None, "candy_environment");
 
-        let environment =
-            self.module
-                .add_global(self.candy_value_pointer_type, None, "candy_environment");
-
-        let main_result_ptr = self.builder.build_call(
-            run_candy_main,
-            &[
-                main_function.as_basic_value_enum().into(),
-                environment.as_basic_value_enum().into(),
-            ],
-            "",
-        );
-
-        if print_main_output {
-            self.builder.build_call(
-                print_fn,
-                &[main_result_ptr.try_as_basic_value().unwrap_left().into()],
+            let main_result_ptr = self.builder.build_call(
+                run_candy_main,
+                &[
+                    main_function.as_basic_value_enum().into(),
+                    environment.as_basic_value_enum().into(),
+                ],
                 "",
             );
-            for value in self.module.get_globals() {
-                if value != environment {
-                    let val = self.builder.build_load(
-                        self.candy_value_pointer_type,
-                        value.as_pointer_value(),
-                        "",
-                    );
-                    self.builder.build_call(free_fn, &[val.into()], "");
+
+            if print_main_output {
+                self.builder.build_call(
+                    print_fn,
+                    &[main_result_ptr.try_as_basic_value().unwrap_left().into()],
+                    "",
+                );
+                for value in self.module.get_globals() {
+                    if value != environment {
+                        let val = self.builder.build_load(
+                            self.candy_value_pointer_type,
+                            value.as_pointer_value(),
+                            "",
+                        );
+                        self.builder.build_call(free_fn, &[val.into()], "");
+                    }
                 }
             }
+
+            let ret_value = i32_type.const_int(0, false);
+            self.builder.build_return(Some(&ret_value));
         }
 
-        let ret_value = i32_type.const_int(0, false);
-        self.builder.build_return(Some(&ret_value));
         if print_llvm_ir {
             self.module.print_to_stderr();
         }
