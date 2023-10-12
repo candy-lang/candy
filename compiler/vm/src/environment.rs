@@ -1,6 +1,6 @@
 use crate::{
     byte_code::ByteCode,
-    heap::{Data, Handle, Heap,  Int, List, Struct, Tag, Text},
+    heap::{Data, Handle, Heap, Int, List, Struct, Tag, Text},
     tracer::Tracer,
     vm::VmHandleCall,
     StateAfterRun, StateAfterRunForever, Vm, VmFinished,
