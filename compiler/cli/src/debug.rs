@@ -12,6 +12,7 @@ use candy_frontend::{
     lir_optimize::OptimizeLir,
     mir_optimize::OptimizeMir,
     mir_to_lir::MirToLir,
+    module::Module,
     position::Offset,
     rcst_to_cst::RcstToCst,
     rich_ir::{RichIr, RichIrAnnotation, TokenType},
@@ -20,7 +21,7 @@ use candy_frontend::{
     TracingConfig, TracingMode,
 };
 use candy_vm::{byte_code::RichIrForByteCode, heap::HeapData, mir_to_byte_code::compile_byte_code};
-use clap::{Parser, ValueHint};
+use clap::{Parser, ValueEnum, ValueHint};
 use colored::{Color, Colorize};
 use diffy::{create_patch, PatchFormatter};
 use itertools::Itertools;
@@ -30,6 +31,7 @@ use rustc_hash::FxHashMap;
 use std::{
     env, fs, io,
     path::{Path, PathBuf},
+    str,
 };
 use walkdir::WalkDir;
 
@@ -52,36 +54,41 @@ pub(crate) enum Options {
     Hir(OnlyPath),
 
     /// Mid-Level Intermediate Representation
-    Mir(PathAndTracing),
+    Mir(PathAndExecutionTargetAndTracing),
 
     /// Optimized Mid-Level Intermediate Representation
-    OptimizedMir(PathAndTracing),
+    OptimizedMir(PathAndExecutionTargetAndTracing),
 
     /// Low-Level Intermediate Representation
-    Lir(PathAndTracing),
+    Lir(PathAndExecutionTargetAndTracing),
 
     /// Optimized Low-Level Intermediate Representation
-    OptimizedLir(PathAndTracing),
+    OptimizedLir(PathAndExecutionTargetAndTracing),
 
     /// VM Byte Code
-    VmByteCode(PathAndTracing),
+    VmByteCode(PathAndExecutionTargetAndTracing),
 
     /// LLVM Intermediate Representation
     #[cfg(feature = "inkwell")]
-    LlvmIr(OnlyPath),
+    LlvmIr(PathAndExecutionTarget),
 
     #[command(subcommand)]
     Gold(Gold),
 }
+
 #[derive(Parser, Debug)]
 pub(crate) struct OnlyPath {
     #[arg(value_hint = ValueHint::FilePath)]
     path: PathBuf,
 }
+
 #[derive(Parser, Debug)]
-pub(crate) struct PathAndTracing {
+pub(crate) struct PathAndExecutionTargetAndTracing {
     #[arg(value_hint = ValueHint::FilePath)]
     path: PathBuf,
+
+    #[arg(long, value_enum, default_value_t = ExecutionTargetKind::Module)]
+    execution_target: ExecutionTargetKind,
 
     #[arg(long)]
     register_fuzzables: bool,
@@ -92,7 +99,7 @@ pub(crate) struct PathAndTracing {
     #[arg(long)]
     trace_evaluated_expressions: bool,
 }
-impl PathAndTracing {
+impl PathAndExecutionTargetAndTracing {
     fn to_tracing_config(&self) -> TracingConfig {
         TracingConfig {
             register_fuzzables: TracingMode::only_current_or_off(self.register_fuzzables),
@@ -100,6 +107,29 @@ impl PathAndTracing {
             evaluated_expressions: TracingMode::only_current_or_off(
                 self.trace_evaluated_expressions,
             ),
+        }
+    }
+}
+
+#[derive(Parser, Debug)]
+pub(crate) struct PathAndExecutionTarget {
+    #[arg(value_hint = ValueHint::FilePath)]
+    path: PathBuf,
+
+    #[arg(long, value_enum, default_value_t = ExecutionTargetKind::Module)]
+    execution_target: ExecutionTargetKind,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, ValueEnum)]
+pub(crate) enum ExecutionTargetKind {
+    Module,
+    MainFunction,
+}
+impl ExecutionTargetKind {
+    fn resolve(self, module: Module) -> ExecutionTarget {
+        match self {
+            ExecutionTargetKind::Module => ExecutionTarget::Module(module),
+            ExecutionTargetKind::MainFunction => ExecutionTarget::MainFunction(module),
         }
     }
 }
@@ -131,47 +161,48 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
         }
         Options::Mir(options) => {
             let module = module_for_path(options.path.clone())?;
+            let execution_target = options.execution_target.resolve(module.clone());
             let tracing = options.to_tracing_config();
-            let mir = db.mir(ExecutionTarget::Module(module.clone()), tracing.clone());
+            let mir = db.mir(execution_target, tracing.clone());
             mir.ok()
                 .map(|(mir, _)| RichIr::for_mir(&module, &mir, &tracing))
         }
         Options::OptimizedMir(options) => {
             let module = module_for_path(options.path.clone())?;
+            let execution_target = options.execution_target.resolve(module.clone());
             let tracing = options.to_tracing_config();
-            let mir = db.optimized_mir(ExecutionTarget::Module(module.clone()), tracing.clone());
+            let mir = db.optimized_mir(execution_target, tracing.clone());
             mir.ok()
                 .map(|(mir, _, _)| RichIr::for_optimized_mir(&module, &mir, &tracing))
         }
         Options::Lir(options) => {
             let module = module_for_path(options.path.clone())?;
+            let execution_target = options.execution_target.resolve(module.clone());
             let tracing = options.to_tracing_config();
-            let lir = db.lir(ExecutionTarget::Module(module.clone()), tracing.clone());
+            let lir = db.lir(execution_target, tracing.clone());
             lir.ok()
                 .map(|(lir, _)| RichIr::for_lir(&module, &lir, &tracing))
         }
         Options::OptimizedLir(options) => {
             let module = module_for_path(options.path.clone())?;
+            let execution_target = options.execution_target.resolve(module.clone());
             let tracing = options.to_tracing_config();
-            let lir = db.optimized_lir(ExecutionTarget::Module(module.clone()), tracing.clone());
+            let lir = db.optimized_lir(execution_target, tracing.clone());
             lir.ok()
                 .map(|(lir, _)| RichIr::for_lir(&module, &lir, &tracing))
         }
         Options::VmByteCode(options) => {
             let module = module_for_path(options.path.clone())?;
+            let execution_target = options.execution_target.resolve(module.clone());
             let tracing = options.to_tracing_config();
-            let (vm_byte_code, _) = compile_byte_code(
-                &db,
-                ExecutionTarget::Module(module.clone()),
-                tracing.clone(),
-            );
+            let (vm_byte_code, _) = compile_byte_code(&db, execution_target, tracing.clone());
             Some(RichIr::for_byte_code(&module, &vm_byte_code, &tracing))
         }
         #[cfg(feature = "inkwell")]
         Options::LlvmIr(options) => {
             let module = module_for_path(options.path.clone())?;
-            let llvm_ir = db.llvm_ir(ExecutionTarget::Module(module.clone()));
-            llvm_ir.ok()
+            let execution_target = options.execution_target.resolve(module);
+            db.llvm_ir(execution_target).ok()
         }
         Options::Gold(options) => return options.run(&db),
     };
@@ -189,10 +220,10 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
     } in annotations
     {
         assert!(displayed_byte <= range.start);
-        let before_annotation = std::str::from_utf8(&bytes[*displayed_byte..*range.start]).unwrap();
+        let before_annotation = str::from_utf8(&bytes[*displayed_byte..*range.start]).unwrap();
         print!("{before_annotation}");
 
-        let in_annotation = std::str::from_utf8(&bytes[*range.start..*range.end]).unwrap();
+        let in_annotation = str::from_utf8(&bytes[*range.start..*range.end]).unwrap();
 
         if let Some(token_type) = token_type {
             let color = match token_type {
@@ -209,12 +240,12 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
             };
             print!("{}", in_annotation.color(color));
         } else {
-            print!("{}", in_annotation)
+            print!("{in_annotation}")
         }
 
         displayed_byte = range.end;
     }
-    let rest = std::str::from_utf8(&bytes[*displayed_byte..]).unwrap();
+    let rest = str::from_utf8(&bytes[*displayed_byte..]).unwrap();
     println!("{rest}");
 
     Ok(())
@@ -234,6 +265,9 @@ pub(crate) enum Gold {
 pub(crate) struct GoldOptions {
     #[arg(value_hint = ValueHint::DirPath)]
     directory: Option<PathBuf>,
+
+    #[arg(long, value_enum, default_value_t = ExecutionTargetKind::MainFunction)]
+    execution_target: ExecutionTargetKind,
 
     #[arg(long, value_hint = ValueHint::DirPath)]
     output_directory: Option<PathBuf>,
@@ -317,7 +351,7 @@ impl GoldOptions {
         {
             let path = file.path();
             let module = module_for_path(path.to_owned())?;
-            let execution_target = ExecutionTarget::MainFunction(module.clone());
+            let execution_target = self.execution_target.resolve(module.clone());
             let directory = output_directory.join(path.strip_prefix(&directory).unwrap());
             fs::create_dir_all(&directory).unwrap();
 
