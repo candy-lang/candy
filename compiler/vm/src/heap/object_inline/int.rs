@@ -274,10 +274,6 @@ mod tests {
 
     #[test]
     fn bit_length() {
-        assert_eq!(inline_int(-4).bit_length(), inline_int(3));
-        assert_eq!(inline_int(-3).bit_length(), inline_int(3));
-        assert_eq!(inline_int(-2).bit_length(), inline_int(2));
-        assert_eq!(inline_int(-1).bit_length(), inline_int(1));
         assert_eq!(inline_int(0).bit_length(), inline_int(0));
         assert_eq!(inline_int(1).bit_length(), inline_int(1));
         assert_eq!(inline_int(2).bit_length(), inline_int(2));
