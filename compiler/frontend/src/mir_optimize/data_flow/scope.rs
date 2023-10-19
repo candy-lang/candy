@@ -5,6 +5,7 @@ use crate::{
     impl_display_via_richir,
     mir::{Expression, Id},
     rich_ir::{RichIrBuilder, ToRichIr},
+    utils::HashSetExtension,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::fmt::Debug;
@@ -87,7 +88,7 @@ impl DataFlowScope {
                 // HIR IDs are not normal parameters (except for `needs`) and
                 // can't be accessed by the user. Hence, we don't have to track
                 // their value.
-                assert!(self.locals.insert(id));
+                self.locals.force_insert(id);
                 return;
             }
             Expression::Function { .. } => {
@@ -136,7 +137,7 @@ impl DataFlowScope {
         self.insert(id, value);
     }
     pub(super) fn insert(&mut self, id: Id, value: impl Into<FlowValue>) {
-        assert!(self.locals.insert(id));
+        self.locals.force_insert(id);
         self.state.timeline.insert(id, value);
     }
 

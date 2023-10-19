@@ -3,7 +3,7 @@ use crate::{
     impl_display_via_richir,
     mir::Id,
     rich_ir::{RichIrBuilder, ToRichIr},
-    utils::ArcImHashMap,
+    utils::{ArcImHashMap, ArcImHashMapExtension},
 };
 use enumset::EnumSet;
 use itertools::Itertools;
@@ -18,10 +18,10 @@ pub struct Timeline {
 
 impl Timeline {
     pub fn insert(&mut self, id: Id, value: impl Into<FlowValue>) {
-        assert!(self.values.insert(id, value.into()).is_none());
+        self.values.force_insert(id, value.into());
     }
     pub fn replace(&mut self, id: Id, value: impl Into<FlowValue>) {
-        assert!(self.values.insert(id, value.into()).is_some());
+        self.values.force_replace(id, value.into());
     }
     pub fn remove(&mut self, id: Id) {
         self.values.remove(&id);

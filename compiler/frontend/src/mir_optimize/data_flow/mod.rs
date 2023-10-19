@@ -4,6 +4,7 @@ use crate::{
     mir::{Body, Expression, Id},
     mir_optimize::data_flow::operation::OperationKind,
     rich_ir::{RichIr, ToRichIr},
+    utils::{HashMapExtension, HashSetExtension},
 };
 use rustc_hash::FxHashMap;
 use std::{collections::hash_map::Entry, fmt::Debug};
@@ -25,7 +26,7 @@ pub struct DataFlow {
 impl DataFlow {
     pub(super) fn new(body: &Body) -> Self {
         let mut reference_counts = body.reference_counts();
-        assert!(reference_counts.insert(body.return_value(), 1).is_none());
+        reference_counts.force_insert(body.return_value(), 1);
         Self {
             reference_counts,
             scopes: vec![DataFlowScope::new_top_level(body.return_value())],
@@ -37,7 +38,7 @@ impl DataFlow {
         for parameter in &parameters {
             *self.reference_counts.entry(*parameter).or_default() += 1;
         }
-        assert!(self.reference_counts.insert(return_value, 1).is_none());
+        self.reference_counts.force_insert(return_value, 1);
 
         let timeline = self.innermost_scope().state.timeline.clone();
         self.scopes
@@ -99,7 +100,7 @@ impl DataFlow {
             // 0.
             self.reference_counts.remove(parameter);
         }
-        self.reference_counts.remove(&return_value).unwrap();
+        self.reference_counts.force_remove(&return_value);
     }
     pub(super) fn finalize(mut self, mapping: &FxHashMap<Id, Id>) -> DataFlowInsights {
         let root_scope = self.scopes.pop().unwrap();
@@ -114,8 +115,8 @@ impl DataFlow {
             panic!();
         };
         for constant in lifted_constants {
-            assert!(inner_scope.locals.remove(&constant));
-            assert!(outer_scope.locals.insert(constant));
+            inner_scope.locals.force_remove(&constant);
+            outer_scope.locals.force_insert(constant);
         }
     }
     pub(super) fn on_module_folded(
