@@ -19,8 +19,9 @@ use crate::{Exit, ProgramResult};
 /// This command compiles the given file, or, if no file is provided, the package of
 /// your current working directory. The module should export a `main` function.
 /// This function is then called with an environment.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Parser, Debug)]
-pub(crate) struct Options {
+pub struct Options {
     /// If enabled, print the generated LLVM IR to stderr.
     #[arg(long = "print-llvm-ir", default_value_t = false)]
     print_llvm_ir: bool,
@@ -47,7 +48,7 @@ pub(crate) struct Options {
     path: Option<PathBuf>,
 }
 
-pub(crate) fn compile(options: Options) -> ProgramResult {
+pub fn compile(options: &Options) -> ProgramResult {
     let packages_path = packages_path();
     let db = Database::new_with_file_system_module_provider(packages_path);
     let module = module_for_path(options.path.clone())?;
@@ -60,10 +61,11 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
             _ => unreachable!(),
         })
         .file_name()
-        .unwrap_or(OsStr::new("Executable"))
+        .unwrap_or_else(|| OsStr::new("Executable"))
         .to_string_lossy()
         .to_string();
 
+    #[allow(clippy::map_unwrap_or)]
     let (mir, errors) = db
         .optimized_mir(module.clone(), TracingConfig::off())
         .map(|(mir, _, errors)| (mir, errors))
@@ -80,14 +82,14 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
         });
 
     if !errors.is_empty() {
-        for error in errors.iter() {
+        for error in errors.as_ref() {
             println!("{:?}", error);
         }
         std::process::exit(1);
     }
 
     let context = candy_backend_inkwell::inkwell::context::Context::create();
-    let mut codegen = CodeGen::new(&context, &path, mir);
+    let codegen = CodeGen::new(&context, &path, mir);
     let llvm_candy_module = codegen
         .compile(options.print_llvm_ir, options.print_main_output)
         .map_err(|e| Exit::LlvmError(e.to_string()))?;

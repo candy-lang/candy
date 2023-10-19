@@ -18,35 +18,29 @@ pub fn packages_path() -> PackagesPath {
     PackagesPath::try_from(candy_repo.join("packages").as_path()).unwrap()
 }
 
-pub(crate) fn module_for_path(path: impl Into<Option<PathBuf>>) -> Result<Module, Exit> {
+pub fn module_for_path(path: impl Into<Option<PathBuf>>) -> Result<Module, Exit> {
     let packages_path = packages_path();
-    match path.into() {
-        Some(file) => {
-            Module::from_path(&packages_path, &file, ModuleKind::Code).map_err(
-                |error| match error {
-                    ModuleFromPathError::NotFound(_) => {
-                        error!("The given file doesn't exist.");
-                        Exit::FileNotFound
-                    }
-                    ModuleFromPathError::NotInPackage(_) => {
-                        error!("The given file is not in a Candy package.");
-                        Exit::NotInCandyPackage
-                    }
-                },
-            )
-        }
-        None => {
-            let Some(package) = packages_path.find_surrounding_package(&current_dir().unwrap())
-            else {
-                error!("You are not in a Candy package. Either navigate into a package or specify a Candy file.");
-                error!("Candy packages are folders that contain a `_package.candy` file. This file marks the root folder of a package. Relative imports can only happen within the package.");
-                return Err(Exit::NotInCandyPackage);
-            };
-            Ok(Module {
-                package,
-                path: vec![],
-                kind: ModuleKind::Code,
-            })
-        }
+    if let Some(file) = path.into() {
+        Module::from_path(&packages_path, &file, ModuleKind::Code).map_err(|error| match error {
+            ModuleFromPathError::NotFound(_) => {
+                error!("The given file doesn't exist.");
+                Exit::FileNotFound
+            }
+            ModuleFromPathError::NotInPackage(_) => {
+                error!("The given file is not in a Candy package.");
+                Exit::NotInCandyPackage
+            }
+        })
+    } else {
+        let Some(package) = packages_path.find_surrounding_package(&current_dir().unwrap()) else {
+            error!("You are not in a Candy package. Either navigate into a package or specify a Candy file.");
+            error!("Candy packages are folders that contain a `_package.candy` file. This file marks the root folder of a package. Relative imports can only happen within the package.");
+            return Err(Exit::NotInCandyPackage);
+        };
+        Ok(Module {
+            package,
+            path: vec![],
+            kind: ModuleKind::Code,
+        })
     }
 }

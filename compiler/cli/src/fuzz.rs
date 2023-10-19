@@ -16,14 +16,14 @@ use tracing::{error, info};
 ///
 /// Fuzzable functions are functions written without curly braces.
 #[derive(Parser, Debug)]
-pub(crate) struct Options {
+pub struct Options {
     /// The file or package to fuzz. If none is provided, the package of your
     /// current working directory will be fuzzed.
     #[arg(value_hint = ValueHint::FilePath)]
     path: Option<PathBuf>,
 }
 
-pub(crate) fn fuzz(options: Options) -> ProgramResult {
+pub fn fuzz(options: Options) -> ProgramResult {
     let db = Database::new_with_file_system_module_provider(packages_path());
     let module = module_for_path(options.path)?;
 
