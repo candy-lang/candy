@@ -13,4 +13,4 @@ check condition :=
 
 checkEquals actual expected :=
   # Panics if `actual` and `expected` are different.
-  needs (equals actual expected) "A check failed: Expected {actual} to be {expected}."
+  needs (actual | equals expected) "A check failed: Expected {actual} to be {expected}."
