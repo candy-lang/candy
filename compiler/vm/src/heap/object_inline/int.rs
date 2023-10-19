@@ -80,7 +80,7 @@ impl InlineInt {
     }
 
     pub fn shift_left(self, heap: &mut Heap, rhs: Self) -> Int {
-        let lhs = self.get();
+        let lhs: i64 = self.get();
         #[allow(clippy::map_unwrap_or)]
         rhs.try_get::<u32>()
             .and_then(|rhs| {
@@ -88,10 +88,17 @@ impl InlineInt {
                 // type (i.e., `rhs < 64`). However, we need to check that the mathematical result
                 // is completely representable in our available bits and doesn't get truncated.
 
+                let bit_length = if lhs.is_negative() {
+                    // One 1 is necessary for the sign.
+                    i64::BITS - lhs.leading_ones() + 1
+                } else {
+                    i64::BITS - lhs.leading_zeros()
+                };
+
                 #[allow(clippy::cast_possible_truncation)]
                 let value_shift = Self::VALUE_SHIFT as u32;
 
-                if lhs.bit_length() + rhs < InlineObject::BITS - value_shift {
+                if bit_length + rhs < InlineObject::BITS - value_shift {
                     Some(lhs << rhs)
                 } else {
                     None
