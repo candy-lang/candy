@@ -197,12 +197,8 @@ impl InlineObjectTrait for InlineInt {
 #[extension_trait]
 pub impl I64BitLength for i64 {
     fn bit_length(self) -> u32 {
-        if self.is_negative() {
-            // One 1 is necessary for the sign.
-            Self::BITS - self.leading_ones() + 1
-        } else {
-            Self::BITS - self.leading_zeros()
-        }
+        assert!(!self.is_negative());
+        Self::BITS - self.leading_zeros()
     }
 }
 
