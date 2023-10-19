@@ -2,10 +2,11 @@ use self::{
     builtin::InlineBuiltin, handle::InlineHandle, int::InlineInt, pointer::InlinePointer,
     tag::InlineTag,
 };
-use super::{
-    object_heap::HeapObject, Data, DisplayWithSymbolTable, Heap, OrdWithSymbolTable, SymbolTable,
+use super::{object_heap::HeapObject, Data, Heap};
+use crate::{
+    handle_id::HandleId,
+    utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
-use crate::handle_id::HandleId;
 use candy_frontend::format::{format_value, FormatValue, MaxLength, Precedence};
 use enum_dispatch::enum_dispatch;
 use extension_trait::extension_trait;
@@ -14,7 +15,7 @@ use rustc_hash::FxHashMap;
 use std::{
     borrow::Cow,
     cmp::Ordering,
-    fmt::{self, Debug, Display, Formatter},
+    fmt::{self, Formatter},
     hash::{Hash, Hasher},
     num::NonZeroU64,
     ops::Deref,
@@ -47,6 +48,8 @@ pub impl InlineObjectSliceCloneToHeap for [InlineObject] {
 pub struct InlineObject(NonZeroU64);
 
 impl InlineObject {
+    pub const BITS: u32 = NonZeroU64::BITS;
+
     pub const KIND_WIDTH: usize = 3;
     pub const KIND_MASK: u64 = 0b111;
     pub const KIND_POINTER: u64 = 0b000;
@@ -55,10 +58,12 @@ impl InlineObject {
     pub const KIND_TAG: u64 = 0b011;
     pub const KIND_HANDLE: u64 = 0b100;
 
-    pub fn new(value: NonZeroU64) -> Self {
+    #[must_use]
+    pub const fn new(value: NonZeroU64) -> Self {
         Self(value)
     }
-    pub fn raw_word(self) -> NonZeroU64 {
+    #[must_use]
+    pub const fn raw_word(self) -> NonZeroU64 {
         self.0
     }
 
@@ -71,8 +76,10 @@ impl InlineObject {
             heap.dup_handle_by(handle, amount);
         };
 
-        if let Ok(it) = HeapObject::try_from(self) {
-            it.dup_by(amount)
+        match InlineData::from(self) {
+            InlineData::Pointer(pointer) => pointer.get().dup_by(amount),
+            InlineData::Tag(tag) => tag.dup_by(amount),
+            _ => {}
         }
     }
     pub fn drop(self, heap: &mut Heap) {
@@ -80,15 +87,19 @@ impl InlineObject {
             heap.drop_handle(handle);
         };
 
-        if let Ok(it) = HeapObject::try_from(self) {
-            it.drop(heap)
+        match InlineData::from(self) {
+            InlineData::Pointer(pointer) => pointer.get().drop(heap),
+            InlineData::Tag(tag) => tag.drop(heap),
+            _ => {}
         }
     }
 
     // Cloning
+    #[must_use]
     pub fn clone_to_heap(self, heap: &mut Heap) -> Self {
         self.clone_to_heap_with_mapping(heap, &mut FxHashMap::default())
     }
+    #[must_use]
     pub fn clone_to_heap_with_mapping(
         self,
         heap: &mut Heap,
@@ -98,16 +109,12 @@ impl InlineObject {
     }
 }
 
-impl Debug for InlineObject {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        Debug::fmt(&InlineData::from(*self), f)
+impl DebugDisplay for InlineObject {
+    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
+        InlineData::from(*self).fmt(f, is_debug)
     }
 }
-impl DisplayWithSymbolTable for InlineObject {
-    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
-        DisplayWithSymbolTable::fmt(&InlineData::from(*self), f, symbol_table)
-    }
-}
+impl_debug_display_via_debugdisplay!(InlineObject);
 
 impl Eq for InlineObject {}
 impl PartialEq for InlineObject {
@@ -117,12 +124,17 @@ impl PartialEq for InlineObject {
 }
 impl Hash for InlineObject {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        InlineData::from(*self).hash(state)
+        InlineData::from(*self).hash(state);
     }
 }
-impl OrdWithSymbolTable for InlineObject {
-    fn cmp(&self, symbol_table: &SymbolTable, other: &Self) -> Ordering {
-        OrdWithSymbolTable::cmp(&Data::from(*self), symbol_table, &Data::from(*other))
+impl Ord for InlineObject {
+    fn cmp(&self, other: &Self) -> Ordering {
+        Data::from(*self).cmp(&Data::from(*other))
+    }
+}
+impl PartialOrd for InlineObject {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -138,7 +150,8 @@ impl TryFrom<InlineObject> for HeapObject {
 }
 
 #[enum_dispatch]
-pub trait InlineObjectTrait: Copy + Debug + DisplayWithSymbolTable + Eq + Hash {
+pub trait InlineObjectTrait: Copy + DebugDisplay + Eq + Hash {
+    #[must_use]
     fn clone_to_heap_with_mapping(
         self,
         heap: &mut Heap,
@@ -158,76 +171,62 @@ pub enum InlineData {
 impl InlineData {
     fn handle_id(&self) -> Option<HandleId> {
         match self {
-            InlineData::Handle(handle) => Some(handle.handle_id()),
+            Self::Handle(handle) => Some(handle.handle_id()),
             _ => None,
         }
     }
 }
 
+#[allow(clippy::fallible_impl_from)]
 impl From<InlineObject> for InlineData {
     fn from(object: InlineObject) -> Self {
         let value = object.0.get();
         match value & InlineObject::KIND_MASK {
-            InlineObject::KIND_POINTER => InlineData::Pointer(InlinePointer::new_unchecked(object)),
-            InlineObject::KIND_INT => InlineData::Int(InlineInt::new_unchecked(object)),
-            InlineObject::KIND_BUILTIN => InlineData::Builtin(InlineBuiltin::new_unchecked(object)),
-            InlineObject::KIND_TAG => InlineData::Tag(InlineTag::new_unchecked(object)),
-            InlineObject::KIND_HANDLE => InlineData::Handle(InlineHandle::new_unchecked(object)),
+            InlineObject::KIND_POINTER => Self::Pointer(InlinePointer::new_unchecked(object)),
+            InlineObject::KIND_INT => Self::Int(InlineInt::new_unchecked(object)),
+            InlineObject::KIND_BUILTIN => Self::Builtin(InlineBuiltin::new_unchecked(object)),
+            InlineObject::KIND_TAG => Self::Tag(InlineTag::new_unchecked(object)),
+            InlineObject::KIND_HANDLE => Self::Handle(InlineHandle::new_unchecked(object)),
             _ => panic!("Unknown inline value type: {value:016x}"),
         }
     }
 }
 
-impl Debug for InlineData {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+impl DebugDisplay for InlineData {
+    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         match self {
-            InlineData::Pointer(value) => Debug::fmt(value, f),
-            InlineData::Int(value) => Debug::fmt(value, f),
-            InlineData::Builtin(value) => Debug::fmt(value, f),
-            InlineData::Tag(value) => Debug::fmt(value, f),
-            InlineData::Handle(value) => Debug::fmt(value, f),
+            Self::Pointer(value) => value.fmt(f, is_debug),
+            Self::Int(value) => value.fmt(f, is_debug),
+            Self::Builtin(value) => value.fmt(f, is_debug),
+            Self::Tag(value) => value.fmt(f, is_debug),
+            Self::Handle(value) => value.fmt(f, is_debug),
         }
     }
 }
-impl DisplayWithSymbolTable for InlineData {
-    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
-        match self {
-            InlineData::Pointer(value) => DisplayWithSymbolTable::fmt(value, f, symbol_table),
-            InlineData::Int(value) => Display::fmt(value, f),
-            InlineData::Builtin(value) => Display::fmt(value, f),
-            InlineData::Tag(value) => DisplayWithSymbolTable::fmt(value, f, symbol_table),
-            InlineData::Handle(value) => Display::fmt(value, f),
-        }
-    }
-}
+impl_debug_display_via_debugdisplay!(InlineData);
 
 impl Deref for InlineData {
     type Target = InlineObject;
 
     fn deref(&self) -> &Self::Target {
         match self {
-            InlineData::Pointer(value) => value,
-            InlineData::Int(value) => value,
-            InlineData::Builtin(value) => value,
-            InlineData::Tag(value) => value,
-            InlineData::Handle(value) => value,
+            Self::Pointer(value) => value,
+            Self::Int(value) => value,
+            Self::Builtin(value) => value,
+            Self::Tag(value) => value,
+            Self::Handle(value) => value,
         }
     }
 }
 
 #[extension_trait]
 pub impl ToDebugText for InlineObject {
-    fn to_debug_text(
-        self,
-        precendence: Precedence,
-        max_length: MaxLength,
-        symbol_table: &SymbolTable,
-    ) -> String {
+    fn to_debug_text(self, precendence: Precedence, max_length: MaxLength) -> String {
         format_value(self, precendence, max_length, &|value| {
             Some(match value.into() {
                 Data::Int(int) => FormatValue::Int(int.get()),
                 Data::Tag(tag) => FormatValue::Tag {
-                    symbol: symbol_table.get(tag.symbol_id()),
+                    symbol: tag.symbol().get(),
                     value: tag.value(),
                 },
                 Data::Text(text) => FormatValue::Text(text.get()),

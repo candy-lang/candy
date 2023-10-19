@@ -1,4 +1,6 @@
 #![feature(let_chains, round_char_boundary)]
+#![warn(clippy::nursery, clippy::pedantic, unused_crate_dependencies)]
+#![allow(clippy::missing_panics_doc, clippy::module_name_repetitions)]
 
 mod coverage;
 mod fuzzer;
@@ -24,10 +26,8 @@ use candy_frontend::{
     {hir::Id, TracingConfig, TracingMode},
 };
 use candy_vm::{
-    heap::{DisplayWithSymbolTable, Heap, SymbolTable},
-    mir_to_lir::compile_lir,
-    tracer::stack_trace::StackTracer,
-    Panic, Vm, VmFinished,
+    heap::Heap, mir_to_byte_code::compile_byte_code, tracer::stack_trace::StackTracer, Panic, Vm,
+    VmFinished,
 };
 use std::rc::Rc;
 use tracing::{debug, error, info};
@@ -41,13 +41,15 @@ where
         calls: TracingMode::Off,
         evaluated_expressions: TracingMode::Off,
     };
-    let (lir, _) = compile_lir(db, module, tracing);
-    let lir = Rc::new(lir);
+    let (byte_code, _) = compile_byte_code(db, module, tracing);
+    let byte_code = Rc::new(byte_code);
 
+    let mut heap = Heap::default();
     let VmFinished {
         tracer: FuzzablesFinder { fuzzables },
         ..
-    } = Vm::for_module(lir.clone(), FuzzablesFinder::default()).run_forever_without_handles();
+    } = Vm::for_module(byte_code.clone(), &mut heap, FuzzablesFinder::default())
+        .run_forever_without_handles(&mut heap);
 
     info!(
         "Now, the fuzzing begins. So far, we have {} functions to fuzz.",
@@ -58,13 +60,13 @@ where
 
     for (id, function) in fuzzables {
         info!("Fuzzing {id}.");
-        let mut fuzzer = Fuzzer::new(lir.clone(), function, id.clone());
-        fuzzer.run(100000);
+        let mut fuzzer = Fuzzer::new(byte_code.clone(), function, id.clone());
+        fuzzer.run(100_000);
 
         match fuzzer.into_status() {
             Status::StillFuzzing { total_coverage, .. } => {
                 let coverage = total_coverage
-                    .in_range(&lir.range_of_function(&id))
+                    .in_range(&byte_code.range_of_function(&id))
                     .relative_coverage();
                 debug!("Achieved a coverage of {:.1} %.", coverage * 100.0);
             }
@@ -82,7 +84,7 @@ where
                     heap,
                     tracer,
                 };
-                case.dump(db, &lir.symbol_table);
+                case.dump(db);
                 failing_cases.push(case);
             }
         }
@@ -103,15 +105,13 @@ pub struct FailingFuzzCase {
 
 impl FailingFuzzCase {
     #[allow(unused_variables)]
-    pub fn dump<DB>(&self, db: &DB, symbol_table: &SymbolTable)
+    pub fn dump<DB>(&self, db: &DB)
     where
         DB: AstToHir + PositionConversionDb,
     {
         error!(
             "Calling `{} {}` panics: {}",
-            self.function,
-            self.input.to_string(symbol_table),
-            self.panic.reason,
+            self.function, self.input, self.panic.reason,
         );
         error!("{} is responsible.", self.panic.responsible);
         // Segfaults: https://github.com/candy-lang/candy/issues/458

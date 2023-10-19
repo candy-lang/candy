@@ -13,5 +13,8 @@ candy_value_t *candy_builtin_list_length(const candy_value_t *list, candy_value_
 const candy_value_t *candy_builtin_print(candy_value_t *value, candy_value_t *responsible);
 candy_value_t *candy_builtin_struct_get(candy_value_t *structure, candy_value_t *key, candy_value_t *responsible);
 candy_value_t *candy_builtin_struct_get_keys(candy_value_t *structure, candy_value_t *responsible);
+const candy_value_t *candy_builtin_tag_has_value(candy_value_t *tag, candy_value_t *responsible);
+candy_value_t *candy_builtin_tag_get_value(candy_value_t *tag, candy_value_t *responsible);
+candy_value_t *candy_builtin_tag_without_value(candy_value_t *tag, candy_value_t *responsible);
 const candy_value_t *candy_builtin_struct_has_key(candy_value_t *structure, candy_value_t *key, candy_value_t *responsible);
 const candy_value_t *candy_builtin_type_of(candy_value_t *value, candy_value_t *responsible);

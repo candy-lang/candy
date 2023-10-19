@@ -1,6 +1,9 @@
 use extension_trait::extension_trait;
 use rustc_hash::FxHasher;
-use std::hash::{Hash, Hasher};
+use std::{
+    collections::HashMap,
+    hash::{BuildHasher, Hash, Hasher},
+};
 
 #[extension_trait]
 pub impl AdjustCasingOfFirstLetter for str {
@@ -25,5 +28,16 @@ pub impl<T: Hash> DoHash for T {
         let mut hasher = FxHasher::default();
         self.hash(&mut hasher);
         hasher.finish()
+    }
+}
+
+#[extension_trait]
+pub impl<K, V, S> HashMapExtension<K, V> for HashMap<K, V, S>
+where
+    K: Eq + Hash,
+    S: BuildHasher,
+{
+    fn force_insert(&mut self, k: K, v: V) {
+        assert!(self.insert(k, v).is_none());
     }
 }

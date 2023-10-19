@@ -58,6 +58,8 @@ absolute value :=
   needs (is value)
   ifElse (isNegative value) { negate value } { value }
 
+isUnsignedByte value :=
+  is value | bool.lazyAnd { value | isNonNegative } | bool.lazyAnd { value | isLessThan 256 }
 fitsInRustU32 value :=
   needs (is value)
   needs (isNonNegative value)
@@ -81,6 +83,13 @@ bitLength := builtins.intBitLength
 bitwiseAnd := builtins.intBitwiseAnd
 bitwiseOr := builtins.intBitwiseOr
 bitwiseXor := builtins.intBitwiseXor
+
+lowestBits value bitCount :=
+  needs (is value)
+  needs (is bitCount)
+  needs (isPositive bitCount)
+  mask = 1 | shiftLeft bitCount | subtract 1
+  value | bitwiseAnd mask
 
 isEven value :=
   needs (is value)

@@ -1,13 +1,12 @@
 use super::{InlineObject, InlineObjectTrait};
-use crate::heap::{
-    object_heap::HeapObject, DisplayWithSymbolTable, Heap, OrdWithSymbolTable, SymbolTable,
+use crate::{
+    heap::{object_heap::HeapObject, Heap},
+    utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_ord_via_get, DebugDisplay},
 };
 use derive_more::Deref;
 use rustc_hash::FxHashMap;
 use std::{
-    cmp::Ordering,
-    fmt::{self, Debug, Formatter},
-    hash::{Hash, Hasher},
+    fmt::{self, Formatter},
     num::NonZeroU64,
     ptr::NonNull,
 };
@@ -15,7 +14,7 @@ use std::{
 #[derive(Clone, Copy, Deref)]
 pub struct InlinePointer(InlineObject);
 impl InlinePointer {
-    pub fn new_unchecked(object: InlineObject) -> Self {
+    pub const fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
     }
 
@@ -25,35 +24,14 @@ impl InlinePointer {
     }
 }
 
-impl Debug for InlinePointer {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{:?}", self.get())
+impl DebugDisplay for InlinePointer {
+    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
+        self.get().fmt(f, is_debug)
     }
 }
-impl DisplayWithSymbolTable for InlinePointer {
-    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
-        DisplayWithSymbolTable::fmt(&self.get(), f, symbol_table)
-    }
-}
+impl_debug_display_via_debugdisplay!(InlinePointer);
 
-impl Eq for InlinePointer {}
-impl PartialEq for InlinePointer {
-    fn eq(&self, other: &Self) -> bool {
-        self.get() == other.get()
-    }
-}
-
-impl Hash for InlinePointer {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get().hash(state)
-    }
-}
-
-impl OrdWithSymbolTable for InlinePointer {
-    fn cmp(&self, symbol_table: &SymbolTable, other: &Self) -> Ordering {
-        self.get().cmp(symbol_table, &other.get())
-    }
-}
+impl_eq_hash_ord_via_get!(InlinePointer);
 
 impl From<HeapObject> for InlinePointer {
     fn from(value: HeapObject) -> Self {

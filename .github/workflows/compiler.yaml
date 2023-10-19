@@ -5,37 +5,60 @@ on:
     branches: [main]
   pull_request:
 
+env:
+  RUST_BACKTRACE: 1
+  # Use LLD as the linker to increase compile times. It's installed together
+  # with LLVM.
+  RUSTFLAGS: -C link-arg=-fuse-ld=lld
+
 jobs:
   check:
     name: Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3.5.3
+      - uses: actions/checkout@v4
       - uses: dsherret/rust-toolchain-file@v1
-      - uses: Swatinem/rust-cache@v2.6.0
+      - uses: Swatinem/rust-cache@v2.7.0
+      - name: Cache LLVM and Clang
+        id: cache-llvm
+        uses: actions/cache@v3
+        with:
+          path: ./llvm
+          key: llvm-15.0
       - uses: KyleMayes/install-llvm-action@v1.8.3
         with:
           version: "15.0"
+          cached: ${{ steps.cache-llvm.outputs.cache-hit }}
 
       # Compiler
-      - name: 'Compiler: clippy'
+      - name: "Compiler: clippy"
         run: cargo clippy -- --deny warnings
-      - name: 'Compiler: test'
+      - name: "Compiler: test"
         run: cargo test --workspace
-      - name: 'Compiler: fmt'
+      - name: "Compiler: fmt"
         run: cargo fmt --check
 
       # Core
-      - name: 'Core: run'
+      - name: "Core: run"
         run: cargo run --release -- check ./packages/Core/_.candy
 
   # fuzzing:
   #   name: Fuzzing
   #   runs-on: ubuntu-latest
   #   steps:
-  #     - uses: actions/checkout@v3.5.3
+  #     - uses: actions/checkout@v4
   #     - uses: dsherret/rust-toolchain-file@v1
-  #     - uses: Swatinem/rust-cache@v2.6.0
+  #     - uses: Swatinem/rust-cache@v2.7.0
+  #     - name: Cache LLVM and Clang
+  #       id: cache-llvm
+  #       uses: actions/cache@v3
+  #       with:
+  #         path: ./llvm
+  #         key: llvm-15.0
+  #     - uses: KyleMayes/install-llvm-action@v1.8.3
+  #       with:
+  #         version: "15.0"
+  #         cached: ${{ steps.cache-llvm.outputs.cache-hit }}
 
   #     - run: cargo run --release -- fuzz ./packages/Benchmark.candy
 
@@ -43,7 +66,7 @@ jobs:
     name: Check Golden IR Files
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3.5.3
+      - uses: actions/checkout@v4
         with:
           path: candy/
 
@@ -51,14 +74,24 @@ jobs:
       # toolchain file's path.
       - run: cp candy/rust-toolchain.toml ./
       - uses: dsherret/rust-toolchain-file@v1
-      - uses: Swatinem/rust-cache@v2.6.0
-      
+      - uses: Swatinem/rust-cache@v2.7.0
+      - name: Cache LLVM and Clang
+        id: cache-llvm
+        uses: actions/cache@v3
+        with:
+          path: ./llvm
+          key: llvm-15.0
+      - uses: KyleMayes/install-llvm-action@v1.8.3
+        with:
+          version: "15.0"
+          cached: ${{ steps.cache-llvm.outputs.cache-hit }}
+
       - name: Generate Goldens
         working-directory: candy/
-        run: cargo run --release -- debug gold generate ./packages/Examples/
+        run: cargo run --release --features inkwell -- debug gold generate ./packages/Examples/
 
       - name: Checkout Golden IRs
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4
         with:
           token: ${{ secrets.GOLDEN_IR_PUSH_TOKEN }}
           repository: candy-lang/golden-irs
@@ -104,9 +137,19 @@ jobs:
     name: Benchmark
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3.5.3
+      - uses: actions/checkout@v4
       - uses: dsherret/rust-toolchain-file@v1
-      - uses: Swatinem/rust-cache@v2.6.0
+      - uses: Swatinem/rust-cache@v2.7.0
+      - name: Cache LLVM and Clang
+        id: cache-llvm
+        uses: actions/cache@v3
+        with:
+          path: ./llvm
+          key: llvm-15.0
+      - uses: KyleMayes/install-llvm-action@v1.8.3
+        with:
+          version: "15.0"
+          cached: ${{ steps.cache-llvm.outputs.cache-hit }}
 
       - name: Run benchmark
         working-directory: compiler/vm/
@@ -144,7 +187,7 @@ jobs:
       run:
         working-directory: vscode_extension/
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - run: npm install
       - run: npm install @microsoft/eslint-formatter-sarif@3.0.0

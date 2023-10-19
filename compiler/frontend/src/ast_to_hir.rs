@@ -7,7 +7,10 @@ use crate::{
     cst::{self, CstDb},
     cst_to_ast::CstToAst,
     error::{CompilerError, CompilerErrorPayload},
-    hir::{self, Body, Expression, Function, HirError, IdKey, Pattern, PatternIdentifierId},
+    hir::{
+        self, Body, Expression, Function, FunctionKind, HirError, IdKey, Pattern,
+        PatternIdentifierId,
+    },
     id::IdGenerator,
     module::{Module, Package},
     position::Offset,
@@ -30,9 +33,15 @@ pub trait AstToHir: CstDb + CstToAst {
     fn hir_id_to_display_span(&self, id: &hir::Id) -> Option<Range<Offset>>;
 
     #[salsa::transparent]
-    fn ast_to_hir_id(&self, id: &ast::Id) -> Vec<hir::Id>;
+    fn ast_to_hir_ids(&self, id: &ast::Id) -> Vec<hir::Id>;
     #[salsa::transparent]
-    fn cst_to_hir_id(&self, module: Module, id: cst::Id) -> Vec<hir::Id>;
+    fn cst_to_hir_ids(&self, module: Module, id: cst::Id) -> Vec<hir::Id>;
+
+    // For example, an identifier in a struct pattern (`[foo]`) can correspond
+    // to two HIR IDs: The implicit key `Foo` and the capturing identifier
+    // `foo`. This function returns the latter.
+    #[salsa::transparent]
+    fn cst_to_last_hir_id(&self, module: Module, id: cst::Id) -> Option<hir::Id>;
 
     fn hir(&self, module: Module) -> HirResult;
 }
@@ -54,22 +63,27 @@ fn hir_id_to_display_span(db: &dyn AstToHir, id: &hir::Id) -> Option<Range<Offse
     Some(db.find_cst(id.module.clone(), cst_id).display_span())
 }
 
-fn ast_to_hir_id(db: &dyn AstToHir, id: &ast::Id) -> Vec<hir::Id> {
+fn ast_to_hir_ids(db: &dyn AstToHir, id: &ast::Id) -> Vec<hir::Id> {
     if let Ok((_, hir_to_ast_id_mapping)) = db.hir(id.module.clone()) {
         hir_to_ast_id_mapping
             .iter()
             .filter_map(|(key, value)| if value == id { Some(key) } else { None })
             .cloned()
+            .sorted()
             .collect_vec()
     } else {
         vec![]
     }
 }
-fn cst_to_hir_id(db: &dyn AstToHir, module: Module, id: cst::Id) -> Vec<hir::Id> {
-    let ids = db.cst_to_ast_id(module, id);
+fn cst_to_hir_ids(db: &dyn AstToHir, module: Module, id: cst::Id) -> Vec<hir::Id> {
+    let ids = db.cst_to_ast_ids(module, id);
     ids.into_iter()
-        .flat_map(|id| db.ast_to_hir_id(&id))
+        .flat_map(|id| db.ast_to_hir_ids(&id))
+        .sorted()
         .collect_vec()
+}
+fn cst_to_last_hir_id(db: &dyn AstToHir, module: Module, id: cst::Id) -> Option<hir::Id> {
+    db.cst_to_hir_ids(module, id).pop()
 }
 
 fn hir(db: &dyn AstToHir, module: Module) -> HirResult {
@@ -222,11 +236,9 @@ impl Context<'_> {
                                     Expression::Symbol(name.value.uppercase_first_letter()),
                                     None,
                                 ),
-                                AstKind::Error { errors, .. } => self.push(
+                                AstKind::Error { errors } => self.push(
                                     ast.id.clone(),
                                     Expression::Error {
-                                        child: None,
-                                        // TODO: These errors are already reported for the value itself.
                                         errors: errors.clone(),
                                     },
                                     None,
@@ -246,6 +258,15 @@ impl Context<'_> {
             AstKind::Function(function) => self.compile_function(ast.id.clone(), function, None),
             AstKind::Call(call) => self.lower_call(Some(ast.id.clone()), call),
             AstKind::Assignment(Assignment { is_public, body }) => {
+                // An assignment to a single identifier (i.e., no destructuring)
+                // gets converted to at least two HIR expressions:
+                //
+                // - The penultimate one is mapped to the whole AST
+                // - The last is a reference to the penultimate one and gets
+                //   mapped to the identifier's AST.
+                //
+                // This is necessary to differentiate assignments and references
+                // for IDE features.
                 let (names, body) = match body {
                     ast::AssignmentBody::Function { name, function } => {
                         let body = self.compile_function(ast.id.clone(), function, &***name);
@@ -261,36 +282,51 @@ impl Context<'_> {
                         let body = self.compile(body);
                         self.end_non_top_level(reset_state);
 
-                        let (pattern, identifier_ids) = self.lower_pattern(pattern);
-                        let body = self.push(
-                            None,
-                            Expression::Destructure {
-                                expression: body,
-                                pattern,
-                            },
-                            None,
-                        );
+                        let names = if let AstKind::Identifier(Identifier(name)) = &pattern.kind {
+                            let body_reference_id = self.push(
+                                ast.id.clone(),
+                                Expression::Reference(body),
+                                name.value.clone(),
+                            );
+                            let assignment_reference_id = self.push(
+                                name.id.clone(),
+                                Expression::Reference(body_reference_id),
+                                name.value.clone(),
+                            );
+                            vec![(name.value.clone(), assignment_reference_id)]
+                        } else {
+                            let pattern_id = pattern.id.clone();
+                            let (pattern, identifier_ids) = self.lower_pattern(pattern);
+                            self.push(
+                                pattern_id,
+                                Expression::Destructure {
+                                    expression: body,
+                                    pattern,
+                                },
+                                None,
+                            );
 
-                        let names = identifier_ids
-                            .into_iter()
-                            .sorted_by_key(|(_, (_, identifier_id))| identifier_id.0)
-                            .map(|(name, (ast_id, identifier_id))| {
-                                let id = self.push(
-                                    ast_id,
-                                    Expression::PatternIdentifierReference(identifier_id),
-                                    name.clone(),
-                                );
-                                (name, id)
-                            })
-                            .collect_vec();
+                            identifier_ids
+                                .into_iter()
+                                .sorted_by_key(|(_, (_, identifier_id))| identifier_id.0)
+                                .map(|(name, (ast_id, identifier_id))| {
+                                    let id = self.push(
+                                        ast_id,
+                                        Expression::PatternIdentifierReference(identifier_id),
+                                        name.clone(),
+                                    );
+                                    (name, id)
+                                })
+                                .collect_vec()
+                        };
 
-                        self.push(
+                        let nothing_id = self.push(
                             ast.id.clone(),
                             Expression::Symbol("Nothing".to_string()),
                             None,
                         );
 
-                        (names, body)
+                        (names, nothing_id)
                     }
                 };
                 if *is_public {
@@ -341,9 +377,8 @@ impl Context<'_> {
 
                             (pattern, body)
                         }
-                        AstKind::Error { errors, .. } => {
+                        AstKind::Error { errors } => {
                             let pattern = Pattern::Error {
-                                child: None,
                                 errors: errors.clone(),
                             };
 
@@ -369,17 +404,13 @@ impl Context<'_> {
             AstKind::OrPattern(_) => {
                 unreachable!("Or patterns should be handled in `PatternContext`.")
             }
-            AstKind::Error { child, errors } => {
-                let child = child.as_ref().map(|child| self.compile_single(child));
-                self.push(
-                    ast.id.clone(),
-                    Expression::Error {
-                        child,
-                        errors: errors.clone(),
-                    },
-                    None,
-                )
-            }
+            AstKind::Error { errors } => self.push(
+                ast.id.clone(),
+                Expression::Error {
+                    errors: errors.clone(),
+                },
+                None,
+            ),
         }
     }
 
@@ -436,7 +467,7 @@ impl Context<'_> {
                     Expression::Function(Function {
                         parameters: vec![],
                         body: then_body,
-                        fuzzable: false,
+                        kind: FunctionKind::CurlyBraces,
                     }),
                     None,
                 );
@@ -458,7 +489,7 @@ impl Context<'_> {
                     Expression::Function(Function {
                         parameters: vec![],
                         body: else_body,
-                        fuzzable: false,
+                        kind: FunctionKind::CurlyBraces,
                     }),
                     None,
                 );
@@ -545,7 +576,11 @@ impl Context<'_> {
             Expression::Function(Function {
                 parameters,
                 body: inner_body,
-                fuzzable: function.fuzzable,
+                kind: if function.fuzzable {
+                    FunctionKind::Normal
+                } else {
+                    FunctionKind::CurlyBraces
+                },
             }),
             None,
         )
@@ -712,7 +747,6 @@ impl Context<'_> {
         self.push(
             ast_id,
             Expression::Error {
-                child: None,
                 errors: vec![CompilerError {
                     module: self.module.clone(),
                     span,
@@ -774,7 +808,7 @@ impl Context<'_> {
         //   HirId(~:test.candy:use:importedFileContent) = useModule
         //     currently in ~:test.candy:use:importedFileContent
         //     relative path: HirId(~:test.candy:use:relativePath)
-        //  }
+        // }
 
         assert!(self.use_id.is_none());
 
@@ -799,7 +833,7 @@ impl Context<'_> {
             Expression::Function(Function {
                 parameters: vec![relative_path],
                 body: inner_body,
-                fuzzable: false,
+                kind: FunctionKind::Use,
             }),
             "use".to_string(),
         );
@@ -879,8 +913,6 @@ impl<'a> PatternContext<'a> {
                                     value: None,
                                 },
                                 AstKind::Error { errors, .. } => Pattern::Error {
-                                    child: None,
-                                    // TODO: These errors are already reported for the value itself.
                                     errors: errors.clone(),
                                 },
                                 _ => panic!(
@@ -928,7 +960,6 @@ impl<'a> PatternContext<'a> {
                 Pattern::Or(patterns)
             }
             AstKind::Error { errors, .. } => Pattern::Error {
-                child: None,
                 errors: errors.clone(),
             },
         }
@@ -936,7 +967,6 @@ impl<'a> PatternContext<'a> {
 
     fn error(&self, ast: &Ast, error: HirError) -> Pattern {
         Pattern::Error {
-            child: None,
             errors: vec![CompilerError {
                 module: self.module.clone(),
                 span: self.db.ast_id_to_span(&ast.id).unwrap(),

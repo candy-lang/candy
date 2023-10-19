@@ -11,11 +11,11 @@
 #   arguments, so make sure to guard all calls with appropriate needs. If you
 #   don't, the underlying Rust code may panic.
 #
-# - Invalid struct accesses cause panics, so make sure you know a key is in a
-#   struct when you access it using the dot syntax.
+# - In this package, invalid struct accesses using the dot syntax cause panics,
+#   so make sure you know a key is in a struct when you access it.
 #
 # - Don't remove the `structGet` function! All struct accesses from other
-#   packages refer to this function.
+#   packages call this function.
 
 typeIs value type =
   needs (type | ✨.typeOf | ✨.equals Tag)
@@ -37,22 +37,96 @@ isLessThanOrEqualTo a b =
     Greater -> False
 
 equals a b :=
-  # Returns `True` or `False` depending on whether `a` and `b` are equal.
+  # Returns `True` if both values are equal, otherwise `False`.
+  #
+  # These are the rules for equality in Candy:
+  #
+  # - Values of different types are different.
+  #   ```
+  #   equals 3 "Hey" => False
+  #   ```
+  #
+  # - Integers and texts are equal if they are the same.
+  #   ```
+  #   equals 5 5 => True
+  #   equals 3 5 => False
+  #   equals "Hey" "Hey" => True
+  #   equals "A" "B" => False
+  #   ```
+  #
+  # - Handles are equal if they share the same underlying handle ID.
+  #
+  # - Tags are equal if their symbol is equal and either both don't have a value
+  #   or both have values that are equal.
+  #   ```
+  #   equals Kiwi Kiwi => True
+  #   equals Kiwi Banana => False
+  #   equals Kiwi (Kiwi 3) => False
+  #   equals (Kiwi 3) (Kiwi 3) => True
+  #   equals (Kiwi 5) (Kiwi 3) => False
+  #   ```
+  #
+  # - Functions are equal if they are defined at the same position in the source
+  #   code.
+  #   ```
+  #   foo = { a -> 4 }
+  #   equals foo foo => True
+  #   equals foo { a -> 4 } => False
+  #   ```
+  #   Note: Currently, this is not correctly implemented in the VM.
+  #
+  # - Lists are equal if they have the same length and all their items are
+  #   equal.
+  #   ```
+  #   equals (1, 2, 3) (1, 2, 3) => True
+  #   equals (1, 2, 3) (1, 2) => False
+  #   equals (1, 2, 3) (1, 2, 30) => False
+  #   ```
+  #
+  # - Structs are equal if their sets of keys are equal and the corresponding
+  #   values are equal.
+  #   ```
+  #   equals [Foo: 2] [Foo: 2] => True
+  #   equals [Foo: 2] [Bar: 2] => False
+  #   equals [Foo: 2] [] => False
+  #   equals [Foo: 2] [Foo: 3] => False
+  #   ```
   ✨.equals a b
 
 functionRun function :=
-  # Executes `function` and returns its result.
+  # Calls the `function` with zero arguments. Returns the return value of the
+  # function.
   #
-  # `function` may not accept any arguments.
+  # This built-in is necessary because functions in Candy are called by writing
+  # space-separated arguments such as `foo 2`. For functions that take no
+  # arguments, this syntax is not possible. Such functions are rare though
+  # because most functions don't have side effects.
+  #
+  # ```
+  # functionRun { 4 } => 4
+  # ```
   needs (function | typeIs Function)
   needs (function | ✨.getArgumentCount | equals 0)
   ✨.functionRun function
+
 getArgumentCount function :=
-  # Returns the number of arguments that `function` expects.
+  # Returns the number of arguments the `function` requires.
+  #
+  # ```
+  # getArgumentCount { a -> a } => 1
+  # getArgumentCount getArgumentCount => 1
+  # ```
   needs (function | typeIs Function)
   ✨.getArgumentCount function
 
 ifElse condition then else :=
+  # If the condition is `True`, runs `then`. If it's `False`, runs `else`.
+  # Returns the return value of the function that ran.
+  #
+  # ```
+  # ifElse True { 1 } { 2 } => 1
+  # ifElse False { 1 } { 2 } => 2
+  # ```
   conditionIsBool = condition %
     True | False -> True
     _ -> False
@@ -77,64 +151,152 @@ fitsInRustU128 value =
   value | isLessThanOrEqualTo rustU128Max
 
 intAdd a b :=
+  # Returns `a` + `b`.
+  #
+  # ```
+  # intAdd 1 2 => 3
+  # ```
   needs (a | typeIs Int)
   needs (b | typeIs Int)
   ✨.intAdd a b
+
 intBitLength value :=
-  # Determines the fewest bits necessary to express this integer, not including the sign.
+  # Returns the number of bits that are necessary to represent that integer,
+  # ignoring the sign.
+  #
+  # ```
+  # intBitLength 1 => 1
+  # intBitLength 2 => 2
+  # intBitLength 3 => 2
+  # intBitLength -3 => 2
+  # ```
   needs (value | typeIs Int)
   ✨.intBitLength value
+
 intBitwiseAnd a b :=
+  # Returns the result of taking the bitwise "and" of `a` and `b`.
+  #
+  # ```
+  # intBitwiseAnd 1 2 => 1
+  # ```
   needs (a | typeIs Int)
   needs (b | typeIs Int)
   ✨.intBitwiseAnd a b
+
 intBitwiseOr a b :=
+  # Returns the result of taking the bitwise "or" of `a` and `b`.
+  #
+  # ```
+  # intBitwiseOr 1 2 => 2
+  # ```
   needs (a | typeIs Int)
   needs (b | typeIs Int)
   ✨.intBitwiseOr a b
+
 intBitwiseXor a b :=
+  # Returns the result of taking the bitwise "xor" of `a` and `b`.
+  #
+  # ```
+  # intBitwiseXor 1 3 => 2
+  # ```
   needs (a | typeIs Int)
   needs (b | typeIs Int)
   ✨.intBitwiseXor a b
+
 intCompareTo a b :=
-  # Returns `Less`, `Equal`, or `Greater` depending on whether `a` is less than, equal to, or
-  # greater than `b`.
+  # Returns the relationship between the integers as a tag, which is either
+  # `Less`, `Equal`, or `Greater`.
+  #
+  # ```
+  # intCompareTo 1 3 => Less
+  # intCompareTo 3 3 => Equal
+  # intCompareTo 5 3 => Greater
+  # ```
   needs (a | typeIs Int)
   needs (b | typeIs Int)
   ✨.intCompareTo a b
+
 intDivideTruncating dividend divisor :=
   # Returns `dividend` ÷ `divisor`.
   #
-  # This operation rounds towards zero, truncating any fractional part of the exact result.
+  # This division rounds towards zero, truncating any fractional part of the
+  # exact result.
+  #
+  # ```
+  # intDivideTruncating 6 3 => 2
+  # intDivideTruncating 5 3 => 1
+  # ```
   needs (dividend | typeIs Int)
   needs (divisor | typeIs Int)
   needs (divisor | equals 0 | not) "You can't divide by zero."
   ✨.intDivideTruncating dividend divisor
+
 intModulo dividend divisor :=
+  # Returns `dividend` % `divisor`.
+  #
+  # The result of a modulo operation is the smallest possible number x such that
+  # there exists a y with dividend = y * divisor + x.
+  #
+  # ```
+  # intModulo 6 3 => 0
+  # intModulo 5 3 => 2
+  # intModulo 5 -3 => 2
+  # intModulo -5 3 => 1
+  # intModulo -5 -3 => 1
+  # ```
   needs (dividend | typeIs Int)
   needs (divisor | typeIs Int)
   needs (divisor | equals 0 | not) "You can't divide by zero."
   ✨.intModulo dividend divisor
+
 intMultiply factorA factorB :=
   # Returns `factorA` × `factorB`.
+  #
+  # ```
+  # intMultiply 6 2 => 12
+  # ```
   needs (factorA | typeIs Int)
   needs (factorB | typeIs Int)
   ✨.intMultiply factorA factorB
+
 intParse text :=
-  # Parses `text` as an integer.
+  # Parses `text` into an integer.
   #
-  # `text` must be a string of decimal digits, optionally preceded by a minus sign.
+  # `text` must be a string of decimal digits, optionally preceded by a minus
+  # sign. If the text is the textual representation of an integer, returns `Ok`
+  # and the parsed integer. Otherwise, returns `Error NotAnInteger`.
   #
-  # This function returns `Ok integer` if `text` represents an integer and `Error errorMessage`
-  # otherwise.
+  # ```
+  # intParse "6" => Ok 6
+  # intParse "-2" => Ok -2
+  # intParse "Foo" => Error NotAnInteger
+  # ```
   needs (text | typeIs Text)
   ✨.intParse text
+
 intRemainder dividend divisor :=
+  # Returns the remainder you get when dividing the dividend by the divisor.
+  #
+  # The result has the same sign as the `dividend`.
+  #
+  # ```
+  # intRemainder 6 3 => 0
+  # intRemainder 5 3 => 2
+  # intRemainder -5 3 => -2
+  # intRemainder 5 -3 => 2
+  # intRemainder -5 -3 => -2
+  # ```
   needs (dividend | typeIs Int)
   needs (divisor | typeIs Int)
   needs (divisor | equals 0 | not) "You can't divide by zero."
   ✨.intRemainder dividend divisor
+
 intShiftLeft value amount :=
+  # Returns `value` << `amount`.
+  #
+  # ```
+  # intShiftLeft 1 3 => 8
+  # ```
   needs (value | typeIs Int)
   needs (amount | typeIs Int)
   needs
@@ -142,7 +304,14 @@ intShiftLeft value amount :=
     "The shift `amount` is negative: {amount}. You might want to call `shiftRight` instead."
   needs (amount | fitsInRustU128) "Shifts by that much are not yet supported."
   ✨.intShiftLeft value amount
+
 intShiftRight value amount :=
+  # Returns `value` >> `amount`.
+  #
+  # ```
+  # intShiftLeft 8 3 => 1
+  # intShiftLeft 10 3 => 1
+  # ```
   needs (value | typeIs Int)
   needs (amount | typeIs Int)
   needs
@@ -150,91 +319,234 @@ intShiftRight value amount :=
     "The shift `amount` is negative: {amount}. You might want to call `shiftLeft` instead."
   needs (amount | fitsInRustU128) "Shifts by that much are not yet supported."
   ✨.intShiftRight value amount
+
 intSubtract minuend subtrahend :=
+  # Returns `minuend` - `subtrahend`.
+  #
+  # ```
+  # intSubtract 3 2 => 1
+  # ```
   # Returns `minuend` - `subtrahend`.
   needs (minuend | typeIs Int)
   needs (subtrahend | typeIs Int)
   ✨.intSubtract minuend subtrahend
 
 listFilled length item :=
-  # Returns a list of `length` elements, each of which is `item`.
+  # Returns a list of `length` items, each of which is `item`.
+  #
+  # ```
+  # listFilled 3 Foo => (Foo, Foo, Foo)
+  # listFilled 10 1 => (1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+  # listFilled 0 Bar => (,)
+  # ```
   needs (length | typeIs Int)
   needs (length | isNonNegative)
   ✨.listFilled length item
+
 listGet list index :=
+  # Returns the item at position `index` in the `list`.
+  #
+  # Indexing is zero-based.
+  #
+  # ```
+  # listGet (Foo, Bar, Baz) 0 => Foo
+  # listGet (Foo, Bar, Baz) 1 => Bar
+  # listGet (Foo, Bar, Baz) 2 => Baz
+  # ```
   needs (list | typeIs List)
   needs (index | typeIs Int)
   needs (index | isNonNegative)
   needs (index | intCompareTo (list | ✨.listLength) | equals Less)
   ✨.listGet list index
+
 listInsert list index item :=
+  # Returns a new list that is like the given `list` except the `item` is
+  # inserted at the given `index`.
+  #
+  # The index can point one past the end of the list (0 <= index <= length).
+  #
+  # ```
+  # listInsert (Foo, Bar) 0 Baz => (Baz, Foo, Bar)
+  # listInsert (Foo, Bar) 1 Baz => (Foo, Baz, Bar)
+  # listInsert (Foo, Bar) 2 Baz => (Foo, Bar, Baz)
+  # ```
   needs (list | typeIs List)
   needs (index | typeIs Int)
   needs (index | isNonNegative)
   needs (index | isLessThanOrEqualTo (list | ✨.listLength))
   ✨.listInsert list index item
+
 listLength list :=
+  # Returns the length of the list.
+  #
+  # ```
+  # listLength (Foo, Bar) => 2
+  # ```
   needs (list | typeIs List)
   ✨.listLength list
+
 listRemoveAt list index :=
-  # Returns `(listWithoutItemAtIndex, itemAtIndex)`.
+  # Returns a two-item list containing a new list without the item at the index,
+  # and the removed item.
+  #
+  # ```
+  # listRemoveAt (Foo, Bar, Baz) 1 => ((Foo, Baz), Bar)
+  # ```
   needs (list | typeIs List)
   needs (index | typeIs Int)
   needs (index | isNonNegative)
   needs (index | intCompareTo (list | listLength) | equals Less)
   ✨.listRemoveAt list index
+
 listReplace list index newItem :=
+  # Returns a list that is like the given `list` except the item at `index` is
+  # replaced with the `newItem`.
+  #
+  # ```
+  # listReplace (Foo, Bar, Baz) 1 Blub => (Foo, Blub, Baz)
+  # ```
   needs (list | typeIs List)
   needs (index | typeIs Int)
   needs (index | isNonNegative)
   needs (index | intCompareTo (list | listLength) | equals Less)
   ✨.listReplace list index newItem
 
-print message := ✨.print message
+print message :=
+  # Takes a text and prints it. Returns `Nothing`.
+  #
+  # ```
+  # print "Hello!" => Nothing
+  # ```
+  needs (message | typeIs Text)
+  ✨.print message
 
 structGet struct key :=
+  # Returns the value that's saved in the `struct` for the `key`.
+  #
+  # This function is called each time you use the dot syntax in any package
+  # except this one.
+  #
+  # ```
+  # structGet [Foo: 2] Foo => 2
+  # ```
   needs (struct | typeIs Struct)
+
   needs (struct | ✨.structHasKey key)
+  # TODO: Add this message when our optimizations become smarter.
+  # "Struct `{struct}` is missing the key `{key}`."
+  # Diff from the previous attempt:
+  # https://github.com/candy-lang/golden-irs/compare/432eabe0dd6fc5be7d17f6413b4608ae4c870ef6_..06506cc02149e4e29479ee2396824215b3b548ec_
+
   ✨.structGet struct key
+
 structGetKeys struct :=
-  # Returns a list of all keys inside `struct`.
+  # Returns a list of all keys inside the `struct`.
   #
   # The order of the keys is unspecified.
+  #
+  # ```
+  # structGetKeys [Foo: 2, Bar: 1] => (Foo, Bar)
+  # ```
   needs (struct | typeIs Struct)
   ✨.structGetKeys struct
+
 structHasKey struct key :=
-  # Returns whether `struct` contains the key `key`.
+  # Returns whether the `struct` contains the `key`.
+  #
+  # ```
+  # structHasKey [Foo: 2, Bar: 1] Foo => True
+  # structHasKey [Foo: 2, Bar: 1] Bar => False
+  # ```
   needs (struct | typeIs Struct)
   ✨.structHasKey struct key
 
 tagGetValue tag :=
+  # Returns the `tag`'s associated value.
+  #
+  # ```
+  # tagGetValue (Foo 1) => 1
+  # tagGetValue (Bar Baz) => Baz
+  # ```
   needs (tag | typeIs Tag)
   needs (tag | ✨.tagHasValue)
   ✨.tagGetValue tag
+
 tagHasValue tag :=
+  # Returns whether the `tag` has a value.
+  #
+  # ```
+  # tagHasValue (Foo 1) => True
+  # tagHasValue Bar => False
+  # ```
   needs (tag | typeIs Tag)
   ✨.tagHasValue tag
+
 tagWithoutValue tag :=
+  # Returns the `tag` without a value.
+  #
+  # ```
+  # tagWithoutValue (Foo 1) => Foo
+  # tagWithoutValue Bar => Bar
+  # ```
   needs (tag | typeIs Tag)
   ✨.tagWithoutValue tag
 
 textCharacters text :=
   # Returns a list of characters (Unicode grapheme clusters) in this text.
+  #
+  # ```
+  # textCharacters "Hello" => ("H", "e", "l", "l", "o")
+  # ```
+  #
   needs (text | typeIs Text)
   ✨.textCharacters text
+
 textConcatenate a b :=
+  # Returns a concatenation of both arguments.
+  #
+  # ```
+  # textConcatenate "Hello" "world" => "Helloworld"
+  # ```
   needs (a | typeIs Text)
   needs (b | typeIs Text)
   ✨.textConcatenate a b
+
 textContains text pattern :=
+  # Returns whether the `text` contains the `pattern` text.
+  #
+  # This does _not_ support patterns such as regular expressions – it just looks
+  # for the literal `pattern`.
+  #
+  # ```
+  # textContains "Hello" "H" => True
+  # textContains "Hello" "X" => False
+  # ```
   needs (text | typeIs Text)
   needs (pattern | typeIs Text)
   ✨.textContains text pattern
+
 textEndsWith text suffix :=
+  # Returns whether the `text` ends with the `suffix`.
+  #
+  # ```
+  # textEndsWith "Hello, world" "world" => True
+  # textEndsWith "Hello, world" "you" => False
+  # ```
   needs (text | typeIs Text)
   needs (suffix | typeIs Text)
   ✨.textEndsWith text suffix
+
 textFromUtf8 bytes :=
+  # Parses the `bytes` into a text.
+  #
+  # The `bytes` must be a list of integers between 0 and 255, inclusive. If the
+  # bytes are a valid UTF-8 encoding, returns the corresponding text. Otherwise,
+  # returns `Error NotUtf8` and the original bytes.
+  #
+  # ```
+  # textFromUtf8 (104, 101, 108, 108, 111) => Ok "Hello"
+  # textFromUtf8 (104, 101, 245) => Error NotUtf8
+  # ```
   needs (bytes | typeIs List)
   ## TODO: Add this when it runs faster.
   ## needs (bytes | iterable.fromList | iterable.all { byte ->
@@ -243,7 +555,13 @@ textFromUtf8 bytes :=
   ##   }
   ## })
   ✨.textFromUtf8 bytes
+
 textGetRange text startInclusive endExclusive :=
+  # Returns the substring of the `text` from `startInclusive` to `endExclusive`.
+  #
+  # ```
+  # textGetRange "Hello" 1 3 => "el"
+  # ```
   needs (text | typeIs Text)
   needs (startInclusive | typeIs Int)
   needs (startInclusive | isNonNegative)
@@ -253,26 +571,74 @@ textGetRange text startInclusive endExclusive :=
   needs (endExclusive | isLessThanOrEqualTo (text | ✨.textLength))
   needs (startInclusive | isLessThanOrEqualTo endExclusive)
   ✨.textGetRange text startInclusive endExclusive
+
 textIsEmpty text :=
+  # Returns whether the `text` is empty.
+  #
+  # ```
+  # textIsEmpty "Hello" => False
+  # textIsEmpty "" => True
+  # ```
   needs (text | typeIs Text)
   ✨.textIsEmpty text
+
 textLength text :=
-  # Returns the number of characters (Unicode grapheme clusters) in this text.
+  # Returns the number of characters (Unicode grapheme clusters) in the `text`.
+  #
+  # ```
+  # textLength "Hello" => 5
+  # textLength "" => 0
+  # ```
   needs (text | typeIs Text)
   ✨.textLength text
+
 textStartsWith text prefix :=
+  # Returns whether the `text` starts with the `prefix`.
+  #
+  # ```
+  # textStartsWith "Hello, world" "Hello" => True
+  # textStartsWith "Hello, world" "Hi" => False
+  # ```
   needs (text | typeIs Text)
   needs (prefix | typeIs Text)
   ✨.textStartsWith text prefix
+
 textTrimEnd text :=
+  # Returns a text with whitespace removed at the end.
+  #
+  # ```
+  # textTrimEnd "  Hi  " => "  Hi"
+  # ```
   needs (text | typeIs Text)
-  # text
   ✨.textTrimEnd text
+
 textTrimStart text :=
+  # Returns a text with whitespace removed at the start.
+  #
+  # ```
+  # textTrimStart "  Hi  " => "Hi  "
+  # ```
   needs (text | typeIs Text)
-  # text
   ✨.textTrimStart text
 
-toDebugText any := ✨.toDebugText any
+toDebugText value :=
+  # Returns a stringified version of the `value`.
+  #
+  # ```
+  # toDebugText 2 => "2"
+  # ```
+  ✨.toDebugText value
 
-typeOf any := ✨.typeOf any
+typeOf value :=
+  # Returns a tag representing the type of the `value`. These are the possible
+  # types: `Function`, `Int`, `List`, `Struct`, `Text`, `Tag`
+  #
+  # ```
+  # typeOf {} => Function
+  # typeOf 2 => Int
+  # typeOf (1, 2) => List
+  # typeOf [Foo: 2] => Struct
+  # typeOf "Hi" => Text
+  # typeOf Text => Tag
+  # ```
+  ✨.typeOf value

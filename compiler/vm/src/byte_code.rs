@@ -1,7 +1,5 @@
-use crate::heap::Heap;
-use crate::heap::{
-    DisplayWithSymbolTable, Function, HirId, InlineData, InlineObject, SymbolId, SymbolTable,
-};
+use crate::heap::{Function, HirId, InlineData, InlineObject};
+use crate::heap::{Heap, Text};
 use crate::instruction_pointer::InstructionPointer;
 use candy_frontend::hir;
 use candy_frontend::rich_ir::ReferenceKey;
@@ -19,10 +17,9 @@ use rustc_hash::FxHashSet;
 use std::ops::Range;
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-pub struct Lir {
+pub struct ByteCode {
     pub module: Module,
     pub constant_heap: Heap,
-    pub symbol_table: SymbolTable,
     pub instructions: Vec<Instruction>,
     pub(super) origins: Vec<FxHashSet<hir::Id>>,
     pub module_function: Function,
@@ -38,7 +35,7 @@ pub enum Instruction {
     ///
     /// a, value -> a, tag
     CreateTag {
-        symbol_id: SymbolId,
+        symbol: Text,
     },
 
     /// Pops num_items items, pushes a list.
@@ -107,7 +104,7 @@ pub enum Instruction {
     /// a, reason, responsible -> 💥
     Panic,
 
-    /// a, HIR ID, function, arg1, arg2, ..., argN, responsible -> a
+    /// a, HIR ID, function, arg1, arg2, ..., argN -> a
     TraceCallStarts {
         num_args: usize,
     },
@@ -128,38 +125,39 @@ impl Instruction {
     /// this instruction.
     pub fn apply_to_stack(&self, stack: &mut Vec<Id>, result: Id) {
         match self {
-            Instruction::CreateTag { .. } => {
+            Self::CreateTag { .. } => {
                 stack.pop();
                 stack.push(result);
             }
-            Instruction::CreateList { num_items } => {
+            Self::CreateList { num_items } => {
                 stack.pop_multiple(*num_items);
                 stack.push(result);
             }
-            Instruction::CreateStruct { num_fields } => {
+            Self::CreateStruct { num_fields } => {
                 stack.pop_multiple(2 * num_fields); // fields
                 stack.push(result);
             }
-            Instruction::CreateFunction { .. } => {
+            Self::CreateFunction { .. } => {
                 stack.push(result);
             }
-            Instruction::PushConstant(_) => {
+            Self::PushConstant(_) => {
                 stack.push(result);
             }
-            Instruction::PushFromStack(_) => {
+            Self::PushFromStack(_) => {
                 stack.push(result);
             }
-            Instruction::PopMultipleBelowTop(n) => {
+            Self::PopMultipleBelowTop(n) => {
                 let top = stack.pop().unwrap();
                 stack.pop_multiple(*n);
                 stack.push(top);
             }
-            Instruction::Call { num_args } => {
+            Self::Call { num_args } => {
+                stack.pop(); // responsible
                 stack.pop_multiple(*num_args);
                 stack.pop(); // function/builtin
                 stack.push(result); // return value
             }
-            Instruction::TailCall {
+            Self::TailCall {
                 num_locals_to_pop,
                 num_args,
             } => {
@@ -168,30 +166,30 @@ impl Instruction {
                 stack.pop_multiple(*num_locals_to_pop);
                 stack.push(result); // return value
             }
-            Instruction::Return => {
+            Self::Return => {
                 // Only modifies the call stack and the instruction pointer.
                 // Leaves the return value untouched on the stack.
             }
-            Instruction::Panic => {
+            Self::Panic => {
                 stack.pop(); // responsible
                 stack.pop(); // reason
                 stack.push(result);
             }
-            Instruction::TraceCallStarts { num_args } => {
-                stack.pop(); // HIR ID
+            Self::TraceCallStarts { num_args } => {
                 stack.pop_multiple(*num_args);
                 stack.pop(); // callee
+                stack.pop(); // HIR ID
             }
-            Instruction::TraceCallEnds => {
+            Self::TraceCallEnds => {
                 stack.pop(); // return value
             }
-            Instruction::TraceExpressionEvaluated => {
-                stack.pop(); // HIR ID
+            Self::TraceExpressionEvaluated => {
                 stack.pop(); // value
+                stack.pop(); // HIR ID
             }
-            Instruction::TraceFoundFuzzableFunction => {
+            Self::TraceFoundFuzzableFunction => {
+                stack.pop(); // function
                 stack.pop(); // HIR ID
-                stack.pop(); // value
             }
         }
     }
@@ -208,10 +206,12 @@ impl StackExt for Vec<Id> {
     }
 }
 
-impl Lir {
+impl ByteCode {
+    #[must_use]
     pub fn functions_behind(&self, ip: InstructionPointer) -> &FxHashSet<hir::Id> {
         &self.origins[*ip]
     }
+    #[must_use]
     pub fn range_of_function(&self, function: &hir::Id) -> Range<InstructionPointer> {
         let start = self
             .origins
@@ -229,23 +229,8 @@ impl Lir {
     }
 }
 
-impl ToRichIr for Lir {
+impl ToRichIr for ByteCode {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        builder.push("# Symbol Table", TokenType::Comment, EnumSet::empty());
-        for (symbol_id, symbol) in self.symbol_table.ids_and_symbols() {
-            builder.push_newline();
-            builder.push(
-                format!("{:?}", symbol_id),
-                TokenType::Address,
-                EnumSet::empty(),
-            );
-            builder.push(": ", None, EnumSet::empty());
-            let symbol_range = builder.push(symbol, TokenType::Symbol, EnumSet::empty());
-            builder.push_reference(ReferenceKey::Symbol(symbol.to_string()), symbol_range)
-        }
-        builder.push_newline();
-        builder.push_newline();
-
         builder.push("# Constant heap", TokenType::Comment, EnumSet::empty());
         for constant in self.constant_heap.iter() {
             builder.push_newline();
@@ -284,19 +269,19 @@ impl ToRichIr for Lir {
             builder.push(
                 format!(
                     "{}: ",
-                    ToString::to_string(&i)
+                    i.to_string()
                         .pad_to_width_with_alignment(instruction_index_width, Alignment::Right),
                 ),
                 TokenType::Comment,
                 EnumSet::empty(),
             );
 
-            instruction.build_rich_ir(builder, &self.symbol_table);
+            instruction.build_rich_ir(builder);
         }
     }
 }
 impl Instruction {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder, symbol_table: &SymbolTable) {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         let discriminant: InstructionDiscriminants = self.into();
         builder.push(
             Into::<&'static str>::into(discriminant),
@@ -305,27 +290,20 @@ impl Instruction {
         );
 
         match self {
-            Instruction::CreateTag { symbol_id } => {
+            Self::CreateTag { symbol } => {
                 builder.push(" ", None, EnumSet::empty());
-                let symbol_range = builder.push(
-                    DisplayWithSymbolTable::to_string(symbol_id, symbol_table),
-                    None,
-                    EnumSet::empty(),
-                );
-                builder.push_reference(
-                    ReferenceKey::Symbol(symbol_table.get(*symbol_id).to_string()),
-                    symbol_range,
-                );
+                let symbol_range = builder.push(symbol.get(), None, EnumSet::empty());
+                builder.push_reference(ReferenceKey::Symbol(symbol.to_string()), symbol_range);
             }
-            Instruction::CreateList { num_items } => {
+            Self::CreateList { num_items } => {
                 builder.push(" ", None, EnumSet::empty());
-                builder.push(ToString::to_string(num_items), None, EnumSet::empty());
+                builder.push(num_items.to_string(), None, EnumSet::empty());
             }
-            Instruction::CreateStruct { num_fields } => {
+            Self::CreateStruct { num_fields } => {
                 builder.push(" ", None, EnumSet::empty());
-                builder.push(ToString::to_string(num_fields), None, EnumSet::empty());
+                builder.push(num_fields.to_string(), None, EnumSet::empty());
             }
-            Instruction::CreateFunction {
+            Self::CreateFunction {
                 captured,
                 num_args,
                 body,
@@ -344,7 +322,7 @@ impl Instruction {
                     EnumSet::empty(),
                 );
             }
-            Instruction::PushConstant(constant) => {
+            Self::PushConstant(constant) => {
                 builder.push(" ", None, EnumSet::empty());
                 if let InlineData::Pointer(pointer) = InlineData::from(*constant) {
                     builder.push(
@@ -362,22 +340,22 @@ impl Instruction {
                     EnumSet::empty(),
                 );
             }
-            Instruction::PushFromStack(offset) => {
+            Self::PushFromStack(offset) => {
                 builder.push(" ", None, EnumSet::empty());
-                builder.push(ToString::to_string(offset), None, EnumSet::empty());
+                builder.push(offset.to_string(), None, EnumSet::empty());
             }
-            Instruction::PopMultipleBelowTop(count) => {
+            Self::PopMultipleBelowTop(count) => {
                 builder.push(" ", None, EnumSet::empty());
-                builder.push(ToString::to_string(count), None, EnumSet::empty());
+                builder.push(count.to_string(), None, EnumSet::empty());
             }
-            Instruction::Call { num_args } => {
+            Self::Call { num_args } => {
                 builder.push(
                     format!(" with {num_args} {}", arguments_plural(*num_args)),
                     None,
                     EnumSet::empty(),
                 );
             }
-            Instruction::TailCall {
+            Self::TailCall {
                 num_locals_to_pop,
                 num_args,
             } => {
@@ -390,23 +368,23 @@ impl Instruction {
                     EnumSet::empty(),
                 );
             }
-            Instruction::Return => {}
-            Instruction::Panic => {}
-            Instruction::TraceCallStarts { num_args } => {
+            Self::Return => {}
+            Self::Panic => {}
+            Self::TraceCallStarts { num_args } => {
                 builder.push(
                     format!(" ({num_args} {})", arguments_plural(*num_args)),
                     None,
                     EnumSet::empty(),
                 );
             }
-            Instruction::TraceCallEnds => {}
-            Instruction::TraceExpressionEvaluated => {}
-            Instruction::TraceFoundFuzzableFunction => {}
+            Self::TraceCallEnds => {}
+            Self::TraceExpressionEvaluated => {}
+            Self::TraceFoundFuzzableFunction => {}
         }
     }
 }
 
-fn arguments_plural(num_args: usize) -> &'static str {
+const fn arguments_plural(num_args: usize) -> &'static str {
     if num_args == 1 {
         "argument"
     } else {
@@ -415,8 +393,12 @@ fn arguments_plural(num_args: usize) -> &'static str {
 }
 
 #[extension_trait]
-pub impl RichIrForLir for RichIr {
-    fn for_byte_code(module: &Module, byte_code: &Lir, tracing_config: &TracingConfig) -> RichIr {
+pub impl RichIrForByteCode for RichIr {
+    fn for_byte_code(
+        module: &Module,
+        byte_code: &ByteCode,
+        tracing_config: &TracingConfig,
+    ) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
             format!("# VM Byte Code for module {module}"),

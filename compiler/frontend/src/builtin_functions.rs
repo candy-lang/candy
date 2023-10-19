@@ -7,53 +7,70 @@ use lazy_static::lazy_static;
 use strum::IntoEnumIterator;
 use strum_macros::{AsRefStr, EnumIter};
 
+/// These are all built-ins.
+///
+/// In the end, all Candy code boils down to some instructions. Some of those
+/// instructions are grouped into `Builtins` – you can think of them as
+/// functions with an implementation that's provided by the runtime.
+///
+/// TODO: Re-evaluate whether builtins should instead be lowered into
+/// instructions directly (i.e. we would have an `IntAdd` instruction instead of
+/// a builtin `IntAdd` that can be called).
+///
+/// Like all callable values, builtins are being passed a responsibility
+/// parameter as the last argument. Because built-ins are only called through
+/// corresponding functions from the `Builtins` package, all preconditions are
+/// guaranteed to be true and built-ins can ignore the responsibility parameter.
+///
+/// See the source code of the `Builtins` package for documentation on what
+/// these functions do.
 #[derive(AsRefStr, Clone, Copy, Debug, EnumIter, Eq, Hash, PartialEq)]
 #[strum(serialize_all = "snake_case")]
 pub enum BuiltinFunction {
-    Equals,              // any any -> booleanTag
-    FunctionRun,         // (functionWith0Arguments) -> (returnValue: any)
-    GetArgumentCount,    // function -> argumentCount
-    IfElse,              // condition thenFunction elseFunction -> resultOfExecutedFunction
-    IntAdd,              // (summandA: int) (summandB: int) -> (sum: int)
-    IntBitLength,        // (value: int) -> (numberOfBits: int)
-    IntBitwiseAnd,       // (valueA: int) (valueB: int) -> (result: int)
-    IntBitwiseOr,        // (valueA: int) (valueB: int) -> (result: int)
-    IntBitwiseXor,       // (valueA: int) (valueB: int) -> (result: int)
-    IntCompareTo,        // (valueA: int) (valueB: int) -> (ordering: Less | Equal | Greater)
-    IntDivideTruncating, // (dividend: int) (divisor: int) -> (quotient: int)
-    IntModulo,           // (dividend: int) (divisor: int) -> (modulus: int)
-    IntMultiply,         // (factorA: int) (factorB: int) -> (product: int)
-    IntParse,            // text -> (parsedInt: maybeOfInt)
-    IntRemainder,        // (dividend: int) (divisor: int) -> (remainder: int)
-    IntShiftLeft,        // (value: int) (amount: int) -> (shifted: int)
-    IntShiftRight,       // (value: int) (amount: int) -> (shifted: int)
-    IntSubtract,         // (minuend: int) (subtrahend: int) -> (difference: int)
-    ListFilled,          // (length: int) item -> list
-    ListGet,             // list (index: int) -> item
-    ListInsert,          // list (index: int) item -> list
-    ListLength,          // list -> int
-    ListRemoveAt,        // list (index: int) -> (list, item)
-    ListReplace,         // list (index: int) newItem -> list
-    Print,               // message -> Nothing
-    StructGet,           // struct key -> value
-    StructGetKeys,       // struct -> listOfKeys
-    StructHasKey,        // struct key -> booleanTag
-    TagGetValue,         // tag -> any
-    TagHasValue,         // tag -> booleanTag
-    TagWithoutValue,     // tag -> tag
-    TextCharacters,      // text -> (listOfText: list)
-    TextConcatenate,     // (textA: text) (textB: text) -> (concatenated: text)
-    TextContains,        // text (pattern: text) -> booleanTag
-    TextEndsWith,        // text (suffix: text) -> booleanTag
-    TextFromUtf8,        // (bytes: listOfInteger) -> resultOfText
-    TextGetRange,        // text (startInclusive: int) (endExclusive: int) -> (substring: text)
-    TextIsEmpty,         // text -> (isEmpty: booleanTag)
-    TextLength,          // text -> (length: int)
-    TextStartsWith,      // text (prefix: text) -> booleanTag
-    TextTrimEnd,         // text -> text
-    TextTrimStart,       // text -> text
-    ToDebugText,         // any -> text
-    TypeOf,              // any -> typeTag
+    Equals,
+    FunctionRun,
+    GetArgumentCount,
+    IfElse,
+    IntAdd,
+    IntBitLength,
+    IntBitwiseAnd,
+    IntBitwiseOr,
+    IntBitwiseXor,
+    IntCompareTo,
+    IntDivideTruncating,
+    IntModulo,
+    IntMultiply,
+    IntParse,
+    IntRemainder,
+    IntShiftLeft,
+    IntShiftRight,
+    IntSubtract,
+    ListFilled,
+    ListGet,
+    ListInsert,
+    ListLength,
+    ListRemoveAt,
+    ListReplace,
+    Print,
+    StructGet,
+    StructGetKeys,
+    StructHasKey,
+    TagGetValue,
+    TagHasValue,
+    TagWithoutValue,
+    TextCharacters,
+    TextConcatenate,
+    TextContains,
+    TextEndsWith,
+    TextFromUtf8,
+    TextGetRange,
+    TextIsEmpty,
+    TextLength,
+    TextStartsWith,
+    TextTrimEnd,
+    TextTrimStart,
+    ToDebugText,
+    TypeOf,
 }
 lazy_static! {
     pub static ref VALUES: Vec<BuiltinFunction> = BuiltinFunction::iter().collect();

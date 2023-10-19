@@ -4,13 +4,16 @@ use std::fmt::Display;
 pub struct Pointer(usize);
 
 impl Pointer {
-    pub fn null() -> Self {
+    #[must_use]
+    pub const fn null() -> Self {
         Self(0)
     }
-    pub fn from_raw(raw: usize) -> Self {
+    #[must_use]
+    pub const fn from_raw(raw: usize) -> Self {
         Self(raw)
     }
-    pub fn raw(&self) -> usize {
+    #[must_use]
+    pub const fn raw(&self) -> usize {
         self.0
     }
 }

@@ -35,6 +35,7 @@ pub enum CstKind<D = CstData> {
     Identifier(String),
     Symbol(String),
     Int {
+        radix_prefix: Option<(IntRadix, String)>,
         value: BigUint,
         string: String,
     },
@@ -51,6 +52,7 @@ pub enum CstKind<D = CstData> {
         parts: Vec<Cst<D>>,
         closing: Box<Cst<D>>,
     },
+    TextNewline(String), // special newline for text because line breaks have semantic meaning there
     TextPart(String),
     TextInterpolation {
         opening_curly_braces: Vec<Cst<D>>,
@@ -121,7 +123,13 @@ pub enum CstKind<D = CstData> {
         error: CstError,
     },
 }
+#[derive(Clone, Debug, EnumIs, Eq, Hash, PartialEq)]
+pub enum IntRadix {
+    Binary,
+    Hexadecimal,
+}
 pub type FunctionParametersAndArrow<D> = (Vec<Cst<D>>, Box<Cst<D>>);
+
 impl<D> CstKind<D> {
     #[must_use]
     pub fn is_whitespace_or_comment(&self) -> bool {
@@ -188,7 +196,7 @@ impl<D> CstKind<D> {
                 children.push(closing);
                 children
             }
-            Self::TextPart(_) => vec![],
+            Self::TextNewline(_) | Self::TextPart(_) => vec![],
             Self::TextInterpolation {
                 opening_curly_braces,
                 expression,
@@ -356,7 +364,16 @@ impl<D> Display for CstKind<D> {
             }
             Self::Identifier(identifier) => identifier.fmt(f),
             Self::Symbol(symbol) => symbol.fmt(f),
-            Self::Int { string, .. } => string.fmt(f),
+            Self::Int {
+                radix_prefix,
+                value: _,
+                string,
+            } => {
+                if let Some((_, radix_string)) = radix_prefix {
+                    radix_string.fmt(f)?;
+                }
+                string.fmt(f)
+            }
             Self::OpeningText {
                 opening_single_quotes,
                 opening_double_quote,
@@ -382,11 +399,12 @@ impl<D> Display for CstKind<D> {
                 closing,
             } => {
                 opening.fmt(f)?;
-                for part in parts {
-                    part.fmt(f)?;
+                for line in parts {
+                    line.fmt(f)?;
                 }
                 closing.fmt(f)
             }
+            Self::TextNewline(newline) => newline.fmt(f),
             Self::TextPart(literal) => literal.fmt(f),
             Self::TextInterpolation {
                 opening_curly_braces,

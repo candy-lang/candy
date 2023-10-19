@@ -25,12 +25,19 @@ typedef struct
     struct candy_value **values;
 } candy_struct_t;
 
+typedef struct
+{
+    char *text;
+    struct candy_value *value;
+} candy_tag_t;
+
 typedef struct candy_value
 {
     union
     {
         int64_t integer;
         char *text;
+        candy_tag_t tag;
         struct candy_value **list;
         candy_function_t function;
         candy_struct_t structure;
@@ -62,7 +69,7 @@ const candy_value_t *to_candy_bool(int value);
 int candy_tag_to_bool(const candy_value_t *value);
 candy_value_t *make_candy_int(int64_t value);
 candy_value_t *make_candy_text(char *text);
-candy_value_t *make_candy_tag(char *tag);
+candy_value_t *make_candy_tag(char *tag, candy_value_t *value);
 candy_value_t *make_candy_list(candy_value_t **values);
 candy_value_t *make_candy_function(candy_function function, void *environment, int env_size);
 candy_value_t *run_candy_main(candy_value_t *function, candy_value_t *arg);

@@ -1,7 +1,7 @@
 use super::{utils::heap_object_impls, HeapObjectTrait};
-use crate::heap::{
-    object_heap::HeapObject, DisplayWithSymbolTable, Heap, InlineObject, OrdWithSymbolTable,
-    SymbolTable,
+use crate::{
+    heap::{object_heap::HeapObject, Heap, InlineObject},
+    utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
 use candy_frontend::utils::DoHash;
 use derive_more::Deref;
@@ -9,7 +9,7 @@ use itertools::{izip, Itertools};
 use rustc_hash::FxHashMap;
 use std::{
     cmp::Ordering,
-    fmt::{self, Debug, Formatter},
+    fmt::{self, Formatter},
     hash::{Hash, Hasher},
     ptr, slice,
 };
@@ -20,7 +20,7 @@ pub struct HeapStruct(HeapObject);
 impl HeapStruct {
     const LEN_SHIFT: usize = 4;
 
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
     pub fn create(
@@ -176,39 +176,38 @@ impl HeapStruct {
     }
 }
 
-impl Debug for HeapStruct {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+impl DebugDisplay for HeapStruct {
+    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         let keys = self.keys();
         if keys.is_empty() {
-            write!(f, "[]")
-        } else {
-            let values = self.values();
+            return write!(f, "[]");
+        }
+        let values = self.values();
+        if is_debug {
             let hashes = self.hashes();
             write!(
                 f,
                 "[{}]",
                 izip!(hashes, keys, values)
-                    .map(|(hash, key, value)| format!("{hash:016X} → {key:?}: {value:?}"))
+                    .map(|(hash, key, value)| {
+                        (
+                            format!("{:016X}", hash),
+                            DebugDisplay::to_string(key, is_debug),
+                            DebugDisplay::to_string(value, is_debug),
+                        )
+                    })
+                    .map(|(hash, key, value)| format!("{hash} → {key}: {value}"))
                     .join(", ")
             )
-        }
-    }
-}
-impl DisplayWithSymbolTable for HeapStruct {
-    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
-        let keys = self.keys();
-        if keys.is_empty() {
-            write!(f, "[]")
         } else {
-            let values = self.values();
             write!(
                 f,
                 "[{}]",
                 keys.iter()
                     .zip(values.iter())
                     .map(|(key, value)| (
-                        DisplayWithSymbolTable::to_string(key, symbol_table),
-                        DisplayWithSymbolTable::to_string(value, symbol_table)
+                        DebugDisplay::to_string(key, is_debug),
+                        DebugDisplay::to_string(value, is_debug)
                     ))
                     .sorted_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b))
                     .map(|(key, value)| format!("{key}: {value}"))
@@ -217,6 +216,7 @@ impl DisplayWithSymbolTable for HeapStruct {
         }
     }
 }
+impl_debug_display_via_debugdisplay!(HeapStruct);
 
 impl Eq for HeapStruct {}
 impl PartialEq for HeapStruct {
@@ -226,19 +226,26 @@ impl PartialEq for HeapStruct {
             && self.keys() == other.keys()
     }
 }
+
 impl Hash for HeapStruct {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.hashes().hash(state);
         self.values().hash(state);
     }
 }
-impl OrdWithSymbolTable for HeapStruct {
-    fn cmp(&self, symbol_table: &SymbolTable, other: &Self) -> Ordering {
+
+impl Ord for HeapStruct {
+    fn cmp(&self, other: &Self) -> Ordering {
         let mut self_keys = self.keys().to_vec();
-        self_keys.sort_by(|a, b| a.cmp(symbol_table, b));
+        self_keys.sort();
         let mut other_keys = other.keys().to_vec();
-        other_keys.sort_by(|a, b| a.cmp(symbol_table, b));
-        self_keys.cmp(symbol_table, &other_keys)
+        other_keys.sort();
+        self_keys.cmp(&other_keys)
+    }
+}
+impl PartialOrd for HeapStruct {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -261,7 +268,7 @@ impl HeapObjectTrait for HeapStruct {
                 self.content_word_pointer(0).as_ptr(),
                 clone.content_word_pointer(0).as_ptr(),
                 self.len(),
-            )
+            );
         };
         for (index, &key) in self.keys().iter().enumerate() {
             clone.unsafe_set_content_word(

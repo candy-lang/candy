@@ -6,7 +6,21 @@
     }
   ],
   "settings": {
+    "candy.languageServerCommand": "cargo run --manifest-path ../compiler/cli/Cargo.toml --release -- lsp",
+    "candy.packagesPath": ".",
     // Please keep these settings in sync with ../compiler.code-workspace.
+    "[json]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[markdown]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[typescript]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[yaml]": {
+      "editor.defaultFormatter": "redhat.vscode-yaml"
+    },
     "editor.codeActionsOnSave": {
       "source.fixAll": true,
       "source.organizeImports": true

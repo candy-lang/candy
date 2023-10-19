@@ -123,10 +123,7 @@ impl NormalizeSpans for Ast {
                 body.normalize_spans();
             }
             AstKind::OrPattern(OrPattern(patterns)) => patterns.normalize_spans(),
-            AstKind::Error { child, errors } => {
-                if let Some(child) = child {
-                    child.normalize_spans();
-                }
+            AstKind::Error { errors } => {
                 for error in errors {
                     error.span = Offset(0)..Offset(error.span.end.0 - error.span.start.0);
                 }

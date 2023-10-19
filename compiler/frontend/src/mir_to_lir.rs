@@ -58,12 +58,10 @@ impl LoweringContext {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 struct CurrentBody {
     id_mapping: FxHashMap<mir::Id, lir::Id>,
-    captured_count: usize,
-    parameter_count: usize,
-    expressions: Vec<lir::Expression>,
+    body: lir::Body,
     last_constant: Option<mir::Id>,
     ids_to_drop: FxHashSet<lir::Id>,
 }
@@ -75,16 +73,19 @@ impl CurrentBody {
         parameters: &[mir::Id],
         body: &mir::Body,
     ) -> lir::Body {
-        let mut lir_body = Self::new(captured, parameters);
+        let mut lir_body = Self::new(original_hirs, captured, parameters);
         for (id, expression) in body.iter() {
             lir_body.compile_expression(context, id, expression);
         }
-        lir_body.finish(&context.constant_mapping, original_hirs)
+        lir_body.finish(&context.constant_mapping)
     }
 
-    fn new(captured: &[mir::Id], parameters: &[mir::Id]) -> Self {
-        let captured_count = captured.len();
-        let parameter_count = parameters.len();
+    fn new(
+        original_hirs: FxHashSet<hir::Id>,
+        captured: &[mir::Id],
+        parameters: &[mir::Id],
+    ) -> Self {
+        let body = lir::Body::new(original_hirs, captured.len(), parameters.len());
         let id_mapping: FxHashMap<_, _> = captured
             .iter()
             .chain(parameters.iter())
@@ -102,9 +103,7 @@ impl CurrentBody {
 
         Self {
             id_mapping,
-            captured_count,
-            parameter_count,
-            expressions: Vec::new(),
+            body,
             last_constant: None,
             ids_to_drop,
         }
@@ -222,9 +221,7 @@ impl CurrentBody {
                     self.push(id, lir::Expression::CreateFunction { captured, body_id });
                 }
             }
-            mir::Expression::Parameter => {
-                panic!("The MIR should not contain any parameter expressions.")
-            }
+            mir::Expression::Parameter => unreachable!(),
             mir::Expression::Call {
                 function,
                 arguments,
@@ -340,9 +337,9 @@ impl CurrentBody {
     fn push(&mut self, mir_id: mir::Id, expression: impl Into<lir::Expression>) -> lir::Id {
         let expression = expression.into();
         let is_constant = matches!(expression, lir::Expression::Constant(_));
-        self.expressions.push(expression);
+        self.body.push(expression);
 
-        let id = self.last_expression_id();
+        let id = self.body.last_expression_id().unwrap();
         assert!(self.id_mapping.insert(mir_id, id).is_none());
         if !is_constant {
             assert!(self.ids_to_drop.insert(id));
@@ -350,23 +347,15 @@ impl CurrentBody {
         id
     }
 
-    fn last_expression_id(&self) -> lir::Id {
-        lir::Id::from_usize(self.captured_count + self.parameter_count + self.expressions.len())
-    }
-
     fn maybe_dup(&mut self, id: lir::Id) {
         if !self.ids_to_drop.contains(&id) {
             return;
         }
 
-        self.expressions.push(lir::Expression::Dup(id));
+        self.body.push(lir::Expression::Dup { id, amount: 1 });
     }
-    fn finish(
-        mut self,
-        constant_mapping: &FxHashMap<mir::Id, lir::ConstantId>,
-        original_hirs: FxHashSet<hir::Id>,
-    ) -> lir::Body {
-        if self.expressions.is_empty() {
+    fn finish(mut self, constant_mapping: &FxHashMap<mir::Id, lir::ConstantId>) -> lir::Body {
+        if self.body.expressions().is_empty() {
             // If the top-level MIR contains only constants, its LIR body will
             // still be empty. Hence, we push a reference to the last constant
             // we encountered.
@@ -374,21 +363,16 @@ impl CurrentBody {
             self.push(last_constant_id, constant_mapping[&last_constant_id]);
         }
 
-        self.ids_to_drop.remove(&self.last_expression_id());
+        let last_expression_id = self.body.last_expression_id().unwrap();
+        self.ids_to_drop.remove(&last_expression_id);
         if !self.ids_to_drop.is_empty() {
-            let return_value_id = self.last_expression_id();
             for id in self.ids_to_drop.iter().sorted().rev() {
-                self.expressions.push(lir::Expression::Drop(*id));
+                self.body.push(lir::Expression::Drop(*id));
             }
-            self.expressions
-                .push(lir::Expression::Reference(return_value_id));
+            self.body
+                .push(lir::Expression::Reference(last_expression_id));
         }
 
-        lir::Body::new(
-            original_hirs,
-            self.captured_count,
-            self.parameter_count,
-            self.expressions,
-        )
+        self.body
     }
 }

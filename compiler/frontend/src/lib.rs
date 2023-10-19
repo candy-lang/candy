@@ -7,7 +7,7 @@
     let_chains,
     try_blocks
 )]
-#![warn(clippy::nursery, clippy::pedantic)]
+#![warn(clippy::nursery, clippy::pedantic, unused_crate_dependencies)]
 #![allow(
     clippy::cognitive_complexity,
     clippy::match_same_arms,
@@ -32,6 +32,7 @@ pub mod hir;
 pub mod hir_to_mir;
 pub mod id;
 pub mod lir;
+pub mod lir_optimize;
 pub mod mir;
 pub mod mir_optimize;
 pub mod mir_to_lir;

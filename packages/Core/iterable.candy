@@ -38,12 +38,7 @@ generateWithState initialState mapper :=
   # - an `Error`, indicating that the iterator is done
   needs (function.is1 mapper)
   recursive initialState { recurse state ->
-    {
-      mapper state | result.map { result ->
-        [item, state] = result
-        [item, Rest: recurse state]
-      }
-    }
+    { mapper state | result.map { [item, state] -> [item, Rest: recurse state] } }
   }
 generate length valueGetter :=
   # Creates a new iterable of the given `length`, where each slot is filled by calling `valueGetter`
@@ -59,6 +54,12 @@ generate length valueGetter :=
       Ok [item, State: index | int.add 1]
     }
   }
+range length :=
+  # Creates a new iterable of the given `length`, where each slot is filled by the index.
+  needs (int.is length)
+  needs (int.isNonNegative length)
+  needs (int.fitsInRustU32 length)
+  generate length { index -> index }
 
 ## Mapping Transformation
 ##
@@ -68,19 +69,15 @@ map iterable mapper :=
   needs (is iterable)
   needs (function.is1 mapper)
   generateWithState iterable { previousState ->
-    previousState | next | result.map { itemAndRest ->
-      [item, rest] = itemAndRest
-      [Item: mapper item, State: rest]
-    }
+    previousState | next | result.map { [item, rest] -> [Item: mapper item, State: rest] }
   }
 
 withIndex iterable :=
   needs (is iterable)
   generateWithState [iterable, Index: 0] { previousState ->
     [iterable, index] = previousState
-    iterable | next | result.map { itemAndRest ->
-      [item, rest] = itemAndRest
-      [Item: [item, index], State: [Iterable: rest, Index: index | int.add 1]]
+    iterable | next
+    | result.map { [item, rest] -> [Item: [item, index], State: [Iterable: rest, Index: index | int.add 1]]
     }
   }
 
@@ -88,8 +85,7 @@ withIndex iterable :=
 
 # TODO: ensure this works with tail recursion
 foldLeftHelper = { foldLeftHelper iterable value combine ->
-  iterable | next | result.map { it ->
-    [item, rest] = it
+  iterable | next | result.map { [item, rest] ->
     newValue = combine value item
     foldLeftHelper foldLeftHelper rest newValue combine
   }
@@ -105,10 +101,7 @@ reduceLeft iterable combine :=
   needs (is iterable)
   needs (function.is2 combine)
   iterable | next | result.mapError { _ -> "Can't `reduceLeft` an empty iterable" }
-  | result.map { it ->
-    [item, rest] = it
-    rest | foldLeft item combine
-  }
+  | result.map { [item, rest] -> rest | foldLeft item combine }
 # TODO: `reduceRight`
 
 sum iterableOfInt :=
@@ -154,8 +147,7 @@ joinToText iterable :=
 
 whereHelper = { whereHelper iterable tester ->
   generateWithState iterable { iterable ->
-    iterable | next | result.flatMap { itemAndRest ->
-      [item, rest] = itemAndRest
+    iterable | next | result.flatMap { [item, rest] ->
       ifElse (tester item) { Ok [item, State: rest] } { whereHelper rest tester | next }
     }
   }
@@ -166,9 +158,8 @@ where iterable tester :=
   whereHelper whereHelper iterable tester
 
 takeWhile iterable tester := generateWithState iterable { iterable ->
-  iterable | next | result.flatMap { itemAndRest ->
-    [item, rest] = itemAndRest
-    ifElse (tester item) { Ok [item, State: rest] } { Error Empty }
+  iterable | next
+  | result.flatMap { [item, rest] -> ifElse (tester item) { Ok [item, State: rest] } { Error Empty }
   }
 }
 
@@ -179,10 +170,7 @@ take iterable n :=
   needs (int.is n)
   needs (int.isNonNegative n)
 
-  iterable | withIndex | takeWhile { it ->
-    [item, index] = it
-    index | int.isLessThan n
-  }
+  iterable | withIndex | takeWhile { [item, index] -> index | int.isLessThan n }
   | map { it -> it.item }
 
 skipHelper = { skipHelper iterable n ->
@@ -211,14 +199,10 @@ forEach iterable action :=
 
 fromList l :=
   needs (list.is l)
-  # () => Result[(Item, Iterable[Item]), Any]
-  # iterable | function.run | result.map { it -> it | list.get 0 }
-  # The state contains the list and an index.
-  generateWithState [l, Index: 0] { [l, index] ->
-    ifElse
-      l | list.isValidIndex index
-      { Ok [Item: l | list.get index, State: [l, Index: index | int.add 1]] }
-      { Error Empty }
+  generate (l | list.length) { index -> l | list.get index }
+fromListReversed l :=
+  needs (list.is l)
+  generate (l | list.length) { index -> l | list.get (l | list.length | int.subtract index | int.subtract 1)
   }
 
 toList iterable :=

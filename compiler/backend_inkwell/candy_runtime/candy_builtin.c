@@ -135,6 +135,19 @@ const candy_value_t *candy_builtin_struct_has_key(candy_value_t *structure, cand
     return &__internal_false;
 }
 
+const candy_value_t *candy_builtin_tag_has_value(candy_value_t *tag, candy_value_t *responsible)
+{
+    return to_candy_bool(tag->value.tag.value != NULL);
+}
+candy_value_t *candy_builtin_tag_get_value(candy_value_t *tag, candy_value_t *responsible)
+{
+    return tag->value.tag.value;
+}
+candy_value_t *candy_builtin_tag_without_value(candy_value_t *tag, candy_value_t *responsible)
+{
+    return make_candy_tag(tag->value.tag.text, NULL);
+}
+
 const candy_value_t *candy_builtin_type_of(candy_value_t *value, candy_value_t *responsible)
 {
     switch (value->type)

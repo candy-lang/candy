@@ -144,14 +144,14 @@ impl Context<'_> {
                 expression.validate(self.visible);
             }
 
-            let id = expression.id();
-            self.pureness.visit_optimized(id, &expression);
+            self.pureness.visit_optimized(expression.id(), &expression);
 
             module_folding::apply(self, &mut expression);
 
+            let new_id = expression.id();
             index = expression.index() + 1;
             let expression = mem::replace(&mut *expression, Expression::Parameter);
-            self.visible.insert(id, expression);
+            self.visible.insert(new_id, expression);
         }
 
         for (id, expression) in &mut body.expressions {
@@ -189,6 +189,7 @@ impl Context<'_> {
 
                 let is_call = matches!(**expression, Expression::Call { .. });
                 inlining::inline_tiny_functions(self, expression);
+                inlining::inline_needs_function(self, expression);
                 inlining::inline_functions_containing_use(self, expression);
                 if is_call && matches!(**expression, Expression::Function { .. }) {
                     // We inlined a function call and the resulting code starts with

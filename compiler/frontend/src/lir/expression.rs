@@ -32,7 +32,10 @@ pub enum Expression {
     Reference(Id),
 
     /// Increase the reference count of the given value.
-    Dup(Id),
+    Dup {
+        id: Id,
+        amount: usize,
+    },
 
     /// Decrease the reference count of the given value.
     ///
@@ -68,6 +71,93 @@ pub enum Expression {
         hir_definition: Id,
         function: Id,
     },
+}
+
+impl Expression {
+    pub fn replace_ids(&mut self, mut replacer: impl FnMut(Id) -> Id) {
+        match self {
+            Self::CreateTag { symbol: _, value } => {
+                *value = replacer(*value);
+            }
+            Self::CreateList(items) => {
+                for item in items {
+                    *item = replacer(*item);
+                }
+            }
+            Self::CreateStruct(fields) => {
+                for (key, value) in fields {
+                    *key = replacer(*key);
+                    *value = replacer(*value);
+                }
+            }
+            Self::CreateFunction {
+                captured,
+                body_id: _,
+            } => {
+                for captured in captured {
+                    *captured = replacer(*captured);
+                }
+            }
+            Self::Constant(_) => {}
+            Self::Reference(id) => {
+                *id = replacer(*id);
+            }
+            Self::Dup { id, amount: _ } => {
+                *id = replacer(*id);
+            }
+            Self::Drop(id) => {
+                *id = replacer(*id);
+            }
+            Self::Call {
+                function,
+                arguments,
+                responsible,
+            } => {
+                *function = replacer(*function);
+                for argument in arguments {
+                    *argument = replacer(*argument);
+                }
+                *responsible = replacer(*responsible);
+            }
+            Self::Panic {
+                reason,
+                responsible,
+            } => {
+                *reason = replacer(*reason);
+                *responsible = replacer(*responsible);
+            }
+            Self::TraceCallStarts {
+                hir_call,
+                function,
+                arguments,
+                responsible,
+            } => {
+                *hir_call = replacer(*hir_call);
+                *function = replacer(*function);
+                for argument in arguments {
+                    *argument = replacer(*argument);
+                }
+                *responsible = replacer(*responsible);
+            }
+            Self::TraceCallEnds { return_value } => {
+                *return_value = replacer(*return_value);
+            }
+            Self::TraceExpressionEvaluated {
+                hir_expression,
+                value,
+            } => {
+                *hir_expression = replacer(*hir_expression);
+                *value = replacer(*value);
+            }
+            Self::TraceFoundFuzzableFunction {
+                hir_definition,
+                function,
+            } => {
+                *hir_definition = replacer(*hir_definition);
+                *function = replacer(*function);
+            }
+        }
+    }
 }
 
 impl_display_via_richir!(Expression);
@@ -115,9 +205,11 @@ impl ToRichIr for Expression {
             }
             Self::Constant(id) => id.build_rich_ir(builder),
             Self::Reference(id) => id.build_rich_ir(builder),
-            Self::Dup(id) => {
+            Self::Dup { id, amount } => {
                 builder.push("dup ", None, EnumSet::empty());
                 id.build_rich_ir(builder);
+                builder.push(" by ", None, EnumSet::empty());
+                builder.push(amount.to_string(), None, EnumSet::empty());
             }
             Self::Drop(id) => {
                 builder.push("drop ", None, EnumSet::empty());

@@ -3,21 +3,21 @@ use crate::{
     utils::{module_for_path, packages_path},
     Exit, ProgramResult,
 };
-use candy_frontend::{ast_to_hir::AstToHir, hir, TracingConfig};
+use candy_frontend::{hir, TracingConfig, TracingMode};
 use candy_vm::{
-    heap::{Data, Handle, HirId, Struct, SymbolId, Tag, Text},
-    mir_to_lir::compile_lir,
+    environment::DefaultEnvironment,
+    heap::{Heap, HirId},
+    mir_to_byte_code::compile_byte_code,
     tracer::stack_trace::StackTracer,
-    StateAfterRunForever, Vm, VmFinished,
+    Vm, VmFinished,
 };
 use clap::{Parser, ValueHint};
 use std::{
-    io::{self, BufRead, Write},
     path::PathBuf,
     rc::Rc,
     time::{Duration, Instant},
 };
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 
 /// Run a Candy program.
 ///
@@ -30,19 +30,26 @@ pub(crate) struct Options {
     /// current working directory will be run.
     #[arg(value_hint = ValueHint::FilePath)]
     path: Option<PathBuf>,
+
+    #[arg(last(true))]
+    arguments: Vec<String>,
 }
 
 pub(crate) fn run(options: Options) -> ProgramResult {
     let packages_path = packages_path();
-    let db = Database::new_with_file_system_module_provider(packages_path);
+    let db = Database::new_with_file_system_module_provider(packages_path.clone());
     let module = module_for_path(options.path)?;
 
-    let tracing = TracingConfig::off();
+    let tracing = TracingConfig {
+        register_fuzzables: TracingMode::Off,
+        calls: TracingMode::All,
+        evaluated_expressions: TracingMode::Off,
+    };
 
     debug!("Running {module}.");
 
     let compilation_start = Instant::now();
-    let lir = Rc::new(compile_lir(&db, module, tracing).0);
+    let byte_code = Rc::new(compile_byte_code(&db, module.clone(), tracing).0);
 
     let compilation_end = Instant::now();
     debug!(
@@ -50,27 +57,23 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         format_duration(compilation_end - compilation_start),
     );
 
-    let VmFinished {
-        mut heap,
-        tracer,
-        result,
-    } = Vm::for_module(&*lir, StackTracer::default()).run_forever_without_handles();
+    let mut heap = Heap::default();
+    let VmFinished { tracer, result } =
+        Vm::for_module(&*byte_code, &mut heap, StackTracer::default())
+            .run_forever_without_handles(&mut heap);
     let exports = match result {
         Ok(exports) => exports,
         Err(panic) => {
             error!("The module panicked: {}", panic.reason);
             error!("{} is responsible.", panic.responsible);
-            if let Some(span) = db.hir_id_to_span(&panic.responsible) {
-                error!("Responsible is at {span:?}.");
-            }
             error!(
                 "This is the stack trace:\n{}",
-                tracer.format(&db, &lir.as_ref().symbol_table),
+                tracer.format(&db, &packages_path),
             );
             return Err(Exit::CodePanicked);
         }
     };
-    let main = match exports.into_main_function(&lir.symbol_table) {
+    let main = match exports.into_main_function(&heap) {
         Ok(main) => main,
         Err(error) => {
             error!("{error}");
@@ -84,68 +87,31 @@ pub(crate) fn run(options: Options) -> ProgramResult {
     );
 
     debug!("Running main function.");
-    // TODO: Add more environment stuff.
-    let stdout = Handle::new(&mut heap, 2);
-    let stdin = Handle::new(&mut heap, 1);
-    let environment = Struct::create_with_symbol_keys(
-        &mut heap,
-        true,
-        [(SymbolId::STDOUT, **stdout), (SymbolId::STDIN, **stdin)],
-    )
-    .into();
+    let (environment_object, mut environment) =
+        DefaultEnvironment::new(&mut heap, &options.arguments);
     let platform = HirId::create(&mut heap, true, hir::Id::platform());
-    let mut vm = Vm::for_function(
-        lir.clone(),
-        heap,
+    let vm = Vm::for_function(
+        byte_code.clone(),
+        &mut heap,
+        platform,
         main,
-        &[environment, platform.into()],
+        &[environment_object, platform.into()],
         StackTracer::default(),
     );
-
-    let result = loop {
-        match vm.run_forever() {
-            StateAfterRunForever::CallingHandle(mut call) => {
-                if call.handle == stdout {
-                    let [message, _responsible] = call.arguments[..] else {
-                        unreachable!()
-                    };
-
-                    match message.into() {
-                        Data::Text(text) => println!("{}", text.get()),
-                        _ => info!("Non-text value sent to stdout: {message:?}"),
-                    }
-                    vm = call.complete(Tag::create_nothing());
-                } else if call.handle == stdin {
-                    let [_responsible] = call.arguments[..] else {
-                        unreachable!()
-                    };
-
-                    io::stdout().flush().unwrap();
-                    let input = {
-                        let stdin = io::stdin();
-                        stdin.lock().lines().next().unwrap().unwrap()
-                    };
-                    let text = Text::create(call.heap(), true, &input);
-                    vm = call.complete(text);
-                } else {
-                    unreachable!()
-                }
-            }
-            StateAfterRunForever::Finished(VmFinished { result, .. }) => match result {
-                Ok(return_value) => {
-                    debug!("The main function returned: {return_value:?}");
-                    break Ok(());
-                }
-                Err(panic) => {
-                    error!("The main function panicked: {}", panic.reason);
-                    error!("{} is responsible.", panic.responsible);
-                    error!(
-                        "This is the stack trace:\n{}",
-                        tracer.format(&db, &lir.as_ref().symbol_table),
-                    );
-                    break Err(Exit::CodePanicked);
-                }
-            },
+    let VmFinished { result, .. } = vm.run_forever_with_environment(&mut heap, &mut environment);
+    let result = match result {
+        Ok(return_value) => {
+            debug!("The main function returned: {return_value:?}");
+            Ok(())
+        }
+        Err(panic) => {
+            error!("The main function panicked: {}", panic.reason);
+            error!("{} is responsible.", panic.responsible);
+            error!(
+                "This is the stack trace:\n{}",
+                tracer.format(&db, &packages_path),
+            );
+            Err(Exit::CodePanicked)
         }
     };
     let execution_end = Instant::now();
@@ -154,7 +120,7 @@ pub(crate) fn run(options: Options) -> ProgramResult {
         format_duration(execution_end - discovery_end),
     );
 
-    drop(lir); // Make sure the LIR is kept around until here.
+    drop(byte_code); // Make sure the byte code is kept around until here.
     result
 }
 

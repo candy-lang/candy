@@ -1,10 +1,7 @@
 use super::{memory::MemoryReference, stack_trace::StackFrameKey, PausedState};
 use crate::database::Database;
 use candy_frontend::hir::{self, Expression, HirDb};
-use candy_vm::heap::{
-    Data, DataDiscriminants, DisplayWithSymbolTable, InlineObject, ObjectInHeap,
-    OrdWithSymbolTable, Tag,
-};
+use candy_vm::heap::{Data, DataDiscriminants, InlineObject, ObjectInHeap, Tag};
 use dap::{
     requests::VariablesArguments,
     responses::VariablesResponse,
@@ -22,7 +19,7 @@ impl PausedState {
     pub fn variables(
         &mut self,
         db: &Database,
-        args: VariablesArguments,
+        args: &VariablesArguments,
         supports_variable_type: bool,
     ) -> VariablesResponse {
         let should_include_indexed = matches!(
@@ -41,11 +38,11 @@ impl PausedState {
         let key = self
             .variables_ids
             .id_to_key(args.variables_reference.try_into().unwrap())
-            .to_owned();
+            .clone();
         let mut variables = vec![];
         match &key {
             VariablesKey::Arguments(stack_frame_key) => {
-                let call = &stack_frame_key.get(self.vm.as_ref().unwrap()).unwrap().call;
+                let call = &stack_frame_key.get(self.vm_ref()).unwrap().call;
                 match Data::from(call.callee) {
                     Data::Function(function) => {
                         if should_include_named {
@@ -53,13 +50,14 @@ impl PausedState {
                                 .vm
                                 .as_ref()
                                 .unwrap()
-                                .lir()
+                                .vm
+                                .byte_code()
                                 .functions_behind(function.body());
                             assert_eq!(functions.len(), 1);
-                            let function = functions.iter().next().unwrap();
+                            let function: &hir::Id = functions.iter().next().unwrap();
 
                             let Expression::Function(hir::Function { parameters, .. }) =
-                                db.find_expression(function.to_owned()).unwrap()
+                                db.find_expression(function.clone()).unwrap()
                             else {
                                 panic!("Function's HIR is not a function: {function}");
                             };
@@ -68,7 +66,7 @@ impl PausedState {
                                 parameters
                                     .iter()
                                     .map(|it| ToString::to_string(&it.keys.last().unwrap()))
-                                    .zip_eq(call.arguments.to_owned())
+                                    .zip_eq(call.arguments.clone())
                                     .skip(start)
                                     .take(count)
                                     .map(|(parameter, argument)| {
@@ -83,7 +81,7 @@ impl PausedState {
                     }
                     Data::Builtin(_) => {
                         if should_include_indexed {
-                            let arguments = call.arguments.to_owned();
+                            let arguments = call.arguments.clone();
                             variables.extend(
                                 arguments[start..].iter().take(count).enumerate().map(
                                     |(index, object)| {
@@ -98,17 +96,11 @@ impl PausedState {
                             );
                         }
                     }
-                    it => panic!(
-                        "Unexpected callee: {}",
-                        DisplayWithSymbolTable::to_string(
-                            &it,
-                            &self.vm.as_ref().unwrap().lir().symbol_table,
-                        ),
-                    ),
+                    it => panic!("Unexpected callee: {it}"),
                 };
             }
             VariablesKey::Locals(stack_frame_key) => {
-                let locals = stack_frame_key.get_locals(self.vm.as_ref().unwrap());
+                let locals = stack_frame_key.get_locals(self.vm_ref());
                 if should_include_named && !locals.is_empty() {
                     let body = db.containing_body_of(locals.first().unwrap().0.clone());
                     let locals = locals
@@ -134,7 +126,7 @@ impl PausedState {
                         .map(|(name, value, count)| {
                             self.create_variable(
                                 if count == *total_name_counts.get(name).unwrap() - 1 {
-                                    name.to_owned()
+                                    name.to_string()
                                 } else {
                                     format!("{name} v{count}")
                                 },
@@ -147,7 +139,7 @@ impl PausedState {
             }
             VariablesKey::Heap => {
                 if should_include_named {
-                    let mut vars = self.vm.as_ref().unwrap().heap().iter().collect_vec();
+                    let mut vars = self.heap_ref().iter().collect_vec();
                     vars.sort_by_key(|it| it.address());
                     variables.extend(vars[start..].iter().take(count).map(|object| {
                         self.create_variable(
@@ -162,10 +154,9 @@ impl PausedState {
                 Data::Tag(Tag::Heap(tag)) => {
                     if should_include_named {
                         if start == 0 && count > 0 {
-                            let symbol_table = &self.vm.as_ref().unwrap().lir().symbol_table;
                             variables.push(Variable {
                                 name: "Symbol".to_string(),
-                                value: symbol_table.get(tag.symbol_id()).to_string(),
+                                value: tag.symbol().get().to_string(),
                                 type_field: if supports_variable_type {
                                     Some("Symbol".to_string())
                                 } else {
@@ -229,33 +220,21 @@ impl PausedState {
                         start = start.saturating_sub(1);
                         count = count.saturating_sub(1);
 
-                        let mut fields = struct_
+                        let fields = struct_
                             .keys()
                             .iter()
                             .copied()
                             .zip_eq(struct_.values().iter().copied())
+                            .sorted()
                             .collect_vec();
-                        let symbol_table = &self.vm.as_ref().unwrap().lir().symbol_table;
-                        fields.sort_by(|a, b| OrdWithSymbolTable::cmp(a, symbol_table, b));
                         variables.extend(fields.into_iter().skip(start).take(count).map(
                             |(key, value)| {
-                                let symbol_table = &self.vm.as_ref().unwrap().lir().symbol_table;
-                                self.create_variable(
-                                    DisplayWithSymbolTable::to_string(&key, symbol_table),
-                                    value,
-                                    supports_variable_type,
-                                )
+                                self.create_variable(key.to_string(), value, supports_variable_type)
                             },
                         ));
                     }
                 }
-                it => panic!(
-                    "Tried to get inner variables of {}.",
-                    DisplayWithSymbolTable::to_string(
-                        &it,
-                        &self.vm.as_ref().unwrap().lir().symbol_table
-                    ),
-                ),
+                it => panic!("Tried to get inner variables of {it}."),
             },
         }
 
@@ -301,10 +280,7 @@ impl PausedState {
 
         Variable {
             name,
-            value: DisplayWithSymbolTable::to_string(
-                &object,
-                &self.vm.as_ref().unwrap().lir().symbol_table,
-            ),
+            value: object.to_string(),
             type_field: Self::type_field_for(data.into(), supports_variable_type),
             presentation_hint: Some(Self::presentation_hint_for(data.into())),
             evaluate_name: None,

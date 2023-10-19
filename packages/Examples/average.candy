@@ -1,4 +1,4 @@
-[int, iterable, list, result] = use "Core"
+[bool, int, iterable, list, result] = use "Core"
 [divideTruncating] = int
 
 average a =

@@ -1,6 +1,6 @@
 use self::tree_with_ids::TreeWithIds;
 pub use self::{
-    error::CstError, id::Id, is_multiline::IsMultiline, kind::CstKind,
+    error::CstError, id::Id, is_multiline::IsMultiline, kind::CstKind, kind::IntRadix,
     unwrap_whitespace_and_comment::UnwrapWhitespaceAndComment,
 };
 use crate::{module::Module, position::Offset, rcst_to_cst::RcstToCst};

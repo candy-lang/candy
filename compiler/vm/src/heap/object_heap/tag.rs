@@ -1,14 +1,13 @@
 use super::{utils::heap_object_impls, HeapObjectTrait};
-use crate::heap::{
-    object_heap::HeapObject,
-    symbol_table::{DisplayWithSymbolTable, OrdWithSymbolTable},
-    Heap, InlineObject, SymbolId, SymbolTable,
+use crate::{
+    heap::{object_heap::HeapObject, Heap, InlineObject, Text},
+    utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
 use derive_more::Deref;
 use rustc_hash::FxHashMap;
 use std::{
     cmp::Ordering,
-    fmt::{self, Debug, Formatter},
+    fmt::{self, Formatter},
     hash::{Hash, Hasher},
     num::NonZeroU64,
     ptr::NonNull,
@@ -19,44 +18,39 @@ use std::{
 pub struct HeapTag(HeapObject);
 
 impl HeapTag {
-    const SYMBOL_ID_SHIFT: usize = 4;
-
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
     pub fn create(
         heap: &mut Heap,
         is_reference_counted: bool,
-        symbol_id: SymbolId,
+        symbol: Text,
         value: impl Into<InlineObject>,
     ) -> Self {
-        let symbol_id = symbol_id.value();
-        debug_assert_eq!(
-            (symbol_id << Self::SYMBOL_ID_SHIFT) >> Self::SYMBOL_ID_SHIFT,
-            symbol_id,
-            "Symbol ID is too large.",
-        );
-
         let value = value.into();
         let tag = Self(heap.allocate(
             HeapObject::KIND_TAG,
             is_reference_counted,
-            (symbol_id as u64) << Self::SYMBOL_ID_SHIFT,
+            0,
             2 * HeapObject::WORD_SIZE,
         ));
         unsafe {
+            *tag.symbol_pointer().as_mut() = symbol.into();
             *tag.value_pointer().as_mut() = value.raw_word().get();
         };
         tag
     }
 
-    pub fn symbol_id(self) -> SymbolId {
-        let header_word = self.header_word();
-        SymbolId::from((header_word >> Self::SYMBOL_ID_SHIFT) as usize)
+    fn symbol_pointer(self) -> NonNull<InlineObject> {
+        self.content_word_pointer(0).cast()
+    }
+    pub fn symbol(self) -> Text {
+        let symbol = unsafe { *self.symbol_pointer().as_ref() };
+        symbol.try_into().unwrap()
     }
 
     fn value_pointer(self) -> NonNull<u64> {
-        self.content_word_pointer(0)
+        self.content_word_pointer(1)
     }
     pub fn value(self) -> InlineObject {
         let value = unsafe { *self.value_pointer().as_ref() };
@@ -64,41 +58,42 @@ impl HeapTag {
     }
 }
 
-impl Debug for HeapTag {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{:?}", self.symbol_id())?;
-
-        write!(f, " ({:?})", self.value())
-    }
-}
-impl DisplayWithSymbolTable for HeapTag {
-    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
+impl DebugDisplay for HeapTag {
+    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         // We can always use the display formatter since the symbol has a constrained charset.
-        write!(f, "{}", symbol_table.get(self.symbol_id()))?;
-        write!(f, " ({})", self.value().to_string(symbol_table))
+        write!(f, "{}", self.symbol().get())?;
+
+        write!(f, " (")?;
+        DebugDisplay::fmt(&self.value(), f, is_debug)?;
+        write!(f, ")")
     }
 }
+impl_debug_display_via_debugdisplay!(HeapTag);
 
 impl Eq for HeapTag {}
 impl PartialEq for HeapTag {
     fn eq(&self, other: &Self) -> bool {
-        self.symbol_id() == other.symbol_id() && self.value() == other.value()
+        self.symbol() == other.symbol() && self.value() == other.value()
     }
 }
 
 impl Hash for HeapTag {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.symbol_id().hash(state);
+        self.symbol().hash(state);
         self.value().hash(state);
     }
 }
 
-impl OrdWithSymbolTable for HeapTag {
-    fn cmp(&self, symbol_table: &SymbolTable, other: &Self) -> Ordering {
-        symbol_table
-            .get(self.symbol_id())
-            .cmp(symbol_table.get(other.symbol_id()))
-            .then_with(|| self.value().cmp(symbol_table, &other.value()))
+impl Ord for HeapTag {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.symbol()
+            .cmp(&other.symbol())
+            .then_with(|| self.value().cmp(&other.value()))
+    }
+}
+impl PartialOrd for HeapTag {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -115,14 +110,17 @@ impl HeapObjectTrait for HeapTag {
         clone: HeapObject,
         address_map: &mut FxHashMap<HeapObject, HeapObject>,
     ) {
+        let symbol = self.symbol().clone_to_heap_with_mapping(heap, address_map);
         let value = self.value().clone_to_heap_with_mapping(heap, address_map);
         let clone = Self(clone);
         unsafe {
+            *clone.symbol_pointer().as_mut() = symbol.into();
             *clone.value_pointer().as_mut() = value.raw_word().get();
         };
     }
 
     fn drop_children(self, heap: &mut Heap) {
+        self.symbol().drop(heap);
         self.value().drop(heap);
     }
 

@@ -1,30 +1,32 @@
 use super::input::Input;
 use crate::coverage::Coverage;
 use candy_frontend::hir::Id;
+use candy_vm::VmFinished;
 use candy_vm::{
-    heap::{
-        DisplayWithSymbolTable, Function, Heap, HirId, InlineObject, InlineObjectSliceCloneToHeap,
-        SymbolTable,
-    },
-    lir::Lir,
+    byte_code::ByteCode,
+    environment::StateAfterRunWithoutHandles,
+    heap::{Function, Heap, HirId, InlineObject, InlineObjectSliceCloneToHeap},
     tracer::stack_trace::StackTracer,
     Panic, Vm,
 };
-use candy_vm::{StateAfterRunWithoutHandles, VmFinished};
 use rustc_hash::FxHashMap;
 use std::borrow::Borrow;
 
-const MAX_INSTRUCTIONS: usize = 1000000;
+const MAX_INSTRUCTIONS: usize = 1_000_000;
 
-pub struct Runner<L: Borrow<Lir>> {
-    pub lir: L,
-    pub vm: Option<Vm<L, StackTracer>>, // Is consumed when the runner is finished.
+pub struct Runner<B: Borrow<ByteCode>> {
+    pub byte_code: B,
+    state: Option<State<B>>,
     pub input: Input,
     pub num_instructions: usize,
     pub coverage: Coverage,
-    pub result: Option<RunResult>,
+}
+enum State<B: Borrow<ByteCode>> {
+    Running { heap: Heap, vm: Vm<B, StackTracer> },
+    Finished(RunResult),
 }
 
+#[must_use]
 pub enum RunResult {
     /// Executing the function with the input took more than `MAX_INSTRUCTIONS`.
     Timeout,
@@ -48,27 +50,25 @@ pub enum RunResult {
     },
 }
 impl RunResult {
-    pub fn to_string(&self, symbol_table: &SymbolTable, call: &str) -> String {
+    #[must_use]
+    pub fn to_string(&self, call: &str) -> String {
         match self {
-            RunResult::Timeout => format!("{call} timed out."),
-            RunResult::Done { return_value, .. } => format!(
-                "{call} returned {}.",
-                DisplayWithSymbolTable::to_string(return_value, symbol_table),
-            ),
-            RunResult::NeedsUnfulfilled { reason } => {
+            Self::Timeout => format!("{call} timed out."),
+            Self::Done { return_value, .. } => format!("{call} returned {return_value}."),
+            Self::NeedsUnfulfilled { reason } => {
                 format!("{call} panicked and it's our fault: {reason}")
             }
-            RunResult::Panicked { panic, .. } => {
+            Self::Panicked { panic, .. } => {
                 format!("{call} panicked internally: {}", panic.reason)
             }
         }
     }
 }
 
-impl<L: Borrow<Lir> + Clone> Runner<L> {
-    pub fn new(lir: L, function: Function, input: Input) -> Self {
+impl<B: Borrow<ByteCode> + Clone> Runner<B> {
+    pub fn new(byte_code: B, function: Function, input: Input) -> Self {
         let mut heap = Heap::default();
-        let num_instructions = lir.borrow().instructions.len();
+        let num_instructions = byte_code.borrow().instructions.len();
 
         let mut mapping = FxHashMap::default();
         let function = function
@@ -81,28 +81,27 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
         arguments.push(HirId::create(&mut heap, true, Id::fuzzer()).into());
 
         let vm = Vm::for_function(
-            lir.clone(),
-            heap,
+            byte_code.clone(),
+            &mut heap,
             function,
             &arguments,
             StackTracer::default(),
         );
 
-        Runner {
-            lir,
-            vm: Some(vm),
+        Self {
+            byte_code,
+            state: Some(State::Running { heap, vm }),
             input,
             num_instructions: 0,
             coverage: Coverage::none(num_instructions),
-            result: None,
         }
     }
 
     pub fn run(&mut self, instructions_left: &mut usize) {
-        assert!(self.vm.is_some());
-        assert!(self.result.is_none());
+        let State::Running { mut heap, mut vm } = self.state.take().unwrap() else {
+            panic!("Runner is not running anymore.");
+        };
 
-        let mut vm = self.vm.take().unwrap();
         while *instructions_left > 0 {
             if let Some(ip) = vm.next_instruction() {
                 self.coverage.add(ip);
@@ -110,22 +109,20 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
             self.num_instructions += 1;
             *instructions_left -= 1;
 
-            match vm.run_without_handles() {
+            match vm.run_without_handles(&mut heap) {
                 StateAfterRunWithoutHandles::Running(new_vm) => vm = new_vm,
                 StateAfterRunWithoutHandles::Finished(VmFinished {
-                    heap,
                     result: Ok(return_value),
                     ..
                 }) => {
-                    self.result = Some(RunResult::Done { heap, return_value });
-                    break;
+                    self.state = Some(State::Finished(RunResult::Done { heap, return_value }));
+                    return;
                 }
                 StateAfterRunWithoutHandles::Finished(VmFinished {
-                    heap,
                     tracer,
                     result: Err(panic),
                 }) => {
-                    self.result = Some(if panic.responsible == Id::fuzzer() {
+                    let result = if panic.responsible == Id::fuzzer() {
                         RunResult::NeedsUnfulfilled {
                             reason: panic.reason,
                         }
@@ -135,14 +132,26 @@ impl<L: Borrow<Lir> + Clone> Runner<L> {
                             tracer,
                             panic,
                         }
-                    });
-                    break;
+                    };
+                    self.state = Some(State::Finished(result));
+                    return;
                 }
             }
 
             if self.num_instructions > MAX_INSTRUCTIONS {
-                self.result = Some(RunResult::Timeout)
+                self.state = Some(State::Finished(RunResult::Timeout));
             }
+        }
+        self.state = Some(State::Running { heap, vm });
+    }
+
+    pub fn take_result(&mut self) -> Option<RunResult> {
+        match self.state.take().unwrap() {
+            running @ State::Running { .. } => {
+                self.state = Some(running);
+                None
+            }
+            State::Finished(result) => Some(result),
         }
     }
 }

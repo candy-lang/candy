@@ -6,7 +6,6 @@ use crate::{
     module::{Module, ModuleKind, Package},
     rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr, TokenType},
 };
-
 use derive_more::From;
 use enumset::EnumSet;
 use itertools::Itertools;
@@ -150,7 +149,7 @@ impl Id {
     /// An ID that can be used to blame the tooling. For example, when calling
     /// the `main` function, we want to be able to blame the platform for
     /// passing a wrong environment.
-    fn tooling(name: String) -> Self {
+    const fn tooling(name: String) -> Self {
         Self {
             module: Module {
                 package: Package::Tooling(name),
@@ -180,17 +179,6 @@ impl Id {
     #[must_use]
     pub fn dummy() -> Self {
         Self::tooling("dummy".to_string())
-    }
-    /// TODO: Currently, when a higher-order function calls a function passed as
-    /// a parameter, that's registered as a normal call instruction, making the
-    /// callsite in the higher-order function responsible for the successful
-    /// fulfillment of the passed function's `needs`. We probably want to change
-    /// how that works so that the caller of the higher-order function is at
-    /// fault when passing a panicking function. After we did that, we should be
-    /// able to remove this ID.
-    #[must_use]
-    pub fn complicated_responsibility() -> Self {
-        Self::tooling("complicated-responsibility".to_string())
     }
 
     #[must_use]
@@ -347,7 +335,6 @@ pub enum Expression {
         reason: Id,
     },
     Error {
-        child: Option<Id>,
         errors: Vec<CompilerError>,
     },
 }
@@ -398,7 +385,6 @@ pub enum Pattern {
     Struct(Vec<(Pattern, Pattern)>),
     Or(Vec<Pattern>),
     Error {
-        child: Option<Box<Pattern>>,
         errors: Vec<CompilerError>,
     },
 }
@@ -422,10 +408,7 @@ impl Pattern {
                 .iter()
                 .any(|(_, value_pattern)| value_pattern.contains_captured_identifiers()),
             Self::Or(patterns) => patterns.first().unwrap().contains_captured_identifiers(),
-            Self::Error { child, .. } => child
-                .as_ref()
-                .map(|child| child.contains_captured_identifiers())
-                .unwrap_or_default(),
+            Self::Error { .. } => false,
         }
     }
     pub fn captured_identifier_count(&self) -> usize {
@@ -446,15 +429,7 @@ impl Pattern {
             // If the number or captured identifiers isn't the same in both
             // sides, the pattern is invalid and the generated code will panic.
             Self::Or(patterns) => patterns.first().unwrap().captured_identifier_count(),
-            Self::Error { child, .. } => {
-                // Since generated code panics in this case, it doesn't matter
-                // whether the child captured any identifiers since they can't
-                // be accessed anyway.
-                child
-                    .as_ref()
-                    .map(|child| child.captured_identifier_count())
-                    .unwrap_or_default()
-            }
+            Self::Error { .. } => 0,
         }
     }
 
@@ -499,14 +474,45 @@ impl Pattern {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Function {
     pub parameters: Vec<Id>,
     pub body: Body,
-    pub fuzzable: bool,
+    pub kind: FunctionKind,
+}
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum FunctionKind {
+    /// A normal function (e.g., `foo a = …`).
+    Normal,
+
+    /// The generated use function, which is not fuzzable but otherwise behaves
+    /// like a normal function (i.e., it passes on its responsibility
+    /// parameter).
+    Use,
+
+    /// A function defined using curly braces (e.g., `foo = { a -> … }`).
+    CurlyBraces,
+}
+impl FunctionKind {
+    #[must_use]
+    pub const fn is_fuzzable(self) -> bool {
+        match self {
+            Self::Normal => true,
+            Self::Use | Self::CurlyBraces => false,
+        }
+    }
+    /// For functions with curly braces, whoever is responsible for `needs` in
+    /// the outer scope is also responsible for `needs` in this function.
+    #[must_use]
+    pub const fn uses_own_responsibility(self) -> bool {
+        match self {
+            Self::Normal | Self::Use => true,
+            Self::CurlyBraces => false,
+        }
+    }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, Eq, Default, PartialEq)]
 pub struct Body {
     pub expressions: LinkedHashMap<Id, Expression>,
     pub identifiers: FxHashMap<Id, String>,
@@ -518,7 +524,7 @@ impl Hash for Body {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum HirError {
     NeedsWithWrongNumberOfArguments { num_args: usize },
     PatternContainsCall,
@@ -605,10 +611,10 @@ impl ToRichIr for Expression {
                 builder.push(
                     format!(
                         "{{ ({}) ",
-                        if function.fuzzable {
-                            "fuzzable"
-                        } else {
-                            "non-fuzzable"
+                        match function.kind {
+                            FunctionKind::Normal => "fuzzable",
+                            FunctionKind::Use => "non-fuzzable, but passes on responsibility",
+                            FunctionKind::CurlyBraces => "non-fuzzable",
                         },
                     ),
                     None,
@@ -645,8 +651,8 @@ impl ToRichIr for Expression {
                 builder.push(" with reason ", None, EnumSet::empty());
                 reason.build_rich_ir(builder);
             }
-            Self::Error { child, errors } => {
-                build_errors_rich_ir(builder, errors, child);
+            Self::Error { errors } => {
+                build_errors_rich_ir(builder, errors);
             }
         }
     }
@@ -658,7 +664,7 @@ impl ToRichIr for Pattern {
                 builder.push(format!("{int}"), TokenType::Int, EnumSet::empty());
             }
             Self::Text(text) => {
-                builder.push(format!(r#""{text:?}\""#), TokenType::Text, EnumSet::empty());
+                builder.push(format!(r#""{text}""#), TokenType::Text, EnumSet::empty());
             }
             Self::NewIdentifier(reference) => reference.build_rich_ir(builder),
             Self::Tag { symbol, value } => {
@@ -691,17 +697,13 @@ impl ToRichIr for Pattern {
                 builder.push("]", None, EnumSet::empty());
             }
             Self::Or(patterns) => builder.push_children(patterns, " | "),
-            Self::Error { child, errors } => {
-                build_errors_rich_ir(builder, errors, child);
+            Self::Error { errors } => {
+                build_errors_rich_ir(builder, errors);
             }
         }
     }
 }
-fn build_errors_rich_ir<C: ToRichIr>(
-    builder: &mut RichIrBuilder,
-    errors: &[CompilerError],
-    child: &Option<C>,
-) {
+fn build_errors_rich_ir(builder: &mut RichIrBuilder, errors: &[CompilerError]) {
     builder.push(
         if errors.len() == 1 { "error" } else { "errors" },
         None,
@@ -709,13 +711,6 @@ fn build_errors_rich_ir<C: ToRichIr>(
     );
     builder.push_foldable(|builder| {
         builder.push_children_multiline(errors);
-        if let Some(child) = child {
-            builder.indent();
-            builder.push_newline();
-            builder.push("fallback: ", None, EnumSet::empty());
-            child.build_rich_ir(builder);
-            builder.dedent();
-        }
     });
 }
 impl ToRichIr for Function {

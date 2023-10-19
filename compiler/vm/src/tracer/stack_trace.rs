@@ -1,8 +1,15 @@
 use super::Tracer;
-use crate::heap::{DisplayWithSymbolTable, Heap, HirId, InlineObject, SymbolTable};
-use candy_frontend::{ast_to_hir::AstToHir, cst::CstKind, position::PositionConversionDb};
+use crate::heap::{Heap, HirId, InlineObject, ToDebugText};
+use candy_frontend::{
+    ast_to_hir::AstToHir,
+    cst::CstKind,
+    format::{MaxLength, Precedence},
+    module::PackagesPath,
+    position::{PositionConversionDb, RangeOfPosition},
+};
 use itertools::Itertools;
 use pad::PadStr;
+use std::{env::current_dir, path::Path};
 
 #[derive(Debug, Default)]
 pub struct StackTracer {
@@ -14,6 +21,7 @@ pub struct StackTracer {
 
 #[derive(Clone, Debug)]
 pub struct Call {
+    pub call_site: HirId,
     pub callee: InlineObject,
     pub arguments: Vec<InlineObject>,
 }
@@ -36,10 +44,15 @@ impl Tracer for StackTracer {
     fn call_started(
         &mut self,
         heap: &mut Heap,
+        call_site: HirId,
         callee: InlineObject,
         arguments: Vec<InlineObject>,
     ) {
-        let call = Call { callee, arguments };
+        let call = Call {
+            call_site,
+            callee,
+            arguments,
+        };
         call.dup(heap);
         self.call_stack.push(call);
     }
@@ -49,55 +62,17 @@ impl Tracer for StackTracer {
 }
 
 impl StackTracer {
-    pub fn format<DB>(&self, db: &DB, symbol_table: &SymbolTable) -> String
+    pub fn format<DB>(&self, db: &DB, packages_path: &PackagesPath) -> String
     where
         DB: AstToHir + PositionConversionDb,
     {
-        let mut caller_locations_and_calls = vec![];
-
-        for Call {
-            callee, arguments, ..
-        } in self.call_stack.iter().rev()
-        {
-            let call_site: HirId = match arguments.last().copied() {
-                Some(responsible) => responsible.try_into().unwrap(),
-                None => {
-                    continue; // Call of a module.
-                }
-            };
-            let call_site = call_site.get().clone();
-
-            let module = call_site.module.clone();
-            let cst_id = if module.package.is_tooling() {
-                None
-            } else {
-                db.hir_to_cst_id(&call_site)
-            };
-            let cst = cst_id.map(|id| db.find_cst(module.clone(), id));
-            let span = cst.map(|cst| db.range_to_positions(module.clone(), cst.data.span));
-            let caller_location_string = format!(
-                "{call_site} {}",
-                span.map(|it| format!(
-                    "{}:{} – {}:{}",
-                    it.start.line, it.start.character, it.end.line, it.end.character,
-                ))
-                .unwrap_or_else(|| "<no location>".to_owned()),
-            );
-            let call_string = format!(
-                "{} {}",
-                cst_id
-                    .and_then(|id| {
-                        let cst = db.find_cst(call_site.module.clone(), id);
-                        match cst.kind {
-                            CstKind::Call { receiver, .. } => extract_receiver_name(&receiver),
-                            _ => None,
-                        }
-                    })
-                    .unwrap_or_else(|| DisplayWithSymbolTable::to_string(callee, symbol_table)),
-                arguments.iter().map(|arg| format!("{arg:?}")).join(" "),
-            );
-            caller_locations_and_calls.push((caller_location_string, call_string));
-        }
+        let current_package_path = current_dir().ok(); // current_package.to_path(packages_path).unwrap();
+        let caller_locations_and_calls = self
+            .call_stack
+            .iter()
+            .rev()
+            .map(|it| Self::format_call(db, packages_path, current_package_path.as_deref(), it))
+            .collect_vec();
 
         let longest_location = caller_locations_and_calls
             .iter()
@@ -110,12 +85,83 @@ impl StackTracer {
             .map(|(location, call)| format!("{} {}", location.pad_to_width(longest_location), call))
             .join("\n")
     }
+
+    fn format_call<DB>(
+        db: &DB,
+        packages_path: &PackagesPath,
+        current_directory: Option<&Path>,
+        call: &Call,
+    ) -> (String, String)
+    where
+        DB: AstToHir + PositionConversionDb,
+    {
+        let Call {
+            call_site,
+            callee,
+            arguments,
+            ..
+        } = call;
+
+        let hir_id = call_site.get();
+        let module = hir_id.module.clone();
+        let cst_id = if module.package.is_tooling() {
+            None
+        } else {
+            db.hir_to_cst_id(hir_id)
+        };
+
+        let span_string = cst_id.map(|id| {
+            let cst = db.find_cst(module.clone(), id);
+            db.range_to_positions(module.clone(), cst.data.span)
+                .format()
+        });
+        #[allow(clippy::map_unwrap_or)]
+        let caller_location_string = hir_id
+            .module
+            .try_to_path(packages_path)
+            .map(|path| {
+                current_directory
+                    .and_then(|it| path.strip_prefix(it).ok())
+                    .unwrap_or(&path)
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .map(|path| {
+                span_string
+                    .as_deref()
+                    .map(|span_string| format!("{path}:{span_string}"))
+                    .unwrap_or(path)
+            })
+            .unwrap_or_else(|| {
+                span_string
+                    .map(|span_string| format!("{hir_id}  {span_string}"))
+                    .unwrap_or_else(|| hir_id.to_string())
+            });
+
+        let call_string = format!(
+            "{} {}",
+            cst_id
+                .and_then(|id| {
+                    let cst = db.find_cst(hir_id.module.clone(), id);
+                    match cst.kind {
+                        CstKind::Call { receiver, .. } => extract_receiver_name(&receiver),
+                        _ => None,
+                    }
+                })
+                .unwrap_or_else(|| callee.to_string()),
+            arguments
+                .iter()
+                .map(|it| it.to_debug_text(Precedence::High, MaxLength::Unlimited))
+                .join(" "),
+        );
+        (caller_location_string, call_string)
+    }
 }
 
 fn extract_receiver_name(cst_kind: &CstKind) -> Option<String> {
     match cst_kind {
         CstKind::TrailingWhitespace { child, .. } => extract_receiver_name(child),
-        CstKind::Identifier(identifier) => Some(ToString::to_string(identifier)),
+        CstKind::Identifier(identifier) => Some(identifier.to_string()),
         CstKind::Parenthesized { inner, .. } => extract_receiver_name(inner),
         CstKind::StructAccess { struct_, key, .. } => {
             let struct_string = extract_receiver_name(struct_)?;

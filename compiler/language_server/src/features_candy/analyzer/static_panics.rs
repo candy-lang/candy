@@ -49,7 +49,7 @@ impl StaticPanicsOfExpression for Expression {
     ) {
         let referenced = self.referenced_ids();
         match self {
-            Expression::Function {
+            Self::Function {
                 parameters, body, ..
             } => {
                 parameters
@@ -57,8 +57,8 @@ impl StaticPanicsOfExpression for Expression {
                     .map(|responsible| referenced.contains(responsible))
                     .unwrap_or(true);
 
-                for parameter in parameters.iter() {
-                    visible.insert(*parameter, Expression::Parameter);
+                for parameter in &*parameters {
+                    visible.insert(*parameter, Self::Parameter);
                 }
 
                 body.collect_static_panics(visible, panics, is_fuzzable);
@@ -67,17 +67,17 @@ impl StaticPanicsOfExpression for Expression {
                     visible.remove(*parameter);
                 }
             }
-            Expression::Panic {
+            Self::Panic {
                 reason,
                 responsible,
             } if is_fuzzable => {
                 let reason = visible.get(*reason);
                 let responsible = visible.get(*responsible);
 
-                let Expression::Text(reason) = reason else {
+                let Self::Text(reason) = reason else {
                     return;
                 };
-                let Expression::HirId(responsible) = responsible else {
+                let Self::HirId(responsible) = responsible else {
                     return;
                 };
 

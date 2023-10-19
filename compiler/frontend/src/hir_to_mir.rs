@@ -308,7 +308,7 @@ impl<'a> LoweringContext<'a> {
             hir::Expression::Function(hir::Function {
                 parameters: original_parameters,
                 body: original_body,
-                fuzzable,
+                kind,
             }) => {
                 let function =
                     body.push_function(hir_id.clone(), |function, responsible_parameter| {
@@ -317,7 +317,7 @@ impl<'a> LoweringContext<'a> {
                             self.mapping.insert(original_parameter.clone(), parameter);
                         }
 
-                        let responsible = if *fuzzable {
+                        let responsible = if kind.uses_own_responsibility() {
                             responsible_parameter
                         } else {
                             // This is a function with curly braces, so whoever is responsible
@@ -329,7 +329,7 @@ impl<'a> LoweringContext<'a> {
                         self.compile_expressions(function, responsible, &original_body.expressions);
                     });
 
-                if self.tracing.register_fuzzables.is_enabled() && *fuzzable {
+                if self.tracing.register_fuzzables.is_enabled() && kind.is_fuzzable() {
                     let hir_definition = body.push(Expression::HirId(hir_id.clone()));
                     body.push(Expression::TraceFoundFuzzableFunction {
                         hir_definition,
@@ -743,9 +743,8 @@ impl PatternLoweringContext {
                 }
                 result
             }
-            hir::Pattern::Error { child, errors } => {
-                let result = body.compile_errors(self.responsible, errors);
-                child.as_ref().map_or(result, |child| self.compile(body, expression, child))
+            hir::Pattern::Error { errors } => {
+                body.compile_errors(self.responsible, errors)
             }
         }
     }

@@ -1,6 +1,6 @@
 # 🍭 Candy
 
-A sweet programming language that is robust, minimalistic, and expressive.
+A sweet, functional programming language that is robust, minimalistic, and expressive.
 
 Many programming languages have a strict separation between compile-time and runtime errors.
 Sometimes, this border can seem arbitrary:
@@ -20,7 +20,7 @@ In fact, we try to show more errors than typical statically typed languages.
   ```candy
   3                   # int
   "Candy"             # text
-  Green               # symbol
+  Green               # symbol (uppercase)
   (Foo, Bar)          # list
   [Name: "Candy"]     # struct
   { it -> add it 2 }  # function
@@ -31,9 +31,10 @@ In fact, we try to show more errors than typical statically typed languages.
   The syntax is indentation-aware.
 
   ```candy
-  foo = 42
-  println message =
-    print message
+  # I'm a comment
+  foo = 42                # variable (lowercase)
+  println message =       # function
+    print message         # function call
     print "\n"
   println "Hello, world!"
   ```
@@ -77,12 +78,14 @@ We already have a language server that provides some tooling.
 
 ## How to use Candy
 
-1. Install [<img height="16" src="https://rust-lang.org/static/images/favicon.svg"> Rust](https://rust-lang.org): https://www.rust-lang.org/tools/install.
-2. Clone this repo.
-3. Open the workspace (`compiler.code-workspace`) in VS Code.
-4. In the VS Code settings (JSON), add the following: `"candy.languageServerCommand": "cargo run --manifest-path <path-to-the-candy-folder>/compiler/cli/Cargo.toml -- lsp"`.  
-   If you want to write code in 🍭 Candy (as opposed to working on the compiler), you should also add `--release` before the standalone `--`.
-   This makes the IDE tooling faster, but startup will take longer.
-5. Run `npm install` inside `vscode_extension/`.
-6. Run the launch config “Run Extension (VS Code Extension)”.
-7. In the new VS Code window that opens, you can enjoy 🍭 Candy :)
+1. Install [<img height="16" src="https://rust-lang.org/static/images/favicon.svg"> Rust](https://rust-lang.org): [rust-lang.org/tools/install](https://rust-lang.org/tools/install) (use rustup, since we use nightly features).
+2. Install [<img height="16" src="https://code.visualstudio.com/favicon.ico"> Visual Studio Code (VS Code)](https://code.visualstudio.com): [code.visualstudio.com/download](https://code.visualstudio.com/download).
+3. Clone this repo.
+4. Open the workspace (`compiler.code-workspace`) in VS Code.
+5. Install the recommended VSCode extensions.
+6. Run `npm install` inside `vscode_extension/`.
+7. Run the launch config “Run Extension (VS Code Extension)”.
+8. In the new VS Code window that opens, you can enjoy 🍭 Candy :)
+
+If you are working on the Rust code itself, you might want to disable the release mode for quicker compilation:
+In the VS Code settings (JSON), add the following: `"candy.languageServerCommand": "cargo run --manifest-path <path-to-the-candy-folder>/compiler/cli/Cargo.toml -- lsp"`.

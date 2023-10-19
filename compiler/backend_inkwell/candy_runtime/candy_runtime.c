@@ -55,7 +55,12 @@ void print_candy_value(const candy_value_t *value)
         printf("%s", value->value.text);
         break;
     case CANDY_TYPE_TAG:
-        printf("%s", value->value.text);
+        printf("%s", value->value.tag.text);
+        if (value->value.tag.value)
+        {
+            printf(" ");
+            print_candy_value(value->value.tag.value);
+        }
         break;
     case CANDY_TYPE_LIST:
         printf("(");
@@ -135,11 +140,12 @@ candy_value_t *make_candy_text(char *text)
     return candy_value;
 }
 
-candy_value_t *make_candy_tag(char *tag)
+candy_value_t *make_candy_tag(char *tag, candy_value_t *value)
 {
     candy_value_t *candy_value = malloc(sizeof(candy_value_t));
-    candy_value->value.text = malloc(sizeof(char) * (strlen(tag) + 1));
-    strcpy(candy_value->value.text, tag);
+    candy_value->value.tag.text = malloc(sizeof(char) * (strlen(tag) + 1));
+    strcpy(candy_value->value.tag.text, tag);
+    candy_value->value.tag.value = value;
     candy_value->type = CANDY_TYPE_TAG;
     return candy_value;
 }

@@ -18,7 +18,7 @@ use std::{
 pub struct HeapInt(HeapObject);
 
 impl HeapInt {
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
     pub fn create(heap: &mut Heap, is_reference_counted: bool, value: BigInt) -> Self {
@@ -52,9 +52,9 @@ impl HeapInt {
         Int::create_from_bigint(heap, true, self.get().mod_floor(rhs))
     }
 
-    pub fn compare_to(self, rhs: &BigInt) -> Tag {
+    pub fn compare_to(self, heap: &Heap, rhs: &BigInt) -> Tag {
         // PERF: Add manual check if the `rhs` is an [InlineInt]?
-        Tag::create_ordering(self.get().cmp(rhs))
+        Tag::create_ordering(heap, self.get().cmp(rhs))
     }
 
     operator_fn!(shift_left, Shl, shl);
@@ -105,7 +105,7 @@ impl HeapObjectTrait for HeapInt {
         _address_map: &mut FxHashMap<HeapObject, HeapObject>,
     ) {
         let clone = Self(clone);
-        let value = self.get().to_owned();
+        let value = self.get().clone();
         unsafe { ptr::write(clone.int_pointer().as_ptr(), value) };
     }
 

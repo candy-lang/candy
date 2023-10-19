@@ -3,9 +3,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
     ast::{
-        self, Assignment, AssignmentBody, Ast, AstError, AstKind, AstString, Call, Function,
-        Identifier, Int, List, Match, MatchCase, OrPattern, Struct, StructAccess, Symbol, Text,
-        TextPart,
+        self, Assignment, AssignmentBody, Ast, AstError, AstKind, AstString, Call, CollectErrors,
+        Function, Identifier, Int, List, Match, MatchCase, OrPattern, Struct, StructAccess, Symbol,
+        Text, TextPart,
     },
     cst::{self, Cst, CstDb, CstKind, UnwrapWhitespaceAndComment},
     error::{CompilerError, CompilerErrorPayload},
@@ -27,7 +27,7 @@ pub trait CstToAst: CstDb + RcstToCst {
     fn ast_id_to_display_span(&self, id: &ast::Id) -> Option<Range<Offset>>;
 
     #[salsa::transparent]
-    fn cst_to_ast_id(&self, module: Module, id: cst::Id) -> Vec<ast::Id>;
+    fn cst_to_ast_ids(&self, module: Module, id: cst::Id) -> Vec<ast::Id>;
 
     fn ast(&self, module: Module) -> AstResult;
 }
@@ -47,12 +47,13 @@ fn ast_id_to_display_span(db: &dyn CstToAst, id: &ast::Id) -> Option<Range<Offse
     Some(db.find_cst(id.module.clone(), cst_id).display_span())
 }
 
-fn cst_to_ast_id(db: &dyn CstToAst, module: Module, id: cst::Id) -> Vec<ast::Id> {
+fn cst_to_ast_ids(db: &dyn CstToAst, module: Module, id: cst::Id) -> Vec<ast::Id> {
     if let Ok((_, ast_to_cst_id_mapping)) = db.ast(module) {
         ast_to_cst_id_mapping
             .iter()
             .filter_map(|(key, value)| if value == &id { Some(key) } else { None })
             .cloned()
+            .sorted()
             .collect_vec()
     } else {
         vec![]
@@ -112,9 +113,10 @@ impl LoweringContext {
             | CstKind::SingleQuote
             | CstKind::DoubleQuote
             | CstKind::Percent
-            | CstKind::Octothorpe => {
-                self.create_error_ast(cst, None, AstError::UnexpectedPunctuation)
-            }
+            | CstKind::Octothorpe => self.create_error_ast(
+                cst,
+                vec![self.create_error(cst, AstError::UnexpectedPunctuation)],
+            ),
             CstKind::Whitespace(_)
             | CstKind::Newline(_)
             | CstKind::Comment { .. }
@@ -122,18 +124,11 @@ impl LoweringContext {
                 panic!("Whitespace should have been removed before lowering to AST.")
             }
             CstKind::Identifier(identifier) => {
-                let string = self.create_string(cst.data.id, identifier.to_string());
-                let mut kind = AstKind::Identifier(Identifier(string));
                 if lowering_type == LoweringType::PatternLiteralPart {
-                    kind = AstKind::Error {
-                        child: None,
-                        errors: vec![self.create_error(
-                            cst,
-                            AstError::PatternLiteralPartContainsInvalidExpression,
-                        )],
-                    };
+                    return self.create_ast_for_invalid_expression_in_pattern(cst);
                 };
-                self.create_ast(cst.data.id, kind)
+                let string = self.create_string(cst.data.id, identifier.to_string());
+                self.create_ast(cst.data.id, Identifier(string))
             }
             CstKind::Symbol(symbol) => {
                 let string = self.create_string(cst.data.id, symbol.to_string());
@@ -160,14 +155,15 @@ impl LoweringContext {
                     _ => panic!("Text needs to start with any number of single quotes followed by a double quote, but started with {}.", opening)
                 };
 
-                let mut lowered_parts = vec![];
-                for part in parts {
+                let lowered_parts = parts.iter().filter_map(|part| {
                     match &part.kind {
+                        CstKind::TextNewline(_) => {
+                            let newline = self.create_string(part.data.id, "\n".to_string());
+                            Some(self.create_ast(part.data.id, AstKind::TextPart(TextPart(newline))))
+                        },
                         CstKind::TextPart(text) => {
                             let string = self.create_string(part.data.id, text.clone());
-                            let text_part =
-                                self.create_ast(part.data.id, TextPart(string));
-                            lowered_parts.push(text_part);
+                            Some(self.create_ast(part.data.id, AstKind::TextPart(TextPart(string))))
                         },
                         CstKind::TextInterpolation {
                             opening_curly_braces,
@@ -175,7 +171,7 @@ impl LoweringContext {
                             closing_curly_braces,
                         } => {
                             if lowering_type != LoweringType::Expression {
-                                return self.create_ast_for_invalid_expression_in_pattern(cst);
+                                return Some(self.create_ast_for_invalid_expression_in_pattern(cst));
                             };
 
                             if opening_curly_braces.len() != (opening_single_quote_count + 1)
@@ -191,27 +187,23 @@ impl LoweringContext {
                             }
 
                             let ast = self.lower_cst(expression, LoweringType::Expression);
-
                             if closing_curly_braces.len() == opening_single_quote_count + 1
                                 && closing_curly_braces
                                     .iter()
                                     .all(|closing_curly_brace| closing_curly_brace.kind.is_closing_curly_brace())
                             {
-                                lowered_parts.push(ast);
+                                Some(ast)
                             } else {
-                                let error = self.create_error_ast(
+                                errors.push(self.create_error(
                                     part,
-                                    ast,
                                     AstError::TextInterpolationMissesClosingCurlyBraces,
-                                );
-                                lowered_parts.push(error);
+                                ));
+                                None
                             }
                         },
-                        CstKind::Error { error, .. } => errors.push(self.create_error(part, *error)),
-                        _ => panic!("Text contains non-TextPart. Whitespaces should have been removed already."),
+                        _ => panic!("TextLine contains non-TextPart. Whitespaces should have been removed already."),
                     }
-                }
-                let text = self.create_ast(cst.data.id, Text(lowered_parts));
+                }).collect_vec();
 
                 if !matches!(
                     &closing.kind,
@@ -229,10 +221,11 @@ impl LoweringContext {
                     errors.push(self.create_error(closing, AstError::TextMissesClosingQuote));
                 }
 
-                self.wrap_in_errors(cst.data.id, text, errors)
+                self.create_errors_or_ast(cst, errors, Text(lowered_parts))
             }
             CstKind::OpeningText { .. } => panic!("OpeningText should only occur in Text."),
             CstKind::ClosingText { .. } => panic!("ClosingText should only occur in Text."),
+            CstKind::TextNewline(_) => panic!("TextNewline should only occur in Text."),
             CstKind::TextPart(_) => panic!("TextPart should only occur in Text."),
             CstKind::TextInterpolation { .. } => {
                 panic!("TextInterpolation should only occur in Text.")
@@ -294,8 +287,6 @@ impl LoweringContext {
                         patterns.push(self.lower_cst(left, LoweringType::Pattern));
                         patterns.reverse();
 
-                        let mut errors = vec![];
-
                         let captured_identifiers = patterns
                             .iter()
                             .map(|it| it.captured_identifiers())
@@ -304,6 +295,7 @@ impl LoweringContext {
                             .iter()
                             .flat_map(HashMap::keys)
                             .collect::<FxHashSet<_>>();
+                        let mut errors = vec![];
                         for identifier in all_identifiers {
                             let number_of_missing_captures = captured_identifiers
                                 .iter()
@@ -330,8 +322,7 @@ impl LoweringContext {
                             ));
                         }
 
-                        let ast = self.create_ast(cst.data.id, OrPattern(patterns));
-                        self.wrap_in_errors(cst.data.id, ast, errors)
+                        self.create_errors_or_ast(cst, errors, OrPattern(patterns))
                     }
                 }
             }
@@ -343,25 +334,29 @@ impl LoweringContext {
                 match lowering_type {
                     LoweringType::Expression => {}
                     LoweringType::Pattern | LoweringType::PatternLiteralPart => {
-                        return self.create_error_ast(cst, None, AstError::ParenthesizedInPattern);
+                        return self.create_error_ast(
+                            cst,
+                            vec![self.create_error(cst, AstError::ParenthesizedInPattern)],
+                        );
                     }
                 }
-
-                let mut ast = self.lower_cst(inner, LoweringType::Expression);
 
                 assert!(
                     opening_parenthesis.kind.is_opening_parenthesis(),
                     "Parenthesized needs to start with opening parenthesis, but started with {opening_parenthesis}.",
                 );
+
+                let inner = self.lower_cst(inner, LoweringType::Expression);
+
+                let mut errors = vec![];
                 if !closing_parenthesis.kind.is_closing_parenthesis() {
-                    ast = self.create_error_ast(
+                    errors.push(self.create_error(
                         closing_parenthesis,
-                        ast,
                         AstError::ParenthesizedMissesClosingParenthesis,
-                    );
+                    ));
                 }
 
-                ast
+                self.create_errors_or_use_ast(cst, errors, inner)
             }
             CstKind::Call {
                 receiver,
@@ -380,15 +375,12 @@ impl LoweringContext {
                                 "Parenthesized needs to start with opening parenthesis, but started with {opening_parenthesis}.",
                             );
                             if !closing_parenthesis.kind.is_closing_parenthesis() {
-                                return self.create_ast(
-                                    closing_parenthesis.data.id,
-                                    AstKind::Error {
-                                        child: None,
-                                        errors: vec![self.create_error(
-                                            closing_parenthesis,
-                                            AstError::ParenthesizedMissesClosingParenthesis,
-                                        )],
-                                    },
+                                return self.create_error_ast(
+                                    closing_parenthesis,
+                                    vec![self.create_error(
+                                        cst,
+                                        AstError::ParenthesizedMissesClosingParenthesis,
+                                    )],
                                 );
                             }
                             &inner.kind
@@ -413,14 +405,13 @@ impl LoweringContext {
                 items,
                 closing_parenthesis,
             } => {
-                let mut errors = vec![];
-
                 if lowering_type == LoweringType::PatternLiteralPart {
-                    errors.push(
-                        self.create_error(
+                    return self.create_error_ast(
+                        cst,
+                        vec![self.create_error(
                             cst,
                             AstError::PatternLiteralPartContainsInvalidExpression,
-                        ),
+                        )],
                     );
                 };
 
@@ -430,6 +421,7 @@ impl LoweringContext {
                 );
 
                 let mut ast_items = vec![];
+                let mut errors = vec![];
                 if items.len() == 1 && items[0].kind.is_comma() {
                     // Empty list (`(,)`), do nothing.
                 } else {
@@ -439,14 +431,13 @@ impl LoweringContext {
                             continue;
                         };
 
-                        let mut value = self.lower_cst(&value.clone(), lowering_type);
+                        let value = self.lower_cst(&value.clone(), lowering_type);
 
                         if let Some(comma) = comma && !comma.kind.is_comma() {
-                            value = self.create_error_ast(
+                            errors.push(self.create_error(
                                 comma,
-                                value,
                                 AstError::ListItemMissesComma,
-                            );
+                            ));
                         }
 
                         ast_items.push(value);
@@ -462,8 +453,7 @@ impl LoweringContext {
                     );
                 }
 
-                let ast = self.create_ast(cst.data.id, List(ast_items));
-                self.wrap_in_errors(cst.data.id, ast, errors)
+                self.create_errors_or_ast(cst, errors, List(ast_items))
             }
             CstKind::ListItem { .. } => panic!("ListItem should only appear in List."),
             CstKind::Struct {
@@ -471,15 +461,8 @@ impl LoweringContext {
                 fields,
                 closing_bracket,
             } => {
-                let mut errors = vec![];
-
                 if lowering_type == LoweringType::PatternLiteralPart {
-                    errors.push(
-                        self.create_error(
-                            cst,
-                            AstError::PatternLiteralPartContainsInvalidExpression,
-                        ),
-                    );
+                    return self.create_ast_for_invalid_expression_in_pattern(cst);
                 };
 
                 assert!(
@@ -487,71 +470,69 @@ impl LoweringContext {
                     "Struct should always have an opening bracket, but instead had {opening_bracket}.",
                 );
 
-                let fields = fields
-                    .iter()
-                    .filter_map(|field| {
-                        let CstKind::StructField {
-                            key_and_colon,
-                            value,
-                            comma,
-                        } = &field.kind
-                        else {
-                            errors.push(self.create_error(cst, AstError::StructWithNonStructField));
-                            return None;
+                let mut lowered_fields = vec![];
+                let mut errors = vec![];
+                for field in fields {
+                    let CstKind::StructField {
+                        key_and_colon,
+                        value,
+                        comma,
+                    } = &field.kind
+                    else {
+                        errors.push(self.create_error(cst, AstError::StructWithNonStructField));
+                        continue;
+                    };
+
+                    if let Some(box (key, colon)) = key_and_colon {
+                        // Normal syntax, e.g. `[foo: bar]`.
+
+                        let key_lowering_type = match lowering_type {
+                            LoweringType::Expression => LoweringType::Expression,
+                            LoweringType::Pattern | LoweringType::PatternLiteralPart => {
+                                LoweringType::PatternLiteralPart
+                            }
+                        };
+                        let key = if colon.kind.is_colon() {
+                            self.lower_cst(key, key_lowering_type)
+                        } else {
+                            self.create_error_ast(
+                                colon,
+                                vec![self.create_error(colon, AstError::StructKeyMissesColon)],
+                            )
                         };
 
-                        if let Some(box (key, colon)) = key_and_colon {
-                            // Normal syntax, e.g. `[foo: bar]`.
+                        let mut value = self.lower_cst(&value.clone(), lowering_type);
 
-                            let key_lowering_type = match lowering_type {
-                                LoweringType::Expression => LoweringType::Expression,
-                                LoweringType::Pattern | LoweringType::PatternLiteralPart => {
-                                    LoweringType::PatternLiteralPart
-                                }
-                            };
-                            let mut key = self.lower_cst(key, key_lowering_type);
-
-                            if !colon.kind.is_colon() {
-                                key = self.create_error_ast(
-                                    colon,
-                                    key,
-                                    AstError::StructKeyMissesColon,
-                                );
-                            }
-
-                            let mut value = self.lower_cst(&value.clone(), lowering_type);
-
-                            if let Some(comma) = comma && !comma.kind.is_comma() {
-                                value = self.create_error_ast(
-                                    comma,
-                                    value,
-                                    AstError::StructValueMissesComma,
-                                );
-                            }
-                            Some((Some(key), value))
-                        } else {
-                            // Shorthand syntax, e.g. `[foo]`.
-                            let mut ast = self.lower_cst(&value.clone(), lowering_type);
-
-                            if !ast.kind.is_identifier() {
-                                ast = self.create_error_ast(
-                                    value,
-                                    ast,
-                                    AstError::StructShorthandWithNotIdentifier,
-                                );
-                            }
-
-                            if let Some(comma) = comma && !comma.kind.is_comma() {
-                                ast = self.create_error_ast(
-                                    comma,
-                                    ast,
-                                    AstError::StructValueMissesComma,
-                                );
-                            }
-                            Some((None, ast))
+                        if let Some(comma) = comma && !comma.kind.is_comma() {
+                            value = self.create_error_ast(
+                                comma,
+                                vec![self.create_error(comma, AstError::StructValueMissesComma)],
+                            );
                         }
-                    })
-                    .collect();
+
+                        lowered_fields.push((Some(key), value));
+                    } else {
+                        // Shorthand syntax, e.g. `[foo]`.
+                        let ast = self.lower_cst(&value.clone(), lowering_type);
+
+                        if !ast.kind.is_identifier() {
+                            errors.push(
+                                self.create_error(
+                                    value,
+                                    AstError::StructShorthandWithNotIdentifier,
+                                ),
+                            );
+                        }
+
+                        if let Some(comma) = comma && !comma.kind.is_comma() {
+                            errors.push(self.create_error(
+                                comma,
+                                AstError::StructValueMissesComma,
+                            ));
+                        }
+                        lowered_fields.push((None, ast));
+                    }
+                }
 
                 if !closing_bracket.kind.is_closing_bracket() {
                     errors.push(
@@ -559,8 +540,13 @@ impl LoweringContext {
                     );
                 }
 
-                let ast = self.create_ast(cst.data.id, Struct { fields });
-                self.wrap_in_errors(cst.data.id, ast, errors)
+                self.create_errors_or_ast(
+                    cst,
+                    errors,
+                    Struct {
+                        fields: lowered_fields,
+                    },
+                )
             }
             CstKind::StructField { .. } => panic!("StructField should only appear in Struct."),
             CstKind::StructAccess { struct_, dot, key } => {
@@ -576,7 +562,7 @@ impl LoweringContext {
                 cases,
             } => {
                 if lowering_type != LoweringType::Expression {
-                    return self.create_ast_for_invalid_expression_in_pattern(expression);
+                    return self.create_ast_for_invalid_expression_in_pattern(cst);
                 };
 
                 let expression = self.lower_cst(expression, LoweringType::Expression);
@@ -602,7 +588,7 @@ impl LoweringContext {
                 body,
             } => {
                 if lowering_type != LoweringType::Expression {
-                    return self.create_ast_for_invalid_expression_in_pattern(pattern);
+                    return self.create_ast_for_invalid_expression_in_pattern(cst);
                 };
 
                 let pattern = self.lower_cst(pattern, LoweringType::Pattern);
@@ -634,7 +620,6 @@ impl LoweringContext {
                     "Expected an opening curly brace at the beginning of a function, but found {opening_curly_brace}.",
                 );
 
-                let mut errors = vec![];
                 let parameters = if let Some((parameters, arrow)) = parameters_and_arrow {
                     assert!(
                         arrow.kind.is_arrow(),
@@ -647,6 +632,7 @@ impl LoweringContext {
 
                 let body = self.lower_csts(body);
 
+                let mut errors = vec![];
                 if !closing_curly_brace.kind.is_closing_curly_brace() {
                     errors.push(self.create_error(
                         closing_curly_brace,
@@ -654,15 +640,15 @@ impl LoweringContext {
                     ));
                 }
 
-                let ast = self.create_ast(
-                    cst.data.id,
+                self.create_errors_or_ast(
+                    cst,
+                    errors,
                     Function {
                         parameters,
                         body,
                         fuzzable: false,
                     },
-                );
-                self.wrap_in_errors(cst.data.id, ast, errors)
+                )
             }
             CstKind::Assignment {
                 left,
@@ -683,19 +669,23 @@ impl LoweringContext {
                     receiver: name,
                     arguments: parameters,
                 } = &left.kind
+                    && !matches!(name.kind, CstKind::Symbol(_))
                 {
                     let name = match &name.kind {
                         CstKind::Identifier(identifier) => {
                             self.create_string(name.data.id, identifier.clone())
                         }
                         CstKind::Error { error, .. } => {
-                            return self.create_error_ast(cst, None, *error);
+                            return self
+                                .create_error_ast(cst, vec![self.create_error(cst, *error)]);
                         }
                         _ => {
                             return self.create_error_ast(
                                 cst,
-                                None,
-                                AstError::ExpectedNameOrPatternInAssignment,
+                                vec![self.create_error(
+                                    cst,
+                                    AstError::ExpectedNameOrPatternInAssignment,
+                                )],
                             );
                         }
                     };
@@ -724,7 +714,9 @@ impl LoweringContext {
                     },
                 )
             }
-            CstKind::Error { error, .. } => self.create_error_ast(cst, None, *error),
+            CstKind::Error { error, .. } => {
+                self.create_error_ast(cst, vec![self.create_error(cst, *error)])
+            }
         }
     }
 
@@ -747,7 +739,9 @@ impl LoweringContext {
                     },
                 )
             }
-            CstKind::Error { error, .. } => self.create_error_ast(key, None, error),
+            CstKind::Error { error, .. } => {
+                self.create_error_ast(key, vec![self.create_error(key, error)])
+            }
             _ => panic!(
                 "Expected an identifier after the dot in a struct access, but found `{}`.",
                 key
@@ -771,8 +765,11 @@ impl LoweringContext {
             self.create_ast(cst.data.id, Identifier(identifier))
         } else {
             let identifier = self.create_string(cst.data.id, format!("<invalid#{index}>"));
-            let ast = self.create_ast(cst.data.id, Identifier(identifier));
-            self.create_error_ast(cst, ast, AstError::ExpectedParameter)
+            self.create_ast(cst.data.id, Identifier(identifier));
+            self.create_error_ast(
+                cst,
+                vec![self.create_error(cst, AstError::ExpectedParameter)],
+            )
         }
     }
 
@@ -800,35 +797,36 @@ impl LoweringContext {
     }
 
     // Errors
-    fn wrap_in_errors(&mut self, cst_id: cst::Id, ast: Ast, errors: Vec<CompilerError>) -> Ast {
-        if errors.is_empty() {
-            return ast;
-        }
-
-        self.create_ast(
-            cst_id,
-            AstKind::Error {
-                child: Some(Box::new(ast)),
-                errors,
-            },
+    fn create_ast_for_invalid_expression_in_pattern(&mut self, cst: &Cst) -> Ast {
+        self.create_error_ast(
+            cst,
+            vec![self.create_error(cst, AstError::PatternContainsInvalidExpression)],
         )
     }
-    fn create_ast_for_invalid_expression_in_pattern(&mut self, cst: &Cst) -> Ast {
-        self.create_error_ast(cst, None, AstError::PatternContainsInvalidExpression)
-    }
-    fn create_error_ast(
+    fn create_errors_or_use_ast(
         &mut self,
         cst: &Cst,
-        child: impl Into<Option<Ast>>,
-        error: impl Into<CompilerErrorPayload>,
+        mut errors: Vec<CompilerError>,
+        ast: Ast,
     ) -> Ast {
-        self.create_ast(
-            cst.data.id,
-            AstKind::Error {
-                child: child.into().map(Box::new),
-                errors: vec![self.create_error(cst, error)],
-            },
-        )
+        if errors.is_empty() {
+            ast
+        } else {
+            ast.collect_errors(&mut errors);
+            self.create_error_ast(cst, errors)
+        }
+    }
+    fn create_errors_or_ast(
+        &mut self,
+        cst: &Cst,
+        errors: Vec<CompilerError>,
+        ast: impl Into<AstKind>,
+    ) -> Ast {
+        let ast = self.create_ast(cst.data.id, ast.into());
+        self.create_errors_or_use_ast(cst, errors, ast)
+    }
+    fn create_error_ast(&mut self, cst: &Cst, errors: Vec<CompilerError>) -> Ast {
+        self.create_ast(cst.data.id, AstKind::Error { errors })
     }
     fn create_error(&self, cst: &Cst, error: impl Into<CompilerErrorPayload>) -> CompilerError {
         CompilerError {

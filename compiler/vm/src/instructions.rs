@@ -1,9 +1,6 @@
 use crate::{
-    heap::{
-        Data, DisplayWithSymbolTable, Function, HirId, InlineObject, List, Pointer, Struct,
-        SymbolTable, Tag, Text,
-    },
-    lir::Instruction,
+    byte_code::Instruction,
+    heap::{Data, Function, Heap, HirId, InlineObject, List, Pointer, Struct, Tag, Text},
     tracer::Tracer,
     vm::{CallHandle, MachineState, Panic},
 };
@@ -22,8 +19,8 @@ pub enum InstructionResult {
 impl MachineState {
     pub fn run_instruction(
         &mut self,
+        heap: &mut Heap,
         instruction: &Instruction,
-        symbol_table: &SymbolTable,
         tracer: &mut impl Tracer,
     ) -> InstructionResult {
         if TRACE {
@@ -51,13 +48,13 @@ impl MachineState {
                         .join(", ")
                 },
             );
-            trace!("Heap: {:?}", self.heap);
+            trace!("Heap: {heap:?}");
         }
 
         match instruction {
-            Instruction::CreateTag { symbol_id } => {
+            Instruction::CreateTag { symbol } => {
                 let value = self.pop_from_data_stack();
-                let tag = Tag::create_with_value(&mut self.heap, true, *symbol_id, value);
+                let tag = Tag::create_with_value(heap, true, *symbol, value);
                 self.push_to_data_stack(tag);
                 InstructionResult::Done
             }
@@ -67,7 +64,7 @@ impl MachineState {
                     item_addresses.push(self.pop_from_data_stack());
                 }
                 let items = item_addresses.into_iter().rev().collect_vec();
-                let list = List::create(&mut self.heap, true, &items);
+                let list = List::create(heap, true, &items);
                 self.push_to_data_stack(list);
                 InstructionResult::Done
             }
@@ -78,7 +75,7 @@ impl MachineState {
                     key_value_addresses.push(self.pop_from_data_stack());
                 }
                 let entries = key_value_addresses.into_iter().rev().tuples().collect();
-                let struct_ = Struct::create(&mut self.heap, true, &entries);
+                let struct_ = Struct::create(heap, true, &entries);
                 self.push_to_data_stack(struct_);
                 InstructionResult::Done
             }
@@ -91,11 +88,11 @@ impl MachineState {
                     .iter()
                     .map(|offset| {
                         let object = self.get_from_data_stack(*offset);
-                        object.dup(&mut self.heap);
+                        object.dup(heap);
                         object
                     })
                     .collect_vec();
-                let function = Function::create(&mut self.heap, true, &captured, *num_args, *body);
+                let function = Function::create(heap, true, &captured, *num_args, *body);
                 self.push_to_data_stack(function);
                 InstructionResult::Done
             }
@@ -105,14 +102,14 @@ impl MachineState {
             }
             Instruction::PushFromStack(offset) => {
                 let address = self.get_from_data_stack(*offset);
-                address.dup(&mut self.heap);
+                address.dup(heap);
                 self.push_to_data_stack(address);
                 InstructionResult::Done
             }
             Instruction::PopMultipleBelowTop(n) => {
                 let top = self.pop_from_data_stack();
                 for _ in 0..*n {
-                    self.pop_from_data_stack().drop(&mut self.heap);
+                    self.pop_from_data_stack().drop(heap);
                 }
                 self.push_to_data_stack(top);
                 InstructionResult::Done
@@ -125,7 +122,7 @@ impl MachineState {
                 arguments.reverse();
                 let callee = self.pop_from_data_stack();
 
-                self.call(callee, &arguments, symbol_table)
+                self.call(heap, callee, &arguments)
             }
             Instruction::TailCall {
                 num_locals_to_pop,
@@ -138,13 +135,13 @@ impl MachineState {
                 arguments.reverse();
                 let callee = self.pop_from_data_stack();
                 for _ in 0..*num_locals_to_pop {
-                    self.pop_from_data_stack().drop(&mut self.heap);
+                    self.pop_from_data_stack().drop(heap);
                 }
 
                 // Tail calling a function is basically just a normal call, but
                 // pretending we are our caller.
                 self.next_instruction = self.call_stack.pop();
-                self.call(callee, &arguments, symbol_table)
+                self.call(heap, callee, &arguments)
             }
             Instruction::Return => {
                 self.next_instruction = self.call_stack.pop();
@@ -159,13 +156,13 @@ impl MachineState {
                     // where we have validated the inputs before calling the
                     // instructions, or when lowering compiler errors from the
                     // HIR to the MIR.
-                    panic!("We should never generate a LIR where the reason is not a text.");
+                    panic!("We should never generate byte code where the reason is not a text.");
                 };
                 let responsible: HirId = responsible_for_panic.try_into().unwrap();
 
                 InstructionResult::Panic(Panic {
-                    reason: reason.get().to_owned(),
-                    responsible: responsible.get().to_owned(),
+                    reason: reason.get().to_string(),
+                    responsible: responsible.get().clone(),
                 })
             }
             Instruction::TraceCallStarts { num_args } => {
@@ -174,22 +171,23 @@ impl MachineState {
                     args.push(self.pop_from_data_stack());
                 }
                 let callee = self.pop_from_data_stack();
+                let call_site = self.pop_from_data_stack().try_into().unwrap();
 
                 args.reverse();
-                tracer.call_started(&mut self.heap, callee, args);
+                tracer.call_started(heap, call_site, callee, args);
                 InstructionResult::Done
             }
             Instruction::TraceCallEnds => {
                 let return_value = self.pop_from_data_stack();
 
-                tracer.call_ended(&mut self.heap, return_value);
+                tracer.call_ended(heap, return_value);
                 InstructionResult::Done
             }
             Instruction::TraceExpressionEvaluated => {
                 let value = self.pop_from_data_stack();
                 let expression = self.pop_from_data_stack().try_into().unwrap();
 
-                tracer.value_evaluated(&mut self.heap, expression, value);
+                tracer.value_evaluated(heap, expression, value);
                 InstructionResult::Done
             }
             Instruction::TraceFoundFuzzableFunction => {
@@ -198,7 +196,7 @@ impl MachineState {
             );
                 let definition = self.pop_from_data_stack().try_into().unwrap();
 
-                tracer.found_fuzzable_function(&mut self.heap, definition, function);
+                tracer.found_fuzzable_function(heap, definition, function);
                 InstructionResult::Done
             }
         }
@@ -206,24 +204,36 @@ impl MachineState {
 
     pub fn call(
         &mut self,
+        heap: &mut Heap,
         callee: InlineObject,
         arguments: &[InlineObject],
-        symbol_table: &SymbolTable,
     ) -> InstructionResult {
         match callee.into() {
-            Data::Function(function) => self.call_function(function, arguments),
+            Data::Function(function) => self.call_function(heap, function, arguments),
             Data::Builtin(builtin) => {
-                callee.drop(&mut self.heap);
-                self.run_builtin_function(builtin.get(), arguments, symbol_table)
+                callee.drop(heap);
+                self.run_builtin_function(heap, builtin.get(), arguments)
             }
             Data::Handle(handle) => {
-                let responsible: HirId = (*arguments.last().unwrap()).try_into().unwrap();
-                if arguments.len() != handle.argument_count() {
+                let parameter_count = handle.argument_count();
+                let argument_count = arguments.len();
+                if argument_count != parameter_count {
+                    let responsible: HirId = arguments.last().unwrap().clone().try_into().unwrap();
                     return InstructionResult::Panic(Panic {
                         reason: format!(
-                            "A function expected {} parameters, but you called it with {} arguments.",
-                            handle.argument_count(),
-                            arguments.len(),
+                            "A function expected {} {}, but you called it with {} {}.",
+                            parameter_count,
+                            if parameter_count == 1 {
+                                "parameter"
+                            } else {
+                                "parameters"
+                            },
+                            argument_count,
+                            if argument_count == 1 {
+                                "argument"
+                            } else {
+                                "arguments"
+                            },
                         ),
                         responsible: responsible.get().clone(),
                     });
@@ -243,9 +253,9 @@ impl MachineState {
                 }
 
                 if let [value] = arguments {
-                    let tag = Tag::create_with_value(&mut self.heap, true, tag.symbol_id(), *value);
+                    let tag = Tag::create_with_value(heap, true, tag.symbol(), *value);
                     self.push_to_data_stack(tag);
-                    value.dup(&mut self.heap);
+                    value.dup(heap);
                     InstructionResult::Done
                 } else {
                     InstructionResult::Panic(Panic {
@@ -261,8 +271,7 @@ impl MachineState {
                 let responsible: HirId = (*arguments.last().unwrap()).try_into().unwrap();
                 InstructionResult::Panic(Panic {
                     reason: format!(
-                        "You can only call functions, builtins, tags, and handles, but you tried to call {}.",
-                        DisplayWithSymbolTable::to_string(&callee, symbol_table),
+                        "You can only call functions, builtins, tags, and handles, but you tried to call {callee}.",
                     ),
                     responsible: responsible.get().clone(),
                 })
@@ -271,6 +280,7 @@ impl MachineState {
     }
     pub fn call_function(
         &mut self,
+        heap: &mut Heap,
         function: Function,
         arguments: &[InlineObject],
     ) -> InstructionResult {
@@ -291,7 +301,7 @@ impl MachineState {
         }
         let captured = function.captured();
         for captured in captured {
-            captured.dup(&mut self.heap);
+            captured.dup(heap);
         }
         self.data_stack.extend_from_slice(captured);
         self.data_stack.extend_from_slice(arguments);

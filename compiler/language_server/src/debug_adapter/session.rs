@@ -1,6 +1,7 @@
 use super::{
-    paused::PausedState, tracer::DebugTracer, DebugVm, ServerToClient, ServerToClientMessage,
-    SessionId,
+    paused::{PausedState, PausedVm},
+    tracer::DebugTracer,
+    DebugVm, ServerToClient, ServerToClientMessage, SessionId,
 };
 use crate::database::Database;
 use candy_frontend::{
@@ -9,11 +10,12 @@ use candy_frontend::{
     TracingConfig, TracingMode,
 };
 use candy_vm::{
-    heap::{HirId, Struct},
-    lir::Instruction,
-    mir_to_lir::compile_lir,
+    byte_code::Instruction,
+    environment::StateAfterRunWithoutHandles,
+    heap::{Heap, HirId, Struct},
+    mir_to_byte_code::compile_byte_code,
     tracer::DummyTracer,
-    StateAfterRunWithoutHandles, Vm, VmFinished,
+    Vm, VmFinished,
 };
 use dap::{
     events::StoppedEventBody,
@@ -53,7 +55,7 @@ pub async fn run_debug_session(
             Err(message) => {
                 session
                     .send_response_err(seq, ResponseMessage::Error(message.to_string()))
-                    .await
+                    .await;
             }
         }
     }
@@ -188,10 +190,10 @@ impl DebugSession {
                     calls: TracingMode::All,
                     evaluated_expressions: TracingMode::All,
                 };
-                let lir = compile_lir(&self.db, module.clone(), tracing.clone()).0;
-                let VmFinished {
-                    mut heap, result, ..
-                } = Vm::for_module(&lir, DummyTracer).run_forever_without_handles();
+                let byte_code = compile_byte_code(&self.db, module.clone(), tracing.clone()).0;
+                let mut heap = Heap::default();
+                let VmFinished { result, .. } = Vm::for_module(&byte_code, &mut heap, DummyTracer)
+                    .run_forever_without_handles(&mut heap);
                 let result = match result {
                     Ok(result) => result,
                     Err(error) => {
@@ -199,7 +201,7 @@ impl DebugSession {
                         return Err("module-panicked");
                     }
                 };
-                let main = match result.into_main_function(&lir.symbol_table) {
+                let main = match result.into_main_function(&heap) {
                     Ok(main) => main,
                     Err(error) => {
                         error!("Failed to find main function: {error}");
@@ -215,15 +217,16 @@ impl DebugSession {
                 let platform = HirId::create(&mut heap, true, Id::platform());
                 let tracer = DebugTracer::default();
                 let vm = Vm::for_function(
-                    Rc::new(lir),
-                    heap,
+                    Rc::new(byte_code),
+                    &mut heap,
+                    platform,
                     main,
                     &[environment, platform.into()],
                     tracer,
                 );
 
                 // TODO: remove when we support pause and continue
-                let vm = match vm.run_n_without_handles(10000) {
+                let vm = match vm.run_n_without_handles(&mut heap, 10000) {
                     StateAfterRunWithoutHandles::Running(vm) => Some(vm),
                     StateAfterRunWithoutHandles::Finished(_) => None,
                 };
@@ -231,7 +234,7 @@ impl DebugSession {
                 if let Some(vm) = vm {
                     self.state = State::Launched {
                         initialize_arguments,
-                        execution_state: ExecutionState::Paused(PausedState::new(vm)),
+                        execution_state: ExecutionState::Paused(PausedState::new(heap, vm)),
                     };
 
                     self.send(EventBody::Stopped(StoppedEventBody {
@@ -256,7 +259,7 @@ impl DebugSession {
             Command::Pause(_) => todo!(),
             Command::ReadMemory(args) => {
                 let state = self.state.require_paused_mut()?;
-                let response = state.read_memory(args)?;
+                let response = state.read_memory(&args)?;
                 self.send_response_ok(request.seq, ResponseBody::ReadMemory(Some(response)))
                     .await;
                 Ok(())
@@ -265,7 +268,7 @@ impl DebugSession {
             Command::RestartFrame(_) => todo!(),
             Command::ReverseContinue(_) => todo!(),
             Command::Scopes(args) => {
-                let scopes = self.state.require_paused_mut()?.scopes(args);
+                let scopes = self.state.require_paused_mut()?.scopes(&args);
                 self.send_response_ok(request.seq, ResponseBody::Scopes(scopes))
                     .await;
                 Ok(())
@@ -290,7 +293,7 @@ impl DebugSession {
             Command::StackTrace(args) => {
                 let start_at_1_config = self.state.require_initialized()?.into();
                 let state = self.state.require_paused_mut()?;
-                let stack_trace = state.stack_trace(&self.db, start_at_1_config, args)?;
+                let stack_trace = state.stack_trace(&self.db, start_at_1_config, &args);
                 self.send_response_ok(request.seq, ResponseBody::StackTrace(stack_trace))
                     .await;
                 Ok(())
@@ -321,7 +324,7 @@ impl DebugSession {
                     .unwrap_or_default();
                 let variables = self.state.require_paused_mut()?.variables(
                     &self.db,
-                    args,
+                    &args,
                     supports_variable_type,
                 );
                 self.send_response_ok(request.seq, ResponseBody::Variables(variables))
@@ -348,18 +351,18 @@ impl DebugSession {
         let state = self.state.require_paused_mut().unwrap();
 
         // TODO: honor `args.granularity`
-        let mut vm = state.vm.take().unwrap();
+        let PausedVm { mut heap, mut vm } = state.vm.take().unwrap();
         let initial_stack_size = vm.call_stack().len();
         let vm_after_stepping = loop {
             let Some(instruction_pointer) = vm.next_instruction() else {
                 break None; // The VM finished executing anyways.
             };
             let is_trace_instruction = matches!(
-                vm.lir().instructions[*instruction_pointer],
+                vm.byte_code().instructions[*instruction_pointer],
                 Instruction::TraceCallEnds | Instruction::TraceExpressionEvaluated,
             );
 
-            match vm.run_without_handles() {
+            match vm.run_without_handles(&mut heap) {
                 StateAfterRunWithoutHandles::Running(new_vm) => {
                     vm = new_vm;
                 }
@@ -381,7 +384,7 @@ impl DebugSession {
         };
 
         if let Some(vm) = vm_after_stepping {
-            state.vm = Some(vm);
+            state.vm = Some(PausedVm::new(heap, vm));
 
             self.send(EventBody::Stopped(StoppedEventBody {
                 reason: StoppedEventReason::Step,
@@ -439,7 +442,7 @@ impl DebugSession {
     }
     async fn send(&self, message: impl Into<ServerToClientMessage>) {
         let message = ServerToClient {
-            session_id: self.session_id.to_owned(),
+            session_id: self.session_id.clone(),
             message: message.into(),
         };
         self.client
@@ -449,19 +452,19 @@ impl DebugSession {
 }
 
 impl State {
-    fn require_initialized(&self) -> Result<&InitializeArguments, &'static str> {
+    const fn require_initialized(&self) -> Result<&InitializeArguments, &'static str> {
         match &self {
-            State::Initial => Err("not-initialized"),
-            State::Initialized(initialize_arguments)
-            | State::Launched {
+            Self::Initial => Err("not-initialized"),
+            Self::Initialized(initialize_arguments)
+            | Self::Launched {
                 initialize_arguments,
                 ..
             } => Ok(initialize_arguments),
         }
     }
-    fn require_paused(&self) -> Result<&PausedState, &'static str> {
+    const fn require_paused(&self) -> Result<&PausedState, &'static str> {
         match self {
-            State::Launched {
+            Self::Launched {
                 execution_state: ExecutionState::Paused(state),
                 ..
             } => Ok(state),
@@ -470,7 +473,7 @@ impl State {
     }
     fn require_paused_mut(&mut self) -> Result<&mut PausedState, &'static str> {
         match self {
-            State::Launched {
+            Self::Launched {
                 execution_state: ExecutionState::Paused(state),
                 ..
             } => Ok(state),
@@ -485,13 +488,13 @@ pub struct StartAt1Config {
     columns_start_at_1: bool,
 }
 impl StartAt1Config {
-    pub fn range_to_dap(&self, range: Range) -> Range {
+    pub const fn range_to_dap(self, range: Range) -> Range {
         let start = self.position_to_dap(range.start);
         let end = self.position_to_dap(range.end);
         Range { start, end }
     }
-    fn position_to_dap(&self, position: Position) -> Position {
-        fn apply(start_at_1: bool, value: u32) -> u32 {
+    const fn position_to_dap(self, position: Position) -> Position {
+        const fn apply(start_at_1: bool, value: u32) -> u32 {
             if start_at_1 {
                 value + 1
             } else {

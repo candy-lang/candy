@@ -4,8 +4,6 @@ use crate::{
     utils::{module_for_path, packages_path},
     Exit, ProgramResult,
 };
-use candy_frontend::{TracingConfig, TracingMode};
-use candy_vm::mir_to_lir::compile_lir;
 use clap::{Parser, ValueHint};
 use std::path::PathBuf;
 use tracing::{error, info};
@@ -28,12 +26,6 @@ pub(crate) struct Options {
 pub(crate) fn fuzz(options: Options) -> ProgramResult {
     let db = Database::new_with_file_system_module_provider(packages_path());
     let module = module_for_path(options.path)?;
-    let tracing = TracingConfig {
-        register_fuzzables: TracingMode::All,
-        calls: TracingMode::Off,
-        evaluated_expressions: TracingMode::Off,
-    };
-    let (lir, _) = compile_lir(&db, module.clone(), tracing);
 
     debug!("Fuzzing `{module}`…");
     let failing_cases = candy_fuzzer::fuzz(&db, module);
@@ -47,7 +39,7 @@ pub(crate) fn fuzz(options: Options) -> ProgramResult {
         error!("These are the failing cases:");
         for case in failing_cases {
             error!("");
-            case.dump(&db, &lir.symbol_table);
+            case.dump(&db);
         }
         Err(Exit::FuzzingFoundFailingCases)
     }

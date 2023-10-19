@@ -1,7 +1,7 @@
 use self::{session::run_debug_session, tracer::DebugTracer};
 use crate::server::Server;
 use candy_frontend::module::PackagesPath;
-use candy_vm::{lir::Lir, Vm};
+use candy_vm::{byte_code::ByteCode, Vm};
 use dap::{prelude::EventBody, requests::Request, responses::Response};
 use derive_more::{Display, From};
 use lsp_types::notification::Notification;
@@ -16,7 +16,7 @@ mod paused;
 mod session;
 mod tracer;
 
-type DebugVm = Vm<Rc<Lir>, DebugTracer>;
+type DebugVm = Vm<Rc<ByteCode>, DebugTracer>;
 
 #[derive(Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, Serialize)]
 #[serde(transparent)]
@@ -55,7 +55,7 @@ impl DebugSessionManager {
         }
 
         thread::spawn(|| {
-            run_debug_session(session_id, client, packages_path, client_to_server_receiver)
+            run_debug_session(session_id, client, packages_path, client_to_server_receiver);
         });
     }
     async fn handle_message(&self, request: RequestNotification) {

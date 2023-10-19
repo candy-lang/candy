@@ -145,9 +145,18 @@ impl Rcst {
                 *state.offset += symbol.len();
                 CstKind::Symbol(symbol.clone())
             }
-            CstKind::Int { value, string } => {
+            CstKind::Int {
+                radix_prefix,
+                value,
+                string,
+            } => {
+                *state.offset += radix_prefix
+                    .as_ref()
+                    .map(|(_, radix_string)| radix_string.len())
+                    .unwrap_or_default();
                 *state.offset += string.len();
                 CstKind::Int {
+                    radix_prefix: radix_prefix.clone(),
                     value: value.clone(),
                     string: string.clone(),
                 }
@@ -175,6 +184,10 @@ impl Rcst {
                 parts: parts.to_csts_helper(state),
                 closing: Box::new(closing.to_cst(state)),
             },
+            CstKind::TextNewline(newline) => {
+                *state.offset += newline.len();
+                CstKind::TextNewline(newline.clone())
+            }
             CstKind::TextPart(text) => {
                 *state.offset += text.len();
                 CstKind::TextPart(text.clone())

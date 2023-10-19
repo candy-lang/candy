@@ -1,5 +1,5 @@
 builtins = use "Builtins"
-# [ifElse, int, recursive] = use "Core"
+[int, result, toDebugText] = use "Core"
 
 recursive initialArg body =
   # needs
@@ -31,4 +31,9 @@ fibonacci n =
     }
   }
 
-main environment := fibonacci 15 # 610
+main := { environment ->
+  environment.arguments %
+    (n,) -> n | int.parse | result.map { it -> fibonacci it | toDebugText } | result.getValue
+    _ -> "Usage: `cargo run -- run fibonacci.candy -- <number>`"
+  | environment.stdout
+}

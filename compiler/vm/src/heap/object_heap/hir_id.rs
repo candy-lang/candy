@@ -1,6 +1,6 @@
 use super::{utils::heap_object_impls, HeapObjectTrait};
 use crate::{
-    heap::{object_heap::HeapObject, symbol_table::impl_ord_with_symbol_table_via_ord, Heap},
+    heap::{object_heap::HeapObject, Heap},
     utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_ord_via_get, DebugDisplay},
 };
 use candy_frontend::hir::Id;
@@ -16,11 +16,11 @@ use std::{
 pub struct HeapHirId(HeapObject);
 
 impl HeapHirId {
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
     pub fn create(heap: &mut Heap, is_reference_counted: bool, value: Id) -> Self {
-        let id = HeapHirId(heap.allocate(
+        let id = Self(heap.allocate(
             HeapObject::KIND_HIR_ID,
             is_reference_counted,
             0,
@@ -61,7 +61,7 @@ impl HeapObjectTrait for HeapHirId {
         _address_map: &mut FxHashMap<HeapObject, HeapObject>,
     ) {
         let clone = Self(clone);
-        let value = self.get().to_owned();
+        let value = self.get().clone();
         unsafe { ptr::write(clone.id_pointer().as_ptr(), value) };
     }
 
@@ -71,5 +71,3 @@ impl HeapObjectTrait for HeapHirId {
         unsafe { ptr::drop_in_place(self.id_pointer().as_ptr()) };
     }
 }
-
-impl_ord_with_symbol_table_via_ord!(HeapHirId);

@@ -44,13 +44,13 @@ impl Bodies {
     pub fn get(&self, id: BodyId) -> &Body {
         &self.0[id.to_usize()]
     }
-    pub fn push(&mut self, constant: Body) -> BodyId {
+    pub fn push(&mut self, body: Body) -> BodyId {
         let id = BodyId::from_usize(self.0.len());
-        self.0.push(constant);
+        self.0.push(body);
         id
     }
 
-    fn ids_and_bodies(&self) -> impl Iterator<Item = (BodyId, &Body)> {
+    pub fn ids_and_bodies(&self) -> impl Iterator<Item = (BodyId, &Body)> {
         self.0
             .iter()
             .enumerate()
@@ -103,13 +103,12 @@ impl Body {
         original_hirs: FxHashSet<hir::Id>,
         captured_count: usize,
         parameter_count: usize,
-        expressions: Vec<Expression>,
     ) -> Self {
         Self {
             original_hirs,
             captured_count,
             parameter_count,
-            expressions,
+            expressions: vec![],
         }
     }
 
@@ -122,7 +121,7 @@ impl Body {
     pub const fn captured_count(&self) -> usize {
         self.captured_count
     }
-    fn captured_ids(&self) -> impl Iterator<Item = Id> {
+    pub fn captured_ids(&self) -> impl Iterator<Item = Id> {
         (0..self.captured_count).map(Id::from_usize)
     }
 
@@ -130,7 +129,7 @@ impl Body {
     pub const fn parameter_count(&self) -> usize {
         self.parameter_count
     }
-    fn parameter_ids(&self) -> impl Iterator<Item = Id> {
+    pub fn parameter_ids(&self) -> impl Iterator<Item = Id> {
         (self.captured_count..self.captured_count + self.parameter_count).map(Id::from_usize)
     }
 
@@ -144,6 +143,20 @@ impl Body {
             .iter()
             .enumerate()
             .map(move |(index, it)| (Id::from_usize(offset + index), it))
+    }
+    #[must_use]
+    pub fn last_expression_id(&self) -> Option<Id> {
+        if self.expressions.is_empty() {
+            None
+        } else {
+            Some(Id::from_usize(
+                self.captured_count + self.parameter_count + self.expressions.len(),
+            ))
+        }
+    }
+
+    pub fn push(&mut self, expression: Expression) {
+        self.expressions.push(expression);
     }
 }
 impl ToRichIr for Body {

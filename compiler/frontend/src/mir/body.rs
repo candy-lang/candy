@@ -106,7 +106,9 @@ impl VisibleExpressions {
         self.expressions.insert(id, expression);
     }
     pub fn remove(&mut self, id: Id) -> Expression {
-        self.expressions.remove(&id).unwrap()
+        self.expressions.remove(&id).unwrap_or_else(|| {
+            panic!("Expression with ID {id} is not visible in this scope. Visible expressions: {self:?}")
+        })
     }
     #[must_use]
     pub fn get(&self, id: Id) -> &Expression {

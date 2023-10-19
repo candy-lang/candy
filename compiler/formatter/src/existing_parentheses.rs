@@ -52,10 +52,11 @@ impl<'a> ExistingParentheses<'a> {
                         trailing_whitespace.push(whitespace);
 
                         let mut whitespace = trailing_whitespace.remove(0);
-                        for trailing_whitespace in trailing_whitespace.drain(..) {
+                        for trailing_whitespace in trailing_whitespace {
                             trailing_whitespace
                                 .into_empty_and_move_comments_to(edits, &mut whitespace);
                         }
+                        trailing_whitespace = vec![];
                         UnformattedCst { child, whitespace }
                     };
 
@@ -74,7 +75,7 @@ impl<'a> ExistingParentheses<'a> {
                                 right_parenthesis: UnformattedCst<'a>,
                             ) -> UnformattedCst<'a> {
                                 if left_parenthesis.whitespace.has_comments() {
-                                    edits.delete(right_parenthesis.child.data.span.to_owned());
+                                    edits.delete(right_parenthesis.child.data.span.clone());
                                     right_parenthesis
                                         .whitespace
                                         .into_empty_and_move_comments_to(
@@ -83,7 +84,7 @@ impl<'a> ExistingParentheses<'a> {
                                         );
                                     left_parenthesis
                                 } else {
-                                    edits.delete(left_parenthesis.child.data.span.to_owned());
+                                    edits.delete(left_parenthesis.child.data.span.clone());
                                     left_parenthesis.whitespace.into_empty_trailing(edits);
                                     right_parenthesis
                                 }
@@ -109,7 +110,7 @@ impl<'a> ExistingParentheses<'a> {
         (cst, parentheses)
     }
 
-    pub fn is_some(&self) -> bool {
+    pub const fn is_some(&self) -> bool {
         match self {
             ExistingParentheses::None { .. } => false,
             ExistingParentheses::Some { .. } => true,
@@ -129,13 +130,13 @@ impl<'a> ExistingParentheses<'a> {
                 opening,
                 mut closing,
             } => {
-                edits.delete(opening.child.data.span.to_owned());
+                edits.delete(opening.child.data.span.clone());
                 opening.whitespace.into_empty_trailing(edits);
 
                 let (child_width, child_whitespace) = child.split();
                 child_whitespace.into_empty_and_move_comments_to(edits, &mut closing.whitespace);
 
-                edits.delete(closing.child.data.span.to_owned());
+                edits.delete(closing.child.data.span.clone());
 
                 FormattedCst::new(child_width, closing.whitespace)
             }
@@ -218,7 +219,7 @@ impl<'a> ExistingParentheses<'a> {
 }
 
 impl SinglelineWidth {
-    pub const PARENTHESIS: SinglelineWidth = SinglelineWidth::new_const(1);
+    pub const PARENTHESIS: Self = Self::new_const(1);
 }
 
 fn split_whitespace(cst: &Cst) -> UnformattedCst {

@@ -1,16 +1,26 @@
 #![feature(let_chains)]
+#![warn(unused_crate_dependencies)]
 
-use candy_frontend::mir::{Body, Expression, Id, Mir};
+use candy_frontend::module::Module as CandyModule;
+use candy_frontend::{
+    mir::{Body, Expression, Id, Mir},
+    mir_optimize::OptimizeMir,
+    TracingConfig,
+};
 use inkwell::{
     builder::Builder,
     context::Context,
     module::{Linkage, Module},
     support::LLVMString,
     types::{BasicType, StructType},
-    values::{BasicValue, BasicValueEnum, FunctionValue, GlobalValue, PointerValue},
+    values::{BasicValue, BasicValueEnum, FunctionValue, GlobalValue},
     AddressSpace,
 };
+// We depend on this package (used by inkwell) to specify a version and configure features.
+use llvm_sys as _;
 
+use candy_frontend::rich_ir::{RichIr, ToRichIr};
+use candy_frontend::string_to_rcst::ModuleError;
 pub use inkwell;
 use itertools::Itertools;
 use std::{
@@ -18,6 +28,23 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
+
+#[salsa::query_group(LlvmIrStorage)]
+pub trait LlvmIrDb: OptimizeMir {
+    #[salsa::transparent]
+    fn llvm_ir(&self, module: CandyModule) -> Result<RichIr, ModuleError>;
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn llvm_ir(db: &dyn LlvmIrDb, module: CandyModule) -> Result<RichIr, ModuleError> {
+    let (mir, _, _) = db.optimized_mir(module.clone(), TracingConfig::off())?;
+
+    let context = Context::create();
+    let mut codegen = CodeGen::new(&context, "module", mir);
+    let llvm_ir = codegen.compile("", false, true).unwrap();
+
+    Ok(llvm_ir.to_str().unwrap().to_rich_ir(true))
+}
 
 #[derive(Clone)]
 struct FunctionInfo<'ctx> {
@@ -31,12 +58,10 @@ pub struct CodeGen<'ctx> {
     module: Module<'ctx>,
     builder: Builder<'ctx>,
     mir: Arc<Mir>,
-    tags: HashMap<String, Option<Id>>,
     globals: HashMap<Id, GlobalValue<'ctx>>,
     locals: HashMap<Id, BasicValueEnum<'ctx>>,
     functions: HashMap<Id, FunctionInfo<'ctx>>,
     unrepresented_ids: HashSet<Id>,
-    main_return: Option<PointerValue<'ctx>>,
 }
 
 impl<'ctx> CodeGen<'ctx> {
@@ -48,12 +73,10 @@ impl<'ctx> CodeGen<'ctx> {
             module,
             builder,
             mir,
-            tags: HashMap::new(),
             globals: HashMap::new(),
             locals: HashMap::new(),
             functions: HashMap::new(),
             unrepresented_ids: HashSet::new(),
-            main_return: None,
         }
     }
 
@@ -62,7 +85,7 @@ impl<'ctx> CodeGen<'ctx> {
         path: &str,
         print_llvm_ir: bool,
         print_main_output: bool,
-    ) -> Result<(), LLVMString> {
+    ) -> Result<LLVMString, LLVMString> {
         let void_type = self.context.void_type();
         let i8_type = self.context.i8_type();
         let i32_type = self.context.i32_type();
@@ -74,13 +97,23 @@ impl<'ctx> CodeGen<'ctx> {
         let make_int_fn_type = candy_value_ptr.fn_type(&[i64_type.into()], false);
         self.module
             .add_function("make_candy_int", make_int_fn_type, Some(Linkage::External));
-        let make_tag_fn_type =
-            candy_value_ptr.fn_type(&[i8_type.ptr_type(AddressSpace::default()).into()], false);
+        let make_tag_fn_type = candy_value_ptr.fn_type(
+            &[
+                i8_type.ptr_type(AddressSpace::default()).into(),
+                candy_value_ptr.into(),
+            ],
+            false,
+        );
         let make_candy_tag =
             self.module
                 .add_function("make_candy_tag", make_tag_fn_type, Some(Linkage::External));
-        self.module
-            .add_function("make_candy_text", make_tag_fn_type, Some(Linkage::External));
+        let make_text_fn_type =
+            candy_value_ptr.fn_type(&[i8_type.ptr_type(AddressSpace::default()).into()], false);
+        self.module.add_function(
+            "make_candy_text",
+            make_text_fn_type,
+            Some(Linkage::External),
+        );
         let make_list_fn_type = candy_value_ptr.fn_type(&[candy_value_ptr.into()], false);
         self.module.add_function(
             "make_candy_list",
@@ -158,53 +191,55 @@ impl<'ctx> CodeGen<'ctx> {
         };
 
         self.builder.position_at_end(block);
-        self.compile_mir(&self.mir.body.clone(), &main_info);
+        let main_return = self
+            .compile_mir(&self.mir.body.clone(), &main_info)
+            .unwrap();
         self.builder.position_at_end(block);
 
         let environment = self
             .module
             .add_global(candy_value_ptr, None, "candy_environment");
 
-        if let Some(main_return) = self.main_return {
-            const MAIN_FN_NAME: &str = "Main";
-            let main_text = self.make_str_literal(MAIN_FN_NAME);
+        const MAIN_FN_NAME: &str = "Main";
+        let main_text = self.make_str_literal(MAIN_FN_NAME);
 
-            let main_tag = self
-                .builder
-                .build_call(make_candy_tag, &[main_text.into()], "");
+        let main_tag = self.builder.build_call(
+            make_candy_tag,
+            &[main_text.into(), candy_value_ptr.const_null().into()],
+            "",
+        );
 
-            let main_fn = self
-                .builder
-                .build_call(
-                    candy_builtin_struct_get,
-                    &[
-                        main_return.into(),
-                        main_tag.try_as_basic_value().unwrap_left().into(),
-                    ],
-                    "",
-                )
-                .try_as_basic_value()
-                .unwrap_left();
+        let main_fn = self
+            .builder
+            .build_call(
+                candy_builtin_struct_get,
+                &[
+                    main_return.as_basic_value_enum().into(),
+                    main_tag.try_as_basic_value().unwrap_left().into(),
+                ],
+                "",
+            )
+            .try_as_basic_value()
+            .unwrap_left();
 
-            let main_res_ptr = self.builder.build_call(
-                run_candy_main,
-                &[main_fn.into(), environment.as_basic_value_enum().into()],
+        let main_res_ptr = self.builder.build_call(
+            run_candy_main,
+            &[main_fn.into(), environment.as_basic_value_enum().into()],
+            "",
+        );
+
+        if print_main_output {
+            self.builder.build_call(
+                print_fn,
+                &[main_res_ptr.try_as_basic_value().unwrap_left().into()],
                 "",
             );
-
-            if print_main_output {
-                self.builder.build_call(
-                    print_fn,
-                    &[main_res_ptr.try_as_basic_value().unwrap_left().into()],
-                    "",
-                );
-                for value in self.module.get_globals() {
-                    if value != environment {
-                        let val =
-                            self.builder
-                                .build_load(candy_value_ptr, value.as_pointer_value(), "");
-                        self.builder.build_call(free_fn, &[val.into()], "");
-                    }
+            for value in self.module.get_globals() {
+                if value != environment {
+                    let val =
+                        self.builder
+                            .build_load(candy_value_ptr, value.as_pointer_value(), "");
+                    self.builder.build_call(free_fn, &[val.into()], "");
                 }
             }
         }
@@ -215,9 +250,11 @@ impl<'ctx> CodeGen<'ctx> {
             self.module.print_to_stderr();
         }
         self.module.verify()?;
-        let bc_path = PathBuf::from(format!("{path}.bc"));
-        self.module.write_bitcode_to_path(&bc_path);
-        Ok(())
+        if !path.is_empty() {
+            let bc_path = PathBuf::from(format!("{path}.bc"));
+            self.module.write_bitcode_to_path(&bc_path);
+        }
+        Ok(self.module.print_to_string())
     }
 
     pub fn compile_asm_and_link(
@@ -263,18 +300,31 @@ impl<'ctx> CodeGen<'ctx> {
         Ok(())
     }
 
-    fn compile_mir(&mut self, mir: &Body, function_ctx: &FunctionInfo<'ctx>) {
+    fn compile_mir(
+        &mut self,
+        mir: &Body,
+        function_ctx: &FunctionInfo<'ctx>,
+    ) -> Option<impl BasicValue<'ctx>> {
         let candy_value_ptr = self
             .module
             .get_struct_type("candy_value")
             .unwrap()
             .ptr_type(AddressSpace::default());
 
-        for (idx, (id, expr)) in mir.expressions.iter().enumerate() {
-            match expr {
+        let mut return_value = None;
+
+        for (id, expr) in mir.expressions.iter() {
+            let expr_value = match expr {
                 Expression::Int(value) => {
+                    // TODO: Use proper BigInts here
                     let i64_type = self.context.i64_type();
-                    let v = i64_type.const_int(value.try_into().unwrap(), false);
+                    let v = i64_type.const_int(
+                        value
+                            .clamp(&i64::MIN.into(), &i64::MAX.into())
+                            .try_into()
+                            .unwrap(),
+                        false,
+                    );
 
                     let make_candy_int = self.module.get_function("make_candy_int").unwrap();
                     let call = self.builder.build_call(make_candy_int, &[v.into()], "");
@@ -285,10 +335,7 @@ impl<'ctx> CodeGen<'ctx> {
                         call.try_as_basic_value().unwrap_left(),
                     );
 
-                    if idx == mir.expressions.len() - 1 {
-                        self.builder
-                            .build_return(Some(&global.as_basic_value_enum()));
-                    }
+                    Some(global.as_basic_value_enum())
                 }
                 candy_frontend::mir::Expression::Text(text) => {
                     let string = self.make_str_literal(text);
@@ -297,30 +344,35 @@ impl<'ctx> CodeGen<'ctx> {
                         .builder
                         .build_call(make_candy_text, &[string.into()], "");
 
-                    let global =
-                        self.create_global(text, id, call.try_as_basic_value().unwrap_left());
+                    let global = self.create_global(
+                        &format!("text_{text}"),
+                        id,
+                        call.try_as_basic_value().unwrap_left(),
+                    );
 
-                    if idx == mir.expressions.len() - 1 {
-                        self.builder
-                            .build_return(Some(&global.as_basic_value_enum()));
-                    }
+                    Some(global.as_basic_value_enum())
                 }
                 candy_frontend::mir::Expression::Tag { symbol, value } => {
-                    self.tags.insert(symbol.clone(), *value);
+                    let tag_value = match value {
+                        Some(value) => self.get_value_with_id(function_ctx, value).unwrap(),
+                        None => candy_value_ptr.const_null().as_basic_value_enum(),
+                    };
 
                     let string = self.make_str_literal(symbol);
                     let make_candy_tag = self.module.get_function("make_candy_tag").unwrap();
-                    let call = self
-                        .builder
-                        .build_call(make_candy_tag, &[string.into()], "");
+                    let call = self.builder.build_call(
+                        make_candy_tag,
+                        &[string.into(), tag_value.into()],
+                        "",
+                    );
 
-                    let global =
-                        self.create_global(symbol, id, call.try_as_basic_value().unwrap_left());
+                    let global = self.create_global(
+                        &format!("tag_{symbol}"),
+                        id,
+                        call.try_as_basic_value().unwrap_left(),
+                    );
 
-                    if idx == mir.expressions.len() - 1 {
-                        self.builder
-                            .build_return(Some(&global.as_basic_value_enum()));
-                    }
+                    Some(global.as_basic_value_enum())
                 }
                 candy_frontend::mir::Expression::Builtin(builtin) => {
                     let builtin_name = format!("candy_builtin_{}", builtin.as_ref());
@@ -356,10 +408,7 @@ impl<'ctx> CodeGen<'ctx> {
                         call.try_as_basic_value().unwrap_left(),
                     );
 
-                    if idx == mir.expressions.len() - 1 {
-                        self.builder
-                            .build_return(Some(&global.as_basic_value_enum()));
-                    }
+                    Some(global.as_basic_value_enum())
                 }
                 candy_frontend::mir::Expression::List(list) => {
                     let i64_type = self.context.i64_type();
@@ -404,10 +453,7 @@ impl<'ctx> CodeGen<'ctx> {
                     let global =
                         self.create_global("", id, candy_list.try_as_basic_value().unwrap_left());
 
-                    if idx == mir.expressions.len() - 1 {
-                        self.builder
-                            .build_return(Some(&global.as_basic_value_enum()));
-                    }
+                    Some(global.as_basic_value_enum())
                 }
                 candy_frontend::mir::Expression::Struct(s) => {
                     let i64_type = self.context.i64_type();
@@ -487,24 +533,13 @@ impl<'ctx> CodeGen<'ctx> {
 
                     self.locals.insert(*id, struct_value);
 
-                    let function_ctx_name =
-                        function_ctx.function_value.get_name().to_str().unwrap();
-                    if idx == mir.expressions.len() - 1 {
-                        if function_ctx_name != "main" {
-                            self.builder
-                                .build_return(Some(&struct_value.into_pointer_value()));
-                        } else {
-                            self.main_return.replace(struct_value.into_pointer_value());
-                        }
-                    }
+                    Some(struct_value.into_pointer_value().as_basic_value_enum())
                 }
                 candy_frontend::mir::Expression::Reference(ref_id) => {
                     let value = self.get_value_with_id(function_ctx, ref_id).unwrap();
 
                     self.locals.insert(*id, value);
-                    if idx == mir.expressions.len() - 1 {
-                        self.builder.build_return(Some(&value));
-                    }
+                    Some(value)
                 }
                 candy_frontend::mir::Expression::HirId(hir_id) => {
                     let text = format!("{hir_id}");
@@ -515,7 +550,10 @@ impl<'ctx> CodeGen<'ctx> {
                         .builder
                         .build_call(make_candy_text, &[string.into()], "");
 
-                    self.create_global(&text, id, call.try_as_basic_value().unwrap_left());
+                    let global =
+                        self.create_global(&text, id, call.try_as_basic_value().unwrap_left());
+
+                    Some(global.as_basic_value_enum())
                 }
                 candy_frontend::mir::Expression::Function {
                     original_hirs,
@@ -606,9 +644,7 @@ impl<'ctx> CodeGen<'ctx> {
                     self.compile_mir(body, &function_info);
                     self.builder.position_at_end(current_block);
 
-                    if idx == mir.expressions.len() - 1 {
-                        self.builder.build_return(Some(&global));
-                    }
+                    Some(global.as_basic_value_enum())
                 }
                 candy_frontend::mir::Expression::Parameter => unreachable!(),
                 candy_frontend::mir::Expression::Call {
@@ -648,10 +684,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let call_value = call.try_as_basic_value().unwrap_left();
                         self.locals.insert(*id, call_value);
 
-                        if idx == mir.expressions.len() - 1 {
-                            self.builder
-                                .build_return(Some(&call_value.into_pointer_value()));
-                        }
+                        Some(call_value.as_basic_value_enum())
                     } else {
                         let function_value = self
                             .get_value_with_id(function_ctx, function)
@@ -689,10 +722,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let call_value = call.try_as_basic_value().unwrap_left();
                         self.locals.insert(*id, call_value);
 
-                        if idx == mir.expressions.len() - 1 {
-                            self.builder
-                                .build_return(Some(&call_value.into_pointer_value()));
-                        }
+                        Some(call_value.as_basic_value_enum())
                     }
                 }
                 candy_frontend::mir::Expression::UseModule { .. } => unreachable!(),
@@ -709,6 +739,9 @@ impl<'ctx> CodeGen<'ctx> {
                         .build_call(panic_fn, &[reason.into(), responsible.into()], "");
 
                     self.builder.build_unreachable();
+
+                    // Early return to avoid building a return instruction.
+                    return None;
                 }
                 candy_frontend::mir::Expression::TraceCallStarts { .. } => unimplemented!(),
                 candy_frontend::mir::Expression::TraceCallEnds { .. } => unimplemented!(),
@@ -718,8 +751,20 @@ impl<'ctx> CodeGen<'ctx> {
                 candy_frontend::mir::Expression::TraceFoundFuzzableFunction { .. } => {
                     unimplemented!()
                 }
+            };
+
+            if let Some(expr_value) = expr_value {
+                return_value.replace(expr_value);
             }
         }
+        let fn_name = function_ctx.function_value.get_name().to_string_lossy();
+        // This "main" refers to the entrypoint of the compiled program, not to the Candy main function
+        // which may be named differently.
+        if fn_name != "main" {
+            self.builder
+                .build_return(return_value.as_ref().map(|v| v as &dyn BasicValue<'ctx>));
+        }
+        return_value
     }
 
     fn create_global(
@@ -791,6 +836,9 @@ impl<'ctx> CodeGen<'ctx> {
         }
         if v.is_none() && let Some(value) = self.locals.get(id) {
             v.replace(*value);
+        }
+        if self.unrepresented_ids.contains(id) {
+            v.replace(candy_value_ptr.const_null().as_basic_value_enum());
         }
         v.unwrap_or_else(|| panic!("{id} should be a real ID"))
             .into()

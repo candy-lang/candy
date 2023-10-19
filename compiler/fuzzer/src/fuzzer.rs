@@ -3,20 +3,22 @@ use crate::{
     input::Input,
     input_pool::{InputPool, Score},
     runner::{RunResult, Runner},
+    utils::collect_symbols_in_heap,
     values::InputGeneration,
 };
 use candy_frontend::hir::Id;
 use candy_vm::{
-    heap::{Data, DisplayWithSymbolTable, Function, Heap},
-    lir::Lir,
+    byte_code::ByteCode,
+    heap::{Data, Function, Heap},
     tracer::stack_trace::StackTracer,
     Panic,
 };
+use itertools::Itertools;
 use std::rc::Rc;
 use tracing::debug;
 
 pub struct Fuzzer {
-    pub lir: Rc<Lir>,
+    pub byte_code: Rc<ByteCode>,
     pub function_heap: Heap,
     pub function: Function,
     pub function_id: Id,
@@ -29,7 +31,7 @@ pub struct Fuzzer {
 pub enum Status {
     StillFuzzing {
         total_coverage: Coverage,
-        runner: Runner<Rc<Lir>>,
+        runner: Runner<Rc<ByteCode>>,
     },
     // TODO: In the future, also add a state for trying to simplify the input.
     FoundPanic {
@@ -41,19 +43,23 @@ pub enum Status {
 }
 
 impl Fuzzer {
-    pub fn new(lir: Rc<Lir>, function: Function, function_id: Id) -> Self {
+    #[must_use]
+    pub fn new(byte_code: Rc<ByteCode>, function: Function, function_id: Id) -> Self {
         let mut heap = Heap::default();
         let function: Function = Data::from(function.clone_to_heap(&mut heap))
             .try_into()
             .unwrap();
 
-        // PERF: Avoid collecting the symbols into a hash set of owned strings that we then copy again.
-        let pool = InputPool::new(function.argument_count(), lir.symbol_table.clone());
-        let runner = Runner::new(lir.clone(), function, pool.generate_new_input());
+        // TODO: Collect `InlineTag`s by walking `function`
+        let pool = InputPool::new(
+            function.argument_count(),
+            collect_symbols_in_heap(&heap).into_iter().collect_vec(),
+        );
+        let runner = Runner::new(byte_code.clone(), function, pool.generate_new_input());
 
-        let num_instructions = lir.instructions.len();
+        let num_instructions = byte_code.instructions.len();
         Self {
-            lir,
+            byte_code,
             function_heap: heap,
             function,
             function_id,
@@ -65,18 +71,22 @@ impl Fuzzer {
         }
     }
 
-    pub fn lir(&self) -> Rc<Lir> {
-        self.lir.clone()
+    #[must_use]
+    pub fn byte_code(&self) -> Rc<ByteCode> {
+        self.byte_code.clone()
     }
 
+    #[must_use]
     pub fn status(&self) -> &Status {
         self.status.as_ref().unwrap()
     }
+    #[must_use]
     pub fn into_status(self) -> Status {
         self.status.unwrap()
     }
 
-    pub fn input_pool(&self) -> &InputPool {
+    #[must_use]
+    pub const fn input_pool(&self) -> &InputPool {
         &self.pool
     }
 
@@ -112,10 +122,10 @@ impl Fuzzer {
         &mut self,
         instructions_left: &mut usize,
         total_coverage: Coverage,
-        mut runner: Runner<Rc<Lir>>,
+        mut runner: Runner<Rc<ByteCode>>,
     ) -> Status {
         runner.run(instructions_left);
-        let Some(result) = runner.result else {
+        let Some(result) = runner.take_result() else {
             return Status::StillFuzzing {
                 total_coverage,
                 runner,
@@ -127,30 +137,27 @@ impl Fuzzer {
             self.function_id
                 .keys
                 .last()
-                .map(|function_name| DisplayWithSymbolTable::to_string(
-                    function_name,
-                    &runner.lir.symbol_table
-                ))
-                .unwrap_or_else(|| "{…}".to_string()),
-            runner.input.to_string(&runner.lir.symbol_table),
+                .map_or_else(|| "{…}".to_string(), ToString::to_string),
+            runner.input,
         );
-        debug!(
-            "{}",
-            result.to_string(&runner.lir.symbol_table, &call_string)
-        );
+        debug!("{}", result.to_string(&call_string));
         match result {
             RunResult::Timeout => self.create_new_fuzzing_case(total_coverage),
             RunResult::Done { .. } | RunResult::NeedsUnfulfilled { .. } => {
-                let function_range = self.lir.range_of_function(&self.function_id);
+                let function_range = self.byte_code.range_of_function(&self.function_id);
                 let function_coverage = total_coverage.in_range(&function_range);
 
                 // We favor small inputs with good code coverage.
+                #[allow(clippy::cast_precision_loss)]
                 let score = {
                     let complexity = runner.input.complexity() as Score;
                     let new_function_coverage = runner.coverage.in_range(&function_range);
-                    let score: Score = (1.5 * runner.num_instructions as f64)
-                        + (0.1 * new_function_coverage.improvement_on(&function_coverage) as f64)
-                        - 0.4 * complexity;
+                    let coverage_improvement =
+                        new_function_coverage.improvement_on(&function_coverage);
+
+                    let score = (runner.num_instructions as f64)
+                        .mul_add(1.5, 0.1 * coverage_improvement as f64);
+                    let score: Score = complexity.mul_add(-0.4, score);
                     score.clamp(0.1, Score::MAX)
                 };
                 self.pool.add(runner.input, result, score);
@@ -170,7 +177,7 @@ impl Fuzzer {
     }
     fn create_new_fuzzing_case(&self, total_coverage: Coverage) -> Status {
         let runner = Runner::new(
-            self.lir.clone(),
+            self.byte_code.clone(),
             self.function,
             self.pool.generate_new_input(),
         );

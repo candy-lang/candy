@@ -15,9 +15,9 @@ impl PausedState {
     #[allow(unused_parens)]
     pub fn read_memory(
         &mut self,
-        args: ReadMemoryArguments,
+        args: &ReadMemoryArguments,
     ) -> Result<ReadMemoryResponse, &'static str> {
-        let reference = MemoryReference::from_dap(args.memory_reference)?;
+        let reference = MemoryReference::from_dap(&args.memory_reference)?;
         let (base_offset, actual_range, data) = match reference {
             MemoryReference::Inline { value } => {
                 let bytes = value.raw_word().get().to_ne_bytes();
@@ -25,10 +25,8 @@ impl PausedState {
                 (0, range, Cow::Owned(bytes.to_vec()))
             }
             MemoryReference::Heap { address } => {
-                let vm = self.vm.as_ref().unwrap();
-
                 let object = HeapObject::new(NonNull::new(address.get() as *mut u64).unwrap());
-                if !vm.heap().objects().contains(&ObjectInHeap(object)) {
+                if !self.heap_ref().objects().contains(&ObjectInHeap(object)) {
                     return Err("memory-reference-invalid");
                 }
                 let range = HeapData::from(object).address_range();
@@ -77,10 +75,7 @@ pub enum MemoryReference {
 }
 impl MemoryReference {
     pub fn new(value: InlineObject) -> Self {
-        match HeapObject::try_from(value) {
-            Ok(object) => Self::heap(object),
-            Err(_) => MemoryReference::Inline { value },
-        }
+        HeapObject::try_from(value).map_or_else(|_| Self::Inline { value }, Self::heap)
     }
     pub fn heap(object: HeapObject) -> Self {
         Self::Heap {
@@ -88,7 +83,7 @@ impl MemoryReference {
         }
     }
 
-    pub fn from_dap(value: String) -> Result<Self, &'static str> {
+    pub fn from_dap(value: &str) -> Result<Self, &'static str> {
         let mut parts = value.split('-');
 
         match parts.next().ok_or("heap-inline-disambiguator-missing")? {
@@ -116,12 +111,12 @@ impl MemoryReference {
     }
     pub fn to_dap(self) -> String {
         match self {
-            MemoryReference::Inline { value } => format!(
+            Self::Inline { value } => format!(
                 "inline-{:0width$X}",
                 value.raw_word(),
                 width = 2 * size_of::<usize>(),
             ),
-            MemoryReference::Heap { address } => {
+            Self::Heap { address } => {
                 format!("heap-{address:016X}")
             }
         }
@@ -130,7 +125,7 @@ impl MemoryReference {
 
 #[extension_trait]
 impl<T: Copy + Ord> RangeExtension<T> for Range<T> {
-    fn intersection(&self, other: &Range<T>) -> Range<T> {
+    fn intersection(&self, other: &Self) -> Self {
         self.start.max(other.start)..self.end.min(other.end)
     }
 }

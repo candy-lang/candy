@@ -47,8 +47,9 @@ impl<D> IsMultiline for CstKind<D> {
                 parts,
                 closing,
             } => opening.is_multiline() || parts.is_multiline() || closing.is_multiline(),
+            Self::TextNewline(_) => true,
             Self::TextPart(_) => false,
-            Self::TextInterpolation { .. } => false,
+            Self::TextInterpolation { expression, .. } => expression.is_multiline(),
             Self::BinaryBar { left, bar, right } => {
                 left.is_multiline() || bar.is_multiline() || right.is_multiline()
             }

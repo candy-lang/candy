@@ -20,7 +20,7 @@ pub struct HeapText(HeapObject);
 impl HeapText {
     const BYTE_LEN_SHIFT: usize = 4;
 
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
     pub fn create(heap: &mut Heap, is_reference_counted: bool, value: &str) -> Self {
@@ -51,8 +51,8 @@ impl HeapText {
         unsafe { str::from_utf8_unchecked(slice::from_raw_parts(pointer, self.byte_len())) }
     }
 
-    pub fn is_empty(self) -> Tag {
-        Tag::create_bool(self.get().is_empty())
+    pub fn is_empty(self, heap: &Heap) -> Tag {
+        Tag::create_bool(heap, self.get().is_empty())
     }
     pub fn length(self, heap: &mut Heap) -> Int {
         Int::create(heap, true, self.get().graphemes(true).count())
@@ -65,14 +65,14 @@ impl HeapText {
             .collect_vec();
         List::create(heap, true, &characters)
     }
-    pub fn contains(self, pattern: Text) -> Tag {
-        Tag::create_bool(self.get().contains(pattern.get()))
+    pub fn contains(self, heap: &Heap, pattern: Text) -> Tag {
+        Tag::create_bool(heap, self.get().contains(pattern.get()))
     }
-    pub fn starts_with(self, prefix: Text) -> Tag {
-        Tag::create_bool(self.get().starts_with(prefix.get()))
+    pub fn starts_with(self, heap: &Heap, prefix: Text) -> Tag {
+        Tag::create_bool(heap, self.get().starts_with(prefix.get()))
     }
-    pub fn ends_with(self, suffix: Text) -> Tag {
-        Tag::create_bool(self.get().ends_with(suffix.get()))
+    pub fn ends_with(self, heap: &Heap, suffix: Text) -> Tag {
+        Tag::create_bool(heap, self.get().ends_with(suffix.get()))
     }
     pub fn get_range(self, heap: &mut Heap, range: Range<Int>) -> Text {
         // TODO: Support indices larger than usize.
@@ -132,7 +132,7 @@ impl HeapObjectTrait for HeapText {
                 self.text_pointer().as_ptr(),
                 clone.text_pointer().as_ptr(),
                 self.byte_len(),
-            )
+            );
         };
     }
 

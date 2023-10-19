@@ -36,7 +36,7 @@ impl Tracer for DebugTracer {
             .last_mut()
             .map(|it| &mut it.locals)
             .unwrap_or(&mut self.root_locals)
-            .push((expression.get().to_owned(), value));
+            .push((expression.get().clone(), value));
     }
 
     fn call_started(

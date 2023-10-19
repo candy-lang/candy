@@ -2,13 +2,14 @@ use self::{
     function::HeapFunction, hir_id::HeapHirId, int::HeapInt, list::HeapList, struct_::HeapStruct,
     tag::HeapTag, text::HeapText,
 };
-use super::{Data, DisplayWithSymbolTable, Heap, OrdWithSymbolTable, SymbolTable};
+use super::{Data, Heap};
+use crate::utils::{impl_debug_display_via_debugdisplay, DebugDisplay};
 use enum_dispatch::enum_dispatch;
 use rustc_hash::FxHashMap;
 use std::{
     cmp::Ordering,
     collections::hash_map,
-    fmt::{self, Debug, Display, Formatter, Pointer},
+    fmt::{self, Formatter, Pointer},
     hash::{Hash, Hasher},
     num::NonZeroUsize,
     ops::{Deref, Range},
@@ -60,28 +61,35 @@ impl HeapObject {
     pub const IS_REFERENCE_COUNTED_SHIFT: usize = 3;
     pub const IS_REFERENCE_COUNTED_MASK: u64 = 0b1 << Self::IS_REFERENCE_COUNTED_SHIFT;
 
-    pub fn new(address: NonNull<u64>) -> Self {
+    #[must_use]
+    pub const fn new(address: NonNull<u64>) -> Self {
         Self(address)
     }
 
-    pub fn address(self) -> NonNull<u64> {
+    #[must_use]
+    pub const fn address(self) -> NonNull<u64> {
         self.0
     }
-    pub fn pointer_equals(self, other: HeapObject) -> bool {
+    #[must_use]
+    pub fn pointer_equals(self, other: Self) -> bool {
         self.0 == other.0
     }
+    #[must_use]
     pub fn unsafe_get_word(self, offset: usize) -> u64 {
         unsafe { *self.word_pointer(offset).as_ref() }
     }
+    #[must_use]
     pub fn word_pointer(self, offset: usize) -> NonNull<u64> {
         self.0
             .map_addr(|it| it.checked_add(offset * Self::WORD_SIZE).unwrap())
     }
+    #[must_use]
     pub fn header_word(self) -> u64 {
         self.unsafe_get_word(0)
     }
 
     // Reference Counting
+    #[must_use]
     pub(super) fn is_reference_counted(self) -> bool {
         self.header_word() & Self::IS_REFERENCE_COUNTED_MASK != 0
     }
@@ -92,11 +100,16 @@ impl HeapObject {
             None
         }
     }
+    #[must_use]
     pub fn reference_count(&self) -> Option<usize> {
-        self.reference_count_pointer()
-            .map(|it| unsafe { *it.as_ref() as usize })
+        self.reference_count_pointer().map(|it| {
+            #[allow(clippy::cast_possible_truncation)]
+            unsafe {
+                *it.as_ref() as usize
+            }
+        })
     }
-    pub(super) fn set_reference_count(&self, value: usize) {
+    pub(super) fn set_reference_count(self, value: usize) {
         let mut pointer = self.reference_count_pointer().unwrap();
         unsafe { *pointer.as_mut() = value as u64 }
     }
@@ -135,13 +148,15 @@ impl HeapObject {
     }
 
     // Cloning
+    #[must_use]
     pub fn clone_to_heap(self, heap: &mut Heap) -> Self {
         self.clone_to_heap_with_mapping(heap, &mut FxHashMap::default())
     }
+    #[must_use]
     pub fn clone_to_heap_with_mapping(
         self,
         heap: &mut Heap,
-        address_map: &mut FxHashMap<HeapObject, HeapObject>,
+        address_map: &mut FxHashMap<Self, Self>,
     ) -> Self {
         match address_map.entry(self) {
             hash_map::Entry::Occupied(entry) => {
@@ -162,6 +177,7 @@ impl HeapObject {
     }
 
     // Content
+    #[must_use]
     pub fn content_word_pointer(self, offset: usize) -> NonNull<u64> {
         let offset = if self.is_reference_counted() {
             offset + 2
@@ -170,6 +186,7 @@ impl HeapObject {
         };
         self.word_pointer(offset)
     }
+    #[must_use]
     pub fn unsafe_get_content_word(self, offset: usize) -> u64 {
         unsafe { *self.content_word_pointer(offset).as_ref() }
     }
@@ -178,16 +195,12 @@ impl HeapObject {
     }
 }
 
-impl Debug for HeapObject {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        Debug::fmt(&HeapData::from(*self), f)
+impl DebugDisplay for HeapObject {
+    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
+        DebugDisplay::fmt(&HeapData::from(*self), f, is_debug)
     }
 }
-impl DisplayWithSymbolTable for HeapObject {
-    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
-        DisplayWithSymbolTable::fmt(&HeapData::from(*self), f, symbol_table)
-    }
-}
+impl_debug_display_via_debugdisplay!(HeapObject);
 
 impl Pointer for HeapObject {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -206,9 +219,14 @@ impl Hash for HeapObject {
         HeapData::from(*self).hash(state);
     }
 }
-impl OrdWithSymbolTable for HeapObject {
-    fn cmp(&self, symbol_table: &SymbolTable, other: &Self) -> Ordering {
-        OrdWithSymbolTable::cmp(&Data::from(*self), symbol_table, &Data::from(*other))
+impl Ord for HeapObject {
+    fn cmp(&self, other: &Self) -> Ordering {
+        Data::from(*self).cmp(&Data::from(*other))
+    }
+}
+impl PartialOrd for HeapObject {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -231,8 +249,8 @@ pub trait HeapObjectTrait: Copy + Into<HeapObject> {
         address_map: &mut FxHashMap<HeapObject, HeapObject>,
     );
 
-    /// Calls [Heap::drop] for all referenced [HeapObject]s and drops allocated
-    /// Rust objects owned by this object.
+    /// Calls [`Heap::drop`] for all referenced [`HeapObject`]s and drops
+    /// allocated Rust objects owned by this object.
     ///
     /// This method is called by [free] prior to deallocating the object's
     /// memory.
@@ -255,33 +273,22 @@ pub enum HeapData {
     HirId(HeapHirId),
 }
 
-impl Debug for HeapData {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+impl DebugDisplay for HeapData {
+    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         match self {
-            Self::Int(int) => Debug::fmt(int, f),
-            Self::List(list) => Debug::fmt(list, f),
-            Self::Struct(struct_) => Debug::fmt(struct_, f),
-            Self::Text(text) => Debug::fmt(text, f),
-            Self::Tag(tag) => Debug::fmt(tag, f),
-            Self::Function(function) => Debug::fmt(function, f),
-            Self::HirId(hir_id) => Debug::fmt(hir_id, f),
+            Self::Int(int) => DebugDisplay::fmt(int, f, is_debug),
+            Self::List(list) => DebugDisplay::fmt(list, f, is_debug),
+            Self::Struct(struct_) => DebugDisplay::fmt(struct_, f, is_debug),
+            Self::Text(text) => DebugDisplay::fmt(text, f, is_debug),
+            Self::Tag(tag) => DebugDisplay::fmt(tag, f, is_debug),
+            Self::Function(function) => DebugDisplay::fmt(function, f, is_debug),
+            Self::HirId(hir_id) => DebugDisplay::fmt(hir_id, f, is_debug),
         }
     }
 }
-impl DisplayWithSymbolTable for HeapData {
-    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
-        match self {
-            Self::Int(int) => Display::fmt(int, f),
-            Self::List(list) => DisplayWithSymbolTable::fmt(list, f, symbol_table),
-            Self::Struct(struct_) => DisplayWithSymbolTable::fmt(struct_, f, symbol_table),
-            Self::Text(text) => Display::fmt(text, f),
-            Self::Tag(tag) => DisplayWithSymbolTable::fmt(tag, f, symbol_table),
-            Self::Function(function) => Display::fmt(function, f),
-            Self::HirId(hir_id) => Display::fmt(hir_id, f),
-        }
-    }
-}
+impl_debug_display_via_debugdisplay!(HeapData);
 
+#[allow(clippy::fallible_impl_from)]
 impl From<HeapObject> for HeapData {
     fn from(object: HeapObject) -> Self {
         let header_word = object.header_word();
@@ -291,19 +298,19 @@ impl From<HeapObject> for HeapData {
                     header_word & !HeapObject::IS_REFERENCE_COUNTED_MASK,
                     HeapObject::KIND_INT,
                 );
-                HeapData::Int(HeapInt::new_unchecked(object))
+                Self::Int(HeapInt::new_unchecked(object))
             }
-            HeapObject::KIND_LIST => HeapData::List(HeapList::new_unchecked(object)),
-            HeapObject::KIND_STRUCT => HeapData::Struct(HeapStruct::new_unchecked(object)),
-            HeapObject::KIND_TAG => HeapData::Tag(HeapTag::new_unchecked(object)),
-            HeapObject::KIND_TEXT => HeapData::Text(HeapText::new_unchecked(object)),
-            HeapObject::KIND_FUNCTION => HeapData::Function(HeapFunction::new_unchecked(object)),
+            HeapObject::KIND_LIST => Self::List(HeapList::new_unchecked(object)),
+            HeapObject::KIND_STRUCT => Self::Struct(HeapStruct::new_unchecked(object)),
+            HeapObject::KIND_TAG => Self::Tag(HeapTag::new_unchecked(object)),
+            HeapObject::KIND_TEXT => Self::Text(HeapText::new_unchecked(object)),
+            HeapObject::KIND_FUNCTION => Self::Function(HeapFunction::new_unchecked(object)),
             HeapObject::KIND_HIR_ID => {
                 assert_eq!(
                     header_word & !HeapObject::IS_REFERENCE_COUNTED_MASK,
                     HeapObject::KIND_HIR_ID,
                 );
-                HeapData::HirId(HeapHirId::new_unchecked(object))
+                Self::HirId(HeapHirId::new_unchecked(object))
             }
             tag => panic!("Invalid tag: {tag:b}"),
         }
@@ -314,13 +321,13 @@ impl Deref for HeapData {
 
     fn deref(&self) -> &Self::Target {
         match &self {
-            HeapData::Int(int) => int,
-            HeapData::List(list) => list,
-            HeapData::Struct(struct_) => struct_,
-            HeapData::Text(text) => text,
-            HeapData::Tag(tag) => tag,
-            HeapData::Function(function) => function,
-            HeapData::HirId(hir_id) => hir_id,
+            Self::Int(int) => int,
+            Self::List(list) => list,
+            Self::Struct(struct_) => struct_,
+            Self::Text(text) => text,
+            Self::Tag(tag) => tag,
+            Self::Function(function) => function,
+            Self::HirId(hir_id) => hir_id,
         }
     }
 }

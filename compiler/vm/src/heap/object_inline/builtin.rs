@@ -1,9 +1,6 @@
 use super::InlineObjectTrait;
 use crate::{
-    heap::{
-        object_heap::HeapObject, symbol_table::impl_ord_with_symbol_table_via_ord, Heap,
-        InlineObject,
-    },
+    heap::{object_heap::HeapObject, Heap, InlineObject},
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
 use candy_frontend::builtin_functions::{self, BuiltinFunction};
@@ -22,7 +19,7 @@ pub struct InlineBuiltin(InlineObject);
 impl InlineBuiltin {
     const INDEX_SHIFT: usize = 3;
 
-    pub fn new_unchecked(object: InlineObject) -> Self {
+    pub const fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
     }
 
@@ -49,7 +46,7 @@ impl PartialEq for InlineBuiltin {
 }
 impl Hash for InlineBuiltin {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.index().hash(state)
+        self.index().hash(state);
     }
 }
 impl Ord for InlineBuiltin {
@@ -91,5 +88,3 @@ impl InlineObjectTrait for InlineBuiltin {
         self
     }
 }
-
-impl_ord_with_symbol_table_via_ord!(InlineBuiltin);

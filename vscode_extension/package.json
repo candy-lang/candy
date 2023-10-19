@@ -9,6 +9,7 @@
     "url": "https://github.com/candy-lang/candy.git",
     "directory": "new-new-packages/vscode_extension"
   },
+  "//": "Keep in sync with `devDependencies`.`@types/vscode`",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -149,6 +150,11 @@
         "category": "Candy Compiler Debugging",
         "command": "candy.debug.viewVmByteCode",
         "title": "View VM Byte Code"
+      },
+      {
+        "category": "Candy Compiler Debugging",
+        "command": "candy.debug.viewLlvmIr",
+        "title": "View LLVM IR"
       }
     ],
     "configuration": {
@@ -157,14 +163,14 @@
         "candy.languageServerCommand": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Command to start the 🍭 Candy language server. If empty, we'll attempt to find the 🍭 Candy executable in the `PATH` environment variable.",
-          "scope": "machine"
+          "markdownDescription": "Command to start the 🍭 Candy language server. If empty, we'll attempt to find the 🍭 Candy executable in the `PATH` environment variable. If you want LLVM IR support, add the `inkwell` feature flag.",
+          "scope": "machine-overridable"
         },
         "candy.packagesPath": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Path of a folder containing all packages.",
-          "scope": "machine"
+          "markdownDescription": "Path of a folder containing all 🍭 Candy packages.",
+          "scope": "machine-overridable"
         }
       }
     },
@@ -230,23 +236,23 @@
     "test": "node ./out/test/runTest.js"
   },
   "dependencies": {
-    "@vscode/debugadapter": "^1.61.0",
+    "@vscode/debugadapter": "^1.63.0",
     "vscode-languageclient": "^8.1.0"
   },
   "devDependencies": {
     "@types/glob": "^8.1.0",
-    "@types/mocha": "^10.0.1",
-    "@types/node": "^20.4.9",
+    "@types/mocha": "^10.0.2",
+    "@types/node": "^20.7.0",
     "@types/vscode": "^1.81.0",
-    "@typescript-eslint/eslint-plugin": "^6.3.0",
-    "@typescript-eslint/parser": "^6.3.0",
-    "eslint": "^8.47.0",
-    "eslint-config-prettier": "^8.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.7.3",
+    "@typescript-eslint/parser": "^6.7.3",
+    "eslint": "^8.50.0",
+    "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-prettier": "^5.0.0",
-    "glob": "^10.3.3",
+    "glob": "^10.3.10",
     "mocha": "^10.2.0",
-    "prettier": "^3.0.1",
-    "typescript": "^5.1.6",
+    "prettier": "^3.0.3",
+    "typescript": "^5.2.2",
     "vscode-test": "^1.4.0"
   },
   "eslintConfig": {

@@ -1,8 +1,6 @@
 use super::input::Input;
 use candy_frontend::builtin_functions;
-use candy_vm::heap::{
-    Data, Heap, I64BitLength, InlineObject, Int, List, Struct, SymbolTable, Tag, Text,
-};
+use candy_vm::heap::{Data, Heap, I64BitLength, InlineObject, Int, List, Struct, Tag, Text};
 use extension_trait::extension_trait;
 use itertools::Itertools;
 use num_bigint::RandBigInt;
@@ -16,23 +14,23 @@ use std::{cell::RefCell, rc::Rc};
 
 #[extension_trait]
 pub impl InputGeneration for Input {
-    fn generate(heap: Rc<RefCell<Heap>>, num_args: usize, symbol_table: &SymbolTable) -> Input {
+    fn generate(heap: Rc<RefCell<Heap>>, num_args: usize, symbols: &[Text]) -> Input {
         let mut arguments = vec![];
         for _ in 0..num_args {
             let address = InlineObject::generate(
                 &mut heap.borrow_mut(),
                 &mut rand::thread_rng(),
                 5.0,
-                symbol_table,
+                symbols,
             );
             arguments.push(address);
         }
-        Input { heap, arguments }
+        Self { heap, arguments }
     }
-    fn mutate(&mut self, rng: &mut ThreadRng, symbol_table: &SymbolTable) {
+    fn mutate(&mut self, rng: &mut ThreadRng, symbols: &[Text]) {
         let mut heap = self.heap.borrow_mut();
         let argument = self.arguments.choose_mut(rng).unwrap();
-        *argument = argument.generate_mutated(&mut heap, rng, symbol_table);
+        *argument = argument.generate_mutated(&mut heap, rng, symbols);
     }
     fn complexity(&self) -> usize {
         self.arguments
@@ -48,24 +46,24 @@ impl InlineObjectGeneration for InlineObject {
         heap: &mut Heap,
         rng: &mut ThreadRng,
         mut complexity: f32,
-        symbol_table: &SymbolTable,
+        symbols: &[Text],
     ) -> InlineObject {
         match rng.gen_range(1..=5) {
             1 => Int::create_from_bigint(heap, true, rng.gen_bigint(10)).into(),
             2 => Text::create(heap, true, "test").into(),
             3 => {
                 if rng.gen_bool(0.2) {
-                    let value = Self::generate(heap, rng, complexity - 10.0, symbol_table);
-                    Tag::create_with_value(heap, true, symbol_table.choose(rng), value).into()
+                    let value = Self::generate(heap, rng, complexity - 10.0, symbols);
+                    Tag::create_with_value(heap, true, *symbols.choose(rng).unwrap(), value).into()
                 } else {
-                    Tag::create(symbol_table.choose(rng)).into()
+                    Tag::create(*symbols.choose(rng).unwrap()).into()
                 }
             }
             4 => {
                 complexity -= 1.0;
                 let mut items = vec![];
                 while complexity > 10.0 {
-                    let item = Self::generate(heap, rng, 10.0, symbol_table);
+                    let item = Self::generate(heap, rng, 10.0, symbols);
                     items.push(item);
                     complexity -= 10.0;
                 }
@@ -75,8 +73,8 @@ impl InlineObjectGeneration for InlineObject {
                 complexity -= 1.0;
                 let mut fields = FxHashMap::default();
                 while complexity > 20.0 {
-                    let key = Self::generate(heap, rng, 10.0, symbol_table);
-                    let value = Self::generate(heap, rng, 10.0, symbol_table);
+                    let key = Self::generate(heap, rng, 10.0, symbols);
+                    let value = Self::generate(heap, rng, 10.0, symbols);
                     fields.insert(key, value);
                     complexity -= 20.0;
                 }
@@ -92,10 +90,10 @@ impl InlineObjectGeneration for InlineObject {
         self,
         heap: &mut Heap,
         rng: &mut ThreadRng,
-        symbol_table: &SymbolTable,
+        symbols: &[Text],
     ) -> InlineObject {
         if rng.gen_bool(0.1) {
-            return Self::generate(heap, rng, 100.0, symbol_table);
+            return Self::generate(heap, rng, 100.0, symbols);
         }
 
         match self.into() {
@@ -106,30 +104,35 @@ impl InlineObjectGeneration for InlineObject {
             Data::Text(text) => mutate_string(rng, heap, text.get().to_string()).into(),
             Data::Tag(tag) => {
                 if rng.gen_bool(0.5) {
-                    Tag::create_with_value_option(heap, true, symbol_table.choose(rng), tag.value())
-                        .into()
+                    Tag::create_with_value_option(
+                        heap,
+                        true,
+                        *symbols.choose(rng).unwrap(),
+                        tag.value(),
+                    )
+                    .into()
                 } else if let Some(value) = tag.value() {
                     if rng.gen_bool(0.9) {
-                        let value = value.generate_mutated(heap, rng, symbol_table);
-                        Tag::create_with_value(heap, true, tag.symbol_id(), value).into()
+                        let value = value.generate_mutated(heap, rng, symbols);
+                        Tag::create_with_value(heap, true, tag.symbol(), value).into()
                     } else {
                         tag.without_value().into()
                     }
                 } else {
-                    let value = Self::generate(heap, rng, 100.0, symbol_table);
-                    Tag::create_with_value(heap, true, tag.symbol_id(), value).into()
+                    let value = Self::generate(heap, rng, 100.0, symbols);
+                    Tag::create_with_value(heap, true, tag.symbol(), value).into()
                 }
             }
             Data::List(list) => {
                 let len = list.len();
                 if rng.gen_bool(0.9) && len > 0 {
                     let index = rng.gen_range(0..len);
-                    let new_item = list.get(index).generate_mutated(heap, rng, symbol_table);
+                    let new_item = list.get(index).generate_mutated(heap, rng, symbols);
                     list.replace(heap, index, new_item).into()
                 } else if rng.gen_bool(0.5) && len > 0 {
                     list.remove(heap, rng.gen_range(0..len)).into()
                 } else {
-                    let new_item = Self::generate(heap, rng, 100.0, symbol_table);
+                    let new_item = Self::generate(heap, rng, 100.0, symbols);
                     list.insert(heap, rng.gen_range(0..=len), new_item).into()
                 }
             }
@@ -138,15 +141,15 @@ impl InlineObjectGeneration for InlineObject {
                 if rng.gen_bool(0.9) && len > 0 {
                     let index = rng.gen_range(0..len);
                     let key = struct_.keys()[index];
-                    let value = struct_.values()[index].generate_mutated(heap, rng, symbol_table);
+                    let value = struct_.values()[index].generate_mutated(heap, rng, symbols);
                     struct_.insert(heap, key, value).into()
                 // TODO: Support removing value from a struct
                 // } else if rng.gen_bool(0.5) && len > 0 {
                 //     struct_
                 //         .remove(rng.gen_range(0..len));
                 } else {
-                    let key = Self::generate(heap, rng, 10.0, symbol_table);
-                    let value = Self::generate(heap, rng, 100.0, symbol_table);
+                    let key = Self::generate(heap, rng, 10.0, symbols);
+                    let value = Self::generate(heap, rng, 100.0, symbols);
                     struct_.insert(heap, key, value).into()
                 }
             }
@@ -161,10 +164,15 @@ impl InlineObjectGeneration for InlineObject {
         match self.into() {
             Data::Int(int) => match int {
                 Int::Inline(int) => int.get().bit_length() as usize,
-                Int::Heap(int) => int.get().bits() as usize,
+                Int::Heap(int) => int.get().bits().try_into().unwrap_or(usize::MAX),
             },
             Data::Text(text) => text.byte_len() + 1,
-            Data::Tag(tag) => 1 + tag.value().map(|it| it.complexity()).unwrap_or_default(),
+            Data::Tag(tag) => {
+                1 + tag
+                    .value()
+                    .map(InlineObjectGeneration::complexity)
+                    .unwrap_or_default()
+            }
             Data::List(list) => {
                 list.items()
                     .iter()
@@ -188,7 +196,7 @@ fn mutate_string(rng: &mut ThreadRng, heap: &mut Heap, mut string: String) -> Te
     if rng.gen_bool(0.5) && !string.is_empty() {
         let start = string.floor_char_boundary(rng.gen_range(0..=string.len()));
         let end = string.floor_char_boundary(start + rng.gen_range(0..=(string.len() - start)));
-        string.replace_range(start..end, "")
+        string.replace_range(start..end, "");
     } else {
         let insertion_point = string.floor_char_boundary(rng.gen_range(0..=string.len()));
         let string_to_insert = (0..rng.gen_range(0..10))
@@ -199,7 +207,7 @@ fn mutate_string(rng: &mut ThreadRng, heap: &mut Heap, mut string: String) -> Te
                     .unwrap()
             })
             .join("");
-        string.insert_str(insertion_point, &string_to_insert)
+        string.insert_str(insertion_point, &string_to_insert);
     }
     Text::create(heap, true, &string)
 }

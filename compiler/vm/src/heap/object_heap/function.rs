@@ -1,9 +1,6 @@
 use super::{utils::heap_object_impls, HeapObjectTrait};
 use crate::{
-    heap::{
-        object_heap::HeapObject, symbol_table::impl_ord_with_symbol_table_via_ord, Heap,
-        InlineObject,
-    },
+    heap::{object_heap::HeapObject, Heap, InlineObject},
     instruction_pointer::InstructionPointer,
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
@@ -25,7 +22,7 @@ impl HeapFunction {
     const CAPTURED_LEN_SHIFT: usize = 32;
     const ARGUMENT_COUNT_SHIFT: usize = 4;
 
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
     pub fn create(
@@ -88,6 +85,7 @@ impl HeapFunction {
         self.content_word_pointer(0)
     }
     pub fn body(self) -> InstructionPointer {
+        #[allow(clippy::cast_possible_truncation)]
         unsafe { *self.body_pointer().as_ref() as usize }.into()
     }
     pub fn set_body(self, body: InstructionPointer) {
@@ -134,6 +132,7 @@ impl PartialEq for HeapFunction {
             && self.body() == other.body()
     }
 }
+
 impl Hash for HeapFunction {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.captured().hash(state);
@@ -141,6 +140,7 @@ impl Hash for HeapFunction {
         self.body().hash(state);
     }
 }
+
 impl Ord for HeapFunction {
     fn cmp(&self, other: &Self) -> Ordering {
         // TODO: Compare the underlying HIR ID once we have it here (plus captured stuff)
@@ -187,5 +187,3 @@ impl HeapObjectTrait for HeapFunction {
 
     fn deallocate_external_stuff(self) {}
 }
-
-impl_ord_with_symbol_table_via_ord!(HeapFunction);

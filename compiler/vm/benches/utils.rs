@@ -16,9 +16,9 @@ use candy_frontend::{
     TracingConfig,
 };
 use candy_vm::{
+    byte_code::ByteCode,
     heap::{Heap, HirId, InlineObject, Struct},
-    lir::Lir,
-    mir_to_lir::compile_lir,
+    mir_to_byte_code::compile_byte_code,
     tracer::DummyTracer,
     PopulateInMemoryProviderFromFileSystem, Vm, VmFinished,
 };
@@ -70,7 +70,7 @@ impl MutableModuleProviderOwner for Database {
     }
 }
 
-pub fn setup_and_compile(source_code: &str) -> Lir {
+pub fn setup_and_compile(source_code: &str) -> ByteCode {
     let mut db = setup();
     compile(&mut db, source_code)
 }
@@ -82,7 +82,7 @@ pub fn setup() -> Database {
     db.module_provider.add_str(&MODULE, r#"_ = use "Core""#);
 
     // Load `Core` into the cache.
-    let errors = compile_lir(&db, MODULE.clone(), TRACING.clone()).1;
+    let errors = compile_byte_code(&db, MODULE.clone(), TRACING.clone()).1;
     if !errors.is_empty() {
         for error in errors.iter() {
             warn!("{}", error.to_string_with_location(&db));
@@ -93,33 +93,31 @@ pub fn setup() -> Database {
     db
 }
 
-pub fn compile(db: &mut Database, source_code: &str) -> Lir {
+pub fn compile(db: &mut Database, source_code: &str) -> ByteCode {
     db.did_open_module(&MODULE, source_code.as_bytes().to_owned());
-    compile_lir(db, MODULE.clone(), TRACING.clone()).0
+    compile_byte_code(db, MODULE.clone(), TRACING.clone()).0
 }
 
-pub fn run(lir: impl Borrow<Lir>) -> (Heap, InlineObject) {
-    let VmFinished {
-        mut heap,
-        tracer,
-        result,
-    } = Vm::for_module(lir.borrow(), DummyTracer).run_forever_without_handles();
+pub fn run(byte_code: impl Borrow<ByteCode>) -> (Heap, InlineObject) {
+    let mut heap = Heap::default();
+    let VmFinished { tracer, result } = Vm::for_module(byte_code.borrow(), &mut heap, DummyTracer)
+        .run_forever_without_handles(&mut heap);
     let main = result
         .expect("Module panicked.")
-        .into_main_function(&lir.borrow().symbol_table)
+        .into_main_function(&heap)
         .unwrap();
 
     // Run the `main` function.
     let environment = Struct::create(&mut heap, true, &FxHashMap::default());
     let responsible = HirId::create(&mut heap, true, hir::Id::user());
-    let VmFinished { heap, result, .. } = Vm::for_function(
-        lir,
-        heap,
+    let VmFinished { result, .. } = Vm::for_function(
+        byte_code,
+        &mut heap,
         main,
         &[environment.into(), responsible.into()],
         tracer,
     )
-    .run_forever_without_handles();
+    .run_forever_without_handles(&mut heap);
     match result {
         Ok(return_value) => (heap, return_value),
         Err(panic) => {

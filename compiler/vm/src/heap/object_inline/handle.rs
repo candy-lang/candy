@@ -1,7 +1,7 @@
 use super::{InlineObject, InlineObjectTrait};
 use crate::{
     handle_id::HandleId,
-    heap::{object_heap::HeapObject, symbol_table::impl_ord_with_symbol_table_via_ord, Heap},
+    heap::{object_heap::HeapObject, Heap},
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
 use candy_frontend::id::CountableId;
@@ -21,7 +21,7 @@ impl InlineHandle {
     const HANDLE_ID_SHIFT: usize = 32;
     const ARGUMENT_COUNT_SHIFT: usize = 4;
 
-    pub fn new_unchecked(object: InlineObject) -> Self {
+    pub const fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
     }
 
@@ -70,7 +70,7 @@ impl PartialEq for InlineHandle {
 }
 impl Hash for InlineHandle {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.handle_id().hash(state)
+        self.handle_id().hash(state);
     }
 }
 impl Ord for InlineHandle {
@@ -101,5 +101,3 @@ impl InlineObjectTrait for InlineHandle {
         self
     }
 }
-
-impl_ord_with_symbol_table_via_ord!(InlineHandle);

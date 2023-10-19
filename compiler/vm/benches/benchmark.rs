@@ -3,6 +3,14 @@ use criterion::{
     Criterion,
 };
 use criterion_cycles_per_byte::CyclesPerByte;
+use tracing::Level;
+use tracing_subscriber::{
+    filter,
+    fmt::{format::FmtSpan, writer::BoxMakeWriter},
+    prelude::__tracing_subscriber_SubscriberExt,
+    util::SubscriberInitExt,
+    Layer,
+};
 use utils::{compile, run, setup, setup_and_compile};
 
 mod utils;
@@ -132,11 +140,13 @@ impl<'a, M: Measurement> BencherExtension for Bencher<'a, M> {
 }
 
 fn run_benchmarks<M: Measurement>(c: &mut Criterion<M>, prefix: &str) {
+    init_logger();
     benchmark_compiler(c, prefix);
     benchmark_vm_runtime(c, prefix);
 }
 
 fn run_cycle_benchmarks(c: &mut Criterion<CyclesPerByte>) {
+    init_logger();
     run_benchmarks(c, "Cycles");
 }
 criterion_group!(
@@ -152,3 +162,15 @@ criterion_group!(time_benchmarks, run_time_benchmarks);
 
 // criterion_main!(cycle_benchmarks, time_benchmarks);
 criterion_main!(time_benchmarks);
+
+fn init_logger() {
+    let writer = BoxMakeWriter::new(std::io::stderr);
+    let console_log = tracing_subscriber::fmt::layer()
+        .compact()
+        .with_writer(writer)
+        .with_span_events(FmtSpan::ENTER)
+        .with_filter(filter::filter_fn(|metadata| {
+            metadata.level() <= &Level::WARN
+        }));
+    tracing_subscriber::registry().with(console_log).init();
+}

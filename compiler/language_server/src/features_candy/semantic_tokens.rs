@@ -27,7 +27,7 @@ fn visit_csts(
     token_type_for_identifier: Option<SemanticTokenType>,
 ) {
     for cst in csts {
-        visit_cst(builder, cst, token_type_for_identifier)
+        visit_cst(builder, cst, token_type_for_identifier);
     }
 }
 fn visit_cst(
@@ -133,11 +133,12 @@ fn visit_cst(
             closing,
         } => {
             visit_cst(builder, opening, None);
-            for part in parts {
-                visit_cst(builder, part, None);
+            for line in parts {
+                visit_cst(builder, line, None);
             }
             visit_cst(builder, closing, None);
         }
+        CstKind::TextNewline(_) => {}
         CstKind::TextPart(_) => builder.add(
             cst.data.span.clone(),
             SemanticTokenType::Text,

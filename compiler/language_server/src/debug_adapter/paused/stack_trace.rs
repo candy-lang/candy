@@ -9,8 +9,8 @@ use crate::{
 };
 use candy_frontend::{ast_to_hir::AstToHir, hir::Id, utils::AdjustCasingOfFirstLetter};
 use candy_vm::{
-    heap::{Data, DisplayWithSymbolTable, InlineObject},
-    lir::Lir,
+    byte_code::ByteCode,
+    heap::{Data, InlineObject},
     Vm,
 };
 use dap::{
@@ -26,10 +26,9 @@ impl PausedState {
         &mut self,
         db: &Database,
         start_at_1_config: StartAt1Config,
-        args: StackTraceArguments,
-    ) -> Result<StackTraceResponse, &'static str> {
-        let vm = &self.vm.as_ref().unwrap();
-        let tracer = vm.tracer();
+        args: &StackTraceArguments,
+    ) -> StackTraceResponse {
+        let tracer = self.vm.as_ref().unwrap().vm.tracer();
 
         let start_frame = args.start_frame.unwrap_or_default();
         let levels = args
@@ -51,7 +50,7 @@ impl PausedState {
                     start_at_1_config,
                     id,
                     frame,
-                    self.vm.as_ref().unwrap().lir(),
+                    self.vm.as_ref().unwrap().vm.byte_code(),
                 )
             },
         ));
@@ -75,10 +74,10 @@ impl PausedState {
             });
         }
 
-        Ok(StackTraceResponse {
+        StackTraceResponse {
             stack_frames,
             total_frames: Some(total_frames),
-        })
+        }
     }
 
     fn stack_frame(
@@ -86,11 +85,11 @@ impl PausedState {
         start_at_1_config: StartAt1Config,
         id: usize,
         frame: &StackFrame,
-        lir: &Lir,
+        byte_code: &ByteCode,
     ) -> dap::types::StackFrame {
         let (name, source, range) = match Data::from(frame.call.callee) {
             Data::Function(function) => {
-                let functions = lir.functions_behind(function.body());
+                let functions = byte_code.functions_behind(function.body());
                 assert_eq!(functions.len(), 1);
                 let function = functions.iter().next().unwrap();
 
@@ -100,7 +99,7 @@ impl PausedState {
                         &module_to_url(&function.module, &db.packages_path).unwrap(),
                     )),
                     source_reference: None,
-                    presentation_hint: if lir.module.package == function.module.package {
+                    presentation_hint: if byte_code.module.package == function.module.package {
                         PresentationHint::Emphasize
                     } else {
                         PresentationHint::Normal
@@ -111,7 +110,7 @@ impl PausedState {
                     checksums: None,
                 };
                 let range = db.hir_id_to_span(function).unwrap();
-                let range = db.range_to_lsp_range(function.module.to_owned(), range);
+                let range = db.range_to_lsp_range(function.module.clone(), range);
                 let range = start_at_1_config.range_to_dap(range);
                 (function.function_name(), Some(source), Some(range))
             }
@@ -122,17 +121,14 @@ impl PausedState {
                 );
                 (name, None, None)
             }
-            it => panic!(
-                "Unexpected callee: {}",
-                DisplayWithSymbolTable::to_string(&it, &lir.symbol_table),
-            ),
+            it => panic!("Unexpected callee: {it}"),
         };
         dap::types::StackFrame {
             id,
             name,
             source,
-            line: range.map(|it| it.start.line as usize).unwrap_or(1),
-            column: range.map(|it| it.start.character as usize).unwrap_or(1),
+            line: range.map_or(1, |it| it.start.line as usize),
+            column: range.map_or(1, |it| it.start.character as usize),
             end_line: range.map(|it| it.end.line as usize),
             end_column: range.map(|it| it.end.character as usize),
             can_restart: Some(false),
@@ -149,16 +145,19 @@ pub struct StackFrameKey {
     index: usize,
 }
 impl StackFrameKey {
-    pub fn get<'a, L: Borrow<Lir>>(&self, vm: &'a Vm<L, DebugTracer>) -> Option<&'a StackFrame> {
+    pub fn get<'a, B: Borrow<ByteCode>>(
+        &self,
+        vm: &'a Vm<B, DebugTracer>,
+    ) -> Option<&'a StackFrame> {
         if self.index == 0 {
             return None;
         }
 
         Some(&vm.tracer().call_stack[self.index - 1])
     }
-    pub fn get_locals<'a, L: Borrow<Lir>>(
+    pub fn get_locals<'a, B: Borrow<ByteCode>>(
         &self,
-        vm: &'a Vm<L, DebugTracer>,
+        vm: &'a Vm<B, DebugTracer>,
     ) -> &'a Vec<(Id, InlineObject)> {
         let tracer = vm.tracer();
         if self.index == 0 {

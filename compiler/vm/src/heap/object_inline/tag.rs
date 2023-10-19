@@ -1,74 +1,71 @@
 use super::InlineObjectTrait;
 use crate::{
     heap::{
-        object_heap::HeapObject, symbol_table::impl_ord_with_symbol_table_via_ord,
-        DisplayWithSymbolTable, Heap, InlineObject, SymbolId, SymbolTable,
+        object_heap::{text::HeapText, HeapObject},
+        Heap, InlineObject, Text,
     },
-    utils::impl_eq_hash_ord_via_get,
+    utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_ord_via_get, DebugDisplay},
 };
 use derive_more::Deref;
 use rustc_hash::FxHashMap;
 use std::{
-    fmt::{self, Debug, Formatter},
+    fmt::{self, Formatter},
     num::NonZeroU64,
+    ptr::NonNull,
 };
 
 #[derive(Clone, Copy, Deref)]
 pub struct InlineTag(InlineObject);
 
 impl InlineTag {
-    const SYMBOL_ID_SHIFT: usize = 3;
+    const SYMBOL_POINTER_MASK: u64 = !0b111;
 
-    pub fn new_unchecked(object: InlineObject) -> Self {
+    pub const fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
     }
-
-    pub fn get(self) -> SymbolId {
-        SymbolId::from((self.raw_word().get() >> Self::SYMBOL_ID_SHIFT) as usize)
-    }
-}
-
-impl Debug for InlineTag {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{:?}", self.get())
-    }
-}
-impl DisplayWithSymbolTable for InlineTag {
-    fn fmt(&self, f: &mut Formatter, symbol_table: &SymbolTable) -> fmt::Result {
-        // We can always use the display formatter since the symbol has a constrained charset.
-        write!(f, "{}", symbol_table.get(self.get()))
-    }
-}
-
-impl_eq_hash_ord_via_get!(InlineTag);
-
-impl From<SymbolId> for InlineObject {
-    fn from(symbol_id: SymbolId) -> Self {
-        *InlineTag::from(symbol_id)
-    }
-}
-impl From<SymbolId> for InlineTag {
-    fn from(symbol_id: SymbolId) -> Self {
-        let symbol_id = symbol_id.value();
+    pub fn new(symbol: Text) -> Self {
+        let symbol_pointer = symbol.address().addr().get() as u64;
         debug_assert_eq!(
-            (symbol_id << Self::SYMBOL_ID_SHIFT) >> Self::SYMBOL_ID_SHIFT,
-            symbol_id,
-            "Symbol ID is too large.",
+            symbol_pointer & Self::SYMBOL_POINTER_MASK,
+            symbol_pointer,
+            "Symbol pointer is invalid.",
         );
-        let header_word = InlineObject::KIND_TAG | ((symbol_id as u64) << Self::SYMBOL_ID_SHIFT);
+        let header_word = InlineObject::KIND_TAG | symbol_pointer;
         let header_word = unsafe { NonZeroU64::new_unchecked(header_word) };
         Self(InlineObject::new(header_word))
     }
+
+    pub fn get(self) -> Text {
+        let pointer = self.raw_word().get() & Self::SYMBOL_POINTER_MASK;
+        let pointer = unsafe { NonNull::new_unchecked(pointer as *mut u64) };
+        Text::from(HeapText::new_unchecked(HeapObject::new(pointer)))
+    }
+
+    pub fn dup_by(self, amount: usize) {
+        self.get().dup_by(amount);
+    }
+    pub fn drop(self, heap: &mut Heap) {
+        self.get().drop(heap);
+    }
 }
+
+impl DebugDisplay for InlineTag {
+    fn fmt(&self, f: &mut Formatter, _is_debug: bool) -> fmt::Result {
+        // We can always use the display formatter since the symbol has a constrained charset.
+        write!(f, "{}", self.get().get())
+    }
+}
+impl_debug_display_via_debugdisplay!(InlineTag);
+
+impl_eq_hash_ord_via_get!(InlineTag);
 
 impl InlineObjectTrait for InlineTag {
     fn clone_to_heap_with_mapping(
         self,
-        _heap: &mut Heap,
-        _address_map: &mut FxHashMap<HeapObject, HeapObject>,
+        heap: &mut Heap,
+        address_map: &mut FxHashMap<HeapObject, HeapObject>,
     ) -> Self {
-        self
+        let cloned = self.get().clone_to_heap_with_mapping(heap, address_map);
+        Self::new(HeapText::new_unchecked(cloned).into())
     }
 }
-
-impl_ord_with_symbol_table_via_ord!(InlineTag);
