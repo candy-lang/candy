@@ -37,7 +37,7 @@ single list :=
   list %
     (,) -> Error Empty
     (item,) -> Ok item
-    _ -> Error TooLong
+    _ -> Error MoreThanOneItem
 first list :=
   needs (is list)
   list %

@@ -215,7 +215,7 @@ impl Id {
                 if a.len() != b.len() {
                     return Some(false);
                 }
-                for (a, b) in a.iter().zip(b) {
+                for (a, b) in a.iter().zip_eq(b) {
                     if !a.semantically_equals(*b, visible, pureness)? {
                         return Some(false);
                     }
@@ -237,7 +237,12 @@ impl Id {
                 | Expression::Builtin(_)
                 | Expression::List(_)
                 | Expression::Struct(_),
-                _,
+                Expression::Int(_)
+                | Expression::Text(_)
+                | Expression::Tag { .. }
+                | Expression::Builtin(_)
+                | Expression::List(_)
+                | Expression::Struct(_),,
             ) => Some(false),
             _ => None,
         }
