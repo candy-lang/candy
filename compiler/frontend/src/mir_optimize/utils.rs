@@ -1,5 +1,6 @@
 use super::pure::PurenessInsights;
 use crate::mir::{Body, Expression, Id, VisibleExpressions};
+use itertools::Itertools;
 use rustc_hash::FxHashSet;
 use std::mem;
 
@@ -242,7 +243,7 @@ impl Id {
                 | Expression::Tag { .. }
                 | Expression::Builtin(_)
                 | Expression::List(_)
-                | Expression::Struct(_),,
+                | Expression::Struct(_),
             ) => Some(false),
             _ => None,
         }
