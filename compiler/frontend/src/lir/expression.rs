@@ -111,13 +111,11 @@ impl Expression {
             Self::Call {
                 function,
                 arguments,
-                responsible,
             } => {
                 *function = replacer(*function);
                 for argument in arguments {
                     *argument = replacer(*argument);
                 }
-                *responsible = replacer(*responsible);
             }
             Self::Panic {
                 reason,
@@ -130,14 +128,12 @@ impl Expression {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             } => {
                 *hir_call = replacer(*hir_call);
                 *function = replacer(*function);
                 for argument in arguments {
                     *argument = replacer(*argument);
                 }
-                *responsible = replacer(*responsible);
             }
             Self::TraceCallEnds { return_value } => {
                 *return_value = replacer(*return_value);
