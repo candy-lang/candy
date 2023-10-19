@@ -66,7 +66,7 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
 
     let (mir, errors) = db
         .optimized_mir(module.clone(), TracingConfig::off())
-        .map(|(mir, _, errors)| (mir, errors))
+        .map(|(mir, _, _, errors)| (mir, errors))
         .unwrap_or_else(|error| {
             let payload = CompilerErrorPayload::Module(error);
             let mir = Mir::build(|body| {
@@ -87,7 +87,7 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
     }
 
     let context = candy_backend_inkwell::inkwell::context::Context::create();
-    let mut codegen = CodeGen::new(&context, &path, mir);
+    let codegen = CodeGen::new(&context, &path, mir);
     let llvm_candy_module = codegen
         .compile(options.print_llvm_ir, options.print_main_output)
         .map_err(|e| Exit::LlvmError(e.to_string()))?;

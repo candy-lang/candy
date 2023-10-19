@@ -20,7 +20,6 @@ candy_fuzzer = { path = "../fuzzer" }
 candy_language_server = { path = "../language_server" }
 candy_vm = { path = "../vm" }
 clap = { version = "4.1.8", features = ["derive"] }
-colored = "2.0.4"
 diffy = "0.3.0"
 itertools = "0.11.0"
 lazy_static = "1.4.0"

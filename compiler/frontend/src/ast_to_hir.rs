@@ -106,7 +106,7 @@ fn compile_top_level(
         public_identifiers: FxHashMap::default(),
         body: Body::default(),
         id_prefix: hir::Id::new(module, vec![]),
-        identifiers: RcImHashMap::new(),
+        identifiers: RcImHashMap::default(),
         is_top_level: true,
         use_id: None,
     };

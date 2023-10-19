@@ -4,6 +4,7 @@ use crate::{
     mir::{Expression, Id},
     rich_ir::{RichIrBuilder, ToRichIr},
 };
+use enumset::EnumSet;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -43,7 +44,7 @@ impl Operation {
             OperationKind::Panic(panic) => Some(panic.reason),
             OperationKind::Impure => None,
         };
-        self.timeline.reduce(parameters, return_value)
+        self.timeline.reduce(parameters, return_value);
     }
 }
 
@@ -55,10 +56,10 @@ impl ToRichIr for Operation {
                 panic.build_rich_ir(builder);
             }
             OperationKind::Impure => {
-                builder.push("impure", None, Default::default());
+                builder.push("impure", None, EnumSet::default());
             }
         }
-        builder.push(" if:", None, Default::default());
+        builder.push(" if:", None, EnumSet::default());
         builder.indent();
         builder.push_newline();
         self.timeline.build_rich_ir(builder);

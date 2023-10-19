@@ -6,22 +6,12 @@ use crate::{
 #[cfg(feature = "inkwell")]
 use candy_backend_inkwell::LlvmIrDb;
 use candy_frontend::{
-    ast_to_hir::AstToHir,
-    cst_to_ast::CstToAst,
-    hir_to_mir::HirToMir,
-    lir_optimize::OptimizeLir,
-    mir_optimize::OptimizeMir,
-    mir_to_lir::MirToLir,
-    position::Offset,
-    rcst_to_cst::RcstToCst,
-    rich_ir::{RichIr, RichIrAnnotation, TokenType},
-    string_to_rcst::StringToRcst,
-    utils::DoHash,
-    TracingConfig, TracingMode,
+    ast_to_hir::AstToHir, cst_to_ast::CstToAst, hir_to_mir::HirToMir, lir_optimize::OptimizeLir,
+    mir_optimize::OptimizeMir, mir_to_lir::MirToLir, rcst_to_cst::RcstToCst, rich_ir::RichIr,
+    string_to_rcst::StringToRcst, utils::DoHash, TracingConfig, TracingMode,
 };
 use candy_vm::{byte_code::RichIrForByteCode, heap::HeapData, mir_to_byte_code::compile_byte_code};
 use clap::{Parser, ValueHint};
-use colored::{Color, Colorize};
 use diffy::{create_patch, PatchFormatter};
 use itertools::Itertools;
 use lazy_static::lazy_static;
@@ -304,7 +294,7 @@ impl GoldOptions {
             let mir = RichIr::for_mir(&module, &mir, &Self::TRACING_CONFIG);
             visit("MIR", mir.text);
 
-            let (optimized_mir, _, _) = db
+            let (optimized_mir, _, _, _) = db
                 .optimized_mir(module.clone(), Self::TRACING_CONFIG.clone())
                 .unwrap();
             let optimized_mir =

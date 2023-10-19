@@ -21,7 +21,7 @@ pub trait MirToLir: OptimizeMir {
 pub type LirResult = Result<(Arc<Lir>, Arc<FxHashSet<CompilerError>>), ModuleError>;
 
 fn lir(db: &dyn MirToLir, module: Module, tracing: TracingConfig) -> LirResult {
-    let (mir, _, errors) = db.optimized_mir(module.clone(), tracing)?;
+    let (mir, _, _, errors) = db.optimized_mir(module.clone(), tracing)?;
 
     let mut context = LoweringContext::default();
     context.compile_function(

@@ -26,7 +26,7 @@ impl DataFlowScope {
         Self::new(Timeline::default(), vec![], return_value)
     }
     pub fn new(mut timeline: Timeline, parameters: Vec<Id>, return_value: Id) -> Self {
-        for parameter in parameters.iter() {
+        for parameter in &parameters {
             assert!(timeline.values.insert(*parameter, FlowValue::Any).is_none());
         }
         Self {
@@ -51,10 +51,10 @@ impl DataFlowScope {
         assert!(self.state.result.is_ok());
 
         let value = match expression {
-            Expression::Int(int) => FlowValue::Int(int.to_owned()),
-            Expression::Text(text) => FlowValue::Text(text.to_owned()),
+            Expression::Int(int) => FlowValue::Int(int.clone()),
+            Expression::Text(text) => FlowValue::Text(text.clone()),
             Expression::Tag { symbol, value } => FlowValue::Tag {
-                symbol: symbol.to_owned(),
+                symbol: symbol.clone(),
                 value: value.map(|it| {
                     *reference_counts.get_mut(&it).unwrap() += 1;
                     Box::new(FlowValue::Reference(it))

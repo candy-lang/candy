@@ -34,12 +34,12 @@ impl DataFlow {
 
     pub(super) fn enter_function(&mut self, parameters: Vec<Id>, return_value: Id) {
         info!("Entering function {:?} -> {:?}", parameters, return_value);
-        for parameter in parameters.iter() {
+        for parameter in &parameters {
             *self.reference_counts.entry(*parameter).or_default() += 1;
         }
         assert!(self.reference_counts.insert(return_value, 1).is_none());
 
-        let timeline = self.innermost_scope().state.timeline.to_owned();
+        let timeline = self.innermost_scope().state.timeline.clone();
         self.scopes
             .push(DataFlowScope::new(timeline, parameters, return_value));
     }
@@ -110,7 +110,9 @@ impl DataFlow {
         insights
     }
     pub(super) fn on_constants_lifted(&mut self, lifted_constants: impl IntoIterator<Item = Id>) {
-        let [.., outer_scope, inner_scope] = self.scopes.as_mut_slice() else { panic!(); };
+        let [.., outer_scope, inner_scope] = self.scopes.as_mut_slice() else {
+            panic!();
+        };
         for constant in lifted_constants {
             assert!(inner_scope.locals.remove(&constant));
             assert!(outer_scope.locals.insert(constant));
@@ -131,7 +133,7 @@ impl DataFlow {
             "Modules can't panic conditionally.",
         );
 
-        let mut timeline = other.timeline.to_owned();
+        let mut timeline = other.timeline.clone();
         timeline.map_ids(mapping);
         match &other.result {
             Ok(return_value) => {
@@ -145,13 +147,13 @@ impl DataFlow {
             Err(panic) => {
                 assert!(this.state.result.is_ok());
                 this.state.timeline = timeline;
-                this.state.result = Err(panic.to_owned());
+                this.state.result = Err(panic.clone());
             }
         }
     }
 
     pub fn innermost_scope_to_rich_ir(&self) -> RichIr {
-        self.innermost_scope().to_rich_ir()
+        self.innermost_scope().to_rich_ir(false)
     }
     fn innermost_scope(&self) -> &DataFlowScope {
         self.scopes.last().unwrap()

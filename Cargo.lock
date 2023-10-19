@@ -118,7 +118,6 @@ dependencies = [
  "candy_language_server",
  "candy_vm",
  "clap",
- "colored",
  "diffy",
  "itertools 0.11.0",
  "lazy_static",

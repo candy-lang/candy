@@ -47,7 +47,7 @@ pub trait ReferenceCounts {
     /// also includes references to locally defined IDs.
     // PERF: Maybe change this to accept a closure instead of collecting them to an `FxHashSet`
     #[must_use]
-    pub fn reference_counts(&self) -> FxHashMap<Id, usize> {
+    fn reference_counts(&self) -> FxHashMap<Id, usize> {
         let mut reference_counts = FxHashMap::default();
         self.collect_reference_counts(&mut reference_counts);
         reference_counts

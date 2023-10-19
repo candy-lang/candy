@@ -4,7 +4,6 @@ use crate::{
 };
 use enumset::EnumSet;
 use lazy_static::lazy_static;
-use std::fmt::{self, Display, Formatter};
 use strum::IntoEnumIterator;
 use strum_macros::{AsRefStr, EnumIter};
 

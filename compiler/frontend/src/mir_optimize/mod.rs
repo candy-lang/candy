@@ -42,13 +42,13 @@
 //! both performance and code size. Whenever they can be applied, they should be
 //! applied.
 
+pub use self::utils::ReferenceCounts;
 use self::{
     current_expression::{Context, CurrentExpression},
     data_flow::{
         flow_value::FlowValue, insights::DataFlowInsights, operation::Panic, timeline::Timeline,
     },
     pure::PurenessInsights,
-    utils::ReferenceCounts,
 };
 use super::{hir, hir_to_mir::HirToMir, mir::Mir, tracing::TracingConfig};
 use crate::{
@@ -158,16 +158,16 @@ impl Context<'_> {
             let id = expression.id();
             {
                 let mut body = Body::default();
-                body.expressions.push((id, (*expression).to_owned()));
+                body.expressions.push((id, (*expression).clone()));
                 body.to_rich_ir(false).print_to_console();
             }
 
             // TODO: Remove pureness when data flow takes care of it.
-            self.pureness.visit_optimized(id, &*expression);
+            self.pureness.visit_optimized(id, &expression);
 
             module_folding::apply(self, &mut expression);
             self.data_flow
-                .visit_optimized(id, &*expression, &original_reference_counts);
+                .visit_optimized(id, &expression, &original_reference_counts);
 
             {
                 println!("Data Flow Insights:");
@@ -216,11 +216,11 @@ impl Context<'_> {
                 self.pureness
                     .enter_function(parameters, *responsible_parameter);
                 self.data_flow
-                    .enter_function(parameters.to_owned(), body.return_value());
+                    .enter_function(parameters.clone(), body.return_value());
 
                 self.optimize_body(body);
 
-                let parameters = parameters.to_owned();
+                let parameters = parameters.clone();
                 let return_value = body.return_value();
                 for parameter in &parameters {
                     self.visible.remove(*parameter);

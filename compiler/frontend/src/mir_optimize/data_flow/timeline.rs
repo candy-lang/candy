@@ -150,7 +150,7 @@ impl ToRichIr for Timeline {
 
         for variants in &self.variants {
             builder.push("Or", None, EnumSet::empty());
-            builder.push_children_multiline(variants)
+            builder.push_children_multiline(variants);
         }
     }
 }

@@ -2,6 +2,7 @@ use crate::{database::Database, utils::LspPositionConversion};
 use candy_frontend::{
     ast_to_hir::AstToHir,
     mir::{Body, Expression, Mir, VisibleExpressions},
+    mir_optimize::ReferenceCounts,
     module::Module,
 };
 use candy_vm::Panic;
@@ -47,7 +48,7 @@ impl StaticPanicsOfExpression for Expression {
         panics: &mut Vec<Panic>,
         is_fuzzable: bool,
     ) {
-        let referenced = self.referenced_ids();
+        let referenced = self.reference_counts();
         match self {
             Self::Function {
                 parameters,
@@ -55,7 +56,7 @@ impl StaticPanicsOfExpression for Expression {
                 body,
                 ..
             } => {
-                let is_fuzzable = referenced.contains(responsible_parameter);
+                let is_fuzzable = referenced.contains_key(responsible_parameter);
 
                 for parameter in &*parameters {
                     visible.insert(*parameter, Self::Parameter);

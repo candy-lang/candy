@@ -78,9 +78,9 @@ pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression)
                 *builtin,
                 &arguments,
                 responsible,
-                context.visible,
+                &context.visible,
                 context.id_generator,
-                context.pureness,
+                &context.pureness,
             ) else {
                 return;
             };
