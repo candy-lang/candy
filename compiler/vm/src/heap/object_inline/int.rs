@@ -91,7 +91,7 @@ impl InlineInt {
                 #[allow(clippy::cast_possible_truncation)]
                 let value_shift = Self::VALUE_SHIFT as u32;
 
-                if self.get().bit_length() + rhs < InlineObject::BITS - value_shift {
+                if lhs.bit_length() + rhs < InlineObject::BITS - value_shift {
                     Some(lhs << rhs)
                 } else {
                     None
