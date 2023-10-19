@@ -14,28 +14,37 @@ use std::{collections::BTreeSet, mem};
 #[derive(Clone, Debug, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
 pub enum FlowValue {
     Any,
+
     Not(BTreeSet<FlowValue>),
+
     #[from]
     Builtin(BuiltinFunction),
+
     AnyInt,
     #[from]
     Int(BigInt),
+
     AnyFunction,
     #[from]
     Function(DataFlowInsights),
+
     AnyList,
     #[from]
     List(Vec<FlowValue>),
+
     #[from]
     Reference(Id),
+
     AnyStruct,
     #[from]
     Struct(Vec<(FlowValue, FlowValue)>),
+
     AnyTag,
     Tag {
         symbol: String,
         value: Option<Box<FlowValue>>,
     },
+
     AnyText,
     #[from]
     Text(String),

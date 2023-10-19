@@ -427,6 +427,7 @@ impl RichIr {
 
             let in_annotation = std::str::from_utf8(&bytes[*range.start..*range.end]).unwrap();
 
+            #[allow(clippy::option_if_let_else)]
             if let Some(token_type) = token_type {
                 let color = match token_type {
                     TokenType::Module => Color::Yellow,
@@ -443,7 +444,7 @@ impl RichIr {
                 };
                 print!("{}", in_annotation.color(color));
             } else {
-                print!("{}", in_annotation)
+                print!("{}", in_annotation);
             }
 
             displayed_byte = range.end;

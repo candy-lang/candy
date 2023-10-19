@@ -80,8 +80,8 @@ pub(crate) fn compile(options: Options) -> ProgramResult {
         });
 
     if !errors.is_empty() {
-        for error in errors.iter() {
-            println!("{:?}", error);
+        for error in &*errors {
+            println!("{error:?}");
         }
         std::process::exit(1);
     }
