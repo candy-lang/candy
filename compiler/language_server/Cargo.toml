@@ -6,9 +6,14 @@ rust-version = "1.56"
 
 [lib]
 
+[features]
+default = []
+inkwell = ["candy_backend_inkwell"]
+
 [dependencies]
 async-trait = "0.1.64"
 base64 = "0.21.2"
+candy_backend_inkwell = { path = "../backend_inkwell", optional = true }
 candy_formatter = { path = "../formatter" }
 candy_frontend = { path = "../frontend" }
 candy_fuzzer = { path = "../fuzzer" }
@@ -30,7 +35,7 @@ serde_json = "1.0.80"
 strum = "0.25.0"
 strum_macros = "0.25.0"
 tokio = { version = "1.24.2", features = ["full"] }
-tower-lsp = "0.19.0"
+tower-lsp = "0.20.0"
 tracing = { version = "0.1", features = ["release_max_level_debug"] }
 # typify = "0.0.11"
 url = "2.3.1"

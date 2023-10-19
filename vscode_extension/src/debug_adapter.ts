@@ -1,29 +1,29 @@
-import * as path from 'path';
-import * as vscode from 'vscode';
-import { LanguageClient } from 'vscode-languageclient/node';
-import { CandyDebugAdapterLoggerFactory } from './debug_adapter/logger';
+import * as path from "path";
+import * as vscode from "vscode";
+import { LanguageClient } from "vscode-languageclient/node";
+import { CandyDebugAdapterLoggerFactory } from "./debug_adapter/logger";
 import {
   debugAdapterCreate,
   debugAdapterMessage,
   DebugSessionId,
-} from './lsp_custom_protocol';
+} from "./lsp_custom_protocol";
 
 export function registerDebugAdapter(
   context: vscode.ExtensionContext,
-  client: LanguageClient
+  client: LanguageClient,
 ) {
   const loggerFactory = new CandyDebugAdapterLoggerFactory();
   context.subscriptions.push(
-    vscode.debug.registerDebugAdapterTrackerFactory('candy', loggerFactory)
+    vscode.debug.registerDebugAdapterTrackerFactory("candy", loggerFactory),
   );
 
   const descriptorFactory = new CandyDebugAdapterDescriptorFactory(client);
   context.subscriptions.push(
     descriptorFactory,
     vscode.debug.registerDebugAdapterDescriptorFactory(
-      'candy',
-      descriptorFactory
-    )
+      "candy",
+      descriptorFactory,
+    ),
   );
 }
 
@@ -44,21 +44,20 @@ class CandyDebugAdapterDescriptorFactory
       }
 
       debugAdapter.sendMessage.fire(message.message);
-    }
+    },
   );
 
   async createDebugAdapterDescriptor(
     session: vscode.DebugSession,
-    _executable: vscode.DebugAdapterExecutable | undefined
   ): Promise<vscode.DebugAdapterDescriptor | null | undefined> {
     const program = this.resolveProgram(
       session.configuration.program,
-      session.workspaceFolder
+      session.workspaceFolder,
     );
     if (!program) {
       return;
     }
-    console.log(`Creating debug adapter for \`${program}\``);
+    console.log(`Creating debug adapter for \`${program.toString()}\``);
 
     await this.client.sendRequest(debugAdapterCreate, {
       sessionId: session.id,
@@ -71,34 +70,35 @@ class CandyDebugAdapterDescriptorFactory
   }
 
   private resolveProgram(
-    program: any,
-    workspaceFolder: vscode.WorkspaceFolder | undefined
+    program: unknown,
+    workspaceFolder: vscode.WorkspaceFolder | undefined,
   ): vscode.Uri | undefined {
     // TODO
     if (!program) {
-      vscode.window.showErrorMessage('No `program` specified in `launch.json`');
-      return;
-    }
-    if (typeof program !== 'string') {
-      vscode.window.showErrorMessage(
-        '`program` specified in `launch.json` must be a string.'
+      void vscode.window.showErrorMessage(
+        "No `program` specified in `launch.json`",
       );
       return;
     }
-    program as string;
+    if (typeof program !== "string") {
+      void vscode.window.showErrorMessage(
+        "`program` specified in `launch.json` must be a string.",
+      );
+      return;
+    }
 
     if (path.isAbsolute(program)) {
       return vscode.Uri.file(program);
     }
 
     if (!workspaceFolder) {
-      vscode.window.showErrorMessage(
-        '`program` specified in `launch.json` must be an absolute path when not in a workspace.'
+      void vscode.window.showErrorMessage(
+        "`program` specified in `launch.json` must be an absolute path when not in a workspace.",
       );
       return;
     }
     return workspaceFolder.uri.with({
-      path: `${workspaceFolder.uri.path}/${path}`,
+      path: `${workspaceFolder.uri.path}/${program}`,
     });
   }
 
@@ -110,12 +110,12 @@ class CandyDebugAdapterDescriptorFactory
 class CandyDebugAdapter implements vscode.DebugAdapter {
   constructor(
     private readonly sessionId: DebugSessionId,
-    private readonly client: LanguageClient
+    private readonly client: LanguageClient,
   ) {}
 
   // VS Code → Candy
   handleMessage(message: vscode.DebugProtocolMessage): void {
-    this.client.sendNotification(debugAdapterMessage, {
+    void this.client.sendNotification(debugAdapterMessage, {
       sessionId: this.sessionId,
       message: message,
     });
@@ -126,5 +126,6 @@ class CandyDebugAdapter implements vscode.DebugAdapter {
   onDidSendMessage: vscode.Event<vscode.DebugProtocolMessage> =
     this.sendMessage.event;
 
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
   dispose() {}
 }

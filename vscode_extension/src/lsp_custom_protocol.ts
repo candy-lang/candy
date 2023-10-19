@@ -1,10 +1,10 @@
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 import {
   DocumentUri,
   NotificationType,
   Position,
   RequestType,
-} from 'vscode-languageclient';
+} from "vscode-languageclient";
 
 // Debug Adapter Protocol
 export type DebugSessionId = string;
@@ -13,14 +13,14 @@ export const debugAdapterCreate = new RequestType<
   DebugAdapterCreateParams,
   void,
   void
->('candy/debugAdapter/create');
+>("candy/debugAdapter/create");
 export interface DebugAdapterCreateParams {
   readonly sessionId: DebugSessionId;
 }
 
 // VS Code ←→ Candy
 export const debugAdapterMessage = new NotificationType<DebugAdapterMessage>(
-  'candy/debugAdapter/message'
+  "candy/debugAdapter/message",
 );
 export interface DebugAdapterMessage {
   readonly sessionId: DebugSessionId;
@@ -32,11 +32,11 @@ export interface ViewIrParams {
   readonly uri: DocumentUri;
 }
 export const viewIr = new RequestType<ViewIrParams, string, void>(
-  'candy/viewIr'
+  "candy/viewIr",
 );
 
 export const updateIrType = new NotificationType<UpdateIrParams>(
-  'candy/updateIr'
+  "candy/updateIr",
 );
 export interface UpdateIrParams {
   readonly uri: DocumentUri;
@@ -44,7 +44,7 @@ export interface UpdateIrParams {
 
 // Hints
 export const publishHintsType = new NotificationType<HintsParams>(
-  'candy/textDocument/publishHints'
+  "candy/textDocument/publishHints",
 );
 export interface HintsParams {
   readonly uri: string;
@@ -56,15 +56,15 @@ export interface Hint {
   readonly position: Position;
 }
 export type HintKind =
-  | 'value'
-  | 'fuzzingStatus'
-  | 'sampleInputReturningNormally'
-  | 'sampleInputPanickingWithCallerResponsible'
-  | 'sampleInputPanickingWithInternalCodeResponsible';
+  | "value"
+  | "fuzzingStatus"
+  | "sampleInputReturningNormally"
+  | "sampleInputPanickingWithCallerResponsible"
+  | "sampleInputPanickingWithInternalCodeResponsible";
 
 // Status
 export const publishServerStatusType = new NotificationType<ServerStatus>(
-  'candy/publishServerStatus'
+  "candy/publishServerStatus",
 );
 export interface ServerStatus {
   text: string;

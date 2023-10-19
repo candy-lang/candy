@@ -1,3 +1,5 @@
+#[cfg(feature = "inkwell")]
+use candy_backend_inkwell::LlvmIrStorage;
 use candy_frontend::{
     ast::AstDbStorage,
     ast_to_hir::AstToHirStorage,
@@ -5,7 +7,9 @@ use candy_frontend::{
     cst_to_ast::CstToAstStorage,
     hir::HirDbStorage,
     hir_to_mir::HirToMirStorage,
+    lir_optimize::OptimizeLirStorage,
     mir_optimize::OptimizeMirStorage,
+    mir_to_lir::MirToLirStorage,
     module::{
         FileSystemModuleProvider, GetModuleContentQuery, InMemoryModuleProvider, Module,
         ModuleDbStorage, ModuleProvider, ModuleProviderOwner, MutableModuleProviderOwner,
@@ -16,18 +20,42 @@ use candy_frontend::{
     string_to_rcst::StringToRcstStorage,
 };
 
-#[salsa::database(
-    AstDbStorage,
-    AstToHirStorage,
-    CstDbStorage,
-    CstToAstStorage,
-    HirDbStorage,
-    HirToMirStorage,
-    ModuleDbStorage,
-    OptimizeMirStorage,
-    PositionConversionStorage,
-    RcstToCstStorage,
-    StringToRcstStorage
+#[cfg_attr(
+    feature = "inkwell",
+    salsa::database(
+        AstDbStorage,
+        AstToHirStorage,
+        CstDbStorage,
+        CstToAstStorage,
+        HirDbStorage,
+        HirToMirStorage,
+        LlvmIrStorage,
+        MirToLirStorage,
+        ModuleDbStorage,
+        OptimizeLirStorage,
+        OptimizeMirStorage,
+        PositionConversionStorage,
+        RcstToCstStorage,
+        StringToRcstStorage
+    )
+)]
+#[cfg_attr(
+    not(feature = "inkwell"),
+    salsa::database(
+        AstDbStorage,
+        AstToHirStorage,
+        CstDbStorage,
+        CstToAstStorage,
+        HirDbStorage,
+        HirToMirStorage,
+        MirToLirStorage,
+        ModuleDbStorage,
+        OptimizeLirStorage,
+        OptimizeMirStorage,
+        PositionConversionStorage,
+        RcstToCstStorage,
+        StringToRcstStorage
+    )
 )]
 pub struct Database {
     storage: salsa::Storage<Self>,

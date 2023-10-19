@@ -1,12 +1,13 @@
-use self::session::run_debug_session;
+use self::{session::run_debug_session, tracer::DebugTracer};
 use crate::server::Server;
 use candy_frontend::module::PackagesPath;
+use candy_vm::{byte_code::ByteCode, Vm};
 use dap::{prelude::EventBody, requests::Request, responses::Response};
 use derive_more::{Display, From};
 use lsp_types::notification::Notification;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::thread;
+use std::{rc::Rc, thread};
 use tokio::sync::{mpsc, RwLock};
 use tower_lsp::{jsonrpc, Client};
 use tracing::error;
@@ -14,8 +15,8 @@ use tracing::error;
 mod paused;
 mod session;
 mod tracer;
-mod utils;
-mod vm_state;
+
+type DebugVm = Vm<Rc<ByteCode>, DebugTracer>;
 
 #[derive(Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, Serialize)]
 #[serde(transparent)]
@@ -54,7 +55,7 @@ impl DebugSessionManager {
         }
 
         thread::spawn(|| {
-            run_debug_session(session_id, client, packages_path, client_to_server_receiver)
+            run_debug_session(session_id, client, packages_path, client_to_server_receiver);
         });
     }
     async fn handle_message(&self, request: RequestNotification) {

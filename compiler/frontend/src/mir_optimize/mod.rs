@@ -95,6 +95,7 @@ pub type OptimizedMirResult = Result<
     ModuleError,
 >;
 
+#[allow(clippy::needless_pass_by_value)]
 fn optimized_mir(
     db: &dyn OptimizeMir,
     module: Module,
@@ -158,15 +159,15 @@ impl Context<'_> {
             {
                 let mut body = Body::default();
                 body.expressions.push((id, (*expression).to_owned()));
-                body.to_rich_ir().print_to_console();
+                body.to_rich_ir(false).print_to_console();
             }
 
             // TODO: Remove pureness when data flow takes care of it.
-            self.pureness.visit_optimized(id, &expression);
+            self.pureness.visit_optimized(id, &*expression);
 
             module_folding::apply(self, &mut expression);
             self.data_flow
-                .visit_optimized(id, &expression, &original_reference_counts);
+                .visit_optimized(id, &*expression, &original_reference_counts);
 
             {
                 println!("Data Flow Insights:");
@@ -176,9 +177,10 @@ impl Context<'_> {
                 println!();
             }
 
+            let new_id = expression.id();
             index = expression.index() + 1;
             let expression = mem::replace(&mut *expression, Expression::Parameter);
-            self.visible.insert(id, expression);
+            self.visible.insert(new_id, expression);
 
             if self.data_flow.is_unconditional_panic() {
                 for (_, expression) in body.expressions.drain(index..) {
@@ -193,8 +195,8 @@ impl Context<'_> {
         }
 
         common_subtree_elimination::eliminate_common_subtrees(body, &self.pureness);
-        reference_following::remove_redundant_return_references(body);
         tree_shaking::tree_shake(body, &self.pureness);
+        reference_following::remove_redundant_return_references(body);
     }
 
     fn optimize_expression(&mut self, expression: &mut CurrentExpression) {
@@ -244,6 +246,7 @@ impl Context<'_> {
 
                 let is_call = matches!(**expression, Expression::Call { .. });
                 inlining::inline_tiny_functions(self, expression);
+                inlining::inline_needs_function(self, expression);
                 inlining::inline_functions_containing_use(self, expression);
                 if is_call && matches!(**expression, Expression::Function { .. }) {
                     // We inlined a function call and the resulting code starts with
@@ -260,6 +263,7 @@ impl Context<'_> {
     }
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn recover_from_cycle(
     _db: &dyn OptimizeMir,
     cycle: &[String],

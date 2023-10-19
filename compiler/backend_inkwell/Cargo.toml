@@ -1,0 +1,11 @@
+[package]
+name = "candy_backend_inkwell"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+candy_frontend = { version = "0.1.0", path = "../frontend" }
+inkwell = { version = "0.2.0", features = ["llvm15-0"] }
+itertools = "0.11.0"
+llvm-sys = { version = "150", features = ["prefer-dynamic"] }
+salsa = "0.16.1"

@@ -27,13 +27,13 @@ fn comment_rcst(db: &dyn CommentStringToRcst, id: hir::Id) -> Arc<Vec<Rcst>> {
             .cloned()
             .collect_vec()
     } else {
-        let cst_id = db.hir_to_cst_id(id.clone()).unwrap();
+        let cst_id = db.hir_to_cst_id(&id).unwrap();
         match db.find_cst(id.module, cst_id).kind {
             cst::CstKind::Assignment {
                 box assignment_sign,
                 ..
             } => match assignment_sign.kind {
-                cst::CstKind::TrailingWhitespace { whitespace, .. } => whitespace.to_vec(),
+                cst::CstKind::TrailingWhitespace { whitespace, .. } => whitespace,
                 _ => vec![],
             },
             _ => panic!(
@@ -58,12 +58,12 @@ fn comment_rcst(db: &dyn CommentStringToRcst, id: hir::Id) -> Arc<Vec<Rcst>> {
 }
 
 impl Rcst {
-    fn wrap_in_whitespace(mut self, mut whitespace: Vec<Rcst>) -> Self {
+    fn wrap_in_whitespace(mut self, mut whitespace: Vec<Self>) -> Self {
         if whitespace.is_empty() {
             return self;
         }
 
-        if let Rcst::TrailingWhitespace {
+        if let Self::TrailingWhitespace {
             whitespace: self_whitespace,
             ..
         } = &mut self
@@ -71,7 +71,7 @@ impl Rcst {
             self_whitespace.append(&mut whitespace);
             self
         } else {
-            Rcst::TrailingWhitespace {
+            Self::TrailingWhitespace {
                 child: Box::new(self),
                 whitespace,
             }
@@ -343,7 +343,7 @@ mod parse {
         );
     }
 
-    #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
     enum InlineFormatting {
         Emphasized,
         Link,
@@ -351,23 +351,23 @@ mod parse {
     }
     impl InlineFormatting {
         fn as_rcst(
-            &self,
+            self,
             has_opening_char: bool,
             inner_parts: Vec<Rcst>,
             has_closing_char: bool,
         ) -> Rcst {
             match self {
-                InlineFormatting::Emphasized => Rcst::Emphasized {
+                Self::Emphasized => Rcst::Emphasized {
                     has_opening_underscore: has_opening_char,
                     text: inner_parts,
                     has_closing_underscore: has_closing_char,
                 },
-                InlineFormatting::Link => Rcst::Link {
+                Self::Link => Rcst::Link {
                     has_opening_bracket: has_opening_char,
                     text: inner_parts,
                     has_closing_bracket: has_closing_char,
                 },
-                InlineFormatting::Code => Rcst::InlineCode {
+                Self::Code => Rcst::InlineCode {
                     has_opening_backtick: has_opening_char,
                     code: inner_parts,
                     has_closing_backtick: has_closing_char,
@@ -390,7 +390,7 @@ mod parse {
                 initial_state.len(),
                 initial_state.iter().collect::<FxHashSet<_>>().len()
             );
-            let parser = SingleLineInlineParser {
+            let parser = Self {
                 top_level_parts: vec![],
                 formattings: initial_state
                     .iter()
@@ -414,8 +414,7 @@ mod parse {
         fn is_in_code(&self) -> bool {
             self.formattings
                 .last()
-                .map(|(_, it, _)| it == &InlineFormatting::Code)
-                .unwrap_or(false)
+                .map_or(false, |(_, it, _)| it == &InlineFormatting::Code)
         }
 
         fn push_part(&mut self, part: Rcst) {
@@ -482,23 +481,23 @@ mod parse {
             while let Some(character) = characters.next() {
                 match character {
                     '_' if !self.is_in_code() => {
-                        if !self.is_in_emphasized() {
-                            self.start_formatting(InlineFormatting::Emphasized);
-                        } else {
+                        if self.is_in_emphasized() {
                             self.end_formatting(InlineFormatting::Emphasized, true);
+                        } else {
+                            self.start_formatting(InlineFormatting::Emphasized);
                         }
                     }
                     '[' if !self.is_in_link() && !self.is_in_code() => {
-                        self.start_formatting(InlineFormatting::Link)
+                        self.start_formatting(InlineFormatting::Link);
                     }
                     ']' if self.is_in_link() && !self.is_in_code() => {
-                        self.end_formatting(InlineFormatting::Link, true)
+                        self.end_formatting(InlineFormatting::Link, true);
                     }
                     '`' => {
-                        if !self.is_in_code() {
-                            self.start_formatting(InlineFormatting::Code);
-                        } else {
+                        if self.is_in_code() {
                             self.end_formatting(InlineFormatting::Code, true);
+                        } else {
+                            self.start_formatting(InlineFormatting::Code);
                         }
                     }
                     '\\' => {
@@ -839,23 +838,25 @@ mod parse {
 
     #[instrument]
     fn url_line(input: Vec<&str>) -> Option<(Vec<&str>, Rcst)> {
+        fn is_whitespace(character: char) -> bool {
+            SUPPORTED_WHITESPACE.contains(character)
+        }
+
         if let [line, remaining @ ..] = input.as_slice() {
             if !line.starts_with("https://") && !line.starts_with("http://") {
                 return None;
             }
 
-            fn is_whitespace(character: char) -> bool {
-                SUPPORTED_WHITESPACE.contains(character)
-            }
             let end_index = line.find(is_whitespace).unwrap_or(line.len());
 
             // TODO: handle violations
-            let url = Url::parse(&line[..end_index])
-                .map(Rcst::UrlLine)
-                .unwrap_or_else(|_| Rcst::Error {
-                    child: Some(Rcst::TextPart(line.to_string()).into()),
+            let url = Url::parse(&line[..end_index]).map_or_else(
+                |_| Rcst::Error {
+                    child: Some(Rcst::TextPart((*line).to_string()).into()),
                     error: RcstError::UrlInvalid,
-                });
+                },
+                Rcst::UrlLine,
+            );
             Some((recombine(&line[end_index..], remaining), url))
         } else {
             None
@@ -1031,12 +1032,11 @@ mod parse {
         line.strip_prefix('-').map(|line| {
             let (line, has_trailing_space) = line
                 .strip_prefix(' ')
-                .map(|line| (line, true))
-                .unwrap_or((line, false));
+                .map_or((line, false), |line| (line, true));
             (
                 line,
                 RcstListItemMarker::Unordered { has_trailing_space },
-                1 + (has_trailing_space as usize),
+                1 + usize::from(has_trailing_space),
             )
         })
     }
@@ -1044,7 +1044,7 @@ mod parse {
     fn ordered_list_item_marker(mut line: &str) -> Option<(&str, RcstListItemMarker, usize)> {
         let number = line
             .chars()
-            .take_while(|it| it.is_ascii_digit())
+            .take_while(char::is_ascii_digit)
             .collect::<String>();
         if number.is_empty() {
             return None;
@@ -1066,14 +1066,14 @@ mod parse {
             return None;
         }
 
-        let has_trailing_space = if let Some(' ') = line.chars().next() {
+        let has_trailing_space = if line.starts_with(' ') {
             line = &line[1..];
             true
         } else {
             false
         };
 
-        let extra_indentation = format!("{}", number).len() + 1 + (has_trailing_space as usize);
+        let extra_indentation = format!("{}", number).len() + 1 + usize::from(has_trailing_space);
 
         Some((
             line,
@@ -1093,10 +1093,8 @@ mod parse {
         let Some((line, remaining)) = input.split_first() else {
             return None;
         };
-        let allows_unordered = list_type
-            .map(|it| it == ListType::Unordered)
-            .unwrap_or(true);
-        let allows_ordered = list_type.map(|it| it == ListType::Ordered).unwrap_or(true);
+        let allows_unordered = list_type.map_or(true, |it| it == ListType::Unordered);
+        let allows_ordered = list_type.map_or(true, |it| it == ListType::Ordered);
         // TODO: move the `allow_…` before the match checks when Rust's MIR no longer breaks
         let ((line, marker, extra_indentation), list_type) =
             if let Some(marker) = unordered_list_item_marker(line) && allows_unordered  {

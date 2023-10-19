@@ -18,12 +18,12 @@ use unicode_segmentation::UnicodeSegmentation;
 pub struct HeapText(HeapObject);
 
 impl HeapText {
-    const BYTE_LEN_SHIFT: usize = 3;
+    const BYTE_LEN_SHIFT: usize = 4;
 
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
-    pub fn create(heap: &mut Heap, value: &str) -> Self {
+    pub fn create(heap: &mut Heap, is_reference_counted: bool, value: &str) -> Self {
         let byte_len = value.len();
         assert_eq!(
             (byte_len << Self::BYTE_LEN_SHIFT) >> Self::BYTE_LEN_SHIFT,
@@ -31,7 +31,9 @@ impl HeapText {
             "Text is too long.",
         );
         let text = Self(heap.allocate(
-            HeapObject::KIND_TEXT | ((byte_len as u64) << Self::BYTE_LEN_SHIFT),
+            HeapObject::KIND_TEXT,
+            is_reference_counted,
+            (byte_len as u64) << Self::BYTE_LEN_SHIFT,
             byte_len,
         ));
         unsafe { ptr::copy_nonoverlapping(value.as_ptr(), text.text_pointer().as_ptr(), byte_len) };
@@ -49,27 +51,27 @@ impl HeapText {
         unsafe { str::from_utf8_unchecked(slice::from_raw_parts(pointer, self.byte_len())) }
     }
 
-    pub fn is_empty(self, heap: &mut Heap) -> Tag {
+    pub fn is_empty(self, heap: &Heap) -> Tag {
         Tag::create_bool(heap, self.get().is_empty())
     }
     pub fn length(self, heap: &mut Heap) -> Int {
-        Int::create(heap, self.get().graphemes(true).count())
+        Int::create(heap, true, self.get().graphemes(true).count())
     }
     pub fn characters(self, heap: &mut Heap) -> List {
         let characters = self
             .get()
             .graphemes(true)
-            .map(|it| Text::create(heap, it).into())
+            .map(|it| Text::create(heap, true, it).into())
             .collect_vec();
-        List::create(heap, &characters)
+        List::create(heap, true, &characters)
     }
-    pub fn contains(self, heap: &mut Heap, pattern: Text) -> Tag {
+    pub fn contains(self, heap: &Heap, pattern: Text) -> Tag {
         Tag::create_bool(heap, self.get().contains(pattern.get()))
     }
-    pub fn starts_with(self, heap: &mut Heap, prefix: Text) -> Tag {
+    pub fn starts_with(self, heap: &Heap, prefix: Text) -> Tag {
         Tag::create_bool(heap, self.get().starts_with(prefix.get()))
     }
-    pub fn ends_with(self, heap: &mut Heap, suffix: Text) -> Tag {
+    pub fn ends_with(self, heap: &Heap, suffix: Text) -> Tag {
         Tag::create_bool(heap, self.get().ends_with(suffix.get()))
     }
     pub fn get_range(self, heap: &mut Heap, range: Range<Int>) -> Text {
@@ -88,17 +90,17 @@ impl HeapText {
             .skip(start_inclusive)
             .take(end_exclusive - start_inclusive)
             .collect();
-        Text::create(heap, &text)
+        Text::create(heap, true, &text)
     }
 
     pub fn concatenate(self, heap: &mut Heap, other: Text) -> Text {
-        Text::create(heap, &format!("{}{}", self.get(), other.get()))
+        Text::create(heap, true, &format!("{}{}", self.get(), other.get()))
     }
     pub fn trim_start(self, heap: &mut Heap) -> Text {
-        Text::create(heap, self.get().trim_start())
+        Text::create(heap, true, self.get().trim_start())
     }
     pub fn trim_end(self, heap: &mut Heap) -> Text {
-        Text::create(heap, self.get().trim_end())
+        Text::create(heap, true, self.get().trim_end())
     }
 }
 
@@ -130,7 +132,7 @@ impl HeapObjectTrait for HeapText {
                 self.text_pointer().as_ptr(),
                 clone.text_pointer().as_ptr(),
                 self.byte_len(),
-            )
+            );
         };
     }
 

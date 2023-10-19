@@ -46,7 +46,7 @@ impl<'a> CurrentExpression<'a> {
         Self { body, index }
     }
 
-    pub fn index(&self) -> usize {
+    pub const fn index(&self) -> usize {
         self.index
     }
     pub fn id(&self) -> Id {
@@ -74,7 +74,7 @@ impl<'a> CurrentExpression<'a> {
         let mut expressions = expressions.into_iter();
         let (_, last_expression) = expressions.next_back().unwrap();
         self.body.expressions.splice(
-            self.index..(self.index + 1),
+            self.index..=self.index,
             expressions.chain([(self.id(), last_expression)]),
         );
     }

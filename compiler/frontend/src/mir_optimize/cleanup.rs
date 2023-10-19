@@ -42,7 +42,7 @@ impl Mir {
         // PERF: use `partition_point` instead of moving expressions to a new body
         let mut still_constants = true;
         let old_body = mem::take(&mut self.body);
-        for (id, expression) in old_body.into_iter() {
+        for (id, expression) in old_body {
             if still_constants && !pureness.is_definition_const(&expression) {
                 still_constants = false;
                 Self::sort_constants(&mut self.body);
@@ -56,7 +56,7 @@ impl Mir {
     /// Assumes that the given body contains only constants.
     fn sort_constants(body: &mut Body) {
         body.sort_by(|(_, a), (_, b)| {
-            fn order_score(expr: &Expression) -> u8 {
+            const fn order_score(expr: &Expression) -> u8 {
                 match expr {
                     Expression::HirId(_) => 0,
                     Expression::Builtin(_) => 1,

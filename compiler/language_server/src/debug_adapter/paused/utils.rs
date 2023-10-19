@@ -1,19 +1,5 @@
-use candy_vm::{
-    fiber::{Fiber, FiberId},
-    lir::Lir,
-    tracer::Tracer,
-    vm::Vm,
-};
-use extension_trait::extension_trait;
 use rustc_hash::FxHashMap;
-use std::{borrow::Borrow, hash::Hash, num::NonZeroUsize};
-
-#[extension_trait]
-pub impl FiberIdExtension for FiberId {
-    fn get<L: Borrow<Lir>, T: Tracer>(self, vm: &Vm<L, T>) -> &Fiber<T::ForFiber> {
-        vm.fiber(self).unwrap().fiber_ref()
-    }
-}
+use std::{hash::Hash, num::NonZeroUsize};
 
 // In some places (e.g., `Variable::variables_reference`), `0` is used to
 // represent no value. (Not sure why they didn't use `null` like in many other
@@ -39,7 +25,7 @@ impl<T: Clone + Eq + Hash> Default for IdMapping<T> {
     fn default() -> Self {
         Self {
             keys: vec![],
-            key_to_id: Default::default(),
+            key_to_id: FxHashMap::default(),
         }
     }
 }

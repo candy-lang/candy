@@ -1,6 +1,11 @@
 name: PR
 
-on: pull_request_target
+on:
+  pull_request_target:
+    types:
+      - opened
+      - ready_for_review
+      - synchronize
 
 jobs:
   add-labels:
@@ -20,12 +25,10 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      - uses: samspills/assign-pr-to-author@v1.0.2
-        with:
-          repo-token: ${{ secrets.BOT_TOKEN }}
+      - uses: technote-space/assign-author@v1.6.2
 
   automerge-pr:
-    if: github.event.action == 'opened'
+    if: (github.event.action == 'opened' && !github.event.pull_request.draft) || github.event.action == 'ready_for_review'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -49,13 +52,14 @@ jobs:
       - uses: dependabot/fetch-metadata@v1.6.0
         id: dependabot-metadata
       - name: Approve patch and minor updates
-        if: steps.dependabot-metadata.outputs.update-type == 'version-update:semver-patch' || steps.dependabot-metadata.outputs.update-type == 'version-update:semver-minor'
+        id: approve-patch-and-minor-updates
+        if: (steps.dependabot-metadata.outputs.update-type == 'version-update:semver-patch' || steps.dependabot-metadata.outputs.update-type == 'version-update:semver-minor') && steps.dependabot-metadata.outputs.dependency-names != '@types/vscode'
         run: gh pr review "$PR_URL" --approve
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Request manual review for major updates
-        if: steps.dependabot-metadata.outputs.update-type == 'version-update:semver-major' && toJSON(github.event.pull_request.requested_reviewers) == '[]'
+        if: steps.approve-patch-and-minor-updates.outcome == 'skipped' && toJSON(github.event.pull_request.requested_reviewers) == '[]'
         run: gh pr edit "$PR_URL" --add-reviewer JonasWanke
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}

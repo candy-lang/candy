@@ -14,45 +14,46 @@ impl<D> IsMultiline for Cst<D> {
 impl<D> IsMultiline for CstKind<D> {
     fn is_multiline(&self) -> bool {
         match self {
-            CstKind::EqualsSign => false,
-            CstKind::Comma => false,
-            CstKind::Dot => false,
-            CstKind::Colon => false,
-            CstKind::ColonEqualsSign => false,
-            CstKind::Bar => false,
-            CstKind::OpeningParenthesis => false,
-            CstKind::ClosingParenthesis => false,
-            CstKind::OpeningBracket => false,
-            CstKind::ClosingBracket => false,
-            CstKind::OpeningCurlyBrace => false,
-            CstKind::ClosingCurlyBrace => false,
-            CstKind::Arrow => false,
-            CstKind::SingleQuote => false,
-            CstKind::DoubleQuote => false,
-            CstKind::Percent => false,
-            CstKind::Octothorpe => false,
-            CstKind::Whitespace(_) => false,
-            CstKind::Newline(_) => true,
-            CstKind::Comment { .. } => false,
-            CstKind::TrailingWhitespace { child, whitespace } => {
+            Self::EqualsSign => false,
+            Self::Comma => false,
+            Self::Dot => false,
+            Self::Colon => false,
+            Self::ColonEqualsSign => false,
+            Self::Bar => false,
+            Self::OpeningParenthesis => false,
+            Self::ClosingParenthesis => false,
+            Self::OpeningBracket => false,
+            Self::ClosingBracket => false,
+            Self::OpeningCurlyBrace => false,
+            Self::ClosingCurlyBrace => false,
+            Self::Arrow => false,
+            Self::SingleQuote => false,
+            Self::DoubleQuote => false,
+            Self::Percent => false,
+            Self::Octothorpe => false,
+            Self::Whitespace(_) => false,
+            Self::Newline(_) => true,
+            Self::Comment { .. } => false,
+            Self::TrailingWhitespace { child, whitespace } => {
                 child.is_multiline() || whitespace.is_multiline()
             }
-            CstKind::Identifier(_) => false,
-            CstKind::Symbol(_) => false,
-            CstKind::Int { .. } => false,
-            CstKind::OpeningText { .. } => false,
-            CstKind::ClosingText { .. } => false,
-            CstKind::Text {
+            Self::Identifier(_) => false,
+            Self::Symbol(_) => false,
+            Self::Int { .. } => false,
+            Self::OpeningText { .. } => false,
+            Self::ClosingText { .. } => false,
+            Self::Text {
                 opening,
                 parts,
                 closing,
             } => opening.is_multiline() || parts.is_multiline() || closing.is_multiline(),
-            CstKind::TextPart(_) => false,
-            CstKind::TextInterpolation { .. } => false,
-            CstKind::BinaryBar { left, bar, right } => {
+            Self::TextNewline(_) => true,
+            Self::TextPart(_) => false,
+            Self::TextInterpolation { expression, .. } => expression.is_multiline(),
+            Self::BinaryBar { left, bar, right } => {
                 left.is_multiline() || bar.is_multiline() || right.is_multiline()
             }
-            CstKind::Parenthesized {
+            Self::Parenthesized {
                 opening_parenthesis,
                 inner,
                 closing_parenthesis,
@@ -61,11 +62,11 @@ impl<D> IsMultiline for CstKind<D> {
                     || inner.is_multiline()
                     || closing_parenthesis.is_multiline()
             }
-            CstKind::Call {
+            Self::Call {
                 receiver,
                 arguments,
             } => receiver.is_multiline() || arguments.is_multiline(),
-            CstKind::List {
+            Self::List {
                 opening_parenthesis,
                 items,
                 closing_parenthesis,
@@ -74,14 +75,10 @@ impl<D> IsMultiline for CstKind<D> {
                     || items.is_multiline()
                     || closing_parenthesis.is_multiline()
             }
-            CstKind::ListItem { value, comma } => {
-                value.is_multiline()
-                    || comma
-                        .as_ref()
-                        .map(|comma| comma.is_multiline())
-                        .unwrap_or(false)
+            Self::ListItem { value, comma } => {
+                value.is_multiline() || comma.as_ref().map_or(false, |comma| comma.is_multiline())
             }
-            CstKind::Struct {
+            Self::Struct {
                 opening_bracket,
                 fields,
                 closing_bracket,
@@ -90,35 +87,30 @@ impl<D> IsMultiline for CstKind<D> {
                     || fields.is_multiline()
                     || closing_bracket.is_multiline()
             }
-            CstKind::StructField {
+            Self::StructField {
                 key_and_colon,
                 value,
                 comma,
             } => {
-                key_and_colon
-                    .as_deref()
-                    .map(|(key, colon)| key.is_multiline() || colon.is_multiline())
-                    .unwrap_or(false)
-                    || value.is_multiline()
-                    || comma
-                        .as_ref()
-                        .map(|comma| comma.is_multiline())
-                        .unwrap_or(false)
+                key_and_colon.as_deref().map_or(false, |(key, colon)| {
+                    key.is_multiline() || colon.is_multiline()
+                }) || value.is_multiline()
+                    || comma.as_ref().map_or(false, |comma| comma.is_multiline())
             }
-            CstKind::StructAccess { struct_, dot, key } => {
+            Self::StructAccess { struct_, dot, key } => {
                 struct_.is_multiline() || dot.is_multiline() || key.is_multiline()
             }
-            CstKind::Match {
+            Self::Match {
                 expression,
                 percent,
                 cases,
             } => expression.is_multiline() || percent.is_multiline() || cases.is_multiline(),
-            CstKind::MatchCase {
+            Self::MatchCase {
                 pattern,
                 arrow,
                 body,
             } => pattern.is_multiline() || arrow.is_multiline() || body.is_multiline(),
-            CstKind::Function {
+            Self::Function {
                 opening_curly_brace,
                 parameters_and_arrow,
                 body,
@@ -127,19 +119,18 @@ impl<D> IsMultiline for CstKind<D> {
                 opening_curly_brace.is_multiline()
                     || parameters_and_arrow
                         .as_ref()
-                        .map(|(parameters, arrow)| {
+                        .map_or(false, |(parameters, arrow)| {
                             parameters.is_multiline() || arrow.is_multiline()
                         })
-                        .unwrap_or(false)
                     || body.is_multiline()
                     || closing_curly_brace.is_multiline()
             }
-            CstKind::Assignment {
+            Self::Assignment {
                 left,
                 assignment_sign,
                 body,
             } => left.is_multiline() || assignment_sign.is_multiline() || body.is_multiline(),
-            CstKind::Error {
+            Self::Error {
                 unparsable_input, ..
             } => unparsable_input.is_multiline(),
         }
@@ -154,16 +145,13 @@ impl IsMultiline for str {
 
 impl<C: IsMultiline> IsMultiline for Vec<C> {
     fn is_multiline(&self) -> bool {
-        self.iter().any(|cst| cst.is_multiline())
+        self.iter().any(IsMultiline::is_multiline)
     }
 }
 
 impl<T: IsMultiline> IsMultiline for Option<T> {
     fn is_multiline(&self) -> bool {
-        match self {
-            Some(it) => it.is_multiline(),
-            None => false,
-        }
+        self.as_ref().map_or(false, IsMultiline::is_multiline)
     }
 }
 

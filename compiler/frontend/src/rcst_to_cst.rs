@@ -116,11 +116,11 @@ impl Rcst {
             }
             CstKind::Whitespace(whitespace) => {
                 *state.offset += whitespace.len();
-                CstKind::Whitespace(whitespace.to_owned())
+                CstKind::Whitespace(whitespace.clone())
             }
             CstKind::Newline(newline) => {
                 *state.offset += newline.len();
-                CstKind::Newline(newline.to_owned())
+                CstKind::Newline(newline.clone())
             }
             CstKind::Comment {
                 octothorpe,
@@ -130,7 +130,7 @@ impl Rcst {
                 *state.offset += comment.len();
                 CstKind::Comment {
                     octothorpe: Box::new(octothorpe),
-                    comment: comment.to_owned(),
+                    comment: comment.clone(),
                 }
             }
             CstKind::TrailingWhitespace { child, whitespace } => CstKind::TrailingWhitespace {
@@ -139,17 +139,26 @@ impl Rcst {
             },
             CstKind::Identifier(identifier) => {
                 *state.offset += identifier.len();
-                CstKind::Identifier(identifier.to_owned())
+                CstKind::Identifier(identifier.clone())
             }
             CstKind::Symbol(symbol) => {
                 *state.offset += symbol.len();
-                CstKind::Symbol(symbol.to_owned())
+                CstKind::Symbol(symbol.clone())
             }
-            CstKind::Int { value, string } => {
+            CstKind::Int {
+                radix_prefix,
+                value,
+                string,
+            } => {
+                *state.offset += radix_prefix
+                    .as_ref()
+                    .map(|(_, radix_string)| radix_string.len())
+                    .unwrap_or_default();
                 *state.offset += string.len();
                 CstKind::Int {
-                    value: value.to_owned(),
-                    string: string.to_owned(),
+                    radix_prefix: radix_prefix.clone(),
+                    value: value.clone(),
+                    string: string.clone(),
                 }
             }
             CstKind::OpeningText {
@@ -175,9 +184,13 @@ impl Rcst {
                 parts: parts.to_csts_helper(state),
                 closing: Box::new(closing.to_cst(state)),
             },
+            CstKind::TextNewline(newline) => {
+                *state.offset += newline.len();
+                CstKind::TextNewline(newline.clone())
+            }
             CstKind::TextPart(text) => {
                 *state.offset += text.len();
-                CstKind::TextPart(text.to_owned())
+                CstKind::TextPart(text.clone())
             }
             CstKind::TextInterpolation {
                 opening_curly_braces,
@@ -296,8 +309,8 @@ impl Rcst {
             } => {
                 *state.offset += unparsable_input.len();
                 CstKind::Error {
-                    unparsable_input: unparsable_input.to_owned(),
-                    error: error.to_owned(),
+                    unparsable_input: unparsable_input.clone(),
+                    error: *error,
                 }
             }
         }

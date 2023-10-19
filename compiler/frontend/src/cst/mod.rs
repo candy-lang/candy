@@ -1,6 +1,6 @@
 use self::tree_with_ids::TreeWithIds;
 pub use self::{
-    error::CstError, id::Id, is_multiline::IsMultiline, kind::CstKind,
+    error::CstError, id::Id, is_multiline::IsMultiline, kind::CstKind, kind::IntRadix,
     unwrap_whitespace_and_comment::UnwrapWhitespaceAndComment,
 };
 use crate::{module::Module, position::Offset, rcst_to_cst::RcstToCst};
@@ -35,6 +35,7 @@ impl Cst {
     ///
     /// For example, if a call contains errors, we want to only underline the
     /// name of the called function itself, not everything including arguments.
+    #[must_use]
     pub fn display_span(&self) -> Range<Offset> {
         match &self.kind {
             CstKind::TrailingWhitespace { child, .. } => child.display_span(),
@@ -57,12 +58,12 @@ pub trait CstDb: RcstToCst {
 }
 
 fn find_cst(db: &dyn CstDb, module: Module, id: Id) -> Cst {
-    db.cst(module).unwrap().find(&id).unwrap().to_owned()
+    db.cst(module).unwrap().find(id).unwrap().clone()
 }
 fn find_cst_by_offset(db: &dyn CstDb, module: Module, offset: Offset) -> Cst {
     db.cst(module)
         .unwrap()
         .find_by_offset(offset)
         .unwrap()
-        .to_owned()
+        .clone()
 }

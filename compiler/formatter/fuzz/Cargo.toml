@@ -1,0 +1,21 @@
+[package]
+name = "candy_formatter_fuzzer"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+candy_formatter = { path = ".." }
+candy_frontend = { path = "../../frontend" }
+lazy_static = "1.4.0"
+libfuzzer-sys = "0.4"
+salsa = "0.16.1"
+
+[[bin]]
+name = "formatter"
+path = "fuzz_targets/formatter.rs"
+test = false
+doc = false

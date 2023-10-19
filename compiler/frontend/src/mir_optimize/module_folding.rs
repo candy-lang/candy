@@ -119,7 +119,7 @@ pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
             expression.prepend_optimized(
                 &mut context.visible,
                 mir.body.iter().map(|(id, expression)| {
-                    let mut expression = expression.to_owned();
+                    let mut expression = expression.clone();
                     expression.replace_ids(&mut |id| {
                         if let Some(new_id) = mapping.get(id) {
                             *id = *new_id;

@@ -4,7 +4,7 @@ use candy_frontend::{
     mir::{Body, Expression, Mir, VisibleExpressions},
     module::Module,
 };
-use candy_vm::fiber::Panic;
+use candy_vm::Panic;
 use extension_trait::extension_trait;
 use lsp_types::{Diagnostic, DiagnosticSeverity};
 use std::mem;
@@ -14,17 +14,22 @@ pub impl StaticPanicsOfMir for Mir {
     fn static_panics(&mut self) -> Vec<Panic> {
         let mut errors = vec![];
         self.body
-            .collect_static_panics(&mut VisibleExpressions::none_visible(), &mut errors);
+            .collect_static_panics(&mut VisibleExpressions::none_visible(), &mut errors, true);
         errors
     }
 }
 
 #[extension_trait]
 impl StaticPanicsOfBody for Body {
-    fn collect_static_panics(&mut self, visible: &mut VisibleExpressions, panics: &mut Vec<Panic>) {
+    fn collect_static_panics(
+        &mut self,
+        visible: &mut VisibleExpressions,
+        panics: &mut Vec<Panic>,
+        is_fuzzable: bool,
+    ) {
         for (id, expression) in &mut self.expressions {
             let mut expression = mem::replace(expression, Expression::Parameter);
-            expression.collect_static_panics(visible, panics);
+            expression.collect_static_panics(visible, panics, is_fuzzable);
             visible.insert(*id, expression);
         }
 
@@ -36,44 +41,51 @@ impl StaticPanicsOfBody for Body {
 
 #[extension_trait]
 impl StaticPanicsOfExpression for Expression {
-    fn collect_static_panics(&mut self, visible: &mut VisibleExpressions, panics: &mut Vec<Panic>) {
+    fn collect_static_panics(
+        &mut self,
+        visible: &mut VisibleExpressions,
+        panics: &mut Vec<Panic>,
+        is_fuzzable: bool,
+    ) {
+        let referenced = self.referenced_ids();
         match self {
-            Expression::Function {
+            Self::Function {
                 parameters,
                 responsible_parameter,
                 body,
                 ..
             } => {
-                for parameter in parameters.iter() {
-                    visible.insert(*parameter, Expression::Parameter);
-                }
-                visible.insert(*responsible_parameter, Expression::Parameter);
+                let is_fuzzable = referenced.contains(responsible_parameter);
 
-                body.collect_static_panics(visible, panics);
+                for parameter in &*parameters {
+                    visible.insert(*parameter, Self::Parameter);
+                }
+                visible.insert(*responsible_parameter, Self::Parameter);
+
+                body.collect_static_panics(visible, panics, is_fuzzable);
 
                 for parameter in parameters {
                     visible.remove(*parameter);
                 }
                 visible.remove(*responsible_parameter);
             }
-            Expression::Panic {
+            Self::Panic {
                 reason,
                 responsible,
-            } => {
+            } if is_fuzzable => {
                 let reason = visible.get(*reason);
                 let responsible = visible.get(*responsible);
 
-                let Expression::Text(reason) = reason else {
+                let Self::Text(reason) = reason else {
                     return;
                 };
-                let Expression::HirId(responsible) = responsible else {
+                let Self::HirId(responsible) = responsible else {
                     return;
                 };
 
                 panics.push(Panic {
                     reason: reason.to_string(),
                     responsible: responsible.clone(),
-                    panicked_child: None,
                 });
             }
             _ => {}
@@ -84,7 +96,7 @@ impl StaticPanicsOfExpression for Expression {
 #[extension_trait]
 pub impl StaticPanicToDiagnostic for Panic {
     fn to_diagnostic(&self, db: &Database, module: &Module) -> Diagnostic {
-        let call_span = db.hir_id_to_display_span(self.responsible.clone()).unwrap();
+        let call_span = db.hir_id_to_display_span(&self.responsible).unwrap();
         let call_span = db.range_to_lsp_range(module.clone(), call_span);
 
         Diagnostic {

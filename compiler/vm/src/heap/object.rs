@@ -4,28 +4,26 @@ use super::{
         struct_::HeapStruct, tag::HeapTag, text::HeapText, HeapData, HeapObject,
     },
     object_inline::{
-        builtin::InlineBuiltin,
-        int::InlineInt,
-        port::{InlineReceivePort, InlineSendPort},
-        InlineData, InlineObject,
+        builtin::InlineBuiltin, handle::InlineHandle, int::InlineInt, tag::InlineTag, InlineData,
+        InlineObject,
     },
     Heap,
 };
 use crate::{
-    channel::ChannelId,
-    fiber::InstructionPointer,
+    handle_id::HandleId,
+    instruction_pointer::InstructionPointer,
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
 use candy_frontend::{builtin_functions::BuiltinFunction, hir::Id};
 use derive_more::{Deref, From};
 use num_bigint::BigInt;
+use num_traits::Signed;
 use rustc_hash::FxHashMap;
 use std::{
     borrow::Cow,
     cmp::Ordering,
-    fmt::{self, Formatter},
+    fmt::{self, Debug, Formatter},
     hash::Hash,
-    ops::{Shl, Shr},
     str,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
@@ -41,12 +39,12 @@ pub enum Data {
     HirId(HirId),
     Function(Function),
     Builtin(Builtin),
-    SendPort(SendPort),
-    ReceivePort(ReceivePort),
+    Handle(Handle),
 }
 impl Data {
-    pub fn function(&self) -> Option<&Function> {
-        if let Data::Function(function) = self {
+    #[must_use]
+    pub const fn function(&self) -> Option<&Function> {
+        if let Self::Function(function) = self {
             Some(function)
         } else {
             None
@@ -58,23 +56,23 @@ impl From<InlineObject> for Data {
     fn from(object: InlineObject) -> Self {
         match object.into() {
             InlineData::Pointer(pointer) => pointer.get().into(),
-            InlineData::Int(int) => Data::Int(Int::Inline(int)),
-            InlineData::SendPort(send_port) => Data::SendPort(SendPort(send_port)),
-            InlineData::ReceivePort(receive_port) => Data::ReceivePort(ReceivePort(receive_port)),
-            InlineData::Builtin(builtin) => Data::Builtin(Builtin(builtin)),
+            InlineData::Int(int) => Self::Int(Int::Inline(int)),
+            InlineData::Builtin(builtin) => Self::Builtin(Builtin(builtin)),
+            InlineData::Tag(symbol_id) => Self::Tag(Tag::Inline(symbol_id)),
+            InlineData::Handle(handle) => Self::Handle(Handle(handle)),
         }
     }
 }
 impl From<HeapObject> for Data {
     fn from(object: HeapObject) -> Self {
         match object.into() {
-            HeapData::Int(int) => Data::Int(Int::Heap(int)),
-            HeapData::List(list) => Data::List(List(list)),
-            HeapData::Struct(struct_) => Data::Struct(Struct(struct_)),
-            HeapData::Tag(tag) => Data::Tag(Tag(tag)),
-            HeapData::Text(text) => Data::Text(Text(text)),
-            HeapData::Function(function) => Data::Function(Function(function)),
-            HeapData::HirId(hir_id) => Data::HirId(HirId(hir_id)),
+            HeapData::Int(int) => Self::Int(Int::Heap(int)),
+            HeapData::List(list) => Self::List(List(list)),
+            HeapData::Struct(struct_) => Self::Struct(Struct(struct_)),
+            HeapData::Tag(tag) => Self::Tag(Tag::Heap(tag)),
+            HeapData::Text(text) => Self::Text(Text(text)),
+            HeapData::Function(function) => Self::Function(Function(function)),
+            HeapData::HirId(hir_id) => Self::HirId(HirId(hir_id)),
         }
     }
 }
@@ -82,16 +80,15 @@ impl From<HeapObject> for Data {
 impl DebugDisplay for Data {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         match self {
-            Data::Int(int) => DebugDisplay::fmt(int, f, is_debug),
-            Data::Tag(tag) => DebugDisplay::fmt(tag, f, is_debug),
-            Data::Text(text) => DebugDisplay::fmt(text, f, is_debug),
-            Data::List(list) => DebugDisplay::fmt(list, f, is_debug),
-            Data::Struct(struct_) => DebugDisplay::fmt(struct_, f, is_debug),
-            Data::HirId(hir_id) => DebugDisplay::fmt(hir_id, f, is_debug),
-            Data::Function(function) => DebugDisplay::fmt(function, f, is_debug),
-            Data::Builtin(builtin) => DebugDisplay::fmt(builtin, f, is_debug),
-            Data::SendPort(send_port) => DebugDisplay::fmt(send_port, f, is_debug),
-            Data::ReceivePort(receive_port) => DebugDisplay::fmt(receive_port, f, is_debug),
+            Self::Int(int) => DebugDisplay::fmt(int, f, is_debug),
+            Self::Tag(tag) => DebugDisplay::fmt(tag, f, is_debug),
+            Self::Text(text) => DebugDisplay::fmt(text, f, is_debug),
+            Self::List(list) => DebugDisplay::fmt(list, f, is_debug),
+            Self::Struct(struct_) => DebugDisplay::fmt(struct_, f, is_debug),
+            Self::HirId(hir_id) => DebugDisplay::fmt(hir_id, f, is_debug),
+            Self::Function(function) => DebugDisplay::fmt(function, f, is_debug),
+            Self::Builtin(builtin) => DebugDisplay::fmt(builtin, f, is_debug),
+            Self::Handle(send_port) => DebugDisplay::fmt(send_port, f, is_debug),
         }
     }
 }
@@ -99,14 +96,16 @@ impl_debug_display_via_debugdisplay!(Data);
 
 // Int
 
-#[derive(Clone, Copy, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
+// FIXME: Custom Ord, PartialOrd impl
+#[derive(Clone, Copy, Eq, From, Hash, PartialEq)]
 pub enum Int {
     Inline(InlineInt),
     Heap(HeapInt),
 }
 
 impl Int {
-    pub fn create<T>(heap: &mut Heap, value: T) -> Self
+    #[must_use]
+    pub fn create<T>(heap: &mut Heap, is_reference_counted: bool, value: T) -> Self
     where
         T: Copy + TryInto<i64> + Into<BigInt>,
     {
@@ -114,30 +113,37 @@ impl Int {
             .try_into()
             .map_err(|_| ())
             .and_then(InlineInt::try_from)
-            .map(|it| it.into())
-            .unwrap_or_else(|_| HeapInt::create(heap, value.into()).into())
+            .map_or_else(
+                |_| HeapInt::create(heap, is_reference_counted, value.into()).into(),
+                Into::into,
+            )
     }
-    pub fn create_from_bigint(heap: &mut Heap, value: BigInt) -> Self {
+    #[must_use]
+    pub fn create_from_bigint(heap: &mut Heap, is_reference_counted: bool, value: BigInt) -> Self {
         i64::try_from(&value)
             .map_err(|_| ())
             .and_then(InlineInt::try_from)
-            .map(|it| it.into())
-            .unwrap_or_else(|_| HeapInt::create(heap, value).into())
+            .map_or_else(
+                |_| HeapInt::create(heap, is_reference_counted, value).into(),
+                Into::into,
+            )
     }
 
-    pub fn get(&self) -> Cow<BigInt> {
+    #[must_use]
+    pub fn get<'a>(self) -> Cow<'a, BigInt> {
         match self {
-            Int::Inline(int) => Cow::Owned(int.get().into()),
-            Int::Heap(int) => Cow::Borrowed(int.get()),
+            Self::Inline(int) => Cow::Owned(int.get().into()),
+            Self::Heap(int) => Cow::Borrowed(int.get()),
         }
     }
-    pub fn try_get<T>(&self) -> Option<T>
+    #[must_use]
+    pub fn try_get<T>(self) -> Option<T>
     where
         T: TryFrom<i64> + for<'a> TryFrom<&'a BigInt>,
     {
         match self {
-            Int::Inline(int) => int.try_get(),
-            Int::Heap(int) => int.get().try_into().ok(),
+            Self::Inline(int) => int.try_get(),
+            Self::Heap(int) => int.get().try_into().ok(),
         }
     }
 
@@ -146,32 +152,65 @@ impl Int {
     operator_fn!(multiply);
     operator_fn!(int_divide_truncating);
     operator_fn!(remainder);
-    pub fn modulo(&self, heap: &mut Heap, rhs: &Int) -> Self {
+    #[must_use]
+    pub fn modulo(self, heap: &mut Heap, rhs: Self) -> Self {
         match (self, rhs) {
-            (Int::Inline(lhs), Int::Inline(rhs)) => lhs.modulo(heap, *rhs),
-            (Int::Heap(on_heap), Int::Inline(inline))
-            | (Int::Inline(inline), Int::Heap(on_heap)) => {
+            (Self::Inline(lhs), Self::Inline(rhs)) => lhs.modulo(heap, rhs),
+            (Self::Heap(on_heap), Self::Inline(inline))
+            | (Self::Inline(inline), Self::Heap(on_heap)) => {
                 on_heap.modulo(heap, &inline.get().into())
             }
-            (Int::Heap(lhs), Int::Heap(rhs)) => lhs.modulo(heap, rhs.get()),
+            (Self::Heap(lhs), Self::Heap(rhs)) => lhs.modulo(heap, rhs.get()),
         }
     }
 
-    pub fn compare_to(&self, heap: &mut Heap, rhs: &Int) -> Tag {
+    #[must_use]
+    pub fn compare_to(self, heap: &Heap, rhs: Self) -> Tag {
         match (self, rhs) {
-            (Int::Inline(lhs), rhs) => lhs.compare_to(heap, *rhs),
-            (Int::Heap(lhs), Int::Inline(rhs)) => lhs.compare_to(heap, &rhs.get().into()),
-            (Int::Heap(lhs), Int::Heap(rhs)) => lhs.compare_to(heap, rhs.get()),
+            (Self::Inline(lhs), rhs) => lhs.compare_to(heap, rhs),
+            (Self::Heap(lhs), Self::Inline(rhs)) => lhs.compare_to(heap, &rhs.get().into()),
+            (Self::Heap(lhs), Self::Heap(rhs)) => lhs.compare_to(heap, rhs.get()),
         }
     }
 
-    shift_fn!(shift_left, shl);
-    shift_fn!(shift_right, shr);
-
-    pub fn bit_length(&self, heap: &mut Heap) -> Self {
+    #[must_use]
+    pub fn shift_left(self, heap: &mut Heap, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Self::Inline(lhs), Self::Inline(rhs)) => lhs.shift_left(heap, rhs),
+            (Self::Inline(lhs), Self::Heap(rhs)) => Self::create_from_bigint(
+                heap,
+                true,
+                // TODO: Support shifting by larger numbers
+                BigInt::from(lhs.get()) << i128::try_from(rhs.get()).unwrap(),
+            ),
+            // TODO: Support shifting by larger numbers
+            (Self::Heap(lhs), rhs) => lhs.shift_left(heap, rhs.try_get::<i128>().unwrap()),
+        }
+    }
+    #[must_use]
+    pub fn shift_right(self, heap: &mut Heap, rhs: Self) -> Self {
         match self {
-            Int::Inline(int) => int.bit_length().into(),
-            Int::Heap(int) => int.bit_length(heap),
+            Self::Inline(lhs) => {
+                let rhs = match rhs {
+                    Self::Inline(rhs) => rhs,
+                    Self::Heap(rhs) => {
+                        debug_assert!(rhs.get().is_positive(), "Shift amount must be positive.");
+                        #[allow(clippy::cast_possible_wrap)]
+                        InlineInt::from_unchecked(InlineInt::VALUE_BITS as i64)
+                    }
+                };
+                Self::Inline(lhs.shift_right(rhs))
+            }
+            // TODO: Support shifting by larger numbers
+            Self::Heap(lhs) => lhs.shift_right(heap, rhs.try_get::<i128>().unwrap()),
+        }
+    }
+
+    #[must_use]
+    pub fn bit_length(self, heap: &mut Heap) -> Self {
+        match self {
+            Self::Inline(int) => int.bit_length().into(),
+            Self::Heap(int) => int.bit_length(heap),
         }
     }
 
@@ -182,9 +221,10 @@ impl Int {
 
 macro_rules! bitwise_fn {
     ($name:ident) => {
-        pub fn $name(&self, heap: &mut Heap, rhs: &Int) -> Self {
+        #[must_use]
+        pub fn $name(self, heap: &mut Heap, rhs: Int) -> Self {
             match (self, rhs) {
-                (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(*rhs).into(),
+                (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(rhs).into(),
                 (Int::Heap(on_heap), Int::Inline(inline))
                 | (Int::Inline(inline), Int::Heap(on_heap)) => {
                     on_heap.$name(heap, &inline.get().into())
@@ -196,46 +236,31 @@ macro_rules! bitwise_fn {
 }
 macro_rules! operator_fn {
     ($name:ident) => {
-        pub fn $name(&self, heap: &mut Heap, rhs: &Int) -> Self {
+        #[must_use]
+        pub fn $name(self, heap: &mut Heap, rhs: Int) -> Self {
             match (self, rhs) {
-                (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(heap, *rhs),
-                (Int::Heap(on_heap), Int::Inline(inline))
-                | (Int::Inline(inline), Int::Heap(on_heap)) => on_heap.$name(heap, inline.get()),
+                (Int::Inline(lhs), _) => lhs.$name(heap, rhs),
+                (Int::Heap(lhs), Int::Inline(rhs)) => lhs.$name(heap, rhs.get()),
                 (Int::Heap(lhs), Int::Heap(rhs)) => lhs.$name(heap, rhs.get()),
             }
         }
     };
 }
-macro_rules! shift_fn {
-    ($name:ident, $function:ident) => {
-        pub fn $name(&self, heap: &mut Heap, rhs: &Int) -> Self {
-            match (self, rhs) {
-                (Int::Inline(lhs), Int::Inline(rhs)) => lhs.$name(heap, *rhs),
-                // TODO: Support shifting by larger numbers
-                (Int::Inline(lhs), rhs) => Int::create_from_bigint(
-                    heap,
-                    BigInt::from(lhs.get()).$function(rhs.try_get::<i128>().unwrap()),
-                ),
-                (Int::Heap(lhs), rhs) => lhs.$name(heap, rhs.try_get::<i128>().unwrap()),
-            }
-        }
-    };
-}
-use {bitwise_fn, operator_fn, shift_fn};
+use {bitwise_fn, operator_fn};
 
 impl DebugDisplay for Int {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         match self {
-            Int::Inline(int) => DebugDisplay::fmt(int, f, is_debug),
-            Int::Heap(int) => DebugDisplay::fmt(int, f, is_debug),
+            Self::Inline(int) => DebugDisplay::fmt(int, f, is_debug),
+            Self::Heap(int) => DebugDisplay::fmt(int, f, is_debug),
         }
     }
 }
 impl_debug_display_via_debugdisplay!(Int);
 
 impl From<Int> for InlineObject {
-    fn from(int: Int) -> Self {
-        match int {
+    fn from(value: Int) -> Self {
+        match value {
             Int::Inline(int) => *int,
             Int::Heap(int) => (*int).into(),
         }
@@ -244,73 +269,182 @@ impl From<Int> for InlineObject {
 impl_try_froms!(Int, "Expected an int.");
 impl_try_from_heap_object!(Int, "Expected an int.");
 
+impl Ord for Int {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Self::Inline(this), Self::Inline(other)) => Ord::cmp(this, other),
+            (Self::Inline(_), Self::Heap(other)) => {
+                if other.get().is_positive() {
+                    Ordering::Less
+                } else {
+                    Ordering::Greater
+                }
+            }
+            (Self::Heap(this), Self::Heap(other)) => Ord::cmp(this, other),
+            (Self::Heap(this), Self::Inline(_)) => {
+                if this.get().is_positive() {
+                    Ordering::Greater
+                } else {
+                    Ordering::Less
+                }
+            }
+        }
+    }
+}
+#[allow(clippy::incorrect_partial_ord_impl_on_ord_type)]
+impl PartialOrd for Int {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(Ord::cmp(self, other))
+    }
+}
+
 // Tag
 
-#[derive(Clone, Copy, Deref, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Tag(HeapTag);
+#[derive(Clone, Copy, Eq, From, Hash, PartialEq)]
+pub enum Tag {
+    Inline(InlineTag),
+    Heap(HeapTag),
+}
 
 impl Tag {
-    pub fn create(heap: &mut Heap, symbol: Text, value: impl Into<Option<InlineObject>>) -> Self {
-        HeapTag::create(heap, symbol, value).into()
+    #[must_use]
+    pub fn create(symbol: Text) -> Self {
+        Self::Inline(InlineTag::new(symbol))
     }
-    pub fn create_from_str(
+    #[must_use]
+    pub fn create_with_value(
         heap: &mut Heap,
-        symbol: &str,
+        is_reference_counted: bool,
+        symbol: Text,
+        value: impl Into<InlineObject>,
+    ) -> Self {
+        HeapTag::create(heap, is_reference_counted, symbol, value).into()
+    }
+    #[must_use]
+    pub fn create_with_value_option(
+        heap: &mut Heap,
+        is_reference_counted: bool,
+        symbol: Text,
         value: impl Into<Option<InlineObject>>,
     ) -> Self {
-        let symbol = Text::create(heap, symbol);
-        Self::create(heap, symbol, value)
+        value.into().map_or_else(
+            || Self::create(symbol),
+            |value| Self::create_with_value(heap, is_reference_counted, symbol, value),
+        )
     }
-    pub fn create_nothing(heap: &mut Heap) -> Self {
-        Self::create_from_str(heap, "Nothing", None)
+    #[must_use]
+    pub fn create_nothing(heap: &Heap) -> Self {
+        Self::create(heap.default_symbols().nothing)
     }
-    pub fn create_bool(heap: &mut Heap, value: bool) -> Self {
-        Self::create_from_str(heap, if value { "True" } else { "False" }, None)
+    #[must_use]
+    pub fn create_bool(heap: &Heap, value: bool) -> Self {
+        let symbol = if value {
+            heap.default_symbols().true_
+        } else {
+            heap.default_symbols().false_
+        };
+        Self::create(symbol)
     }
-    pub fn create_ordering(heap: &mut Heap, value: Ordering) -> Self {
+    #[must_use]
+    pub fn create_ordering(heap: &Heap, value: Ordering) -> Self {
         let value = match value {
-            Ordering::Less => "Less",
-            Ordering::Equal => "Equal",
-            Ordering::Greater => "Greater",
+            Ordering::Less => heap.default_symbols().less,
+            Ordering::Equal => heap.default_symbols().equal,
+            Ordering::Greater => heap.default_symbols().greater,
         };
-        Self::create_from_str(heap, value, None)
+        Self::create(value)
     }
-    pub fn create_result(heap: &mut Heap, value: Result<InlineObject, InlineObject>) -> Self {
+    #[must_use]
+    pub fn create_result(
+        heap: &mut Heap,
+        is_reference_counted: bool,
+        value: Result<InlineObject, InlineObject>,
+    ) -> Self {
         let (symbol, value) = match value {
-            Ok(it) => ("Ok", it),
-            Err(it) => ("Error", it),
+            Ok(it) => (heap.default_symbols().ok, it),
+            Err(it) => (heap.default_symbols().error, it),
         };
-        Self::create_from_str(heap, symbol, value)
+        Self::create_with_value(heap, is_reference_counted, symbol, value)
+    }
+
+    #[must_use]
+    pub fn symbol(&self) -> Text {
+        match self {
+            Self::Inline(tag) => tag.get(),
+            Self::Heap(tag) => tag.symbol(),
+        }
+    }
+    pub fn try_into_bool(self, heap: &Heap) -> Result<bool, &'static str> {
+        match self {
+            Self::Inline(tag) => {
+                let symbol = tag.get();
+                if symbol == heap.default_symbols().true_ {
+                    Ok(true)
+                } else if symbol == heap.default_symbols().false_ {
+                    Ok(false)
+                } else {
+                    Err("Expected `True` or `False`.")
+                }
+            }
+            Self::Heap(_) => Err("Expected a tag without a value, found {value:?}."),
+        }
+    }
+
+    #[must_use]
+    pub const fn has_value(&self) -> bool {
+        match self {
+            Self::Inline(_) => false,
+            Self::Heap(_) => true,
+        }
+    }
+    #[must_use]
+    pub fn value(&self) -> Option<InlineObject> {
+        match self {
+            Self::Inline(_) => None,
+            Self::Heap(tag) => Some(tag.value()),
+        }
+    }
+
+    #[must_use]
+    pub fn without_value(self) -> Self {
+        Self::create(self.symbol())
     }
 }
 
-impls_via_0!(Tag);
+impl DebugDisplay for Tag {
+    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
+        match self {
+            Self::Inline(tag) => DebugDisplay::fmt(tag, f, is_debug),
+            Self::Heap(tag) => DebugDisplay::fmt(tag, f, is_debug),
+        }
+    }
+}
+impl_debug_display_via_debugdisplay!(Tag);
+
+impl From<Tag> for InlineObject {
+    fn from(value: Tag) -> Self {
+        match value {
+            Tag::Inline(value) => *value,
+            Tag::Heap(value) => (*value).into(),
+        }
+    }
+}
+
+impl Ord for Tag {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.symbol()
+            .cmp(&other.symbol())
+            .then_with(|| self.value().cmp(&other.value()))
+    }
+}
+impl PartialOrd for Tag {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl_try_froms!(Tag, "Expected a tag.");
 impl_try_from_heap_object!(Tag, "Expected a tag.");
-
-impl TryFrom<InlineObject> for bool {
-    type Error = &'static str;
-
-    fn try_from(value: InlineObject) -> Result<Self, Self::Error> {
-        (Data::from(value)).try_into()
-    }
-}
-impl TryFrom<Data> for bool {
-    type Error = &'static str;
-
-    fn try_from(value: Data) -> Result<Self, Self::Error> {
-        let tag: Tag = value.try_into()?;
-        if tag.value().is_some() {
-            return Err("Expected a tag without a value.");
-        }
-
-        match tag.symbol().get() {
-            "True" => Ok(true),
-            "False" => Ok(false),
-            _ => Err("Expected `True` or `False`."),
-        }
-    }
-}
 
 // Text
 
@@ -318,14 +452,9 @@ impl TryFrom<Data> for bool {
 pub struct Text(HeapText);
 
 impl Text {
-    pub fn create(heap: &mut Heap, value: &str) -> Self {
-        HeapText::create(heap, value).into()
-    }
-    pub fn create_from_utf8(heap: &mut Heap, bytes: &[u8]) -> Tag {
-        let result = str::from_utf8(bytes)
-            .map(|it| Text::create(heap, it).into())
-            .map_err(|_| Text::create(heap, "Invalid UTF-8.").into());
-        Tag::create_result(heap, result)
+    #[must_use]
+    pub fn create(heap: &mut Heap, is_reference_counted: bool, value: &str) -> Self {
+        HeapText::create(heap, is_reference_counted, value).into()
     }
 }
 
@@ -339,8 +468,9 @@ impl_try_from_heap_object!(Text, "Expected a text.");
 pub struct List(HeapList);
 
 impl List {
-    pub fn create(heap: &mut Heap, items: &[InlineObject]) -> Self {
-        HeapList::create(heap, items).into()
+    #[must_use]
+    pub fn create(heap: &mut Heap, is_reference_counted: bool, items: &[InlineObject]) -> Self {
+        HeapList::create(heap, is_reference_counted, items).into()
     }
 }
 
@@ -354,18 +484,25 @@ impl_try_from_heap_object!(List, "Expected a list.");
 pub struct Struct(HeapStruct);
 
 impl Struct {
-    pub fn create(heap: &mut Heap, fields: &FxHashMap<InlineObject, InlineObject>) -> Self {
-        HeapStruct::create(heap, fields).into()
+    #[must_use]
+    pub fn create(
+        heap: &mut Heap,
+        is_reference_counted: bool,
+        fields: &FxHashMap<InlineObject, InlineObject>,
+    ) -> Self {
+        HeapStruct::create(heap, is_reference_counted, fields).into()
     }
+    #[must_use]
     pub fn create_with_symbol_keys(
         heap: &mut Heap,
-        fields: impl IntoIterator<Item = (&str, InlineObject)>,
+        is_reference_counted: bool,
+        fields: impl IntoIterator<Item = (Text, InlineObject)>,
     ) -> Self {
         let fields = fields
             .into_iter()
-            .map(|(key, value)| ((Tag::create_from_str(heap, key, None)).into(), value))
+            .map(|(key, value)| ((Tag::create(key)).into(), value))
             .collect();
-        Self::create(heap, &fields)
+        Self::create(heap, is_reference_counted, &fields)
     }
 }
 
@@ -379,13 +516,15 @@ impl_try_from_heap_object!(Struct, "Expected a struct.");
 pub struct Function(HeapFunction);
 
 impl Function {
+    #[must_use]
     pub fn create(
         heap: &mut Heap,
+        is_reference_counted: bool,
         captured: &[InlineObject],
         argument_count: usize,
         body: InstructionPointer,
     ) -> Self {
-        HeapFunction::create(heap, captured, argument_count, body).into()
+        HeapFunction::create(heap, is_reference_counted, captured, argument_count, body).into()
     }
 }
 
@@ -400,8 +539,9 @@ impl_try_from_heap_object!(Function, "Expected a function.");
 pub struct HirId(HeapHirId);
 
 impl HirId {
-    pub fn create(heap: &mut Heap, id: Id) -> HirId {
-        HeapHirId::create(heap, id).into()
+    #[must_use]
+    pub fn create(heap: &mut Heap, is_reference_counted: bool, id: Id) -> Self {
+        HeapHirId::create(heap, is_reference_counted, id).into()
     }
 }
 
@@ -415,6 +555,7 @@ impl_try_from_heap_object!(HirId, "Expected a HIR ID.");
 pub struct Builtin(InlineBuiltin);
 
 impl Builtin {
+    #[must_use]
     pub fn create(builtin: BuiltinFunction) -> Self {
         InlineBuiltin::from(builtin).into()
     }
@@ -422,40 +563,32 @@ impl Builtin {
 
 impls_via_0!(Builtin);
 
-// Send Port
+// Handle
 
-#[derive(Clone, Copy, Deref, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct SendPort(InlineSendPort);
+#[derive(Clone, Copy, Deref, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Handle(InlineHandle);
 
-impl SendPort {
-    pub fn create(heap: &mut Heap, channel_id: ChannelId) -> InlineObject {
-        InlineSendPort::create(heap, channel_id)
+impl Handle {
+    #[must_use]
+    pub fn new(heap: &mut Heap, argument_count: usize) -> Self {
+        let id = heap.handle_id_generator.generate();
+        Self::create(heap, id, argument_count)
+    }
+    #[must_use]
+    pub fn create(heap: &mut Heap, handle_id: HandleId, argument_count: usize) -> Self {
+        InlineHandle::create(heap, handle_id, argument_count).into()
     }
 }
 
-impls_via_0!(SendPort);
-impl_try_froms!(SendPort, "Expected a send port.");
-
-// Receive Port
-
-#[derive(Clone, Copy, Deref, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct ReceivePort(InlineReceivePort);
-
-impl ReceivePort {
-    pub fn create(heap: &mut Heap, channel_id: ChannelId) -> InlineObject {
-        InlineReceivePort::create(heap, channel_id)
-    }
-}
-
-impls_via_0!(ReceivePort);
-impl_try_froms!(ReceivePort, "Expected a receive port.");
+impls_via_0!(Handle);
+impl_try_froms!(Handle, "Expected a handle.");
 
 // Utils
 
 macro_rules! impls_via_0 {
     ($type:ty) => {
         impl DebugDisplay for $type {
-            fn fmt(&self, f: &mut std::fmt::Formatter, is_debug: bool) -> std::fmt::Result {
+            fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
                 DebugDisplay::fmt(&self.0, f, is_debug)
             }
         }

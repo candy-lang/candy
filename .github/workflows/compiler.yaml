@@ -6,53 +6,150 @@ on:
   pull_request:
 
 env:
-  RUST_VERSION: nightly
+  RUST_BACKTRACE: 1
+  # Use LLD as the linker to increase compile times. It's installed together
+  # with LLVM.
+  RUSTFLAGS: -C link-arg=-fuse-ld=lld
 
 jobs:
   check:
     name: Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3.5.3
-      - uses: dtolnay/rust-toolchain@0e66bd3e6b38ec0ad5312288c83e47c143e6b09e
+      - uses: actions/checkout@v4
+      - uses: dsherret/rust-toolchain-file@v1
+      - uses: Swatinem/rust-cache@v2.7.0
+      - name: Cache LLVM and Clang
+        id: cache-llvm
+        uses: actions/cache@v3
         with:
-          toolchain: ${{ env.RUST_VERSION }}
-          components: clippy, rustfmt
-      - uses: Swatinem/rust-cache@v2.5.1
+          path: ./llvm
+          key: llvm-15.0
+      - uses: KyleMayes/install-llvm-action@v1.9.0
+        with:
+          version: "15.0"
+          cached: ${{ steps.cache-llvm.outputs.cache-hit }}
 
       # Compiler
-      - name: 'Compiler: clippy'
+      - name: "Compiler: clippy"
         run: cargo clippy -- --deny warnings
-      - name: 'Compiler: test'
+      - name: "Compiler: test"
         run: cargo test --workspace
-      - name: 'Compiler: fmt'
+      - name: "Compiler: fmt"
         run: cargo fmt --check
 
       # Core
-      - name: 'Core: run'
-        run: cargo run --release -- check packages/Core/_.candy
+      - name: "Core: run"
+        run: cargo run --release -- check ./packages/Core/_.candy
 
   # fuzzing:
   #   name: Fuzzing
   #   runs-on: ubuntu-latest
   #   steps:
-  #     - uses: actions/checkout@v3.5.3
-  #     - uses: dtolnay/rust-toolchain@0e66bd3e6b38ec0ad5312288c83e47c143e6b09e
+  #     - uses: actions/checkout@v4
+  #     - uses: dsherret/rust-toolchain-file@v1
+  #     - uses: Swatinem/rust-cache@v2.7.0
+  #     - name: Cache LLVM and Clang
+  #       id: cache-llvm
+  #       uses: actions/cache@v3
   #       with:
-  #         toolchain: ${{ env.RUST_VERSION }}
-  #     - uses: Swatinem/rust-cache@v2.5.1
+  #         path: ./llvm
+  #         key: llvm-15.0
+  #     - uses: KyleMayes/install-llvm-action@v1.9.0
+  #       with:
+  #         version: "15.0"
+  #         cached: ${{ steps.cache-llvm.outputs.cache-hit }}
 
-  #     - run: cargo run --release -- fuzz packages/Benchmark.candy
+  #     - run: cargo run --release -- fuzz ./packages/Benchmark.candy
+
+  check-goldens:
+    name: Check Golden IR Files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: candy/
+
+      # dsherret/rust-toolchain-file doesn't have an input to specify the
+      # toolchain file's path.
+      - run: cp candy/rust-toolchain.toml ./
+      - uses: dsherret/rust-toolchain-file@v1
+      - uses: Swatinem/rust-cache@v2.7.0
+      - name: Cache LLVM and Clang
+        id: cache-llvm
+        uses: actions/cache@v3
+        with:
+          path: ./llvm
+          key: llvm-15.0
+      - uses: KyleMayes/install-llvm-action@v1.9.0
+        with:
+          version: "15.0"
+          cached: ${{ steps.cache-llvm.outputs.cache-hit }}
+
+      - name: Generate Goldens
+        working-directory: candy/
+        run: cargo run --release --features inkwell -- debug gold generate ./packages/Examples/
+
+      - name: Checkout Golden IRs
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GOLDEN_IR_PUSH_TOKEN }}
+          repository: candy-lang/golden-irs
+          ref: ${{ github.event_name == 'pull_request' && format('{0}_', github.event.pull_request.base.sha) || 'main' }}
+          fetch-depth: 1
+          path: golden-irs/
+
+      - name: Create new branch in golden-irs/
+        working-directory: golden-irs/
+        run: |
+          git checkout --orphan ${{ github.sha }}_
+          git rm -r --force .
+      - run: mv candy/packages/Examples/.goldens/* golden-irs/
+      - uses: EndBug/add-and-commit@v9.1.3
+        with:
+          cwd: golden-irs/
+          add: .
+          message: Generate golden IRs
+          push: --force origin ${{ github.sha }}_
+
+      - id: diff
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        working-directory: golden-irs/
+        run: git diff --exit-code ${{ github.event.pull_request.base.sha }}_ ${{ github.sha }}_
+      - name: Shorten commit SHAs
+        id: short-shas
+        if: steps.diff.outcome == 'failure'
+        run: |
+          base_sha=${{ github.event.pull_request.base.sha }}
+          echo "base_sha=${base_sha::7}" >> "$GITHUB_OUTPUT"
+          head_sha=${{ github.sha }}
+          echo "head_sha=${head_sha::7}" >> "$GITHUB_OUTPUT"
+      - if: steps.diff.outcome == 'failure'
+        uses: peter-evans/create-or-update-comment@v3.0.2
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          token: ${{ secrets.GOLDEN_IR_COMMENT_TOKEN }}
+          body: |
+            The golden IRs have changed: [${{ steps.short-shas.outputs.base_sha }}..${{ steps.short-shas.outputs.head_sha }}](https://github.com/candy-lang/golden-irs/compare/${{ github.event.pull_request.base.sha }}_..${{ github.sha }}_)
 
   benchmark:
     name: Benchmark
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3.5.3
-      - uses: dtolnay/rust-toolchain@0e66bd3e6b38ec0ad5312288c83e47c143e6b09e
+      - uses: actions/checkout@v4
+      - uses: dsherret/rust-toolchain-file@v1
+      - uses: Swatinem/rust-cache@v2.7.0
+      - name: Cache LLVM and Clang
+        id: cache-llvm
+        uses: actions/cache@v3
         with:
-          toolchain: ${{ env.RUST_VERSION }}
-      - uses: Swatinem/rust-cache@v2.5.1
+          path: ./llvm
+          key: llvm-15.0
+      - uses: KyleMayes/install-llvm-action@v1.9.0
+        with:
+          version: "15.0"
+          cached: ${{ steps.cache-llvm.outputs.cache-hit }}
 
       - name: Run benchmark
         working-directory: compiler/vm/
@@ -79,3 +176,31 @@ jobs:
           alert-threshold: 200%
           # Benchmarks running on GitHub Actions have a very high variance.
           fail-on-alert: true
+
+  vscode-extension-check:
+    name: Check VS Code Extension
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    defaults:
+      run:
+        working-directory: vscode_extension/
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: npm install
+      - run: npm install @microsoft/eslint-formatter-sarif@3.0.0
+
+      - name: Run ESLint
+        run: |
+          npx eslint . \
+            --ext .ts \
+            --format @microsoft/eslint-formatter-sarif \
+            --output-file eslint-results.sarif
+        continue-on-error: true
+
+      - uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: vscode_extension/eslint-results.sarif
+          wait-for-processing: true

@@ -2,6 +2,7 @@ use super::{Cst, CstKind};
 use std::ops::Deref;
 
 pub trait UnwrapWhitespaceAndComment {
+    #[must_use]
     fn unwrap_whitespace_and_comment(&self) -> Self;
 }
 impl<D: Clone> UnwrapWhitespaceAndComment for Cst<D> {
@@ -56,7 +57,7 @@ impl<D: Clone> UnwrapWhitespaceAndComment for Cst<D> {
                 parts: parts.unwrap_whitespace_and_comment(),
                 closing: closing.unwrap_whitespace_and_comment(),
             },
-            kind @ CstKind::TextPart(_) => kind.clone(),
+            kind @ (CstKind::TextNewline(_) | CstKind::TextPart(_)) => kind.clone(),
             CstKind::TextInterpolation {
                 opening_curly_braces,
                 expression,
@@ -100,7 +101,7 @@ impl<D: Clone> UnwrapWhitespaceAndComment for Cst<D> {
                 value: value.unwrap_whitespace_and_comment(),
                 comma: comma
                     .as_ref()
-                    .map(|comma| comma.unwrap_whitespace_and_comment()),
+                    .map(UnwrapWhitespaceAndComment::unwrap_whitespace_and_comment),
             },
             CstKind::Struct {
                 opening_bracket,
@@ -125,7 +126,7 @@ impl<D: Clone> UnwrapWhitespaceAndComment for Cst<D> {
                 value: value.unwrap_whitespace_and_comment(),
                 comma: comma
                     .as_ref()
-                    .map(|comma| comma.unwrap_whitespace_and_comment()),
+                    .map(UnwrapWhitespaceAndComment::unwrap_whitespace_and_comment),
             },
             CstKind::StructAccess { struct_, dot, key } => CstKind::StructAccess {
                 struct_: struct_.unwrap_whitespace_and_comment(),
@@ -177,7 +178,7 @@ impl<D: Clone> UnwrapWhitespaceAndComment for Cst<D> {
             },
             kind @ CstKind::Error { .. } => kind.clone(),
         };
-        Cst {
+        Self {
             data: self.data.clone(),
             kind,
         }
@@ -185,14 +186,14 @@ impl<D: Clone> UnwrapWhitespaceAndComment for Cst<D> {
 }
 impl<C: UnwrapWhitespaceAndComment> UnwrapWhitespaceAndComment for Box<C> {
     fn unwrap_whitespace_and_comment(&self) -> Self {
-        Box::new(self.deref().unwrap_whitespace_and_comment())
+        Self::new(self.deref().unwrap_whitespace_and_comment())
     }
 }
 impl<D: Clone> UnwrapWhitespaceAndComment for Vec<Cst<D>> {
     fn unwrap_whitespace_and_comment(&self) -> Self {
         self.iter()
             .filter(|it| !it.is_whitespace_or_comment())
-            .map(|it| it.unwrap_whitespace_and_comment())
+            .map(UnwrapWhitespaceAndComment::unwrap_whitespace_and_comment)
             .collect()
     }
 }

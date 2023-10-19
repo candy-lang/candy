@@ -8,6 +8,7 @@ pub struct TracingConfig {
     pub evaluated_expressions: TracingMode,
 }
 impl TracingConfig {
+    #[must_use]
     pub const fn off() -> Self {
         Self {
             register_fuzzables: TracingMode::Off,
@@ -16,7 +17,8 @@ impl TracingConfig {
         }
     }
 
-    pub fn for_child_module(&self) -> Self {
+    #[must_use]
+    pub const fn for_child_module(&self) -> Self {
         Self {
             register_fuzzables: self.register_fuzzables.for_child_module(),
             calls: self.calls.for_child_module(),
@@ -37,35 +39,39 @@ pub enum TracingMode {
     All,
 }
 impl TracingMode {
-    pub fn all_or_off(should_trace: bool) -> Self {
+    #[must_use]
+    pub const fn all_or_off(should_trace: bool) -> Self {
         if should_trace {
-            TracingMode::All
+            Self::All
         } else {
-            TracingMode::Off
+            Self::Off
         }
     }
 
-    pub fn only_current_or_off(should_trace: bool) -> Self {
+    #[must_use]
+    pub const fn only_current_or_off(should_trace: bool) -> Self {
         if should_trace {
-            TracingMode::OnlyCurrent
+            Self::OnlyCurrent
         } else {
-            TracingMode::Off
+            Self::Off
         }
     }
 
-    pub fn is_enabled(&self) -> bool {
+    #[must_use]
+    pub const fn is_enabled(&self) -> bool {
         match self {
-            TracingMode::Off => false,
-            TracingMode::OnlyCurrent => true,
-            TracingMode::All => true,
+            Self::Off => false,
+            Self::OnlyCurrent => true,
+            Self::All => true,
         }
     }
 
-    pub fn for_child_module(&self) -> Self {
+    #[must_use]
+    pub const fn for_child_module(&self) -> Self {
         match self {
-            TracingMode::Off => TracingMode::Off,
-            TracingMode::OnlyCurrent => TracingMode::Off,
-            TracingMode::All => TracingMode::All,
+            Self::Off => Self::Off,
+            Self::OnlyCurrent => Self::Off,
+            Self::All => Self::All,
         }
     }
 }

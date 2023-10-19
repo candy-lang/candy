@@ -1,9 +1,13 @@
 use async_trait::async_trait;
+#[cfg(feature = "inkwell")]
+use candy_backend_inkwell::LlvmIrDb;
 use candy_frontend::{
     ast_to_hir::{AstToHir, HirResult},
     cst_to_ast::{AstResult, CstToAst},
     hir_to_mir::{HirToMir, MirResult},
+    lir_optimize::OptimizeLir,
     mir_optimize::{OptimizeMir, OptimizedMirResult},
+    mir_to_lir::{LirResult, MirToLir},
     module::{Module, ModuleKind, PackagesPath},
     position::{line_start_offsets_raw, Offset},
     rich_ir::{
@@ -13,7 +17,6 @@ use candy_frontend::{
     string_to_rcst::{ModuleError, RcstResult, StringToRcst},
     TracingConfig,
 };
-use candy_vm::{lir::Lir, mir_to_lir::compile_lir};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, hash::Hash, ops::Range, sync::Arc};
@@ -53,12 +56,15 @@ impl Server {
         features.ir.open(&self.db, config, params.uri.clone()).await;
 
         let open_irs = features.ir.open_irs.read().await;
-        Ok(open_irs.get(&params.uri).unwrap().ir.text.to_owned())
+        Ok(open_irs.get(&params.uri).unwrap().ir.text.clone())
     }
 }
 
 #[derive(Debug, Default)]
 pub struct IrFeatures {
+    /// If a tab gets closed just after a request, the IR might be missing in
+    /// this map already while we are still working on requests for it. In that
+    /// case, we return empty responses.
     open_irs: Arc<RwLock<FxHashMap<Url, OpenIr>>>,
 }
 impl IrFeatures {
@@ -77,7 +83,7 @@ impl IrFeatures {
     async fn ensure_is_open(&self, db: &Mutex<Database>, config: IrConfig) {
         let packages_path = {
             let db = db.lock().await;
-            db.packages_path.to_owned()
+            db.packages_path.clone()
         };
         let uri = Url::from_config(&config, &packages_path);
         {
@@ -91,30 +97,47 @@ impl IrFeatures {
     }
     async fn open(&self, db: &Mutex<Database>, config: IrConfig, uri: Url) {
         let db = db.lock().await;
-        let open_ir = self.create(&db, config);
+        let open_ir = Self::create(&db, config);
         let mut open_irs = self.open_irs.write().await;
         open_irs.insert(uri, open_ir);
     }
-    fn create(&self, db: &Database, config: IrConfig) -> OpenIr {
+    fn create(db: &Database, config: IrConfig) -> OpenIr {
         let ir = match &config.ir {
             Ir::Rcst => Self::rich_ir_for_rcst(&config.module, db.rcst(config.module.clone())),
             Ir::Ast => Self::rich_ir_for_ast(&config.module, db.ast(config.module.clone())),
             Ir::Hir => Self::rich_ir_for_hir(&config.module, db.hir(config.module.clone())),
             Ir::Mir(tracing_config) => Self::rich_ir_for_mir(
                 &config.module,
-                db.mir(config.module.clone(), tracing_config.to_owned()),
+                db.mir(config.module.clone(), tracing_config.clone()),
                 tracing_config,
             ),
             Ir::OptimizedMir(tracing_config) => Self::rich_ir_for_optimized_mir(
                 &config.module,
-                db.optimized_mir(config.module.clone(), tracing_config.to_owned()),
+                db.optimized_mir(config.module.clone(), tracing_config.clone()),
                 tracing_config,
             ),
             Ir::Lir(tracing_config) => Self::rich_ir_for_lir(
                 &config.module,
-                &compile_lir(db, config.module.clone(), tracing_config.to_owned()).0,
+                &db.lir(config.module.clone(), tracing_config.clone()),
                 tracing_config,
             ),
+            Ir::OptimizedLir(tracing_config) => Self::rich_ir_for_optimized_lir(
+                &config.module,
+                db.optimized_lir(config.module.clone(), tracing_config.clone()),
+                tracing_config,
+            ),
+            Ir::VmByteCode(tracing_config) => Self::rich_ir_for_vm_byte_code(
+                &config.module,
+                &candy_vm::mir_to_byte_code::compile_byte_code(
+                    db,
+                    config.module.clone(),
+                    tracing_config.clone(),
+                )
+                .0,
+                tracing_config,
+            ),
+            #[cfg(feature = "inkwell")]
+            Ir::LlvmIr => db.llvm_ir(config.module.clone()).unwrap(),
         };
 
         let line_start_offsets = line_start_offsets_raw(&ir.text);
@@ -125,100 +148,96 @@ impl IrFeatures {
         }
     }
     fn rich_ir_for_rcst(module: &Module, rcst: RcstResult) -> RichIr {
-        let mut builder = RichIrBuilder::default();
-        builder.push(
-            format!("# RCST for module {module}"),
-            TokenType::Comment,
-            EnumSet::empty(),
-        );
-        builder.push_newline();
-        match rcst {
-            Ok(rcst) => rcst.build_rich_ir(&mut builder),
-            Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
-        }
-        builder.finish()
+        Self::rich_ir_for("RCST", module, None, |builder| match rcst {
+            Ok(rcst) => rcst.build_rich_ir(builder),
+            Err(error) => Self::build_rich_ir_for_module_error(builder, module, error),
+        })
     }
     fn rich_ir_for_ast(module: &Module, asts: AstResult) -> RichIr {
-        let mut builder = RichIrBuilder::default();
-        builder.push(
-            format!("# AST for module {module}"),
-            TokenType::Comment,
-            EnumSet::empty(),
-        );
-        builder.push_newline();
-        match asts {
-            Ok((asts, _)) => asts.build_rich_ir(&mut builder),
-            Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
-        }
-        builder.finish()
+        Self::rich_ir_for("AST", module, None, |builder| match asts {
+            Ok((asts, _)) => asts.build_rich_ir(builder),
+            Err(error) => Self::build_rich_ir_for_module_error(builder, module, error),
+        })
     }
     fn rich_ir_for_hir(module: &Module, hir: HirResult) -> RichIr {
-        let mut builder = RichIrBuilder::default();
-        builder.push(
-            format!("# HIR for module {module}"),
-            TokenType::Comment,
-            EnumSet::empty(),
-        );
-        builder.push_newline();
-        match hir {
-            Ok((hir, _)) => hir.build_rich_ir(&mut builder),
-            Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
-        }
-        builder.finish()
+        Self::rich_ir_for("HIR", module, None, |builder| match hir {
+            Ok((hir, _)) => hir.build_rich_ir(builder),
+            Err(error) => Self::build_rich_ir_for_module_error(builder, module, error),
+        })
     }
     fn rich_ir_for_mir(module: &Module, mir: MirResult, tracing_config: &TracingConfig) -> RichIr {
-        let mut builder = RichIrBuilder::default();
-        builder.push(
-            format!("# MIR for module {module}"),
-            TokenType::Comment,
-            EnumSet::empty(),
-        );
-        builder.push_newline();
-        builder.push_tracing_config(tracing_config);
-        builder.push_newline();
-        match mir {
-            Ok((mir, _)) => mir.build_rich_ir(&mut builder),
-            Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
-        }
-        builder.finish()
+        Self::rich_ir_for("MIR", module, tracing_config, |builder| match mir {
+            Ok((mir, _)) => mir.build_rich_ir(builder),
+            Err(error) => Self::build_rich_ir_for_module_error(builder, module, error),
+        })
     }
     fn rich_ir_for_optimized_mir(
         module: &Module,
         mir: OptimizedMirResult,
         tracing_config: &TracingConfig,
     ) -> RichIr {
-        let mut builder = RichIrBuilder::default();
-        builder.push(
-            format!("# Optimized MIR for module {module}"),
-            TokenType::Comment,
-            EnumSet::empty(),
-        );
-        builder.push_newline();
-        builder.push_tracing_config(tracing_config);
-        builder.push_newline();
-        match mir {
-            Ok((mir, _, _, _)) => mir.build_rich_ir(&mut builder),
-            Err(error) => Self::build_rich_ir_for_module_error(&mut builder, module, &error),
-        }
-        builder.finish()
+        Self::rich_ir_for(
+            "Optimized MIR",
+            module,
+            tracing_config,
+            |builder| match mir {
+                Ok((mir, _, _)) => mir.build_rich_ir(builder),
+                Err(error) => Self::build_rich_ir_for_module_error(builder, module, error),
+            },
+        )
     }
-    fn rich_ir_for_lir(module: &Module, lir: &Lir, tracing_config: &TracingConfig) -> RichIr {
+    fn rich_ir_for_lir(module: &Module, lir: &LirResult, tracing_config: &TracingConfig) -> RichIr {
+        Self::rich_ir_for("LIR", module, tracing_config, |builder| match lir {
+            Ok((lir, _)) => lir.build_rich_ir(builder),
+            Err(error) => Self::build_rich_ir_for_module_error(builder, module, *error),
+        })
+    }
+    fn rich_ir_for_optimized_lir(
+        module: &Module,
+        lir: LirResult,
+        tracing_config: &TracingConfig,
+    ) -> RichIr {
+        Self::rich_ir_for(
+            "Optimized LIR",
+            module,
+            tracing_config,
+            |builder| match lir {
+                Ok((lir, _)) => lir.build_rich_ir(builder),
+                Err(error) => Self::build_rich_ir_for_module_error(builder, module, error),
+            },
+        )
+    }
+    fn rich_ir_for_vm_byte_code(
+        module: &Module,
+        byte_code: &candy_vm::byte_code::ByteCode,
+        tracing_config: &TracingConfig,
+    ) -> RichIr {
+        Self::rich_ir_for("VM Byte Code", module, tracing_config, |builder| {
+            byte_code.build_rich_ir(builder);
+        })
+    }
+    fn rich_ir_for(
+        ir_name: &str,
+        module: &Module,
+        tracing_config: impl Into<Option<&TracingConfig>>,
+        build_rich_ir: impl FnOnce(&mut RichIrBuilder),
+    ) -> RichIr {
         let mut builder = RichIrBuilder::default();
-        builder.push(
-            format!("# LIR for module {module}"),
-            TokenType::Comment,
-            EnumSet::empty(),
-        );
+        builder.push_comment_line(format!("{ir_name} for module {module}"));
+        if let Some(tracing_config) = tracing_config.into() {
+            builder.push_newline();
+            builder.push_tracing_config(tracing_config);
+        }
         builder.push_newline();
-        builder.push_tracing_config(tracing_config);
-        builder.push_newline();
-        lir.build_rich_ir(&mut builder);
-        builder.finish()
+
+        build_rich_ir(&mut builder);
+
+        builder.finish(true)
     }
     fn build_rich_ir_for_module_error(
         builder: &mut RichIrBuilder,
         module: &Module,
-        module_error: &ModuleError,
+        module_error: ModuleError,
     ) {
         match module_error {
             ModuleError::DoesNotExist => {
@@ -258,35 +277,61 @@ struct IrConfig {
 }
 impl IrConfig {
     fn decode(uri: &Url, packages_path: &PackagesPath) -> Self {
-        let (path, ir) = uri.path().rsplit_once('.').unwrap();
-        let details = urlencoding::decode(uri.fragment().unwrap()).unwrap();
+        let (path, ir) = uri
+            .path()
+            .rsplit_once('.')
+            .expect("URI path is missing a file extension.");
+        let details = urlencoding::decode(uri.fragment().expect("URI is missing a fragment"))
+            .expect("URI Fragment is not URL-encoded.");
         let mut details: serde_json::Map<String, serde_json::Value> =
-            serde_json::from_str(&details).unwrap();
+            serde_json::from_str(&details).expect("Decoded URI fragment is not a valid JSON map.");
 
-        let original_scheme = details.get("scheme").unwrap().as_str().unwrap();
-        let original_uri = format!("{original_scheme}:{path}").parse().unwrap();
+        let original_scheme = details
+            .get("scheme")
+            .expect("Decoded URI fragment is missing the `scheme`.")
+            .as_str()
+            .expect("Decoded URI fragment's `scheme` is not a string.");
+        let original_uri = format!("{original_scheme}:{path}")
+            .parse()
+            .expect("Recreated original URI is not a valid URI.");
 
-        let module_kind = match details.get("moduleKind").unwrap().as_str().unwrap() {
+        let module_kind = match details
+            .get("moduleKind")
+            .expect("Decoded URI fragment is missing the `moduleKind`.")
+            .as_str()
+            .expect("Decoded URI fragment's `moduleKind` is not a string.")
+        {
             "code" => ModuleKind::Code,
             "asset" => ModuleKind::Asset,
             module_kind => panic!("Unknown module kind: `{module_kind}`"),
         };
 
-        let tracing_config = details
-            .remove("tracingConfig")
-            .map(|it| serde_json::from_value(it).unwrap());
+        let tracing_config = details.remove("tracingConfig").map(|it| {
+            serde_json::from_value(it)
+                .expect("Decoded URI fragment's `tracingConfig` is not a valid JSON map.")
+        });
 
         let ir = IrDiscriminants::try_from(ir).unwrap_or_else(|_| panic!("Unsupported IR: {ir}"));
         let ir = match ir {
             IrDiscriminants::Rcst => Ir::Rcst,
             IrDiscriminants::Ast => Ir::Ast,
             IrDiscriminants::Hir => Ir::Hir,
-            IrDiscriminants::Mir => Ir::Mir(tracing_config.unwrap()),
-            IrDiscriminants::OptimizedMir => Ir::OptimizedMir(tracing_config.unwrap()),
-            IrDiscriminants::Lir => Ir::Lir(tracing_config.unwrap()),
+            IrDiscriminants::Mir => Ir::Mir(tracing_config.expect("Tracing config is missing.")),
+            IrDiscriminants::OptimizedMir => {
+                Ir::OptimizedMir(tracing_config.expect("Tracing config is missing."))
+            }
+            IrDiscriminants::Lir => Ir::Lir(tracing_config.expect("Tracing config is missing.")),
+            IrDiscriminants::OptimizedLir => {
+                Ir::OptimizedLir(tracing_config.expect("Tracing config is missing."))
+            }
+            IrDiscriminants::VmByteCode => {
+                Ir::VmByteCode(tracing_config.expect("Tracing config is missing."))
+            }
+            #[cfg(feature = "inkwell")]
+            IrDiscriminants::LlvmIr => Ir::LlvmIr,
         };
 
-        IrConfig {
+        Self {
             module: module_from_url(&original_uri, module_kind, packages_path).unwrap(),
             ir,
         }
@@ -301,6 +346,13 @@ impl UrlFromIrConfig for Url {
 
         let mut details = serde_json::Map::new();
         details.insert("scheme".to_string(), original_url.scheme().into());
+        details.insert(
+            "moduleKind".to_string(),
+            match config.module.kind {
+                ModuleKind::Code => "code".into(),
+                ModuleKind::Asset => "asset".into(),
+            },
+        );
         match &config.ir {
             Ir::Mir(tracing_config)
             | Ir::OptimizedMir(tracing_config)
@@ -313,7 +365,7 @@ impl UrlFromIrConfig for Url {
             _ => {}
         }
 
-        Url::parse(
+        Self::parse(
             format!(
                 "candy-ir:{}.{ir}#{}",
                 original_url.path(),
@@ -337,14 +389,22 @@ pub enum Ir {
     Mir(TracingConfig),
     OptimizedMir(TracingConfig),
     Lir(TracingConfig),
+    OptimizedLir(TracingConfig),
+    VmByteCode(TracingConfig),
+    #[cfg(feature = "inkwell")]
+    LlvmIr,
 }
 impl Ir {
-    fn tracing_config(&self) -> Option<&TracingConfig> {
+    const fn tracing_config(&self) -> Option<&TracingConfig> {
         match self {
-            Ir::Rcst | Ir::Ast | Ir::Hir => None,
-            Ir::Mir(tracing_config)
-            | Ir::OptimizedMir(tracing_config)
-            | Ir::Lir(tracing_config) => Some(tracing_config),
+            Self::Rcst | Self::Ast | Self::Hir => None,
+            Self::Mir(tracing_config)
+            | Self::OptimizedMir(tracing_config)
+            | Self::Lir(tracing_config)
+            | Self::OptimizedLir(tracing_config)
+            | Self::VmByteCode(tracing_config) => Some(tracing_config),
+            #[cfg(feature = "inkwell")]
+            Self::LlvmIr => None,
         }
     }
 }
@@ -379,7 +439,7 @@ impl LanguageFeatures for IrFeatures {
     ) -> Option<LocationLink> {
         let (origin_selection_range, key, config) = {
             let open_irs = self.open_irs.read().await;
-            let open_ir = open_irs.get(&uri).unwrap();
+            let open_ir = open_irs.get(&uri)?;
             let offset = open_ir.lsp_position_to_offset(position);
 
             let (key, result) = open_ir.find_references_entry(offset)?;
@@ -401,16 +461,12 @@ impl LanguageFeatures for IrFeatures {
                 });
             }
 
-            (
-                origin_selection_range,
-                key.to_owned(),
-                open_ir.config.to_owned(),
-            )
+            (origin_selection_range, key.clone(), open_ir.config.clone())
         };
 
         let packages_path = {
             let db = db.lock().await;
-            db.packages_path.to_owned()
+            db.packages_path.clone()
         };
 
         let packages_path_for_function = packages_path.clone();
@@ -419,11 +475,11 @@ impl LanguageFeatures for IrFeatures {
             self.ensure_is_open(db, config).await;
 
             let rich_irs = self.open_irs.read().await;
-            let other_ir = rich_irs.get(&uri).unwrap();
+            let other_ir = rich_irs.get(&uri)?;
             let result = other_ir.ir.references.get(key).unwrap();
             let target_range = other_ir.range_to_lsp_range(result.definition.as_ref().unwrap());
 
-            (uri, target_range)
+            Some((uri, target_range))
         };
 
         let (uri, target_range) = match &key {
@@ -440,28 +496,43 @@ impl LanguageFeatures for IrFeatures {
             ),
             ReferenceKey::ModuleWithSpan(module, span) => {
                 let db = db.lock().await;
-                let range = db.range_to_lsp_range(module.to_owned(), span.to_owned());
+                let range = db.range_to_lsp_range(module.clone(), span.clone());
                 (module_to_url(module, &packages_path).unwrap(), range)
             }
             ReferenceKey::HirId(id) => {
                 let config = IrConfig {
-                    module: id.module.to_owned(),
+                    module: id.module.clone(),
                     ir: Ir::Hir,
                 };
-                find_in_other_ir(config, &key).await
+                find_in_other_ir(config, &key).await?
             }
             ReferenceKey::MirId(_) => {
                 let config = IrConfig {
-                    module: config.module.to_owned(),
+                    module: config.module.clone(),
                     ir: Ir::Mir(
                         config
                             .ir
                             .tracing_config()
-                            .map(|it| it.to_owned())
+                            .cloned()
                             .unwrap_or_else(TracingConfig::off),
                     ),
                 };
-                find_in_other_ir(config, &key).await
+                find_in_other_ir(config, &key).await?
+            }
+            ReferenceKey::LirId(_)
+            | ReferenceKey::LirConstantId(_)
+            | ReferenceKey::LirBodyId(_) => {
+                let config = IrConfig {
+                    module: config.module.clone(),
+                    ir: Ir::Lir(
+                        config
+                            .ir
+                            .tracing_config()
+                            .cloned()
+                            .unwrap_or_else(TracingConfig::off),
+                    ),
+                };
+                find_in_other_ir(config, &key).await?
             }
         };
         Some(LocationLink {
@@ -477,9 +548,9 @@ impl LanguageFeatures for IrFeatures {
     }
     async fn folding_ranges(&self, _db: &Mutex<Database>, uri: Url) -> Vec<FoldingRange> {
         let open_irs = self.open_irs.read().await;
-        dbg!(&uri);
-        dbg!(&open_irs.keys());
-        let open_ir = open_irs.get(&uri).unwrap();
+        let Some(open_ir) = open_irs.get(&uri) else {
+            return vec![];
+        };
         open_ir.folding_ranges()
     }
 
@@ -495,7 +566,9 @@ impl LanguageFeatures for IrFeatures {
         include_declaration: bool,
     ) -> FxHashMap<Url, Vec<Reference>> {
         let open_irs = self.open_irs.read().await;
-        let open_ir = open_irs.get(&uri).unwrap();
+        let Some(open_ir) = open_irs.get(&uri) else {
+            return FxHashMap::default();
+        };
 
         let offset = open_ir.lsp_position_to_offset(position);
         let Some((reference_key, _)) = open_ir.find_references_entry(offset) else {
@@ -511,7 +584,7 @@ impl LanguageFeatures for IrFeatures {
                 .iter()
                 .map(|(uri, ir)| {
                     (
-                        uri.to_owned(),
+                        uri.clone(),
                         ir.find_references(reference_key, include_declaration),
                     )
                 })
@@ -525,7 +598,9 @@ impl LanguageFeatures for IrFeatures {
     }
     async fn semantic_tokens(&self, _db: &Mutex<Database>, uri: Url) -> Vec<SemanticToken> {
         let open_irs = self.open_irs.read().await;
-        let open_ir = open_irs.get(&uri).unwrap();
+        let Some(open_ir) = open_irs.get(&uri) else {
+            return vec![];
+        };
         open_ir.semantic_tokens()
     }
 }
@@ -564,13 +639,13 @@ impl OpenIr {
             references.push(Reference {
                 range: self.range_to_lsp_range(definition),
                 is_write: true,
-            })
+            });
         }
         for reference in &result.references {
             references.push(Reference {
                 range: self.range_to_lsp_range(reference),
                 is_write: true,
-            })
+            });
         }
         references
     }
@@ -619,17 +694,17 @@ impl OpenIr {
 impl TokenTypeToSemantic for TokenType {
     fn to_semantic(&self) -> SemanticTokenType {
         match self {
-            TokenType::Module => SemanticTokenType::Module,
-            TokenType::Type => SemanticTokenType::Type,
-            TokenType::Parameter => SemanticTokenType::Parameter,
-            TokenType::Variable => SemanticTokenType::Variable,
-            TokenType::Function => SemanticTokenType::Function,
-            TokenType::Comment => SemanticTokenType::Comment,
-            TokenType::Symbol => SemanticTokenType::Symbol,
-            TokenType::Text => SemanticTokenType::Text,
-            TokenType::Int => SemanticTokenType::Int,
-            TokenType::Address => SemanticTokenType::Address,
-            TokenType::Constant => SemanticTokenType::Constant,
+            Self::Module => SemanticTokenType::Module,
+            Self::Type => SemanticTokenType::Type,
+            Self::Parameter => SemanticTokenType::Parameter,
+            Self::Variable => SemanticTokenType::Variable,
+            Self::Function => SemanticTokenType::Function,
+            Self::Comment => SemanticTokenType::Comment,
+            Self::Symbol => SemanticTokenType::Symbol,
+            Self::Text => SemanticTokenType::Text,
+            Self::Int => SemanticTokenType::Int,
+            Self::Address => SemanticTokenType::Address,
+            Self::Constant => SemanticTokenType::Constant,
         }
     }
 }
@@ -638,7 +713,7 @@ impl TokenTypeToSemantic for TokenType {
 impl TokenModifierToSemantic for TokenModifier {
     fn to_semantic(&self) -> SemanticTokenModifier {
         match self {
-            TokenModifier::Builtin => SemanticTokenModifier::Builtin,
+            Self::Builtin => SemanticTokenModifier::Builtin,
         }
     }
 }

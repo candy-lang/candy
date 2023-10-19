@@ -1,6 +1,6 @@
 use super::{utils::heap_object_impls, HeapObjectTrait};
 use crate::{
-    heap::{object_heap::HeapObject, Heap, InlineObject, Tag, Text},
+    heap::{object_heap::HeapObject, Heap, InlineObject, Text},
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
 use derive_more::Deref;
@@ -18,15 +18,25 @@ use std::{
 pub struct HeapTag(HeapObject);
 
 impl HeapTag {
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
-    pub fn create(heap: &mut Heap, symbol: Text, value: impl Into<Option<InlineObject>>) -> Self {
+    pub fn create(
+        heap: &mut Heap,
+        is_reference_counted: bool,
+        symbol: Text,
+        value: impl Into<InlineObject>,
+    ) -> Self {
         let value = value.into();
-        let tag = Self(heap.allocate(HeapObject::KIND_TAG, 2 * HeapObject::WORD_SIZE));
+        let tag = Self(heap.allocate(
+            HeapObject::KIND_TAG,
+            is_reference_counted,
+            0,
+            2 * HeapObject::WORD_SIZE,
+        ));
         unsafe {
             *tag.symbol_pointer().as_mut() = symbol.into();
-            *tag.value_pointer().as_mut() = value.map_or(0, |value| value.raw_word().get());
+            *tag.value_pointer().as_mut() = value.raw_word().get();
         };
         tag
     }
@@ -42,16 +52,9 @@ impl HeapTag {
     fn value_pointer(self) -> NonNull<u64> {
         self.content_word_pointer(1)
     }
-    pub fn has_value(self) -> bool {
-        unsafe { *self.value_pointer().as_ref() != 0 }
-    }
-    pub fn value(self) -> Option<InlineObject> {
+    pub fn value(self) -> InlineObject {
         let value = unsafe { *self.value_pointer().as_ref() };
-        NonZeroU64::new(value).map(InlineObject::new)
-    }
-
-    pub fn without_value(self, heap: &mut Heap) -> Tag {
-        Tag::create(heap, self.symbol(), None)
+        InlineObject::new(NonZeroU64::new(value).unwrap())
     }
 }
 
@@ -60,12 +63,9 @@ impl DebugDisplay for HeapTag {
         // We can always use the display formatter since the symbol has a constrained charset.
         write!(f, "{}", self.symbol().get())?;
 
-        if let Some(value) = self.value() {
-            write!(f, " (")?;
-            DebugDisplay::fmt(&value, f, is_debug)?;
-            write!(f, ")")?;
-        }
-        Ok(())
+        write!(f, " (")?;
+        DebugDisplay::fmt(&self.value(), f, is_debug)?;
+        write!(f, ")")
     }
 }
 impl_debug_display_via_debugdisplay!(HeapTag);
@@ -80,9 +80,7 @@ impl PartialEq for HeapTag {
 impl Hash for HeapTag {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.symbol().hash(state);
-        if let Some(value) = self.value() {
-            value.hash(state);
-        }
+        self.value().hash(state);
     }
 }
 
@@ -113,21 +111,17 @@ impl HeapObjectTrait for HeapTag {
         address_map: &mut FxHashMap<HeapObject, HeapObject>,
     ) {
         let symbol = self.symbol().clone_to_heap_with_mapping(heap, address_map);
-        let value = self
-            .value()
-            .map(|it| it.clone_to_heap_with_mapping(heap, address_map));
+        let value = self.value().clone_to_heap_with_mapping(heap, address_map);
         let clone = Self(clone);
         unsafe {
             *clone.symbol_pointer().as_mut() = symbol.into();
-            *clone.value_pointer().as_mut() = value.map_or(0, |it| it.raw_word().get());
+            *clone.value_pointer().as_mut() = value.raw_word().get();
         };
     }
 
     fn drop_children(self, heap: &mut Heap) {
         self.symbol().drop(heap);
-        if let Some(value) = self.value() {
-            value.drop(heap);
-        }
+        self.value().drop(heap);
     }
 
     fn deallocate_external_stuff(self) {}

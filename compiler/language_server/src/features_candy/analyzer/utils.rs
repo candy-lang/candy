@@ -11,7 +11,7 @@ where
     DB: AstToHir + ModuleDb + PositionConversionDb,
 {
     fn id_to_end_of_line(&self, id: hir::Id) -> Option<Position> {
-        let span = self.hir_id_to_display_span(id.clone())?;
+        let span = self.hir_id_to_display_span(&id)?;
         let line = self
             .offset_to_lsp_position(id.module.clone(), span.start)
             .line;

@@ -1,0 +1,39 @@
+builtins = use "Builtins"
+[int, result, toDebugText] = use "Core"
+
+recursive initialArg body =
+  # needs
+  #   function.is2 body
+  #   "The `body` should take the recursive function and the argument."
+  recurse = { recurse arg ->
+    rec = { arg -> recurse recurse arg }
+    body rec arg
+  }
+  recurse recurse initialArg
+
+compareTo valueA valueB =
+  # needs (is valueA)
+  # needs (is valueB)
+  result = valueA | builtins.intCompareTo valueB
+  # check (equals result Equal | bool.implies (equals valueA valueB))
+  # check ((equals result Equal) | bool.implies (equals valueA valueB))
+  result
+isLessThan valueA valueB =
+  # needs (is valueA)
+  # needs (is valueB)
+  builtins.equals (compareTo valueA valueB) Less
+
+fibonacci n =
+  # needs (int.is n)
+  recursive n { recurse n ->
+    builtins.ifElse (n | isLessThan 2) { n } {
+      recurse (n | builtins.intSubtract 1) | builtins.intAdd (recurse (n | builtins.intSubtract 2))
+    }
+  }
+
+main := { environment ->
+  environment.arguments %
+    (n,) -> n | int.parse | result.map { it -> fibonacci it | toDebugText } | result.getValue
+    _ -> "Usage: `cargo run -- run fibonacci.candy -- <number>`"
+  | environment.stdout
+}

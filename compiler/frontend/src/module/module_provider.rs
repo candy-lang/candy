@@ -20,6 +20,7 @@ pub struct InMemoryModuleProvider {
 impl InMemoryModuleProvider {
     // It's exported in `lib.rs`, but the linter still complains about it.
     #[allow(dead_code)]
+    #[must_use]
     pub fn for_modules<S: AsRef<str>>(modules: FxHashMap<Module, S>) -> Self {
         let mut result = Self::default();
         for (module, content) in modules {
@@ -32,7 +33,7 @@ impl InMemoryModuleProvider {
         self.modules.insert(module.clone(), Arc::new(content));
     }
     pub fn add_str<S: AsRef<str>>(&mut self, module: &Module, content: S) {
-        self.add(module, content.as_ref().as_bytes().to_vec())
+        self.add(module, content.as_ref().as_bytes().to_vec());
     }
     pub fn remove(&mut self, module: &Module) {
         self.modules.remove(module);
@@ -78,7 +79,7 @@ pub struct OverlayModuleProvider<O: ModuleProvider, F: ModuleProvider> {
     pub fallback: F,
 }
 impl<O: ModuleProvider, F: ModuleProvider> OverlayModuleProvider<O, F> {
-    pub fn new(overlay: O, fallback: F) -> Self {
+    pub const fn new(overlay: O, fallback: F) -> Self {
         Self { overlay, fallback }
     }
 }

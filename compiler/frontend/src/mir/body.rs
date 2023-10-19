@@ -22,14 +22,17 @@ pub struct Body {
     pub expressions: Vec<(Id, Expression)>,
 }
 impl Body {
+    #[must_use]
     pub fn new(expressions: Vec<(Id, Expression)>) -> Self {
         Self { expressions }
     }
+    #[must_use]
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = (Id, &Expression)> {
         self.expressions
             .iter()
             .map(|(id, expression)| (*id, expression))
     }
+    #[must_use]
     pub fn iter_mut(&mut self) -> impl DoubleEndedIterator<Item = (Id, &mut Expression)> {
         self.expressions
             .iter_mut()
@@ -45,6 +48,7 @@ impl IntoIterator for Body {
     }
 }
 impl Body {
+    #[must_use]
     pub fn return_value(&self) -> Id {
         let (id, _) = self.expressions.last().unwrap();
         *id
@@ -92,6 +96,7 @@ pub struct VisibleExpressions {
     expressions: FxHashMap<Id, Expression>,
 }
 impl VisibleExpressions {
+    #[must_use]
     pub fn none_visible() -> Self {
         Self {
             expressions: FxHashMap::default(),
@@ -101,13 +106,17 @@ impl VisibleExpressions {
         self.expressions.insert(id, expression);
     }
     pub fn remove(&mut self, id: Id) -> Expression {
-        self.expressions.remove(&id).unwrap()
+        self.expressions.remove(&id).unwrap_or_else(|| {
+            panic!("Expression with ID {id} is not visible in this scope. Visible expressions: {self:?}")
+        })
     }
+    #[must_use]
     pub fn get(&self, id: Id) -> &Expression {
         self.expressions.get(&id).unwrap_or_else(|| {
             panic!("Expression with ID {id} is not visible in this scope. Visible expressions: {self:?}")
         })
     }
+    #[must_use]
     pub fn contains(&self, id: Id) -> bool {
         self.expressions.contains_key(&id)
     }
@@ -120,7 +129,7 @@ impl Debug for VisibleExpressions {
             self.expressions
                 .keys()
                 .sorted()
-                .map(|id| id.to_string())
+                .map(ToString::to_string)
                 .join(", "),
         )
     }
@@ -128,12 +137,12 @@ impl Debug for VisibleExpressions {
 
 impl Body {
     pub fn visit(
-        &mut self,
-        visitor: &mut dyn FnMut(Id, &mut Expression, bool) -> VisitorResult,
+        &self,
+        visitor: &mut dyn FnMut(Id, &Expression, bool) -> VisitorResult,
     ) -> VisitorResult {
         let length = self.expressions.len();
         for i in 0..length {
-            let (id, expression) = self.expressions.get_mut(i).unwrap();
+            let (id, expression) = self.expressions.get(i).unwrap();
             match Self::visit_expression(*id, expression, i == length - 1, visitor) {
                 VisitorResult::Continue => {}
                 VisitorResult::Abort => return VisitorResult::Abort,
@@ -143,12 +152,41 @@ impl Body {
     }
     fn visit_expression(
         id: Id,
+        expression: &Expression,
+        is_returned: bool,
+        visitor: &mut dyn FnMut(Id, &Expression, bool) -> VisitorResult,
+    ) -> VisitorResult {
+        if let Expression::Function { body, .. } = expression {
+            match body.visit(visitor) {
+                VisitorResult::Continue => {}
+                VisitorResult::Abort => return VisitorResult::Abort,
+            }
+        }
+        visitor(id, expression, is_returned)
+    }
+
+    pub fn visit_mut(
+        &mut self,
+        visitor: &mut dyn FnMut(Id, &mut Expression, bool) -> VisitorResult,
+    ) -> VisitorResult {
+        let length = self.expressions.len();
+        for i in 0..length {
+            let (id, expression) = self.expressions.get_mut(i).unwrap();
+            match Self::visit_expression_mut(*id, expression, i == length - 1, visitor) {
+                VisitorResult::Continue => {}
+                VisitorResult::Abort => return VisitorResult::Abort,
+            }
+        }
+        VisitorResult::Continue
+    }
+    fn visit_expression_mut(
+        id: Id,
         expression: &mut Expression,
         is_returned: bool,
         visitor: &mut dyn FnMut(Id, &mut Expression, bool) -> VisitorResult,
     ) -> VisitorResult {
         if let Expression::Function { body, .. } = expression {
-            match body.visit(visitor) {
+            match body.visit_mut(visitor) {
                 VisitorResult::Continue => {}
                 VisitorResult::Abort => return VisitorResult::Abort,
             }
@@ -210,12 +248,12 @@ impl Body {
             ..
         } = expression
         {
-            for parameter in parameters.iter() {
+            for parameter in &*parameters {
                 visible.insert(*parameter, Expression::Parameter);
             }
             visible.insert(*responsible_parameter, Expression::Parameter);
             body.visit_with_visible_rec(visible, visitor);
-            for parameter in parameters.iter() {
+            for parameter in &*parameters {
                 visible.remove(*parameter);
             }
             visible.remove(*responsible_parameter);
@@ -224,7 +262,7 @@ impl Body {
         visitor(id, expression, visible, is_returned);
     }
 
-    pub fn visit_bodies(&mut self, visitor: &mut dyn FnMut(&mut Body)) {
+    pub fn visit_bodies(&mut self, visitor: &mut dyn FnMut(&mut Self)) {
         for (_, expression) in self.iter_mut() {
             expression.visit_bodies(visitor);
         }
@@ -233,8 +271,8 @@ impl Body {
 }
 impl Expression {
     pub fn visit_bodies(&mut self, visitor: &mut dyn FnMut(&mut Body)) {
-        if let Expression::Function { body, .. } = self {
-            body.visit_bodies(visitor)
+        if let Self::Function { body, .. } = self {
+            body.visit_bodies(visitor);
         }
     }
 }
@@ -245,13 +283,14 @@ pub struct FunctionBodyBuilder {
     #[deref]
     #[deref_mut]
     body_builder: BodyBuilder,
-    responsible_parameter: Id,
+    // PERF: These are numbered sequentially, so avoid the vec
     parameters: Vec<Id>,
+    responsible_parameter: Id,
 }
 impl FunctionBodyBuilder {
     fn new(hir_id: hir::Id, mut id_generator: IdGenerator<Id>) -> Self {
         let responsible_parameter = id_generator.generate();
-        FunctionBodyBuilder {
+        Self {
             hir_id,
             body_builder: BodyBuilder::new(id_generator),
             parameters: vec![],
@@ -282,8 +321,9 @@ pub struct BodyBuilder {
     body: Body,
 }
 impl BodyBuilder {
+    #[must_use]
     pub fn new(id_generator: IdGenerator<Id>) -> Self {
-        BodyBuilder {
+        Self {
             id_generator,
             body: Body::default(),
         }
@@ -352,7 +392,7 @@ impl BodyBuilder {
     }
     pub fn push_if_else<T, E>(
         &mut self,
-        hir_id: hir::Id,
+        hir_id: &hir::Id,
         condition: Id,
         then_builder: T,
         else_builder: E,
@@ -379,10 +419,12 @@ impl BodyBuilder {
         })
     }
 
+    #[must_use]
     pub fn current_return_value(&self) -> Id {
         self.body.return_value()
     }
 
+    #[must_use]
     pub fn finish(self) -> (IdGenerator<Id>, Body) {
         (self.id_generator, self.body)
     }
@@ -391,7 +433,7 @@ impl BodyBuilder {
 impl_display_via_richir!(Body);
 impl ToRichIr for Body {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        fn push(builder: &mut RichIrBuilder, id: &Id, expression: &Expression) {
+        builder.push_custom_multiline(&self.expressions, |builder, (id, expression)| {
             if let Expression::Function { original_hirs, .. } = expression {
                 builder.push("# ", TokenType::Comment, EnumSet::empty());
                 builder.push_children_custom(
@@ -406,24 +448,10 @@ impl ToRichIr for Body {
                 builder.push_newline();
             }
 
-            let range = builder.push(
-                id.to_short_debug_string(),
-                TokenType::Variable,
-                EnumSet::empty(),
-            );
-            builder.push_definition(id.to_owned(), range);
-
+            let range = builder.push(id.to_string(), TokenType::Comment, EnumSet::empty());
+            builder.push_definition(*id, range);
             builder.push(" = ", None, EnumSet::empty());
             expression.build_rich_ir(builder);
-        }
-
-        let mut iterator = self.expressions.iter();
-        if let Some((id, expression)) = iterator.next() {
-            push(builder, id, expression);
-        }
-        for (id, expression) in iterator {
-            builder.push_newline();
-            push(builder, id, expression);
-        }
+        });
     }
 }

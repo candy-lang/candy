@@ -2,9 +2,8 @@ use super::input::Input;
 use crate::{runner::RunResult, values::InputGeneration};
 use candy_vm::heap::{Heap, Text};
 use itertools::Itertools;
-use rand::{rngs::ThreadRng, seq::SliceRandom, Rng, SeedableRng};
-use rand_chacha::ChaCha20Rng;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
+use rustc_hash::FxHashMap;
 use std::{cell::RefCell, rc::Rc};
 
 pub type Score = f64;
@@ -17,25 +16,17 @@ pub struct InputPool {
 }
 
 impl InputPool {
-    pub fn new(num_args: usize, symbols_in_heap: &FxHashSet<Text>) -> Self {
-        let mut heap = Heap::default();
-
-        let mut symbols = symbols_in_heap
-            .iter()
-            .map(|symbol| symbol.clone_to_heap(&mut heap).try_into().unwrap())
-            .collect_vec();
-        if symbols.is_empty() {
-            symbols.push(Text::create(&mut heap, "Nothing"));
-        }
-
+    #[must_use]
+    pub fn new(num_args: usize, symbols: Vec<Text>) -> Self {
         Self {
-            heap: Rc::new(RefCell::new(heap)),
+            heap: Rc::default(),
             num_args,
             symbols,
             results_and_scores: FxHashMap::default(),
         }
     }
 
+    #[must_use]
     pub fn generate_new_input(&self) -> Input {
         loop {
             let input = self.generate_input();
@@ -44,6 +35,7 @@ impl InputPool {
             }
         }
     }
+    #[must_use]
     pub fn generate_input(&self) -> Input {
         let mut rng = ThreadRng::default();
 
@@ -64,13 +56,24 @@ impl InputPool {
         self.results_and_scores.insert(input, (result, score));
     }
 
+    #[must_use]
     pub fn interesting_inputs(&self) -> Vec<Input> {
-        let mut rng = ChaCha20Rng::seed_from_u64(0);
-        let results_and_scores = self.results_and_scores.iter().collect_vec();
-        results_and_scores
-            .choose_multiple_weighted(&mut rng, 3, |(_, (_, score))| *score)
-            .unwrap()
-            .map(|(input, _)| (*input).clone())
+        self.results_and_scores
+            .iter()
+            .sorted_by(
+                |(_, (result_a, mut score_a)), (_, (result_b, mut score_b))| {
+                    if matches!(result_a, RunResult::Done { .. }) {
+                        score_a += 50.;
+                    }
+                    if matches!(result_b, RunResult::Done { .. }) {
+                        score_b += 50.;
+                    }
+                    score_a.partial_cmp(&score_b).unwrap()
+                },
+            )
+            .rev()
+            .take(3)
+            .map(|(input, _)| input.clone())
             .collect_vec()
     }
 

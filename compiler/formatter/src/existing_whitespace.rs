@@ -12,7 +12,7 @@ use derive_more::From;
 use itertools::Itertools;
 use std::{borrow::Cow, num::NonZeroUsize};
 
-#[derive(Clone, Debug, From)]
+#[derive(Clone, Copy, Debug, Eq, Hash, From, PartialEq)]
 pub enum TrailingWhitespace {
     None,
     Space,
@@ -29,7 +29,7 @@ pub enum TrailingWithIndentationConfig {
         indentation: Indentation,
     },
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum WhitespacePositionInBody {
     Start,
     Middle,
@@ -44,7 +44,7 @@ pub const NEWLINE: &str = "\n";
 
 /// Captures the existing trailing whitespace of CST nodes for later formatting.
 ///
-/// The CST node ends at [start_offset], which is also where [whitespace] begins.
+/// The CST node ends at [`start_offset`], which is also where [`whitespace`] begins.
 ///
 /// The three whitespace fields can contain singleline whitespace, linebreaks, and comments.
 ///
@@ -66,7 +66,7 @@ pub struct ExistingWhitespace<'a> {
     adopted_whitespace_after: Cow<'a, [Cst]>,
 }
 impl<'a> ExistingWhitespace<'a> {
-    pub fn empty(start_offset: Offset) -> Self {
+    pub const fn empty(start_offset: Offset) -> Self {
         Self {
             start_offset,
             adopted_whitespace_before: Cow::Borrowed(&[]),
@@ -92,8 +92,7 @@ impl<'a> ExistingWhitespace<'a> {
         self.whitespace
             .as_ref()
             .last()
-            .map(|it| it.data.span.end)
-            .unwrap_or(self.start_offset)
+            .map_or(self.start_offset, |it| it.data.span.end)
     }
     pub fn is_empty(&self) -> bool {
         self.adopted_whitespace_before.is_empty()
@@ -124,7 +123,7 @@ impl<'a> ExistingWhitespace<'a> {
                 Cow::Borrowed(whitespace) => {
                     let (first, remaining) = whitespace.split_first().unwrap();
                     *whitespace = remaining;
-                    first.data.span.to_owned()
+                    first.data.span.clone()
                 },
                 Cow::Owned(whitespace) => whitespace.remove(0).data.span,
             };
@@ -178,8 +177,7 @@ impl<'a> ExistingWhitespace<'a> {
             let other_end_offset = other
                 .whitespace
                 .last()
-                .map(|it| it.data.span.end)
-                .unwrap_or_else(|| other.start_offset);
+                .map_or(other.start_offset, |it| it.data.span.end);
             if self.start_offset == other_end_offset
                 && other.adopted_whitespace_after.is_empty()
                 && self.adopted_whitespace_before.is_empty()
@@ -224,7 +222,7 @@ impl<'a> ExistingWhitespace<'a> {
         assert!(!self.has_comments());
 
         for whitespace in self.whitespace_ref() {
-            edits.delete(whitespace.data.span.to_owned());
+            edits.delete(whitespace.data.span.clone());
         }
 
         SinglelineWidth::default()
@@ -322,6 +320,15 @@ impl<'a> ExistingWhitespace<'a> {
         comments_and_whitespace: &[(&Cst, Option<Offset>)],
         config: &TrailingWithIndentationConfig,
     ) -> Width {
+        enum NewlineCount {
+            NoneOrAdopted,
+            Owned(NonZeroUsize),
+        }
+        enum CommentPosition {
+            FirstLine,
+            NextLine(NewlineCount),
+        }
+
         let (previous_width, indentation, ensure_space_before_first_comment, inner_newline_limit) =
             match config {
                 TrailingWithIndentationConfig::Body {
@@ -339,21 +346,11 @@ impl<'a> ExistingWhitespace<'a> {
                 TrailingWithIndentationConfig::Trailing {
                     previous_width,
                     indentation,
-                } => (previous_width.to_owned(), *indentation, true, 1),
+                } => (*previous_width, *indentation, true, 1),
             };
 
         let mut width = Width::default();
-
-        enum NewlineCount {
-            NoneOrAdopted,
-            Owned(NonZeroUsize),
-        }
-        enum CommentPosition {
-            FirstLine,
-            NextLine(NewlineCount),
-        }
         let mut comment_position = CommentPosition::FirstLine;
-
         let mut last_reusable_whitespace_range = None;
 
         for (item, offset_override) in comments_and_whitespace {
@@ -368,7 +365,7 @@ impl<'a> ExistingWhitespace<'a> {
                         if let Some(range) = last_reusable_whitespace_range {
                             edits.delete(range);
                         }
-                        last_reusable_whitespace_range = Some(item.data.span.to_owned());
+                        last_reusable_whitespace_range = Some(item.data.span.clone());
                     }
                 }
                 CstKind::Newline(_) => match &mut comment_position {
@@ -382,7 +379,7 @@ impl<'a> ExistingWhitespace<'a> {
                         let newline_count = if is_adopted {
                             NewlineCount::NoneOrAdopted
                         } else {
-                            edits.change(item.data.span.to_owned(), NEWLINE);
+                            edits.change(item.data.span.clone(), NEWLINE);
                             NewlineCount::Owned(NonZeroUsize::new(1).unwrap())
                         };
 
@@ -411,7 +408,7 @@ impl<'a> ExistingWhitespace<'a> {
                     CommentPosition::NextLine(NewlineCount::Owned(count)) => {
                         // We already encountered and kept at least one newline.
                         if count.get() >= inner_newline_limit {
-                            edits.delete(item.data.span.to_owned());
+                            edits.delete(item.data.span.clone());
                         } else {
                             *count = count.checked_add(1).unwrap();
                             width += Width::NEWLINE;
@@ -536,7 +533,7 @@ where
 {
     let mut result = None;
     for item in iterator {
-        let first = result.map(|(first, _)| first).unwrap_or(item);
+        let first = result.map_or(item, |(first, _)| first);
         result = Some((first, item));
     }
     result
@@ -613,7 +610,7 @@ mod test {
                         previous_width: child_width,
                         indentation,
                     },
-                )
+                );
             }
         };
         assert_eq!(edits.apply(), expected);

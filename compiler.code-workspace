@@ -13,6 +13,10 @@
       "path": "compiler/vm"
     },
     {
+      "name": "Compiler: Inkwell Backend",
+      "path": "compiler/backend_inkwell"
+    },
+    {
       "name": "Compiler: Fuzzer",
       "path": "compiler/fuzzer"
     },
@@ -43,6 +47,18 @@
   ],
   "settings": {
     // Please keep these settings in sync with ./packages/candy.code-workspace.
+    "[json]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[markdown]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[typescript]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[yaml]": {
+      "editor.defaultFormatter": "redhat.vscode-yaml"
+    },
     "editor.codeActionsOnSave": {
       "source.fixAll": true,
       "source.organizeImports": true

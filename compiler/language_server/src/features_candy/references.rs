@@ -41,14 +41,8 @@ where
             Some(ReferenceQuery::Needs(module))
         }
         CstKind::Identifier { .. } => {
-            let hir_ids = db.cst_to_hir_id(module, origin_cst.data.id);
-            assert_eq!(
-                hir_ids.len(),
-                1,
-                "The CST ID of an identifier should map to exactly one HIR ID.",
-            );
-            let hir_id = hir_ids.into_iter().next().unwrap();
-
+            let hir_id = db.cst_to_last_hir_id(module, origin_cst.data.id)?;
+            debug!("HIR ID: {hir_id}");
             let target_id: Option<hir::Id> =
                 if let Some(hir_expr) = db.find_expression(hir_id.clone()) {
                     let containing_body = db.containing_body_of(hir_id.clone());
@@ -89,9 +83,9 @@ where
     // TODO: search all files
     let module = match &query {
         ReferenceQuery::Id(id) => id.module.clone(),
-        ReferenceQuery::Int(module, _) => module.to_owned(),
-        ReferenceQuery::Symbol(module, _) => module.to_owned(),
-        ReferenceQuery::Needs(module) => module.to_owned(),
+        ReferenceQuery::Int(module, _) => module.clone(),
+        ReferenceQuery::Symbol(module, _) => module.clone(),
+        ReferenceQuery::Needs(module) => module.clone(),
     };
     let (hir, _) = db.hir(module).unwrap();
 
@@ -135,16 +129,16 @@ where
             }
         }
         for (id, expression) in &body.expressions {
-            self.visit_expression(id.to_owned(), expression);
+            self.visit_expression(id.clone(), expression);
         }
     }
     fn visit_ids(&mut self, ids: &[hir::Id]) {
         for id in ids {
-            self.visit_id(id.to_owned());
+            self.visit_id(id.clone());
         }
     }
     fn visit_id(&mut self, id: hir::Id) {
-        let expression = match self.db.find_expression(id.to_owned()) {
+        let expression = match self.db.find_expression(id.clone()) {
             Some(expression) => expression,
             None => return, // Generated code
         };
@@ -199,10 +193,7 @@ where
                     self.add_reference(id, false);
                 }
             }
-            Expression::Error { child, .. } => {
-                if let Some(child) = child {
-                    self.visit_id(child.clone());
-                }
+            Expression::Error { .. } => {
             }
         }
     }
@@ -219,7 +210,7 @@ where
         }
         self.discovered_references.insert(id.clone());
 
-        if let Some(span) = self.db.hir_id_to_span(id.clone()) {
+        if let Some(span) = self.db.hir_id_to_span(&id) {
             self.references.push(Reference {
                 range: self.db.range_to_lsp_range(id.module, span),
                 is_write,

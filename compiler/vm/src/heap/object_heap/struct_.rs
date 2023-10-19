@@ -18,12 +18,16 @@ use std::{
 pub struct HeapStruct(HeapObject);
 
 impl HeapStruct {
-    const LEN_SHIFT: usize = 3;
+    const LEN_SHIFT: usize = 4;
 
-    pub fn new_unchecked(object: HeapObject) -> Self {
+    pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
-    pub fn create(heap: &mut Heap, value: &FxHashMap<InlineObject, InlineObject>) -> Self {
+    pub fn create(
+        heap: &mut Heap,
+        is_reference_counted: bool,
+        value: &FxHashMap<InlineObject, InlineObject>,
+    ) -> Self {
         let len = value.len();
         assert_eq!(
             (len << Self::LEN_SHIFT) >> Self::LEN_SHIFT,
@@ -35,7 +39,7 @@ impl HeapStruct {
             // PERF: Reuse hashes from the map.
             .map(|(&key, &value)| (key.do_hash(), key, value))
             .sorted_by_key(|(hash, _, _)| *hash);
-        let struct_ = Self::create_uninitialized(heap, len);
+        let struct_ = Self::create_uninitialized(heap, is_reference_counted, len);
         unsafe {
             for (index, (hash, key, value)) in entries.enumerate() {
                 *struct_.content_word_pointer(index).as_ptr() = hash;
@@ -48,14 +52,16 @@ impl HeapStruct {
         };
         struct_
     }
-    fn create_uninitialized(heap: &mut Heap, len: usize) -> Self {
+    fn create_uninitialized(heap: &mut Heap, is_reference_counted: bool, len: usize) -> Self {
         assert_eq!(
             (len << Self::LEN_SHIFT) >> Self::LEN_SHIFT,
             len,
             "Struct is too long.",
         );
         Self(heap.allocate(
-            HeapObject::KIND_STRUCT | ((len as u64) << Self::LEN_SHIFT),
+            HeapObject::KIND_STRUCT,
+            is_reference_counted,
+            (len as u64) << Self::LEN_SHIFT,
             3 * len * HeapObject::WORD_SIZE,
         ))
     }
@@ -103,7 +109,7 @@ impl HeapStruct {
         let hash = key.do_hash();
         match self.index_of_key(key, hash) {
             Ok(index) => {
-                let struct_ = Self::create_uninitialized(heap, self.len());
+                let struct_ = Self::create_uninitialized(heap, true, self.len());
                 unsafe {
                     ptr::copy_nonoverlapping(
                         self.content_word_pointer(0).as_ptr(),
@@ -121,7 +127,7 @@ impl HeapStruct {
                 struct_
             }
             Err(index) => {
-                let struct_ = Self::create_uninitialized(heap, self.len() + 1);
+                let struct_ = Self::create_uninitialized(heap, true, self.len() + 1);
                 // PERF: Merge consecutive copies.
                 self.insert_into_items(struct_, 0, index, hash);
                 self.insert_into_items(struct_, 1, index, key);
@@ -174,40 +180,39 @@ impl DebugDisplay for HeapStruct {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
         let keys = self.keys();
         if keys.is_empty() {
-            write!(f, "[]")
-        } else {
-            let values = self.values();
-            if is_debug {
-                let hashes = self.hashes();
-                write!(
-                    f,
-                    "[{}]",
-                    izip!(hashes, keys, values)
-                        .map(|(hash, key, value)| {
-                            (
-                                format!("{:016X}", hash),
-                                DebugDisplay::to_string(key, is_debug),
-                                DebugDisplay::to_string(value, is_debug),
-                            )
-                        })
-                        .map(|(hash, key, value)| format!("{hash} → {key}: {value}"))
-                        .join(", ")
-                )
-            } else {
-                write!(
-                    f,
-                    "[{}]",
-                    keys.iter()
-                        .zip(values.iter())
-                        .map(|(key, value)| (
+            return write!(f, "[]");
+        }
+        let values = self.values();
+        if is_debug {
+            let hashes = self.hashes();
+            write!(
+                f,
+                "[{}]",
+                izip!(hashes, keys, values)
+                    .map(|(hash, key, value)| {
+                        (
+                            format!("{:016X}", hash),
                             DebugDisplay::to_string(key, is_debug),
-                            DebugDisplay::to_string(value, is_debug)
-                        ))
-                        .sorted_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b))
-                        .map(|(key, value)| format!("{key}: {value}"))
-                        .join(", ")
-                )
-            }
+                            DebugDisplay::to_string(value, is_debug),
+                        )
+                    })
+                    .map(|(hash, key, value)| format!("{hash} → {key}: {value}"))
+                    .join(", ")
+            )
+        } else {
+            write!(
+                f,
+                "[{}]",
+                keys.iter()
+                    .zip(values.iter())
+                    .map(|(key, value)| (
+                        DebugDisplay::to_string(key, is_debug),
+                        DebugDisplay::to_string(value, is_debug)
+                    ))
+                    .sorted_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b))
+                    .map(|(key, value)| format!("{key}: {value}"))
+                    .join(", ")
+            )
         }
     }
 }
@@ -221,12 +226,14 @@ impl PartialEq for HeapStruct {
             && self.keys() == other.keys()
     }
 }
+
 impl Hash for HeapStruct {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.hashes().hash(state);
         self.values().hash(state);
     }
 }
+
 impl Ord for HeapStruct {
     fn cmp(&self, other: &Self) -> Ordering {
         let mut self_keys = self.keys().to_vec();
@@ -261,7 +268,7 @@ impl HeapObjectTrait for HeapStruct {
                 self.content_word_pointer(0).as_ptr(),
                 clone.content_word_pointer(0).as_ptr(),
                 self.len(),
-            )
+            );
         };
         for (index, &key) in self.keys().iter().enumerate() {
             clone.unsafe_set_content_word(

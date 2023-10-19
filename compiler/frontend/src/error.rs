@@ -4,7 +4,7 @@ use super::{ast::AstError, cst, cst::CstError, hir::HirError};
 use crate::{
     mir::MirError,
     module::Module,
-    position::{Offset, PositionConversionDb},
+    position::{Offset, PositionConversionDb, RangeOfPosition},
     rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr},
     string_to_rcst::ModuleError,
 };
@@ -36,28 +36,20 @@ impl CompilerError {
         }
     }
     pub fn to_string_with_location(&self, db: &impl PositionConversionDb) -> String {
-        let range = db.range_to_positions(self.module.clone(), self.span.to_owned());
-        format!(
-            "{}:{}:{} – {}:{}: {}",
-            self.module,
-            range.start.line,
-            range.start.character,
-            range.end.line,
-            range.end.character,
-            self.payload,
-        )
+        let range = db.range_to_positions(self.module.clone(), self.span.clone());
+        format!("{}:{}: {}", self.module, range.format(), self.payload)
     }
 }
 impl Display for CompilerErrorPayload {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let message = match self {
-            CompilerErrorPayload::Module(error) => match error {
+            Self::Module(error) => match error {
                 ModuleError::DoesNotExist => "The module doesn't exist.".to_string(),
                 ModuleError::InvalidUtf8 => "The module contains invalid UTF-8.".to_string(),
                 ModuleError::IsNotCandy => "The module is not Candy.".to_string(),
                 ModuleError::IsToolingModule => "The module is a tooling module.".to_string(),
             },
-            CompilerErrorPayload::Cst(error) => match error {
+            Self::Cst(error) => match error {
                 CstError::BinaryBarMissesRight => "There should be a right side after this bar.",
                 CstError::CurlyBraceNotClosed => "The curly brace is not closed.",
                 CstError::IdentifierContainsNonAlphanumericAscii => {
@@ -98,7 +90,7 @@ impl Display for CompilerErrorPayload {
                 }
             }
             .to_string(),
-            CompilerErrorPayload::Ast(error) => match error {
+            Self::Ast(error) => match error {
                 AstError::ExpectedNameOrPatternInAssignment => {
                     "An assignment should have a name or pattern on the left side.".to_string()
                 }
@@ -158,7 +150,7 @@ impl Display for CompilerErrorPayload {
                 AstError::TextMissesClosingQuote => "This text never ends.".to_string(),
                 AstError::UnexpectedPunctuation => "This punctuation was unexpected.".to_string(),
             },
-            CompilerErrorPayload::Hir(error) => match error {
+            Self::Hir(error) => match error {
                 HirError::NeedsWithWrongNumberOfArguments { num_args } => {
                     format!("`needs` accepts one or two arguments, but was called with {num_args} arguments. Its parameters are the `condition` and an optional `message`.")
                 }
@@ -171,7 +163,7 @@ impl Display for CompilerErrorPayload {
                 }
                 HirError::UnknownReference { name } => format!("`{name}` is not in scope."),
             },
-            CompilerErrorPayload::Mir(error) => match error {
+            Self::Mir(error) => match error {
                 MirError::UseWithInvalidPath { module, path } => {
                     format!(
                         "{module} tries to `use` {path:?}, but that's an invalid path.",
@@ -197,6 +189,7 @@ impl Display for CompilerErrorPayload {
 }
 
 impl CompilerError {
+    #[must_use]
     pub fn to_related_information(&self) -> Vec<(Module, cst::Id, String)> {
         match &self.payload {
             CompilerErrorPayload::Ast(AstError::OrPatternIsMissingIdentifiers {
@@ -207,7 +200,7 @@ impl CompilerError {
                 .map(|capture| {
                     (
                         self.module.clone(),
-                        capture.to_owned(),
+                        *capture,
                         "The identifier is bound here.".to_string(),
                     )
                 })
@@ -228,7 +221,7 @@ impl ToRichIr for CompilerError {
             EnumSet::empty(),
         );
         builder.push_reference(
-            ReferenceKey::ModuleWithSpan(self.module.clone(), self.span.to_owned()),
+            ReferenceKey::ModuleWithSpan(self.module.clone(), self.span.clone()),
             range,
         );
         builder.push(format!(": {}", self.payload), None, EnumSet::empty());

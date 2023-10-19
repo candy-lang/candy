@@ -1,40 +1,41 @@
-use candy_frontend::hir::Id;
-use candy_vm::{
-    self,
-    channel::Packet,
-    execution_controller::{CountingExecutionController, ExecutionController},
-    fiber::{EndedReason, Fiber, FiberId, InstructionPointer, Panic, VmEnded},
-    heap::{Function, HirId, InlineObjectSliceCloneToHeap},
-    lir::Lir,
-    tracer::{
-        stack_trace::{FiberStackTracer, StackTracer},
-        FiberTracer,
-    },
-    vm::{self, Vm},
-};
-
 use super::input::Input;
 use crate::coverage::Coverage;
+use candy_frontend::hir::Id;
+use candy_vm::VmFinished;
+use candy_vm::{
+    byte_code::ByteCode,
+    environment::StateAfterRunWithoutHandles,
+    heap::{Function, Heap, HirId, InlineObject, InlineObjectSliceCloneToHeap},
+    tracer::stack_trace::StackTracer,
+    Panic, Vm,
+};
 use rustc_hash::FxHashMap;
 use std::borrow::Borrow;
 
 const MAX_INSTRUCTIONS: usize = 1_000_000;
 
-pub struct Runner<L: Borrow<Lir>> {
-    pub vm: Option<Vm<L, StackTracer>>, // Is consumed when the runner is finished.
+pub struct Runner<B: Borrow<ByteCode>> {
+    pub byte_code: B,
+    state: Option<State<B>>,
     pub input: Input,
-    pub tracer: StackTracer,
     pub num_instructions: usize,
     pub coverage: Coverage,
-    pub result: Option<RunResult>,
+}
+enum State<B: Borrow<ByteCode>> {
+    Running { heap: Heap, vm: Vm<B, StackTracer> },
+    Finished(RunResult),
 }
 
+#[must_use]
 pub enum RunResult {
     /// Executing the function with the input took more than `MAX_INSTRUCTIONS`.
     Timeout,
 
     /// The execution finished successfully with a value.
-    Done(Packet),
+    Done {
+        heap: Heap,
+        return_value: InlineObject,
+    },
 
     /// The execution panicked and the caller of the function (aka the fuzzer)
     /// is at fault.
@@ -42,27 +43,32 @@ pub enum RunResult {
 
     /// The execution panicked with an internal panic. This indicates an error
     /// in the code that should be shown to the user.
-    Panicked(Panic),
+    Panicked {
+        heap: Heap,
+        tracer: StackTracer,
+        panic: Panic,
+    },
 }
 impl RunResult {
+    #[must_use]
     pub fn to_string(&self, call: &str) -> String {
         match self {
-            RunResult::Timeout => format!("{call} timed out."),
-            RunResult::Done(return_value) => format!("{call} returned {}.", return_value.object),
-            RunResult::NeedsUnfulfilled { reason } => {
+            Self::Timeout => format!("{call} timed out."),
+            Self::Done { return_value, .. } => format!("{call} returned {return_value}."),
+            Self::NeedsUnfulfilled { reason } => {
                 format!("{call} panicked and it's our fault: {reason}")
             }
-            RunResult::Panicked(panic) => {
+            Self::Panicked { panic, .. } => {
                 format!("{call} panicked internally: {}", panic.reason)
             }
         }
     }
 }
 
-impl<L: Borrow<Lir>> Runner<L> {
-    pub fn new(lir: L, function: Function, input: Input) -> Self {
-        let (mut heap, constant_mapping) = lir.borrow().constant_heap.clone();
-        let num_instructions = lir.borrow().instructions.len();
+impl<B: Borrow<ByteCode> + Clone> Runner<B> {
+    pub fn new(byte_code: B, function: Function, input: Input) -> Self {
+        let mut heap = Heap::default();
+        let num_instructions = byte_code.borrow().instructions.len();
 
         let mut mapping = FxHashMap::default();
         let function = function
@@ -72,101 +78,81 @@ impl<L: Borrow<Lir>> Runner<L> {
         let arguments = input
             .arguments
             .clone_to_heap_with_mapping(&mut heap, &mut mapping);
-        let responsible = HirId::create(&mut heap, Id::fuzzer());
+        let responsible = HirId::create(&mut heap, true, Id::fuzzer());
 
-        let mut tracer = StackTracer::default();
         let vm = Vm::for_function(
-            lir,
-            heap,
-            constant_mapping,
+            byte_code.clone(),
+            &mut heap,
             function,
             &arguments,
             responsible,
-            &mut tracer,
+            StackTracer::default(),
         );
 
-        Runner {
-            vm: Some(vm),
+        Self {
+            byte_code,
+            state: Some(State::Running { heap, vm }),
             input,
-            tracer,
             num_instructions: 0,
             coverage: Coverage::none(num_instructions),
-            result: None,
         }
     }
 
-    pub fn run(&mut self, execution_controller: &mut impl ExecutionController<FiberStackTracer>) {
-        assert!(self.vm.is_some());
-        assert!(self.result.is_none());
-
-        let mut coverage_tracker = CoverageTrackingExecutionController {
-            coverage: &mut self.coverage,
+    pub fn run(&mut self, instructions_left: &mut usize) {
+        let State::Running { mut heap, mut vm } = self.state.take().unwrap() else {
+            panic!("Runner is not running anymore.");
         };
-        let mut instruction_counter = CountingExecutionController::default();
-        let mut execution_controller = (
-            execution_controller,
-            &mut coverage_tracker,
-            &mut instruction_counter,
-        );
 
-        self.vm
-            .as_mut()
-            .unwrap()
-            .run(&mut execution_controller, &mut self.tracer);
+        while *instructions_left > 0 {
+            if let Some(ip) = vm.next_instruction() {
+                self.coverage.add(ip);
+            }
+            self.num_instructions += 1;
+            *instructions_left -= 1;
 
-        self.num_instructions += instruction_counter.num_instructions;
-
-        self.result = match self.vm.as_ref().unwrap().status() {
-            vm::Status::CanRun => {
-                if self.num_instructions > MAX_INSTRUCTIONS {
-                    Some(RunResult::Timeout)
-                } else {
-                    None
+            match vm.run_without_handles(&mut heap) {
+                StateAfterRunWithoutHandles::Running(new_vm) => vm = new_vm,
+                StateAfterRunWithoutHandles::Finished(VmFinished {
+                    result: Ok(return_value),
+                    ..
+                }) => {
+                    self.state = Some(State::Finished(RunResult::Done { heap, return_value }));
+                    return;
+                }
+                StateAfterRunWithoutHandles::Finished(VmFinished {
+                    tracer,
+                    result: Err(panic),
+                }) => {
+                    let result = if panic.responsible == Id::fuzzer() {
+                        RunResult::NeedsUnfulfilled {
+                            reason: panic.reason,
+                        }
+                    } else {
+                        RunResult::Panicked {
+                            heap,
+                            tracer,
+                            panic,
+                        }
+                    };
+                    self.state = Some(State::Finished(result));
+                    return;
                 }
             }
-            // Because the fuzzer never sends channels as inputs, the function
-            // waits on some internal concurrency operations that will never be
-            // completed. This most likely indicates an error in the code, but
-            // it's of course valid to have a function that never returns. Thus,
-            // this should be treated just like a regular timeout.
-            vm::Status::WaitingForOperations => Some(RunResult::Timeout),
-            vm::Status::Done => {
-                let VmEnded { heap, reason, .. } =
-                    self.vm.take().unwrap().tear_down(&mut self.tracer);
-                let EndedReason::Finished(return_value) = reason else {
-                    unreachable!();
-                };
-                Some(RunResult::Done(Packet {
-                    heap,
-                    object: return_value,
-                }))
+
+            if self.num_instructions > MAX_INSTRUCTIONS {
+                self.state = Some(State::Finished(RunResult::Timeout));
             }
-            vm::Status::Panicked(panic) => Some(if panic.responsible == Id::fuzzer() {
-                RunResult::NeedsUnfulfilled {
-                    reason: panic.reason,
-                }
-            } else {
-                self.vm.take().unwrap().tear_down(&mut self.tracer);
-                RunResult::Panicked(panic)
-            }),
-        };
-    }
-}
-
-pub struct CoverageTrackingExecutionController<'a> {
-    coverage: &'a mut Coverage,
-}
-impl<'a, T: FiberTracer> ExecutionController<T> for CoverageTrackingExecutionController<'a> {
-    fn should_continue_running(&self) -> bool {
-        true
+        }
+        self.state = Some(State::Running { heap, vm });
     }
 
-    fn instruction_executed(
-        &mut self,
-        _fiber_id: FiberId,
-        _fiber: &Fiber<T>,
-        ip: InstructionPointer,
-    ) {
-        self.coverage.add(ip);
+    pub fn take_result(&mut self) -> Option<RunResult> {
+        match self.state.take().unwrap() {
+            running @ State::Running { .. } => {
+                self.state = Some(running);
+                None
+            }
+            State::Finished(result) => Some(result),
+        }
     }
 }

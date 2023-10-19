@@ -26,7 +26,7 @@ use lsp_types::{
 };
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::mem;
+use std::{borrow::Cow, mem};
 use tokio::sync::{Mutex, RwLock, RwLockMappedWriteGuard, RwLockReadGuard, RwLockWriteGuard};
 use tower_lsp::{jsonrpc, Client, ClientSocket, LanguageServer, LspService};
 use tracing::{debug, span, Level};
@@ -54,20 +54,20 @@ pub struct RunningServerState {
 impl ServerState {
     pub fn require_features(&self) -> &ServerFeatures {
         match self {
-            ServerState::Initial { features, .. } => features,
-            ServerState::Running(RunningServerState { features, .. }) => features,
-            ServerState::Shutdown => panic!("Server is shut down."),
+            Self::Initial { features, .. } => features,
+            Self::Running(RunningServerState { features, .. }) => features,
+            Self::Shutdown => panic!("Server is shut down."),
         }
     }
     pub fn require_running(&self) -> &RunningServerState {
         match self {
-            ServerState::Running(state) => state,
+            Self::Running(state) => state,
             _ => panic!("Server is not running."),
         }
     }
     pub fn require_running_mut(&mut self) -> &mut RunningServerState {
         match self {
-            ServerState::Running(state) => state,
+            Self::Running(state) => state,
             _ => panic!("Server is not running."),
         }
     }
@@ -105,7 +105,7 @@ impl ServerFeatures {
                 language: language_id.clone(),
                 scheme: Some(scheme.to_owned()),
                 pattern: None,
-            }))
+            }));
         };
         for features in self.all_features() {
             add_selectors_for(&mut selectors, features);
@@ -130,10 +130,7 @@ impl AnalyzerClient {
     pub async fn update_status(&self, status: Option<String>) {
         self.client
             .send_notification::<ServerStatusNotification>(ServerStatusNotification {
-                text: match status {
-                    Some(status) => format!("🍭 {status}"),
-                    None => "🍭".to_string(),
-                },
+                text: status.map_or_else(|| "🍭".to_string(), |status| format!("🍭 {status}")),
             })
             .await;
     }
@@ -183,13 +180,13 @@ impl Server {
         })
         .custom_method(
             "candy/debugAdapter/create",
-            Server::candy_debug_adapter_create,
+            Self::candy_debug_adapter_create,
         )
         .custom_method(
             "candy/debugAdapter/message",
-            Server::candy_debug_adapter_message,
+            Self::candy_debug_adapter_message,
         )
-        .custom_method("candy/viewIr", Server::candy_view_ir)
+        .custom_method("candy/viewIr", Self::candy_view_ir)
         .finish();
 
         (service, client)
@@ -207,7 +204,7 @@ impl Server {
             state.require_running_mut()
         })
     }
-    pub async fn features_from_url<'a>(
+    pub fn features_from_url<'a>(
         &self,
         server_features: &'a ServerFeatures,
         url: &Url,
@@ -283,8 +280,6 @@ impl LanguageServer for Server {
     }
 
     async fn initialized(&self, _: InitializedParams) {
-        debug!("LSP: initialized");
-
         fn registration(method: &'static str, options: impl Serialize) -> Registration {
             Registration {
                 id: method.to_string(),
@@ -292,9 +287,14 @@ impl LanguageServer for Server {
                 register_options: Some(serde_json::to_value(options).unwrap()),
             }
         }
+
+        debug!("LSP: initialized");
+
         let state = self.state.read().await;
         let features = state.require_features();
 
+        // TODO: Fix lifetimes and remove this allow
+        #[allow(clippy::redundant_closure_for_method_calls)]
         self.client
             .register_capability(vec![
                 registration(
@@ -387,9 +387,7 @@ impl LanguageServer for Server {
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         let state = self.require_running_state().await;
-        let features = self
-            .features_from_url(&state.features, &params.text_document.uri)
-            .await;
+        let features = self.features_from_url(&state.features, &params.text_document.uri);
         assert!(features.supports_did_open());
         let content = params.text_document.text.into_bytes();
         features
@@ -399,9 +397,7 @@ impl LanguageServer for Server {
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         let state = self.require_running_state().await;
         {
-            let features = self
-                .features_from_url(&state.features, &params.text_document.uri)
-                .await;
+            let features = self.features_from_url(&state.features, &params.text_document.uri);
             assert!(features.supports_did_change());
             features
                 .did_change(
@@ -414,7 +410,10 @@ impl LanguageServer for Server {
 
         let module_result = module_from_url(
             &params.text_document.uri,
-            if params.text_document.uri.path().ends_with(".candy") {
+            if std::path::Path::new(params.text_document.uri.path())
+                .extension()
+                .map_or(false, |ext| ext.eq_ignore_ascii_case("candy"))
+            {
                 ModuleKind::Code
             } else {
                 ModuleKind::Asset
@@ -439,9 +438,7 @@ impl LanguageServer for Server {
     }
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         let state = self.require_running_state().await;
-        let features = self
-            .features_from_url(&state.features, &params.text_document.uri)
-            .await;
+        let features = self.features_from_url(&state.features, &params.text_document.uri);
         assert!(features.supports_did_close());
         features.did_close(&self.db, params.text_document.uri).await;
     }
@@ -451,12 +448,10 @@ impl LanguageServer for Server {
         params: GotoDefinitionParams,
     ) -> jsonrpc::Result<Option<GotoDefinitionResponse>> {
         let state = self.require_running_state().await;
-        let features = self
-            .features_from_url(
-                &state.features,
-                &params.text_document_position_params.text_document.uri,
-            )
-            .await;
+        let features = self.features_from_url(
+            &state.features,
+            &params.text_document_position_params.text_document.uri,
+        );
         assert!(features.supports_find_definition());
         let response = features
             .find_definition(
@@ -527,9 +522,7 @@ impl LanguageServer for Server {
         params: FoldingRangeParams,
     ) -> jsonrpc::Result<Option<Vec<FoldingRange>>> {
         let state = self.require_running_state().await;
-        let features = self
-            .features_from_url(&state.features, &params.text_document.uri)
-            .await;
+        let features = self.features_from_url(&state.features, &params.text_document.uri);
         assert!(features.supports_folding_ranges());
         Ok(Some(
             features
@@ -543,9 +536,7 @@ impl LanguageServer for Server {
         params: DocumentFormattingParams,
     ) -> jsonrpc::Result<Option<Vec<TextEdit>>> {
         let state = self.require_running_state().await;
-        let features = self
-            .features_from_url(&state.features, &params.text_document.uri)
-            .await;
+        let features = self.features_from_url(&state.features, &params.text_document.uri);
         assert!(features.supports_format());
         Ok(Some(
             features.format(&self.db, params.text_document.uri).await,
@@ -558,7 +549,7 @@ impl LanguageServer for Server {
     ) -> jsonrpc::Result<Option<PrepareRenameResponse>> {
         let state = self.require_running_state().await;
         let uri = params.text_document.uri;
-        let features = self.features_from_url(&state.features, &uri).await;
+        let features = self.features_from_url(&state.features, &uri);
         let result = features
             .prepare_rename(&self.db, uri, params.position)
             .await;
@@ -567,7 +558,7 @@ impl LanguageServer for Server {
     async fn rename(&self, params: RenameParams) -> jsonrpc::Result<Option<WorkspaceEdit>> {
         let state = self.require_running_state().await;
         let uri = params.text_document_position.text_document.uri;
-        let features = self.features_from_url(&state.features, &uri).await;
+        let features = self.features_from_url(&state.features, &uri);
         let result = features
             .rename(
                 &self.db,
@@ -583,7 +574,7 @@ impl LanguageServer for Server {
             })),
             Err(RenameError::NewNameInvalid) => Err(jsonrpc::Error {
                 code: jsonrpc::ErrorCode::InvalidParams,
-                message: "The new name is not valid.".to_string(),
+                message: Cow::Borrowed("The new name is not valid."),
                 data: None,
             }),
         }
@@ -595,7 +586,7 @@ impl LanguageServer for Server {
     ) -> jsonrpc::Result<Option<SemanticTokensResult>> {
         let state = self.require_running_state().await;
         let uri = params.text_document.uri;
-        let features = self.features_from_url(&state.features, &uri).await;
+        let features = self.features_from_url(&state.features, &uri);
         let tokens = features.semantic_tokens(&self.db, uri);
         let tokens = tokens.await;
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
@@ -614,7 +605,7 @@ impl Server {
     ) -> FxHashMap<Url, Vec<Reference>> {
         let state = self.state.read().await;
         let state = state.require_running();
-        let features = self.features_from_url(&state.features, &uri).await;
+        let features = self.features_from_url(&state.features, &uri);
         assert!(features.supports_references());
         features
             .references(
@@ -628,7 +619,7 @@ impl Server {
     }
 }
 
-/// https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#renameRegistrationOptions
+/// <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#renameRegistrationOptions>
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RenameRegistrationOptions {

@@ -1,4 +1,5 @@
-use candy_vm::heap::{Heap, InlineObject};
+use candy_frontend::format::{MaxLength, Precedence};
+use candy_vm::heap::{Heap, InlineObject, ToDebugText};
 use itertools::Itertools;
 use std::{
     cell::RefCell,
@@ -18,7 +19,10 @@ impl Display for Input {
         write!(
             f,
             "{}",
-            self.arguments.iter().map(|it| format!("{it:?}")).join(" "),
+            self.arguments
+                .iter()
+                .map(|argument| argument.to_debug_text(Precedence::High, MaxLength::Limited(40)))
+                .join(" "),
         )
     }
 }
@@ -35,6 +39,6 @@ impl PartialEq for Input {
 }
 impl Hash for Input {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.arguments.hash(state)
+        self.arguments.hash(state);
     }
 }

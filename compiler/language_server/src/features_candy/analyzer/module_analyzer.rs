@@ -4,23 +4,27 @@ use crate::{
     server::AnalyzerClient, utils::LspPositionConversion,
 };
 use candy_frontend::{
-    ast_to_hir::AstToHir, mir_optimize::OptimizeMir, module::Module, TracingConfig, TracingMode,
+    ast_to_hir::AstToHir,
+    format::{MaxLength, Precedence},
+    mir_optimize::OptimizeMir,
+    module::Module,
+    TracingConfig, TracingMode,
 };
 use candy_fuzzer::{FuzzablesFinder, Fuzzer, Status};
 use candy_vm::{
-    execution_controller::RunLimitedNumberOfInstructions,
-    fiber::{Panic, VmEnded},
-    lir::Lir,
-    mir_to_lir::compile_lir,
+    byte_code::ByteCode,
+    environment::StateAfterRunWithoutHandles,
+    heap::{Heap, ToDebugText},
+    mir_to_byte_code::compile_byte_code,
     tracer::{evaluated_values::EvaluatedValuesTracer, stack_trace::StackTracer},
-    vm::{self, Vm},
+    Panic, Vm, VmFinished,
 };
 use extension_trait::extension_trait;
 use itertools::Itertools;
 use lsp_types::Diagnostic;
 use rand::{prelude::SliceRandom, thread_rng};
 use std::rc::Rc;
-use tracing::info;
+use tracing::debug;
 
 /// A hints finder is responsible for finding hints for a single module.
 pub struct ModuleAnalyzer {
@@ -33,35 +37,41 @@ enum State {
     /// This enables us to show hints for constants.
     EvaluateConstants {
         static_panics: Vec<Panic>,
-        tracer: (StackTracer, EvaluatedValuesTracer),
-        vm: Vm<Lir, (StackTracer, EvaluatedValuesTracer)>,
+        byte_code: Rc<ByteCode>,
+        heap: Heap,
+        vm: Vm<Rc<ByteCode>, (StackTracer, EvaluatedValuesTracer)>,
     },
     /// Next, we run the module again to finds fuzzable functions. This time, we
     /// disable tracing of evaluated expressions, but we enable registration of
     /// fuzzable functions. Thus, the found functions to fuzz have the most
-    /// efficient LIR possible.
+    /// efficient byte code possible.
     FindFuzzables {
         static_panics: Vec<Panic>,
-        constants_ended: VmEnded,
+        heap_for_constants: Heap,
         stack_tracer: StackTracer,
+        /// We need to keep a reference to this byte code for its constant heap
+        /// since objects in `evaluated_values` refer to it.
+        evaluated_values_byte_code: Rc<ByteCode>,
         evaluated_values: EvaluatedValuesTracer,
-        lir: Rc<Lir>,
-        tracer: FuzzablesFinder,
-        vm: Vm<Rc<Lir>, FuzzablesFinder>,
+        byte_code: Rc<ByteCode>,
+        heap: Heap,
+        vm: Vm<Rc<ByteCode>, FuzzablesFinder>,
     },
     /// Then, the functions are actually fuzzed.
     Fuzz {
+        byte_code: Rc<ByteCode>,
         static_panics: Vec<Panic>,
-        constants_ended: VmEnded,
+        heap_for_constants: Heap,
         stack_tracer: StackTracer,
+        evaluated_values_byte_code: Rc<ByteCode>,
         evaluated_values: EvaluatedValuesTracer,
-        fuzzable_finder_ended: VmEnded,
+        heap_for_fuzzables: Heap,
         fuzzers: Vec<Fuzzer>,
     },
 }
 
 impl ModuleAnalyzer {
-    pub fn for_module(module: Module) -> Self {
+    pub const fn for_module(module: Module) -> Self {
         Self {
             module,
             state: Some(State::Initial),
@@ -103,39 +113,44 @@ impl ModuleAnalyzer {
                     calls: TracingMode::Off,
                     evaluated_expressions: TracingMode::OnlyCurrent,
                 };
-                let (lir, _) = compile_lir(db, self.module.clone(), tracing);
+                let (byte_code, _) = compile_byte_code(db, self.module.clone(), tracing);
+                let byte_code = Rc::new(byte_code);
 
-                let mut tracer = (
+                let mut heap = Heap::default();
+                let tracer = (
                     StackTracer::default(),
                     EvaluatedValuesTracer::new(self.module.clone()),
                 );
-                let vm = Vm::for_module(lir, &mut tracer);
+                let vm = Vm::for_module(byte_code.clone(), &mut heap, tracer);
 
                 State::EvaluateConstants {
                     static_panics,
-                    tracer,
+                    byte_code,
+                    heap,
                     vm,
                 }
             }
             State::EvaluateConstants {
                 static_panics,
-                mut tracer,
-                mut vm,
+                byte_code,
+                heap: mut heap_for_constants,
+                vm,
             } => {
                 client
                     .update_status(Some(format!("Evaluating {}", self.module)))
                     .await;
 
-                vm.run(&mut RunLimitedNumberOfInstructions::new(500), &mut tracer);
-                if !matches!(vm.status(), vm::Status::Done | vm::Status::Panicked(_)) {
-                    return State::EvaluateConstants {
-                        static_panics,
-                        tracer,
-                        vm,
-                    };
-                }
-
-                let constants_ended = vm.tear_down(&mut tracer);
+                let tracer = match vm.run_n_without_handles(&mut heap_for_constants, 500) {
+                    StateAfterRunWithoutHandles::Running(vm) => {
+                        return State::EvaluateConstants {
+                            static_panics,
+                            byte_code,
+                            heap: heap_for_constants,
+                            vm,
+                        }
+                    }
+                    StateAfterRunWithoutHandles::Finished(VmFinished { tracer, .. }) => tracer,
+                };
                 let (stack_tracer, evaluated_values) = tracer;
 
                 let tracing = TracingConfig {
@@ -143,68 +158,82 @@ impl ModuleAnalyzer {
                     calls: TracingMode::Off,
                     evaluated_expressions: TracingMode::Off,
                 };
-                let (lir, _) = compile_lir(db, self.module.clone(), tracing);
-                let lir = Rc::new(lir);
+                let (fuzzing_byte_code, _) = compile_byte_code(db, self.module.clone(), tracing);
+                let fuzzing_byte_code = Rc::new(fuzzing_byte_code);
 
-                let mut tracer = FuzzablesFinder::default();
-                let vm = Vm::for_module(lir.clone(), &mut tracer);
+                let mut heap = Heap::default();
+                let vm = Vm::for_module(
+                    fuzzing_byte_code.clone(),
+                    &mut heap,
+                    FuzzablesFinder::default(),
+                );
                 State::FindFuzzables {
                     static_panics,
-                    constants_ended,
+                    heap_for_constants,
                     stack_tracer,
+                    evaluated_values_byte_code: byte_code,
                     evaluated_values,
-                    lir,
-                    tracer,
+                    byte_code: fuzzing_byte_code,
+                    heap,
                     vm,
                 }
             }
             State::FindFuzzables {
                 static_panics,
-                constants_ended,
+                heap_for_constants,
                 stack_tracer,
+                evaluated_values_byte_code,
                 evaluated_values,
-                lir,
-                mut tracer,
-                mut vm,
+                byte_code,
+                mut heap,
+                vm,
             } => {
                 client
                     .update_status(Some(format!("Evaluating {}", self.module)))
                     .await;
 
-                vm.run(&mut RunLimitedNumberOfInstructions::new(500), &mut tracer);
-                if !matches!(vm.status(), vm::Status::Done | vm::Status::Panicked(_)) {
-                    return State::FindFuzzables {
-                        static_panics,
-                        constants_ended,
-                        stack_tracer,
-                        evaluated_values,
-                        lir,
-                        tracer,
-                        vm,
-                    };
-                }
+                let (heap, tracer) = match vm.run_n_without_handles(&mut heap, 500) {
+                    StateAfterRunWithoutHandles::Running(vm) => {
+                        return State::FindFuzzables {
+                            static_panics,
+                            heap_for_constants,
+                            stack_tracer,
+                            evaluated_values_byte_code,
+                            evaluated_values,
+                            byte_code,
+                            heap,
+                            vm,
+                        }
+                    }
+                    StateAfterRunWithoutHandles::Finished(VmFinished { tracer, .. }) => {
+                        (heap, tracer)
+                    }
+                };
 
-                let fuzzable_finder_ended = vm.tear_down(&mut tracer);
                 let fuzzers = tracer
-                    .into_fuzzables()
+                    .fuzzables
                     .iter()
-                    .map(|(id, function)| Fuzzer::new(lir.clone(), *function, id.clone()))
+                    .map(|(id, function)| Fuzzer::new(byte_code.clone(), *function, id.clone()))
                     .collect();
                 State::Fuzz {
+                    byte_code,
                     static_panics,
-                    constants_ended,
+                    heap_for_constants,
                     stack_tracer,
+                    evaluated_values_byte_code,
                     evaluated_values,
-                    fuzzable_finder_ended,
+                    heap_for_fuzzables: heap,
                     fuzzers,
                 }
             }
             State::Fuzz {
+                byte_code,
                 static_panics,
-                constants_ended,
+                heap_for_constants,
                 stack_tracer,
+                evaluated_values_byte_code,
                 evaluated_values,
-                fuzzable_finder_ended,
+                heap_for_fuzzables,
                 mut fuzzers,
             } => {
                 let mut running_fuzzers = fuzzers
@@ -214,11 +243,13 @@ impl ModuleAnalyzer {
                 let Some(fuzzer) = running_fuzzers.choose_mut(&mut thread_rng()) else {
                     client.update_status(None).await;
                     return State::Fuzz {
+                        byte_code,
                         static_panics,
-                        constants_ended,
+                        heap_for_constants,
                         stack_tracer,
+                        evaluated_values_byte_code,
                         evaluated_values,
-                        fuzzable_finder_ended,
+                        heap_for_fuzzables,
                         fuzzers,
                     };
                 };
@@ -227,14 +258,16 @@ impl ModuleAnalyzer {
                     .update_status(Some(format!("Fuzzing {}", fuzzer.function_id)))
                     .await;
 
-                fuzzer.run(&mut RunLimitedNumberOfInstructions::new(500));
+                fuzzer.run(500);
 
                 State::Fuzz {
+                    byte_code,
                     static_panics,
-                    constants_ended,
+                    heap_for_constants,
                     stack_tracer,
+                    evaluated_values_byte_code,
                     evaluated_values,
-                    fuzzable_finder_ended,
+                    heap_for_fuzzables,
                     fuzzers,
                 }
             }
@@ -260,7 +293,7 @@ impl ModuleAnalyzer {
                     evaluated_values
                         .values()
                         .iter()
-                        .flat_map(|(id, value)| Insight::for_value(db, id.clone(), *value)),
+                        .filter_map(|(id, value)| Insight::for_value(db, id.clone(), *value)),
                 );
             }
             State::Fuzz {
@@ -274,7 +307,7 @@ impl ModuleAnalyzer {
                     evaluated_values
                         .values()
                         .iter()
-                        .flat_map(|(id, value)| Insight::for_value(db, id.clone(), *value)),
+                        .filter_map(|(id, value)| Insight::for_value(db, id.clone(), *value)),
                 );
 
                 for fuzzer in fuzzers {
@@ -297,19 +330,18 @@ impl ModuleAnalyzer {
                         // future.
                         continue;
                     }
-                    if db.hir_to_cst_id(id.clone()).is_none() {
-                        panic!(
-                            "It looks like the generated code {} is at fault for a panic.",
-                            panic.responsible,
-                        );
-                    }
+                    assert!(
+                        db.hir_to_cst_id(&id).is_some(),
+                        "It looks like the generated code {} is at fault for a panic.",
+                        panic.responsible,
+                    );
 
                     // TODO: In the future, re-run only the failing case with
                     // tracing enabled and also show the arguments to the failing
                     // function in the hint.
                     let call_span = db
-                        .hir_id_to_display_span(panic.responsible.clone())
-                        .unwrap();
+                        .hir_id_to_display_span(&panic.responsible)
+                        .unwrap_or_else(|| panic!("Couldn't find the span for {panic:?}."));
                     insights.push(Insight::Diagnostic(Diagnostic::error(
                         db.range_to_lsp_range(self.module.clone(), call_span),
                         format!(
@@ -318,7 +350,7 @@ impl ModuleAnalyzer {
                             input
                                 .arguments
                                 .iter()
-                                .map(|argument| format!("{argument}"))
+                                .map(|it| it.to_debug_text(Precedence::High, MaxLength::Unlimited))
                                 .join(" "),
                             panic.reason,
                         ),
@@ -327,7 +359,7 @@ impl ModuleAnalyzer {
             }
         }
 
-        info!("Insights: {insights:?}");
+        debug!("Insights: {insights:?}");
 
         insights
     }

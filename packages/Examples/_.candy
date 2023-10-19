@@ -1,0 +1,14 @@
+# Run or benchmark by navigating into this folder and then running one of these commands:
+# `cargo build --release -- run`
+# `cargo build --release && time target/release/candy run`
+
+builtins = use "Builtins"
+# echo = use ".echo"
+# fibonacci = use ".fibonacci"
+
+main := { environment ->
+  # print message = environment.stdout message
+
+  result = 1 | builtins.intAdd 2
+  result | builtins.toDebugText | builtins.print
+}

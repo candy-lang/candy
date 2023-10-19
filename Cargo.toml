@@ -1,10 +1,12 @@
 [workspace]
-
+resolver = "2"
 members = [
+    "compiler/backend_inkwell",
     "compiler/cli",
     "compiler/frontend",
     "compiler/fuzzer",
     "compiler/formatter",
+    "compiler/formatter/fuzz",
     "compiler/language_server",
     "compiler/vm",
     "compiler/vm/fuzz",

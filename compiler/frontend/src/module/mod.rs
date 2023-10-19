@@ -28,6 +28,7 @@ fn get_module_content_as_string(db: &dyn ModuleDb, module: Module) -> Option<Arc
     String::from_utf8((*content).clone()).ok().map(Arc::new)
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn get_module_content(db: &dyn ModuleDb, module: Module) -> Option<Arc<Vec<u8>>> {
     // The following line of code shouldn't be neccessary, but it is.
     //

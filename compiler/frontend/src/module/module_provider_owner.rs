@@ -1,10 +1,12 @@
 use super::{InMemoryModuleProvider, Module, ModuleProvider};
 
 pub trait ModuleProviderOwner {
+    #[must_use]
     fn get_module_provider(&self) -> &dyn ModuleProvider;
 }
 
 pub trait MutableModuleProviderOwner: ModuleProviderOwner {
+    #[must_use]
     fn get_in_memory_module_provider(&mut self) -> &mut InMemoryModuleProvider;
     fn invalidate_module(&mut self, module: &Module);
 
@@ -20,6 +22,7 @@ pub trait MutableModuleProviderOwner: ModuleProviderOwner {
         self.get_in_memory_module_provider().remove(module);
         self.invalidate_module(module);
     }
+    #[must_use]
     fn get_open_modules(&mut self) -> Vec<Module> {
         self.get_in_memory_module_provider()
             .get_all_modules()
@@ -89,7 +92,7 @@ mod test {
             kind: ModuleKind::Code,
         };
 
-        db.did_open_module(&module, "123".to_string().into_bytes());
+        db.did_open_module(&module, b"123".to_vec());
         assert_eq!(
             db.get_module_content_as_string(module.clone())
                 .unwrap()
@@ -97,25 +100,27 @@ mod test {
             "123",
         );
         assert_eq!(
-            db.rcst(module.clone()).unwrap().as_ref().to_owned(),
+            db.rcst(module.clone()).unwrap().as_ref().clone(),
             vec![CstKind::Int {
+                radix_prefix: None,
                 value: 123u8.into(),
                 string: "123".to_string(),
             }
             .into()],
         );
 
-        db.did_change_module(&module, "456".to_string().into_bytes());
+        db.did_change_module(&module, b"456".to_vec());
         assert_eq!(
             db.get_module_content_as_string(module.clone())
                 .unwrap()
                 .as_ref()
-                .to_owned(),
+                .clone(),
             "456",
         );
         assert_eq!(
-            db.rcst(module.clone()).unwrap().as_ref().to_owned(),
+            db.rcst(module.clone()).unwrap().as_ref().clone(),
             vec![CstKind::Int {
+                radix_prefix: None,
                 value: 456u16.into(),
                 string: "456".to_string(),
             }

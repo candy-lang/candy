@@ -32,7 +32,17 @@ isValidInsertIndex list index :=
 
 get := builtins.listGet
 
-# TODO: add `single list` when we have pattern matching
+single list :=
+  needs (is list)
+  list %
+    (,) -> Error "Can't get the single item of an empty list."
+    (item,) -> Ok item
+    _ -> Error "Can't get the single item of a list with more than one item."
+first list :=
+  needs (is list)
+  list %
+    (,) -> Error "Can't get the first item of an empty list."
+    _ -> Ok (list | get 0)
 last list :=
   needs (is list)
   list | lastIndex | result.mapError { _ -> "Can't get the last item of an empty list." }
@@ -69,13 +79,25 @@ generate length valueGetter :=
   needs (function.is1 valueGetter)
 
   list = filled length Placeholder
-  recursive [list, Index: 0] { recurse state ->
-    [list, index] = state
+  recursive [list, Index: 0] { recurse [list, index] ->
     ifElse (index | equals length) { list } {
       item = valueGetter index
       list = list | replace index item
       recurse [list, Index: int.add index 1]
     }
+  }
+
+getRange list startInclusive endExclusive :=
+  needs (is list)
+  needs (int.is startInclusive)
+  needs (startInclusive | int.isNonNegative)
+  needs (startInclusive | int.isLessThanOrEqualTo (list | length))
+  needs (int.is endExclusive)
+  needs (endExclusive | int.isNonNegative)
+  needs (endExclusive | int.isLessThanOrEqualTo (list | length))
+  needs (startInclusive | int.isLessThanOrEqualTo endExclusive)
+  generate (endExclusive | int.subtract startInclusive) { index ->
+    list | get (startInclusive | int.add index)
   }
 
 concatenate listA listB :=

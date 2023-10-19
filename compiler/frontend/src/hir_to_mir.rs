@@ -24,6 +24,7 @@ pub trait HirToMir: PositionConversionDb + CstDb + AstToHir {
 
 pub type MirResult = Result<(Arc<Mir>, Arc<FxHashSet<CompilerError>>), ModuleError>;
 
+#[allow(clippy::needless_pass_by_value)]
 fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> MirResult {
     let (mir, errors) = match module.kind {
         ModuleKind::Code => {
@@ -95,7 +96,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
         let is_condition_true =
             body.push_call(builtin_equals, vec![condition, true_tag], needs_code);
         let is_condition_bool = body.push_if_else(
-            needs_id.child("isConditionTrue"),
+            &needs_id.child("isConditionTrue"),
             is_condition_true,
             |body| {
                 body.push_reference(true_tag);
@@ -106,7 +107,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
             needs_code,
         );
         body.push_if_else(
-            needs_id.child("isConditionBool"),
+            &needs_id.child("isConditionBool"),
             is_condition_bool,
             |body| {
                 body.push_reference(nothing_tag);
@@ -129,7 +130,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
             responsible_for_call,
         );
         body.push_if_else(
-            needs_id.child("isReasonText"),
+            &needs_id.child("isReasonText"),
             is_reason_text,
             |body| {
                 body.push_reference(nothing_tag);
@@ -143,7 +144,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
 
         // The core logic of the needs.
         body.push_if_else(
-            needs_id.child("condition"),
+            &needs_id.child("condition"),
             condition,
             |body| {
                 body.push_reference(nothing_tag);
@@ -259,7 +260,7 @@ impl<'a> LoweringContext<'a> {
                     let nothing = body.push_nothing();
                     let is_match = body.push_is_match(pattern_result, responsible);
                     body.push_if_else(
-                        hir_id.child("isMatch"),
+                        &hir_id.child("isMatch"),
                         is_match,
                         |body| {
                             body.push_reference(nothing);
@@ -309,7 +310,7 @@ impl<'a> LoweringContext<'a> {
             hir::Expression::Function(hir::Function {
                 parameters: original_parameters,
                 body: original_body,
-                fuzzable,
+                kind,
             }) => {
                 let function =
                     body.push_function(hir_id.clone(), |function, responsible_parameter| {
@@ -318,7 +319,7 @@ impl<'a> LoweringContext<'a> {
                             self.mapping.insert(original_parameter.clone(), parameter);
                         }
 
-                        let responsible = if *fuzzable {
+                        let responsible = if kind.uses_own_responsibility() {
                             responsible_parameter
                         } else {
                             // This is a function with curly braces, so whoever is responsible
@@ -330,7 +331,7 @@ impl<'a> LoweringContext<'a> {
                         self.compile_expressions(function, responsible, &original_body.expressions);
                     });
 
-                if self.tracing.register_fuzzables.is_enabled() && *fuzzable {
+                if self.tracing.register_fuzzables.is_enabled() && kind.is_fuzzable() {
                     let hir_definition = body.push(Expression::HirId(hir_id.clone()));
                     body.push(Expression::TraceFoundFuzzableFunction {
                         hir_definition,
@@ -517,7 +518,7 @@ impl PatternLoweringContext {
     ) -> Id {
         let match_tag = body.push_match_tag();
         let no_match_tag = body.push_no_match_tag();
-        let context = PatternLoweringContext {
+        let context = Self {
             hir_id,
             match_tag,
             no_match_tag,
@@ -530,11 +531,11 @@ impl PatternLoweringContext {
         match pattern {
             hir::Pattern::NewIdentifier(_) => self.push_match(body, vec![expression]),
             hir::Pattern::Int(int) => {
-                let expected = body.push_int(int.to_owned().into());
+                let expected = body.push_int(int.clone().into());
                 self.compile_exact_value(body, expression, expected)
             }
             hir::Pattern::Text(text) => {
-                let expected = body.push_text(text.to_owned());
+                let expected = body.push_text(text.clone());
                 self.compile_exact_value(body, expression, expected)
             }
             hir::Pattern::Tag { symbol, value } => {
@@ -546,7 +547,7 @@ impl PatternLoweringContext {
                         vec![expression],
                         self.responsible,
                     );
-                    let expected_symbol = body.push_tag(symbol.to_owned(), None);
+                    let expected_symbol = body.push_tag(symbol.clone(), None);
                     self.compile_equals(body, expected_symbol, actual_symbol, |body| {
                         let builtin_tag_has_value = body.push_builtin(BuiltinFunction::TagHasValue);
                         let actual_has_value = body.push_call(builtin_tag_has_value, vec![expression], self.responsible);
@@ -655,7 +656,7 @@ impl PatternLoweringContext {
                                 );
 
                                 let result = body.push_if_else(
-                                    self.hir_id.child("hasKey"),
+                                    &self.hir_id.child("hasKey"),
                                     has_key,
                                     |body| {
                                         let value = body.push_call(
@@ -717,7 +718,7 @@ impl PatternLoweringContext {
                 for pattern in rest_patterns {
                     let is_match = body.push_is_match(result, self.responsible);
                     result = body.push_if_else(
-                        self.hir_id.child("isMatch"),
+                        &self.hir_id.child("isMatch"),
                         is_match,
                         |body| {
                             let captured_identifiers = pattern.captured_identifiers();
@@ -748,13 +749,8 @@ impl PatternLoweringContext {
                 }
                 result
             }
-            hir::Pattern::Error { child, errors } => {
-                let result = body.compile_errors(self.responsible, errors);
-                if let Some(child) = child {
-                    self.compile(body, expression, child)
-                } else {
-                    result
-                }
+            hir::Pattern::Error { errors } => {
+                body.compile_errors(self.responsible, errors)
             }
         }
     }
@@ -829,7 +825,7 @@ impl PatternLoweringContext {
         let equals = body.push_call(builtin_equals, vec![expected, actual], self.responsible);
 
         body.push_if_else(
-            self.hir_id.child("equals"),
+            &self.hir_id.child("equals"),
             equals,
             then_builder,
             |body| {
@@ -853,8 +849,8 @@ impl PatternLoweringContext {
             hir::Pattern::NewIdentifier(_) => {
                 panic!("New identifiers can't be used in this part of a pattern.")
             }
-            hir::Pattern::Int(int) => body.push_int(int.to_owned().into()),
-            hir::Pattern::Text(text) => body.push_text(text.to_owned()),
+            hir::Pattern::Int(int) => body.push_int(int.clone().into()),
+            hir::Pattern::Text(text) => body.push_text(text.clone()),
             hir::Pattern::Tag { symbol, value } => {
                 let value = value
                     .as_ref()
@@ -892,7 +888,7 @@ impl PatternLoweringContext {
 
         let is_match = body.push_is_match(return_value, self.responsible);
         body.push_if_else(
-            self.hir_id.child("isMatch"),
+            &self.hir_id.child("isMatch"),
             is_match,
             |body| {
                 let list_get_function = body.push_builtin(BuiltinFunction::ListGet);

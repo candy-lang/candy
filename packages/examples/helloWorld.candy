@@ -1,5 +1,0 @@
-# A self-contained hello world example that doesn't even use the Core library.
-
-builtins = use "Builtins"
-
-main := { environment -> environment.stdout | builtins.channelSend "Hello, world!" }

@@ -33,28 +33,28 @@ impl SplitOuterTrailingWhitespace for Rcst {
     }
 }
 
-impl<A: SplitOuterTrailingWhitespace> SplitOuterTrailingWhitespace for Vec<A> {
+impl<T: SplitOuterTrailingWhitespace> SplitOuterTrailingWhitespace for Vec<T> {
     fn split_outer_trailing_whitespace(mut self) -> (Vec<Rcst>, Self) {
-        match self.pop() {
-            Some(last) => {
+        self.pop().map_or_else(
+            || (vec![], vec![]),
+            |last| {
                 let (whitespace, last) = last.split_outer_trailing_whitespace();
                 self.push(last);
                 (whitespace, self)
-            }
-            None => (vec![], vec![]),
-        }
+            },
+        )
     }
 }
 
 impl<T: SplitOuterTrailingWhitespace> SplitOuterTrailingWhitespace for Option<T> {
     fn split_outer_trailing_whitespace(self) -> (Vec<Rcst>, Self) {
-        match self {
-            Some(it) => {
+        self.map_or_else(
+            || (vec![], None),
+            |it| {
                 let (whitespace, it) = it.split_outer_trailing_whitespace();
                 (whitespace, Some(it))
-            }
-            None => (vec![], None),
-        }
+            },
+        )
     }
 }
 

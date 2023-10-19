@@ -10,7 +10,9 @@ use tokio::sync::Mutex;
 #[async_trait]
 #[allow(clippy::diverging_sub_expression)]
 pub trait LanguageFeatures: Send + Sync {
+    #[must_use]
     fn language_id(&self) -> Option<String>;
+    #[must_use]
     fn supported_url_schemes(&self) -> Vec<&'static str>;
 
     async fn initialize(&self) {}
@@ -43,6 +45,7 @@ pub trait LanguageFeatures: Send + Sync {
     fn supports_folding_ranges(&self) -> bool {
         false
     }
+    #[must_use]
     async fn folding_ranges(&self, _db: &Mutex<Database>, _uri: Url) -> Vec<FoldingRange> {
         unimplemented!()
     }
@@ -50,6 +53,7 @@ pub trait LanguageFeatures: Send + Sync {
     fn supports_format(&self) -> bool {
         false
     }
+    #[must_use]
     async fn format(&self, _db: &Mutex<Database>, _uri: Url) -> Vec<TextEdit> {
         unimplemented!()
     }
@@ -57,6 +61,7 @@ pub trait LanguageFeatures: Send + Sync {
     fn supports_find_definition(&self) -> bool {
         false
     }
+    #[must_use]
     async fn find_definition(
         &self,
         _db: &Mutex<Database>,
@@ -70,6 +75,7 @@ pub trait LanguageFeatures: Send + Sync {
         false
     }
     /// Used for highlighting and finding references.
+    #[must_use]
     async fn references(
         &self,
         _db: &Mutex<Database>,
@@ -84,6 +90,7 @@ pub trait LanguageFeatures: Send + Sync {
     fn supports_rename(&self) -> bool {
         false
     }
+    #[must_use]
     async fn prepare_rename(
         &self,
         _db: &Mutex<Database>,
@@ -92,6 +99,7 @@ pub trait LanguageFeatures: Send + Sync {
     ) -> Option<lsp_types::Range> {
         unimplemented!()
     }
+    #[must_use]
     async fn rename(
         &self,
         _db: &Mutex<Database>,
@@ -105,6 +113,7 @@ pub trait LanguageFeatures: Send + Sync {
     fn supports_semantic_tokens(&self) -> bool {
         false
     }
+    #[must_use]
     async fn semantic_tokens(&self, _db: &Mutex<Database>, _uri: Url) -> Vec<SemanticToken> {
         unimplemented!()
     }

@@ -14,7 +14,7 @@ use std::{
 #[derive(Clone, Copy, Deref)]
 pub struct InlinePointer(InlineObject);
 impl InlinePointer {
-    pub fn new_unchecked(object: InlineObject) -> Self {
+    pub const fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
     }
 

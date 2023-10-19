@@ -1,90 +1,96 @@
 use crate::{
-    channel::ChannelId,
-    channel::{Capacity, Packet},
-    fiber::{Fiber, Panic, Status},
-    heap::{
-        Data, Function, Heap, HirId, InlineObject, Int, List, ReceivePort, SendPort, Struct, Tag,
-        Text,
-    },
-    tracer::FiberTracer,
+    heap::{Data, Function, Heap, HirId, InlineObject, Int, List, Struct, Tag, Text, ToDebugText},
+    instructions::InstructionResult,
+    vm::{CallHandle, MachineState, Panic},
 };
-use candy_frontend::builtin_functions::BuiltinFunction;
+use candy_frontend::{
+    builtin_functions::BuiltinFunction,
+    format::{MaxLength, Precedence},
+};
+use derive_more::Deref;
 use itertools::Itertools;
 use num_bigint::BigInt;
 use paste::paste;
-use std::str::FromStr;
-use tracing::{info, span, Level};
+use std::{
+    str::FromStr,
+    sync::atomic::{AtomicBool, Ordering},
+};
+use tracing::{span, Level};
 
-impl<FT: FiberTracer> Fiber<FT> {
+/// Our language server talks to clients using the LSP on stdin/stdout. When it
+/// is running, we can't print log messages / etc. on stdout since it messes up
+/// the LSP's messages.
+pub static CAN_USE_STDOUT: AtomicBool = AtomicBool::new(true);
+
+impl MachineState {
     pub(super) fn run_builtin_function(
         &mut self,
+        heap: &mut Heap,
         builtin_function: BuiltinFunction,
         args: &[InlineObject],
         responsible: HirId,
-    ) {
+    ) -> InstructionResult {
         let result = span!(Level::TRACE, "Running builtin").in_scope(|| match &builtin_function {
-            BuiltinFunction::ChannelCreate => self.heap.channel_create(args),
-            BuiltinFunction::ChannelSend => self.heap.channel_send(args),
-            BuiltinFunction::ChannelReceive => self.heap.channel_receive(args),
-            BuiltinFunction::Equals => self.heap.equals(args),
-            BuiltinFunction::FunctionRun => self.heap.function_run(args, responsible),
-            BuiltinFunction::GetArgumentCount => self.heap.get_argument_count(args),
-            BuiltinFunction::IfElse => self.heap.if_else(args, responsible),
-            BuiltinFunction::IntAdd => self.heap.int_add(args),
-            BuiltinFunction::IntBitLength => self.heap.int_bit_length(args),
-            BuiltinFunction::IntBitwiseAnd => self.heap.int_bitwise_and(args),
-            BuiltinFunction::IntBitwiseOr => self.heap.int_bitwise_or(args),
-            BuiltinFunction::IntBitwiseXor => self.heap.int_bitwise_xor(args),
-            BuiltinFunction::IntCompareTo => self.heap.int_compare_to(args),
-            BuiltinFunction::IntDivideTruncating => self.heap.int_divide_truncating(args),
-            BuiltinFunction::IntModulo => self.heap.int_modulo(args),
-            BuiltinFunction::IntMultiply => self.heap.int_multiply(args),
-            BuiltinFunction::IntParse => self.heap.int_parse(args),
-            BuiltinFunction::IntRemainder => self.heap.int_remainder(args),
-            BuiltinFunction::IntShiftLeft => self.heap.int_shift_left(args),
-            BuiltinFunction::IntShiftRight => self.heap.int_shift_right(args),
-            BuiltinFunction::IntSubtract => self.heap.int_subtract(args),
-            BuiltinFunction::ListFilled => self.heap.list_filled(args),
-            BuiltinFunction::ListGet => self.heap.list_get(args),
-            BuiltinFunction::ListInsert => self.heap.list_insert(args),
-            BuiltinFunction::ListLength => self.heap.list_length(args),
-            BuiltinFunction::ListRemoveAt => self.heap.list_remove_at(args),
-            BuiltinFunction::ListReplace => self.heap.list_replace(args),
-            BuiltinFunction::Parallel => self.heap.parallel(args),
-            BuiltinFunction::Print => self.heap.print(args),
-            BuiltinFunction::StructGet => self.heap.struct_get(args),
-            BuiltinFunction::StructGetKeys => self.heap.struct_get_keys(args),
-            BuiltinFunction::StructHasKey => self.heap.struct_has_key(args),
-            BuiltinFunction::TagGetValue => self.heap.tag_get_value(args),
-            BuiltinFunction::TagHasValue => self.heap.tag_has_value(args),
-            BuiltinFunction::TagWithoutValue => self.heap.tag_without_value(args),
-            BuiltinFunction::TextCharacters => self.heap.text_characters(args),
-            BuiltinFunction::TextConcatenate => self.heap.text_concatenate(args),
-            BuiltinFunction::TextContains => self.heap.text_contains(args),
-            BuiltinFunction::TextEndsWith => self.heap.text_ends_with(args),
-            BuiltinFunction::TextFromUtf8 => self.heap.text_from_utf8(args),
-            BuiltinFunction::TextGetRange => self.heap.text_get_range(args),
-            BuiltinFunction::TextIsEmpty => self.heap.text_is_empty(args),
-            BuiltinFunction::TextLength => self.heap.text_length(args),
-            BuiltinFunction::TextStartsWith => self.heap.text_starts_with(args),
-            BuiltinFunction::TextTrimEnd => self.heap.text_trim_end(args),
-            BuiltinFunction::TextTrimStart => self.heap.text_trim_start(args),
-            BuiltinFunction::ToDebugText => self.heap.to_debug_text(args),
-            BuiltinFunction::Try => self.heap.try_(args),
-            BuiltinFunction::TypeOf => self.heap.type_of(args),
+            BuiltinFunction::Equals => heap.equals(args),
+            BuiltinFunction::FunctionRun => Heap::function_run(args, responsible),
+            BuiltinFunction::GetArgumentCount => heap.get_argument_count(args),
+            BuiltinFunction::IfElse => heap.if_else(args, responsible),
+            BuiltinFunction::IntAdd => heap.int_add(args),
+            BuiltinFunction::IntBitLength => heap.int_bit_length(args),
+            BuiltinFunction::IntBitwiseAnd => heap.int_bitwise_and(args),
+            BuiltinFunction::IntBitwiseOr => heap.int_bitwise_or(args),
+            BuiltinFunction::IntBitwiseXor => heap.int_bitwise_xor(args),
+            BuiltinFunction::IntCompareTo => heap.int_compare_to(args),
+            BuiltinFunction::IntDivideTruncating => heap.int_divide_truncating(args),
+            BuiltinFunction::IntModulo => heap.int_modulo(args),
+            BuiltinFunction::IntMultiply => heap.int_multiply(args),
+            BuiltinFunction::IntParse => heap.int_parse(args),
+            BuiltinFunction::IntRemainder => heap.int_remainder(args),
+            BuiltinFunction::IntShiftLeft => heap.int_shift_left(args),
+            BuiltinFunction::IntShiftRight => heap.int_shift_right(args),
+            BuiltinFunction::IntSubtract => heap.int_subtract(args),
+            BuiltinFunction::ListFilled => heap.list_filled(args),
+            BuiltinFunction::ListGet => heap.list_get(args),
+            BuiltinFunction::ListInsert => heap.list_insert(args),
+            BuiltinFunction::ListLength => heap.list_length(args),
+            BuiltinFunction::ListRemoveAt => heap.list_remove_at(args),
+            BuiltinFunction::ListReplace => heap.list_replace(args),
+            BuiltinFunction::Print => heap.print(args),
+            BuiltinFunction::StructGet => heap.struct_get(args),
+            BuiltinFunction::StructGetKeys => heap.struct_get_keys(args),
+            BuiltinFunction::StructHasKey => heap.struct_has_key(args),
+            BuiltinFunction::TagGetValue => heap.tag_get_value(args),
+            BuiltinFunction::TagHasValue => heap.tag_has_value(args),
+            BuiltinFunction::TagWithoutValue => heap.tag_without_value(args),
+            BuiltinFunction::TextCharacters => heap.text_characters(args),
+            BuiltinFunction::TextConcatenate => heap.text_concatenate(args),
+            BuiltinFunction::TextContains => heap.text_contains(args),
+            BuiltinFunction::TextEndsWith => heap.text_ends_with(args),
+            BuiltinFunction::TextFromUtf8 => heap.text_from_utf8(args),
+            BuiltinFunction::TextGetRange => heap.text_get_range(args),
+            BuiltinFunction::TextIsEmpty => heap.text_is_empty(args),
+            BuiltinFunction::TextLength => heap.text_length(args),
+            BuiltinFunction::TextStartsWith => heap.text_starts_with(args),
+            BuiltinFunction::TextTrimEnd => heap.text_trim_end(args),
+            BuiltinFunction::TextTrimStart => heap.text_trim_start(args),
+            BuiltinFunction::ToDebugText => heap.to_debug_text(args),
+            BuiltinFunction::TypeOf => heap.type_of(args),
         });
+
         match result {
-            Ok(Return(value)) => self.data_stack.push(value),
+            Ok(Return(value)) => {
+                self.data_stack.push(value);
+                InstructionResult::Done
+            }
             Ok(DivergeControlFlow {
                 function,
                 responsible,
-            }) => self.call_function(function, &[], responsible),
-            Ok(CreateChannel { capacity }) => self.status = Status::CreatingChannel { capacity },
-            Ok(Send { channel, packet }) => self.status = Status::Sending { channel, packet },
-            Ok(Receive { channel }) => self.status = Status::Receiving { channel },
-            Ok(Parallel { body }) => self.status = Status::InParallelScope { body },
-            Ok(Try { body }) => self.status = Status::InTry { body },
-            Err(reason) => self.panic(Panic::new(reason, responsible.get().to_owned())),
+            }) => self.call_function(heap, function, &[], responsible),
+            Ok(CallHandle(call)) => InstructionResult::CallHandle(call),
+            Err(reason) => InstructionResult::Panic(Panic {
+                reason,
+                responsible: responsible.get().clone(),
+            }),
         }
     }
 }
@@ -96,25 +102,8 @@ enum SuccessfulBehavior {
         function: Function,
         responsible: HirId,
     },
-    CreateChannel {
-        capacity: Capacity,
-    },
-    Send {
-        channel: ChannelId,
-        packet: Packet,
-    },
-    Receive {
-        channel: ChannelId,
-    },
-    Parallel {
-        body: Function,
-    },
-    Try {
-        body: Function,
-    },
+    CallHandle(CallHandle),
 }
-use derive_more::Deref;
-use SuccessfulBehavior::*;
 
 impl From<SuccessfulBehavior> for BuiltinResult {
     fn from(ok: SuccessfulBehavior) -> Self {
@@ -169,56 +158,63 @@ macro_rules! unpack_and_later_drop {
     };
 }
 
-impl Heap {
-    fn channel_create(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |capacity: Int| {
-            let capacity = capacity.try_get().unwrap();
-            CreateChannel { capacity }
-        })
-    }
-    fn channel_send(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |port: SendPort, packet: Any| {
-            let mut heap = Heap::default();
-            let object = packet.object.clone_to_heap(&mut heap);
-            Send {
-                channel: port.channel_id(),
-                packet: Packet { heap, object },
-            }
-        })
-    }
-    fn channel_receive(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |port: ReceivePort| {
-            Receive {
-                channel: port.channel_id(),
-            }
-        })
-    }
+#[allow(clippy::enum_glob_use)]
+use SuccessfulBehavior::*;
 
+impl Heap {
     fn equals(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |a: Any, b: Any| {
             Return(Tag::create_bool(self, **a == **b).into())
         })
     }
 
-    fn function_run(&mut self, args: &[InlineObject], responsible: HirId) -> BuiltinResult {
-        unpack!(self, args, |function: Function| {
-            DivergeControlFlow {
-                function: *function,
-                responsible,
+    fn function_run(args: &[InlineObject], responsible: HirId) -> BuiltinResult {
+        unpack!(self, args, |function: Any| {
+            match **function {
+                Data::Builtin(_) => {
+                    // TODO: Replace with `unreachable!()` once we have guards
+                    // for argument counts on the Candy side – there are no
+                    // builtins without arguments.
+                    return Err("`✨.functionRun` called with builtin".to_string());
+                }
+                Data::Function(function) => DivergeControlFlow {
+                    function,
+                    responsible,
+                },
+                Data::Handle(handle) => {
+                    if handle.argument_count() != 0 {
+                        return Err(
+                            "`✨.functionRun` expects a function or handle without arguments"
+                                .to_string(),
+                        );
+                    }
+                    CallHandle(CallHandle {
+                        handle,
+                        arguments: vec![],
+                        responsible,
+                    })
+                }
+                _ => return Err("`✨.functionRun` expects a function or handle".to_string()),
             }
         })
     }
     fn get_argument_count(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |function: Function| {
-            Return(Int::create(self, function.argument_count()).into())
+        unpack_and_later_drop!(self, args, |function: Any| {
+            let count = match **function {
+                Data::Builtin(builtin) => builtin.get().num_parameters(),
+                Data::Function(function) => function.argument_count(),
+                Data::Handle(handle) => handle.argument_count(),
+                _ => return Err("`✨.getArgumentCount` expects a function or handle".to_string()),
+            };
+            Return(Int::create(self, true, count).into())
         })
     }
 
     fn if_else(&mut self, args: &[InlineObject], responsible: HirId) -> BuiltinResult {
-        unpack!(self, args, |condition: bool,
+        unpack!(self, args, |condition: Tag,
                              then: Function,
                              else_: Function| {
-            let (run, dont_run) = if *condition {
+            let (run, dont_run) = if condition.try_into_bool(self).unwrap() {
                 (then, else_)
             } else {
                 (else_, then)
@@ -236,7 +232,7 @@ impl Heap {
 
     fn int_add(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |a: Int, b: Int| {
-            Return(a.add(self, &b).into())
+            Return(a.add(self, *b).into())
         })
     }
     fn int_bit_length(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -244,66 +240,76 @@ impl Heap {
     }
     fn int_bitwise_and(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |a: Int, b: Int| {
-            Return(a.bitwise_and(self, &b).into())
+            Return(a.bitwise_and(self, *b).into())
         })
     }
     fn int_bitwise_or(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |a: Int, b: Int| {
-            Return(a.bitwise_or(self, &b).into())
+            Return(a.bitwise_or(self, *b).into())
         })
     }
     fn int_bitwise_xor(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |a: Int, b: Int| {
-            Return(a.bitwise_xor(self, &b).into())
+            Return(a.bitwise_xor(self, *b).into())
         })
     }
     fn int_compare_to(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |a: Int, b: Int| {
-            Return(a.compare_to(self, &b).into())
+            Return(a.compare_to(self, *b).into())
         })
     }
     fn int_divide_truncating(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
-            Return(dividend.int_divide_truncating(self, &divisor).into())
+            Return(dividend.int_divide_truncating(self, *divisor).into())
         })
     }
     fn int_modulo(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
-            Return(dividend.modulo(self, &divisor).into())
+            Return(dividend.modulo(self, *divisor).into())
         })
     }
     fn int_multiply(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |factor_a: Int, factor_b: Int| {
-            Return(factor_a.multiply(self, &factor_b).into())
+            Return(factor_a.multiply(self, *factor_b).into())
         })
     }
     fn int_parse(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |text: Text| {
-            let result = match BigInt::from_str(text.get()) {
-                Ok(int) => Ok(Int::create_from_bigint(self, int).into()),
-                Err(err) => Err(Text::create(self, &err.to_string()).into()),
-            };
-            Return(Tag::create_result(self, result).into())
+        unpack!(self, args, |text: Text| {
+            let result = BigInt::from_str(text.get())
+                .map(|int| {
+                    text.drop(self);
+                    Int::create_from_bigint(self, true, int).into()
+                })
+                .map_err(|_| {
+                    Tag::create_with_value(
+                        self,
+                        true,
+                        self.default_symbols().not_an_integer,
+                        text.object,
+                    )
+                    .into()
+                });
+            Return(Tag::create_result(self, true, result).into())
         })
     }
     fn int_remainder(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
-            Return(dividend.remainder(self, &divisor).into())
+            Return(dividend.remainder(self, *divisor).into())
         })
     }
     fn int_shift_left(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Int, amount: Int| {
-            Return(value.shift_left(self, &amount).into())
+            Return(value.shift_left(self, *amount).into())
         })
     }
     fn int_shift_right(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Int, amount: Int| {
-            Return(value.shift_right(self, &amount).into())
+            Return(value.shift_right(self, *amount).into())
         })
     }
     fn int_subtract(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |minuend: Int, subtrahend: Int| {
-            Return(minuend.subtract(self, &subtrahend).into())
+            Return(minuend.subtract(self, *subtrahend).into())
         })
     }
 
@@ -319,7 +325,7 @@ impl Heap {
                 item.object.dup_by(self, length_usize - 1);
             }
 
-            Return(List::create(self, &vec![item_object; length_usize]).into())
+            Return(List::create(self, true, &vec![item_object; length_usize]).into())
         })
     }
     fn list_get(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -342,7 +348,7 @@ impl Heap {
     }
     fn list_length(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |list: List| {
-            Return(Int::create(self, list.len()).into())
+            Return(Int::create(self, true, list.len()).into())
         })
     }
     fn list_remove_at(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -363,17 +369,13 @@ impl Heap {
         })
     }
 
-    fn parallel(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack!(self, args, |body_taking_nursery: Function| {
-            Parallel {
-                body: *body_taking_nursery,
-            }
-        })
-    }
-
     fn print(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |message: Any| {
-            info!("{}", message.object);
+        unpack_and_later_drop!(self, args, |message: Text| {
+            if CAN_USE_STDOUT.load(Ordering::Relaxed) {
+                println!("{}", message.get());
+            } else {
+                eprintln!("{}", message.get());
+            }
             Return(Tag::create_nothing(self).into())
         })
     }
@@ -387,7 +389,7 @@ impl Heap {
     }
     fn struct_get_keys(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |struct_: Struct| {
-            Return(List::create(self, struct_.keys()).into())
+            Return(List::create(self, true, struct_.keys()).into())
         })
     }
     fn struct_has_key(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -410,8 +412,7 @@ impl Heap {
     }
     fn tag_without_value(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |tag: Tag| {
-            tag.symbol().dup();
-            Return(tag.without_value(self).into())
+            Return(tag.without_value().into())
         })
     }
 
@@ -436,19 +437,33 @@ impl Heap {
         })
     }
     fn text_from_utf8(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |bytes: List| {
+        unpack!(self, args, |bytes: List| {
             // TODO: Remove `u8` checks once we have `needs` ensuring that the bytes are valid.
-            let bytes: Vec<_> = bytes
+            let real_bytes: Vec<_> = bytes
                 .items()
                 .iter()
                 .map(|&it| {
                     Int::try_from(it)
                         .ok()
-                        .and_then(|it| it.try_get())
+                        .and_then(Int::try_get)
                         .ok_or_else(|| format!("Value is not a byte: {it}."))
                 })
                 .try_collect()?;
-            Return(Text::create_from_utf8(self, &bytes).into())
+            let text = String::from_utf8(real_bytes)
+                .map(|it| {
+                    bytes.drop(self);
+                    Text::create(self, true, &it).into()
+                })
+                .map_err(|_| {
+                    Tag::create_with_value(
+                        self,
+                        true,
+                        self.default_symbols().not_utf8,
+                        bytes.object,
+                    )
+                    .into()
+                });
+            Return(Tag::create_result(self, true, text).into())
         })
     }
     fn text_get_range(&mut self, args: &[InlineObject]) -> BuiltinResult {
@@ -492,31 +507,29 @@ impl Heap {
     #[allow(clippy::wrong_self_convention)]
     fn to_debug_text(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Any| {
-            Return(Text::create(self, &format!("{:?}", **value)).into())
+            let formatted = value
+                .object
+                .to_debug_text(Precedence::Low, MaxLength::Unlimited);
+            Return(Text::create(self, true, &formatted).into())
         })
-    }
-
-    fn try_(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack!(self, args, |body: Function| { Try { body: *body } })
     }
 
     fn type_of(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Any| {
-            let type_name = match **value {
-                Data::Int(_) => "Int",
-                Data::Text(_) => "Text",
-                Data::Tag(_) => "Tag",
-                Data::List(_) => "List",
-                Data::Struct(_) => "Struct",
+            let type_text = match **value {
+                Data::Int(_) => self.default_symbols().int,
+                Data::Text(_) => self.default_symbols().text,
+                Data::Tag(_) => self.default_symbols().tag,
+                Data::List(_) => self.default_symbols().list,
+                Data::Struct(_) => self.default_symbols().struct_,
                 Data::HirId(_) => panic!(
                     "HIR ID shouldn't occurr in Candy programs except in VM-controlled places."
                 ),
-                Data::Function(_) => "Function",
-                Data::Builtin(_) => "Builtin",
-                Data::SendPort(_) => "SendPort",
-                Data::ReceivePort(_) => "ReceivePort",
+                Data::Function(_) => self.default_symbols().function,
+                Data::Builtin(_) => self.default_symbols().builtin,
+                Data::Handle(_) => self.default_symbols().function,
             };
-            Return(Tag::create_from_str(self, type_name, None).into())
+            Return(Tag::create(type_text).into())
         })
     }
 }

@@ -9,6 +9,7 @@
     "url": "https://github.com/candy-lang/candy.git",
     "directory": "new-new-packages/vscode_extension"
   },
+  "//": "Keep in sync with `devDependencies`.`@types/vscode`",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -144,6 +145,16 @@
         "category": "Candy Compiler Debugging",
         "command": "candy.debug.viewLir",
         "title": "View LIR"
+      },
+      {
+        "category": "Candy Compiler Debugging",
+        "command": "candy.debug.viewVmByteCode",
+        "title": "View VM Byte Code"
+      },
+      {
+        "category": "Candy Compiler Debugging",
+        "command": "candy.debug.viewLlvmIr",
+        "title": "View LLVM IR"
       }
     ],
     "configuration": {
@@ -152,14 +163,14 @@
         "candy.languageServerCommand": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Command to start the 🍭 Candy language server. If empty, we'll attempt to find the 🍭 Candy executable in the `PATH` environment variable.",
-          "scope": "machine"
+          "markdownDescription": "Command to start the 🍭 Candy language server. If empty, we'll attempt to find the 🍭 Candy executable in the `PATH` environment variable. If you want LLVM IR support, add the `inkwell` feature flag.",
+          "scope": "machine-overridable"
         },
         "candy.packagesPath": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Path of a folder containing all packages.",
-          "scope": "machine"
+          "markdownDescription": "Path of a folder containing all 🍭 Candy packages.",
+          "scope": "machine-overridable"
         }
       }
     },
@@ -219,26 +230,52 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
-    "lint": "eslint src --ext ts",
+    "lint": "eslint --ext ts .",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "test": "node ./out/test/runTest.js"
   },
   "dependencies": {
-    "@vscode/debugadapter": "^1.61.0",
+    "@vscode/debugadapter": "^1.63.0",
     "vscode-languageclient": "^8.1.0"
   },
   "devDependencies": {
-    "@types/glob": "^8.0.1",
-    "@types/mocha": "^10.0.1",
-    "@types/node": "^20.4.2",
-    "@types/vscode": "^1.80.0",
-    "@typescript-eslint/eslint-plugin": "^5.61.0",
-    "@typescript-eslint/parser": "^5.62.0",
-    "eslint": "^8.44.0",
-    "glob": "^10.3.3",
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.2",
+    "@types/node": "^20.8.7",
+    "@types/vscode": "^1.81.0",
+    "@typescript-eslint/eslint-plugin": "^6.8.0",
+    "@typescript-eslint/parser": "^6.8.0",
+    "eslint": "^8.51.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.1",
+    "glob": "^10.3.10",
     "mocha": "^10.2.0",
-    "typescript": "^5.1.6",
+    "prettier": "^3.0.3",
+    "typescript": "^5.2.2",
     "vscode-test": "^1.4.0"
-  }
+  },
+  "eslintConfig": {
+    "root": true,
+    "plugins": [
+      "@typescript-eslint",
+      "prettier"
+    ],
+    "extends": [
+      "eslint:recommended",
+      "plugin:@typescript-eslint/strict-type-checked",
+      "plugin:@typescript-eslint/stylistic-type-checked",
+      "prettier"
+    ],
+    "parser": "@typescript-eslint/parser",
+    "parserOptions": {
+      "ecmaVersion": 2020,
+      "project": true,
+      "sourceType": "module"
+    },
+    "rules": {
+      "prettier/prettier": "warn"
+    }
+  },
+  "prettier": {}
 }

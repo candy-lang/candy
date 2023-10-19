@@ -3,9 +3,9 @@ use crate::{
     module::Module,
     rich_ir::{RichIrBuilder, ToRichIr, TokenType},
 };
-use derive_more::Deref;
+use derive_more::{Deref, From};
 use enumset::EnumSet;
-use num_bigint::BigUint;
+use num_bigint::{BigInt, BigUint};
 use rustc_hash::FxHashMap;
 use std::{
     fmt::{self, Display, Formatter},
@@ -17,20 +17,23 @@ use strum_macros::EnumIs;
 pub trait AstDb: CstToAst {
     fn find_ast(&self, id: Id) -> Option<Ast>;
 }
+#[allow(clippy::needless_pass_by_value)]
 fn find_ast(db: &dyn AstDb, id: Id) -> Option<Ast> {
     let (ast, _) = db.ast(id.module.clone()).ok()?;
-    ast.find(&id).map(|it| it.to_owned())
+    ast.find(&id).cloned()
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Id {
     pub module: Module,
     pub local: usize,
 }
 impl Id {
-    pub fn new(module: Module, local: usize) -> Self {
+    #[must_use]
+    pub const fn new(module: Module, local: usize) -> Self {
         Self { module, local }
     }
+    #[must_use]
     pub fn to_short_debug_string(&self) -> String {
         format!("${}", self.local)
     }
@@ -48,7 +51,7 @@ pub struct Ast {
     pub kind: AstKind,
 }
 
-#[derive(Clone, Debug, EnumIs, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, EnumIs, Eq, From, Hash, PartialEq)]
 pub enum AstKind {
     Int(Int),
     Text(Text),
@@ -64,12 +67,7 @@ pub enum AstKind {
     Match(Match),
     MatchCase(MatchCase),
     OrPattern(OrPattern),
-    Error {
-        /// The child may be set if it still makes sense to continue working
-        /// with the error-containing subtree.
-        child: Option<Box<Ast>>,
-        errors: Vec<CompilerError>,
-    },
+    Error { errors: Vec<CompilerError> },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -102,7 +100,7 @@ pub struct StructAccess {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Function {
-    pub parameters: Vec<AstString>,
+    pub parameters: Vec<Ast>,
     pub body: Vec<Ast>,
     pub fuzzable: bool,
 }
@@ -197,7 +195,7 @@ impl FindAst for Ast {
             AstKind::Match(match_) => match_.find(id),
             AstKind::MatchCase(match_case) => match_case.find(id),
             AstKind::OrPattern(or_pattern) => or_pattern.find(id),
-            AstKind::Error { child, .. } => child.as_ref().and_then(|child| child.find(id)),
+            AstKind::Error { .. } => None,
         }
     }
 }
@@ -238,8 +236,8 @@ impl FindAst for Assignment {
 impl FindAst for AssignmentBody {
     fn find(&self, id: &Id) -> Option<&Ast> {
         match self {
-            AssignmentBody::Function { name: _, function } => function.find(id),
-            AssignmentBody::Body { pattern, body } => pattern.find(id).or_else(|| body.find(id)),
+            Self::Function { name: _, function } => function.find(id),
+            Self::Body { pattern, body } => pattern.find(id).or_else(|| body.find(id)),
         }
     }
 }
@@ -265,6 +263,7 @@ impl FindAst for Vec<Ast> {
 }
 
 impl AstKind {
+    #[must_use]
     pub fn captured_identifiers(&self) -> FxHashMap<String, Vec<Id>> {
         let mut captured_identifiers = FxHashMap::default();
         self.captured_identifiers_helper(&mut captured_identifiers);
@@ -272,43 +271,39 @@ impl AstKind {
     }
     fn captured_identifiers_helper(&self, captured_identifiers: &mut FxHashMap<String, Vec<Id>>) {
         match self {
-            AstKind::Int(_) | AstKind::Text(_) | AstKind::TextPart(_) => {}
-            AstKind::Identifier(Identifier(identifier)) => {
+            Self::Int(_) | Self::Text(_) | Self::TextPart(_) => {}
+            Self::Identifier(Identifier(identifier)) => {
                 let entry = captured_identifiers
                     .entry(identifier.value.clone())
                     .or_insert_with(Vec::new);
-                entry.push(identifier.id.to_owned())
+                entry.push(identifier.id.clone());
             }
-            AstKind::Symbol(_) => {}
-            AstKind::List(List(list)) => {
+            Self::Symbol(_) => {}
+            Self::List(List(list)) => {
                 for item in list {
-                    item.captured_identifiers_helper(captured_identifiers)
+                    item.captured_identifiers_helper(captured_identifiers);
                 }
             }
-            AstKind::Struct(Struct { fields }) => {
+            Self::Struct(Struct { fields }) => {
                 for (key, value) in fields {
                     if let Some(key) = key {
-                        key.captured_identifiers_helper(captured_identifiers)
+                        key.captured_identifiers_helper(captured_identifiers);
                     }
-                    value.captured_identifiers_helper(captured_identifiers)
+                    value.captured_identifiers_helper(captured_identifiers);
                 }
             }
-            AstKind::StructAccess(_)
-            | AstKind::Function(_)
-            | AstKind::Call(_)
-            | AstKind::Assignment(_)
-            | AstKind::Match(_)
-            | AstKind::MatchCase(_) => {}
-            AstKind::OrPattern(OrPattern(patterns)) => {
+            Self::StructAccess(_)
+            | Self::Function(_)
+            | Self::Call(_)
+            | Self::Assignment(_)
+            | Self::Match(_)
+            | Self::MatchCase(_) => {}
+            Self::OrPattern(OrPattern(patterns)) => {
                 for pattern in patterns {
                     pattern.captured_identifiers_helper(captured_identifiers);
                 }
             }
-            AstKind::Error { child, .. } => {
-                if let Some(child) = child {
-                    child.captured_identifiers_helper(captured_identifiers)
-                }
-            }
+            Self::Error { .. } => {}
         }
     }
 }
@@ -332,7 +327,7 @@ impl CollectErrors for Ast {
             AstKind::Struct(struct_) => {
                 for (key, value) in struct_.fields {
                     if let Some(key) = key {
-                        key.collect_errors(errors)
+                        key.collect_errors(errors);
                     }
                     value.collect_errors(errors);
                 }
@@ -344,7 +339,7 @@ impl CollectErrors for Ast {
             AstKind::Call(call) => call.arguments.collect_errors(errors),
             AstKind::Assignment(assignment) => match assignment.body {
                 AssignmentBody::Function { name: _, function } => {
-                    function.body.collect_errors(errors)
+                    function.body.collect_errors(errors);
                 }
                 AssignmentBody::Body { pattern, body } => {
                     pattern.collect_errors(errors);
@@ -367,13 +362,9 @@ impl CollectErrors for Ast {
                 }
             }
             AstKind::Error {
-                child,
-                errors: mut recovered_errors,
+                errors: mut ast_errors,
             } => {
-                errors.append(&mut recovered_errors);
-                if let Some(child) = child {
-                    child.collect_errors(errors)
-                }
+                errors.append(&mut ast_errors);
             }
         }
     }
@@ -403,23 +394,17 @@ impl ToRichIr for Ast {
             AstKind::Match(match_) => match_.build_rich_ir(builder),
             AstKind::MatchCase(match_case) => match_case.build_rich_ir(builder),
             AstKind::OrPattern(or_pattern) => or_pattern.build_rich_ir(builder),
-            AstKind::Error { child, errors } => {
+            AstKind::Error { errors } => {
                 builder.push("error:", None, EnumSet::empty());
                 builder.push_children_multiline(errors);
-                if let Some(child) = child {
-                    builder.indent();
-                    builder.push_newline();
-                    builder.push("fallback: ", None, EnumSet::empty());
-                    child.build_rich_ir(builder);
-                    builder.dedent();
-                }
             }
         }
     }
 }
 impl ToRichIr for Int {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        builder.push(format!("int {}", self.0), TokenType::Int, EnumSet::empty());
+        let range = builder.push(format!("int {}", self.0), TokenType::Int, EnumSet::empty());
+        builder.push_reference(BigInt::from(self.0.clone()), range);
     }
 }
 impl ToRichIr for Text {
@@ -489,13 +474,27 @@ impl ToRichIr for Function {
             None,
             EnumSet::empty(),
         );
-        for parameter in &self.parameters {
-            builder.push(" ", None, EnumSet::empty());
-            parameter.build_rich_ir(builder);
-        }
+
         if !self.parameters.is_empty() {
-            builder.push(" ->", None, EnumSet::empty());
+            if self
+                .parameters
+                .iter()
+                .all(|it| matches!(it.kind, AstKind::Identifier(_)))
+            {
+                for parameter in &self.parameters {
+                    builder.push(" ", None, EnumSet::empty());
+                    parameter.build_rich_ir(builder);
+                }
+                builder.push(" ->", None, EnumSet::empty());
+            } else {
+                builder.push_children_multiline(&self.parameters);
+                builder.indent();
+                builder.push_newline();
+                builder.dedent();
+                builder.push("->", None, EnumSet::empty());
+            }
         }
+
         builder.push_foldable(|builder| {
             builder.push_children_multiline(&self.body);
             builder.push_newline();
@@ -526,7 +525,7 @@ impl ToRichIr for Assignment {
         match &self.body {
             AssignmentBody::Function { function, .. } => function.build_rich_ir(builder),
             AssignmentBody::Body { body, .. } => {
-                builder.push_foldable(|builder| builder.push_children_multiline(body))
+                builder.push_foldable(|builder| builder.push_children_multiline(body));
             }
         }
     }

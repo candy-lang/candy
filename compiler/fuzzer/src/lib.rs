@@ -1,4 +1,6 @@
 #![feature(let_chains, round_char_boundary)]
+#![warn(clippy::nursery, clippy::pedantic, unused_crate_dependencies)]
+#![allow(clippy::missing_panics_doc, clippy::module_name_repetitions)]
 
 mod coverage;
 mod fuzzer;
@@ -24,8 +26,8 @@ use candy_frontend::{
     {hir::Id, TracingConfig, TracingMode},
 };
 use candy_vm::{
-    execution_controller::RunLimitedNumberOfInstructions, fiber::Panic, mir_to_lir::compile_lir,
-    tracer::stack_trace::StackTracer, vm::Vm,
+    heap::Heap, mir_to_byte_code::compile_byte_code, tracer::stack_trace::StackTracer, Panic, Vm,
+    VmFinished,
 };
 use std::rc::Rc;
 use tracing::{debug, error, info};
@@ -39,14 +41,15 @@ where
         calls: TracingMode::Off,
         evaluated_expressions: TracingMode::Off,
     };
-    let (lir, _) = compile_lir(db, module, tracing);
-    let lir = Rc::new(lir);
+    let (byte_code, _) = compile_byte_code(db, module, tracing);
+    let byte_code = Rc::new(byte_code);
 
-    let (_heap, fuzzables) = {
-        let mut tracer = FuzzablesFinder::default();
-        let result = Vm::for_module(lir.clone(), &mut tracer).run_until_completion(&mut tracer);
-        (result.heap, tracer.into_fuzzables())
-    };
+    let mut heap = Heap::default();
+    let VmFinished {
+        tracer: FuzzablesFinder { fuzzables },
+        ..
+    } = Vm::for_module(byte_code.clone(), &mut heap, FuzzablesFinder::default())
+        .run_forever_without_handles(&mut heap);
 
     info!(
         "Now, the fuzzing begins. So far, we have {} functions to fuzz.",
@@ -57,19 +60,20 @@ where
 
     for (id, function) in fuzzables {
         info!("Fuzzing {id}.");
-        let mut fuzzer = Fuzzer::new(lir.clone(), function, id.clone());
-        fuzzer.run(&mut RunLimitedNumberOfInstructions::new(100_000));
+        let mut fuzzer = Fuzzer::new(byte_code.clone(), function, id.clone());
+        fuzzer.run(100_000);
 
         match fuzzer.into_status() {
             Status::StillFuzzing { total_coverage, .. } => {
                 let coverage = total_coverage
-                    .in_range(&lir.range_of_function(&id))
+                    .in_range(&byte_code.range_of_function(&id))
                     .relative_coverage();
                 debug!("Achieved a coverage of {:.1} %.", coverage * 100.0);
             }
             Status::FoundPanic {
                 input,
                 panic,
+                heap,
                 tracer,
             } => {
                 error!("The fuzzer discovered an input that crashes {id}:");
@@ -77,12 +81,12 @@ where
                     function: id,
                     input,
                     panic,
+                    heap,
                     tracer,
                 };
                 case.dump(db);
                 failing_cases.push(case);
             }
-            Status::TotalCoverageButNoPanic => {}
         }
     }
 
@@ -93,6 +97,8 @@ pub struct FailingFuzzCase {
     function: Id,
     input: Input,
     panic: Panic,
+    #[allow(dead_code)]
+    heap: Heap,
     #[allow(dead_code)]
     tracer: StackTracer,
 }

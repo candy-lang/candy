@@ -1,9 +1,16 @@
-#![feature(anonymous_lifetime_in_impl_trait)]
-#![feature(box_patterns)]
-#![feature(const_trait_impl)]
-#![feature(let_chains)]
-#![allow(clippy::borrow_interior_mutable_const)]
-#![allow(clippy::declare_interior_mutable_const)]
+#![feature(
+    anonymous_lifetime_in_impl_trait,
+    box_patterns,
+    const_trait_impl,
+    let_chains
+)]
+#![warn(clippy::nursery, clippy::pedantic, unused_crate_dependencies)]
+#![allow(
+    clippy::cognitive_complexity,
+    clippy::match_same_arms,
+    clippy::module_name_repetitions,
+    clippy::too_many_lines
+)]
 
 use candy_frontend::{cst::Cst, position::Offset};
 use existing_whitespace::{TrailingWithIndentationConfig, WhitespacePositionInBody};

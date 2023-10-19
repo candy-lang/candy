@@ -1,4 +1,40 @@
-use std::fmt::{self, Debug, Display, Formatter};
+use candy_frontend::module::{InMemoryModuleProvider, Module, ModuleKind, Package, PackagesPath};
+use extension_trait::extension_trait;
+use std::{
+    fmt::{self, Debug, Display, Formatter},
+    fs,
+};
+use walkdir::WalkDir;
+
+/// The in-memory provider is heavily used during testing, benchmarking, and
+/// fuzzing. Sometimes though, it's nice to be able to import a module from the
+/// file system directly (such as the `Builtins`).
+#[extension_trait]
+pub impl PopulateInMemoryProviderFromFileSystem for InMemoryModuleProvider {
+    fn load_package_from_file_system(&mut self, package_name: impl Into<String>) {
+        let package_name = package_name.into();
+        let packages_path = PackagesPath::try_from("../../packages").unwrap();
+        let package_path = packages_path.join(package_name.clone());
+        let package = Package::Managed(package_name.into());
+
+        for file in WalkDir::new(&package_path)
+            .into_iter()
+            .map(Result::unwrap)
+            .filter(|it| it.file_type().is_file())
+        {
+            let module = Module::from_package_and_path(
+                &packages_path,
+                package.clone(),
+                file.path(),
+                ModuleKind::Code,
+            )
+            .unwrap();
+
+            let source_code = fs::read_to_string(file.path()).unwrap();
+            self.add_str(&module, source_code);
+        }
+    }
+}
 
 pub trait DebugDisplay: Debug + Display {
     fn to_string(&self, is_debug: bool) -> String {

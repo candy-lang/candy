@@ -1,51 +1,99 @@
-# TODO: As soon as tags or value hiding is supported, change fixed point numbers
-# to that. Currently, they're just normal ints.
-
 bool = use "..bool"
 [check] = use "..check"
 [ifElse, recursive] = use "..controlFlow"
 [equals] = use "..equality"
 [run] = use "..function"
 int = use "..int"
+struct = use "..struct"
+tag = use "..tag"
 text = use "..text"
 [toDebugText] = use "..toDebugText"
 
-decimalsPow = 10000000
-# TODO: Perhaps allow different levels of precision.
+isScale scale = int.is scale | bool.lazyAnd { int.isNonNegative scale }
+scaleFactor scale =
+  needs (isScale scale)
+  10 | int.pow scale
 
-is := int.is
+is a := a %
+  FixedDecimal [minorUnits, scale] -> int.is minorUnits | bool.lazyAnd { isScale scale}
+  _ -> False
 
+minorUnits a :=
+  needs (is a)
+  (a | tag.getValue).minorUnits
+scale a :=
+  needs (is a)
+  (a | tag.getValue).scale
+
+fromIntScaled minorUnits scale :=
+  needs (int.is minorUnits)
+  needs (isScale scale)
+  FixedDecimal [minorUnits, scale]
 fromInt a :=
   needs (int.is a)
-  a | int.multiply decimalsPow
+  fromIntScaled a 0
 floorToInt a :=
   needs (is a)
-  a | int.divideTruncating decimalsPow
+  a | minorUnits | int.divideTruncating (a | scale | scaleFactor)
+
+rescaledMinorUnits a targetScale =
+  needs (is a)
+  needs (isScale targetScale)
+  ifElse
+    a | scale | int.isGreaterThan targetScale
+    { a | minorUnits | int.divideTruncating (scaleFactor (a | scale | int.subtract targetScale)) }
+    { a | minorUnits | int.multiply (scaleFactor (targetScale | int.subtract (a | scale))) }
+rescale a targetScale :=
+  needs (is a)
+  needs (isScale targetScale)
+  fromIntScaled (a | rescaledMinorUnits targetScale) targetScale
+comparableMinorUnits valueA valueB =
+  needs (is valueA)
+  needs (is valueB)
+  targetScale = int.max (valueA | scale) (valueB | scale)
+  [
+    ValueA: rescaledMinorUnits valueA targetScale,
+    ValueB: rescaledMinorUnits valueB targetScale,
+    targetScale,
+  ]
 
 add summandA summandB :=
   needs (is summandA)
   needs (is summandB)
-  summandA | int.add summandB
+  [valueA, valueB, targetScale] = comparableMinorUnits summandA summandB
+  fromIntScaled (valueA | int.add valueB) targetScale
 subtract minuend subtrahend :=
   needs (is minuend)
   needs (is subtrahend)
-  minuend | int.subtract subtrahend
+  [valueA, valueB, targetScale] = comparableMinorUnits minuend subtrahend
+  fromIntScaled (valueA | int.subtract valueB) targetScale
 negate value :=
   needs (is value)
-  value | int.negate
+  fromIntScaled (value | minorUnits | int.negate) (value | scale)
 multiply factorA factorB :=
   needs (is factorA)
   needs (is factorB)
-  factorA | int.multiply factorB | int.divideTruncating decimalsPow
-divide dividend divisor :=
+  fromIntScaled
+    factorA | minorUnits | int.multiply (factorB | minorUnits)
+    factorA | scale | int.add (factorB | scale)
+divideTruncating dividend divisor :=
   needs (is dividend)
   needs (is divisor)
-  needs (divisor | equals 0 | bool.not) "You can't divide by zero."
-  dividend | int.multiply decimalsPow | int.divideTruncating divisor
+  needs (divisor | minorUnits | equals 0 | bool.not) "You can't divide by zero."
+  [valueA, valueB, targetScale] = comparableMinorUnits dividend divisor
+  fromIntScaled (valueA | int.multiply (targetScale | scaleFactor) | int.divideTruncating valueB) targetScale
+divideTruncatingAtScale dividend divisor targetScale :=
+  needs (is dividend)
+  needs (is divisor)
+  needs (isScale targetScale)
+  needs (divisor | minorUnits | equals 0 | bool.not) "You can't divide by zero."
+  [valueA, valueB] = comparableMinorUnits dividend divisor
+  fromIntScaled (valueA | int.multiply (targetScale | scaleFactor) | int.divideTruncating valueB) targetScale
 
 compareTo valueA valueB :=
   needs (is valueA)
   needs (is valueB)
+  [valueA, valueB] = comparableMinorUnits valueA valueB
   result = valueA | int.compareTo valueB
   check (equals result Equal | bool.implies (equals valueA valueB))
   result
@@ -68,13 +116,13 @@ isGreaterThanOrEqualTo valueA valueB :=
 
 isPositive value :=
   needs (is value)
-  value | isGreaterThan 0
+  value | minorUnits | int.isGreaterThan 0
 isNonPositive value :=
   needs (is value)
   value | isPositive | bool.not
 isNegative value :=
   needs (is value)
-  value | isLessThan 0
+  value | minorUnits | int.isLessThan 0
 isNonNegative value :=
   needs (is value)
   value | isNegative | bool.not
@@ -87,7 +135,7 @@ approxEquals a b delta :=
   needs (is b)
   needs (is delta)
   needs (isNonNegative delta)
-  a | int.subtract b | int.absolute | int.isLessThanOrEqualTo delta
+  a | subtract b | absolute | isLessThanOrEqualTo delta
 
 min valueA valueB :=
   needs (is valueA)
@@ -114,11 +162,12 @@ coerceIn value minimum maximum :=
 
 toText a :=
   needs (is a)
-  beforeDot = a | floorToInt | toDebugText
+  beforeDot = a | floorToInt
   afterDot = run {
-    tmp = a | int.remainder decimalsPow
-    ifElse (isNonNegative tmp) { tmp | int.add decimalsPow | toDebugText | text.removePrefix "1" } {
-      tmp | int.subtract decimalsPow | toDebugText | text.removePrefix "-1"
+    scaleFactor = a | scale | scaleFactor
+    tmp = a | minorUnits | int.remainder scaleFactor
+    ifElse (int.isNonNegative tmp) { tmp | int.add scaleFactor | toDebugText | text.removePrefix "1" } {
+      tmp | int.subtract scaleFactor | toDebugText | text.removePrefix "-1"
     }
   }
-  "{beforeDot}.{afterDot}"
+  "{beforeDot}.{afterDot}" 

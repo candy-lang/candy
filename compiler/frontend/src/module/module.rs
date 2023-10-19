@@ -3,6 +3,7 @@ use crate::{
     impl_display_via_richir,
     rich_ir::{RichIrBuilder, ToRichIr, TokenType},
 };
+use enumset::EnumSet;
 use itertools::Itertools;
 use std::{
     fmt::{self, Display, Formatter},
@@ -12,21 +13,22 @@ use std::{
 };
 use tracing::{error, warn};
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Module {
     pub package: Package,
     pub path: Vec<String>,
     pub kind: ModuleKind,
 }
-#[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ModuleKind {
     Code,
     Asset,
 }
 
 impl Module {
+    #[must_use]
     pub fn from_package_name(name: String) -> Self {
-        Module {
+        Self {
             package: Package::Managed(name.into()),
             path: vec![],
             kind: ModuleKind::Code,
@@ -81,13 +83,14 @@ impl Module {
             }
         }
 
-        Ok(Module {
+        Ok(Self {
             package,
             path,
             kind,
         })
     }
 
+    #[must_use]
     pub fn to_possible_paths(&self, packages_path: &PackagesPath) -> Option<Vec<PathBuf>> {
         let mut path = self.package.to_path(packages_path)?;
         for component in self.path.clone() {
@@ -109,7 +112,8 @@ impl Module {
             ],
         })
     }
-    fn try_to_path(&self, packages_path: &PackagesPath) -> Option<PathBuf> {
+    #[must_use]
+    pub fn try_to_path(&self, packages_path: &PackagesPath) -> Option<PathBuf> {
         let paths = self.to_possible_paths(packages_path).unwrap_or_else(|| {
             panic!(
                 "Tried to get content of anonymous module {self} that is not cached by the language server.",
@@ -141,7 +145,7 @@ impl Module {
             warn!(
                 "Couldn't write to associated debug file {}: {error}.",
                 path.to_string_lossy(),
-            )
+            );
         });
     }
 }
@@ -152,15 +156,12 @@ impl ToRichIr for Module {
             format!(
                 "{}:{}",
                 self.package,
-                self.path
-                    .iter()
-                    .map(|component| component.to_string())
-                    .join("/"),
+                self.path.iter().map(ToString::to_string).join("/"),
             ),
             TokenType::Module,
-            Default::default(),
+            EnumSet::default(),
         );
-        builder.push_reference(self.to_owned(), range);
+        builder.push_reference(self.clone(), range);
     }
 }
 impl_display_via_richir!(Module);
@@ -173,14 +174,14 @@ pub enum ModuleFromPathError {
 impl Display for ModuleFromPathError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            ModuleFromPathError::NotFound(path) => {
+            Self::NotFound(path) => {
                 write!(
                     f,
                     "File `{}` does not exist or its path is invalid.",
                     path.to_string_lossy(),
                 )
             }
-            ModuleFromPathError::NotInPackage(path) => {
+            Self::NotInPackage(path) => {
                 write!(
                     f,
                     "File `{}` is not located in the package.",

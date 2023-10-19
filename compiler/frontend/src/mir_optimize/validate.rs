@@ -56,8 +56,8 @@ impl Expression {
     pub fn validate(&self, visible: &VisibleExpressions) {
         for id in self.captured_ids() {
             if !visible.contains(id) {
-                error!("Expression references ID {id:?}, but that ID is not visible:");
-                error!("{self}");
+                println!("Expression references ID {id:?}, but that ID is not visible:");
+                println!("{self}");
                 panic!("Expression references ID that is not in its scope.");
             }
         }

@@ -3,7 +3,7 @@ use crate::position::Offset;
 
 pub trait TreeWithIds {
     fn first_id(&self) -> Option<Id>;
-    fn find(&self, id: &Id) -> Option<&Cst>;
+    fn find(&self, id: Id) -> Option<&Cst>;
 
     fn first_offset(&self) -> Option<Offset>;
     fn find_by_offset(&self, offset: Offset) -> Option<&Cst>;
@@ -12,8 +12,8 @@ impl TreeWithIds for Cst {
     fn first_id(&self) -> Option<Id> {
         Some(self.data.id)
     }
-    fn find(&self, id: &Id) -> Option<&Cst> {
-        if id == &self.data.id {
+    fn find(&self, id: Id) -> Option<&Cst> {
+        if id == self.data.id {
             return Some(self);
         };
 
@@ -37,11 +37,20 @@ impl TreeWithIds for Cst {
             | CstKind::Octothorpe
             | CstKind::Whitespace(_)
             | CstKind::Newline(_) => None,
-            CstKind::Comment { octothorpe, .. } => octothorpe.find(id),
+            CstKind::Comment {
+                octothorpe,
+                comment: _,
+            } => octothorpe.find(id),
             CstKind::TrailingWhitespace { child, whitespace } => {
                 child.find(id).or_else(|| whitespace.find(id))
             }
-            CstKind::Identifier(_) | CstKind::Symbol(_) | CstKind::Int { .. } => None,
+            CstKind::Identifier(_)
+            | CstKind::Symbol(_)
+            | CstKind::Int {
+                radix_prefix: _,
+                value: _,
+                string: _,
+            } => None,
             CstKind::OpeningText {
                 opening_single_quotes,
                 opening_double_quote,
@@ -62,7 +71,7 @@ impl TreeWithIds for Cst {
                 .find(id)
                 .or_else(|| parts.find(id))
                 .or_else(|| closing.find(id)),
-            CstKind::TextPart(_) => None,
+            CstKind::TextNewline(_) | CstKind::TextPart(_) => None,
             CstKind::TextInterpolation {
                 opening_curly_braces,
                 expression,
@@ -187,12 +196,26 @@ impl TreeWithIds for Cst {
             | CstKind::Octothorpe
             | CstKind::Whitespace(_)
             | CstKind::Newline(_) => (None, false),
-            CstKind::Comment { octothorpe, .. } => (octothorpe.find_by_offset(offset), true),
-            CstKind::TrailingWhitespace { child, .. } => (child.find_by_offset(offset), false),
-            CstKind::Identifier { .. } | CstKind::Symbol { .. } | CstKind::Int { .. } => {
-                (None, true)
-            }
-            CstKind::Text { parts, .. } => {
+            CstKind::Comment {
+                octothorpe,
+                comment: _,
+            } => (octothorpe.find_by_offset(offset), true),
+            CstKind::TrailingWhitespace {
+                child,
+                whitespace: _,
+            } => (child.find_by_offset(offset), false),
+            CstKind::Identifier(_)
+            | CstKind::Symbol(_)
+            | CstKind::Int {
+                radix_prefix: _,
+                value: _,
+                string: _,
+            } => (None, true),
+            CstKind::Text {
+                opening: _,
+                parts,
+                closing: _,
+            } => {
                 let interpolation_index = parts
                     .binary_search_by_key(&offset, |it| it.first_offset().unwrap())
                     .or_else(|err| if err == 0 { Err(()) } else { Ok(err - 1) })
@@ -207,19 +230,32 @@ impl TreeWithIds for Cst {
                     (None, false)
                 }
             }
-            CstKind::OpeningText { .. } | CstKind::ClosingText { .. } | CstKind::TextPart(_) => {
-                (None, false)
+            CstKind::OpeningText {
+                opening_single_quotes: _,
+                opening_double_quote: _,
             }
-            CstKind::TextInterpolation { expression, .. } => {
-                (expression.find_by_offset(offset), false)
+            | CstKind::ClosingText {
+                closing_double_quote: _,
+                closing_single_quotes: _,
             }
+            | CstKind::TextNewline(_)
+            | CstKind::TextPart(_) => (None, false),
+            CstKind::TextInterpolation {
+                opening_curly_braces: _,
+                expression,
+                closing_curly_braces: _,
+            } => (expression.find_by_offset(offset), false),
             CstKind::BinaryBar { left, bar, right } => (
                 left.find_by_offset(offset)
                     .or_else(|| bar.find_by_offset(offset))
                     .or_else(|| right.find_by_offset(offset)),
                 false,
             ),
-            CstKind::Parenthesized { inner, .. } => (inner.find_by_offset(offset), false),
+            CstKind::Parenthesized {
+                opening_parenthesis: _,
+                inner,
+                closing_parenthesis: _,
+            } => (inner.find_by_offset(offset), false),
             CstKind::Call {
                 receiver,
                 arguments,
@@ -301,7 +337,27 @@ impl TreeWithIds for Cst {
                     .or_else(|| body.find_by_offset(offset)),
                 false,
             ),
-            CstKind::Function { body, .. } => (body.find_by_offset(offset), false),
+            CstKind::Function {
+                opening_curly_brace,
+                parameters_and_arrow,
+                body,
+                closing_curly_brace,
+            } => (
+                opening_curly_brace
+                    .find_by_offset(offset)
+                    .or_else(|| {
+                        parameters_and_arrow
+                            .as_ref()
+                            .and_then(|(parameters, arrow)| {
+                                parameters
+                                    .find_by_offset(offset)
+                                    .or_else(|| arrow.find_by_offset(offset))
+                            })
+                    })
+                    .or_else(|| body.find_by_offset(offset))
+                    .or_else(|| closing_curly_brace.find_by_offset(offset)),
+                false,
+            ),
             CstKind::Assignment {
                 left,
                 assignment_sign,
@@ -328,14 +384,14 @@ impl TreeWithIds for Cst {
 }
 impl<T: TreeWithIds> TreeWithIds for Option<T> {
     fn first_id(&self) -> Option<Id> {
-        self.as_ref().and_then(|it| it.first_id())
+        self.as_ref().and_then(TreeWithIds::first_id)
     }
-    fn find(&self, id: &Id) -> Option<&Cst> {
+    fn find(&self, id: Id) -> Option<&Cst> {
         self.as_ref().and_then(|it| it.find(id))
     }
 
     fn first_offset(&self) -> Option<Offset> {
-        self.as_ref().and_then(|it| it.first_offset())
+        self.as_ref().and_then(TreeWithIds::first_offset)
     }
     fn find_by_offset(&self, offset: Offset) -> Option<&Cst> {
         self.as_ref().and_then(|it| it.find_by_offset(offset))
@@ -345,7 +401,7 @@ impl<T: TreeWithIds> TreeWithIds for Box<T> {
     fn first_id(&self) -> Option<Id> {
         self.as_ref().first_id()
     }
-    fn find(&self, id: &Id) -> Option<&Cst> {
+    fn find(&self, id: Id) -> Option<&Cst> {
         self.as_ref().find(id)
     }
 
@@ -358,26 +414,18 @@ impl<T: TreeWithIds> TreeWithIds for Box<T> {
 }
 impl<T: TreeWithIds> TreeWithIds for [T] {
     fn first_id(&self) -> Option<Id> {
-        self.iter()
-            .map(|it| it.first_id())
-            .filter_map(Some)
-            .next()
-            .flatten()
+        self.iter().find_map(TreeWithIds::first_id)
     }
-    fn find(&self, id: &Id) -> Option<&Cst> {
+    fn find(&self, id: Id) -> Option<&Cst> {
         let child_index = self
-            .binary_search_by_key(id, |it| it.first_id().unwrap())
+            .binary_search_by_key(&id, |it| it.first_id().unwrap())
             .or_else(|err| if err == 0 { Err(()) } else { Ok(err - 1) })
             .ok()?;
         self[child_index].find(id)
     }
 
     fn first_offset(&self) -> Option<Offset> {
-        self.iter()
-            .map(|it| it.first_offset())
-            .filter_map(Some)
-            .next()
-            .flatten()
+        self.iter().find_map(TreeWithIds::first_offset)
     }
     fn find_by_offset(&self, offset: Offset) -> Option<&Cst> {
         let child_index = self

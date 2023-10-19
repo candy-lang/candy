@@ -14,6 +14,7 @@ use strum_macros::EnumIs;
 pub struct PackagesPath(PathBuf);
 
 impl PackagesPath {
+    #[must_use]
     pub fn find_surrounding_package(&self, path: &Path) -> Option<Package> {
         let mut candidate = dunce::canonicalize(path).unwrap_or_else(|error| {
             panic!(
@@ -46,6 +47,7 @@ impl PackagesPath {
 
         // The `candidate` folder contains the `_package.candy` file.
         Some(
+            #[allow(clippy::option_if_let_else)]
             if let Ok(path_relative_to_packages) = candidate.strip_prefix(&**self) {
                 Package::Managed(path_relative_to_packages.to_path_buf())
             } else {
@@ -86,7 +88,7 @@ impl TryFrom<&Path> for PackagesPath {
             ));
         }
 
-        Ok(PackagesPath(path))
+        Ok(Self(path))
     }
 }
 
@@ -110,32 +112,35 @@ pub enum Package {
 }
 
 impl Package {
-    pub fn builtins() -> Package {
-        Package::Managed(PathBuf::from("Builtins"))
+    #[must_use]
+    pub fn builtins() -> Self {
+        Self::Managed(PathBuf::from("Builtins"))
     }
-    pub fn core() -> Package {
-        Package::Managed(PathBuf::from("Core"))
+    #[must_use]
+    pub fn core() -> Self {
+        Self::Managed(PathBuf::from("Core"))
     }
 
+    #[must_use]
     pub fn to_path(&self, packages_path: &PackagesPath) -> Option<PathBuf> {
         match self {
-            Package::User(path) => Some(path.clone()),
-            Package::Managed(path) => Some(packages_path.join(path)),
-            Package::Anonymous { .. } => None,
-            Package::Tooling(_) => None,
+            Self::User(path) => Some(path.clone()),
+            Self::Managed(path) => Some(packages_path.join(path)),
+            Self::Anonymous { .. } => None,
+            Self::Tooling(_) => None,
         }
     }
 }
 impl Display for Package {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Package::User(path) => write!(f, "{path:?}"),
-            Package::Managed(path) => match path.as_os_str().to_str() {
+            Self::User(path) => write!(f, "{path:?}"),
+            Self::Managed(path) => match path.as_os_str().to_str() {
                 Some(string) => write!(f, "{string}"),
                 None => write!(f, "{path:?}"),
             },
-            Package::Anonymous { url } => write!(f, "anonymous:{url}"),
-            Package::Tooling(tooling) => write!(f, "tooling:{tooling}"),
+            Self::Anonymous { url } => write!(f, "anonymous:{url}"),
+            Self::Tooling(tooling) => write!(f, "tooling:{tooling}"),
         }
     }
 }

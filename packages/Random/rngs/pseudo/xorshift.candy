@@ -1,0 +1,216 @@
+# An Xorshift random number generator.
+#
+# The Xorshift[^1] algorithm is not suitable for cryptographic purposes, but is very fast. If you do
+# not know for sure that it fits your requirements, use a more secure one.
+#
+# When seeded with zero (i.e. `fromSeed 0` is called), this implementation actually uses
+# `0xBAD_5EED_0BAD_5EED_0BAD_5EED_0BAD_5EED` for the seed. This arbitrary value is used because the
+# underlying algorithm can't escape from an all-zero state.
+#
+# [^1]: George Marsaglia (July 2003): ["Xorshift RNGs"](https://www.jstatsoft.org/v08/i14/paper),
+#       _Journal of Statistical Software_, Vol. 8, Issue 14
+#
+# Port of Rust's Xorshift implementation:
+# https://github.com/rust-random/rngs/blob/0b59b21942e0ca2843c9b08ec8e0b422c0710876/rand_xorshift/src/lib.rs
+# https://github.com/rust-random/rngs/blob/0b59b21942e0ca2843c9b08ec8e0b422c0710876/rand_xorshift/tests/mod.rs
+
+[bool, check, equals, ifElse, int, iterable, list, recursive, tag] = use "Core"
+[uniform] = use "....distributions"
+rng = use "....rng"
+[lowEndianBytesToU32] = use "..utils"
+
+is generator := generator %
+  Xorshift [x, y, z, w] ->
+    int.is x | bool.lazyAnd { int.is y } | bool.lazyAnd { int.is z } | bool.lazyAnd { int.is w }
+  _ -> False
+
+fromSeed seed :=
+  needs (list.is seed)
+  needs (seed | list.length | equals 16)
+  needs (seed | iterable.fromList | iterable.all { it -> int.isUnsignedByte it })
+
+  getU32 = { index ->
+    seed | list.getRange (index | int.multiply 4) (index | int.add 1 | int.multiply 4)
+    | lowEndianBytesToU32
+  }
+
+  state = ifElse
+    seed | iterable.fromList | iterable.all { it -> it | equals 0 }
+    { [X: 0x0BAD5EED, Y: 0x0BAD5EED, Z: 0x0BAD5EED, W: 0x0BAD5EED] }
+    { [X: getU32 0, Y: getU32 1, Z: getU32 2, W: getU32 3] }
+  Xorshift state
+
+fromRng generator :=
+  needs (rng.is generator)
+  [generator, Values: (x, y, z, w)] =
+    generator | rng.nextList 4 { it -> it | uniform.nextUnsignedIntWithBytes 4 }
+  [generator, NewGenerator: Xorshift [x, y, z, w]]
+
+nextU32 generator :=
+  needs (is generator)
+  Xorshift [x, y, z, w] = generator
+
+  ## These shifts are taken from the example in the Summary section of
+  ## the paper “Xorshift RNGs” (on the bottom of page 5).
+  t = x | int.bitwiseXor (x | int.shiftLeft 11 | int.lowestBits 32)
+  newW = w | int.bitwiseXor (w | int.shiftRight 19)
+    | int.bitwiseXor (t | int.bitwiseXor (t | int.shiftRight 8))
+  generator = Xorshift [X: y, Y: z, Z: w, W: newW]
+  [generator, Value: newW]
+
+nextBytes generator length :=
+  needs (is generator)
+  needs (int.is length)
+  needs (length | int.isPositive)
+
+  littleEndianBytes value byteCount =
+    needs (int.is value)
+    needs (int.is byteCount)
+    needs (int.isPositive byteCount)
+    iterable.generateWithState [value, RemainingByteCount: byteCount] {
+      [value, remainingByteCount] ->
+      ifElse (remainingByteCount | equals 0) { Error Empty } {
+        Ok [
+          State:
+            [
+              Value: value | int.shiftRight 8,
+              RemainingByteCount: remainingByteCount | int.subtract 1,
+            ],
+          Item: value | int.lowestBits 8,
+        ]
+      }
+    }
+    | iterable.toList
+
+  recursive [generator, Bytes: (,)] { recurse [generator, bytes] ->
+    remainingBytes = length | int.subtract (bytes | list.length)
+    ifElse (remainingBytes | equals 0) { [generator, bytes] } {
+      [generator, value] = generator | nextU32
+      bytes =
+        bytes | list.concatenate (value | littleEndianBytes (remainingBytes | int.coerceAtMost 4))
+      recurse [generator, bytes]
+    }
+  }
+
+asRng generator :=
+  needs (is generator)
+  Rng [State: generator, nextBytes]
+
+test =
+  nextU64 generator =
+    # Users of this RNG should use the `Rng` interface and distributions to get random numbers. This
+    # function only exists because tests in the original Rust implementation use it and our uniform
+    # distribution uses a different byte order.
+
+    needs (is generator)
+    # Implement `nextU64` via `nextU32`, little-endian order.
+    #
+    # Source: https://github.com/rust-random/rand/blob/f3dd0b885c4597b9617ca79987a0dd899ab29fcb/rand_core/src/impls.rs#L23-L29
+    [generator, Value: x] = generator | nextU32
+    [generator, Value: y] = generator | nextU32
+    [generator, Value: y | int.shiftLeft 32 | int.bitwiseOr x]
+
+  testConstruction =
+    seed = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
+    generator1 = fromSeed seed
+
+    [Generator: generator1, value] = generator1 | nextU64
+    check (value | equals 4325440999699518727)
+
+    [Generator: generator1, NewGenerator: generator2] = fromRng (generator1 | asRng)
+    generator1 = generator1 | rng.getState
+
+    ## In the original Rust code, these two generators were clones. However, due to the different
+    ## byte order produced by our uniform distribution, this is not the case here.
+    [Generator: generator1, value] = generator1 | nextU64
+    check (value | equals 15614385950550801700)
+    [Generator: generator2, value] = generator2 | nextU64
+    # In Rust, the value was 15614385950550801700.
+    check (value | equals 13321984983912137592)
+
+  testTrueValues =
+    seed = (16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
+    generator = fromSeed seed
+
+    nextList = { generator length nextItem ->
+      [generator, values] = generator | asRng | rng.nextList length { generator ->
+        [generator, value] = generator | rng.getState | nextItem
+        [Generator: generator | asRng, value]
+      }
+      [Generator: generator | rng.getState, values]
+    }
+
+    [generator, values] = generator | nextList 9 nextU32
+    expectedValues = (
+      2081028795,
+      620940381,
+      269070770,
+      16943764,
+      854422573,
+      29242889,
+      1550291885,
+      1227154591,
+      271695242,
+    )
+    check (values | equals expectedValues)
+
+    [generator, values] = generator | nextList 9 nextU64
+    expectedValues = (
+      9247529084182843387,
+      8321512596129439293,
+      14104136531997710878,
+      6848554330849612046,
+      343577296533772213,
+      17828467390962600268,
+      9847333257685787782,
+      7717352744383350108,
+      1133407547287910111,
+    )
+    check (values | equals expectedValues)
+
+    [generator, Bytes: values] = generator | nextBytes 32
+    expectedValues = (
+      102,
+      57,
+      212,
+      16,
+      233,
+      130,
+      49,
+      183,
+      158,
+      187,
+      44,
+      203,
+      63,
+      149,
+      45,
+      17,
+      117,
+      129,
+      131,
+      160,
+      70,
+      121,
+      158,
+      155,
+      224,
+      209,
+      192,
+      53,
+      10,
+      62,
+      57,
+      72,
+    )
+    check (values | equals expectedValues)
+
+  testZeroSeed =
+    ## Xorshift does not work with an all zero seed.
+    ## Assert it does not panic.
+    seed = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+    generator = fromSeed seed
+    [generator, Value: a] = generator | nextU32
+    check (a | equals 0 | bool.not)
+    [generator, Value: b] = generator | nextU32
+    check (a | equals b | bool.not)

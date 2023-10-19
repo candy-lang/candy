@@ -7,7 +7,7 @@
       "request": "launch",
       "preLaunchTask": "Compiler: Build (debug)",
       "program": "${workspaceRoot}/target/debug/candy",
-      "args": ["run", "packages/examples/fibonacci.candy"],
+      "args": ["run", "packages/Examples/fibonacci.candy"],
       "cwd": "${workspaceRoot}"
     }
   ]

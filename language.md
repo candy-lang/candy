@@ -26,7 +26,7 @@ Note that not all of the features described here are implemented or even finaliz
   - [Lists](#lists)
   - [Structs](#structs)
   - [Functions](#functions)
-  - [Ports](#ports)
+  - [Handles](#handles)
   - [More?](#more)
 - [Variables](#variables)
 - [Functions](#functions-1)
@@ -37,8 +37,6 @@ Note that not all of the features described here are implemented or even finaliz
 - [Destructuring](#destructuring)
 - [Pattern Matching](#pattern-matching)
 - [Meta wrappers](#meta-wrappers)
-- [Concurrency](#concurrency)
-  - [Channels](#channels)
 - [Packages](#packages)
 - [Environment and Capabilities](#environment-and-capabilities)
 - [Interoperability With Other Languages](#interoperability-with-other-languages)
@@ -195,11 +193,10 @@ longFunction = { foo ->
 }
 ```
 
-### Ports
+### Handles
 
-Ports allow you to interact with a [channel](#concurrency).
-There are receive ports and send ports to receive and send data from a channel, respectively.
-See the [Concurrency](#concurrency) section for more information.
+Handles allow you to communicate with the outside world.
+See the [Environment and Capabilities](#environment-and-capabilities) section for more information.
 
 ### More?
 
@@ -545,69 +542,7 @@ metaWrapper (String value) [
 ]
 ```
 
-TODO: Give the `ToText` a receive port to support progressive visualizations?
-
-## Concurrency
-
-Candy supports a lightweight version of threads called _fibers_.
-To enforce structured concurrency, they can only be spawned using a special concurrency object called the _nursery_.
-In the following code, the surrounding call to `core.parallel` only exits when all fibers inside have completed.
-
-Note: The actual `print` works differently, using [capabilities](#environment-and-capabilities).
-
-```candy
-core.parallel { nursery ->
-  core.async nursery { print "Banana" }
-  core.async nursery { print "Kiwi" }
-  # Banana and Kiwi may print in any order
-}
-print "Peach"  # Always prints after the others
-```
-
-This way, if you call a function, you can be sure that it doesn't continue running code in the background even after it returns.
-The only exception is if you pass it a nursery, which it can use to spawn other fibers.
-
-### Channels
-
-Channels can be used to communicate between fibers.
-You can think of a channel like a conveyer belt or a pipe:
-It has a _send end_, which you can use to put messages into it, and it has a _receive end_, which you can use to read messages from it.
-A channel also has a capacity, which indicates how many messages it can hold simultaneously.
-
-```candy
-channel = core.channel.create 5  # creates a new channel with capacity 5
-sendPort = channel.sendPort
-receivePort = channel.receivePort
-
-core.channel.send sendPort Foo
-core.channel.send sendPort Bar
-core.channel.receive receivePort  # Foo
-core.channel.receive receivePort  # Bar
-```
-
-There is no guaranteed ordering between messages sent by multiple fibers, but messages coming from the same fiber are guaranteed to arrive in the same order they were sent.
-
-All channel operations are blocking.
-Thus, channels also function as a synchronization primitive and can generate _backpressure_.
-
-```candy
-core.parallel { nursery ->
-  channel = core.channel.create 3
-  core.async nursery {
-    loop {
-      core.channel.send channel.sendPort "Hi!"
-    }
-  }
-  core.async nursery {
-    loop {
-      print (core.channel.receive channel.receivePort)
-    }
-  }
-}
-```
-
-In this example, if the printing takes longer than the generating of new texts to print, the generator will wait for the printing to happen.
-At most 3 texts will exist before being printed.
+TODO: Give the `ToText` a handle to support progressive visualizations?
 
 ## Packages
 
@@ -616,14 +551,14 @@ TODO: Write something
 ## Environment and Capabilities
 
 At some point, your Candy program needs to have side effects – otherwise, it's just heating up your CPU.
-To model that, the `main` function receives an `environment`, which is a struct containing platform-specific values, including channels.
+To model that, the `main` function receives an `environment`, which is a struct containing platform-specific values, including handles.
 
 For example, on desktop platforms, the environment looks something like this:
 
 ```candy
 [
-  Stdin: <channel receive port>,
-  Stdout: <channel send port>,
+  Stdin: <handle>,
+  Stdout: <handle>,
   WorkingDirectory: ...,
   Variables: [
     ...
@@ -632,13 +567,15 @@ For example, on desktop platforms, the environment looks something like this:
 ]
 ```
 
-Channels also function as _capabilities_ here:
-If you don't pass the stdout channel to a function, there's no way for it to print anything.
+You can call handles to yield control back to the platform.
+
+Handles also function as _capabilities_ here:
+If you don't pass the stdout handle to a function, there's no way for it to print anything.
 This is especially useful for more "powerful" capabilities like accessing the file system or network:
 When using a package, without reading its source code, you can be confident that it won't delete your files under some special circumstances.
 
-If a function expects a stdout channel, there's no way it can tell if you gave it another channel that you just created.
-You could for example process the output of the function, filter some information out, and forward the rest to the real stdout channel.
+If a function expects a stdout handle, there's no way it can tell if you gave it another function that you just created.
+You could for example process the output of the function, filter some information out, and forward the rest to the real stdout handle.
 
 ## Interoperability With Other Languages
 
