@@ -786,6 +786,7 @@ impl<'ctx> CodeGen<'ctx> {
         self.builtins.force_insert(builtin, function);
         function
     }
+
     fn add_function(
         &self,
         name: &str,
@@ -795,6 +796,7 @@ impl<'ctx> CodeGen<'ctx> {
         let function_type = return_type.function_type(parameter_types, false);
         self.module.add_function(name, function_type, None)
     }
+
     fn create_global(
         &mut self,
         name: &str,
