@@ -4,7 +4,7 @@
     const_trait_impl,
     let_chains
 )]
-#![warn(clippy::nursery, clippy::pedantic)]
+#![warn(clippy::nursery, clippy::pedantic, unused_crate_dependencies)]
 #![allow(
     clippy::cognitive_complexity,
     clippy::match_same_arms,

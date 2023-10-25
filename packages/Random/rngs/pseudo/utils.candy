@@ -1,0 +1,13 @@
+[bool, check, equals, int, iterable, list] = use "Core"
+
+lowEndianBytesToU32 bytes :=
+  needs (list.is bytes)
+  needs (bytes | list.length | equals 4)
+  needs (bytes | iterable.fromList | iterable.all { it -> int.isUnsignedByte it })
+
+  bytes | iterable.fromListReversed
+  | iterable.foldLeft 0 { acc byte -> acc | int.shiftLeft 8 | int.bitwiseOr byte }
+
+test =
+  bytes = (1, 2, 3, 4)
+  check (bytes | lowEndianBytesToU32 | equals 0x04030201)

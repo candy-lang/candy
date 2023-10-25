@@ -1,0 +1,128 @@
+[bool, equals, function, ifElse, int, iterable, list, recursive] = use "Core"
+rng = use "...rng"
+
+## Bool
+
+nextBool generator :=
+  needs (rng.is generator)
+  [generator, Bytes: (byte,)] = generator | rng.nextBytes 1
+  [generator, Value: byte | int.isOdd]
+
+## Int
+
+nextUnsignedByte generator :=
+  needs (rng.is generator)
+  [generator, Bytes: (byte,)] = generator | rng.nextBytes 1
+  [generator, Value: byte]
+
+nextUnsignedIntWithBytes generator numberOfBytes :=
+  needs (rng.is generator)
+  needs (int.is numberOfBytes)
+  needs (int.isPositive numberOfBytes)
+  [generator, bytes] = generator | rng.nextBytes numberOfBytes
+  value = bytes | iterable.fromList
+    | iterable.foldLeft 0 { sum byte -> sum | int.shiftLeft 8 | int.bitwiseOr byte }
+  [generator, value]
+
+nextUnsignedInt generator maxExclusive :=
+  needs (rng.is generator)
+  needs (int.is maxExclusive)
+  needs (int.isPositive maxExclusive)
+
+  ifElse (maxExclusive | equals 1) { [generator, Value: 0] } {
+    # This algorithm is ported from M.E. O'Neill in [0], which is an optimized version of Daniel
+    # Lemire's algorithm in [1]. The original source code from the blog post [1] in C++ is shown below
+    # as comments. Our version is modified to work with arbitrary bit lengths instead of only 32.
+    #
+    # [0]: Efficiently Generating a Number in a Range,
+    #      https://www.pcg-random.org/posts/bounded-rands.html#conclusions_5,
+    #      https://github.com/imneme/bounded-rands/blob/3d71f53c975b1e5b29f2f3b05a74e26dab9c3d84/bounded64.cpp#L322-L335
+    # [1]: Fast Random Integer Generation in an Interval,
+    #      https://arxiv.org/abs/1805.10941v4,
+    #      https://arxiv.org/pdf/1805.10941v4.pdf#page=6
+    bytes = maxExclusive | int.subtract 1 | int.bitLength | int.add 7 | int.divideTruncating 8
+    bits = bytes | int.multiply 8
+
+    getML = { generator ->
+      # uint32_t x = rng();
+      [generator, Value: x] = generator | nextUnsignedIntWithBytes bytes
+
+      # uint64_t m = uint64_t(x) * uint64_t(range);
+      m = x | int.multiply maxExclusive
+
+      # uint32_t l = uint32_t(m);
+      l = m | int.lowestBits bits
+
+      [generator, m, l]
+    }
+
+    [generator, m, l] = generator | getML
+
+    # if (l < range)
+    [generator, m] = ifElse (l | int.isGreaterThanOrEqualTo maxExclusive) { [generator, m] } {
+      # uint32_t t = -range;
+      threshold = 1 | int.shiftLeft bits | int.subtract maxExclusive
+
+      # if (t >= range)
+      threshold = ifElse (threshold | int.isLessThan maxExclusive) { threshold } {
+        # t -= range;
+        threshold = threshold | int.subtract maxExclusive
+
+        # if (t >= range)
+        ifElse (threshold | int.isLessThan maxExclusive) { threshold } {
+          # t %= range;
+          threshold | int.modulo maxExclusive
+        }
+      }
+
+      # while (l < t)
+      recursive [generator, m, l] { recurse [generator, m, l] ->
+        ifElse (l | int.isGreaterThanOrEqualTo threshold) { m } { recurse (generator | getML) }
+      }
+    }
+
+    # return m >> 32;
+    [generator, Value: m | int.shiftRight bits]
+  }
+
+nextIntInRange generator minInclusive maxExclusive :=
+  needs (rng.is generator)
+  needs (int.is minInclusive)
+  needs (int.is maxExclusive)
+  needs (minInclusive | int.isLessThan maxExclusive)
+  [generator, value] = generator | nextUnsignedInt (maxExclusive | int.subtract minInclusive)
+  [generator, Value: value | int.add minInclusive]
+
+## Selections
+
+nextFromList generator items :=
+  # Select a random `item` from `items`.
+  needs (rng.is generator)
+  needs (list.is items)
+  needs (items | list.isEmpty | bool.not)
+  [generator, Value: index] = generator | nextUnsignedInt (items | list.length)
+  [generator, Value: items | list.get index]
+
+nextFromDistributions generator nextItemDistributions :=
+  # Select a random distribution from `nextItemDistributions` and evaluate that against the RNG.
+  needs (rng.is generator)
+  needs (list.is nextItemDistributions)
+  needs (nextItemDistributions | list.isEmpty | bool.not)
+  needs (nextItemDistributions | iterable.fromList | iterable.all { it -> function.is1 it })
+  [generator, Value: distribution] = generator | nextFromList nextItemDistributions
+  generator | distribution
+
+nextResult generator nextOk nextError :=
+  needs (rng.is generator)
+  needs (function.is1 nextOk)
+  needs (function.is1 nextError)
+  generator | nextFromDistributions (
+    { generator ->
+      [generator, value] = generator | nextOk
+      [generator, Value: Ok value]
+    },
+    { generator ->
+      [generator, value] = generator | nextError
+      [generator, Value: Error value]
+    },
+  )

@@ -1,4 +1,5 @@
 #![feature(let_chains)]
+#![warn(unused_crate_dependencies)]
 
 use candy_frontend::module::Module as CandyModule;
 use candy_frontend::{
@@ -15,14 +16,17 @@ use inkwell::{
     values::{BasicValue, BasicValueEnum, FunctionValue, GlobalValue},
     AddressSpace,
 };
+// We depend on this package (used by inkwell) to specify a version and configure features.
+use llvm_sys as _;
 
 use candy_frontend::rich_ir::{RichIr, ToRichIr};
 use candy_frontend::string_to_rcst::ModuleError;
 pub use inkwell;
+use inkwell::targets::{InitializationConfig, Target, TargetMachine};
 use itertools::Itertools;
 use std::{
     collections::{HashMap, HashSet},
-    path::PathBuf,
+    path::Path,
     sync::Arc,
 };
 
@@ -37,8 +41,9 @@ fn llvm_ir(db: &dyn LlvmIrDb, module: CandyModule) -> Result<RichIr, ModuleError
     let (mir, _, _) = db.optimized_mir(module.clone(), TracingConfig::off())?;
 
     let context = Context::create();
-    let mut codegen = CodeGen::new(&context, "module", mir);
-    let llvm_ir = codegen.compile("", false, true).unwrap();
+    let codegen = CodeGen::new(&context, "module", mir);
+    let module = codegen.compile(false, true).unwrap();
+    let llvm_ir = module.module.print_to_string();
 
     Ok(llvm_ir.to_str().unwrap().to_rich_ir(true))
 }
@@ -61,6 +66,84 @@ pub struct CodeGen<'ctx> {
     unrepresented_ids: HashSet<Id>,
 }
 
+pub struct LlvmCandyModule<'ctx> {
+    module: Module<'ctx>,
+}
+
+impl<'ctx> LlvmCandyModule<'ctx> {
+    pub fn compile_obj_and_link(
+        &self,
+        path: &str,
+        build_rt: bool,
+        debug: bool,
+        linker: &str,
+    ) -> Result<(), std::io::Error> {
+        if build_rt {
+            std::process::Command::new("make")
+                .args(["-C", "compiler/backend_inkwell/candy_runtime/", "clean"])
+                .spawn()?
+                .wait()?;
+
+            std::process::Command::new("make")
+                .args([
+                    "-C",
+                    "compiler/backend_inkwell/candy_runtime/",
+                    "candy_runtime.a",
+                ])
+                .spawn()?
+                .wait()?;
+        }
+        let triple = TargetMachine::get_default_triple();
+        Target::initialize_native(&InitializationConfig::default()).unwrap();
+        let target = Target::from_triple(&triple).unwrap();
+
+        let target_machine = target
+            .create_target_machine(
+                &triple,
+                "generic",
+                "",
+                inkwell::OptimizationLevel::Default,
+                inkwell::targets::RelocMode::Default,
+                inkwell::targets::CodeModel::Default,
+            )
+            .unwrap();
+
+        self.module
+            .set_data_layout(&target_machine.get_target_data().get_data_layout());
+        self.module.set_triple(&triple);
+
+        let o_path = format!("{path}.o");
+
+        target_machine
+            .write_to_file(
+                &self.module,
+                inkwell::targets::FileType::Object,
+                Path::new(&o_path),
+            )
+            .unwrap();
+
+        std::process::Command::new(linker)
+            .args([
+                "-dynamic-linker",
+                // TODO: This is not portable.
+                "/lib/ld-linux-x86-64.so.2",
+                "/usr/lib/crt1.o",
+                "/usr/lib/crti.o",
+                "-L/usr/lib",
+                "-lc",
+                &o_path,
+                "compiler/backend_inkwell/candy_runtime/candy_runtime.a",
+                "/usr/lib/crtn.o",
+                if debug { "-g" } else { "" },
+                "-o",
+                o_path.as_str().strip_suffix(".candy.o").unwrap(),
+            ])
+            .spawn()?
+            .wait()?;
+        Ok(())
+    }
+}
+
 impl<'ctx> CodeGen<'ctx> {
     pub fn new(context: &'ctx Context, module_name: &str, mir: Arc<Mir>) -> Self {
         let module = context.create_module(module_name);
@@ -78,11 +161,10 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
     pub fn compile(
-        &mut self,
-        path: &str,
+        mut self,
         print_llvm_ir: bool,
         print_main_output: bool,
-    ) -> Result<LLVMString, LLVMString> {
+    ) -> Result<LlvmCandyModule<'ctx>, LLVMString> {
         let void_type = self.context.void_type();
         let i8_type = self.context.i8_type();
         let i32_type = self.context.i32_type();
@@ -247,54 +329,9 @@ impl<'ctx> CodeGen<'ctx> {
             self.module.print_to_stderr();
         }
         self.module.verify()?;
-        if !path.is_empty() {
-            let bc_path = PathBuf::from(format!("{path}.bc"));
-            self.module.write_bitcode_to_path(&bc_path);
-        }
-        Ok(self.module.print_to_string())
-    }
-
-    pub fn compile_asm_and_link(
-        &self,
-        path: &str,
-        build_rt: bool,
-        debug: bool,
-    ) -> Result<(), std::io::Error> {
-        let bc_path = PathBuf::from(&format!("{path}.bc"));
-        std::process::Command::new("llc")
-            .arg(&bc_path)
-            .args(["-O3"])
-            .spawn()?
-            .wait()?;
-        if build_rt {
-            std::process::Command::new("make")
-                .args(["-C", "compiler/backend_inkwell/candy_runtime/", "clean"])
-                .spawn()?
-                .wait()?;
-
-            std::process::Command::new("make")
-                .args([
-                    "-C",
-                    "compiler/backend_inkwell/candy_runtime/",
-                    "candy_runtime.a",
-                ])
-                .spawn()?
-                .wait()?;
-        }
-        let s_path = PathBuf::from(format!("{path}.s"));
-        std::process::Command::new("clang")
-            .args([
-                s_path.to_str().unwrap(),
-                "compiler/backend_inkwell/candy_runtime/candy_runtime.a",
-                if debug { "-g" } else { "" },
-                "-O3",
-                "-flto",
-                "-o",
-                &s_path.to_str().unwrap().replace(".candy.s", ""),
-            ])
-            .spawn()?
-            .wait()?;
-        Ok(())
+        Ok(LlvmCandyModule {
+            module: self.module,
+        })
     }
 
     fn compile_mir(

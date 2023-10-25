@@ -48,6 +48,8 @@ impl<B: Borrow<ByteCode>, T: Tracer> Vm<B, T> {
 }
 
 pub struct DefaultEnvironment {
+    // Sorted alphabetically
+    get_random_bytes_handle: Handle,
     stdin_handle: Handle,
     stdout_handle: Handle,
     system_clock_handle: Handle,
@@ -59,6 +61,7 @@ impl DefaultEnvironment {
             .map(|it| Text::create(heap, true, it).into())
             .collect_vec();
         let arguments = List::create(heap, true, arguments.as_slice());
+        let get_random_bytes_handle = Handle::new(heap, 1);
         let stdin_handle = Handle::new(heap, 0);
         let stdout_handle = Handle::new(heap, 1);
         let system_clock_handle = Handle::new(heap, 0);
@@ -67,12 +70,17 @@ impl DefaultEnvironment {
             true,
             [
                 (heap.default_symbols().arguments, arguments.into()),
-                (heap.default_symbols().stdout, **stdout_handle),
+                (
+                    heap.default_symbols().get_random_bytes,
+                    **get_random_bytes_handle,
+                ),
                 (heap.default_symbols().stdin, **stdin_handle),
+                (heap.default_symbols().stdout, **stdout_handle),
                 (heap.default_symbols().system_clock, **system_clock_handle),
             ],
         );
         let environment = Self {
+            get_random_bytes_handle,
             stdin_handle,
             stdout_handle,
             system_clock_handle,
@@ -86,7 +94,70 @@ impl Environment for DefaultEnvironment {
         heap: &mut Heap,
         call: VmHandleCall<B, T>,
     ) -> Vm<B, T> {
-        if call.handle == self.system_clock_handle {
+        if call.handle == self.get_random_bytes_handle {
+            let [length] = call.arguments.as_slice() else {
+                unreachable!()
+            };
+
+            let Data::Int(length) = (*length).into() else {
+                // TODO: Panic
+                let message = Text::create(
+                    heap,
+                    true,
+                    "Handle `getRandomBytes` was called with a non-integer.",
+                );
+                let result = Tag::create_result(heap, true, Err(message.into()));
+                return call.complete(heap, result);
+            };
+            let Some(length) = length.try_get::<usize>() else {
+                // TODO: Panic
+                let message = Text::create(
+                    heap,
+                    true,
+                    "Handle `getRandomBytes` was called with a length that doesn't fit in usize.",
+                );
+                let result = Tag::create_result(heap, true, Err(message.into()));
+                return call.complete(heap, result);
+            };
+
+            let mut bytes = vec![0u8; length];
+            if let Err(error) = getrandom::getrandom(&mut bytes) {
+                let message = Text::create(heap, true, &error.to_string());
+                let result = Tag::create_result(heap, true, Err(message.into()));
+                return call.complete(heap, result);
+            }
+
+            let bytes = bytes
+                .into_iter()
+                .map(|it| Int::create(heap, true, it).into())
+                .collect_vec();
+            let bytes = List::create(heap, true, bytes.as_slice());
+            let result = Tag::create_result(heap, true, Ok(bytes.into()));
+            call.complete(heap, result)
+        } else if call.handle == self.stdin_handle {
+            let [] = call.arguments.as_slice() else {
+                unreachable!()
+            };
+            let input = {
+                let stdin = io::stdin();
+                stdin.lock().lines().next().unwrap().unwrap()
+            };
+            let text = Text::create(heap, true, &input);
+            call.complete(heap, text)
+        } else if call.handle == self.stdout_handle {
+            let [message] = call.arguments.as_slice() else {
+                unreachable!()
+            };
+
+            if let Data::Text(text) = (*message).into() {
+                println!("{}", text.get());
+            } else {
+                info!("Non-text value sent to stdout: {message:?}");
+            }
+
+            let nothing = Tag::create_nothing(heap);
+            call.complete(heap, nothing)
+        } else if call.handle == self.system_clock_handle {
             let [] = call.arguments.as_slice() else {
                 unreachable!()
             };
@@ -95,23 +166,6 @@ impl Environment for DefaultEnvironment {
             let since_unix_epoch = now.duration_since(SystemTime::UNIX_EPOCH).unwrap();
             let nanoseconds = Int::create(heap, true, since_unix_epoch.as_nanos());
             call.complete(heap, nanoseconds)
-        } else if call.handle == self.stdin_handle {
-            let input = {
-                let stdin = io::stdin();
-                stdin.lock().lines().next().unwrap().unwrap()
-            };
-            let text = Text::create(heap, true, &input);
-            call.complete(heap, text)
-        } else if call.handle == self.stdout_handle {
-            let message = call.arguments[0];
-
-            if let Data::Text(text) = message.into() {
-                println!("{}", text.get());
-            } else {
-                info!("Non-text value sent to stdout: {message:?}");
-            }
-            let nothing = Tag::create_nothing(heap);
-            call.complete(heap, nothing)
         } else {
             unreachable!()
         }

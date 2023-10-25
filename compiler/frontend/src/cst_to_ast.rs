@@ -27,7 +27,7 @@ pub trait CstToAst: CstDb + RcstToCst {
     fn ast_id_to_display_span(&self, id: &ast::Id) -> Option<Range<Offset>>;
 
     #[salsa::transparent]
-    fn cst_to_ast_id(&self, module: Module, id: cst::Id) -> Vec<ast::Id>;
+    fn cst_to_ast_ids(&self, module: Module, id: cst::Id) -> Vec<ast::Id>;
 
     fn ast(&self, module: Module) -> AstResult;
 }
@@ -47,12 +47,13 @@ fn ast_id_to_display_span(db: &dyn CstToAst, id: &ast::Id) -> Option<Range<Offse
     Some(db.find_cst(id.module.clone(), cst_id).display_span())
 }
 
-fn cst_to_ast_id(db: &dyn CstToAst, module: Module, id: cst::Id) -> Vec<ast::Id> {
+fn cst_to_ast_ids(db: &dyn CstToAst, module: Module, id: cst::Id) -> Vec<ast::Id> {
     if let Ok((_, ast_to_cst_id_mapping)) = db.ast(module) {
         ast_to_cst_id_mapping
             .iter()
             .filter_map(|(key, value)| if value == &id { Some(key) } else { None })
             .cloned()
+            .sorted()
             .collect_vec()
     } else {
         vec![]
@@ -668,6 +669,7 @@ impl LoweringContext {
                     receiver: name,
                     arguments: parameters,
                 } = &left.kind
+                    && !matches!(name.kind, CstKind::Symbol(_))
                 {
                     let name = match &name.kind {
                         CstKind::Identifier(identifier) => {

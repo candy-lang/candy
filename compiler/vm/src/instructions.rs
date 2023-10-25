@@ -219,12 +219,16 @@ impl MachineState {
                 self.run_builtin_function(heap, builtin.get(), arguments, responsible)
             }
             Data::Handle(handle) => {
-                if arguments.len() != handle.argument_count() {
+                let parameter_count = handle.argument_count();
+                let argument_count = arguments.len();
+                if argument_count != parameter_count {
                     return InstructionResult::Panic(Panic {
                         reason: format!(
-                            "A function expected {} parameters, but you called it with {} arguments.",
-                            handle.argument_count(),
-                            arguments.len(),
+                            "A function expected {} {}, but you called it with {} {}.",
+                            parameter_count,
+                            if parameter_count == 1 { "parameter" } else { "parameters" },
+                            argument_count,
+                            if argument_count == 1 { "argument" } else { "arguments" },
                         ),
                         responsible: responsible.get().clone(),
                     });

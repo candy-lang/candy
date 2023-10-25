@@ -1,6 +1,18 @@
 #![feature(lazy_cell)]
+#![warn(clippy::nursery, clippy::pedantic, unused_crate_dependencies)]
+#![allow(
+    clippy::cognitive_complexity,
+    clippy::match_same_arms,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::module_name_repetitions,
+    clippy::similar_names,
+    clippy::too_many_lines
+)]
 
+use candy_vm::CAN_USE_STDOUT;
 use clap::Parser;
+use std::sync::atomic::Ordering;
 use tracing::{debug, Level, Metadata};
 use tracing_subscriber::{
     filter,
@@ -43,6 +55,7 @@ async fn main() -> ProgramResult {
 
     let should_log_to_stdout = !matches!(options, CandyOptions::Lsp);
     init_logger(should_log_to_stdout);
+    CAN_USE_STDOUT.store(should_log_to_stdout, Ordering::Relaxed);
 
     match options {
         CandyOptions::Run(options) => run::run(options),
@@ -51,13 +64,13 @@ async fn main() -> ProgramResult {
         CandyOptions::Debug(options) => debug::debug(options),
         CandyOptions::Lsp => lsp::lsp().await,
         #[cfg(feature = "inkwell")]
-        CandyOptions::Inkwell(options) => inkwell::compile(options),
+        CandyOptions::Inkwell(options) => inkwell::compile(&options),
     }
 }
 
-type ProgramResult = Result<(), Exit>;
+pub type ProgramResult = Result<(), Exit>;
 #[derive(Debug)]
-enum Exit {
+pub enum Exit {
     CodePanicked,
     DirectoryNotFound,
     #[cfg(feature = "inkwell")]

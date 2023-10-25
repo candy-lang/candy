@@ -11,6 +11,11 @@
     strict_provenance,
     try_blocks
 )]
+// We can't enable `unused_crate_dependencies` since it reports false positives about
+// dev-dependencies used in our benchmarks.
+// https://github.com/rust-lang/rust/issues/57274
+// https://github.com/rust-lang/rust/issues/95513
+// https://github.com/rust-lang/rust-clippy/issues/4341
 #![warn(clippy::nursery, clippy::pedantic)]
 #![allow(
     clippy::large_enum_variant,
@@ -23,6 +28,7 @@
 )]
 
 use crate::heap::{Struct, Tag};
+pub use builtin_functions::CAN_USE_STDOUT;
 use heap::{Function, Heap, InlineObject};
 pub use instruction_pointer::InstructionPointer;
 use tracing::debug;

@@ -1,5 +1,5 @@
 #![feature(let_chains, round_char_boundary)]
-#![warn(clippy::nursery, clippy::pedantic)]
+#![warn(clippy::nursery, clippy::pedantic, unused_crate_dependencies)]
 #![allow(clippy::missing_panics_doc, clippy::module_name_repetitions)]
 
 mod coverage;
