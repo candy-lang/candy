@@ -27,7 +27,7 @@ use inkwell::{
 use itertools::Itertools;
 // We depend on this package (used by inkwell) to specify a version and configure features.
 use llvm_sys as _;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::{path::Path, sync::Arc};
 
 #[salsa::query_group(LlvmIrStorage)]
