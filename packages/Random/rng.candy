@@ -1,4 +1,4 @@
-[equals, function, ifElse, int, iterable, list, recursive] = use "Core"
+[equals, function, ifElse, int, iterator, list, recursive] = use "Core"
 
 is generator :=
   # A generator is an `Rng [state, NextBytes: (state, length: int) -> [state, bytes: list[int]]]`
@@ -20,7 +20,7 @@ nextBytes generator length :=
   [Generator: state, bytes] = state | nextBytes length
   needs (list.is bytes)
   needs (bytes | list.length | equals length)
-  needs (bytes | iterable.fromList | iterable.all { it -> int.isUnsignedByte it })
+  needs (bytes | iterator.fromList | iterator.all { it -> int.isUnsignedByte it })
   [Generator: Rng [state, nextBytes], bytes]
 
 nextList generator length nextItem :=

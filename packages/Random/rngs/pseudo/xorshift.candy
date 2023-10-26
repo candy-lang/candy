@@ -14,7 +14,7 @@
 # https://github.com/rust-random/rngs/blob/0b59b21942e0ca2843c9b08ec8e0b422c0710876/rand_xorshift/src/lib.rs
 # https://github.com/rust-random/rngs/blob/0b59b21942e0ca2843c9b08ec8e0b422c0710876/rand_xorshift/tests/mod.rs
 
-[bool, check, equals, ifElse, int, iterable, list, recursive, tag] = use "Core"
+[bool, check, equals, ifElse, int, iterator, list, recursive, tag] = use "Core"
 [uniform] = use "....distributions"
 rng = use "....rng"
 [lowEndianBytesToU32] = use "..utils"
@@ -27,7 +27,7 @@ is generator := generator %
 fromSeed seed :=
   needs (list.is seed)
   needs (seed | list.length | equals 16)
-  needs (seed | iterable.fromList | iterable.all { it -> int.isUnsignedByte it })
+  needs (seed | iterator.fromList | iterator.all { it -> int.isUnsignedByte it })
 
   getU32 = { index ->
     seed | list.getRange (index | int.multiply 4) (index | int.add 1 | int.multiply 4)
@@ -35,9 +35,9 @@ fromSeed seed :=
   }
 
   state = ifElse
-    seed | iterable.fromList | iterable.all { it -> it | equals 0 }
-    { [X: 0x0BAD5EED, Y: 0x0BAD5EED, Z: 0x0BAD5EED, W: 0x0BAD5EED] }
-    { [X: getU32 0, Y: getU32 1, Z: getU32 2, W: getU32 3] }
+      seed | iterator.fromList | iterator.all { it -> it | equals 0 }
+      { [X: 0x0BAD5EED, Y: 0x0BAD5EED, Z: 0x0BAD5EED, W: 0x0BAD5EED] }
+      { [X: getU32 0, Y: getU32 1, Z: getU32 2, W: getU32 3] }
   Xorshift state
 
 fromRng generator :=
@@ -67,7 +67,7 @@ nextBytes generator length :=
     needs (int.is value)
     needs (int.is byteCount)
     needs (int.isPositive byteCount)
-    iterable.generateWithState [value, RemainingByteCount: byteCount] {
+    iterator.generateWithState [value, RemainingByteCount: byteCount] {
       [value, remainingByteCount] ->
       ifElse (remainingByteCount | equals 0) { Error Empty } {
         Ok [
@@ -80,7 +80,7 @@ nextBytes generator length :=
         ]
       }
     }
-    | iterable.toList
+    | iterator.toList
 
   recursive [generator, Bytes: (,)] { recurse [generator, bytes] ->
     remainingBytes = length | int.subtract (bytes | list.length)

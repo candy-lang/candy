@@ -1,4 +1,4 @@
-[bool, equals, function, ifElse, int, iterable, list, recursive] = use "Core"
+[bool, equals, function, ifElse, int, iterator, list, recursive] = use "Core"
 rng = use "...rng"
 
 ## Bool
@@ -20,8 +20,8 @@ nextUnsignedIntWithBytes generator numberOfBytes :=
   needs (int.is numberOfBytes)
   needs (int.isPositive numberOfBytes)
   [generator, bytes] = generator | rng.nextBytes numberOfBytes
-  value = bytes | iterable.fromList
-    | iterable.foldLeft 0 { sum byte -> sum | int.shiftLeft 8 | int.bitwiseOr byte }
+  value = bytes | iterator.fromList
+    | iterator.foldLeft 0 { sum byte -> sum | int.shiftLeft 8 | int.bitwiseOr byte }
   [generator, value]
 
 nextUnsignedInt generator maxExclusive :=
@@ -108,7 +108,7 @@ nextFromDistributions generator nextItemDistributions :=
   needs (rng.is generator)
   needs (list.is nextItemDistributions)
   needs (nextItemDistributions | list.isEmpty | bool.not)
-  needs (nextItemDistributions | iterable.fromList | iterable.all { it -> function.is1 it })
+  needs (nextItemDistributions | iterator.fromList | iterator.all { it -> function.is1 it })
   [generator, Value: distribution] = generator | nextFromList nextItemDistributions
   generator | distribution
 

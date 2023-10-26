@@ -1,29 +1,28 @@
 builtins = use "Builtins"
-[bool, equals, ifElse, iterable, list, result, text] = use "Core"
+[bool, equals, ifElse, iterator, list, result, text] = use "Core"
 
 splitWhereFirst iter checker =
-  # Splits the iterable into a list and an iterable of the remaining items. The
-  # matching item itself is still the first item of the remaining iterable.
+  # Splits the iterator into a list and an iterator of the remaining items. The
+  # matching item itself is still the first item of the remaining iterator.
   builtins.print "Getting leading items"
-  firstPart = iter | iterable.takeUntil { item -> checker item } | iterable.toList
+  firstPart = iter | iterator.takeUntil { item -> checker item } | iterator.toList
   builtins.print "Turned into list"
-  (firstPart, iter | iterable.skip (firstPart | list.length))
+  (firstPart, iter | iterator.skip (firstPart | list.length))
 
-split iter delimeter = iterable.generateWithState iter { state ->
-  state | iterable.takeUntil { item -> equals item delimeter }
-  state | iterable.next | result.map { }
+split iter delimeter = iterator.generateWithState iter { state ->
+  state | iterator.takeUntil { item -> equals item delimeter }
+  state | iterator.next | result.map { }
 }
 
 main := { env ->
   print message = env.stdout message
 
-  foo =
-    "Hello, world! This is some long text. Bla bla blub." | text.characters | iterable.fromList
+  foo = "Hello, world! This is some long text. Bla bla blub." | text.characters | iterator.fromList
   #| splitWhereFirst { c ->
   #  builtins.print c
   #  equals c ","
   #}
   #builtins.print "Hi"
   #builtins.print foo
-  | iterable.forEach { item -> print item }
+  | iterator.forEach { item -> print item }
 }

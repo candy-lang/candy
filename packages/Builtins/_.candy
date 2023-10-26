@@ -552,7 +552,7 @@ textFromUtf8 bytes :=
   # ```
   needs (bytes | typeIs List)
   ## TODO: Add this when it runs faster.
-  ## needs (bytes | iterable.fromList | iterable.all { byte ->
+  ## needs (bytes | iterator.fromList | iterator.all { byte ->
   ##   bool.lazyAnd (int.is byte) {
   ##     bool.and (byte | int.isNonNegative) (byte | int.isLessThan 256)
   ##   }
