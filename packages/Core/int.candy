@@ -152,15 +152,15 @@ test =
 
   checkEquals (6 | remainder 3) 0
   checkEquals (5 | remainder 3) 2
-  checkEquals ((negate 5) | remainder 3) (negate 2)
+  checkEquals (negate 5 | remainder 3) (negate 2)
   checkEquals (5 | remainder (negate 3)) 2
-  checkEquals ((negate 5) | remainder (negate 3)) (negate 2)
+  checkEquals (negate 5 | remainder (negate 3)) (negate 2)
 
   checkEquals (6 | modulo 3) 0
   checkEquals (5 | modulo 3) 2
   checkEquals (5 | modulo (negate 3)) 2
-  checkEquals ((negate 5) | modulo 3) 1
-  checkEquals ((negate 5) | modulo (negate 3)) 1
+  checkEquals (negate 5 | modulo 3) 1
+  checkEquals (negate 5 | modulo (negate 3)) 1
 
   checkEquals (6 | compareTo 3) Greater
   checkEquals (6 | compareTo 6) Equal
