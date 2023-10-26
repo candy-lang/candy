@@ -111,3 +111,66 @@ flatten resultOfResult :=
     needs (is innerResult)
     innerResult
   }
+
+test =
+  [checkEquals] = use "..check"
+  int = use "..int"
+
+  checkEquals (is (Ok 4)) True
+  checkEquals (is (Error 4)) True
+  checkEquals (is 4) False
+
+  checkEquals (getValue (Ok 4)) 4
+  checkEquals (getValue (Error 4)) 4
+
+  checkEquals (isOk (Error 4)) False
+  checkEquals (isOk (Ok 4)) True
+
+  checkEquals (unwrap (Ok 4)) 4
+  checkEquals (expect (Ok 4) "blub") 4
+
+  checkEquals (isError (Error 4)) True
+  checkEquals (isError (Ok 4)) False
+
+  checkEquals (unwrapError (Error 4)) 4
+  checkEquals (expectError (Error 4) "blub") 4
+
+  checkEquals ((Ok 4) | mapOrElse { a -> int.add a 1 } { a -> int.add a 2 }) 5
+  checkEquals ((Error 4) | mapOrElse { a -> int.add a 1 } { a -> int.add a 2 }) 6
+
+  checkEquals ((Ok 4) | mapOr { a -> int.add a 1 } 2) 5
+  checkEquals ((Error 4) | mapOr { a -> int.add a 1 } 2) 2
+
+  checkEquals ((Ok 1) | flatMap { a -> Ok (int.add a 1) }) (Ok 2)
+  checkEquals ((Error 1) | flatMap { a -> Ok (int.add a 1) }) (Error 1)
+  checkEquals ((Ok 1) | flatMap { a -> Error 3 }) (Error 3)
+
+  checkEquals ((Ok 1) | map { a -> int.add a 1 }) (Ok 2)
+  checkEquals ((Error 1) | map { a -> int.add a 1 }) (Error 1)
+
+  checkEquals ((Ok 1) | and (Ok 2)) (Ok 2)
+  checkEquals ((Ok 1) | and (Error 2)) (Error 2)
+  checkEquals ((Error 1) | and (Ok 2)) (Error 1)
+  checkEquals ((Error 1) | and (Error 2)) (Error 1)
+
+  checkEquals ((Ok 1) | flatMapError { a -> Ok (int.add a 1) }) (Ok 1)
+  checkEquals ((Error 1) | flatMapError { a -> Ok (int.add a 1) }) (Ok 2)
+  checkEquals ((Error 1) | flatMapError { a -> Error (int.add a 1) }) (Error 2)
+
+  checkEquals ((Ok 1) | mapError { a -> int.add a 1 }) (Ok 1)
+  checkEquals ((Error 1) | mapError { a -> int.add a 1 }) (Error 2)
+
+  checkEquals ((Ok 1) | or (Ok 2)) (Ok 1)
+  checkEquals ((Ok 1) | or (Error 2)) (Ok 1)
+  checkEquals ((Error 1) | or (Ok 2)) (Ok 2)
+  checkEquals ((Error 1) | or (Error 2)) (Error 2)
+
+  checkEquals (unwrapOrElse (Ok 1) { 2 }) 1
+  checkEquals (unwrapOrElse (Error 1) { 2 }) 2
+
+  checkEquals (unwrapOr (Ok 1) 2) 1
+  checkEquals (unwrapOr (Error 1) 2) 2
+
+  checkEquals (flatten (Error 1)) (Error 1)
+  checkEquals (flatten (Ok (Error 1))) (Error 1)
+  checkEquals (flatten (Ok (Ok 1))) (Ok 1)

@@ -43,3 +43,12 @@ repeat times body :=
       recurse (times | builtins.intSubtract 1)
     }
   }
+
+test =
+  [checkEquals] = use "..check"
+
+  checkEquals (ifElse True { Then } { Else }) Then
+  checkEquals (ifElse False { Then } { Else }) Else
+
+  checkEquals (if True { Then }) Then
+  checkEquals (if False { Then }) Nothing

@@ -49,3 +49,36 @@ implies a b :=
   needs (is a)
   needs (is b)
   a | not | or b
+
+test =
+  [checkEquals] = use "..check"
+
+  checkEquals (is True) True
+  checkEquals (is False) True
+  checkEquals (is 3) False
+
+  checkEquals (not True) False
+  checkEquals (not False) True
+
+  ## `lazyAnd` and `lazyOr` are automatically tested by the tests for the
+  ## non-lazy variants.
+
+  checkEquals (True | and True) True
+  checkEquals (True | and False) False
+  checkEquals (False | and True) False
+  checkEquals (False | and False) False
+
+  checkEquals (True | or True) True
+  checkEquals (True | or False) True
+  checkEquals (False | or True) True
+  checkEquals (False | or False) False
+
+  checkEquals (True | xor True) False
+  checkEquals (True | xor False) True
+  checkEquals (False | xor True) True
+  checkEquals (False | xor False) False
+
+  checkEquals (True | implies True) True
+  checkEquals (True | implies False) False
+  checkEquals (False | implies True) True
+  checkEquals (False | implies False) True
