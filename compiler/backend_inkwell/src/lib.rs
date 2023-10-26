@@ -36,12 +36,8 @@ use inkwell::{
 use itertools::Itertools;
 // We depend on this package (used by inkwell) to specify a version and configure features.
 use llvm_sys as _;
-use rustc_hash::FxHashMap;
-use std::{
-    collections::{HashMap, HashSet},
-    path::Path,
-    sync::Arc,
-};
+use rustc_hash::{FxHashMap, FxHashSet};
+use std::{path::Path, sync::Arc};
 
 #[salsa::query_group(LlvmIrStorage)]
 pub trait LlvmIrDb: OptimizeMir {
@@ -75,10 +71,10 @@ pub struct CodeGen<'ctx> {
     mir: Arc<Mir>,
     candy_value_pointer_type: PointerType<'ctx>,
     builtins: FxHashMap<BuiltinFunction, FunctionValue<'ctx>>,
-    globals: HashMap<Id, GlobalValue<'ctx>>,
-    locals: HashMap<Id, BasicValueEnum<'ctx>>,
-    functions: HashMap<Id, FunctionInfo<'ctx>>,
-    unrepresented_ids: HashSet<Id>,
+    globals: FxHashMap<Id, GlobalValue<'ctx>>,
+    locals: FxHashMap<Id, BasicValueEnum<'ctx>>,
+    functions: FxHashMap<Id, FunctionInfo<'ctx>>,
+    unrepresented_ids: FxHashSet<Id>,
 }
 
 pub struct LlvmCandyModule<'ctx> {
@@ -175,10 +171,10 @@ impl<'ctx> CodeGen<'ctx> {
             mir,
             candy_value_pointer_type,
             builtins: FxHashMap::default(),
-            globals: HashMap::new(),
-            locals: HashMap::new(),
-            functions: HashMap::new(),
-            unrepresented_ids: HashSet::new(),
+            globals: FxHashMap::default(),
+            locals: FxHashMap::default(),
+            functions: FxHashMap::default(),
+            unrepresented_ids: FxHashSet::default(),
         }
     }
 
@@ -805,6 +801,7 @@ impl<'ctx> CodeGen<'ctx> {
         self.builtins.force_insert(builtin, function);
         function
     }
+
     fn add_function(
         &self,
         name: &str,
@@ -814,6 +811,7 @@ impl<'ctx> CodeGen<'ctx> {
         let function_type = return_type.function_type(parameter_types, false);
         self.module.add_function(name, function_type, None)
     }
+
     fn create_global(
         &mut self,
         name: &str,
