@@ -83,7 +83,7 @@ pub struct OnlyPath {
 }
 
 #[derive(Parser, Debug)]
-pub(crate) struct PathAndExecutionTargetAndTracing {
+pub struct PathAndExecutionTargetAndTracing {
     #[arg(value_hint = ValueHint::FilePath)]
     path: PathBuf,
 
@@ -113,7 +113,7 @@ impl PathAndExecutionTargetAndTracing {
 }
 
 #[derive(Parser, Debug)]
-pub(crate) struct PathAndExecutionTarget {
+pub struct PathAndExecutionTarget {
     #[arg(value_hint = ValueHint::FilePath)]
     path: PathBuf,
 
@@ -122,20 +122,20 @@ pub(crate) struct PathAndExecutionTarget {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, ValueEnum)]
-pub(crate) enum ExecutionTargetKind {
+pub enum ExecutionTargetKind {
     Module,
     MainFunction,
 }
 impl ExecutionTargetKind {
-    fn resolve(self, module: Module) -> ExecutionTarget {
+    const fn resolve(self, module: Module) -> ExecutionTarget {
         match self {
-            ExecutionTargetKind::Module => ExecutionTarget::Module(module),
-            ExecutionTargetKind::MainFunction => ExecutionTarget::MainFunction(module),
+            Self::Module => ExecutionTarget::Module(module),
+            Self::MainFunction => ExecutionTarget::MainFunction(module),
         }
     }
 }
 
-pub(crate) fn debug(options: Options) -> ProgramResult {
+pub fn debug(options: Options) -> ProgramResult {
     let packages_path = packages_path();
     let db = Database::new_with_file_system_module_provider(packages_path);
 
