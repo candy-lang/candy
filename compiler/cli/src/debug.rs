@@ -127,6 +127,7 @@ pub enum ExecutionTargetKind {
     MainFunction,
 }
 impl ExecutionTargetKind {
+    #[must_use]
     const fn resolve(self, module: Module) -> ExecutionTarget {
         match self {
             Self::Module => ExecutionTarget::Module(module),
