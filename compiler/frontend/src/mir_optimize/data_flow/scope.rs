@@ -5,7 +5,7 @@ use crate::{
     impl_display_via_richir,
     mir::{Expression, Id},
     rich_ir::{RichIrBuilder, ToRichIr},
-    utils::HashSetExtension,
+    utils::{ArcImHashMapExtension, HashSetExtension},
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::fmt::Debug;
@@ -28,7 +28,7 @@ impl DataFlowScope {
     }
     pub fn new(mut timeline: Timeline, parameters: Vec<Id>, return_value: Id) -> Self {
         for parameter in &parameters {
-            assert!(timeline.values.insert(*parameter, FlowValue::Any).is_none());
+            timeline.values.force_insert(*parameter, FlowValue::Any);
         }
         Self {
             locals: FxHashSet::default(),
@@ -136,6 +136,36 @@ impl DataFlowScope {
         };
         self.insert(id, value);
     }
+
+    pub(super) fn on_call_inlined(
+        &mut self,
+        call_id: Id,
+        function: Id,
+        mapping: &FxHashMap<Id, Id>,
+    ) {
+        let FlowValue::Function(mut function) = self.state.timeline.values[&function].clone()
+        else {
+            panic!("Inlined function is not a function.");
+        };
+
+        let mut function_timeline = function.timeline.clone();
+        function_timeline.map_ids(mapping);
+
+        self.state.operations.append(&mut function.operations);
+
+        match function.result {
+            Ok(return_value) => {
+                self.state.timeline &= function_timeline;
+                self.state.timeline.replace(call_id, return_value);
+            }
+            Err(panic) => {
+                assert!(self.state.result.is_ok());
+                self.state.timeline = function_timeline;
+                self.state.result = Err(panic);
+            }
+        }
+    }
+
     pub(super) fn insert(&mut self, id: Id, value: impl Into<FlowValue>) {
         self.locals.force_insert(id);
         self.state.timeline.insert(id, value);

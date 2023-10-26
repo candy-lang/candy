@@ -98,13 +98,14 @@ impl Context<'_> {
             // Callee is used as an argument → recursion
             return;
         }
+        let function = *function;
 
         let Expression::Function {
             original_hirs: _,
             parameters,
             responsible_parameter,
             body,
-        } = self.visible.get(*function)
+        } = self.visible.get(function)
         else {
             // Callee is not a function.
             return;
@@ -113,6 +114,8 @@ impl Context<'_> {
             // Number of arguments doesn't match the expected parameter count.
             return;
         }
+
+        let call_id = expression.id();
 
         let id_mapping: FxHashMap<Id, Id> = parameters
             .iter()
@@ -135,5 +138,7 @@ impl Context<'_> {
             });
             (id_mapping[&id], expression)
         }));
+        self.data_flow
+            .on_call_inlined(call_id, function, &id_mapping);
     }
 }

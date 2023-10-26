@@ -119,6 +119,15 @@ impl DataFlow {
             outer_scope.locals.force_insert(constant);
         }
     }
+    pub(super) fn on_call_inlined(
+        &mut self,
+        call_id: Id,
+        function: Id,
+        mapping: &FxHashMap<Id, Id>,
+    ) {
+        self.innermost_scope_mut()
+            .on_call_inlined(call_id, function, mapping);
+    }
     pub(super) fn on_module_folded(
         &mut self,
         id: Id,
