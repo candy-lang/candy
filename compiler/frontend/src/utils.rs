@@ -2,6 +2,7 @@ use extension_trait::extension_trait;
 use rustc_hash::FxHasher;
 use std::{
     collections::{HashMap, HashSet},
+    fmt::Debug,
     hash::{BuildHasher, BuildHasherDefault, Hash, Hasher},
 };
 
@@ -52,17 +53,25 @@ where
 #[extension_trait]
 pub impl<K, V, S> HashMapExtension<K, V, S> for HashMap<K, V, S>
 where
-    K: Eq + Hash,
+    K: Debug + Eq + Hash,
+    V: Debug,
     S: BuildHasher,
 {
     fn force_insert(&mut self, k: K, v: V) {
-        assert!(self.insert(k, v).is_none());
+        let existing = self.insert(k, v);
+        assert!(
+            existing.is_none(),
+            "Called `force_insert(…)`, but the key was already present with value {:?}.",
+            existing.unwrap(),
+        );
     }
     fn force_replace(&mut self, k: K, v: V) -> V {
-        self.insert(k, v).unwrap()
+        self.insert(k, v)
+            .unwrap_or_else(|| panic!("Called `force_replace(…)`, but the key was not found."))
     }
     fn force_remove(&mut self, k: &K) -> V {
-        self.remove(k).unwrap()
+        self.remove(k)
+            .unwrap_or_else(|| panic!("Called `force_remove({k:?})`, but the key was not found."))
     }
 }
 
@@ -71,18 +80,27 @@ macro_rules! impl_im_force_insert {
         #[extension_trait]
         pub impl<K, V, S> $name<K, V, S> for $hash_map_type<K, V, S>
         where
-            K: Clone + Eq + Hash,
-            V: Clone,
+            K: Clone + Debug + Eq + Hash,
+            V: Clone + Debug,
             S: BuildHasher,
         {
             fn force_insert(&mut self, k: K, v: V) {
-                assert!(self.insert(k, v).is_none());
+                let existing = self.insert(k, v);
+                assert!(
+                    existing.is_none(),
+                    "Called `force_insert(…)`, but the key was already present with value {:?}.",
+                    existing.unwrap(),
+                );
             }
             fn force_replace(&mut self, k: K, v: V) -> V {
-                self.insert(k, v).unwrap()
+                self.insert(k, v).unwrap_or_else(|| {
+                    panic!("Called `force_replace(…)`, but the key was not found.")
+                })
             }
             fn force_remove(&mut self, k: &K) -> V {
-                self.remove(k).unwrap()
+                self.remove(k).unwrap_or_else(|| {
+                    panic!("Called `force_remove({k:?})`, but the key was not found.")
+                })
             }
         }
     };
