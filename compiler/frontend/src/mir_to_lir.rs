@@ -7,6 +7,7 @@ use crate::{
     mir::{self},
     mir_optimize::OptimizeMir,
     string_to_rcst::ModuleError,
+    utils::{HashMapExtension, HashSetExtension},
     TracingConfig,
 };
 use itertools::Itertools;
@@ -143,11 +144,12 @@ impl CurrentBody {
                             },
                         );
                     } else {
+                        let value = self.id_for(context, *value);
                         self.push(
                             id,
                             lir::Expression::CreateTag {
                                 symbol: symbol.clone(),
-                                value: self.id_mapping[value],
+                                value,
                             },
                         );
                     }
@@ -236,7 +238,7 @@ impl CurrentBody {
                 if captured.is_empty() {
                     self.push_constant(context, id, body_id);
                 } else {
-                    let captured = captured.iter().map(|it| self.id_mapping[it]).collect();
+                    let captured = self.ids_for(context, &captured);
                     self.push(id, lir::Expression::CreateFunction { captured, body_id });
                 }
             }
@@ -292,19 +294,16 @@ impl CurrentBody {
                 let function = self.id_for(context, *function);
                 let arguments = self.ids_for(context, arguments);
                 let responsible = self.id_for(context, *responsible);
-                self.push(
-                    id,
-                    lir::Expression::TraceCallStarts {
-                        hir_call,
-                        function,
-                        arguments,
-                        responsible,
-                    },
-                );
+                self.push_without_value(lir::Expression::TraceCallStarts {
+                    hir_call,
+                    function,
+                    arguments,
+                    responsible,
+                });
             }
             mir::Expression::TraceCallEnds { return_value } => {
                 let return_value = self.id_for(context, *return_value);
-                self.push(id, lir::Expression::TraceCallEnds { return_value });
+                self.push_without_value(lir::Expression::TraceCallEnds { return_value });
             }
             mir::Expression::TraceExpressionEvaluated {
                 hir_expression,
@@ -312,13 +311,10 @@ impl CurrentBody {
             } => {
                 let hir_expression = self.id_for(context, *hir_expression);
                 let value = self.id_for(context, *value);
-                self.push(
-                    id,
-                    lir::Expression::TraceExpressionEvaluated {
-                        hir_expression,
-                        value,
-                    },
-                );
+                self.push_without_value(lir::Expression::TraceExpressionEvaluated {
+                    hir_expression,
+                    value,
+                });
             }
             mir::Expression::TraceFoundFuzzableFunction {
                 hir_definition,
@@ -326,13 +322,10 @@ impl CurrentBody {
             } => {
                 let hir_definition = self.id_for(context, *hir_definition);
                 let function = self.id_for(context, *function);
-                self.push(
-                    id,
-                    lir::Expression::TraceFoundFuzzableFunction {
-                        hir_definition,
-                        function,
-                    },
-                );
+                self.push_without_value(lir::Expression::TraceFoundFuzzableFunction {
+                    hir_definition,
+                    function,
+                });
             }
         }
     }
@@ -362,14 +355,17 @@ impl CurrentBody {
     fn push(&mut self, mir_id: mir::Id, expression: impl Into<lir::Expression>) -> lir::Id {
         let expression = expression.into();
         let is_constant = matches!(expression, lir::Expression::Constant(_));
-        self.body.push(expression);
-
-        let id = self.body.last_expression_id().unwrap();
-        assert!(self.id_mapping.insert(mir_id, id).is_none());
+        let id = self.body.push(expression);
+        self.id_mapping.force_insert(mir_id, id);
         if !is_constant {
-            assert!(self.ids_to_drop.insert(id));
+            self.ids_to_drop.force_insert(id);
         }
         id
+    }
+    /// Push an expression that doesn't produce a return value, i.e., a trace
+    /// expression.
+    fn push_without_value(&mut self, expression: impl Into<lir::Expression>) {
+        self.body.push(expression.into());
     }
 
     fn maybe_dup(&mut self, id: lir::Id) {

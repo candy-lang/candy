@@ -86,11 +86,7 @@ impl MachineState {
             } => {
                 let captured = captured
                     .iter()
-                    .map(|offset| {
-                        let object = self.get_from_data_stack(*offset);
-                        object.dup(heap);
-                        object
-                    })
+                    .map(|offset| self.get_from_data_stack(*offset))
                     .collect_vec();
                 let function = Function::create(heap, true, &captured, *num_args, *body);
                 self.push_to_data_stack(function);
@@ -102,16 +98,21 @@ impl MachineState {
             }
             Instruction::PushFromStack(offset) => {
                 let address = self.get_from_data_stack(*offset);
-                address.dup(heap);
                 self.push_to_data_stack(address);
                 InstructionResult::Done
             }
             Instruction::PopMultipleBelowTop(n) => {
                 let top = self.pop_from_data_stack();
-                for _ in 0..*n {
-                    self.pop_from_data_stack().drop(heap);
-                }
+                self.pop_multiple_from_data_stack(*n);
                 self.push_to_data_stack(top);
+                InstructionResult::Done
+            }
+            Instruction::Dup { amount } => {
+                self.pop_from_data_stack().dup_by(heap, *amount);
+                InstructionResult::Done
+            }
+            Instruction::Drop => {
+                self.pop_from_data_stack().drop(heap);
                 InstructionResult::Done
             }
             Instruction::Call { num_args } => {
@@ -136,9 +137,7 @@ impl MachineState {
                 // PERF: Built the reverse list in place
                 arguments.reverse();
                 let callee = self.pop_from_data_stack();
-                for _ in 0..*num_locals_to_pop {
-                    self.pop_from_data_stack().drop(heap);
-                }
+                self.pop_multiple_from_data_stack(*num_locals_to_pop);
 
                 // Tail calling a function is basically just a normal call, but
                 // pretending we are our caller.
@@ -195,8 +194,8 @@ impl MachineState {
             }
             Instruction::TraceFoundFuzzableFunction => {
                 let function = self.pop_from_data_stack().try_into().expect(
-                "Instruction TraceFoundFuzzableFunction executed, but stack top is not a function.",
-            );
+                    "Instruction TraceFoundFuzzableFunction executed, but stack top is not a function.",
+                );
                 let definition = self.pop_from_data_stack().try_into().unwrap();
 
                 tracer.found_fuzzable_function(heap, definition, function);
@@ -213,9 +212,8 @@ impl MachineState {
         responsible: HirId,
     ) -> InstructionResult {
         match callee.into() {
-            Data::Function(function) => self.call_function(heap, function, arguments, responsible),
+            Data::Function(function) => self.call_function( function, arguments, responsible),
             Data::Builtin(builtin) => {
-                callee.drop(heap);
                 self.run_builtin_function(heap, builtin.get(), arguments, responsible)
             }
             Data::Handle(handle) => {
@@ -250,7 +248,6 @@ impl MachineState {
                 if let [value] = arguments {
                     let tag = Tag::create_with_value(heap, true, tag.symbol(), *value);
                     self.push_to_data_stack(tag);
-                    value.dup(heap);
                     InstructionResult::Done
                 } else {
                     InstructionResult::Panic(Panic {
@@ -272,7 +269,6 @@ impl MachineState {
     }
     pub fn call_function(
         &mut self,
-        heap: &mut Heap,
         function: Function,
         arguments: &[InlineObject],
         responsible: HirId,
@@ -291,11 +287,7 @@ impl MachineState {
         if let Some(next_instruction) = self.next_instruction {
             self.call_stack.push(next_instruction);
         }
-        let captured = function.captured();
-        for captured in captured {
-            captured.dup(heap);
-        }
-        self.data_stack.extend_from_slice(captured);
+        self.data_stack.extend_from_slice(function.captured());
         self.data_stack.extend_from_slice(arguments);
         self.push_to_data_stack(responsible);
         self.next_instruction = Some(function.body());
@@ -310,6 +302,10 @@ impl MachineState {
     }
     fn pop_from_data_stack(&mut self) -> InlineObject {
         self.data_stack.pop().expect("Data stack is empty.")
+    }
+    fn pop_multiple_from_data_stack(&mut self, amount: usize) {
+        assert!(amount <= self.data_stack.len());
+        self.data_stack.truncate(self.data_stack.len() - amount);
     }
 }
 

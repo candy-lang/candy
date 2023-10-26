@@ -85,7 +85,7 @@ impl MachineState {
             Ok(DivergeControlFlow {
                 function,
                 responsible,
-            }) => self.call_function(heap, function, &[], responsible),
+            }) => self.call_function(function, &[], responsible),
             Ok(CallHandle(call)) => InstructionResult::CallHandle(call),
             Err(reason) => InstructionResult::Panic(Panic {
                 reason,

@@ -140,7 +140,7 @@ impl IrFeatures {
             ),
             Ir::VmByteCode(tracing_config) => Self::rich_ir_for_vm_byte_code(
                 &config.module,
-                &candy_vm::mir_to_byte_code::compile_byte_code(
+                &candy_vm::lir_to_byte_code::compile_byte_code(
                     db,
                     ExecutionTarget::Module(config.module.clone()),
                     tracing_config.clone(),

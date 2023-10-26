@@ -5,7 +5,7 @@ use crate::{
 };
 use candy_frontend::{hir_to_mir::ExecutionTarget, TracingConfig, TracingMode};
 use candy_vm::{
-    environment::DefaultEnvironment, heap::Heap, mir_to_byte_code::compile_byte_code,
+    environment::DefaultEnvironment, heap::Heap, lir_to_byte_code::compile_byte_code,
     tracer::stack_trace::StackTracer, Vm, VmFinished,
 };
 use clap::{Parser, ValueHint};

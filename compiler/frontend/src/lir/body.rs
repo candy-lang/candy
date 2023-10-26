@@ -160,8 +160,14 @@ impl Body {
     pub fn expressions(&self) -> &[Expression] {
         &self.expressions
     }
-    pub fn ids_and_expressions(&self) -> impl Iterator<Item = (Id, &Expression)> {
-        let offset = self.captured_count + self.parameter_count + 1;
+    #[must_use]
+    pub fn expression(&self, id: Id) -> Option<&Expression> {
+        self.expressions
+            .get(id.to_usize() - self.expression_id_offset())
+    }
+    #[must_use]
+    pub fn ids_and_expressions(&self) -> impl DoubleEndedIterator<Item = (Id, &Expression)> {
+        let offset = self.expression_id_offset();
         self.expressions
             .iter()
             .enumerate()
@@ -173,13 +179,18 @@ impl Body {
             None
         } else {
             Some(Id::from_usize(
-                self.captured_count + self.parameter_count + self.expressions.len(),
+                self.expression_id_offset() + self.expressions.len() - 1,
             ))
         }
     }
+    #[must_use]
+    const fn expression_id_offset(&self) -> usize {
+        self.captured_count + self.parameter_count + 1
+    }
 
-    pub fn push(&mut self, expression: Expression) {
+    pub fn push(&mut self, expression: Expression) -> Id {
         self.expressions.push(expression);
+        self.last_expression_id().unwrap()
     }
 }
 impl ToRichIr for Body {
