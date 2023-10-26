@@ -171,8 +171,9 @@ intBitLength value :=
   # intBitLength -3 => 2
   # ```
   needs (value | typeIs Int)
-  ## Ensure `value` is non-negative.
-  needs (value | ✨.intAdd 1 | ✨.intCompareTo 0 | ✨.equals Greater)
+  needs
+    (value | ✨.intAdd 1 | ✨.intCompareTo 0 | ✨.equals Greater)
+    "Value must be non-negative"
   ✨.intBitLength value
 
 intBitwiseAnd a b :=
