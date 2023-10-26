@@ -45,8 +45,7 @@ pub fn run(options: Options) -> ProgramResult {
     debug!("Running {module}.");
 
     let compilation_start = Instant::now();
-    let byte_code =
-        compile_byte_code(&db, ExecutionTarget::MainFunction(module.clone()), tracing).0;
+    let byte_code = compile_byte_code(&db, ExecutionTarget::MainFunction(module), tracing).0;
 
     let compilation_end = Instant::now();
     debug!(
