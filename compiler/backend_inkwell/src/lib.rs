@@ -1,5 +1,14 @@
 #![feature(let_chains)]
-#![warn(unused_crate_dependencies)]
+#![warn(clippy::nursery, clippy::pedantic, unused_crate_dependencies)]
+#![allow(
+    clippy::cognitive_complexity,
+    clippy::match_same_arms,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::module_name_repetitions,
+    clippy::similar_names,
+    clippy::too_many_lines
+)]
 
 use candy_frontend::{
     builtin_functions::BuiltinFunction,
@@ -151,6 +160,7 @@ impl<'ctx> LlvmCandyModule<'ctx> {
 }
 
 impl<'ctx> CodeGen<'ctx> {
+    #[must_use]
     pub fn new(context: &'ctx Context, module_name: &str, mir: Arc<Mir>) -> Self {
         let module = context.create_module(module_name);
         let builder = context.create_builder();
@@ -324,7 +334,7 @@ impl<'ctx> CodeGen<'ctx> {
         function_ctx: &FunctionInfo<'ctx>,
     ) -> Option<impl BasicValue<'ctx>> {
         let mut return_value = None;
-        for (id, expr) in mir.expressions.iter() {
+        for (id, expr) in &mir.expressions {
             let expr_value = match expr {
                 Expression::Int(value) => {
                     // TODO: Use proper BigInts here
@@ -342,7 +352,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                     let global = self.create_global(
                         &format!("num_{value}"),
-                        id,
+                        *id,
                         call.try_as_basic_value().unwrap_left(),
                     );
 
@@ -357,7 +367,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                     let global = self.create_global(
                         &format!("text_{text}"),
-                        id,
+                        *id,
                         call.try_as_basic_value().unwrap_left(),
                     );
 
@@ -365,7 +375,7 @@ impl<'ctx> CodeGen<'ctx> {
                 }
                 Expression::Tag { symbol, value } => {
                     let tag_value = match value {
-                        Some(value) => self.get_value_with_id(function_ctx, value).unwrap(),
+                        Some(value) => self.get_value_with_id(function_ctx, *value).unwrap(),
                         None => self
                             .candy_value_pointer_type
                             .const_null()
@@ -382,7 +392,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                     let global = self.create_global(
                         &format!("tag_{symbol}"),
-                        id,
+                        *id,
                         call.try_as_basic_value().unwrap_left(),
                     );
 
@@ -415,7 +425,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                     let global = self.create_global(
                         &format!("fun_candy_builtin_{}", builtin.as_ref()),
-                        id,
+                        *id,
                         call.try_as_basic_value().unwrap_left(),
                     );
 
@@ -430,7 +440,7 @@ impl<'ctx> CodeGen<'ctx> {
                         "",
                     );
                     let values = list.iter().map(|v| {
-                        self.get_value_with_id(function_ctx, v)
+                        self.get_value_with_id(function_ctx, *v)
                             .unwrap()
                             .into_pointer_value()
                     });
@@ -462,7 +472,7 @@ impl<'ctx> CodeGen<'ctx> {
                             .build_call(make_candy_list, &[list_array.into()], "");
 
                     let global =
-                        self.create_global("", id, candy_list.try_as_basic_value().unwrap_left());
+                        self.create_global("", *id, candy_list.try_as_basic_value().unwrap_left());
 
                     Some(global.as_basic_value_enum())
                 }
@@ -482,11 +492,11 @@ impl<'ctx> CodeGen<'ctx> {
                     );
                     for (idx, (key, value)) in s.iter().enumerate() {
                         let key = self
-                            .get_value_with_id(function_ctx, key)
+                            .get_value_with_id(function_ctx, *key)
                             .unwrap()
                             .into_pointer_value();
                         let value = self
-                            .get_value_with_id(function_ctx, value)
+                            .get_value_with_id(function_ctx, *value)
                             .unwrap()
                             .into_pointer_value();
 
@@ -547,7 +557,7 @@ impl<'ctx> CodeGen<'ctx> {
                     Some(struct_value.into_pointer_value().as_basic_value_enum())
                 }
                 Expression::Reference(ref_id) => {
-                    let value = self.get_value_with_id(function_ctx, ref_id).unwrap();
+                    let value = self.get_value_with_id(function_ctx, *ref_id).unwrap();
 
                     self.locals.insert(*id, value);
                     Some(value)
@@ -562,7 +572,7 @@ impl<'ctx> CodeGen<'ctx> {
                         .build_call(make_candy_text, &[string.into()], "");
 
                     let global =
-                        self.create_global(&text, id, call.try_as_basic_value().unwrap_left());
+                        self.create_global(&text, *id, call.try_as_basic_value().unwrap_left());
 
                     Some(global.as_basic_value_enum())
                 }
@@ -597,12 +607,17 @@ impl<'ctx> CodeGen<'ctx> {
 
                     let env_ptr = self.builder.build_malloc(env_struct_type, "").unwrap();
 
-                    for (idx, cap_id) in captured_ids.iter().enumerate() {
-                        let value = self.get_value_with_id(function_ctx, cap_id);
+                    for (index, captured_id) in captured_ids.iter().enumerate() {
+                        let value = self.get_value_with_id(function_ctx, *captured_id);
 
                         let member = self
                             .builder
-                            .build_struct_gep(env_struct_type, env_ptr, idx as u32, "")
+                            .build_struct_gep(
+                                env_struct_type,
+                                env_ptr,
+                                index.try_into().unwrap(),
+                                "",
+                            )
                             .unwrap();
                         self.builder.build_store(member, value.unwrap());
                     }
@@ -621,10 +636,10 @@ impl<'ctx> CodeGen<'ctx> {
                     let function_info = FunctionInfo {
                         function_value: function,
                         captured_ids: captured_ids.clone(),
-                        env_type: if !captured_ids.is_empty() {
-                            Some(env_struct_type)
-                        } else {
+                        env_type: if captured_ids.is_empty() {
                             None
+                        } else {
+                            Some(env_struct_type)
                         },
                     };
                     self.functions.insert(*id, function_info.clone());
@@ -647,7 +662,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                     let global = self.create_global(
                         &format!("fun_{name}"),
-                        id,
+                        *id,
                         call.try_as_basic_value().unwrap_left(),
                     );
 
@@ -668,7 +683,7 @@ impl<'ctx> CodeGen<'ctx> {
                     self.unrepresented_ids.insert(*responsible);
                     let mut args: Vec<_> = arguments
                         .iter()
-                        .map(|arg| self.get_value_with_id(function_ctx, arg).unwrap().into())
+                        .map(|arg| self.get_value_with_id(function_ctx, *arg).unwrap().into())
                         .collect();
 
                     if let Some(FunctionInfo {
@@ -702,7 +717,7 @@ impl<'ctx> CodeGen<'ctx> {
                         Some(call_value.as_basic_value_enum())
                     } else {
                         let function_value = self
-                            .get_value_with_id(function_ctx, function)
+                            .get_value_with_id(function_ctx, *function)
                             .unwrap_or_else(|| panic!("There is no function with ID {function}"));
 
                         let get_candy_fn_ptr = self
@@ -744,7 +759,7 @@ impl<'ctx> CodeGen<'ctx> {
                 Expression::Panic { reason, .. } => {
                     let panic_fn = self.module.get_function("candy_panic").unwrap();
 
-                    let reason = self.get_value_with_id(function_ctx, reason).unwrap();
+                    let reason = self.get_value_with_id(function_ctx, *reason).unwrap();
 
                     self.builder.build_call(panic_fn, &[reason.into()], "");
 
@@ -802,7 +817,7 @@ impl<'ctx> CodeGen<'ctx> {
     fn create_global(
         &mut self,
         name: &str,
-        id: &Id,
+        id: Id,
         value: impl BasicValue<'ctx>,
     ) -> GlobalValue<'ctx> {
         let global = self
@@ -811,7 +826,7 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.build_store(global.as_pointer_value(), value);
 
         global.set_initializer(&self.candy_value_pointer_type.const_null());
-        assert!(self.globals.insert(*id, global).is_none());
+        assert!(self.globals.insert(id, global).is_none());
         global
     }
 
@@ -837,13 +852,13 @@ impl<'ctx> CodeGen<'ctx> {
     fn get_value_with_id(
         &self,
         function_ctx: &FunctionInfo<'ctx>,
-        id: &Id,
+        id: Id,
     ) -> Option<BasicValueEnum<'ctx>> {
-        let mut v = self.globals.get(id).map(|a| {
+        let mut v = self.globals.get(&id).map(|it| {
             self.builder
-                .build_load(self.candy_value_pointer_type, a.as_pointer_value(), "")
+                .build_load(self.candy_value_pointer_type, it.as_pointer_value(), "")
         });
-        if v.is_none() && let Some(i) = function_ctx.captured_ids.iter().position(|i| i == id) {
+        if v.is_none() && let Some(index) = function_ctx.captured_ids.iter().position(|i| *i == id) {
             let env_ptr = function_ctx.function_value.get_last_param().unwrap();
 
             let env_value = self
@@ -851,18 +866,18 @@ impl<'ctx> CodeGen<'ctx> {
                 .build_struct_gep(
                     function_ctx.env_type.unwrap(),
                     env_ptr.into_pointer_value(),
-                    i as u32,
+                    index.try_into().unwrap(),
                     "",
                 )
                 .unwrap();
 
-            v.replace(self.builder.build_load(self.candy_value_pointer_type, env_value, ""));
+            v = Some(self.builder.build_load(self.candy_value_pointer_type, env_value, ""));
         }
-        if v.is_none() && let Some(value) = self.locals.get(id) {
-            v.replace(*value);
+        if v.is_none() && let Some(value) = self.locals.get(&id) {
+            v = Some(*value);
         }
-        if self.unrepresented_ids.contains(id) {
-            v.replace(
+        if self.unrepresented_ids.contains(&id) {
+            v = Some(
                 self.candy_value_pointer_type
                     .const_null()
                     .as_basic_value_enum(),
