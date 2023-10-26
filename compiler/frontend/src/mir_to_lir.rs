@@ -143,11 +143,12 @@ impl CurrentBody {
                             },
                         );
                     } else {
+                        let value = self.id_for(context, *value);
                         self.push(
                             id,
                             lir::Expression::CreateTag {
                                 symbol: symbol.clone(),
-                                value: self.id_mapping[value],
+                                value,
                             },
                         );
                     }
@@ -236,7 +237,7 @@ impl CurrentBody {
                 if captured.is_empty() {
                     self.push_constant(context, id, body_id);
                 } else {
-                    let captured = captured.iter().map(|it| self.id_mapping[it]).collect();
+                    let captured = self.ids_for(context, &captured);
                     self.push(id, lir::Expression::CreateFunction { captured, body_id });
                 }
             }
