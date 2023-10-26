@@ -77,7 +77,6 @@ pub enum Exit {
     ExternalError,
     FileNotFound,
     FuzzingFoundFailingCases,
-    NoMainFunction,
     NotInCandyPackage,
     CodeContainsErrors,
     #[cfg(feature = "inkwell")]

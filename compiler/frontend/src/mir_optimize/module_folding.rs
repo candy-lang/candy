@@ -30,6 +30,7 @@
 use super::current_expression::{Context, CurrentExpression};
 use crate::{
     error::{CompilerError, CompilerErrorPayload},
+    hir_to_mir::ExecutionTarget,
     id::IdGenerator,
     mir::{Body, BodyBuilder, Expression, Id, MirError},
     module::{Module, UsePath},
@@ -98,10 +99,10 @@ pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
         }
     };
 
-    match context
-        .db
-        .optimized_mir(module_to_import.clone(), context.tracing.for_child_module())
-    {
+    match context.db.optimized_mir(
+        ExecutionTarget::Module(module_to_import.clone()),
+        context.tracing.for_child_module(),
+    ) {
         Ok((mir, other_pureness, more_errors)) => {
             context.errors.extend(more_errors.iter().cloned());
 

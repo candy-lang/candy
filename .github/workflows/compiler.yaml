@@ -116,7 +116,7 @@ jobs:
         if: github.event_name == 'pull_request'
         continue-on-error: true
         working-directory: golden-irs/
-        run: git diff --exit-code ${{ github.event.pull_request.base.sha }}_ ${{ github.sha }}_
+        run: git diff --quiet ${{ github.event.pull_request.base.sha }}_ ${{ github.sha }}_
       - name: Shorten commit SHAs
         id: short-shas
         if: steps.diff.outcome == 'failure'

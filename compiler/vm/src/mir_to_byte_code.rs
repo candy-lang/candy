@@ -7,10 +7,10 @@ use candy_frontend::{
     cst::CstDb,
     error::{CompilerError, CompilerErrorPayload},
     hir,
+    hir_to_mir::ExecutionTarget,
     id::CountableId,
     mir::{Body, Expression, Id, Mir},
     mir_optimize::OptimizeMir,
-    module::Module,
     tracing::TracingConfig,
 };
 use extension_trait::extension_trait;
@@ -20,15 +20,16 @@ use std::sync::Arc;
 
 pub fn compile_byte_code<Db>(
     db: &Db,
-    module: Module,
+    target: ExecutionTarget,
     tracing: TracingConfig,
 ) -> (ByteCode, Arc<FxHashSet<CompilerError>>)
 where
     Db: CstDb + OptimizeMir,
 {
+    let module = target.module().clone();
     #[allow(clippy::map_unwrap_or)]
     let (mir, errors) = db
-        .optimized_mir(module.clone(), tracing)
+        .optimized_mir(target, tracing)
         .map(|(mir, _, errors)| (mir, errors))
         .unwrap_or_else(|error| {
             let payload = CompilerErrorPayload::Module(error);

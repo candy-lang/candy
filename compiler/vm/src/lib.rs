@@ -27,11 +27,8 @@
     clippy::too_many_lines
 )]
 
-use crate::heap::{Struct, Tag};
 pub use builtin_functions::CAN_USE_STDOUT;
-use heap::{Function, Heap, InlineObject};
 pub use instruction_pointer::InstructionPointer;
-use tracing::debug;
 pub use utils::PopulateInMemoryProviderFromFileSystem;
 pub use vm::{Panic, StateAfterRun, StateAfterRunForever, Vm, VmFinished};
 
@@ -46,18 +43,3 @@ pub mod mir_to_byte_code;
 pub mod tracer;
 mod utils;
 mod vm;
-
-impl InlineObject {
-    pub fn into_main_function(self, heap: &Heap) -> Result<Function, &'static str> {
-        let exported_definitions: Struct = self.try_into().unwrap();
-        debug!("The module exports these definitions: {exported_definitions}",);
-
-        exported_definitions
-            .get(Tag::create(heap.default_symbols().main))
-            .ok_or("The module doesn't export a main function.")
-            .and_then(|main| {
-                main.try_into()
-                    .map_err(|_| "The exported main value is not a function.")
-            })
-    }
-}

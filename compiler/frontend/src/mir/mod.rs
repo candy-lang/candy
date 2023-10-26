@@ -16,10 +16,7 @@ pub struct Mir {
     pub body: Body,
 }
 impl Mir {
-    pub fn build<F>(function: F) -> Self
-    where
-        F: FnOnce(&mut BodyBuilder),
-    {
+    pub fn build(function: impl FnOnce(&mut BodyBuilder)) -> Self {
         let mut builder = BodyBuilder::new(IdGenerator::start_at(1));
         function(&mut builder);
         let (id_generator, body) = builder.finish();
