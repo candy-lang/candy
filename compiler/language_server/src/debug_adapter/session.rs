@@ -5,17 +5,16 @@ use super::{
 };
 use crate::database::Database;
 use candy_frontend::{
-    hir::Id,
+    hir_to_mir::ExecutionTarget,
     module::{Module, ModuleKind, PackagesPath},
     TracingConfig, TracingMode,
 };
 use candy_vm::{
     byte_code::Instruction,
     environment::StateAfterRunWithoutHandles,
-    heap::{Heap, HirId, Struct},
+    heap::{Heap, Struct},
     lir_to_byte_code::compile_byte_code,
-    tracer::DummyTracer,
-    Vm, VmFinished,
+    Vm,
 };
 use dap::{
     events::StoppedEventBody,
@@ -190,40 +189,20 @@ impl DebugSession {
                     calls: TracingMode::All,
                     evaluated_expressions: TracingMode::All,
                 };
-                let byte_code = compile_byte_code(&self.db, module.clone(), tracing.clone()).0;
-                let mut heap = Heap::default();
-                let VmFinished { result, .. } = Vm::for_module(&byte_code, &mut heap, DummyTracer)
-                    .run_forever_without_handles(&mut heap);
-                let result = match result {
-                    Ok(result) => result,
-                    Err(error) => {
-                        error!("Module panicked: {}", error.reason);
-                        return Err("module-panicked");
-                    }
-                };
-                let main = match result.into_main_function(&heap) {
-                    Ok(main) => main,
-                    Err(error) => {
-                        error!("Failed to find main function: {error}");
-                        return Err("no-main-function");
-                    }
-                };
+                let byte_code = compile_byte_code(
+                    &self.db,
+                    ExecutionTarget::MainFunction(module.clone()),
+                    tracing.clone(),
+                )
+                .0;
 
                 self.send_response_ok(request.seq, ResponseBody::Launch)
                     .await;
 
-                // Run the `main` function.
-                let environment = Struct::create(&mut heap, true, &FxHashMap::default()).into();
-                let platform = HirId::create(&mut heap, true, Id::platform());
+                let mut heap = Heap::default();
+                let environment = Struct::create(&mut heap, true, &FxHashMap::default());
                 let tracer = DebugTracer::default();
-                let vm = Vm::for_function(
-                    Rc::new(byte_code),
-                    &mut heap,
-                    main,
-                    &[environment],
-                    platform,
-                    tracer,
-                );
+                let vm = Vm::for_main_function(Rc::new(byte_code), &mut heap, environment, tracer);
 
                 // TODO: remove when we support pause and continue
                 let vm = match vm.run_n_without_handles(&mut heap, 10000) {

@@ -105,6 +105,7 @@ dependencies = [
  "inkwell",
  "itertools 0.11.0",
  "llvm-sys",
+ "rustc-hash",
  "salsa",
 ]
 

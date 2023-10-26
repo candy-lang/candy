@@ -6,6 +6,7 @@ use crate::{
 use candy_frontend::{
     ast_to_hir::AstToHir,
     format::{MaxLength, Precedence},
+    hir_to_mir::ExecutionTarget,
     mir_optimize::OptimizeMir,
     module::Module,
     TracingConfig, TracingMode,
@@ -96,7 +97,7 @@ impl ModuleAnalyzer {
 
                 let (mir, _, _) = db
                     .optimized_mir(
-                        self.module.clone(),
+                        ExecutionTarget::Module(self.module.clone()),
                         TracingConfig {
                             register_fuzzables: TracingMode::OnlyCurrent,
                             calls: TracingMode::Off,
@@ -113,7 +114,8 @@ impl ModuleAnalyzer {
                     calls: TracingMode::Off,
                     evaluated_expressions: TracingMode::OnlyCurrent,
                 };
-                let (byte_code, _) = compile_byte_code(db, self.module.clone(), tracing);
+                let (byte_code, _) =
+                    compile_byte_code(db, ExecutionTarget::Module(self.module.clone()), tracing);
                 let byte_code = Rc::new(byte_code);
 
                 let mut heap = Heap::default();
@@ -158,7 +160,8 @@ impl ModuleAnalyzer {
                     calls: TracingMode::Off,
                     evaluated_expressions: TracingMode::Off,
                 };
-                let (fuzzing_byte_code, _) = compile_byte_code(db, self.module.clone(), tracing);
+                let (fuzzing_byte_code, _) =
+                    compile_byte_code(db, ExecutionTarget::Module(self.module.clone()), tracing);
                 let fuzzing_byte_code = Rc::new(fuzzing_byte_code);
 
                 let mut heap = Heap::default();

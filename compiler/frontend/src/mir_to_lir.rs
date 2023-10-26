@@ -1,11 +1,11 @@
 use crate::{
     error::CompilerError,
     hir::{self},
+    hir_to_mir::ExecutionTarget,
     id::CountableId,
     lir::{self, Lir},
     mir::{self},
     mir_optimize::OptimizeMir,
-    module::Module,
     string_to_rcst::ModuleError,
     utils::{HashMapExtension, HashSetExtension},
     TracingConfig,
@@ -16,13 +16,14 @@ use std::sync::Arc;
 
 #[salsa::query_group(MirToLirStorage)]
 pub trait MirToLir: OptimizeMir {
-    fn lir(&self, module: Module, tracing: TracingConfig) -> LirResult;
+    fn lir(&self, target: ExecutionTarget, tracing: TracingConfig) -> LirResult;
 }
 
 pub type LirResult = Result<(Arc<Lir>, Arc<FxHashSet<CompilerError>>), ModuleError>;
 
-fn lir(db: &dyn MirToLir, module: Module, tracing: TracingConfig) -> LirResult {
-    let (mir, _, errors) = db.optimized_mir(module.clone(), tracing)?;
+fn lir(db: &dyn MirToLir, target: ExecutionTarget, tracing: TracingConfig) -> LirResult {
+    let module = target.module().clone();
+    let (mir, _, errors) = db.optimized_mir(target, tracing)?;
 
     let mut context = LoweringContext::default();
     context.compile_function(

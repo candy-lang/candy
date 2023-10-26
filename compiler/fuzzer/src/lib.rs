@@ -20,6 +20,7 @@ pub use self::{
 use candy_frontend::{
     ast_to_hir::AstToHir,
     cst::CstDb,
+    hir_to_mir::ExecutionTarget,
     lir_optimize::OptimizeLir,
     module::Module,
     position::PositionConversionDb,
@@ -41,7 +42,7 @@ where
         calls: TracingMode::Off,
         evaluated_expressions: TracingMode::Off,
     };
-    let (byte_code, _) = compile_byte_code(db, module, tracing);
+    let (byte_code, _) = compile_byte_code(db, ExecutionTarget::Module(module), tracing);
     let byte_code = Rc::new(byte_code);
 
     let mut heap = Heap::default();

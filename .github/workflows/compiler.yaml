@@ -18,14 +18,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dsherret/rust-toolchain-file@v1
-      - uses: Swatinem/rust-cache@v2.7.0
+      - uses: Swatinem/rust-cache@v2.7.1
       - name: Cache LLVM and Clang
         id: cache-llvm
         uses: actions/cache@v3
         with:
           path: ./llvm
           key: llvm-15.0
-      - uses: KyleMayes/install-llvm-action@v1.8.3
+      - uses: KyleMayes/install-llvm-action@v1.9.0
         with:
           version: "15.0"
           cached: ${{ steps.cache-llvm.outputs.cache-hit }}
@@ -48,14 +48,14 @@ jobs:
   #   steps:
   #     - uses: actions/checkout@v4
   #     - uses: dsherret/rust-toolchain-file@v1
-  #     - uses: Swatinem/rust-cache@v2.7.0
+  #     - uses: Swatinem/rust-cache@v2.7.1
   #     - name: Cache LLVM and Clang
   #       id: cache-llvm
   #       uses: actions/cache@v3
   #       with:
   #         path: ./llvm
   #         key: llvm-15.0
-  #     - uses: KyleMayes/install-llvm-action@v1.8.3
+  #     - uses: KyleMayes/install-llvm-action@v1.9.0
   #       with:
   #         version: "15.0"
   #         cached: ${{ steps.cache-llvm.outputs.cache-hit }}
@@ -74,14 +74,14 @@ jobs:
       # toolchain file's path.
       - run: cp candy/rust-toolchain.toml ./
       - uses: dsherret/rust-toolchain-file@v1
-      - uses: Swatinem/rust-cache@v2.7.0
+      - uses: Swatinem/rust-cache@v2.7.1
       - name: Cache LLVM and Clang
         id: cache-llvm
         uses: actions/cache@v3
         with:
           path: ./llvm
           key: llvm-15.0
-      - uses: KyleMayes/install-llvm-action@v1.8.3
+      - uses: KyleMayes/install-llvm-action@v1.9.0
         with:
           version: "15.0"
           cached: ${{ steps.cache-llvm.outputs.cache-hit }}
@@ -116,7 +116,7 @@ jobs:
         if: github.event_name == 'pull_request'
         continue-on-error: true
         working-directory: golden-irs/
-        run: git diff --exit-code ${{ github.event.pull_request.base.sha }}_ ${{ github.sha }}_
+        run: git diff --quiet ${{ github.event.pull_request.base.sha }}_ ${{ github.sha }}_
       - name: Shorten commit SHAs
         id: short-shas
         if: steps.diff.outcome == 'failure'
@@ -126,7 +126,7 @@ jobs:
           head_sha=${{ github.sha }}
           echo "head_sha=${head_sha::7}" >> "$GITHUB_OUTPUT"
       - if: steps.diff.outcome == 'failure'
-        uses: peter-evans/create-or-update-comment@v3.0.2
+        uses: peter-evans/create-or-update-comment@v3.1.0
         with:
           issue-number: ${{ github.event.pull_request.number }}
           token: ${{ secrets.GOLDEN_IR_COMMENT_TOKEN }}
@@ -139,14 +139,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dsherret/rust-toolchain-file@v1
-      - uses: Swatinem/rust-cache@v2.7.0
+      - uses: Swatinem/rust-cache@v2.7.1
       - name: Cache LLVM and Clang
         id: cache-llvm
         uses: actions/cache@v3
         with:
           path: ./llvm
           key: llvm-15.0
-      - uses: KyleMayes/install-llvm-action@v1.8.3
+      - uses: KyleMayes/install-llvm-action@v1.9.0
         with:
           version: "15.0"
           cached: ${{ steps.cache-llvm.outputs.cache-hit }}

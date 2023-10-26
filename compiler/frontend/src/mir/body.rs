@@ -334,8 +334,8 @@ impl BodyBuilder {
             .push_with_new_id(&mut self.id_generator, expression)
     }
 
-    pub fn push_int(&mut self, value: BigInt) -> Id {
-        self.push(Expression::Int(value))
+    pub fn push_int(&mut self, value: impl Into<BigInt>) -> Id {
+        self.push(Expression::Int(value.into()))
     }
     pub fn push_text(&mut self, value: String) -> Id {
         self.push(Expression::Text(value))
@@ -417,6 +417,25 @@ impl BodyBuilder {
             reason,
             responsible,
         })
+    }
+    pub fn push_panic_if_false(
+        &mut self,
+        hir_id: &hir::Id,
+        condition: Id,
+        reason: Id,
+        responsible: Id,
+    ) -> Id {
+        self.push_if_else(
+            hir_id,
+            condition,
+            |body| {
+                body.push_nothing();
+            },
+            |body| {
+                body.push_panic(reason, responsible);
+            },
+            responsible,
+        )
     }
 
     #[must_use]

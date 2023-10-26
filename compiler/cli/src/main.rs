@@ -1,5 +1,14 @@
 #![feature(lazy_cell)]
-#![warn(unused_crate_dependencies)]
+#![warn(clippy::nursery, clippy::pedantic, unused_crate_dependencies)]
+#![allow(
+    clippy::cognitive_complexity,
+    clippy::match_same_arms,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::module_name_repetitions,
+    clippy::similar_names,
+    clippy::too_many_lines
+)]
 
 use candy_vm::CAN_USE_STDOUT;
 use clap::Parser;
@@ -55,20 +64,19 @@ async fn main() -> ProgramResult {
         CandyOptions::Debug(options) => debug::debug(options),
         CandyOptions::Lsp => lsp::lsp().await,
         #[cfg(feature = "inkwell")]
-        CandyOptions::Inkwell(options) => inkwell::compile(options),
+        CandyOptions::Inkwell(options) => inkwell::compile(&options),
     }
 }
 
-type ProgramResult = Result<(), Exit>;
+pub type ProgramResult = Result<(), Exit>;
 #[derive(Debug)]
-enum Exit {
+pub enum Exit {
     CodePanicked,
     DirectoryNotFound,
     #[cfg(feature = "inkwell")]
     ExternalError,
     FileNotFound,
     FuzzingFoundFailingCases,
-    NoMainFunction,
     NotInCandyPackage,
     CodeContainsErrors,
     #[cfg(feature = "inkwell")]
