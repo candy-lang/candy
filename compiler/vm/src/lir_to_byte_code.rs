@@ -7,6 +7,7 @@ use candy_frontend::{
     cst::CstDb,
     error::{CompilerError, CompilerErrorPayload},
     hir,
+    hir_to_mir::ExecutionTarget,
     id::CountableId,
     lir::{Bodies, Body, BodyId, Constant, ConstantId, Constants, Expression, Id, Lir},
     lir_optimize::OptimizeLir,
@@ -21,15 +22,16 @@ use std::{mem, sync::Arc};
 
 pub fn compile_byte_code<Db>(
     db: &Db,
-    module: Module,
+    target: ExecutionTarget,
     tracing: TracingConfig,
 ) -> (ByteCode, Arc<FxHashSet<CompilerError>>)
 where
     Db: CstDb + OptimizeLir,
 {
+    let module = target.module().clone();
     #[allow(clippy::map_unwrap_or)]
     let (lir, errors) = db
-        .optimized_lir(module.clone(), tracing)
+        .optimized_lir(target, tracing)
         .map(|(lir, errors)| (lir, errors))
         .unwrap_or_else(|error| {
             let mut constants = Constants::default();
