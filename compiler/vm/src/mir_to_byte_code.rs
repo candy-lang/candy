@@ -69,7 +69,6 @@ where
         &FxHashSet::from_iter([hir::Id::new(module, vec![])]),
         &FxHashSet::default(),
         &[],
-        Id::from_usize(0),
         &mir.body,
     );
     module_function.set_body(start);
@@ -83,7 +82,6 @@ fn compile_function(
     original_hirs: &FxHashSet<hir::Id>,
     captured: &FxHashSet<Id>,
     parameters: &[Id],
-    responsible_parameter: Id,
     body: &Body,
 ) -> InstructionPointer {
     let mut context = LoweringContext {
@@ -98,14 +96,13 @@ fn compile_function(
     for parameter in parameters {
         context.stack.push(*parameter);
     }
-    context.stack.push(responsible_parameter);
 
     for (id, expression) in body.iter() {
         context.compile_expression(id, expression);
     }
     // Expressions may not push things onto the stack, but to the constant heap
     // instead.
-    if *context.stack.last().unwrap() != body.return_value() {
+    if context.stack.last() != Some(&body.return_value()) {
         context.emit_reference_to(body.return_value());
     }
 
@@ -248,7 +245,6 @@ impl<'c> LoweringContext<'c> {
             Expression::Function {
                 original_hirs,
                 parameters,
-                responsible_parameter,
                 body,
             } => {
                 let captured = expression
@@ -263,19 +259,18 @@ impl<'c> LoweringContext<'c> {
                     original_hirs,
                     &captured,
                     parameters,
-                    *responsible_parameter,
                     body,
                 );
 
                 if captured.is_empty() {
-                    let list = Function::create(
+                    let function = Function::create(
                         &mut self.byte_code.constant_heap,
                         false,
                         &[],
                         parameters.len(),
                         instructions,
                     );
-                    self.constants.insert(id, list.into());
+                    self.constants.insert(id, function.into());
                 } else {
                     for captured in &captured {
                         self.emit_reference_to(*captured);
@@ -299,13 +294,11 @@ impl<'c> LoweringContext<'c> {
             Expression::Call {
                 function,
                 arguments,
-                responsible,
             } => {
                 self.emit_reference_to(*function);
                 for argument in arguments {
                     self.emit_reference_to(*argument);
                 }
-                self.emit_reference_to(*responsible);
                 self.emit(
                     id,
                     Instruction::Call {
@@ -335,14 +328,12 @@ impl<'c> LoweringContext<'c> {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             } => {
                 self.emit_reference_to(*hir_call);
                 self.emit_reference_to(*function);
                 for argument in arguments {
                     self.emit_reference_to(*argument);
                 }
-                self.emit_reference_to(*responsible);
                 self.emit(
                     id,
                     Instruction::TraceCallStarts {
@@ -382,6 +373,9 @@ impl<'c> LoweringContext<'c> {
         }
     }
     fn emit(&mut self, id: Id, instruction: Instruction) {
+        if matches!(instruction, Instruction::PopMultipleBelowTop(0)) {
+            return;
+        }
         instruction.apply_to_stack(&mut self.stack, id);
         self.instructions.push(instruction);
     }

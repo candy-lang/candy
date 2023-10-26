@@ -73,24 +73,7 @@ impl ToRichIr for Bodies {
                 builder.push_definition(parameter_id, range);
             }
 
-            let responsible_parameter_id = body.responsible_parameter_id();
-            builder.push(
-                if body.parameter_count == 0 {
-                    " (responsible "
-                } else {
-                    " (+ responsible "
-                },
-                None,
-                EnumSet::empty(),
-            );
-            let range = builder.push(
-                responsible_parameter_id.to_string(),
-                TokenType::Parameter,
-                EnumSet::empty(),
-            );
-            builder.push_definition(responsible_parameter_id, range);
-
-            builder.push(") =", None, EnumSet::empty());
+            builder.push(" =", None, EnumSet::empty());
 
             builder.indent();
             builder.push_newline();
@@ -106,7 +89,6 @@ impl ToRichIr for Bodies {
 ///
 /// - captured variables
 /// - parameters
-/// - responsible parameter
 /// - locals
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Body {
@@ -152,16 +134,11 @@ impl Body {
     }
 
     #[must_use]
-    pub fn responsible_parameter_id(&self) -> Id {
-        Id::from_usize(self.captured_count + self.parameter_count)
-    }
-
-    #[must_use]
     pub fn expressions(&self) -> &[Expression] {
         &self.expressions
     }
     pub fn ids_and_expressions(&self) -> impl Iterator<Item = (Id, &Expression)> {
-        let offset = self.captured_count + self.parameter_count + 1;
+        let offset = self.captured_count + self.parameter_count;
         self.expressions
             .iter()
             .enumerate()

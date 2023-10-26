@@ -60,20 +60,12 @@ impl PurenessInsights {
         // TODO: Don't optimize lifted constants again.
         // Then, we can also add asserts here about not visiting them twice.
     }
-    pub(super) fn enter_function(&mut self, parameters: &[Id], responsible_parameter: Id) {
+    pub(super) fn enter_function(&mut self, parameters: &[Id]) {
         self.definition_pureness
             .extend(parameters.iter().map(|id| (*id, true)));
-        let _existing = self.definition_pureness.insert(responsible_parameter, true);
-        // TODO: Handle lifted constants properly.
-        // assert!(existing.is_none());
 
         self.definition_constness
             .extend(parameters.iter().map(|id| (*id, false)));
-        let _existing = self
-            .definition_constness
-            .insert(responsible_parameter, false);
-        // TODO: Handle lifted constants properly.
-        // assert!(existing.is_none());
     }
     pub(super) fn on_normalize_ids(&mut self, mapping: &FxHashMap<Id, Id>) {
         fn update(values: &mut FxHashMap<Id, bool>, mapping: &FxHashMap<Id, Id>) {

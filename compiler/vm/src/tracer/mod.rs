@@ -23,7 +23,6 @@ pub trait Tracer {
         _call_site: HirId,
         _callee: InlineObject,
         _arguments: Vec<InlineObject>,
-        _responsible: HirId,
     ) {
     }
     fn call_ended(&mut self, _heap: &mut Heap, _return_value: InlineObject) {}

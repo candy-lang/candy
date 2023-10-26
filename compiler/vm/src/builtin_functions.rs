@@ -1,7 +1,7 @@
 use crate::{
     heap::{Data, Function, Heap, HirId, InlineObject, Int, List, Struct, Tag, Text, ToDebugText},
     instructions::InstructionResult,
-    vm::{CallHandle, MachineState, Panic},
+    vm::{self, MachineState, Panic},
 };
 use candy_frontend::{
     builtin_functions::BuiltinFunction,
@@ -28,8 +28,10 @@ impl MachineState {
         heap: &mut Heap,
         builtin_function: BuiltinFunction,
         args: &[InlineObject],
-        responsible: HirId,
     ) -> InstructionResult {
+        let responsible: HirId = (*args.last().unwrap()).try_into().unwrap();
+        let args = &args[..args.len() - 1];
+
         let result = span!(Level::TRACE, "Running builtin").in_scope(|| match &builtin_function {
             BuiltinFunction::Equals => heap.equals(args),
             BuiltinFunction::FunctionRun => Heap::function_run(args, responsible),
@@ -85,7 +87,7 @@ impl MachineState {
             Ok(DivergeControlFlow {
                 function,
                 responsible,
-            }) => self.call_function(heap, function, &[], responsible),
+            }) => self.call_function(heap, function, &[responsible.into()]),
             Ok(CallHandle(call)) => InstructionResult::CallHandle(call),
             Err(reason) => InstructionResult::Panic(Panic {
                 reason,
@@ -98,11 +100,11 @@ impl MachineState {
 type BuiltinResult = Result<SuccessfulBehavior, String>;
 enum SuccessfulBehavior {
     Return(InlineObject),
+    CallHandle(vm::CallHandle),
     DivergeControlFlow {
         function: Function,
         responsible: HirId,
     },
-    CallHandle(CallHandle),
 }
 
 impl From<SuccessfulBehavior> for BuiltinResult {
@@ -188,16 +190,16 @@ impl Heap {
                                 .to_string(),
                         );
                     }
-                    CallHandle(CallHandle {
+                    CallHandle(vm::CallHandle {
                         handle,
                         arguments: vec![],
-                        responsible,
                     })
                 }
                 _ => return Err("`✨.functionRun` expects a function or handle".to_string()),
             }
         })
     }
+
     fn get_argument_count(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |function: Any| {
             let count = match **function {
@@ -206,7 +208,8 @@ impl Heap {
                 Data::Handle(handle) => handle.argument_count(),
                 _ => return Err("`✨.getArgumentCount` expects a function or handle".to_string()),
             };
-            Return(Int::create(self, true, count).into())
+            let count_without_responsibility = count - 1;
+            Return(Int::create(self, true, count_without_responsibility).into())
         })
     }
 

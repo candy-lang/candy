@@ -38,11 +38,7 @@ impl Body {
         let mut id_mapping = FxHashMap::default();
 
         let mut reference_count_adjustments = self.get_combined_reference_count_adjustments();
-        for id in self
-            .captured_ids()
-            .chain(self.parameter_ids())
-            .chain([self.responsible_parameter_id()])
-        {
+        for id in self.captured_ids().chain(self.parameter_ids()) {
             new_body.maybe_dup(&mut reference_count_adjustments, id, &id_mapping);
         }
 

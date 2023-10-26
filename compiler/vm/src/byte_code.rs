@@ -104,7 +104,7 @@ pub enum Instruction {
     /// a, reason, responsible -> 💥
     Panic,
 
-    /// a, HIR ID, function, arg1, arg2, ..., argN, responsible -> a
+    /// a, HIR ID, function, arg1, arg2, ..., argN -> a
     TraceCallStarts {
         num_args: usize,
     },
@@ -161,7 +161,6 @@ impl Instruction {
                 num_locals_to_pop,
                 num_args,
             } => {
-                stack.pop(); // responsible
                 stack.pop_multiple(*num_args);
                 stack.pop(); // function/builtin
                 stack.pop_multiple(*num_locals_to_pop);
@@ -177,21 +176,20 @@ impl Instruction {
                 stack.push(result);
             }
             Self::TraceCallStarts { num_args } => {
-                stack.pop(); // HIR ID
-                stack.pop(); // responsible
                 stack.pop_multiple(*num_args);
                 stack.pop(); // callee
+                stack.pop(); // HIR ID
             }
             Self::TraceCallEnds => {
                 stack.pop(); // return value
             }
             Self::TraceExpressionEvaluated => {
-                stack.pop(); // HIR ID
                 stack.pop(); // value
+                stack.pop(); // HIR ID
             }
             Self::TraceFoundFuzzableFunction => {
+                stack.pop(); // function
                 stack.pop(); // HIR ID
-                stack.pop(); // value
             }
         }
     }

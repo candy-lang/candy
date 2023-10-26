@@ -64,7 +64,9 @@ void print_candy_value(const candy_value_t *value)
         break;
     case CANDY_TYPE_LIST:
         printf("(");
-        candy_value_t *length = candy_builtin_list_length(value);
+        // TODO: The responsible parameter is not by builtin_list_length
+        // anyways, so we just pass anything.
+        candy_value_t *length = candy_builtin_list_length(value, value);
         size_t list_length = length->value.integer;
         free_candy_value(length);
         size_t index = 0;
@@ -189,11 +191,14 @@ void *get_candy_function_environment(candy_value_t *function)
     return function->value.function.environment;
 }
 
-void candy_panic(const candy_value_t *reason)
+void candy_panic(const candy_value_t *reason, const candy_value_t* responsible)
 {
     printf("The program panicked for the following reason: \n");
     print_candy_value(reason);
     printf("\n");
+    printf("The code at ");
+    print_candy_value(responsible);
+    printf(" is responsible.");
     exit(-1);
 }
 

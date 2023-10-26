@@ -27,13 +27,11 @@ impl Body {
             if let Expression::Function {
                 original_hirs: _,
                 parameters,
-                responsible_parameter,
                 body,
             } = expression
             {
                 let mut inner_visible = visible.clone();
                 inner_visible.extend(parameters.iter().copied());
-                inner_visible.insert(*responsible_parameter);
                 body.validate(defined_ids, inner_visible);
             }
 

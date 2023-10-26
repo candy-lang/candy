@@ -54,7 +54,6 @@ pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression)
     let Expression::Call {
         function,
         arguments,
-        responsible,
     } = &**expression
     else {
         return;
@@ -64,7 +63,7 @@ pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression)
         Expression::Tag {
             symbol,
             value: None,
-        } if arguments.len() == 1 => {
+        } if arguments.len() == 2 => {
             **expression = Expression::Tag {
                 symbol: symbol.clone(),
                 value: Some(arguments[0]),
@@ -72,12 +71,10 @@ pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression)
         }
         Expression::Builtin(builtin) => {
             let arguments = arguments.clone();
-            let responsible = *responsible;
             let Some(result) = run_builtin(
                 &mut *expression,
                 *builtin,
                 &arguments,
-                responsible,
                 context.visible,
                 context.id_generator,
                 context.pureness,
@@ -98,7 +95,6 @@ fn run_builtin(
     expression: &mut CurrentExpression,
     builtin: BuiltinFunction,
     arguments: &[Id],
-    responsible: Id,
     visible: &VisibleExpressions,
     id_generator: &mut IdGenerator<Id>,
     pureness: &PurenessInsights,
@@ -108,6 +104,7 @@ fn run_builtin(
         builtin.num_parameters(),
         "Wrong number of arguments for calling {builtin}",
     );
+    let (&responsible, arguments) = arguments.split_last().unwrap();
 
     let result = match builtin {
         BuiltinFunction::Equals => {
@@ -120,8 +117,7 @@ fn run_builtin(
             };
             Expression::Call {
                 function: *function,
-                arguments: vec![],
-                responsible,
+                arguments: vec![responsible],
             }
         }
         BuiltinFunction::GetArgumentCount => {
@@ -131,7 +127,8 @@ fn run_builtin(
             let Expression::Function { parameters, .. } = visible.get(*function) else {
                 return None;
             };
-            parameters.len().into()
+            // The responsibility parameter doesn't count.
+            (parameters.len() - 1).into()
         }
         BuiltinFunction::IfElse => {
             let [condition, then, else_] = arguments else {
@@ -140,8 +137,7 @@ fn run_builtin(
             let condition = visible.get(*condition).try_into().ok()?;
             Expression::Call {
                 function: if condition { *then } else { *else_ },
-                arguments: vec![],
-                responsible,
+                arguments: vec![responsible],
             }
         }
         BuiltinFunction::IntAdd => {

@@ -45,13 +45,11 @@ impl Tracer for DebugTracer {
         call_site: HirId,
         callee: InlineObject,
         arguments: Vec<InlineObject>,
-        responsible: HirId,
     ) {
         let call = Call {
             call_site,
             callee,
             arguments,
-            responsible,
         };
         call.dup(heap);
         self.call_stack.push(StackFrame::new(call));

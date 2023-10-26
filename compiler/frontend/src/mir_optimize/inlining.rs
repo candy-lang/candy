@@ -88,7 +88,6 @@ impl Context<'_> {
         let Expression::Call {
             function,
             arguments,
-            responsible: responsible_argument,
         } = &**expression
         else {
             // Expression is not a call.
@@ -102,7 +101,6 @@ impl Context<'_> {
         let Expression::Function {
             original_hirs: _,
             parameters,
-            responsible_parameter,
             body,
         } = self.visible.get(*function)
         else {
@@ -118,7 +116,6 @@ impl Context<'_> {
             .iter()
             .zip(arguments.iter())
             .map(|(parameter, argument)| (*parameter, *argument))
-            .chain([(*responsible_parameter, *responsible_argument)])
             .chain(
                 body.defined_ids()
                     .into_iter()

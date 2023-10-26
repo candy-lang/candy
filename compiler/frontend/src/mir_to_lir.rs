@@ -28,7 +28,6 @@ fn lir(db: &dyn MirToLir, module: Module, tracing: TracingConfig) -> LirResult {
         FxHashSet::from_iter([hir::Id::new(module, vec![])]),
         &[],
         &[],
-        mir::Id::from_usize(0),
         &mir.body,
     );
     let lir = Lir::new(context.constants, context.bodies);
@@ -52,17 +51,9 @@ impl LoweringContext {
         original_hirs: FxHashSet<hir::Id>,
         captured: &[mir::Id],
         parameters: &[mir::Id],
-        responsible_parameter: mir::Id,
         body: &mir::Body,
     ) -> lir::BodyId {
-        let body = CurrentBody::compile_function(
-            self,
-            original_hirs,
-            captured,
-            parameters,
-            responsible_parameter,
-            body,
-        );
+        let body = CurrentBody::compile_function(self, original_hirs, captured, parameters, body);
         self.bodies.push(body)
     }
 }
@@ -80,10 +71,9 @@ impl CurrentBody {
         original_hirs: FxHashSet<hir::Id>,
         captured: &[mir::Id],
         parameters: &[mir::Id],
-        responsible_parameter: mir::Id,
         body: &mir::Body,
     ) -> lir::Body {
-        let mut lir_body = Self::new(original_hirs, captured, parameters, responsible_parameter);
+        let mut lir_body = Self::new(original_hirs, captured, parameters);
         for (id, expression) in body.iter() {
             lir_body.compile_expression(context, id, expression);
         }
@@ -94,25 +84,23 @@ impl CurrentBody {
         original_hirs: FxHashSet<hir::Id>,
         captured: &[mir::Id],
         parameters: &[mir::Id],
-        responsible_parameter: mir::Id,
     ) -> Self {
         let body = lir::Body::new(original_hirs, captured.len(), parameters.len());
         let id_mapping: FxHashMap<_, _> = captured
             .iter()
             .chain(parameters.iter())
             .copied()
-            .chain([responsible_parameter])
             .enumerate()
             .map(|(index, id)| (id, lir::Id::from_usize(index)))
             .collect();
-        // The responsible parameter is a HIR ID, which is always constant.
-        // Hence, it never has to be dropped.
-        let ids_to_drop = id_mapping
-            .iter()
-            .filter(|(&k, _)| k != responsible_parameter)
-            .map(|(_, v)| v)
-            .copied()
-            .collect();
+
+        // Don't drop responsible parameters because they are guaranteed to be
+        // constant and thereby not reference-counted.
+        let mut ids_to_drop: FxHashSet<lir::Id> = id_mapping.values().copied().collect();
+        if let Some(responsible_id) = parameters.last() {
+            ids_to_drop.remove(&id_mapping[responsible_id]);
+        }
+
         Self {
             id_mapping,
             body,
@@ -215,7 +203,6 @@ impl CurrentBody {
             mir::Expression::Function {
                 original_hirs,
                 parameters,
-                responsible_parameter,
                 body,
             } => {
                 let captured = expression
@@ -225,13 +212,8 @@ impl CurrentBody {
                     .sorted()
                     .collect_vec();
 
-                let body_id = context.compile_function(
-                    original_hirs.clone(),
-                    &captured,
-                    parameters,
-                    *responsible_parameter,
-                    body,
-                );
+                let body_id =
+                    context.compile_function(original_hirs.clone(), &captured, parameters, body);
                 if captured.is_empty() {
                     self.push_constant(context, id, body_id);
                 } else {
@@ -243,17 +225,14 @@ impl CurrentBody {
             mir::Expression::Call {
                 function,
                 arguments,
-                responsible,
             } => {
                 let function = self.id_for(context, *function);
                 let arguments = self.ids_for(context, arguments);
-                let responsible = self.id_for(context, *responsible);
                 self.push(
                     id,
                     lir::Expression::Call {
                         function,
                         arguments,
-                        responsible,
                     },
                 );
             }
@@ -285,19 +264,16 @@ impl CurrentBody {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             } => {
                 let hir_call = self.id_for(context, *hir_call);
                 let function = self.id_for(context, *function);
                 let arguments = self.ids_for(context, arguments);
-                let responsible = self.id_for(context, *responsible);
                 self.push(
                     id,
                     lir::Expression::TraceCallStarts {
                         hir_call,
                         function,
                         arguments,
-                        responsible,
                     },
                 );
             }

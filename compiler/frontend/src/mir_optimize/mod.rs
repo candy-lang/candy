@@ -166,26 +166,19 @@ impl Context<'_> {
     fn optimize_expression(&mut self, expression: &mut CurrentExpression) {
         'outer: loop {
             if let Expression::Function {
-                parameters,
-                responsible_parameter,
-                body,
-                ..
+                parameters, body, ..
             } = &mut **expression
             {
                 for parameter in &*parameters {
                     self.visible.insert(*parameter, Expression::Parameter);
                 }
-                self.visible
-                    .insert(*responsible_parameter, Expression::Parameter);
-                self.pureness
-                    .enter_function(parameters, *responsible_parameter);
+                self.pureness.enter_function(parameters);
 
                 self.optimize_body(body);
 
                 for parameter in &*parameters {
                     self.visible.remove(*parameter);
                 }
-                self.visible.remove(*responsible_parameter);
             }
 
             loop {
@@ -211,6 +204,19 @@ impl Context<'_> {
                     break 'outer;
                 }
             }
+        }
+
+        // TODO: If this is a call to the `needs` function with `True` as the
+        // first argument, optimize it away. This is not correct – calling
+        // `needs True 3 4` should panic instead. But we figured this is
+        // temporarily fine until we have data flow.
+        if let Expression::Call { function, arguments, .. } = &**expression
+            && let Expression::Function { original_hirs, .. } = self.visible.get(*function)
+            && original_hirs.contains(&hir::Id::needs())
+            && arguments.len() == 4
+            && let Expression::Tag { symbol, value: None  } = self.visible.get(arguments[0])
+            && symbol == "True" {
+            **expression = Expression::nothing();
         }
     }
 }

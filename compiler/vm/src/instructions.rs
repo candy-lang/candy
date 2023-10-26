@@ -115,7 +115,6 @@ impl MachineState {
                 InstructionResult::Done
             }
             Instruction::Call { num_args } => {
-                let responsible = self.pop_from_data_stack().try_into().unwrap();
                 let mut arguments = (0..*num_args)
                     .map(|_| self.pop_from_data_stack())
                     .collect_vec();
@@ -123,13 +122,12 @@ impl MachineState {
                 arguments.reverse();
                 let callee = self.pop_from_data_stack();
 
-                self.call(heap, callee, &arguments, responsible)
+                self.call(heap, callee, &arguments)
             }
             Instruction::TailCall {
                 num_locals_to_pop,
                 num_args,
             } => {
-                let responsible = self.pop_from_data_stack().try_into().unwrap();
                 let mut arguments = (0..*num_args)
                     .map(|_| self.pop_from_data_stack())
                     .collect_vec();
@@ -143,7 +141,7 @@ impl MachineState {
                 // Tail calling a function is basically just a normal call, but
                 // pretending we are our caller.
                 self.next_instruction = self.call_stack.pop();
-                self.call(heap, callee, &arguments, responsible)
+                self.call(heap, callee, &arguments)
             }
             Instruction::Return => {
                 self.next_instruction = self.call_stack.pop();
@@ -168,7 +166,6 @@ impl MachineState {
                 })
             }
             Instruction::TraceCallStarts { num_args } => {
-                let responsible = self.pop_from_data_stack().try_into().unwrap();
                 let mut args = vec![];
                 for _ in 0..*num_args {
                     args.push(self.pop_from_data_stack());
@@ -177,7 +174,7 @@ impl MachineState {
                 let call_site = self.pop_from_data_stack().try_into().unwrap();
 
                 args.reverse();
-                tracer.call_started(heap, call_site, callee, args, responsible);
+                tracer.call_started(heap, call_site, callee, args);
                 InstructionResult::Done
             }
             Instruction::TraceCallEnds => {
@@ -210,25 +207,33 @@ impl MachineState {
         heap: &mut Heap,
         callee: InlineObject,
         arguments: &[InlineObject],
-        responsible: HirId,
     ) -> InstructionResult {
         match callee.into() {
-            Data::Function(function) => self.call_function(heap, function, arguments, responsible),
+            Data::Function(function) => self.call_function(heap, function, arguments),
             Data::Builtin(builtin) => {
                 callee.drop(heap);
-                self.run_builtin_function(heap, builtin.get(), arguments, responsible)
+                self.run_builtin_function(heap, builtin.get(), arguments)
             }
             Data::Handle(handle) => {
                 let parameter_count = handle.argument_count();
                 let argument_count = arguments.len();
                 if argument_count != parameter_count {
+                    let responsible: HirId = arguments.last().unwrap().clone().try_into().unwrap();
                     return InstructionResult::Panic(Panic {
                         reason: format!(
                             "A function expected {} {}, but you called it with {} {}.",
                             parameter_count,
-                            if parameter_count == 1 { "parameter" } else { "parameters" },
+                            if parameter_count == 1 {
+                                "parameter"
+                            } else {
+                                "parameters"
+                            },
                             argument_count,
-                            if argument_count == 1 { "argument" } else { "arguments" },
+                            if argument_count == 1 {
+                                "argument"
+                            } else {
+                                "arguments"
+                            },
                         ),
                         responsible: responsible.get().clone(),
                     });
@@ -236,10 +241,10 @@ impl MachineState {
                 InstructionResult::CallHandle(CallHandle {
                     handle,
                     arguments: arguments.to_vec(),
-                    responsible,
                 })
-            },
+            }
             Data::Tag(tag) => {
+                let responsible: HirId = (*arguments.last().unwrap()).try_into().unwrap();
                 if tag.has_value() {
                     return InstructionResult::Panic(Panic {
                         reason: "A tag's value cannot be overwritten by calling it. Use `tag.withValue` instead.".to_string(),
@@ -262,12 +267,15 @@ impl MachineState {
                 })
                 }
             }
-            _ => InstructionResult::Panic(Panic {
-                reason: format!(
-                    "You can only call functions, builtins, tags, and handles, but you tried to call {callee}.",
-                ),
-                responsible: responsible.get().clone(),
-            }),
+            _ => {
+                let responsible: HirId = (*arguments.last().unwrap()).try_into().unwrap();
+                InstructionResult::Panic(Panic {
+                    reason: format!(
+                        "You can only call functions, builtins, tags, and handles, but you tried to call {callee}.",
+                    ),
+                    responsible: responsible.get().clone(),
+                })
+            }
         }
     }
     pub fn call_function(
@@ -275,10 +283,10 @@ impl MachineState {
         heap: &mut Heap,
         function: Function,
         arguments: &[InlineObject],
-        responsible: HirId,
     ) -> InstructionResult {
         let expected_num_args = function.argument_count();
         if arguments.len() != expected_num_args {
+            let responsible: HirId = (*arguments.last().unwrap()).try_into().unwrap();
             return InstructionResult::Panic(Panic {
                 reason: format!(
                     "A function expected {expected_num_args} parameters, but you called it with {} arguments.",
@@ -297,7 +305,6 @@ impl MachineState {
         }
         self.data_stack.extend_from_slice(captured);
         self.data_stack.extend_from_slice(arguments);
-        self.push_to_data_stack(responsible);
         self.next_instruction = Some(function.body());
         InstructionResult::Done
     }

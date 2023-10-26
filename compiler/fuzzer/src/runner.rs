@@ -75,17 +75,18 @@ impl<B: Borrow<ByteCode> + Clone> Runner<B> {
             .clone_to_heap_with_mapping(&mut heap, &mut mapping)
             .try_into()
             .unwrap();
-        let arguments = input
+        let mut arguments = input
             .arguments
             .clone_to_heap_with_mapping(&mut heap, &mut mapping);
-        let responsible = HirId::create(&mut heap, true, Id::fuzzer());
+        let fuzzer_responsibility = HirId::create(&mut heap, true, Id::fuzzer());
+        arguments.push(fuzzer_responsibility.into());
 
         let vm = Vm::for_function(
             byte_code.clone(),
             &mut heap,
+            fuzzer_responsibility,
             function,
             &arguments,
-            responsible,
             StackTracer::default(),
         );
 

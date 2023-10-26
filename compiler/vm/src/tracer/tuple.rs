@@ -19,9 +19,8 @@ impl Tracer for Tuple {
         call_site: HirId,
         callee: InlineObject,
         arguments: Vec<InlineObject>,
-        responsible: HirId,
     ) {
-        for_tuples!( #(Tuple.call_started(heap, call_site, callee, arguments.clone(), responsible);)* );
+        for_tuples!( #(Tuple.call_started(heap, call_site, callee, arguments.clone());)* );
     }
     fn call_ended(&mut self, heap: &mut Heap, return_value: InlineObject) {
         for_tuples!( #(Tuple.call_ended(heap, return_value);)* );

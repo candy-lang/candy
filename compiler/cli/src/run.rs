@@ -93,9 +93,9 @@ pub fn run(options: Options) -> ProgramResult {
     let vm = Vm::for_function(
         byte_code.clone(),
         &mut heap,
-        main,
-        &[environment_object],
         platform,
+        main,
+        &[environment_object, platform.into()],
         StackTracer::default(),
     );
     let VmFinished { result, .. } = vm.run_forever_with_environment(&mut heap, &mut environment);

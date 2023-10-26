@@ -593,9 +593,7 @@ impl<'ctx> CodeGen<'ctx> {
                     original_hirs,
                     parameters,
                     body,
-                    responsible_parameter,
                 } => {
-                    self.unrepresented_ids.insert(*responsible_parameter);
                     let name = original_hirs
                         .iter()
                         .sorted()
@@ -686,9 +684,7 @@ impl<'ctx> CodeGen<'ctx> {
                 candy_frontend::mir::Expression::Call {
                     function,
                     arguments,
-                    responsible,
                 } => {
-                    self.unrepresented_ids.insert(*responsible);
                     let mut args: Vec<_> = arguments
                         .iter()
                         .map(|arg| self.get_value_with_id(function_ctx, arg).unwrap().into())
@@ -764,12 +760,17 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                 }
                 candy_frontend::mir::Expression::UseModule { .. } => unreachable!(),
-                candy_frontend::mir::Expression::Panic { reason, .. } => {
+                candy_frontend::mir::Expression::Panic {
+                    reason,
+                    responsible,
+                } => {
                     let panic_fn = self.module.get_function("candy_panic").unwrap();
 
                     let reason = self.get_value_with_id(function_ctx, reason).unwrap();
+                    let responsible = self.get_value_with_id(function_ctx, responsible).unwrap();
 
-                    self.builder.build_call(panic_fn, &[reason.into()], "");
+                    self.builder
+                        .build_call(panic_fn, &[reason.into(), responsible.into()], "");
 
                     self.builder.build_unreachable();
 

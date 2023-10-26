@@ -24,24 +24,19 @@ pub struct Call {
     pub call_site: HirId,
     pub callee: InlineObject,
     pub arguments: Vec<InlineObject>,
-    pub responsible: HirId,
 }
 impl Call {
     pub fn dup(&self, heap: &mut Heap) {
-        self.call_site.dup();
         self.callee.dup(heap);
         for argument in &self.arguments {
             argument.dup(heap);
         }
-        self.responsible.dup();
     }
     pub fn drop(&self, heap: &mut Heap) {
-        self.call_site.drop(heap);
         self.callee.drop(heap);
         for argument in &self.arguments {
             argument.drop(heap);
         }
-        self.responsible.drop(heap);
     }
 }
 
@@ -52,13 +47,11 @@ impl Tracer for StackTracer {
         call_site: HirId,
         callee: InlineObject,
         arguments: Vec<InlineObject>,
-        responsible: HirId,
     ) {
         let call = Call {
             call_site,
             callee,
             arguments,
-            responsible,
         };
         call.dup(heap);
         self.call_stack.push(call);

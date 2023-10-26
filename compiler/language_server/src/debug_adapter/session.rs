@@ -219,9 +219,9 @@ impl DebugSession {
                 let vm = Vm::for_function(
                     Rc::new(byte_code),
                     &mut heap,
-                    main,
-                    &[environment],
                     platform,
+                    main,
+                    &[environment, platform.into()],
                     tracer,
                 );
 

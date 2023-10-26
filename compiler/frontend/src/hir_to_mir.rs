@@ -94,7 +94,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
         let true_tag = body.push_bool(true);
         let false_tag = body.push_bool(false);
         let is_condition_true =
-            body.push_call(builtin_equals, vec![condition, true_tag], needs_code);
+            body.push_call(builtin_equals, vec![condition, true_tag, needs_code]);
         let is_condition_bool = body.push_if_else(
             &needs_id.child("isConditionTrue"),
             is_condition_true,
@@ -102,7 +102,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
                 body.push_reference(true_tag);
             },
             |body| {
-                body.push_call(builtin_equals, vec![condition, false_tag], needs_code);
+                body.push_call(builtin_equals, vec![condition, false_tag, needs_code]);
             },
             needs_code,
         );
@@ -122,12 +122,11 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
 
         // Make sure the reason is a text.
         let builtin_type_of = body.push_builtin(BuiltinFunction::TypeOf);
-        let type_of_reason = body.push_call(builtin_type_of, vec![reason], responsible_for_call);
+        let type_of_reason = body.push_call(builtin_type_of, vec![reason, responsible_for_call]);
         let text_tag = body.push_tag("Text".to_string(), None);
         let is_reason_text = body.push_call(
             builtin_equals,
-            vec![type_of_reason, text_tag],
-            responsible_for_call,
+            vec![type_of_reason, text_tag, responsible_for_call],
         );
         body.push_if_else(
             &needs_id.child("isReasonText"),
@@ -270,8 +269,7 @@ impl<'a> LoweringContext<'a> {
                             let one = body.push_int(1.into());
                             let reason = body.push_call(
                                 list_get_function,
-                                vec![pattern_result, one],
-                                responsible,
+                                vec![pattern_result, one, responsible],
                             );
 
                             body.push_panic(reason, responsible);
@@ -290,7 +288,7 @@ impl<'a> LoweringContext<'a> {
                     let list_get = body.push_builtin(BuiltinFunction::ListGet);
                     let index = body.push_int((identifier_id.0 + 1).into());
                     let responsible = body.push_hir_id(hir_id.clone());
-                    body.push_call(list_get, vec![result, index], responsible)
+                    body.push_call(list_get, vec![result, index, responsible])
                 }
             }
             hir::Expression::Match { expression, cases } => {
@@ -346,22 +344,21 @@ impl<'a> LoweringContext<'a> {
                 function,
                 arguments,
             } => {
-                let responsible = body.push_hir_id(hir_id.clone());
+                let call_site = body.push_hir_id(hir_id.clone());
                 let arguments = arguments
                     .iter()
                     .map(|argument| self.mapping[argument])
+                    .chain([call_site])
                     .collect_vec();
 
                 if self.tracing.calls.is_enabled() {
-                    let hir_call = body.push_hir_id(hir_id.clone());
                     body.push(Expression::TraceCallStarts {
-                        hir_call,
+                        hir_call: call_site,
                         function: self.mapping[function],
                         arguments: arguments.clone(),
-                        responsible,
                     });
                 }
-                let call = body.push_call(self.mapping[function], arguments, responsible);
+                let call = body.push_call(self.mapping[function], arguments);
                 if self.tracing.calls.is_enabled() {
                     body.push(Expression::TraceCallEnds { return_value: call });
                     body.push_reference(call)
@@ -389,8 +386,8 @@ impl<'a> LoweringContext<'a> {
                         self.mapping[condition],
                         self.mapping[reason],
                         responsible_for_needs,
+                        responsible,
                     ],
-                    responsible,
                 )
             }
             hir::Expression::Error { errors, .. } => {
@@ -474,8 +471,7 @@ impl<'a> LoweringContext<'a> {
                     let one = body.push_int(1.into());
                     let reason = body.push_call(
                         list_get_function,
-                        vec![pattern_result, one],
-                        responsible_for_match,
+                        vec![pattern_result, one, responsible_for_match],
                     );
                     no_match_reasons.push(reason);
 
@@ -492,8 +488,12 @@ impl<'a> LoweringContext<'a> {
                 });
                 body.push_call(
                     builtin_if_else,
-                    vec![is_match, then_function, else_function],
-                    responsible_for_match,
+                    vec![
+                        is_match,
+                        then_function,
+                        else_function,
+                        responsible_for_match,
+                    ],
                 )
             }
         }
@@ -544,18 +544,17 @@ impl PatternLoweringContext {
                         body.push_builtin(BuiltinFunction::TagWithoutValue);
                     let actual_symbol = body.push_call(
                         builtin_tag_without_value,
-                        vec![expression],
-                        self.responsible,
+                        vec![expression, self.responsible],
                     );
                     let expected_symbol = body.push_tag(symbol.clone(), None);
                     self.compile_equals(body, expected_symbol, actual_symbol, |body| {
                         let builtin_tag_has_value = body.push_builtin(BuiltinFunction::TagHasValue);
-                        let actual_has_value = body.push_call(builtin_tag_has_value, vec![expression], self.responsible);
+                        let actual_has_value = body.push_call(builtin_tag_has_value, vec![expression, self.responsible]);
                         let expected_has_value = body.push_bool(value.is_some());
                         self.compile_equals(body, expected_has_value, actual_has_value, |body| {
                             if let Some(value) = value {
                                 let builtin_tag_get_value = body.push_builtin(BuiltinFunction::TagGetValue);
-                                let actual_value = body.push_call(builtin_tag_get_value, vec![expression], self.responsible);
+                                let actual_value = body.push_call(builtin_tag_get_value, vec![expression, self.responsible]);
                                 self.compile(body, actual_value, value);
                             } else {
                                 self.push_match(body, vec![]);
@@ -567,9 +566,9 @@ impl PatternLoweringContext {
                                 ]
                             } else {
                                 let builtin_tag_get_value = body.push_builtin(BuiltinFunction::TagGetValue);
-                                let actual_value = body.push_call(builtin_tag_get_value, vec![expression], self.responsible);
+                                let actual_value = body.push_call(builtin_tag_get_value, vec![expression, self.responsible]);
                                 let builtin_to_debug_text = body.push_builtin(BuiltinFunction::ToDebugText);
-                                let actual_value_text = body.push_call(builtin_to_debug_text, vec![actual_value], self.responsible);
+                                let actual_value_text = body.push_call(builtin_to_debug_text, vec![actual_value, self.responsible]);
                                 vec![
                                     body.push_text("Expected tag to not have a value, but it has one: `".to_string()),
                                     actual_value_text,
@@ -598,7 +597,7 @@ impl PatternLoweringContext {
                     let expected = body.push_int(list.len().into());
                     let builtin_list_length = body.push_builtin(BuiltinFunction::ListLength);
                     let actual_length =
-                        body.push_call(builtin_list_length, vec![expression], self.responsible);
+                        body.push_call(builtin_list_length, vec![expression, self.responsible]);
                     self.compile_equals(
                         body,
                         expected,
@@ -614,8 +613,7 @@ impl PatternLoweringContext {
                                         let index = body.push_int(index.into());
                                         let item = body.push_call(
                                             builtin_list_get,
-                                            vec![expression, index],
-                                            self.responsible,
+                                            vec![expression, index, self.responsible],
                                         );
                                         let result = self.compile(body, item, item_pattern);
                                         (result, item_pattern.captured_identifier_count())
@@ -651,8 +649,7 @@ impl PatternLoweringContext {
                                 let key = self.compile_pattern_to_key_expression(body, key_pattern);
                                 let has_key = body.push_call(
                                     builtin_struct_has_key,
-                                    vec![expression, key],
-                                    self.responsible,
+                                    vec![expression, key, self.responsible,],
                                 );
 
                                 let result = body.push_if_else(
@@ -661,8 +658,7 @@ impl PatternLoweringContext {
                                     |body| {
                                         let value = body.push_call(
                                             builtin_struct_get,
-                                            vec![expression, key],
-                                            self.responsible,
+                                            vec![expression, key, self.responsible],
                                         );
                                         self.compile(body, value, value_pattern);
                                     },
@@ -672,14 +668,12 @@ impl PatternLoweringContext {
 
                                         let key_as_text = body.push_call(
                                             to_debug_text,
-                                            vec![key],
-                                            self.responsible,
+                                            vec![key, self.responsible],
                                         );
 
                                         let struct_as_text = body.push_call(
                                             to_debug_text,
-                                            vec![expression],
-                                            self.responsible,
+                                            vec![expression, self.responsible],
                                         );
 
                                         let reason_parts = vec![
@@ -736,7 +730,7 @@ impl PatternLoweringContext {
                                     let Some(index) = index else { return body.push_reference(nothing); };
 
                                     let index = body.push_int((1 + index).into());
-                                    body.push_call(list_get_function, vec![result, index], self.responsible)
+                                    body.push_call(list_get_function, vec![result, index, self.responsible])
                                 })
                                 .collect();
                             self.push_match(body, captured_identifiers);
@@ -791,7 +785,7 @@ impl PatternLoweringContext {
     {
         let expected_type = body.push_tag(expected_type, None);
         let builtin_type_of = body.push_builtin(BuiltinFunction::TypeOf);
-        let type_ = body.push_call(builtin_type_of, vec![expression], self.responsible);
+        let type_ = body.push_call(builtin_type_of, vec![expression, self.responsible]);
         self.compile_equals(
             body,
             expected_type,
@@ -822,7 +816,7 @@ impl PatternLoweringContext {
         E: FnOnce(&mut BodyBuilder, Id, Id) -> Vec<Id>,
     {
         let builtin_equals = body.push_builtin(BuiltinFunction::Equals);
-        let equals = body.push_call(builtin_equals, vec![expected, actual], self.responsible);
+        let equals = body.push_call(builtin_equals, vec![expected, actual, self.responsible]);
 
         body.push_if_else(
             &self.hir_id.child("equals"),
@@ -831,8 +825,8 @@ impl PatternLoweringContext {
             |body| {
                 let to_debug_text = body.push_builtin(BuiltinFunction::ToDebugText);
                 let expected_as_text =
-                    body.push_call(to_debug_text, vec![expected], self.responsible);
-                let actual_as_text = body.push_call(to_debug_text, vec![actual], self.responsible);
+                    body.push_call(to_debug_text, vec![expected, self.responsible]);
+                let actual_as_text = body.push_call(to_debug_text, vec![actual, self.responsible]);
                 let reason_parts = reason_factory(body, expected_as_text, actual_as_text);
                 let reason = self.push_text_concatenate(body, reason_parts);
                 self.push_no_match(body, reason);
@@ -896,8 +890,7 @@ impl PatternLoweringContext {
                     let index = body.push_int((index + 1).into());
                     let captured_identifier = body.push_call(
                         list_get_function,
-                        vec![return_value, index],
-                        self.responsible,
+                        vec![return_value, index, self.responsible],
                     );
                     captured_identifiers.push(captured_identifier);
                 }
@@ -919,8 +912,7 @@ impl PatternLoweringContext {
             .reduce(|left, right| {
                 body.push_call(
                     builtin_text_concatenate,
-                    vec![left, right],
-                    self.responsible,
+                    vec![left, right, self.responsible],
                 )
             })
             .unwrap()
@@ -951,16 +943,14 @@ impl BodyBuilder {
         let zero = self.push_int(0.into());
         let match_or_no_match_tag = self.push_call(
             list_get_function,
-            vec![match_or_no_match, zero],
-            responsible,
+            vec![match_or_no_match, zero, responsible],
         );
 
         let equals_function = self.push_builtin(BuiltinFunction::Equals);
         let match_tag = self.push_match_tag();
         self.push_call(
             equals_function,
-            vec![match_or_no_match_tag, match_tag],
-            responsible,
+            vec![match_or_no_match_tag, match_tag, responsible],
         )
     }
 

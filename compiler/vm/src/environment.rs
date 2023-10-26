@@ -59,9 +59,9 @@ impl DefaultEnvironment {
             .map(|it| Text::create(heap, true, it).into())
             .collect_vec();
         let arguments = List::create(heap, true, arguments.as_slice());
-        let get_random_bytes_handle = Handle::new(heap, 1);
-        let stdin_handle = Handle::new(heap, 0);
-        let stdout_handle = Handle::new(heap, 1);
+        let get_random_bytes_handle = Handle::new(heap, 2);
+        let stdin_handle = Handle::new(heap, 1);
+        let stdout_handle = Handle::new(heap, 2);
         let environment_object = Struct::create_with_symbol_keys(
             heap,
             true,

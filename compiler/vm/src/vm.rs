@@ -35,7 +35,6 @@ pub struct MachineState {
 pub struct CallHandle {
     pub handle: Handle,
     pub arguments: Vec<InlineObject>,
-    pub responsible: HirId,
 }
 
 #[derive(Clone, Debug)]
@@ -52,25 +51,19 @@ where
     pub fn for_function(
         byte_code: B,
         heap: &mut Heap,
+        call_site: HirId,
         function: Function,
         arguments: &[InlineObject],
-        responsible: HirId,
         mut tracer: T,
     ) -> Self {
-        tracer.call_started(
-            heap,
-            responsible,
-            function.into(),
-            arguments.to_vec(),
-            responsible,
-        );
+        tracer.call_started(heap, call_site, function.into(), arguments.to_vec());
 
         let mut state = MachineState {
             next_instruction: None,
             data_stack: vec![],
             call_stack: vec![],
         };
-        state.call_function(heap, function, arguments, responsible);
+        state.call_function(heap, function, arguments);
 
         let inner = Box::new(VmInner {
             byte_code,
@@ -93,7 +86,7 @@ where
             0,
             "Function is not a module function because it has arguments.",
         );
-        Self::for_function(byte_code, heap, function, &[], responsible, tracer)
+        Self::for_function(byte_code, heap, responsible, function, &[], tracer)
     }
 
     #[must_use]

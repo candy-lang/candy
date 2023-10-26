@@ -242,21 +242,16 @@ impl Body {
         visitor: &mut dyn FnMut(Id, &mut Expression, &VisibleExpressions, bool),
     ) {
         if let Expression::Function {
-            parameters,
-            responsible_parameter,
-            body,
-            ..
+            parameters, body, ..
         } = expression
         {
             for parameter in &*parameters {
                 visible.insert(*parameter, Expression::Parameter);
             }
-            visible.insert(*responsible_parameter, Expression::Parameter);
             body.visit_with_visible_rec(visible, visitor);
             for parameter in &*parameters {
                 visible.remove(*parameter);
             }
-            visible.remove(*responsible_parameter);
         }
 
         visitor(id, expression, visible, is_returned);
@@ -308,8 +303,11 @@ impl FunctionBodyBuilder {
         let (id_generator, body) = self.body_builder.finish();
         let function = Expression::Function {
             original_hirs: vec![self.hir_id].into_iter().collect(),
-            parameters: self.parameters,
-            responsible_parameter: self.responsible_parameter,
+            parameters: self
+                .parameters
+                .into_iter()
+                .chain([self.responsible_parameter])
+                .collect(),
             body,
         };
         (id_generator, function)
@@ -383,11 +381,10 @@ impl BodyBuilder {
         self.push(function)
     }
 
-    pub fn push_call(&mut self, function: Id, arguments: Vec<Id>, responsible: Id) -> Id {
+    pub fn push_call(&mut self, function: Id, arguments: Vec<Id>) -> Id {
         self.push(Expression::Call {
             function,
             arguments,
-            responsible,
         })
     }
     pub fn push_if_else<T, E>(
@@ -407,8 +404,7 @@ impl BodyBuilder {
         let else_function = self.push_function(hir_id.child("else"), |body, _| else_builder(body));
         self.push_call(
             builtin_if_else,
-            vec![condition, then_function, else_function],
-            responsible,
+            vec![condition, then_function, else_function, responsible],
         )
     }
 

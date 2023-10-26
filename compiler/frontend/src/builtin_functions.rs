@@ -129,7 +129,8 @@ impl BuiltinFunction {
 
     #[must_use]
     pub const fn num_parameters(&self) -> usize {
-        match self {
+        // Responsibility parameter.
+        1 + match self {
             Self::Equals => 2,
             Self::FunctionRun => 1,
             Self::GetArgumentCount => 1,

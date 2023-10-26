@@ -114,8 +114,7 @@ pub fn run(byte_code: impl Borrow<ByteCode>) -> (Heap, InlineObject) {
         byte_code,
         &mut heap,
         main,
-        &[environment.into()],
-        responsible,
+        &[environment.into(), responsible.into()],
         tracer,
     )
     .run_forever_without_handles(&mut heap);
