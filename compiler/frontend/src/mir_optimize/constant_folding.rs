@@ -600,7 +600,7 @@ fn run_builtin(
                 unreachable!()
             };
             let formatted =
-                format_value(*argument, Precedence::High, MaxLength::Unlimited, &|id| {
+                format_value(*argument, Precedence::Low, MaxLength::Unlimited, &|id| {
                     Some(match visible.get(id) {
                         Expression::Int(int) => FormatValue::Int(Cow::Borrowed(int)),
                         Expression::Text(text) => FormatValue::Text(text),
