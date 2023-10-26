@@ -110,13 +110,24 @@ impl DataFlow {
         insights.map_ids(mapping);
         insights
     }
-    pub(super) fn on_constants_lifted(&mut self, lifted_constants: impl IntoIterator<Item = Id>) {
+    pub(super) fn on_constant_lifted(
+        &mut self,
+        constant_id: Id,
+        new_reference_id: impl Into<Option<Id>>,
+    ) {
         let [.., outer_scope, inner_scope] = self.scopes.as_mut_slice() else {
             panic!();
         };
-        for constant in lifted_constants {
-            inner_scope.locals.force_remove(&constant);
-            outer_scope.locals.force_insert(constant);
+
+        if let Some(value) = inner_scope.remove(constant_id) {
+            outer_scope.insert(constant_id, value);
+        } else {
+            // The value wasn't needed and got optimized away.
+            outer_scope.locals.force_insert(constant_id);
+        }
+
+        if let Some(new_reference_id) = new_reference_id.into() {
+            inner_scope.insert(new_reference_id, constant_id);
         }
     }
     pub(super) fn on_call_inlined(

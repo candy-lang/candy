@@ -170,6 +170,10 @@ impl DataFlowScope {
         self.locals.force_insert(id);
         self.state.timeline.insert(id, value);
     }
+    pub(super) fn remove(&mut self, id: Id) -> Option<FlowValue> {
+        self.locals.force_remove(&id);
+        self.state.timeline.remove(id)
+    }
 
     pub fn finalize(mut self) -> DataFlowInsights {
         self.state.reduce();

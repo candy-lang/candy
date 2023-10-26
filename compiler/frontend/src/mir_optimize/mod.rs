@@ -228,8 +228,6 @@ impl Context<'_> {
                 self.visible.remove(*responsible_parameter);
 
                 let constants = constant_lifting::lift_constants(self, body);
-                self.data_flow
-                    .on_constants_lifted(constants.iter().map(|(id, _)| *id));
                 expression.prepend_optimized(&mut self.visible, constants);
                 self.data_flow
                     .exit_function(expression.id(), &parameters, return_value);

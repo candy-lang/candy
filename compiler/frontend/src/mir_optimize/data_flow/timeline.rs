@@ -22,8 +22,8 @@ impl Timeline {
     pub fn replace(&mut self, id: Id, value: impl Into<FlowValue>) {
         self.values.force_replace(id, value.into());
     }
-    pub fn remove(&mut self, id: Id) {
-        self.values.remove(&id);
+    pub fn remove(&mut self, id: Id) -> Option<FlowValue> {
+        self.values.remove(&id)
     }
 
     pub fn visit_referenced_ids(&self, visit: &mut impl FnMut(Id)) {

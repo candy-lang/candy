@@ -59,11 +59,20 @@ pub fn lift_constants(context: &mut Context, body: &mut Body) -> Vec<(Id, Expres
 
         constants.push(body.expressions.remove(index));
 
-        if is_return_value {
+        let new_reference_id = if is_return_value {
             // The return value was removed. Add a reference to the lifted
             // constant.
-            body.push(context.id_generator.generate(), Expression::Reference(id));
-        }
+            let id = context.id_generator.generate();
+            let expression = Expression::Reference(id);
+            context.pureness.visit_optimized(id, &expression);
+            body.push(id, expression);
+            Some(id)
+        } else {
+            None
+        };
+        context
+            .data_flow
+            .on_constant_lifted(constants.last().unwrap().0, new_reference_id);
     }
 
     constants
