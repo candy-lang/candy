@@ -40,7 +40,7 @@ use walkdir::WalkDir;
 /// This command compiles the given file and outputs its intermediate
 /// representation.
 #[derive(Parser, Debug)]
-pub(crate) enum Options {
+pub enum Options {
     /// Raw Concrete Syntax Tree
     Rcst(OnlyPath),
 
@@ -77,7 +77,7 @@ pub(crate) enum Options {
 }
 
 #[derive(Parser, Debug)]
-pub(crate) struct OnlyPath {
+pub struct OnlyPath {
     #[arg(value_hint = ValueHint::FilePath)]
     path: PathBuf,
 }
@@ -100,7 +100,8 @@ pub(crate) struct PathAndExecutionTargetAndTracing {
     trace_evaluated_expressions: bool,
 }
 impl PathAndExecutionTargetAndTracing {
-    fn to_tracing_config(&self) -> TracingConfig {
+    #[must_use]
+    const fn to_tracing_config(&self) -> TracingConfig {
         TracingConfig {
             register_fuzzables: TracingMode::only_current_or_off(self.register_fuzzables),
             calls: TracingMode::only_current_or_off(self.trace_calls),
@@ -225,6 +226,7 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
 
         let in_annotation = str::from_utf8(&bytes[*range.start..*range.end]).unwrap();
 
+        #[allow(clippy::option_if_let_else)]
         if let Some(token_type) = token_type {
             let color = match token_type {
                 TokenType::Module => Color::BrightYellow,
@@ -240,7 +242,7 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
             };
             print!("{}", in_annotation.color(color));
         } else {
-            print!("{in_annotation}")
+            print!("{in_annotation}");
         }
 
         displayed_byte = range.end;
@@ -254,7 +256,7 @@ pub(crate) fn debug(options: Options) -> ProgramResult {
 /// Dump IRs next to the original files to compare outputs of different compiler
 /// versions.
 #[derive(Parser, Debug)]
-pub(crate) enum Gold {
+pub enum Gold {
     /// For each Candy file, generate the IRs next to the file.
     Generate(GoldOptions),
 
@@ -262,7 +264,7 @@ pub(crate) enum Gold {
     Check(GoldOptions),
 }
 #[derive(Parser, Debug)]
-pub(crate) struct GoldOptions {
+pub struct GoldOptions {
     #[arg(value_hint = ValueHint::DirPath)]
     directory: Option<PathBuf>,
 
@@ -275,10 +277,10 @@ pub(crate) struct GoldOptions {
 impl Gold {
     fn run(&self, db: &Database) -> ProgramResult {
         match &self {
-            Gold::Generate(options) => options.visit_irs(db, |_file, _ir_name, ir_file, ir| {
-                fs::write(ir_file, ir).unwrap()
+            Self::Generate(options) => options.visit_irs(db, |_file, _ir_name, ir_file, ir| {
+                fs::write(ir_file, ir).unwrap();
             }),
-            Gold::Check(options) => {
+            Self::Check(options) => {
                 let mut did_change = false;
                 let formatter = PatchFormatter::new().with_color();
                 options.visit_irs(db, |file, ir_name, ir_file, ir| {
@@ -330,7 +332,7 @@ impl GoldOptions {
     ) -> ProgramResult {
         let directory = self
             .directory
-            .to_owned()
+            .clone()
             .unwrap_or_else(|| env::current_dir().unwrap());
         if !directory.is_dir() {
             print!("{} is not a directory", directory.display());
@@ -345,7 +347,7 @@ impl GoldOptions {
 
         for file in WalkDir::new(&directory)
             .into_iter()
-            .map(|it| it.unwrap())
+            .map(Result::unwrap)
             .filter(|it| it.file_type().is_file())
             .filter(|it| it.file_name().to_string_lossy().ends_with(".candy"))
         {
@@ -357,7 +359,7 @@ impl GoldOptions {
 
             let mut visit = |ir_name: &str, ir: String| {
                 let ir_file = directory.join(format!("{ir_name}.txt"));
-                visitor(path, ir_name, &ir_file, ir)
+                visitor(path, ir_name, &ir_file, ir);
             };
 
             let rcst = db.rcst(module.clone());
@@ -459,7 +461,7 @@ impl GoldOptions {
             .iter()
             .find_position(|&&it| it == "# Instructions")
             .unwrap();
-        lines[constants_start + 1..constants_end - 1].sort();
+        lines[constants_start + 1..constants_end - 1].sort_unstable();
         // Re-add the trailing newline
         lines.push("");
 
