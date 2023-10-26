@@ -126,7 +126,7 @@ jobs:
           head_sha=${{ github.sha }}
           echo "head_sha=${head_sha::7}" >> "$GITHUB_OUTPUT"
       - if: steps.diff.outcome == 'failure'
-        uses: peter-evans/create-or-update-comment@v3.0.2
+        uses: peter-evans/create-or-update-comment@v3.1.0
         with:
           issue-number: ${{ github.event.pull_request.number }}
           token: ${{ secrets.GOLDEN_IR_COMMENT_TOKEN }}
