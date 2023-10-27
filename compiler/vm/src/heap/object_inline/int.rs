@@ -92,7 +92,7 @@ impl InlineInt {
                     // One 1 is necessary for the sign.
                     i64::BITS - lhs.leading_ones() + 1
                 } else {
-                    lhs.bit_length()
+                    i64::BITS - lhs.leading_zeros()
                 };
 
                 #[allow(clippy::cast_possible_truncation)]
