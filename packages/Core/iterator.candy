@@ -71,7 +71,7 @@ generateWithState initialState mapper :=
       mapper state %
         More [item, state] -> More [item, Rest: recurse state]
         Empty -> Empty
-        _ -> needs False "The `mapper` is bad."
+        a -> needs False "The `mapper` is bad. It should return Empty or More [item, state], but it returned this: {a}"
     }
   }
 generate length valueGetter :=
@@ -112,7 +112,7 @@ withIndex iterator :=
   generateWithState [iterator, Index: 0] { [iterator, index] ->
     iterator | next %
       Empty -> Empty
-      More [item, rest] -> [Item: [item, index], State: [Iterator: rest, Index: index | int.add 1]]
+      More [item, rest] -> More [Item: [item, index], State: [Iterator: rest, Index: index | int.add 1]]
   }
 
 ensure iterator guard :=
@@ -218,7 +218,7 @@ skip iterator n :=
     recursive [iterator, n] { recurse [iterator, n] ->
       ifElse (equals n 0) { iterator | next } {
         iterator | next %
-          Empty -> Nothing
+          Empty -> Empty
           More [rest] -> recurse [Iterator: rest, N: n | int.subtract 1]
       }
     }
@@ -260,7 +260,7 @@ windowed iterator size step allowPartialWindows :=
     items = iterator | take size | toList
     length = items | list.length
     isLongEnough = ifElse allowPartialWindows { length | int.isPositive } { length | equals size }
-    ifElse isLongEnough { Ok [Item: items, State: iterator | skip step] } { Error Empty }
+    ifElse isLongEnough { More [Item: items, State: iterator | skip step] } { Empty }
   }
 chunked iterator size :=
   needs (int.is size)
@@ -290,7 +290,7 @@ test =
   checkEquals (oneToTen | where { a -> a | int.isOdd } | toList) (1, 3, 5, 7, 9)
   checkEquals (oneToTen | takeWhile { a -> a | int.isLessThan 4 } | toList) (1, 2, 3)
   checkEquals (oneToTen | take 4 | toList) (1, 2, 3, 4)
-  checkEquals (oneToTen | take 12 | toList) oneToTen
+  checkEquals (oneToTen | take 12 | toList) (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
   checkEquals (oneToTen | skip 4 | toList) (5, 6, 7, 8, 9, 10)
   checkEquals (oneToTen | skip 40 | toList) (,)
   checkEquals (oneToTen | windowed 4 3 False | toList) ((1, 2, 3, 4), (4, 5, 6, 7), (7, 8, 9, 10))
