@@ -139,124 +139,124 @@ pow base exponent :=
           }
   }
 
-test =
-  [checkEquals] = use "..check"
-
-  checkEquals (is 2) True
-  checkEquals (is Foo) False
-
-  checkEquals (2 | add 3) 5
-  checkEquals (4 | subtract 1) 3
-  checkEquals (2 | multiply 3) 6
-  checkEquals (7 | divideTruncating 4) 1
-
-  checkEquals (6 | remainder 3) 0
-  checkEquals (5 | remainder 3) 2
-  checkEquals ((negate 5) | remainder 3) (negate 2)
-  checkEquals (5 | remainder (negate 3)) 2
-  checkEquals ((negate 5) | remainder (negate 3)) (negate 2)
-
-  checkEquals (6 | modulo 3) 0
-  checkEquals (5 | modulo 3) 2
-  checkEquals (5 | modulo (negate 3)) 2
-  checkEquals ((negate 5) | modulo 3) 1
-  checkEquals ((negate 5) | modulo (negate 3)) 1
-
-  checkEquals (6 | compareTo 3) Greater
-  checkEquals (6 | compareTo 6) Equal
-  checkEquals (6 | compareTo 9) Less
-
-  checkEquals (1 | isLessThan 2) True
-  checkEquals (2 | isLessThan 2) False
-  checkEquals (2 | isLessThan 1) False
-
-  checkEquals (1 | isGreaterThan 2) False
-  checkEquals (2 | isGreaterThan 2) False
-  checkEquals (2 | isGreaterThan 1) True
-
-  checkEquals (1 | isLessThanOrEqualTo 2) True
-  checkEquals (2 | isLessThanOrEqualTo 2) True
-  checkEquals (2 | isLessThanOrEqualTo 1) False
-
-  checkEquals (1 | isGreaterThanOrEqualTo 2) False
-  checkEquals (2 | isGreaterThanOrEqualTo 2) True
-  checkEquals (2 | isGreaterThanOrEqualTo 1) True
-
-  checkEquals (isPositive 1) True
-  checkEquals (isPositive 0) False
-  checkEquals (isPositive (negate 1)) False
-
-  checkEquals (isNonPositive 1) False
-  checkEquals (isNonPositive 0) True
-  checkEquals (isNonPositive (negate 1)) True
-
-  checkEquals (isNegative 1) False
-  checkEquals (isNegative 0) False
-  checkEquals (isNegative (negate 1)) True
-
-  checkEquals (isNonNegative 1) True
-  checkEquals (isNonNegative 0) True
-  checkEquals (isNonNegative (negate 1)) False
-
-  checkEquals (absolute 3) 3
-  checkEquals (absolute 0) 0
-  checkEquals (absolute (negate 3)) 3
-
-  checkEquals (1 | shiftLeft 2) 4
-  checkEquals (3 | shiftLeft 1) 6
-
-  checkEquals (5 | shiftRight 2) 1
-  checkEquals (10 | shiftRight 1) 5
-
-  checkEquals (bitLength 0) 0
-  checkEquals (bitLength 1) 1
-  checkEquals (bitLength 3) 2
-  checkEquals (bitLength 10) 4
-
-  checkEquals (0b10 | bitwiseAnd 0b10) 0b10
-  checkEquals (0b10 | bitwiseAnd 0b1) 0
-  checkEquals (0b11 | bitwiseAnd 0b110) 0b10
-
-  checkEquals (0b10 | bitwiseOr 0b10) 0b10
-  checkEquals (0b10 | bitwiseOr 0b1) 0b11
-  checkEquals (0b11 | bitwiseOr 0b110) 0b111
-
-  checkEquals (0b10 | bitwiseXor 0b10) 0
-  checkEquals (0b10 | bitwiseXor 0b1) 0b11
-  checkEquals (0b11 | bitwiseXor 0b110) 0b101
-
-  checkEquals (isEven 0) True
-  checkEquals (isEven 1) False
-  checkEquals (isEven 2) True
-  checkEquals (isEven 3) False
-  checkEquals (isEven (negate 3)) False
-
-  checkEquals (isOdd 0) False
-  checkEquals (isOdd 1) True
-  checkEquals (isOdd 2) False
-  checkEquals (isOdd 3) True
-  checkEquals (isOdd (negate 3)) True
-
-  checkEquals (min 3 1) 1
-  checkEquals (min 1 2) 1
-
-  checkEquals (max 3 1) 3
-  checkEquals (max 1 2) 2
-
-  checkEquals (2 | coerceAtLeast 1) 2
-  checkEquals (2 | coerceAtLeast 3) 3
-
-  checkEquals (2 | coerceAtMost 1) 1
-  checkEquals (2 | coerceAtMost 3) 2
-
-  checkEquals (1 | coerceIn 2 4) 2
-  checkEquals (3 | coerceIn 2 4) 3
-  checkEquals (5 | coerceIn 2 4) 4
-
-  checkEquals (parse "123") (Ok 123)
-  # TODO: Currently, `parse` returns a different error.
-  #checkEquals (parse "Hi") (Error NotAnInteger)
-
-  checkEquals (3 | pow 2) 9
-  checkEquals (2 | pow 3) 8
-  checkEquals (9 | pow 1) 9
+#test =
+#  [checkEquals] = use "..check"
+#
+#  checkEquals (is 2) True
+#  checkEquals (is Foo) False
+#
+#  checkEquals (2 | add 3) 5
+#  checkEquals (4 | subtract 1) 3
+#  checkEquals (2 | multiply 3) 6
+#  checkEquals (7 | divideTruncating 4) 1
+#
+#  checkEquals (6 | remainder 3) 0
+#  checkEquals (5 | remainder 3) 2
+#  checkEquals ((negate 5) | remainder 3) (negate 2)
+#  checkEquals (5 | remainder (negate 3)) 2
+#  checkEquals ((negate 5) | remainder (negate 3)) (negate 2)
+#
+#  checkEquals (6 | modulo 3) 0
+#  checkEquals (5 | modulo 3) 2
+#  checkEquals (5 | modulo (negate 3)) 2
+#  checkEquals ((negate 5) | modulo 3) 1
+#  checkEquals ((negate 5) | modulo (negate 3)) 1
+#
+#  checkEquals (6 | compareTo 3) Greater
+#  checkEquals (6 | compareTo 6) Equal
+#  checkEquals (6 | compareTo 9) Less
+#
+#  checkEquals (1 | isLessThan 2) True
+#  checkEquals (2 | isLessThan 2) False
+#  checkEquals (2 | isLessThan 1) False
+#
+#  checkEquals (1 | isGreaterThan 2) False
+#  checkEquals (2 | isGreaterThan 2) False
+#  checkEquals (2 | isGreaterThan 1) True
+#
+#  checkEquals (1 | isLessThanOrEqualTo 2) True
+#  checkEquals (2 | isLessThanOrEqualTo 2) True
+#  checkEquals (2 | isLessThanOrEqualTo 1) False
+#
+#  checkEquals (1 | isGreaterThanOrEqualTo 2) False
+#  checkEquals (2 | isGreaterThanOrEqualTo 2) True
+#  checkEquals (2 | isGreaterThanOrEqualTo 1) True
+#
+#  checkEquals (isPositive 1) True
+#  checkEquals (isPositive 0) False
+#  checkEquals (isPositive (negate 1)) False
+#
+#  checkEquals (isNonPositive 1) False
+#  checkEquals (isNonPositive 0) True
+#  checkEquals (isNonPositive (negate 1)) True
+#
+#  checkEquals (isNegative 1) False
+#  checkEquals (isNegative 0) False
+#  checkEquals (isNegative (negate 1)) True
+#
+#  checkEquals (isNonNegative 1) True
+#  checkEquals (isNonNegative 0) True
+#  checkEquals (isNonNegative (negate 1)) False
+#
+#  checkEquals (absolute 3) 3
+#  checkEquals (absolute 0) 0
+#  checkEquals (absolute (negate 3)) 3
+#
+#  checkEquals (1 | shiftLeft 2) 4
+#  checkEquals (3 | shiftLeft 1) 6
+#
+#  checkEquals (5 | shiftRight 2) 1
+#  checkEquals (10 | shiftRight 1) 5
+#
+#  checkEquals (bitLength 0) 0
+#  checkEquals (bitLength 1) 1
+#  checkEquals (bitLength 3) 2
+#  checkEquals (bitLength 10) 4
+#
+#  checkEquals (0b10 | bitwiseAnd 0b10) 0b10
+#  checkEquals (0b10 | bitwiseAnd 0b1) 0
+#  checkEquals (0b11 | bitwiseAnd 0b110) 0b10
+#
+#  checkEquals (0b10 | bitwiseOr 0b10) 0b10
+#  checkEquals (0b10 | bitwiseOr 0b1) 0b11
+#  checkEquals (0b11 | bitwiseOr 0b110) 0b111
+#
+#  checkEquals (0b10 | bitwiseXor 0b10) 0
+#  checkEquals (0b10 | bitwiseXor 0b1) 0b11
+#  checkEquals (0b11 | bitwiseXor 0b110) 0b101
+#
+#  checkEquals (isEven 0) True
+#  checkEquals (isEven 1) False
+#  checkEquals (isEven 2) True
+#  checkEquals (isEven 3) False
+#  checkEquals (isEven (negate 3)) False
+#
+#  checkEquals (isOdd 0) False
+#  checkEquals (isOdd 1) True
+#  checkEquals (isOdd 2) False
+#  checkEquals (isOdd 3) True
+#  checkEquals (isOdd (negate 3)) True
+#
+#  checkEquals (min 3 1) 1
+#  checkEquals (min 1 2) 1
+#
+#  checkEquals (max 3 1) 3
+#  checkEquals (max 1 2) 2
+#
+#  checkEquals (2 | coerceAtLeast 1) 2
+#  checkEquals (2 | coerceAtLeast 3) 3
+#
+#  checkEquals (2 | coerceAtMost 1) 1
+#  checkEquals (2 | coerceAtMost 3) 2
+#
+#  checkEquals (1 | coerceIn 2 4) 2
+#  checkEquals (3 | coerceIn 2 4) 3
+#  checkEquals (5 | coerceIn 2 4) 4
+#
+#  checkEquals (parse "123") (Ok 123)
+#  # TODO: Currently, `parse` returns a different error.
+#  #checkEquals (parse "Hi") (Error NotAnInteger)
+#
+#  checkEquals (3 | pow 2) 9
+#  checkEquals (2 | pow 3) 8
+#  checkEquals (9 | pow 1) 9

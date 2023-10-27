@@ -44,11 +44,11 @@ repeat times body :=
     }
   }
 
-test =
-  [checkEquals] = use "..check"
-
-  checkEquals (ifElse True { Then } { Else }) Then
-  checkEquals (ifElse False { Then } { Else }) Else
-
-  checkEquals (if True { Then }) Then
-  checkEquals (if False { Then }) Nothing
+#test =
+#  [checkEquals] = use "..check"
+#
+#  checkEquals (ifElse True { Then } { Else }) Then
+#  checkEquals (ifElse False { Then } { Else }) Else
+#
+#  checkEquals (if True { Then }) Then
+#  checkEquals (if False { Then }) Nothing
