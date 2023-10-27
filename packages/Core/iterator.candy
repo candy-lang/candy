@@ -30,7 +30,7 @@ text = use "..text"
 ## That's why this function wraps the given iterator and returns a new function
 ## that's guaranteed to behave like an iterator. If the wrapped iterator behaves
 ## badly, the guard is called (and it's supposed to panic).
-wrapSafe iterator notIteratorGuard =
+wrapSafe iterator notIteratorGuard :=
   needs (function.is0 notIteratorGuard)
   panicUsingGuard = {
     function.run notIteratorGuard
