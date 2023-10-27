@@ -37,16 +37,18 @@ wrapSafe iterator notIteratorGuard =
     needs False "The guard needs to panic."
   }
 
-  nextFunction = iterator %
-    Iterator function -> function
-    _ -> panicUsingGuard
-  if (function.is0 | bool.not nextFunction) panicUsingGuard
-
-  Iterator {
-    function.run nextFunction %
-      Empty -> Empty
-      More [item, rest] -> More [item, Rest: wrapSafe rest]
+  recursive iterator { recurse iterator ->
+    nextFunction = iterator %
+      Iterator function -> function
       _ -> function.run panicUsingGuard
+    if (function.is0 nextFunction | bool.not) panicUsingGuard
+
+    Iterator {
+      function.run nextFunction %
+        Empty -> Empty
+        More [item, rest] -> More [item, Rest: recurse rest]
+        _ -> function.run panicUsingGuard
+    }
   }
 
 next iterator :=
