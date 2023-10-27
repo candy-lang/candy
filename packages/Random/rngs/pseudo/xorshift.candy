@@ -35,9 +35,9 @@ fromSeed seed :=
   }
 
   state = ifElse
-      seed | iterator.fromList | iterator.all { it -> it | equals 0 }
-      { [X: 0x0BAD5EED, Y: 0x0BAD5EED, Z: 0x0BAD5EED, W: 0x0BAD5EED] }
-      { [X: getU32 0, Y: getU32 1, Z: getU32 2, W: getU32 3] }
+    seed | iterator.fromList | iterator.all { it -> it | equals 0 }
+    { [X: 0x0BAD5EED, Y: 0x0BAD5EED, Z: 0x0BAD5EED, W: 0x0BAD5EED] }
+    { [X: getU32 0, Y: getU32 1, Z: getU32 2, W: getU32 3] }
   Xorshift state
 
 fromRng generator :=
