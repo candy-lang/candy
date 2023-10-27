@@ -71,6 +71,7 @@ generateWithState initialState mapper :=
       mapper state %
         More [item, state] -> More [item, Rest: recurse state]
         Empty -> Empty
+        _ -> needs False "The `mapper` is bad."
     }
   }
 generate length valueGetter :=
@@ -108,8 +109,7 @@ map iterator mapper :=
 
 withIndex iterator :=
   iterator = iterator | wrapSafe { needs False "`withIndex` needs an iterator." }
-  generateWithState [iterator, Index: 0] { state ->
-    [iterator, index] = state
+  generateWithState [iterator, Index: 0] { [iterator, index] ->
     iterator | next %
       Empty -> Empty
       More [item, rest] -> [Item: [item, index], State: [Iterator: rest, Index: index | int.add 1]]
@@ -182,18 +182,23 @@ where iterator tester :=
   needs (function.is1 tester)
   recursive iterator { recurse iterator ->
     generateWithState iterator { iterator ->
-      iterator | next
-      | result.flatMap { [item, rest] -> ifElse (tester item) { Ok [item, State: rest] } { recurse rest | next }
-      }
+      iterator | next %
+        Empty -> Empty
+        More [item, rest] ->
+          ifElse (tester item) { More [item, State: rest] } {
+            recurse rest | next %
+              Empty -> Empty
+              More [item, rest] -> More [item, State: rest]
+          }
     }
   }
 
 takeWhile iterator tester :=
   iterator = iterator | wrapSafe { needs False "`takeWhile` needs an iterator." }
   generateWithState iterator { iterator ->
-    iterator | next
-    | result.flatMap { [item, rest] -> ifElse (tester item) { Ok [item, State: rest] } { Error Empty }
-    }
+    iterator | next %
+      Empty -> Empty
+      More [item, rest] -> ifElse (tester item) { More [item, State: rest] } { Empty }
   }
 
 takeUntil iterator tester := iterator | takeWhile { item -> tester item | bool.not }
@@ -268,14 +273,12 @@ test =
   [toDebugText] = use "..toDebugText"
   oneToThree = (1, 2, 3) | fromList
   oneToTen = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10) | fromList
-  checkEquals (is oneToThree) True
-  checkEquals (is 3) False
   testNext =
-    Ok [item, rest] = oneToThree | next
+    More [item, rest] = oneToThree | next
     checkEquals item 1
-    Ok [item, rest] = rest | next
+    More [item, rest] = rest | next
     checkEquals item 2
-  
+
   checkEquals (isEmpty oneToThree) False
   checkEquals (isEmpty (fromList (,))) True
   checkEquals (oneToThree | map { a -> int.multiply a 2 } | toList) (2, 4, 6)
@@ -287,6 +290,8 @@ test =
   checkEquals (oneToTen | where { a -> a | int.isOdd } | toList) (1, 3, 5, 7, 9)
   checkEquals (oneToTen | takeWhile { a -> a | int.isLessThan 4 } | toList) (1, 2, 3)
   checkEquals (oneToTen | take 4 | toList) (1, 2, 3, 4)
+  checkEquals (oneToTen | take 12 | toList) oneToTen
   checkEquals (oneToTen | skip 4 | toList) (5, 6, 7, 8, 9, 10)
+  checkEquals (oneToTen | skip 40 | toList) (,)
   checkEquals (oneToTen | windowed 4 3 False | toList) ((1, 2, 3, 4), (4, 5, 6, 7), (7, 8, 9, 10))
   checkEquals (oneToTen | chunked 3 | toList) ((1, 2, 3), (4, 5, 6), (7, 8, 9), (10,))
