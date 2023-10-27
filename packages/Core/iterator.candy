@@ -117,7 +117,7 @@ withIndex iterator :=
 
 ensure iterator guard :=
   # Useful for ensuring that a `needs` holds for each item of the iterator.
-  function.is1 guard
+  needs (function.is1 guard)
   iterator = iterator | wrapSafe { needs False "`ensure` needs an iterator." }
 
   iterator | map { item ->
