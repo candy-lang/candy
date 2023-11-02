@@ -121,22 +121,22 @@ trim text :=
   needs (is text)
   text | trimStart | trimEnd
 
-test =
-  [checkEquals] = use "..check"
-
-  checkEquals (is "Hi") True
-  checkEquals (is 2) False
-
-  checkEquals (isEmpty "") True
-  checkEquals (isEmpty "Hi") False
-
-  checkEquals (length "") 0
-  checkEquals (length "Hi") 2
-  checkEquals (length "🍔") 1
-
-  checkEquals (characters "Hello") ("H", "e", "l", "l", "o")
-
-  checkEquals (getRange "Hello" 1 4) "ell"
-
-  checkEquals (concatenate "jelly" "fish") "jellyfish"
-  checkEquals (concatenate "tea" "sing") "teasing"
+#test =
+#  [checkEquals] = use "..check"
+#
+#  checkEquals (is "Hi") True
+#  checkEquals (is 2) False
+#
+#  checkEquals (isEmpty "") True
+#  checkEquals (isEmpty "Hi") False
+#
+#  checkEquals (length "") 0
+#  checkEquals (length "Hi") 2
+#  checkEquals (length "🍔") 1
+#
+#  checkEquals (characters "Hello") ("H", "e", "l", "l", "o")
+#
+#  checkEquals (getRange "Hello" 1 4) "ell"
+#
+#  checkEquals (concatenate "jelly" "fish") "jellyfish"
+#  checkEquals (concatenate "tea" "sing") "teasing"

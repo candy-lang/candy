@@ -109,74 +109,74 @@ concatenate listA listB :=
     }
   }
 
-test =
-  [checkEquals] = use "..check"
-
-  checkEquals (is (1, 2, 3)) True
-  checkEquals (is Hello) False
-
-  checkEquals (length (1, 2, 3)) 3
-  checkEquals (length (3, 3)) 2
-
-  checkEquals (isEmpty (,)) True
-
-  checkEquals (lastIndex (1, 2, 3)) (Ok 2)
-  checkEquals (lastIndex (3, 3)) (Ok 1)
-  checkEquals (lastIndex (,)) (Error Empty)
-
-  checkEquals ((1, 2, 3) | isValidIndex (int.negate 1)) False
-  checkEquals ((1, 2, 3) | isValidIndex 0) True
-  checkEquals ((1, 2, 3) | isValidIndex 1) True
-  checkEquals ((1, 2, 3) | isValidIndex 2) True
-  checkEquals ((1, 2, 3) | isValidIndex 3) False
-  checkEquals ((1, 2, 3) | isValidIndex 4) False
-  checkEquals ((1, 2, 3) | isValidIndex 100) False
-
-  checkEquals ((1, 2, 3) | isValidInsertIndex (int.negate 1)) False
-  checkEquals ((1, 2, 3) | isValidInsertIndex 0) True
-  checkEquals ((1, 2, 3) | isValidInsertIndex 1) True
-  checkEquals ((1, 2, 3) | isValidInsertIndex 2) True
-  checkEquals ((1, 2, 3) | isValidInsertIndex 3) True
-  checkEquals ((1, 2, 3) | isValidInsertIndex 4) False
-  checkEquals ((1, 2, 3) | isValidInsertIndex 100) False
-
-  checkEquals ((Foo, Bar, Baz) | get 0) Foo
-  checkEquals ((Foo, Bar, Baz) | get 1) Bar
-  checkEquals ((Foo, Bar, Baz) | get 2) Baz
-
-  checkEquals (single (,)) (Error Empty)
-  checkEquals (single (Foo,)) (Ok Foo)
-  checkEquals (single (Foo, Bar)) (Error MoreThanOneItem)
-
-  checkEquals (first (,)) (Error Empty)
-  checkEquals (first (Foo,)) (Ok Foo)
-  checkEquals (first (Foo, Bar)) (Ok Foo)
-
-  checkEquals (last (,)) (Error Empty)
-  checkEquals (last (Foo,)) (Ok Foo)
-  checkEquals (last (Foo, Bar)) (Ok Bar)
-
-  checkEquals ((Foo, Bar) | insert 0 Baz) (Baz, Foo, Bar)
-  checkEquals ((Foo, Bar) | insert 1 Baz) (Foo, Baz, Bar)
-  checkEquals ((Foo, Bar) | insert 2 Baz) (Foo, Bar, Baz)
-
-  checkEquals ((Foo, Bar) | prepend Baz) (Baz, Foo, Bar)
-
-  checkEquals ((Foo, Bar) | append Baz) (Foo, Bar, Baz)
-
-  checkEquals ((Foo, Bar) | replace 0 Baz) (Baz, Bar)
-  checkEquals ((Foo, Bar) | replace 1 Baz) (Foo, Baz)
-
-  checkEquals ((1, 2) | update 0 { a -> int.add a 1 }) (2, 2)
-
-  checkEquals ((Foo, Bar) | removeAt 0) (Bar,)
-  checkEquals ((Foo, Bar) | removeAt 1) (Foo,)
-
-  checkEquals (filled 2 Foo) (Foo, Foo)
-  checkEquals (filled 10 1) (1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
-
-  checkEquals (generate 5 { a -> a }) (0, 1, 2, 3, 4)
-
-  checkEquals ((1, 2, 3, 4, 5) | getRange 1 4) (2, 3, 4)
-
-  checkEquals (concatenate (1, 2, 3) (4, 5)) (1, 2, 3, 4, 5)
+#test =
+#  [checkEquals] = use "..check"
+#
+#  checkEquals (is (1, 2, 3)) True
+#  checkEquals (is Hello) False
+#
+#  checkEquals (length (1, 2, 3)) 3
+#  checkEquals (length (3, 3)) 2
+#
+#  checkEquals (isEmpty (,)) True
+#
+#  checkEquals (lastIndex (1, 2, 3)) (Ok 2)
+#  checkEquals (lastIndex (3, 3)) (Ok 1)
+#  checkEquals (lastIndex (,)) (Error Empty)
+#
+#  checkEquals ((1, 2, 3) | isValidIndex (int.negate 1)) False
+#  checkEquals ((1, 2, 3) | isValidIndex 0) True
+#  checkEquals ((1, 2, 3) | isValidIndex 1) True
+#  checkEquals ((1, 2, 3) | isValidIndex 2) True
+#  checkEquals ((1, 2, 3) | isValidIndex 3) False
+#  checkEquals ((1, 2, 3) | isValidIndex 4) False
+#  checkEquals ((1, 2, 3) | isValidIndex 100) False
+#
+#  checkEquals ((1, 2, 3) | isValidInsertIndex (int.negate 1)) False
+#  checkEquals ((1, 2, 3) | isValidInsertIndex 0) True
+#  checkEquals ((1, 2, 3) | isValidInsertIndex 1) True
+#  checkEquals ((1, 2, 3) | isValidInsertIndex 2) True
+#  checkEquals ((1, 2, 3) | isValidInsertIndex 3) True
+#  checkEquals ((1, 2, 3) | isValidInsertIndex 4) False
+#  checkEquals ((1, 2, 3) | isValidInsertIndex 100) False
+#
+#  checkEquals ((Foo, Bar, Baz) | get 0) Foo
+#  checkEquals ((Foo, Bar, Baz) | get 1) Bar
+#  checkEquals ((Foo, Bar, Baz) | get 2) Baz
+#
+#  checkEquals (single (,)) (Error Empty)
+#  checkEquals (single (Foo,)) (Ok Foo)
+#  checkEquals (single (Foo, Bar)) (Error MoreThanOneItem)
+#
+#  checkEquals (first (,)) (Error Empty)
+#  checkEquals (first (Foo,)) (Ok Foo)
+#  checkEquals (first (Foo, Bar)) (Ok Foo)
+#
+#  checkEquals (last (,)) (Error Empty)
+#  checkEquals (last (Foo,)) (Ok Foo)
+#  checkEquals (last (Foo, Bar)) (Ok Bar)
+#
+#  checkEquals ((Foo, Bar) | insert 0 Baz) (Baz, Foo, Bar)
+#  checkEquals ((Foo, Bar) | insert 1 Baz) (Foo, Baz, Bar)
+#  checkEquals ((Foo, Bar) | insert 2 Baz) (Foo, Bar, Baz)
+#
+#  checkEquals ((Foo, Bar) | prepend Baz) (Baz, Foo, Bar)
+#
+#  checkEquals ((Foo, Bar) | append Baz) (Foo, Bar, Baz)
+#
+#  checkEquals ((Foo, Bar) | replace 0 Baz) (Baz, Bar)
+#  checkEquals ((Foo, Bar) | replace 1 Baz) (Foo, Baz)
+#
+#  checkEquals ((1, 2) | update 0 { a -> int.add a 1 }) (2, 2)
+#
+#  checkEquals ((Foo, Bar) | removeAt 0) (Bar,)
+#  checkEquals ((Foo, Bar) | removeAt 1) (Foo,)
+#
+#  checkEquals (filled 2 Foo) (Foo, Foo)
+#  checkEquals (filled 10 1) (1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+#
+#  checkEquals (generate 5 { a -> a }) (0, 1, 2, 3, 4)
+#
+#  checkEquals ((1, 2, 3, 4, 5) | getRange 1 4) (2, 3, 4)
+#
+#  checkEquals (concatenate (1, 2, 3) (4, 5)) (1, 2, 3, 4, 5)

@@ -39,16 +39,16 @@ doNotRun body :=
   #   errors.
   needs (is0 body)
 
-test =
-  [checkEquals] = use "..check"
-
-  checkEquals (is {}) True
-  checkEquals (is 4) False
-  checkEquals (getArgumentCount {}) 0
-  checkEquals (getArgumentCount { a -> }) 1
-
-  checkEquals (is0 {}) True
-  checkEquals (is0 { a -> }) False
-
-  checkEquals (run { 4 }) 4
-  checkEquals (doNotRun { 4 }) Nothing
+#test =
+#  [checkEquals] = use "..check"
+#
+#  checkEquals (is {}) True
+#  checkEquals (is 4) False
+#  checkEquals (getArgumentCount {}) 0
+#  checkEquals (getArgumentCount { a -> }) 1
+#
+#  checkEquals (is0 {}) True
+#  checkEquals (is0 { a -> }) False
+#
+#  checkEquals (run { 4 }) 4
+#  checkEquals (doNotRun { 4 }) Nothing

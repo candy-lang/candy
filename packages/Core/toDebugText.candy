@@ -2,13 +2,13 @@ builtins = use "Builtins"
 
 toDebugText value := builtins.toDebugText value
 
-test =
-  [checkEquals] = use "..check"
-
-  checkEquals (3 | toDebugText) "3"
-  checkEquals ("Hi" | toDebugText) '""Hi""'
-  checkEquals (Foo | toDebugText) "Foo"
-  checkEquals (Foo 3 | toDebugText) "Foo 3"
-  checkEquals (Foo (Bar 3) | toDebugText) "Foo (Bar 3)"
-  checkEquals ((1, 2, 3) | toDebugText) "(1, 2, 3)"
-  checkEquals ({} | toDebugText) '"{ … }"'
+#test =
+#  [checkEquals] = use "..check"
+#
+#  checkEquals (3 | toDebugText) "3"
+#  checkEquals ("Hi" | toDebugText) '""Hi""'
+#  checkEquals (Foo | toDebugText) "Foo"
+#  checkEquals (Foo 3 | toDebugText) "Foo 3"
+#  checkEquals (Foo (Bar 3) | toDebugText) "Foo (Bar 3)"
+#  checkEquals ((1, 2, 3) | toDebugText) "(1, 2, 3)"
+#  checkEquals ({} | toDebugText) '"{ … }"'

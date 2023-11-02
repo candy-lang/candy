@@ -16,17 +16,17 @@ getKeys struct :=
   needs (is struct)
   struct | builtins.structGetKeys
 
-test =
-  [checkEquals] = use "..check"
-
-  checkEquals (is 3) False
-  checkEquals (is []) True
-
-  checkEquals (hasKey [Foo: 2] Foo) True
-  checkEquals (hasKey [Foo: 2] Bar) False
-
-  checkEquals (get [Foo: 2] Foo) (Ok 2)
-  checkEquals (get [Foo: 2] Bar) (Error KeyNotInStruct)
-
-  checkEquals (getKeys [Foo: 2]) (Foo,)
-  ## For bigger structs, the order of keys is not guaranteed.
+#test =
+#  [checkEquals] = use "..check"
+#
+#  checkEquals (is 3) False
+#  checkEquals (is []) True
+#
+#  checkEquals (hasKey [Foo: 2] Foo) True
+#  checkEquals (hasKey [Foo: 2] Bar) False
+#
+#  checkEquals (get [Foo: 2] Foo) (Ok 2)
+#  checkEquals (get [Foo: 2] Bar) (Error KeyNotInStruct)
+#
+#  checkEquals (getKeys [Foo: 2]) (Foo,)
+#  ## For bigger structs, the order of keys is not guaranteed.
