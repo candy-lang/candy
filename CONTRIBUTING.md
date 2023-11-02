@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to Candy! 🎉
 
-We use [Discord](https://discord.gg/5Vr4eAJ7gU) for communication.
+We use [<img height="12" src="https://github.com/candy-lang/candy/assets/19330937/baf90ce0-1d0a-4279-92fa-1c360cd28b38"> Discord][Discord] for communication.
 If you have any questions, please don't hesitate to ask us there :)
 
 ## Local Setup
@@ -14,7 +14,7 @@ Follow the [README's How to use Candy section](https://github.com/candy-lang/can
 Visit the [GitHub Project](https://github.com/orgs/candy-lang/projects/1/views/1) and look for an interesting problem you want to solve.
 
 If you're new to this project, we recommend issues tagged with [<kbd>good first issue</kbd>](https://github.com/orgs/candy-lang/projects/1/views/4).
-If there are no such issues (or too few), please write us [a message on Discord][Discord].
+If there are no such issues (or too few), please write us [a message on <img height="12" src="https://github.com/candy-lang/candy/assets/19330937/baf90ce0-1d0a-4279-92fa-1c360cd28b38"> Discord][Discord].
 
 If an issue's title or description are not clear, please don't hesitate to comment on that issue and ask for clarification.
 
