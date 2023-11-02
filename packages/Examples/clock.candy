@@ -6,5 +6,5 @@ main := { environment ->
 
   c = clock.fromSystemClock environment.systemClock
   now = clock.now c
-  print "It has been {now | instant.toUnixTimeDuration | duration.toText} since the start the of unix epoch"
+  print "It has been {now | instant.toUnixTimeDuration | duration.toText} since the start the of Unix epoch"
 }
