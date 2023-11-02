@@ -2,6 +2,7 @@
     anonymous_lifetime_in_impl_trait,
     box_patterns,
     entry_insert,
+    extract_if,
     hasher_prefixfree_extras,
     io_error_more,
     let_chains,
