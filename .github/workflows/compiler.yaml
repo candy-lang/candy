@@ -137,7 +137,7 @@ jobs:
     name: Benchmark
     runs-on: ubuntu-latest
     # Benchmarks on pushes to main should run sequentially.
-    concurrency: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('{0}-{1}-{2}', github.workflow, github.job, github.ref) || null }}
+    concurrency: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('{0}-{1}-{2}', github.workflow, github.job, github.ref) || github.run_id }}
     steps:
       - uses: actions/checkout@v4
       - uses: dsherret/rust-toolchain-file@v1
