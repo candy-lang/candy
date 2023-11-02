@@ -1,6 +1,6 @@
 use crate::{
     byte_code::ByteCode,
-    heap::{Data, Handle, Heap, Int, List, Struct, Tag, Text},
+    heap::{Data, Handle, Heap, InlineObject, Int, List, Struct, Tag, Text},
     tracer::Tracer,
     vm::VmHandleCall,
     StateAfterRun, StateAfterRunForever, Vm, VmFinished,
@@ -89,72 +89,71 @@ impl Environment for DefaultEnvironment {
         heap: &mut Heap,
         call: VmHandleCall<B, T>,
     ) -> Vm<B, T> {
-        if call.handle == self.get_random_bytes_handle {
-            let [length] = call.arguments.as_slice() else {
-                unreachable!()
-            };
-
-            let Data::Int(length) = (*length).into() else {
-                // TODO: Panic
-                let message = Text::create(
-                    heap,
-                    true,
-                    "Handle `getRandomBytes` was called with a non-integer.",
-                );
-                let result = Tag::create_result(heap, true, Err(message.into()));
-                return call.complete(heap, result);
-            };
-            let Some(length) = length.try_get::<usize>() else {
-                // TODO: Panic
-                let message = Text::create(
-                    heap,
-                    true,
-                    "Handle `getRandomBytes` was called with a length that doesn't fit in usize.",
-                );
-                let result = Tag::create_result(heap, true, Err(message.into()));
-                return call.complete(heap, result);
-            };
-
-            let mut bytes = vec![0u8; length];
-            if let Err(error) = getrandom::getrandom(&mut bytes) {
-                let message = Text::create(heap, true, &error.to_string());
-                let result = Tag::create_result(heap, true, Err(message.into()));
-                return call.complete(heap, result);
-            }
-
-            let bytes = bytes
-                .into_iter()
-                .map(|it| Int::create(heap, true, it).into())
-                .collect_vec();
-            let bytes = List::create(heap, true, bytes.as_slice());
-            let result = Tag::create_result(heap, true, Ok(bytes.into()));
-            call.complete(heap, result)
+        let result = if call.handle == self.get_random_bytes_handle {
+            Self::get_random_bytes(heap, &call.arguments)
         } else if call.handle == self.stdin_handle {
-            let [] = call.arguments.as_slice() else {
-                unreachable!()
-            };
-            let input = {
-                let stdin = io::stdin();
-                stdin.lock().lines().next().unwrap().unwrap()
-            };
-            let text = Text::create(heap, true, &input);
-            call.complete(heap, text)
+            Self::stdin(heap, &call.arguments)
         } else if call.handle == self.stdout_handle {
-            let [message] = call.arguments.as_slice() else {
-                unreachable!()
-            };
-
-            if let Data::Text(text) = (*message).into() {
-                println!("{}", text.get());
-            } else {
-                info!("Non-text value sent to stdout: {message:?}");
-            }
-
-            let nothing = Tag::create_nothing(heap);
-            call.complete(heap, nothing)
+            Self::stdout(heap, &call.arguments)
         } else {
             unreachable!()
+        };
+        call.complete(heap, result)
+    }
+}
+impl DefaultEnvironment {
+    fn get_random_bytes(heap: &mut Heap, arguments: &[InlineObject]) -> InlineObject {
+        let [length] = arguments else { unreachable!() };
+        let Data::Int(length) = (*length).into() else {
+            // TODO: Panic
+            let message = Text::create(
+                heap,
+                true,
+                "Handle `getRandomBytes` was called with a non-integer.",
+            );
+            return Tag::create_result(heap, true, Err(message.into())).into();
+        };
+        let Some(length) = length.try_get::<usize>() else {
+            // TODO: Panic
+            let message = Text::create(
+                heap,
+                true,
+                "Handle `getRandomBytes` was called with a length that doesn't fit in usize.",
+            );
+            return Tag::create_result(heap, true, Err(message.into())).into();
+        };
+
+        let mut bytes = vec![0u8; length];
+        if let Err(error) = getrandom::getrandom(&mut bytes) {
+            let message = Text::create(heap, true, &error.to_string());
+            return Tag::create_result(heap, true, Err(message.into())).into();
         }
+
+        let bytes = bytes
+            .into_iter()
+            .map(|it| Int::create(heap, true, it).into())
+            .collect_vec();
+        let bytes = List::create(heap, true, bytes.as_slice());
+        Tag::create_result(heap, true, Ok(bytes.into())).into()
+    }
+
+    fn stdin(heap: &mut Heap, arguments: &[InlineObject]) -> InlineObject {
+        assert!(arguments.is_empty());
+        let input = {
+            let stdin = io::stdin();
+            stdin.lock().lines().next().unwrap().unwrap()
+        };
+        Text::create(heap, true, &input).into()
+    }
+    fn stdout(heap: &Heap, arguments: &[InlineObject]) -> InlineObject {
+        let [message] = arguments else { unreachable!() };
+        if let Data::Text(text) = (*message).into() {
+            println!("{}", text.get());
+        } else {
+            info!("Non-text value sent to stdout: {message:?}");
+        }
+
+        Tag::create_nothing(heap).into()
     }
 }
 
