@@ -1,0 +1,10 @@
+[text] = use "Core"
+
+is request = request 
+  Request body -> text.is body
+  _ -> False
+
+body request :=
+  needs (is request)
+  Request [body] = request
+  body

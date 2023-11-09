@@ -1,0 +1,41 @@
+[bool, function, list, iterable] = use "Core"
+request := use ".request"
+
+is server := server %
+  Server [getNextRequest, close] ->
+    function.is0 getNextRequest | bool.lazyAnd { function.is0 close }
+  _ -> False
+
+start environmentHttpServer listOfSockets :=
+  # Start an HTTP server that's listening on all of the given sockets.
+  #
+  # `environmentHttpServer` should be `environment.httpServer`.
+  needs (function.is1 environmentHttpServer)
+  needs (list.is listOfSockets)
+  needs (listOfSockets | iterable.fromList | iterable.all text.is)
+  ## TODO: properly validate sockets
+  server = Server (environmentHttpServer listOfSockets)
+  check (is server)
+  server
+
+close server :=
+  needs (is server)
+  Server [close] = server
+  close | function.run
+
+nextRequest server :=
+  # Waits for the next request and returns `[request, sendResponse]`.
+  needs (is server)
+  Server [getNextRequest] = server
+  [Request: req, sendResponse] (getNextRequest | function.run)
+  check (text.is req)
+  check (function.is1 sendResponse)
+
+  req = Request req
+  check (request.is req)
+
+  sendResponse body =
+    needs (text.is body)
+    sendResponse body
+
+  [Request: req, sendResponse]
