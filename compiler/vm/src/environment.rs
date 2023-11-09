@@ -86,7 +86,7 @@ impl DefaultEnvironment {
             .collect_vec();
         let arguments = List::create(heap, true, arguments.as_slice());
         let get_random_bytes_handle = Handle::new(heap, 1);
-        let http_server_handle = Handle::new(heap, 0);
+        let http_server_handle = Handle::new(heap, 1);
         let stdin_handle = Handle::new(heap, 0);
         let stdout_handle = Handle::new(heap, 1);
         let environment_object = Struct::create_with_symbol_keys(
