@@ -2,14 +2,14 @@
 [server] = use ".."
 
 main := { environment ->
-  sockets = ["127.0.0.1:8080"]
-  s = server.listen environment.httpServer sockets
+  sockets = ("127.0.0.1:8080",)
+  s = server.start environment.httpServer sockets
   print "Started an HTTP server at {sockets}"
 
   [Request: req, sendResponse] = s | server.nextRequest
   print "Received a request: {req}"
 
-  responseBody "Hello from Candy!"
+  responseBody = "Hello from Candy!"
   sendResponse responseBody
   print '"Sent a response: "{responseBody}""'
 

@@ -1,4 +1,4 @@
-[bool, function, list, iterable] = use "Core"
+[bool, check, function, list, iterable, result, text] = use "Core"
 request := use ".request"
 
 is server := server %
@@ -27,7 +27,8 @@ nextRequest server :=
   # Waits for the next request and returns `[request, sendResponse]`.
   needs (is server)
   Server [getNextRequest] = server
-  [Request: req, sendResponse] (getNextRequest | function.run)
+  ## TODO: Handle errors
+  [Request: req, sendResponse] = getNextRequest | function.run | result.unwrap
   check (text.is req)
   check (function.is1 sendResponse)
 

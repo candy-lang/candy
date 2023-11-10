@@ -1,6 +1,6 @@
 [text] = use "Core"
 
-is request = request 
+is request := request %
   Request body -> text.is body
   _ -> False
 
