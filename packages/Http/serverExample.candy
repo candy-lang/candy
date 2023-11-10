@@ -11,7 +11,7 @@ main := { environment ->
 
   responseBody = "Hello from Candy!"
   sendResponse responseBody
-  print '"Sent a response: "{responseBody}""'
+  print '"Sent a response: "{{responseBody}}""'
 
   s | server.close
   print "Closed the server"
