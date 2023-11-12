@@ -3,7 +3,7 @@
 
 main := { environment ->
   sockets = ("127.0.0.1:8080",)
-  s = server.start environment.httpServer sockets
+  s = environment.httpServer | server.start sockets
   print "Started an HTTP server at {sockets}"
 
   [Request: req, sendResponse] = s | server.nextRequest
