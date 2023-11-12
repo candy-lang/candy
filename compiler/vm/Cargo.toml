@@ -25,6 +25,7 @@ rand = "0.8.5"
 rustc-hash = "1.1.0"
 salsa = "0.16.1"
 strum = { version = "0.25.0", features = ["derive"] }
+tiny_http = "0.12.0"
 tracing = { version = "0.1", features = ["release_max_level_debug"] }
 unicode-segmentation = "1.9.0"
 walkdir = "2.3.3"
