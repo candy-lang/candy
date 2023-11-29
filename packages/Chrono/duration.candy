@@ -1,7 +1,7 @@
 [fixedDecimal, tag, check, equals, bool, ifElse, int, toDebugText, text] = use "Core"
 constants = use "..constants"
 
-# Storage Format: Duration (fixedDecimal of nanoseconds)
+## Storage Format: Duration (fixedDecimal of nanoseconds)
 is d := d %
   Duration nanoseconds -> fixedDecimal.is nanoseconds
   _ -> False
