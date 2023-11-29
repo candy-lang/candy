@@ -78,7 +78,8 @@ rick := "
   Never gonna run around and desert you
   Never gonna make you cry
   Never gonna say goodbye
-  Never gonna tell a lie and hurt you"
+  Never gonna tell a lie and hurt you
+"
 
 fromUtf8 := builtins.textFromUtf8
 
@@ -126,7 +127,20 @@ firstIndexOf text char :=
   needs (is char)
   needs (length char | equals 1)
   recursive 0 { recurse i ->
-    ifElse (text | length | int.isGreaterThanOrEqualTo i) {ifElse (text | characterAt i | equals char) {i} {i | int.add 1 | recurse}} {int.negate 1}
+    ifElse
+      text | length | int.isGreaterThan i
+      { ifElse (text | characterAt i | equals char) { i } { i | int.add 1 | recurse } }
+      { int.negate 1 }
+  }
+
+repeat text times :=
+  needs (is text)
+  needs (int.is times)
+  needs (times | int.isGreaterThanOrEqualTo 1)
+  recursive (text, times) { recurse (repeatedText, times) ->
+    ifElse (times | equals 1) { repeatedText } {
+      (repeatedText | concatenate text, times | int.subtract 1) | recurse
+    }
   }
 
 padStart text len char :=
@@ -134,14 +148,16 @@ padStart text len char :=
   needs (int.is len)
   needs (is char)
   needs (char | length | equals 1)
-  recursive text { recurse text ->
-    ifElse (text | length | int.isGreaterThanOrEqualTo len) {text} {char | concatenate text | recurse}
+  textLength = text | length
+  ifElse (textLength | int.isGreaterThanOrEqualTo len) { text } {
+    (char | repeat (len | int.subtract textLength)) | concatenate text 
   }
 padEnd text len char :=
   needs (is text)
   needs (int.is len)
   needs (is char)
   needs (char | length | equals 1)
-  recursive text { recurse text ->
-    ifElse (text | length | int.isGreaterThanOrEqualTo len) {text} {text | concatenate char | recurse}
+  textLength = text | length
+  ifElse (textLength | int.isGreaterThanOrEqualTo len) { text } {
+    text | concatenate (char | repeat (len | int.subtract textLength))
   }
