@@ -18,4 +18,4 @@ mockFromInstant inst :=
 
 now clock :=
   needs (is clock)
-  function.run (tag.getValue clock)
+  clock | tag.getValue | function.run
