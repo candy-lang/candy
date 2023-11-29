@@ -35,7 +35,7 @@ fromNormalDays days :=
   needs (isNumber days)
   Duration (numberAsFixedDecimal days | fixedDecimal.multiply (fixedDecimal.fromInt constants.nanosecondsPerNormalDay))
 
-# TODO: Do this without truncating division if possible
+## TODO: Do this without truncating division if possible
 totalNanoseconds duration :=
   needs (is duration)
   tag.getValue duration
