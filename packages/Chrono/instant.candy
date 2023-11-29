@@ -2,9 +2,9 @@
 constants = use "..constants"
 duration = use "..duration"
 
-## Storage Format: Instant (fixedDecimal of nanoseconds since the Unix Epoch)
+## Storage Format: Instant (fixedDecimal of seconds since the Unix Epoch)
 is i := i %
-  Instant nanoseconds -> fixedDecimal.is nanoseconds
+  Instant seconds -> fixedDecimal.is seconds
   _ -> False
 
 startOfUnixEpoch := Instant fixedDecimal.zero
@@ -25,7 +25,7 @@ subtract instant dur :=
 durationBetween instantA instantB :=
   needs (is instantA)
   needs (is instantB)
-  duration.fromNanoseconds (fixedDecimal.subtract (tag.getValue instantA) (tag.getValue instantB))
+  duration.fromSeconds (fixedDecimal.subtract (tag.getValue instantA) (tag.getValue instantB))
 
 compareTo valueA valueB :=
   needs (is valueA)
@@ -75,4 +75,4 @@ coerceIn value minimum maximum :=
 
 toUnixTimeDuration instant :=
   needs (is instant)
-  duration.fromNanoseconds (tag.getValue instant)
+  duration.fromSeconds (tag.getValue instant)

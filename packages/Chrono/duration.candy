@@ -1,9 +1,9 @@
 [fixedDecimal, tag, check, equals, bool, ifElse, int, toDebugText, text] = use "Core"
 constants = use "..constants"
 
-## Storage Format: Duration (fixedDecimal of nanoseconds)
+## Storage Format: Duration (fixedDecimal of seconds)
 is d := d %
-  Duration nanoseconds -> fixedDecimal.is nanoseconds
+  Duration seconds -> fixedDecimal.is seconds
   _ -> False
 
 isNumber n = int.is n | bool.lazyOr {fixedDecimal.is n}
@@ -13,50 +13,51 @@ numberAsFixedDecimal n =
 
 zero := Duration fixedDecimal.zero
 
+## TODO: Do this without truncating division if possible
 fromNanoseconds nanoseconds :=
   needs (isNumber nanoseconds)
-  Duration (numberAsFixedDecimal nanoseconds)
+  Duration (numberAsFixedDecimal nanoseconds | fixedDecimal.divideTruncating (fixedDecimal.fromInt constants.nanosecondsPerSecond))
 fromMicroseconds microseconds :=
   needs (isNumber microseconds)
-  Duration (numberAsFixedDecimal microseconds | fixedDecimal.multiply (fixedDecimal.fromInt constants.nanosecondsPerMicrosecond))
+  Duration (numberAsFixedDecimal microseconds | fixedDecimal.divideTruncating (fixedDecimal.fromInt constants.microsecondsPerSecond))
 fromMilliseconds milliseconds :=
   needs (isNumber milliseconds)
-  Duration (numberAsFixedDecimal milliseconds | fixedDecimal.multiply (fixedDecimal.fromInt constants.nanosecondsPerMillisecond))
+  Duration (numberAsFixedDecimal milliseconds | fixedDecimal.divideTruncating (fixedDecimal.fromInt constants.millisecondsPerSecond))
 fromSeconds seconds :=
   needs (isNumber seconds)
-  Duration (numberAsFixedDecimal seconds | fixedDecimal.multiply (fixedDecimal.fromInt constants.nanosecondsPerSecond))
+  Duration (numberAsFixedDecimal seconds)
 fromMinutes minutes :=
   needs (isNumber minutes)
-  Duration (numberAsFixedDecimal minutes | fixedDecimal.multiply (fixedDecimal.fromInt constants.nanosecondsPerMinute))
+  Duration (numberAsFixedDecimal minutes | fixedDecimal.multiply (fixedDecimal.fromInt constants.secondsPerMinute))
 fromHours hours :=
   needs (isNumber hours)
-  Duration (numberAsFixedDecimal hours | fixedDecimal.multiply (fixedDecimal.fromInt constants.nanosecondsPerHour))
+  Duration (numberAsFixedDecimal hours | fixedDecimal.multiply (fixedDecimal.fromInt constants.secondsPerHour))
 fromNormalDays days :=
   needs (isNumber days)
-  Duration (numberAsFixedDecimal days | fixedDecimal.multiply (fixedDecimal.fromInt constants.nanosecondsPerNormalDay))
+  Duration (numberAsFixedDecimal days | fixedDecimal.multiply (fixedDecimal.fromInt constants.secondsPerNormalDay))
 
 ## TODO: Do this without truncating division if possible
 totalNanoseconds duration :=
   needs (is duration)
-  tag.getValue duration
+  tag.getValue duration | fixedDecimal.multiply (fixedDecimal.fromInt constants.nanosecondsPerSecond)
 totalMicroseconds duration :=
   needs (is duration)
-  tag.getValue duration | fixedDecimal.divideTruncating (fixedDecimal.fromInt constants.nanosecondsPerHour)
+  tag.getValue duration | fixedDecimal.multiply (fixedDecimal.fromInt constants.microsecondsPerSecond)
 totalMilliseconds duration :=
   needs (is duration)
-  tag.getValue duration | fixedDecimal.divideTruncating (fixedDecimal.fromInt constants.nanosecondsPerMillisecond)
+  tag.getValue duration | fixedDecimal.multiply (fixedDecimal.fromInt constants.millisecondsPerSecond)
 totalSeconds duration :=
   needs (is duration)
-  tag.getValue duration | fixedDecimal.divideTruncating (fixedDecimal.fromInt constants.nanosecondsPerSecond)
+  tag.getValue duration
 totalMinutes duration :=
   needs (is duration)
-  tag.getValue duration | fixedDecimal.divideTruncating (fixedDecimal.fromInt constants.nanosecondsPerMinute)
+  tag.getValue duration | fixedDecimal.divideTruncating (fixedDecimal.fromInt constants.secondsPerMinute)
 totalHours duration :=
   needs (is duration)
-  tag.getValue duration | fixedDecimal.divideTruncating (fixedDecimal.fromInt constants.nanosecondsPerHour)
+  tag.getValue duration | fixedDecimal.divideTruncating (fixedDecimal.fromInt constants.secondsPerHour)
 totalNormalDays duration :=
   needs (is duration)
-  tag.getValue duration | fixedDecimal.divideTruncating (fixedDecimal.fromInt constants.nanosecondsPerNormalDay)
+  tag.getValue duration | fixedDecimal.divideTruncating (fixedDecimal.fromInt constants.secondsPerNormalDay)
 
 add summandA summandB :=
   needs (is summandA)
