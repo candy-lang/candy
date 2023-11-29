@@ -2,7 +2,7 @@
 constants = use "..constants"
 duration = use "..duration"
 
-# Storage Format: Instant (fixedDecimal of nanoseconds since the Unix Epoch)
+## Storage Format: Instant (fixedDecimal of nanoseconds since the Unix Epoch)
 is i := i %
   Instant nanoseconds -> fixedDecimal.is nanoseconds
   _ -> False
