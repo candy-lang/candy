@@ -13,7 +13,7 @@ fromUnixDuration dur :=
   needs (duration.is dur)
   Instant (tag.getValue dur)
 
-addDuration instant dur :=
+add instant dur :=
   needs (is instant)
   needs (duration.is dur)
   Instant (fixedDecimal.add (tag.getValue instant) (tag.getValue dur))
