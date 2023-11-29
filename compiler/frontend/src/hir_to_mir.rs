@@ -17,20 +17,48 @@ use linked_hash_map::LinkedHashMap;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum ExecutionTarget {
+    Module(Module),
+    MainFunction(Module),
+}
+impl ExecutionTarget {
+    #[must_use]
+    pub const fn module(&self) -> &Module {
+        match &self {
+            Self::Module(module) => module,
+            Self::MainFunction(module) => module,
+        }
+    }
+}
+
 #[salsa::query_group(HirToMirStorage)]
 pub trait HirToMir: PositionConversionDb + CstDb + AstToHir {
-    fn mir(&self, module: Module, tracing: TracingConfig) -> MirResult;
+    fn mir(&self, target: ExecutionTarget, tracing: TracingConfig) -> MirResult;
 }
 
 pub type MirResult = Result<(Arc<Mir>, Arc<FxHashSet<CompilerError>>), ModuleError>;
 
 #[allow(clippy::needless_pass_by_value)]
-fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> MirResult {
+fn mir(db: &dyn HirToMir, target: ExecutionTarget, tracing: TracingConfig) -> MirResult {
+    let (module, target_is_main_function) = match target {
+        ExecutionTarget::Module(module) => (module, false),
+        ExecutionTarget::MainFunction(module) => {
+            assert_eq!(module.kind, ModuleKind::Code);
+            (module, true)
+        }
+    };
     let (mir, errors) = match module.kind {
         ModuleKind::Code => {
             let (hir, _) = db.hir(module.clone())?;
             let mut errors = FxHashSet::default();
-            let mir = LoweringContext::compile_module(module, &hir, &tracing, &mut errors);
+            let mir = LoweringContext::compile_module(
+                module,
+                target_is_main_function,
+                &hir,
+                &tracing,
+                &mut errors,
+            );
             (mir, errors)
         }
         ModuleKind::Asset => {
@@ -39,10 +67,7 @@ fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> MirResult {
             };
             (
                 Mir::build(|body| {
-                    let bytes = bytes
-                        .iter()
-                        .map(|&it| body.push_int(it.into()))
-                        .collect_vec();
+                    let bytes = bytes.iter().map(|&it| body.push_int(it)).collect_vec();
                     body.push_list(bytes);
                 }),
                 FxHashSet::default(),
@@ -175,6 +200,7 @@ struct OngoingDestructuring {
 impl<'a> LoweringContext<'a> {
     fn compile_module(
         module: Module,
+        target_is_main_function: bool,
         hir: &hir::Body,
         tracing: &TracingConfig,
         errors: &mut FxHashSet<CompilerError>,
@@ -184,7 +210,8 @@ impl<'a> LoweringContext<'a> {
 
             let needs_function = generate_needs_function(body);
 
-            let module_hir_id = body.push_hir_id(hir::Id::new(module, vec![]));
+            let module_hir_id = hir::Id::new(module, vec![]);
+            let module_id = body.push_hir_id(module_hir_id.clone());
             let mut context = LoweringContext {
                 mapping: &mut mapping,
                 needs_function,
@@ -192,8 +219,81 @@ impl<'a> LoweringContext<'a> {
                 ongoing_destructuring: None,
                 errors,
             };
-            context.compile_expressions(body, module_hir_id, &hir.expressions);
+            context.compile_expressions(body, module_id, &hir.expressions);
+
+            if target_is_main_function {
+                let export_struct = body.current_return_value();
+                LoweringContext::compile_get_main_function_from_export_struct(
+                    body,
+                    &module_hir_id,
+                    module_id,
+                    export_struct,
+                );
+            }
         })
+    }
+    fn compile_get_main_function_from_export_struct(
+        body: &mut BodyBuilder,
+        module_hir_id: &hir::Id,
+        module_id: Id,
+        export_struct: Id,
+    ) {
+        let struct_has_key_function = body.push_builtin(BuiltinFunction::StructHasKey);
+        let main_tag = body.push_tag("Main".to_string(), None);
+        let export_contains_main_function = body.push_call(
+            struct_has_key_function,
+            vec![export_struct, main_tag],
+            module_id,
+        );
+        let reason = body.push_text("The module doesn't export a main function.".to_string());
+        body.push_panic_if_false(
+            module_hir_id,
+            export_contains_main_function,
+            reason,
+            module_id,
+        );
+
+        let struct_get_function = body.push_builtin(BuiltinFunction::StructGet);
+        let main_function = body.push_call(
+            struct_get_function,
+            vec![export_struct, main_tag],
+            module_id,
+        );
+
+        let type_of_function = body.push_builtin(BuiltinFunction::TypeOf);
+        let type_of_main = body.push_call(type_of_function, vec![main_function], module_id);
+        let equals_function = body.push_builtin(BuiltinFunction::Equals);
+        let function_tag = body.push_tag("Function".to_string(), None);
+        let type_of_main_equals_function =
+            body.push_call(equals_function, vec![type_of_main, function_tag], module_id);
+        let reason = body.push_text("The exported main value is not a function.".to_string());
+        body.push_panic_if_false(
+            module_hir_id,
+            type_of_main_equals_function,
+            reason,
+            module_id,
+        );
+
+        let get_argument_count_function = body.push_builtin(BuiltinFunction::GetArgumentCount);
+        let main_function_parameter_count =
+            body.push_call(get_argument_count_function, vec![main_function], module_id);
+        let one = body.push_int(1);
+        let main_function_parameter_count_is_one = body.push_call(
+            equals_function,
+            vec![main_function_parameter_count, one],
+            module_id,
+        );
+        let reason = body.push_text(
+            "The exported main function doesn't accept exactly one parameter.".to_string(),
+        );
+        body.push_panic_if_false(
+            module_hir_id,
+            main_function_parameter_count_is_one,
+            reason,
+            module_id,
+        );
+
+        body.push_reference(main_function);
     }
 
     fn compile_expressions(
@@ -214,7 +314,7 @@ impl<'a> LoweringContext<'a> {
         expression: &hir::Expression,
     ) {
         let id = match expression {
-            hir::Expression::Int(int) => body.push_int(int.clone().into()),
+            hir::Expression::Int(int) => body.push_int(int.clone()),
             hir::Expression::Text(text) => body.push_text(text.clone()),
             hir::Expression::Reference(reference) => body.push_reference(self.mapping[reference]),
             hir::Expression::Symbol(symbol) => body.push_tag(symbol.clone(), None),
@@ -267,7 +367,7 @@ impl<'a> LoweringContext<'a> {
                         },
                         |body| {
                             let list_get_function = body.push_builtin(BuiltinFunction::ListGet);
-                            let one = body.push_int(1.into());
+                            let one = body.push_int(1);
                             let reason = body.push_call(
                                 list_get_function,
                                 vec![pattern_result, one],
@@ -288,7 +388,7 @@ impl<'a> LoweringContext<'a> {
                     body.push_reference(result)
                 } else {
                     let list_get = body.push_builtin(BuiltinFunction::ListGet);
-                    let index = body.push_int((identifier_id.0 + 1).into());
+                    let index = body.push_int(identifier_id.0 + 1);
                     let responsible = body.push_hir_id(hir_id.clone());
                     body.push_call(list_get, vec![result, index], responsible)
                 }
@@ -471,7 +571,7 @@ impl<'a> LoweringContext<'a> {
                 });
                 let else_function = body.push_function(case_id.child("didNotMatch"), |body, _| {
                     let list_get_function = body.push_builtin(BuiltinFunction::ListGet);
-                    let one = body.push_int(1.into());
+                    let one = body.push_int(1);
                     let reason = body.push_call(
                         list_get_function,
                         vec![pattern_result, one],
@@ -531,7 +631,7 @@ impl PatternLoweringContext {
         match pattern {
             hir::Pattern::NewIdentifier(_) => self.push_match(body, vec![expression]),
             hir::Pattern::Int(int) => {
-                let expected = body.push_int(int.clone().into());
+                let expected = body.push_int(int.clone());
                 self.compile_exact_value(body, expression, expected)
             }
             hir::Pattern::Text(text) => {
@@ -595,7 +695,7 @@ impl PatternLoweringContext {
                 // Check that it's a list.
                 self.compile_verify_type_condition(body, expression, "List".to_string(), |body| {
                     // Check that the length is correct.
-                    let expected = body.push_int(list.len().into());
+                    let expected = body.push_int(list.len());
                     let builtin_list_length = body.push_builtin(BuiltinFunction::ListLength);
                     let actual_length =
                         body.push_call(builtin_list_length, vec![expression], self.responsible);
@@ -611,7 +711,7 @@ impl PatternLoweringContext {
                                 .enumerate()
                                 .map(|(index, item_pattern)| {
                                     move |body: &mut BodyBuilder| {
-                                        let index = body.push_int(index.into());
+                                        let index = body.push_int(index);
                                         let item = body.push_call(
                                             builtin_list_get,
                                             vec![expression, index],
@@ -735,7 +835,7 @@ impl PatternLoweringContext {
                                         .position(|it| it == identifier_id);
                                     let Some(index) = index else { return body.push_reference(nothing); };
 
-                                    let index = body.push_int((1 + index).into());
+                                    let index = body.push_int(1 + index);
                                     body.push_call(list_get_function, vec![result, index], self.responsible)
                                 })
                                 .collect();
@@ -849,7 +949,7 @@ impl PatternLoweringContext {
             hir::Pattern::NewIdentifier(_) => {
                 panic!("New identifiers can't be used in this part of a pattern.")
             }
-            hir::Pattern::Int(int) => body.push_int(int.clone().into()),
+            hir::Pattern::Int(int) => body.push_int(int.clone()),
             hir::Pattern::Text(text) => body.push_text(text.clone()),
             hir::Pattern::Tag { symbol, value } => {
                 let value = value
@@ -893,7 +993,7 @@ impl PatternLoweringContext {
             |body| {
                 let list_get_function = body.push_builtin(BuiltinFunction::ListGet);
                 for index in 0..captured_identifier_count {
-                    let index = body.push_int((index + 1).into());
+                    let index = body.push_int(index + 1);
                     let captured_identifier = body.push_call(
                         list_get_function,
                         vec![return_value, index],
@@ -948,7 +1048,7 @@ impl BodyBuilder {
     /// boolean.
     fn push_is_match(&mut self, match_or_no_match: Id, responsible: Id) -> Id {
         let list_get_function = self.push_builtin(BuiltinFunction::ListGet);
-        let zero = self.push_int(0.into());
+        let zero = self.push_int(0);
         let match_or_no_match_tag = self.push_call(
             list_get_function,
             vec![match_or_no_match, zero],

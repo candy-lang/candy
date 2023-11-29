@@ -4,7 +4,7 @@ use crate::instruction_pointer::InstructionPointer;
 use candy_frontend::hir;
 use candy_frontend::rich_ir::ReferenceKey;
 use candy_frontend::{
-    mir::Id,
+    lir::Id,
     module::Module,
     rich_ir::{RichIr, RichIrBuilder, ToRichIr, TokenType},
     TracingConfig,
@@ -70,6 +70,19 @@ pub enum Instruction {
 
     /// Leaves the top stack item untouched, but removes n below.
     PopMultipleBelowTop(usize),
+
+    /// Increases the reference count by `amount`.
+    ///
+    /// a, value -> a
+    Dup {
+        amount: usize,
+    },
+
+    /// Decreases the reference count by one and, if the reference count reaches
+    /// zero, deallocates it.
+    ///
+    /// a, value -> a
+    Drop,
 
     /// Sets up the data stack for a function execution and then changes the
     /// instruction pointer to the first instruction.
@@ -150,6 +163,12 @@ impl Instruction {
                 let top = stack.pop().unwrap();
                 stack.pop_multiple(*n);
                 stack.push(top);
+            }
+            Self::Dup { amount: _ } => {
+                stack.pop();
+            }
+            Self::Drop => {
+                stack.pop();
             }
             Self::Call { num_args } => {
                 stack.pop(); // responsible
@@ -350,6 +369,11 @@ impl Instruction {
                 builder.push(" ", None, EnumSet::empty());
                 builder.push(count.to_string(), None, EnumSet::empty());
             }
+            Self::Dup { amount } => {
+                builder.push(" by ", None, EnumSet::empty());
+                builder.push(amount.to_string(), None, EnumSet::empty());
+            }
+            Self::Drop => {}
             Self::Call { num_args } => {
                 builder.push(
                     format!(" with {num_args} {}", arguments_plural(*num_args)),

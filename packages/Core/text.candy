@@ -161,3 +161,23 @@ padEnd text len char :=
   ifElse (textLength | int.isGreaterThanOrEqualTo len) { text } {
     text | concatenate (char | repeat (len | int.subtract textLength))
   }
+
+#test =
+#  [checkEquals] = use "..check"
+#
+#  checkEquals (is "Hi") True
+#  checkEquals (is 2) False
+#
+#  checkEquals (isEmpty "") True
+#  checkEquals (isEmpty "Hi") False
+#
+#  checkEquals (length "") 0
+#  checkEquals (length "Hi") 2
+#  checkEquals (length "🍔") 1
+#
+#  checkEquals (characters "Hello") ("H", "e", "l", "l", "o")
+#
+#  checkEquals (getRange "Hello" 1 4) "ell"
+#
+#  checkEquals (concatenate "jelly" "fish") "jellyfish"
+#  checkEquals (concatenate "tea" "sing") "teasing"

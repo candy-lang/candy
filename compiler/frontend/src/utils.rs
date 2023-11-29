@@ -1,7 +1,7 @@
 use extension_trait::extension_trait;
 use rustc_hash::FxHasher;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     hash::{BuildHasher, Hash, Hasher},
 };
 
@@ -28,6 +28,17 @@ pub impl<T: Hash> DoHash for T {
         let mut hasher = FxHasher::default();
         self.hash(&mut hasher);
         hasher.finish()
+    }
+}
+
+#[extension_trait]
+pub impl<T, S> HashSetExtension<T> for HashSet<T, S>
+where
+    T: Eq + Hash,
+    S: BuildHasher,
+{
+    fn force_insert(&mut self, value: T) {
+        assert!(self.insert(value));
     }
 }
 

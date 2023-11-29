@@ -20,13 +20,14 @@ pub use self::{
 use candy_frontend::{
     ast_to_hir::AstToHir,
     cst::CstDb,
-    mir_optimize::OptimizeMir,
+    hir_to_mir::ExecutionTarget,
+    lir_optimize::OptimizeLir,
     module::Module,
     position::PositionConversionDb,
     {hir::Id, TracingConfig, TracingMode},
 };
 use candy_vm::{
-    heap::Heap, mir_to_byte_code::compile_byte_code, tracer::stack_trace::StackTracer, Panic, Vm,
+    heap::Heap, lir_to_byte_code::compile_byte_code, tracer::stack_trace::StackTracer, Panic, Vm,
     VmFinished,
 };
 use std::rc::Rc;
@@ -34,14 +35,14 @@ use tracing::{debug, error, info};
 
 pub fn fuzz<DB>(db: &DB, module: Module) -> Vec<FailingFuzzCase>
 where
-    DB: AstToHir + CstDb + OptimizeMir + PositionConversionDb,
+    DB: AstToHir + CstDb + OptimizeLir + PositionConversionDb,
 {
     let tracing = TracingConfig {
         register_fuzzables: TracingMode::All,
         calls: TracingMode::Off,
         evaluated_expressions: TracingMode::Off,
     };
-    let (byte_code, _) = compile_byte_code(db, module, tracing);
+    let (byte_code, _) = compile_byte_code(db, ExecutionTarget::Module(module), tracing);
     let byte_code = Rc::new(byte_code);
 
     let mut heap = Heap::default();

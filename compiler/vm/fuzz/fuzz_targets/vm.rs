@@ -5,9 +5,11 @@ use candy_frontend::{
     ast_to_hir::AstToHirStorage,
     cst::CstDbStorage,
     cst_to_ast::CstToAstStorage,
-    hir::{self, HirDbStorage},
-    hir_to_mir::HirToMirStorage,
+    hir::HirDbStorage,
+    hir_to_mir::{ExecutionTarget, HirToMirStorage},
+    lir_optimize::OptimizeLirStorage,
     mir_optimize::OptimizeMirStorage,
+    mir_to_lir::MirToLirStorage,
     module::{
         InMemoryModuleProvider, Module, ModuleDbStorage, ModuleKind, ModuleProvider,
         ModuleProviderOwner, Package,
@@ -18,8 +20,8 @@ use candy_frontend::{
     TracingConfig,
 };
 use candy_vm::{
-    heap::{Heap, HirId, Struct},
-    mir_to_byte_code::compile_byte_code,
+    heap::{Heap, Struct},
+    lir_to_byte_code::compile_byte_code,
     tracer::DummyTracer,
     PopulateInMemoryProviderFromFileSystem, Vm, VmFinished,
 };
@@ -43,7 +45,9 @@ lazy_static! {
     CstToAstStorage,
     HirDbStorage,
     HirToMirStorage,
+    MirToLirStorage,
     ModuleDbStorage,
+    OptimizeLirStorage,
     OptimizeMirStorage,
     PositionConversionStorage,
     RcstToCstStorage,
@@ -66,38 +70,24 @@ fuzz_target!(|data: &[u8]| {
     db.module_provider.load_package_from_file_system("Builtins");
     db.module_provider.add(&MODULE, data.to_vec());
 
-    let byte_code = compile_byte_code(&db, MODULE.clone(), TRACING.clone()).0;
+    let byte_code = compile_byte_code(
+        &db,
+        ExecutionTarget::MainFunction(MODULE.clone()),
+        TRACING.clone(),
+    )
+    .0;
 
     let mut heap = Heap::default();
-    let VmFinished { result, .. } =
-        Vm::for_module(&byte_code, &mut heap, DummyTracer).run_forever_without_handles(&mut heap);
-    let Ok(exports) = result else {
-        println!("The module panicked.");
-        return;
-    };
-    let Ok(main) = exports.into_main_function(&heap) else {
-        println!("The module doesn't export a main function.");
-        return;
-    };
-
-    // Run the `main` function.
     let environment = Struct::create(&mut heap, true, &Default::default());
-    let responsible = HirId::create(&mut heap, true, hir::Id::user());
-    let VmFinished { result, .. } = Vm::for_function(
-        &byte_code,
-        &mut heap,
-        main,
-        &[environment.into()],
-        responsible,
-        DummyTracer,
-    )
-    .run_forever_without_handles(&mut heap);
+    let VmFinished { result, .. } =
+        Vm::for_main_function(&byte_code, &mut heap, environment, DummyTracer)
+            .run_forever_without_handles(&mut heap);
     match result {
         Ok(return_value) => {
             println!("The main function returned: {return_value:?}")
         }
         Err(panic) => {
-            panic!("The main function panicked: {}", panic.reason)
+            panic!("The program panicked: {}", panic.reason)
         }
     }
 });

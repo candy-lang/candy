@@ -4,7 +4,7 @@ use candy_backend_inkwell::LlvmIrDb;
 use candy_frontend::{
     ast_to_hir::{AstToHir, HirResult},
     cst_to_ast::{AstResult, CstToAst},
-    hir_to_mir::{HirToMir, MirResult},
+    hir_to_mir::{ExecutionTarget, HirToMir, MirResult},
     lir_optimize::OptimizeLir,
     mir_optimize::{OptimizeMir, OptimizedMirResult},
     mir_to_lir::{LirResult, MirToLir},
@@ -108,36 +108,50 @@ impl IrFeatures {
             Ir::Hir => Self::rich_ir_for_hir(&config.module, db.hir(config.module.clone())),
             Ir::Mir(tracing_config) => Self::rich_ir_for_mir(
                 &config.module,
-                db.mir(config.module.clone(), tracing_config.clone()),
+                db.mir(
+                    ExecutionTarget::Module(config.module.clone()),
+                    tracing_config.clone(),
+                ),
                 tracing_config,
             ),
             Ir::OptimizedMir(tracing_config) => Self::rich_ir_for_optimized_mir(
                 &config.module,
-                db.optimized_mir(config.module.clone(), tracing_config.clone()),
+                db.optimized_mir(
+                    ExecutionTarget::Module(config.module.clone()),
+                    tracing_config.clone(),
+                ),
                 tracing_config,
             ),
             Ir::Lir(tracing_config) => Self::rich_ir_for_lir(
                 &config.module,
-                &db.lir(config.module.clone(), tracing_config.clone()),
+                &db.lir(
+                    ExecutionTarget::Module(config.module.clone()),
+                    tracing_config.clone(),
+                ),
                 tracing_config,
             ),
             Ir::OptimizedLir(tracing_config) => Self::rich_ir_for_optimized_lir(
                 &config.module,
-                db.optimized_lir(config.module.clone(), tracing_config.clone()),
+                db.optimized_lir(
+                    ExecutionTarget::Module(config.module.clone()),
+                    tracing_config.clone(),
+                ),
                 tracing_config,
             ),
             Ir::VmByteCode(tracing_config) => Self::rich_ir_for_vm_byte_code(
                 &config.module,
-                &candy_vm::mir_to_byte_code::compile_byte_code(
+                &candy_vm::lir_to_byte_code::compile_byte_code(
                     db,
-                    config.module.clone(),
+                    ExecutionTarget::Module(config.module.clone()),
                     tracing_config.clone(),
                 )
                 .0,
                 tracing_config,
             ),
             #[cfg(feature = "inkwell")]
-            Ir::LlvmIr => db.llvm_ir(config.module.clone()).unwrap(),
+            Ir::LlvmIr => db
+                .llvm_ir(ExecutionTarget::Module(config.module.clone()))
+                .unwrap(),
         };
 
         let line_start_offsets = line_start_offsets_raw(&ir.text);

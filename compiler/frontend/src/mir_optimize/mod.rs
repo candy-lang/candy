@@ -49,8 +49,8 @@ use self::{
 use super::{hir, hir_to_mir::HirToMir, mir::Mir, tracing::TracingConfig};
 use crate::{
     error::CompilerError,
+    hir_to_mir::ExecutionTarget,
     mir::{Body, Expression, MirError, VisibleExpressions},
-    module::Module,
     string_to_rcst::ModuleError,
     utils::DoHash,
 };
@@ -75,7 +75,7 @@ mod validate;
 #[salsa::query_group(OptimizeMirStorage)]
 pub trait OptimizeMir: HirToMir {
     #[salsa::cycle(recover_from_cycle)]
-    fn optimized_mir(&self, module: Module, tracing: TracingConfig) -> OptimizedMirResult;
+    fn optimized_mir(&self, target: ExecutionTarget, tracing: TracingConfig) -> OptimizedMirResult;
 }
 
 pub type OptimizedMirResult = Result<
@@ -90,11 +90,12 @@ pub type OptimizedMirResult = Result<
 #[allow(clippy::needless_pass_by_value)]
 fn optimized_mir(
     db: &dyn OptimizeMir,
-    module: Module,
+    target: ExecutionTarget,
     tracing: TracingConfig,
 ) -> OptimizedMirResult {
+    let module = target.module();
     debug!("{module}: Compiling.");
-    let (mir, errors) = db.mir(module.clone(), tracing.clone())?;
+    let (mir, errors) = db.mir(target.clone(), tracing.clone())?;
     let mut mir = (*mir).clone();
     let mut pureness = PurenessInsights::default();
     let mut errors = (*errors).clone();
@@ -219,11 +220,11 @@ impl Context<'_> {
 fn recover_from_cycle(
     _db: &dyn OptimizeMir,
     cycle: &[String],
-    module: &Module,
+    target: &ExecutionTarget,
     _tracing: &TracingConfig,
 ) -> OptimizedMirResult {
     let error = CompilerError::for_whole_module(
-        module.clone(),
+        target.module().clone(),
         MirError::ModuleHasCycle {
             cycle: cycle.to_vec(),
         },
@@ -231,7 +232,7 @@ fn recover_from_cycle(
 
     let mir = Mir::build(|body| {
         let reason = body.push_text(error.payload.to_string());
-        let responsible = body.push_hir_id(hir::Id::new(module.clone(), vec![]));
+        let responsible = body.push_hir_id(hir::Id::new(target.module().clone(), vec![]));
         body.push_panic(reason, responsible);
     });
 

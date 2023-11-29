@@ -80,7 +80,7 @@ impl InlineInt {
     }
 
     pub fn shift_left(self, heap: &mut Heap, rhs: Self) -> Int {
-        let lhs = self.get();
+        let lhs: i64 = self.get();
         #[allow(clippy::map_unwrap_or)]
         rhs.try_get::<u32>()
             .and_then(|rhs| {
@@ -88,10 +88,17 @@ impl InlineInt {
                 // type (i.e., `rhs < 64`). However, we need to check that the mathematical result
                 // is completely representable in our available bits and doesn't get truncated.
 
+                let bit_length = if lhs.is_negative() {
+                    // One 1 is necessary for the sign.
+                    i64::BITS - lhs.leading_ones() + 1
+                } else {
+                    lhs.bit_length()
+                };
+
                 #[allow(clippy::cast_possible_truncation)]
                 let value_shift = Self::VALUE_SHIFT as u32;
 
-                if self.get().bit_length() + rhs < InlineObject::BITS - value_shift {
+                if bit_length + rhs < InlineObject::BITS - value_shift {
                     Some(lhs << rhs)
                 } else {
                     None
@@ -197,12 +204,8 @@ impl InlineObjectTrait for InlineInt {
 #[extension_trait]
 pub impl I64BitLength for i64 {
     fn bit_length(self) -> u32 {
-        if self.is_negative() {
-            // One 1 is necessary for the sign.
-            Self::BITS - self.leading_ones() + 1
-        } else {
-            Self::BITS - self.leading_zeros()
-        }
+        assert!(!self.is_negative());
+        Self::BITS - self.leading_zeros()
     }
 }
 
@@ -278,10 +281,6 @@ mod tests {
 
     #[test]
     fn bit_length() {
-        assert_eq!(inline_int(-4).bit_length(), inline_int(3));
-        assert_eq!(inline_int(-3).bit_length(), inline_int(3));
-        assert_eq!(inline_int(-2).bit_length(), inline_int(2));
-        assert_eq!(inline_int(-1).bit_length(), inline_int(1));
         assert_eq!(inline_int(0).bit_length(), inline_int(0));
         assert_eq!(inline_int(1).bit_length(), inline_int(1));
         assert_eq!(inline_int(2).bit_length(), inline_int(2));

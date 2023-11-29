@@ -37,41 +37,47 @@
 
 use super::current_expression::{Context, CurrentExpression};
 use crate::mir::Expression;
+use itertools::Itertools;
 
 pub fn lift_constants(context: &mut Context, expression: &mut CurrentExpression) {
     let Expression::Function { body, .. } = &mut **expression else {
         return;
     };
 
-    let mut constants = vec![];
+    let return_value = body.return_value();
+    let mut new_return_reference_target = None;
+    let constants = body
+        .expressions
+        .extract_if(|(id, expression)| {
+            let id = *id;
 
-    let mut index = 0;
-    while index < body.expressions.len() {
-        let (id, expression) = &body.expressions[index];
-        let id = *id;
+            if !context.pureness.is_definition_const(expression) {
+                return false;
+            }
 
-        if !context.pureness.is_definition_const(expression) {
-            index += 1;
-            continue;
-        }
+            let is_return_value = id == return_value;
+            if is_return_value && let Expression::Reference(_) = expression {
+                // Returned references shouldn't be lifted. If we would lift one,
+                // we'd have to add a reference anyway.
+                return false;
+            }
 
-        let is_return_value = id == body.return_value();
-        if is_return_value && let Expression::Reference(_) = expression {
-            // Returned references shouldn't be lifted. If we would lift one,
-            // we'd have to add a reference anyway.
-            index += 1;
-            continue;
-        }
+            // This is a constant and should be lifted.
 
-        // This is a constant and should be lifted.
+            if is_return_value {
+                // The return value was removed. Add a reference to the lifted
+                // constant.
+                new_return_reference_target = Some(id);
+            }
+            true
+        })
+        .collect_vec();
 
-        constants.push(body.expressions.remove(index));
-
-        if is_return_value {
-            // The return value was removed. Add a reference to the lifted
-            // constant.
-            body.push(context.id_generator.generate(), Expression::Reference(id));
-        }
+    if let Some(new_return_reference_target) = new_return_reference_target {
+        body.push(
+            context.id_generator.generate(),
+            Expression::Reference(new_return_reference_target),
+        );
     }
 
     expression.prepend_optimized(context.visible, constants);

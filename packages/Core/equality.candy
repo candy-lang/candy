@@ -1,3 +1,40 @@
 builtins = use "Builtins"
 
 equals := builtins.equals
+
+#test =
+#  [checkEquals] = use "..check"
+#
+#  checkEquals (equals 2 Foo) False
+#
+#  ## numbers
+#  checkEquals (equals 5 5) True
+#  checkEquals (equals 3 5) False
+#
+#  ## text
+#  checkEquals (equals "Hey" "Hey") True
+#  checkEquals (equals "A" "B") False
+#
+#  ## tags
+#  checkEquals (equals Kiwi Kiwi) True
+#  checkEquals (equals Kiwi Banana) False
+#  checkEquals (equals Kiwi (Kiwi 3)) False
+#  checkEquals (equals (Kiwi 3) (Kiwi 3)) True
+#  checkEquals (equals (Kiwi 5) (Kiwi 3)) False
+#
+#  ## functions
+#  foo = { a -> 4 }
+#  checkEquals (equals foo foo) True
+#  ## TODO: Currently, this is not implemented correctly in the VM.
+#  # checkEquals (equals foo { a -> 4 }) False
+#
+#  ## lists
+#  checkEquals (equals (1, 2, 3) (1, 2, 3)) True
+#  checkEquals (equals (1, 2, 3) (1, 2)) False
+#  checkEquals (equals (1, 2, 3) (1, 2, 30)) False
+#
+#  ## structs
+#  checkEquals (equals [Foo: 2] [Foo: 2]) True
+#  checkEquals (equals [Foo: 2] [Bar: 2]) False
+#  checkEquals (equals [Foo: 2] []) False
+#  checkEquals (equals [Foo: 2] [Foo: 3]) False

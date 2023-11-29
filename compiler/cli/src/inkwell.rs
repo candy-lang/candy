@@ -1,18 +1,21 @@
-use std::ffi::OsStr;
-use std::path::PathBuf;
-use std::sync::Arc;
-
+use crate::{
+    database::Database,
+    utils::{module_for_path, packages_path},
+    Exit, ProgramResult,
+};
 use candy_backend_inkwell::CodeGen;
-use candy_frontend::error::{CompilerError, CompilerErrorPayload};
-use candy_frontend::mir::Mir;
-use candy_frontend::mir_optimize::OptimizeMir;
-use candy_frontend::{hir, module, TracingConfig};
+use candy_frontend::{
+    error::{CompilerError, CompilerErrorPayload},
+    hir,
+    hir_to_mir::ExecutionTarget,
+    mir::Mir,
+    mir_optimize::OptimizeMir,
+    module, TracingConfig,
+};
 use clap::{Parser, ValueHint};
 use rustc_hash::FxHashSet;
-
-use crate::database::Database;
-use crate::utils::{module_for_path, packages_path};
-use crate::{Exit, ProgramResult};
+use std::{ffi::OsStr, path::PathBuf, sync::Arc};
+use tracing::error;
 
 /// Compile a Candy program to a native binary.
 ///
@@ -42,8 +45,8 @@ pub struct Options {
     #[arg(long, default_value = "ld.lld")]
     linker: String,
 
-    /// The file or package to run. If none is provided, run the package of your
-    /// current working directory.
+    /// The file or package to compile. If none is provided, compile the package
+    /// of your current working directory.
     #[arg(value_hint = ValueHint::FilePath)]
     path: Option<PathBuf>,
 }
@@ -67,7 +70,10 @@ pub fn compile(options: &Options) -> ProgramResult {
 
     #[allow(clippy::map_unwrap_or)]
     let (mir, errors) = db
-        .optimized_mir(module.clone(), TracingConfig::off())
+        .optimized_mir(
+            ExecutionTarget::MainFunction(module.clone()),
+            TracingConfig::off(),
+        )
         .map(|(mir, _, errors)| (mir, errors))
         .unwrap_or_else(|error| {
             let payload = CompilerErrorPayload::Module(error);
@@ -95,7 +101,10 @@ pub fn compile(options: &Options) -> ProgramResult {
         .map_err(|e| Exit::LlvmError(e.to_string()))?;
     llvm_candy_module
         .compile_obj_and_link(&path, options.build_runtime, options.debug, &options.linker)
-        .map_err(|_| Exit::ExternalError)?;
+        .map_err(|err| {
+            error!("Failed to compile and link executable: {}", err);
+            Exit::ExternalError
+        })?;
 
     ProgramResult::Ok(())
 }

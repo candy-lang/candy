@@ -74,7 +74,7 @@ We already have a language server that provides some tooling.
 
 ## Discussion
 
-[Join our Discord server.](https://discord.gg/5Vr4eAJ7gU)
+[Join our <img height="12" src="https://github.com/candy-lang/candy/assets/19330937/baf90ce0-1d0a-4279-92fa-1c360cd28b38"> Discord server.](https://discord.gg/5Vr4eAJ7gU)
 
 ## How to use Candy
 

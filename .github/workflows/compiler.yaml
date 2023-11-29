@@ -116,7 +116,7 @@ jobs:
         if: github.event_name == 'pull_request'
         continue-on-error: true
         working-directory: golden-irs/
-        run: git diff --exit-code ${{ github.event.pull_request.base.sha }}_ ${{ github.sha }}_
+        run: git diff --quiet ${{ github.event.pull_request.base.sha }}_ ${{ github.sha }}_
       - name: Shorten commit SHAs
         id: short-shas
         if: steps.diff.outcome == 'failure'
@@ -136,6 +136,8 @@ jobs:
   benchmark:
     name: Benchmark
     runs-on: ubuntu-latest
+    # Benchmarks on pushes to main should run sequentially.
+    concurrency: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('{0}-{1}-{2}', github.workflow, github.job, github.ref) || github.run_id }}
     steps:
       - uses: actions/checkout@v4
       - uses: dsherret/rust-toolchain-file@v1

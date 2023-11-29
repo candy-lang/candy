@@ -20,3 +20,20 @@ withSymbol tag symbolTag :=
 withValue tag value :=
   needs (is tag)
   (tag | withoutValue) value
+
+#test =
+#  [checkEquals] = use "..check"
+#
+#  checkEquals (is 3) False
+#  checkEquals (is Foo) True
+#  checkEquals (is (Foo 2)) True
+#
+#  checkEquals (hasValue Foo) False
+#  checkEquals (hasValue (Foo 2)) True
+#
+#  checkEquals (withoutValue Foo) Foo
+#  checkEquals (withoutValue (Foo 2)) Foo
+#
+#  checkEquals (getValue (Foo 2)) 2
+#
+#  checkEquals (withSymbol (Foo 2) Bar) (Bar 2)
