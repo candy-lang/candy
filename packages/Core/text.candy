@@ -137,7 +137,6 @@ padStart text len char :=
   recursive text { recurse text ->
     ifElse (text | length | int.isGreaterThanOrEqualTo len) {text} {char | concatenate text | recurse}
   }
-
 padEnd text len char :=
   needs (is text)
   needs (int.is len)
