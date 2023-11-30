@@ -53,7 +53,7 @@ updates:
   - package-ecosystem: npm
     directory: /vscode_extension
     schedule:
-      interval: daily
+      interval: weekly
     groups:
       glob:
         patterns:
