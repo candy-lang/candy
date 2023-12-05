@@ -1,0 +1,53 @@
+[print] = use "Builtins"
+[equals, function, ifElse, int, iterator, list, panic, result, text, toDebugText] = use "Core"
+
+exampleInput := use ".example.txt" | text.fromUtf8 | result.unwrap
+
+textSplitIf t predicate :=
+  needs (text.is t)
+  needs (function.is1 predicate)
+  iterator.generateWithState [RemainingText: t, YieldedAfterLastMatch: False] {
+    [remainingText, yieldedAfterLastMatch] ->
+    remainingText | text.findFirstIndexWhere predicate %
+      FoundAt index ->
+        More [
+          Item: remainingText | text.getRange 0 index,
+          State:
+            [
+              RemainingText:
+                remainingText | text.getRange (index | int.add 1) (remainingText | text.length),
+              YieldedAfterLastMatch: False,
+            ],
+        ]
+      NotFound ->
+        ifElse yieldedAfterLastMatch { Empty } {
+          More [Item: remainingText, State: [RemainingText: "", YieldedAfterLastMatch: True]]
+        }
+  }
+textSplitOn t separator :=
+  needs (text.is t)
+  needs (text.is separator)
+  needs (separator | text.length | equals 1)
+  t | textSplitIf { char -> char | equals separator }
+textLines t :=
+  needs (text.is t)
+  ## TODO(JonasWanke): This should find other newline characters as well
+  t | textSplitOn text.newline
+
+findCalibrationValue line :=
+  needs (text.is line)
+
+  parseDigit = { digitResult ->
+    digitResult %
+      Found digit -> digit | int.parse | result.unwrap
+      NotFound -> panic "Could not find digit"
+  }
+
+  firstDigit = line | text.characters | list.findFirstWhere text.isAsciiDigit | parseDigit
+  lastDigit = line | text.characters | list.findLastWhere text.isAsciiDigit | parseDigit
+  firstDigit | int.multiply 10 | int.add lastDigit
+
+main := { environment ->
+  print
+    exampleInput | textLines | iterator.map findCalibrationValue | iterator.toList | toDebugText
+}
