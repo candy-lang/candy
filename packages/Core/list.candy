@@ -109,6 +109,42 @@ concatenate listA listB :=
     }
   }
 
+findFirstIndexWhere list predicate :=
+  needs (is list)
+  needs (function.is1 predicate)
+  recursive [list, Index: 0] { recurse [list, index] ->
+    ifElse (index | equals (list | length)) { NotFound } {
+      predicateResult = predicate (list | get index)
+      needs (bool.is predicateResult)
+      ifElse predicateResult { FoundAt index } { recurse [list, Index: int.add index 1] }
+    }
+  }
+findFirstWhere list predicate :=
+  needs (is list)
+  needs (function.is1 predicate)
+  list | findFirstIndexWhere predicate | result.map { index -> list | get index | result.unwrap }
+findFirstIndexOf list item :=
+  needs (is list)
+  findFirstIndexWhere list { a -> a | equals item }
+findLastIndexWhere list predicate :=
+  needs (is list)
+  needs (function.is1 predicate)
+  recursive [list, Index: list | lastIndex | result.unwrapOr (int.negate 1)] {
+    recurse [list, index] ->
+    ifElse (index | equals (int.negate 1)) { NotFound } {
+      predicateResult = predicate (list | get index)
+      needs (bool.is predicateResult)
+      ifElse predicateResult { FoundAt index } { recurse [list, Index: int.subtract index 1] }
+    }
+  }
+findLastWhere list predicate :=
+  needs (is list)
+  needs (function.is1 predicate)
+  list | findLastIndexWhere predicate | result.map { index -> list | get index | result.unwrap }
+findLastIndexOf list item :=
+  needs (is list)
+  findLastIndexWhere list { a -> a | equals item }
+
 #test =
 #  [checkEquals] = use "..check"
 #
