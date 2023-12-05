@@ -122,7 +122,9 @@ findFirstIndexWhere list predicate :=
 findFirstWhere list predicate :=
   needs (is list)
   needs (function.is1 predicate)
-  list | findFirstIndexWhere predicate | result.map { index -> list | get index | result.unwrap }
+  list | findFirstIndexWhere predicate %
+    FoundAt index -> Found (list | get index)
+    NotFound -> NotFound
 findFirstIndexOf list item :=
   needs (is list)
   findFirstIndexWhere list { a -> a | equals item }
@@ -140,7 +142,9 @@ findLastIndexWhere list predicate :=
 findLastWhere list predicate :=
   needs (is list)
   needs (function.is1 predicate)
-  list | findLastIndexWhere predicate | result.map { index -> list | get index | result.unwrap }
+  list | findLastIndexWhere predicate %
+    FoundAt index -> Found (list | get index)
+    NotFound -> NotFound
 findLastIndexOf list item :=
   needs (is list)
   findLastIndexWhere list { a -> a | equals item }
