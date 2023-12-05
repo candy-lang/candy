@@ -10,6 +10,9 @@ type = use "..type"
 
 is value := type.is value Text
 
+newline := "
+
+"
 rick := "
   We're no strangers to love
   You know the rules and so do I
