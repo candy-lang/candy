@@ -1,0 +1,53 @@
+name: Formatter Issue
+description: The formatter is crashing or producing undesired output
+labels:
+  - 'T: Fix'
+  - 'P: Compiler: Formatter'
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+  - type: input
+    id: contact
+    attributes:
+      label: Contact Details
+      description: How can we get in touch with you if we need more info?
+      placeholder: ex. email@example.com
+    validations:
+      required: false
+  - type: textarea
+    id: input
+    attributes:
+      label: Input
+      description: What code are you trying to format?
+      render: candy
+    validations:
+      required: true
+  - type: textarea
+    id: actual-output
+    attributes:
+      label: Actual Output
+      description: What did the formatter produce?
+      render: candy
+    validations:
+      required: true
+  - type: textarea
+    id: desired-output
+    attributes:
+      label: Desired Output
+      description: What do you expect the formatter to produce?
+      render: candy
+    validations:
+      required: true
+  - type: textarea
+    id: log-output
+    attributes:
+      label: Relevant Log Output
+      description: Please include any relevant log output, especially if the formatter crashed.
+      render: text
+  - type: textarea
+    id: additional-info
+    attributes:
+      label: Additional Information
+      description: Is there anything else we should know?
