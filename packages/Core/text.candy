@@ -2,6 +2,7 @@ builtins = use "Builtins"
 bool = use "..bool"
 [ifElse] = use "..controlFlow"
 [equals] = use "..equality"
+function = use "..function"
 int = use "..int"
 # iterable = use "..iterable"
 list = use "..list"
@@ -123,6 +124,25 @@ trimEnd := builtins.textTrimEnd
 trim text :=
   needs (is text)
   text | trimStart | trimEnd
+
+findFirstIndexWhere text predicate :=
+  needs (is text)
+  needs (function.is1 predicate)
+  text | characters | list.findFirstIndexWhere predicate
+findFirstIndexOf text character :=
+  needs (is text)
+  needs (is character)
+  needs (character | length | equals 1)
+  text | characters | list.findFirstIndexOf character
+findLastIndexWhere text predicate :=
+  needs (is text)
+  needs (function.is1 predicate)
+  text | characters | list.findLastIndexWhere predicate
+findLastIndexOf text character :=
+  needs (is text)
+  needs (is character)
+  needs (character | length | equals 1)
+  text | characters | list.findLastIndexOf character
 
 #test =
 #  [checkEquals] = use "..check"
