@@ -1,4 +1,4 @@
-[channel, equals, ifElse, int, iterable, list, recursive, text] = use "Core"
+[equals, ifElse, int, iterator, list, recursive, text] = use "Core"
 
 hanoi amount from via to =
   # https://rosettacode.org/wiki/Towers_of_Hanoi
@@ -16,14 +16,14 @@ hanoi amount from via to =
 main := { environment ->
   print message =
     needs (text.is message)
-    environment.stdout | channel.send message
+    environment.stdout message
 
   # TODO: Improve performance and memory usage. Running this with _2_ disks produces an OOM.
   steps = hanoi 1 "A" "B" "C"
-  steps | iterable.fromList | iterable.map { step ->
+  steps | iterator.fromList | iterator.map { step ->
     [from, to] = step
-    from | text.concatenate " → " | text.concatenate to
+    from | text.concatenate "→ " | text.concatenate to
   }
-  | iterable.joinToText
+  | iterator.joinToText
   | print
 }

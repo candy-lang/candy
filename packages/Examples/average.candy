@@ -1,10 +1,10 @@
-[bool, int, iterable, list, result] = use "Core"
+[bool, int, iterator, list, result] = use "Core"
 [divideTruncating] = int
 
 average a =
   needs (list.is a)
   needs (a | list.isEmpty | bool.not)
-  needs (a | iterable.fromList | iterable.all { a -> int.is a })
-  divideTruncating (a | iterable.fromList | iterable.sum) (a | list.length)
+  needs (a | iterator.fromList | iterator.all { a -> int.is a })
+  divideTruncating (a | iterator.fromList | iterator.sum) (a | list.length)
 
 main environment := average (1, 2, 3)

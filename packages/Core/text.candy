@@ -3,7 +3,7 @@ bool = use "..bool"
 [ifElse] = use "..controlFlow"
 [equals] = use "..equality"
 int = use "..int"
-# iterable = use "..iterable"
+# iterator = use "..iterator"
 list = use "..list"
 struct = use "..struct"
 type = use "..type"
@@ -78,7 +78,8 @@ rick := "
   Never gonna run around and desert you
   Never gonna make you cry
   Never gonna say goodbye
-  Never gonna tell a lie and hurt you"
+  Never gonna tell a lie and hurt you
+"
 
 fromUtf8 := builtins.textFromUtf8
 
