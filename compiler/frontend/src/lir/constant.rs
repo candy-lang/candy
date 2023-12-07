@@ -90,9 +90,23 @@ pub enum Constant {
     Function(BodyId),
 }
 
-impl_display_via_richir!(Constant);
-impl ToRichIr for Constant {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+impl Constant {
+    pub fn build_rich_ir_with_constants(
+        &self,
+        builder: &mut RichIrBuilder,
+        constants: impl Into<Option<&Constants>>,
+    ) {
+        let constants = constants.into();
+        let build_constant = |builder: &mut RichIrBuilder, id: ConstantId| {
+            if let Some(constants) = constants {
+                constants
+                    .get(id)
+                    .build_rich_ir_with_constants(builder, constants);
+            } else {
+                id.build_rich_ir(builder);
+            }
+        };
+
         match self {
             Self::Int(int) => {
                 int.build_rich_ir(builder);
@@ -107,7 +121,7 @@ impl ToRichIr for Constant {
                 builder.push_reference(ReferenceKey::Symbol(symbol.clone()), range);
                 if let Some(value) = value {
                     builder.push(" ", None, EnumSet::empty());
-                    value.build_rich_ir(builder);
+                    build_constant(builder, *value);
                 }
             }
             Self::Builtin(builtin) => {
@@ -126,9 +140,9 @@ impl ToRichIr for Constant {
                 builder.push_children_custom(
                     fields.iter().collect_vec(),
                     |builder, (key, value)| {
-                        key.build_rich_ir(builder);
+                        build_constant(builder, **key);
                         builder.push(": ", None, EnumSet::empty());
-                        value.build_rich_ir(builder);
+                        build_constant(builder, **value);
                     },
                     ", ",
                 );
@@ -144,5 +158,12 @@ impl ToRichIr for Constant {
                 builder.push(" }", None, EnumSet::empty());
             }
         }
+    }
+}
+
+impl_display_via_richir!(Constant);
+impl ToRichIr for Constant {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        self.build_rich_ir_with_constants(builder, None)
     }
 }
