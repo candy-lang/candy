@@ -238,7 +238,7 @@ impl Body {
             let range = builder.push(id.to_string(), TokenType::Variable, EnumSet::empty());
             builder.push_definition(*id, range);
             builder.push(" = ", None, EnumSet::empty());
-            expression.build_rich_ir_with_constants(builder, constants);
+            expression.build_rich_ir_with_constants(builder, constants, self);
         });
     }
 }
