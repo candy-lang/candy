@@ -1,4 +1,4 @@
-use super::{BodyId, ConstantId, Id};
+use super::{BodyId, ConstantId, Constants, Id};
 use crate::{
     impl_display_via_richir,
     rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr, TokenType},
@@ -160,11 +160,13 @@ impl Expression {
             }
         }
     }
-}
 
-impl_display_via_richir!(Expression);
-impl ToRichIr for Expression {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+    pub fn build_rich_ir_with_constants(
+        &self,
+        builder: &mut RichIrBuilder,
+        constants: impl Into<Option<&Constants>>,
+    ) {
+        let constants = constants.into();
         match self {
             Self::CreateTag { symbol, value } => {
                 let range = builder.push(symbol, TokenType::Symbol, EnumSet::empty());
@@ -205,7 +207,16 @@ impl ToRichIr for Expression {
 
                 builder.push(" }", None, EnumSet::empty());
             }
-            Self::Constant(id) => id.build_rich_ir(builder),
+            Self::Constant(id) => {
+                id.build_rich_ir(builder);
+                if let Some(constants) = constants {
+                    builder.push("<", None, EnumSet::empty());
+                    constants
+                        .get(*id)
+                        .build_rich_ir_with_constants(builder, constants);
+                    builder.push(">", None, EnumSet::empty());
+                }
+            }
             Self::Reference(id) => id.build_rich_ir(builder),
             Self::Dup { id, amount } => {
                 builder.push("dup ", None, EnumSet::empty());
@@ -287,5 +298,12 @@ impl ToRichIr for Expression {
                 hir_definition.build_rich_ir(builder);
             }
         }
+    }
+}
+
+impl_display_via_richir!(Expression);
+impl ToRichIr for Expression {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        self.build_rich_ir_with_constants(builder, None)
     }
 }
