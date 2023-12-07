@@ -22,7 +22,7 @@ dap = { path = "../../third_party/dap-rs" }
 derive_more = "0.99.17"
 enumset = "1.0.12"
 extension-trait = "1.0.1"
-itertools = "0.11.0"
+itertools = "0.12.0"
 lazy_static = "1.4.0"
 lsp-types = "0.94.0"
 num-bigint = { version = "0.4.3", features = ["rand"] }

@@ -4,6 +4,9 @@ local/
 *.candy.*
 .goldens/
 
+# Valgrind
+callgrind.out.*
+
 # ANTLR
 .antlr/
 

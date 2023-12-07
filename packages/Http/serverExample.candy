@@ -1,0 +1,18 @@
+[print] = use "Builtins"
+[server] = use ".."
+
+main := { environment ->
+  sockets = ("127.0.0.1:8080",)
+  s = environment.httpServer | server.start sockets
+  print "Started an HTTP server at {sockets}"
+
+  [Request: req, sendResponse] = s | server.nextRequest
+  print "Received a request: {req}"
+
+  responseBody = "Hello from Candy!"
+  sendResponse responseBody
+  print '"Sent a response: "{{responseBody}}""'
+
+  s | server.close
+  print "Closed the server"
+}

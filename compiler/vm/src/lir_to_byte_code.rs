@@ -170,7 +170,7 @@ impl<'c> LoweringContext<'c> {
                     .default_symbols()
                     .get(symbol)
                     .unwrap_or_else(|| {
-                        Text::create(&mut self.byte_code.constant_heap, true, symbol)
+                        Text::create(&mut self.byte_code.constant_heap, false, symbol)
                     });
 
                 self.emit_reference_to(*value);

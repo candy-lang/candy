@@ -1,4 +1,5 @@
 #![feature(
+    addr_parse_ascii,
     allocator_api,
     anonymous_lifetime_in_impl_trait,
     core_intrinsics,
