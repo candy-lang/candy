@@ -58,6 +58,7 @@ use rustc_hash::FxHashSet;
 use std::{mem, sync::Arc};
 use tracing::debug;
 
+mod after_panic;
 mod cleanup;
 mod common_subtree_elimination;
 mod complexity;
@@ -68,7 +69,6 @@ mod inlining;
 mod module_folding;
 mod pure;
 mod reference_following;
-mod after_panic;
 mod tree_shaking;
 mod utils;
 mod validate;

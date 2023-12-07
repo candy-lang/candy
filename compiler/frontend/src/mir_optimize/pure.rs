@@ -231,10 +231,10 @@ impl PurenessInsights {
 
     // Called after all optimizations are done for this `expression`.
     pub(super) fn visit_optimized(&mut self, id: Id, expression: &Expression) {
-        if self.is_definition_pure(expression) {
+        if self.is_definition_deterministic(expression) {
             self.deterministic_definitions.insert(id);
         }
-        if self.is_function_pure(expression) {
+        if self.is_function_deterministic(expression) {
             self.deterministic_functions.insert(id);
         }
 

@@ -56,12 +56,10 @@ pub fn eliminate_common_subtrees(body: &mut Body, pureness: &PurenessInsights) {
     // The matches are stored as an index into [body] so that we can read the
     // potentially matching normalized expression and also have mutable access
     // to the current expression within the main loop.
-    let mut pure_expressions: FxHashMap<u64, Vec<usize>> = FxHashMap::default();
     let mut deterministic_expressions: FxHashMap<u64, Vec<usize>> = FxHashMap::default();
 
     let mut inner_function_ids: FxHashMap<Id, Vec<Id>> = FxHashMap::default();
     let mut additional_function_hirs: FxHashMap<Id, FxHashSet<hir::Id>> = FxHashMap::default();
-    let mut updated_references: FxHashMap<Id, Id> = FxHashMap::default();
 
     for index in 0..body.expressions.len() {
         let id = body.expressions[index].0;
@@ -69,15 +67,15 @@ pub fn eliminate_common_subtrees(body: &mut Body, pureness: &PurenessInsights) {
         let normalized_hash = {
             let expression = &mut body.expressions[index].1;
 
+            if !pureness.is_definition_deterministic(expression) {
+                continue;
+            }
+
             if let Expression::Function { body, .. } = &expression {
                 inner_function_ids.insert(
                     id,
                     body.all_functions().into_iter().map(|(id, _)| id).collect(),
                 );
-            }
-
-            if !pureness.is_definition_deterministic(expression) {
-                continue;
             }
 
             expression.do_hash_normalized()
@@ -102,7 +100,6 @@ pub fn eliminate_common_subtrees(body: &mut Body, pureness: &PurenessInsights) {
                     &mut body.expressions[index].1,
                     Expression::Reference(canonical_id),
                 );
-                updated_references.insert(id, canonical_id);
 
                 if let Expression::Function {
                     body,
