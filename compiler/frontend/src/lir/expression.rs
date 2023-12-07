@@ -1,4 +1,4 @@
-use super::{BodyId, ConstantId, Constants, Id};
+use super::{Body, BodyId, ConstantId, Constants, Id};
 use crate::{
     impl_display_via_richir,
     rich_ir::{ReferenceKey, RichIrBuilder, ToRichIr, TokenType},
@@ -165,18 +165,25 @@ impl Expression {
         &self,
         builder: &mut RichIrBuilder,
         constants: impl Into<Option<&Constants>>,
+        body: impl Into<Option<&Body>>,
     ) {
         let constants = constants.into();
+        let body = body.into();
+
         match self {
             Self::CreateTag { symbol, value } => {
                 let range = builder.push(symbol, TokenType::Symbol, EnumSet::empty());
                 builder.push_reference(ReferenceKey::Symbol(symbol.clone()), range);
                 builder.push(" ", None, EnumSet::empty());
-                value.build_rich_ir(builder);
+                value.build_rich_ir_with_constants(builder, constants, body);
             }
             Self::CreateList(items) => {
                 builder.push("(", None, EnumSet::empty());
-                builder.push_children(items, ", ");
+                builder.push_children_custom(
+                    items,
+                    |builder, it| it.build_rich_ir_with_constants(builder, constants, body),
+                    ", ",
+                );
                 if items.len() <= 1 {
                     builder.push(",", None, EnumSet::empty());
                 }
@@ -187,9 +194,9 @@ impl Expression {
                 builder.push_children_custom(
                     fields.iter().collect_vec(),
                     |builder, (key, value)| {
-                        key.build_rich_ir(builder);
+                        key.build_rich_ir_with_constants(builder, constants, body);
                         builder.push(": ", None, EnumSet::empty());
-                        value.build_rich_ir(builder);
+                        value.build_rich_ir_with_constants(builder, constants, body);
                     },
                     ", ",
                 );
@@ -202,31 +209,26 @@ impl Expression {
                 if captured.is_empty() {
                     builder.push("nothing", None, EnumSet::empty());
                 } else {
-                    builder.push_children(captured, ", ");
+                    builder.push_children_custom(
+                        captured,
+                        |builder, it| it.build_rich_ir_with_constants(builder, constants, body),
+                        ", ",
+                    );
                 }
 
                 builder.push(" }", None, EnumSet::empty());
             }
-            Self::Constant(id) => {
-                id.build_rich_ir(builder);
-                if let Some(constants) = constants {
-                    builder.push("<", None, EnumSet::empty());
-                    constants
-                        .get(*id)
-                        .build_rich_ir_with_constants(builder, constants);
-                    builder.push(">", None, EnumSet::empty());
-                }
-            }
-            Self::Reference(id) => id.build_rich_ir(builder),
+            Self::Constant(id) => id.build_rich_ir_with_constants(builder, constants),
+            Self::Reference(id) => id.build_rich_ir_with_constants(builder, constants, body),
             Self::Dup { id, amount } => {
                 builder.push("dup ", None, EnumSet::empty());
-                id.build_rich_ir(builder);
+                id.build_rich_ir_with_constants(builder, constants, body);
                 builder.push(" by ", None, EnumSet::empty());
                 builder.push(amount.to_string(), None, EnumSet::empty());
             }
             Self::Drop(id) => {
                 builder.push("drop ", None, EnumSet::empty());
-                id.build_rich_ir(builder);
+                id.build_rich_ir_with_constants(builder, constants, body);
             }
             Self::Call {
                 function,
@@ -234,15 +236,19 @@ impl Expression {
                 responsible,
             } => {
                 builder.push("call ", None, EnumSet::empty());
-                function.build_rich_ir(builder);
+                function.build_rich_ir_with_constants(builder, constants, body);
                 builder.push(" with ", None, EnumSet::empty());
                 if arguments.is_empty() {
                     builder.push("no arguments", None, EnumSet::empty());
                 } else {
-                    builder.push_children(arguments, " ");
+                    builder.push_children_custom(
+                        arguments,
+                        |builder, it| it.build_rich_ir_with_constants(builder, constants, body),
+                        " ",
+                    );
                 }
                 builder.push(" (", None, EnumSet::empty());
-                responsible.build_rich_ir(builder);
+                responsible.build_rich_ir_with_constants(builder, constants, body);
                 builder.push(" is responsible)", None, EnumSet::empty());
             }
             Self::Panic {
@@ -250,9 +256,9 @@ impl Expression {
                 responsible,
             } => {
                 builder.push("panicking because ", None, EnumSet::empty());
-                reason.build_rich_ir(builder);
+                reason.build_rich_ir_with_constants(builder, constants, body);
                 builder.push(" (", None, EnumSet::empty());
-                responsible.build_rich_ir(builder);
+                responsible.build_rich_ir_with_constants(builder, constants, body);
                 builder.push(" is at fault)", None, EnumSet::empty());
             }
             Self::TraceCallStarts {
@@ -262,13 +268,17 @@ impl Expression {
                 responsible,
             } => {
                 builder.push("trace: start of call of ", None, EnumSet::empty());
-                function.build_rich_ir(builder);
+                function.build_rich_ir_with_constants(builder, constants, body);
                 builder.push(" with ", None, EnumSet::empty());
-                builder.push_children(arguments, " ");
+                builder.push_children_custom(
+                    arguments,
+                    |builder, it| it.build_rich_ir_with_constants(builder, constants, body),
+                    " ",
+                );
                 builder.push(" (", None, EnumSet::empty());
-                responsible.build_rich_ir(builder);
+                responsible.build_rich_ir_with_constants(builder, constants, body);
                 builder.push(" is responsible, code is at ", None, EnumSet::empty());
-                hir_call.build_rich_ir(builder);
+                hir_call.build_rich_ir_with_constants(builder, constants, body);
                 builder.push(")", None, EnumSet::empty());
             }
             Self::TraceCallEnds { return_value } => {
@@ -277,25 +287,25 @@ impl Expression {
                     None,
                     EnumSet::empty(),
                 );
-                return_value.build_rich_ir(builder);
+                return_value.build_rich_ir_with_constants(builder, constants, body);
             }
             Self::TraceExpressionEvaluated {
                 hir_expression,
                 value,
             } => {
                 builder.push("trace: expression ", None, EnumSet::empty());
-                hir_expression.build_rich_ir(builder);
+                hir_expression.build_rich_ir_with_constants(builder, constants, body);
                 builder.push(" evaluated to ", None, EnumSet::empty());
-                value.build_rich_ir(builder);
+                value.build_rich_ir_with_constants(builder, constants, body);
             }
             Self::TraceFoundFuzzableFunction {
                 hir_definition,
                 function,
             } => {
                 builder.push("trace: found fuzzable function ", None, EnumSet::empty());
-                function.build_rich_ir(builder);
+                function.build_rich_ir_with_constants(builder, constants, body);
                 builder.push(" defined at ", None, EnumSet::empty());
-                hir_definition.build_rich_ir(builder);
+                hir_definition.build_rich_ir_with_constants(builder, constants, body);
             }
         }
     }
@@ -304,6 +314,6 @@ impl Expression {
 impl_display_via_richir!(Expression);
 impl ToRichIr for Expression {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        self.build_rich_ir_with_constants(builder, None)
+        self.build_rich_ir_with_constants(builder, None, None);
     }
 }
