@@ -145,14 +145,13 @@ impl Context<'_> {
             if cfg!(debug_assertions) {
                 expression.validate(self.visible);
             }
-
             self.pureness.visit_optimized(expression.id(), &expression);
 
             module_folding::apply(self, &mut expression);
 
             let new_id = expression.id();
             index = expression.index() + 1;
-            let expression = mem::replace(&mut *expression, Expression::Parameter);
+            let expression = mem::replace(expression.get_mut_carefully(), Expression::Parameter);
             self.visible.insert(new_id, expression);
         }
 
@@ -160,10 +159,32 @@ impl Context<'_> {
             *expression = self.visible.remove(*id);
         }
 
-        after_panic::remove_expressions_after_panic(body);
+        after_panic::remove_expressions_after_panic(body, self.pureness);
         common_subtree_elimination::eliminate_common_subtrees(body, self.pureness);
+        {
+            // Reference following
+            let mut index = 0;
+            while index < body.expressions.len() {
+                // Thoroughly optimize the expression.
+                let mut expression = CurrentExpression::new(body, index);
+                reference_following::follow_references(self, &mut expression);
+                if cfg!(debug_assertions) {
+                    expression.validate(self.visible);
+                }
+                self.pureness.visit_optimized(expression.id(), &expression);
+
+                let new_id = expression.id();
+                index = expression.index() + 1;
+                let expression =
+                    mem::replace(expression.get_mut_carefully(), Expression::Parameter);
+                self.visible.insert(new_id, expression);
+            }
+            for (id, expression) in &mut body.expressions {
+                *expression = self.visible.remove(*id);
+            }
+        }
         tree_shaking::tree_shake(body, self.pureness);
-        reference_following::remove_redundant_return_references(body);
+        reference_following::remove_redundant_return_references(body, self.pureness);
     }
 
     fn optimize_expression(&mut self, expression: &mut CurrentExpression) {
@@ -173,7 +194,7 @@ impl Context<'_> {
                 responsible_parameter,
                 body,
                 ..
-            } = &mut **expression
+            } = expression.get_mut_carefully()
             {
                 for parameter in &*parameters {
                     self.visible.insert(*parameter, Expression::Parameter);
@@ -201,7 +222,7 @@ impl Context<'_> {
                 inlining::inline_tiny_functions(self, expression);
                 inlining::inline_needs_function(self, expression);
                 inlining::inline_functions_containing_use(self, expression);
-                inlining::inline_calls_with_constant_arguments(self, expression);
+                // inlining::inline_calls_with_constant_arguments(self, expression);
                 if is_call && matches!(**expression, Expression::Function { .. }) {
                     // We inlined a function call and the resulting code starts with
                     // a function definition. We need to visit that first before

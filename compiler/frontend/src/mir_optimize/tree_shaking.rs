@@ -19,7 +19,7 @@ use crate::mir::Body;
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
-pub fn tree_shake(body: &mut Body, pureness: &PurenessInsights) {
+pub fn tree_shake(body: &mut Body, pureness: &mut PurenessInsights) {
     let expressions = body.iter().collect_vec();
     let mut keep = FxHashSet::default();
     let mut ids_to_remove = FxHashSet::default();
@@ -35,5 +35,10 @@ pub fn tree_shake(body: &mut Body, pureness: &PurenessInsights) {
         }
     }
 
-    body.remove_all(|id, _| ids_to_remove.contains(&id));
+    for (id, expression) in body.remove_all(|id, _| ids_to_remove.contains(&id)) {
+        pureness.on_remove(id);
+        for id in expression.defined_ids() {
+            pureness.on_remove(id);
+        }
+    }
 }

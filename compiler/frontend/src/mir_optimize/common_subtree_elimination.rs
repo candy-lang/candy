@@ -18,7 +18,7 @@
 //! [constant lifting]: super::constant_lifting
 //! [module folding]: super::module_folding
 
-use super::pure::PurenessInsights;
+use super::{current_expression::CurrentExpression, pure::PurenessInsights};
 use crate::{
     builtin_functions::BuiltinFunction,
     hir,
@@ -36,7 +36,7 @@ use std::{
     mem,
 };
 
-pub fn eliminate_common_subtrees(body: &mut Body, pureness: &PurenessInsights) {
+pub fn eliminate_common_subtrees(body: &mut Body, pureness: &mut PurenessInsights) {
     // Previously, this was a more intuitive `FxHashMap<Id, Expression>`.
     // However, we had to clone _every_ expression for this, which was quite
     // slow.
@@ -96,10 +96,9 @@ pub fn eliminate_common_subtrees(body: &mut Body, pureness: &PurenessInsights) {
 
                 let (canonical_id, _) = body.expressions[*canonical_index];
 
-                let old_expression = mem::replace(
-                    &mut body.expressions[index].1,
-                    Expression::Reference(canonical_id),
-                );
+                let mut current_expression = CurrentExpression::new(body, index);
+                let old_expression =
+                    current_expression.replace_with(Expression::Reference(canonical_id), pureness);
 
                 if let Expression::Function {
                     body,

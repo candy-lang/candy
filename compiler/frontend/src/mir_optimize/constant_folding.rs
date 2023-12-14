@@ -65,10 +65,13 @@ pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression)
             symbol,
             value: None,
         } if arguments.len() == 1 => {
-            **expression = Expression::Tag {
-                symbol: symbol.clone(),
-                value: Some(arguments[0]),
-            };
+            expression.replace_with(
+                Expression::Tag {
+                    symbol: symbol.clone(),
+                    value: Some(arguments[0]),
+                },
+                context.pureness,
+            );
         }
         Expression::Builtin(builtin) => {
             let arguments = arguments.clone();
@@ -84,7 +87,7 @@ pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression)
             ) else {
                 return;
             };
-            **expression = result;
+            expression.replace_with(result, context.pureness);
         }
         _ => {}
     }
@@ -101,7 +104,7 @@ fn run_builtin(
     responsible: Id,
     visible: &VisibleExpressions,
     id_generator: &mut IdGenerator<Id>,
-    pureness: &PurenessInsights,
+    pureness: &mut PurenessInsights,
 ) -> Option<Expression> {
     debug_assert_eq!(
         arguments.len(),
@@ -236,7 +239,7 @@ fn run_builtin(
                 Err(err) => Err(body.push_with_new_id(id_generator, err.to_string())),
             };
             body.push_with_new_id(id_generator, result);
-            expression.replace_with_multiple(body);
+            expression.replace_with_multiple(body, pureness);
             return None;
         }
         BuiltinFunction::IntRemainder => {
@@ -431,7 +434,7 @@ fn run_builtin(
                 .map(|it| body.push_with_new_id(id_generator, it))
                 .collect_vec();
             body.push_with_new_id(id_generator, characters);
-            expression.replace_with_multiple(body);
+            expression.replace_with_multiple(body, pureness);
             return None;
         }
         BuiltinFunction::TextConcatenate => {
@@ -505,7 +508,7 @@ fn run_builtin(
                 .map(|it| body.push_with_new_id(id_generator, it))
                 .map_err(|_| body.push_with_new_id(id_generator, "Invalid UTF-8."));
             body.push_with_new_id(id_generator, result);
-            expression.replace_with_multiple(body);
+            expression.replace_with_multiple(body, pureness);
             return None;
         }
         BuiltinFunction::TextGetRange => {

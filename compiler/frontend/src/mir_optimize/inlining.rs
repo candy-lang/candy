@@ -37,6 +37,7 @@
 use super::{
     complexity::Complexity,
     current_expression::{Context, CurrentExpression},
+    pure::PurenessInsights,
 };
 use crate::{
     hir,
@@ -135,14 +136,20 @@ impl Context<'_> {
             )
             .collect();
 
-        expression.replace_with_multiple(body.iter().map(|(id, expression)| {
-            let mut expression = expression.clone();
-            expression.replace_ids(&mut |id| {
-                if let Some(replacement) = id_mapping.get(id) {
-                    *id = *replacement;
-                }
-            });
-            (id_mapping[&id], expression)
-        }));
+        expression.replace_with_multiple(
+            body.iter().map(|(id, expression)| {
+                let mut expression = expression.clone();
+                expression.replace_ids(&mut |id| {
+                    if let Some(replacement) = id_mapping.get(id) {
+                        *id = *replacement;
+                    }
+                });
+                (id_mapping[&id], expression)
+            }),
+            // The replaced expression is definitely a call, which means it
+            // doesn't define any expressions that need to be removed from the
+            // pureness insights.
+            &mut PurenessInsights::default(),
+        );
     }
 }

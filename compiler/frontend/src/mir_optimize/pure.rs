@@ -43,6 +43,7 @@
 use crate::{
     builtin_functions::BuiltinFunction,
     mir::{Expression, Id},
+    utils::HashSetExtension,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -271,18 +272,49 @@ impl PurenessInsights {
                 })
                 .collect();
         }
+        update(&mut self.deterministic_definitions, mapping);
+        update(&mut self.deterministic_functions, mapping);
         update(&mut self.pure_definitions, mapping);
+        update(&mut self.pure_functions, mapping);
         update(&mut self.const_definitions, mapping);
+    }
+    pub(super) fn on_remove(&mut self, id: Id) {
+        let Self {
+            deterministic_definitions,
+            deterministic_functions,
+            pure_definitions,
+            pure_functions,
+            const_definitions,
+        } = self;
+        deterministic_definitions.remove(&id);
+        deterministic_functions.remove(&id);
+        pure_definitions.remove(&id);
+        pure_functions.remove(&id);
+        const_definitions.remove(&id);
     }
     pub(super) fn include(&mut self, other: &Self, mapping: &FxHashMap<Id, Id>) {
         fn insert(source: &FxHashSet<Id>, mapping: &FxHashMap<Id, Id>, target: &mut FxHashSet<Id>) {
             for id in source {
-                assert!(target.insert(mapping[id]));
+                let replacement = *mapping
+                    .get(id)
+                    .unwrap_or_else(|| panic!("Missing mapping for {id}"));
+                target.force_insert(replacement);
             }
         }
 
         // TODO: Can we avoid some of the cloning?
+        insert(
+            &other.deterministic_definitions,
+            mapping,
+            &mut self.deterministic_definitions,
+        );
+        insert(
+            &other.deterministic_functions,
+            mapping,
+            &mut self.deterministic_functions,
+        );
         insert(&other.pure_definitions, mapping, &mut self.pure_definitions);
+        insert(&other.pure_functions, mapping, &mut self.pure_functions);
         insert(
             &other.const_definitions,
             mapping,
