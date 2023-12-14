@@ -1,0 +1,47 @@
+[bool, checkEquals, equals, ifElse, iterable, list, result, text] = use "Core"
+
+encodeField field =
+  needs (text.is field)
+  ifElse
+    field | text.contains '"""' | bool.lazyOr { field | text.contains text.newline }
+    {
+      encoded = field | text.characters | iterable.fromList
+      | iterable.map { char -> ifElse (char | equals '"""') { '""""' } { char } }
+      | iterable.joinToText
+      '""{{encoded}}""'
+    }
+    { field }
+
+encodeLine line =
+  needs (list.is line)
+  needs (line | iterable.fromList | iterable.all text.is)
+  line | iterable.fromList | iterable.map encodeField | iterable.joinToTextWithSeparator ","
+
+encode lines :=
+  needs (list.is lines)
+  needs (lines | iterable.fromList | iterable.all list.is)
+  fieldsPerLine = lines | list.first | result.map list.length | result.unwrapOr 0
+  lines | iterable.fromList | iterable.map { line ->
+    needs (line | list.length | equals fieldsPerLine)
+    "{line | encodeLine}{text.newline}"
+  }
+  | iterable.joinToText
+
+test =
+  # From https://datatracker.ietf.org/doc/html/rfc4180#section-2
+  checkEquals (encodeLine ("aaa", "bbb", "ccc")) "aaa,bbb,ccc"
+
+  checkEquals
+    encode (("aaa", "bbb", "ccc"), ("zzz", "yyy", "xxx"))
+    "aaa,bbb,ccc{text.newline}zzz,yyy,xxx{text.newline}"
+  checkEquals
+    encode (("field_name", "field_name", "field_name"), ("aaa", "bbb", "ccc"), ("zzz", "yyy", "xxx"))
+    "
+      field_name,field_name,field_name{text.newline}aaa,bbb,ccc{text.newline}zzz,yyy,xxx{text.newline}
+    "
+  checkEquals
+    encode (("aaa", "b{text.newline}bb", "ccc"), ("zzz", "yyy", "xxx"))
+    '"aaa,"b{{text.newline}}bb",ccc{{text.newline}}zzz,yyy,xxx{{text.newline}}"'
+  checkEquals (encode (("aaa", '"b"bb"', "ccc"),)) '"aaa,"b""bb",ccc{{text.newline}}"'
+
+main environment := "Abc"
