@@ -1,5 +1,5 @@
 bool := use ".bool"
-[check] := use ".check"
+[check, checkEquals] := use ".check"
 [if, ifElse, loop, recursive, repeat] := use ".controlFlow"
 [equals] := use ".equality"
 fixedDecimal := use ".fixedDecimal"
