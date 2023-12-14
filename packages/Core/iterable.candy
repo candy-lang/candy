@@ -142,6 +142,16 @@ joinToText iterable :=
     needs (text.is item)
     result | text.concatenate item
   }
+joinToTextWithSeparator iterable separator :=
+  needs (is iterable)
+  needs (text.is separator)
+
+  iterable | reduceLeft { a b ->
+    needs (text.is a)
+    needs (text.is b)
+    a | text.concatenate separator | text.concatenate b
+  }
+  | result.unwrapOr ""
 
 ## Filtering
 
