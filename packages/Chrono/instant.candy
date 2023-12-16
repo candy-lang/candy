@@ -1,34 +1,33 @@
-[fixedDecimal, tag, check, equals, bool, ifElse] = use "Core"
+[tag, check, equals, bool, ifElse] = use "Core"
 constants = use "..constants"
 duration = use "..duration"
 
-## Storage Format: Instant (fixedDecimal of seconds since the Unix Epoch)
+## Storage Format: Instant (Duration since the Unix Epoch)
 is i := i %
-  Instant seconds -> fixedDecimal.is seconds
+  Instant dur -> duration.is dur
   _ -> False
 
-startOfUnixEpoch := Instant fixedDecimal.zero
+startOfUnixEpoch := Instant duration.zero
 
 fromUnixDuration dur :=
   needs (duration.is dur)
-  Instant (tag.getValue dur)
+  Instant dur
 
 add instant dur :=
   needs (is instant)
   needs (duration.is dur)
-  Instant (fixedDecimal.add (tag.getValue instant) (tag.getValue dur))
+  Instant (duration.add (tag.getValue instant) dur)
 subtract instant durationOrInstant :=
   needs (is instant)
   needs (is durationOrInstant | bool.lazyOr { duration.is durationOrInstant })
-  ifElse 
-    (is durationOrInstant) 
-    { duration.fromSeconds (fixedDecimal.subtract (tag.getValue instant) (tag.getValue durationOrInstant)) } 
-    { Instant (fixedDecimal.subtract (tag.getValue instant) (tag.getValue durationOrInstant)) }
+  durationOrInstant %
+    Instant dur -> duration.subtract (tag.getValue instant) dur
+    dur -> Instant (duration.subtract (tag.getValue instant) dur)
 
 compareTo valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  result = (tag.getValue valueA) | fixedDecimal.compareTo (tag.getValue valueB)
+  result = (tag.getValue valueA) | duration.compareTo (tag.getValue valueB)
   check (equals result Equal | bool.implies (equals valueA valueB))
   result
 isLessThan valueA valueB :=
