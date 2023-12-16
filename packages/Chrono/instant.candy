@@ -17,15 +17,13 @@ add instant dur :=
   needs (is instant)
   needs (duration.is dur)
   Instant (fixedDecimal.add (tag.getValue instant) (tag.getValue dur))
-subtract instant dur :=
+subtract instant durationOrInstant :=
   needs (is instant)
-  needs (duration.is dur)
-  Instant (fixedDecimal.subtract (tag.getValue instant) (tag.getValue dur))
-
-durationBetween instantA instantB :=
-  needs (is instantA)
-  needs (is instantB)
-  duration.fromSeconds (fixedDecimal.subtract (tag.getValue instantA) (tag.getValue instantB))
+  needs (is durationOrInstant | bool.lazyOr { duration.is durationOrInstant })
+  ifElse 
+    (is durationOrInstant) 
+    { duration.fromSeconds (fixedDecimal.subtract (tag.getValue instant) (tag.getValue durationOrInstant)) } 
+    { Instant (fixedDecimal.subtract (tag.getValue instant) (tag.getValue durationOrInstant)) }
 
 compareTo valueA valueB :=
   needs (is valueA)
