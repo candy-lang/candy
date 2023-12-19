@@ -40,6 +40,7 @@ impl ToRichIr for Lir {
 
         builder.push("# Bodies", TokenType::Comment, EnumSet::empty());
         builder.push_newline();
-        self.bodies.build_rich_ir(builder);
+        self.bodies
+            .build_rich_ir_with_constants(builder, &self.constants);
     }
 }
