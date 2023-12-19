@@ -61,8 +61,22 @@ pub fn eliminate_common_subtrees(body: &mut Body, pureness: &mut PurenessInsight
     let mut inner_function_ids: FxHashMap<Id, Vec<Id>> = FxHashMap::default();
     let mut additional_function_hirs: FxHashMap<Id, FxHashSet<hir::Id>> = FxHashMap::default();
 
+    // When two expressions are the same, the second one gets replaced by a
+    // reference to the first one. In order for common subtree elimination to
+    // work on expressions after that, which reference the second expression,
+    // we basically need to do reference following as well.
+    let mut replaced: FxHashMap<Id, Id> = FxHashMap::default();
+
     for index in 0..body.expressions.len() {
         let id = body.expressions[index].0;
+
+        {
+            body.expressions[index].1.replace_ids(&mut |id| {
+                if let Some(other) = replaced.get(id) {
+                    *id = *other;
+                }
+            });
+        }
 
         let normalized_hash = {
             let expression = &mut body.expressions[index].1;
@@ -99,6 +113,7 @@ pub fn eliminate_common_subtrees(body: &mut Body, pureness: &mut PurenessInsight
                 let mut current_expression = CurrentExpression::new(body, index);
                 let old_expression =
                     current_expression.replace_with(Expression::Reference(canonical_id), pureness);
+                replaced.insert(id, canonical_id);
 
                 if let Expression::Function {
                     body,
