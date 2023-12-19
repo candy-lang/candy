@@ -33,9 +33,9 @@ body:
     validations:
       required: true
   - type: textarea
-    id: log-output
+    id: logs
     attributes:
-      label: Relevant Log Output
+      label: Relevant Logs
       description: Please include any relevant log output, especially if the formatter crashed.
       render: text
   - type: textarea
