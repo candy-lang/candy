@@ -66,6 +66,7 @@ impl RunResult {
 }
 
 impl<B: Borrow<ByteCode> + Clone> Runner<B> {
+    #[must_use]
     pub fn new(byte_code: B, function: Function, input: &Input) -> Self {
         let mut heap = Heap::default();
         let num_instructions = byte_code.borrow().instructions.len();
