@@ -108,24 +108,7 @@ impl HeapStruct {
     pub fn insert(self, heap: &mut Heap, key: InlineObject, value: InlineObject) -> Self {
         let hash = key.do_hash();
         match self.index_of_key(key, hash) {
-            Ok(index) => {
-                let struct_ = Self::create_uninitialized(heap, true, self.len());
-                unsafe {
-                    ptr::copy_nonoverlapping(
-                        self.content_word_pointer(0).as_ptr(),
-                        struct_.content_word_pointer(0).as_ptr(),
-                        3 * self.len(),
-                    );
-                    ptr::write(
-                        struct_
-                            .content_word_pointer(2 * self.len() + index)
-                            .cast()
-                            .as_ptr(),
-                        value,
-                    );
-                }
-                struct_
-            }
+            Ok(index) => self.replace_at_index(heap, index, value),
             Err(index) => {
                 let struct_ = Self::create_uninitialized(heap, true, self.len() + 1);
                 // PERF: Merge consecutive copies.
@@ -135,6 +118,27 @@ impl HeapStruct {
                 struct_
             }
         }
+    }
+    #[must_use]
+    pub fn replace_at_index(self, heap: &mut Heap, index: usize, value: InlineObject) -> Self {
+        assert!(index < self.len());
+
+        let struct_ = Self::create_uninitialized(heap, true, self.len());
+        unsafe {
+            ptr::copy_nonoverlapping(
+                self.content_word_pointer(0).as_ptr(),
+                struct_.content_word_pointer(0).as_ptr(),
+                3 * self.len(),
+            );
+            ptr::write(
+                struct_
+                    .content_word_pointer(2 * self.len() + index)
+                    .cast()
+                    .as_ptr(),
+                value,
+            );
+        }
+        struct_
     }
     fn insert_into_items<T>(self, other: Self, items_index: usize, index: usize, item: T) {
         let self_base = items_index * self.len();

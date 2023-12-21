@@ -1,15 +1,13 @@
 use super::input::Input;
-use crate::{runner::RunResult, values::InputGeneration};
+use crate::runner::RunResult;
 use candy_vm::heap::{Heap, Text};
 use itertools::Itertools;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use rustc_hash::FxHashMap;
-use std::{cell::RefCell, rc::Rc};
 
 pub type Score = f64;
 
 pub struct InputPool {
-    heap: Rc<RefCell<Heap>>,
     num_args: usize,
     symbols: Vec<Text>,
     results_and_scores: FxHashMap<Input, (RunResult, Score)>,
@@ -19,7 +17,6 @@ impl InputPool {
     #[must_use]
     pub fn new(num_args: usize, symbols: Vec<Text>) -> Self {
         Self {
-            heap: Rc::default(),
             num_args,
             symbols,
             results_and_scores: FxHashMap::default(),
@@ -27,29 +24,34 @@ impl InputPool {
     }
 
     #[must_use]
-    pub fn generate_new_input(&self) -> Input {
+    pub fn generate_new_input(&self, heap: &mut Heap) -> Input {
         loop {
-            let input = self.generate_input();
-            if !self.results_and_scores.contains_key(&input) {
-                return input;
+            let input = self.generate_input(heap);
+            if self.results_and_scores.contains_key(&input) {
+                input.drop(heap);
+                continue;
             }
+
+            return input;
         }
     }
     #[must_use]
-    pub fn generate_input(&self) -> Input {
+    pub fn generate_input(&self, heap: &mut Heap) -> Input {
         let mut rng = ThreadRng::default();
 
         if rng.gen_bool(0.1) || self.results_and_scores.len() < 20 {
-            return Input::generate(self.heap.clone(), self.num_args, &self.symbols);
+            return Input::generate(heap, self.num_args, &self.symbols);
         }
 
-        let inputs_and_scores = self.results_and_scores.iter().collect_vec();
+        let inputs_and_scores = self
+            .results_and_scores
+            .iter()
+            .map(|(input, (_, score))| (input, *score))
+            .collect_vec();
         let (input, _) = inputs_and_scores
-            .choose_weighted(&mut rng, |(_, (_, score))| *score)
+            .choose_weighted(&mut rng, |(_, score)| *score)
             .unwrap();
-        let mut input = (**input).clone();
-        input.mutate(&mut rng, &self.symbols);
-        input
+        input.mutated(heap, &mut rng, &self.symbols)
     }
 
     pub fn add(&mut self, input: Input, result: RunResult, score: Score) {
@@ -79,5 +81,14 @@ impl InputPool {
 
     pub fn result_of(&self, input: &Input) -> &RunResult {
         &self.results_and_scores.get(input).unwrap().0
+    }
+
+    pub fn drop(self, heap: &mut Heap) {
+        for symbol in self.symbols {
+            symbol.drop(heap);
+        }
+        for (input, _) in self.results_and_scores {
+            input.drop(heap);
+        }
     }
 }
