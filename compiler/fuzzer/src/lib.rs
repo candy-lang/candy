@@ -39,7 +39,7 @@ where
     DB: AstToHir + CstDb + OptimizeLir + PositionConversionDb,
 {
     let tracing = TracingConfig {
-        register_fuzzables: TracingMode::All,
+        register_fuzzables: TracingMode::OnlyCurrent,
         calls: TracingMode::Off,
         evaluated_expressions: TracingMode::Off,
     };
@@ -48,14 +48,13 @@ where
 
     let mut heap = Heap::default();
     let VmFinished {
-        tracer: FuzzablesFinder { mut fuzzables },
+        tracer: FuzzablesFinder { fuzzables },
         ..
     } = Vm::for_module(byte_code.clone(), &mut heap, FuzzablesFinder::default())
         .run_forever_without_handles(&mut heap);
 
-    fuzzables.retain(|k, _| k.module.package.to_string().contains("Example"));
     info!(
-        "Now, the fuzzing begins. So far, we have {} functions to fuzz: {fuzzables:?}.",
+        "Now, the fuzzing begins. We have {} functions to fuzz: {fuzzables:?}.",
         fuzzables.len(),
     );
 
