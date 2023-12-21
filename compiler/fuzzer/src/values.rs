@@ -10,30 +10,29 @@ use rand::{
     Rng,
 };
 use rustc_hash::FxHashMap;
-use std::{cell::RefCell, rc::Rc};
 
-#[extension_trait]
-pub impl InputGeneration for Input {
-    fn generate(heap: Rc<RefCell<Heap>>, num_args: usize, symbols: &[Text]) -> Input {
-        let mut arguments = vec![];
-        for _ in 0..num_args {
-            let address = InlineObject::generate(
-                &mut heap.borrow_mut(),
-                &mut rand::thread_rng(),
-                5.0,
-                symbols,
-            );
-            arguments.push(address);
+impl Input {
+    pub fn generate(heap: &mut Heap, num_args: usize, symbols: &[Text]) -> Self {
+        let arguments = (0..num_args)
+            .map(|_| InlineObject::generate(heap, &mut rand::thread_rng(), 5.0, symbols))
+            .collect();
+        Self::new(arguments)
+    }
+    pub fn mutated(&self, heap: &mut Heap, rng: &mut ThreadRng, symbols: &[Text]) -> Self {
+        let mut arguments = self.arguments().to_owned();
+
+        let index_to_mutate = rng.gen_range(0..arguments.len());
+        for (index, argument) in arguments.iter_mut().enumerate() {
+            if index == index_to_mutate {
+                *argument = argument.generate_mutated(heap, rng, symbols);
+            } else {
+                argument.dup(heap);
+            }
         }
-        Self { heap, arguments }
+        Self::new(arguments)
     }
-    fn mutate(&mut self, rng: &mut ThreadRng, symbols: &[Text]) {
-        let mut heap = self.heap.borrow_mut();
-        let argument = self.arguments.choose_mut(rng).unwrap();
-        *argument = argument.generate_mutated(&mut heap, rng, symbols);
-    }
-    fn complexity(&self) -> usize {
-        self.arguments
+    pub fn complexity(&self) -> usize {
+        self.arguments()
             .iter()
             .map(|argument| argument.complexity())
             .sum()
@@ -86,6 +85,8 @@ impl InlineObjectGeneration for InlineObject {
             _ => unreachable!(),
         }
     }
+    // FIXME: Proper refcount updates in `generate_mutated`
+    // FIXME: Detailed code review of the whole fuzzer package
     fn generate_mutated(
         self,
         heap: &mut Heap,

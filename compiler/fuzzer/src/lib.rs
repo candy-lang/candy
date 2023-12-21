@@ -17,6 +17,7 @@ pub use self::{
     runner::RunResult,
     utils::FuzzablesFinder,
 };
+use crate::fuzzer::FuzzerResult;
 use candy_frontend::{
     ast_to_hir::AstToHir,
     cst::CstDb,
@@ -47,13 +48,14 @@ where
 
     let mut heap = Heap::default();
     let VmFinished {
-        tracer: FuzzablesFinder { fuzzables },
+        tracer: FuzzablesFinder { mut fuzzables },
         ..
     } = Vm::for_module(byte_code.clone(), &mut heap, FuzzablesFinder::default())
         .run_forever_without_handles(&mut heap);
 
+    fuzzables.retain(|k, _| k.module.package.to_string().contains("Example"));
     info!(
-        "Now, the fuzzing begins. So far, we have {} functions to fuzz.",
+        "Now, the fuzzing begins. So far, we have {} functions to fuzz: {fuzzables:?}.",
         fuzzables.len(),
     );
 
@@ -64,14 +66,14 @@ where
         let mut fuzzer = Fuzzer::new(byte_code.clone(), function, id.clone());
         fuzzer.run(100_000);
 
-        match fuzzer.into_status() {
-            Status::StillFuzzing { total_coverage, .. } => {
+        match fuzzer.into_result() {
+            FuzzerResult::StillFuzzing { total_coverage, .. } => {
                 let coverage = total_coverage
                     .in_range(&byte_code.range_of_function(&id))
                     .relative_coverage();
                 debug!("Achieved a coverage of {:.1} %.", coverage * 100.0);
             }
-            Status::FoundPanic {
+            FuzzerResult::FoundPanic {
                 input,
                 panic,
                 heap,

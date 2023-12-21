@@ -5,7 +5,7 @@ use candy_vm::VmFinished;
 use candy_vm::{
     byte_code::ByteCode,
     environment::StateAfterRunWithoutHandles,
-    heap::{Function, Heap, HirId, InlineObject, InlineObjectSliceCloneToHeap},
+    heap::{Function, Heap, HirId, InlineObject},
     tracer::stack_trace::StackTracer,
     Panic, Vm,
 };
@@ -66,7 +66,7 @@ impl RunResult {
 }
 
 impl<B: Borrow<ByteCode> + Clone> Runner<B> {
-    pub fn new(byte_code: B, function: Function, input: Input) -> Self {
+    pub fn new(byte_code: B, function: Function, input: &Input) -> Self {
         let mut heap = Heap::default();
         let num_instructions = byte_code.borrow().instructions.len();
 
@@ -75,16 +75,14 @@ impl<B: Borrow<ByteCode> + Clone> Runner<B> {
             .clone_to_heap_with_mapping(&mut heap, &mut mapping)
             .try_into()
             .unwrap();
-        let arguments = input
-            .arguments
-            .clone_to_heap_with_mapping(&mut heap, &mut mapping);
+        let input = input.clone_to_heap_with_mapping(&mut heap, &mut mapping);
         let responsible = HirId::create(&mut heap, true, Id::fuzzer());
 
         let vm = Vm::for_function(
             byte_code.clone(),
             &mut heap,
             function,
-            &arguments,
+            input.arguments(),
             responsible,
             StackTracer::default(),
         );

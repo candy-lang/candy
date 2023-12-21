@@ -4,12 +4,11 @@ use crate::{
     input_pool::{InputPool, Score},
     runner::{RunResult, Runner},
     utils::collect_symbols_in_heap,
-    values::InputGeneration,
 };
 use candy_frontend::hir::Id;
 use candy_vm::{
     byte_code::ByteCode,
-    heap::{Data, Function, Heap},
+    heap::{Function, Heap},
     tracer::stack_trace::StackTracer,
     Panic,
 };
@@ -19,7 +18,9 @@ use tracing::debug;
 
 pub struct Fuzzer {
     pub byte_code: Rc<ByteCode>,
-    pub function_heap: Heap,
+    /// This heap lives as long as the fuzzer and houses our copy of the
+    /// function to fuzz, our input pool, and current input.
+    pub persistent_heap: Heap,
     pub function: Function,
     pub function_id: Id,
     pool: InputPool,
@@ -31,6 +32,7 @@ pub struct Fuzzer {
 pub enum Status {
     StillFuzzing {
         total_coverage: Coverage,
+        input: Input,
         runner: Runner<Rc<ByteCode>>,
     },
     // TODO: In the future, also add a state for trying to simplify the input.
@@ -42,30 +44,55 @@ pub enum Status {
     },
 }
 
+// Very similar to `Status`, but this one is self-contained (has its own heap).
+#[allow(clippy::large_enum_variant)]
+pub enum FuzzerResult {
+    StillFuzzing {
+        total_coverage: Coverage,
+        heap: Heap,
+        input: Input,
+        runner: Runner<Rc<ByteCode>>,
+    },
+    FoundPanic {
+        heap: Heap,
+        input: Input,
+        panic: Panic,
+        tracer: StackTracer,
+    },
+}
+
 impl Fuzzer {
     #[must_use]
     pub fn new(byte_code: Rc<ByteCode>, function: Function, function_id: Id) -> Self {
-        let mut heap = Heap::default();
-        let function: Function = Data::from(function.clone_to_heap(&mut heap))
+        let mut persistent_heap = Heap::default();
+        let function: Function = function
+            .clone_to_heap(&mut persistent_heap)
             .try_into()
             .unwrap();
 
         // TODO: Collect `InlineTag`s by walking `function`
         let pool = InputPool::new(
             function.argument_count(),
-            collect_symbols_in_heap(&heap).into_iter().collect_vec(),
+            collect_symbols_in_heap(&persistent_heap)
+                .into_iter()
+                .collect_vec(),
         );
-        let runner = Runner::new(byte_code.clone(), function, pool.generate_new_input());
+
+        let input = pool.generate_new_input(&mut persistent_heap);
+        // The input is owned by the `InputPool` and our heap. The `Runner`
+        // creates a copy in its heap.
+        let runner = Runner::new(byte_code.clone(), function, &input);
 
         let num_instructions = byte_code.instructions.len();
         Self {
             byte_code,
-            function_heap: heap,
+            persistent_heap,
             function,
             function_id,
             pool,
             status: Some(Status::StillFuzzing {
                 total_coverage: Coverage::none(num_instructions),
+                input,
                 runner,
             }),
         }
@@ -81,8 +108,34 @@ impl Fuzzer {
         self.status.as_ref().unwrap()
     }
     #[must_use]
-    pub fn into_status(self) -> Status {
-        self.status.unwrap()
+    pub fn into_result(mut self) -> FuzzerResult {
+        match self.status.unwrap() {
+            Status::StillFuzzing {
+                total_coverage,
+                input,
+                runner,
+            } => {
+                input.dup(&mut self.persistent_heap);
+                self.pool.drop(&mut self.persistent_heap);
+                FuzzerResult::StillFuzzing {
+                    total_coverage,
+                    heap: self.persistent_heap,
+                    input,
+                    runner,
+                }
+            }
+            Status::FoundPanic {
+                heap,
+                input,
+                panic,
+                tracer,
+            } => FuzzerResult::FoundPanic {
+                heap,
+                input,
+                panic,
+                tracer,
+            },
+        }
     }
 
     #[must_use]
@@ -98,21 +151,12 @@ impl Fuzzer {
             status = match status {
                 Status::StillFuzzing {
                     total_coverage,
+                    input,
                     runner,
-                } => self.continue_fuzzing(&mut instructions_left, total_coverage, runner),
+                } => self.continue_fuzzing(&mut instructions_left, total_coverage, input, runner),
                 // We already found some arguments that caused the function to panic,
                 // so there's nothing more to do.
-                Status::FoundPanic {
-                    input,
-                    panic,
-                    heap,
-                    tracer,
-                } => Status::FoundPanic {
-                    input,
-                    panic,
-                    heap,
-                    tracer,
-                },
+                status @ Status::FoundPanic { .. } => status,
             };
         }
         self.status = Some(status);
@@ -122,24 +166,19 @@ impl Fuzzer {
         &mut self,
         instructions_left: &mut usize,
         total_coverage: Coverage,
+        input: Input,
         mut runner: Runner<Rc<ByteCode>>,
     ) -> Status {
         runner.run(instructions_left);
         let Some(result) = runner.take_result() else {
             return Status::StillFuzzing {
                 total_coverage,
+                input,
                 runner,
             };
         };
 
-        let call_string = format!(
-            "`{} {}`",
-            self.function_id
-                .keys
-                .last()
-                .map_or_else(|| "{…}".to_string(), ToString::to_string),
-            runner.input,
-        );
+        let call_string = format!("`{} {}`", self.function_id.function_name(), input);
         debug!("{}", result.to_string(&call_string));
         match result {
             RunResult::Timeout => self.create_new_fuzzing_case(total_coverage),
@@ -150,7 +189,7 @@ impl Fuzzer {
                 // We favor small inputs with good code coverage.
                 #[allow(clippy::cast_precision_loss)]
                 let score = {
-                    let complexity = runner.input.complexity() as Score;
+                    let complexity = input.complexity() as Score;
                     let new_function_coverage = runner.coverage.in_range(&function_range);
                     let coverage_improvement =
                         new_function_coverage.improvement_on(&function_coverage);
@@ -160,7 +199,10 @@ impl Fuzzer {
                     let score: Score = complexity.mul_add(-0.4, score);
                     score.clamp(0.1, Score::MAX)
                 };
-                self.pool.add(runner.input, result, score);
+
+                // This must use our copy of the input, not the runner's.
+                self.pool.add(input, result, score);
+
                 self.create_new_fuzzing_case(&total_coverage + &runner.coverage)
             }
             RunResult::Panicked {
@@ -168,21 +210,19 @@ impl Fuzzer {
                 tracer,
                 panic,
             } => Status::FoundPanic {
+                heap,
                 input: runner.input,
                 panic,
-                heap,
                 tracer,
             },
         }
     }
-    fn create_new_fuzzing_case(&self, total_coverage: Coverage) -> Status {
-        let runner = Runner::new(
-            self.byte_code.clone(),
-            self.function,
-            self.pool.generate_new_input(),
-        );
+    fn create_new_fuzzing_case(&mut self, total_coverage: Coverage) -> Status {
+        let input = self.pool.generate_new_input(&mut self.persistent_heap);
+        let runner = Runner::new(self.byte_code.clone(), self.function, &input);
         Status::StillFuzzing {
             total_coverage,
+            input,
             runner,
         }
     }
