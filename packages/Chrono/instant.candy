@@ -72,4 +72,4 @@ coerceIn value minimum maximum :=
 
 toUnixTimeDuration instant :=
   needs (is instant)
-  duration.fromSeconds (tag.getValue instant)
+  tag.getValue instant
