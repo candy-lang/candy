@@ -127,7 +127,7 @@ dependencies = [
  "clap",
  "colored",
  "diffy",
- "itertools 0.11.0",
+ "itertools 0.12.0",
  "lazy_static",
  "regex",
  "rustc-hash",
@@ -146,7 +146,7 @@ dependencies = [
  "candy_frontend",
  "derive_more",
  "extension-trait",
- "itertools 0.11.0",
+ "itertools 0.12.0",
  "traversal",
  "unicode-width",
 ]
@@ -172,7 +172,7 @@ dependencies = [
  "extension-trait",
  "im",
  "impl-trait-for-tuples",
- "itertools 0.11.0",
+ "itertools 0.12.0",
  "lazy_static",
  "linked-hash-map",
  "num-bigint",
@@ -197,7 +197,7 @@ dependencies = [
  "candy_frontend",
  "candy_vm",
  "extension-trait",
- "itertools 0.11.0",
+ "itertools 0.12.0",
  "num-bigint",
  "rand",
  "rustc-hash",
@@ -219,7 +219,7 @@ dependencies = [
  "derive_more",
  "enumset",
  "extension-trait",
- "itertools 0.11.0",
+ "itertools 0.12.0",
  "lazy_static",
  "lsp-types",
  "num-bigint",
@@ -251,7 +251,7 @@ dependencies = [
  "extension-trait",
  "getrandom",
  "impl-trait-for-tuples",
- "itertools 0.11.0",
+ "itertools 0.12.0",
  "lazy_static",
  "num-bigint",
  "num-integer",
@@ -930,6 +930,15 @@ name = "itertools"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25db6b064527c5d482d0423354fcd07a89a2dfe07b67892e62411946db7f07b0"
 dependencies = [
  "either",
 ]

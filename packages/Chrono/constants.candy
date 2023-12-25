@@ -1,0 +1,36 @@
+[int] = use "Core"
+
+daysPerNormalWeek := 7
+
+hoursPerNormalDay := 24
+hoursPerNormalWeek := hoursPerNormalDay | int.multiply daysPerNormalWeek
+
+minutesPerHour := 60
+minutesPerNormalDay := minutesPerHour | int.multiply hoursPerNormalDay
+minutesPerNormalWeek := minutesPerNormalDay | int.multiply daysPerNormalWeek
+
+secondsPerMinute := 60
+secondsPerHour := secondsPerMinute | int.multiply minutesPerHour
+secondsPerNormalDay := secondsPerHour | int.multiply hoursPerNormalDay
+secondsPerNormalWeek := secondsPerNormalDay | int.multiply daysPerNormalWeek
+
+millisecondsPerSecond := 1000
+millisecondsPerMinute := millisecondsPerSecond | int.multiply secondsPerMinute
+millisecondsPerHour := millisecondsPerMinute | int.multiply minutesPerHour
+millisecondsPerNormalDay := millisecondsPerHour | int.multiply hoursPerNormalDay
+millisecondsPerNormalWeek := millisecondsPerNormalDay | int.multiply daysPerNormalWeek
+
+microsecondsPerMillisecond := 1000
+microsecondsPerSecond := microsecondsPerMillisecond | int.multiply millisecondsPerSecond
+microsecondsPerMinute := microsecondsPerSecond | int.multiply secondsPerMinute
+microsecondsPerHour := microsecondsPerMinute | int.multiply minutesPerHour
+microsecondsPerNormalDay := microsecondsPerHour | int.multiply hoursPerNormalDay
+microsecondsPerNormalWeek := microsecondsPerNormalDay | int.multiply daysPerNormalWeek
+
+nanosecondsPerMicrosecond := 1000
+nanosecondsPerMillisecond := nanosecondsPerMicrosecond | int.multiply microsecondsPerMillisecond
+nanosecondsPerSecond := nanosecondsPerMillisecond | int.multiply millisecondsPerSecond
+nanosecondsPerMinute := nanosecondsPerSecond | int.multiply secondsPerMinute
+nanosecondsPerHour := nanosecondsPerMinute | int.multiply minutesPerHour
+nanosecondsPerNormalDay := nanosecondsPerHour | int.multiply hoursPerNormalDay
+nanosecondsPerNormalWeek := nanosecondsPerNormalDay | int.multiply daysPerNormalWeek

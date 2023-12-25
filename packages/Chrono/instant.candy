@@ -1,0 +1,75 @@
+[tag, check, equals, bool, ifElse] = use "Core"
+constants = use "..constants"
+duration = use "..duration"
+
+## Storage Format: Instant (Duration since the Unix Epoch)
+is i := i %
+  Instant dur -> duration.is dur
+  _ -> False
+
+startOfUnixEpoch := Instant duration.zero
+
+fromUnixDuration dur :=
+  needs (duration.is dur)
+  Instant dur
+
+add instant dur :=
+  needs (is instant)
+  needs (duration.is dur)
+  Instant (duration.add (tag.getValue instant) dur)
+subtract instant durationOrInstant :=
+  needs (is instant)
+  needs (is durationOrInstant | bool.lazyOr { duration.is durationOrInstant })
+  durationOrInstant %
+    Instant dur -> duration.subtract (tag.getValue instant) dur
+    dur -> Instant (duration.subtract (tag.getValue instant) dur)
+
+compareTo valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  result = (tag.getValue valueA) | duration.compareTo (tag.getValue valueB)
+  check (equals result Equal | bool.implies (equals valueA valueB))
+  result
+isLessThan valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  equals (compareTo valueA valueB) Less
+isGreaterThan valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  equals (compareTo valueA valueB) Greater
+isLessThanOrEqualTo valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  valueA | isGreaterThan valueB | bool.not
+isGreaterThanOrEqualTo valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  valueA | isLessThan valueB | bool.not
+
+min valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  ifElse (valueA | isLessThanOrEqualTo valueB) { valueA } { valueB }
+max valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  ifElse (valueA | isGreaterThanOrEqualTo valueB) { valueA } { valueB }
+coerceAtLeast value minimum :=
+  needs (is value)
+  needs (is minimum)
+  max value minimum
+coerceAtMost value maximum :=
+  needs (is value)
+  needs (is maximum)
+  min value maximum
+coerceIn value minimum maximum :=
+  needs (is value)
+  needs (is minimum)
+  needs (is maximum)
+  needs (minimum | isLessThanOrEqualTo maximum)
+  value | coerceAtLeast minimum | coerceAtMost maximum
+
+toUnixTimeDuration instant :=
+  needs (is instant)
+  tag.getValue instant
