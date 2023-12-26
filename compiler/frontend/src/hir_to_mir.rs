@@ -56,7 +56,7 @@ fn mir(db: &dyn HirToMir, target: ExecutionTarget, tracing: TracingConfig) -> Mi
                 module,
                 target_is_main_function,
                 &hir,
-                &tracing,
+                tracing,
                 &mut errors,
             );
             (mir, errors)
@@ -185,7 +185,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
 struct LoweringContext<'a> {
     mapping: &'a mut FxHashMap<hir::Id, Id>,
     needs_function: Id,
-    tracing: &'a TracingConfig,
+    tracing: TracingConfig,
     ongoing_destructuring: Option<OngoingDestructuring>,
     errors: &'a mut FxHashSet<CompilerError>,
 }
@@ -202,7 +202,7 @@ impl<'a> LoweringContext<'a> {
         module: Module,
         target_is_main_function: bool,
         hir: &hir::Body,
-        tracing: &TracingConfig,
+        tracing: TracingConfig,
         errors: &mut FxHashSet<CompilerError>,
     ) -> Mir {
         Mir::build(|body| {

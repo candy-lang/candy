@@ -70,12 +70,8 @@ fuzz_target!(|data: &[u8]| {
     db.module_provider.load_package_from_file_system("Builtins");
     db.module_provider.add(&MODULE, data.to_vec());
 
-    let byte_code = compile_byte_code(
-        &db,
-        ExecutionTarget::MainFunction(MODULE.clone()),
-        TRACING.clone(),
-    )
-    .0;
+    let byte_code =
+        compile_byte_code(&db, ExecutionTarget::MainFunction(MODULE.clone()), TRACING).0;
 
     let mut heap = Heap::default();
     let environment = Struct::create(&mut heap, true, &Default::default());

@@ -95,7 +95,7 @@ fn optimized_mir(
 ) -> OptimizedMirResult {
     let module = target.module();
     debug!("{module}: Compiling.");
-    let (mir, errors) = db.mir(target.clone(), tracing.clone())?;
+    let (mir, errors) = db.mir(target.clone(), tracing)?;
     let mut mir = (*mir).clone();
     let mut pureness = PurenessInsights::default();
     let mut errors = (*errors).clone();
@@ -216,7 +216,7 @@ impl Context<'_> {
     }
 }
 
-#[allow(clippy::unnecessary_wraps)]
+#[allow(clippy::trivially_copy_pass_by_ref, clippy::unnecessary_wraps)]
 fn recover_from_cycle(
     _db: &dyn OptimizeMir,
     cycle: &[String],
