@@ -90,24 +90,47 @@ pub struct PathAndExecutionTargetAndTracing {
     #[arg(long, value_enum, default_value_t = ExecutionTargetKind::Module)]
     execution_target: ExecutionTargetKind,
 
-    #[arg(long)]
-    register_fuzzables: bool,
+    // The tracing modes can be specified as follows:
+    //
+    // - not specified or `--register-fuzzables=off`: off
+    // - `--register-fuzzables` of `--register-fuzzables=only-current`: only current
+    // - `--register-fuzzables=all`: all
+    //
+    // (Same for `trace-calls` and `evaluated-expressions`.)
+    #[arg(
+        long,
+        default_value("off"),
+        default_missing_value("only-current"),
+        num_args(0..=1),
+        require_equals(true)
+    )]
+    register_fuzzables: TracingMode,
 
-    #[arg(long)]
-    trace_calls: bool,
+    #[arg(
+        long,
+        default_value("off"),
+        default_missing_value("only-current"),
+        num_args(0..=1),
+        require_equals(true)
+    )]
+    trace_calls: TracingMode,
 
-    #[arg(long)]
-    trace_evaluated_expressions: bool,
+    #[arg(
+        long,
+        default_value("off"),
+        default_missing_value("only-current"),
+        num_args(0..=1),
+        require_equals(true)
+    )]
+    trace_evaluated_expressions: TracingMode,
 }
 impl PathAndExecutionTargetAndTracing {
     #[must_use]
     const fn to_tracing_config(&self) -> TracingConfig {
         TracingConfig {
-            register_fuzzables: TracingMode::only_current_or_off(self.register_fuzzables),
-            calls: TracingMode::only_current_or_off(self.trace_calls),
-            evaluated_expressions: TracingMode::only_current_or_off(
-                self.trace_evaluated_expressions,
-            ),
+            register_fuzzables: self.register_fuzzables,
+            calls: self.trace_calls,
+            evaluated_expressions: self.trace_evaluated_expressions,
         }
     }
 }
@@ -380,33 +403,33 @@ impl GoldOptions {
             visit("HIR", hir.text);
 
             let (mir, _) = db
-                .mir(execution_target.clone(), Self::TRACING_CONFIG.clone())
+                .mir(execution_target.clone(), Self::TRACING_CONFIG)
                 .unwrap();
             let mir = RichIr::for_mir(&module, &mir, Self::TRACING_CONFIG);
             visit("MIR", mir.text);
 
             let (optimized_mir, _, _) = db
-                .optimized_mir(execution_target.clone(), Self::TRACING_CONFIG.clone())
+                .optimized_mir(execution_target.clone(), Self::TRACING_CONFIG)
                 .unwrap();
             let optimized_mir =
                 RichIr::for_optimized_mir(&module, &optimized_mir, Self::TRACING_CONFIG);
             visit("Optimized MIR", optimized_mir.text);
 
             let (lir, _) = db
-                .lir(execution_target.clone(), Self::TRACING_CONFIG.clone())
+                .lir(execution_target.clone(), Self::TRACING_CONFIG)
                 .unwrap();
             let lir = RichIr::for_lir(&module, &lir, Self::TRACING_CONFIG);
             visit("LIR", lir.text);
 
             let (optimized_lir, _) = db
-                .optimized_lir(execution_target.clone(), Self::TRACING_CONFIG.clone())
+                .optimized_lir(execution_target.clone(), Self::TRACING_CONFIG)
                 .unwrap();
             let optimized_lir =
                 RichIr::for_optimized_lir(&module, &optimized_lir, Self::TRACING_CONFIG);
             visit("Optimized LIR", optimized_lir.text);
 
             let (vm_byte_code, _) =
-                compile_byte_code(db, execution_target.clone(), Self::TRACING_CONFIG.clone());
+                compile_byte_code(db, execution_target.clone(), Self::TRACING_CONFIG);
             let vm_byte_code_rich_ir =
                 RichIr::for_byte_code(&module, &vm_byte_code, Self::TRACING_CONFIG);
             visit(
