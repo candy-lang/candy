@@ -93,7 +93,7 @@ pub struct PathAndExecutionTargetAndTracing {
     // The tracing modes can be specified as follows:
     //
     // - not specified or `--register-fuzzables=off`: off
-    // - `--register-fuzzables` of `--register-fuzzables=only-current`: only current
+    // - `--register-fuzzables` or `--register-fuzzables=only-current`: only current
     // - `--register-fuzzables=all`: all
     //
     // (Same for `trace-calls` and `evaluated-expressions`.)
