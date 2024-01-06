@@ -162,23 +162,23 @@ repeat text times :=
     }
   }
 
-padStart text len char :=
+padStart text len character :=
   needs (is text)
   needs (int.is len)
-  needs (is char)
-  needs (char | length | equals 1)
+  needs (is character)
+  needs (character | length | equals 1)
   textLength = text | length
   ifElse (textLength | int.isGreaterThanOrEqualTo len) { text } {
-    (char | repeat (len | int.subtract textLength)) | concatenate text 
+    (character | repeat (len | int.subtract textLength)) | concatenate text
   }
-padEnd text len char :=
+padEnd text len character :=
   needs (is text)
   needs (int.is len)
-  needs (is char)
-  needs (char | length | equals 1)
+  needs (is character)
+  needs (character | length | equals 1)
   textLength = text | length
   ifElse (textLength | int.isGreaterThanOrEqualTo len) { text } {
-    text | concatenate (char | repeat (len | int.subtract textLength))
+    text | concatenate (character | repeat (len | int.subtract textLength))
   }
 
 #test =
