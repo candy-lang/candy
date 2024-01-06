@@ -170,7 +170,11 @@ impl TryInto<bool> for &Expression {
     type Error = ();
 
     fn try_into(self) -> Result<bool, ()> {
-        let Expression::Tag { symbol, .. } = self else {
+        let Expression::Tag {
+            symbol,
+            value: None,
+        } = self
+        else {
             return Err(());
         };
         match symbol.as_str() {
