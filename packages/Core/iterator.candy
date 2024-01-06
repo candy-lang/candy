@@ -71,7 +71,7 @@ generateWithState initialState mapper :=
       mapper state %
         More [item, state] -> More [item, Rest: recurse state]
         Empty -> Empty
-        a -> needs False "The `mapper` is bad. It should return Empty or More [item, state], but it returned this: {a}"
+        a -> needs False "The `mapper` is bad. It should return `Empty` or `More [item, state]`, but it returned this: `{a}`"
     }
   }
 generate length valueGetter :=
