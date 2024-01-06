@@ -112,7 +112,15 @@ impl CurrentBody {
         // Hence, it never has to be dropped.
         let ids_to_drop = id_mapping
             .iter()
-            .filter(|(&k, _)| k != responsible_parameter)
+            .filter(
+                #[allow(clippy::suspicious_operation_groupings)]
+                |(&mir_id, &lir_id)| {
+                    // Captured values should not be dropped in case the function is
+                    // called again. They are dropped when the function object
+                    // itself is dropped.
+                    lir_id.to_usize() >= captured.len() && mir_id != responsible_parameter
+                },
+            )
             .map(|(_, v)| v)
             .copied()
             .collect();
@@ -370,7 +378,9 @@ impl CurrentBody {
     }
 
     fn maybe_dup(&mut self, id: lir::Id) {
-        if !self.ids_to_drop.contains(&id) {
+        // Captured IDs aren't dropped at the end of the body since future
+        // invocations can still use them, but therefore we need to dup it.
+        if id.to_usize() >= self.body.captured_count() && !self.ids_to_drop.contains(&id) {
             return;
         }
 

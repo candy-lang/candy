@@ -55,11 +55,11 @@ impl Body {
         // drops to avoid having to create a reference to it after those drops.
         let return_expression_id =
             if let Expression::Reference(id) = self.expressions().last().unwrap()
-                && *id == self.ids_and_expressions().rev()
+                && self.ids_and_expressions().rev()
                     .skip(1)
                     .find(|(_, expression)| !matches!(expression, Expression::Dup {..} | Expression::Drop(_)))
-                    .unwrap()
-                    .0 {
+                        .map(|(id, _)| id) == Some(*id)
+                     {
                 // The last expression is a reference to the last expression
                 // before all drops. We can remove it because we move all drops
                 // before that last expression.
