@@ -2,7 +2,7 @@ use super::{Cst, CstData, CstError};
 use crate::rich_ir::{RichIrBuilder, ToRichIr, TokenType};
 use enumset::EnumSet;
 use num_bigint::{BigInt, BigUint};
-use std::fmt::{self, Display, Formatter};
+use std::fmt::{self, Display, Formatter, Pointer};
 use strum_macros::EnumIs;
 
 #[derive(Clone, Debug, EnumIs, Eq, Hash, PartialEq)]
@@ -106,6 +106,7 @@ pub enum CstKind<D = CstData> {
     },
     MatchCase {
         pattern: Box<Cst<D>>,
+        condition: Option<MatchCaseWithComma<D>>,
         arrow: Box<Cst<D>>,
         body: Vec<Cst<D>>,
     },
@@ -130,6 +131,7 @@ pub enum IntRadix {
     Binary,
     Hexadecimal,
 }
+pub type MatchCaseWithComma<D> = Box<(Cst<D>, Cst<D>)>;
 pub type FunctionParametersAndArrow<D> = (Vec<Cst<D>>, Box<Cst<D>>);
 
 impl<D> CstKind<D> {
@@ -291,10 +293,14 @@ impl<D> CstKind<D> {
             }
             Self::MatchCase {
                 pattern,
+                condition,
                 arrow,
                 body,
             } => {
                 let mut children = vec![pattern.as_ref(), arrow.as_ref()];
+                if let Some(box (comma, condition)) = condition {
+                    children.extend([&comma, &condition]);
+                }
                 children.extend(body);
                 children
             }
@@ -507,11 +513,16 @@ impl<D> Display for CstKind<D> {
             }
             Self::MatchCase {
                 pattern,
+                condition,
                 arrow,
                 body,
             } => {
                 pattern.fmt(f)?;
                 arrow.fmt(f)?;
+                if let Some(box (comma, condition)) = condition {
+                    comma.fmt(f)?;
+                    condition.fmt(f)?;
+                }
                 for expression in body {
                     expression.fmt(f)?;
                 }
@@ -904,6 +915,7 @@ where
             Self::MatchCase {
                 pattern,
                 arrow,
+                condition,
                 body,
             } => {
                 builder.push_cst_kind("MatchCase", |builder| {

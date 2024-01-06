@@ -131,6 +131,7 @@ pub struct Match {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct MatchCase {
     pub pattern: Box<Ast>,
+    pub condition: Option<Box<Ast>>,
     pub body: Vec<Ast>,
 }
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -248,7 +249,14 @@ impl FindAst for Match {
 }
 impl FindAst for MatchCase {
     fn find(&self, id: &Id) -> Option<&Ast> {
-        self.pattern.find(id).or_else(|| self.body.find(id))
+        self.pattern
+            .find(id)
+            .or_else(|| {
+                self.condition
+                    .as_ref()
+                    .and_then(|box condition| condition.find(id))
+            })
+            .or_else(|| self.body.find(id))
     }
 }
 impl FindAst for OrPattern {
@@ -352,8 +360,15 @@ impl CollectErrors for Ast {
                 expression.collect_errors(errors);
                 cases.collect_errors(errors);
             }
-            AstKind::MatchCase(MatchCase { pattern, body }) => {
+            AstKind::MatchCase(MatchCase {
+                pattern,
+                condition,
+                body,
+            }) => {
                 pattern.collect_errors(errors);
+                if let Some(box condition) = condition {
+                    condition.collect_errors(errors);
+                }
                 body.collect_errors(errors);
             }
             AstKind::OrPattern(OrPattern(patterns)) => {
