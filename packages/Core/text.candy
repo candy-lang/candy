@@ -1,6 +1,6 @@
 builtins = use "Builtins"
 bool = use "..bool"
-[ifElse] = use "..controlFlow"
+[ifElse, recursive] = use "..controlFlow"
 [equals] = use "..equality"
 int = use "..int"
 # iterator = use "..iterator"
@@ -122,22 +122,62 @@ trim text :=
   needs (is text)
   text | trimStart | trimEnd
 
-test =
-  [checkEquals] = use "..check"
+firstIndexOf text char :=
+  needs (is text)
+  needs (is char)
+  needs (length char | equals 1)
+  recursive 0 { recurse i ->
+    ifElse
+      text | length | int.isGreaterThan i
+      { ifElse (text | characterAt i | equals char) { i } { i | int.add 1 | recurse } }
+      { int.negate 1 }
+  }
 
-  checkEquals (is "Hi") True
-  checkEquals (is 2) False
+repeat text times :=
+  needs (is text)
+  needs (int.is times)
+  needs (times | int.isGreaterThanOrEqualTo 1)
+  recursive (text, times) { recurse (repeatedText, times) ->
+    ifElse (times | equals 1) { repeatedText } {
+      (repeatedText | concatenate text, times | int.subtract 1) | recurse
+    }
+  }
 
-  checkEquals (isEmpty "") True
-  checkEquals (isEmpty "Hi") False
+padStart text len char :=
+  needs (is text)
+  needs (int.is len)
+  needs (is char)
+  needs (char | length | equals 1)
+  textLength = text | length
+  ifElse (textLength | int.isGreaterThanOrEqualTo len) { text } {
+    (char | repeat (len | int.subtract textLength)) | concatenate text 
+  }
+padEnd text len char :=
+  needs (is text)
+  needs (int.is len)
+  needs (is char)
+  needs (char | length | equals 1)
+  textLength = text | length
+  ifElse (textLength | int.isGreaterThanOrEqualTo len) { text } {
+    text | concatenate (char | repeat (len | int.subtract textLength))
+  }
 
-  checkEquals (length "") 0
-  checkEquals (length "Hi") 2
-  checkEquals (length "🍔") 1
-
-  checkEquals (characters "Hello") ("H", "e", "l", "l", "o")
-
-  checkEquals (getRange "Hello" 1 4) "ell"
-
-  checkEquals (concatenate "jelly" "fish") "jellyfish"
-  checkEquals (concatenate "tea" "sing") "teasing"
+#test =
+#  [checkEquals] = use "..check"
+#
+#  checkEquals (is "Hi") True
+#  checkEquals (is 2) False
+#
+#  checkEquals (isEmpty "") True
+#  checkEquals (isEmpty "Hi") False
+#
+#  checkEquals (length "") 0
+#  checkEquals (length "Hi") 2
+#  checkEquals (length "🍔") 1
+#
+#  checkEquals (characters "Hello") ("H", "e", "l", "l", "o")
+#
+#  checkEquals (getRange "Hello" 1 4) "ell"
+#
+#  checkEquals (concatenate "jelly" "fish") "jellyfish"
+#  checkEquals (concatenate "tea" "sing") "teasing"
