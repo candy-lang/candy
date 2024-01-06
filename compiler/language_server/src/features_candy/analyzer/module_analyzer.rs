@@ -351,7 +351,7 @@ impl ModuleAnalyzer {
                             "For `{} {}`, this call panics: {}",
                             fuzzer.function_id.function_name(),
                             input
-                                .arguments
+                                .arguments()
                                 .iter()
                                 .map(|it| it.to_debug_text(Precedence::High, MaxLength::Unlimited))
                                 .join(" "),

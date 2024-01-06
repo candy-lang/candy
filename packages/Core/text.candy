@@ -1,6 +1,6 @@
 builtins = use "Builtins"
 bool = use "..bool"
-[ifElse] = use "..controlFlow"
+[ifElse, recursive] = use "..controlFlow"
 [equals] = use "..equality"
 function = use "..function"
 int = use "..int"
@@ -82,7 +82,8 @@ rick := "
   Never gonna run around and desert you
   Never gonna make you cry
   Never gonna say goodbye
-  Never gonna tell a lie and hurt you"
+  Never gonna tell a lie and hurt you
+"
 
 fromUtf8 := builtins.textFromUtf8
 
@@ -150,6 +151,35 @@ isAsciiDigit character :=
   character %
     "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" -> True
     _ -> False
+
+repeat text times :=
+  needs (is text)
+  needs (int.is times)
+  needs (times | int.isGreaterThanOrEqualTo 1)
+  recursive (text, times) { recurse (repeatedText, times) ->
+    ifElse (times | equals 1) { repeatedText } {
+      (repeatedText | concatenate text, times | int.subtract 1) | recurse
+    }
+  }
+
+padStart text len char :=
+  needs (is text)
+  needs (int.is len)
+  needs (is char)
+  needs (char | length | equals 1)
+  textLength = text | length
+  ifElse (textLength | int.isGreaterThanOrEqualTo len) { text } {
+    (char | repeat (len | int.subtract textLength)) | concatenate text 
+  }
+padEnd text len char :=
+  needs (is text)
+  needs (int.is len)
+  needs (is char)
+  needs (char | length | equals 1)
+  textLength = text | length
+  ifElse (textLength | int.isGreaterThanOrEqualTo len) { text } {
+    text | concatenate (char | repeat (len | int.subtract textLength))
+  }
 
 #test =
 #  [checkEquals] = use "..check"

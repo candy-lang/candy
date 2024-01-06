@@ -10,30 +10,30 @@ use rand::{
     Rng,
 };
 use rustc_hash::FxHashMap;
-use std::{cell::RefCell, rc::Rc};
+use std::collections::hash_map;
 
-#[extension_trait]
-pub impl InputGeneration for Input {
-    fn generate(heap: Rc<RefCell<Heap>>, num_args: usize, symbols: &[Text]) -> Input {
-        let mut arguments = vec![];
-        for _ in 0..num_args {
-            let address = InlineObject::generate(
-                &mut heap.borrow_mut(),
-                &mut rand::thread_rng(),
-                5.0,
-                symbols,
-            );
-            arguments.push(address);
+impl Input {
+    pub fn generate(heap: &mut Heap, num_args: usize, symbols: &[Text]) -> Self {
+        let arguments = (0..num_args)
+            .map(|_| InlineObject::generate(heap, &mut rand::thread_rng(), 5.0, symbols))
+            .collect();
+        Self::new(arguments)
+    }
+    pub fn mutated(&self, heap: &mut Heap, rng: &mut ThreadRng, symbols: &[Text]) -> Self {
+        let mut arguments = self.arguments().to_owned();
+
+        let index_to_mutate = rng.gen_range(0..arguments.len());
+        for (index, argument) in arguments.iter_mut().enumerate() {
+            if index == index_to_mutate {
+                *argument = argument.generate_mutated(heap, rng, symbols);
+            } else {
+                argument.dup(heap);
+            }
         }
-        Self { heap, arguments }
+        Self::new(arguments)
     }
-    fn mutate(&mut self, rng: &mut ThreadRng, symbols: &[Text]) {
-        let mut heap = self.heap.borrow_mut();
-        let argument = self.arguments.choose_mut(rng).unwrap();
-        *argument = argument.generate_mutated(&mut heap, rng, symbols);
-    }
-    fn complexity(&self) -> usize {
-        self.arguments
+    pub fn complexity(&self) -> usize {
+        self.arguments()
             .iter()
             .map(|argument| argument.complexity())
             .sum()
@@ -56,7 +56,9 @@ impl InlineObjectGeneration for InlineObject {
                     let value = Self::generate(heap, rng, complexity - 10.0, symbols);
                     Tag::create_with_value(heap, true, *symbols.choose(rng).unwrap(), value).into()
                 } else {
-                    Tag::create(*symbols.choose(rng).unwrap()).into()
+                    let symbol = *symbols.choose(rng).unwrap();
+                    symbol.dup();
+                    Tag::create(symbol).into()
                 }
             }
             4 => {
@@ -73,19 +75,29 @@ impl InlineObjectGeneration for InlineObject {
                 complexity -= 1.0;
                 let mut fields = FxHashMap::default();
                 while complexity > 20.0 {
-                    let key = Self::generate(heap, rng, 10.0, symbols);
+                    // Generate a key that is not already in the struct
+                    let entry = loop {
+                        let key = Self::generate(heap, rng, 10.0, symbols);
+                        match fields.entry(key) {
+                            hash_map::Entry::Occupied(_) => key.drop(heap),
+                            hash_map::Entry::Vacant(entry) => break entry,
+                        }
+                    };
+
                     let value = Self::generate(heap, rng, 10.0, symbols);
-                    fields.insert(key, value);
+                    entry.insert(value);
                     complexity -= 20.0;
                 }
                 Struct::create(heap, true, &fields).into()
             }
             6 => {
+                // No `dup()` necessary since these are inline.
                 builtin_functions::VALUES[rng.gen_range(0..builtin_functions::VALUES.len())].into()
             }
             _ => unreachable!(),
         }
     }
+    #[allow(clippy::too_many_lines)]
     fn generate_mutated(
         self,
         heap: &mut Heap,
@@ -101,37 +113,65 @@ impl InlineObjectGeneration for InlineObject {
                 Int::create_from_bigint(heap, true, int.get().as_ref() + rng.gen_range(-10..10))
                     .into()
             }
-            Data::Text(text) => mutate_string(rng, heap, text.get().to_string()).into(),
+            Data::Text(text) => {
+                let mut string = text.get().to_string();
+                mutate_string(rng, &mut string);
+                Text::create(heap, true, &string).into()
+            }
             Data::Tag(tag) => {
                 if rng.gen_bool(0.5) {
-                    Tag::create_with_value_option(
-                        heap,
-                        true,
-                        *symbols.choose(rng).unwrap(),
-                        tag.value(),
-                    )
-                    .into()
+                    // New symbol, keep value
+                    let symbol = *symbols.choose(rng).unwrap();
+                    symbol.dup();
+
+                    if let Some(value) = tag.value() {
+                        value.dup(heap);
+                    }
+
+                    Tag::create_with_value_option(heap, true, symbol, tag.value()).into()
                 } else if let Some(value) = tag.value() {
+                    tag.symbol().dup();
                     if rng.gen_bool(0.9) {
+                        // Keep symbol, mutate value
                         let value = value.generate_mutated(heap, rng, symbols);
                         Tag::create_with_value(heap, true, tag.symbol(), value).into()
                     } else {
+                        // Keep symbol, remove value
                         tag.without_value().into()
                     }
                 } else {
+                    // Keep symbol, add value
+                    tag.symbol().dup();
                     let value = Self::generate(heap, rng, 100.0, symbols);
                     Tag::create_with_value(heap, true, tag.symbol(), value).into()
                 }
             }
             Data::List(list) => {
                 let len = list.len();
-                if rng.gen_bool(0.9) && len > 0 {
-                    let index = rng.gen_range(0..len);
-                    let new_item = list.get(index).generate_mutated(heap, rng, symbols);
-                    list.replace(heap, index, new_item).into()
-                } else if rng.gen_bool(0.5) && len > 0 {
-                    list.remove(heap, rng.gen_range(0..len)).into()
+                if len > 0 && rng.gen_bool(0.9) {
+                    // Replace item
+                    let index_to_mutate = rng.gen_range(0..len);
+                    let new_item = list
+                        .get(index_to_mutate)
+                        .generate_mutated(heap, rng, symbols);
+                    for (index, item) in list.items().iter().enumerate() {
+                        if index != index_to_mutate {
+                            item.dup(heap);
+                        }
+                    }
+                    list.replace(heap, index_to_mutate, new_item).into()
+                } else if len > 0 && rng.gen_bool(0.5) {
+                    // Remove item
+                    let new_list = list.remove(heap, rng.gen_range(0..len));
+                    for item in new_list.items() {
+                        item.dup(heap);
+                    }
+                    new_list.into()
                 } else {
+                    // Add item
+                    for item in list.items() {
+                        item.dup(heap);
+                    }
                     let new_item = Self::generate(heap, rng, 100.0, symbols);
                     list.insert(heap, rng.gen_range(0..=len), new_item).into()
                 }
@@ -139,21 +179,51 @@ impl InlineObjectGeneration for InlineObject {
             Data::Struct(struct_) => {
                 let len = struct_.len();
                 if rng.gen_bool(0.9) && len > 0 {
-                    let index = rng.gen_range(0..len);
-                    let key = struct_.keys()[index];
-                    let value = struct_.values()[index].generate_mutated(heap, rng, symbols);
-                    struct_.insert(heap, key, value).into()
+                    // Mutate value
+                    let index_to_mutate = rng.gen_range(0..len);
+                    for key in struct_.keys() {
+                        key.dup(heap);
+                    }
+                    for (index, value) in struct_.values().iter().enumerate() {
+                        if index != index_to_mutate {
+                            value.dup(heap);
+                        }
+                    }
+                    let value =
+                        struct_.values()[index_to_mutate].generate_mutated(heap, rng, symbols);
+                    struct_
+                        .replace_at_index(heap, index_to_mutate, value)
+                        .into()
                 // TODO: Support removing value from a struct
                 // } else if rng.gen_bool(0.5) && len > 0 {
                 //     struct_
                 //         .remove(rng.gen_range(0..len));
                 } else {
-                    let key = Self::generate(heap, rng, 10.0, symbols);
+                    // Add entry
+                    for key in struct_.keys() {
+                        key.dup(heap);
+                    }
+                    for value in struct_.values() {
+                        value.dup(heap);
+                    }
+
+                    // Generate a key that is not already in the struct
+                    let key = loop {
+                        let key = Self::generate(heap, rng, 10.0, symbols);
+                        if struct_.contains(key) {
+                            key.drop(heap);
+                        } else {
+                            break key;
+                        }
+                    };
                     let value = Self::generate(heap, rng, 100.0, symbols);
                     struct_.insert(heap, key, value).into()
                 }
             }
-            Data::Builtin(_) => (*builtin_functions::VALUES.choose(rng).unwrap()).into(),
+            Data::Builtin(_) => {
+                // No `dup()` necessary since these are inline.
+                (*builtin_functions::VALUES.choose(rng).unwrap()).into()
+            }
             Data::HirId(_) | Data::Function(_) | Data::Handle(_) => {
                 panic!("Couldn't have been created for fuzzing.")
             }
@@ -192,10 +262,10 @@ impl InlineObjectGeneration for InlineObject {
     }
 }
 
-fn mutate_string(rng: &mut ThreadRng, heap: &mut Heap, mut string: String) -> Text {
+fn mutate_string(rng: &mut ThreadRng, string: &mut String) {
     if rng.gen_bool(0.5) && !string.is_empty() {
-        let start = string.floor_char_boundary(rng.gen_range(0..=string.len()));
-        let end = string.floor_char_boundary(start + rng.gen_range(0..=(string.len() - start)));
+        let start = string.floor_char_boundary(rng.gen_range(0..string.len()));
+        let end = string.ceil_char_boundary(rng.gen_range((start + 1)..=string.len()));
         string.replace_range(start..end, "");
     } else {
         let insertion_point = string.floor_char_boundary(rng.gen_range(0..=string.len()));
@@ -209,5 +279,4 @@ fn mutate_string(rng: &mut ThreadRng, heap: &mut Heap, mut string: String) -> Te
             .join("");
         string.insert_str(insertion_point, &string_to_insert);
     }
-    Text::create(heap, true, &string)
 }

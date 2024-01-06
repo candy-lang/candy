@@ -36,6 +36,8 @@ floorToInt a :=
   needs (is a)
   a | minorUnits | int.divideTruncating (a | scale | scaleFactor)
 
+zero := fromInt 0
+
 rescaledMinorUnits a targetScale =
   needs (is a)
   needs (isScale targetScale)

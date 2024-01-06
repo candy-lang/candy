@@ -159,7 +159,8 @@ impl MachineState {
                     // HIR to the MIR.
                     panic!("We should never generate byte code where the reason is not a text.");
                 };
-                let responsible: HirId = responsible_for_panic.try_into().unwrap();
+                let responsible: HirId = responsible_for_panic.try_into()
+                    .unwrap_or_else(|_| panic!("Expected a panic's responsible argument to be a HIR ID, but got {responsible_for_panic:?}."));
 
                 InstructionResult::Panic(Panic {
                     reason: reason.get().to_string(),
