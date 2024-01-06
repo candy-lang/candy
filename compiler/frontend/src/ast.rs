@@ -555,9 +555,22 @@ impl ToRichIr for Match {
 }
 impl ToRichIr for MatchCase {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push("case ", None, EnumSet::empty());
         self.pattern.build_rich_ir(builder);
+        if let Some(box condition) = &self.condition {
+            builder.push(", ", None, EnumSet::empty());
+            builder.indent();
+            builder.push_newline();
+            builder.push("condition ", None, EnumSet::empty());
+            condition.build_rich_ir(builder);
+        }
         builder.push(" -> ", None, EnumSet::empty());
+        builder.indent();
         builder.push_foldable(|builder| builder.push_children_multiline(&self.body));
+        if self.condition.is_some() {
+            builder.dedent();
+        }
+        builder.dedent();
     }
 }
 impl ToRichIr for OrPattern {
