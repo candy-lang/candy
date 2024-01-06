@@ -126,24 +126,24 @@ trim text :=
   needs (is text)
   text | trimStart | trimEnd
 
-findFirstIndexWhere text predicate :=
+firstIndexWhere text predicate :=
   needs (is text)
   needs (function.is1 predicate)
-  text | characters | list.findFirstIndexWhere predicate
-findFirstIndexOf text character :=
+  text | characters | list.firstIndexWhere predicate
+firstIndexOf text character :=
   needs (is text)
   needs (is character)
   needs (character | length | equals 1)
-  text | characters | list.findFirstIndexOf character
-findLastIndexWhere text predicate :=
+  text | characters | list.firstIndexOf character
+lastIndexWhere text predicate :=
   needs (is text)
   needs (function.is1 predicate)
-  text | characters | list.findLastIndexWhere predicate
-findLastIndexOf text character :=
+  text | characters | list.lastIndexWhere predicate
+lastIndexOf text character :=
   needs (is text)
   needs (is character)
   needs (character | length | equals 1)
-  text | characters | list.findLastIndexOf character
+  text | characters | list.lastIndexOf character
 
 isAsciiDigit character :=
   needs (is character)
