@@ -690,7 +690,11 @@ impl ToRichIr for Expression {
                         pattern.build_rich_ir(builder);
                         if let Some(condition) = condition {
                             builder.push(", ", None, EnumSet::empty());
+                            builder.indent();
+                            builder.push_newline();
                             condition.build_rich_ir(builder);
+                            builder.dedent();
+                            builder.push_newline();
                         }
                         builder.push(" ->", None, EnumSet::empty());
                         builder.push_indented_foldable(|builder| {
