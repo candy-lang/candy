@@ -1,0 +1,297 @@
+# Iterators define themselves by their behavior. That's why they're just a fancy
+# function. In fact, iterators are just tagged functions:
+#
+# Iterator { ... }
+#
+# Calling the function should produce a value of one of the following forms:
+#
+# - `Empty`: The iterator is done iterating.
+# - `More [item, rest]`: The iterator is not empty yet. It returned the next
+#   item as well as the rest, which should also be an iterator.
+
+bool = use "..bool"
+[if, ifElse, recursive] = use "..controlFlow"
+[equals] = use "..equality"
+function = use "..function"
+int = use "..int"
+result = use "..result"
+list = use "..list"
+text = use "..text"
+
+## Candy tracks responsibilities precisely. That is great for enabling cool
+## tooling and writing error-resilient code, but higher-order functions become
+## more challenging to write correctly.
+##
+## For example, if you write a function that should accept an iterator, there's
+## no way to write a `needs` at the beginning of the function that ensures the
+## argument is an iterator. After all, it may look like an iterator on the
+## surface but return something ill-formed after being advanced many times.
+##
+## That's why this function wraps the given iterator and returns a new function
+## that's guaranteed to behave like an iterator. If the wrapped iterator behaves
+## badly, the guard is called (and it's supposed to panic).
+wrapSafe iterator notIteratorGuard :=
+  needs (function.is0 notIteratorGuard)
+  panicUsingGuard = {
+    function.run notIteratorGuard
+    needs False "The guard needs to panic."
+  }
+
+  recursive iterator { recurse iterator ->
+    nextFunction = iterator %
+      Iterator function -> function
+      _ -> function.run panicUsingGuard
+    if (function.is0 nextFunction | bool.not) panicUsingGuard
+
+    Iterator {
+      function.run nextFunction %
+        Empty -> Empty
+        More [item, rest] -> More [item, Rest: recurse rest]
+        _ -> function.run panicUsingGuard
+    }
+  }
+
+next iterator :=
+  iterator = iterator | wrapSafe { needs False "`next` needs an iterator." }
+  Iterator nextFunction = iterator
+  function.run nextFunction
+isEmpty iterator :=
+  iterator = iterator | wrapSafe { needs False "`isEmpty` needs an iterator." }
+  iterator | next | equals Empty
+
+generateWithState initialState mapper :=
+  # Creates a new iterator from a state and mapper. The `mapper` receives the
+  # current state and returns either one of these:
+  #
+  # - `More [item, state]`
+  # - `Empty`
+  needs (function.is1 mapper)
+  recursive initialState { recurse state ->
+    Iterator {
+      mapper state %
+        More [item, state] -> More [item, Rest: recurse state]
+        Empty -> Empty
+        a -> needs False "The `mapper` is bad. It should return `Empty` or `More [item, state]`, but it returned this: `{a}`"
+    }
+  }
+generate length valueGetter :=
+  # Creates a new iterator of the given `length`, where each slot is filled by calling `valueGetter`
+  # with the index.
+  needs (int.is length)
+  needs (int.isNonNegative length)
+  needs (int.fitsInRustU32 length)
+  needs (function.is1 valueGetter)
+
+  generateWithState 0 { index ->
+    ifElse (index | equals length) { Empty } {
+      More [Item: valueGetter index, State: index | int.add 1]
+    }
+  }
+range length :=
+  # Creates a new iterator of the given `length`, where each slot is filled by the index.
+  needs (int.is length)
+  needs (int.isNonNegative length)
+  needs (int.fitsInRustU32 length)
+  generate length { index -> index }
+
+## Mapping Transformation
+##
+## These return an iterator with the same length, but different items.
+
+map iterator mapper :=
+  iterator = iterator | wrapSafe { needs False "`map` needs an iterator." }
+  needs (function.is1 mapper)
+  generateWithState iterator { iterator ->
+    iterator | next %
+      Empty -> Empty
+      More [item, rest] -> More [Item: mapper item, State: rest]
+  }
+
+withIndex iterator :=
+  iterator = iterator | wrapSafe { needs False "`withIndex` needs an iterator." }
+  generateWithState [iterator, Index: 0] { [iterator, index] ->
+    iterator | next %
+      Empty -> Empty
+      More [item, rest] -> More [Item: [item, index], State: [Iterator: rest, Index: index | int.add 1]]
+  }
+
+ensure iterator guard :=
+  # Useful for ensuring that a `needs` holds for each item of the iterator.
+  needs (function.is1 guard)
+  iterator = iterator | wrapSafe { needs False "`ensure` needs an iterator." }
+
+  iterator | map { item ->
+    guard item
+    item
+  }
+
+## Reduction
+
+# TODO: ensure this works with tail recursion
+foldLeft iterator initialValue combine :=
+  iterator = iterator | wrapSafe { needs False "`foldLeft` needs an iterator." }
+  needs (function.is2 combine)
+  recursive [iterator, Value: initialValue] { recurse [iterator, value] ->
+    iterator | next %
+      Empty -> value
+      More [item, rest] -> recurse [Iterator: rest, Value: combine value item]
+  }
+# TODO: `foldRight`
+
+reduceLeft iterator combine :=
+  needs (function.is2 combine)
+  iterator | wrapSafe { needs False "`reduceLeft` needs an iterator." } | next %
+    Empty -> Error "Can't `reduceLeft` an empty iterator"
+    More [item, rest] -> Ok (rest | foldLeft item combine)
+# TODO: `reduceRight`
+
+sum iteratorOfInt := iteratorOfInt | wrapSafe { needs False "`sum` needs an iterator." }
+  | ensure { a -> needs (int.is a) "Iterator items need to be ints." }
+  | reduceLeft { a b -> a | int.add b }
+  | result.unwrapOr 0
+length iterator :=
+  iterator | wrapSafe { needs False "`length` needs an iterator." } | map { _ -> 1 } | sum
+
+all iterator tester :=
+  needs (function.is1 tester)
+  ## TODO: stop after the first `False`
+  iterator | wrapSafe { needs False "`all` needs an iterator." } | foldLeft True { result item ->
+    itemResult = tester item
+    needs (bool.is itemResult)
+    result | bool.and itemResult
+  }
+any iterator tester :=
+  needs (function.is1 tester)
+  ## TODO: stop after the first `True`
+  iterator | wrapSafe { needs False "`any` needs an iterator." } | foldLeft False { result item ->
+    itemResult = tester item
+    needs (bool.is itemResult)
+    result | bool.or itemResult
+  }
+
+joinToText iterator := iterator | wrapSafe { needs False "`joinToText` needs an iterator." }
+  | foldLeft "" { result item ->
+  needs (text.is item)
+  result | text.concatenate item
+}
+
+## Filtering
+
+where iterator tester :=
+  iterator = iterator | wrapSafe { needs False "`where` needs an iterator." }
+  needs (function.is1 tester)
+  recursive iterator { recurse iterator ->
+    generateWithState iterator { iterator ->
+      iterator | next %
+        Empty -> Empty
+        More [item, rest] ->
+          ifElse (tester item) { More [item, State: rest] } {
+            recurse rest | next %
+              Empty -> Empty
+              More [item, rest] -> More [item, State: rest]
+          }
+    }
+  }
+
+takeWhile iterator tester :=
+  iterator = iterator | wrapSafe { needs False "`takeWhile` needs an iterator." }
+  generateWithState iterator { iterator ->
+    iterator | next %
+      Empty -> Empty
+      More [item, rest] -> ifElse (tester item) { More [item, State: rest] } { Empty }
+  }
+
+takeUntil iterator tester := iterator | takeWhile { item -> tester item | bool.not }
+
+take iterator n :=
+  needs (int.is n)
+  needs (int.isNonNegative n)
+  iterator | wrapSafe { needs False "`take` needs an iterator." } | withIndex
+  | takeWhile { [item, index] -> index | int.isLessThan n }
+  | map { it -> it.item }
+
+skip iterator n :=
+  iterator = iterator | wrapSafe { needs False "`skip` needs an iterator." }
+  needs (int.is n)
+  needs (int.isNonNegative n)
+  Iterator {
+    recursive [iterator, n] { recurse [iterator, n] ->
+      ifElse (equals n 0) { iterator | next } {
+        iterator | next %
+          Empty -> Empty
+          More [rest] -> recurse [Iterator: rest, N: n | int.subtract 1]
+      }
+    }
+  }
+
+## Action
+
+forEach iterator action :=
+  needs (function.is1 action)
+  iterator | wrapSafe { needs False "`forEach` needs an iterator." } | foldLeft Nothing { _ item ->
+    action item
+    Nothing
+  }
+
+## Conversion
+
+fromList l :=
+  needs (list.is l)
+  generate (l | list.length) { index -> l | list.get index }
+fromListReversed l :=
+  needs (list.is l)
+  generate (l | list.length) { index -> l | list.get (l | list.length | int.subtract index | int.subtract 1)
+  }
+
+toList iterator := iterator | wrapSafe { needs False "`toList` needs an iterator." }
+  | foldLeft (,) { result item -> result | list.append item }
+
+## Partitioning
+
+windowed iterator size step allowPartialWindows :=
+  iterator = iterator | wrapSafe { needs False "`windowed` needs an iterator." }
+  needs (int.is size)
+  needs (int.isPositive size)
+  needs (int.is step)
+  needs (int.isPositive step)
+  needs (bool.is allowPartialWindows)
+
+  generateWithState iterator { iterator ->
+    items = iterator | take size | toList
+    length = items | list.length
+    isLongEnough = ifElse allowPartialWindows { length | int.isPositive } { length | equals size }
+    ifElse isLongEnough { More [Item: items, State: iterator | skip step] } { Empty }
+  }
+chunked iterator size :=
+  needs (int.is size)
+  needs (int.isPositive size)
+
+  iterator | wrapSafe { needs False "`chunked` needs an iterator." } | windowed size size True
+
+test =
+  [checkEquals] = use "..check"
+  [toDebugText] = use "..toDebugText"
+  oneToThree = (1, 2, 3) | fromList
+  oneToTen = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10) | fromList
+  testNext =
+    More [item, rest] = oneToThree | next
+    checkEquals item 1
+    More [item, rest] = rest | next
+    checkEquals item 2
+
+  checkEquals (isEmpty oneToThree) False
+  checkEquals (isEmpty (fromList (,))) True
+  checkEquals (oneToThree | map { a -> int.multiply a 2 } | toList) (2, 4, 6)
+  checkEquals (oneToThree | sum) 6
+  checkEquals (oneToThree | length) 3
+  checkEquals (oneToThree | all { a -> int.isPositive a }) True
+  checkEquals (oneToThree | any { a -> equals a 2 }) True
+  checkEquals (oneToThree | map { a -> a | toDebugText } | joinToText) "123"
+  checkEquals (oneToTen | where { a -> a | int.isOdd } | toList) (1, 3, 5, 7, 9)
+  checkEquals (oneToTen | takeWhile { a -> a | int.isLessThan 4 } | toList) (1, 2, 3)
+  checkEquals (oneToTen | take 4 | toList) (1, 2, 3, 4)
+  checkEquals (oneToTen | take 12 | toList) (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  checkEquals (oneToTen | skip 4 | toList) (5, 6, 7, 8, 9, 10)
+  checkEquals (oneToTen | skip 40 | toList) (,)
+  checkEquals (oneToTen | windowed 4 3 False | toList) ((1, 2, 3, 4), (4, 5, 6, 7), (7, 8, 9, 10))
+  checkEquals (oneToTen | chunked 3 | toList) ((1, 2, 3), (4, 5, 6), (7, 8, 9), (10,))

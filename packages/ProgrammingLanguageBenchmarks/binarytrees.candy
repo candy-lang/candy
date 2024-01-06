@@ -1,6 +1,6 @@
 # https://programming-language-benchmarks.vercel.app/problem/binarytrees
 
-[channel, equals, if, ifElse, int, iterable, recursive, result, struct, text] = use "Core"
+[channel, equals, if, ifElse, int, iterator, recursive, result, struct, text] = use "Core"
 
 createTree n :=
   needs (int.is n)
@@ -40,7 +40,7 @@ main := { environment ->
   recursive minDepth { recurse depth ->
     if (depth | int.isLessThanOrEqualTo maxDepth) {
       iterations = 1 | int.shiftLeft (maxDepth | int.subtract depth | int.add minDepth)
-      check = iterable.generate iterations { _ -> createTree depth | checkTree } | iterable.sum
+      check = iterator.generate iterations { _ -> createTree depth | checkTree } | iterator.sum
       print "{iterations}\t trees of depth {depth}\t check: {check}"
       recurse (depth | int.add 2)
     }
