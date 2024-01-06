@@ -290,8 +290,8 @@ impl RichIrBuilder {
             .push(range);
     }
 
-    pub fn push_tracing_config(&mut self, tracing_config: &TracingConfig) {
-        fn push_mode(builder: &mut RichIrBuilder, title: &str, mode: &TracingMode) {
+    pub fn push_tracing_config(&mut self, tracing_config: TracingConfig) {
+        fn push_mode(builder: &mut RichIrBuilder, title: &str, mode: TracingMode) {
             builder.push_comment_line(format!(
                 "• {title} {}",
                 match mode {
@@ -308,13 +308,13 @@ impl RichIrBuilder {
         push_mode(
             self,
             "Include tracing of fuzzable functions?",
-            &tracing_config.register_fuzzables,
+            tracing_config.register_fuzzables,
         );
-        push_mode(self, "Include tracing of calls?", &tracing_config.calls);
+        push_mode(self, "Include tracing of calls?", tracing_config.calls);
         push_mode(
             self,
             "Include tracing of evaluated expressions?",
-            &tracing_config.evaluated_expressions,
+            tracing_config.evaluated_expressions,
         );
     }
 
@@ -373,25 +373,25 @@ impl RichIr {
         Self::for_ir("HIR", module, None, |builder| body.build_rich_ir(builder))
     }
     #[must_use]
-    pub fn for_mir(module: &Module, mir: &Mir, tracing_config: &TracingConfig) -> Self {
+    pub fn for_mir(module: &Module, mir: &Mir, tracing_config: TracingConfig) -> Self {
         Self::for_ir("MIR", module, tracing_config, |builder| {
             mir.build_rich_ir(builder);
         })
     }
     #[must_use]
-    pub fn for_optimized_mir(module: &Module, mir: &Mir, tracing_config: &TracingConfig) -> Self {
+    pub fn for_optimized_mir(module: &Module, mir: &Mir, tracing_config: TracingConfig) -> Self {
         Self::for_ir("Optimized MIR", module, tracing_config, |builder| {
             mir.build_rich_ir(builder);
         })
     }
     #[must_use]
-    pub fn for_lir(module: &Module, lir: &Lir, tracing_config: &TracingConfig) -> Self {
+    pub fn for_lir(module: &Module, lir: &Lir, tracing_config: TracingConfig) -> Self {
         Self::for_ir("LIR", module, tracing_config, |builder| {
             lir.build_rich_ir(builder);
         })
     }
     #[must_use]
-    pub fn for_optimized_lir(module: &Module, lir: &Lir, tracing_config: &TracingConfig) -> Self {
+    pub fn for_optimized_lir(module: &Module, lir: &Lir, tracing_config: TracingConfig) -> Self {
         Self::for_ir("Optimized LIR", module, tracing_config, |builder| {
             lir.build_rich_ir(builder);
         })
@@ -400,7 +400,7 @@ impl RichIr {
     fn for_ir(
         ir_name: &str,
         module: &Module,
-        tracing_config: impl Into<Option<&TracingConfig>>,
+        tracing_config: impl Into<Option<TracingConfig>>,
         build_rich_ir: impl FnOnce(&mut RichIrBuilder),
     ) -> Self {
         let mut builder = RichIrBuilder::default();

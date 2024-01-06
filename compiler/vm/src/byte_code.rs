@@ -423,7 +423,7 @@ pub impl RichIrForByteCode for RichIr {
     fn for_byte_code(
         module: &Module,
         byte_code: &ByteCode,
-        tracing_config: &TracingConfig,
+        tracing_config: TracingConfig,
     ) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(
