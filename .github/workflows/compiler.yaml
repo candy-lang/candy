@@ -139,7 +139,7 @@ jobs:
           issue-number: ${{ github.event.pull_request.number }}
           token: ${{ secrets.GOLDEN_IR_COMMENT_TOKEN }}
           body: |
-            The golden IRs have changed: [${{ steps.short-shas.outputs.base_sha }}..${{ steps.short-shas.outputs.head_sha }}](https://github.com/candy-lang/golden-irs/compare/${{ github.event.pull_request.base.sha }}_..${{ github.sha }}_)
+            The golden IRs have changed: [${{ steps.short-shas.outputs.base_sha }}..${{ steps.short-shas.outputs.head_sha }}](https://github.com/candy-lang/golden-irs/compare/${{ github.event.pull_request.base.sha }}_..${{ env.HEAD_SHA }}_)
 
   benchmark:
     name: Benchmark
