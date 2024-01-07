@@ -1,10 +1,9 @@
 use crate::{
     byte_code::Instruction,
-    heap::{Data, Function, Heap, HirId, InlineObject, List, Pointer, Struct, Tag, Text},
+    heap::{Data, Function, Heap, HirId, InlineObject, List, Struct, Tag, Text},
     tracer::Tracer,
     vm::{CallHandle, MachineState, Panic},
 };
-use extension_trait::extension_trait;
 use itertools::Itertools;
 use tracing::trace;
 
@@ -307,12 +306,5 @@ impl MachineState {
     fn pop_multiple_from_data_stack(&mut self, amount: usize) {
         assert!(amount <= self.data_stack.len());
         self.data_stack.truncate(self.data_stack.len() - amount);
-    }
-}
-
-#[extension_trait]
-impl NthLast for Vec<Pointer> {
-    fn nth_last(&mut self, index: usize) -> Pointer {
-        self[self.len() - 1 - index]
     }
 }

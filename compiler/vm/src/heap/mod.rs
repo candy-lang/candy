@@ -5,10 +5,9 @@ pub use self::{
     },
     object_heap::{HeapData, HeapObject, HeapObjectTrait},
     object_inline::{
-        int::I64BitLength, InlineData, InlineObject, InlineObjectSliceCloneToHeap,
-        InlineObjectTrait, ToDebugText,
+        int::I64BitLength, pointer::InlinePointer, InlineData, InlineObject,
+        InlineObjectSliceCloneToHeap, InlineObjectTrait, ToDebugText,
     },
-    pointer::Pointer,
 };
 use crate::handle_id::HandleId;
 use candy_frontend::id::IdGenerator;
@@ -24,7 +23,6 @@ use std::{
 mod object;
 mod object_heap;
 mod object_inline;
-mod pointer;
 
 pub struct Heap {
     objects: FxHashSet<ObjectInHeap>,
