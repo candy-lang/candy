@@ -20,9 +20,11 @@ pub struct HeapStruct(HeapObject);
 impl HeapStruct {
     const LEN_SHIFT: usize = 4;
 
+    #[must_use]
     pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
+    #[must_use]
     pub fn create(
         heap: &mut Heap,
         is_reference_counted: bool,
@@ -52,6 +54,7 @@ impl HeapStruct {
         };
         struct_
     }
+    #[must_use]
     fn create_uninitialized(heap: &mut Heap, is_reference_counted: bool, len: usize) -> Self {
         assert_eq!(
             (len << Self::LEN_SHIFT) >> Self::LEN_SHIFT,
@@ -66,15 +69,19 @@ impl HeapStruct {
         ))
     }
 
+    #[must_use]
     pub fn len(self) -> usize {
         (self.header_word() >> Self::LEN_SHIFT) as usize
     }
+    #[must_use]
     pub fn hashes<'a>(self) -> &'a [u64] {
         self.items(0)
     }
+    #[must_use]
     pub fn keys<'a>(self) -> &'a [InlineObject] {
         self.items(1)
     }
+    #[must_use]
     pub fn values<'a>(self) -> &'a [InlineObject] {
         self.items(2)
     }
@@ -85,6 +92,7 @@ impl HeapStruct {
             self.values().iter().copied(),
         )
     }
+    #[must_use]
     fn items<'a, T>(self, items_index: usize) -> &'a [T] {
         let len = self.len();
         unsafe {
@@ -95,9 +103,11 @@ impl HeapStruct {
         }
     }
 
+    #[must_use]
     pub fn contains(self, key: InlineObject) -> bool {
         self.index_of_key(key, key.do_hash()).is_ok()
     }
+    #[must_use]
     pub fn get(self, key: impl Into<InlineObject>) -> Option<InlineObject> {
         let key = key.into();
         self.index_of_key(key, key.do_hash())

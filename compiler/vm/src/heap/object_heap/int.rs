@@ -18,9 +18,11 @@ use std::{
 pub struct HeapInt(HeapObject);
 
 impl HeapInt {
+    #[must_use]
     pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
+    #[must_use]
     pub fn create(heap: &mut Heap, is_reference_counted: bool, value: BigInt) -> Self {
         if let Ok(value) = i64::try_from(&value) {
             debug_assert!(!InlineInt::fits(value));
@@ -36,9 +38,11 @@ impl HeapInt {
         int
     }
 
+    #[must_use]
     fn int_pointer(self) -> NonNull<BigInt> {
         self.content_word_pointer(0).cast()
     }
+    #[must_use]
     pub fn get<'a>(self) -> &'a BigInt {
         unsafe { self.int_pointer().as_ref() }
     }
@@ -48,10 +52,12 @@ impl HeapInt {
     operator_fn!(multiply, Mul, mul);
     operator_fn!(int_divide_truncating, Div, div);
     operator_fn!(remainder, Rem, rem);
+    #[must_use]
     pub fn modulo(self, heap: &mut Heap, rhs: &BigInt) -> Int {
         Int::create_from_bigint(heap, true, self.get().mod_floor(rhs))
     }
 
+    #[must_use]
     pub fn compare_to(self, heap: &Heap, rhs: &BigInt) -> Tag {
         // PERF: Add manual check if the `rhs` is an [InlineInt]?
         Tag::create_ordering(heap, self.get().cmp(rhs))
@@ -60,6 +66,7 @@ impl HeapInt {
     operator_fn!(shift_left, Shl, shl);
     operator_fn!(shift_right, Shr, shr);
 
+    #[must_use]
     pub fn bit_length(self, heap: &mut Heap) -> Int {
         assert!(*self.get() >= 0.into());
         Int::create(heap, true, self.get().bits())
@@ -72,6 +79,7 @@ impl HeapInt {
 
 macro_rules! operator_fn {
     ($name:ident, $trait:ident, $function:ident) => {
+        #[must_use]
         pub fn $name<T>(self, heap: &mut Heap, rhs: T) -> Int
         where
             for<'a> &'a BigInt: $trait<T, Output = BigInt>,

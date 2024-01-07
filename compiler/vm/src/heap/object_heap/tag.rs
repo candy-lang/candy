@@ -18,9 +18,11 @@ use std::{
 pub struct HeapTag(HeapObject);
 
 impl HeapTag {
+    #[must_use]
     pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
+    #[must_use]
     pub fn create(
         heap: &mut Heap,
         is_reference_counted: bool,
@@ -41,17 +43,21 @@ impl HeapTag {
         tag
     }
 
+    #[must_use]
     fn symbol_pointer(self) -> NonNull<InlineObject> {
         self.content_word_pointer(0).cast()
     }
+    #[must_use]
     pub fn symbol(self) -> Text {
         let symbol = unsafe { *self.symbol_pointer().as_ref() };
         symbol.try_into().unwrap()
     }
 
+    #[must_use]
     fn value_pointer(self) -> NonNull<u64> {
         self.content_word_pointer(1)
     }
+    #[must_use]
     pub fn value(self) -> InlineObject {
         let value = unsafe { *self.value_pointer().as_ref() };
         InlineObject::new(NonZeroU64::new(value).unwrap())
