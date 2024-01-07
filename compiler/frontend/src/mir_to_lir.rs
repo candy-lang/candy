@@ -108,8 +108,11 @@ impl CurrentBody {
             .enumerate()
             .map(|(index, id)| (id, lir::Id::from_usize(index)))
             .collect();
-        // The responsible parameter is a HIR ID, which is always constant.
-        // Hence, it never has to be dropped.
+        // The responsible parameter is a HIR ID, which is (almost) always
+        // constant. Hence, it doesn't normally have to be dropped.
+        //
+        // The exception is the responsible parameter passed when starting a VM,
+        // which can be constant or non-constant.
         let ids_to_drop = id_mapping
             .iter()
             .filter(
@@ -259,7 +262,7 @@ impl CurrentBody {
             } => {
                 let function = self.id_for(context, *function);
                 let arguments = self.ids_for(context, arguments);
-                let responsible = self.id_for(context, *responsible);
+                let responsible = self.id_for_without_dup(context, *responsible);
                 self.push(
                     id,
                     lir::Expression::Call {
@@ -350,6 +353,18 @@ impl CurrentBody {
 
         self.push(id, context.constant_for(id).unwrap())
     }
+    /// Resolve a [`mir::ID`] to a [`lir::ID`] without inserting a dup for it.
+    ///
+    /// This is used for the responsible parameter in function calls since it
+    /// will always be const.
+    fn id_for_without_dup(&mut self, context: &LoweringContext, id: mir::Id) -> lir::Id {
+        if let Some(&id) = self.id_mapping.get(&id) {
+            return id;
+        }
+
+        self.push(id, context.constant_for(id).unwrap())
+    }
+
     fn push_constant(
         &mut self,
         context: &mut LoweringContext,
@@ -378,9 +393,23 @@ impl CurrentBody {
     }
 
     fn maybe_dup(&mut self, id: lir::Id) {
-        // Captured IDs aren't dropped at the end of the body since future
-        // invocations can still use them, but therefore we need to dup it.
-        if id.to_usize() >= self.body.captured_count() && !self.ids_to_drop.contains(&id) {
+        // We need to dup all values that we determined we have to drop (via
+        // `self.ids_to_drop`) plus:
+        //
+        // - Captured values: These are only dropped when the function object
+        //   itself is dropped and are hence not part of `self.ids_to_drop`.
+        // - The responsible parameter when it is passed as a normal parameter
+        //   (only happens when calling the `needs` function): Since responsible
+        //   parameters are almost always constant HIR IDs, we don't
+        //   reference-count them for every function call (see
+        //   `self.id_for_without_dup`). However, when starting the VM with a
+        //   non-constant HIR ID, this top-level responsibility could be dropped
+        //   when calling `needs`.
+        let is_captured = id.to_usize() < self.body.captured_count();
+        if !is_captured
+            && id != self.body.responsible_parameter_id()
+            && !self.ids_to_drop.contains(&id)
+        {
             return;
         }
 
