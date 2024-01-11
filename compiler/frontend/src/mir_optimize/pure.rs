@@ -134,10 +134,10 @@ impl PurenessInsights {
             | Expression::List(_)
             | Expression::Struct(_)
             | Expression::HirId(_)
-            | Expression::UseModule { .. } => true, // always panics
+            | Expression::UseModule { .. }
+            | Expression::Panic { .. } => true, // always panics
             Expression::Parameter
             | Expression::Call { .. }
-            | Expression::Panic { .. }
             | Expression::TraceCallStarts { .. }
             | Expression::TraceCallEnds { .. }
             | Expression::TraceExpressionEvaluated { .. }

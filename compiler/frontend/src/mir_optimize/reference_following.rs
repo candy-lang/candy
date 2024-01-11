@@ -35,5 +35,7 @@ pub fn remove_redundant_return_references(body: &mut Body, pureness: &mut Purene
         && referenced == second_last_id {
         let (id, _) = body.expressions.pop().unwrap();
         pureness.on_remove(id);
+        // The expression is a reference, so it can't define any inner IDs we'd
+        // have to inform the [`PurenessInsights`] about.
     }
 }

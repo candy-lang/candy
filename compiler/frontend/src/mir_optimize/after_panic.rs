@@ -7,7 +7,7 @@ pub fn remove_expressions_after_panic(body: &mut Body, pureness: &mut PurenessIn
     let Some(panic_index) = body
         .expressions
         .iter()
-        .position(|(_, expression)| matches!(expression, Expression::Panic { .. }))
+        .position(|(_, expression)| expression.is_panic())
     else {
         return;
     };

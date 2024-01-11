@@ -33,6 +33,8 @@ impl<'a> CurrentExpression<'a> {
         self.body.expressions[self.index].0
     }
 
+    /// When you modify the expression, you need to also update the pureness
+    /// insights.
     pub fn get_mut_carefully(&mut self) -> &mut Expression {
         &mut self.body.expressions[self.index].1
     }

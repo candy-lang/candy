@@ -70,13 +70,11 @@ pub fn eliminate_common_subtrees(body: &mut Body, pureness: &mut PurenessInsight
     for index in 0..body.expressions.len() {
         let id = body.expressions[index].0;
 
-        {
-            body.expressions[index].1.replace_ids(&mut |id| {
-                if let Some(other) = replaced.get(id) {
-                    *id = *other;
-                }
-            });
-        }
+        body.expressions[index].1.replace_ids(&mut |id| {
+            if let Some(other) = replaced.get(id) {
+                *id = *other;
+            }
+        });
 
         let normalized_hash = {
             let expression = &mut body.expressions[index].1;
