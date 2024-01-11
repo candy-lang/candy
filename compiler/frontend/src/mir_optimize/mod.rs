@@ -69,6 +69,7 @@ mod inlining;
 mod module_folding;
 mod pure;
 mod reference_following;
+mod tail_calls;
 mod tree_shaking;
 mod utils;
 mod validate;
@@ -185,6 +186,7 @@ impl Context<'_> {
         }
         tree_shaking::tree_shake(body, self.pureness);
         reference_following::remove_redundant_return_references(body, self.pureness);
+        tail_calls::simplify_tail_call_tracing(body, self.pureness);
     }
 
     fn optimize_expression(&mut self, expression: &mut CurrentExpression) {
