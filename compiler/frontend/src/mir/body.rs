@@ -71,12 +71,13 @@ impl Body {
         self.expressions.append(&mut expressions);
         self.expressions.append(&mut old_expressions);
     }
-    pub fn remove_all<F>(&mut self, mut predicate: F)
+    pub fn remove_all<F>(&mut self, mut predicate: F) -> Vec<(Id, Expression)>
     where
         F: FnMut(Id, &Expression) -> bool,
     {
         self.expressions
-            .retain(|(id, expression)| !predicate(*id, expression));
+            .extract_if(|(id, expression)| predicate(*id, expression))
+            .collect()
     }
     pub fn sort_by<F>(&mut self, predicate: F)
     where

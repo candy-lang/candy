@@ -18,7 +18,7 @@
 //! [constant lifting]: super::constant_lifting
 //! [module folding]: super::module_folding
 
-use super::pure::PurenessInsights;
+use super::{current_expression::CurrentExpression, pure::PurenessInsights};
 use crate::{
     builtin_functions::BuiltinFunction,
     hir,
@@ -36,7 +36,7 @@ use std::{
     mem,
 };
 
-pub fn eliminate_common_subtrees(body: &mut Body, pureness: &PurenessInsights) {
+pub fn eliminate_common_subtrees(body: &mut Body, pureness: &mut PurenessInsights) {
     // Previously, this was a more intuitive `FxHashMap<Id, Expression>`.
     // However, we had to clone _every_ expression for this, which was quite
     // slow.
@@ -56,24 +56,30 @@ pub fn eliminate_common_subtrees(body: &mut Body, pureness: &PurenessInsights) {
     // The matches are stored as an index into [body] so that we can read the
     // potentially matching normalized expression and also have mutable access
     // to the current expression within the main loop.
-    let mut pure_expressions: FxHashMap<u64, Vec<usize>> = FxHashMap::default();
+    let mut deterministic_expressions: FxHashMap<u64, Vec<usize>> = FxHashMap::default();
 
     let mut inner_function_ids: FxHashMap<Id, Vec<Id>> = FxHashMap::default();
     let mut additional_function_hirs: FxHashMap<Id, FxHashSet<hir::Id>> = FxHashMap::default();
-    let mut updated_references: FxHashMap<Id, Id> = FxHashMap::default();
+
+    // When two expressions are the same, the second one gets replaced by a
+    // reference to the first one. In order for common subtree elimination to
+    // work on expressions after that, which reference the second expression,
+    // we basically need to do reference following as well.
+    let mut replaced: FxHashMap<Id, Id> = FxHashMap::default();
 
     for index in 0..body.expressions.len() {
         let id = body.expressions[index].0;
 
+        body.expressions[index].1.replace_ids(&mut |id| {
+            if let Some(other) = replaced.get(id) {
+                *id = *other;
+            }
+        });
+
         let normalized_hash = {
             let expression = &mut body.expressions[index].1;
-            expression.replace_id_references(&mut |id| {
-                if let Some(update) = updated_references.get(id) {
-                    *id = *update;
-                }
-            });
 
-            if !pureness.is_definition_pure(expression) {
+            if !pureness.is_definition_deterministic(expression) {
                 continue;
             }
 
@@ -87,7 +93,7 @@ pub fn eliminate_common_subtrees(body: &mut Body, pureness: &PurenessInsights) {
             expression.do_hash_normalized()
         };
 
-        let existing_entries = pure_expressions.entry(normalized_hash);
+        let existing_entries = deterministic_expressions.entry(normalized_hash);
         match existing_entries {
             Entry::Occupied(mut potential_matches) => {
                 let expression = &body.expressions[index].1;
@@ -102,11 +108,10 @@ pub fn eliminate_common_subtrees(body: &mut Body, pureness: &PurenessInsights) {
 
                 let (canonical_id, _) = body.expressions[*canonical_index];
 
-                let old_expression = mem::replace(
-                    &mut body.expressions[index].1,
-                    Expression::Reference(canonical_id),
-                );
-                updated_references.insert(id, canonical_id);
+                let mut current_expression = CurrentExpression::new(body, index);
+                let old_expression =
+                    current_expression.replace_with(Expression::Reference(canonical_id), pureness);
+                replaced.insert(id, canonical_id);
 
                 if let Expression::Function {
                     body,

@@ -40,7 +40,7 @@ use crate::mir::Expression;
 use itertools::Itertools;
 
 pub fn lift_constants(context: &mut Context, expression: &mut CurrentExpression) {
-    let Expression::Function { body, .. } = &mut **expression else {
+    let Expression::Function { body, .. } = expression.get_mut_carefully() else {
         return;
     };
 
