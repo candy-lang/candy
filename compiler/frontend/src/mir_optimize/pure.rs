@@ -73,6 +73,7 @@ impl PurenessInsights {
             Expression::UseModule { .. }
             | Expression::TraceCallStarts { .. }
             | Expression::TraceCallEnds { .. }
+            | Expression::TraceTailCall { .. }
             | Expression::TraceExpressionEvaluated { .. }
             | Expression::TraceFoundFuzzableFunction { .. } => false,
         }
@@ -140,6 +141,7 @@ impl PurenessInsights {
             | Expression::Panic { .. }
             | Expression::TraceCallStarts { .. }
             | Expression::TraceCallEnds { .. }
+            | Expression::TraceTailCall { .. }
             | Expression::TraceExpressionEvaluated { .. }
             | Expression::TraceFoundFuzzableFunction { .. }
             | Expression::Reference(_) => false,
