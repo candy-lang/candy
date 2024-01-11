@@ -117,7 +117,7 @@ jobs:
       - name: Store files larger than 100 MB in LFS
         run: |
           large_files=$(find . -type f -size +100M -not -path "./.git/*")
-          if [ ! -z "$large_files" ]; then
+          if [ -n "$large_files" ]; then
             while IFS= read -r path; do
               echo "${path/ /[[:space:]]} filter=lfs diff=lfs merge=lfs -text" >> .gitattributes
             done <<< "$large_files"
