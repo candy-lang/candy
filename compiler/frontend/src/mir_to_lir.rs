@@ -23,7 +23,7 @@ pub type LirResult = Result<(Arc<Lir>, Arc<FxHashSet<CompilerError>>), ModuleErr
 
 fn lir(db: &dyn MirToLir, target: ExecutionTarget, tracing: TracingConfig) -> LirResult {
     let module = target.module().clone();
-    let (mir, _, errors) = db.optimized_mir(target, tracing)?;
+    let (mir, errors) = db.optimized_mir(target, tracing)?;
 
     let mut context = LoweringContext::default();
     context.compile_function(

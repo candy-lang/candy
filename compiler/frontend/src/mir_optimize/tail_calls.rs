@@ -1,54 +1,77 @@
-use super::pure::PurenessInsights;
-use crate::mir::{Body, Expression};
+use crate::mir::{Body, Expression, Mir};
 use std::mem;
+use tracing::info;
 
-pub fn simplify_tail_call_tracing(body: &mut Body, pureness: &mut PurenessInsights) {
-    let [.., (
+pub fn simplify_tail_call_tracing(mir: &mut Mir) {
+    // Since this runs as a final pass over the MIR after all other
+    // optimizations, we don't have to update any [`PurenessInsights`].
+    visit_body(&mut mir.body);
+}
+
+fn visit_body(body: &mut Body) {
+    for (_, expression) in &mut body.expressions {
+        if let Expression::Function { body, .. } = expression {
+            visit_body(body);
+            simplify_body(body);
+        }
+    }
+}
+fn simplify_body(body: &mut Body) {
+    let [.., (call_id, Expression::Call { .. }), (
         _,
-        Expression::TraceCallStarts {
-            hir_call: start_hir_call,
-            function: start_function,
-            arguments: start_arguments,
-            responsible: start_responsible,
+        Expression::TraceCallEnds {
+            return_value: end_return_value,
         },
-    ), (
-        _,
-        Expression::Call {
-            function: call_function,
-            arguments: call_arguments,
-            responsible: call_responsible,
-        },
-    ), (end_id, Expression::TraceCallEnds { return_value: _ })] = &mut body.expressions[..]
+    ), (_, Expression::Reference(reference_target))] = &mut body.expressions[..]
     else {
         return;
     };
-    assert_eq!(start_function, call_function);
-    assert_eq!(start_arguments, call_arguments);
-    assert_eq!(start_responsible, call_responsible);
 
-    let hir_call = *start_hir_call;
-    let function = *start_function;
-    let responsible = *start_responsible;
-    // We're going to replace the trace call starts expression, so we can steal
-    // and reuse its argument vec.
-    let arguments = mem::take(start_arguments);
-    let end_id = *end_id;
+    if call_id != end_return_value || end_return_value != reference_target {
+        // There's a call at the end of the function, but we return something
+        // else. This does not form a tail call.
+        return;
+    }
 
-    // Replace trace call starts with trace tail call
-    let trace_call_starts_index = body.expressions.len() - 3;
-    body.expressions[trace_call_starts_index].1 = Expression::TraceTailCall {
+    // Remove the trace call ends and reference
+    body.expressions.truncate(body.expressions.len() - 2);
+
+    // Find the matching trace call starts
+    let mut nesting = 0;
+    let mut trace_call_starts = None;
+    for (index, (_, expression)) in body.expressions.iter_mut().enumerate().rev().skip(1) {
+        match expression {
+            Expression::TraceCallStarts {
+                hir_call,
+                function,
+                arguments,
+                responsible,
+            } => {
+                if nesting > 0 {
+                    nesting -= 1;
+                    continue;
+                }
+
+                trace_call_starts = Some((
+                    index,
+                    *hir_call,
+                    *function,
+                    mem::take(arguments),
+                    *responsible,
+                ));
+                break;
+            }
+            Expression::TraceCallEnds { .. } => nesting += 1,
+            _ => {}
+        }
+    }
+    let (index, hir_call, function, arguments, responsible) = trace_call_starts.unwrap();
+
+    body.expressions[index].1 = Expression::TraceTailCall {
         hir_call,
         function,
         arguments,
         responsible,
     };
-    // We don't have to inform the [`PurenessInsights`] because
-    // [`Expression::TraceTailCall`] and [`Expression::TraceCallStarts`] have
-    // the same properties.
-
-    // Remove trace call ends
-    body.expressions.pop().unwrap();
-    pureness.on_remove(end_id);
-    // The trace call ends expression doesn't define any inner IDs we'd have to
-    // inform the [`PurenessInsights`] about.
+    info!("Simplifying tail call tracing");
 }

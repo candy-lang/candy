@@ -100,7 +100,7 @@ pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
         }
     };
 
-    match context.db.optimized_mir(
+    match context.db.optimized_mir_without_tail_calls(
         ExecutionTarget::Module(module_to_import.clone()),
         context.tracing.for_child_module(),
     ) {
