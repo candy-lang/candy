@@ -192,7 +192,7 @@ impl DebugSession {
                 let byte_code = compile_byte_code(
                     &self.db,
                     ExecutionTarget::MainFunction(module.clone()),
-                    tracing.clone(),
+                    tracing,
                 )
                 .0;
 

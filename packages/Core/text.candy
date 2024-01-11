@@ -1,6 +1,6 @@
 builtins = use "Builtins"
 bool = use "..bool"
-[ifElse] = use "..controlFlow"
+[ifElse, recursive] = use "..controlFlow"
 [equals] = use "..equality"
 function = use "..function"
 int = use "..int"
@@ -126,24 +126,24 @@ trim text :=
   needs (is text)
   text | trimStart | trimEnd
 
-findFirstIndexWhere text predicate :=
+firstIndexWhere text predicate :=
   needs (is text)
   needs (function.is1 predicate)
-  text | characters | list.findFirstIndexWhere predicate
-findFirstIndexOf text character :=
+  text | characters | list.firstIndexWhere predicate
+firstIndexOf text character :=
   needs (is text)
   needs (is character)
   needs (character | length | equals 1)
-  text | characters | list.findFirstIndexOf character
-findLastIndexWhere text predicate :=
+  text | characters | list.firstIndexOf character
+lastIndexWhere text predicate :=
   needs (is text)
   needs (function.is1 predicate)
-  text | characters | list.findLastIndexWhere predicate
-findLastIndexOf text character :=
+  text | characters | list.lastIndexWhere predicate
+lastIndexOf text character :=
   needs (is text)
   needs (is character)
   needs (character | length | equals 1)
-  text | characters | list.findLastIndexOf character
+  text | characters | list.lastIndexOf character
 
 isAsciiDigit character :=
   needs (is character)
@@ -151,6 +151,35 @@ isAsciiDigit character :=
   character %
     "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" -> True
     _ -> False
+
+repeat text times :=
+  needs (is text)
+  needs (int.is times)
+  needs (times | int.isGreaterThanOrEqualTo 1)
+  recursive (text, times) { recurse (repeatedText, times) ->
+    ifElse (times | equals 1) { repeatedText } {
+      (repeatedText | concatenate text, times | int.subtract 1) | recurse
+    }
+  }
+
+padStart text len character :=
+  needs (is text)
+  needs (int.is len)
+  needs (is character)
+  needs (character | length | equals 1)
+  textLength = text | length
+  ifElse (textLength | int.isGreaterThanOrEqualTo len) { text } {
+    (character | repeat (len | int.subtract textLength)) | concatenate text
+  }
+padEnd text len character :=
+  needs (is text)
+  needs (int.is len)
+  needs (is character)
+  needs (character | length | equals 1)
+  textLength = text | length
+  ifElse (textLength | int.isGreaterThanOrEqualTo len) { text } {
+    text | concatenate (character | repeat (len | int.subtract textLength))
+  }
 
 #test =
 #  [checkEquals] = use "..check"

@@ -86,12 +86,7 @@ pub fn setup() -> Database {
     db.module_provider.add_str(&MODULE, r#"_ = use "Core""#);
 
     // Load `Core` into the cache.
-    let errors = compile_byte_code(
-        &db,
-        ExecutionTarget::Module(MODULE.clone()),
-        TRACING.clone(),
-    )
-    .1;
+    let errors = compile_byte_code(&db, ExecutionTarget::Module(MODULE.clone()), TRACING).1;
     if !errors.is_empty() {
         for error in errors.iter() {
             warn!("{}", error.to_string_with_location(&db));
@@ -104,12 +99,7 @@ pub fn setup() -> Database {
 
 pub fn compile(db: &mut Database, source_code: &str) -> ByteCode {
     db.did_open_module(&MODULE, source_code.as_bytes().to_owned());
-    compile_byte_code(
-        db,
-        ExecutionTarget::MainFunction(MODULE.clone()),
-        TRACING.clone(),
-    )
-    .0
+    compile_byte_code(db, ExecutionTarget::MainFunction(MODULE.clone()), TRACING).0
 }
 
 pub fn run(byte_code: impl Borrow<ByteCode>) -> (Heap, InlineObject) {

@@ -5,10 +5,9 @@ pub use self::{
     },
     object_heap::{HeapData, HeapObject, HeapObjectTrait},
     object_inline::{
-        int::I64BitLength, InlineData, InlineObject, InlineObjectSliceCloneToHeap,
-        InlineObjectTrait, ToDebugText,
+        int::I64BitLength, pointer::InlinePointer, InlineData, InlineObject,
+        InlineObjectSliceCloneToHeap, InlineObjectTrait, ToDebugText,
     },
-    pointer::Pointer,
 };
 use crate::handle_id::HandleId;
 use candy_frontend::id::IdGenerator;
@@ -24,7 +23,6 @@ use std::{
 mod object;
 mod object_heap;
 mod object_inline;
-mod pointer;
 
 pub struct Heap {
     objects: FxHashSet<ObjectInHeap>,
@@ -250,6 +248,7 @@ pub struct DefaultSymbols {
     pub stdin: Text,
     pub stdout: Text,
     pub struct_: Text,
+    pub system_clock: Text,
     pub tag: Text,
     pub text: Text,
     pub true_: Text,
@@ -280,6 +279,7 @@ impl DefaultSymbols {
             stdin: Text::create(heap, false, "Stdin"),
             stdout: Text::create(heap, false, "Stdout"),
             struct_: Text::create(heap, false, "Struct"),
+            system_clock: Text::create(heap, false, "SystemClock"),
             tag: Text::create(heap, false, "Tag"),
             text: Text::create(heap, false, "Text"),
             true_: Text::create(heap, false, "True"),
@@ -323,6 +323,7 @@ impl DefaultSymbols {
             stdin: clone_to_heap(heap, address_map, self.stdin),
             stdout: clone_to_heap(heap, address_map, self.stdout),
             struct_: clone_to_heap(heap, address_map, self.struct_),
+            system_clock: clone_to_heap(heap, address_map, self.system_clock),
             tag: clone_to_heap(heap, address_map, self.tag),
             text: clone_to_heap(heap, address_map, self.text),
             true_: clone_to_heap(heap, address_map, self.true_),
@@ -338,7 +339,7 @@ impl DefaultSymbols {
             .map(|it| symbols[it])
     }
     #[must_use]
-    pub const fn all_symbols(&self) -> [Text; 26] {
+    pub const fn all_symbols(&self) -> [Text; 27] {
         [
             self.arguments,
             self.builtin,
@@ -363,6 +364,7 @@ impl DefaultSymbols {
             self.stdin,
             self.stdout,
             self.struct_,
+            self.system_clock,
             self.tag,
             self.text,
             self.true_,

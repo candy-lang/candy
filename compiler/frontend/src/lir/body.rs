@@ -171,8 +171,12 @@ impl Body {
     }
     #[must_use]
     pub fn expression(&self, id: Id) -> Option<&Expression> {
-        self.expressions
-            .get(id.to_usize() - self.expression_id_offset())
+        let expression_id_offset = self.expression_id_offset();
+        if id.to_usize() < expression_id_offset {
+            return None;
+        }
+
+        self.expressions.get(id.to_usize() - expression_id_offset)
     }
     #[must_use]
     pub fn ids_and_expressions(&self) -> impl DoubleEndedIterator<Item = (Id, &Expression)> {
