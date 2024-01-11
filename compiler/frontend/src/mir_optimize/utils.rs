@@ -2,7 +2,6 @@ use super::pure::PurenessInsights;
 use crate::mir::{Body, Expression, Id, VisibleExpressions};
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
-use std::mem;
 
 impl Expression {
     /// All IDs defined inside this expression. For all expressions except
@@ -390,11 +389,9 @@ impl Expression {
 }
 impl Body {
     pub fn replace_ids(&mut self, replacer: &mut impl FnMut(&mut Id)) {
-        let body = mem::take(self);
-        for (mut id, mut expression) in body {
-            replacer(&mut id);
+        for (id, expression) in &mut self.expressions {
+            replacer(id);
             expression.replace_ids(replacer);
-            self.push(id, expression);
         }
     }
 }
