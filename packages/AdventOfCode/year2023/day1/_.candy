@@ -1,14 +1,16 @@
+# https://adventofcode.com/2023/day/1
+
 [print] = use "Builtins"
 [equals, function, ifElse, int, iterator, list, panic, result, text, toDebugText] = use "Core"
 
-exampleInput := use ".example.txt" | text.fromUtf8 | result.unwrap
+input := use ".input.txt" | text.fromUtf8 | result.unwrap
 
 textSplitIf t predicate :=
   needs (text.is t)
   needs (function.is1 predicate)
   iterator.generateWithState [RemainingText: t, YieldedAfterLastMatch: False] {
     [remainingText, yieldedAfterLastMatch] ->
-    remainingText | text.findFirstIndexWhere predicate %
+    remainingText | text.firstIndexWhere predicate %
       FoundAt index ->
         More [
           Item: remainingText | text.getRange 0 index,
@@ -43,11 +45,10 @@ findCalibrationValue line :=
       NotFound -> panic "Could not find digit"
   }
 
-  firstDigit = line | text.characters | list.findFirstWhere text.isAsciiDigit | parseDigit
-  lastDigit = line | text.characters | list.findLastWhere text.isAsciiDigit | parseDigit
+  firstDigit = line | text.characters | list.firstWhere text.isAsciiDigit | parseDigit
+  lastDigit = line | text.characters | list.lastWhere text.isAsciiDigit | parseDigit
   firstDigit | int.multiply 10 | int.add lastDigit
 
 main := { environment ->
-  print
-    exampleInput | textLines | iterator.map findCalibrationValue | iterator.toList | toDebugText
+  print (input | textLines | iterator.map findCalibrationValue | iterator.sum | toDebugText)
 }
