@@ -126,6 +126,7 @@ jobs:
           cwd: golden-irs/
           add: .
           remove: .gitattributes
+          default_author: user_info
           message: Generate golden IRs
           push: --force origin ${{ env.HEAD_SHA }}_
 
