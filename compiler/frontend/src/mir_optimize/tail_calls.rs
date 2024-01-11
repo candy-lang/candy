@@ -1,6 +1,5 @@
 use crate::mir::{Body, Expression, Mir};
 use std::mem;
-use tracing::info;
 
 pub fn simplify_tail_call_tracing(mir: &mut Mir) {
     // Since this runs as a final pass over the MIR after all other
@@ -73,5 +72,4 @@ fn simplify_body(body: &mut Body) {
         arguments,
         responsible,
     };
-    info!("Simplifying tail call tracing");
 }
