@@ -20,9 +20,11 @@ pub struct InlineTag(InlineObject);
 impl InlineTag {
     const SYMBOL_POINTER_MASK: u64 = !0b111;
 
+    #[must_use]
     pub const fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
     }
+    #[must_use]
     pub fn new(symbol: Text) -> Self {
         let symbol_pointer = symbol.address().addr().get() as u64;
         debug_assert_eq!(
@@ -35,6 +37,7 @@ impl InlineTag {
         Self(InlineObject::new(header_word))
     }
 
+    #[must_use]
     pub fn get(self) -> Text {
         let pointer = self.raw_word().get() & Self::SYMBOL_POINTER_MASK;
         let pointer = unsafe { NonNull::new_unchecked(pointer as *mut u64) };

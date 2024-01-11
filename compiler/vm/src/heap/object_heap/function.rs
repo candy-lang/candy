@@ -22,9 +22,11 @@ impl HeapFunction {
     const CAPTURED_LEN_SHIFT: usize = 32;
     const ARGUMENT_COUNT_SHIFT: usize = 4;
 
+    #[must_use]
     pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
+    #[must_use]
     pub fn create(
         heap: &mut Heap,
         is_reference_counted: bool,
@@ -67,23 +69,29 @@ impl HeapFunction {
         function
     }
 
+    #[must_use]
     pub fn captured_len(self) -> usize {
         (self.header_word() >> Self::CAPTURED_LEN_SHIFT) as usize
     }
+    #[must_use]
     fn captured_pointer(self) -> NonNull<InlineObject> {
         self.content_word_pointer(1).cast()
     }
+    #[must_use]
     pub fn captured<'a>(self) -> &'a [InlineObject] {
         unsafe { slice::from_raw_parts(self.captured_pointer().as_ptr(), self.captured_len()) }
     }
 
+    #[must_use]
     pub fn argument_count(self) -> usize {
         ((self.header_word() & 0xFFFF_FFFF) >> Self::ARGUMENT_COUNT_SHIFT) as usize
     }
 
+    #[must_use]
     fn body_pointer(self) -> NonNull<u64> {
         self.content_word_pointer(0)
     }
+    #[must_use]
     pub fn body(self) -> InstructionPointer {
         #[allow(clippy::cast_possible_truncation)]
         unsafe { *self.body_pointer().as_ref() as usize }.into()

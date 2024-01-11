@@ -139,6 +139,7 @@ struct Context<'a> {
 }
 
 impl Context<'_> {
+    #[must_use]
     fn start_non_top_level(&mut self) -> NonTopLevelResetState {
         NonTopLevelResetState(mem::replace(&mut self.is_top_level, false))
     }
