@@ -137,11 +137,32 @@ fn run_builtin(
             let [condition, then, else_] = arguments else {
                 unreachable!()
             };
-            let condition = visible.get(*condition).try_into().ok()?;
-            Expression::Call {
-                function: if condition { *then } else { *else_ },
-                arguments: vec![],
-                responsible,
+            if let Ok(condition) = visible.get(*condition).try_into() {
+                // if true foo bar -> foo
+                // if false foo bar -> bar
+                Expression::Call {
+                    function: if condition { *then } else { *else_ },
+                    arguments: vec![],
+                    responsible,
+                }
+            } else {
+                // if foo { True } { False } -> foo
+                match (visible.get(*then), visible.get(*else_)) {
+                    (
+                        Expression::Function { body: a, .. },
+                        Expression::Function { body: b, .. },
+                    ) => match (&a.expressions[..], &b.expressions[..]) {
+                        ([(_, a)], [(_, b)]) => {
+                            if a.try_into().ok()? && !b.try_into().ok()? {
+                                Expression::Reference(*condition)
+                            } else {
+                                return None;
+                            }
+                        }
+                        _ => return None,
+                    },
+                    _ => return None,
+                }
             }
         }
         BuiltinFunction::IntAdd => {
