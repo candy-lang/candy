@@ -31,6 +31,7 @@ impl PurenessInsights {
             }
             Expression::TraceCallStarts { .. }
             | Expression::TraceCallEnds { .. }
+            | Expression::TraceTailCall { .. }
             | Expression::TraceExpressionEvaluated { .. }
             | Expression::TraceFoundFuzzableFunction { .. } => false,
         }

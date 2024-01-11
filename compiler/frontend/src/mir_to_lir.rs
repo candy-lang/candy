@@ -317,6 +317,23 @@ impl CurrentBody {
                 let return_value = self.id_for(context, *return_value);
                 self.push_without_value(lir::Expression::TraceCallEnds { return_value });
             }
+            mir::Expression::TraceTailCall {
+                hir_call,
+                function,
+                arguments,
+                responsible,
+            } => {
+                let hir_call = self.id_for(context, *hir_call);
+                let function = self.id_for(context, *function);
+                let arguments = self.ids_for(context, arguments);
+                let responsible = self.id_for(context, *responsible);
+                self.push_without_value(lir::Expression::TraceTailCall {
+                    hir_call,
+                    function,
+                    arguments,
+                    responsible,
+                });
+            }
             mir::Expression::TraceExpressionEvaluated {
                 hir_expression,
                 value,

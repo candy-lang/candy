@@ -764,8 +764,9 @@ impl<'ctx> CodeGen<'ctx> {
                     // Early return to avoid building a return instruction.
                     return None;
                 }
-                Expression::TraceCallStarts { .. } => unimplemented!(),
-                Expression::TraceCallEnds { .. } => unimplemented!(),
+                Expression::TraceCallStarts { .. }
+                | Expression::TraceCallEnds { .. }
+                | Expression::TraceTailCall { .. } => unimplemented!(),
                 Expression::TraceExpressionEvaluated { .. } => {
                     unimplemented!()
                 }

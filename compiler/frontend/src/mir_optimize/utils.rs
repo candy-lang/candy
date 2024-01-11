@@ -106,6 +106,12 @@ impl Expression {
                 function,
                 arguments,
                 responsible,
+            }
+            | Self::TraceTailCall {
+                hir_call,
+                function,
+                arguments,
+                responsible,
             } => {
                 referenced.insert(*hir_call);
                 referenced.insert(*function);
@@ -313,6 +319,12 @@ impl Expression {
                 replacer(responsible);
             }
             Self::TraceCallStarts {
+                hir_call,
+                function,
+                arguments,
+                responsible,
+            }
+            | Self::TraceTailCall {
                 hir_call,
                 function,
                 arguments,
