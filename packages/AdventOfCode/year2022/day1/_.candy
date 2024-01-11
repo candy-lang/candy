@@ -1,0 +1,6 @@
+[result, text] = use "Core"
+
+inputSimple := use ".day1simple.txt" | text.fromUtf8 | result.unwrap
+day1 := use ".day1.txt" | text.fromUtf8 | result.unwrap
+
+main := { environment -> input }

@@ -109,12 +109,15 @@ fn compile_top_level(
         identifiers: im::HashMap::new(),
         is_top_level: true,
         use_id: None,
+        builtins_id: None,
     };
 
+    context.generate_use();
     if is_builtins_package {
         context.generate_sparkles();
+    } else {
+        context.generate_builtins();
     }
-    context.generate_use();
     context.compile(ast);
     context.generate_exports_struct();
 
@@ -136,6 +139,7 @@ struct Context<'a> {
     identifiers: im::HashMap<String, hir::Id>,
     is_top_level: bool,
     use_id: Option<hir::Id>,
+    builtins_id: Option<hir::Id>,
 }
 
 impl Context<'_> {
@@ -592,21 +596,12 @@ impl Context<'_> {
         id: Option<ast::Id>,
         struct_access: &StructAccess,
     ) -> hir::Id {
-        // We forward struct accesses to `(use "Builtins").structGet` to reuse
-        // its validation logic. However, this only works outside the Builtins
+        // We forward struct accesses to `builtins.structGet` to reuse its
+        // validation logic. However, this only works outside the Builtins
         // package.
         let struct_get_id = if self.module.package == Package::builtins() {
             self.push(None, Expression::Builtin(BuiltinFunction::StructGet), None)
         } else {
-            let builtins = self.push(None, Expression::Text("Builtins".to_string()), None);
-            let builtins_id = self.push(
-                None,
-                Expression::Call {
-                    function: self.use_id.clone().unwrap(),
-                    arguments: vec![builtins],
-                },
-                None,
-            );
             let struct_get_id =
                 self.push(None, Expression::Builtin(BuiltinFunction::StructGet), None);
             let struct_get = self.push(None, Expression::Symbol("StructGet".to_string()), None);
@@ -614,7 +609,7 @@ impl Context<'_> {
                 None,
                 Expression::Call {
                     function: struct_get_id,
-                    arguments: vec![builtins_id, struct_get],
+                    arguments: vec![self.builtins_id.clone().unwrap(), struct_get],
                 },
                 None,
             )
@@ -839,6 +834,23 @@ impl Context<'_> {
             "use".to_string(),
         );
         self.use_id = Some(use_id);
+    }
+
+    fn generate_builtins(&mut self) {
+        // HirId(~:test.candy:0) = call HirId(~:test.candy:use) "Builtins"
+
+        assert!(self.builtins_id.is_none());
+
+        let builtins_text = self.push(None, Expression::Text("Builtins".to_string()), None);
+        let builtins_id = self.push(
+            None,
+            Expression::Call {
+                function: self.use_id.clone().unwrap(),
+                arguments: vec![builtins_text],
+            },
+            None,
+        );
+        self.builtins_id = Some(builtins_id);
     }
 
     fn generate_exports_struct(&mut self) -> hir::Id {
