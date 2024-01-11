@@ -126,6 +126,7 @@ jobs:
       - run: cat .gitattributes
         working-directory: golden-irs/
       - name: '`git add` all files except .gitattributes'
+        working-directory: golden-irs/
         run: git add --all -- ':!.gitattributes'
       - uses: EndBug/add-and-commit@v9.1.3
         with:
