@@ -22,13 +22,16 @@ impl InlineInt {
     const VALUE_SHIFT: usize = 3;
     pub const VALUE_BITS: usize = InlineObject::BITS as usize - Self::VALUE_SHIFT;
 
+    #[must_use]
     pub const fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
     }
 
+    #[must_use]
     pub const fn fits(value: i64) -> bool {
         (value << Self::VALUE_SHIFT) >> Self::VALUE_SHIFT == value
     }
+    #[must_use]
     pub fn from_unchecked(value: i64) -> Self {
         debug_assert_eq!(
             (value << Self::VALUE_SHIFT) >> Self::VALUE_SHIFT,
@@ -42,9 +45,11 @@ impl InlineInt {
     }
 
     #[allow(clippy::cast_possible_wrap)]
+    #[must_use]
     pub fn get(self) -> i64 {
         self.raw_word().get() as i64 >> Self::VALUE_SHIFT
     }
+    #[must_use]
     pub fn try_get<T: TryFrom<i64>>(self) -> Option<T> {
         self.get().try_into().ok()
     }
@@ -54,6 +59,7 @@ impl InlineInt {
     operator_fn!(multiply, i64::checked_mul, Mul::mul);
     operator_fn!(int_divide_truncating, i64::checked_div, Div::div);
     operator_fn!(remainder, i64::checked_rem, Rem::rem);
+    #[must_use]
     pub fn modulo(self, heap: &mut Heap, rhs: Self) -> Int {
         let lhs = self.get();
         let rhs = rhs.get();
@@ -65,6 +71,7 @@ impl InlineInt {
             })
     }
 
+    #[must_use]
     pub fn compare_to(self, heap: &Heap, rhs: Int) -> Tag {
         let ordering = match rhs {
             Int::Inline(rhs) => self.get().cmp(&rhs.get()),
@@ -79,6 +86,7 @@ impl InlineInt {
         Tag::create_ordering(heap, ordering)
     }
 
+    #[must_use]
     pub fn shift_left(self, heap: &mut Heap, rhs: Self) -> Int {
         let lhs: i64 = self.get();
         #[allow(clippy::map_unwrap_or)]
@@ -110,12 +118,14 @@ impl InlineInt {
                 Int::create_from_bigint(heap, true, BigInt::from(lhs).shl(rhs.get()))
             })
     }
+    #[must_use]
     pub fn shift_right(self, rhs: Self) -> Self {
         // SAFETY: The value can only get closer to zero, so it must be covered by our range as
         // well.
         Self::from_unchecked(self.get() >> rhs.get())
     }
 
+    #[must_use]
     pub fn bit_length(self) -> Self {
         // SAFETY: The `bit_length` can be at most 61 since that's how large an [InlineInt] can get.
         Self::from_unchecked(self.get().bit_length().into())
@@ -128,6 +138,7 @@ impl InlineInt {
 
 macro_rules! operator_fn {
     ($name:ident, $inline_operation:expr, $bigint_operation:expr) => {
+        #[must_use]
         pub fn $name(self, heap: &mut Heap, rhs: Int) -> Int {
             let lhs = self.get();
             match rhs {
@@ -153,6 +164,7 @@ macro_rules! operator_fn {
 }
 macro_rules! operator_fn_closed {
     ($name:ident, $operation:expr) => {
+        #[must_use]
         pub fn $name(self, rhs: Self) -> Self {
             // SAFETY: The new number can't exceed the input number of bits.
             Self::from_unchecked($operation(self.get(), rhs.get()))

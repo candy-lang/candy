@@ -233,10 +233,13 @@ impl PartialOrd for HeapObject {
 #[enum_dispatch]
 pub trait HeapObjectTrait: Copy + Into<HeapObject> {
     // Number of content bytes following the header and reference count words.
+    #[must_use]
     fn content_size(self) -> usize;
+    #[must_use]
     fn total_size(self) -> usize {
         2 * HeapObject::WORD_SIZE + self.content_size()
     }
+    #[must_use]
     fn address_range(self) -> Range<NonZeroUsize> {
         let start = self.into().address().addr();
         start..start.checked_add(self.total_size()).unwrap()

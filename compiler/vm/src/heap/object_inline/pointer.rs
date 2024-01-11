@@ -14,10 +14,12 @@ use std::{
 #[derive(Clone, Copy, Deref)]
 pub struct InlinePointer(InlineObject);
 impl InlinePointer {
+    #[must_use]
     pub const fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
     }
 
+    #[must_use]
     pub fn get(self) -> HeapObject {
         let pointer = unsafe { NonNull::new_unchecked(self.raw_word().get() as *mut u64) };
         HeapObject::new(pointer)

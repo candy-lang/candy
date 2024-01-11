@@ -21,10 +21,12 @@ impl InlineHandle {
     const HANDLE_ID_SHIFT: usize = 32;
     const ARGUMENT_COUNT_SHIFT: usize = 4;
 
+    #[must_use]
     pub const fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
     }
 
+    #[must_use]
     pub fn create(heap: &mut Heap, handle_id: HandleId, argument_count: usize) -> Self {
         heap.notify_handle_created(handle_id);
         let handle_id = handle_id.to_usize();
@@ -48,10 +50,12 @@ impl InlineHandle {
         Self(InlineObject(header_word))
     }
 
+    #[must_use]
     pub fn handle_id(self) -> HandleId {
         HandleId::from_usize((self.raw_word().get() >> Self::HANDLE_ID_SHIFT) as usize)
     }
 
+    #[must_use]
     pub fn argument_count(self) -> usize {
         ((self.raw_word().get() & 0xFFFF_FFFF) >> Self::ARGUMENT_COUNT_SHIFT) as usize
     }
