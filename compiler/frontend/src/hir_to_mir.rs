@@ -12,7 +12,6 @@ use crate::{
     position::PositionConversionDb,
     string_to_rcst::ModuleError,
 };
-use extension_trait::extension_trait;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -584,15 +583,15 @@ impl<'a> LoweringContext<'a> {
     }
 }
 
-impl IsExact for hir::Pattern {
+impl hir::Pattern {
     fn is_exact(&self) -> bool {
         match self {
             Self::NewIdentifier(_) => false,
             Self::Int(_) => true,
             Self::Text(_) => true,
             Self::Tag { symbol: _, value } => value.as_ref().map_or(true, |val| val.is_exact()),
-            Self::List(items) => items.iter().all(IsExact::is_exact),
-            Self::Struct(struct_) => false,
+            Self::List(items) => items.iter().all(Self::is_exact),
+            Self::Struct(_) => false,
             Self::Or(_) => false,
             Self::Error { .. } => true,
         }
@@ -709,7 +708,7 @@ impl PatternLoweringContext {
                         .iter()
                         .map(|(key_pattern, value_pattern)| {
                             |body: &mut BodyBuilder| {
-                                let key = self.compile_key_pattern(body, key_pattern);
+                                let key = self.compile_pattern(body, key_pattern);
                                 let has_key = body.push_call(
                                     builtin_struct_has_key,
                                     vec![expression, key],
@@ -858,39 +857,11 @@ impl PatternLoweringContext {
                     .collect();
                 body.push_list(items)
             }
-            hir::Pattern::Struct(fields) => {
-                let fields = fields
-                    .iter()
-                    .map(|field| {
-                        (
-                            self.compile_pattern(body, &field.0),
-                            self.compile_pattern(body, &field.1),
-                        )
-                    })
-                    .collect();
-                body.push_struct(fields)
+            hir::Pattern::Struct(_) => {
+                panic!("Structs can't be used in this part of a pattern.")
             }
             hir::Pattern::Or(_) => unreachable!(),
             hir::Pattern::Error { errors } => body.compile_errors(self.responsible, errors),
-        }
-    }
-    fn compile_key_pattern(&self, body: &mut BodyBuilder, pattern: &hir::Pattern) -> Id {
-        match pattern {
-            hir::Pattern::NewIdentifier(_) => {
-                panic!("New identifiers can't be used in this part of a pattern.")
-            }
-            hir::Pattern::Int(int) => body.push_int(int.clone()),
-            hir::Pattern::Text(text) => body.push_text(text.clone()),
-            hir::Pattern::Tag { symbol, value } => {
-                let value = value
-                    .as_ref()
-                    .map(|value| self.compile_key_pattern(body, value));
-                body.push_tag(symbol.to_string(), value)
-            }
-            hir::Pattern::List(_) => panic!("Lists can't be used in this part of a pattern."),
-            hir::Pattern::Struct(_) => panic!("Structs can't be used in this part of a pattern."),
-            hir::Pattern::Or(_) => panic!("Or-patterns can't be used in this part of a pattern."),
-            hir::Pattern::Error { errors, .. } => body.compile_errors(self.responsible, errors),
         }
     }
 
