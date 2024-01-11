@@ -73,7 +73,7 @@ impl LoweringContext {
 struct CurrentBody {
     id_mapping: FxHashMap<mir::Id, lir::Id>,
     body: lir::Body,
-    last_constant: Option<mir::Id>,
+    current_constant: Option<mir::Id>,
     ids_to_drop: FxHashSet<lir::Id>,
 }
 impl CurrentBody {
@@ -87,6 +87,7 @@ impl CurrentBody {
     ) -> lir::Body {
         let mut lir_body = Self::new(original_hirs, captured, parameters, responsible_parameter);
         for (id, expression) in body.iter() {
+            lir_body.current_constant = None;
             lir_body.compile_expression(context, id, expression);
         }
         lir_body.finish(&context.constant_mapping)
@@ -111,14 +112,22 @@ impl CurrentBody {
         // Hence, it never has to be dropped.
         let ids_to_drop = id_mapping
             .iter()
-            .filter(|(&k, _)| k != responsible_parameter)
+            .filter(
+                #[allow(clippy::suspicious_operation_groupings)]
+                |(&mir_id, &lir_id)| {
+                    // Captured values should not be dropped in case the function is
+                    // called again. They are dropped when the function object
+                    // itself is dropped.
+                    lir_id.to_usize() >= captured.len() && mir_id != responsible_parameter
+                },
+            )
             .map(|(_, v)| v)
             .copied()
             .collect();
         Self {
             id_mapping,
             body,
-            last_constant: None,
+            current_constant: None,
             ids_to_drop,
         }
     }
@@ -349,7 +358,7 @@ impl CurrentBody {
     ) {
         let constant_id = context.constants.push(constant);
         context.constant_mapping.insert(id, constant_id);
-        self.last_constant = Some(id);
+        self.current_constant = Some(id);
     }
 
     fn push(&mut self, mir_id: mir::Id, expression: impl Into<lir::Expression>) -> lir::Id {
@@ -369,19 +378,20 @@ impl CurrentBody {
     }
 
     fn maybe_dup(&mut self, id: lir::Id) {
-        if !self.ids_to_drop.contains(&id) {
+        // Captured IDs aren't dropped at the end of the body since future
+        // invocations can still use them, but therefore we need to dup it.
+        if id.to_usize() >= self.body.captured_count() && !self.ids_to_drop.contains(&id) {
             return;
         }
 
         self.body.push(lir::Expression::Dup { id, amount: 1 });
     }
     fn finish(mut self, constant_mapping: &FxHashMap<mir::Id, lir::ConstantId>) -> lir::Body {
-        if self.body.expressions().is_empty() {
+        if let Some(current_constant) = self.current_constant {
             // If the top-level MIR contains only constants, its LIR body will
             // still be empty. Hence, we push a reference to the last constant
             // we encountered.
-            let last_constant_id = self.last_constant.unwrap();
-            self.push(last_constant_id, constant_mapping[&last_constant_id]);
+            self.push(current_constant, constant_mapping[&current_constant]);
         }
 
         let last_expression_id = self.body.last_expression_id().unwrap();
