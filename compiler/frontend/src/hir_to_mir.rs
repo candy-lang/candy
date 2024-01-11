@@ -638,59 +638,69 @@ impl PatternLoweringContext {
                 let expected = body.push_text(text.clone());
                 self.compile_exact_value(body, expression, expected)
             }
-            hir::Pattern::Tag { symbol, value } => {
-                self.compile_verify_type_condition(body, expression, "Tag".to_string(), |body| {
-                    let builtin_tag_without_value =
-                        body.push_builtin(BuiltinFunction::TagWithoutValue);
-                    let actual_symbol = body.push_call(
-                        builtin_tag_without_value,
-                        vec![expression],
-                        self.responsible,
-                    );
-                    let expected_symbol = body.push_tag(symbol.clone(), None);
-                    self.compile_equals(body, expected_symbol, actual_symbol, |body| {
+            hir::Pattern::Tag {
+                symbol,
+                value: None,
+            } => {
+                let expected = body.push_tag(symbol.to_string(), None);
+                self.compile_exact_value(body, expression, expected)
+            }
+            hir::Pattern::Tag {
+                symbol,
+                value: Some(value),
+            } => self.compile_verify_type_condition(body, expression, "Tag".to_string(), |body| {
+                let builtin_tag_without_value = body.push_builtin(BuiltinFunction::TagWithoutValue);
+                let actual_symbol = body.push_call(
+                    builtin_tag_without_value,
+                    vec![expression],
+                    self.responsible,
+                );
+                let expected_symbol = body.push_tag(symbol.clone(), None);
+                self.compile_equals(
+                    body,
+                    expected_symbol,
+                    actual_symbol,
+                    |body| {
                         let builtin_tag_has_value = body.push_builtin(BuiltinFunction::TagHasValue);
-                        let actual_has_value = body.push_call(builtin_tag_has_value, vec![expression], self.responsible);
-                        let expected_has_value = body.push_bool(value.is_some());
-                        self.compile_equals(body, expected_has_value, actual_has_value, |body| {
-                            if let Some(value) = value {
-                                let builtin_tag_get_value = body.push_builtin(BuiltinFunction::TagGetValue);
-                                let actual_value = body.push_call(builtin_tag_get_value, vec![expression], self.responsible);
+                        let actual_has_value = body.push_call(
+                            builtin_tag_has_value,
+                            vec![expression],
+                            self.responsible,
+                        );
+                        let expected_has_value = body.push_bool(true);
+                        self.compile_equals(
+                            body,
+                            expected_has_value,
+                            actual_has_value,
+                            |body| {
+                                let builtin_tag_get_value =
+                                    body.push_builtin(BuiltinFunction::TagGetValue);
+                                let actual_value = body.push_call(
+                                    builtin_tag_get_value,
+                                    vec![expression],
+                                    self.responsible,
+                                );
                                 self.compile(body, actual_value, value);
-                            } else {
-                                self.push_match(body, vec![]);
-                            }
-                        }, |body, _, _| {
-                            if value.is_some() {
-                                vec![
-                                    body.push_text("Expected tag to have a value, but it doesn't have any.".to_string()),
-                                ]
-                            } else {
-                                let builtin_tag_get_value = body.push_builtin(BuiltinFunction::TagGetValue);
-                                let actual_value = body.push_call(builtin_tag_get_value, vec![expression], self.responsible);
-                                let builtin_to_debug_text = body.push_builtin(BuiltinFunction::ToDebugText);
-                                let actual_value_text = body.push_call(builtin_to_debug_text, vec![actual_value], self.responsible);
-                                vec![
-                                    body.push_text("Expected tag to not have a value, but it has one: `".to_string()),
-                                    actual_value_text,
-                                    body.push_text("`.".to_string()),
-                                ]
-                            }
-                        });
-
-                    }, |body, expected, actual| {
+                            },
+                            |body, _, _| {
+                                vec![body.push_text(
+                                    "Expected tag to have a value, but it doesn't have any."
+                                        .to_string(),
+                                )]
+                            },
+                        );
+                    },
+                    |body, expected, actual| {
                         vec![
-                            body.push_text(
-                                "Expected ".to_string()
-                            ),
+                            body.push_text("Expected ".to_string()),
                             expected,
                             body.push_text(", got ".to_string()),
                             actual,
                             body.push_text(".".to_string()),
                         ]
-                    });
-                })
-            }
+                    },
+                );
+            }),
             hir::Pattern::List(list) => {
                 // Check that it's a list.
                 self.compile_verify_type_condition(body, expression, "List".to_string(), |body| {
@@ -833,10 +843,16 @@ impl PatternLoweringContext {
                                     let index = captured_identifiers
                                         .iter()
                                         .position(|it| it == identifier_id);
-                                    let Some(index) = index else { return body.push_reference(nothing); };
+                                    let Some(index) = index else {
+                                        return body.push_reference(nothing);
+                                    };
 
                                     let index = body.push_int(1 + index);
-                                    body.push_call(list_get_function, vec![result, index], self.responsible)
+                                    body.push_call(
+                                        list_get_function,
+                                        vec![result, index],
+                                        self.responsible,
+                                    )
                                 })
                                 .collect();
                             self.push_match(body, captured_identifiers);
@@ -849,9 +865,7 @@ impl PatternLoweringContext {
                 }
                 result
             }
-            hir::Pattern::Error { errors } => {
-                body.compile_errors(self.responsible, errors)
-            }
+            hir::Pattern::Error { errors } => body.compile_errors(self.responsible, errors),
         }
     }
 
