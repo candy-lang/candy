@@ -584,7 +584,6 @@ impl<'a> LoweringContext<'a> {
     }
 }
 
-#[extension_trait]
 impl IsExact for hir::Pattern {
     fn is_exact(&self) -> bool {
         match self {
@@ -593,9 +592,7 @@ impl IsExact for hir::Pattern {
             Self::Text(_) => true,
             Self::Tag { symbol: _, value } => value.as_ref().map_or(true, |val| val.is_exact()),
             Self::List(items) => items.iter().all(IsExact::is_exact),
-            Self::Struct(struct_) => struct_
-                .iter()
-                .all(|field| field.0.is_exact() && field.1.is_exact()),
+            Self::Struct(struct_) => false,
             Self::Or(_) => false,
             Self::Error { .. } => true,
         }
@@ -610,7 +607,7 @@ struct PatternLoweringContext {
 }
 impl PatternLoweringContext {
     /// Checks a pattern and returns an expression of type
-    /// `(Match, variable0, …, variableN) | (NoMatch, reasonText)`.
+    /// `Match (variable0, …, variableN) | NoMatch`.
     fn check_pattern(
         body: &mut BodyBuilder,
         hir_id: hir::Id,
@@ -957,7 +954,7 @@ impl BodyBuilder {
         self.push_tag("NoMatch".to_string(), None)
     }
 
-    /// Compiles to code taking a `Match (…)` or `NoMatch` and returning a
+    /// Compiles to code taking a `Match (…,)` or `NoMatch` and returning a
     /// boolean.
     fn push_is_match(&mut self, match_or_no_match: Id, responsible: Id) -> Id {
         let tag_without_value = self.push_builtin(BuiltinFunction::TagWithoutValue);
