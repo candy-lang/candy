@@ -11,6 +11,7 @@ use crate::{
     module::{Module, ModuleKind},
     position::PositionConversionDb,
     string_to_rcst::ModuleError,
+    tracing::CallTracingMode,
 };
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
@@ -463,7 +464,13 @@ impl<'a> LoweringContext<'a> {
                 }
                 let call = body.push_call(self.mapping[function], arguments, responsible);
                 if self.tracing.calls.is_enabled() {
-                    body.push(Expression::TraceCallEnds { return_value: call });
+                    let return_value = match self.tracing.calls {
+                        CallTracingMode::OnlyForPanicTraces => None,
+                        CallTracingMode::Off
+                        | CallTracingMode::OnlyCurrent
+                        | CallTracingMode::All => Some(call),
+                    };
+                    body.push(Expression::TraceCallEnds { return_value });
                     body.push_reference(call)
                 } else {
                     call

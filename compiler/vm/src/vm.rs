@@ -182,7 +182,7 @@ where
     pub fn run(mut self, heap: &mut Heap) -> StateAfterRun<B, T> {
         let Some(current_instruction) = self.inner.state.next_instruction else {
             let return_value = self.inner.state.data_stack.pop().unwrap();
-            self.inner.tracer.call_ended(heap, return_value);
+            self.inner.tracer.call_ended(heap, Some(return_value));
 
             if let Some(environment) = self.inner.environment_for_main_function {
                 // We just ran the whole module which returned the main

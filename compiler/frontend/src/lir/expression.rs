@@ -61,7 +61,7 @@ pub enum Expression {
     },
 
     TraceCallEnds {
-        return_value: Id,
+        return_value: Option<Id>,
     },
 
     TraceExpressionEvaluated {
@@ -142,7 +142,9 @@ impl Expression {
                 *responsible = replacer(*responsible);
             }
             Self::TraceCallEnds { return_value } => {
-                *return_value = replacer(*return_value);
+                if let Some(return_value) = return_value {
+                    *return_value = replacer(*return_value);
+                }
             }
             Self::TraceExpressionEvaluated {
                 hir_expression,
@@ -282,12 +284,16 @@ impl Expression {
                 builder.push(")", None, EnumSet::empty());
             }
             Self::TraceCallEnds { return_value } => {
-                builder.push(
-                    "trace: end of call with return value ",
-                    None,
-                    EnumSet::empty(),
-                );
-                return_value.build_rich_ir_with_constants(builder, constants, body);
+                if let Some(return_value) = return_value {
+                    builder.push(
+                        "trace: end of call with return value ",
+                        None,
+                        EnumSet::empty(),
+                    );
+                    return_value.build_rich_ir_with_constants(builder, constants, body);
+                } else {
+                    builder.push("trace: end of call", None, EnumSet::empty());
+                }
             }
             Self::TraceExpressionEvaluated {
                 hir_expression,

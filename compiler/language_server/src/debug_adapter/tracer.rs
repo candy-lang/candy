@@ -56,7 +56,7 @@ impl Tracer for DebugTracer {
         call.dup(heap);
         self.call_stack.push(StackFrame::new(call));
     }
-    fn call_ended(&mut self, heap: &mut Heap, _return_value: InlineObject) {
+    fn call_ended(&mut self, heap: &mut Heap, _return_value: Option<InlineObject>) {
         self.call_stack.pop().unwrap().drop(heap);
     }
 }

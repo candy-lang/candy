@@ -277,8 +277,11 @@ impl<'c> LoweringContext<'c> {
                 );
             }
             Expression::TraceCallEnds { return_value } => {
-                self.emit_reference_to(*return_value);
-                self.emit(id, Instruction::TraceCallEnds);
+                let has_return_value = return_value.as_ref().map_or(false, |return_value| {
+                    self.emit_reference_to(*return_value);
+                    true
+                });
+                self.emit(id, Instruction::TraceCallEnds { has_return_value });
             }
             Expression::TraceExpressionEvaluated {
                 hir_expression,
