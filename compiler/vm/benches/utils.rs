@@ -15,7 +15,7 @@ use candy_frontend::{
     position::PositionConversionStorage,
     rcst_to_cst::RcstToCstStorage,
     string_to_rcst::StringToRcstStorage,
-    TracingConfig, TracingMode,
+    CallTracingMode, TracingConfig, TracingMode,
 };
 use candy_vm::{
     byte_code::ByteCode,
@@ -31,7 +31,7 @@ use tracing::warn;
 
 const TRACING: TracingConfig = TracingConfig {
     register_fuzzables: TracingMode::Off,
-    calls: TracingMode::All,
+    calls: CallTracingMode::OnlyForPanicTraces,
     evaluated_expressions: TracingMode::Off,
 };
 lazy_static! {

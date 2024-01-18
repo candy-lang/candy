@@ -19,7 +19,7 @@
     clippy::too_many_lines
 )]
 
-pub use self::tracing::{TracingConfig, TracingMode};
+pub use self::tracing::{CallTracingMode, TracingConfig, TracingMode};
 
 pub mod ast;
 pub mod ast_to_hir;
