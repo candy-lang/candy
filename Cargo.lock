@@ -166,6 +166,7 @@ dependencies = [
 name = "candy_frontend"
 version = "0.1.0"
 dependencies = [
+ "bitvec",
  "clap",
  "derive_more",
  "dunce",

@@ -42,18 +42,20 @@
 
 use crate::{
     builtin_functions::BuiltinFunction,
+    id::CountableId,
     mir::{Expression, Id},
-    utils::HashSetExtension,
 };
-use rustc_hash::{FxHashMap, FxHashSet};
+use bitvec::vec::BitVec;
+use rustc_hash::FxHashMap;
+use std::iter;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct PurenessInsights {
-    deterministic_definitions: FxHashSet<Id>,
-    deterministic_functions: FxHashSet<Id>,
-    pure_definitions: FxHashSet<Id>,
-    pure_functions: FxHashSet<Id>,
-    const_definitions: FxHashSet<Id>,
+    deterministic_definitions: IdSet,
+    deterministic_functions: IdSet,
+    pure_definitions: IdSet,
+    pure_functions: IdSet,
+    const_definitions: IdSet,
 }
 impl PurenessInsights {
     pub fn is_definition_deterministic(&self, expression: &Expression) -> bool {
@@ -69,7 +71,7 @@ impl PurenessInsights {
             | Expression::Function { .. }
             | Expression::Parameter
             | Expression::Panic { .. } => true,
-            Expression::Call { function, .. } => self.deterministic_functions.contains(function),
+            Expression::Call { function, .. } => self.deterministic_functions.contains(*function),
             Expression::UseModule { .. }
             | Expression::TraceCallStarts { .. }
             | Expression::TraceCallEnds { .. }
@@ -158,7 +160,7 @@ impl PurenessInsights {
             | Expression::HirId(_)
             | Expression::Function { .. }
             | Expression::Parameter => true,
-            Expression::Call { function, .. } => self.pure_functions.contains(function),
+            Expression::Call { function, .. } => self.pure_functions.contains(*function),
             Expression::UseModule { .. } | Expression::Panic { .. } => false,
             Expression::TraceCallStarts { .. }
             | Expression::TraceCallEnds { .. }
@@ -227,7 +229,7 @@ impl PurenessInsights {
             && expression
                 .captured_ids()
                 .iter()
-                .all(|id| self.const_definitions.contains(id))
+                .all(|id| self.const_definitions.contains(*id))
     }
 
     // Called after all optimizations are done for this `expression`.
@@ -254,20 +256,17 @@ impl PurenessInsights {
         // Then, we can also add asserts here about not visiting them twice.
     }
     pub(super) fn enter_function(&mut self, parameters: &[Id], responsible_parameter: Id) {
-        self.pure_definitions.extend(parameters.iter().copied());
-        let _existing = self.pure_definitions.insert(responsible_parameter);
-        // TODO: Handle lifted constants properly.
-        // assert!(existing.is_none());
-
+        self.pure_definitions.extend(parameters);
+        self.pure_definitions.insert(responsible_parameter);
         // TODO: Handle lifted constants properly.
         // assert!(existing.is_none());
     }
     pub(super) fn on_normalize_ids(&mut self, mapping: &FxHashMap<Id, Id>) {
-        fn update(values: &mut FxHashSet<Id>, mapping: &FxHashMap<Id, Id>) {
+        fn update(values: &mut IdSet, mapping: &FxHashMap<Id, Id>) {
             *values = values
                 .iter()
                 .filter_map(|original_id| {
-                    let new_id = mapping.get(original_id)?;
+                    let new_id = mapping.get(&original_id)?;
                     Some(*new_id)
                 })
                 .collect();
@@ -286,19 +285,19 @@ impl PurenessInsights {
             pure_functions,
             const_definitions,
         } = self;
-        deterministic_definitions.remove(&id);
-        deterministic_functions.remove(&id);
-        pure_definitions.remove(&id);
-        pure_functions.remove(&id);
-        const_definitions.remove(&id);
+        deterministic_definitions.remove(id);
+        deterministic_functions.remove(id);
+        pure_definitions.remove(id);
+        pure_functions.remove(id);
+        const_definitions.remove(id);
     }
     pub(super) fn include(&mut self, other: &Self, mapping: &FxHashMap<Id, Id>) {
-        fn insert(source: &FxHashSet<Id>, mapping: &FxHashMap<Id, Id>, target: &mut FxHashSet<Id>) {
+        fn insert(source: &IdSet, mapping: &FxHashMap<Id, Id>, target: &mut IdSet) {
             for id in source {
                 let replacement = *mapping
-                    .get(id)
+                    .get(&id)
                     .unwrap_or_else(|| panic!("Missing mapping for {id}"));
-                target.force_insert(replacement);
+                target.insert(replacement);
             }
         }
 
@@ -320,5 +319,100 @@ impl PurenessInsights {
             mapping,
             &mut self.const_definitions,
         );
+    }
+}
+
+/// This behaves like a [`HashSet<Id>`], but it's more efficient for our use
+/// case: We store a [`BitVec`] where each index corresponds to an [`Id`]
+/// because our [`Id`]s are numbered sequentially.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct IdSet(BitVec);
+impl IdSet {
+    fn contains(&self, id: Id) -> bool {
+        if id.to_usize() >= self.0.len() {
+            false
+        } else {
+            self.0[id.to_usize()]
+        }
+    }
+
+    pub fn iter(&self) -> IdSetIter {
+        self.into_iter()
+    }
+
+    fn insert(&mut self, id: Id) {
+        let additional_length_to_reserve = (id.to_usize() + 1).saturating_sub(self.0.len());
+        if additional_length_to_reserve > 0 {
+            self.0
+                .extend(iter::repeat(false).take(additional_length_to_reserve));
+        }
+        self.0.set(id.to_usize(), true);
+    }
+    fn remove(&mut self, id: Id) {
+        if id.to_usize() >= self.0.len() {
+            return;
+        }
+        self.0.set(id.to_usize(), false);
+    }
+}
+
+impl<'a> IntoIterator for &'a IdSet {
+    type IntoIter = IdSetIter<'a>;
+    type Item = Id;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        IdSetIter {
+            values: self,
+            index: 0,
+        }
+    }
+}
+pub struct IdSetIter<'a> {
+    values: &'a IdSet,
+    index: usize,
+}
+impl<'a> Iterator for IdSetIter<'a> {
+    type Item = Id;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.values.0.len() {
+            return None;
+        }
+
+        loop {
+            self.index += 1;
+            if self.index >= self.values.0.len() {
+                return None;
+            }
+            if self.values.0[self.index] {
+                return Some(Id::from_usize(self.index));
+            }
+        }
+    }
+}
+
+impl FromIterator<Id> for IdSet {
+    fn from_iter<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = Id>,
+    {
+        let mut result = Self::default();
+        for id in iter {
+            result.insert(id);
+        }
+        result
+    }
+}
+
+impl<'a> Extend<&'a Id> for IdSet {
+    #[inline]
+    fn extend<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = &'a Id>,
+    {
+        for id in iter {
+            self.insert(*id);
+        }
     }
 }
