@@ -174,6 +174,16 @@ joinToText iterator := iterator | wrapSafe { needs False "`joinToText` needs an 
   needs (text.is item)
   result | text.concatenate item
 }
+joinToTextWithSeparator iterator separator :=
+  iterator = iterator | wrapSafe { needs False "`joinToTextWithSeparator` needs an iterator." }
+  needs (text.is separator)
+
+  iterator | reduceLeft { a b ->
+    needs (text.is a)
+    needs (text.is b)
+    a | text.concatenate separator | text.concatenate b
+  }
+  | result.unwrapOr ""
 
 ## Filtering
 
