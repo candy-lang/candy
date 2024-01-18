@@ -349,7 +349,12 @@ impl Gold {
     }
 }
 impl GoldOptions {
-    const TRACING_CONFIG: TracingConfig = TracingConfig::off();
+    const TRACING_CONFIG: TracingConfig = TracingConfig {
+        register_fuzzables: TracingMode::Off,
+        calls: CallTracingMode::OnlyForPanicTraces,
+        evaluated_expressions: TracingMode::Off,
+    };
+
     fn visit_irs(
         &self,
         db: &Database,
