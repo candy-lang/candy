@@ -16,17 +16,13 @@ fn visit_body(body: &mut Body) {
     }
 }
 fn simplify_body(body: &mut Body) {
-    let [.., (call_id, Expression::Call { .. }), (
-        _,
-        Expression::TraceCallEnds {
-            return_value: end_return_value,
-        },
-    ), (_, Expression::Reference(reference_target))] = &mut body.expressions[..]
+    let [.., (call_id, Expression::Call { .. }), (_, Expression::TraceCallEnds { .. }), (_, Expression::Reference(reference_target))] =
+        &mut body.expressions[..]
     else {
         return;
     };
 
-    if call_id != end_return_value || end_return_value != reference_target {
+    if call_id != reference_target {
         // There's a call at the end of the function, but we return something
         // else. This does not form a tail call.
         return;
