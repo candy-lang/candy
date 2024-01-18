@@ -13,7 +13,13 @@ use std::{env::current_dir, path::Path};
 
 #[derive(Debug, Default)]
 pub struct StackTracer {
-    pub call_stack: Vec<Call>,
+    /// The outer [`Vec`] models the normal call stack.
+    ///
+    /// Each inner [`Vec`] contains at least one [`Call`]. Multiple calls
+    /// correspond to tail calls.
+    // PERF: Use something like `Smallvec<[Call; 1]>` to reduce allocations for
+    // non-tail calls
+    pub call_stack: Vec<Vec<Call>>,
 }
 
 // Stack traces are a reduced view of the tracing state that represent the stack
@@ -61,10 +67,29 @@ impl Tracer for StackTracer {
             responsible,
         };
         call.dup(heap);
-        self.call_stack.push(call);
+        self.call_stack.push(vec![call]);
     }
-    fn call_ended(&mut self, heap: &mut Heap, _return_value: InlineObject) {
-        self.call_stack.pop().unwrap().drop(heap);
+    fn call_ended(&mut self, heap: &mut Heap, _return_value: Option<InlineObject>) {
+        for call in self.call_stack.pop().unwrap() {
+            call.drop(heap);
+        }
+    }
+    fn tail_call(
+        &mut self,
+        heap: &mut Heap,
+        call_site: HirId,
+        callee: InlineObject,
+        arguments: Vec<InlineObject>,
+        responsible: HirId,
+    ) {
+        let call = Call {
+            call_site,
+            callee,
+            arguments,
+            responsible,
+        };
+        call.dup(heap);
+        self.call_stack.last_mut().unwrap().push(call);
     }
 }
 
@@ -77,6 +102,7 @@ impl StackTracer {
         let caller_locations_and_calls = self
             .call_stack
             .iter()
+            .flatten()
             .rev()
             .map(|it| Self::format_call(db, packages_path, current_package_path.as_deref(), it))
             .collect_vec();

@@ -25,6 +25,7 @@ use candy_frontend::{
     lir_optimize::OptimizeLir,
     module::Module,
     position::PositionConversionDb,
+    tracing::CallTracingMode,
     {hir::Id, TracingConfig, TracingMode},
 };
 use candy_vm::{
@@ -40,7 +41,7 @@ where
 {
     let tracing = TracingConfig {
         register_fuzzables: TracingMode::OnlyCurrent,
-        calls: TracingMode::Off,
+        calls: CallTracingMode::Off,
         evaluated_expressions: TracingMode::Off,
     };
     let (byte_code, _) = compile_byte_code(db, ExecutionTarget::Module(module), tracing);

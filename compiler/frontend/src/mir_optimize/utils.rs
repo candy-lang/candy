@@ -105,6 +105,12 @@ impl Expression {
                 function,
                 arguments,
                 responsible,
+            }
+            | Self::TraceTailCall {
+                hir_call,
+                function,
+                arguments,
+                responsible,
             } => {
                 referenced.insert(*hir_call);
                 referenced.insert(*function);
@@ -112,7 +118,9 @@ impl Expression {
                 referenced.insert(*responsible);
             }
             Self::TraceCallEnds { return_value } => {
-                referenced.insert(*return_value);
+                if let Some(return_value) = return_value {
+                    referenced.insert(*return_value);
+                }
             }
             Self::TraceExpressionEvaluated {
                 hir_expression,
@@ -316,6 +324,12 @@ impl Expression {
                 function,
                 arguments,
                 responsible,
+            }
+            | Self::TraceTailCall {
+                hir_call,
+                function,
+                arguments,
+                responsible,
             } => {
                 replacer(hir_call);
                 replacer(function);
@@ -325,7 +339,9 @@ impl Expression {
                 replacer(responsible);
             }
             Self::TraceCallEnds { return_value } => {
-                replacer(return_value);
+                if let Some(return_value) = return_value {
+                    replacer(return_value);
+                }
             }
             Self::TraceExpressionEvaluated {
                 hir_expression,

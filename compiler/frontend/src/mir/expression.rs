@@ -82,6 +82,13 @@ pub enum Expression {
         responsible: Id,
     },
 
+    /// Calls are traced like this before optimizations:
+    ///
+    /// ```candy-mir
+    /// traceCallStarts hirCall function arguments responsible
+    /// return_value = call function arguments responsible
+    /// traceCallEnds return_value
+    /// ```
     TraceCallStarts {
         hir_call: Id,
         function: Id,
@@ -89,8 +96,25 @@ pub enum Expression {
         responsible: Id,
     },
 
+    /// With [`CallTracingMode::OnlyForPanicTraces`], we don't need the return
+    /// values.
     TraceCallEnds {
-        return_value: Id,
+        return_value: Option<Id>,
+    },
+
+    /// Tail calls look like this, where `TraceTailCall` expressions are only
+    /// generated during optimizations:
+    ///
+    /// ```candy-mir
+    /// traceTailCall hirCall function arguments responsible
+    /// call function arguments responsible
+    /// # end of the function
+    /// ```
+    TraceTailCall {
+        hir_call: Id,
+        function: Id,
+        arguments: Vec<Id>,
+        responsible: Id,
     },
 
     TraceExpressionEvaluated {
@@ -279,6 +303,12 @@ impl Hash for Expression {
                 function,
                 arguments,
                 responsible,
+            }
+            | Self::TraceTailCall {
+                hir_call,
+                function,
+                arguments,
+                responsible,
             } => {
                 hir_call.hash(state);
                 function.hash(state);
@@ -458,12 +488,32 @@ impl ToRichIr for Expression {
                 builder.push(")", None, EnumSet::empty());
             }
             Self::TraceCallEnds { return_value } => {
-                builder.push(
-                    "trace: end of call with return value ",
-                    None,
-                    EnumSet::empty(),
-                );
-                return_value.build_rich_ir(builder);
+                if let Some(return_value) = return_value {
+                    builder.push(
+                        "trace: end of call with return value ",
+                        None,
+                        EnumSet::empty(),
+                    );
+                    return_value.build_rich_ir(builder);
+                } else {
+                    builder.push("trace: end of call", None, EnumSet::empty());
+                }
+            }
+            Self::TraceTailCall {
+                hir_call,
+                function,
+                arguments,
+                responsible,
+            } => {
+                builder.push("trace: tail call of ", None, EnumSet::empty());
+                function.build_rich_ir(builder);
+                builder.push(" with ", None, EnumSet::empty());
+                builder.push_children(arguments, " ");
+                builder.push(" (", None, EnumSet::empty());
+                responsible.build_rich_ir(builder);
+                builder.push(" is responsible, code is at ", None, EnumSet::empty());
+                hir_call.build_rich_ir(builder);
+                builder.push(")", None, EnumSet::empty());
             }
             Self::TraceExpressionEvaluated {
                 hir_expression,

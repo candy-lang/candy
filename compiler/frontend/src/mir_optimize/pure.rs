@@ -56,6 +56,7 @@ pub struct PurenessInsights {
     const_definitions: FxHashSet<Id>,
 }
 impl PurenessInsights {
+    #[must_use]
     pub fn is_definition_deterministic(&self, expression: &Expression) -> bool {
         match expression {
             Expression::Int(_)
@@ -73,10 +74,12 @@ impl PurenessInsights {
             Expression::UseModule { .. }
             | Expression::TraceCallStarts { .. }
             | Expression::TraceCallEnds { .. }
+            | Expression::TraceTailCall { .. }
             | Expression::TraceExpressionEvaluated { .. }
             | Expression::TraceFoundFuzzableFunction { .. } => false,
         }
     }
+    #[must_use]
     pub fn is_function_deterministic(&self, expression: &Expression) -> bool {
         match expression {
             Expression::Builtin(builtin) => match builtin {
@@ -140,12 +143,18 @@ impl PurenessInsights {
             | Expression::Call { .. }
             | Expression::TraceCallStarts { .. }
             | Expression::TraceCallEnds { .. }
+            | Expression::TraceTailCall { .. }
             | Expression::TraceExpressionEvaluated { .. }
             | Expression::TraceFoundFuzzableFunction { .. }
             | Expression::Reference(_) => false,
         }
     }
 
+    #[must_use]
+    pub const fn pure_definitions(&self) -> &FxHashSet<Id> {
+        &self.pure_definitions
+    }
+    #[must_use]
     pub fn is_definition_pure(&self, expression: &Expression) -> bool {
         match expression {
             Expression::Int(_)
@@ -162,11 +171,13 @@ impl PurenessInsights {
             Expression::UseModule { .. } | Expression::Panic { .. } => false,
             Expression::TraceCallStarts { .. }
             | Expression::TraceCallEnds { .. }
+            | Expression::TraceTailCall { .. }
             | Expression::TraceExpressionEvaluated { .. }
             | Expression::TraceFoundFuzzableFunction { .. } => false,
         }
     }
 
+    #[must_use]
     pub fn is_function_pure(&self, expression: &Expression) -> bool {
         match expression {
             Expression::Builtin(builtin) => match builtin {
@@ -222,6 +233,7 @@ impl PurenessInsights {
             _ => false, // calling anything else will panic
         }
     }
+    #[must_use]
     pub fn is_definition_const(&self, expression: &Expression) -> bool {
         self.is_definition_pure(expression)
             && expression

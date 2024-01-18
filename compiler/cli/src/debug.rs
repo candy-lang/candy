@@ -17,6 +17,7 @@ use candy_frontend::{
     rcst_to_cst::RcstToCst,
     rich_ir::{RichIr, RichIrAnnotation, TokenType},
     string_to_rcst::StringToRcst,
+    tracing::CallTracingMode,
     utils::DoHash,
     TracingConfig, TracingMode,
 };
@@ -109,11 +110,11 @@ pub struct PathAndExecutionTargetAndTracing {
     #[arg(
         long,
         default_value("off"),
-        default_missing_value("only-current"),
+        default_missing_value("only-potentially-panicking"),
         num_args(0..=1),
         require_equals(true)
     )]
-    trace_calls: TracingMode,
+    trace_calls: CallTracingMode,
 
     #[arg(
         long,
@@ -198,7 +199,7 @@ pub fn debug(options: Options) -> ProgramResult {
             let tracing = options.to_tracing_config();
             let mir = db.optimized_mir(execution_target, tracing);
             mir.ok()
-                .map(|(mir, _, _)| RichIr::for_optimized_mir(&module, &mir, tracing))
+                .map(|(mir, _)| RichIr::for_optimized_mir(&module, &mir, tracing))
         }
         Options::Lir(options) => {
             let module = module_for_path(options.path.clone())?;
@@ -413,7 +414,7 @@ impl GoldOptions {
             let mir = RichIr::for_mir(&module, &mir, Self::TRACING_CONFIG);
             visit("MIR", mir.text);
 
-            let (optimized_mir, _, _) = db
+            let (optimized_mir, _) = db
                 .optimized_mir(execution_target.clone(), Self::TRACING_CONFIG)
                 .unwrap();
             let optimized_mir =

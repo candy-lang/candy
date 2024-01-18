@@ -11,6 +11,7 @@ use crate::{
     module::{Module, ModuleKind},
     position::PositionConversionDb,
     string_to_rcst::ModuleError,
+    tracing::CallTracingMode,
 };
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
@@ -345,7 +346,7 @@ impl<'a> LoweringContext<'a> {
                     });
                     result
                 } else {
-                    let pattern_result = PatternLoweringContext::compile_pattern(
+                    let pattern_result = PatternLoweringContext::check_pattern(
                         body,
                         hir_id.clone(),
                         responsible,
@@ -366,14 +367,7 @@ impl<'a> LoweringContext<'a> {
                             body.push_reference(nothing);
                         },
                         |body| {
-                            let list_get_function = body.push_builtin(BuiltinFunction::ListGet);
-                            let one = body.push_int(1);
-                            let reason = body.push_call(
-                                list_get_function,
-                                vec![pattern_result, one],
-                                responsible,
-                            );
-
+                            let reason = body.push_text("The value doesn't match the pattern on the left side of the destructuring.".to_string());
                             body.push_panic(reason, responsible);
                         },
                         responsible,
@@ -387,10 +381,12 @@ impl<'a> LoweringContext<'a> {
                 if is_trivial {
                     body.push_reference(result)
                 } else {
-                    let list_get = body.push_builtin(BuiltinFunction::ListGet);
-                    let index = body.push_int(identifier_id.0 + 1);
                     let responsible = body.push_hir_id(hir_id.clone());
-                    body.push_call(list_get, vec![result, index], responsible)
+                    let tag_get_value = body.push_builtin(BuiltinFunction::TagGetValue);
+                    let captured = body.push_call(tag_get_value, vec![result], responsible);
+                    let list_get = body.push_builtin(BuiltinFunction::ListGet);
+                    let index = body.push_int(identifier_id.0);
+                    body.push_call(list_get, vec![captured, index], responsible)
                 }
             }
             hir::Expression::Match { expression, cases } => {
@@ -451,23 +447,7 @@ impl<'a> LoweringContext<'a> {
                     .iter()
                     .map(|argument| self.mapping[argument])
                     .collect_vec();
-
-                if self.tracing.calls.is_enabled() {
-                    let hir_call = body.push_hir_id(hir_id.clone());
-                    body.push(Expression::TraceCallStarts {
-                        hir_call,
-                        function: self.mapping[function],
-                        arguments: arguments.clone(),
-                        responsible,
-                    });
-                }
-                let call = body.push_call(self.mapping[function], arguments, responsible);
-                if self.tracing.calls.is_enabled() {
-                    body.push(Expression::TraceCallEnds { return_value: call });
-                    body.push_reference(call)
-                } else {
-                    call
-                }
+                self.push_call(body, hir_id, self.mapping[function], arguments, responsible)
             }
             hir::Expression::UseModule {
                 current_module,
@@ -483,7 +463,9 @@ impl<'a> LoweringContext<'a> {
             }),
             hir::Expression::Needs { condition, reason } => {
                 let responsible = body.push_hir_id(hir_id.clone());
-                body.push_call(
+                self.push_call(
+                    body,
+                    hir_id,
                     self.needs_function,
                     vec![
                         self.mapping[condition],
@@ -527,7 +509,6 @@ impl<'a> LoweringContext<'a> {
             cases,
             responsible_for_needs,
             responsible_for_match,
-            vec![],
             0,
         )
     }
@@ -540,7 +521,6 @@ impl<'a> LoweringContext<'a> {
         cases: &[(hir::Pattern, hir::Body)],
         responsible_for_needs: Id,
         responsible_for_match: Id,
-        mut no_match_reasons: Vec<Id>,
         case_index: usize,
     ) -> Id {
         match cases {
@@ -550,7 +530,7 @@ impl<'a> LoweringContext<'a> {
                 body.push_panic(reason, responsible_for_match)
             }
             [(case_pattern, case_body), rest @ ..] => {
-                let pattern_result = PatternLoweringContext::compile_pattern(
+                let pattern_result = PatternLoweringContext::check_pattern(
                     body,
                     hir_id.clone(),
                     responsible_for_match,
@@ -570,15 +550,6 @@ impl<'a> LoweringContext<'a> {
                     self.compile_expressions(body, responsible_for_needs, &case_body.expressions);
                 });
                 let else_function = body.push_function(case_id.child("didNotMatch"), |body, _| {
-                    let list_get_function = body.push_builtin(BuiltinFunction::ListGet);
-                    let one = body.push_int(1);
-                    let reason = body.push_call(
-                        list_get_function,
-                        vec![pattern_result, one],
-                        responsible_for_match,
-                    );
-                    no_match_reasons.push(reason);
-
                     self.compile_match_rec(
                         hir_id,
                         body,
@@ -586,7 +557,6 @@ impl<'a> LoweringContext<'a> {
                         rest,
                         responsible_for_needs,
                         responsible_for_match,
-                        no_match_reasons,
                         case_index + 1,
                     );
                 });
@@ -596,6 +566,53 @@ impl<'a> LoweringContext<'a> {
                     responsible_for_match,
                 )
             }
+        }
+    }
+
+    fn push_call(
+        &self,
+        body: &mut BodyBuilder,
+        hir_id: &hir::Id,
+        function: Id,
+        arguments: Vec<Id>,
+        responsible: Id,
+    ) -> Id {
+        if self.tracing.calls.is_enabled() {
+            let hir_call = body.push_hir_id(hir_id.clone());
+            body.push(Expression::TraceCallStarts {
+                hir_call,
+                function,
+                arguments: arguments.clone(),
+                responsible,
+            });
+        }
+        let call = body.push_call(function, arguments, responsible);
+        if self.tracing.calls.is_enabled() {
+            let return_value = match self.tracing.calls {
+                CallTracingMode::OnlyForPanicTraces => None,
+                CallTracingMode::Off | CallTracingMode::OnlyCurrent | CallTracingMode::All => {
+                    Some(call)
+                }
+            };
+            body.push(Expression::TraceCallEnds { return_value });
+            body.push_reference(call)
+        } else {
+            call
+        }
+    }
+}
+
+impl hir::Pattern {
+    fn is_exact(&self) -> bool {
+        match self {
+            Self::NewIdentifier(_) => false,
+            Self::Int(_) => true,
+            Self::Text(_) => true,
+            Self::Tag { symbol: _, value } => value.as_ref().map_or(true, |val| val.is_exact()),
+            Self::List(items) => items.iter().all(Self::is_exact),
+            Self::Struct(_) => false,
+            Self::Or(_) => false,
+            Self::Error { .. } => true,
         }
     }
 }
@@ -608,8 +625,8 @@ struct PatternLoweringContext {
 }
 impl PatternLoweringContext {
     /// Checks a pattern and returns an expression of type
-    /// `(Match, variable0, …, variableN) | (NoMatch, reasonText)`.
-    fn compile_pattern(
+    /// `Match (variable0, …, variableN) | NoMatch`.
+    fn check_pattern(
         body: &mut BodyBuilder,
         hir_id: hir::Id,
         responsible: Id,
@@ -624,31 +641,28 @@ impl PatternLoweringContext {
             no_match_tag,
             responsible,
         };
-        context.compile(body, expression, pattern)
+        context.check(body, expression, pattern)
     }
 
-    fn compile(&self, body: &mut BodyBuilder, expression: Id, pattern: &hir::Pattern) -> Id {
+    fn check(&self, body: &mut BodyBuilder, expression: Id, pattern: &hir::Pattern) -> Id {
+        if pattern.is_exact() {
+            let exact_value = self.compile_pattern(body, pattern);
+            return self.check_equals_exact_value(body, expression, exact_value);
+        }
         match pattern {
             hir::Pattern::NewIdentifier(_) => self.push_match(body, vec![expression]),
-            hir::Pattern::Int(int) => {
-                let expected = body.push_int(int.clone());
-                self.compile_exact_value(body, expression, expected)
-            }
-            hir::Pattern::Text(text) => {
-                let expected = body.push_text(text.clone());
-                self.compile_exact_value(body, expression, expected)
-            }
+            // The unreachable cases will be caught be the pattern.is_exact()
+            // check above.
+            hir::Pattern::Int(_) => unreachable!(),
+            hir::Pattern::Text(_) => unreachable!(),
             hir::Pattern::Tag {
-                symbol,
+                symbol: _,
                 value: None,
-            } => {
-                let expected = body.push_tag(symbol.to_string(), None);
-                self.compile_exact_value(body, expression, expected)
-            }
+            } => unreachable!(),
             hir::Pattern::Tag {
                 symbol,
                 value: Some(value),
-            } => self.compile_verify_type_condition(body, expression, "Tag".to_string(), |body| {
+            } => self.check_type(body, expression, "Tag".to_string(), |body| {
                 let builtin_tag_without_value = body.push_builtin(BuiltinFunction::TagWithoutValue);
                 let actual_symbol = body.push_call(
                     builtin_tag_without_value,
@@ -656,101 +670,56 @@ impl PatternLoweringContext {
                     self.responsible,
                 );
                 let expected_symbol = body.push_tag(symbol.clone(), None);
-                self.compile_equals(
-                    body,
-                    expected_symbol,
-                    actual_symbol,
-                    |body| {
-                        let builtin_tag_has_value = body.push_builtin(BuiltinFunction::TagHasValue);
-                        let actual_has_value = body.push_call(
-                            builtin_tag_has_value,
+                self.check_equals(body, expected_symbol, actual_symbol, |body| {
+                    let builtin_tag_has_value = body.push_builtin(BuiltinFunction::TagHasValue);
+                    let actual_has_value =
+                        body.push_call(builtin_tag_has_value, vec![expression], self.responsible);
+                    let expected_has_value = body.push_bool(true);
+                    self.check_equals(body, expected_has_value, actual_has_value, |body| {
+                        let builtin_tag_get_value = body.push_builtin(BuiltinFunction::TagGetValue);
+                        let actual_value = body.push_call(
+                            builtin_tag_get_value,
                             vec![expression],
                             self.responsible,
                         );
-                        let expected_has_value = body.push_bool(true);
-                        self.compile_equals(
-                            body,
-                            expected_has_value,
-                            actual_has_value,
-                            |body| {
-                                let builtin_tag_get_value =
-                                    body.push_builtin(BuiltinFunction::TagGetValue);
-                                let actual_value = body.push_call(
-                                    builtin_tag_get_value,
-                                    vec![expression],
-                                    self.responsible,
-                                );
-                                self.compile(body, actual_value, value);
-                            },
-                            |body, _, _| {
-                                vec![body.push_text(
-                                    "Expected tag to have a value, but it doesn't have any."
-                                        .to_string(),
-                                )]
-                            },
-                        );
-                    },
-                    |body, expected, actual| {
-                        vec![
-                            body.push_text("Expected ".to_string()),
-                            expected,
-                            body.push_text(", got ".to_string()),
-                            actual,
-                            body.push_text(".".to_string()),
-                        ]
-                    },
-                );
+                        self.check(body, actual_value, value);
+                    });
+                });
             }),
             hir::Pattern::List(list) => {
                 // Check that it's a list.
-                self.compile_verify_type_condition(body, expression, "List".to_string(), |body| {
+                self.check_type(body, expression, "List".to_string(), |body| {
                     // Check that the length is correct.
                     let expected = body.push_int(list.len());
                     let builtin_list_length = body.push_builtin(BuiltinFunction::ListLength);
                     let actual_length =
                         body.push_call(builtin_list_length, vec![expression], self.responsible);
-                    self.compile_equals(
-                        body,
-                        expected,
-                        actual_length,
-                        |body| {
-                            // Destructure the items.
-                            let builtin_list_get = body.push_builtin(BuiltinFunction::ListGet);
-                            let condition_builders = list
-                                .iter()
-                                .enumerate()
-                                .map(|(index, item_pattern)| {
-                                    move |body: &mut BodyBuilder| {
-                                        let index = body.push_int(index);
-                                        let item = body.push_call(
-                                            builtin_list_get,
-                                            vec![expression, index],
-                                            self.responsible,
-                                        );
-                                        let result = self.compile(body, item, item_pattern);
-                                        (result, item_pattern.captured_identifier_count())
-                                    }
-                                })
-                                .collect_vec();
-                            self.compile_match_conjunction(body, condition_builders);
-                        },
-                        |body, _expected, actual| {
-                            vec![
-                                body.push_text(format!(
-                                    "Expected {} {}, got ",
-                                    list.len(),
-                                    if list.len() == 1 { "item" } else { "items" },
-                                )),
-                                actual,
-                                body.push_text(".".to_string()),
-                            ]
-                        },
-                    );
+                    self.check_equals(body, expected, actual_length, |body| {
+                        // Destructure the items.
+                        let builtin_list_get = body.push_builtin(BuiltinFunction::ListGet);
+                        let condition_builders = list
+                            .iter()
+                            .enumerate()
+                            .map(|(index, item_pattern)| {
+                                move |body: &mut BodyBuilder| {
+                                    let index = body.push_int(index);
+                                    let item = body.push_call(
+                                        builtin_list_get,
+                                        vec![expression, index],
+                                        self.responsible,
+                                    );
+                                    let result = self.check(body, item, item_pattern);
+                                    (result, item_pattern.captured_identifier_count())
+                                }
+                            })
+                            .collect_vec();
+                        self.check_all(body, condition_builders);
+                    });
                 })
             }
             hir::Pattern::Struct(struct_) => {
                 // Check that it's a struct.
-                self.compile_verify_type_condition(body, expression, "Struct".to_string(), |body| {
+                self.check_type(body, expression, "Struct".to_string(), |body| {
                     // Destructure the entries.
                     let builtin_struct_has_key = body.push_builtin(BuiltinFunction::StructHasKey);
                     let builtin_struct_get = body.push_builtin(BuiltinFunction::StructGet);
@@ -758,7 +727,7 @@ impl PatternLoweringContext {
                         .iter()
                         .map(|(key_pattern, value_pattern)| {
                             |body: &mut BodyBuilder| {
-                                let key = self.compile_pattern_to_key_expression(body, key_pattern);
+                                let key = self.compile_pattern(body, key_pattern);
                                 let has_key = body.push_call(
                                     builtin_struct_has_key,
                                     vec![expression, key],
@@ -774,36 +743,10 @@ impl PatternLoweringContext {
                                             vec![expression, key],
                                             self.responsible,
                                         );
-                                        self.compile(body, value, value_pattern);
+                                        self.check(body, value, value_pattern);
                                     },
                                     |body| {
-                                        let to_debug_text =
-                                            body.push_builtin(BuiltinFunction::ToDebugText);
-
-                                        let key_as_text = body.push_call(
-                                            to_debug_text,
-                                            vec![key],
-                                            self.responsible,
-                                        );
-
-                                        let struct_as_text = body.push_call(
-                                            to_debug_text,
-                                            vec![expression],
-                                            self.responsible,
-                                        );
-
-                                        let reason_parts = vec![
-                                            body.push_text(
-                                                "Struct doesn't contain key `".to_string(),
-                                            ),
-                                            key_as_text,
-                                            body.push_text("`: `".to_string()),
-                                            struct_as_text,
-                                            body.push_text("`.".to_string()),
-                                        ];
-                                        let reason_text =
-                                            self.push_text_concatenate(body, reason_parts);
-                                        self.push_no_match(body, reason_text);
+                                        self.push_no_match(body);
                                     },
                                     self.responsible,
                                 );
@@ -811,7 +754,7 @@ impl PatternLoweringContext {
                             }
                         })
                         .collect_vec();
-                    self.compile_match_conjunction(body, condition_builders);
+                    self.check_all(body, condition_builders);
                 })
             }
             hir::Pattern::Or(patterns) => {
@@ -819,7 +762,7 @@ impl PatternLoweringContext {
                     panic!("Or pattern must contain at least two patterns.");
                 };
 
-                let mut result = self.compile(body, expression, first_pattern);
+                let mut result = self.check(body, expression, first_pattern);
 
                 let captured_identifiers_order = first_pattern.captured_identifiers();
                 let list_get_function = body.push_builtin(BuiltinFunction::ListGet);
@@ -858,7 +801,7 @@ impl PatternLoweringContext {
                             self.push_match(body, captured_identifiers);
                         },
                         |body| {
-                            self.compile(body, expression, pattern);
+                            self.check(body, expression, pattern);
                         },
                         self.responsible,
                     );
@@ -869,72 +812,37 @@ impl PatternLoweringContext {
         }
     }
 
-    fn compile_exact_value(
+    fn check_equals_exact_value(
         &self,
         body: &mut BodyBuilder,
         expression: Id,
-        expected_value: Id,
+        exact_value: Id,
     ) -> Id {
-        self.compile_equals(
-            body,
-            expected_value,
-            expression,
-            |body| {
-                self.push_match(body, vec![]);
-            },
-            |body, expected, actual| {
-                vec![
-                    body.push_text("Expected `".to_string()),
-                    expected,
-                    body.push_text("`, got `".to_string()),
-                    actual,
-                    body.push_text("`.".to_string()),
-                ]
-            },
-        )
+        self.check_equals(body, exact_value, expression, |body| {
+            self.push_match(body, vec![]);
+        })
     }
-    fn compile_verify_type_condition<T>(
+
+    fn check_type(
         &self,
         body: &mut BodyBuilder,
         expression: Id,
         expected_type: String,
-        then_builder: T,
-    ) -> Id
-    where
-        T: FnOnce(&mut BodyBuilder),
-    {
+        then_builder: impl FnOnce(&mut BodyBuilder),
+    ) -> Id {
         let expected_type = body.push_tag(expected_type, None);
         let builtin_type_of = body.push_builtin(BuiltinFunction::TypeOf);
         let type_ = body.push_call(builtin_type_of, vec![expression], self.responsible);
-        self.compile_equals(
-            body,
-            expected_type,
-            type_,
-            then_builder,
-            |body, expected, actual| {
-                vec![
-                    body.push_text("Expected a ".to_string()),
-                    expected,
-                    body.push_text(", got `".to_string()),
-                    actual,
-                    body.push_text("`.".to_string()),
-                ]
-            },
-        )
+        self.check_equals(body, expected_type, type_, then_builder)
     }
 
-    fn compile_equals<T, E>(
+    fn check_equals(
         &self,
         body: &mut BodyBuilder,
         expected: Id,
         actual: Id,
-        then_builder: T,
-        reason_factory: E,
-    ) -> Id
-    where
-        T: FnOnce(&mut BodyBuilder),
-        E: FnOnce(&mut BodyBuilder, Id, Id) -> Vec<Id>,
-    {
+        then_builder: impl FnOnce(&mut BodyBuilder),
+    ) -> Id {
         let builtin_equals = body.push_builtin(BuiltinFunction::Equals);
         let equals = body.push_call(builtin_equals, vec![expected, actual], self.responsible);
 
@@ -943,56 +851,52 @@ impl PatternLoweringContext {
             equals,
             then_builder,
             |body| {
-                let to_debug_text = body.push_builtin(BuiltinFunction::ToDebugText);
-                let expected_as_text =
-                    body.push_call(to_debug_text, vec![expected], self.responsible);
-                let actual_as_text = body.push_call(to_debug_text, vec![actual], self.responsible);
-                let reason_parts = reason_factory(body, expected_as_text, actual_as_text);
-                let reason = self.push_text_concatenate(body, reason_parts);
-                self.push_no_match(body, reason);
+                self.push_no_match(body);
             },
             self.responsible,
         )
     }
-    fn compile_pattern_to_key_expression(
-        &self,
-        body: &mut BodyBuilder,
-        pattern: &hir::Pattern,
-    ) -> Id {
+
+    fn compile_pattern(&self, body: &mut BodyBuilder, pattern: &hir::Pattern) -> Id {
+        assert!(pattern.is_exact());
         match pattern {
-            hir::Pattern::NewIdentifier(_) => {
-                panic!("New identifiers can't be used in this part of a pattern.")
-            }
+            hir::Pattern::NewIdentifier(_) => unreachable!(),
             hir::Pattern::Int(int) => body.push_int(int.clone()),
             hir::Pattern::Text(text) => body.push_text(text.clone()),
             hir::Pattern::Tag { symbol, value } => {
                 let value = value
                     .as_ref()
-                    .map(|value| self.compile_pattern_to_key_expression(body, value));
+                    .map(|value| self.compile_pattern(body, value));
                 body.push_tag(symbol.to_string(), value)
             }
-            hir::Pattern::List(_) => panic!("Lists can't be used in this part of a pattern."),
-            hir::Pattern::Struct(_) => panic!("Structs can't be used in this part of a pattern."),
-            hir::Pattern::Or(_) => panic!("Or-patterns can't be used in this part of a pattern."),
-            hir::Pattern::Error { errors, .. } => body.compile_errors(self.responsible, errors),
+            hir::Pattern::List(items) => {
+                let items = items
+                    .iter()
+                    .map(|item| self.compile_pattern(body, item))
+                    .collect();
+                body.push_list(items)
+            }
+            hir::Pattern::Struct(_) => {
+                panic!("Structs can't be used in this part of a pattern.")
+            }
+            hir::Pattern::Or(_) => unreachable!(),
+            hir::Pattern::Error { errors } => body.compile_errors(self.responsible, errors),
         }
     }
 
-    fn compile_match_conjunction<F>(&self, body: &mut BodyBuilder, condition_builders: Vec<F>) -> Id
-    where
-        F: FnMut(&mut BodyBuilder) -> (Id, usize),
-    {
-        self.compile_match_conjunction_rec(body, condition_builders, vec![])
-    }
-    fn compile_match_conjunction_rec<F>(
+    fn check_all(
         &self,
         body: &mut BodyBuilder,
-        mut condition_builders: Vec<F>,
+        condition_builders: Vec<impl FnMut(&mut BodyBuilder) -> (Id, usize)>,
+    ) -> Id {
+        self.check_all_rec(body, condition_builders, vec![])
+    }
+    fn check_all_rec(
+        &self,
+        body: &mut BodyBuilder,
+        mut condition_builders: Vec<impl FnMut(&mut BodyBuilder) -> (Id, usize)>,
         mut captured_identifiers: Vec<Id>,
-    ) -> Id
-    where
-        F: FnMut(&mut BodyBuilder) -> (Id, usize),
-    {
+    ) -> Id {
         if condition_builders.is_empty() {
             return self.push_match(body, captured_identifiers);
         };
@@ -1005,17 +909,16 @@ impl PatternLoweringContext {
             &self.hir_id.child("isMatch"),
             is_match,
             |body| {
-                let list_get_function = body.push_builtin(BuiltinFunction::ListGet);
+                let tag_get_value = body.push_builtin(BuiltinFunction::TagGetValue);
+                let captured = body.push_call(tag_get_value, vec![return_value], self.responsible);
+                let list_get = body.push_builtin(BuiltinFunction::ListGet);
                 for index in 0..captured_identifier_count {
-                    let index = body.push_int(index + 1);
-                    let captured_identifier = body.push_call(
-                        list_get_function,
-                        vec![return_value, index],
-                        self.responsible,
-                    );
+                    let index = body.push_int(index);
+                    let captured_identifier =
+                        body.push_call(list_get, vec![captured, index], self.responsible);
                     captured_identifiers.push(captured_identifier);
                 }
-                self.compile_match_conjunction_rec(body, condition_builders, captured_identifiers);
+                self.check_all_rec(body, condition_builders, captured_identifiers);
             },
             |body| {
                 body.push_reference(return_value);
@@ -1024,29 +927,12 @@ impl PatternLoweringContext {
         )
     }
 
-    fn push_text_concatenate(&self, body: &mut BodyBuilder, parts: Vec<Id>) -> Id {
-        assert!(!parts.is_empty());
-
-        let builtin_text_concatenate = body.push_builtin(BuiltinFunction::TextConcatenate);
-        parts
-            .into_iter()
-            .reduce(|left, right| {
-                body.push_call(
-                    builtin_text_concatenate,
-                    vec![left, right],
-                    self.responsible,
-                )
-            })
-            .unwrap()
+    fn push_match(&self, body: &mut BodyBuilder, captured_identifiers: Vec<Id>) -> Id {
+        let captured = body.push_list(captured_identifiers);
+        body.push_call(self.match_tag, vec![captured], self.responsible)
     }
-
-    fn push_match(&self, body: &mut BodyBuilder, mut captured_identifiers: Vec<Id>) -> Id {
-        captured_identifiers.insert(0, self.match_tag);
-        body.push_list(captured_identifiers)
-    }
-    fn push_no_match(&self, body: &mut BodyBuilder, reason_text: Id) -> Id {
-        let no_match_tag = self.no_match_tag;
-        body.push_list(vec![no_match_tag, reason_text])
+    fn push_no_match(&self, body: &mut BodyBuilder) -> Id {
+        body.push_reference(self.no_match_tag)
     }
 }
 
@@ -1058,22 +944,18 @@ impl BodyBuilder {
         self.push_tag("NoMatch".to_string(), None)
     }
 
-    /// Compiles to code taking a `(Match, …)` or `(NoMatch, …)` and returning a
+    /// Compiles to code taking a `Match (…,)` or `NoMatch` and returning a
     /// boolean.
     fn push_is_match(&mut self, match_or_no_match: Id, responsible: Id) -> Id {
-        let list_get_function = self.push_builtin(BuiltinFunction::ListGet);
-        let zero = self.push_int(0);
-        let match_or_no_match_tag = self.push_call(
-            list_get_function,
-            vec![match_or_no_match, zero],
-            responsible,
-        );
+        let tag_without_value = self.push_builtin(BuiltinFunction::TagWithoutValue);
+        let match_or_no_match_symbol =
+            self.push_call(tag_without_value, vec![match_or_no_match], responsible);
 
         let equals_function = self.push_builtin(BuiltinFunction::Equals);
         let match_tag = self.push_match_tag();
         self.push_call(
             equals_function,
-            vec![match_or_no_match_tag, match_tag],
+            vec![match_or_no_match_symbol, match_tag],
             responsible,
         )
     }
