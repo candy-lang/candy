@@ -20,6 +20,8 @@
   - vscode_extension/**/*
 'P: Core':
   - packages/Core/**/*
+'P: Csv':
+  - packages/Csv/**/*
 'P: Examples':
   - packages/Examples/**/*
 'P: Http':
