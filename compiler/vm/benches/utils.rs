@@ -110,7 +110,7 @@ pub fn run(byte_code: impl Borrow<ByteCode>) -> (Heap, InlineObject) {
     let mut heap = Heap::default();
     let environment = Struct::create(&mut heap, true, &FxHashMap::default());
     let VmFinished { result, .. } =
-        Vm::for_main_function(byte_code, &mut heap, environment, DummyTracer)
+        Vm::for_main_function(byte_code, &mut heap, environment, StackTracer::default())
             .run_forever_without_handles(&mut heap);
     match result {
         Ok(return_value) => (heap, return_value),
