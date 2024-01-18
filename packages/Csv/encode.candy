@@ -1,31 +1,31 @@
-[bool, checkEquals, equals, ifElse, iterable, list, result, text] = use "Core"
+[bool, checkEquals, equals, ifElse, iterator, list, result, text] = use "Core"
 
 encodeField field =
   needs (text.is field)
   ifElse
     field | text.contains '"""' | bool.lazyOr { field | text.contains text.newline }
     {
-      encoded = field | text.characters | iterable.fromList
-      | iterable.map { char -> ifElse (char | equals '"""') { '""""' } { char } }
-      | iterable.joinToText
+      encoded = field | text.characters | iterator.fromList
+      | iterator.map { char -> ifElse (char | equals '"""') { '""""' } { char } }
+      | iterator.joinToText
       '""{{encoded}}""'
     }
     { field }
 
 encodeLine line =
   needs (list.is line)
-  needs (line | iterable.fromList | iterable.all text.is)
-  line | iterable.fromList | iterable.map encodeField | iterable.joinToTextWithSeparator ","
+  needs (line | iterator.fromList | iterator.all text.is)
+  line | iterator.fromList | iterator.map encodeField | iterator.joinToTextWithSeparator ","
 
 encode lines :=
   needs (list.is lines)
-  needs (lines | iterable.fromList | iterable.all list.is)
+  needs (lines | iterator.fromList | iterator.all list.is)
   fieldsPerLine = lines | list.first | result.map list.length | result.unwrapOr 0
-  lines | iterable.fromList | iterable.map { line ->
+  lines | iterator.fromList | iterator.map { line ->
     needs (line | list.length | equals fieldsPerLine)
     "{line | encodeLine}{text.newline}"
   }
-  | iterable.joinToText
+  | iterator.joinToText
 
 test =
   # From https://datatracker.ietf.org/doc/html/rfc4180#section-2
