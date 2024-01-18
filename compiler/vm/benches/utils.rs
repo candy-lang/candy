@@ -29,7 +29,11 @@ use rustc_hash::FxHashMap;
 use std::borrow::Borrow;
 use tracing::warn;
 
-const TRACING: TracingConfig = TracingConfig::off();
+const TRACING: TracingConfig = TracingConfig {
+    register_fuzzables: TracingMode::Off,
+    calls: TracingMode::All,
+    evaluated_expressions: TracingMode::Off,
+};
 lazy_static! {
     static ref PACKAGE: Package = Package::User("/".into());
     static ref MODULE: Module = Module {
