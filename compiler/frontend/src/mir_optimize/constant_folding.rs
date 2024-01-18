@@ -709,6 +709,7 @@ fn run_builtin(
                 Expression::Panic { .. } => return None,
                 Expression::TraceCallStarts { .. }
                 | Expression::TraceCallEnds { .. }
+                | Expression::TraceTailCall { .. }
                 | Expression::TraceExpressionEvaluated { .. }
                 | Expression::TraceFoundFuzzableFunction { .. } => unreachable!(),
             }

@@ -185,6 +185,19 @@ impl MachineState {
                 tracer.call_ended(heap, return_value);
                 InstructionResult::Done
             }
+            Instruction::TraceTailCall { num_args } => {
+                let responsible = self.pop_from_data_stack().try_into().unwrap();
+                let mut args = vec![];
+                for _ in 0..*num_args {
+                    args.push(self.pop_from_data_stack());
+                }
+                let callee = self.pop_from_data_stack();
+                let call_site = self.pop_from_data_stack().try_into().unwrap();
+
+                args.reverse();
+                tracer.tail_call(heap, call_site, callee, args, responsible);
+                InstructionResult::Done
+            }
             Instruction::TraceExpressionEvaluated => {
                 let value = self.pop_from_data_stack();
                 let expression = self.pop_from_data_stack().try_into().unwrap();

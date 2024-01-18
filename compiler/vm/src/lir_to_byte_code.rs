@@ -280,6 +280,25 @@ impl<'c> LoweringContext<'c> {
                 self.emit_reference_to(*return_value);
                 self.emit(id, Instruction::TraceCallEnds);
             }
+            Expression::TraceTailCall {
+                hir_call,
+                function,
+                arguments,
+                responsible,
+            } => {
+                self.emit_reference_to(*hir_call);
+                self.emit_reference_to(*function);
+                for argument in arguments {
+                    self.emit_reference_to(*argument);
+                }
+                self.emit_reference_to(*responsible);
+                self.emit(
+                    id,
+                    Instruction::TraceTailCall {
+                        num_args: arguments.len(),
+                    },
+                );
+            }
             Expression::TraceExpressionEvaluated {
                 hir_expression,
                 value,
