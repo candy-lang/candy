@@ -15,7 +15,7 @@ use candy_frontend::{
     position::PositionConversionStorage,
     rcst_to_cst::RcstToCstStorage,
     string_to_rcst::StringToRcstStorage,
-    TracingConfig,
+    TracingConfig, TracingMode,
 };
 use candy_vm::{
     byte_code::ByteCode,
