@@ -27,7 +27,24 @@ encode lines :=
   }
   | iterator.joinToText
 
-test =
+testEncodeLine =
+  # TODO(JonaWanke): Add tests cases for leading/trailing whitespace when our parser is fixed,
+  # https://github.com/candy-lang/candy/issues/896
+  checkEquals (encodeLine (,)) ""
+  checkEquals (encodeLine ("aaa",)) "aaa"
+  checkEquals (encodeLine ("aaa", "bbb")) "aaa,bbb"
+
+testEncodeLineWithSpecialCharacters =
+  checkEquals (encodeLine ('"aa"a"',)) '""aa""a""'
+  checkEquals (encodeLine ("aa{text.newline}a",)) '""aa{{text.newline}}a""'
+
+testEncode =
+  checkEquals (encode (,)) ""
+  checkEquals (encode (("aaa",),)) "aaa{text.newline}"
+  checkEquals (encode (("aaa", "bbb"),)) "aaa,bbb{text.newline}"
+  checkEquals (encode (("aaa",), ("bbb",))) "aaa{text.newline}bbb{text.newline}"
+
+testRfcExamples =
   # From https://datatracker.ietf.org/doc/html/rfc4180#section-2
   checkEquals (encodeLine ("aaa", "bbb", "ccc")) "aaa,bbb,ccc"
 

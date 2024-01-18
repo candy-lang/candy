@@ -1,14 +1,16 @@
-[bool, checkEquals, ifElse, int, list, recursive, text] = use "Core"
-[parser] = use "Parser"
+[bool, checkEquals, equals, ifElse, int, list, recursive, text] = use "Core"
+[cursor, parser] = use "Parser"
 
 decode csv :=
   needs (text.is csv)
+  # TODO(JonasWanke): Error on lines with different field counts
   recursive [Lines: (,), Fields: (,), FieldStartOffset: 0, P: parser.new csv] {
     recurse [lines, fields, fieldStartOffset, p] ->
     Parser (Cursor [source, Offset: oldOffset]) = p
     p | parser.next %
       Ok [Parser: p, character] ->
-        Parser (Cursor [Offset: newOffset]) = p
+        Parser c = p
+        Cursor [Offset: newOffset] = c
         character %
           "," ->
             recurse [
@@ -22,7 +24,16 @@ decode csv :=
           
           " ->
             fields = fields | list.append (source | text.getRange fieldStartOffset oldOffset)
-            recurse [Lines: lines | list.append fields, Fields: (,), FieldStartOffset: newOffset, p]
+            lines = lines | list.append fields
+            # CSV files can have a trailing newline.
+            ifElse
+              (c | cursor.isAtEnd)
+              {
+                ifElse (oldOffset | equals 0) { Ok (,) } { Ok lines }
+              }
+              {
+                recurse [lines, Fields: (,), FieldStartOffset: newOffset, p]
+              }
           # TODO(JonasWanke): handle quoted field
           _ -> recurse [lines, fields, fieldStartOffset, p]
       Error Empty ->
@@ -35,6 +46,46 @@ decode csv :=
   }
 
 test =
+  checkEquals (decode "") (Ok (,))
+  checkEquals (decode "{text.newline}") (Ok (,))
+
+  checkEquals (decode "aaa") (Ok (("aaa",),))
+  checkEquals (decode "aaa{text.newline}") (Ok (("aaa",),))
+
+  checkEquals (decode " aaa ") (Ok ((" aaa ",),))
+  checkEquals (decode " aaa {text.newline}") (Ok ((" aaa ",),))
+
+  checkEquals (decode "aaa,bbb") (Ok (("aaa", "bbb"),))
+  checkEquals (decode "aaa,bbb{text.newline}") (Ok (("aaa", "bbb"),))
+  checkEquals (decode "aaa,bbb{text.newline}ccc,ddd") (Ok (("aaa", "bbb"), ("ccc", "ddd")))
+  checkEquals
+    decode "aaa,bbb{text.newline}ccc,ddd{text.newline}"
+    Ok (("aaa", "bbb"), ("ccc", "ddd"))
+  # Parser is broken, hence this verbose formatting: https://github.com/candy-lang/candy/issues/896
+  checkEquals
+    decode "
+       aaa , bbb {text.newline} ccc , ddd {text.newline}
+    "
+    Ok (
+      (
+        "
+           aaa 
+        ",
+        "
+           bbb 
+        ",
+      ),
+      (
+        "
+           ccc 
+        ",
+        "
+           ddd 
+        ",
+      ),
+    )
+
+testRfcExamples =
   # From https://datatracker.ietf.org/doc/html/rfc4180#section-2
   checkEquals (decode "aaa,bbb,ccc") (Ok (("aaa", "bbb", "ccc"),))
 
