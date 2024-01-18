@@ -46,19 +46,17 @@ fn simplify_body(body: &mut Body) {
                 arguments,
                 responsible,
             } => {
-                if nesting > 0 {
-                    nesting -= 1;
-                    continue;
+                if nesting == 0 {
+                    trace_call_starts = Some((
+                        index,
+                        *hir_call,
+                        *function,
+                        mem::take(arguments),
+                        *responsible,
+                    ));
+                    break;
                 }
-
-                trace_call_starts = Some((
-                    index,
-                    *hir_call,
-                    *function,
-                    mem::take(arguments),
-                    *responsible,
-                ));
-                break;
+                nesting -= 1;
             }
             Expression::TraceCallEnds { .. } => nesting += 1,
             _ => {}
