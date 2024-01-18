@@ -8,6 +8,7 @@ use crate::{
     position::Offset,
     rcst_to_cst::CstResult,
     string_to_rcst::{ModuleError, RcstResult},
+    tracing::CallTracingMode,
     TracingConfig, TracingMode,
 };
 use derive_more::From;
@@ -310,7 +311,15 @@ impl RichIrBuilder {
             "Include tracing of fuzzable functions?",
             tracing_config.register_fuzzables,
         );
-        push_mode(self, "Include tracing of calls?", tracing_config.calls);
+        self.push_comment_line(format!(
+            "• Include tracing of calls? {}",
+            match tracing_config.calls {
+                CallTracingMode::Off => "No",
+                CallTracingMode::OnlyCurrent => "Only for the current module",
+                CallTracingMode::OnlyForPanicTraces => "Only for panic traces",
+                CallTracingMode::All => "Yes",
+            },
+        ));
         push_mode(
             self,
             "Include tracing of evaluated expressions?",

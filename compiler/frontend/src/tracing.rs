@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct TracingConfig {
     pub register_fuzzables: TracingMode,
-    pub calls: TracingMode,
+    pub calls: CallTracingMode,
     pub evaluated_expressions: TracingMode,
 }
 impl TracingConfig {
@@ -13,7 +13,7 @@ impl TracingConfig {
     pub const fn off() -> Self {
         Self {
             register_fuzzables: TracingMode::Off,
-            calls: TracingMode::Off,
+            calls: CallTracingMode::Off,
             evaluated_expressions: TracingMode::Off,
         }
     }
@@ -62,8 +62,7 @@ impl TracingMode {
     pub const fn is_enabled(&self) -> bool {
         match self {
             Self::Off => false,
-            Self::OnlyCurrent => true,
-            Self::All => true,
+            Self::OnlyCurrent | Self::All => true,
         }
     }
 
@@ -72,6 +71,40 @@ impl TracingMode {
         match self {
             Self::Off => Self::Off,
             Self::OnlyCurrent => Self::Off,
+            Self::All => Self::All,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize, ValueEnum)]
+#[serde(rename_all = "camelCase")]
+pub enum CallTracingMode {
+    Off,
+
+    /// Traces the module that's the root of the compilation and no child
+    /// modules.
+    OnlyCurrent,
+
+    /// Only trace calls that could panick and don't trace return values.
+    OnlyForPanicTraces,
+
+    All,
+}
+impl CallTracingMode {
+    #[must_use]
+    pub const fn is_enabled(&self) -> bool {
+        match self {
+            Self::Off => false,
+            Self::OnlyCurrent | Self::OnlyForPanicTraces | Self::All => true,
+        }
+    }
+
+    #[must_use]
+    pub const fn for_child_module(&self) -> Self {
+        match self {
+            Self::Off => Self::Off,
+            Self::OnlyCurrent => Self::Off,
+            Self::OnlyForPanicTraces => Self::OnlyForPanicTraces,
             Self::All => Self::All,
         }
     }
