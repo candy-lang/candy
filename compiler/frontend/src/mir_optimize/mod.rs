@@ -184,8 +184,8 @@ impl Context<'_> {
                 *expression = self.visible.remove(*id);
             }
         }
-        tree_shaking::tree_shake(body, self.pureness);
         call_tracing::remove_unnecessary_call_tracing(body, self.pureness, self.tracing.calls);
+        tree_shaking::tree_shake(body, self.pureness);
         reference_following::remove_redundant_return_references(body, self.pureness);
     }
 
