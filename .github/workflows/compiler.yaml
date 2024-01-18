@@ -18,10 +18,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dsherret/rust-toolchain-file@v1
-      - uses: Swatinem/rust-cache@v2.7.2
+      - uses: Swatinem/rust-cache@v2.7.3
       - name: Cache LLVM and Clang
         id: cache-llvm
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ./llvm
           key: llvm-15.0
@@ -48,10 +48,10 @@ jobs:
   #   steps:
   #     - uses: actions/checkout@v4
   #     - uses: dsherret/rust-toolchain-file@v1
-  #     - uses: Swatinem/rust-cache@v2.7.2
+  #     - uses: Swatinem/rust-cache@v2.7.3
   #     - name: Cache LLVM and Clang
   #       id: cache-llvm
-  #       uses: actions/cache@v3
+  #       uses: actions/cache@v4
   #       with:
   #         path: ./llvm
   #         key: llvm-15.0
@@ -82,10 +82,10 @@ jobs:
       # toolchain file's path.
       - run: cp candy/rust-toolchain.toml ./
       - uses: dsherret/rust-toolchain-file@v1
-      - uses: Swatinem/rust-cache@v2.7.2
+      - uses: Swatinem/rust-cache@v2.7.3
       - name: Cache LLVM and Clang
         id: cache-llvm
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ./llvm
           key: llvm-15.0
@@ -149,10 +149,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dsherret/rust-toolchain-file@v1
-      - uses: Swatinem/rust-cache@v2.7.2
+      - uses: Swatinem/rust-cache@v2.7.3
       - name: Cache LLVM and Clang
         id: cache-llvm
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ./llvm
           key: llvm-15.0
