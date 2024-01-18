@@ -23,7 +23,7 @@ pub type LirResult = Result<(Arc<Lir>, Arc<FxHashSet<CompilerError>>), ModuleErr
 
 fn lir(db: &dyn MirToLir, target: ExecutionTarget, tracing: TracingConfig) -> LirResult {
     let module = target.module().clone();
-    let (mir, _, errors) = db.optimized_mir(target, tracing)?;
+    let (mir, errors) = db.optimized_mir(target, tracing)?;
 
     let mut context = LoweringContext::default();
     context.compile_function(
@@ -73,7 +73,7 @@ impl LoweringContext {
 struct CurrentBody {
     id_mapping: FxHashMap<mir::Id, lir::Id>,
     body: lir::Body,
-    last_constant: Option<mir::Id>,
+    current_constant: Option<mir::Id>,
     ids_to_drop: FxHashSet<lir::Id>,
 }
 impl CurrentBody {
@@ -87,6 +87,7 @@ impl CurrentBody {
     ) -> lir::Body {
         let mut lir_body = Self::new(original_hirs, captured, parameters, responsible_parameter);
         for (id, expression) in body.iter() {
+            lir_body.current_constant = None;
             lir_body.compile_expression(context, id, expression);
         }
         lir_body.finish(&context.constant_mapping)
@@ -107,18 +108,29 @@ impl CurrentBody {
             .enumerate()
             .map(|(index, id)| (id, lir::Id::from_usize(index)))
             .collect();
-        // The responsible parameter is a HIR ID, which is always constant.
-        // Hence, it never has to be dropped.
+        // The responsible parameter is a HIR ID, which is (almost) always
+        // constant. Hence, it doesn't normally have to be dropped.
+        //
+        // The exception is the responsible parameter passed when starting a VM,
+        // which can be constant or non-constant.
         let ids_to_drop = id_mapping
             .iter()
-            .filter(|(&k, _)| k != responsible_parameter)
+            .filter(
+                #[allow(clippy::suspicious_operation_groupings)]
+                |(&mir_id, &lir_id)| {
+                    // Captured values should not be dropped in case the function is
+                    // called again. They are dropped when the function object
+                    // itself is dropped.
+                    lir_id.to_usize() >= captured.len() && mir_id != responsible_parameter
+                },
+            )
             .map(|(_, v)| v)
             .copied()
             .collect();
         Self {
             id_mapping,
             body,
-            last_constant: None,
+            current_constant: None,
             ids_to_drop,
         }
     }
@@ -250,7 +262,7 @@ impl CurrentBody {
             } => {
                 let function = self.id_for(context, *function);
                 let arguments = self.ids_for(context, arguments);
-                let responsible = self.id_for(context, *responsible);
+                let responsible = self.id_for_without_dup(context, *responsible);
                 self.push(
                     id,
                     lir::Expression::Call {
@@ -305,6 +317,23 @@ impl CurrentBody {
                 let return_value = self.id_for(context, *return_value);
                 self.push_without_value(lir::Expression::TraceCallEnds { return_value });
             }
+            mir::Expression::TraceTailCall {
+                hir_call,
+                function,
+                arguments,
+                responsible,
+            } => {
+                let hir_call = self.id_for(context, *hir_call);
+                let function = self.id_for(context, *function);
+                let arguments = self.ids_for(context, arguments);
+                let responsible = self.id_for(context, *responsible);
+                self.push_without_value(lir::Expression::TraceTailCall {
+                    hir_call,
+                    function,
+                    arguments,
+                    responsible,
+                });
+            }
             mir::Expression::TraceExpressionEvaluated {
                 hir_expression,
                 value,
@@ -341,6 +370,18 @@ impl CurrentBody {
 
         self.push(id, context.constant_for(id).unwrap())
     }
+    /// Resolve a [`mir::ID`] to a [`lir::ID`] without inserting a dup for it.
+    ///
+    /// This is used for the responsible parameter in function calls since it
+    /// will always be const.
+    fn id_for_without_dup(&mut self, context: &LoweringContext, id: mir::Id) -> lir::Id {
+        if let Some(&id) = self.id_mapping.get(&id) {
+            return id;
+        }
+
+        self.push(id, context.constant_for(id).unwrap())
+    }
+
     fn push_constant(
         &mut self,
         context: &mut LoweringContext,
@@ -349,7 +390,7 @@ impl CurrentBody {
     ) {
         let constant_id = context.constants.push(constant);
         context.constant_mapping.insert(id, constant_id);
-        self.last_constant = Some(id);
+        self.current_constant = Some(id);
     }
 
     fn push(&mut self, mir_id: mir::Id, expression: impl Into<lir::Expression>) -> lir::Id {
@@ -369,19 +410,34 @@ impl CurrentBody {
     }
 
     fn maybe_dup(&mut self, id: lir::Id) {
-        if !self.ids_to_drop.contains(&id) {
+        // We need to dup all values that we determined we have to drop (via
+        // `self.ids_to_drop`) plus:
+        //
+        // - Captured values: These are only dropped when the function object
+        //   itself is dropped and are hence not part of `self.ids_to_drop`.
+        // - The responsible parameter when it is passed as a normal parameter
+        //   (only happens when calling the `needs` function): Since responsible
+        //   parameters are almost always constant HIR IDs, we don't
+        //   reference-count them for every function call (see
+        //   `self.id_for_without_dup`). However, when starting the VM with a
+        //   non-constant HIR ID, this top-level responsibility could be dropped
+        //   when calling `needs`.
+        let is_captured = id.to_usize() < self.body.captured_count();
+        if !is_captured
+            && id != self.body.responsible_parameter_id()
+            && !self.ids_to_drop.contains(&id)
+        {
             return;
         }
 
         self.body.push(lir::Expression::Dup { id, amount: 1 });
     }
     fn finish(mut self, constant_mapping: &FxHashMap<mir::Id, lir::ConstantId>) -> lir::Body {
-        if self.body.expressions().is_empty() {
+        if let Some(current_constant) = self.current_constant {
             // If the top-level MIR contains only constants, its LIR body will
             // still be empty. Hence, we push a reference to the last constant
             // we encountered.
-            let last_constant_id = self.last_constant.unwrap();
-            self.push(last_constant_id, constant_mapping[&last_constant_id]);
+            self.push(current_constant, constant_mapping[&current_constant]);
         }
 
         let last_expression_id = self.body.last_expression_id().unwrap();

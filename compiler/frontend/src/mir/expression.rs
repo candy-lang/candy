@@ -82,6 +82,13 @@ pub enum Expression {
         responsible: Id,
     },
 
+    /// Calls are traced like this before optimizations:
+    ///
+    /// ```candy-mir
+    /// traceCallStarts hirCall function arguments responsible
+    /// return_value = call function arguments responsible
+    /// traceCallEnds return_value
+    /// ```
     TraceCallStarts {
         hir_call: Id,
         function: Id,
@@ -91,6 +98,21 @@ pub enum Expression {
 
     TraceCallEnds {
         return_value: Id,
+    },
+
+    /// Tail calls look like this, where `TraceTailCall` expressions are only
+    /// generated during optimizations:
+    ///
+    /// ```candy-mir
+    /// traceTailCall hirCall function arguments responsible
+    /// call function arguments responsible
+    /// # end of the function
+    /// ```
+    TraceTailCall {
+        hir_call: Id,
+        function: Id,
+        arguments: Vec<Id>,
+        responsible: Id,
     },
 
     TraceExpressionEvaluated {
@@ -170,7 +192,11 @@ impl TryInto<bool> for &Expression {
     type Error = ();
 
     fn try_into(self) -> Result<bool, ()> {
-        let Expression::Tag { symbol, .. } = self else {
+        let Expression::Tag {
+            symbol,
+            value: None,
+        } = self
+        else {
             return Err(());
         };
         match symbol.as_str() {
@@ -271,6 +297,12 @@ impl Hash for Expression {
                 responsible.hash(state);
             }
             Self::TraceCallStarts {
+                hir_call,
+                function,
+                arguments,
+                responsible,
+            }
+            | Self::TraceTailCall {
                 hir_call,
                 function,
                 arguments,
@@ -460,6 +492,22 @@ impl ToRichIr for Expression {
                     EnumSet::empty(),
                 );
                 return_value.build_rich_ir(builder);
+            }
+            Self::TraceTailCall {
+                hir_call,
+                function,
+                arguments,
+                responsible,
+            } => {
+                builder.push("trace: tail call of ", None, EnumSet::empty());
+                function.build_rich_ir(builder);
+                builder.push(" with ", None, EnumSet::empty());
+                builder.push_children(arguments, " ");
+                builder.push(" (", None, EnumSet::empty());
+                responsible.build_rich_ir(builder);
+                builder.push(" is responsible, code is at ", None, EnumSet::empty());
+                hir_call.build_rich_ir(builder);
+                builder.push(")", None, EnumSet::empty());
             }
             Self::TraceExpressionEvaluated {
                 hir_expression,

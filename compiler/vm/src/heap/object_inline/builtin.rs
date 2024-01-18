@@ -19,13 +19,16 @@ pub struct InlineBuiltin(InlineObject);
 impl InlineBuiltin {
     const INDEX_SHIFT: usize = 3;
 
+    #[must_use]
     pub const fn new_unchecked(object: InlineObject) -> Self {
         Self(object)
     }
 
+    #[must_use]
     fn index(self) -> usize {
         (self.raw_word().get() >> Self::INDEX_SHIFT) as usize
     }
+    #[must_use]
     pub fn get(self) -> BuiltinFunction {
         builtin_functions::VALUES[self.index()]
     }

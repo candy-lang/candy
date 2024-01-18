@@ -110,43 +110,43 @@ impl IrFeatures {
                 &config.module,
                 db.mir(
                     ExecutionTarget::Module(config.module.clone()),
-                    tracing_config.clone(),
+                    *tracing_config,
                 ),
-                tracing_config,
+                *tracing_config,
             ),
             Ir::OptimizedMir(tracing_config) => Self::rich_ir_for_optimized_mir(
                 &config.module,
                 db.optimized_mir(
                     ExecutionTarget::Module(config.module.clone()),
-                    tracing_config.clone(),
+                    *tracing_config,
                 ),
-                tracing_config,
+                *tracing_config,
             ),
             Ir::Lir(tracing_config) => Self::rich_ir_for_lir(
                 &config.module,
                 &db.lir(
                     ExecutionTarget::Module(config.module.clone()),
-                    tracing_config.clone(),
+                    *tracing_config,
                 ),
-                tracing_config,
+                *tracing_config,
             ),
             Ir::OptimizedLir(tracing_config) => Self::rich_ir_for_optimized_lir(
                 &config.module,
                 db.optimized_lir(
                     ExecutionTarget::Module(config.module.clone()),
-                    tracing_config.clone(),
+                    *tracing_config,
                 ),
-                tracing_config,
+                *tracing_config,
             ),
             Ir::VmByteCode(tracing_config) => Self::rich_ir_for_vm_byte_code(
                 &config.module,
                 &candy_vm::lir_to_byte_code::compile_byte_code(
                     db,
                     ExecutionTarget::Module(config.module.clone()),
-                    tracing_config.clone(),
+                    *tracing_config,
                 )
                 .0,
-                tracing_config,
+                *tracing_config,
             ),
             #[cfg(feature = "inkwell")]
             Ir::LlvmIr => db
@@ -179,7 +179,7 @@ impl IrFeatures {
             Err(error) => Self::build_rich_ir_for_module_error(builder, module, error),
         })
     }
-    fn rich_ir_for_mir(module: &Module, mir: MirResult, tracing_config: &TracingConfig) -> RichIr {
+    fn rich_ir_for_mir(module: &Module, mir: MirResult, tracing_config: TracingConfig) -> RichIr {
         Self::rich_ir_for("MIR", module, tracing_config, |builder| match mir {
             Ok((mir, _)) => mir.build_rich_ir(builder),
             Err(error) => Self::build_rich_ir_for_module_error(builder, module, error),
@@ -188,19 +188,19 @@ impl IrFeatures {
     fn rich_ir_for_optimized_mir(
         module: &Module,
         mir: OptimizedMirResult,
-        tracing_config: &TracingConfig,
+        tracing_config: TracingConfig,
     ) -> RichIr {
         Self::rich_ir_for(
             "Optimized MIR",
             module,
             tracing_config,
             |builder| match mir {
-                Ok((mir, _, _)) => mir.build_rich_ir(builder),
+                Ok((mir, _)) => mir.build_rich_ir(builder),
                 Err(error) => Self::build_rich_ir_for_module_error(builder, module, error),
             },
         )
     }
-    fn rich_ir_for_lir(module: &Module, lir: &LirResult, tracing_config: &TracingConfig) -> RichIr {
+    fn rich_ir_for_lir(module: &Module, lir: &LirResult, tracing_config: TracingConfig) -> RichIr {
         Self::rich_ir_for("LIR", module, tracing_config, |builder| match lir {
             Ok((lir, _)) => lir.build_rich_ir(builder),
             Err(error) => Self::build_rich_ir_for_module_error(builder, module, *error),
@@ -209,7 +209,7 @@ impl IrFeatures {
     fn rich_ir_for_optimized_lir(
         module: &Module,
         lir: LirResult,
-        tracing_config: &TracingConfig,
+        tracing_config: TracingConfig,
     ) -> RichIr {
         Self::rich_ir_for(
             "Optimized LIR",
@@ -224,7 +224,7 @@ impl IrFeatures {
     fn rich_ir_for_vm_byte_code(
         module: &Module,
         byte_code: &candy_vm::byte_code::ByteCode,
-        tracing_config: &TracingConfig,
+        tracing_config: TracingConfig,
     ) -> RichIr {
         Self::rich_ir_for("VM Byte Code", module, tracing_config, |builder| {
             byte_code.build_rich_ir(builder);
@@ -233,7 +233,7 @@ impl IrFeatures {
     fn rich_ir_for(
         ir_name: &str,
         module: &Module,
-        tracing_config: impl Into<Option<&TracingConfig>>,
+        tracing_config: impl Into<Option<TracingConfig>>,
         build_rich_ir: impl FnOnce(&mut RichIrBuilder),
     ) -> RichIr {
         let mut builder = RichIrBuilder::default();
@@ -409,14 +409,14 @@ pub enum Ir {
     LlvmIr,
 }
 impl Ir {
-    const fn tracing_config(&self) -> Option<&TracingConfig> {
+    const fn tracing_config(&self) -> Option<TracingConfig> {
         match self {
             Self::Rcst | Self::Ast | Self::Hir => None,
             Self::Mir(tracing_config)
             | Self::OptimizedMir(tracing_config)
             | Self::Lir(tracing_config)
             | Self::OptimizedLir(tracing_config)
-            | Self::VmByteCode(tracing_config) => Some(tracing_config),
+            | Self::VmByteCode(tracing_config) => Some(*tracing_config),
             #[cfg(feature = "inkwell")]
             Self::LlvmIr => None,
         }
@@ -527,7 +527,6 @@ impl LanguageFeatures for IrFeatures {
                         config
                             .ir
                             .tracing_config()
-                            .cloned()
                             .unwrap_or_else(TracingConfig::off),
                     ),
                 };
@@ -542,7 +541,6 @@ impl LanguageFeatures for IrFeatures {
                         config
                             .ir
                             .tracing_config()
-                            .cloned()
                             .unwrap_or_else(TracingConfig::off),
                     ),
                 };

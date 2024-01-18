@@ -171,9 +171,7 @@ intBitLength value :=
   # intBitLength -3 => 2
   # ```
   needs (value | typeIs Int)
-  needs
-    (value | ✨.intAdd 1 | ✨.intCompareTo 0 | ✨.equals Greater)
-    "Value must be non-negative"
+  needs (value | ✨.intAdd 1 | ✨.intCompareTo 0 | ✨.equals Greater) "Value must be non-negative"
   ✨.intBitLength value
 
 intBitwiseAnd a b :=
@@ -552,7 +550,7 @@ textFromUtf8 bytes :=
   # ```
   needs (bytes | typeIs List)
   ## TODO: Add this when it runs faster.
-  ## needs (bytes | iterable.fromList | iterable.all { byte ->
+  ## needs (bytes | iterator.fromList | iterator.all { byte ->
   ##   bool.lazyAnd (int.is byte) {
   ##     bool.and (byte | int.isNonNegative) (byte | int.isLessThan 256)
   ##   }

@@ -95,7 +95,7 @@ impl ModuleAnalyzer {
                     .update_status(Some(format!("Compiling {}", self.module)))
                     .await;
 
-                let (mir, _, _) = db
+                let (mir, _) = db
                     .optimized_mir(
                         ExecutionTarget::Module(self.module.clone()),
                         TracingConfig {
@@ -351,7 +351,7 @@ impl ModuleAnalyzer {
                             "For `{} {}`, this call panics: {}",
                             fuzzer.function_id.function_name(),
                             input
-                                .arguments
+                                .arguments()
                                 .iter()
                                 .map(|it| it.to_debug_text(Precedence::High, MaxLength::Unlimited))
                                 .join(" "),

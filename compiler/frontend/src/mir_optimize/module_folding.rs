@@ -67,20 +67,22 @@ pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
                     containing_module: current_module.clone(),
                 },
             );
-            expression.replace_with_multiple(panicking_expression(
-                context.id_generator,
-                error.payload.to_string(),
-                responsible,
-            ));
+            expression.replace_with_multiple(
+                panicking_expression(context.id_generator, error.payload.to_string(), responsible),
+                context.pureness,
+            );
             context.errors.insert(error);
             return;
         }
         _ => {
-            expression.replace_with_multiple(panicking_expression(
-                context.id_generator,
-                "`use` expects a text as a path.".to_string(),
-                responsible,
-            ));
+            expression.replace_with_multiple(
+                panicking_expression(
+                    context.id_generator,
+                    "`use` expects a text as a path.".to_string(),
+                    responsible,
+                ),
+                context.pureness,
+            );
             return;
         }
     };
@@ -89,17 +91,16 @@ pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
         Ok(module) => module,
         Err(error) => {
             let error = CompilerError::for_whole_module(current_module.clone(), error);
-            expression.replace_with_multiple(panicking_expression(
-                context.id_generator,
-                error.payload.to_string(),
-                responsible,
-            ));
+            expression.replace_with_multiple(
+                panicking_expression(context.id_generator, error.payload.to_string(), responsible),
+                context.pureness,
+            );
             context.errors.insert(error);
             return;
         }
     };
 
-    match context.db.optimized_mir(
+    match context.db.optimized_mir_without_tail_calls(
         ExecutionTarget::Module(module_to_import.clone()),
         context.tracing.for_child_module(),
     ) {
@@ -126,7 +127,10 @@ pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
                     (mapping[&id], expression)
                 }),
             );
-            **expression = Expression::Reference(mapping[&mir.body.return_value()]);
+            expression.replace_with(
+                Expression::Reference(mapping[&mir.body.return_value()]),
+                context.pureness,
+            );
         }
         Err(error) => {
             context
@@ -141,7 +145,7 @@ pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
 
             let (inner_id_generator, body) = builder.finish();
             *context.id_generator = inner_id_generator;
-            expression.replace_with_multiple(body);
+            expression.replace_with_multiple(body, context.pureness);
         }
     };
 }

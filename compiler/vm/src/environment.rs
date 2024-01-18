@@ -13,6 +13,7 @@ use std::{
     io::{self, BufRead},
     net::SocketAddr,
     str::FromStr,
+    time::SystemTime,
 };
 use tiny_http::{Request, Response, Server};
 use tracing::info;
@@ -61,6 +62,8 @@ pub struct DefaultEnvironment {
     stdin_handle: Handle,
     stdout_handle: Handle,
 
+    system_clock_handle: Handle,
+
     dynamic_handles: FxHashMap<Handle, DynamicHandle>,
 }
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -89,6 +92,7 @@ impl DefaultEnvironment {
         let http_server_handle = Handle::new(heap, 1);
         let stdin_handle = Handle::new(heap, 0);
         let stdout_handle = Handle::new(heap, 1);
+        let system_clock_handle = Handle::new(heap, 0);
         let environment_object = Struct::create_with_symbol_keys(
             heap,
             true,
@@ -101,6 +105,7 @@ impl DefaultEnvironment {
                 (heap.default_symbols().http_server, **http_server_handle),
                 (heap.default_symbols().stdin, **stdin_handle),
                 (heap.default_symbols().stdout, **stdout_handle),
+                (heap.default_symbols().system_clock, **system_clock_handle),
             ],
         );
         let environment = Self {
@@ -109,6 +114,7 @@ impl DefaultEnvironment {
             http_server_states: vec![],
             stdin_handle,
             stdout_handle,
+            system_clock_handle,
             dynamic_handles: FxHashMap::default(),
         };
         (environment_object, environment)
@@ -128,6 +134,8 @@ impl Environment for DefaultEnvironment {
             Self::stdin(heap, &call.arguments)
         } else if call.handle == self.stdout_handle {
             Self::stdout(heap, &call.arguments)
+        } else if call.handle == self.system_clock_handle {
+            Self::system_clock(heap, &call.arguments)
         } else {
             let dynamic_handle = self.dynamic_handles.get(&call.handle).unwrap_or_else(|| {
                 panic!(
@@ -400,6 +408,14 @@ impl DefaultEnvironment {
         }
 
         Tag::create_nothing(heap).into()
+    }
+
+    fn system_clock(heap: &mut Heap, arguments: &[InlineObject]) -> InlineObject {
+        let [] = arguments else { unreachable!() };
+
+        let now = SystemTime::now();
+        let since_unix_epoch = now.duration_since(SystemTime::UNIX_EPOCH).unwrap();
+        Int::create(heap, true, since_unix_epoch.as_nanos()).into()
     }
 
     fn create_dynamic_handle(

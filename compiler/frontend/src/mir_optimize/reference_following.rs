@@ -16,7 +16,10 @@
 //!
 //! [constant folding]: super::constant_folding
 
-use super::current_expression::{Context, CurrentExpression};
+use super::{
+    current_expression::{Context, CurrentExpression},
+    pure::PurenessInsights,
+};
 use crate::mir::{Body, Expression};
 
 pub fn follow_references(context: &mut Context, expression: &mut CurrentExpression) {
@@ -27,9 +30,12 @@ pub fn follow_references(context: &mut Context, expression: &mut CurrentExpressi
     });
 }
 
-pub fn remove_redundant_return_references(body: &mut Body) {
+pub fn remove_redundant_return_references(body: &mut Body, pureness: &mut PurenessInsights) {
     while let [.., (second_last_id, _), (_, Expression::Reference(referenced))] = &body.expressions[..]
         && referenced == second_last_id {
-        body.expressions.pop();
+        let (id, _) = body.expressions.pop().unwrap();
+        pureness.on_remove(id);
+        // The expression is a reference, so it can't define any inner IDs we'd
+        // have to inform the [`PurenessInsights`] about.
     }
 }

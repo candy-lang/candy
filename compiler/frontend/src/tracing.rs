@@ -1,6 +1,7 @@
+use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TracingConfig {
     pub register_fuzzables: TracingMode,
@@ -27,7 +28,7 @@ impl TracingConfig {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize, ValueEnum)]
 #[serde(rename_all = "camelCase")]
 pub enum TracingMode {
     Off,

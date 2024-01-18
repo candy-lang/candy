@@ -1,0 +1,199 @@
+[fixedDecimal, tag, check, equals, bool, ifElse, int, toDebugText, text] = use "Core"
+constants = use "..constants"
+
+## Storage Format: Duration (fixedDecimal of seconds)
+is d := d %
+  Duration seconds -> fixedDecimal.is seconds
+  _ -> False
+
+isNumber n = int.is n | bool.lazyOr {fixedDecimal.is n}
+numberAsFixedDecimal n = 
+  needs (isNumber n)
+  ifElse (fixedDecimal.is n) {n} {fixedDecimal.fromInt n}
+
+zero := Duration fixedDecimal.zero
+
+## TODO: Do this without truncating division if possible
+fromNanoseconds nanoseconds :=
+  needs (isNumber nanoseconds)
+  Duration (numberAsFixedDecimal nanoseconds | fixedDecimal.divideTruncating (fixedDecimal.fromInt constants.nanosecondsPerSecond))
+fromMicroseconds microseconds :=
+  needs (isNumber microseconds)
+  Duration (numberAsFixedDecimal microseconds | fixedDecimal.divideTruncating (fixedDecimal.fromInt constants.microsecondsPerSecond))
+fromMilliseconds milliseconds :=
+  needs (isNumber milliseconds)
+  Duration (numberAsFixedDecimal milliseconds | fixedDecimal.divideTruncating (fixedDecimal.fromInt constants.millisecondsPerSecond))
+fromSeconds seconds :=
+  needs (isNumber seconds)
+  Duration (numberAsFixedDecimal seconds)
+fromMinutes minutes :=
+  needs (isNumber minutes)
+  Duration (numberAsFixedDecimal minutes | fixedDecimal.multiply (fixedDecimal.fromInt constants.secondsPerMinute))
+fromHours hours :=
+  needs (isNumber hours)
+  Duration (numberAsFixedDecimal hours | fixedDecimal.multiply (fixedDecimal.fromInt constants.secondsPerHour))
+fromNormalDays days :=
+  needs (isNumber days)
+  Duration (numberAsFixedDecimal days | fixedDecimal.multiply (fixedDecimal.fromInt constants.secondsPerNormalDay))
+
+## TODO: Do this without truncating division if possible
+totalNanoseconds duration :=
+  needs (is duration)
+  tag.getValue duration | fixedDecimal.multiply (fixedDecimal.fromInt constants.nanosecondsPerSecond)
+totalMicroseconds duration :=
+  needs (is duration)
+  tag.getValue duration | fixedDecimal.multiply (fixedDecimal.fromInt constants.microsecondsPerSecond)
+totalMilliseconds duration :=
+  needs (is duration)
+  tag.getValue duration | fixedDecimal.multiply (fixedDecimal.fromInt constants.millisecondsPerSecond)
+totalSeconds duration :=
+  needs (is duration)
+  tag.getValue duration
+totalMinutes duration :=
+  needs (is duration)
+  tag.getValue duration | fixedDecimal.divideTruncating (fixedDecimal.fromInt constants.secondsPerMinute)
+totalHours duration :=
+  needs (is duration)
+  tag.getValue duration | fixedDecimal.divideTruncating (fixedDecimal.fromInt constants.secondsPerHour)
+totalNormalDays duration :=
+  needs (is duration)
+  tag.getValue duration | fixedDecimal.divideTruncating (fixedDecimal.fromInt constants.secondsPerNormalDay)
+
+add summandA summandB :=
+  needs (is summandA)
+  needs (is summandB)
+  Duration (fixedDecimal.add (tag.getValue summandA) (tag.getValue summandB))
+subtract minuend subtrahend :=
+  needs (is minuend)
+  needs (is subtrahend)
+  Duration (fixedDecimal.subtract (tag.getValue minuend) (tag.getValue subtrahend))
+negate value :=
+  needs (is value)
+  Duration (value | tag.getValue | fixedDecimal.negate)
+multiply factorA factorB :=
+  needs (is factorA)
+  needs (isNumber factorB)
+  Duration (fixedDecimal.multiply (tag.getValue factorA) (numberAsFixedDecimal factorB))
+divideTruncating dividend divisor :=
+  needs (is dividend)
+  needs (isNumber divisor)
+  needs (divisor | numberAsFixedDecimal | equals fixedDecimal.zero | bool.not) "You can't divide by zero."
+  Duration (fixedDecimal.divideTruncating (tag.getValue dividend) (numberAsFixedDecimal divisor))
+  
+subNormalDayComponent duration :=
+  needs (is duration)
+  subtract duration (fromNormalDays (totalNormalDays duration | fixedDecimal.floorToInt))
+subHourComponent duration :=
+  needs (is duration)
+  subtract duration (fromHours (totalHours duration | fixedDecimal.floorToInt))
+subMinuteComponent duration :=
+  needs (is duration)
+  subtract duration (fromMinutes (totalMinutes duration | fixedDecimal.floorToInt))
+subSecondComponent duration :=
+  needs (is duration)
+  subtract duration (fromSeconds (totalSeconds duration | fixedDecimal.floorToInt))
+subMillisecondComponent duration :=
+  needs (is duration)
+  subtract duration (fromMilliseconds (totalMilliseconds duration | fixedDecimal.floorToInt))
+subMicrosecondComponent duration :=
+  needs (is duration)
+  subtract duration (fromMicroseconds (totalMicroseconds duration | fixedDecimal.floorToInt))
+subNanosecondComponent duration :=
+  needs (is duration)
+  subtract duration (fromNanoseconds (totalNanoseconds duration | fixedDecimal.floorToInt))
+  
+normalDays duration :=
+  needs (is duration)
+  duration | totalNormalDays | fixedDecimal.floorToInt
+hours duration :=
+  needs (is duration)
+  duration | subNormalDayComponent | totalHours | fixedDecimal.floorToInt
+minutes duration :=
+  needs (is duration)
+  duration | subHourComponent | totalMinutes | fixedDecimal.floorToInt
+seconds duration :=
+  needs (is duration)
+  duration | subMinuteComponent | totalSeconds | fixedDecimal.floorToInt
+milliseconds duration :=
+  needs (is duration)
+  duration | subSecondComponent | totalHours | fixedDecimal.floorToInt
+microseconds duration :=
+  needs (is duration)
+  duration | subMillisecondComponent | totalMicroseconds | fixedDecimal.floorToInt
+nanoseconds duration :=
+  needs (is duration)
+  duration | subMicrosecondComponent | totalNanoseconds | fixedDecimal.floorToInt
+
+compareTo valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  result = (tag.getValue valueA) | fixedDecimal.compareTo (tag.getValue valueB)
+  check (equals result Equal | bool.implies (equals valueA valueB))
+  result
+isLessThan valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  equals (compareTo valueA valueB) Less
+isGreaterThan valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  equals (compareTo valueA valueB) Greater
+isLessThanOrEqualTo valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  valueA | isGreaterThan valueB | bool.not
+isGreaterThanOrEqualTo valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  valueA | isLessThan valueB | bool.not
+
+isPositive value :=
+  needs (is value)
+  value | tag.getValue | fixedDecimal.isPositive
+isNonPositive value :=
+  needs (is value)
+  value | isPositive | bool.not
+isNegative value :=
+  needs (is value)
+  value | tag.getValue | fixedDecimal.isNegative
+isNonNegative value :=
+  needs (is value)
+  value | isNegative | bool.not
+absolute value :=
+  needs (is value)
+  ifElse (isNegative value) { negate value } { value }
+
+min valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  ifElse (valueA | isLessThanOrEqualTo valueB) { valueA } { valueB }
+max valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  ifElse (valueA | isGreaterThanOrEqualTo valueB) { valueA } { valueB }
+coerceAtLeast value minimum :=
+  needs (is value)
+  needs (is minimum)
+  max value minimum
+coerceAtMost value maximum :=
+  needs (is value)
+  needs (is maximum)
+  min value maximum
+coerceIn value minimum maximum :=
+  needs (is value)
+  needs (is minimum)
+  needs (is maximum)
+  needs (minimum | isLessThanOrEqualTo maximum)
+  value | coerceAtLeast minimum | coerceAtMost maximum
+
+# default format: -D:hh:mm:ss.FFFFFFFFF
+toText duration :=
+  needs (is duration)
+  sign = ifElse (isNegative duration) {"-"} {""}
+  d = duration | normalDays
+  hh = duration | hours | toDebugText | text.padStart 2 "0"
+  mm = duration | minutes | toDebugText | text.padStart 2 "0"
+  ss = duration | seconds | toDebugText | text.padStart 2 "0"
+  f = duration | subSecondComponent | tag.getValue | fixedDecimal.toText
+  f = f | text.getRange 0 (f | text.firstIndexOf ".") | text.padEnd 9 "0"
+  "{sign}{d}:{hh}:{mm}:{ss}.{f}"
