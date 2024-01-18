@@ -12,7 +12,7 @@ is value := type.is value List
 length := builtins.listLength
 isEmpty list :=
   needs (is list)
-  equals (length list) 0
+  equals (list | length) 0
 
 lastIndex list :=
   needs (is list)
@@ -55,7 +55,7 @@ prepend list item :=
   list | insert 0 item
 append list item :=
   needs (is list)
-  list | insert (length list) item
+  list | insert (list | length) item
 
 replace := builtins.listReplace
 update list index updater :=

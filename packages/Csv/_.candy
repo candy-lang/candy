@@ -1,1 +1,2 @@
+[decode] := use ".decode"
 [encode] := use ".encode"
