@@ -70,17 +70,26 @@ mod inlining;
 mod module_folding;
 mod pure;
 mod reference_following;
+mod tail_calls;
 mod tree_shaking;
 mod utils;
 mod validate;
 
 #[salsa::query_group(OptimizeMirStorage)]
 pub trait OptimizeMir: HirToMir {
-    #[salsa::cycle(recover_from_cycle)]
     fn optimized_mir(&self, target: ExecutionTarget, tracing: TracingConfig) -> OptimizedMirResult;
+
+    #[salsa::cycle(recover_from_cycle)]
+    fn optimized_mir_without_tail_calls(
+        &self,
+        target: ExecutionTarget,
+        tracing: TracingConfig,
+    ) -> OptimizedMirWithoutTailCallsResult;
 }
 
-pub type OptimizedMirResult = Result<
+pub type OptimizedMirResult = Result<(Arc<Mir>, Arc<FxHashSet<CompilerError>>), ModuleError>;
+
+pub type OptimizedMirWithoutTailCallsResult = Result<
     (
         Arc<Mir>,
         Arc<PurenessInsights>,
@@ -95,6 +104,20 @@ fn optimized_mir(
     target: ExecutionTarget,
     tracing: TracingConfig,
 ) -> OptimizedMirResult {
+    let (mir, _, errors) = db.optimized_mir_without_tail_calls(target, tracing)?;
+    let mut mir = (*mir).clone();
+
+    tail_calls::simplify_tail_call_tracing(&mut mir);
+
+    Ok((Arc::new(mir), errors))
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn optimized_mir_without_tail_calls(
+    db: &dyn OptimizeMir,
+    target: ExecutionTarget,
+    tracing: TracingConfig,
+) -> OptimizedMirWithoutTailCallsResult {
     let module = target.module();
     debug!("{module}: Compiling.");
     let (mir, errors) = db.mir(target.clone(), tracing)?;
@@ -248,7 +271,7 @@ fn recover_from_cycle(
     cycle: &[String],
     target: &ExecutionTarget,
     _tracing: &TracingConfig,
-) -> OptimizedMirResult {
+) -> OptimizedMirWithoutTailCallsResult {
     let error = CompilerError::for_whole_module(
         target.module().clone(),
         MirError::ModuleHasCycle {

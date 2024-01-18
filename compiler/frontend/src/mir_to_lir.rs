@@ -23,7 +23,7 @@ pub type LirResult = Result<(Arc<Lir>, Arc<FxHashSet<CompilerError>>), ModuleErr
 
 fn lir(db: &dyn MirToLir, target: ExecutionTarget, tracing: TracingConfig) -> LirResult {
     let module = target.module().clone();
-    let (mir, _, errors) = db.optimized_mir(target, tracing)?;
+    let (mir, errors) = db.optimized_mir(target, tracing)?;
 
     let mut context = LoweringContext::default();
     context.compile_function(
@@ -316,6 +316,23 @@ impl CurrentBody {
             mir::Expression::TraceCallEnds { return_value } => {
                 let return_value = return_value.map(|it| self.id_for(context, it));
                 self.push_without_value(lir::Expression::TraceCallEnds { return_value });
+            }
+            mir::Expression::TraceTailCall {
+                hir_call,
+                function,
+                arguments,
+                responsible,
+            } => {
+                let hir_call = self.id_for(context, *hir_call);
+                let function = self.id_for(context, *function);
+                let arguments = self.ids_for(context, arguments);
+                let responsible = self.id_for(context, *responsible);
+                self.push_without_value(lir::Expression::TraceTailCall {
+                    hir_call,
+                    function,
+                    arguments,
+                    responsible,
+                });
             }
             mir::Expression::TraceExpressionEvaluated {
                 hir_expression,

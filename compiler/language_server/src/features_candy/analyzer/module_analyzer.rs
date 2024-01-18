@@ -96,7 +96,7 @@ impl ModuleAnalyzer {
                     .update_status(Some(format!("Compiling {}", self.module)))
                     .await;
 
-                let (mir, _, _) = db
+                let (mir, _) = db
                     .optimized_mir(
                         ExecutionTarget::Module(self.module.clone()),
                         TracingConfig {

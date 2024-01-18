@@ -64,6 +64,13 @@ pub enum Expression {
         return_value: Option<Id>,
     },
 
+    TraceTailCall {
+        hir_call: Id,
+        function: Id,
+        arguments: Vec<Id>,
+        responsible: Id,
+    },
+
     TraceExpressionEvaluated {
         hir_expression: Id,
         value: Id,
@@ -129,6 +136,12 @@ impl Expression {
                 *responsible = replacer(*responsible);
             }
             Self::TraceCallStarts {
+                hir_call,
+                function,
+                arguments,
+                responsible,
+            }
+            | Self::TraceTailCall {
                 hir_call,
                 function,
                 arguments,
@@ -294,6 +307,26 @@ impl Expression {
                 } else {
                     builder.push("trace: end of call", None, EnumSet::empty());
                 }
+            }
+            Self::TraceTailCall {
+                hir_call,
+                function,
+                arguments,
+                responsible,
+            } => {
+                builder.push("trace: tail call of ", None, EnumSet::empty());
+                function.build_rich_ir_with_constants(builder, constants, body);
+                builder.push(" with ", None, EnumSet::empty());
+                builder.push_children_custom(
+                    arguments,
+                    |builder, it| it.build_rich_ir_with_constants(builder, constants, body),
+                    " ",
+                );
+                builder.push(" (", None, EnumSet::empty());
+                responsible.build_rich_ir_with_constants(builder, constants, body);
+                builder.push(" is responsible, code is at ", None, EnumSet::empty());
+                hir_call.build_rich_ir_with_constants(builder, constants, body);
+                builder.push(")", None, EnumSet::empty());
             }
             Self::TraceExpressionEvaluated {
                 hir_expression,
