@@ -351,7 +351,7 @@ impl Gold {
 impl GoldOptions {
     const TRACING_CONFIG: TracingConfig = TracingConfig {
         register_fuzzables: TracingMode::Off,
-        calls: TracingMode::All,
+        calls: CallTracingMode::OnlyForPanicTraces,
         evaluated_expressions: TracingMode::Off,
     };
 
