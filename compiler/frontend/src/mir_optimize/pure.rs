@@ -153,7 +153,7 @@ impl PurenessInsights {
     }
 
     #[must_use]
-    pub const fn pure_definitions(&self) -> &FxHashSet<Id> {
+    pub const fn pure_definitions(&self) -> &IdSet {
         &self.pure_definitions
     }
     #[must_use]
@@ -338,9 +338,10 @@ impl PurenessInsights {
 /// case: We store a [`BitVec`] where each index corresponds to an [`Id`]
 /// because our [`Id`]s are numbered sequentially.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-struct IdSet(BitVec);
+pub struct IdSet(BitVec);
 impl IdSet {
-    fn contains(&self, id: Id) -> bool {
+    #[must_use]
+    pub fn contains(&self, id: Id) -> bool {
         if id.to_usize() >= self.0.len() {
             false
         } else {
@@ -348,11 +349,12 @@ impl IdSet {
         }
     }
 
+    #[must_use]
     pub fn iter(&self) -> IdSetIter {
         self.into_iter()
     }
 
-    fn insert(&mut self, id: Id) {
+    pub fn insert(&mut self, id: Id) {
         let additional_length_to_reserve = (id.to_usize() + 1).saturating_sub(self.0.len());
         if additional_length_to_reserve > 0 {
             self.0
@@ -360,7 +362,7 @@ impl IdSet {
         }
         self.0.set(id.to_usize(), true);
     }
-    fn remove(&mut self, id: Id) {
+    pub fn remove(&mut self, id: Id) {
         if id.to_usize() >= self.0.len() {
             return;
         }
