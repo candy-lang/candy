@@ -118,9 +118,7 @@ pub enum Instruction {
     TraceCallEnds { has_return_value: bool },
 
     /// a, HIR ID, function, arg1, arg2, ..., argN, responsible -> a
-    TraceTailCall {
-        num_args: usize,
-    },
+    TraceTailCall { num_args: usize },
 
     /// a, HIR ID, value -> a
     TraceExpressionEvaluated,
