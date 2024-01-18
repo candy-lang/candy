@@ -43,5 +43,3 @@ test =
     encode (("aaa", "b{text.newline}bb", "ccc"), ("zzz", "yyy", "xxx"))
     '"aaa,"b{{text.newline}}bb",ccc{{text.newline}}zzz,yyy,xxx{{text.newline}}"'
   checkEquals (encode (("aaa", '"b"bb"', "ccc"),)) '"aaa,"b""bb",ccc{{text.newline}}"'
-
-main environment := "Abc"
