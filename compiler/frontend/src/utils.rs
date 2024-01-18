@@ -32,6 +32,18 @@ pub impl<T: Hash> DoHash for T {
 }
 
 #[extension_trait]
+pub impl<T> VecRetainIndexed<T> for Vec<T> {
+    fn retain_indexed(&mut self, mut f: impl FnMut(usize, &T) -> bool) {
+        let mut index = 0;
+        self.retain(|item| {
+            let keep = f(index, item);
+            index += 1;
+            keep
+        });
+    }
+}
+
+#[extension_trait]
 pub impl<T, S> HashSetExtension<T> for HashSet<T, S>
 where
     T: Eq + Hash,

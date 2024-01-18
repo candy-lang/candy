@@ -149,6 +149,10 @@ impl PurenessInsights {
     }
 
     #[must_use]
+    pub const fn pure_definitions(&self) -> &FxHashSet<Id> {
+        &self.pure_definitions
+    }
+    #[must_use]
     pub fn is_definition_pure(&self, expression: &Expression) -> bool {
         match expression {
             Expression::Int(_)
