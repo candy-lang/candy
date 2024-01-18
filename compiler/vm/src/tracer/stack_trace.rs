@@ -69,7 +69,7 @@ impl Tracer for StackTracer {
         call.dup(heap);
         self.call_stack.push(vec![call]);
     }
-    fn call_ended(&mut self, heap: &mut Heap, _return_value: InlineObject) {
+    fn call_ended(&mut self, heap: &mut Heap, _return_value: Option<InlineObject>) {
         for call in self.call_stack.pop().unwrap() {
             call.drop(heap);
         }

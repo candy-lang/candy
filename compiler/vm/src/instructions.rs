@@ -179,9 +179,12 @@ impl MachineState {
                 tracer.call_started(heap, call_site, callee, args, responsible);
                 InstructionResult::Done
             }
-            Instruction::TraceCallEnds => {
-                let return_value = self.pop_from_data_stack();
-
+            Instruction::TraceCallEnds { has_return_value } => {
+                let return_value = if *has_return_value {
+                    Some(self.pop_from_data_stack())
+                } else {
+                    None
+                };
                 tracer.call_ended(heap, return_value);
                 InstructionResult::Done
             }

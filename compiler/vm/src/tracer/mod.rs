@@ -26,7 +26,7 @@ pub trait Tracer {
         _responsible: HirId,
     ) {
     }
-    fn call_ended(&mut self, _heap: &mut Heap, _return_value: InlineObject) {}
+    fn call_ended(&mut self, _heap: &mut Heap, _return_value: Option<InlineObject>) {}
     fn tail_call(
         &mut self,
         _heap: &mut Heap,

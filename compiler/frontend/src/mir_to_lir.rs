@@ -314,7 +314,7 @@ impl CurrentBody {
                 });
             }
             mir::Expression::TraceCallEnds { return_value } => {
-                let return_value = self.id_for(context, *return_value);
+                let return_value = return_value.map(|it| self.id_for(context, it));
                 self.push_without_value(lir::Expression::TraceCallEnds { return_value });
             }
             mir::Expression::TraceTailCall {

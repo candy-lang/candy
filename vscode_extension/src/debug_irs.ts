@@ -155,10 +155,11 @@ function registerDebugIrCommand(
 
 interface TracingConfig {
   registerFuzzables: TracingMode;
-  calls: TracingMode;
+  calls: CallTracingMode;
   evaluatedExpressions: TracingMode;
 }
 type TracingMode = "off" | "onlyCurrent" | "all";
+type CallTracingMode = "off" | "onlyCurrent" | "onlyForPanicTraces" | "all";
 
 async function pickTracingConfig(
   options: { canSelectOnlyCurrent: boolean } = { canSelectOnlyCurrent: true },
@@ -171,7 +172,7 @@ async function pickTracingConfig(
     return;
   }
 
-  const calls = await pickTracingMode("Include tracing of calls?", options);
+  const calls = await pickCallTracingMode("Include tracing of calls?", options);
   if (calls === undefined) {
     return;
   }
@@ -195,6 +196,21 @@ async function pickTracingMode(
   if (options.canSelectOnlyCurrent) {
     items.push({ label: "Only for the current module", mode: "onlyCurrent" });
   }
+  items.push({ label: "Yes", mode: "all" });
+
+  const result = await vscode.window.showQuickPick<Item>(items, { title });
+  return result?.mode;
+}
+async function pickCallTracingMode(
+  title: string,
+  options: { canSelectOnlyCurrent: boolean } = { canSelectOnlyCurrent: true },
+): Promise<CallTracingMode | undefined> {
+  type Item = vscode.QuickPickItem & { mode: CallTracingMode };
+  const items: Item[] = [{ label: "No", mode: "off" }];
+  if (options.canSelectOnlyCurrent) {
+    items.push({ label: "Only for the current module", mode: "onlyCurrent" });
+  }
+  items.push({ label: "Only for panic traces", mode: "onlyForPanicTraces" });
   items.push({ label: "Yes", mode: "all" });
 
   const result = await vscode.window.showQuickPick<Item>(items, { title });

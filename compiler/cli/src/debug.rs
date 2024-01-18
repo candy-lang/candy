@@ -17,6 +17,7 @@ use candy_frontend::{
     rcst_to_cst::RcstToCst,
     rich_ir::{RichIr, RichIrAnnotation, TokenType},
     string_to_rcst::StringToRcst,
+    tracing::CallTracingMode,
     utils::DoHash,
     TracingConfig, TracingMode,
 };
@@ -109,11 +110,11 @@ pub struct PathAndExecutionTargetAndTracing {
     #[arg(
         long,
         default_value("off"),
-        default_missing_value("only-current"),
+        default_missing_value("only-potentially-panicking"),
         num_args(0..=1),
         require_equals(true)
     )]
-    trace_calls: TracingMode,
+    trace_calls: CallTracingMode,
 
     #[arg(
         long,
@@ -348,7 +349,12 @@ impl Gold {
     }
 }
 impl GoldOptions {
-    const TRACING_CONFIG: TracingConfig = TracingConfig::off();
+    const TRACING_CONFIG: TracingConfig = TracingConfig {
+        register_fuzzables: TracingMode::Off,
+        calls: CallTracingMode::OnlyForPanicTraces,
+        evaluated_expressions: TracingMode::Off,
+    };
+
     fn visit_irs(
         &self,
         db: &Database,

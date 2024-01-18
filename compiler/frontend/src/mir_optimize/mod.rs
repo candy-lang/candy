@@ -59,6 +59,7 @@ use std::{mem, sync::Arc};
 use tracing::debug;
 
 mod after_panic;
+mod call_tracing;
 mod cleanup;
 mod common_subtree_elimination;
 mod complexity;
@@ -206,6 +207,7 @@ impl Context<'_> {
                 *expression = self.visible.remove(*id);
             }
         }
+        call_tracing::remove_unnecessary_call_tracing(body, self.pureness, self.tracing.calls);
         tree_shaking::tree_shake(body, self.pureness);
         reference_following::remove_redundant_return_references(body, self.pureness);
     }
