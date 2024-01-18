@@ -26,6 +26,8 @@
   - packages/Examples/**/*
 'P: Http':
   - packages/Http/**/*
+'P: Parser':
+  - packages/Parser/**/*
 'P: ProgrammingLanguageBenchmarks':
   - packages/ProgrammingLanguageBenchmarks/**/*
 'P: Random':
