@@ -7,7 +7,8 @@ use candy_vm::{
 #[derive(Debug, Default)]
 pub struct DebugTracer {
     pub root_locals: Vec<(Id, InlineObject)>,
-    pub call_stack: Vec<StackFrame>,
+    /// Analogous to [`StackTracer::call_stack`].
+    pub call_stack: Vec<Vec<StackFrame>>,
 }
 
 #[derive(Debug)]
@@ -34,6 +35,7 @@ impl Tracer for DebugTracer {
         value.dup(heap);
         self.call_stack
             .last_mut()
+            .and_then(|it| it.last_mut())
             .map(|it| &mut it.locals)
             .unwrap_or(&mut self.root_locals)
             .push((expression.get().clone(), value));
@@ -54,9 +56,31 @@ impl Tracer for DebugTracer {
             responsible,
         };
         call.dup(heap);
-        self.call_stack.push(StackFrame::new(call));
+        self.call_stack.push(vec![StackFrame::new(call)]);
     }
     fn call_ended(&mut self, heap: &mut Heap, _return_value: InlineObject) {
-        self.call_stack.pop().unwrap().drop(heap);
+        for call in self.call_stack.pop().unwrap() {
+            call.drop(heap);
+        }
+    }
+    fn tail_call(
+        &mut self,
+        heap: &mut Heap,
+        call_site: HirId,
+        callee: InlineObject,
+        arguments: Vec<InlineObject>,
+        responsible: HirId,
+    ) {
+        let call = Call {
+            call_site,
+            callee,
+            arguments,
+            responsible,
+        };
+        call.dup(heap);
+        self.call_stack
+            .last_mut()
+            .unwrap()
+            .push(StackFrame::new(call));
     }
 }

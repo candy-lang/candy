@@ -19,6 +19,7 @@ use dap::{
     responses::StackTraceResponse,
     types::{PresentationHint, Source, StackFramePresentationhint},
 };
+use itertools::Itertools;
 use std::{borrow::Borrow, hash::Hash};
 
 impl PausedState {
@@ -39,21 +40,29 @@ impl PausedState {
         let total_frames = tracer.call_stack.len() + 1;
 
         let mut stack_frames = Vec::with_capacity((1 + call_stack.len()).min(levels));
-        stack_frames.extend(call_stack.iter().enumerate().rev().skip(start_frame).map(
-            |(index, frame)| {
-                let id = self
-                    .stack_frame_ids
-                    .key_to_id(StackFrameKey { index: index + 1 })
-                    .get();
-                Self::stack_frame(
-                    db,
-                    start_at_1_config,
-                    id,
-                    frame,
-                    self.vm.as_ref().unwrap().vm.byte_code(),
-                )
-            },
-        ));
+        stack_frames.extend(
+            call_stack
+                .iter()
+                .flatten()
+                .collect_vec()
+                .iter()
+                .enumerate()
+                .rev()
+                .skip(start_frame)
+                .map(|(index, frame)| {
+                    let id = self
+                        .stack_frame_ids
+                        .key_to_id(StackFrameKey { index: index + 1 })
+                        .get();
+                    Self::stack_frame(
+                        db,
+                        start_at_1_config,
+                        id,
+                        frame,
+                        self.vm.as_ref().unwrap().vm.byte_code(),
+                    )
+                }),
+        );
 
         if stack_frames.len() < levels {
             stack_frames.push(dap::types::StackFrame {
@@ -153,17 +162,23 @@ impl StackFrameKey {
             return None;
         }
 
-        Some(&vm.tracer().call_stack[self.index - 1])
+        Some(
+            vm.tracer()
+                .call_stack
+                .iter()
+                .flatten()
+                .nth(self.index - 1)
+                .unwrap(),
+        )
     }
     pub fn get_locals<'a, B: Borrow<ByteCode>>(
         &self,
         vm: &'a Vm<B, DebugTracer>,
     ) -> &'a Vec<(Id, InlineObject)> {
-        let tracer = vm.tracer();
         if self.index == 0 {
-            &tracer.root_locals
+            &vm.tracer().root_locals
         } else {
-            &tracer.call_stack[self.index - 1].locals
+            &self.get(vm).unwrap().locals
         }
     }
 }

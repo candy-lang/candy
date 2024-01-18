@@ -125,6 +125,11 @@ pub enum Instruction {
     // a, return value -> a
     TraceCallEnds,
 
+    /// a, HIR ID, function, arg1, arg2, ..., argN, responsible -> a
+    TraceTailCall {
+        num_args: usize,
+    },
+
     /// a, HIR ID, value -> a
     TraceExpressionEvaluated,
 
@@ -195,7 +200,7 @@ impl Instruction {
                 stack.pop(); // reason
                 stack.push(result);
             }
-            Self::TraceCallStarts { num_args } => {
+            Self::TraceCallStarts { num_args } | Self::TraceTailCall { num_args } => {
                 stack.pop(); // HIR ID
                 stack.pop(); // responsible
                 stack.pop_multiple(*num_args);
@@ -396,7 +401,7 @@ impl Instruction {
             }
             Self::Return => {}
             Self::Panic => {}
-            Self::TraceCallStarts { num_args } => {
+            Self::TraceCallStarts { num_args } | Self::TraceTailCall { num_args } => {
                 builder.push(
                     format!(" ({num_args} {})", arguments_plural(*num_args)),
                     None,

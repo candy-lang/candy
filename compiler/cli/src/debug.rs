@@ -198,7 +198,7 @@ pub fn debug(options: Options) -> ProgramResult {
             let tracing = options.to_tracing_config();
             let mir = db.optimized_mir(execution_target, tracing);
             mir.ok()
-                .map(|(mir, _, _)| RichIr::for_optimized_mir(&module, &mir, tracing))
+                .map(|(mir, _)| RichIr::for_optimized_mir(&module, &mir, tracing))
         }
         Options::Lir(options) => {
             let module = module_for_path(options.path.clone())?;
@@ -408,7 +408,7 @@ impl GoldOptions {
             let mir = RichIr::for_mir(&module, &mir, Self::TRACING_CONFIG);
             visit("MIR", mir.text);
 
-            let (optimized_mir, _, _) = db
+            let (optimized_mir, _) = db
                 .optimized_mir(execution_target.clone(), Self::TRACING_CONFIG)
                 .unwrap();
             let optimized_mir =
