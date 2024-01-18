@@ -1,7 +1,7 @@
 [bool, checkEquals, ifElse, int, list, recursive, text] = use "Core"
 [parser] = use "Parser"
 
-decodeFile csv :=
+decode csv :=
   needs (text.is csv)
   recursive [Lines: (,), Fields: (,), FieldStartOffset: 0, P: parser.new csv] {
     recurse [lines, fields, fieldStartOffset, p] ->
@@ -36,20 +36,18 @@ decodeFile csv :=
 
 test =
   # From https://datatracker.ietf.org/doc/html/rfc4180#section-2
-  checkEquals
-    decodeFile "aaa,bbb,ccc"
-    Ok (("aaa", "bbb", "ccc"),)
+  checkEquals (decode "aaa,bbb,ccc") (Ok (("aaa", "bbb", "ccc"),))
 
   checkEquals
-    decodeFile "aaa,bbb,ccc{text.newline}zzz,yyy,xxx{text.newline}"
+    decode "aaa,bbb,ccc{text.newline}zzz,yyy,xxx{text.newline}"
     Ok (("aaa", "bbb", "ccc"), ("zzz", "yyy", "xxx"))
   checkEquals
-    decodeFile "
+    decode "
       field_name,field_name,field_name{text.newline}aaa,bbb,ccc{text.newline}zzz,yyy,xxx{text.newline}
     "
     Ok (("field_name", "field_name", "field_name"), ("aaa", "bbb", "ccc"), ("zzz", "yyy", "xxx"))
   # TODO(JonasWanke): handle quoted field
   # checkEquals
-  #   decodeFile '"aaa,"b{{text.newline}}bb",ccc{{text.newline}}zzz,yyy,xxx{{text.newline}}"'
+  #   decode '"aaa,"b{{text.newline}}bb",ccc{{text.newline}}zzz,yyy,xxx{{text.newline}}"'
   #   Ok (("aaa", "b{text.newline}bb", "ccc"), ("zzz", "yyy", "xxx"))
-  # checkEquals (decodeFile '"aaa,"b""bb",ccc{{text.newline}}"') (Ok (("aaa", '"b"bb"', "ccc"),))
+  # checkEquals (decode '"aaa,"b""bb",ccc{{text.newline}}"') (Ok (("aaa", '"b"bb"', "ccc"),))
