@@ -154,7 +154,7 @@ impl Context<'_> {
     }
 
     #[must_use]
-    fn with_scope<F, T>(&mut self, func: F) -> (Body, T)
+    fn with_scope<F, T>(&mut self, id_prefix: Option<hir::Id>, func: F) -> (Body, T)
     where
         F: Fn(&mut Self) -> T,
     {
@@ -164,6 +164,9 @@ impl Context<'_> {
             identifiers: self.identifiers.clone(),
         };
 
+        if let Some(id_prefix) = id_prefix {
+            self.id_prefix = id_prefix;
+        }
         let res = self.with_non_top_level(|scope| func(scope));
 
         let inner_body = mem::replace(&mut self.body, reset_state.body);
@@ -358,16 +361,14 @@ impl Context<'_> {
                 // The scope is only for hierarchical IDs. The actual bodies are
                 // inside the cases.
                 let match_id = self.create_next_id(ast.id.clone(), None);
-                let (_, cases) = self.with_scope(|scope| {
-                    scope.id_prefix = match_id.clone();
-
+                let (_, cases) = self.with_scope(Some(match_id.clone()), |scope| {
                     cases
                         .iter()
                         .map(|case| match &case.kind {
                             AstKind::MatchCase(MatchCase { box pattern, body }) => {
                                 let (pattern, pattern_identifiers) = scope.lower_pattern(pattern);
 
-                                let (body, _) = scope.with_scope(|scope| {
+                                let (body, _) = scope.with_scope(None, |scope| {
                                     for (name, (ast_id, identifier_id)) in
                                         pattern_identifiers.clone()
                                     {
@@ -387,7 +388,7 @@ impl Context<'_> {
                                     errors: errors.clone(),
                                 };
 
-                                let (body, _) = scope.with_scope(|scope| {
+                                let (body, _) = scope.with_scope(None, |scope| {
                                     scope.compile(&[]);
                                 });
 
@@ -458,10 +459,8 @@ impl Context<'_> {
                     },
                     None,
                 );
-
                 let then_function_id = self.create_next_id(None, None);
-                let (then_body, _) = self.with_scope(|scope| {
-                    scope.id_prefix = then_function_id.clone();
+                let (then_body, _) = self.with_scope(Some(then_function_id.clone()), |scope| {
                     scope.push(None, Expression::Reference(hir.clone()), None);
                 });
                 let then_function = self.push_with_existing_id(
@@ -475,8 +474,7 @@ impl Context<'_> {
                 );
 
                 let else_function_id = self.create_next_id(None, None);
-                let (else_body, _) = self.with_scope(|scope| {
-                    scope.id_prefix = else_function_id.clone();
+                let (else_body, _) = self.with_scope(Some(else_function_id.clone()), |scope| {
                     scope.push(
                         None,
                         Expression::Call {
@@ -529,16 +527,13 @@ impl Context<'_> {
         identifier: impl Into<Option<&str>>,
     ) -> hir::Id {
         let function_id = self.create_next_id(id, identifier);
-
-        let (inner_body, parameters) = self.with_scope(|scope| {
-            scope.id_prefix = function_id.clone();
-
+        let (inner_body, parameters) = self.with_scope(Some(function_id.clone()), |scope| {
             // TODO: Error on parameters with same name
             let mut parameters = Vec::with_capacity(function.parameters.len());
             for parameter in &function.parameters {
                 if let AstKind::Identifier(Identifier(parameter)) = &parameter.kind {
                     let name = parameter.value.to_string();
-                    parameters.push(function_id.child(name.clone()));
+                    parameters.push(scope.id_prefix.child(name.clone()));
 
                     let id = scope.create_next_id(parameter.id.clone(), &*name);
                     scope.body.identifiers.insert(id.clone(), name.clone());
@@ -808,10 +803,8 @@ impl Context<'_> {
         assert!(self.use_id.is_none());
 
         let use_id = self.create_next_id(None, "use");
-        let relative_path = use_id.child("relativePath");
-        let (inner_body, _) = self.with_scope(|scope| {
-            scope.id_prefix = use_id.clone();
-
+        let (inner_body, relative_path) = self.with_scope(Some(use_id.clone()), |scope| {
+            let relative_path = scope.id_prefix.child("relativePath");
             scope.push(
                 None,
                 Expression::UseModule {
@@ -820,6 +813,7 @@ impl Context<'_> {
                 },
                 "importedModule".to_string(),
             );
+            relative_path
         });
 
         self.push_with_existing_id(
