@@ -21,7 +21,7 @@ use candy_vm::{
     byte_code::ByteCode,
     heap::{Heap, InlineObject, Struct},
     lir_to_byte_code::compile_byte_code,
-    tracer::DummyTracer,
+    tracer::stack_trace::StackTracer,
     PopulateInMemoryProviderFromFileSystem, Vm, VmFinished,
 };
 use lazy_static::lazy_static;
