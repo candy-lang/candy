@@ -154,7 +154,7 @@ impl Context<'_> {
     }
 
     #[must_use]
-    fn with_scope<F, T>(&mut self, id_prefix: Option<hir::Id>, func: F) -> (Body, T)
+    fn with_scope<F, T>(&mut self, id_prefix: impl Into<Option<hir::Id>>, func: F) -> (Body, T)
     where
         F: Fn(&mut Self) -> T,
     {
@@ -164,7 +164,7 @@ impl Context<'_> {
             identifiers: self.identifiers.clone(),
         };
 
-        if let Some(id_prefix) = id_prefix {
+        if let Some(id_prefix) = id_prefix.into() {
             self.id_prefix = id_prefix;
         }
         let res = self.with_non_top_level(|scope| func(scope));
@@ -361,7 +361,7 @@ impl Context<'_> {
                 // The scope is only for hierarchical IDs. The actual bodies are
                 // inside the cases.
                 let match_id = self.create_next_id(ast.id.clone(), None);
-                let (_, cases) = self.with_scope(Some(match_id.clone()), |scope| {
+                let (_, cases) = self.with_scope(match_id.clone(), |scope| {
                     cases
                         .iter()
                         .map(|case| match &case.kind {
@@ -460,7 +460,7 @@ impl Context<'_> {
                     None,
                 );
                 let then_function_id = self.create_next_id(None, None);
-                let (then_body, _) = self.with_scope(Some(then_function_id.clone()), |scope| {
+                let (then_body, _) = self.with_scope(then_function_id.clone(), |scope| {
                     scope.push(None, Expression::Reference(hir.clone()), None);
                 });
                 let then_function = self.push_with_existing_id(
@@ -474,7 +474,7 @@ impl Context<'_> {
                 );
 
                 let else_function_id = self.create_next_id(None, None);
-                let (else_body, _) = self.with_scope(Some(else_function_id.clone()), |scope| {
+                let (else_body, _) = self.with_scope(else_function_id.clone(), |scope| {
                     scope.push(
                         None,
                         Expression::Call {
@@ -527,7 +527,7 @@ impl Context<'_> {
         identifier: impl Into<Option<&str>>,
     ) -> hir::Id {
         let function_id = self.create_next_id(id, identifier);
-        let (inner_body, parameters) = self.with_scope(Some(function_id.clone()), |scope| {
+        let (inner_body, parameters) = self.with_scope(function_id.clone(), |scope| {
             // TODO: Error on parameters with same name
             let mut parameters = Vec::with_capacity(function.parameters.len());
             for parameter in &function.parameters {
@@ -803,7 +803,7 @@ impl Context<'_> {
         assert!(self.use_id.is_none());
 
         let use_id = self.create_next_id(None, "use");
-        let (inner_body, relative_path) = self.with_scope(Some(use_id.clone()), |scope| {
+        let (inner_body, relative_path) = self.with_scope(use_id.clone(), |scope| {
             let relative_path = scope.id_prefix.child("relativePath");
             scope.push(
                 None,
