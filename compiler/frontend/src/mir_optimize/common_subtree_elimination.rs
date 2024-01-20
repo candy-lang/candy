@@ -639,6 +639,12 @@ impl NormalizedComparison for Expression {
                 function,
                 arguments,
                 responsible,
+            }
+            | Self::TraceTailCall {
+                hir_call,
+                function,
+                arguments,
+                responsible,
             } => {
                 hir_call.hash_normalized(normalization, state);
                 function.hash_normalized(normalization, state);

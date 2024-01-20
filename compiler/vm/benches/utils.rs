@@ -15,13 +15,13 @@ use candy_frontend::{
     position::PositionConversionStorage,
     rcst_to_cst::RcstToCstStorage,
     string_to_rcst::StringToRcstStorage,
-    TracingConfig,
+    CallTracingMode, TracingConfig, TracingMode,
 };
 use candy_vm::{
     byte_code::ByteCode,
     heap::{Heap, InlineObject, Struct},
     lir_to_byte_code::compile_byte_code,
-    tracer::DummyTracer,
+    tracer::stack_trace::StackTracer,
     PopulateInMemoryProviderFromFileSystem, Vm, VmFinished,
 };
 use lazy_static::lazy_static;
@@ -29,7 +29,11 @@ use rustc_hash::FxHashMap;
 use std::borrow::Borrow;
 use tracing::warn;
 
-const TRACING: TracingConfig = TracingConfig::off();
+const TRACING: TracingConfig = TracingConfig {
+    register_fuzzables: TracingMode::Off,
+    calls: CallTracingMode::OnlyForPanicTraces,
+    evaluated_expressions: TracingMode::Off,
+};
 lazy_static! {
     static ref PACKAGE: Package = Package::User("/".into());
     static ref MODULE: Module = Module {
@@ -106,7 +110,7 @@ pub fn run(byte_code: impl Borrow<ByteCode>) -> (Heap, InlineObject) {
     let mut heap = Heap::default();
     let environment = Struct::create(&mut heap, true, &FxHashMap::default());
     let VmFinished { result, .. } =
-        Vm::for_main_function(byte_code, &mut heap, environment, DummyTracer)
+        Vm::for_main_function(byte_code, &mut heap, environment, StackTracer::default())
             .run_forever_without_handles(&mut heap);
     match result {
         Ok(return_value) => (heap, return_value),

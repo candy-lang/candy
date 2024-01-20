@@ -23,7 +23,18 @@ impl Tracer for Tuple {
     ) {
         for_tuples!( #(Tuple.call_started(heap, call_site, callee, arguments.clone(), responsible);)* );
     }
-    fn call_ended(&mut self, heap: &mut Heap, return_value: InlineObject) {
+    fn call_ended(&mut self, heap: &mut Heap, return_value: Option<InlineObject>) {
         for_tuples!( #(Tuple.call_ended(heap, return_value);)* );
+    }
+    #[allow(clippy::redundant_clone)] // PERF: Avoid clone for last tuple element
+    fn tail_call(
+        &mut self,
+        heap: &mut Heap,
+        call_site: HirId,
+        callee: InlineObject,
+        arguments: Vec<InlineObject>,
+        responsible: HirId,
+    ) {
+        for_tuples!( #(Tuple.tail_call(heap, call_site, callee, arguments.clone(), responsible);)* );
     }
 }

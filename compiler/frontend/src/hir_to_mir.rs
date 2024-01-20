@@ -11,6 +11,7 @@ use crate::{
     module::{Module, ModuleKind},
     position::PositionConversionDb,
     string_to_rcst::ModuleError,
+    tracing::CallTracingMode,
 };
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
@@ -446,23 +447,7 @@ impl<'a> LoweringContext<'a> {
                     .iter()
                     .map(|argument| self.mapping[argument])
                     .collect_vec();
-
-                if self.tracing.calls.is_enabled() {
-                    let hir_call = body.push_hir_id(hir_id.clone());
-                    body.push(Expression::TraceCallStarts {
-                        hir_call,
-                        function: self.mapping[function],
-                        arguments: arguments.clone(),
-                        responsible,
-                    });
-                }
-                let call = body.push_call(self.mapping[function], arguments, responsible);
-                if self.tracing.calls.is_enabled() {
-                    body.push(Expression::TraceCallEnds { return_value: call });
-                    body.push_reference(call)
-                } else {
-                    call
-                }
+                self.push_call(body, hir_id, self.mapping[function], arguments, responsible)
             }
             hir::Expression::UseModule {
                 current_module,
@@ -478,7 +463,9 @@ impl<'a> LoweringContext<'a> {
             }),
             hir::Expression::Needs { condition, reason } => {
                 let responsible = body.push_hir_id(hir_id.clone());
-                body.push_call(
+                self.push_call(
+                    body,
+                    hir_id,
                     self.needs_function,
                     vec![
                         self.mapping[condition],
@@ -579,6 +566,38 @@ impl<'a> LoweringContext<'a> {
                     responsible_for_match,
                 )
             }
+        }
+    }
+
+    fn push_call(
+        &self,
+        body: &mut BodyBuilder,
+        hir_id: &hir::Id,
+        function: Id,
+        arguments: Vec<Id>,
+        responsible: Id,
+    ) -> Id {
+        if self.tracing.calls.is_enabled() {
+            let hir_call = body.push_hir_id(hir_id.clone());
+            body.push(Expression::TraceCallStarts {
+                hir_call,
+                function,
+                arguments: arguments.clone(),
+                responsible,
+            });
+        }
+        let call = body.push_call(function, arguments, responsible);
+        if self.tracing.calls.is_enabled() {
+            let return_value = match self.tracing.calls {
+                CallTracingMode::OnlyForPanicTraces => None,
+                CallTracingMode::Off | CallTracingMode::OnlyCurrent | CallTracingMode::All => {
+                    Some(call)
+                }
+            };
+            body.push(Expression::TraceCallEnds { return_value });
+            body.push_reference(call)
+        } else {
+            call
         }
     }
 }

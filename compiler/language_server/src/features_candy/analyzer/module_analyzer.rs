@@ -9,6 +9,7 @@ use candy_frontend::{
     hir_to_mir::ExecutionTarget,
     mir_optimize::OptimizeMir,
     module::Module,
+    tracing::CallTracingMode,
     TracingConfig, TracingMode,
 };
 use candy_fuzzer::{FuzzablesFinder, Fuzzer, Status};
@@ -95,12 +96,12 @@ impl ModuleAnalyzer {
                     .update_status(Some(format!("Compiling {}", self.module)))
                     .await;
 
-                let (mir, _, _) = db
+                let (mir, _) = db
                     .optimized_mir(
                         ExecutionTarget::Module(self.module.clone()),
                         TracingConfig {
                             register_fuzzables: TracingMode::OnlyCurrent,
-                            calls: TracingMode::Off,
+                            calls: CallTracingMode::Off,
                             evaluated_expressions: TracingMode::Off,
                         },
                     )
@@ -111,7 +112,7 @@ impl ModuleAnalyzer {
 
                 let tracing = TracingConfig {
                     register_fuzzables: TracingMode::Off,
-                    calls: TracingMode::Off,
+                    calls: CallTracingMode::Off,
                     evaluated_expressions: TracingMode::OnlyCurrent,
                 };
                 let (byte_code, _) =
@@ -157,7 +158,7 @@ impl ModuleAnalyzer {
 
                 let tracing = TracingConfig {
                     register_fuzzables: TracingMode::OnlyCurrent,
-                    calls: TracingMode::Off,
+                    calls: CallTracingMode::Off,
                     evaluated_expressions: TracingMode::Off,
                 };
                 let (fuzzing_byte_code, _) =
