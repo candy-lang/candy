@@ -29,7 +29,7 @@ pub fn remove_unnecessary_call_tracing(
                 }
             }
             _ => {
-                if !pureness.pure_definitions().contains(id) {
+                if !pureness.pure_definitions().contains(*id) {
                     for (_, only_pure_since_then) in &mut trace_call_starts {
                         *only_pure_since_then = false;
                     }
