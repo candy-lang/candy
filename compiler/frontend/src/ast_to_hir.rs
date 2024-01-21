@@ -280,7 +280,7 @@ impl Context<'_> {
                             Expression::Reference(body.clone()),
                             name.value.clone(),
                         );
-                        (vec![(name.value.clone(), name_id)], body)
+                        (vec![(name.value.clone(), name.id.clone(), name_id)], body)
                     }
                     ast::AssignmentBody::Body { pattern, body } => {
                         let reset_state = self.start_non_top_level();
@@ -298,7 +298,7 @@ impl Context<'_> {
                                 Expression::Reference(body_reference_id),
                                 name.value.clone(),
                             );
-                            vec![(name.value.clone(), assignment_reference_id)]
+                            vec![(name.value.clone(), name.id.clone(), assignment_reference_id)]
                         } else {
                             let pattern_id = pattern.id.clone();
                             let (pattern, identifier_ids) = self.lower_pattern(pattern);
@@ -316,11 +316,11 @@ impl Context<'_> {
                                 .sorted_by_key(|(_, (_, identifier_id))| identifier_id.0)
                                 .map(|(name, (ast_id, identifier_id))| {
                                     let id = self.push(
-                                        ast_id,
+                                        ast_id.clone(),
                                         Expression::PatternIdentifierReference(identifier_id),
                                         name.clone(),
                                     );
-                                    (name, id)
+                                    (name, ast_id, id)
                                 })
                                 .collect_vec()
                         };
@@ -336,19 +336,22 @@ impl Context<'_> {
                 };
                 if *is_public {
                     if self.is_top_level {
-                        for (name, id) in names {
-                            if self.public_identifiers.contains_key(&name) {
+                        for (name, ast_id, id) in names {
+                            if let Entry::Vacant(entry) =
+                                self.public_identifiers.entry(name.clone())
+                            {
+                                entry.insert(id);
+                            } else {
                                 self.push_error(
-                                    None,
-                                    self.db.ast_id_to_display_span(&ast.id).unwrap(),
-                                    HirError::PublicAssignmentWithSameName { name: name.clone() },
+                                    ast_id.clone(),
+                                    self.db.ast_id_to_display_span(&ast_id).unwrap(),
+                                    HirError::PublicAssignmentWithSameName { name },
                                 );
                             }
-                            self.public_identifiers.insert(name, id);
                         }
                     } else {
                         self.push_error(
-                            None,
+                            ast.id.clone(),
                             self.db.ast_id_to_display_span(&ast.id).unwrap(),
                             HirError::PublicAssignmentInNotTopLevel,
                         );
