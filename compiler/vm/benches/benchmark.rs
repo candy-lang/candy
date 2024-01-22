@@ -75,7 +75,7 @@ main _ := fib {n}"#,
 fn create_binary_trees_code(n: usize) -> String {
     format!(
         r#"
-[equals, if, ifElse, int, iterable, recursive, result, struct, text] = use "Core"
+[equals, if, ifElse, int, iterator, recursive, result, struct, text] = use "Core"
 
 createTree n :=
   needs (int.is n)
@@ -110,7 +110,7 @@ main _ :=
   recursive minDepth {{ recurse depth ->
     if (depth | int.isLessThanOrEqualTo maxDepth) {{
       iterations = 1 | int.shiftLeft (maxDepth | int.subtract depth | int.add minDepth)
-      check = iterable.generate iterations {{ _ -> createTree depth | checkTree }} | iterable.sum
+      check = iterator.generate iterations {{ _ -> createTree depth | checkTree }} | iterator.sum
       recurse (depth | int.add 2)
     }}
   }}
