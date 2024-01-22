@@ -143,41 +143,42 @@ struct Context<'a> {
 }
 
 impl Context<'_> {
-    #[must_use]
-    fn start_non_top_level(&mut self) -> NonTopLevelResetState {
-        NonTopLevelResetState(mem::replace(&mut self.is_top_level, false))
+    fn with_non_top_level<F, T>(&mut self, func: F) -> T
+    where
+        F: Fn(&mut Self) -> T,
+    {
+        let reset_state = mem::replace(&mut self.is_top_level, false);
+        let res = func(self);
+        self.is_top_level = reset_state;
+        res
     }
-    #[allow(clippy::needless_pass_by_value)]
-    fn end_non_top_level(&mut self, reset_state: NonTopLevelResetState) {
-        self.is_top_level = reset_state.0;
-    }
-}
-struct NonTopLevelResetState(bool);
 
-impl Context<'_> {
     #[must_use]
-    fn start_scope(&mut self) -> ScopeResetState {
-        ScopeResetState {
+    fn with_scope<F, T>(&mut self, id_prefix: impl Into<Option<hir::Id>>, func: F) -> (Body, T)
+    where
+        F: Fn(&mut Self) -> T,
+    {
+        let reset_state = ScopeResetState {
             body: mem::take(&mut self.body),
             id_prefix: self.id_prefix.clone(),
             identifiers: self.identifiers.clone(),
-            non_top_level_reset_state: self.start_non_top_level(),
+        };
+
+        if let Some(id_prefix) = id_prefix.into() {
+            self.id_prefix = id_prefix;
         }
-    }
-    #[must_use]
-    fn end_scope(&mut self, reset_state: ScopeResetState) -> Body {
+        let res = self.with_non_top_level(|scope| func(scope));
+
         let inner_body = mem::replace(&mut self.body, reset_state.body);
         self.id_prefix = reset_state.id_prefix;
         self.identifiers = reset_state.identifiers;
-        self.end_non_top_level(reset_state.non_top_level_reset_state);
-        inner_body
+        (inner_body, res)
     }
 }
 struct ScopeResetState {
     body: Body,
     id_prefix: hir::Id,
     identifiers: im::HashMap<String, hir::Id>,
-    non_top_level_reset_state: NonTopLevelResetState,
 }
 
 impl Context<'_> {
@@ -280,12 +281,10 @@ impl Context<'_> {
                             Expression::Reference(body.clone()),
                             name.value.clone(),
                         );
-                        (vec![(name.value.clone(), name_id)], body)
+                        (vec![(name.value.clone(), name.id.clone(), name_id)], body)
                     }
                     ast::AssignmentBody::Body { pattern, body } => {
-                        let reset_state = self.start_non_top_level();
-                        let body = self.compile(body);
-                        self.end_non_top_level(reset_state);
+                        let body = self.with_non_top_level(|scope| scope.compile(body));
 
                         let names = if let AstKind::Identifier(Identifier(name)) = &pattern.kind {
                             let body_reference_id = self.push(
@@ -298,7 +297,7 @@ impl Context<'_> {
                                 Expression::Reference(body_reference_id),
                                 name.value.clone(),
                             );
-                            vec![(name.value.clone(), assignment_reference_id)]
+                            vec![(name.value.clone(), name.id.clone(), assignment_reference_id)]
                         } else {
                             let pattern_id = pattern.id.clone();
                             let (pattern, identifier_ids) = self.lower_pattern(pattern);
@@ -316,11 +315,11 @@ impl Context<'_> {
                                 .sorted_by_key(|(_, (_, identifier_id))| identifier_id.0)
                                 .map(|(name, (ast_id, identifier_id))| {
                                     let id = self.push(
-                                        ast_id,
+                                        ast_id.clone(),
                                         Expression::PatternIdentifierReference(identifier_id),
                                         name.clone(),
                                     );
-                                    (name, id)
+                                    (name, ast_id, id)
                                 })
                                 .collect_vec()
                         };
@@ -336,19 +335,22 @@ impl Context<'_> {
                 };
                 if *is_public {
                     if self.is_top_level {
-                        for (name, id) in names {
-                            if self.public_identifiers.contains_key(&name) {
+                        for (name, ast_id, id) in names {
+                            if let Entry::Vacant(entry) =
+                                self.public_identifiers.entry(name.clone())
+                            {
+                                entry.insert(id);
+                            } else {
                                 self.push_error(
-                                    None,
-                                    self.db.ast_id_to_display_span(&ast.id).unwrap(),
-                                    HirError::PublicAssignmentWithSameName { name: name.clone() },
+                                    ast_id.clone(),
+                                    self.db.ast_id_to_display_span(&ast_id).unwrap(),
+                                    HirError::PublicAssignmentWithSameName { name },
                                 );
                             }
-                            self.public_identifiers.insert(name, id);
                         }
                     } else {
                         self.push_error(
-                            None,
+                            ast.id.clone(),
                             self.db.ast_id_to_display_span(&ast.id).unwrap(),
                             HirError::PublicAssignmentInNotTopLevel,
                         );
@@ -359,47 +361,46 @@ impl Context<'_> {
             AstKind::Match(ast::Match { expression, cases }) => {
                 let expression = self.compile_single(expression);
 
-                let reset_state = self.start_scope();
-                let match_id = self.create_next_id(ast.id.clone(), None);
-                self.id_prefix = match_id.clone();
-
-                let cases = cases
-                    .iter()
-                    .map(|case| match &case.kind {
-                        AstKind::MatchCase(MatchCase { box pattern, body }) => {
-                            let (pattern, pattern_identifiers) = self.lower_pattern(pattern);
-
-                            let reset_state = self.start_scope();
-                            for (name, (ast_id, identifier_id)) in pattern_identifiers {
-                                self.push(
-                                    ast_id,
-                                    Expression::PatternIdentifierReference(identifier_id),
-                                    name.clone(),
-                                );
-                            }
-                            self.compile(body.as_ref());
-                            let body = self.end_scope(reset_state);
-
-                            (pattern, body)
-                        }
-                        AstKind::Error { errors } => {
-                            let pattern = Pattern::Error {
-                                errors: errors.clone(),
-                            };
-
-                            let reset_state = self.start_scope();
-                            self.compile(&[]);
-                            let body = self.end_scope(reset_state);
-
-                            (pattern, body)
-                        }
-                        _ => unreachable!("Expected match case in match cases, got {case:?}."),
-                    })
-                    .collect_vec();
-
                 // The scope is only for hierarchical IDs. The actual bodies are
                 // inside the cases.
-                let _ = self.end_scope(reset_state);
+                let match_id = self.create_next_id(ast.id.clone(), None);
+                let (_, cases) = self.with_scope(match_id.clone(), |scope| {
+                    cases
+                        .iter()
+                        .map(|case| match &case.kind {
+                            AstKind::MatchCase(MatchCase { box pattern, body }) => {
+                                let (pattern, pattern_identifiers) = scope.lower_pattern(pattern);
+
+                                let (body, _) = scope.with_scope(None, |scope| {
+                                    for (name, (ast_id, identifier_id)) in
+                                        pattern_identifiers.clone()
+                                    {
+                                        scope.push(
+                                            ast_id,
+                                            Expression::PatternIdentifierReference(identifier_id),
+                                            name.clone(),
+                                        );
+                                    }
+                                    scope.compile(body.as_ref());
+                                });
+
+                                (pattern, body)
+                            }
+                            AstKind::Error { errors } => {
+                                let pattern = Pattern::Error {
+                                    errors: errors.clone(),
+                                };
+
+                                let (body, _) = scope.with_scope(None, |scope| {
+                                    scope.compile(&[]);
+                                });
+
+                                (pattern, body)
+                            }
+                            _ => unreachable!("Expected match case in match cases, got {case:?}."),
+                        })
+                        .collect_vec()
+                });
 
                 self.push_with_existing_id(match_id, Expression::Match { expression, cases }, None)
             }
@@ -461,12 +462,10 @@ impl Context<'_> {
                     },
                     None,
                 );
-
-                let reset_state = self.start_scope();
                 let then_function_id = self.create_next_id(None, None);
-                self.id_prefix = then_function_id.clone();
-                self.push(None, Expression::Reference(hir.clone()), None);
-                let then_body = self.end_scope(reset_state);
+                let (then_body, _) = self.with_scope(then_function_id.clone(), |scope| {
+                    scope.push(None, Expression::Reference(hir.clone()), None);
+                });
                 let then_function = self.push_with_existing_id(
                     then_function_id,
                     Expression::Function(Function {
@@ -477,18 +476,17 @@ impl Context<'_> {
                     None,
                 );
 
-                let reset_state = self.start_scope();
                 let else_function_id = self.create_next_id(None, None);
-                self.id_prefix = else_function_id.clone();
-                self.push(
-                    None,
-                    Expression::Call {
-                        function: to_debug_text_function.clone(),
-                        arguments: vec![hir],
-                    },
-                    None,
-                );
-                let else_body = self.end_scope(reset_state);
+                let (else_body, _) = self.with_scope(else_function_id.clone(), |scope| {
+                    scope.push(
+                        None,
+                        Expression::Call {
+                            function: to_debug_text_function.clone(),
+                            arguments: vec![hir.clone()],
+                        },
+                        None,
+                    );
+                });
                 let else_function = self.push_with_existing_id(
                     else_function_id,
                     Expression::Function(Function {
@@ -531,50 +529,49 @@ impl Context<'_> {
         function: &ast::Function,
         identifier: impl Into<Option<&str>>,
     ) -> hir::Id {
-        let reset_state = self.start_scope();
         let function_id = self.create_next_id(id, identifier);
-        self.id_prefix = function_id.clone();
+        let (inner_body, parameters) = self.with_scope(function_id.clone(), |scope| {
+            // TODO: Error on parameters with same name
+            let mut parameters = Vec::with_capacity(function.parameters.len());
+            for parameter in &function.parameters {
+                if let AstKind::Identifier(Identifier(parameter)) = &parameter.kind {
+                    let name = parameter.value.to_string();
+                    parameters.push(scope.id_prefix.child(name.clone()));
 
-        // TODO: Error on parameters with same name
-        let mut parameters = Vec::with_capacity(function.parameters.len());
-        for parameter in &function.parameters {
-            if let AstKind::Identifier(Identifier(parameter)) = &parameter.kind {
-                let name = parameter.value.to_string();
-                parameters.push(function_id.child(name.clone()));
+                    let id = scope.create_next_id(parameter.id.clone(), &*name);
+                    scope.body.identifiers.insert(id.clone(), name.clone());
+                    scope.identifiers.insert(name, id);
+                } else {
+                    let parameter_id = scope.create_next_id(parameter.id.clone(), None);
+                    parameters.push(parameter_id.clone());
 
-                let id = self.create_next_id(parameter.id.clone(), &*name);
-                self.body.identifiers.insert(id.clone(), name.clone());
-                self.identifiers.insert(name, id);
-            } else {
-                let parameter_id = self.create_next_id(parameter.id.clone(), None);
-                parameters.push(parameter_id.clone());
-
-                let (pattern, identifier_ids) = self.lower_pattern(parameter);
-                self.push(
-                    None,
-                    Expression::Destructure {
-                        expression: parameter_id,
-                        pattern,
-                    },
-                    None,
-                );
-
-                for (name, (ast_id, identifier_id)) in identifier_ids
-                    .into_iter()
-                    .sorted_by_key(|(_, (_, identifier_id))| identifier_id.0)
-                {
-                    self.push(
-                        ast_id,
-                        Expression::PatternIdentifierReference(identifier_id),
-                        name.clone(),
+                    let (pattern, identifier_ids) = scope.lower_pattern(parameter);
+                    scope.push(
+                        None,
+                        Expression::Destructure {
+                            expression: parameter_id,
+                            pattern,
+                        },
+                        None,
                     );
+
+                    for (name, (ast_id, identifier_id)) in identifier_ids
+                        .into_iter()
+                        .sorted_by_key(|(_, (_, identifier_id))| identifier_id.0)
+                    {
+                        scope.push(
+                            ast_id,
+                            Expression::PatternIdentifierReference(identifier_id),
+                            name.clone(),
+                        );
+                    }
                 }
             }
-        }
 
-        self.compile(&function.body);
+            scope.compile(&function.body);
 
-        let inner_body = self.end_scope(reset_state);
+            parameters
+        });
 
         self.push_with_existing_id(
             function_id,
@@ -808,21 +805,19 @@ impl Context<'_> {
 
         assert!(self.use_id.is_none());
 
-        let reset_state = self.start_scope();
         let use_id = self.create_next_id(None, "use");
-        self.id_prefix = use_id.clone();
-        let relative_path = use_id.child("relativePath");
-
-        self.push(
-            None,
-            Expression::UseModule {
-                current_module: self.module.clone(),
-                relative_path: relative_path.clone(),
-            },
-            "importedModule".to_string(),
-        );
-
-        let inner_body = self.end_scope(reset_state);
+        let (inner_body, relative_path) = self.with_scope(use_id.clone(), |scope| {
+            let relative_path = scope.id_prefix.child("relativePath");
+            scope.push(
+                None,
+                Expression::UseModule {
+                    current_module: scope.module.clone(),
+                    relative_path: relative_path.clone(),
+                },
+                "importedModule".to_string(),
+            );
+            relative_path
+        });
 
         self.push_with_existing_id(
             use_id.clone(),
