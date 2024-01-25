@@ -260,15 +260,6 @@ impl DefaultEnvironment {
     fn file_read_to_end(&mut self, heap: &mut Heap, arguments: &[InlineObject]) -> InlineObject {
         let [file] = arguments else { unreachable!() };
 
-        // let file = if let Data::Handle(handle) = Data::from(*file)
-        //     && let Some(DynamicHandle::File(file)) = self.dynamic_handles.get(&handle) {
-        //     file
-        // } else {
-        //     // TODO: Panic
-        //     let message =
-        //     Text::create(heap, true, &format!("Handle `file.readToEnd` was called with a non-file."),);
-        //     return Tag::create_result(heap, true, Err(message.into())).into();
-        // };
         let file = match self.resolve_file_handle_mut(heap, "file.readToEnd", *file) {
             Ok(file) => file,
             Err(result) => return result,
@@ -302,15 +293,6 @@ impl DefaultEnvironment {
     fn file_close(&mut self, heap: &mut Heap, arguments: &[InlineObject]) -> InlineObject {
         let [file] = arguments else { unreachable!() };
 
-        // let file = if let Data::Handle(handle) = Data::from(*file)
-        //     && let Some(DynamicHandle::File(file)) = self.dynamic_handles.get_mut(&handle) {
-        //     file
-        // } else {
-        //     // TODO: Panic
-        //     let message =
-        //     Text::create(heap, true, "Handle `file.close` was called with a non-file.",);
-        //     return Tag::create_result(heap, true, Err(message.into())).into();
-        // };
         let file = match self.resolve_file_handle_mut(heap, "file.close", *file) {
             Ok(file) => file,
             Err(result) => return result,
@@ -350,29 +332,6 @@ impl DefaultEnvironment {
             Err(Tag::create_result(heap, true, Err(message.into())).into())
         }
     }
-    // fn resolve_file_handle(
-    //     &self,
-    //     heap: &mut Heap,
-    //     handle_name: &str,
-    //     file: InlineObject,
-    // ) -> Result<&File, InlineObject> {
-    //     if let Data::Handle(handle) = Data::from(file)
-    //         && let Some(DynamicHandle::File(file)) = self.dynamic_handles.get(&handle) {
-    //             if let Some(file) = file {
-    //                 Ok(file)
-    //             } else {
-    //                 // TODO: Panic
-    //                 let message =
-    //                     Text::create(heap, true, &format!("Handle `{handle_name}` was called with a closed file."),);
-    //                 Err(Tag::create_result(heap, true, Err(message.into())).into())
-    //             }
-    //      } else {
-    //         // TODO: Panic
-    //         let message =
-    //             Text::create(heap, true, &format!("Handle `{handle_name}` was called with a non-file."),);
-    //         Err(Tag::create_result(heap, true, Err(message.into())).into())
-    //     }
-    // }
 
     // HTTP
 
