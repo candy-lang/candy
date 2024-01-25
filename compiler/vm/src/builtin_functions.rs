@@ -62,6 +62,7 @@ impl MachineState {
             BuiltinFunction::TagGetValue => heap.tag_get_value(args),
             BuiltinFunction::TagHasValue => heap.tag_has_value(args),
             BuiltinFunction::TagWithoutValue => heap.tag_without_value(args),
+            BuiltinFunction::TagWithValue => heap.tag_with_value(args),
             BuiltinFunction::TextCharacters => heap.text_characters(args),
             BuiltinFunction::TextConcatenate => heap.text_concatenate(args),
             BuiltinFunction::TextContains => heap.text_contains(args),
@@ -413,6 +414,11 @@ impl Heap {
     fn tag_without_value(&mut self, args: &[InlineObject]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |tag: Tag| {
             Return(tag.without_value().into())
+        })
+    }
+    fn tag_with_value(&mut self, args: &[InlineObject]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |tag: Tag, value: Any| {
+            Return(Tag::create_with_value(self, true, tag.symbol(), value.object).into())
         })
     }
 
