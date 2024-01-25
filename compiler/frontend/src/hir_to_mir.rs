@@ -463,7 +463,7 @@ impl<'a> LoweringContext<'a> {
                 let callee_is_tag =
                     body.push_call(builtin_equals, vec![callee_type, tag_tag], responsible);
                 body.push_if_else(
-                    &hir_id.child("isCalleeTag"),
+                    &hir_id.child("calleeIsTag"),
                     callee_is_tag,
                     |body| {
                         let already_has_value =
