@@ -96,10 +96,10 @@ impl Bodies {
 
             builder.push(") =", None, EnumSet::empty());
 
-            builder.indent();
-            builder.push_newline();
-            body.build_rich_ir_with_constants(builder, constants);
-            builder.dedent();
+            builder.push_indented_foldable(|builder| {
+                builder.push_newline();
+                body.build_rich_ir_with_constants(builder, constants);
+            });
         });
     }
 }

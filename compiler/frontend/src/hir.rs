@@ -597,14 +597,12 @@ impl ToRichIr for Expression {
                 builder.push_children_custom_multiline(cases, |builder, (pattern, body)| {
                     pattern.build_rich_ir(builder);
                     builder.push(" ->", None, EnumSet::empty());
-                    builder.indent();
-                    builder.push_foldable(|builder| {
+                    builder.push_indented_foldable(|builder| {
                         if !body.expressions.is_empty() {
                             builder.push_newline();
                         }
                         body.build_rich_ir(builder);
                     });
-                    builder.dedent();
                 });
             }
             Self::Function(function) => {
@@ -725,13 +723,11 @@ impl ToRichIr for Function {
             builder.push(" ", None, EnumSet::empty());
         }
         builder.push("->", None, EnumSet::empty());
-        builder.push_foldable(|builder| {
-            builder.indent();
+        builder.push_indented_foldable(|builder| {
             builder.push_newline();
             self.body.build_rich_ir(builder);
-            builder.dedent();
-            builder.push_newline();
         });
+        builder.push_newline();
     }
 }
 impl ToRichIr for Body {
