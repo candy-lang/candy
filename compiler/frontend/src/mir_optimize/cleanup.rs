@@ -17,34 +17,29 @@ use crate::{
     id::IdGenerator,
     mir::{Body, Expression, Id, Mir},
 };
-use std::mem;
 
 impl Mir {
     pub fn cleanup(&mut self, pureness: &mut PurenessInsights) {
-        self.sort_leading_constants(pureness);
+        self.sort_constants_to_front(pureness);
         self.normalize_ids(pureness);
     }
 
-    /// Sorts the leading constants in the body. This wouldn't be super useful
-    /// when applied to an unoptimized MIR, but because we optimize it using
-    /// [constant lifting], we can assume that all constants are at the
-    /// beginning of the body.
+    /// Moves constants directly in the body to the front and sorts them. This
+    /// wouldn't be super useful when applied to an unoptimized MIR, but because
+    /// we optimize it using [constant lifting], we can assume that all
+    /// constants are in the outermost body.
     ///
     /// [constant lifting]: super::constant_lifting
-    fn sort_leading_constants(&mut self, pureness: &PurenessInsights) {
-        // PERF: use `partition_point` instead of moving expressions to a new body
-        let mut still_constants = true;
-        let old_body = mem::take(&mut self.body);
-        for (id, expression) in old_body {
-            if still_constants && !pureness.is_definition_const(&expression) {
-                still_constants = false;
-                Self::sort_constants(&mut self.body);
-            }
-            self.body.push(id, expression);
-        }
-        if still_constants {
-            Self::sort_constants(&mut self.body);
-        }
+    fn sort_constants_to_front(&mut self, pureness: &PurenessInsights) {
+        let (constants, mut non_constants) = self
+            .body
+            .expressions
+            .drain(..)
+            .partition(|(_, expression)| pureness.is_definition_const(expression));
+        let mut constants = Body::new(constants);
+        Self::sort_constants(&mut constants);
+        self.body = constants;
+        self.body.expressions.append(&mut non_constants);
     }
     /// Assumes that the given body contains only constants.
     fn sort_constants(body: &mut Body) {
