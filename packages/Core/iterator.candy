@@ -211,7 +211,8 @@ takeWhile iterator tester :=
       More [item, rest] -> ifElse (tester item) { More [item, State: rest] } { Empty }
   }
 
-takeUntil iterator tester := iterator | takeWhile { item -> tester item | bool.not }
+takeUntil iterator tester := iterator | wrapSafe { needs False "`takeUntil` needs an iterator." }
+  | takeWhile { item -> tester item | bool.not }
 
 take iterator n :=
   needs (int.is n)
