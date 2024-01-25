@@ -24,6 +24,8 @@
   - packages/Csv/**/*
 'P: Examples':
   - packages/Examples/**/*
+'P: FileSystem':
+  - packages/FileSystem/**/*
 'P: Http':
   - packages/Http/**/*
 'P: Parser':
