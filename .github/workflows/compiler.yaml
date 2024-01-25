@@ -177,10 +177,11 @@ jobs:
 
       - name: Run benchmark
         working-directory: compiler/vm/
+        # TODO(JonasWanke): Fix output format error
         # Explicitly specify Bash since it also includes `-o pipefail`. Without
         # it, this step succeeds even if the benchmark execution itself fails.
         # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#exit-codes-and-error-action-preference
-        shell: bash
+        # shell: bash
         run: cargo bench -- --output-format bencher | tee benchmark_output.txt
 
       - name: Store benchmark result
