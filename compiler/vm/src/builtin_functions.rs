@@ -172,30 +172,19 @@ impl Heap {
     fn function_run(args: &[InlineObject], responsible: HirId) -> BuiltinResult {
         unpack!(self, args, |function: Any| {
             match **function {
-                Data::Builtin(_) => {
-                    // TODO: Replace with `unreachable!()` once we have guards
-                    // for argument counts on the Candy side – there are no
-                    // builtins without arguments.
-                    return Err("`✨.functionRun` called with builtin".to_string());
-                }
+                // All builtins have at least one argument, so ✨.functionRun
+                // can never be called with a builtin.
+                Data::Builtin(_) => unreachable!(),
                 Data::Function(function) => DivergeControlFlow {
                     function,
                     responsible,
                 },
-                Data::Handle(handle) => {
-                    if handle.argument_count() != 0 {
-                        return Err(
-                            "`✨.functionRun` expects a function or handle without arguments"
-                                .to_string(),
-                        );
-                    }
-                    CallHandle(CallHandle {
-                        handle,
-                        arguments: vec![],
-                        responsible,
-                    })
-                }
-                _ => return Err("`✨.functionRun` expects a function or handle".to_string()),
+                Data::Handle(handle) => CallHandle(CallHandle {
+                    handle,
+                    arguments: vec![],
+                    responsible,
+                }),
+                _ => unreachable!(),
             }
         })
     }
@@ -205,7 +194,7 @@ impl Heap {
                 Data::Builtin(builtin) => builtin.get().num_parameters(),
                 Data::Function(function) => function.argument_count(),
                 Data::Handle(handle) => handle.argument_count(),
-                _ => return Err("`✨.getArgumentCount` expects a function or handle".to_string()),
+                _ => unreachable!(),
             };
             Return(Int::create(self, true, count).into())
         })
