@@ -148,6 +148,11 @@
       },
       {
         "category": "Candy Compiler Debugging",
+        "command": "candy.debug.viewOptimizedLir",
+        "title": "View Optimized LIR"
+      },
+      {
+        "category": "Candy Compiler Debugging",
         "command": "candy.debug.viewVmByteCode",
         "title": "View VM Byte Code"
       },
