@@ -232,6 +232,7 @@ pub struct DefaultSymbols {
     pub error: Text,
     pub false_: Text,
     pub file: Text,
+    pub file_system: Text,
     pub function: Text,
     pub get_random_bytes: Text,
     pub get_next_request: Text,
@@ -266,6 +267,7 @@ impl DefaultSymbols {
             error: Text::create(heap, false, "Error"),
             false_: Text::create(heap, false, "False"),
             file: Text::create(heap, false, "File"),
+            file_system: Text::create(heap, false, "FileSystem"),
             function: Text::create(heap, false, "Function"),
             get_next_request: Text::create(heap, false, "GetNextRequest"),
             get_random_bytes: Text::create(heap, false, "GetRandomBytes"),
@@ -313,6 +315,7 @@ impl DefaultSymbols {
             error: clone_to_heap(heap, address_map, self.error),
             false_: clone_to_heap(heap, address_map, self.false_),
             file: clone_to_heap(heap, address_map, self.file),
+            file_system: clone_to_heap(heap, address_map, self.file_system),
             function: clone_to_heap(heap, address_map, self.function),
             get_next_request: clone_to_heap(heap, address_map, self.get_next_request),
             get_random_bytes: clone_to_heap(heap, address_map, self.get_random_bytes),
@@ -348,7 +351,7 @@ impl DefaultSymbols {
             .map(|it| symbols[it])
     }
     #[must_use]
-    pub const fn all_symbols(&self) -> [Text; 30] {
+    pub const fn all_symbols(&self) -> [Text; 31] {
         [
             self.arguments,
             self.builtin,
@@ -357,6 +360,7 @@ impl DefaultSymbols {
             self.error,
             self.false_,
             self.file,
+            self.file_system,
             self.function,
             self.get_next_request,
             self.get_random_bytes,

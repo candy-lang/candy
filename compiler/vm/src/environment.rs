@@ -104,7 +104,9 @@ impl DefaultEnvironment {
             .map(|it| Text::create(heap, true, it).into())
             .collect_vec();
         let arguments = List::create(heap, true, arguments.as_slice());
+
         let system_clock_handle = Handle::new(heap, 0);
+
         let file_open_handle = Handle::new(heap, 1);
         let file_read_to_end_handle = Handle::new(heap, 1);
         let file_close_handle = Handle::new(heap, 1);
@@ -120,17 +122,29 @@ impl DefaultEnvironment {
                 (heap.default_symbols().close, **file_close_handle),
             ],
         );
+        let file_system_object = Struct::create_with_symbol_keys(
+            heap,
+            true,
+            [(heap.default_symbols().file, file_object.into())],
+        );
+
         let http_server_handle = Handle::new(heap, 1);
+
         let get_random_bytes_handle = Handle::new(heap, 1);
+
         let stdin_handle = Handle::new(heap, 0);
         let stdout_handle = Handle::new(heap, 1);
+
         let environment_object = Struct::create_with_symbol_keys(
             heap,
             true,
             [
                 (heap.default_symbols().arguments, arguments.into()),
                 (heap.default_symbols().system_clock, **system_clock_handle),
-                (heap.default_symbols().file, file_object.into()),
+                (
+                    heap.default_symbols().file_system,
+                    file_system_object.into(),
+                ),
                 (heap.default_symbols().http_server, **http_server_handle),
                 (
                     heap.default_symbols().get_random_bytes,
