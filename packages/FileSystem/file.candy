@@ -20,3 +20,14 @@ readBytes fileSystemFile path :=
   }
   | result.andAlso { [file] -> file | fileSystemFile.close }
   | result.map { [bytes] -> bytes }
+
+readText fileSystemFile path :=
+  fileSystemFile %
+    [open, readToEnd, close] ->
+      needs (function.is1 open)
+      needs (function.is1 readToEnd)
+      needs (function.is1 close)
+    _ -> needs False "`readText` needs `environment.fileSystem.file` as its first parameter."
+  needs (text.is path)
+
+  readBytes fileSystemFile path | result.flatMap { bytes -> bytes | text.fromUtf8 }

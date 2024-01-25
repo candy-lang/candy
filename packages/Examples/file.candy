@@ -5,6 +5,6 @@
 main := { environment ->
   (path,) = environment.arguments
 
-  bytes = file.readBytes environment.fileSystem.file path | result.unwrap
-  print "Bytes: {bytes}"
+  print "Bytes: {file.readBytes environment.fileSystem.file path | result.unwrap}"
+  print "Text: {file.readText environment.fileSystem.file path | result.unwrap}"
 }
