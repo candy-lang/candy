@@ -53,16 +53,20 @@ impl<B: Borrow<ByteCode>, T: Tracer> Vm<B, T> {
 }
 
 pub struct DefaultEnvironment {
-    get_random_bytes_handle: Handle,
+    // Clock
+    system_clock_handle: Handle,
 
+    // HTTP
     http_server_handle: Handle,
     /// `None` means the server got closed.
     http_server_states: Vec<Option<HttpServerState>>,
 
+    // Random
+    get_random_bytes_handle: Handle,
+
+    // Stdio
     stdin_handle: Handle,
     stdout_handle: Handle,
-
-    system_clock_handle: Handle,
 
     dynamic_handles: FxHashMap<Handle, DynamicHandle>,
 }
@@ -88,33 +92,33 @@ impl DefaultEnvironment {
             .map(|it| Text::create(heap, true, it).into())
             .collect_vec();
         let arguments = List::create(heap, true, arguments.as_slice());
-        let get_random_bytes_handle = Handle::new(heap, 1);
+        let system_clock_handle = Handle::new(heap, 0);
         let http_server_handle = Handle::new(heap, 1);
+        let get_random_bytes_handle = Handle::new(heap, 1);
         let stdin_handle = Handle::new(heap, 0);
         let stdout_handle = Handle::new(heap, 1);
-        let system_clock_handle = Handle::new(heap, 0);
         let environment_object = Struct::create_with_symbol_keys(
             heap,
             true,
             [
                 (heap.default_symbols().arguments, arguments.into()),
+                (heap.default_symbols().system_clock, **system_clock_handle),
+                (heap.default_symbols().http_server, **http_server_handle),
                 (
                     heap.default_symbols().get_random_bytes,
                     **get_random_bytes_handle,
                 ),
-                (heap.default_symbols().http_server, **http_server_handle),
                 (heap.default_symbols().stdin, **stdin_handle),
                 (heap.default_symbols().stdout, **stdout_handle),
-                (heap.default_symbols().system_clock, **system_clock_handle),
             ],
         );
         let environment = Self {
-            get_random_bytes_handle,
+            system_clock_handle,
             http_server_handle,
             http_server_states: vec![],
+            get_random_bytes_handle,
             stdin_handle,
             stdout_handle,
-            system_clock_handle,
             dynamic_handles: FxHashMap::default(),
         };
         (environment_object, environment)
@@ -126,16 +130,16 @@ impl Environment for DefaultEnvironment {
         heap: &mut Heap,
         call: VmHandleCall<B, T>,
     ) -> Vm<B, T> {
-        let result = if call.handle == self.get_random_bytes_handle {
-            Self::get_random_bytes(heap, &call.arguments)
+        let result = if call.handle == self.system_clock_handle {
+            Self::system_clock(heap, &call.arguments)
         } else if call.handle == self.http_server_handle {
             self.http_server(heap, &call.arguments)
+        } else if call.handle == self.get_random_bytes_handle {
+            Self::get_random_bytes(heap, &call.arguments)
         } else if call.handle == self.stdin_handle {
             Self::stdin(heap, &call.arguments)
         } else if call.handle == self.stdout_handle {
             Self::stdout(heap, &call.arguments)
-        } else if call.handle == self.system_clock_handle {
-            Self::system_clock(heap, &call.arguments)
         } else {
             let dynamic_handle = self.dynamic_handles.get(&call.handle).unwrap_or_else(|| {
                 panic!(
@@ -163,40 +167,17 @@ impl Environment for DefaultEnvironment {
     }
 }
 impl DefaultEnvironment {
-    fn get_random_bytes(heap: &mut Heap, arguments: &[InlineObject]) -> InlineObject {
-        let [length] = arguments else { unreachable!() };
-        let Data::Int(length) = (*length).into() else {
-            // TODO: Panic
-            let message = Text::create(
-                heap,
-                true,
-                "Handle `getRandomBytes` was called with a non-integer.",
-            );
-            return Tag::create_result(heap, true, Err(message.into())).into();
-        };
-        let Some(length) = length.try_get::<usize>() else {
-            // TODO: Panic
-            let message = Text::create(
-                heap,
-                true,
-                "Handle `getRandomBytes` was called with a length that doesn't fit in usize.",
-            );
-            return Tag::create_result(heap, true, Err(message.into())).into();
-        };
+    // Clock
 
-        let mut bytes = vec![0u8; length];
-        if let Err(error) = getrandom::getrandom(&mut bytes) {
-            let message = Text::create(heap, true, &error.to_string());
-            return Tag::create_result(heap, true, Err(message.into())).into();
-        }
+    fn system_clock(heap: &mut Heap, arguments: &[InlineObject]) -> InlineObject {
+        let [] = arguments else { unreachable!() };
 
-        let bytes = bytes
-            .into_iter()
-            .map(|it| Int::create(heap, true, it).into())
-            .collect_vec();
-        let bytes = List::create(heap, true, bytes.as_slice());
-        Tag::create_result(heap, true, Ok(bytes.into())).into()
+        let now = SystemTime::now();
+        let since_unix_epoch = now.duration_since(SystemTime::UNIX_EPOCH).unwrap();
+        Int::create(heap, true, since_unix_epoch.as_nanos()).into()
     }
+
+    // HTTP
 
     fn http_server(&mut self, heap: &mut Heap, arguments: &[InlineObject]) -> InlineObject {
         let [list_of_socket_texts] = arguments else {
@@ -391,6 +372,45 @@ impl DefaultEnvironment {
         Tag::create_result(heap, true, Err(message.into())).into()
     }
 
+    // Random
+
+    fn get_random_bytes(heap: &mut Heap, arguments: &[InlineObject]) -> InlineObject {
+        let [length] = arguments else { unreachable!() };
+        let Data::Int(length) = (*length).into() else {
+            // TODO: Panic
+            let message = Text::create(
+                heap,
+                true,
+                "Handle `getRandomBytes` was called with a non-integer.",
+            );
+            return Tag::create_result(heap, true, Err(message.into())).into();
+        };
+        let Some(length) = length.try_get::<usize>() else {
+            // TODO: Panic
+            let message = Text::create(
+                heap,
+                true,
+                "Handle `getRandomBytes` was called with a length that doesn't fit in usize.",
+            );
+            return Tag::create_result(heap, true, Err(message.into())).into();
+        };
+
+        let mut bytes = vec![0u8; length];
+        if let Err(error) = getrandom::getrandom(&mut bytes) {
+            let message = Text::create(heap, true, &error.to_string());
+            return Tag::create_result(heap, true, Err(message.into())).into();
+        }
+
+        let bytes = bytes
+            .into_iter()
+            .map(|it| Int::create(heap, true, it).into())
+            .collect_vec();
+        let bytes = List::create(heap, true, bytes.as_slice());
+        Tag::create_result(heap, true, Ok(bytes.into())).into()
+    }
+
+    // Stdio
+
     fn stdin(heap: &mut Heap, arguments: &[InlineObject]) -> InlineObject {
         assert!(arguments.is_empty());
         let input = {
@@ -408,14 +428,6 @@ impl DefaultEnvironment {
         }
 
         Tag::create_nothing(heap).into()
-    }
-
-    fn system_clock(heap: &mut Heap, arguments: &[InlineObject]) -> InlineObject {
-        let [] = arguments else { unreachable!() };
-
-        let now = SystemTime::now();
-        let since_unix_epoch = now.duration_since(SystemTime::UNIX_EPOCH).unwrap();
-        Int::create(heap, true, since_unix_epoch.as_nanos()).into()
     }
 
     fn create_dynamic_handle(
