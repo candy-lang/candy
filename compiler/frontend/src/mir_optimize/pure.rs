@@ -340,6 +340,7 @@ impl PurenessInsights {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct IdSet(BitVec);
 impl IdSet {
+    #[must_use]
     pub fn contains(&self, id: Id) -> bool {
         if id.to_usize() >= self.0.len() {
             false
@@ -348,6 +349,7 @@ impl IdSet {
         }
     }
 
+    #[must_use]
     pub fn iter(&self) -> IdSetIter {
         self.into_iter()
     }

@@ -20,10 +20,14 @@
   - vscode_extension/**/*
 'P: Core':
   - packages/Core/**/*
+'P: Csv':
+  - packages/Csv/**/*
 'P: Examples':
   - packages/Examples/**/*
 'P: Http':
   - packages/Http/**/*
+'P: Parser':
+  - packages/Parser/**/*
 'P: ProgrammingLanguageBenchmarks':
   - packages/ProgrammingLanguageBenchmarks/**/*
 'P: Random':

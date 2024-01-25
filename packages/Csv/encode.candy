@@ -1,0 +1,62 @@
+[bool, checkEquals, equals, ifElse, iterator, list, result, text] = use "Core"
+
+encodeField field =
+  needs (text.is field)
+  ifElse
+    field | text.contains '"""' | bool.lazyOr { field | text.contains text.newline }
+    {
+      encoded = field | text.characters | iterator.fromList
+      | iterator.map { char -> ifElse (char | equals '"""') { '""""' } { char } }
+      | iterator.joinToText
+      '""{{encoded}}""'
+    }
+    { field }
+
+encodeLine line =
+  needs (list.is line)
+  needs (line | iterator.fromList | iterator.all text.is)
+  line | iterator.fromList | iterator.map encodeField | iterator.joinToTextWithSeparator ","
+
+encode lines :=
+  needs (list.is lines)
+  needs (lines | iterator.fromList | iterator.all list.is)
+  fieldsPerLine = lines | list.first | result.map list.length | result.unwrapOr 0
+  lines | iterator.fromList | iterator.map { line ->
+    needs (line | list.length | equals fieldsPerLine)
+    "{line | encodeLine}{text.newline}"
+  }
+  | iterator.joinToText
+
+testEncodeLine =
+  # TODO(JonaWanke): Add tests cases for leading/trailing whitespace when our parser is fixed,
+  # https://github.com/candy-lang/candy/issues/896
+  checkEquals (encodeLine (,)) ""
+  checkEquals (encodeLine ("aaa",)) "aaa"
+  checkEquals (encodeLine ("aaa", "bbb")) "aaa,bbb"
+
+testEncodeLineWithSpecialCharacters =
+  checkEquals (encodeLine ('"aa"a"',)) '""aa""a""'
+  checkEquals (encodeLine ("aa{text.newline}a",)) '""aa{{text.newline}}a""'
+
+testEncode =
+  checkEquals (encode (,)) ""
+  checkEquals (encode (("aaa",),)) "aaa{text.newline}"
+  checkEquals (encode (("aaa", "bbb"),)) "aaa,bbb{text.newline}"
+  checkEquals (encode (("aaa",), ("bbb",))) "aaa{text.newline}bbb{text.newline}"
+
+testRfcExamples =
+  # From https://datatracker.ietf.org/doc/html/rfc4180#section-2
+  checkEquals (encodeLine ("aaa", "bbb", "ccc")) "aaa,bbb,ccc"
+
+  checkEquals
+    encode (("aaa", "bbb", "ccc"), ("zzz", "yyy", "xxx"))
+    "aaa,bbb,ccc{text.newline}zzz,yyy,xxx{text.newline}"
+  checkEquals
+    encode (("field_name", "field_name", "field_name"), ("aaa", "bbb", "ccc"), ("zzz", "yyy", "xxx"))
+    "
+      field_name,field_name,field_name{text.newline}aaa,bbb,ccc{text.newline}zzz,yyy,xxx{text.newline}
+    "
+  checkEquals
+    encode (("aaa", "b{text.newline}bb", "ccc"), ("zzz", "yyy", "xxx"))
+    '"aaa,"b{{text.newline}}bb",ccc{{text.newline}}zzz,yyy,xxx{{text.newline}}"'
+  checkEquals (encode (("aaa", '"b"bb"', "ccc"),)) '"aaa,"b""bb",ccc{{text.newline}}"'

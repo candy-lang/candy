@@ -1,0 +1,25 @@
+[bool, equals, int, text] = use "Core"
+
+is cursor := cursor %
+  Cursor [source, offset] ->
+    text.is source | bool.lazyAnd { int.is offset } | bool.lazyAnd { int.isNonNegative offset }
+    | bool.lazyAnd { offset | int.isLessThanOrEqualTo (source | text.length) }
+  _ -> False
+
+newAtStart source :=
+  needs (text.is source)
+  Cursor [source, Offset: 0]
+
+isAtEnd cursor :=
+  needs (is cursor)
+  Cursor [source, offset] = cursor
+  offset | equals (source | text.length)
+
+add cursor length :=
+  needs (is cursor)
+  needs (int.is length)
+  needs (int.isNonNegative length)
+  Cursor [source, offset] = cursor
+  offset = offset | int.add length
+  needs (offset | int.isLessThanOrEqualTo (source | text.length))
+  Cursor [source, offset]
