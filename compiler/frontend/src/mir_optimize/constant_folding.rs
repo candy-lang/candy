@@ -54,7 +54,6 @@ pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression)
     let Expression::Call {
         function,
         arguments,
-        responsible,
     } = &**expression
     else {
         return;
@@ -64,7 +63,7 @@ pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression)
         Expression::Tag {
             symbol,
             value: None,
-        } if arguments.len() == 1 => {
+        } if arguments.len() == 2 => {
             expression.replace_with(
                 Expression::Tag {
                     symbol: symbol.clone(),
@@ -75,12 +74,10 @@ pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression)
         }
         Expression::Builtin(builtin) => {
             let arguments = arguments.clone();
-            let responsible = *responsible;
             let Some(result) = run_builtin(
                 &mut *expression,
                 *builtin,
                 &arguments,
-                responsible,
                 context.visible,
                 context.id_generator,
                 context.pureness,
@@ -101,7 +98,6 @@ fn run_builtin(
     expression: &mut CurrentExpression,
     builtin: BuiltinFunction,
     arguments: &[Id],
-    responsible: Id,
     visible: &VisibleExpressions,
     id_generator: &mut IdGenerator<Id>,
     pureness: &mut PurenessInsights,
@@ -114,30 +110,29 @@ fn run_builtin(
 
     let result = match builtin {
         BuiltinFunction::Equals => {
-            let [a, b] = arguments else { unreachable!() };
+            let [a, b, _] = arguments else { unreachable!() };
             a.semantically_equals(*b, visible, pureness)?.into()
         }
         BuiltinFunction::FunctionRun => {
-            let [function] = arguments else {
+            let [function, responsible] = arguments else {
                 unreachable!()
             };
             Expression::Call {
                 function: *function,
-                arguments: vec![],
-                responsible,
+                arguments: vec![*responsible],
             }
         }
         BuiltinFunction::GetArgumentCount => {
-            let [function] = arguments else {
+            let [function, _] = arguments else {
                 unreachable!()
             };
             let Expression::Function { parameters, .. } = visible.get(*function) else {
                 return None;
             };
-            parameters.len().into()
+            (parameters.len() - 1).into()
         }
         BuiltinFunction::IfElse => {
-            let [condition, then, else_] = arguments else {
+            let [condition, then, else_, responsible] = arguments else {
                 unreachable!()
             };
             if let Ok(condition) = visible.get(*condition).try_into() {
@@ -145,8 +140,7 @@ fn run_builtin(
                 // if false foo bar -> bar
                 Expression::Call {
                     function: if condition { *then } else { *else_ },
-                    arguments: vec![],
-                    responsible,
+                    arguments: vec![*responsible],
                 }
             } else {
                 // if foo { True } { False } -> foo
@@ -169,18 +163,18 @@ fn run_builtin(
             }
         }
         BuiltinFunction::IntAdd => {
-            let [a, b] = arguments else { unreachable!() };
+            let [a, b, _] = arguments else { unreachable!() };
             let a: &BigInt = visible.get(*a).try_into().ok()?;
             let b: &BigInt = visible.get(*b).try_into().ok()?;
             (a + b).into()
         }
         BuiltinFunction::IntBitLength => {
-            let [a] = arguments else { unreachable!() };
+            let [a, _] = arguments else { unreachable!() };
             let a: &BigInt = visible.get(*a).try_into().ok()?;
             a.bits().into()
         }
         BuiltinFunction::IntBitwiseAnd => {
-            let [a, b] = arguments else { unreachable!() };
+            let [a, b, _] = arguments else { unreachable!() };
             if a.semantically_equals(*b, visible, pureness) == Some(true) {
                 return Some(Expression::Reference(*a));
             }
@@ -190,7 +184,7 @@ fn run_builtin(
             (a & b).into()
         }
         BuiltinFunction::IntBitwiseOr => {
-            let [a, b] = arguments else { unreachable!() };
+            let [a, b, _] = arguments else { unreachable!() };
             if a.semantically_equals(*b, visible, pureness) == Some(true) {
                 return Some(Expression::Reference(*a));
             }
@@ -200,7 +194,7 @@ fn run_builtin(
             (a | b).into()
         }
         BuiltinFunction::IntBitwiseXor => {
-            let [a, b] = arguments else { unreachable!() };
+            let [a, b, _] = arguments else { unreachable!() };
             if a.semantically_equals(*b, visible, pureness) == Some(true) {
                 return Some(0.into());
             }
@@ -210,7 +204,7 @@ fn run_builtin(
             (a ^ b).into()
         }
         BuiltinFunction::IntCompareTo => {
-            let [a, b] = arguments else { unreachable!() };
+            let [a, b, _] = arguments else { unreachable!() };
             if a.semantically_equals(*b, visible, pureness) == Some(true) {
                 return Some(Ordering::Equal.into());
             }
@@ -220,7 +214,7 @@ fn run_builtin(
             a.cmp(b).into()
         }
         BuiltinFunction::IntDivideTruncating => {
-            let [dividend, divisor] = arguments else {
+            let [dividend, divisor, _] = arguments else {
                 unreachable!()
             };
             if dividend.semantically_equals(*divisor, visible, pureness) == Some(true) {
@@ -232,7 +226,7 @@ fn run_builtin(
             (dividend / divisor).into()
         }
         BuiltinFunction::IntModulo => {
-            let [dividend, divisor] = arguments else {
+            let [dividend, divisor, _] = arguments else {
                 unreachable!()
             };
             if dividend.semantically_equals(*divisor, visible, pureness) == Some(true) {
@@ -244,7 +238,7 @@ fn run_builtin(
             dividend.mod_floor(divisor).into()
         }
         BuiltinFunction::IntMultiply => {
-            let [factor_a, factor_b] = arguments else {
+            let [factor_a, factor_b, _] = arguments else {
                 unreachable!()
             };
             let factor_a: &BigInt = visible.get(*factor_a).try_into().ok()?;
@@ -252,7 +246,7 @@ fn run_builtin(
             (factor_a * factor_b).into()
         }
         BuiltinFunction::IntParse => {
-            let [text] = arguments else { unreachable!() };
+            let [text, _] = arguments else { unreachable!() };
             let text: &str = visible.get(*text).try_into().ok()?;
             let mut body = Body::default();
             let result = match BigInt::from_str(text) {
@@ -264,7 +258,7 @@ fn run_builtin(
             return None;
         }
         BuiltinFunction::IntRemainder => {
-            let [dividend, divisor] = arguments else {
+            let [dividend, divisor, _] = arguments else {
                 unreachable!()
             };
             if dividend.semantically_equals(*divisor, visible, pureness) == Some(true) {
@@ -276,7 +270,7 @@ fn run_builtin(
             (dividend % divisor).into()
         }
         BuiltinFunction::IntShiftLeft => {
-            let [value, amount] = arguments else {
+            let [value, amount, _] = arguments else {
                 unreachable!()
             };
             let amount: &BigInt = visible.get(*amount).try_into().ok()?;
@@ -290,7 +284,7 @@ fn run_builtin(
             (value << amount).into()
         }
         BuiltinFunction::IntShiftRight => {
-            let [value, amount] = arguments else {
+            let [value, amount, _] = arguments else {
                 unreachable!()
             };
             let amount: &BigInt = visible.get(*amount).try_into().ok()?;
@@ -304,7 +298,7 @@ fn run_builtin(
             (value >> amount).into()
         }
         BuiltinFunction::IntSubtract => {
-            let [minuend, subtrahend] = arguments else {
+            let [minuend, subtrahend, _] = arguments else {
                 unreachable!()
             };
             if minuend.semantically_equals(*subtrahend, visible, pureness) == Some(true) {
@@ -316,7 +310,7 @@ fn run_builtin(
             (minuend - subtrahend).into()
         }
         BuiltinFunction::ListFilled => {
-            let [length, item] = arguments else {
+            let [length, item, _] = arguments else {
                 unreachable!()
             };
             let Expression::Int(length) = visible.get(*length) else {
@@ -326,7 +320,7 @@ fn run_builtin(
             vec![*item; length.to_usize().unwrap()].into()
         }
         BuiltinFunction::ListGet => {
-            let [list, index] = arguments else {
+            let [list, index, _] = arguments else {
                 unreachable!()
             };
             let Expression::List(list) = visible.get(*list) else {
@@ -340,7 +334,7 @@ fn run_builtin(
         }
         BuiltinFunction::ListInsert => return None,
         BuiltinFunction::ListLength => {
-            let [list] = arguments else { unreachable!() };
+            let [list, _] = arguments else { unreachable!() };
             let Expression::List(list) = visible.get(*list) else {
                 return None;
             };
@@ -350,7 +344,7 @@ fn run_builtin(
         BuiltinFunction::ListReplace => return None,
         BuiltinFunction::Print => return None,
         BuiltinFunction::StructGet => {
-            let [struct_, key] = arguments else {
+            let [struct_, key, _] = arguments else {
                 unreachable!()
             };
             let Expression::Struct(fields) = visible.get(*struct_) else {
@@ -391,7 +385,7 @@ fn run_builtin(
         }
         BuiltinFunction::StructGetKeys => return None,
         BuiltinFunction::StructHasKey => {
-            let [struct_, key] = arguments else {
+            let [struct_, key, _] = arguments else {
                 unreachable!()
             };
             let Expression::Struct(fields) = visible.get(*struct_) else {
@@ -418,7 +412,7 @@ fn run_builtin(
             is_contained?.into()
         }
         BuiltinFunction::TagGetValue => {
-            let [tag] = arguments else { unreachable!() };
+            let [tag, _] = arguments else { unreachable!() };
             let Expression::Tag {
                 value: Some(value), ..
             } = visible.get(*tag)
@@ -428,14 +422,14 @@ fn run_builtin(
             value.into()
         }
         BuiltinFunction::TagHasValue => {
-            let [tag] = arguments else { unreachable!() };
+            let [tag, _] = arguments else { unreachable!() };
             let Expression::Tag { value, .. } = visible.get(*tag) else {
                 return None;
             };
             value.is_some().into()
         }
         BuiltinFunction::TagWithoutValue => {
-            let [tag] = arguments else { unreachable!() };
+            let [tag, _] = arguments else { unreachable!() };
             let Expression::Tag { symbol, .. } = visible.get(*tag) else {
                 return None;
             };
@@ -445,7 +439,7 @@ fn run_builtin(
             }
         }
         BuiltinFunction::TextCharacters => {
-            let [text] = arguments else { unreachable!() };
+            let [text, _] = arguments else { unreachable!() };
             let Expression::Text(text) = visible.get(*text) else {
                 return None;
             };
@@ -459,7 +453,7 @@ fn run_builtin(
             return None;
         }
         BuiltinFunction::TextConcatenate => {
-            let [a, b] = arguments else { unreachable!() };
+            let [a, b, _] = arguments else { unreachable!() };
             match (visible.get(*a), visible.get(*b)) {
                 (Expression::Text(text), other) | (other, Expression::Text(text))
                     if text.is_empty() =>
@@ -473,7 +467,7 @@ fn run_builtin(
             }
         }
         BuiltinFunction::TextContains => {
-            let [text, pattern] = arguments else {
+            let [text, pattern, _] = arguments else {
                 unreachable!()
             };
             let Expression::Text(pattern) = visible.get(*pattern) else {
@@ -489,7 +483,7 @@ fn run_builtin(
             text.contains(pattern).into()
         }
         BuiltinFunction::TextEndsWith => {
-            let [text, suffix] = arguments else {
+            let [text, suffix, _] = arguments else {
                 unreachable!()
             };
             let Expression::Text(suffix) = visible.get(*suffix) else {
@@ -505,7 +499,9 @@ fn run_builtin(
             text.ends_with(suffix).into()
         }
         BuiltinFunction::TextFromUtf8 => {
-            let [bytes] = arguments else { unreachable!() };
+            let [bytes, _] = arguments else {
+                unreachable!()
+            };
             let Expression::List(bytes) = visible.get(*bytes) else {
                 return None;
             };
@@ -533,7 +529,7 @@ fn run_builtin(
             return None;
         }
         BuiltinFunction::TextGetRange => {
-            let [text, start_inclusive, end_exclusive] = arguments else {
+            let [text, start_inclusive, end_exclusive, _] = arguments else {
                 unreachable!()
             };
             if start_inclusive.semantically_equals(*end_exclusive, visible, pureness) == Some(true)
@@ -576,21 +572,21 @@ fn run_builtin(
                 .into()
         }
         BuiltinFunction::TextIsEmpty => {
-            let [text] = arguments else { unreachable!() };
+            let [text, _] = arguments else { unreachable!() };
             let Expression::Text(text) = visible.get(*text) else {
                 return None;
             };
             text.is_empty().into()
         }
         BuiltinFunction::TextLength => {
-            let [text] = arguments else { unreachable!() };
+            let [text, _] = arguments else { unreachable!() };
             let Expression::Text(text) = visible.get(*text) else {
                 return None;
             };
             text.graphemes(true).count().into()
         }
         BuiltinFunction::TextStartsWith => {
-            let [text, suffix] = arguments else {
+            let [text, suffix, _] = arguments else {
                 unreachable!()
             };
             let Expression::Text(suffix) = visible.get(*suffix) else {
@@ -606,21 +602,21 @@ fn run_builtin(
             text.starts_with(suffix).into()
         }
         BuiltinFunction::TextTrimEnd => {
-            let [text] = arguments else { unreachable!() };
+            let [text, _] = arguments else { unreachable!() };
             let Expression::Text(text) = visible.get(*text) else {
                 return None;
             };
             text.trim_end().into()
         }
         BuiltinFunction::TextTrimStart => {
-            let [text] = arguments else { unreachable!() };
+            let [text, _] = arguments else { unreachable!() };
             let Expression::Text(text) = visible.get(*text) else {
                 return None;
             };
             text.trim_start().into()
         }
         BuiltinFunction::ToDebugText => {
-            let [argument] = arguments else {
+            let [argument, _] = arguments else {
                 unreachable!()
             };
             let formatted =

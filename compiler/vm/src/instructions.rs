@@ -115,32 +115,37 @@ impl MachineState {
                 InstructionResult::Done
             }
             Instruction::Call { num_args } => {
-                let responsible = self.pop_from_data_stack().try_into().unwrap();
                 let mut arguments = (0..*num_args)
                     .map(|_| self.pop_from_data_stack())
                     .collect_vec();
-                // PERF: Build the reverse list in place.
-                arguments.reverse();
                 let callee = self.pop_from_data_stack();
 
+                // PERF: Build the reverse list in place.
+                arguments.reverse();
+                let responsible = arguments
+                    .pop()
+                    .expect("no arg")
+                    .try_into()
+                    .expect("last arg is not a HIR id");
                 self.call(heap, callee, &arguments, responsible)
             }
             Instruction::TailCall {
                 num_locals_to_pop,
                 num_args,
             } => {
-                let responsible = self.pop_from_data_stack().try_into().unwrap();
                 let mut arguments = (0..*num_args)
                     .map(|_| self.pop_from_data_stack())
                     .collect_vec();
-                // PERF: Built the reverse list in place
-                arguments.reverse();
                 let callee = self.pop_from_data_stack();
                 self.pop_multiple_from_data_stack(*num_locals_to_pop);
 
                 // Tail calling a function is basically just a normal call, but
                 // pretending we are our caller.
                 self.next_instruction = self.call_stack.pop();
+
+                // PERF: Built the reverse list in place
+                arguments.reverse();
+                let responsible = arguments.pop().unwrap().try_into().unwrap();
                 self.call(heap, callee, &arguments, responsible)
             }
             Instruction::Return => {
@@ -167,7 +172,6 @@ impl MachineState {
                 })
             }
             Instruction::TraceCallStarts { num_args } => {
-                let responsible = self.pop_from_data_stack().try_into().unwrap();
                 let mut args = vec![];
                 for _ in 0..*num_args {
                     args.push(self.pop_from_data_stack());
@@ -176,6 +180,7 @@ impl MachineState {
                 let call_site = self.pop_from_data_stack().try_into().unwrap();
 
                 args.reverse();
+                let responsible = args.pop().unwrap().try_into().unwrap();
                 tracer.call_started(heap, call_site, callee, args, responsible);
                 InstructionResult::Done
             }
@@ -186,7 +191,6 @@ impl MachineState {
                 InstructionResult::Done
             }
             Instruction::TraceTailCall { num_args } => {
-                let responsible = self.pop_from_data_stack().try_into().unwrap();
                 let mut args = vec![];
                 for _ in 0..*num_args {
                     args.push(self.pop_from_data_stack());
@@ -195,6 +199,7 @@ impl MachineState {
                 let call_site = self.pop_from_data_stack().try_into().unwrap();
 
                 args.reverse();
+                let responsible = args.pop().unwrap().try_into().unwrap();
                 tracer.tail_call(heap, call_site, callee, args, responsible);
                 InstructionResult::Done
             }
@@ -225,13 +230,14 @@ impl MachineState {
         responsible: HirId,
     ) -> InstructionResult {
         match callee.into() {
-            Data::Function(function) => self.call_function( function, arguments, responsible),
+            Data::Function(function) => self.call_function(function, arguments, responsible),
             Data::Builtin(builtin) => {
-                self.run_builtin_function(heap, builtin.get(), arguments, responsible)
+                self.run_builtin_function(heap, builtin.get(), arguments)
             }
             Data::Handle(handle) => {
                 let parameter_count = handle.argument_count();
                 let argument_count = arguments.len();
+
                 if argument_count != parameter_count {
                     return InstructionResult::Panic(Panic {
                         reason: format!(

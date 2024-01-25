@@ -28,8 +28,9 @@ impl MachineState {
         heap: &mut Heap,
         builtin_function: BuiltinFunction,
         args: &[InlineObject],
-        responsible: HirId,
     ) -> InstructionResult {
+        let responsible = (*args.last().unwrap()).try_into().unwrap();
+        let args = &args[..args.len() - 1];
         let result = span!(Level::TRACE, "Running builtin").in_scope(|| match &builtin_function {
             BuiltinFunction::Equals => heap.equals(args),
             BuiltinFunction::FunctionRun => Heap::function_run(args, responsible),
@@ -202,7 +203,7 @@ impl Heap {
         unpack_and_later_drop!(self, args, |function: Any| {
             let count = match **function {
                 Data::Builtin(builtin) => builtin.get().num_parameters(),
-                Data::Function(function) => function.argument_count(),
+                Data::Function(function) => function.argument_count() - 1,
                 Data::Handle(handle) => handle.argument_count(),
                 _ => return Err("`✨.getArgumentCount` expects a function or handle".to_string()),
             };

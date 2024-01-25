@@ -55,6 +55,7 @@ impl InlineHandle {
         HandleId::from_usize((self.raw_word().get() >> Self::HANDLE_ID_SHIFT) as usize)
     }
 
+    // Excluding the responsibility argument.
     #[must_use]
     pub fn argument_count(self) -> usize {
         ((self.raw_word().get() & 0xFFFF_FFFF) >> Self::ARGUMENT_COUNT_SHIFT) as usize

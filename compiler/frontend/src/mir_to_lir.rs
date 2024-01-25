@@ -29,8 +29,7 @@ fn lir(db: &dyn MirToLir, target: ExecutionTarget, tracing: TracingConfig) -> Li
     context.compile_function(
         FxHashSet::from_iter([hir::Id::new(module, vec![])]),
         &[],
-        &[],
-        mir::Id::from_usize(0),
+        &[mir::Id::from_usize(0)],
         &mir.body,
     );
     let lir = Lir::new(context.constants, context.bodies);
@@ -54,17 +53,9 @@ impl LoweringContext {
         original_hirs: FxHashSet<hir::Id>,
         captured: &[mir::Id],
         parameters: &[mir::Id],
-        responsible_parameter: mir::Id,
         body: &mir::Body,
     ) -> lir::BodyId {
-        let body = CurrentBody::compile_function(
-            self,
-            original_hirs,
-            captured,
-            parameters,
-            responsible_parameter,
-            body,
-        );
+        let body = CurrentBody::compile_function(self, original_hirs, captured, parameters, body);
         self.bodies.push(body)
     }
 }
@@ -82,10 +73,9 @@ impl CurrentBody {
         original_hirs: FxHashSet<hir::Id>,
         captured: &[mir::Id],
         parameters: &[mir::Id],
-        responsible_parameter: mir::Id,
         body: &mir::Body,
     ) -> lir::Body {
-        let mut lir_body = Self::new(original_hirs, captured, parameters, responsible_parameter);
+        let mut lir_body = Self::new(original_hirs, captured, parameters);
         for (id, expression) in body.iter() {
             lir_body.current_constant = None;
             lir_body.compile_expression(context, id, expression);
@@ -97,14 +87,12 @@ impl CurrentBody {
         original_hirs: FxHashSet<hir::Id>,
         captured: &[mir::Id],
         parameters: &[mir::Id],
-        responsible_parameter: mir::Id,
     ) -> Self {
         let body = lir::Body::new(original_hirs, captured.len(), parameters.len());
         let id_mapping: FxHashMap<_, _> = captured
             .iter()
             .chain(parameters.iter())
             .copied()
-            .chain([responsible_parameter])
             .enumerate()
             .map(|(index, id)| (id, lir::Id::from_usize(index)))
             .collect();
@@ -114,17 +102,16 @@ impl CurrentBody {
         // The exception is the responsible parameter passed when starting a VM,
         // which can be constant or non-constant.
         let ids_to_drop = id_mapping
-            .iter()
+            .values()
             .filter(
                 #[allow(clippy::suspicious_operation_groupings)]
-                |(&mir_id, &lir_id)| {
+                |&lir_id| {
                     // Captured values should not be dropped in case the function is
                     // called again. They are dropped when the function object
                     // itself is dropped.
-                    lir_id.to_usize() >= captured.len() && mir_id != responsible_parameter
+                    lir_id.to_usize() >= captured.len()
                 },
             )
-            .map(|(_, v)| v)
             .copied()
             .collect();
         Self {
@@ -230,7 +217,6 @@ impl CurrentBody {
             mir::Expression::Function {
                 original_hirs,
                 parameters,
-                responsible_parameter,
                 body,
             } => {
                 let captured = expression
@@ -240,13 +226,8 @@ impl CurrentBody {
                     .sorted()
                     .collect_vec();
 
-                let body_id = context.compile_function(
-                    original_hirs.clone(),
-                    &captured,
-                    parameters,
-                    *responsible_parameter,
-                    body,
-                );
+                let body_id =
+                    context.compile_function(original_hirs.clone(), &captured, parameters, body);
                 if captured.is_empty() {
                     self.push_constant(context, id, body_id);
                 } else {
@@ -258,17 +239,14 @@ impl CurrentBody {
             mir::Expression::Call {
                 function,
                 arguments,
-                responsible,
             } => {
                 let function = self.id_for(context, *function);
                 let arguments = self.ids_for(context, arguments);
-                let responsible = self.id_for_without_dup(context, *responsible);
                 self.push(
                     id,
                     lir::Expression::Call {
                         function,
                         arguments,
-                        responsible,
                     },
                 );
             }
@@ -300,17 +278,14 @@ impl CurrentBody {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             } => {
                 let hir_call = self.id_for(context, *hir_call);
                 let function = self.id_for(context, *function);
                 let arguments = self.ids_for(context, arguments);
-                let responsible = self.id_for(context, *responsible);
                 self.push_without_value(lir::Expression::TraceCallStarts {
                     hir_call,
                     function,
                     arguments,
-                    responsible,
                 });
             }
             mir::Expression::TraceCallEnds { return_value } => {
@@ -321,17 +296,14 @@ impl CurrentBody {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             } => {
                 let hir_call = self.id_for(context, *hir_call);
                 let function = self.id_for(context, *function);
                 let arguments = self.ids_for(context, arguments);
-                let responsible = self.id_for(context, *responsible);
                 self.push_without_value(lir::Expression::TraceTailCall {
                     hir_call,
                     function,
                     arguments,
-                    responsible,
                 });
             }
             mir::Expression::TraceExpressionEvaluated {
@@ -423,10 +395,7 @@ impl CurrentBody {
         //   non-constant HIR ID, this top-level responsibility could be dropped
         //   when calling `needs`.
         let is_captured = id.to_usize() < self.body.captured_count();
-        if !is_captured
-            && id != self.body.responsible_parameter_id()
-            && !self.ids_to_drop.contains(&id)
-        {
+        if !is_captured && !self.ids_to_drop.contains(&id) {
             return;
         }
 

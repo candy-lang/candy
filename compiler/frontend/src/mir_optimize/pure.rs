@@ -256,9 +256,9 @@ impl PurenessInsights {
         // TODO: Don't optimize lifted constants again.
         // Then, we can also add asserts here about not visiting them twice.
     }
-    pub(super) fn enter_function(&mut self, parameters: &[Id], responsible_parameter: Id) {
+    pub(super) fn enter_function(&mut self, parameters: &[Id]) {
         self.pure_definitions.extend(parameters.iter().copied());
-        let _existing = self.pure_definitions.insert(responsible_parameter);
+
         // TODO: Handle lifted constants properly.
         // assert!(existing.is_none());
 

@@ -15,14 +15,10 @@ impl Expression {
     }
     fn collect_defined_ids(&self, defined: &mut Vec<Id>) {
         if let Self::Function {
-            parameters,
-            responsible_parameter,
-            body,
-            ..
+            parameters, body, ..
         } = self
         {
             defined.extend(parameters);
-            defined.push(*responsible_parameter);
             body.collect_defined_ids(defined);
         }
     }
@@ -79,11 +75,9 @@ impl Expression {
             Self::Call {
                 function,
                 arguments,
-                responsible,
             } => {
                 referenced.insert(*function);
                 referenced.extend(arguments);
-                referenced.insert(*responsible);
             }
             Self::UseModule {
                 current_module: _,
@@ -104,18 +98,15 @@ impl Expression {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             }
             | Self::TraceTailCall {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             } => {
                 referenced.insert(*hir_call);
                 referenced.insert(*function);
                 referenced.extend(arguments);
-                referenced.insert(*responsible);
             }
             Self::TraceCallEnds { return_value } => {
                 referenced.insert(*return_value);
@@ -281,26 +272,22 @@ impl Expression {
             Self::Function {
                 original_hirs: _,
                 parameters,
-                responsible_parameter,
                 body,
             } => {
                 for parameter in parameters {
                     replacer(parameter);
                 }
-                replacer(responsible_parameter);
                 body.replace_id_references(replacer);
             }
             Self::Parameter => {}
             Self::Call {
                 function,
                 arguments,
-                responsible,
             } => {
                 replacer(function);
                 for argument in arguments {
                     replacer(argument);
                 }
-                replacer(responsible);
             }
             Self::UseModule {
                 current_module: _,
@@ -321,20 +308,17 @@ impl Expression {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             }
             | Self::TraceTailCall {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             } => {
                 replacer(hir_call);
                 replacer(function);
                 for argument in arguments {
                     replacer(argument);
                 }
-                replacer(responsible);
             }
             Self::TraceCallEnds { return_value } => {
                 replacer(return_value);
@@ -372,13 +356,11 @@ impl Expression {
             Self::Function {
                 original_hirs: _,
                 parameters,
-                responsible_parameter,
                 body,
             } => {
                 for parameter in parameters {
                     replacer(parameter);
                 }
-                replacer(responsible_parameter);
                 body.replace_ids(replacer);
             }
             // All other expressions don't define IDs and instead only contain

@@ -576,9 +576,7 @@ impl<'ctx> CodeGen<'ctx> {
                     original_hirs,
                     parameters,
                     body,
-                    responsible_parameter,
                 } => {
-                    self.unrepresented_ids.insert(*responsible_parameter);
                     let name = original_hirs
                         .iter()
                         .sorted()
@@ -674,9 +672,7 @@ impl<'ctx> CodeGen<'ctx> {
                 Expression::Call {
                     function,
                     arguments,
-                    responsible,
                 } => {
-                    self.unrepresented_ids.insert(*responsible);
                     let mut args: Vec<_> = arguments
                         .iter()
                         .map(|arg| self.get_value_with_id(function_ctx, *arg).unwrap().into())

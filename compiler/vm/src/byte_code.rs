@@ -57,7 +57,7 @@ pub enum Instruction {
     /// a -> a, pointer to function
     CreateFunction {
         captured: Vec<StackOffset>,
-        num_args: usize, // excluding responsible parameter
+        num_args: usize, // including responsible parameter
         body: InstructionPointer,
     },
 
@@ -87,14 +87,14 @@ pub enum Instruction {
     /// Sets up the data stack for a function execution and then changes the
     /// instruction pointer to the first instruction.
     ///
-    /// a, function, arg1, arg2, ..., argN, responsible -> a, caller, captured vars, arg1, arg2, ..., argN, responsible
+    /// a, function, arg1, arg2, ..., argN -> a, caller, captured vars, arg1, arg2, ..., argN
     ///
     /// Later, when the function returns (perhaps many instructions after this
     /// one), the stack will contain the result:
     ///
-    /// a, function, arg1, arg2, ..., argN, responsible ~> a, return value from function
+    /// a, function, arg1, arg2, ..., argN ~> a, return value from function
     Call {
-        num_args: usize, // excluding the responsible argument
+        num_args: usize, // including the responsible argument
     },
 
     /// Like `Call`, but after popping the stack entries for the call itself, it
@@ -102,7 +102,7 @@ pub enum Instruction {
     /// executing the call.
     TailCall {
         num_locals_to_pop: usize,
-        num_args: usize, // excluding the responsible argument
+        num_args: usize, // including the responsible argument
     },
 
     /// Returns from the current function to the original caller. Leaves the
@@ -117,7 +117,7 @@ pub enum Instruction {
     /// a, reason, responsible -> 💥
     Panic,
 
-    /// a, HIR ID, function, arg1, arg2, ..., argN, responsible -> a
+    /// a, HIR ID, function, arg1, arg2, ..., argN -> a
     TraceCallStarts {
         num_args: usize,
     },
@@ -125,7 +125,7 @@ pub enum Instruction {
     // a, return value -> a
     TraceCallEnds,
 
-    /// a, HIR ID, function, arg1, arg2, ..., argN, responsible -> a
+    /// a, HIR ID, function, arg1, arg2, ..., argN -> a
     TraceTailCall {
         num_args: usize,
     },
@@ -176,7 +176,6 @@ impl Instruction {
                 stack.pop();
             }
             Self::Call { num_args } => {
-                stack.pop(); // responsible
                 stack.pop_multiple(*num_args);
                 stack.pop(); // function/builtin
                 stack.push(result); // return value
@@ -185,7 +184,6 @@ impl Instruction {
                 num_locals_to_pop,
                 num_args,
             } => {
-                stack.pop(); // responsible
                 stack.pop_multiple(*num_args);
                 stack.pop(); // function/builtin
                 stack.pop_multiple(*num_locals_to_pop);
@@ -202,7 +200,6 @@ impl Instruction {
             }
             Self::TraceCallStarts { num_args } | Self::TraceTailCall { num_args } => {
                 stack.pop(); // HIR ID
-                stack.pop(); // responsible
                 stack.pop_multiple(*num_args);
                 stack.pop(); // callee
             }

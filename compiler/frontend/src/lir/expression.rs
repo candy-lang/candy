@@ -45,7 +45,6 @@ pub enum Expression {
     Call {
         function: Id,
         arguments: Vec<Id>,
-        responsible: Id,
     },
 
     Panic {
@@ -57,7 +56,6 @@ pub enum Expression {
         hir_call: Id,
         function: Id,
         arguments: Vec<Id>,
-        responsible: Id,
     },
 
     TraceCallEnds {
@@ -68,7 +66,6 @@ pub enum Expression {
         hir_call: Id,
         function: Id,
         arguments: Vec<Id>,
-        responsible: Id,
     },
 
     TraceExpressionEvaluated {
@@ -120,13 +117,11 @@ impl Expression {
             Self::Call {
                 function,
                 arguments,
-                responsible,
             } => {
                 *function = replacer(*function);
                 for argument in arguments {
                     *argument = replacer(*argument);
                 }
-                *responsible = replacer(*responsible);
             }
             Self::Panic {
                 reason,
@@ -139,20 +134,17 @@ impl Expression {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             }
             | Self::TraceTailCall {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             } => {
                 *hir_call = replacer(*hir_call);
                 *function = replacer(*function);
                 for argument in arguments {
                     *argument = replacer(*argument);
                 }
-                *responsible = replacer(*responsible);
             }
             Self::TraceCallEnds { return_value } => {
                 *return_value = replacer(*return_value);
@@ -246,7 +238,6 @@ impl Expression {
             Self::Call {
                 function,
                 arguments,
-                responsible,
             } => {
                 builder.push("call ", None, EnumSet::empty());
                 function.build_rich_ir_with_constants(builder, constants, body);
@@ -260,9 +251,6 @@ impl Expression {
                         " ",
                     );
                 }
-                builder.push(" (", None, EnumSet::empty());
-                responsible.build_rich_ir_with_constants(builder, constants, body);
-                builder.push(" is responsible)", None, EnumSet::empty());
             }
             Self::Panic {
                 reason,
@@ -278,7 +266,6 @@ impl Expression {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             } => {
                 builder.push("trace: start of call of ", None, EnumSet::empty());
                 function.build_rich_ir_with_constants(builder, constants, body);
@@ -288,9 +275,7 @@ impl Expression {
                     |builder, it| it.build_rich_ir_with_constants(builder, constants, body),
                     " ",
                 );
-                builder.push(" (", None, EnumSet::empty());
-                responsible.build_rich_ir_with_constants(builder, constants, body);
-                builder.push(" is responsible, code is at ", None, EnumSet::empty());
+                builder.push(" (code is at ", None, EnumSet::empty());
                 hir_call.build_rich_ir_with_constants(builder, constants, body);
                 builder.push(")", None, EnumSet::empty());
             }
@@ -306,7 +291,6 @@ impl Expression {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             } => {
                 builder.push("trace: tail call of ", None, EnumSet::empty());
                 function.build_rich_ir_with_constants(builder, constants, body);
@@ -316,9 +300,7 @@ impl Expression {
                     |builder, it| it.build_rich_ir_with_constants(builder, constants, body),
                     " ",
                 );
-                builder.push(" (", None, EnumSet::empty());
-                responsible.build_rich_ir_with_constants(builder, constants, body);
-                builder.push(" is responsible, code is at ", None, EnumSet::empty());
+                builder.push(" (code is at ", None, EnumSet::empty());
                 hir_call.build_rich_ir_with_constants(builder, constants, body);
                 builder.push(")", None, EnumSet::empty());
             }

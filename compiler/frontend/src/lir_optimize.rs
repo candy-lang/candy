@@ -43,11 +43,7 @@ impl Body {
 
         // Leading dups
         let (mut to_dup, to_drop) = self.get_combined_reference_count_adjustments();
-        for id in self
-            .captured_ids()
-            .chain(self.parameter_ids())
-            .chain([self.responsible_parameter_id()])
-        {
+        for id in self.captured_ids().chain(self.parameter_ids()) {
             new_body.maybe_dup(&mut to_dup, id, &id_mapping);
         }
 
@@ -114,9 +110,8 @@ impl Body {
     }
 
     fn get_new_id(&self, id_mapping: &FxHashMap<Id, Id>, id: Id) -> Id {
-        if id <= self.responsible_parameter_id() {
-            // Captured variables, parameters, and the responsible parameter
-            // keep their ID.
+        if id < self.first_expression_id() {
+            // Captured variables and parameters keep their ID.
             id
         } else {
             id_mapping[&id]

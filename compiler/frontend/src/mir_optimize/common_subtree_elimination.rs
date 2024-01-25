@@ -395,28 +395,17 @@ impl NormalizedComparison for Expression {
                 Self::Function {
                     original_hirs: _,
                     parameters: self_parameters,
-                    responsible_parameter: self_responsible_parameter,
                     body: self_body,
                 },
                 Self::Function {
                     original_hirs: _,
                     parameters: other_parameters,
-                    responsible_parameter: other_responsible_parameter,
                     body: other_body,
                 },
             ) => {
-                self_normalization
-                    .register_function_ids(self_parameters, *self_responsible_parameter);
-                other_normalization
-                    .register_function_ids(other_parameters, *other_responsible_parameter);
-
                 self_parameters.equals_normalized(
                     self_normalization,
                     other_parameters,
-                    other_normalization,
-                ) && self_responsible_parameter.equals_normalized(
-                    self_normalization,
-                    other_responsible_parameter,
                     other_normalization,
                 ) && self_body.equals_normalized(
                     self_normalization,
@@ -429,12 +418,10 @@ impl NormalizedComparison for Expression {
                 Self::Call {
                     function: self_function,
                     arguments: self_arguments,
-                    responsible: self_responsible,
                 },
                 Self::Call {
                     function: other_function,
                     arguments: other_arguments,
-                    responsible: other_responsible,
                 },
             ) => {
                 self_function.equals_normalized(
@@ -444,10 +431,6 @@ impl NormalizedComparison for Expression {
                 ) && self_arguments.equals_normalized(
                     self_normalization,
                     other_arguments,
-                    other_normalization,
-                ) && self_responsible.equals_normalized(
-                    self_normalization,
-                    other_responsible,
                     other_normalization,
                 )
             }
@@ -499,13 +482,11 @@ impl NormalizedComparison for Expression {
                     hir_call: self_hir_call,
                     function: self_function,
                     arguments: self_arguments,
-                    responsible: self_responsible,
                 },
                 Self::TraceCallStarts {
                     hir_call: other_hir_call,
                     function: other_function,
                     arguments: other_arguments,
-                    responsible: other_responsible,
                 },
             ) => {
                 self_hir_call.equals_normalized(
@@ -519,10 +500,6 @@ impl NormalizedComparison for Expression {
                 ) && self_arguments.equals_normalized(
                     self_normalization,
                     other_arguments,
-                    other_normalization,
-                ) && self_responsible.equals_normalized(
-                    self_normalization,
-                    other_responsible,
                     other_normalization,
                 )
             }
@@ -599,24 +576,18 @@ impl NormalizedComparison for Expression {
             Self::Function {
                 original_hirs: _,
                 parameters,
-                responsible_parameter,
                 body,
             } => {
-                normalization.register_function_ids(parameters, *responsible_parameter);
-
                 parameters.hash_normalized(normalization, state);
-                responsible_parameter.hash_normalized(normalization, state);
                 body.hash_normalized(normalization, state);
             }
             Self::Parameter => {}
             Self::Call {
                 function,
                 arguments,
-                responsible,
             } => {
                 function.hash_normalized(normalization, state);
                 arguments.hash_normalized(normalization, state);
-                responsible.hash_normalized(normalization, state);
             }
             Self::UseModule {
                 current_module,
@@ -638,18 +609,15 @@ impl NormalizedComparison for Expression {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             }
             | Self::TraceTailCall {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             } => {
                 hir_call.hash_normalized(normalization, state);
                 function.hash_normalized(normalization, state);
                 arguments.hash_normalized(normalization, state);
-                responsible.hash_normalized(normalization, state);
             }
             Self::TraceCallEnds { return_value } => {
                 return_value.hash_normalized(normalization, state);

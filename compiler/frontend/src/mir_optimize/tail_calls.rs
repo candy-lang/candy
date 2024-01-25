@@ -44,16 +44,9 @@ fn simplify_body(body: &mut Body) {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             } => {
                 if nesting == 0 {
-                    trace_call_starts = Some((
-                        index,
-                        *hir_call,
-                        *function,
-                        mem::take(arguments),
-                        *responsible,
-                    ));
+                    trace_call_starts = Some((index, *hir_call, *function, mem::take(arguments)));
                     break;
                 }
                 nesting -= 1;
@@ -62,12 +55,11 @@ fn simplify_body(body: &mut Body) {
             _ => {}
         }
     }
-    let (index, hir_call, function, arguments, responsible) = trace_call_starts.unwrap();
+    let (index, hir_call, function, arguments) = trace_call_starts.unwrap();
 
     body.expressions[index].1 = Expression::TraceTailCall {
         hir_call,
         function,
         arguments,
-        responsible,
     };
 }

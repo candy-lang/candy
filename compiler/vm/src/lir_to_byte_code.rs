@@ -124,7 +124,6 @@ impl<'c> LoweringContext<'c> {
         for parameter in body.parameter_ids() {
             self.stack.push(parameter);
         }
-        self.stack.push(body.responsible_parameter_id());
 
         for (id, expression) in body.ids_and_expressions() {
             self.compile_expression(id, expression);
@@ -224,13 +223,11 @@ impl<'c> LoweringContext<'c> {
             Expression::Call {
                 function,
                 arguments,
-                responsible,
             } => {
                 self.emit_reference_to(*function);
                 for argument in arguments {
                     self.emit_reference_to(*argument);
                 }
-                self.emit_reference_to(*responsible);
                 self.emit(
                     id,
                     Instruction::Call {
@@ -261,14 +258,12 @@ impl<'c> LoweringContext<'c> {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             } => {
                 self.emit_reference_to(*hir_call);
                 self.emit_reference_to(*function);
                 for argument in arguments {
                     self.emit_reference_to(*argument);
                 }
-                self.emit_reference_to(*responsible);
                 self.emit(
                     id,
                     Instruction::TraceCallStarts {
@@ -284,14 +279,12 @@ impl<'c> LoweringContext<'c> {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             } => {
                 self.emit_reference_to(*hir_call);
                 self.emit_reference_to(*function);
                 for argument in arguments {
                     self.emit_reference_to(*argument);
                 }
-                self.emit_reference_to(*responsible);
                 self.emit(
                     id,
                     Instruction::TraceTailCall {

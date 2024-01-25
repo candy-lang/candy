@@ -213,26 +213,19 @@ impl Context<'_> {
     fn optimize_expression(&mut self, expression: &mut CurrentExpression) {
         'outer: loop {
             if let Expression::Function {
-                parameters,
-                responsible_parameter,
-                body,
-                ..
+                parameters, body, ..
             } = expression.get_mut_carefully()
             {
                 for parameter in &*parameters {
                     self.visible.insert(*parameter, Expression::Parameter);
                 }
-                self.visible
-                    .insert(*responsible_parameter, Expression::Parameter);
-                self.pureness
-                    .enter_function(parameters, *responsible_parameter);
+                self.pureness.enter_function(parameters);
 
                 self.optimize_body(body);
 
                 for parameter in &*parameters {
                     self.visible.remove(*parameter);
                 }
-                self.visible.remove(*responsible_parameter);
             }
 
             loop {

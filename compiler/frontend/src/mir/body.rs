@@ -6,7 +6,6 @@ use crate::{
     impl_display_via_richir,
     rich_ir::{RichIrBuilder, ToRichIr, TokenType},
 };
-use derive_more::{Deref, DerefMut};
 use enumset::EnumSet;
 use itertools::Itertools;
 use num_bigint::BigInt;
@@ -243,21 +242,16 @@ impl Body {
         visitor: &mut dyn FnMut(Id, &mut Expression, &VisibleExpressions, bool),
     ) {
         if let Expression::Function {
-            parameters,
-            responsible_parameter,
-            body,
-            ..
+            parameters, body, ..
         } = expression
         {
             for parameter in &*parameters {
                 visible.insert(*parameter, Expression::Parameter);
             }
-            visible.insert(*responsible_parameter, Expression::Parameter);
             body.visit_with_visible_rec(visible, visitor);
             for parameter in &*parameters {
                 visible.remove(*parameter);
             }
-            visible.remove(*responsible_parameter);
         }
 
         visitor(id, expression, visible, is_returned);
@@ -278,24 +272,18 @@ impl Expression {
     }
 }
 
-#[derive(Deref, DerefMut)]
 pub struct FunctionBodyBuilder {
     hir_id: hir::Id,
-    #[deref]
-    #[deref_mut]
     body_builder: BodyBuilder,
     // PERF: These are numbered sequentially, so avoid the vec
     parameters: Vec<Id>,
-    responsible_parameter: Id,
 }
 impl FunctionBodyBuilder {
     fn new(hir_id: hir::Id, mut id_generator: IdGenerator<Id>) -> Self {
-        let responsible_parameter = id_generator.generate();
         Self {
             hir_id,
             body_builder: BodyBuilder::new(id_generator),
             parameters: vec![],
-            responsible_parameter,
         }
     }
 
@@ -304,13 +292,20 @@ impl FunctionBodyBuilder {
         self.parameters.push(id);
         id
     }
+    /// Returns a responsibility id.
+    pub fn finalize_parameters(&mut self) -> &mut BodyBuilder {
+        let responsibility_parameter = self.new_parameter();
+        assert!(self.body_builder.responsible.is_none());
+        self.body_builder.responsible = Some(responsibility_parameter);
+        &mut self.body_builder
+    }
 
     fn finish(self) -> (IdGenerator<Id>, Expression) {
+        assert!(self.body_builder.responsible.is_some());
         let (id_generator, body) = self.body_builder.finish();
         let function = Expression::Function {
             original_hirs: vec![self.hir_id].into_iter().collect(),
             parameters: self.parameters,
-            responsible_parameter: self.responsible_parameter,
             body,
         };
         (id_generator, function)
@@ -318,6 +313,7 @@ impl FunctionBodyBuilder {
 }
 
 pub struct BodyBuilder {
+    responsible: Option<Id>,
     id_generator: IdGenerator<Id>,
     body: Body,
 }
@@ -325,9 +321,14 @@ impl BodyBuilder {
     #[must_use]
     pub fn new(id_generator: IdGenerator<Id>) -> Self {
         Self {
+            responsible: None,
             id_generator,
             body: Body::default(),
         }
+    }
+
+    pub fn responsible(&self) -> Id {
+        self.responsible.unwrap()
     }
 
     pub fn push(&mut self, expression: Expression) -> Id {
@@ -374,21 +375,31 @@ impl BodyBuilder {
     /// The builder function takes the builder and the responsible parameter.
     pub fn push_function<F>(&mut self, hir_id: hir::Id, function: F) -> Id
     where
-        F: FnOnce(&mut FunctionBodyBuilder, Id),
+        F: FnOnce(&mut FunctionBodyBuilder),
     {
         let mut builder = FunctionBodyBuilder::new(hir_id, mem::take(&mut self.id_generator));
-        let responsible_parameter = builder.responsible_parameter;
-        function(&mut builder, responsible_parameter);
+        function(&mut builder);
         let (id_generator, function) = builder.finish();
         self.id_generator = id_generator;
         self.push(function)
     }
 
-    pub fn push_call(&mut self, function: Id, arguments: Vec<Id>, responsible: Id) -> Id {
+    /// Pushes a function that doesn't accept any parameters (except the
+    /// responsibility).
+    pub fn push_body<F>(&mut self, hir_id: hir::Id, function: F) -> Id
+    where
+        F: FnOnce(&mut Self),
+    {
+        self.push_function(hir_id, |f| {
+            let body = f.finalize_parameters();
+            function(body);
+        })
+    }
+
+    pub fn push_call(&mut self, function: Id, arguments: Vec<Id>) -> Id {
         self.push(Expression::Call {
             function,
             arguments,
-            responsible,
         })
     }
     pub fn push_if_else<T, E>(
@@ -404,12 +415,11 @@ impl BodyBuilder {
         E: FnOnce(&mut Self),
     {
         let builtin_if_else = self.push_builtin(BuiltinFunction::IfElse);
-        let then_function = self.push_function(hir_id.child("then"), |body, _| then_builder(body));
-        let else_function = self.push_function(hir_id.child("else"), |body, _| else_builder(body));
+        let then_function = self.push_body(hir_id.child("then"), |body| then_builder(body));
+        let else_function = self.push_body(hir_id.child("else"), |body| else_builder(body));
         self.push_call(
             builtin_if_else,
-            vec![condition, then_function, else_function],
-            responsible,
+            vec![condition, then_function, else_function, responsible],
         )
     }
 

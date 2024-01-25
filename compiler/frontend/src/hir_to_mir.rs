@@ -105,10 +105,12 @@ fn mir(db: &dyn HirToMir, target: ExecutionTarget, tracing: TracingConfig) -> Mi
 /// ```
 fn generate_needs_function(body: &mut BodyBuilder) -> Id {
     let needs_id = hir::Id::needs();
-    body.push_function(needs_id.clone(), |body, responsible_for_call| {
+    body.push_function(needs_id.clone(), |body| {
         let condition = body.new_parameter();
         let reason = body.new_parameter();
         let responsible_for_condition = body.new_parameter();
+        let body = body.finalize_parameters();
+        let responsible_for_call = body.responsible();
 
         // Common stuff.
         let needs_code = body.push_hir_id(needs_id.clone());
@@ -119,7 +121,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
         let true_tag = body.push_bool(true);
         let false_tag = body.push_bool(false);
         let is_condition_true =
-            body.push_call(builtin_equals, vec![condition, true_tag], needs_code);
+            body.push_call(builtin_equals, vec![condition, true_tag, needs_code]);
         let is_condition_bool = body.push_if_else(
             &needs_id.child("isConditionTrue"),
             is_condition_true,
@@ -127,7 +129,7 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
                 body.push_reference(true_tag);
             },
             |body| {
-                body.push_call(builtin_equals, vec![condition, false_tag], needs_code);
+                body.push_call(builtin_equals, vec![condition, false_tag, needs_code]);
             },
             needs_code,
         );
@@ -147,12 +149,11 @@ fn generate_needs_function(body: &mut BodyBuilder) -> Id {
 
         // Make sure the reason is a text.
         let builtin_type_of = body.push_builtin(BuiltinFunction::TypeOf);
-        let type_of_reason = body.push_call(builtin_type_of, vec![reason], responsible_for_call);
+        let type_of_reason = body.push_call(builtin_type_of, vec![reason, responsible_for_call]);
         let text_tag = body.push_tag("Text".to_string(), None);
         let is_reason_text = body.push_call(
             builtin_equals,
-            vec![type_of_reason, text_tag],
-            responsible_for_call,
+            vec![type_of_reason, text_tag, responsible_for_call],
         );
         body.push_if_else(
             &needs_id.child("isReasonText"),
@@ -242,8 +243,7 @@ impl<'a> LoweringContext<'a> {
         let main_tag = body.push_tag("Main".to_string(), None);
         let export_contains_main_function = body.push_call(
             struct_has_key_function,
-            vec![export_struct, main_tag],
-            module_id,
+            vec![export_struct, main_tag, module_id],
         );
         let reason = body.push_text("The module doesn't export a main function.".to_string());
         body.push_panic_if_false(
@@ -256,16 +256,15 @@ impl<'a> LoweringContext<'a> {
         let struct_get_function = body.push_builtin(BuiltinFunction::StructGet);
         let main_function = body.push_call(
             struct_get_function,
-            vec![export_struct, main_tag],
-            module_id,
+            vec![export_struct, main_tag, module_id],
         );
 
         let type_of_function = body.push_builtin(BuiltinFunction::TypeOf);
-        let type_of_main = body.push_call(type_of_function, vec![main_function], module_id);
+        let type_of_main = body.push_call(type_of_function, vec![main_function, module_id]);
         let equals_function = body.push_builtin(BuiltinFunction::Equals);
         let function_tag = body.push_tag("Function".to_string(), None);
         let type_of_main_equals_function =
-            body.push_call(equals_function, vec![type_of_main, function_tag], module_id);
+            body.push_call(equals_function, vec![type_of_main, function_tag, module_id]);
         let reason = body.push_text("The exported main value is not a function.".to_string());
         body.push_panic_if_false(
             module_hir_id,
@@ -276,12 +275,11 @@ impl<'a> LoweringContext<'a> {
 
         let get_argument_count_function = body.push_builtin(BuiltinFunction::GetArgumentCount);
         let main_function_parameter_count =
-            body.push_call(get_argument_count_function, vec![main_function], module_id);
+            body.push_call(get_argument_count_function, vec![main_function, module_id]);
         let one = body.push_int(1);
         let main_function_parameter_count_is_one = body.push_call(
             equals_function,
-            vec![main_function_parameter_count, one],
-            module_id,
+            vec![main_function_parameter_count, one, module_id],
         );
         let reason = body.push_text(
             "The exported main function doesn't accept exactly one parameter.".to_string(),
@@ -382,10 +380,10 @@ impl<'a> LoweringContext<'a> {
                 } else {
                     let responsible = body.push_hir_id(hir_id.clone());
                     let tag_get_value = body.push_builtin(BuiltinFunction::TagGetValue);
-                    let captured = body.push_call(tag_get_value, vec![result], responsible);
+                    let captured = body.push_call(tag_get_value, vec![result, responsible]);
                     let list_get = body.push_builtin(BuiltinFunction::ListGet);
                     let index = body.push_int(identifier_id.0);
-                    body.push_call(list_get, vec![captured, index], responsible)
+                    body.push_call(list_get, vec![captured, index, responsible])
                 }
             }
             hir::Expression::Match { expression, cases } => {
@@ -407,24 +405,24 @@ impl<'a> LoweringContext<'a> {
                 body: original_body,
                 kind,
             }) => {
-                let function =
-                    body.push_function(hir_id.clone(), |function, responsible_parameter| {
-                        for original_parameter in original_parameters {
-                            let parameter = function.new_parameter();
-                            self.mapping.insert(original_parameter.clone(), parameter);
-                        }
+                let function = body.push_function(hir_id.clone(), |function| {
+                    for original_parameter in original_parameters {
+                        let parameter = function.new_parameter();
+                        self.mapping.insert(original_parameter.clone(), parameter);
+                    }
+                    let body = function.finalize_parameters();
 
-                        let responsible = if kind.uses_own_responsibility() {
-                            responsible_parameter
-                        } else {
-                            // This is a function with curly braces, so whoever is responsible
-                            // for `needs` in the current scope is also responsible for
-                            // `needs` in the function.
-                            responsible_for_needs
-                        };
+                    let responsible = if kind.uses_own_responsibility() {
+                        body.responsible()
+                    } else {
+                        // This is a function with curly braces, so whoever is responsible
+                        // for `needs` in the current scope is also responsible for
+                        // `needs` in the function.
+                        responsible_for_needs
+                    };
 
-                        self.compile_expressions(function, responsible, &original_body.expressions);
-                    });
+                    self.compile_expressions(body, responsible, &original_body.expressions);
+                });
 
                 if self.tracing.register_fuzzables.is_enabled() && kind.is_fuzzable() {
                     let hir_definition = body.push(Expression::HirId(hir_id.clone()));
@@ -445,6 +443,7 @@ impl<'a> LoweringContext<'a> {
                 let arguments = arguments
                     .iter()
                     .map(|argument| self.mapping[argument])
+                    .chain([responsible])
                     .collect_vec();
 
                 if self.tracing.calls.is_enabled() {
@@ -453,10 +452,9 @@ impl<'a> LoweringContext<'a> {
                         hir_call,
                         function: self.mapping[function],
                         arguments: arguments.clone(),
-                        responsible,
                     });
                 }
-                let call = body.push_call(self.mapping[function], arguments, responsible);
+                let call = body.push_call(self.mapping[function], arguments);
                 if self.tracing.calls.is_enabled() {
                     body.push(Expression::TraceCallEnds { return_value: call });
                     body.push_reference(call)
@@ -484,8 +482,8 @@ impl<'a> LoweringContext<'a> {
                         self.mapping[condition],
                         self.mapping[reason],
                         responsible_for_needs,
+                        responsible,
                     ],
-                    responsible,
                 )
             }
             hir::Expression::Error { errors, .. } => {
@@ -555,14 +553,14 @@ impl<'a> LoweringContext<'a> {
 
                 let case_id = hir_id.child(format!("case-{case_index}"));
                 let builtin_if_else = body.push_builtin(BuiltinFunction::IfElse);
-                let then_function = body.push_function(case_id.child("matched"), |body, _| {
+                let then_function = body.push_body(case_id.child("matched"), |body| {
                     self.ongoing_destructuring = Some(OngoingDestructuring {
                         result: pattern_result,
                         is_trivial: false,
                     });
                     self.compile_expressions(body, responsible_for_needs, &case_body.expressions);
                 });
-                let else_function = body.push_function(case_id.child("didNotMatch"), |body, _| {
+                let else_function = body.push_body(case_id.child("didNotMatch"), |body| {
                     self.compile_match_rec(
                         hir_id,
                         body,
@@ -575,8 +573,12 @@ impl<'a> LoweringContext<'a> {
                 });
                 body.push_call(
                     builtin_if_else,
-                    vec![is_match, then_function, else_function],
-                    responsible_for_match,
+                    vec![
+                        is_match,
+                        then_function,
+                        else_function,
+                        responsible_for_match,
+                    ],
                 )
             }
         }
@@ -647,22 +649,18 @@ impl PatternLoweringContext {
                 let builtin_tag_without_value = body.push_builtin(BuiltinFunction::TagWithoutValue);
                 let actual_symbol = body.push_call(
                     builtin_tag_without_value,
-                    vec![expression],
-                    self.responsible,
+                    vec![expression, self.responsible],
                 );
                 let expected_symbol = body.push_tag(symbol.clone(), None);
                 self.check_equals(body, expected_symbol, actual_symbol, |body| {
                     let builtin_tag_has_value = body.push_builtin(BuiltinFunction::TagHasValue);
                     let actual_has_value =
-                        body.push_call(builtin_tag_has_value, vec![expression], self.responsible);
+                        body.push_call(builtin_tag_has_value, vec![expression, self.responsible]);
                     let expected_has_value = body.push_bool(true);
                     self.check_equals(body, expected_has_value, actual_has_value, |body| {
                         let builtin_tag_get_value = body.push_builtin(BuiltinFunction::TagGetValue);
-                        let actual_value = body.push_call(
-                            builtin_tag_get_value,
-                            vec![expression],
-                            self.responsible,
-                        );
+                        let actual_value = body
+                            .push_call(builtin_tag_get_value, vec![expression, self.responsible]);
                         self.check(body, actual_value, value);
                     });
                 });
@@ -674,7 +672,7 @@ impl PatternLoweringContext {
                     let expected = body.push_int(list.len());
                     let builtin_list_length = body.push_builtin(BuiltinFunction::ListLength);
                     let actual_length =
-                        body.push_call(builtin_list_length, vec![expression], self.responsible);
+                        body.push_call(builtin_list_length, vec![expression, self.responsible]);
                     self.check_equals(body, expected, actual_length, |body| {
                         // Destructure the items.
                         let builtin_list_get = body.push_builtin(BuiltinFunction::ListGet);
@@ -686,8 +684,7 @@ impl PatternLoweringContext {
                                     let index = body.push_int(index);
                                     let item = body.push_call(
                                         builtin_list_get,
-                                        vec![expression, index],
-                                        self.responsible,
+                                        vec![expression, index, self.responsible],
                                     );
                                     let result = self.check(body, item, item_pattern);
                                     (result, item_pattern.captured_identifier_count())
@@ -711,8 +708,7 @@ impl PatternLoweringContext {
                                 let key = self.compile_pattern(body, key_pattern);
                                 let has_key = body.push_call(
                                     builtin_struct_has_key,
-                                    vec![expression, key],
-                                    self.responsible,
+                                    vec![expression, key, self.responsible],
                                 );
 
                                 let result = body.push_if_else(
@@ -721,8 +717,7 @@ impl PatternLoweringContext {
                                     |body| {
                                         let value = body.push_call(
                                             builtin_struct_get,
-                                            vec![expression, key],
-                                            self.responsible,
+                                            vec![expression, key, self.responsible],
                                         );
                                         self.check(body, value, value_pattern);
                                     },
@@ -774,8 +769,7 @@ impl PatternLoweringContext {
                                     let index = body.push_int(1 + index);
                                     body.push_call(
                                         list_get_function,
-                                        vec![result, index],
-                                        self.responsible,
+                                        vec![result, index, self.responsible],
                                     )
                                 })
                                 .collect();
@@ -813,7 +807,7 @@ impl PatternLoweringContext {
     ) -> Id {
         let expected_type = body.push_tag(expected_type, None);
         let builtin_type_of = body.push_builtin(BuiltinFunction::TypeOf);
-        let type_ = body.push_call(builtin_type_of, vec![expression], self.responsible);
+        let type_ = body.push_call(builtin_type_of, vec![expression, self.responsible]);
         self.check_equals(body, expected_type, type_, then_builder)
     }
 
@@ -825,7 +819,7 @@ impl PatternLoweringContext {
         then_builder: impl FnOnce(&mut BodyBuilder),
     ) -> Id {
         let builtin_equals = body.push_builtin(BuiltinFunction::Equals);
-        let equals = body.push_call(builtin_equals, vec![expected, actual], self.responsible);
+        let equals = body.push_call(builtin_equals, vec![expected, actual, self.responsible]);
 
         body.push_if_else(
             &self.hir_id.child("equals"),
@@ -891,12 +885,12 @@ impl PatternLoweringContext {
             is_match,
             |body| {
                 let tag_get_value = body.push_builtin(BuiltinFunction::TagGetValue);
-                let captured = body.push_call(tag_get_value, vec![return_value], self.responsible);
+                let captured = body.push_call(tag_get_value, vec![return_value, self.responsible]);
                 let list_get = body.push_builtin(BuiltinFunction::ListGet);
                 for index in 0..captured_identifier_count {
                     let index = body.push_int(index);
                     let captured_identifier =
-                        body.push_call(list_get, vec![captured, index], self.responsible);
+                        body.push_call(list_get, vec![captured, index, self.responsible]);
                     captured_identifiers.push(captured_identifier);
                 }
                 self.check_all_rec(body, condition_builders, captured_identifiers);
@@ -910,7 +904,7 @@ impl PatternLoweringContext {
 
     fn push_match(&self, body: &mut BodyBuilder, captured_identifiers: Vec<Id>) -> Id {
         let captured = body.push_list(captured_identifiers);
-        body.push_call(self.match_tag, vec![captured], self.responsible)
+        body.push_call(self.match_tag, vec![captured, self.responsible])
     }
     fn push_no_match(&self, body: &mut BodyBuilder) -> Id {
         body.push_reference(self.no_match_tag)
@@ -930,14 +924,13 @@ impl BodyBuilder {
     fn push_is_match(&mut self, match_or_no_match: Id, responsible: Id) -> Id {
         let tag_without_value = self.push_builtin(BuiltinFunction::TagWithoutValue);
         let match_or_no_match_symbol =
-            self.push_call(tag_without_value, vec![match_or_no_match], responsible);
+            self.push_call(tag_without_value, vec![match_or_no_match, responsible]);
 
         let equals_function = self.push_builtin(BuiltinFunction::Equals);
         let match_tag = self.push_match_tag();
         self.push_call(
             equals_function,
-            vec![match_or_no_match_symbol, match_tag],
-            responsible,
+            vec![match_or_no_match_symbol, match_tag, responsible],
         )
     }
 

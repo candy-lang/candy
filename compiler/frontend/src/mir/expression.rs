@@ -53,7 +53,6 @@ pub enum Expression {
     Function {
         original_hirs: FxHashSet<hir::Id>,
         parameters: Vec<Id>,
-        responsible_parameter: Id,
         body: Body,
     },
 
@@ -65,7 +64,6 @@ pub enum Expression {
     Call {
         function: Id,
         arguments: Vec<Id>,
-        responsible: Id,
     },
 
     UseModule {
@@ -93,7 +91,6 @@ pub enum Expression {
         hir_call: Id,
         function: Id,
         arguments: Vec<Id>,
-        responsible: Id,
     },
 
     TraceCallEnds {
@@ -112,7 +109,6 @@ pub enum Expression {
         hir_call: Id,
         function: Id,
         arguments: Vec<Id>,
-        responsible: Id,
     },
 
     TraceExpressionEvaluated {
@@ -254,7 +250,6 @@ impl Hash for Expression {
             Self::Function {
                 original_hirs,
                 parameters,
-                responsible_parameter,
                 body,
             } => {
                 {
@@ -267,18 +262,15 @@ impl Hash for Expression {
                     hash.hash(state);
                 }
                 parameters.hash(state);
-                responsible_parameter.hash(state);
                 body.hash(state);
             }
             Self::Parameter => {}
             Self::Call {
                 function,
                 arguments,
-                responsible,
             } => {
                 function.hash(state);
                 arguments.hash(state);
-                responsible.hash(state);
             }
             Self::UseModule {
                 current_module,
@@ -300,18 +292,15 @@ impl Hash for Expression {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             }
             | Self::TraceTailCall {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             } => {
                 hir_call.hash(state);
                 function.hash(state);
                 arguments.hash(state);
-                responsible.hash(state);
             }
             Self::TraceCallEnds { return_value } => return_value.hash(state),
             Self::TraceExpressionEvaluated {
@@ -385,7 +374,6 @@ impl ToRichIr for Expression {
                 // assignment.
                 original_hirs: _,
                 parameters,
-                responsible_parameter,
                 body,
             } => {
                 builder.push("{ ", None, EnumSet::empty());
@@ -401,22 +389,7 @@ impl ToRichIr for Expression {
                     },
                     " ",
                 );
-                builder.push(
-                    if parameters.is_empty() {
-                        "(responsible "
-                    } else {
-                        " (+ responsible "
-                    },
-                    None,
-                    EnumSet::empty(),
-                );
-                let range = builder.push(
-                    responsible_parameter.to_string(),
-                    TokenType::Parameter,
-                    EnumSet::empty(),
-                );
-                builder.push_definition(*responsible_parameter, range);
-                builder.push(") ->", None, EnumSet::empty());
+                builder.push(" ->", None, EnumSet::empty());
                 builder.push_foldable(|builder| {
                     builder.indent();
                     builder.push_newline();
@@ -432,7 +405,6 @@ impl ToRichIr for Expression {
             Self::Call {
                 function,
                 arguments,
-                responsible,
             } => {
                 builder.push("call ", None, EnumSet::empty());
                 function.build_rich_ir(builder);
@@ -442,9 +414,6 @@ impl ToRichIr for Expression {
                 } else {
                     builder.push_children(arguments, " ");
                 }
-                builder.push(" (", None, EnumSet::empty());
-                responsible.build_rich_ir(builder);
-                builder.push(" is responsible)", None, EnumSet::empty());
             }
             Self::UseModule {
                 current_module,
@@ -473,15 +442,12 @@ impl ToRichIr for Expression {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             } => {
                 builder.push("trace: start of call of ", None, EnumSet::empty());
                 function.build_rich_ir(builder);
                 builder.push(" with ", None, EnumSet::empty());
                 builder.push_children(arguments, " ");
-                builder.push(" (", None, EnumSet::empty());
-                responsible.build_rich_ir(builder);
-                builder.push(" is responsible, code is at ", None, EnumSet::empty());
+                builder.push(" (code is at ", None, EnumSet::empty());
                 hir_call.build_rich_ir(builder);
                 builder.push(")", None, EnumSet::empty());
             }
@@ -497,15 +463,12 @@ impl ToRichIr for Expression {
                 hir_call,
                 function,
                 arguments,
-                responsible,
             } => {
                 builder.push("trace: tail call of ", None, EnumSet::empty());
                 function.build_rich_ir(builder);
                 builder.push(" with ", None, EnumSet::empty());
                 builder.push_children(arguments, " ");
-                builder.push(" (", None, EnumSet::empty());
-                responsible.build_rich_ir(builder);
-                builder.push(" is responsible, code is at ", None, EnumSet::empty());
+                builder.push(" (code is at ", None, EnumSet::empty());
                 hir_call.build_rich_ir(builder);
                 builder.push(")", None, EnumSet::empty());
             }
