@@ -17,6 +17,7 @@ use crate::{
     id::IdGenerator,
     mir::{Body, Expression, Id, Mir},
 };
+use std::env;
 
 impl Mir {
     pub fn cleanup(&mut self, pureness: &mut PurenessInsights) {
@@ -81,6 +82,10 @@ impl Mir {
     }
 
     pub fn normalize_ids(&mut self, pureness: &mut PurenessInsights) {
+        if env::var("CANDY_MIR_NORMALIZE_IDS") == Ok("false".to_string()) {
+            return;
+        }
+
         let mut generator = IdGenerator::start_at(1);
         let mapping: FxHashMap<Id, Id> = self
             .body
