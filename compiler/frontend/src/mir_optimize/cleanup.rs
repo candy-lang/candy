@@ -23,19 +23,23 @@ impl Mir {
         self.sort_constants_to_front(pureness);
         self.normalize_ids(pureness);
     }
-
-    /// Moves constants directly in the body to the front and sorts them. This
-    /// wouldn't be super useful when applied to an unoptimized MIR, but because
-    /// we optimize it using [constant lifting], we can assume that all
-    /// constants are in the outermost body.
+    /// Sorts the leading constants in the body. This wouldn't be super useful
+    /// when applied to an unoptimized MIR, but because we optimize it using
+    /// [constant lifting], we can assume that all constants are at the
+    /// beginning of the body.
     ///
     /// [constant lifting]: super::constant_lifting
     fn sort_constants_to_front(&mut self, pureness: &PurenessInsights) {
-        let (constants, mut non_constants) = self
+        // Extract all constants from the body so that we can sort them. We may
+        // not include the last expression in the sorting because it is being
+        // returned.
+        let (constants, mut non_constants): (Vec<_>, Vec<_>) = self
             .body
             .expressions
-            .drain(..)
+            .drain(..self.body.expressions.len() - 1)
             .partition(|(_, expression)| pureness.is_definition_const(expression));
+        non_constants.push(self.body.expressions.pop().unwrap());
+
         let mut constants = Body::new(constants);
         Self::sort_constants(&mut constants);
         self.body = constants;
