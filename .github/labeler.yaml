@@ -1,0 +1,65 @@
+# https://github.com/actions/labeler
+'P: AdventOfCode':
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/AdventOfCode/**/*
+'P: Builtins':
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/Builtins/**/*
+'P: Compiler: CLI':
+  - changed-files:
+      - any-glob-to-any-file:
+          - compiler/cli/**/*
+'P: Compiler: Formatter':
+  - changed-files:
+      - any-glob-to-any-file:
+          - compiler/formatter/**/*
+'P: Compiler: Frontend':
+  - changed-files:
+      - any-glob-to-any-file:
+          - compiler/frontend/**/*
+'P: Compiler: Fuzzer':
+  - changed-files:
+      - any-glob-to-any-file:
+          - compiler/fuzzer/**/*
+'P: Compiler: Inkwell Backend':
+  - changed-files:
+      - any-glob-to-any-file:
+          - compiler/backend_inkwell/**/*
+'P: Compiler: Language Server':
+  - changed-files:
+      - any-glob-to-any-file:
+          - compiler/language_server/**/*
+'P: Compiler: VM':
+  - changed-files:
+      - any-glob-to-any-file:
+          - compiler/vm/**/*
+'P: Compiler: VS Code Extension':
+  - changed-files:
+      - any-glob-to-any-file:
+          - vscode_extension/**/*
+'P: Core':
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/Core/**/*
+'P: Examples':
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/Examples/**/*
+'P: Http':
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/Http/**/*
+'P: ProgrammingLanguageBenchmarks':
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/ProgrammingLanguageBenchmarks/**/*
+'P: Random':
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/Random/**/*
+'P: RosettaCode':
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/RosettaCode/**/*
