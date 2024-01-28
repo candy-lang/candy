@@ -277,8 +277,30 @@ impl<'c> LoweringContext<'c> {
                 );
             }
             Expression::TraceCallEnds { return_value } => {
-                self.emit_reference_to(*return_value);
-                self.emit(id, Instruction::TraceCallEnds);
+                let has_return_value = return_value.as_ref().map_or(false, |return_value| {
+                    self.emit_reference_to(*return_value);
+                    true
+                });
+                self.emit(id, Instruction::TraceCallEnds { has_return_value });
+            }
+            Expression::TraceTailCall {
+                hir_call,
+                function,
+                arguments,
+                responsible,
+            } => {
+                self.emit_reference_to(*hir_call);
+                self.emit_reference_to(*function);
+                for argument in arguments {
+                    self.emit_reference_to(*argument);
+                }
+                self.emit_reference_to(*responsible);
+                self.emit(
+                    id,
+                    Instruction::TraceTailCall {
+                        num_args: arguments.len(),
+                    },
+                );
             }
             Expression::TraceExpressionEvaluated {
                 hir_expression,

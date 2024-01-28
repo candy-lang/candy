@@ -1,0 +1,48 @@
+[bool, equals, ifElse, int, text] = use "Core"
+cursor = use "..cursor"
+
+is parser := parser %
+  Parser c -> cursor.is c
+  _ -> False
+
+new source :=
+  needs (text.is source)
+  Parser (cursor.newAtStart source)
+
+peek parser :=
+  needs (is parser)
+  Parser c = parser
+  ifElse (c | cursor.isAtEnd) { Error Empty } {
+    Cursor [source, offset] = c
+    Ok (source | text.getRange offset (offset | int.add 1))
+  }
+next parser :=
+  needs (is parser)
+  Parser c = parser
+  ifElse (c | cursor.isAtEnd) { Error Empty } {
+    Cursor [source, offset] = c
+    c = c | cursor.add 1
+    Cursor [Offset: newOffset] = c
+    Ok [Parser: Parser c, Character: source | text.getRange offset newOffset]
+  }
+
+matches parser expectedText :=
+  needs (is parser)
+  needs (text.is expectedText)
+  Parser (Cursor [source, offset]) = parser
+  endExclusive = offset | int.add (expectedText | text.length)
+  endExclusive | int.isLessThanOrEqualTo (source | text.length)
+  | bool.lazyAnd { source | text.getRange offset endExclusive | equals expectedText }
+require parser expectedText :=
+  needs (is parser)
+  needs (text.is expectedText)
+  ifElse
+    parser | matches expectedText
+    {
+      Parser c = parser
+      Ok (Parser (c | cursor.add (expectedText | text.length)))
+    }
+    {
+      Parser (Cursor [offset]) = parser
+      Error '"Expected "{{expectedText}}" at offset {offset}."'
+    }

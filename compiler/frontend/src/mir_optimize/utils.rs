@@ -2,7 +2,6 @@ use super::pure::PurenessInsights;
 use crate::mir::{Body, Expression, Id, VisibleExpressions};
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
-use std::mem;
 
 impl Expression {
     /// All IDs defined inside this expression. For all expressions except
@@ -106,6 +105,12 @@ impl Expression {
                 function,
                 arguments,
                 responsible,
+            }
+            | Self::TraceTailCall {
+                hir_call,
+                function,
+                arguments,
+                responsible,
             } => {
                 referenced.insert(*hir_call);
                 referenced.insert(*function);
@@ -113,7 +118,9 @@ impl Expression {
                 referenced.insert(*responsible);
             }
             Self::TraceCallEnds { return_value } => {
-                referenced.insert(*return_value);
+                if let Some(return_value) = return_value {
+                    referenced.insert(*return_value);
+                }
             }
             Self::TraceExpressionEvaluated {
                 hir_expression,
@@ -317,6 +324,12 @@ impl Expression {
                 function,
                 arguments,
                 responsible,
+            }
+            | Self::TraceTailCall {
+                hir_call,
+                function,
+                arguments,
+                responsible,
             } => {
                 replacer(hir_call);
                 replacer(function);
@@ -326,7 +339,9 @@ impl Expression {
                 replacer(responsible);
             }
             Self::TraceCallEnds { return_value } => {
-                replacer(return_value);
+                if let Some(return_value) = return_value {
+                    replacer(return_value);
+                }
             }
             Self::TraceExpressionEvaluated {
                 hir_expression,
@@ -378,11 +393,9 @@ impl Expression {
 }
 impl Body {
     pub fn replace_ids(&mut self, replacer: &mut impl FnMut(&mut Id)) {
-        let body = mem::take(self);
-        for (mut id, mut expression) in body {
-            replacer(&mut id);
+        for (id, expression) in &mut self.expressions {
+            replacer(id);
             expression.replace_ids(replacer);
-            self.push(id, expression);
         }
     }
 }

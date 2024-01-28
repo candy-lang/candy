@@ -1,17 +1,50 @@
 use candy_frontend::format::{MaxLength, Precedence};
-use candy_vm::heap::{Heap, InlineObject, ToDebugText};
+use candy_vm::heap::{Heap, HeapObject, InlineObject, ToDebugText};
 use itertools::Itertools;
+use rustc_hash::FxHashMap;
 use std::{
-    cell::RefCell,
     fmt::{self, Display, Formatter},
-    hash::{Hash, Hasher},
-    rc::Rc,
+    hash::Hash,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Input {
-    pub heap: Rc<RefCell<Heap>>,
-    pub arguments: Vec<InlineObject>,
+    arguments: Vec<InlineObject>,
+}
+impl Input {
+    #[must_use]
+    pub fn new(arguments: Vec<InlineObject>) -> Self {
+        Self { arguments }
+    }
+
+    #[must_use]
+    pub fn arguments(&self) -> &[InlineObject] {
+        &self.arguments
+    }
+
+    pub fn dup(&self, heap: &mut Heap) {
+        for argument in &self.arguments {
+            argument.dup(heap);
+        }
+    }
+    pub fn drop(&self, heap: &mut Heap) {
+        for argument in &self.arguments {
+            argument.drop(heap);
+        }
+    }
+    #[must_use]
+    pub fn clone_to_heap_with_mapping(
+        &self,
+        heap: &mut Heap,
+        address_map: &mut FxHashMap<HeapObject, HeapObject>,
+    ) -> Self {
+        Self::new(
+            self.arguments
+                .iter()
+                .map(|argument| argument.clone_to_heap_with_mapping(heap, address_map))
+                .collect(),
+        )
+    }
 }
 
 impl Display for Input {
@@ -24,21 +57,5 @@ impl Display for Input {
                 .map(|argument| argument.to_debug_text(Precedence::High, MaxLength::Limited(40)))
                 .join(" "),
         )
-    }
-}
-
-impl Eq for Input {}
-impl PartialEq for Input {
-    /// This function assumes that the other input uses the same underlying
-    /// heap. This assumption should hold because all inputs generated during a
-    /// fuzzing run are saved in the same heap.
-    fn eq(&self, other: &Self) -> bool {
-        assert!(Rc::ptr_eq(&self.heap, &other.heap));
-        self.arguments == other.arguments
-    }
-}
-impl Hash for Input {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.arguments.hash(state);
     }
 }

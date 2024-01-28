@@ -20,15 +20,18 @@ pub struct HeapList(HeapObject);
 impl HeapList {
     const LEN_SHIFT: usize = 4;
 
+    #[must_use]
     pub const fn new_unchecked(object: HeapObject) -> Self {
         Self(object)
     }
+    #[must_use]
     pub fn create(heap: &mut Heap, is_reference_counted: bool, value: &[InlineObject]) -> Self {
         let len = value.len();
         let list = Self::create_uninitialized(heap, is_reference_counted, len);
         unsafe { ptr::copy_nonoverlapping(value.as_ptr(), list.items_pointer().as_ptr(), len) };
         list
     }
+    #[must_use]
     fn create_uninitialized(heap: &mut Heap, is_reference_counted: bool, len: usize) -> Self {
         assert_eq!(
             (len << Self::LEN_SHIFT) >> Self::LEN_SHIFT,
@@ -43,18 +46,22 @@ impl HeapList {
         ))
     }
 
+    #[must_use]
     pub fn len(self) -> usize {
         (self.header_word() >> Self::LEN_SHIFT) as usize
     }
+    #[must_use]
     pub fn get(self, index: usize) -> InlineObject {
         debug_assert!(index < self.len());
         let word = self.unsafe_get_content_word(index);
         let word = unsafe { NonZeroU64::new_unchecked(word) };
         InlineObject::new(word)
     }
+    #[must_use]
     fn items_pointer(self) -> NonNull<InlineObject> {
         self.content_word_pointer(0).cast()
     }
+    #[must_use]
     pub fn items<'a>(self) -> &'a [InlineObject] {
         unsafe {
             let pointer = self.items_pointer().as_ref();

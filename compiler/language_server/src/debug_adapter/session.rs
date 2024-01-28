@@ -7,6 +7,7 @@ use crate::database::Database;
 use candy_frontend::{
     hir_to_mir::ExecutionTarget,
     module::{Module, ModuleKind, PackagesPath},
+    tracing::CallTracingMode,
     TracingConfig, TracingMode,
 };
 use candy_vm::{
@@ -186,13 +187,13 @@ impl DebugSession {
 
                 let tracing = TracingConfig {
                     register_fuzzables: TracingMode::Off,
-                    calls: TracingMode::All,
+                    calls: CallTracingMode::All,
                     evaluated_expressions: TracingMode::All,
                 };
                 let byte_code = compile_byte_code(
                     &self.db,
                     ExecutionTarget::MainFunction(module.clone()),
-                    tracing.clone(),
+                    tracing,
                 )
                 .0;
 
@@ -338,7 +339,7 @@ impl DebugSession {
             };
             let is_trace_instruction = matches!(
                 vm.byte_code().instructions[*instruction_pointer],
-                Instruction::TraceCallEnds | Instruction::TraceExpressionEvaluated,
+                Instruction::TraceCallEnds { .. } | Instruction::TraceExpressionEvaluated,
             );
 
             match vm.run_without_handles(&mut heap) {

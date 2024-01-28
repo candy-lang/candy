@@ -7,6 +7,8 @@ rust-version = "1.56"
 [lib]
 
 [dependencies]
+bitvec = "1.0.1"
+clap = { version = "4.1.8", features = ["derive"] }
 derive_more = "0.99.17"
 dunce = "1.0.4"
 enumset = "1.0.12"

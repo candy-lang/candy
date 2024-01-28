@@ -17,6 +17,7 @@ use candy_frontend::{
     rcst_to_cst::RcstToCst,
     rich_ir::{RichIr, RichIrAnnotation, TokenType},
     string_to_rcst::StringToRcst,
+    tracing::CallTracingMode,
     utils::DoHash,
     TracingConfig, TracingMode,
 };
@@ -90,24 +91,47 @@ pub struct PathAndExecutionTargetAndTracing {
     #[arg(long, value_enum, default_value_t = ExecutionTargetKind::Module)]
     execution_target: ExecutionTargetKind,
 
-    #[arg(long)]
-    register_fuzzables: bool,
+    // The tracing modes can be specified as follows:
+    //
+    // - not specified or `--register-fuzzables=off`: off
+    // - `--register-fuzzables` or `--register-fuzzables=only-current`: only current
+    // - `--register-fuzzables=all`: all
+    //
+    // (Same for `trace-calls` and `evaluated-expressions`.)
+    #[arg(
+        long,
+        default_value("off"),
+        default_missing_value("only-current"),
+        num_args(0..=1),
+        require_equals(true)
+    )]
+    register_fuzzables: TracingMode,
 
-    #[arg(long)]
-    trace_calls: bool,
+    #[arg(
+        long,
+        default_value("off"),
+        default_missing_value("only-potentially-panicking"),
+        num_args(0..=1),
+        require_equals(true)
+    )]
+    trace_calls: CallTracingMode,
 
-    #[arg(long)]
-    trace_evaluated_expressions: bool,
+    #[arg(
+        long,
+        default_value("off"),
+        default_missing_value("only-current"),
+        num_args(0..=1),
+        require_equals(true)
+    )]
+    trace_evaluated_expressions: TracingMode,
 }
 impl PathAndExecutionTargetAndTracing {
     #[must_use]
     const fn to_tracing_config(&self) -> TracingConfig {
         TracingConfig {
-            register_fuzzables: TracingMode::only_current_or_off(self.register_fuzzables),
-            calls: TracingMode::only_current_or_off(self.trace_calls),
-            evaluated_expressions: TracingMode::only_current_or_off(
-                self.trace_evaluated_expressions,
-            ),
+            register_fuzzables: self.register_fuzzables,
+            calls: self.trace_calls,
+            evaluated_expressions: self.trace_evaluated_expressions,
         }
     }
 }
@@ -165,40 +189,40 @@ pub fn debug(options: Options) -> ProgramResult {
             let module = module_for_path(options.path.clone())?;
             let execution_target = options.execution_target.resolve(module.clone());
             let tracing = options.to_tracing_config();
-            let mir = db.mir(execution_target, tracing.clone());
+            let mir = db.mir(execution_target, tracing);
             mir.ok()
-                .map(|(mir, _)| RichIr::for_mir(&module, &mir, &tracing))
+                .map(|(mir, _)| RichIr::for_mir(&module, &mir, tracing))
         }
         Options::OptimizedMir(options) => {
             let module = module_for_path(options.path.clone())?;
             let execution_target = options.execution_target.resolve(module.clone());
             let tracing = options.to_tracing_config();
-            let mir = db.optimized_mir(execution_target, tracing.clone());
+            let mir = db.optimized_mir(execution_target, tracing);
             mir.ok()
-                .map(|(mir, _, _)| RichIr::for_optimized_mir(&module, &mir, &tracing))
+                .map(|(mir, _)| RichIr::for_optimized_mir(&module, &mir, tracing))
         }
         Options::Lir(options) => {
             let module = module_for_path(options.path.clone())?;
             let execution_target = options.execution_target.resolve(module.clone());
             let tracing = options.to_tracing_config();
-            let lir = db.lir(execution_target, tracing.clone());
+            let lir = db.lir(execution_target, tracing);
             lir.ok()
-                .map(|(lir, _)| RichIr::for_lir(&module, &lir, &tracing))
+                .map(|(lir, _)| RichIr::for_lir(&module, &lir, tracing))
         }
         Options::OptimizedLir(options) => {
             let module = module_for_path(options.path.clone())?;
             let execution_target = options.execution_target.resolve(module.clone());
             let tracing = options.to_tracing_config();
-            let lir = db.optimized_lir(execution_target, tracing.clone());
+            let lir = db.optimized_lir(execution_target, tracing);
             lir.ok()
-                .map(|(lir, _)| RichIr::for_optimized_lir(&module, &lir, &tracing))
+                .map(|(lir, _)| RichIr::for_optimized_lir(&module, &lir, tracing))
         }
         Options::VmByteCode(options) => {
             let module = module_for_path(options.path.clone())?;
             let execution_target = options.execution_target.resolve(module.clone());
             let tracing = options.to_tracing_config();
-            let (vm_byte_code, _) = compile_byte_code(&db, execution_target, tracing.clone());
-            Some(RichIr::for_byte_code(&module, &vm_byte_code, &tracing))
+            let (vm_byte_code, _) = compile_byte_code(&db, execution_target, tracing);
+            Some(RichIr::for_byte_code(&module, &vm_byte_code, tracing))
         }
         #[cfg(feature = "inkwell")]
         Options::LlvmIr(options) => {
@@ -325,7 +349,12 @@ impl Gold {
     }
 }
 impl GoldOptions {
-    const TRACING_CONFIG: TracingConfig = TracingConfig::off();
+    const TRACING_CONFIG: TracingConfig = TracingConfig {
+        register_fuzzables: TracingMode::Off,
+        calls: CallTracingMode::OnlyForPanicTraces,
+        evaluated_expressions: TracingMode::Off,
+    };
+
     fn visit_irs(
         &self,
         db: &Database,
@@ -380,35 +409,35 @@ impl GoldOptions {
             visit("HIR", hir.text);
 
             let (mir, _) = db
-                .mir(execution_target.clone(), Self::TRACING_CONFIG.clone())
+                .mir(execution_target.clone(), Self::TRACING_CONFIG)
                 .unwrap();
-            let mir = RichIr::for_mir(&module, &mir, &Self::TRACING_CONFIG);
+            let mir = RichIr::for_mir(&module, &mir, Self::TRACING_CONFIG);
             visit("MIR", mir.text);
 
-            let (optimized_mir, _, _) = db
-                .optimized_mir(execution_target.clone(), Self::TRACING_CONFIG.clone())
+            let (optimized_mir, _) = db
+                .optimized_mir(execution_target.clone(), Self::TRACING_CONFIG)
                 .unwrap();
             let optimized_mir =
-                RichIr::for_optimized_mir(&module, &optimized_mir, &Self::TRACING_CONFIG);
+                RichIr::for_optimized_mir(&module, &optimized_mir, Self::TRACING_CONFIG);
             visit("Optimized MIR", optimized_mir.text);
 
             let (lir, _) = db
-                .lir(execution_target.clone(), Self::TRACING_CONFIG.clone())
+                .lir(execution_target.clone(), Self::TRACING_CONFIG)
                 .unwrap();
-            let lir = RichIr::for_lir(&module, &lir, &Self::TRACING_CONFIG);
+            let lir = RichIr::for_lir(&module, &lir, Self::TRACING_CONFIG);
             visit("LIR", lir.text);
 
             let (optimized_lir, _) = db
-                .optimized_lir(execution_target.clone(), Self::TRACING_CONFIG.clone())
+                .optimized_lir(execution_target.clone(), Self::TRACING_CONFIG)
                 .unwrap();
             let optimized_lir =
-                RichIr::for_optimized_lir(&module, &optimized_lir, &Self::TRACING_CONFIG);
+                RichIr::for_optimized_lir(&module, &optimized_lir, Self::TRACING_CONFIG);
             visit("Optimized LIR", optimized_lir.text);
 
             let (vm_byte_code, _) =
-                compile_byte_code(db, execution_target.clone(), Self::TRACING_CONFIG.clone());
+                compile_byte_code(db, execution_target.clone(), Self::TRACING_CONFIG);
             let vm_byte_code_rich_ir =
-                RichIr::for_byte_code(&module, &vm_byte_code, &Self::TRACING_CONFIG);
+                RichIr::for_byte_code(&module, &vm_byte_code, Self::TRACING_CONFIG);
             visit(
                 "VM Byte Code",
                 Self::format_byte_code(&vm_byte_code, &vm_byte_code_rich_ir),

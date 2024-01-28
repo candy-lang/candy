@@ -1,10 +1,9 @@
 use crate::{
     byte_code::Instruction,
-    heap::{Data, Function, Heap, HirId, InlineObject, List, Pointer, Struct, Tag, Text},
+    heap::{Data, Function, Heap, HirId, InlineObject, List, Struct, Tag, Text},
     tracer::Tracer,
     vm::{CallHandle, MachineState, Panic},
 };
-use extension_trait::extension_trait;
 use itertools::Itertools;
 use tracing::trace;
 
@@ -159,7 +158,8 @@ impl MachineState {
                     // HIR to the MIR.
                     panic!("We should never generate byte code where the reason is not a text.");
                 };
-                let responsible: HirId = responsible_for_panic.try_into().unwrap();
+                let responsible: HirId = responsible_for_panic.try_into()
+                    .unwrap_or_else(|_| panic!("Expected a panic's responsible argument to be a HIR ID, but got {responsible_for_panic:?}."));
 
                 InstructionResult::Panic(Panic {
                     reason: reason.get().to_string(),
@@ -179,10 +179,26 @@ impl MachineState {
                 tracer.call_started(heap, call_site, callee, args, responsible);
                 InstructionResult::Done
             }
-            Instruction::TraceCallEnds => {
-                let return_value = self.pop_from_data_stack();
-
+            Instruction::TraceCallEnds { has_return_value } => {
+                let return_value = if *has_return_value {
+                    Some(self.pop_from_data_stack())
+                } else {
+                    None
+                };
                 tracer.call_ended(heap, return_value);
+                InstructionResult::Done
+            }
+            Instruction::TraceTailCall { num_args } => {
+                let responsible = self.pop_from_data_stack().try_into().unwrap();
+                let mut args = vec![];
+                for _ in 0..*num_args {
+                    args.push(self.pop_from_data_stack());
+                }
+                let callee = self.pop_from_data_stack();
+                let call_site = self.pop_from_data_stack().try_into().unwrap();
+
+                args.reverse();
+                tracer.tail_call(heap, call_site, callee, args, responsible);
                 InstructionResult::Done
             }
             Instruction::TraceExpressionEvaluated => {
@@ -306,12 +322,5 @@ impl MachineState {
     fn pop_multiple_from_data_stack(&mut self, amount: usize) {
         assert!(amount <= self.data_stack.len());
         self.data_stack.truncate(self.data_stack.len() - amount);
-    }
-}
-
-#[extension_trait]
-impl NthLast for Vec<Pointer> {
-    fn nth_last(&mut self, index: usize) -> Pointer {
-        self[self.len() - 1 - index]
     }
 }

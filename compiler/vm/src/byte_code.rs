@@ -34,23 +34,17 @@ pub enum Instruction {
     /// Pops 1 argument, pushes a tag.
     ///
     /// a, value -> a, tag
-    CreateTag {
-        symbol: Text,
-    },
+    CreateTag { symbol: Text },
 
     /// Pops num_items items, pushes a list.
     ///
     /// a, item, item, ..., item -> a, pointer to list
-    CreateList {
-        num_items: usize,
-    },
+    CreateList { num_items: usize },
 
     /// Pops 2 * num_fields items, pushes a struct.
     ///
     /// a, key, value, key, value, ..., key, value -> a, pointer to struct
-    CreateStruct {
-        num_fields: usize,
-    },
+    CreateStruct { num_fields: usize },
 
     /// Pushes a function.
     ///
@@ -74,9 +68,7 @@ pub enum Instruction {
     /// Increases the reference count by `amount`.
     ///
     /// a, value -> a
-    Dup {
-        amount: usize,
-    },
+    Dup { amount: usize },
 
     /// Decreases the reference count by one and, if the reference count reaches
     /// zero, deallocates it.
@@ -118,12 +110,15 @@ pub enum Instruction {
     Panic,
 
     /// a, HIR ID, function, arg1, arg2, ..., argN, responsible -> a
-    TraceCallStarts {
-        num_args: usize,
-    },
+    TraceCallStarts { num_args: usize },
 
-    // a, return value -> a
-    TraceCallEnds,
+    /// a -> a
+    /// or:
+    /// a, return value -> a
+    TraceCallEnds { has_return_value: bool },
+
+    /// a, HIR ID, function, arg1, arg2, ..., argN, responsible -> a
+    TraceTailCall { num_args: usize },
 
     /// a, HIR ID, value -> a
     TraceExpressionEvaluated,
@@ -195,14 +190,16 @@ impl Instruction {
                 stack.pop(); // reason
                 stack.push(result);
             }
-            Self::TraceCallStarts { num_args } => {
+            Self::TraceCallStarts { num_args } | Self::TraceTailCall { num_args } => {
                 stack.pop(); // HIR ID
                 stack.pop(); // responsible
                 stack.pop_multiple(*num_args);
                 stack.pop(); // callee
             }
-            Self::TraceCallEnds => {
-                stack.pop(); // return value
+            Self::TraceCallEnds { has_return_value } => {
+                if *has_return_value {
+                    stack.pop(); // return value
+                }
             }
             Self::TraceExpressionEvaluated => {
                 stack.pop(); // HIR ID
@@ -396,14 +393,24 @@ impl Instruction {
             }
             Self::Return => {}
             Self::Panic => {}
-            Self::TraceCallStarts { num_args } => {
+            Self::TraceCallStarts { num_args } | Self::TraceTailCall { num_args } => {
                 builder.push(
                     format!(" ({num_args} {})", arguments_plural(*num_args)),
                     None,
                     EnumSet::empty(),
                 );
             }
-            Self::TraceCallEnds => {}
+            Self::TraceCallEnds { has_return_value } => {
+                builder.push(
+                    if *has_return_value {
+                        " with return value"
+                    } else {
+                        " without return value"
+                    },
+                    None,
+                    EnumSet::empty(),
+                );
+            }
             Self::TraceExpressionEvaluated => {}
             Self::TraceFoundFuzzableFunction => {}
         }
@@ -423,7 +430,7 @@ pub impl RichIrForByteCode for RichIr {
     fn for_byte_code(
         module: &Module,
         byte_code: &ByteCode,
-        tracing_config: &TracingConfig,
+        tracing_config: TracingConfig,
     ) -> RichIr {
         let mut builder = RichIrBuilder::default();
         builder.push(

@@ -74,7 +74,7 @@ pub fn compile(options: &Options) -> ProgramResult {
             ExecutionTarget::MainFunction(module.clone()),
             TracingConfig::off(),
         )
-        .map(|(mir, _, errors)| (mir, errors))
+        .map(|(mir, errors)| (mir, errors))
         .unwrap_or_else(|error| {
             let payload = CompilerErrorPayload::Module(error);
             let mir = Mir::build(|body| {

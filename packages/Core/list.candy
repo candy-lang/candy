@@ -12,7 +12,7 @@ is value := type.is value List
 length := builtins.listLength
 isEmpty list :=
   needs (is list)
-  equals (length list) 0
+  equals (list | length) 0
 
 lastIndex list :=
   needs (is list)
@@ -55,7 +55,7 @@ prepend list item :=
   list | insert 0 item
 append list item :=
   needs (is list)
-  list | insert (length list) item
+  list | insert (list | length) item
 
 replace := builtins.listReplace
 update list index updater :=
@@ -108,6 +108,46 @@ concatenate listA listB :=
       listB | get (index | int.subtract (listA | length))
     }
   }
+
+firstIndexWhere list predicate :=
+  needs (is list)
+  needs (function.is1 predicate)
+  recursive [list, Index: 0] { recurse [list, index] ->
+    ifElse (index | equals (list | length)) { NotFound } {
+      predicateResult = predicate (list | get index)
+      needs (bool.is predicateResult)
+      ifElse predicateResult { FoundAt index } { recurse [list, Index: int.add index 1] }
+    }
+  }
+firstWhere list predicate :=
+  needs (is list)
+  needs (function.is1 predicate)
+  list | firstIndexWhere predicate %
+    FoundAt index -> Found (list | get index)
+    NotFound -> NotFound
+firstIndexOf list item :=
+  needs (is list)
+  firstIndexWhere list { a -> a | equals item }
+lastIndexWhere list predicate :=
+  needs (is list)
+  needs (function.is1 predicate)
+  recursive [list, Index: list | lastIndex | result.unwrapOr (int.negate 1)] {
+    recurse [list, index] ->
+    ifElse (index | equals (int.negate 1)) { NotFound } {
+      predicateResult = predicate (list | get index)
+      needs (bool.is predicateResult)
+      ifElse predicateResult { FoundAt index } { recurse [list, Index: int.subtract index 1] }
+    }
+  }
+lastWhere list predicate :=
+  needs (is list)
+  needs (function.is1 predicate)
+  list | lastIndexWhere predicate %
+    FoundAt index -> Found (list | get index)
+    NotFound -> NotFound
+lastIndexOf list item :=
+  needs (is list)
+  lastIndexWhere list { a -> a | equals item }
 
 #test =
 #  [checkEquals] = use "..check"

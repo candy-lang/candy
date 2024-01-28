@@ -37,6 +37,7 @@
 use super::{
     complexity::Complexity,
     current_expression::{Context, CurrentExpression},
+    pure::PurenessInsights,
 };
 use crate::{
     hir,
@@ -79,6 +80,15 @@ pub fn inline_functions_containing_use(context: &mut Context, expression: &mut C
     if let Expression::Call { function, .. } = **expression
         && let Expression::Function { body, .. } = context.visible.get(function)
         && body.iter().any(|(_, expression)| expression.is_use_module()) {
+        context.inline_call(expression);
+    }
+}
+pub fn inline_calls_with_constant_arguments(
+    context: &mut Context,
+    expression: &mut CurrentExpression,
+) {
+    if let Expression::Call { arguments, .. } = &**expression
+        && arguments.iter().all(|arg| context.pureness.is_definition_const(context.visible.get(*arg))) {
         context.inline_call(expression);
     }
 }
@@ -126,14 +136,20 @@ impl Context<'_> {
             )
             .collect();
 
-        expression.replace_with_multiple(body.iter().map(|(id, expression)| {
-            let mut expression = expression.clone();
-            expression.replace_ids(&mut |id| {
-                if let Some(replacement) = id_mapping.get(id) {
-                    *id = *replacement;
-                }
-            });
-            (id_mapping[&id], expression)
-        }));
+        expression.replace_with_multiple(
+            body.iter().map(|(id, expression)| {
+                let mut expression = expression.clone();
+                expression.replace_ids(&mut |id| {
+                    if let Some(replacement) = id_mapping.get(id) {
+                        *id = *replacement;
+                    }
+                });
+                (id_mapping[&id], expression)
+            }),
+            // The replaced expression is definitely a call, which means it
+            // doesn't define any expressions that need to be removed from the
+            // pureness insights.
+            &mut PurenessInsights::default(),
+        );
     }
 }

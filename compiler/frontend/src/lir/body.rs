@@ -1,4 +1,4 @@
-use super::{Expression, Id};
+use super::{Constants, Expression, Id};
 use crate::{
     hir,
     id::CountableId,
@@ -56,9 +56,13 @@ impl Bodies {
             .enumerate()
             .map(|(index, it)| (BodyId(index), it))
     }
-}
-impl ToRichIr for Bodies {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+
+    pub fn build_rich_ir_with_constants(
+        &self,
+        builder: &mut RichIrBuilder,
+        constants: impl Into<Option<&Constants>>,
+    ) {
+        let constants = constants.into();
         builder.push_custom_multiline(self.ids_and_bodies(), |builder, (id, body)| {
             let range = builder.push(id.to_string(), TokenType::Function, EnumSet::empty());
 
@@ -92,11 +96,16 @@ impl ToRichIr for Bodies {
 
             builder.push(") =", None, EnumSet::empty());
 
-            builder.indent();
-            builder.push_newline();
-            body.build_rich_ir(builder);
-            builder.dedent();
+            builder.push_indented_foldable(|builder| {
+                builder.push_newline();
+                body.build_rich_ir_with_constants(builder, constants);
+            });
         });
+    }
+}
+impl ToRichIr for Bodies {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        self.build_rich_ir_with_constants(builder, None);
     }
 }
 
@@ -162,8 +171,12 @@ impl Body {
     }
     #[must_use]
     pub fn expression(&self, id: Id) -> Option<&Expression> {
-        self.expressions
-            .get(id.to_usize() - self.expression_id_offset())
+        let expression_id_offset = self.expression_id_offset();
+        if id.to_usize() < expression_id_offset {
+            return None;
+        }
+
+        self.expressions.get(id.to_usize() - expression_id_offset)
     }
     #[must_use]
     pub fn ids_and_expressions(&self) -> impl DoubleEndedIterator<Item = (Id, &Expression)> {
@@ -192,9 +205,13 @@ impl Body {
         self.expressions.push(expression);
         self.last_expression_id().unwrap()
     }
-}
-impl ToRichIr for Body {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+
+    pub fn build_rich_ir_with_constants(
+        &self,
+        builder: &mut RichIrBuilder,
+        constants: impl Into<Option<&Constants>>,
+    ) {
+        let constants = constants.into();
         builder.push("# Original HIR IDs: ", TokenType::Comment, EnumSet::empty());
         builder.push_children_custom(
             self.original_hirs.iter().sorted(),
@@ -225,7 +242,12 @@ impl ToRichIr for Body {
             let range = builder.push(id.to_string(), TokenType::Variable, EnumSet::empty());
             builder.push_definition(*id, range);
             builder.push(" = ", None, EnumSet::empty());
-            expression.build_rich_ir(builder);
+            expression.build_rich_ir_with_constants(builder, constants, self);
         });
+    }
+}
+impl ToRichIr for Body {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        self.build_rich_ir_with_constants(builder, None);
     }
 }

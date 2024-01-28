@@ -3,7 +3,9 @@ use crate::{
     utils::{module_for_path, packages_path},
     Exit, ProgramResult,
 };
-use candy_frontend::{hir_to_mir::ExecutionTarget, TracingConfig, TracingMode};
+use candy_frontend::{
+    hir_to_mir::ExecutionTarget, tracing::CallTracingMode, TracingConfig, TracingMode,
+};
 use candy_vm::{
     environment::DefaultEnvironment, heap::Heap, lir_to_byte_code::compile_byte_code,
     tracer::stack_trace::StackTracer, Vm, VmFinished,
@@ -38,7 +40,7 @@ pub fn run(options: Options) -> ProgramResult {
 
     let tracing = TracingConfig {
         register_fuzzables: TracingMode::Off,
-        calls: TracingMode::All,
+        calls: CallTracingMode::OnlyForPanicTraces,
         evaluated_expressions: TracingMode::Off,
     };
 

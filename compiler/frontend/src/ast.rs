@@ -488,9 +488,9 @@ impl ToRichIr for Function {
                 builder.push(" ->", None, EnumSet::empty());
             } else {
                 builder.push_children_multiline(&self.parameters);
-                builder.indent();
-                builder.push_newline();
-                builder.dedent();
+                builder.push_indented(|builder| {
+                    builder.push_newline();
+                });
                 builder.push("->", None, EnumSet::empty());
             }
         }

@@ -5,10 +5,9 @@ pub use self::{
     },
     object_heap::{HeapData, HeapObject, HeapObjectTrait},
     object_inline::{
-        int::I64BitLength, InlineData, InlineObject, InlineObjectSliceCloneToHeap,
-        InlineObjectTrait, ToDebugText,
+        int::I64BitLength, pointer::InlinePointer, InlineData, InlineObject,
+        InlineObjectSliceCloneToHeap, InlineObjectTrait, ToDebugText,
     },
-    pointer::Pointer,
 };
 use crate::handle_id::HandleId;
 use candy_frontend::id::IdGenerator;
@@ -24,7 +23,6 @@ use std::{
 mod object;
 mod object_heap;
 mod object_inline;
-mod pointer;
 
 pub struct Heap {
     objects: FxHashSet<ObjectInHeap>,
@@ -233,6 +231,8 @@ pub struct DefaultSymbols {
     pub equal: Text,
     pub error: Text,
     pub false_: Text,
+    pub file: Text,
+    pub file_system: Text,
     pub function: Text,
     pub get_random_bytes: Text,
     pub get_next_request: Text,
@@ -245,11 +245,14 @@ pub struct DefaultSymbols {
     pub not_utf8: Text,
     pub nothing: Text,
     pub ok: Text,
+    pub open: Text,
+    pub read_to_end: Text,
     pub request: Text,
     pub send_response: Text,
     pub stdin: Text,
     pub stdout: Text,
     pub struct_: Text,
+    pub system_clock: Text,
     pub tag: Text,
     pub text: Text,
     pub true_: Text,
@@ -263,6 +266,8 @@ impl DefaultSymbols {
             equal: Text::create(heap, false, "Equal"),
             error: Text::create(heap, false, "Error"),
             false_: Text::create(heap, false, "False"),
+            file: Text::create(heap, false, "File"),
+            file_system: Text::create(heap, false, "FileSystem"),
             function: Text::create(heap, false, "Function"),
             get_next_request: Text::create(heap, false, "GetNextRequest"),
             get_random_bytes: Text::create(heap, false, "GetRandomBytes"),
@@ -275,11 +280,14 @@ impl DefaultSymbols {
             not_utf8: Text::create(heap, false, "NotUtf8"),
             nothing: Text::create(heap, false, "Nothing"),
             ok: Text::create(heap, false, "Ok"),
+            open: Text::create(heap, false, "Open"),
+            read_to_end: Text::create(heap, false, "ReadToEnd"),
             request: Text::create(heap, false, "Request"),
             send_response: Text::create(heap, false, "SendResponse"),
             stdin: Text::create(heap, false, "Stdin"),
             stdout: Text::create(heap, false, "Stdout"),
             struct_: Text::create(heap, false, "Struct"),
+            system_clock: Text::create(heap, false, "SystemClock"),
             tag: Text::create(heap, false, "Tag"),
             text: Text::create(heap, false, "Text"),
             true_: Text::create(heap, false, "True"),
@@ -306,6 +314,8 @@ impl DefaultSymbols {
             equal: clone_to_heap(heap, address_map, self.equal),
             error: clone_to_heap(heap, address_map, self.error),
             false_: clone_to_heap(heap, address_map, self.false_),
+            file: clone_to_heap(heap, address_map, self.file),
+            file_system: clone_to_heap(heap, address_map, self.file_system),
             function: clone_to_heap(heap, address_map, self.function),
             get_next_request: clone_to_heap(heap, address_map, self.get_next_request),
             get_random_bytes: clone_to_heap(heap, address_map, self.get_random_bytes),
@@ -318,11 +328,14 @@ impl DefaultSymbols {
             not_utf8: clone_to_heap(heap, address_map, self.not_utf8),
             nothing: clone_to_heap(heap, address_map, self.nothing),
             ok: clone_to_heap(heap, address_map, self.ok),
+            open: clone_to_heap(heap, address_map, self.open),
+            read_to_end: clone_to_heap(heap, address_map, self.read_to_end),
             request: clone_to_heap(heap, address_map, self.request),
             send_response: clone_to_heap(heap, address_map, self.send_response),
             stdin: clone_to_heap(heap, address_map, self.stdin),
             stdout: clone_to_heap(heap, address_map, self.stdout),
             struct_: clone_to_heap(heap, address_map, self.struct_),
+            system_clock: clone_to_heap(heap, address_map, self.system_clock),
             tag: clone_to_heap(heap, address_map, self.tag),
             text: clone_to_heap(heap, address_map, self.text),
             true_: clone_to_heap(heap, address_map, self.true_),
@@ -338,7 +351,7 @@ impl DefaultSymbols {
             .map(|it| symbols[it])
     }
     #[must_use]
-    pub const fn all_symbols(&self) -> [Text; 26] {
+    pub const fn all_symbols(&self) -> [Text; 31] {
         [
             self.arguments,
             self.builtin,
@@ -346,6 +359,8 @@ impl DefaultSymbols {
             self.equal,
             self.error,
             self.false_,
+            self.file,
+            self.file_system,
             self.function,
             self.get_next_request,
             self.get_random_bytes,
@@ -358,11 +373,14 @@ impl DefaultSymbols {
             self.not_utf8,
             self.nothing,
             self.ok,
+            self.open,
+            self.read_to_end,
             self.request,
             self.send_response,
             self.stdin,
             self.stdout,
             self.struct_,
+            self.system_clock,
             self.tag,
             self.text,
             self.true_,

@@ -17,6 +17,7 @@ pub use self::{
     runner::RunResult,
     utils::FuzzablesFinder,
 };
+use crate::fuzzer::FuzzerResult;
 use candy_frontend::{
     ast_to_hir::AstToHir,
     cst::CstDb,
@@ -24,6 +25,7 @@ use candy_frontend::{
     lir_optimize::OptimizeLir,
     module::Module,
     position::PositionConversionDb,
+    tracing::CallTracingMode,
     {hir::Id, TracingConfig, TracingMode},
 };
 use candy_vm::{
@@ -38,8 +40,8 @@ where
     DB: AstToHir + CstDb + OptimizeLir + PositionConversionDb,
 {
     let tracing = TracingConfig {
-        register_fuzzables: TracingMode::All,
-        calls: TracingMode::Off,
+        register_fuzzables: TracingMode::OnlyCurrent,
+        calls: CallTracingMode::Off,
         evaluated_expressions: TracingMode::Off,
     };
     let (byte_code, _) = compile_byte_code(db, ExecutionTarget::Module(module), tracing);
@@ -53,7 +55,7 @@ where
         .run_forever_without_handles(&mut heap);
 
     info!(
-        "Now, the fuzzing begins. So far, we have {} functions to fuzz.",
+        "Now, the fuzzing begins. We have {} functions to fuzz: {fuzzables:?}.",
         fuzzables.len(),
     );
 
@@ -64,14 +66,14 @@ where
         let mut fuzzer = Fuzzer::new(byte_code.clone(), function, id.clone());
         fuzzer.run(100_000);
 
-        match fuzzer.into_status() {
-            Status::StillFuzzing { total_coverage, .. } => {
+        match fuzzer.into_result() {
+            FuzzerResult::StillFuzzing { total_coverage, .. } => {
                 let coverage = total_coverage
                     .in_range(&byte_code.range_of_function(&id))
                     .relative_coverage();
                 debug!("Achieved a coverage of {:.1} %.", coverage * 100.0);
             }
-            Status::FoundPanic {
+            FuzzerResult::FoundPanic {
                 input,
                 panic,
                 heap,
