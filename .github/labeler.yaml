@@ -43,14 +43,26 @@
   - changed-files:
       - any-glob-to-any-file:
           - packages/Core/**/*
+'P: Csv':
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/Csv/**/*
 'P: Examples':
   - changed-files:
       - any-glob-to-any-file:
           - packages/Examples/**/*
+'P: FileSystem':
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/FileSystem/**/*
 'P: Http':
   - changed-files:
       - any-glob-to-any-file:
           - packages/Http/**/*
+'P: Parser':
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/Parser/**/*
 'P: ProgrammingLanguageBenchmarks':
   - changed-files:
       - any-glob-to-any-file:
