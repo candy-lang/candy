@@ -3,9 +3,7 @@ use crate::{
     rich_ir::{RichIrBuilder, ToRichIr, TokenModifier, TokenType},
 };
 use enumset::EnumSet;
-use lazy_static::lazy_static;
-use strum::IntoEnumIterator;
-use strum_macros::{AsRefStr, EnumIter};
+use strum_macros::{AsRefStr, VariantArray};
 
 /// These are all built-ins.
 ///
@@ -24,7 +22,7 @@ use strum_macros::{AsRefStr, EnumIter};
 ///
 /// See the source code of the `Builtins` package for documentation on what
 /// these functions do.
-#[derive(AsRefStr, Clone, Copy, Debug, EnumIter, Eq, Hash, PartialEq)]
+#[derive(AsRefStr, Clone, Copy, Debug, Eq, PartialEq, Hash, VariantArray)]
 #[strum(serialize_all = "snake_case")]
 pub enum BuiltinFunction {
     Equals,
@@ -71,9 +69,6 @@ pub enum BuiltinFunction {
     TextTrimStart,
     ToDebugText,
     TypeOf,
-}
-lazy_static! {
-    pub static ref VALUES: Vec<BuiltinFunction> = BuiltinFunction::iter().collect();
 }
 
 impl BuiltinFunction {

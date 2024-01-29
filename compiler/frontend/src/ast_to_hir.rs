@@ -3,7 +3,7 @@ use crate::{
         self, Assignment, Ast, AstKind, AstString, Call, Identifier, Int, List, MatchCase,
         OrPattern, Struct, StructAccess, Symbol, Text, TextPart,
     },
-    builtin_functions::{self, BuiltinFunction},
+    builtin_functions::BuiltinFunction,
     cst::{self, CstDb},
     cst_to_ast::CstToAst,
     error::{CompilerError, CompilerErrorPayload},
@@ -20,6 +20,7 @@ use crate::{
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use std::{collections::hash_map::Entry, mem, ops::Range, sync::Arc};
+use strum::VariantArray;
 
 #[salsa::query_group(AstToHirStorage)]
 pub trait AstToHir: CstDb + CstToAst {
@@ -782,7 +783,7 @@ impl Context<'_> {
     fn generate_sparkles(&mut self) {
         let mut sparkles_map = FxHashMap::default();
 
-        for builtin_function in builtin_functions::VALUES.iter() {
+        for builtin_function in BuiltinFunction::VARIANTS {
             let symbol = self.push(
                 None,
                 Expression::Symbol(format!("{builtin_function:?}")),
