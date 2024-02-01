@@ -162,6 +162,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dsherret/rust-toolchain-file@v1
       - uses: Swatinem/rust-cache@v2.7.3
+      - name: Cache cargo plugins
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/
+          key: ${{ runner.os }}-benchmark-cargo-plugins
       - name: Cache LLVM and Clang
         id: cache-llvm
         uses: actions/cache@v4
