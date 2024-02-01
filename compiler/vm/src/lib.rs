@@ -31,7 +31,7 @@
 pub use builtin_functions::CAN_USE_STDOUT;
 pub use instruction_pointer::InstructionPointer;
 pub use utils::PopulateInMemoryProviderFromFileSystem;
-pub use vm::{Panic, StateAfterRun, StateAfterRunForever, Vm, VmFinished};
+pub use vm::{Panic, StateAfterRun, StateAfterRunForever, Vm, VmFinished, VmHandleCall};
 
 mod builtin_functions;
 pub mod byte_code;
