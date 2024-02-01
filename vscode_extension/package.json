@@ -148,6 +148,11 @@
       },
       {
         "category": "Candy Compiler Debugging",
+        "command": "candy.debug.viewOptimizedLir",
+        "title": "View Optimized LIR"
+      },
+      {
+        "category": "Candy Compiler Debugging",
         "command": "candy.debug.viewVmByteCode",
         "title": "View VM Byte Code"
       },
@@ -242,10 +247,10 @@
   "devDependencies": {
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.6",
-    "@types/node": "^20.11.5",
+    "@types/node": "^20.11.10",
     "@types/vscode": "^1.85.0",
-    "@typescript-eslint/eslint-plugin": "^6.19.0",
-    "@typescript-eslint/parser": "^6.19.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.1",
+    "@typescript-eslint/parser": "^6.19.1",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.1.3",

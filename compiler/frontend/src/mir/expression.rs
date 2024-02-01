@@ -419,13 +419,11 @@ impl ToRichIr for Expression {
                 );
                 builder.push_definition(*responsible_parameter, range);
                 builder.push(") ->", None, EnumSet::empty());
-                builder.push_foldable(|builder| {
-                    builder.indent();
+                builder.push_indented_foldable(|builder| {
                     builder.push_newline();
                     body.build_rich_ir(builder);
-                    builder.dedent();
-                    builder.push_newline();
                 });
+                builder.push_newline();
                 builder.push("}", None, EnumSet::empty());
             }
             Self::Parameter => {

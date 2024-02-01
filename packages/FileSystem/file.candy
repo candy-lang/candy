@@ -1,0 +1,33 @@
+[bool, function, int, iterator, list, result, text] = use "Core"
+
+readBytes fileSystemFile path :=
+  fileSystemFile %
+    [open, readToEnd, close] ->
+      needs (function.is1 open)
+      needs (function.is1 readToEnd)
+      needs (function.is1 close)
+    _ -> needs False "`readBytes` needs `environment.fileSystem.file` as its first parameter."
+  needs (text.is path)
+
+  path | fileSystemFile.open
+  | result.also { file -> needs (function.is0 file) }
+  | result.flatMap { file ->
+    file | fileSystemFile.readToEnd | result.map { bytes -> [file, bytes] }
+  }
+  | result.also { [bytes] ->
+    needs (list.is bytes)
+    needs (bytes | iterator.fromList | iterator.all { byte -> int.isUnsignedByte byte })
+  }
+  | result.andAlso { [file] -> file | fileSystemFile.close }
+  | result.map { [bytes] -> bytes }
+
+readText fileSystemFile path :=
+  fileSystemFile %
+    [open, readToEnd, close] ->
+      needs (function.is1 open)
+      needs (function.is1 readToEnd)
+      needs (function.is1 close)
+    _ -> needs False "`readText` needs `environment.fileSystem.file` as its first parameter."
+  needs (text.is path)
+
+  readBytes fileSystemFile path | result.flatMap { bytes -> bytes | text.fromUtf8 }

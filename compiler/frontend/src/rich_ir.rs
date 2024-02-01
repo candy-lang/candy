@@ -154,6 +154,9 @@ pub struct RichIrBuilder {
     indentation: usize,
 }
 impl RichIrBuilder {
+    pub fn push_indented_foldable(&mut self, build_children: impl FnOnce(&mut Self)) {
+        self.push_indented(|builder| builder.push_foldable(build_children));
+    }
     pub fn push_foldable(&mut self, build_children: impl FnOnce(&mut Self)) {
         let start = self.ir.text.len().into();
         build_children(self);
@@ -161,6 +164,11 @@ impl RichIrBuilder {
         self.ir.folding_ranges.push(start..end);
     }
 
+    pub fn push_indented(&mut self, build_children: impl FnOnce(&mut Self)) {
+        self.indent();
+        build_children(self);
+        self.dedent();
+    }
     pub fn indent(&mut self) {
         self.indentation += 1;
     }
@@ -184,10 +192,10 @@ impl RichIrBuilder {
         children: impl IntoIterator<Item = C>,
         push_child: impl FnMut(&mut Self, &C),
     ) {
-        self.indent();
-        self.push_newline();
-        self.push_custom_multiline(children, push_child);
-        self.dedent();
+        self.push_indented(|builder| {
+            builder.push_newline();
+            builder.push_custom_multiline(children, push_child);
+        });
     }
     pub fn push_multiline<'c, C>(&mut self, items: impl IntoIterator<Item = &'c C>)
     where

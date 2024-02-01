@@ -77,6 +77,26 @@ and resultA resultB :=
   needs (is resultB)
   resultA | flatMap { value -> resultB }
 
+# TODO: find a better name
+also result okSideEffect :=
+  needs (is result)
+  needs (function.is1 okSideEffect)
+  result %
+    Ok value -> okSideEffect value
+    _ -> Nothing
+  result
+andAlso result okFunction :=
+  # Returns `Ok result.value` if `result` `isOk` and `okFunction result.value`
+  # also returns an `Ok` (whose value is discarded). Returns `result`'s or
+  #`okFunction`'s error otherwise.
+  needs (is result)
+  needs (function.is1 okFunction)
+  result | flatMap { value ->
+    otherResult = okFunction value
+    needs (is otherResult)
+    otherResult | map { _ -> value }
+  }
+
 flatMapError result errorMapper :=
   # Returns `result` if it `isOk` and `errorMapper result.value` if it
   # `isError`.
