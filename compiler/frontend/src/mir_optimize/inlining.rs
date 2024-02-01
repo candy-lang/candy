@@ -51,7 +51,7 @@ pub fn inline_tiny_functions(context: &mut Context, expression: &mut CurrentExpr
         expression,
         Complexity {
             is_self_contained: true,
-            expressions: 7,
+            expressions: 100,
         },
     );
 }
