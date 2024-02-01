@@ -18,9 +18,10 @@
 //! When calling a function, the function is responsible for descreasing the
 //! reference count of the arguments by one. The reference counts of captured
 //! variables are not changed – they are only dropped once the function itself
-//! is freed. The responsibility parameter doesn't need to be dropped – all
-//! responsibilities are guaranteed to be constants, so they are not reference
-//! counted anyway.
+//! is freed. The responsibility parameter is not dropped – except for the
+//! responsibility of the main function, which is called from the platform, all
+//! other responsibilities are guaranteed to be constants, so they are not
+//! reference counted anyways.
 
 pub use self::{body::*, constant::*, expression::*, id::*};
 use crate::rich_ir::{RichIrBuilder, ToRichIr, TokenType};
