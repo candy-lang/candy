@@ -131,10 +131,11 @@ fn run_builtin(
             let [function] = arguments else {
                 unreachable!()
             };
-            let Expression::Function { parameters, .. } = visible.get(*function) else {
-                return None;
-            };
-            parameters.len().into()
+            match visible.get(*function) {
+                Expression::Builtin(builtin) => builtin.num_parameters().into(),
+                Expression::Function { parameters, .. } => parameters.len().into(),
+                _ => return None,
+            }
         }
         BuiltinFunction::IfElse => {
             let [condition, then, else_] = arguments else {
