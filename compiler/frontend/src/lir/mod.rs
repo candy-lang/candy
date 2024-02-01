@@ -14,8 +14,13 @@
 //! - drop: Decrease the reference count by one and free the value if the
 //!   reference count is zero.
 //! - free: Free the underlying memory and drop contained values.
-//! - moving ownership: When you call a function, the function is responsible of
-//!   decreasing the reference count by one.
+//!
+//! When calling a function, the function is responsible for descreasing the
+//! reference count of the arguments by one. The reference counts of captured
+//! variables are not changed – they are only dropped once the function itself
+//! is freed. The responsibility parameter doesn't need to be dropped – all
+//! responsibilities are guaranteed to be constants, so they are not reference
+//! counted anyway.
 
 pub use self::{body::*, constant::*, expression::*, id::*};
 use crate::rich_ir::{RichIrBuilder, ToRichIr, TokenType};
