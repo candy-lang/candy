@@ -1,3 +1,22 @@
+//! The Low-Level Intermediate Representation (LIR) contains explicit reference
+//! counting instructions. Because constants are not reference counted, they are
+//! tracked separately from other values.
+//!
+//! The LIR concerns itself with these concepts:
+//!
+//! - constants: Values that are entirely known at compile-time.
+//! - reference count: When running Candy code in the VM, each non-constant heap
+//!   value stores a reference count (a non-negative number).
+//! - create: Refers to allocating memory for a value and writing sensible bytes
+//!   into that memory. (Most) Candy values live on the heap and are
+//!   reference-counted. Initially, the reference count is one.
+//! - dup: Increase the reference count by one.
+//! - drop: Decrease the reference count by one and free the value if the
+//!   reference count is zero.
+//! - free: Free the underlying memory and drop contained values.
+//! - moving ownership: When you call a function, the function is responsible of
+//!   decreasing the reference count by one.
+
 pub use self::{body::*, constant::*, expression::*, id::*};
 use crate::rich_ir::{RichIrBuilder, ToRichIr, TokenType};
 use enumset::EnumSet;
