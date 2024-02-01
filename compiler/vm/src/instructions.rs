@@ -228,59 +228,19 @@ impl MachineState {
         responsible: HirId,
     ) -> InstructionResult {
         match callee.into() {
-            Data::Function(function) => self.call_function( function, arguments, responsible),
+            Data::Function(function) => self.call_function(function, arguments, responsible),
             Data::Builtin(builtin) => {
                 self.run_builtin_function(heap, builtin.get(), arguments, responsible)
             }
             Data::Handle(handle) => {
-                let parameter_count = handle.argument_count();
-                let argument_count = arguments.len();
-                if argument_count != parameter_count {
-                    return InstructionResult::Panic(Panic {
-                        reason: format!(
-                            "A function expected {} {}, but you called it with {} {}.",
-                            parameter_count,
-                            if parameter_count == 1 { "parameter" } else { "parameters" },
-                            argument_count,
-                            if argument_count == 1 { "argument" } else { "arguments" },
-                        ),
-                        responsible: responsible.get().clone(),
-                    });
-                }
+                assert_eq!(handle.argument_count(), arguments.len());
                 InstructionResult::CallHandle(CallHandle {
                     handle,
                     arguments: arguments.to_vec(),
                     responsible,
                 })
-            },
-            Data::Tag(tag) => {
-                if tag.has_value() {
-                    return InstructionResult::Panic(Panic {
-                        reason: "A tag's value cannot be overwritten by calling it. Use `tag.withValue` instead.".to_string(),
-                        responsible: responsible.get().clone(),
-                    });
-                }
-
-                if let [value] = arguments {
-                    let tag = Tag::create_with_value(heap, true, tag.symbol(), *value);
-                    self.push_to_data_stack(tag);
-                    InstructionResult::Done
-                } else {
-                    InstructionResult::Panic(Panic {
-                        reason: format!(
-                            "A tag can only hold exactly one value, but you called it with {} arguments.",
-                            arguments.len(),
-                        ),
-                        responsible: responsible.get().clone(),
-                })
-                }
             }
-            _ => InstructionResult::Panic(Panic {
-                reason: format!(
-                    "You can only call functions, builtins, tags, and handles, but you tried to call {callee}.",
-                ),
-                responsible: responsible.get().clone(),
-            }),
+            _ => panic!("You can only call functions, builtins, and handles."),
         }
     }
     pub fn call_function(
@@ -289,17 +249,7 @@ impl MachineState {
         arguments: &[InlineObject],
         responsible: HirId,
     ) -> InstructionResult {
-        let expected_num_args = function.argument_count();
-        if arguments.len() != expected_num_args {
-            return InstructionResult::Panic(Panic {
-                reason: format!(
-                    "A function expected {expected_num_args} parameters, but you called it with {} arguments.",
-                    arguments.len(),
-                ),
-                responsible: responsible.get().clone(),
-            });
-        }
-
+        assert_eq!(function.argument_count(), arguments.len());
         if let Some(next_instruction) = self.next_instruction {
             self.call_stack.push(next_instruction);
         }

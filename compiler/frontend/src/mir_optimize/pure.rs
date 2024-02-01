@@ -113,6 +113,7 @@ impl PurenessInsights {
                 | BuiltinFunction::TagGetValue
                 | BuiltinFunction::TagHasValue
                 | BuiltinFunction::TagWithoutValue
+                | BuiltinFunction::TagWithValue
                 | BuiltinFunction::TextCharacters
                 | BuiltinFunction::TextConcatenate
                 | BuiltinFunction::TextContains
@@ -211,6 +212,7 @@ impl PurenessInsights {
                 | BuiltinFunction::TagGetValue
                 | BuiltinFunction::TagHasValue
                 | BuiltinFunction::TagWithoutValue
+                | BuiltinFunction::TagWithValue
                 | BuiltinFunction::TextCharacters
                 | BuiltinFunction::TextConcatenate
                 | BuiltinFunction::TextContains
