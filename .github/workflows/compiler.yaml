@@ -190,17 +190,17 @@ jobs:
         # TODO: Support PRs from forks: https://bencher.dev/docs/how-to/github-actions/#pull-requests-from-forks
         run: >
           bencher run
-            --project candy
-            --token ${{ secrets.BENCHER_TOKEN }}
-            --if-branch ${{ github.head_ref || github.ref_name }}
-            --else-if-branch ${{ github.base_ref }}
-            --else-if-branch main
-            --hash ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-            --testbed github-actions-ubuntu-22-04
-            --adapter rust_iai
-            --err
-            --github-actions ${{ secrets.BENCHMARK_RESULTS_COMMENT_TOKEN }}
-            cargo bench
+          --project candy
+          --token ${{ secrets.BENCHER_TOKEN }}
+          --if-branch ${{ github.head_ref || github.ref_name }}
+          --else-if-branch ${{ github.base_ref }}
+          --else-if-branch main
+          --hash ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          --testbed github-actions-ubuntu-22-04
+          --adapter rust_iai
+          --err
+          --github-actions ${{ secrets.BENCHMARK_RESULTS_COMMENT_TOKEN }}
+          cargo bench
 
   vscode-extension-check:
     name: Check VS Code Extension
