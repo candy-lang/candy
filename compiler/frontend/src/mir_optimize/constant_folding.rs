@@ -131,10 +131,11 @@ fn run_builtin(
             let [function] = arguments else {
                 unreachable!()
             };
-            let Expression::Function { parameters, .. } = visible.get(*function) else {
-                return None;
-            };
-            parameters.len().into()
+            match visible.get(*function) {
+                Expression::Builtin(builtin) => builtin.num_parameters().into(),
+                Expression::Function { parameters, .. } => parameters.len().into(),
+                _ => return None,
+            }
         }
         BuiltinFunction::IfElse => {
             let [condition, then, else_] = arguments else {
@@ -444,6 +445,22 @@ fn run_builtin(
                 value: None,
             }
         }
+        BuiltinFunction::TagWithValue => {
+            let [tag, value] = arguments else {
+                unreachable!()
+            };
+            let Expression::Tag {
+                symbol,
+                value: None,
+            } = visible.get(*tag)
+            else {
+                return None;
+            };
+            Expression::Tag {
+                symbol: symbol.clone(),
+                value: Some(*value),
+            }
+        }
         BuiltinFunction::TextCharacters => {
             let [text] = arguments else { unreachable!() };
             let Expression::Text(text) = visible.get(*text) else {
@@ -690,6 +707,7 @@ fn run_builtin(
                         BuiltinFunction::TagGetValue => return None,
                         BuiltinFunction::TagHasValue => "Tag",
                         BuiltinFunction::TagWithoutValue => "Tag",
+                        BuiltinFunction::TagWithValue => "Tag",
                         BuiltinFunction::TextCharacters => "List",
                         BuiltinFunction::TextConcatenate => "Text",
                         BuiltinFunction::TextContains => "Tag",

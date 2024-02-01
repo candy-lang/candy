@@ -447,7 +447,126 @@ impl<'a> LoweringContext<'a> {
                     .iter()
                     .map(|argument| self.mapping[argument])
                     .collect_vec();
-                self.push_call(body, hir_id, self.mapping[function], arguments, responsible)
+
+                let builtin_equals = body.push_builtin(BuiltinFunction::Equals);
+                let builtin_get_argument_count =
+                    body.push_builtin(BuiltinFunction::GetArgumentCount);
+                let builtin_tag_has_value = body.push_builtin(BuiltinFunction::TagHasValue);
+                let builtin_tag_with_value = body.push_builtin(BuiltinFunction::TagWithValue);
+                let builtin_text_concatenate = body.push_builtin(BuiltinFunction::TextConcatenate);
+                let builtin_to_debug_text = body.push_builtin(BuiltinFunction::ToDebugText);
+                let builtin_type_of = body.push_builtin(BuiltinFunction::TypeOf);
+
+                let callee = self.mapping[function];
+                let callee_type = body.push_call(builtin_type_of, vec![callee], responsible);
+                let tag_tag = body.push_tag("Tag".to_string(), None);
+                let callee_is_tag =
+                    body.push_call(builtin_equals, vec![callee_type, tag_tag], responsible);
+                body.push_if_else(
+                    &hir_id.child("calleeIsTag"),
+                    callee_is_tag,
+                    |body| {
+                        let already_has_value =
+                            body.push_call(builtin_tag_has_value, vec![callee], responsible);
+                        body.push_if_else(
+                            &hir_id.child("doesTagHaveValue"),
+                            already_has_value,
+                            |body| {
+                                let reason = body.push_text(
+                                    "You called a tag that already has a value.".to_string(),
+                                );
+                                body.push_panic(reason, responsible);
+                            },
+                            |body| {
+                                if arguments.len() == 1 {
+                                    body.push_call(
+                                        builtin_tag_with_value,
+                                        vec![callee, arguments[0]],
+                                        responsible,
+                                    );
+                                } else {
+                                    let reason = body.push_text(
+                                        "Tags can only be created with one value.".to_string(),
+                                    );
+                                    body.push_panic(reason, responsible);
+                                }
+                            },
+                            responsible,
+                        );
+                    },
+                    |body| {
+                        let function_tag = body.push_tag("Function".to_string(), None);
+                        let callee_is_function = body.push_call(
+                            builtin_equals,
+                            vec![callee_type, function_tag],
+                            responsible,
+                        );
+
+                        body.push_if_else(
+                            &hir_id.child("calleeIsFunction"),
+                            callee_is_function,
+                            |body| {
+                                let argument_count = body.push_call(
+                                    builtin_get_argument_count,
+                                    vec![callee],
+                                    responsible,
+                                );
+                                let expected = body.push_int(arguments.len());
+                                let has_correct_number_of_arguments = body.push_call(
+                                    builtin_equals,
+                                    vec![argument_count, expected],
+                                    responsible,
+                                );
+                                body.push_if_else(
+                                    &hir_id.child("hasCorrectNumberOfArguments"),
+                                    has_correct_number_of_arguments,
+                                    |body| {
+                                        self.push_call(
+                                            body,
+                                            hir_id,
+                                            self.mapping[function],
+                                            arguments.clone(),
+                                            responsible,
+                                        );
+                                    },
+                                    |body| {
+                                        let reason_1 = body.push_text(
+                                            "You called a function that expects ".to_string(),
+                                        );
+                                        let reason_2 = body.push_call(
+                                            builtin_to_debug_text,
+                                            vec![argument_count],
+                                            responsible,
+                                        );
+                                        let reason_3 = body.push_text(format!(
+                                            " arguments with {} arguments.",
+                                            arguments.len(),
+                                        ));
+                                        let reason_1_2 = body.push_call(
+                                            builtin_text_concatenate,
+                                            vec![reason_1, reason_2],
+                                            responsible,
+                                        );
+                                        let reason = body.push_call(
+                                            builtin_text_concatenate,
+                                            vec![reason_1_2, reason_3],
+                                            responsible,
+                                        );
+                                        body.push_panic(reason, responsible);
+                                    },
+                                    responsible,
+                                );
+                            },
+                            |body| {
+                                let reason = body
+                                    .push_text("You can only call tags or functions.".to_string());
+                                body.push_panic(reason, responsible);
+                            },
+                            responsible,
+                        );
+                    },
+                    responsible,
+                )
             }
             hir::Expression::UseModule {
                 current_module,
