@@ -3,7 +3,7 @@ use crate::{
     heap::{object_heap::HeapObject, Heap, InlineObject},
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
 };
-use candy_frontend::builtin_functions::{self, BuiltinFunction};
+use candy_frontend::builtin_functions::BuiltinFunction;
 use derive_more::Deref;
 use rustc_hash::FxHashMap;
 use std::{
@@ -12,6 +12,7 @@ use std::{
     hash::{Hash, Hasher},
     num::NonZeroU64,
 };
+use strum::VariantArray;
 
 #[derive(Clone, Copy, Deref)]
 pub struct InlineBuiltin(InlineObject);
@@ -30,7 +31,7 @@ impl InlineBuiltin {
     }
     #[must_use]
     pub fn get(self) -> BuiltinFunction {
-        builtin_functions::VALUES[self.index()]
+        BuiltinFunction::VARIANTS[self.index()]
     }
 }
 

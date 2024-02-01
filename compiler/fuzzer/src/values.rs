@@ -1,5 +1,5 @@
 use super::input::Input;
-use candy_frontend::builtin_functions;
+use candy_frontend::builtin_functions::BuiltinFunction;
 use candy_vm::heap::{Data, Heap, I64BitLength, InlineObject, Int, List, Struct, Tag, Text};
 use extension_trait::extension_trait;
 use itertools::Itertools;
@@ -11,6 +11,7 @@ use rand::{
 };
 use rustc_hash::FxHashMap;
 use std::collections::hash_map;
+use strum::VariantArray;
 
 impl Input {
     pub fn generate(heap: &mut Heap, num_args: usize, symbols: &[Text]) -> Self {
@@ -92,7 +93,7 @@ impl InlineObjectGeneration for InlineObject {
             }
             6 => {
                 // No `dup()` necessary since these are inline.
-                builtin_functions::VALUES[rng.gen_range(0..builtin_functions::VALUES.len())].into()
+                (*BuiltinFunction::VARIANTS.choose(rng).unwrap()).into()
             }
             _ => unreachable!(),
         }
@@ -222,7 +223,7 @@ impl InlineObjectGeneration for InlineObject {
             }
             Data::Builtin(_) => {
                 // No `dup()` necessary since these are inline.
-                (*builtin_functions::VALUES.choose(rng).unwrap()).into()
+                (*BuiltinFunction::VARIANTS.choose(rng).unwrap()).into()
             }
             Data::HirId(_) | Data::Function(_) | Data::Handle(_) => {
                 panic!("Couldn't have been created for fuzzing.")
