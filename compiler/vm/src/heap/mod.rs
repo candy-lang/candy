@@ -19,10 +19,13 @@ use std::{
     hash::{Hash, Hasher},
     mem,
 };
+use tracing::debug;
 
 mod object;
 mod object_heap;
 mod object_inline;
+
+pub const DEBUG_ALLOCATIONS: bool = false;
 
 pub struct Heap {
     objects: FxHashSet<ObjectInHeap>,
@@ -50,11 +53,13 @@ impl Heap {
         self.allocate_raw(header_word, content_size)
     }
     pub fn allocate_raw(&mut self, header_word: u64, content_size: usize) -> HeapObject {
-        let layout = Layout::from_size_align(
-            2 * HeapObject::WORD_SIZE + content_size,
-            HeapObject::WORD_SIZE,
-        )
-        .unwrap();
+        let size = 2 * HeapObject::WORD_SIZE + content_size;
+        if DEBUG_ALLOCATIONS {
+            // No need for pluralization because our heap objects are always
+            // longer than one byte.
+            debug!("Allocating {size} bytes with header: {header_word:#066b}.");
+        }
+        let layout = Layout::from_size_align(size, HeapObject::WORD_SIZE).unwrap();
 
         // TODO: Handle allocation failure by stopping the VM.
         let pointer = alloc::Global

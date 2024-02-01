@@ -3,7 +3,10 @@ use self::{
     tag::HeapTag, text::HeapText,
 };
 use super::{Data, Heap};
-use crate::utils::{impl_debug_display_via_debugdisplay, DebugDisplay};
+use crate::{
+    heap::DEBUG_ALLOCATIONS,
+    utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
+};
 use enum_dispatch::enum_dispatch;
 use rustc_hash::FxHashMap;
 use std::{
@@ -15,6 +18,7 @@ use std::{
     ops::{Deref, Range},
     ptr::NonNull,
 };
+use tracing::debug;
 
 pub(super) mod function;
 pub(super) mod hir_id;
@@ -143,6 +147,11 @@ impl HeapObject {
         trace!("Freeing object at {self:p}.");
         assert_eq!(self.reference_count().unwrap_or_default(), 0);
         let data = HeapData::from(self);
+        if DEBUG_ALLOCATIONS {
+            // No need for pluralization because our heap objects are longer
+            // than one byte.
+            debug!("Freeing {} bytes: {data:?}.", data.total_size());
+        }
         data.drop_children(heap);
         heap.deallocate(data);
     }
