@@ -1,17 +1,10 @@
 [print] = use "Builtins"
+[file] = use "FileSystem"
 [result, text] = use "Core"
 
 main := { environment ->
   (path,) = environment.arguments
 
-  file = environment.fileSystem.file.open path | result.unwrap
-  print "File: {file}"
-
-  bytes = file | environment.fileSystem.file.readToEnd | result.unwrap
-  print "Bytes: {bytes}"
-  text = bytes | text.fromUtf8 | result.unwrap
-  print "Text: {text}"
-
-  file | environment.fileSystem.file.close
-  print "File: {file}"
+  print "Bytes: {file.readBytes environment.fileSystem.file path | result.unwrap}"
+  print "Text: {file.readText environment.fileSystem.file path | result.unwrap}"
 }
