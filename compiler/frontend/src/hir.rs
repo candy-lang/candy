@@ -142,17 +142,6 @@ pub enum IdKey {
     Named { name: String, disambiguator: usize },
     Positional(usize),
 }
-impl IdKey {
-    fn serialize(&self) -> String {
-        match self {
-            Self::Named {
-                name,
-                disambiguator,
-            } => format!("n{name}#{disambiguator}"),
-            Self::Positional(position) => format!("p{position}"),
-        }
-    }
-}
 impl IdKeys {
     const fn empty() -> Self {
         Self(String::new())
@@ -162,20 +151,17 @@ impl IdKeys {
         self.0.is_empty()
     }
 
-    fn push(&self, key: &IdKey) -> Self {
+    fn push(&self, key: IdKey) -> Self {
         if self.is_empty() {
-            key.serialize().into()
+            Self::from(key)
         } else {
-            Self(format!("{}:{}", self.0, key.serialize()))
+            Self(format!("{}:{key}", self.0))
         }
     }
 
     #[must_use]
     pub fn last_as_string(&self) -> Option<&str> {
-        self.0.rfind(':').map(|i| {
-            let substr = &self.0[(i + ':'.len_utf8() + 'n'.len_utf8())..];
-            substr.rfind("#0").map_or_else(|| substr, |j| &substr[..j])
-        })
+        self.0.rfind(':').map(|i| &self.0[(i + ':'.len_utf8())..])
     }
 
     fn drop_last(&self) -> Option<Self> {
@@ -184,24 +170,17 @@ impl IdKeys {
 }
 impl From<IdKey> for IdKeys {
     fn from(value: IdKey) -> Self {
-        Self(value.serialize())
+        Self(format!("{value}"))
     }
 }
 impl From<Vec<IdKey>> for IdKeys {
     fn from(value: Vec<IdKey>) -> Self {
-        Self(value.iter().map(IdKey::serialize).join(":"))
+        Self(value.iter().map(|it| format!("{it}")).join(":"))
     }
 }
 impl Display for IdKeys {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.0
-                .replace("#0", "")
-                .replace(":p", ":")
-                .replace(":n", ":")
-        )
+        write!(f, "{}", self.0)
     }
 }
 impl Id {
@@ -284,7 +263,7 @@ impl Id {
     pub fn child(&self, key: impl Into<IdKey>) -> Self {
         Self {
             module: self.module.clone(),
-            keys: self.keys.push(&key.into()),
+            keys: self.keys.push(key.into()),
         }
     }
 
@@ -302,13 +281,16 @@ impl Id {
         self.keys
             .0
             .split(':')
-            .map(|it| match it.chars().next() {
-                Some('n') => it
-                    .rfind('#')
-                    .map_or_else(|| &it['n'.len_utf8()..], |i| &it['n'.len_utf8()..i])
-                    .to_string(),
-                Some('p') => format!("<anonymous {}>", &it['p'.len_utf8()..]),
-                _ => panic!("The IdKey {it} does not start with n or p"),
+            .map(|it| {
+                let first_char = it.chars().next().unwrap();
+                if first_char.is_numeric() {
+                    return format!("<anonymous {}>", it);
+                }
+                let last_char = it.chars().last().unwrap();
+                if last_char.is_numeric() {
+                    return it.rfind('#').map_or_else(|| it, |i| &it[..i]).to_string();
+                }
+                it.to_string()
             })
             .join(" → ")
     }
@@ -341,6 +323,7 @@ impl Debug for IdKey {
                 disambiguator,
             } => {
                 write!(f, "{name}")?;
+                // TODO(Optimization): Only include the `#` in Debug output and not when formatting for the HirId path
                 if disambiguator > &0 {
                     write!(f, "#{disambiguator}")?;
                 }
