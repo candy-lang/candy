@@ -133,17 +133,94 @@ impl Body {
 #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Id {
     pub module: Module,
-    pub keys: Vec<IdKey>,
+    pub keys: IdKeys,
 }
+#[derive(Clone, Eq, From, Hash, Ord, PartialEq, PartialOrd, Debug)]
+pub struct IdKeys(String);
 #[derive(Clone, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
 pub enum IdKey {
     Named { name: String, disambiguator: usize },
     Positional(usize),
 }
+impl IdKey {
+    fn serialize(&self) -> String {
+        match self {
+            Self::Named {
+                name,
+                disambiguator,
+            } => format!("n{name}#{disambiguator}"),
+            Self::Positional(position) => format!("p{position}"),
+        }
+    }
+    fn deserialize(key: &str) -> Self {
+        match key.chars().next() {
+            Some('n') => {
+                let Some((name, disambiguator)) = key['n'.len_utf8()..].rsplit_once('#') else {
+                    panic!("The named IdKey {key} does not contain a disambiguator")
+                };
+                Self::Named {
+                    name: name.to_string(),
+                    disambiguator: disambiguator.parse::<usize>().unwrap(),
+                }
+            }
+            Some('p') => Self::Positional(key['p'.len_utf8()..].parse::<usize>().unwrap()),
+            _ => panic!("The IdKey {key} does not start with n or p"),
+        }
+    }
+}
+impl From<IdKey> for IdKeys {
+    fn from(value: IdKey) -> Self {
+        Self(value.serialize())
+    }
+}
+impl From<Vec<IdKey>> for IdKeys {
+    fn from(value: Vec<IdKey>) -> Self {
+        Self(value.iter().map(IdKey::serialize).join(":"))
+    }
+}
+impl IdKeys {
+    const fn empty() -> Self {
+        Self(String::new())
+    }
+
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    fn len(&self) -> usize {
+        self.0.chars().filter(|&c| c == ':').count() + 1
+    }
+
+    fn push(&self, key: &IdKey) -> Self {
+        if self.is_empty() {
+            key.serialize().into()
+        } else {
+            Self(format!("{}:{}", self.0, key.serialize()))
+        }
+    }
+
+    #[must_use]
+    pub fn last(&self) -> Option<IdKey> {
+        self.0
+            .rfind(':')
+            .map(|i| IdKey::deserialize(&self.0[(i + ':'.len_utf8())..]))
+    }
+
+    fn drop_last(&self) -> Option<Self> {
+        self.0.rfind(':').map(|i| Self(self.0[..i].to_string()))
+    }
+
+    fn iter(&self) -> impl Iterator<Item = IdKey> + '_ {
+        self.0.split(':').map(IdKey::deserialize)
+    }
+}
 impl Id {
     #[must_use]
     pub fn new(module: Module, keys: Vec<IdKey>) -> Self {
-        Self { module, keys }
+        Self {
+            module,
+            keys: keys.into(),
+        }
     }
 
     /// An ID that can be used to blame the tooling. For example, when calling
@@ -156,7 +233,7 @@ impl Id {
                 path: vec![],
                 kind: ModuleKind::Code,
             },
-            keys: vec![],
+            keys: IdKeys::empty(),
         }
     }
     /// The user of the Candy tooling is responsible. For example, when the user
@@ -191,7 +268,7 @@ impl Id {
                 path: vec![],
                 kind: ModuleKind::Code,
             },
-            keys: vec![IdKey::from("needs")],
+            keys: IdKey::from("needs").into(),
         }
     }
 
@@ -207,22 +284,17 @@ impl Id {
 
     #[must_use]
     pub fn parent(&self) -> Option<Self> {
-        match self.keys.len() {
-            0 => None,
-            _ => Some(Self {
-                module: self.module.clone(),
-                keys: self.keys[..self.keys.len() - 1].to_vec(),
-            }),
-        }
+        self.keys.drop_last().map(|keys| Self {
+            module: self.module.clone(),
+            keys,
+        })
     }
 
     #[must_use]
     pub fn child(&self, key: impl Into<IdKey>) -> Self {
-        let mut keys = self.keys.clone();
-        keys.push(key.into());
         Self {
             module: self.module.clone(),
-            keys,
+            keys: self.keys.push(&key.into()),
         }
     }
 
@@ -230,7 +302,7 @@ impl Id {
     pub fn is_same_module_and_any_parent_of(&self, other: &Self) -> bool {
         self.module == other.module
             && self.keys.len() < other.keys.len()
-            && self.keys.iter().zip(&other.keys).all(|(a, b)| a == b)
+            && self.keys.iter().zip(other.keys.iter()).all(|(a, b)| a == b)
     }
 
     #[must_use]
@@ -239,7 +311,7 @@ impl Id {
             .iter()
             .map(|it| match it {
                 IdKey::Positional(index) => format!("<anonymous {index}>"),
-                IdKey::Named { name, .. } => name.to_string(),
+                IdKey::Named { name, .. } => name,
             })
             .join(" → ")
     }
