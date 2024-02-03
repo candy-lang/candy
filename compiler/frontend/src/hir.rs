@@ -133,16 +133,16 @@ impl Body {
 #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Id {
     pub module: Module,
-    pub keys: IdKeys,
+    pub keys: IdPath,
 }
 #[derive(Clone, Eq, From, Hash, Ord, PartialEq, PartialOrd, Debug)]
-pub struct IdKeys(String);
+pub struct IdPath(String);
 #[derive(Clone, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
 pub enum IdKey {
     Named { name: String, disambiguator: usize },
     Positional(usize),
 }
-impl IdKeys {
+impl IdPath {
     const fn empty() -> Self {
         Self(String::new())
     }
@@ -168,17 +168,17 @@ impl IdKeys {
         self.0.rfind(':').map(|i| Self(self.0[..i].to_string()))
     }
 }
-impl From<IdKey> for IdKeys {
+impl From<IdKey> for IdPath {
     fn from(value: IdKey) -> Self {
         Self(format!("{value}"))
     }
 }
-impl From<Vec<IdKey>> for IdKeys {
+impl From<Vec<IdKey>> for IdPath {
     fn from(value: Vec<IdKey>) -> Self {
         Self(value.iter().map(|it| format!("{it}")).join(":"))
     }
 }
-impl Display for IdKeys {
+impl Display for IdPath {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -202,7 +202,7 @@ impl Id {
                 path: vec![],
                 kind: ModuleKind::Code,
             },
-            keys: IdKeys::empty(),
+            keys: IdPath::empty(),
         }
     }
     /// The user of the Candy tooling is responsible. For example, when the user
