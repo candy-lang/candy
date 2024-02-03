@@ -152,21 +152,6 @@ impl IdKey {
             Self::Positional(position) => format!("p{position}"),
         }
     }
-    fn deserialize(key: &str) -> Self {
-        match key.chars().next() {
-            Some('n') => {
-                let Some((name, disambiguator)) = key['n'.len_utf8()..].rsplit_once('#') else {
-                    panic!("The named IdKey {key} does not contain a disambiguator")
-                };
-                Self::Named {
-                    name: name.to_string(),
-                    disambiguator: disambiguator.parse::<usize>().unwrap(),
-                }
-            }
-            Some('p') => Self::Positional(key['p'.len_utf8()..].parse::<usize>().unwrap()),
-            _ => panic!("The IdKey {key} does not start with n or p"),
-        }
-    }
 }
 impl IdKeys {
     const fn empty() -> Self {
@@ -186,10 +171,11 @@ impl IdKeys {
     }
 
     #[must_use]
-    pub fn last(&self) -> Option<IdKey> {
-        self.0
-            .rfind(':')
-            .map(|i| IdKey::deserialize(&self.0[(i + ':'.len_utf8())..]))
+    pub fn last_as_string(&self) -> Option<&str> {
+        self.0.rfind(':').map(|i| {
+            let substr = &self.0[(i + ':'.len_utf8() + 'n'.len_utf8())..];
+            substr.rfind("#0").map_or_else(|| substr, |j| &substr[..j])
+        })
     }
 
     fn drop_last(&self) -> Option<Self> {
@@ -213,8 +199,8 @@ impl Display for IdKeys {
             "{}",
             self.0
                 .replace("#0", "")
-                .replace(":n", ":")
                 .replace(":p", ":")
+                .replace(":n", ":")
         )
     }
 }
@@ -318,7 +304,7 @@ impl Id {
             .split(':')
             .map(|it| match it.chars().next() {
                 Some('n') => it
-                    .rfind(':')
+                    .rfind('#')
                     .map_or_else(|| &it['n'.len_utf8()..], |i| &it['n'.len_utf8()..i])
                     .to_string(),
                 Some('p') => format!("<anonymous {}>", &it['p'.len_utf8()..]),
