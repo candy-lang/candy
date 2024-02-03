@@ -168,16 +168,6 @@ impl IdKey {
         }
     }
 }
-impl From<IdKey> for IdKeys {
-    fn from(value: IdKey) -> Self {
-        Self(value.serialize())
-    }
-}
-impl From<Vec<IdKey>> for IdKeys {
-    fn from(value: Vec<IdKey>) -> Self {
-        Self(value.iter().map(IdKey::serialize).join(":"))
-    }
-}
 impl IdKeys {
     const fn empty() -> Self {
         Self(String::new())
@@ -185,10 +175,6 @@ impl IdKeys {
 
     fn is_empty(&self) -> bool {
         self.0.is_empty()
-    }
-
-    fn len(&self) -> usize {
-        self.0.chars().filter(|&c| c == ':').count() + 1
     }
 
     fn push(&self, key: &IdKey) -> Self {
@@ -209,9 +195,27 @@ impl IdKeys {
     fn drop_last(&self) -> Option<Self> {
         self.0.rfind(':').map(|i| Self(self.0[..i].to_string()))
     }
-
-    fn iter(&self) -> impl Iterator<Item = IdKey> + '_ {
-        self.0.split(':').map(IdKey::deserialize)
+}
+impl From<IdKey> for IdKeys {
+    fn from(value: IdKey) -> Self {
+        Self(value.serialize())
+    }
+}
+impl From<Vec<IdKey>> for IdKeys {
+    fn from(value: Vec<IdKey>) -> Self {
+        Self(value.iter().map(IdKey::serialize).join(":"))
+    }
+}
+impl Display for IdKeys {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.0
+                .replace("#0", "")
+                .replace(":n", ":")
+                .replace(":p", ":")
+        )
     }
 }
 impl Id {
@@ -274,7 +278,7 @@ impl Id {
 
     #[must_use]
     pub fn to_short_debug_string(&self) -> String {
-        format!("${}", self.keys.iter().join(":"))
+        format!("${}", self.keys)
     }
 
     #[must_use]
@@ -301,24 +305,31 @@ impl Id {
     #[must_use]
     pub fn is_same_module_and_any_parent_of(&self, other: &Self) -> bool {
         self.module == other.module
-            && self.keys.len() < other.keys.len()
-            && self.keys.iter().zip(other.keys.iter()).all(|(a, b)| a == b)
+            && other
+                .keys
+                .0
+                .starts_with(format!("{}:", self.keys.0).as_str())
     }
 
     #[must_use]
     pub fn function_name(&self) -> String {
         self.keys
-            .iter()
-            .map(|it| match it {
-                IdKey::Positional(index) => format!("<anonymous {index}>"),
-                IdKey::Named { name, .. } => name,
+            .0
+            .split(':')
+            .map(|it| match it.chars().next() {
+                Some('n') => it
+                    .rfind(':')
+                    .map_or_else(|| &it['n'.len_utf8()..], |i| &it['n'.len_utf8()..i])
+                    .to_string(),
+                Some('p') => format!("<anonymous {}>", &it['p'.len_utf8()..]),
+                _ => panic!("The IdKey {it} does not start with n or p"),
             })
             .join(" → ")
     }
 }
 impl Debug for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{}:{}", self.module, self.keys.iter().join(":"))
+        write!(f, "{}:{}", self.module, self.keys)
     }
 }
 impl Display for Id {
