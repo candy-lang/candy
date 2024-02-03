@@ -50,7 +50,7 @@ pub trait AstToHir: CstDb + CstToAst {
 pub type HirResult = Result<(Arc<Body>, Arc<FxHashMap<hir::Id, ast::Id>>), ModuleError>;
 
 fn hir_to_ast_id(db: &dyn AstToHir, id: &hir::Id) -> Option<ast::Id> {
-    let (_, hir_to_ast_id_mapping) = db.hir(id.module.clone()).ok()?;
+    let (_, hir_to_ast_id_mapping) = db.hir(Arc::unwrap_or_clone(id.module.clone())).ok()?;
     hir_to_ast_id_mapping.get(id).cloned()
 }
 fn hir_to_cst_id(db: &dyn AstToHir, id: &hir::Id) -> Option<cst::Id> {
@@ -61,7 +61,10 @@ fn hir_id_to_span(db: &dyn AstToHir, id: &hir::Id) -> Option<Range<Offset>> {
 }
 fn hir_id_to_display_span(db: &dyn AstToHir, id: &hir::Id) -> Option<Range<Offset>> {
     let cst_id = db.hir_to_cst_id(id)?;
-    Some(db.find_cst(id.module.clone(), cst_id).display_span())
+    Some(
+        db.find_cst(Arc::unwrap_or_clone(id.module.clone()), cst_id)
+            .display_span(),
+    )
 }
 
 fn ast_to_hir_ids(db: &dyn AstToHir, id: &ast::Id) -> Vec<hir::Id> {

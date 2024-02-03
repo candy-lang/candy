@@ -16,6 +16,7 @@ extension-trait = "1.0.1"
 im = "15.1.0"
 impl-trait-for-tuples = "0.2.2"
 itertools = "0.12.0"
+lazy_static = "1.4.0"
 linked-hash-map = "0.5.4"
 num-bigint = { version = "0.4.3", features = ["rand"] }
 num-integer = { version = "0.1.45", features = ["i128"] }

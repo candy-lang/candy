@@ -25,7 +25,7 @@ use extension_trait::extension_trait;
 use itertools::Itertools;
 use lsp_types::Diagnostic;
 use rand::{prelude::SliceRandom, thread_rng};
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 use tracing::debug;
 
 /// A hints finder is responsible for finding hints for a single module.
@@ -108,7 +108,9 @@ impl ModuleAnalyzer {
                     .unwrap();
                 let mut mir = (*mir).clone();
                 let mut static_panics = mir.static_panics();
-                static_panics.retain(|panic| panic.responsible.module == self.module);
+                static_panics.retain(|panic| -> bool {
+                    Arc::unwrap_or_clone(panic.responsible.module.clone()) == self.module
+                });
 
                 let tracing = TracingConfig {
                     register_fuzzables: TracingMode::Off,

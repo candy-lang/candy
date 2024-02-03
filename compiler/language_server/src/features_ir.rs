@@ -515,7 +515,7 @@ impl LanguageFeatures for IrFeatures {
             }
             ReferenceKey::HirId(id) => {
                 let config = IrConfig {
-                    module: id.module.clone(),
+                    module: Arc::unwrap_or_clone(id.module.clone()),
                     ir: Ir::Hir,
                 };
                 find_in_other_ir(config, &key).await?

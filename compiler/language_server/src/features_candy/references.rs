@@ -8,7 +8,7 @@ use candy_frontend::{
 };
 use num_bigint::BigUint;
 use rustc_hash::FxHashSet;
-use std::ops::Range;
+use std::{ops::Range, sync::Arc};
 use tracing::{debug, info};
 
 pub fn references<DB>(
@@ -82,7 +82,7 @@ where
 {
     // TODO: search all files
     let module = match &query {
-        ReferenceQuery::Id(id) => id.module.clone(),
+        ReferenceQuery::Id(id) => Arc::unwrap_or_clone(id.module.clone()),
         ReferenceQuery::Int(module, _) => module.clone(),
         ReferenceQuery::Symbol(module, _) => module.clone(),
         ReferenceQuery::Needs(module) => module.clone(),
@@ -212,7 +212,9 @@ where
 
         if let Some(span) = self.db.hir_id_to_span(&id) {
             self.references.push(Reference {
-                range: self.db.range_to_lsp_range(id.module, span),
+                range: self
+                    .db
+                    .range_to_lsp_range(Arc::unwrap_or_clone(id.module), span),
                 is_write,
             });
         }

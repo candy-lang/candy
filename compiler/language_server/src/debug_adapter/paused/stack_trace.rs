@@ -20,7 +20,7 @@ use dap::{
     types::{PresentationHint, Source, StackFramePresentationhint},
 };
 use itertools::Itertools;
-use std::{borrow::Borrow, hash::Hash};
+use std::{borrow::Borrow, hash::Hash, sync::Arc};
 
 impl PausedState {
     pub fn stack_trace(
@@ -119,7 +119,8 @@ impl PausedState {
                     checksums: None,
                 };
                 let range = db.hir_id_to_span(function).unwrap();
-                let range = db.range_to_lsp_range(function.module.clone(), range);
+                let range =
+                    db.range_to_lsp_range(Arc::unwrap_or_clone(function.module.clone()), range);
                 let range = start_at_1_config.range_to_dap(range);
                 (function.function_name(), Some(source), Some(range))
             }
