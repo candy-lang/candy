@@ -54,11 +54,11 @@ pub struct Options {
 pub fn compile(options: &Options) -> ProgramResult {
     let packages_path = packages_path();
     let db = Database::new_with_file_system_module_provider(packages_path);
-    let module = module_for_path(options.path.clone())?;
+    let module = module_for_path(options.path().clone())?;
     let path = options
         .path
         .as_ref()
-        .unwrap_or_else(|| match &module.package {
+        .unwrap_or_else(|| match &module.package() {
             module::Package::User(user) => user,
             module::Package::Managed(managed) => managed,
             _ => unreachable!(),
