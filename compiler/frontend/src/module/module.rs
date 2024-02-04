@@ -34,12 +34,12 @@ impl From<InnerModule> for Module {
 }
 impl Module {
     #[must_use]
-    pub fn package(&self) -> Package {
-        self.0.package.clone()
+    pub fn package(&self) -> &Package {
+        &self.0.package
     }
     #[must_use]
-    pub fn path(&self) -> Vec<String> {
-        self.0.path.clone()
+    pub fn path(&self) -> &Vec<String> {
+        &self.0.path
     }
     #[must_use]
     pub fn kind(&self) -> ModuleKind {

@@ -52,7 +52,7 @@ impl UsePath {
                     ModuleKind::Code
                 };
 
-                let mut total_path = current_module.path();
+                let mut total_path = current_module.path().clone();
                 for _ in 0..*parent_navigations {
                     if total_path.pop().is_none() {
                         return Err("The path contains too many parent navigations. You can't navigate out of the current package.".to_string());
@@ -60,7 +60,7 @@ impl UsePath {
                 }
                 total_path.push(path.to_string());
 
-                Module::new(current_module.package(), total_path, kind)
+                Module::new(current_module.package().clone(), total_path, kind)
             }
         })
     }

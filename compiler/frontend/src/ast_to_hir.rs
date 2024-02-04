@@ -99,7 +99,7 @@ fn compile_top_level(
     module: Module,
     ast: &[Ast],
 ) -> (Body, FxHashMap<hir::Id, ast::Id>) {
-    let is_builtins_package = module.package() == Package::builtins();
+    let is_builtins_package = module.package() == &Package::builtins();
     let mut context = Context {
         module: module.clone(),
         id_mapping: FxHashMap::default(),
@@ -597,7 +597,7 @@ impl Context<'_> {
         // We forward struct accesses to `builtins.structGet` to reuse its
         // validation logic. However, this only works outside the Builtins
         // package.
-        let struct_get_id = if self.module.package() == Package::builtins() {
+        let struct_get_id = if self.module.package() == &Package::builtins() {
             self.push(None, Expression::Builtin(BuiltinFunction::StructGet), None)
         } else {
             let struct_get_id =
