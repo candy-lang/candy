@@ -362,7 +362,7 @@ impl UrlFromIrConfig for Url {
         details.insert("scheme".to_string(), original_url.scheme().into());
         details.insert(
             "moduleKind".to_string(),
-            match config.module.kind {
+            match config.module.kind() {
                 ModuleKind::Code => "code".into(),
                 ModuleKind::Asset => "asset".into(),
             },
@@ -515,7 +515,7 @@ impl LanguageFeatures for IrFeatures {
             }
             ReferenceKey::HirId(id) => {
                 let config = IrConfig {
-                    module: Arc::unwrap_or_clone(id.module.clone()),
+                    module: id.module.clone(),
                     ir: Ir::Hir,
                 };
                 find_in_other_ir(config, &key).await?

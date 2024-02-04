@@ -86,11 +86,11 @@ mod test {
     #[test]
     fn on_demand_module_content_works() {
         let mut db = Database::default();
-        let module = Module {
-            package: Package::User(PathBuf::from("/non/existent")),
-            path: vec!["foo".to_string()],
-            kind: ModuleKind::Code,
-        };
+        let module = Module::new(
+            Package::User(PathBuf::from("/non/existent")),
+            vec!["foo".to_string()],
+            ModuleKind::Code,
+        );
 
         db.did_open_module(&module, b"123".to_vec());
         assert_eq!(

@@ -13,7 +13,7 @@ pub trait CommentStringToRcst: CstDb + HirDb {
 
 fn comment_rcst(db: &dyn CommentStringToRcst, id: hir::Id) -> Arc<Vec<Rcst>> {
     let comments_and_newlines = if id.is_root() {
-        db.cst(Arc::unwrap_or_clone(id.module))
+        db.cst(id.module)
             .unwrap()
             .iter()
             .take_while(|it| {
@@ -28,7 +28,7 @@ fn comment_rcst(db: &dyn CommentStringToRcst, id: hir::Id) -> Arc<Vec<Rcst>> {
             .collect_vec()
     } else {
         let cst_id = db.hir_to_cst_id(&id).unwrap();
-        match db.find_cst(Arc::unwrap_or_clone(id.module), cst_id).kind {
+        match db.find_cst(id.module, cst_id).kind {
             cst::CstKind::Assignment {
                 box assignment_sign,
                 ..

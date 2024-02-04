@@ -45,11 +45,11 @@ fn mir(db: &dyn HirToMir, target: ExecutionTarget, tracing: TracingConfig) -> Mi
     let (module, target_is_main_function) = match target {
         ExecutionTarget::Module(module) => (module, false),
         ExecutionTarget::MainFunction(module) => {
-            assert_eq!(module.kind, ModuleKind::Code);
+            assert_eq!(module.kind(), ModuleKind::Code);
             (module, true)
         }
     };
-    let (mir, errors) = match module.kind {
+    let (mir, errors) = match module.kind() {
         ModuleKind::Code => {
             let (hir, _) = db.hir(module.clone())?;
             let mut errors = FxHashSet::default();

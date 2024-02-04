@@ -2,7 +2,6 @@ use super::Tracer;
 use crate::heap::{Heap, HirId, InlineObject};
 use candy_frontend::{hir::Id, module::Module};
 use rustc_hash::FxHashMap;
-use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct EvaluatedValuesTracer {
@@ -26,7 +25,7 @@ impl EvaluatedValuesTracer {
 impl Tracer for EvaluatedValuesTracer {
     fn value_evaluated(&mut self, heap: &mut Heap, expression: HirId, value: InlineObject) {
         let id = expression.get();
-        if Arc::unwrap_or_clone(id.module.clone()) != self.module {
+        if id.module.clone() != self.module {
             return;
         }
 

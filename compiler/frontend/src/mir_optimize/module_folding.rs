@@ -157,7 +157,7 @@ fn resolve_module(current_module: &Module, path: &str) -> Result<Module, MirErro
             path: path.to_string(),
         });
     };
-    let Ok(module) = path.resolve_relative_to(current_module.clone()) else {
+    let Ok(module) = path.resolve_relative_to(current_module) else {
         return Err(MirError::UseHasTooManyParentNavigations {
             module: current_module.clone(),
             path: path.to_string(),

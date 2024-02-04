@@ -20,7 +20,7 @@ use dap::{
     types::{PresentationHint, Source, StackFramePresentationhint},
 };
 use itertools::Itertools;
-use std::{borrow::Borrow, hash::Hash, sync::Arc};
+use std::{borrow::Borrow, hash::Hash};
 
 impl PausedState {
     pub fn stack_trace(
@@ -108,7 +108,7 @@ impl PausedState {
                         &module_to_url(&function.module, &db.packages_path).unwrap(),
                     )),
                     source_reference: None,
-                    presentation_hint: if byte_code.module.package == function.module.package {
+                    presentation_hint: if byte_code.module.package() == function.module.package() {
                         PresentationHint::Emphasize
                     } else {
                         PresentationHint::Normal
@@ -119,8 +119,7 @@ impl PausedState {
                     checksums: None,
                 };
                 let range = db.hir_id_to_span(function).unwrap();
-                let range =
-                    db.range_to_lsp_range(Arc::unwrap_or_clone(function.module.clone()), range);
+                let range = db.range_to_lsp_range(function.module.clone(), range);
                 let range = start_at_1_config.range_to_dap(range);
                 (function.function_name(), Some(source), Some(range))
             }

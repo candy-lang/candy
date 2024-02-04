@@ -28,7 +28,7 @@ pub trait HirDb: AstToHir {
 }
 #[allow(clippy::needless_pass_by_value)]
 fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
-    let (hir, _) = db.hir(Arc::unwrap_or_clone(id.module.clone())).ok()?;
+    let (hir, _) = db.hir(id.module.clone()).ok()?;
     assert!(
         !id.is_root(),
         "You can't get the root because that got lowered into multiple IDs.",
@@ -40,7 +40,7 @@ fn containing_body_of(db: &dyn HirDb, id: Id) -> Arc<Body> {
     let parent_id = id.parent().expect("The root scope has no parent.");
 
     if parent_id.is_root() {
-        db.hir(Arc::unwrap_or_clone(id.module)).unwrap().0
+        db.hir(id.module).unwrap().0
     } else {
         match db.find_expression(parent_id).unwrap() {
             Expression::Match { cases, .. } => {
@@ -133,7 +133,7 @@ impl Body {
 
 #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Id {
-    pub module: Arc<Module>,
+    pub module: Module,
     pub keys: IdPath,
 }
 #[derive(Clone, Eq, From, Hash, Ord, PartialEq, PartialOrd, Debug)]
@@ -185,32 +185,28 @@ impl Display for IdPath {
     }
 }
 
-const fn tooling_module(name: String) -> Module {
-    Module {
-        package: Package::Tooling(name),
-        path: vec![],
-        kind: ModuleKind::Code,
-    }
+fn tooling_module(name: String) -> Module {
+    Module::new(Package::Tooling(name), vec![], ModuleKind::Code)
 }
 lazy_static! {
-    static ref USER_MODULE: Arc<Module> = Arc::new(tooling_module("user".to_string()));
-    static ref PLATFORM_MODULE: Arc<Module> = Arc::new(tooling_module("platform".to_string()));
-    static ref FUZZER_MODULE: Arc<Module> = Arc::new(tooling_module("fuzzer".to_string()));
-    static ref DUMMY_MODULE: Arc<Module> = Arc::new(tooling_module("dummy".to_string()));
-    static ref NEEDS_MODULE: Arc<Module> = Arc::new(Module {
-        package: Package::Anonymous {
+    static ref USER_MODULE: Module = tooling_module("user".to_string());
+    static ref PLATFORM_MODULE: Module = tooling_module("platform".to_string());
+    static ref FUZZER_MODULE: Module = tooling_module("fuzzer".to_string());
+    static ref DUMMY_MODULE: Module = tooling_module("dummy".to_string());
+    static ref NEEDS_MODULE: Module = Module::new(
+        Package::Anonymous {
             url: "$generated".to_string(),
         },
-        path: vec![],
-        kind: ModuleKind::Code,
-    });
+        vec![],
+        ModuleKind::Code,
+    );
 }
 
 impl Id {
     #[must_use]
-    pub fn new(module: impl Into<Arc<Module>>, keys: Vec<IdKey>) -> Self {
+    pub fn new(module: Module, keys: Vec<IdKey>) -> Self {
         Self {
-            module: module.into(),
+            module,
             keys: keys.into(),
         }
     }
@@ -218,7 +214,7 @@ impl Id {
     /// An ID that can be used to blame the tooling. For example, when calling
     /// the `main` function, we want to be able to blame the platform for
     /// passing a wrong environment.
-    const fn tooling(module: Arc<Module>) -> Self {
+    const fn tooling(module: Module) -> Self {
         Self {
             module,
             keys: IdPath::empty(),

@@ -9,7 +9,7 @@ use candy_frontend::{
 };
 use itertools::Itertools;
 use pad::PadStr;
-use std::{env::current_dir, path::Path, sync::Arc};
+use std::{env::current_dir, path::Path};
 
 #[derive(Debug, Default)]
 pub struct StackTracer {
@@ -137,15 +137,15 @@ impl StackTracer {
 
         let hir_id = call_site.get();
         let module = hir_id.module.clone();
-        let cst_id = if module.package.is_tooling() {
+        let cst_id = if module.package().is_tooling() {
             None
         } else {
             db.hir_to_cst_id(hir_id)
         };
 
         let span_string = cst_id.map(|id| {
-            let cst = db.find_cst(Arc::unwrap_or_clone(module.clone()), id);
-            db.range_to_positions(Arc::unwrap_or_clone(module.clone()), cst.data.span)
+            let cst = db.find_cst(module.clone(), id);
+            db.range_to_positions(module.clone(), cst.data.span)
                 .format()
         });
         #[allow(clippy::map_unwrap_or)]
@@ -175,7 +175,7 @@ impl StackTracer {
             "{} {}",
             cst_id
                 .and_then(|id| {
-                    let cst = db.find_cst(Arc::unwrap_or_clone(hir_id.module.clone()), id);
+                    let cst = db.find_cst(hir_id.module.clone(), id);
                     match cst.kind {
                         CstKind::Call { receiver, .. } => extract_receiver_name(&receiver),
                         _ => None,

@@ -37,10 +37,6 @@ pub fn module_for_path(path: impl Into<Option<PathBuf>>) -> Result<Module, Exit>
             error!("Candy packages are folders that contain a `_package.candy` file. This file marks the root folder of a package. Relative imports can only happen within the package.");
             return Err(Exit::NotInCandyPackage);
         };
-        Ok(Module {
-            package,
-            path: vec![],
-            kind: ModuleKind::Code,
-        })
+        Ok(Module::new(package, vec![], ModuleKind::Code))
     }
 }

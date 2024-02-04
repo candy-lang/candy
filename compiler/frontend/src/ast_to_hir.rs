@@ -50,7 +50,7 @@ pub trait AstToHir: CstDb + CstToAst {
 pub type HirResult = Result<(Arc<Body>, Arc<FxHashMap<hir::Id, ast::Id>>), ModuleError>;
 
 fn hir_to_ast_id(db: &dyn AstToHir, id: &hir::Id) -> Option<ast::Id> {
-    let (_, hir_to_ast_id_mapping) = db.hir(Arc::unwrap_or_clone(id.module.clone())).ok()?;
+    let (_, hir_to_ast_id_mapping) = db.hir(id.module.clone()).ok()?;
     hir_to_ast_id_mapping.get(id).cloned()
 }
 fn hir_to_cst_id(db: &dyn AstToHir, id: &hir::Id) -> Option<cst::Id> {
@@ -61,10 +61,7 @@ fn hir_id_to_span(db: &dyn AstToHir, id: &hir::Id) -> Option<Range<Offset>> {
 }
 fn hir_id_to_display_span(db: &dyn AstToHir, id: &hir::Id) -> Option<Range<Offset>> {
     let cst_id = db.hir_to_cst_id(id)?;
-    Some(
-        db.find_cst(Arc::unwrap_or_clone(id.module.clone()), cst_id)
-            .display_span(),
-    )
+    Some(db.find_cst(id.module.clone(), cst_id).display_span())
 }
 
 fn ast_to_hir_ids(db: &dyn AstToHir, id: &ast::Id) -> Vec<hir::Id> {
@@ -102,7 +99,7 @@ fn compile_top_level(
     module: Module,
     ast: &[Ast],
 ) -> (Body, FxHashMap<hir::Id, ast::Id>) {
-    let is_builtins_package = module.package == Package::builtins();
+    let is_builtins_package = module.package() == Package::builtins();
     let mut context = Context {
         module: module.clone(),
         id_mapping: FxHashMap::default(),
@@ -600,7 +597,7 @@ impl Context<'_> {
         // We forward struct accesses to `builtins.structGet` to reuse its
         // validation logic. However, this only works outside the Builtins
         // package.
-        let struct_get_id = if self.module.package == Package::builtins() {
+        let struct_get_id = if self.module.package() == Package::builtins() {
             self.push(None, Expression::Builtin(BuiltinFunction::StructGet), None)
         } else {
             let struct_get_id =
