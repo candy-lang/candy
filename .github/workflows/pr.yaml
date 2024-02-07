@@ -19,7 +19,7 @@ jobs:
           repo-token: ${{ secrets.BOT_TOKEN }}
 
   assign-author:
-    if: github.event.action == 'opened'
+    if: github.event.action == 'opened' && github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
