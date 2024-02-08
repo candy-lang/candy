@@ -1,0 +1,163 @@
+[bool, checkEquals, fixedDecimal, ifElse, int] = use "Core"
+
+is number := number %
+  ComplexNumber [real, imaginary] ->
+    fixedDecimal.is real | bool.lazyAnd { fixedDecimal.is imaginary }
+  _ -> False
+
+fromFixedDecimals real imaginary :=
+  needs (fixedDecimal.is real)
+  needs (fixedDecimal.is imaginary)
+  ComplexNumber [real, imaginary]
+fromInts real imaginary :=
+  needs (int.is real)
+  needs (int.is imaginary)
+  fromFixedDecimals (fixedDecimal.fromInt real) (fixedDecimal.fromInt imaginary)
+zero := fromFixedDecimals fixedDecimal.zero fixedDecimal.zero
+one := fromFixedDecimals fixedDecimal.one fixedDecimal.zero
+i := fromFixedDecimals fixedDecimal.zero (fixedDecimal.fromInt 1)
+
+real number :=
+  needs (is number)
+  ComplexNumber [real] = number
+  real
+imaginary number :=
+  needs (is number)
+  ComplexNumber [imaginary] = number
+  imaginary
+
+add summandA summandB :=
+  needs (is summandA)
+  needs (is summandB)
+  ComplexNumber [
+    Real: summandA | real | fixedDecimal.add (summandB | real),
+    Imaginary: summandA | imaginary | fixedDecimal.add (summandB | imaginary),
+  ]
+subtract minuend subtrahend :=
+  needs (is minuend)
+  needs (is subtrahend)
+  ComplexNumber [
+    Real: minuend | real | fixedDecimal.subtract (subtrahend | real),
+    Imaginary: minuend | imaginary | fixedDecimal.subtract (subtrahend | imaginary),
+  ]
+conjugate number :=
+  needs (is number)
+  ComplexNumber [Real: number | real, Imaginary: number | imaginary | fixedDecimal.negate]
+negate number :=
+  needs (is number)
+  ComplexNumber [Real: number | real | fixedDecimal.negate, Imaginary: number | imaginary | fixedDecimal.negate]
+
+multiply factorA factorB :=
+  needs (is factorA)
+  needs (is factorB)
+  ComplexNumber [
+    Real:
+      factorA | real | fixedDecimal.multiply (factorB | real)
+      | fixedDecimal.subtract (factorA | imaginary | fixedDecimal.multiply (factorB | imaginary)),
+    Imaginary:
+      factorA | real | fixedDecimal.multiply (factorB | imaginary)
+      | fixedDecimal.subtract (factorA | imaginary | fixedDecimal.multiply (factorB | real)),
+  ]
+square number :=
+  needs (is number)
+  number | multiply number
+divideTruncating dividend divisor :=
+  needs (is dividend)
+  needs (is divisor)
+  finalDivisor = divisor | real | fixedDecimal.square
+    | fixedDecimal.add (divisor | imaginary | fixedDecimal.square)
+  ComplexNumber [
+    Real:
+      dividend | real | fixedDecimal.multiply (divisor | real)
+      | fixedDecimal.add (dividend | imaginary | fixedDecimal.multiply (divisor | imaginary))
+      | fixedDecimal.divideTruncating finalDivisor,
+    Imaginary:
+      dividend | imaginary | fixedDecimal.multiply (divisor | real)
+      | fixedDecimal.subtract (dividend | real | fixedDecimal.multiply (divisor | imaginary))
+      | fixedDecimal.divideTruncating finalDivisor,
+  ]
+reciprocal number :=
+  needs (is number)
+  one | divideTruncating number
+
+l1Norm number :=
+  # Returns the L1 norm `|re| + |im|` (Manhattan distance) from the origin.
+  #
+  # https://en.wikipedia.org/wiki/Taxicab_geometry
+  needs (is number)
+  number | real | fixedDecimal.absolute
+  | fixedDecimal.add (number | imaginary | fixedDecimal.absolute)
+
+toText number :=
+  needs (is number)
+  real = number | real | fixedDecimal.toText
+  imaginarySign = ifElse (number | imaginary | fixedDecimal.isNegative) { "-" } { "+" }
+  imaginary = number | imaginary | fixedDecimal.absolute | fixedDecimal.toText
+  "{real} {imaginarySign} {imaginary} i"
+
+# Most tests are taken from https://github.com/rust-num/num-complex/blob/0eb3e9019b104abd1916a8aaed3f1fbeb93eed0e/src/lib.rs#L2453
+_0_0i = fromInts 0 0
+_00_00i = fromFixedDecimals (fixedDecimal.fromIntScaled 0 1) (fixedDecimal.fromIntScaled 0 1)
+_1_0i = fromInts 1 0
+_1_1i = fromInts 1 1
+_10_10i = fromFixedDecimals (fixedDecimal.fromIntScaled 10 1) (fixedDecimal.fromIntScaled 10 1)
+_0_1i = fromInts 0 1
+_neg1_0i = fromInts (1 | int.negate) 0
+_neg1_1i = fromInts (1 | int.negate) 1
+_05_05i = fromFixedDecimals (fixedDecimal.fromIntScaled 5 1) (fixedDecimal.fromIntScaled 5 1)
+_4_2i = fromInts 4 2
+
+testAdd =
+  checkEquals (_05_05i | add _05_05i) _10_10i
+  checkEquals (_0_1i | add _1_0i) _1_1i
+  checkEquals (_1_0i | add _neg1_1i) _0_1i
+testAddAny number =
+  checkEquals (_0_0i | add number) number
+  checkEquals (number | add _0_0i) number
+testSubtract =
+  checkEquals (_05_05i | subtract _05_05i) _00_00i
+  checkEquals (_0_1i | subtract _1_0i) _neg1_1i
+  checkEquals (_0_1i | subtract _neg1_1i) _1_0i
+testSubtractAny number =
+  checkEquals (number | subtract _0_0i) number
+  checkEquals (number | subtract number) _0_0i
+testConjugate number =
+  needs (is number)
+  checkEquals (number | conjugate | conjugate) number
+testNegate =
+  checkEquals (_1_0i | negate | add _0_1i) _neg1_1i
+  checkEquals (_0_1i | negate | multiply _0_1i) _1_0i
+testNegateAny number =
+  needs (is number)
+  checkEquals (number | negate | negate) number
+
+testMultiply =
+  # checkEquals (_05_05i | multiply _05_05i) _0_1i.unscale(2.0)
+  checkEquals (_1_1i | multiply _0_1i) _neg1_1i
+
+  # i^2 & i^4
+  checkEquals (_0_1i | multiply _0_1i) _neg1_0i
+  checkEquals (_0_1i | multiply _0_1i | multiply _0_1i | multiply _0_1i) _1_0i
+testMultiplyAny number =
+  checkEquals (number | multiply _1_0i) number
+  checkEquals (_1_0i | multiply number) number
+
+testL1Norm =
+  checkEquals (_0_0i | l1Norm) (fixedDecimal.fromInt 0)
+  checkEquals (_1_0i | l1Norm) (fixedDecimal.fromInt 1)
+  checkEquals (_1_1i | l1Norm) (fixedDecimal.fromInt 2)
+  checkEquals (_0_1i | l1Norm) (fixedDecimal.fromInt 1)
+  checkEquals (_neg1_1i | l1Norm) (fixedDecimal.fromInt 2)
+  checkEquals (_05_05i | l1Norm) (fixedDecimal.fromIntScaled 10 1)
+  checkEquals (_4_2i | l1Norm) (fixedDecimal.fromInt 6)
+
+testToText =
+  checkEquals (zero | toText) "0. + 0. i"
+  checkEquals (one | toText) "1. + 0. i"
+  checkEquals (i | toText) "0. + 1. i"
+  checkEquals (fromFixedDecimals fixedDecimal.one fixedDecimal.one | toText) "1. + 1. i"
+  checkEquals
+    fromFixedDecimals (fixedDecimal.fromIntScaled 123456 5) (fixedDecimal.fromIntScaled 123456 3)
+    | toText
+    "1.23456 + 123.456 i"
+  checkEquals (fromInts (10 | int.negate) (10000 | int.negate) | toText) "-10. - 10000. i"
