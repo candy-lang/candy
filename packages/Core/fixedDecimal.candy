@@ -1,5 +1,5 @@
 bool = use "..bool"
-[check] = use "..check"
+[check, checkEquals] = use "..check"
 [ifElse, recursive] = use "..controlFlow"
 [equals] = use "..equality"
 [run] = use "..function"
@@ -182,3 +182,11 @@ toText value :=
       { tmp | int.subtract scaleFactor | toDebugText | text.removePrefix "-1" }
   }
   "{beforeDot}.{afterDot}"
+
+testToText =
+  checkEquals (zero | toText) "0."
+  checkEquals (one | toText) "1."
+  checkEquals (fromIntScaled 123456 5 | toText) "1.23456"
+  checkEquals (fromIntScaled 123456 3 | toText) "123.456"
+  checkEquals (fromInt (10 | int.negate) | toText) "-10."
+  checkEquals (fromInt (10000 | int.negate) | toText) "-10000."
