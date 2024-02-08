@@ -1,0 +1,152 @@
+[int, text] = use "Core"
+
+# https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_(Select_Graphic_Rendition)_parameters
+
+reset := # All attributes become turned off.
+  "0"
+bold :=
+  # As with `faint`, the color change is a PC (SCO / CGA) invention.
+  #
+  # Also known as increased intensity.
+  "1"
+faint :=
+  # May be implemented as a light font weight like bold.
+  #
+  # Also known as decreased intensity or dim.
+  "2"
+italic := # Not widely supported. Sometimes treated as inverse or blink.
+  "3"
+underline := # Style extensions exist for Kitty, VTE, mintty, iTerm2 and Konsole.[27][28][29]
+  "4"
+slowBlink := # Sets blinking to less than 150 times per minute.
+  "5"
+rapidBlink := # MS-DOS ANSI.SYS, 150+ per minute; not widely supported.
+  "6"
+reverseVideo :=
+  # Swap foreground and background colors; inconsistent emulation[30][dubious – discuss]
+  #
+  # Also known as invert.
+  "7"
+conceal := # Not widely supported.
+  #
+  # Also known as hide.
+  "8"
+crossedOut :=
+  # Characters legible but marked as if for deletion. Not supported in Terminal.app.
+  #
+  # Also known as strike.
+  "9"
+primaryFont := # Select primary (default) font.
+  "10"
+alternativeFont number :=
+  # Select alternative font `number`.
+  needs (int.is number)
+  needs (1 | int.isLessThanOrEqualTo number)
+  needs (number | int.isLessThanOrEqualTo 9)
+  "1{number}"
+fraktur := # Rarely supported
+  #
+  # Also known as gothic.
+  "20"
+doublyUnderlined :=
+  # Double-underline per ECMA-48, but instead disables bold intensity on several terminals,
+  # including in the Linux kernel's console before version 4.17.
+  #
+  # Also known as not bold.
+  "21"
+normalIntensity := # Neither bold nor faint; color changes where intensity is implemented as such.
+  "22"
+neitherItalicNorBlackletter := "23"
+notUnderlined := # Neither singly nor doubly underlined.
+  "24"
+notBlinking := # Turn blinking off.
+  "25"
+proportionalSpacing := # ITU T.61 and T.416, not known to be used on terminals
+  "26"
+notReversed := "27"
+reveal := # Not concealed
+  "28"
+notCrossedOut := "29"
+setForegroundColor3Or4Bit number :=
+  # Select foreground color `number`.
+  needs (int.is number)
+  needs (0 | int.isLessThanOrEqualTo number)
+  needs (number | int.isLessThanOrEqualTo 7)
+  "3{number}"
+setForegroundColor8Or24Bit colorText :=
+  # `colorText` has the format `"5;n"` or `"2;r;g;b"`.
+  needs (text.is colorText)
+  "38;{colorText}"
+defaultForegroundColor := # Implementation defined (according to standard).
+  "39"
+setBackgroundColor number :=
+  # Select background color `number`.
+  needs (int.is number)
+  needs (0 | int.isLessThanOrEqualTo number)
+  needs (number | int.isLessThanOrEqualTo 7)
+  "4{number}"
+setBackgroundColor8Or24Bit colorText :=
+  # `colorText` has the format `"5;n"` or `"2;r;g;b"`.
+  needs (text.is colorText)
+  "48;{colorText}"
+defaultBackgroundColor := # Implementation defined (according to standard).
+  "49"
+disableProportionalSpacing := # ITU T.61 and T.416
+  "50"
+framed := # Implemented as "emoji variation selector" in mintty.
+  "51"
+encircled := # Implemented as "emoji variation selector" in mintty.
+  "52"
+overlined := # Not supported in Terminal.app
+  "53"
+neitherFramedNorEncircled := "54"
+notOverlined := "55"
+setUnderlineColor colorText :=
+  # Not in standard; implemented in Kitty, VTE, mintty, and iTerm2.
+  #
+  # `colorText` has the format `"5;n"` or `"2;r;g;b"`.
+  needs (text.is colorText)
+  "58"
+defaultUnderlineColor := # Not in standard; implemented in Kitty, VTE, mintty, and iTerm2.
+  "59"
+ideogramUnderlineOrRightSideLine := # Rarely supported.
+  "60"
+ideogramDoubleUnderlineOrDoubleLineOnTheRightSide := # Rarely supported.
+  "61"
+ideogramOverlineOrLeftSideLine := # Rarely supported.
+  "62"
+ideogramDoubleOverlineOrDoubleLineOnTheLeftSide := # Rarely supported.
+  "63"
+ideogramStressMarking := # Rarely supported.
+  "64"
+noIdeogramAttributes :=
+  # Reset the effects of:
+  #
+  # - `ideogramUnderlineOrRightSideLine`
+  # - `ideogramDoubleUnderlineOrDoubleLineOnTheRightSide`
+  # - `ideogramOverlineOrLeftSideLine`
+  # - `ideogramDoubleOverlineOrDoubleLineOnTheLeftSide`
+  # - `ideogramStressMarking`
+  "65"
+superscript := # Implemented only in mintty.
+  "73"
+subscript := # Implemented only in mintty.
+  "74"
+neitherSuperscriptNorSubscript := # Implemented only in mintty.
+  "75"
+setBrightForegroundColor3Or4Bit number :=
+  # Select bright foreground color `number`.
+  #
+  # Not in standard; originally implemented by aixterm.
+  needs (int.is number)
+  needs (0 | int.isLessThanOrEqualTo number)
+  needs (number | int.isLessThanOrEqualTo 7)
+  "9{number}"
+setBrightBackgroundColor3Or4Bit number :=
+  # Select bright background color `number`.
+  #
+  # Not in standard; originally implemented by aixterm.
+  needs (int.is number)
+  needs (0 | int.isLessThanOrEqualTo number)
+  needs (number | int.isLessThanOrEqualTo 7)
+  "10{number}"
