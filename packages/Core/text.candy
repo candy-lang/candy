@@ -86,6 +86,14 @@ rick := "
 "
 
 fromUtf8 := builtins.textFromUtf8
+charFromAsciiCode code :=
+  needs (int.is code)
+  needs (0 | int.isLessThanOrEqualTo code)
+  needs (code | int.isLessThanOrEqualTo 127)
+  # Ok text = fromUtf8 (code,)
+  # text
+  Ok text = fromUtf8 (code,)
+  text
 
 isEmpty := builtins.textIsEmpty
 length := builtins.textLength
@@ -169,7 +177,7 @@ padStart text len character :=
   needs (character | length | equals 1)
   textLength = text | length
   ifElse (textLength | int.isGreaterThanOrEqualTo len) { text } {
-    (character | repeat (len | int.subtract textLength)) | concatenate text
+    character | repeat (len | int.subtract textLength) | concatenate text
   }
 padEnd text len character :=
   needs (is text)
