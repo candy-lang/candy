@@ -78,6 +78,9 @@ multiply factorA factorB :=
   fromIntScaled
     factorA | minorUnits | int.multiply (factorB | minorUnits)
     factorA | scale | int.add (factorB | scale)
+square value :=
+  needs (is value)
+  value | multiply value
 divideTruncating dividend divisor :=
   needs (is dividend)
   needs (is divisor)
