@@ -15,7 +15,7 @@ scaleFactor scale =
   10 | int.pow scale
 
 is a := a %
-  FixedDecimal [minorUnits, scale] -> int.is minorUnits | bool.lazyAnd { isScale scale}
+  FixedDecimal [minorUnits, scale] -> int.is minorUnits | bool.lazyAnd { isScale scale }
   _ -> False
 
 minorUnits a :=
@@ -37,6 +37,7 @@ floorToInt a :=
   a | minorUnits | int.divideTruncating (a | scale | scaleFactor)
 
 zero := fromInt 0
+one := fromInt 1
 
 rescaledMinorUnits a targetScale =
   needs (is a)
@@ -86,14 +87,18 @@ divideTruncating dividend divisor :=
   needs (is divisor)
   needs (divisor | minorUnits | equals 0 | bool.not) "You can't divide by zero."
   [valueA, valueB, targetScale] = comparableMinorUnits dividend divisor
-  fromIntScaled (valueA | int.multiply (targetScale | scaleFactor) | int.divideTruncating valueB) targetScale
+  fromIntScaled
+    valueA | int.multiply (targetScale | scaleFactor) | int.divideTruncating valueB
+    targetScale
 divideTruncatingAtScale dividend divisor targetScale :=
   needs (is dividend)
   needs (is divisor)
   needs (isScale targetScale)
   needs (divisor | minorUnits | equals 0 | bool.not) "You can't divide by zero."
   [valueA, valueB] = comparableMinorUnits dividend divisor
-  fromIntScaled (valueA | int.multiply (targetScale | scaleFactor) | int.divideTruncating valueB) targetScale
+  fromIntScaled
+    valueA | int.multiply (targetScale | scaleFactor) | int.divideTruncating valueB
+    targetScale
 
 compareTo valueA valueB :=
   needs (is valueA)
@@ -165,14 +170,15 @@ coerceIn value minimum maximum :=
   needs (minimum | isLessThanOrEqualTo maximum)
   value | coerceAtLeast minimum | coerceAtMost maximum
 
-toText a :=
-  needs (is a)
-  beforeDot = a | floorToInt
+toText value :=
+  needs (is value)
+  beforeDot = value | floorToInt
   afterDot = run {
-    scaleFactor = a | scale | scaleFactor
-    tmp = a | minorUnits | int.remainder scaleFactor
-    ifElse (int.isNonNegative tmp) { tmp | int.add scaleFactor | toDebugText | text.removePrefix "1" } {
-      tmp | int.subtract scaleFactor | toDebugText | text.removePrefix "-1"
-    }
+    scaleFactor = value | scale | scaleFactor
+    tmp = value | minorUnits | int.remainder scaleFactor
+    ifElse
+      int.isNonNegative tmp
+      { tmp | int.add scaleFactor | toDebugText | text.removePrefix "1" }
+      { tmp | int.subtract scaleFactor | toDebugText | text.removePrefix "-1" }
   }
-  "{beforeDot}.{afterDot}" 
+  "{beforeDot}.{afterDot}"
