@@ -239,7 +239,6 @@ impl IrFeatures {
         let mut builder = RichIrBuilder::default();
         builder.push_comment_line(format!("{ir_name} for module {module}"));
         if let Some(tracing_config) = tracing_config.into() {
-            builder.push_newline();
             builder.push_tracing_config(tracing_config);
         }
         builder.push_newline();
