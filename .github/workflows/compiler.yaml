@@ -196,11 +196,11 @@ jobs:
         env:
           IAI_CALLGRIND_COLOR: never
         run: |
-          echo "output=<<EOF" >> "$GITHUB_ENV"
+          echo 'output<<EOF' >> $GITHUB_OUTPUT
           cargo bench \
             | sed -E 's/^benchmark::main::(\S+) .*?:[cv]\("(.*?)"(, & \[("(.*?)"|)\]|)\)$/\1: \2.candy \5/g' \
-            | tee $GITHUB_ENV
-          echo "EOF" >> "$GITHUB_ENV"
+            | tee $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
       - name: Store benchmark results
         working-directory: compiler/vm/
         # TODO: Support PRs from forks: https://bencher.dev/docs/how-to/github-actions/#pull-requests-from-forks
