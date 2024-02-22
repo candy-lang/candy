@@ -33,7 +33,7 @@ impl FromStr for PathFormat {
 
 fromstr_deser! {PathFormat}
 
-//// Arguments for an Initialize request.
+/// Arguments for an Initialize request.
 /// In specification: [Initialize](https://microsoft.github.io/debug-adapter-protocol/specification#Requests_Initialize)
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -73,7 +73,7 @@ pub struct InitializeArguments {
     pub supports_args_can_be_interpreted_by_shell: Option<bool>,
 }
 
-//// Arguments for an SetBreakpoints request.
+/// Arguments for an SetBreakpoints request.
 /// In specification: [SetBreakpoints](https://microsoft.github.io/debug-adapter-protocol/specification#Requests_Initialize)
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -130,7 +130,7 @@ pub struct SetFunctionBreakpointsArguments {
     pub breakpoints: Vec<FunctionBreakpoint>,
 }
 
-//// Arguments for a Launch request.
+/// Arguments for a Launch request.
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all(deserialize = "camelCase", serialize = "snake_case"))]
 pub struct LaunchRequestArguments {
@@ -164,7 +164,7 @@ pub struct LaunchRequestArguments {
     pub env: Option<Vec<String>>,
 }
 
-//// Arguments for an Attach request.
+/// Arguments for an Attach request.
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all(deserialize = "camelCase", serialize = "snake_case"))]
 pub struct AttachRequestArguments {
@@ -175,7 +175,7 @@ pub struct AttachRequestArguments {
     pub restart_data: Option<Value>,
 }
 
-//// Arguments for a BreakpointLocations request.
+/// Arguments for a BreakpointLocations request.
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all(deserialize = "camelCase", serialize = "snake_case"))]
 pub struct BreakpointLocationsArguments {
@@ -200,7 +200,7 @@ pub struct BreakpointLocationsArguments {
     pub end_column: Option<usize>,
 }
 
-//// Arguments for a Completions request.
+/// Arguments for a Completions request.
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all(deserialize = "camelCase", serialize = "snake_case"))]
 pub struct CompletionsArguments {
@@ -219,7 +219,7 @@ pub struct CompletionsArguments {
     pub line: Option<usize>,
 }
 
-//// Arguments for a Continue request.
+/// Arguments for a Continue request.
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all(deserialize = "camelCase", serialize = "snake_case"))]
 pub struct ContinueArguments {
@@ -232,7 +232,7 @@ pub struct ContinueArguments {
     pub single_thread: Option<bool>,
 }
 
-//// Arguments for a DataBreakpointInfo request.
+/// Arguments for a DataBreakpointInfo request.
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all(deserialize = "camelCase", serialize = "snake_case"))]
 pub struct DataBreakpointInfoArguments {
@@ -244,7 +244,7 @@ pub struct DataBreakpointInfoArguments {
     pub name: String,
 }
 
-//// Arguments for a Disassamble request.
+/// Arguments for a Disassamble request.
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all(deserialize = "camelCase", serialize = "snake_case"))]
 pub struct DisassembleArguments {
@@ -268,7 +268,7 @@ pub struct DisassembleArguments {
     pub resolve_symbols: Option<bool>,
 }
 
-//// Arguments for a Disconnect request.
+/// Arguments for a Disconnect request.
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all(deserialize = "camelCase", serialize = "snake_case"))]
 pub struct DisconnectArguments {
@@ -289,7 +289,7 @@ pub struct DisconnectArguments {
     pub suspend_debuggee: Option<bool>,
 }
 
-//// Arguments for a Evaluate request.
+/// Arguments for a Evaluate request.
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all(deserialize = "camelCase", serialize = "snake_case"))]
 pub struct EvaluateArguments {

@@ -62,16 +62,26 @@ fn inline_functions_of_maximum_complexity(
 ) {
     if let Expression::Call { function, .. } = **expression
         && let Expression::Function { body, .. } = context.visible.get(function)
-        && body.complexity() <= complexity {
+        && body.complexity() <= complexity
+    {
         context.inline_call(expression);
     }
 }
 
 pub fn inline_needs_function(context: &mut Context, expression: &mut CurrentExpression) {
-    if let Expression::Call { function, arguments, .. } = &**expression
-        && arguments.iter().all(|it| context.pureness.is_definition_const(context.visible.get(*it)))
+    if let Expression::Call {
+        function,
+        arguments,
+        ..
+    } = &**expression
+        && arguments.iter().all(|it| {
+            context
+                .pureness
+                .is_definition_const(context.visible.get(*it))
+        })
         && let Expression::Function { original_hirs, .. } = context.visible.get(*function)
-        && original_hirs.contains(&hir::Id::needs()) {
+        && original_hirs.contains(&hir::Id::needs())
+    {
         context.inline_call(expression);
     }
 }
@@ -79,7 +89,10 @@ pub fn inline_needs_function(context: &mut Context, expression: &mut CurrentExpr
 pub fn inline_functions_containing_use(context: &mut Context, expression: &mut CurrentExpression) {
     if let Expression::Call { function, .. } = **expression
         && let Expression::Function { body, .. } = context.visible.get(function)
-        && body.iter().any(|(_, expression)| expression.is_use_module()) {
+        && body
+            .iter()
+            .any(|(_, expression)| expression.is_use_module())
+    {
         context.inline_call(expression);
     }
 }
@@ -88,7 +101,12 @@ pub fn inline_calls_with_constant_arguments(
     expression: &mut CurrentExpression,
 ) {
     if let Expression::Call { arguments, .. } = &**expression
-        && arguments.iter().all(|arg| context.pureness.is_definition_const(context.visible.get(*arg))) {
+        && arguments.iter().all(|arg| {
+            context
+                .pureness
+                .is_definition_const(context.visible.get(*arg))
+        })
+    {
         context.inline_call(expression);
     }
 }

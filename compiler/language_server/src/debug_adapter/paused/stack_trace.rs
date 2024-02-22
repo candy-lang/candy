@@ -14,7 +14,6 @@ use candy_vm::{
     Vm,
 };
 use dap::{
-    self,
     requests::StackTraceArguments,
     responses::StackTraceResponse,
     types::{PresentationHint, Source, StackFramePresentationhint},

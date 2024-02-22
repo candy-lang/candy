@@ -1,4 +1,3 @@
-use serde_json;
 use std::fmt::Debug;
 
 use crate::errors::{DeserializationError, ServerError};

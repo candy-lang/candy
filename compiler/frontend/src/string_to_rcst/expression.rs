@@ -180,12 +180,14 @@ fn expression_suffix_call<'a>(
                 .or_else(|| closing_bracket(i))
                 .or_else(|| closing_curly_brace(i))
                 .or_else(|| arrow(i));
-            if let Some((i, cst)) = fallback && has_multiline_whitespace {
-                        (i, cst)
-                    } else {
-                        input = i;
-                        break;
-                    }
+            if let Some((i, cst)) = fallback
+                && has_multiline_whitespace
+            {
+                (i, cst)
+            } else {
+                input = i;
+                break;
+            }
         };
 
         expressions.push(expr);

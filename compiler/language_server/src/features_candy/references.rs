@@ -138,39 +138,45 @@ where
         }
     }
     fn visit_id(&mut self, id: hir::Id) {
-        let expression = match self.db.find_expression(id.clone()) {
-            Some(expression) => expression,
-            None => return, // Generated code
+        let Some(expression) = self.db.find_expression(id.clone()) else {
+            // Generated code
+            return;
         };
         self.visit_expression(id, &expression);
     }
     fn visit_expression(&mut self, id: hir::Id, expression: &Expression) {
         match expression {
-            Expression::Int(int) =>{
-                if let ReferenceQuery::Int(_, target) = &self.query && int == target {
+            Expression::Int(int) => {
+                if let ReferenceQuery::Int(_, target) = &self.query
+                    && int == target
+                {
                     self.add_reference(id, false);
                 }
-            },
-            Expression::Text(_) => {},
+            }
+            Expression::Text(_) => {}
             Expression::Reference(target) => {
-                if let ReferenceQuery::Id(target_id) = &self.query && target == target_id {
+                if let ReferenceQuery::Id(target_id) = &self.query
+                    && target == target_id
+                {
                     self.add_reference(id, false);
                 }
             }
             Expression::Symbol(symbol) => {
-                if let ReferenceQuery::Symbol(_, target) = &self.query && symbol == target {
+                if let ReferenceQuery::Symbol(_, target) = &self.query
+                    && symbol == target
+                {
                     self.add_reference(id, false);
                 }
             }
             Expression::List(_)
             | Expression::Struct(_)
             | Expression::Destructure { .. }
-            | Expression::PatternIdentifierReference (_) => {},
+            | Expression::PatternIdentifierReference(_) => {}
             Expression::Match { cases, .. } => {
                 for (_, body) in cases {
                     self.visit_body(body);
                 }
-            },
+            }
             Expression::Function(Function { body, .. }) => {
                 // We don't need to visit the parameters: They can only be the
                 // declaration of an identifier and don't reference it any other
@@ -182,7 +188,9 @@ where
                 function,
                 arguments,
             } => {
-                if let ReferenceQuery::Id(target_id) = &self.query && function == target_id {
+                if let ReferenceQuery::Id(target_id) = &self.query
+                    && function == target_id
+                {
                     self.add_reference(id, false);
                 }
                 self.visit_ids(arguments);
@@ -193,8 +201,7 @@ where
                     self.add_reference(id, false);
                 }
             }
-            Expression::Error { .. } => {
-            }
+            Expression::Error { .. } => {}
         }
     }
 

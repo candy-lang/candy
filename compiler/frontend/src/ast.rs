@@ -275,7 +275,7 @@ impl AstKind {
             Self::Identifier(Identifier(identifier)) => {
                 let entry = captured_identifiers
                     .entry(identifier.value.clone())
-                    .or_insert_with(Vec::new);
+                    .or_default();
                 entry.push(identifier.id.clone());
             }
             Self::Symbol(_) => {}

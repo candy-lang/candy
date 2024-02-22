@@ -54,11 +54,11 @@ where
 {
     let mut rcsts = vec![];
     while let Some((input_after_single, rcst)) = parse_single(input)
-            && count.map_or(true, |(count, exact)| exact || rcsts.len() < count)
-        {
-            input = input_after_single;
-            rcsts.push(rcst);
-        }
+        && count.map_or(true, |(count, exact)| exact || rcsts.len() < count)
+    {
+        input = input_after_single;
+        rcsts.push(rcst);
+    }
     match count {
         Some((count, _)) if count != rcsts.len() => None,
         _ => Some((input, rcsts)),

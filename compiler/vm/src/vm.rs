@@ -121,11 +121,11 @@ where
     }
 
     #[must_use]
-    pub fn byte_code(&self) -> &B {
+    pub const fn byte_code(&self) -> &B {
         &self.inner.byte_code
     }
     #[must_use]
-    pub fn tracer(&self) -> &T {
+    pub const fn tracer(&self) -> &T {
         &self.inner.tracer
     }
     #[must_use]

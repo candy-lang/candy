@@ -74,7 +74,6 @@ pub fn compile(options: &Options) -> ProgramResult {
             ExecutionTarget::MainFunction(module.clone()),
             TracingConfig::off(),
         )
-        .map(|(mir, errors)| (mir, errors))
         .unwrap_or_else(|error| {
             let payload = CompilerErrorPayload::Module(error);
             let mir = Mir::build(|body| {
@@ -89,7 +88,7 @@ pub fn compile(options: &Options) -> ProgramResult {
 
     if !errors.is_empty() {
         for error in errors.as_ref() {
-            println!("{:?}", error);
+            println!("{error:?}");
         }
         std::process::exit(1);
     }

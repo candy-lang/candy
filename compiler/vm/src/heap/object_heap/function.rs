@@ -120,7 +120,7 @@ impl DebugDisplay for HeapFunction {
                 if captured.is_empty() {
                     "nothing".to_string()
                 } else {
-                    captured.iter().map(|it| format!("{:?}", it)).join(", ")
+                    captured.iter().map(|it| format!("{it:?}")).join(", ")
                 },
                 self.body(),
             )
