@@ -196,8 +196,13 @@ jobs:
         env:
           IAI_CALLGRIND_COLOR: never
         run: |
-          output=$(cargo bench | tee /dev/tty)
+          # https://unix.stackexchange.com/a/724034
+          exec 3>&1
+          output=$(cargo bench 3>&- | tee /dev/fd/3)
+          exec 3>&-
+
           renamed_output=$(echo "$output" | sed -E 's/^benchmark::main::(\S+) .*?:[cv]\("(.*?)"(, & \[("(.*?)"|)\]|)\)$/\1: \2.candy \5/g')
+
           bencher run \
             --project candy \
             --token ${{ secrets.BENCHER_TOKEN }} \
