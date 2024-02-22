@@ -10,8 +10,7 @@ use candy_vm::{
 };
 use environment::BenchmarkingEnvironment;
 use iai_callgrind::{
-    black_box, library_benchmark, library_benchmark_group, main, FlamegraphConfig,
-    LibraryBenchmarkConfig,
+    library_benchmark, library_benchmark_group, main, FlamegraphConfig, LibraryBenchmarkConfig,
 };
 use std::fs;
 use tracing::Level;
@@ -27,23 +26,27 @@ use utils::{compile, setup, Database};
 mod environment;
 mod utils;
 
+// The prepare functions are named with a single letter because
+// iai-callgrind-runner truncates the benchmark description:
+// https://github.com/iai-callgrind/iai-callgrind/blob/fc74e6f9e8776afe1de89b6e1a5d5911330f981b/iai-callgrind-runner/src/runner/format.rs#L119-L130
+
 #[library_benchmark]
-#[bench::examples_fibonacci(compile_prepare("Examples/fibonacci.candy"))]
-#[bench::examples_hello_world(compile_prepare("Examples/helloWorld.candy"))]
-fn compile((mut db, source_code): (Database, String)) {
-    utils::compile(&mut db, &source_code);
+#[bench::examples_fibonacci(c("Examples/fibonacci"))]
+#[bench::examples_hello_world(c("Examples/helloWorld"))]
+pub fn compile((mut db, source_code): (Database, String)) {
+    crate::utils::compile(&mut db, &source_code);
 }
-fn compile_prepare(file_path: &str) -> (Database, String) {
+fn c(file_path: &str) -> (Database, String) {
     init_logger();
 
     let db = setup();
-    let source_code = fs::read_to_string(format!("../../packages/{file_path}")).unwrap();
+    let source_code = fs::read_to_string(format!("../../packages/{file_path}.candy")).unwrap();
     (db, source_code)
 }
 
 #[library_benchmark]
-#[bench::examples_fibonacci(vm_runtime_prepare("Examples/fibonacci.candy", &[]))]
-#[bench::examples_hello_world(vm_runtime_prepare("Examples/helloWorld.candy", &["15"]))]
+#[bench::examples_fibonacci(v("Examples/fibonacci", &[]))]
+#[bench::examples_hello_world(v("Examples/helloWorld", &["15"]))]
 fn vm_runtime(mut program: PreparedProgram) {
     let vm = Vm::for_main_function(
         program.byte_code,
@@ -52,7 +55,7 @@ fn vm_runtime(mut program: PreparedProgram) {
         StackTracer::default(),
     );
     let VmFinished { result, tracer, .. } =
-        black_box(vm.run_forever_with_environment(&mut program.heap, &mut program.environment));
+        vm.run_forever_with_environment(&mut program.heap, &mut program.environment);
     result.unwrap_or_else(|it| {
         eprintln!("The program panicked: {}", it.reason);
         eprintln!("{} is responsible.", it.responsible);
@@ -74,10 +77,10 @@ struct PreparedProgram {
     environment: BenchmarkingEnvironment,
     environment_argument: Struct,
 }
-fn vm_runtime_prepare(file_path: &str, arguments: &[&str]) -> PreparedProgram {
+fn v(file_path: &str, arguments: &[&str]) -> PreparedProgram {
     init_logger();
 
-    let source_code = fs::read_to_string(format!("../../packages/{file_path}")).unwrap();
+    let source_code = fs::read_to_string(format!("../../packages/{file_path}.candy")).unwrap();
 
     let mut db = setup();
     let byte_code = compile(&mut db, &source_code);

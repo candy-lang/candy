@@ -190,11 +190,24 @@ jobs:
 
       - name: Install Bencher CLI
         uses: bencherdev/bencher@v0.4.2
-      - name: Run benchmarks and store results
+      - id: benchmark
+        name: Run benchmarks
+        working-directory: compiler/vm/
+        env:
+          IAI_CALLGRIND_COLOR: never
+        run: cargo bench
+      - id: benchmark-renamed
+        name: Rename benchmark outputs
+        env:
+          BENCHMARK_OUTPUT: ${{ steps.benchmark.outputs.stdout }}
+        run: >
+          echo "$BENCHMARK_OUTPUT"
+          | sed -E 's/^benchmark::main::(\S+) .*?:[cv]\("(.*?)"(, & \[("(.*?)"|)\]|)\)$/\1: \2.candy \5/g'
+      - name: Store benchmark results
         working-directory: compiler/vm/
         # TODO: Support PRs from forks: https://bencher.dev/docs/how-to/github-actions/#pull-requests-from-forks
         env:
-          IAI_CALLGRIND_COLOR: never
+          BENCHMARK_OUTPUT: ${{ steps.benchmark-renamed.outputs.stdout }}
         run: >
           bencher run
           --project candy
@@ -207,7 +220,7 @@ jobs:
           --adapter rust_iai_callgrind
           --err
           --github-actions ${{ secrets.BENCHMARK_RESULTS_COMMENT_TOKEN }}
-          cargo bench
+          echo "$BENCHMARK_OUTPUT"
 
   vscode-extension-check:
     name: Check VS Code Extension
