@@ -190,35 +190,26 @@ jobs:
 
       - name: Install Bencher CLI
         uses: bencherdev/bencher@v0.4.2
-      - id: benchmark
-        name: Run benchmarks
-        working-directory: compiler/vm/
-        env:
-          IAI_CALLGRIND_COLOR: never
-        run: |
-          echo 'output<<EOF' >> $GITHUB_OUTPUT
-          cargo bench \
-            | sed -E 's/^benchmark::main::(\S+) .*?:[cv]\("(.*?)"(, & \[("(.*?)"|)\]|)\)$/\1: \2.candy \5/g' \
-            | tee $GITHUB_OUTPUT
-          echo 'EOF' >> $GITHUB_OUTPUT
       - name: Store benchmark results
         working-directory: compiler/vm/
         # TODO: Support PRs from forks: https://bencher.dev/docs/how-to/github-actions/#pull-requests-from-forks
         env:
-          BENCHMARK_OUTPUT: ${{ steps.benchmark.outputs.output }}
-        run: >
-          bencher run
-          --project candy
-          --token ${{ secrets.BENCHER_TOKEN }}
-          --if-branch ${{ github.head_ref || github.ref_name }}
-          --else-if-branch ${{ github.base_ref }}
-          --else-if-branch main
-          --hash ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-          --testbed github-actions-ubuntu-22-04
-          --adapter rust_iai_callgrind
-          --err
-          --github-actions ${{ secrets.BENCHMARK_RESULTS_COMMENT_TOKEN }}
-          echo "$BENCHMARK_OUTPUT"
+          IAI_CALLGRIND_COLOR: never
+        run: |
+          output=$(cargo bench | tee /dev/tty)
+          renamed_output=$(echo "$output" | sed -E 's/^benchmark::main::(\S+) .*?:[cv]\("(.*?)"(, & \[("(.*?)"|)\]|)\)$/\1: \2.candy \5/g')
+          bencher run \
+            --project candy \
+            --token ${{ secrets.BENCHER_TOKEN }} \
+            --if-branch ${{ github.head_ref || github.ref_name }} \
+            --else-if-branch ${{ github.base_ref }} \
+            --else-if-branch main \
+            --hash ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }} \
+            --testbed github-actions-ubuntu-22-04 \
+            --adapter rust_iai_callgrind \
+            --err \
+            --github-actions ${{ secrets.BENCHMARK_RESULTS_COMMENT_TOKEN }} \
+            echo "$renamed_output"
 
   vscode-extension-check:
     name: Check VS Code Extension
