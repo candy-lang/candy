@@ -39,6 +39,8 @@ use super::current_expression::{Context, CurrentExpression};
 use crate::mir::Expression;
 use itertools::Itertools;
 
+const NAME: &str = "Constant Lifting";
+
 pub fn lift_constants(context: &mut Context, expression: &mut CurrentExpression) {
     let Expression::Function { body, .. } = expression.get_mut_carefully() else {
         return;
@@ -80,5 +82,5 @@ pub fn lift_constants(context: &mut Context, expression: &mut CurrentExpression)
         );
     }
 
-    expression.prepend_optimized(context.visible, constants);
+    expression.prepend_optimized(NAME, context.visible, constants);
 }

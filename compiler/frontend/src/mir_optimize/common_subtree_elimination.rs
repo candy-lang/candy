@@ -36,6 +36,8 @@ use std::{
     mem,
 };
 
+const NAME: &str = "Common Subtree Elimination";
+
 pub fn eliminate_common_subtrees(body: &mut Body, pureness: &mut PurenessInsights) {
     // Previously, this was a more intuitive `FxHashMap<Id, Expression>`.
     // However, we had to clone _every_ expression for this, which was quite
@@ -109,8 +111,11 @@ pub fn eliminate_common_subtrees(body: &mut Body, pureness: &mut PurenessInsight
                 let (canonical_id, _) = body.expressions[*canonical_index];
 
                 let mut current_expression = CurrentExpression::new(body, index);
-                let old_expression =
-                    current_expression.replace_with(Expression::Reference(canonical_id), pureness);
+                let old_expression = current_expression.replace_with(
+                    NAME,
+                    Expression::Reference(canonical_id),
+                    pureness,
+                );
                 replaced.insert(id, canonical_id);
 
                 if let Expression::Function {

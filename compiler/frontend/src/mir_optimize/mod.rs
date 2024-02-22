@@ -67,6 +67,7 @@ mod constant_folding;
 mod constant_lifting;
 mod current_expression;
 mod inlining;
+mod log;
 mod module_folding;
 mod pure;
 mod reference_following;
