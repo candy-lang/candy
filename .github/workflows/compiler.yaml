@@ -193,6 +193,8 @@ jobs:
       - name: Run benchmarks and store results
         working-directory: compiler/vm/
         # TODO: Support PRs from forks: https://bencher.dev/docs/how-to/github-actions/#pull-requests-from-forks
+        env:
+          IAI_CALLGRIND_COLOR: never
         run: >
           bencher run
           --project candy
