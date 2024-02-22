@@ -41,18 +41,12 @@ pub enum HintKind {
 
 impl Insight {
     pub fn for_value(db: &Database, id: Id, value: InlineObject) -> Option<Self> {
-        let Some(hir) = db.find_expression(id.clone()) else {
-            return None;
-        };
+        let hir = db.find_expression(id.clone())?;
         let text = match hir {
             Expression::Reference(_) => {
                 // Could be an assignment.
-                let Some(ast_id) = db.hir_to_ast_id(&id) else {
-                    return None;
-                };
-                let Some(ast) = db.find_ast(ast_id) else {
-                    return None;
-                };
+                let ast_id = db.hir_to_ast_id(&id)?;
+                let ast = db.find_ast(ast_id)?;
                 let AstKind::Assignment(Assignment { body, .. }) = &ast.kind else {
                     return None;
                 };
@@ -149,7 +143,7 @@ impl Insight {
     pub fn for_static_panic(db: &Database, module: Module, panic: &Panic) -> Self {
         let call_span = db
             .hir_id_to_display_span(&panic.responsible)
-            .unwrap_or_else(|| panic!("Can't resolve responsible ID for panic: {:?}", panic));
+            .unwrap_or_else(|| panic!("Can't resolve responsible ID for panic: {panic:?}"));
         let call_span = db.range_to_lsp_range(module, call_span);
 
         Self::Diagnostic(Diagnostic::error(

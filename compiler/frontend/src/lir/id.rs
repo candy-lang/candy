@@ -29,7 +29,9 @@ impl Id {
         body: impl Into<Option<&Body>>,
     ) {
         self.build_rich_ir(builder);
-        if let Some(body) = body.into() && let Some(Expression::Constant(constant_id)) = body.expression(self) {
+        if let Some(body) = body.into()
+            && let Some(Expression::Constant(constant_id)) = body.expression(self)
+        {
             builder.push("<", None, EnumSet::empty());
             constant_id.build_rich_ir_with_constants(builder, constants);
             builder.push(">", None, EnumSet::empty());

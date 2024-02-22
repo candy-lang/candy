@@ -857,7 +857,9 @@ impl<'ctx> CodeGen<'ctx> {
             self.builder
                 .build_load(self.candy_value_pointer_type, it.as_pointer_value(), "")
         });
-        if v.is_none() && let Some(index) = function_ctx.captured_ids.iter().position(|i| *i == id) {
+        if v.is_none()
+            && let Some(index) = function_ctx.captured_ids.iter().position(|i| *i == id)
+        {
             let env_ptr = function_ctx.function_value.get_last_param().unwrap();
 
             let env_value = self
@@ -870,9 +872,14 @@ impl<'ctx> CodeGen<'ctx> {
                 )
                 .unwrap();
 
-            v = Some(self.builder.build_load(self.candy_value_pointer_type, env_value, ""));
+            v = Some(
+                self.builder
+                    .build_load(self.candy_value_pointer_type, env_value, ""),
+            );
         }
-        if v.is_none() && let Some(value) = self.locals.get(&id) {
+        if v.is_none()
+            && let Some(value) = self.locals.get(&id)
+        {
             v = Some(*value);
         }
         if self.unrepresented_ids.contains(&id) {

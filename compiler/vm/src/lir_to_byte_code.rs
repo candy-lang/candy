@@ -30,36 +30,33 @@ where
 {
     let module = target.module().clone();
     #[allow(clippy::map_unwrap_or)]
-    let (lir, errors) = db
-        .optimized_lir(target, tracing)
-        .map(|(lir, errors)| (lir, errors))
-        .unwrap_or_else(|error| {
-            let mut constants = Constants::default();
-            let payload = CompilerErrorPayload::Module(error);
-            let reason_id = constants.push(payload.to_string());
-            let responsible_id = constants.push(hir::Id::user());
+    let (lir, errors) = db.optimized_lir(target, tracing).unwrap_or_else(|error| {
+        let mut constants = Constants::default();
+        let payload = CompilerErrorPayload::Module(error);
+        let reason_id = constants.push(payload.to_string());
+        let responsible_id = constants.push(hir::Id::user());
 
-            let mut body = Body::new(
-                FxHashSet::from_iter([hir::Id::new(module.clone(), vec![])]),
-                0,
-                0,
-            );
-            let reason_id = body.push(Expression::Constant(reason_id));
-            let responsible_id = body.push(Expression::Constant(responsible_id));
-            body.push(Expression::Panic {
-                reason: reason_id,
-                responsible: responsible_id,
-            });
-
-            let mut bodies = Bodies::default();
-            bodies.push(body);
-
-            let lir = Lir::new(constants, bodies);
-            let errors = vec![CompilerError::for_whole_module(module.clone(), payload)]
-                .into_iter()
-                .collect();
-            (Arc::new(lir), Arc::new(errors))
+        let mut body = Body::new(
+            FxHashSet::from_iter([hir::Id::new(module.clone(), vec![])]),
+            0,
+            0,
+        );
+        let reason_id = body.push(Expression::Constant(reason_id));
+        let responsible_id = body.push(Expression::Constant(responsible_id));
+        body.push(Expression::Panic {
+            reason: reason_id,
+            responsible: responsible_id,
         });
+
+        let mut bodies = Bodies::default();
+        bodies.push(body);
+
+        let lir = Lir::new(constants, bodies);
+        let errors = vec![CompilerError::for_whole_module(module.clone(), payload)]
+            .into_iter()
+            .collect();
+        (Arc::new(lir), Arc::new(errors))
+    });
     let byte_code = LoweringContext::compile(module, lir.as_ref());
     (byte_code, errors)
 }

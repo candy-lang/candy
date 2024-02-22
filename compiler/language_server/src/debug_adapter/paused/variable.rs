@@ -143,7 +143,7 @@ impl PausedState {
                     vars.sort_by_key(|it| it.address());
                     variables.extend(vars[start..].iter().take(count).map(|object| {
                         self.create_variable(
-                            format!("{:p}", object),
+                            format!("{object:p}"),
                             (*object).into(),
                             supports_variable_type,
                         )

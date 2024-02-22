@@ -17,7 +17,7 @@ use candy_frontend::{
     rcst_to_cst::RcstToCst,
 };
 use lsp_types::{
-    self, notification::Notification, FoldingRange, LocationLink, SemanticToken,
+    notification::Notification, FoldingRange, LocationLink, SemanticToken,
     TextDocumentContentChangeEvent, TextEdit, Url,
 };
 use regex::Regex;
@@ -60,7 +60,7 @@ impl CandyFeatures {
 
     async fn send_to_analyzer(&self, event: analyzer::Message) {
         match self.hints_events_sender.send(event).await {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(error) => panic!("Couldn't send message to hints server: {error:?}."),
         }
     }

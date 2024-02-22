@@ -224,7 +224,8 @@ impl TreeWithIds for Cst {
                 if let Some(part) = interpolation_index.map(|index| &parts[index])
                     && part.kind.is_text_interpolation()
                     && let Some(child) = part.find_by_offset(offset)
-                    && !child.kind.is_text_interpolation() {
+                    && !child.kind.is_text_interpolation()
+                {
                     (Some(child), false)
                 } else {
                     (None, false)
