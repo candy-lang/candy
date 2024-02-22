@@ -45,8 +45,8 @@ fn c(file_path: &str) -> (Database, String) {
 }
 
 #[library_benchmark]
-#[bench::examples_fibonacci(v("Examples/fibonacci", &[]))]
-#[bench::examples_hello_world(v("Examples/helloWorld", &["15"]))]
+#[bench::examples_fibonacci(v("Examples/fibonacci", &["10"]))]
+#[bench::examples_hello_world(v("Examples/helloWorld", &[]))]
 fn vm_runtime(mut program: PreparedProgram) {
     let vm = Vm::for_main_function(
         program.byte_code,
