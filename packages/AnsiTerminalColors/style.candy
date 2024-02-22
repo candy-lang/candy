@@ -1,0 +1,6 @@
+[bool, iterator, list] = use "Core"
+
+is style := style %
+  Clear | Bold | Underline | Reversed | Italic | Blink | Hidden | Dimmed | Strikethrough -> True
+  _ -> False
+isList styles := list.is styles | bool.lazyAnd { styles | iterator.fromList | iterator.all is }

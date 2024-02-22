@@ -1,0 +1,39 @@
+[bool, ifElse, text] = use "Core"
+color = use "..color"
+style = use "..style"
+
+isOptionalColor optionalColor := optionalColor %
+  Color c -> color.is color
+  Inherit -> True
+  _ -> False
+
+is formatted := formatted %
+  Formatted [content, foregroundColor, backgroundColor, styles] ->
+    text.is content | bool.lazyAnd { isOptionalColor foregroundColor }
+    | bool.lazyAnd { isOptionalColor backgroundColor }
+    | bool.lazyAnd { style.isList styles }
+  _ -> False
+isTextOrFormatted textOrFormatted := text.is textOrFormatted | bool.lazyOr { is textOrFormatted }
+
+fromText t :=
+  needs (text.is t)
+  Formatted [Content: t, ForegroundColor: Inherit, BackgroundColor: Inherit, Styles: (,)]
+from textOrFormatted :=
+  needs (isTextOrFormatted textOrFormatted)
+  ifElse (text.is textOrFormatted) { fromText textOrFormatted } { textOrFormatted }
+
+color textOrFormatted foregroundColor :=
+  needs (isTextOrFormatted textOrFormatted)
+  needs (color.is foregroundColor)
+  Formatted [content, backgroundColor, styles] = from textOrFormatted
+  Formatted [content, ForegroundColor: Color foregroundColor, backgroundColor, styles]
+onColor textOrFormatted backgroundColor :=
+  needs (isTextOrFormatted textOrFormatted)
+  needs (color.is backgroundColor)
+  Formatted [content, foregroundColor, styles] = from textOrFormatted
+  Formatted [content, foregroundColor, BackgroundColor: Color backgroundColor, styles]
+styles textOrFormatted styles :=
+  needs (isTextOrFormatted textOrFormatted)
+  needs (style.isList styles)
+  Formatted [content, foregroundColor, backgroundColor] = from textOrFormatted
+  Formatted [content, foregroundColor, backgroundColor, styles]

@@ -7,6 +7,10 @@
   - changed-files:
       - any-glob-to-any-file:
           - packages/AnsiEscapeSequences/**/*
+'P: AnsiTerminalColors':
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/AnsiTerminalColors/**/*
 'P: Builtins':
   - changed-files:
       - any-glob-to-any-file:

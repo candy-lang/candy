@@ -1,0 +1,69 @@
+[
+  colors,
+  controlSequences,
+  GraphicRenditions:
+    [
+      setForegroundColor3Or4Bit,
+      setBrightForegroundColor3Or4Bit,
+      setForegroundColor8Or24Bit,
+      setBackgroundColor3Or4Bit,
+      setBrightBackgroundColor3Or4Bit,
+      setBackgroundColor8Or24Bit,
+    ],
+] = use "AnsiEscapeSequences"
+
+is color := color %
+  Black | Red | Green | Yellow | Blue | Magenta | Cyan | White | BrightBlack | BrightRed
+  | BrightGreen
+  | BrightYellow
+  | BrightBlue
+  | BrightMagenta
+  | BrightCyan
+  | BrightWhite -> True
+  TrueColor [red, green, blue] ->
+    int.isUnsignedByte red | bool.lazyAnd { int.isUnsignedByte green }
+    | bool.lazyAnd { int.isUnsignedByte blue }
+  _ -> False
+
+toForegroundText color :=
+  needs (is color)
+  graphicRendition = color %
+    Black -> setForegroundColor3Or4Bit colors.colors3Or4Bit.black
+    Red -> setForegroundColor3Or4Bit colors.colors3Or4Bit.red
+    Green -> setForegroundColor3Or4Bit colors.colors3Or4Bit.green
+    Yellow -> setForegroundColor3Or4Bit colors.colors3Or4Bit.yellow
+    Blue -> setForegroundColor3Or4Bit colors.colors3Or4Bit.blue
+    Magenta -> setForegroundColor3Or4Bit colors.colors3Or4Bit.magenta
+    Cyan -> setForegroundColor3Or4Bit colors.colors3Or4Bit.cyan
+    White -> setForegroundColor3Or4Bit colors.colors3Or4Bit.white
+    BrightBlack -> setBrightForegroundColor3Or4Bit colors.colors3Or4Bit.black
+    BrightRed -> setBrightForegroundColor3Or4Bit colors.colors3Or4Bit.red
+    BrightGreen -> setBrightForegroundColor3Or4Bit colors.colors3Or4Bit.green
+    BrightYellow -> setBrightForegroundColor3Or4Bit colors.colors3Or4Bit.yellow
+    BrightBlue -> setBrightForegroundColor3Or4Bit colors.colors3Or4Bit.blue
+    BrightMagenta -> setBrightForegroundColor3Or4Bit colors.colors3Or4Bit.magenta
+    BrightCyan -> setBrightForegroundColor3Or4Bit colors.colors3Or4Bit.cyan
+    BrightWhite -> setBrightForegroundColor3Or4Bit colors.colors3Or4Bit.white
+    TrueColor [red, green, blue] -> setForegroundColor8Or24Bit (colors.color24Bit red green blue)
+  controlSequences.selectGraphicRendition graphicRendition
+toBackgroundText color :=
+  needs (is color)
+  graphicRendition = color %
+    Black -> setBackgroundColor3Or4Bit colors.colors3Or4Bit.black
+    Red -> setBackgroundColor3Or4Bit colors.colors3Or4Bit.red
+    Green -> setBackgroundColor3Or4Bit colors.colors3Or4Bit.green
+    Yellow -> setBackgroundColor3Or4Bit colors.colors3Or4Bit.yellow
+    Blue -> setBackgroundColor3Or4Bit colors.colors3Or4Bit.blue
+    Magenta -> setBackgroundColor3Or4Bit colors.colors3Or4Bit.magenta
+    Cyan -> setBackgroundColor3Or4Bit colors.colors3Or4Bit.cyan
+    White -> setBackgroundColor3Or4Bit colors.colors3Or4Bit.white
+    BrightBlack -> setBrightBackgroundColor3Or4Bit colors.colors3Or4Bit.black
+    BrightRed -> setBrightBackgroundColor3Or4Bit colors.colors3Or4Bit.red
+    BrightGreen -> setBrightBackgroundColor3Or4Bit colors.colors3Or4Bit.green
+    BrightYellow -> setBrightBackgroundColor3Or4Bit colors.colors3Or4Bit.yellow
+    BrightBlue -> setBrightBackgroundColor3Or4Bit colors.colors3Or4Bit.blue
+    BrightMagenta -> setBrightBackgroundColor3Or4Bit colors.colors3Or4Bit.magenta
+    BrightCyan -> setBrightBackgroundColor3Or4Bit colors.colors3Or4Bit.cyan
+    BrightWhite -> setBrightBackgroundColor3Or4Bit colors.colors3Or4Bit.white
+    TrueColor [red, green, blue] -> setBackgroundColor8Or24Bit (colors.color24Bit red green blue)
+  controlSequences.selectGraphicRendition graphicRendition

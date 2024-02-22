@@ -12,16 +12,12 @@ color8Bit number :=
   # - 8 – 15: high intensity colors (as in `graphicRenditions.setForegroundColor3Or4Bit`)
   # - 16 – 231: 6 × 6 × 6 cube (216 colors): 16 + 36 × r + 6 × g + b (0 ≤ r, g, b ≤ 5)
   # - 232 – 255: grayscale from dark to light in 24 steps
-  needs (int.is number)
   needs (int.isUnsignedByte number)
   "5;{number}"
 
 color24Bit red green blue :=
   # https://en.wikipedia.org/wiki/ANSI_escape_code#24-bit
-  needs (int.is red)
   needs (int.isUnsignedByte red)
-  needs (int.is green)
   needs (int.isUnsignedByte green)
-  needs (int.is blue)
   needs (int.isUnsignedByte blue)
   "2;{red};{green};{blue}"
