@@ -1,5 +1,4 @@
 use serde::Serialize;
-use serde_json;
 
 use crate::{
     errors::DeserializationError, events::Event, responses::Response,

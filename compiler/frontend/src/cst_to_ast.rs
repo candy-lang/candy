@@ -152,7 +152,7 @@ impl LoweringContext {
                     } if opening_single_quotes
                         .iter()
                         .all(|single_quote| single_quote.kind.is_single_quote()) => opening_single_quotes.len(),
-                    _ => panic!("Text needs to start with any number of single quotes followed by a double quote, but started with {}.", opening)
+                    _ => panic!("Text needs to start with any number of single quotes followed by a double quote, but started with {opening}.")
                 };
 
                 let lowered_parts = parts.iter().filter_map(|part| {
@@ -182,7 +182,7 @@ impl LoweringContext {
                                 panic!(
                                     "Text interpolation needs to start with {} opening curly braces, but started with {}.", 
                                     opening_single_quote_count + 1,
-                                    opening_curly_braces.iter().map(|cst| format!("{}", cst)).join(""),
+                                    opening_curly_braces.iter().map(|cst| format!("{cst}")).join(""),
                                 )
                             }
 
@@ -433,11 +433,10 @@ impl LoweringContext {
 
                         let value = self.lower_cst(&value.clone(), lowering_type);
 
-                        if let Some(comma) = comma && !comma.kind.is_comma() {
-                            errors.push(self.create_error(
-                                comma,
-                                AstError::ListItemMissesComma,
-                            ));
+                        if let Some(comma) = comma
+                            && !comma.kind.is_comma()
+                        {
+                            errors.push(self.create_error(comma, AstError::ListItemMissesComma));
                         }
 
                         ast_items.push(value);
@@ -503,7 +502,9 @@ impl LoweringContext {
 
                         let mut value = self.lower_cst(&value.clone(), lowering_type);
 
-                        if let Some(comma) = comma && !comma.kind.is_comma() {
+                        if let Some(comma) = comma
+                            && !comma.kind.is_comma()
+                        {
                             value = self.create_error_ast(
                                 comma,
                                 vec![self.create_error(comma, AstError::StructValueMissesComma)],
@@ -524,11 +525,10 @@ impl LoweringContext {
                             );
                         }
 
-                        if let Some(comma) = comma && !comma.kind.is_comma() {
-                            errors.push(self.create_error(
-                                comma,
-                                AstError::StructValueMissesComma,
-                            ));
+                        if let Some(comma) = comma
+                            && !comma.kind.is_comma()
+                        {
+                            errors.push(self.create_error(comma, AstError::StructValueMissesComma));
                         }
                         lowered_fields.push((None, ast));
                     }
@@ -743,8 +743,7 @@ impl LoweringContext {
                 self.create_error_ast(key, vec![self.create_error(key, error)])
             }
             _ => panic!(
-                "Expected an identifier after the dot in a struct access, but found `{}`.",
-                key
+                "Expected an identifier after the dot in a struct access, but found `{key}`.",
             ),
         }
     }

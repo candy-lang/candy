@@ -412,11 +412,8 @@ pub fn format_cst<'a>(
             };
 
             let left_width = if let Some(right_first_line_width) = right_width.first_line_width()
-                && (left_min_width
-                    + SinglelineWidth::SPACE
-                    + bar_width
-                    + right_first_line_width)
-                .fits(info.indentation)
+                && (left_min_width + SinglelineWidth::SPACE + bar_width + right_first_line_width)
+                    .fits(info.indentation)
             {
                 left.into_trailing_with_space(edits)
             } else {
@@ -710,12 +707,13 @@ pub fn format_cst<'a>(
                     ..
                 }] if unparsable_input.is_empty(),
             );
-            let (cases, last_case) = if !only_has_empty_error_case && let [cases @ .., last_case] = cases.as_slice() {
-                (cases, last_case)
-            } else {
-                let (percent_width, whitespace) = percent.split();
-                return FormattedCst::new(expression_width + percent_width, whitespace);
-            };
+            let (cases, last_case) =
+                if !only_has_empty_error_case && let [cases @ .., last_case] = cases.as_slice() {
+                    (cases, last_case)
+                } else {
+                    let (percent_width, whitespace) = percent.split();
+                    return FormattedCst::new(expression_width + percent_width, whitespace);
+                };
 
             let case_info = info
                 .resolve_for_expression_with_indented_lines(
@@ -994,18 +992,25 @@ pub fn format_cst<'a>(
                     body.first().unwrap().unwrap_whitespace_and_comment().kind,
                     CstKind::Assignment { .. },
                 );
-            let assignment_sign_trailing = if !contains_single_assignment && left_width.last_line_fits(
-                info.indentation,
-                assignment_sign.min_width(info.indentation) + SinglelineWidth::SPACE + body_width + body_whitespace_width,
-            ) {
+            let assignment_sign_trailing = if !contains_single_assignment
+                && left_width.last_line_fits(
+                    info.indentation,
+                    assignment_sign.min_width(info.indentation)
+                        + SinglelineWidth::SPACE
+                        + body_width
+                        + body_whitespace_width,
+                ) {
                 TrailingWhitespace::Space
             } else if !contains_single_assignment
                 && !body_whitespace_has_comments
                 && let Some(body_first_line_width) = body_width.first_line_width()
                 && left_width.last_line_fits(
                     info.indentation,
-                    assignment_sign.min_width(info.indentation) + SinglelineWidth::SPACE + body_first_line_width,
-            ) {
+                    assignment_sign.min_width(info.indentation)
+                        + SinglelineWidth::SPACE
+                        + body_first_line_width,
+                )
+            {
                 TrailingWhitespace::Space
             } else {
                 TrailingWhitespace::Indentation(info.indentation.with_indent())
@@ -1059,6 +1064,7 @@ fn format_receiver<'a>(
 }
 
 struct Argument<'a> {
+    #[allow(clippy::struct_field_names)]
     argument: MaybeSandwichLikeArgument<'a>,
     precedence: Option<PrecedenceCategory>,
     parentheses: ExistingParentheses<'a>,
