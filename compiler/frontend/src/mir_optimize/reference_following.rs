@@ -24,15 +24,19 @@ use crate::mir::{Body, Expression};
 
 pub fn follow_references(context: &mut Context, expression: &mut CurrentExpression) {
     expression.replace_id_references(&mut |id| {
-        if context.visible.contains(*id) && let Expression::Reference(referenced) = context.visible.get(*id) {
+        if context.visible.contains(*id)
+            && let Expression::Reference(referenced) = context.visible.get(*id)
+        {
             *id = *referenced;
         }
     });
 }
 
 pub fn remove_redundant_return_references(body: &mut Body, pureness: &mut PurenessInsights) {
-    while let [.., (second_last_id, _), (_, Expression::Reference(referenced))] = &body.expressions[..]
-        && referenced == second_last_id {
+    while let [.., (second_last_id, _), (_, Expression::Reference(referenced))] =
+        &body.expressions[..]
+        && referenced == second_last_id
+    {
         let (id, _) = body.expressions.pop().unwrap();
         pureness.on_remove(id);
         // The expression is a reference, so it can't define any inner IDs we'd

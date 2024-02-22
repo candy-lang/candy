@@ -146,7 +146,8 @@ pub fn eliminate_common_subtrees(body: &mut Body, pureness: &mut PurenessInsight
     // Add function HIR IDs to the functions they got normalized into.
     body.visit_mut(&mut |id, expression, _| {
         if let Expression::Function { original_hirs, .. } = expression
-                && let Some(additional_hirs) = additional_function_hirs.remove(&id) {
+            && let Some(additional_hirs) = additional_function_hirs.remove(&id)
+        {
             original_hirs.extend(additional_hirs);
         }
         VisitorResult::Continue
