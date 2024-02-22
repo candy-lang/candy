@@ -2,7 +2,7 @@
 name = "dap"
 version = "0.2.0-alpha1"
 edition = "2021"
-rust-version = "1.56.0"
+rust-version = "1.64.0"
 authors = ["Tamás Szelei <szelei.t@gmail.com>"]
 description = "A Rust implementation of the Debug Adapter Protocol"
 license = "MIT OR Apache-2.0"

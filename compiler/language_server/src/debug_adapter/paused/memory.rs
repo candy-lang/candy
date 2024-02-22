@@ -65,7 +65,7 @@ impl PausedState {
 }
 
 fn format_address(address: usize) -> String {
-    format!("{:#X}", address)
+    format!("{address:#X}")
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -75,7 +75,7 @@ pub enum MemoryReference {
 }
 impl MemoryReference {
     pub fn new(value: InlineObject) -> Self {
-        HeapObject::try_from(value).map_or_else(|_| Self::Inline { value }, Self::heap)
+        HeapObject::try_from(value).map_or_else(|()| Self::Inline { value }, Self::heap)
     }
     pub fn heap(object: HeapObject) -> Self {
         Self::Heap {

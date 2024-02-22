@@ -243,7 +243,7 @@ impl LanguageServer for Server {
             match PackagesPath::try_from(options.get("packagesPath").unwrap().as_str().unwrap()) {
                 Ok(packages_path) => packages_path,
                 Err(err) => {
-                    let message = format!("Failed to initialize: {}", err);
+                    let message = format!("Failed to initialize: {err}");
                     self.client
                         .show_message(MessageType::ERROR, message.clone())
                         .await;

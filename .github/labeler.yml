@@ -39,6 +39,10 @@
   - changed-files:
       - any-glob-to-any-file:
           - vscode_extension/**/*
+'P: ComplexNumber':
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/ComplexNumber/**/*
 'P: Core':
   - changed-files:
       - any-glob-to-any-file:
