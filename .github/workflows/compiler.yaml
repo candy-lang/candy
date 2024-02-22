@@ -189,7 +189,7 @@ jobs:
           cargo install iai-callgrind-runner --version $version
 
       - name: Install Bencher CLI
-        uses: bencherdev/bencher@v0.4.1
+        uses: bencherdev/bencher@v0.4.2
       - name: Run benchmarks and store results
         working-directory: compiler/vm/
         # TODO: Support PRs from forks: https://bencher.dev/docs/how-to/github-actions/#pull-requests-from-forks
@@ -202,7 +202,7 @@ jobs:
           --else-if-branch main
           --hash ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           --testbed github-actions-ubuntu-22-04
-          --adapter rust_iai
+          --adapter rust_iai_callgrind
           --err
           --github-actions ${{ secrets.BENCHMARK_RESULTS_COMMENT_TOKEN }}
           cargo bench
