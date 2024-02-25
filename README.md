@@ -98,7 +98,8 @@ There are still compiler bugs and performance improvements that need work before
 7. Run the launch config “Run Extension (VS Code Extension)”.
 8. In the new VS Code window that opens, you can enjoy 🍭 Candy :)
 
-If you are working on the Rust code itself, you might want to disable the release mode for quicker compilation:
-In the VS Code settings (JSON), add the following: `"candy.languageServerCommand": "cargo run --manifest-path <path-to-the-candy-folder>/compiler/cli/Cargo.toml -- lsp"`.
+If you are working on the Rust code itself, you might want to disable release mode for quicker compilation:
+In `Packages/candy.code-workspace`, in the `candy.languageServerCommand` setting, remove `--release`.
+(But don't commit that change.)
 
 [Discord server]: https://discord.gg/5Vr4eAJ7gU
