@@ -357,10 +357,7 @@ brown =
   foo = 3
   bar = foo
   baz a = a
-  [
-    Bar: foo,
-    Baz: bar,
-  ]
+  [bar, baz]
 
 # equivalent during runtime:
 brown = [
