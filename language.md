@@ -95,15 +95,21 @@ There only exist few types of values in Candy.
 ### Integers
 
 Integers are arbitrarily large, whole numbers.
-You write them in decimal.
 
 ```candy
+# Decimal
 0
 42
 123456789012345678901234567890
+
+# Hexadecimal
+0x123abc
+
+# Binary
+0b101010
 ```
 
-TODO: Different radixes
+TODO: digit grouping
 
 ### Texts
 
