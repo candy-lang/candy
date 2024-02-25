@@ -16,7 +16,7 @@ In particular, this means the following:
 Candy aims to blur the line between compile-time and run-time, for example, by replacing compile-time types with edit-time fuzzing.
 
 This document assumes you're familiar with other programming languages and covers most of what's planned for Candy.
-Note that not all of the features described here are implemented or even finalized.
+Note that not all the features described here are implemented or even finalized.
 
 - [Basic Syntax](#basic-syntax)
 - [Values](#values)
@@ -574,7 +574,7 @@ You can call handles to yield control back to the platform.
 
 Handles also function as _capabilities_ here:
 If you don't pass the stdout handle to a function, there's no way for it to print anything.
-This is especially useful for more "powerful" capabilities like accessing the file system or network:
+This is especially useful for more “powerful” capabilities like accessing the file system or network:
 When using a package, without reading its source code, you can be confident that it won't delete your files under some special circumstances.
 
 If a function expects a stdout handle, there's no way it can tell if you gave it another function that you just created.
@@ -612,7 +612,7 @@ Similar to how Zig build scripts work, we may support having a `build.candy` fil
 
 For instance, to build a project for some custom platform, you may need to combine several native code libraries and integrate those with the Candy code by making some capabilities available via the [environment](#environment-and-capabilities).
 
-Regarding optimization, one idea we had is to let you provide a custom scoring function in the build script instead of having binary options like "optimize for speed" or "optimize for performance".
+Regarding optimization, one idea we had is to let you provide a custom scoring function in the build script instead of having binary options like “optimize for speed” or “optimize for performance”.
 This scoring function could get used by the optimizer to choose which paths to take.
-For example, you could formulate a build where you're okay with a resulting binary blowup of 1  KiB per 10 ms of saved time in some annotated performance-critical section.
+For example, you could formulate a build where you're okay with a resulting binary blowup of 1 KiB per 10 ms of saved time in some annotated performance-critical section.
 Or, when developing for an embedded device with limited storage capacity, you might want to generate a binary that fits within the limit but is otherwise as fast as possible.
