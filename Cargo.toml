@@ -15,7 +15,3 @@ members = [
 [workspace.package]
 edition = "2021"
 rust-version = "1.78.0"
-
-[profile.release]
-# https://github.com/flamegraph-rs/flamegraph#usage-with-benchmarks
-debug = true
