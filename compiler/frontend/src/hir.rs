@@ -161,7 +161,7 @@ impl Id {
     }
     /// The user of the Candy tooling is responsible. For example, when the user
     /// instructs the tooling to run a non-existent module, then the program
-    /// will panic with this responsiblity.
+    /// will panic with this responsibility.
     #[must_use]
     pub fn user() -> Self {
         Self::tooling("user".to_string())
