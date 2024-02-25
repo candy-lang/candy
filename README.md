@@ -93,17 +93,36 @@ There are still compiler bugs and performance improvements that need work before
 
 ## How to use Candy
 
-1. Install [<img height="16" src="https://rust-lang.org/static/images/favicon.svg"> Rust](https://rust-lang.org): [rust-lang.org/tools/install](https://rust-lang.org/tools/install) (use rustup, since we use nightly features).
-2. Install [<img height="16" src="https://code.visualstudio.com/favicon.ico"> Visual Studio Code (VS Code)](https://code.visualstudio.com): [code.visualstudio.com/download](https://code.visualstudio.com/download).
-3. Clone this repo.
-4. Open the workspace (`compiler.code-workspace`) in VS Code.
-5. Install the recommended VS Code extensions.
-6. Run `npm install` inside `vscode_extension/`.
-7. Run the launch config “Run Extension (VS Code Extension)”.
-8. In the new VS Code window that opens, you can enjoy 🍭 Candy :)
+1. Install [<img height="16" src="https://rust-lang.org/static/images/favicon.svg"> Rust](https://rust-lang.org): [rust-lang.org/tools/install](https://rust-lang.org/tools/install) (use Rustup since we use nightly features).
+2. Clone this repo.
+
+Then, you can use Candy in two ways:
+
+### Use the VS Code Extension
+
+1. Install [<img height="16" src="https://code.visualstudio.com/favicon.ico"> Visual Studio Code (VS Code)](https://code.visualstudio.com): [code.visualstudio.com/download](https://code.visualstudio.com/download).
+2. Open the workspace (`compiler.code-workspace`) in VS Code.
+3. Install the recommended VS Code extensions.
+4. Run `npm install` inside `vscode_extension/`.
+5. Run the launch config “Run Extension (VS Code Extension)”.
+6. In the new VS Code window that opens, you can enjoy 🍭 Candy :)
 
 If you are working on the Rust code itself, you might want to disable release mode for quicker compilation:
-In `Packages/candy.code-workspace`, in the `candy.languageServerCommand` setting, remove `--release`.
+In `packages/candy.code-workspace`, in the `candy.languageServerCommand` setting, remove `--release`.
 (But don't commit that change.)
+
+### Use the CLI
+
+From the root of this repository, you can run the Candy CLI by starting the Candy commands with `cargo run --release --`:
+
+```sh
+# Run a Candy file:
+cargo run --release -- run ./packages/Examples/helloWorld.candy
+
+# View all available commands:
+cargo run --release -- help
+```
+
+(Everything after `--` is passed to Candy, everything before it to Cargo.)
 
 [Discord server]: https://discord.gg/5Vr4eAJ7gU
