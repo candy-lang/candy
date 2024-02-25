@@ -1,5 +1,12 @@
 # 🍭 Candy
 
+> **🚧 Work in Progress!**
+>
+> Candy is still in its early stages.
+> We are actively working on it, but it's not ready for production use yet.
+> If you want to help, please join our [Discord server].
+> See also: [The current state](#the-current-state).
+
 A sweet, functional programming language that is robust, minimalistic, and expressive.
 
 Many programming languages have a strict separation between compile-time and runtime errors.
@@ -71,11 +78,14 @@ To get a more in-depth introduction, read the [language document](language.md).
 ## The current state
 
 We are currently implementing a first version of Candy in Rust.
-We already have a language server that provides some tooling.
+We already have a CLI, language server, and VS Code extension that provide some tooling.
+
+The language is still in its early stages, and we are actively working on it.
+There are still compiler bugs and performance improvements that need work before this language is ready for production use.
 
 ## Discussion
 
-[Join our <img height="12" src="https://github.com/candy-lang/candy/assets/19330937/baf90ce0-1d0a-4279-92fa-1c360cd28b38"> Discord server.](https://discord.gg/5Vr4eAJ7gU)
+[Join our <img height="12" src="https://github.com/candy-lang/candy/assets/19330937/baf90ce0-1d0a-4279-92fa-1c360cd28b38"> Discord server.][Discord server]
 
 ## How to use Candy
 
@@ -90,3 +100,5 @@ We already have a language server that provides some tooling.
 
 If you are working on the Rust code itself, you might want to disable the release mode for quicker compilation:
 In the VS Code settings (JSON), add the following: `"candy.languageServerCommand": "cargo run --manifest-path <path-to-the-candy-folder>/compiler/cli/Cargo.toml -- lsp"`.
+
+[Discord server]: https://discord.gg/5Vr4eAJ7gU
