@@ -73,7 +73,11 @@ In fact, we try to show more errors than typical statically typed languages.
     "Hello, {efficientTextReverse name}"  # then this panics: Only palindromes can be efficiently reversed.
   ```
 
-To get a more in-depth introduction, read the [language document](language.md).
+For more info, read:
+
+- Marcel's blog post about Candy: https://marcelgarus.dev/candy
+- the [language documentation](language.md)
+- Marcel's blog post about Candy's compiler pipeline: https://marcelgarus.dev/candy-compiler-pipeline
 
 ## The current state
 
