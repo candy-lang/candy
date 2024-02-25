@@ -20,7 +20,8 @@ In fact, we try to show more errors than typical statically typed languages.
   ```candy
   3                   # int
   "Candy"             # text
-  Green               # symbol (uppercase)
+  Green               # tag (uppercase)
+  Error ListIsEmpty   # tag with a value
   (Foo, Bar)          # list
   [Name: "Candy"]     # struct
   { it -> add it 2 }  # function
