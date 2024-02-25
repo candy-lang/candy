@@ -78,7 +78,7 @@ To get a more in-depth introduction, read the [language document](language.md).
 ## The current state
 
 We are currently implementing a first version of Candy in Rust.
-We already have a CLI, language server, and VS Code extension that provide some tooling.
+We already have a CLI, language server, and Visual Studio Code extension that provide some tooling.
 
 The language is still in its early stages, and we are actively working on it.
 There are still compiler bugs and performance improvements that need work before this language is ready for production use.
@@ -93,7 +93,7 @@ There are still compiler bugs and performance improvements that need work before
 2. Install [<img height="16" src="https://code.visualstudio.com/favicon.ico"> Visual Studio Code (VS Code)](https://code.visualstudio.com): [code.visualstudio.com/download](https://code.visualstudio.com/download).
 3. Clone this repo.
 4. Open the workspace (`compiler.code-workspace`) in VS Code.
-5. Install the recommended VSCode extensions.
+5. Install the recommended VS Code extensions.
 6. Run `npm install` inside `vscode_extension/`.
 7. Run the launch config “Run Extension (VS Code Extension)”.
 8. In the new VS Code window that opens, you can enjoy 🍭 Candy :)
