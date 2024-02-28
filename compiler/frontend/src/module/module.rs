@@ -166,7 +166,7 @@ impl Module {
             return;
         };
 
-        path.set_extension(format!("candy.{}", debug_type));
+        path.set_extension(format!("candy.{debug_type}"));
         fs::write(path.clone(), content).unwrap_or_else(|error| {
             warn!(
                 "Couldn't write to associated debug file {}: {error}.",

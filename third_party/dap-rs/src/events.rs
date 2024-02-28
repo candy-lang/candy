@@ -8,7 +8,7 @@ use crate::types::{
 };
 use std::num::NonZeroUsize;
 
-//// Arguments for a Breakpoint event.
+/// Arguments for a Breakpoint event.
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct BreakpointEventBody {
@@ -20,14 +20,14 @@ pub struct BreakpointEventBody {
     pub breakpoint: Breakpoint,
 }
 
-//// Arguments for a Capabilities event
+/// Arguments for a Capabilities event
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CapabilitiesEventBody {
     pub capabilities: Capabilities,
 }
 
-//// Arguments for a Continued event.
+/// Arguments for a Continued event.
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ContinuedEventBody {
@@ -38,7 +38,7 @@ pub struct ContinuedEventBody {
     pub all_threads_continued: Option<bool>,
 }
 
-//// Arguments for a Exited event
+/// Arguments for a Exited event
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ExitedEventBody {
@@ -46,7 +46,7 @@ pub struct ExitedEventBody {
     pub exit_code: usize,
 }
 
-//// Arguments for a Invalidated event
+/// Arguments for a Invalidated event
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct InvalidatedEventBody {
@@ -64,7 +64,7 @@ pub struct InvalidatedEventBody {
     pub stack_frame_id: Option<usize>,
 }
 
-//// Arguments for a LoadedSource event.
+/// Arguments for a LoadedSource event.
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LoadedSourceEventBody {
@@ -75,7 +75,7 @@ pub struct LoadedSourceEventBody {
     pub source: Source,
 }
 
-//// Arguments for a Memory event.
+/// Arguments for a Memory event.
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct MemoryEventBody {
@@ -87,7 +87,7 @@ pub struct MemoryEventBody {
     pub count: usize,
 }
 
-//// Arguments for a Module event.
+/// Arguments for a Module event.
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ModuleEventBody {
@@ -99,7 +99,7 @@ pub struct ModuleEventBody {
     pub module: Module,
 }
 
-//// Arguments for an Output event.
+/// Arguments for an Output event.
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct OutputEventBody {
@@ -155,7 +155,7 @@ pub struct OutputEventBody {
     pub data: Option<Value>,
 }
 
-//// Arguments for an Process event.
+/// Arguments for an Process event.
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ProcessEventBody {
@@ -180,7 +180,7 @@ pub struct ProcessEventBody {
     pub pointer_size: Option<usize>,
 }
 
-//// Arguments for a ProgressEnd event.
+/// Arguments for a ProgressEnd event.
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ProgressEndEventBody {
@@ -191,7 +191,7 @@ pub struct ProgressEndEventBody {
     pub message: Option<String>,
 }
 
-//// Arguments for a ProgressStart event.
+/// Arguments for a ProgressStart event.
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ProgressStartEventBody {
@@ -222,7 +222,7 @@ pub struct ProgressStartEventBody {
     pub percentage: Option<u8>,
 }
 
-//// Arguments for a ProgressUpdate event.
+/// Arguments for a ProgressUpdate event.
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ProgressUpdateEventBody {
@@ -236,7 +236,7 @@ pub struct ProgressUpdateEventBody {
     pub percentage: Option<usize>,
 }
 
-//// Arguments for a Stopped event.
+/// Arguments for a Stopped event.
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct StoppedEventBody {
@@ -275,7 +275,7 @@ pub struct StoppedEventBody {
     pub hit_breakpoint_ids: Option<Vec<usize>>,
 }
 
-//// Arguments for a Terminated event.
+/// Arguments for a Terminated event.
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TerminatedEventBody {
@@ -286,7 +286,7 @@ pub struct TerminatedEventBody {
     pub restart: Option<Value>,
 }
 
-//// Arguments for a Thread event.
+/// Arguments for a Thread event.
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ThreadEventBody {

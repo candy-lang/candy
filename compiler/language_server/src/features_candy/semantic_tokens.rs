@@ -5,7 +5,7 @@ use candy_frontend::{
     rcst_to_cst::RcstToCst,
 };
 use enumset::EnumSet;
-use lsp_types::{self, SemanticToken};
+use lsp_types::SemanticToken;
 
 use crate::semantic_tokens::{SemanticTokenType, SemanticTokensBuilder};
 
@@ -271,7 +271,8 @@ fn visit_cst(
                 visit_csts(builder, arguments, Some(SemanticTokenType::Parameter));
             } else {
                 let token_type = if let [single] = body.as_slice()
-                    && single.unwrap_whitespace_and_comment().kind.is_function() {
+                    && single.unwrap_whitespace_and_comment().kind.is_function()
+                {
                     SemanticTokenType::Function
                 } else {
                     SemanticTokenType::Variable

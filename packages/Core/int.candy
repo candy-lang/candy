@@ -14,6 +14,9 @@ negate value :=
   needs (is value)
   subtract 0 value
 multiply := builtins.intMultiply
+square value :=
+  needs (is value)
+  value | multiply value
 divideTruncating := builtins.intDivideTruncating
 remainder := builtins.intRemainder
 modulo := builtins.intModulo

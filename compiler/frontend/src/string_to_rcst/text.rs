@@ -22,7 +22,8 @@ pub fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
     let (mut opening_whitespace, mut parts) = if let Some(second_newline_index) = opening_whitespace
         .iter()
         .enumerate()
-        .filter_map(|(i, whitespace)| matches!(whitespace.kind, CstKind::Newline(_)).then(|| i))
+        .filter(|(_, whitespace)| matches!(whitespace.kind, CstKind::Newline(_)))
+        .map(|(i, _)| i)
         .nth(1)
     {
         let (first_whitespace, rest) = opening_whitespace.split_at(second_newline_index);
@@ -53,9 +54,8 @@ pub fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
             let mut whitespace_before_closing_quote = if let Some(last_newline_index) = whitespace
                 .iter()
                 .enumerate()
-                .filter_map(|(i, whitespace)| {
-                    matches!(whitespace.kind, CstKind::Newline(_)).then(|| i)
-                })
+                .filter(|(_, whitespace)| matches!(whitespace.kind, CstKind::Newline(_)))
+                .map(|(i, _)| i)
                 .next_back()
             {
                 let (whitespace, rest) = whitespace.split_at(last_newline_index);
@@ -72,42 +72,50 @@ pub fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
             } else {
                 (input, Vec::new())
             };
-            let closing_quote = if let Some((input_after_double_quote, closing_double_quote)) = double_quote(input_after_whitespace) && let Some((input_after_single_quotes, closing_single_quotes)) = parse_multiple(input_after_double_quote, single_quote, Some((opening_single_quotes.len(), false))) {
-                    input = input_after_single_quotes;
+            let closing_quote = if let Some((input_after_double_quote, closing_double_quote)) =
+                double_quote(input_after_whitespace)
+                && let Some((input_after_single_quotes, closing_single_quotes)) = parse_multiple(
+                    input_after_double_quote,
+                    single_quote,
+                    Some((opening_single_quotes.len(), false)),
+                ) {
+                input = input_after_single_quotes;
 
-                    whitespace_before_closing_quote = if let Some(last_newline_index) = whitespace
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(i, whitespace)| matches!(whitespace.kind, CstKind::Newline(_)).then(|| i))
-                        .next_back()
-                    {
-                        let (whitespace, rest) = whitespace.split_at(last_newline_index);
-                        let mut newlines = convert_whitespace_into_text_newlines(whitespace.to_vec());
-                        parts.append(&mut newlines);
-                        rest.to_vec()
-                    } else {
-                        let mut newlines = convert_whitespace_into_text_newlines(whitespace_before_closing_quote);
-                        parts.append(&mut newlines);
-                        whitespace
-                    };
-
-                    Some(CstKind::ClosingText {
-                        closing_double_quote: Box::new(closing_double_quote),
-                        closing_single_quotes,
-                    })
-                } else if !whitespace.is_empty() || newline(input).is_some() {
-                    Some(CstKind::Error {
-                        unparsable_input: String::new(),
-                        error: CstError::TextNotSufficientlyIndented,
-                    })
-                } else if input.is_empty() {
-                    Some(CstKind::Error {
-                        unparsable_input: String::new(),
-                        error: CstError::TextNotClosed,
-                    })
+                whitespace_before_closing_quote = if let Some(last_newline_index) = whitespace
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, whitespace)| matches!(whitespace.kind, CstKind::Newline(_)))
+                    .map(|(i, _)| i)
+                    .next_back()
+                {
+                    let (whitespace, rest) = whitespace.split_at(last_newline_index);
+                    let mut newlines = convert_whitespace_into_text_newlines(whitespace.to_vec());
+                    parts.append(&mut newlines);
+                    rest.to_vec()
                 } else {
-                    None
+                    let mut newlines =
+                        convert_whitespace_into_text_newlines(whitespace_before_closing_quote);
+                    parts.append(&mut newlines);
+                    whitespace
                 };
+
+                Some(CstKind::ClosingText {
+                    closing_double_quote: Box::new(closing_double_quote),
+                    closing_single_quotes,
+                })
+            } else if !whitespace.is_empty() || newline(input).is_some() {
+                Some(CstKind::Error {
+                    unparsable_input: String::new(),
+                    error: CstError::TextNotSufficientlyIndented,
+                })
+            } else if input.is_empty() {
+                Some(CstKind::Error {
+                    unparsable_input: String::new(),
+                    error: CstError::TextNotClosed,
+                })
+            } else {
+                None
+            };
 
             if let Some(closing_quote) = closing_quote {
                 if let Some(last) = parts.pop() {

@@ -118,13 +118,15 @@ impl<'a> ExistingWhitespace<'a> {
         edits: &mut TextEdits,
         other: &mut ExistingWhitespace<'a>,
     ) {
-        if let Some(whitespace) = self.whitespace.first() && whitespace.kind.is_whitespace() {
+        if let Some(whitespace) = self.whitespace.first()
+            && whitespace.kind.is_whitespace()
+        {
             let span = match &mut self.whitespace {
                 Cow::Borrowed(whitespace) => {
                     let (first, remaining) = whitespace.split_first().unwrap();
                     *whitespace = remaining;
                     first.data.span.clone()
-                },
+                }
                 Cow::Owned(whitespace) => whitespace.remove(0).data.span,
             };
             self.start_offset = span.end;
@@ -586,9 +588,8 @@ mod test {
         let mut csts = parse_rcst(source).to_csts();
         assert_eq!(csts.len(), 1);
 
-        let cst = match csts.pop().unwrap().kind {
-            CstKind::Call { receiver, .. } => receiver,
-            _ => panic!("Expected a call"),
+        let CstKind::Call { receiver: cst, .. } = csts.pop().unwrap().kind else {
+            panic!("Expected a call");
         };
         let reduced_source = cst.to_string();
 

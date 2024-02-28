@@ -205,7 +205,7 @@ impl DebugDisplay for HeapStruct {
                 izip!(hashes, keys, values)
                     .map(|(hash, key, value)| {
                         (
-                            format!("{:016X}", hash),
+                            format!("{hash:016X}"),
                             DebugDisplay::to_string(key, is_debug),
                             DebugDisplay::to_string(value, is_debug),
                         )

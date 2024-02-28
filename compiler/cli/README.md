@@ -5,9 +5,9 @@
 Create a [flamegraph](https://github.com/flamegraph-rs/flamegraph#readme):
 
 ```bash
-cargo flamegraph --bin=candy --deterministic --output=<output file name> -- run <candy file>
+CARGO_PROFILE_RELEASE_DEBUG=true cargo flamegraph --bin=candy --deterministic --output=<output file name> -- run <candy file>
 # For example:
-cargo flamegraph --bin=candy --deterministic --output=flamegraph.svg -- run packages/Examples/fibonacci.candy
+CARGO_PROFILE_RELEASE_DEBUG=true cargo flamegraph --bin=candy --deterministic --output=flamegraph.svg -- run packages/Examples/fibonacci.candy
 ```
 
 Use [hyperfine](https://github.com/sharkdp/hyperfine#readme):

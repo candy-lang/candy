@@ -372,7 +372,7 @@ impl Context<'_> {
                             AstKind::MatchCase(MatchCase { box pattern, body }) => {
                                 let (pattern, pattern_identifiers) = scope.lower_pattern(pattern);
 
-                                let (body, _) = scope.with_scope(None, |scope| {
+                                let (body, ()) = scope.with_scope(None, |scope| {
                                     for (name, (ast_id, identifier_id)) in
                                         pattern_identifiers.clone()
                                     {
@@ -392,7 +392,7 @@ impl Context<'_> {
                                     errors: errors.clone(),
                                 };
 
-                                let (body, _) = scope.with_scope(None, |scope| {
+                                let (body, ()) = scope.with_scope(None, |scope| {
                                     scope.compile(&[]);
                                 });
 
@@ -464,7 +464,7 @@ impl Context<'_> {
                     None,
                 );
                 let then_function_id = self.create_next_id(None, None);
-                let (then_body, _) = self.with_scope(then_function_id.clone(), |scope| {
+                let (then_body, ()) = self.with_scope(then_function_id.clone(), |scope| {
                     scope.push(None, Expression::Reference(hir.clone()), None);
                 });
                 let then_function = self.push_with_existing_id(
@@ -478,7 +478,7 @@ impl Context<'_> {
                 );
 
                 let else_function_id = self.create_next_id(None, None);
-                let (else_body, _) = self.with_scope(else_function_id.clone(), |scope| {
+                let (else_body, ()) = self.with_scope(else_function_id.clone(), |scope| {
                     scope.push(
                         None,
                         Expression::Call {

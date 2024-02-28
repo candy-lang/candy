@@ -284,17 +284,13 @@ impl RichIrBuilder {
     }
 
     pub fn push_definition(&mut self, key: impl Into<ReferenceKey>, range: Range<Offset>) {
-        self.ir
-            .references
-            .entry(key.into())
-            .or_insert_with(ReferenceCollection::default)
-            .definition = Some(range);
+        self.ir.references.entry(key.into()).or_default().definition = Some(range);
     }
     pub fn push_reference(&mut self, key: impl Into<ReferenceKey>, range: Range<Offset>) {
         self.ir
             .references
             .entry(key.into())
-            .or_insert_with(ReferenceCollection::default)
+            .or_default()
             .references
             .push(range);
     }

@@ -45,11 +45,8 @@ fn rcst(db: &dyn StringToRcst, module: Module) -> RcstResult {
     let source = db
         .get_module_content(module)
         .ok_or(ModuleError::DoesNotExist)?;
-    let source = match str::from_utf8(source.as_slice()) {
-        Ok(source) => source,
-        Err(_) => {
-            return Err(ModuleError::InvalidUtf8);
-        }
+    let Ok(source) = str::from_utf8(source.as_slice()) else {
+        return Err(ModuleError::InvalidUtf8);
     };
     Ok(Arc::new(parse_rcst(source)))
 }

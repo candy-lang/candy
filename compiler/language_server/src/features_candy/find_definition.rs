@@ -23,9 +23,8 @@ pub fn find_definition(db: &Database, module: Module, offset: Offset) -> Option<
     let origin_hir_id = db.cst_to_last_hir_id(module.clone(), origin_cst.data.id)?;
     let origin_expression = db.find_expression(origin_hir_id)?;
     debug!("Origin HIR: {origin_expression}");
-    let target_hir_id = match origin_expression {
-        Expression::Reference(id) => id,
-        _ => return None,
+    let Expression::Reference(target_hir_id) = origin_expression else {
+        return None;
     };
     let target_cst_id = db.hir_to_cst_id(&target_hir_id)?;
     let target_cst = db.find_cst(module.clone(), target_cst_id);

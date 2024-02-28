@@ -484,7 +484,7 @@ fn run_builtin(
                     other.clone()
                 }
                 (Expression::Text(text_a), Expression::Text(text_b)) => {
-                    Expression::Text(format!("{}{}", text_a, text_b))
+                    Expression::Text(format!("{text_a}{text_b}"))
                 }
                 _ => return None,
             }
@@ -564,7 +564,9 @@ fn run_builtin(
             } else {
                 None
             };
-            if let Some(end_exclusive) = end_exclusive && end_exclusive.is_zero() {
+            if let Some(end_exclusive) = end_exclusive
+                && end_exclusive.is_zero()
+            {
                 return Some("".into());
             }
 
@@ -581,10 +583,7 @@ fn run_builtin(
                 return Some("".into());
             }
 
-            let Some(end_exclusive) = end_exclusive else {
-                return None;
-            };
-            let end_exclusive = end_exclusive.to_usize().unwrap();
+            let end_exclusive = end_exclusive?.to_usize().unwrap();
 
             text.graphemes(true)
                 .skip(start_inclusive)
