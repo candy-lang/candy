@@ -136,7 +136,7 @@ pub struct Id {
     pub module: Module,
     pub keys: IdPath,
 }
-#[derive(Clone, Eq, From, Hash, Ord, PartialEq, PartialOrd, Debug)]
+#[derive(Clone, Eq, From, Hash, Ord, PartialEq, PartialOrd, Debug, Default)]
 pub struct IdPath(String);
 #[derive(Clone, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
 pub enum IdKey {
@@ -146,8 +146,6 @@ pub enum IdKey {
 impl IdPath {
     const fn empty() -> Self {
         Self(String::new())
-    }
-
     fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -214,10 +212,11 @@ impl Id {
     /// An ID that can be used to blame the tooling. For example, when calling
     /// the `main` function, we want to be able to blame the platform for
     /// passing a wrong environment.
-    const fn tooling(module: Module) -> Self {
+    fn tooling(module: Module) -> Self {
         Self {
             module,
             keys: IdPath::empty(),
+            keys: IdPath::default(),
         }
     }
     /// The user of the Candy tooling is responsible. For example, when the user
