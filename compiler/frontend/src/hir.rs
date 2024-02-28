@@ -330,7 +330,6 @@ impl Debug for IdKey {
                 disambiguator,
             } => {
                 write!(f, "{name}")?;
-                // TODO(Optimization): Only include the `#` in Debug output and not when formatting for the HirId path
                 if disambiguator > &0 {
                     write!(f, "#{disambiguator}")?;
                 }
