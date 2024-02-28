@@ -159,7 +159,7 @@ impl IdPath {
 
     #[must_use]
     pub fn last_as_string(&self) -> Option<&str> {
-        self.0.rfind(':').map(|i| &self.0[(i + ':'.len_utf8())..])
+        self.0.rsplit(':').next()
     }
 
     #[must_use]
@@ -174,7 +174,7 @@ impl From<IdKey> for IdPath {
 }
 impl From<Vec<IdKey>> for IdPath {
     fn from(value: Vec<IdKey>) -> Self {
-        Self(value.iter().map(|it| format!("{it}")).join(":"))
+        Self(value.iter().join(":"))
     }
 }
 impl Display for IdPath {
@@ -291,7 +291,7 @@ impl Id {
             .map(|it| {
                 let first_char = it.chars().next().unwrap();
                 if first_char.is_numeric() {
-                    return format!("<anonymous {}>", it);
+                    return format!("<anonymous {it}>");
                 }
                 let last_char = it.chars().last().unwrap();
                 if last_char.is_numeric() {
