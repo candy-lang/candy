@@ -158,7 +158,7 @@ impl IdPath {
     }
 
     #[must_use]
-    pub fn last_as_string(&self) -> Option<&str> {
+    pub fn last_as_str(&self) -> Option<&str> {
         self.0.rsplit(':').next()
     }
 

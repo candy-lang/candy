@@ -65,7 +65,7 @@ impl PausedState {
                             variables.extend(
                                 parameters
                                     .iter()
-                                    .map(|it| it.keys.last_as_string().unwrap())
+                                    .map(|it| it.keys.last_as_str().unwrap())
                                     .zip_eq(call.arguments.clone())
                                     .skip(start)
                                     .take(count)
