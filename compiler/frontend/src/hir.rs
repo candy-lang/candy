@@ -162,7 +162,8 @@ impl IdPath {
         self.0.rfind(':').map(|i| &self.0[(i + ':'.len_utf8())..])
     }
 
-    fn drop_last(&self) -> Option<Self> {
+    #[must_use]
+    fn parent(&self) -> Option<Self> {
         self.0.rfind(':').map(|i| Self(self.0[..i].to_string()))
     }
 }
@@ -259,7 +260,7 @@ impl Id {
 
     #[must_use]
     pub fn parent(&self) -> Option<Self> {
-        self.keys.drop_last().map(|keys| Self {
+        self.keys.parent().map(|keys| Self {
             module: self.module.clone(),
             keys,
         })
