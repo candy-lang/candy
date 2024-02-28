@@ -144,13 +144,12 @@ pub enum IdKey {
     Positional(usize),
 }
 impl IdPath {
-    const fn empty() -> Self {
-        Self(String::new())
     fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
-    fn push(&self, key: IdKey) -> Self {
+    #[must_use]
+    fn child(&self, key: IdKey) -> Self {
         if self.is_empty() {
             Self::from(key)
         } else {
@@ -215,7 +214,6 @@ impl Id {
     fn tooling(module: Module) -> Self {
         Self {
             module,
-            keys: IdPath::empty(),
             keys: IdPath::default(),
         }
     }
@@ -271,7 +269,7 @@ impl Id {
     pub fn child(&self, key: impl Into<IdKey>) -> Self {
         Self {
             module: self.module.clone(),
-            keys: self.keys.push(key.into()),
+            keys: self.keys.child(key.into()),
         }
     }
 
