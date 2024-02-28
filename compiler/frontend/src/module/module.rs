@@ -34,19 +34,6 @@ impl From<ModuleInner> for Module {
 }
 impl Module {
     #[must_use]
-    pub fn package(&self) -> &Package {
-        &self.0.package
-    }
-    #[must_use]
-    pub fn path(&self) -> &Vec<String> {
-        &self.0.path
-    }
-    #[must_use]
-    pub fn kind(&self) -> ModuleKind {
-        self.0.kind
-    }
-
-    #[must_use]
     pub fn new(package: Package, path: Vec<String>, kind: ModuleKind) -> Self {
         Self(Arc::new(ModuleInner {
             package,
@@ -119,6 +106,19 @@ impl Module {
             kind,
         }
         .into())
+    }
+
+    #[must_use]
+    pub fn package(&self) -> &Package {
+        &self.0.package
+    }
+    #[must_use]
+    pub fn path(&self) -> &Vec<String> {
+        &self.0.path
+    }
+    #[must_use]
+    pub fn kind(&self) -> ModuleKind {
+        self.0.kind
     }
 
     #[must_use]
