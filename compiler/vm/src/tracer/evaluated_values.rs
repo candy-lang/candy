@@ -25,7 +25,7 @@ impl EvaluatedValuesTracer {
 impl Tracer for EvaluatedValuesTracer {
     fn value_evaluated(&mut self, heap: &mut Heap, expression: HirId, value: InlineObject) {
         let id = expression.get();
-        if id.module.clone() != self.module {
+        if id.module != self.module {
             return;
         }
 
