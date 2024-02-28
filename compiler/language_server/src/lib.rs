@@ -1,7 +1,6 @@
 #![feature(
     anonymous_lifetime_in_impl_trait,
     async_closure,
-    arc_unwrap_or_clone,
     box_patterns,
     let_chains,
     strict_provenance

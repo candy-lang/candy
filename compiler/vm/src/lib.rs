@@ -2,7 +2,6 @@
     addr_parse_ascii,
     allocator_api,
     anonymous_lifetime_in_impl_trait,
-    arc_unwrap_or_clone,
     iterator_try_collect,
     let_chains,
     nonzero_ops,

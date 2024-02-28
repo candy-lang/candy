@@ -1,6 +1,5 @@
 #![feature(
     anonymous_lifetime_in_impl_trait,
-    arc_unwrap_or_clone,
     box_patterns,
     entry_insert,
     extract_if,
