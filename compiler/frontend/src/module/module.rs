@@ -15,7 +15,7 @@ use std::{
 use tracing::{error, warn};
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Module(Arc<InnerModule>);
+pub struct Module(Arc<ModuleInner>);
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct ModuleInner {
     package: Package,
@@ -27,8 +27,8 @@ pub enum ModuleKind {
     Code,
     Asset,
 }
-impl From<InnerModule> for Module {
-    fn from(val: InnerModule) -> Self {
+impl From<ModuleInner> for Module {
+    fn from(val: ModuleInner) -> Self {
         Self(Arc::new(val))
     }
 }
@@ -48,7 +48,7 @@ impl Module {
 
     #[must_use]
     pub fn new(package: Package, path: Vec<String>, kind: ModuleKind) -> Self {
-        Self(Arc::new(InnerModule {
+        Self(Arc::new(ModuleInner {
             package,
             path,
             kind,
@@ -57,7 +57,7 @@ impl Module {
 
     #[must_use]
     pub fn from_package_name(name: String) -> Self {
-        InnerModule {
+        ModuleInner {
             package: Package::Managed(name.into()),
             path: vec![],
             kind: ModuleKind::Code,
@@ -113,7 +113,7 @@ impl Module {
             }
         }
 
-        Ok(InnerModule {
+        Ok(ModuleInner {
             package,
             path,
             kind,
