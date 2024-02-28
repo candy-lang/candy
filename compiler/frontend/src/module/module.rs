@@ -17,7 +17,7 @@ use tracing::{error, warn};
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Module(Arc<InnerModule>);
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-struct InnerModule {
+struct ModuleInner {
     package: Package,
     path: Vec<String>,
     kind: ModuleKind,
