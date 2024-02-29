@@ -168,7 +168,7 @@ impl Context<'_> {
     fn optimize_body(&mut self, body: &mut Body) {
         // Even though `self.visible` is mutable, this function guarantees that
         // the value is the same after returning.
-        OptimizationLogger::log_optimize_body_start(&body);
+        OptimizationLogger::log_optimize_body_start(body);
         let mut index = 0;
         while index < body.expressions.len() {
             // Thoroughly optimize the expression.

@@ -16,7 +16,10 @@ use crate::{
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{fmt::{self, Display, Formatter}, sync::Arc};
+use std::{
+    fmt::{self, Display, Formatter},
+    sync::Arc,
+};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum ExecutionTarget {
@@ -36,8 +39,8 @@ impl ExecutionTarget {
 impl Display for ExecutionTarget {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Self::Module(module) => write!(f, "module `{}`", module),
-            Self::MainFunction(module) => write!(f, "main function of module `{}`", module),
+            Self::Module(module) => write!(f, "module `{module}`"),
+            Self::MainFunction(module) => write!(f, "main function of module `{module}`"),
         }
     }
 }
