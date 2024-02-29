@@ -1,0 +1,24 @@
+[graphicRenditions] = use "AnsiEscapeSequences"
+[bool, iterator, list] = use "Core"
+
+is style := style %
+  Clear | Bold | Dimmed | Italic | Underline | Blink | Reversed | Hidden | Strikethrough -> True
+  _ -> False
+isList styles := list.is styles | bool.lazyAnd { styles | iterator.fromList | iterator.all is }
+
+toForegroundGraphicRenditionText style :=
+  needs (is style)
+  style %
+    Clear -> graphicRenditions.reset
+    Bold -> graphicRenditions.bold
+    Dimmed -> graphicRenditions.faint
+    Italic -> graphicRenditions.italic
+    Underline -> graphicRenditions.underline
+    Blink -> graphicRenditions.slowBlink
+    Reversed -> graphicRenditions.reverseVideo
+    Hidden -> graphicRenditions.conceal
+    Strikethrough -> graphicRenditions.crossedOut
+listToForegroundGraphicRenditionText styles :=
+  needs (isList styles)
+  styles | iterator.fromList | iterator.map toForegroundGraphicRenditionText
+  | iterator.joinToTextWithSeparator ";"

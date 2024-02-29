@@ -1,0 +1,137 @@
+[Colors: [color8Bit], ControlSequences: [selectGraphicRendition], graphicRenditions] =
+  use
+    "AnsiEscapeSequences"
+[equals, function, int, iterator, text, toDebugText] = use "Core"
+
+## TODO(JonasWanke): Use normal space in text (instead of NBSP) when
+## https://github.com/candy-lang/candy/issues/896 is fixed.
+nbsp = " "
+
+showGraphicRendition graphicRenditionText content =
+  # n m	SGR	Sets colors and style of the characters following this code
+  needs (text.is graphicRenditionText)
+  needs (text.is content)
+  ## TODO(JonasWanke): Inline after text interpolation formatting is fixed
+  start = selectGraphicRendition graphicRenditionText
+  "{start}{content}{selectGraphicRendition graphicRenditions.reset}"
+
+showStyles stdout =
+  needs (function.is1 stdout)
+
+  stdout "# Styles"
+  stdout ""
+  stdout (showGraphicRendition graphicRenditions.reset "Reset")
+  stdout (showGraphicRendition graphicRenditions.bold "Bold")
+  stdout (showGraphicRendition graphicRenditions.faint "Faint")
+  stdout (showGraphicRendition graphicRenditions.italic "Italic")
+  stdout (showGraphicRendition graphicRenditions.underline "Underline")
+  stdout (showGraphicRendition graphicRenditions.slowBlink "Slow Blink")
+  stdout (showGraphicRendition graphicRenditions.rapidBlink "Rapid Blink")
+  stdout (showGraphicRendition graphicRenditions.reverseVideo "Reverse Video")
+  stdout (showGraphicRendition graphicRenditions.conceal "Conceal")
+  stdout (showGraphicRendition graphicRenditions.crossedOut "Crossed Out")
+  stdout (showGraphicRendition graphicRenditions.primaryFont "Primary Font")
+  stdout
+    iterator.range 9 | iterator.map { index -> index | int.add 1 } | iterator.map { number ->
+      showGraphicRendition (graphicRenditions.alternativeFont number) "Alternative Font {number}"
+    }
+    | iterator.joinToTextWithSeparator nbsp
+  stdout (showGraphicRendition graphicRenditions.fraktur "Fraktur")
+  stdout (showGraphicRendition graphicRenditions.doublyUnderlined "Doubly Underlined")
+  stdout (showGraphicRendition graphicRenditions.normalIntensity "Normal Intensity")
+  stdout
+    showGraphicRendition
+      graphicRenditions.neitherItalicNorBlackletter
+      "Neither Italic Nor Blackletter"
+  stdout (showGraphicRendition graphicRenditions.notUnderlined "Not Underlined")
+  stdout (showGraphicRendition graphicRenditions.notBlinking "Not Blinking")
+  stdout (showGraphicRendition graphicRenditions.proportionalSpacing "Proportional Spacing")
+  stdout (showGraphicRendition graphicRenditions.notReversed "Not Reversed")
+  stdout (showGraphicRendition graphicRenditions.reveal "Reveal")
+  stdout (showGraphicRendition graphicRenditions.notCrossedOut "Not Crossed Out")
+  stdout (showGraphicRendition graphicRenditions.defaultBackgroundColor "Default Background Color")
+  stdout
+    showGraphicRendition graphicRenditions.disableProportionalSpacing "Disable Proportional Spacing"
+  stdout (showGraphicRendition graphicRenditions.framed "Framed")
+  stdout (showGraphicRendition graphicRenditions.encircled "Encircled")
+  stdout (showGraphicRendition graphicRenditions.overlined "Overlined")
+  stdout
+    showGraphicRendition graphicRenditions.neitherFramedNorEncircled "Neither Framed Nor Encircled"
+  stdout (showGraphicRendition graphicRenditions.notOverlined "Not Overlined")
+
+coloredLine offset length graphicRenditionFunction contentGetter separator =
+  needs (int.is offset)
+  needs (int.isNonNegative offset)
+  needs (int.is length)
+  needs (int.isPositive length)
+  needs (function.is1 graphicRenditionFunction)
+  needs (function.is1 contentGetter)
+  needs (text.is separator)
+  iterator.range length | iterator.map { color -> color | int.add offset }
+  | iterator.map { color -> showGraphicRendition (graphicRenditionFunction color) (contentGetter color)
+  }
+  | iterator.joinToTextWithSeparator separator
+
+showColors3Or4Bit stdout =
+  needs (function.is1 stdout)
+
+  line graphicRenditionFunction content =
+    needs (function.is1 graphicRenditionFunction)
+    needs (text.is content)
+    coloredLine 0 8 graphicRenditionFunction { color -> content } nbsp
+  columnHeaders = iterator.range 8 | iterator.map { color -> "{nbsp}{color} " }
+    | iterator.joinToTextWithSeparator nbsp
+
+  stdout "# Colors: 3 and 4 Bit"
+  stdout ""
+  stdout "Foreground {columnHeaders}"
+  stdout "Normal:    {line graphicRenditions.setForegroundColor3Or4Bit "▓▓▓"}"
+  stdout "Bright:    {line graphicRenditions.setBrightForegroundColor3Or4Bit "▓▓▓"}"
+  stdout ""
+  stdout "Background {columnHeaders}"
+  stdout "Normal:    {line graphicRenditions.setBackgroundColor3Or4Bit "{nbsp}  "}"
+  stdout "Bright:    {line graphicRenditions.setBrightBackgroundColor3Or4Bit "{nbsp}  "}"
+
+showColors8Bit stdout =
+  needs (function.is1 stdout)
+
+  line offset length colorFunction width padCharacter =
+    needs (int.is offset)
+    needs (int.isNonNegative offset)
+    needs (int.is length)
+    needs (int.isPositive length)
+    needs (function.is1 colorFunction)
+    needs (int.is width)
+    needs (int.isPositive width)
+    needs (text.is padCharacter)
+    needs (padCharacter | text.length | equals 1)
+    coloredLine
+      offset
+      length
+      { color -> colorFunction (color8Bit color) }
+      { color -> color | toDebugText | text.padStart width padCharacter }
+      ""
+
+  block colorFunction padCharacter =
+    needs (function.is1 colorFunction)
+    needs (text.is padCharacter)
+    needs (padCharacter | text.length | equals 1)
+    stdout (line 0 16 colorFunction 9 padCharacter)
+    iterator.range 6
+    | iterator.forEach { row -> stdout (line (16 | int.add (row | int.multiply 36)) 36 colorFunction 4 padCharacter)
+    }
+    stdout (line 232 24 colorFunction 6 padCharacter)
+
+  stdout "# Colors: 8 Bit"
+  stdout ""
+  block graphicRenditions.setForegroundColor8Or24Bit "▓"
+  stdout ""
+  block graphicRenditions.setBackgroundColor8Or24Bit nbsp
+
+main := { environment ->
+  showStyles environment.stdout
+  environment.stdout ""
+  showColors3Or4Bit environment.stdout
+  environment.stdout ""
+  showColors8Bit environment.stdout
+}
