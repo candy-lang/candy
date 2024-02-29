@@ -6,9 +6,18 @@
       "type": "extensionHost",
       "request": "launch",
       "runtimeExecutable": "${execPath}",
-      "args": ["--extensionDevelopmentPath=${workspaceFolder}", "${workspaceFolder}/../packages/candy.code-workspace"],
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "${workspaceFolder}/../packages/candy.code-workspace"
+      ],
       "outFiles": ["${workspaceFolder}/out/**/*.js"],
       "preLaunchTask": "${defaultBuildTask}"
+    },
+    {
+      "name": "Debug Running Extension",
+      "type": "lldb",
+      "request": "attach",
+      "program": "../../target/release/candy"
     }
   ]
 }
