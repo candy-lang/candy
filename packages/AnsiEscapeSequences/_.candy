@@ -3,4 +3,3 @@
 colors := use ".colors"
 controlSequences := use ".controlSequences"
 graphicRenditions := use ".graphicRenditions"
-[escapeCode] := use ".escapeCode"

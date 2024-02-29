@@ -1,3 +1,0 @@
-[text] = use "Core"
-
-escapeCode := text.charFromAsciiCode 27
