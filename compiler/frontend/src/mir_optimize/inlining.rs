@@ -45,6 +45,8 @@ use crate::{
 };
 use rustc_hash::FxHashMap;
 
+const NAME: &str = "Inlining";
+
 pub fn inline_tiny_functions(context: &mut Context, expression: &mut CurrentExpression) {
     inline_functions_of_maximum_complexity(
         context,
@@ -155,6 +157,7 @@ impl Context<'_> {
             .collect();
 
         expression.replace_with_multiple(
+            NAME,
             body.iter().map(|(id, expression)| {
                 let mut expression = expression.clone();
                 expression.replace_ids(&mut |id| {

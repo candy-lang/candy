@@ -50,6 +50,8 @@ use std::{
 use tracing::warn;
 use unicode_segmentation::UnicodeSegmentation;
 
+const NAME: &str = "Constant Folding";
+
 pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression) {
     let Expression::Call {
         function,
@@ -66,6 +68,7 @@ pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression)
             value: None,
         } if arguments.len() == 1 => {
             expression.replace_with(
+                NAME,
                 Expression::Tag {
                     symbol: symbol.clone(),
                     value: Some(arguments[0]),
@@ -87,7 +90,7 @@ pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression)
             ) else {
                 return;
             };
-            expression.replace_with(result, context.pureness);
+            expression.replace_with(NAME, result, context.pureness);
         }
         _ => {}
     }
@@ -276,6 +279,10 @@ fn run_builtin(
                 unreachable!()
             };
             match (visible.get(*factor_a), visible.get(*factor_b)) {
+                // factor * 0 = 0 * factor = 0
+                (Expression::Int(factor), _) | (_, Expression::Int(factor)) if factor.is_zero() => {
+                    0.into()
+                }
                 // 1 * factor_b = factor_b
                 (Expression::Int(factor_a), _) if factor_a.is_one() => {
                     Expression::Reference(*factor_b)
@@ -299,7 +306,7 @@ fn run_builtin(
                 Err(err) => Err(body.push_with_new_id(id_generator, err.to_string())),
             };
             body.push_with_new_id(id_generator, result);
-            expression.replace_with_multiple(body, pureness);
+            expression.replace_with_multiple(NAME, body, pureness);
             return None;
         }
         BuiltinFunction::IntRemainder => {
@@ -523,7 +530,7 @@ fn run_builtin(
                 .map(|it| body.push_with_new_id(id_generator, it))
                 .collect_vec();
             body.push_with_new_id(id_generator, characters);
-            expression.replace_with_multiple(body, pureness);
+            expression.replace_with_multiple(NAME, body, pureness);
             return None;
         }
         BuiltinFunction::TextConcatenate => {
@@ -594,7 +601,7 @@ fn run_builtin(
                 .map(|it| body.push_with_new_id(id_generator, it))
                 .map_err(|_| body.push_with_new_id(id_generator, "Invalid UTF-8."));
             body.push_with_new_id(id_generator, result);
-            expression.replace_with_multiple(body, pureness);
+            expression.replace_with_multiple(NAME, body, pureness);
             return None;
         }
         BuiltinFunction::TextGetRange => {
