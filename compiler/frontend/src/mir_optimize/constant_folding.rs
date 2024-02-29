@@ -279,6 +279,10 @@ fn run_builtin(
                 unreachable!()
             };
             match (visible.get(*factor_a), visible.get(*factor_b)) {
+                // factor * 0 = 0 * factor = 0
+                (Expression::Int(factor), _) | (_, Expression::Int(factor)) if factor.is_zero() => {
+                    0.into()
+                }
                 // 1 * factor_b = factor_b
                 (Expression::Int(factor_a), _) if factor_a.is_one() => {
                     Expression::Reference(*factor_b)
