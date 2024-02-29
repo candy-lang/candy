@@ -17,7 +17,7 @@ pub impl PopulateInMemoryProviderFromFileSystem for InMemoryModuleProvider {
         let package_path = packages_path.join(package_name.clone());
         let package = Package::Managed(package_name.into());
 
-        for file in WalkDir::new(&package_path)
+        for file in WalkDir::new(package_path)
             .into_iter()
             .map(Result::unwrap)
             .filter(|it| it.file_type().is_file())
@@ -39,9 +39,9 @@ pub impl PopulateInMemoryProviderFromFileSystem for InMemoryModuleProvider {
 pub trait DebugDisplay: Debug + Display {
     fn to_string(&self, is_debug: bool) -> String {
         if is_debug {
-            format!("{:?}", self)
+            format!("{self:?}")
         } else {
-            format!("{}", self)
+            format!("{self}")
         }
     }
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result;

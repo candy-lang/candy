@@ -161,7 +161,7 @@ impl Id {
     }
     /// The user of the Candy tooling is responsible. For example, when the user
     /// instructs the tooling to run a non-existent module, then the program
-    /// will panic with this responsiblity.
+    /// will panic with this responsibility.
     #[must_use]
     pub fn user() -> Self {
         Self::tooling("user".to_string())
@@ -401,8 +401,7 @@ impl Pattern {
             Self::Int(_) | Self::Text(_) => false,
             Self::Tag { value, .. } => value
                 .as_ref()
-                .map(|value| value.contains_captured_identifiers())
-                .unwrap_or_default(),
+                .is_some_and(|value| value.contains_captured_identifiers()),
             Self::List(list) => list.iter().any(Self::contains_captured_identifiers),
             Self::Struct(struct_) => struct_
                 .iter()
@@ -550,8 +549,7 @@ impl ToRichIr for Expression {
                 int.build_rich_ir(builder);
             }
             Self::Text(text) => {
-                let range =
-                    builder.push(format!(r#""{}""#, text), TokenType::Text, EnumSet::empty());
+                let range = builder.push(format!(r#""{text}""#), TokenType::Text, EnumSet::empty());
                 builder.push_reference(text.clone(), range);
             }
             Self::Reference(reference) => {

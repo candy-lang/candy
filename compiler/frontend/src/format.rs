@@ -195,7 +195,7 @@ pub fn format_value<'a, T: 'a + Copy>(
                 }
             }
 
-            let summary = format!("(list of {} items)", list_len);
+            let summary = format!("(list of {list_len} items)");
             if max_length.fits(summary.len()) {
                 summary
             } else {
@@ -250,7 +250,7 @@ pub fn format_value<'a, T: 'a + Copy>(
                     }
                 }
 
-                let summary = format!("[struct with {} entries]", num_entries);
+                let summary = format!("[struct with {num_entries} entries]");
                 return Some(if max_length.fits(summary.len()) {
                     summary
                 } else {

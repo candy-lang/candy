@@ -12,6 +12,6 @@ members = [
     "compiler/vm/fuzz",
 ]
 
-[profile.release]
-# https://github.com/flamegraph-rs/flamegraph#usage-with-benchmarks
-debug = true
+[workspace.package]
+edition = "2021"
+rust-version = "1.78.0"

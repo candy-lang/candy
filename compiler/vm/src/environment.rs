@@ -265,9 +265,7 @@ impl DefaultEnvironment {
             Err(result) => return result,
         };
 
-        let file = if let Some(file) = file {
-            file
-        } else {
+        let Some(file) = file else {
             // TODO: Panic
             let message = Text::create(
                 heap,
@@ -298,9 +296,7 @@ impl DefaultEnvironment {
             Err(result) => return result,
         };
 
-        let file = if let Some(file) = mem::take(file) {
-            file
-        } else {
+        let Some(file) = mem::take(file) else {
             // TODO: Panic
             let message = Text::create(
                 heap,
@@ -323,12 +319,16 @@ impl DefaultEnvironment {
         file: InlineObject,
     ) -> Result<&mut Option<File>, InlineObject> {
         if let Data::Handle(handle) = Data::from(file)
-            && let Some(DynamicHandle::File(file)) = self.dynamic_handles.get_mut(&handle) {
-                Ok(file)
-         } else {
+            && let Some(DynamicHandle::File(file)) = self.dynamic_handles.get_mut(&handle)
+        {
+            Ok(file)
+        } else {
             // TODO: Panic
-            let message =
-                Text::create(heap, true, &format!("Handle `{handle_name}` was called with a non-file."),);
+            let message = Text::create(
+                heap,
+                true,
+                &format!("Handle `{handle_name}` was called with a non-file."),
+            );
             Err(Tag::create_result(heap, true, Err(message.into())).into())
         }
     }

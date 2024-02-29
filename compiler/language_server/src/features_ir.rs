@@ -672,8 +672,7 @@ impl OpenIr {
             value
                 .definition
                 .as_ref()
-                .map(|it| it.contains(&offset))
-                .unwrap_or_default()
+                .is_some_and(|it| it.contains(&offset))
                 || value.references.iter().any(|it| it.contains(&offset))
         })
     }

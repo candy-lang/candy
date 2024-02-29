@@ -1,7 +1,7 @@
 use crate::database::Database;
 use async_trait::async_trait;
 use lsp_types::{
-    self, FoldingRange, LocationLink, SemanticToken, TextDocumentContentChangeEvent, TextEdit, Url,
+    FoldingRange, LocationLink, SemanticToken, TextDocumentContentChangeEvent, TextEdit, Url,
 };
 use rustc_hash::FxHashMap;
 use std::collections::HashMap;

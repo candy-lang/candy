@@ -114,7 +114,7 @@ impl Int {
             .map_err(|_| ())
             .and_then(InlineInt::try_from)
             .map_or_else(
-                |_| HeapInt::create(heap, is_reference_counted, value.into()).into(),
+                |()| HeapInt::create(heap, is_reference_counted, value.into()).into(),
                 Into::into,
             )
     }
@@ -124,7 +124,7 @@ impl Int {
             .map_err(|_| ())
             .and_then(InlineInt::try_from)
             .map_or_else(
-                |_| HeapInt::create(heap, is_reference_counted, value).into(),
+                |()| HeapInt::create(heap, is_reference_counted, value).into(),
                 Into::into,
             )
     }
@@ -291,7 +291,7 @@ impl Ord for Int {
         }
     }
 }
-#[allow(clippy::incorrect_partial_ord_impl_on_ord_type)]
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for Int {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(Ord::cmp(self, other))

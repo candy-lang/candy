@@ -49,20 +49,20 @@ pub fn format_collection<'a>(
             let is_comma_required =
                 is_comma_required_due_to_single_item || !is_last_item || item.has_comments();
             let info = if !is_comma_required && let Width::Singleline(min_width) = min_width {
-                    // We're looking at the last item and everything might fit in one line.
-                    let max_width = Width::MAX - min_width;
-                    assert!(!max_width.is_empty());
+                // We're looking at the last item and everything might fit in one line.
+                let max_width = Width::MAX - min_width;
+                assert!(!max_width.is_empty());
 
-                    item_info.with_trailing_comma_condition(
-                        TrailingCommaCondition::UnlessFitsIn(max_width),
-                    )
-                } else {
-                    item_info.clone()
-                };
+                item_info
+                    .with_trailing_comma_condition(TrailingCommaCondition::UnlessFitsIn(max_width))
+            } else {
+                item_info.clone()
+            };
             let item = format_cst(edits, previous_width_for_items, item, &info);
 
             if let Width::Singleline(old_min_width) = min_width
-                    && let Width::Singleline(item_min_width) = item.min_width(info.indentation) {
+                && let Width::Singleline(item_min_width) = item.min_width(info.indentation)
+            {
                 let (item_min_width, max_width) = if is_last_item {
                     (item_min_width, Width::MAX)
                 } else {

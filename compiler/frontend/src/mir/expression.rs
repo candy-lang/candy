@@ -341,8 +341,7 @@ impl ToRichIr for Expression {
                 int.build_rich_ir(builder);
             }
             Self::Text(text) => {
-                let range =
-                    builder.push(format!(r#""{}""#, text), TokenType::Text, EnumSet::empty());
+                let range = builder.push(format!(r#""{text}""#), TokenType::Text, EnumSet::empty());
                 builder.push_reference(text.clone(), range);
             }
             Self::Tag { symbol, value } => {

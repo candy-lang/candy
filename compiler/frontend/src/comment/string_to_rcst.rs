@@ -107,7 +107,9 @@ mod parse {
 
     #[instrument]
     fn newline(input: Vec<&str>) -> Option<(Vec<&str>, Rcst)> {
-        if let ["", remaining @ ..] = input.as_slice() && !remaining.is_empty() {
+        if let ["", remaining @ ..] = input.as_slice()
+            && !remaining.is_empty()
+        {
             Some((remaining.to_vec(), Rcst::Newline))
         } else {
             None
@@ -666,7 +668,8 @@ mod parse {
         let mut formatting_state = vec![];
 
         if let Some((line, remaining)) = input.split_first()
-                && let Some((title_line, new_formatting_state)) = title_line(line, formatting_state) {
+            && let Some((title_line, new_formatting_state)) = title_line(line, formatting_state)
+        {
             input = recombine("", remaining);
             title_lines.push(title_line);
             formatting_state = new_formatting_state;
@@ -680,7 +683,9 @@ mod parse {
             };
 
             if let Some((line, remaining)) = new_input.split_first()
-                    && let Some((new_title_line, new_formatting_state)) = title_line(line, formatting_state) {
+                && let Some((new_title_line, new_formatting_state)) =
+                    title_line(line, formatting_state)
+            {
                 input = recombine("", remaining);
                 let previous_line = title_lines.pop().unwrap();
                 title_lines.push(previous_line.wrap_in_whitespace(whitespace));
@@ -1073,7 +1078,7 @@ mod parse {
             false
         };
 
-        let extra_indentation = format!("{}", number).len() + 1 + usize::from(has_trailing_space);
+        let extra_indentation = format!("{number}").len() + 1 + usize::from(has_trailing_space);
 
         Some((
             line,
@@ -1090,20 +1095,22 @@ mod parse {
         mut indentation: usize,
         list_type: Option<ListType>,
     ) -> Option<(Vec<&str>, Rcst, ListType)> {
-        let Some((line, remaining)) = input.split_first() else {
-            return None;
-        };
+        let (line, remaining) = input.split_first()?;
         let allows_unordered = list_type.map_or(true, |it| it == ListType::Unordered);
         let allows_ordered = list_type.map_or(true, |it| it == ListType::Ordered);
         // TODO: move the `allow_…` before the match checks when Rust's MIR no longer breaks
-        let ((line, marker, extra_indentation), list_type) =
-            if let Some(marker) = unordered_list_item_marker(line) && allows_unordered  {
-                (marker, ListType::Unordered)
-            } else if let Some(marker) = ordered_list_item_marker(line) && allows_ordered  {
-                (marker, ListType::Ordered)
-            } else {
-                return None;
-            };
+        let ((line, marker, extra_indentation), list_type) = if let Some(marker) =
+            unordered_list_item_marker(line)
+            && allows_unordered
+        {
+            (marker, ListType::Unordered)
+        } else if let Some(marker) = ordered_list_item_marker(line)
+            && allows_ordered
+        {
+            (marker, ListType::Ordered)
+        } else {
+            return None;
+        };
         input = recombine(line, remaining);
         indentation += extra_indentation;
 
@@ -1114,9 +1121,7 @@ mod parse {
     fn list(input: Vec<&str>, indentation: usize) -> Option<(Vec<&str>, Rcst)> {
         let mut list_items = vec![];
 
-        let Some((mut input, first_item, list_type)) = list_item(input, indentation, None) else {
-            return None;
-        };
+        let (mut input, first_item, list_type) = list_item(input, indentation, None)?;
         list_items.push(first_item);
 
         loop {

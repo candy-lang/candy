@@ -126,15 +126,15 @@ pub fn whitespaces_and_newlines(
         let new_input_from_iteration_start = new_input;
 
         if also_comments
-                && is_sufficiently_indented
-                && let Some((new_new_input, whitespace)) = comment(new_input)
-            {
-                new_input = new_new_input;
-                new_parts.push(whitespace);
+            && is_sufficiently_indented
+            && let Some((new_new_input, whitespace)) = comment(new_input)
+        {
+            new_input = new_new_input;
+            new_parts.push(whitespace);
 
-                input = new_input;
-                parts.append(&mut new_parts);
-            }
+            input = new_input;
+            parts.append(&mut new_parts);
+        }
 
         if let Some((new_new_input, newline)) = newline(new_input) {
             new_input = new_new_input;

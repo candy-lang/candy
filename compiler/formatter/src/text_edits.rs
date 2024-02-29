@@ -50,8 +50,7 @@ impl TextEdits {
                 self.edits
                     .get(index)
                     // An edit contains this position.
-                    .map(|it| it.range.contains(&offset))
-                    .unwrap_or_default()
+                    .is_some_and(|it| it.range.contains(&offset))
             })
     }
 

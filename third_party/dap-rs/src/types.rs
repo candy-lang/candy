@@ -1,3 +1,5 @@
+#![allow(clippy::to_string_trait_impl)]
+
 use std::convert::Infallible;
 use std::str::FromStr;
 
