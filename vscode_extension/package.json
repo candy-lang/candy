@@ -242,7 +242,7 @@
   },
   "dependencies": {
     "@vscode/debugadapter": "^1.64.0",
-    "vscode-languageclient": "^8.1.0"
+    "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
     "@types/glob": "^8.1.0",
