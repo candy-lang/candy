@@ -186,7 +186,13 @@ jobs:
             jq '.packages[] | select(.name == "iai-callgrind").version' | \
             tr -d '"'
           )
-          cargo install iai-callgrind-runner --version $version
+          # TODO(JonasWanke): Can we avoid the `--force`? Cargo should support
+          # installing it without the flag [0], but it currently fails [1].
+          # Maybe the cache is missing some files? [2]
+          # [0]: https://github.com/rust-lang/cargo/issues/6727
+          # [1]: https://github.com/candy-lang/candy/actions/runs/8103066154/job/22146912428?pr=929#step:9:59
+          # [2]: https://users.rust-lang.org/t/get-cargo-install-to-fail-silently-if-the-binary-already-exists/99507/2
+          cargo install iai-callgrind-runner --version $version --force
 
       - name: Install Bencher CLI
         uses: bencherdev/bencher@v0.4.2
