@@ -1,4 +1,5 @@
-use crate::mir::Id;
+use super::complexity::Complexity;
+use crate::{hir_to_mir::ExecutionTarget, mir::Id, rich_ir::RichIrBuilder, tracing::TracingConfig};
 use std::{
     env,
     fs::File,
@@ -17,6 +18,34 @@ impl OptimizationLogger {
     // We specify Python for code blocks to get some syntax highlighting of
     // comments and expressions.
 
+    pub fn log_optimized_mir_without_tail_calls_start(
+        target: &ExecutionTarget,
+        tracing: TracingConfig,
+    ) {
+        Self::run(|logger| {
+            logger.write_line(&format!("1. `optimized_mir_without_tail_calls(…)`",));
+            logger.indent();
+            logger.write_newline();
+            logger.write_line(&format!("Execution target: {target}"));
+            logger.write_newline();
+            logger.write_line("```python");
+            let mut builder = RichIrBuilder::default();
+            builder.push_tracing_config(tracing);
+            let tracing = builder.finish(false).text;
+            logger.write_lines(&tracing);
+            logger.write_line("```");
+        });
+    }
+    pub fn log_optimized_mir_without_tail_calls_end(
+        complexity_before: Complexity,
+        complexity_after: Complexity,
+    ) {
+        Self::run(|logger| {
+            logger.dedent();
+            logger.write_line(&format!("Complexity before: {complexity_before}"));
+            logger.write_line(&format!("Complexity after: {complexity_after}"));
+        });
+    }
     pub fn log_replace_id_references(optimization_name: &str, id: Id) {
         Self::run(|logger| {
             logger.write_line(&format!(

@@ -44,6 +44,7 @@
 
 use self::{
     current_expression::{Context, CurrentExpression},
+    log::OptimizationLogger,
     pure::PurenessInsights,
 };
 use super::{hir, hir_to_mir::HirToMir, mir::Mir, tracing::TracingConfig};
@@ -121,6 +122,7 @@ fn optimized_mir_without_tail_calls(
 ) -> OptimizedMirWithoutTailCallsResult {
     let module = target.module();
     debug!("{module}: Compiling.");
+    OptimizationLogger::log_optimized_mir_without_tail_calls_start(&target, tracing);
     let (mir, errors) = db.mir(target.clone(), tracing)?;
     let mut mir = (*mir).clone();
     let mut pureness = PurenessInsights::default();
@@ -131,6 +133,10 @@ fn optimized_mir_without_tail_calls(
     let complexity_after = mir.complexity();
 
     debug!("{module}: Done. Optimized from {complexity_before} to {complexity_after}");
+    OptimizationLogger::log_optimized_mir_without_tail_calls_end(
+        complexity_before,
+        complexity_after,
+    );
     Ok((Arc::new(mir), Arc::new(pureness), Arc::new(errors)))
 }
 
