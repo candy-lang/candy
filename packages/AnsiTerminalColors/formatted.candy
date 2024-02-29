@@ -1,0 +1,61 @@
+[ControlSequences: [selectGraphicRendition], graphicRenditions] = use "AnsiEscapeSequences"
+[bool, ifElse, iterator, list, text] = use "Core"
+col = use "..color"
+style = use "..style"
+
+isOptionalColor optionalColor := optionalColor %
+  Color c -> col.is c
+  Inherit -> True
+  _ -> False
+
+is formatted := formatted %
+  Formatted [content, foregroundColor, backgroundColor, styles] ->
+    text.is content | bool.lazyAnd { isOptionalColor foregroundColor }
+    | bool.lazyAnd { isOptionalColor backgroundColor }
+    | bool.lazyAnd { style.isList styles }
+  _ -> False
+isTextOrFormatted textOrFormatted := text.is textOrFormatted | bool.lazyOr { is textOrFormatted }
+
+fromText t :=
+  needs (text.is t)
+  Formatted [Content: t, ForegroundColor: Inherit, BackgroundColor: Inherit, Styles: (,)]
+from textOrFormatted :=
+  needs (isTextOrFormatted textOrFormatted)
+  ifElse (text.is textOrFormatted) { fromText textOrFormatted } { textOrFormatted }
+
+color textOrFormatted foregroundColor :=
+  needs (isTextOrFormatted textOrFormatted)
+  needs (col.is foregroundColor)
+  Formatted [content, backgroundColor, styles] = from textOrFormatted
+  Formatted [content, ForegroundColor: Color foregroundColor, backgroundColor, styles]
+onColor textOrFormatted backgroundColor :=
+  needs (isTextOrFormatted textOrFormatted)
+  needs (col.is backgroundColor)
+  Formatted [content, foregroundColor, styles] = from textOrFormatted
+  Formatted [content, foregroundColor, BackgroundColor: Color backgroundColor, styles]
+styles textOrFormatted styles :=
+  needs (isTextOrFormatted textOrFormatted)
+  needs (style.isList styles)
+  Formatted [content, foregroundColor, backgroundColor] = from textOrFormatted
+  Formatted [content, foregroundColor, backgroundColor, styles]
+
+format textOrFormatted :=
+  needs (isTextOrFormatted textOrFormatted)
+  Formatted [content, foregroundColor, backgroundColor, styles] = from textOrFormatted
+
+  renditions = (,)
+  renditions = foregroundColor %
+    Color c -> renditions | list.append (c | col.toForegroundGraphicRenditionText)
+    Inherit -> renditions
+  renditions = backgroundColor %
+    Color c -> renditions | list.append (c | col.toBackgroundGraphicRenditionText)
+    Inherit -> renditions
+  renditions = styles %
+    (,) -> renditions
+    _ -> renditions | list.append (style.listToForegroundGraphicRenditionText styles)
+
+  start =
+    selectGraphicRendition
+      renditions | iterator.fromList | iterator.joinToTextWithSeparator ";"
+  reset = selectGraphicRendition graphicRenditions.reset
+  "{start}{content}{reset}"

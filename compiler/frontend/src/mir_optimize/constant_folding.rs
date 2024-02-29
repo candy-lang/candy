@@ -41,7 +41,7 @@ use crate::{
 use itertools::Itertools;
 use num_bigint::BigInt;
 use num_integer::Integer;
-use num_traits::{ToPrimitive, Zero};
+use num_traits::{One, ToPrimitive, Zero};
 use std::{
     borrow::Cow,
     cmp::Ordering,
@@ -49,6 +49,8 @@ use std::{
 };
 use tracing::warn;
 use unicode_segmentation::UnicodeSegmentation;
+
+const NAME: &str = "Constant Folding";
 
 pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression) {
     let Expression::Call {
@@ -66,6 +68,7 @@ pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression)
             value: None,
         } if arguments.len() == 1 => {
             expression.replace_with(
+                NAME,
                 Expression::Tag {
                     symbol: symbol.clone(),
                     value: Some(arguments[0]),
@@ -87,7 +90,7 @@ pub fn fold_constants(context: &mut Context, expression: &mut CurrentExpression)
             ) else {
                 return;
             };
-            expression.replace_with(result, context.pureness);
+            expression.replace_with(NAME, result, context.pureness);
         }
         _ => {}
     }
@@ -171,9 +174,14 @@ fn run_builtin(
         }
         BuiltinFunction::IntAdd => {
             let [a, b] = arguments else { unreachable!() };
-            let a: &BigInt = visible.get(*a).try_into().ok()?;
-            let b: &BigInt = visible.get(*b).try_into().ok()?;
-            (a + b).into()
+            match (visible.get(*a), visible.get(*b)) {
+                // 0 + b = b
+                (Expression::Int(a), _) if a.is_zero() => Expression::Reference(*b),
+                // a + 0 = a
+                (_, Expression::Int(b)) if b.is_zero() => Expression::Reference(*a),
+                (Expression::Int(a), Expression::Int(b)) => (a + b).into(),
+                _ => return None,
+            }
         }
         BuiltinFunction::IntBitLength => {
             let [a] = arguments else { unreachable!() };
@@ -186,9 +194,14 @@ fn run_builtin(
                 return Some(Expression::Reference(*a));
             }
 
-            let a: &BigInt = visible.get(*a).try_into().ok()?;
-            let b: &BigInt = visible.get(*b).try_into().ok()?;
-            (a & b).into()
+            match (visible.get(*a), visible.get(*b)) {
+                // 0 & b = a & 0 = 0
+                (Expression::Int(zero), _) | (_, Expression::Int(zero)) if zero.is_zero() => {
+                    0.into()
+                }
+                (Expression::Int(a), Expression::Int(b)) => (a & b).into(),
+                _ => return None,
+            }
         }
         BuiltinFunction::IntBitwiseOr => {
             let [a, b] = arguments else { unreachable!() };
@@ -196,9 +209,14 @@ fn run_builtin(
                 return Some(Expression::Reference(*a));
             }
 
-            let a: &BigInt = visible.get(*a).try_into().ok()?;
-            let b: &BigInt = visible.get(*b).try_into().ok()?;
-            (a | b).into()
+            match (visible.get(*a), visible.get(*b)) {
+                // 0 | b = b
+                (Expression::Int(a), _) if a.is_zero() => Expression::Reference(*b),
+                // a | 0 = a
+                (_, Expression::Int(b)) if b.is_zero() => Expression::Reference(*a),
+                (Expression::Int(a), Expression::Int(b)) => (a | b).into(),
+                _ => return None,
+            }
         }
         BuiltinFunction::IntBitwiseXor => {
             let [a, b] = arguments else { unreachable!() };
@@ -206,9 +224,14 @@ fn run_builtin(
                 return Some(0.into());
             }
 
-            let a: &BigInt = visible.get(*a).try_into().ok()?;
-            let b: &BigInt = visible.get(*b).try_into().ok()?;
-            (a ^ b).into()
+            match (visible.get(*a), visible.get(*b)) {
+                // 0 ^ b = b
+                (Expression::Int(a), _) if a.is_zero() => Expression::Reference(*b),
+                // a ^ 0 = a
+                (_, Expression::Int(b)) if b.is_zero() => Expression::Reference(*a),
+                (Expression::Int(a), Expression::Int(b)) => (a ^ b).into(),
+                _ => return None,
+            }
         }
         BuiltinFunction::IntCompareTo => {
             let [a, b] = arguments else { unreachable!() };
@@ -228,9 +251,16 @@ fn run_builtin(
                 return Some(1.into());
             }
 
-            let dividend: &BigInt = visible.get(*dividend).try_into().ok()?;
-            let divisor: &BigInt = visible.get(*divisor).try_into().ok()?;
-            (dividend / divisor).into()
+            match (visible.get(*dividend), visible.get(*divisor)) {
+                // dividend / 1 = dividend
+                (_, Expression::Int(divisor)) if divisor.is_one() => {
+                    Expression::Reference(*dividend)
+                }
+                (Expression::Int(dividend), Expression::Int(divisor)) => {
+                    (dividend / divisor).into()
+                }
+                _ => return None,
+            }
         }
         BuiltinFunction::IntModulo => {
             let [dividend, divisor] = arguments else {
@@ -248,9 +278,24 @@ fn run_builtin(
             let [factor_a, factor_b] = arguments else {
                 unreachable!()
             };
-            let factor_a: &BigInt = visible.get(*factor_a).try_into().ok()?;
-            let factor_b: &BigInt = visible.get(*factor_b).try_into().ok()?;
-            (factor_a * factor_b).into()
+            match (visible.get(*factor_a), visible.get(*factor_b)) {
+                // factor * 0 = 0 * factor = 0
+                (Expression::Int(factor), _) | (_, Expression::Int(factor)) if factor.is_zero() => {
+                    0.into()
+                }
+                // 1 * factor_b = factor_b
+                (Expression::Int(factor_a), _) if factor_a.is_one() => {
+                    Expression::Reference(*factor_b)
+                }
+                // factor_a * 1 = factor_a
+                (_, Expression::Int(factor_b)) if factor_b.is_one() => {
+                    Expression::Reference(*factor_a)
+                }
+                (Expression::Int(factor_a), Expression::Int(factor_b)) => {
+                    (factor_a * factor_b).into()
+                }
+                _ => return None,
+            }
         }
         BuiltinFunction::IntParse => {
             let [text] = arguments else { unreachable!() };
@@ -261,7 +306,7 @@ fn run_builtin(
                 Err(err) => Err(body.push_with_new_id(id_generator, err.to_string())),
             };
             body.push_with_new_id(id_generator, result);
-            expression.replace_with_multiple(body, pureness);
+            expression.replace_with_multiple(NAME, body, pureness);
             return None;
         }
         BuiltinFunction::IntRemainder => {
@@ -280,29 +325,35 @@ fn run_builtin(
             let [value, amount] = arguments else {
                 unreachable!()
             };
-            let amount: &BigInt = visible.get(*amount).try_into().ok()?;
-            // TODO: Support larger shift amounts.
-            let amount: u128 = amount.try_into().unwrap();
-            if amount == 0 {
-                return Some(value.into());
+            match (visible.get(*value), visible.get(*amount)) {
+                // value << 0 = value
+                (_, Expression::Int(amount)) if amount.is_zero() => Expression::Reference(*value),
+                // 0 << amount = 0
+                (Expression::Int(value), _) if value.is_zero() => 0.into(),
+                (Expression::Int(value), Expression::Int(amount)) => {
+                    // TODO: Support larger shift amounts.
+                    let amount: u128 = amount.try_into().unwrap();
+                    (value << amount).into()
+                }
+                _ => return None,
             }
-
-            let value: &BigInt = visible.get(*value).try_into().ok()?;
-            (value << amount).into()
         }
         BuiltinFunction::IntShiftRight => {
             let [value, amount] = arguments else {
                 unreachable!()
             };
-            let amount: &BigInt = visible.get(*amount).try_into().ok()?;
-            // TODO: Support larger shift amounts.
-            let amount: u128 = amount.try_into().unwrap();
-            if amount == 0 {
-                return Some(value.into());
+            match (visible.get(*value), visible.get(*amount)) {
+                // value >> 0 = value
+                (_, Expression::Int(amount)) if amount.is_zero() => Expression::Reference(*value),
+                // 0 >> amount = 0
+                (Expression::Int(value), _) if value.is_zero() => 0.into(),
+                (Expression::Int(value), Expression::Int(amount)) => {
+                    // TODO: Support larger shift amounts.
+                    let amount: u128 = amount.try_into().unwrap();
+                    (value >> amount).into()
+                }
+                _ => return None,
             }
-
-            let value: &BigInt = visible.get(*value).try_into().ok()?;
-            (value >> amount).into()
         }
         BuiltinFunction::IntSubtract => {
             let [minuend, subtrahend] = arguments else {
@@ -312,9 +363,16 @@ fn run_builtin(
                 return Some(Expression::Int(0.into()));
             }
 
-            let minuend: &BigInt = visible.get(*minuend).try_into().ok()?;
-            let subtrahend: &BigInt = visible.get(*subtrahend).try_into().ok()?;
-            (minuend - subtrahend).into()
+            match (visible.get(*minuend), visible.get(*subtrahend)) {
+                // minuend - 0 = minuend
+                (_, Expression::Int(subtrahend)) if subtrahend.is_zero() => {
+                    Expression::Reference(*minuend)
+                }
+                (Expression::Int(minuend), Expression::Int(subtrahend)) => {
+                    (minuend - subtrahend).into()
+                }
+                _ => return None,
+            }
         }
         BuiltinFunction::ListFilled => {
             let [length, item] = arguments else {
@@ -472,17 +530,14 @@ fn run_builtin(
                 .map(|it| body.push_with_new_id(id_generator, it))
                 .collect_vec();
             body.push_with_new_id(id_generator, characters);
-            expression.replace_with_multiple(body, pureness);
+            expression.replace_with_multiple(NAME, body, pureness);
             return None;
         }
         BuiltinFunction::TextConcatenate => {
             let [a, b] = arguments else { unreachable!() };
             match (visible.get(*a), visible.get(*b)) {
-                (Expression::Text(text), other) | (other, Expression::Text(text))
-                    if text.is_empty() =>
-                {
-                    other.clone()
-                }
+                (Expression::Text(text), _) if text.is_empty() => Expression::Reference(*b),
+                (_, Expression::Text(text)) if text.is_empty() => Expression::Reference(*a),
                 (Expression::Text(text_a), Expression::Text(text_b)) => {
                     Expression::Text(format!("{text_a}{text_b}"))
                 }
@@ -546,7 +601,7 @@ fn run_builtin(
                 .map(|it| body.push_with_new_id(id_generator, it))
                 .map_err(|_| body.push_with_new_id(id_generator, "Invalid UTF-8."));
             body.push_with_new_id(id_generator, result);
-            expression.replace_with_multiple(body, pureness);
+            expression.replace_with_multiple(NAME, body, pureness);
             return None;
         }
         BuiltinFunction::TextGetRange => {
@@ -711,7 +766,7 @@ fn run_builtin(
                         BuiltinFunction::TextConcatenate => "Text",
                         BuiltinFunction::TextContains => "Tag",
                         BuiltinFunction::TextEndsWith => "Tag",
-                        BuiltinFunction::TextFromUtf8 => "Struct",
+                        BuiltinFunction::TextFromUtf8 => "Tag",
                         BuiltinFunction::TextGetRange => "Text",
                         BuiltinFunction::TextIsEmpty => "Tag",
                         BuiltinFunction::TextLength => "Int",

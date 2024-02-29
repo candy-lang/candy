@@ -18,15 +18,10 @@ use candy_frontend::{
     CallTracingMode, TracingConfig, TracingMode,
 };
 use candy_vm::{
-    byte_code::ByteCode,
-    heap::{Heap, InlineObject, Struct},
-    lir_to_byte_code::compile_byte_code,
-    tracer::stack_trace::StackTracer,
-    PopulateInMemoryProviderFromFileSystem, Vm, VmFinished,
+    byte_code::ByteCode, lir_to_byte_code::compile_byte_code,
+    PopulateInMemoryProviderFromFileSystem,
 };
 use lazy_static::lazy_static;
-use rustc_hash::FxHashMap;
-use std::borrow::Borrow;
 use tracing::warn;
 
 const TRACING: TracingConfig = TracingConfig {
@@ -78,11 +73,6 @@ impl MutableModuleProviderOwner for Database {
     }
 }
 
-pub fn setup_and_compile(source_code: &str) -> ByteCode {
-    let mut db = setup();
-    compile(&mut db, source_code)
-}
-
 pub fn setup() -> Database {
     let mut db = Database::default();
     db.module_provider.load_package_from_file_system("Builtins");
@@ -104,18 +94,4 @@ pub fn setup() -> Database {
 pub fn compile(db: &mut Database, source_code: &str) -> ByteCode {
     db.did_open_module(&MODULE, source_code.as_bytes().to_owned());
     compile_byte_code(db, ExecutionTarget::MainFunction(MODULE.clone()), TRACING).0
-}
-
-pub fn run(byte_code: impl Borrow<ByteCode>) -> (Heap, InlineObject) {
-    let mut heap = Heap::default();
-    let environment = Struct::create(&mut heap, true, &FxHashMap::default());
-    let VmFinished { result, .. } =
-        Vm::for_main_function(byte_code, &mut heap, environment, StackTracer::default())
-            .run_forever_without_handles(&mut heap);
-    match result {
-        Ok(return_value) => (heap, return_value),
-        Err(panic) => {
-            panic!("The program panicked: {}", panic.reason)
-        }
-    }
 }

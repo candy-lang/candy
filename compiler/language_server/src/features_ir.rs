@@ -239,7 +239,6 @@ impl IrFeatures {
         let mut builder = RichIrBuilder::default();
         builder.push_comment_line(format!("{ir_name} for module {module}"));
         if let Some(tracing_config) = tracing_config.into() {
-            builder.push_newline();
             builder.push_tracing_config(tracing_config);
         }
         builder.push_newline();
@@ -490,7 +489,11 @@ impl LanguageFeatures for IrFeatures {
 
             let rich_irs = self.open_irs.read().await;
             let other_ir = rich_irs.get(&uri)?;
-            let result = other_ir.ir.references.get(key).unwrap();
+            // Some HIR IDs are synthetic: They are created during HIR to MIR
+            // lowering.
+            // TODO(JonasWanke): We could always use "$" to mark synthetic parts
+            // in a HIR ID and then navigate to the prefix that's not synthetic.
+            let result = other_ir.ir.references.get(key)?;
             let target_range = other_ir.range_to_lsp_range(result.definition.as_ref().unwrap());
 
             Some((uri, target_range))

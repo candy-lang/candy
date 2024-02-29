@@ -22,8 +22,10 @@ use super::{
 };
 use crate::mir::{Body, Expression};
 
+const NAME: &str = "Reference Following";
+
 pub fn follow_references(context: &mut Context, expression: &mut CurrentExpression) {
-    expression.replace_id_references(&mut |id| {
+    expression.replace_id_references(NAME, &mut |id| {
         if context.visible.contains(*id)
             && let Expression::Reference(referenced) = context.visible.get(*id)
         {

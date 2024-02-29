@@ -1,0 +1,3 @@
+color := use ".color"
+formatted := use ".formatted"
+style := use ".style"
