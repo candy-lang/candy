@@ -125,4 +125,15 @@ cargo run --release -- help
 
 (Everything after `--` is passed to Candy, everything before it to Cargo.)
 
+## Environment Variables for Debugging the Compiler
+
+```sh
+# Don't normalize IDs (number them sequentially) after optimizing the MIR.
+CANDY_MIR_NORMALIZE_IDS=false
+
+# Generate a _large_ Markdown file that lists every single optimization step
+# performed on the MIR.
+CANDY_MIR_OPTIMIZATION_LOG=target/optimization-log.md
+```
+
 [Discord server]: https://discord.gg/5Vr4eAJ7gU
