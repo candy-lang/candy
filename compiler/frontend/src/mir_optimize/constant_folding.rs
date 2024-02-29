@@ -478,11 +478,8 @@ fn run_builtin(
         BuiltinFunction::TextConcatenate => {
             let [a, b] = arguments else { unreachable!() };
             match (visible.get(*a), visible.get(*b)) {
-                (Expression::Text(text), other) | (other, Expression::Text(text))
-                    if text.is_empty() =>
-                {
-                    other.clone()
-                }
+                (Expression::Text(text), _) if text.is_empty() => Expression::Reference(*b),
+                (_, Expression::Text(text)) if text.is_empty() => Expression::Reference(*a),
                 (Expression::Text(text_a), Expression::Text(text_b)) => {
                     Expression::Text(format!("{text_a}{text_b}"))
                 }
