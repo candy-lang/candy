@@ -9,9 +9,9 @@
     "url": "https://github.com/candy-lang/candy.git",
     "directory": "new-new-packages/vscode_extension"
   },
-  "//": "Keep in sync with `devDependencies`.`@types/vscode`",
+  "//": "Keep in sync with `devDependencies.@types/vscode`",
   "engines": {
-    "vscode": "^1.74.0"
+    "vscode": "^1.86.0"
   },
   "categories": [
     "Programming Languages",
