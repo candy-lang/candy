@@ -1,5 +1,10 @@
-use super::complexity::Complexity;
-use crate::{hir_to_mir::ExecutionTarget, mir::Id, rich_ir::RichIrBuilder, tracing::TracingConfig};
+use super::{complexity::Complexity, current_expression::CurrentExpression};
+use crate::{
+    hir_to_mir::ExecutionTarget,
+    mir::{Body, Id},
+    rich_ir::RichIrBuilder,
+    tracing::TracingConfig,
+};
 use std::{
     env,
     fs::File,
@@ -23,7 +28,7 @@ impl OptimizationLogger {
         tracing: TracingConfig,
     ) {
         Self::run(|logger| {
-            logger.write_line(&format!("1. `optimized_mir_without_tail_calls(…)`",));
+            logger.write_line("1. `optimized_mir_without_tail_calls(…)`");
             logger.indent();
             logger.write_newline();
             logger.write_line(&format!("Execution target: {target}"));
@@ -46,6 +51,39 @@ impl OptimizationLogger {
             logger.write_line(&format!("Complexity after: {complexity_after}"));
         });
     }
+
+    pub fn log_optimize_body_start(body: &Body) {
+        Self::run(|logger| {
+            logger.write_line("1. `optimize_body(…)`");
+            logger.indent();
+            logger.write_newline();
+            logger.write_line("```python");
+            logger.write_lines(&body.to_string());
+            logger.write_line("```");
+        });
+    }
+    pub fn log_optimize_body_end() {
+        Self::run(|logger| {
+            logger.dedent();
+        });
+    }
+
+    pub fn log_optimize_expression_start(expression: &CurrentExpression) {
+        Self::run(|logger| {
+            logger.write_line(&format!("1. `optimize_expression({})`", expression.id()));
+            logger.indent();
+            logger.write_newline();
+            logger.write_line("```python");
+            logger.write_lines(&(*expression).to_string());
+            logger.write_line("```");
+        });
+    }
+    pub fn log_optimize_expression_end() {
+        Self::run(|logger| {
+            logger.dedent();
+        });
+    }
+
     pub fn log_replace_id_references(optimization_name: &str, id: Id) {
         Self::run(|logger| {
             logger.write_line(&format!(

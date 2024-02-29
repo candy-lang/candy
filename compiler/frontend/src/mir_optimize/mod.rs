@@ -168,6 +168,7 @@ impl Context<'_> {
     fn optimize_body(&mut self, body: &mut Body) {
         // Even though `self.visible` is mutable, this function guarantees that
         // the value is the same after returning.
+        OptimizationLogger::log_optimize_body_start(&body);
         let mut index = 0;
         while index < body.expressions.len() {
             // Thoroughly optimize the expression.
@@ -217,9 +218,11 @@ impl Context<'_> {
         call_tracing::remove_unnecessary_call_tracing(body, self.pureness, self.tracing.calls);
         tree_shaking::tree_shake(body, self.pureness);
         reference_following::remove_redundant_return_references(body, self.pureness);
+        OptimizationLogger::log_optimize_body_end();
     }
 
     fn optimize_expression(&mut self, expression: &mut CurrentExpression) {
+        OptimizationLogger::log_optimize_expression_start(expression);
         'outer: loop {
             if let Expression::Function {
                 parameters,
@@ -269,6 +272,7 @@ impl Context<'_> {
                 }
             }
         }
+        OptimizationLogger::log_optimize_expression_end();
     }
 }
 
