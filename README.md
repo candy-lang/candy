@@ -89,3 +89,14 @@ We already have a language server that provides some tooling.
 
 If you are working on the Rust code itself, you might want to disable the release mode for quicker compilation:
 In the VS Code settings (JSON), add the following: `"candy.languageServerCommand": "cargo run --manifest-path <path-to-the-candy-folder>/compiler/cli/Cargo.toml -- lsp"`.
+
+## Environment Variables for Debugging the Compiler
+
+```sh
+# Don't normalize IDs (number them sequentially) after optimizing the MIR.
+CANDY_MIR_NORMALIZE_IDS=false
+
+# Generate a _large_ Markdown file that lists every single optimization step
+# performed on the MIR.
+CANDY_MIR_OPTIMIZATION_LOG=target/optimization-log.md
+```
