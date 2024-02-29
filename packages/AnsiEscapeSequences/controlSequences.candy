@@ -1,6 +1,6 @@
 # https://en.wikipedia.org/wiki/ANSI_escape_code#CSI_(Control_Sequence_Introducer)_sequences
 
-[int] = use "Core"
+[int, text] = use "Core"
 [escapeCode] = use "..escapeCode"
 
 controlSequenceIntroducer := "{escapeCode}["
