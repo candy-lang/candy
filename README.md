@@ -1,5 +1,12 @@
 # 🍭 Candy
 
+> **🚧 Work in Progress!**
+>
+> Candy is still in its early stages.
+> We are actively working on it, but it's not ready for production use yet.
+> If you want to help, please join our [Discord server].
+> See also: [The current state](#the-current-state).
+
 A sweet, functional programming language that is robust, minimalistic, and expressive.
 
 Many programming languages have a strict separation between compile-time and runtime errors.
@@ -20,7 +27,8 @@ In fact, we try to show more errors than typical statically typed languages.
   ```candy
   3                   # int
   "Candy"             # text
-  Green               # symbol (uppercase)
+  Green               # tag (uppercase)
+  Error ListIsEmpty   # tag with a value
   (Foo, Bar)          # list
   [Name: "Candy"]     # struct
   { it -> add it 2 }  # function
@@ -65,30 +73,57 @@ In fact, we try to show more errors than typical statically typed languages.
     "Hello, {efficientTextReverse name}"  # then this panics: Only palindromes can be efficiently reversed.
   ```
 
-To get a more in-depth introduction, read the [language document](language.md).
+For more info, read:
+
+- Marcel's blog post about Candy: https://marcelgarus.dev/candy
+- the [language documentation](language.md)
+- Marcel's blog post about Candy's compiler pipeline: https://marcelgarus.dev/candy-compiler-pipeline
 
 ## The current state
 
 We are currently implementing a first version of Candy in Rust.
-We already have a language server that provides some tooling.
+We already have a CLI, language server, and Visual Studio Code extension that provide some tooling.
+
+The language is still in its early stages, and we are actively working on it.
+There are still compiler bugs and performance improvements that need work before this language is ready for production use.
 
 ## Discussion
 
-[Join our <img height="12" src="https://github.com/candy-lang/candy/assets/19330937/baf90ce0-1d0a-4279-92fa-1c360cd28b38"> Discord server.](https://discord.gg/5Vr4eAJ7gU)
+[Join our <img height="12" src="https://github.com/candy-lang/candy/assets/19330937/baf90ce0-1d0a-4279-92fa-1c360cd28b38"> Discord server.][Discord server]
 
 ## How to use Candy
 
-1. Install [<img height="16" src="https://rust-lang.org/static/images/favicon.svg"> Rust](https://rust-lang.org): [rust-lang.org/tools/install](https://rust-lang.org/tools/install) (use rustup, since we use nightly features).
-2. Install [<img height="16" src="https://code.visualstudio.com/favicon.ico"> Visual Studio Code (VS Code)](https://code.visualstudio.com): [code.visualstudio.com/download](https://code.visualstudio.com/download).
-3. Clone this repo.
-4. Open the workspace (`compiler.code-workspace`) in VS Code.
-5. Install the recommended VSCode extensions.
-6. Run `npm install` inside `vscode_extension/`.
-7. Run the launch config “Run Extension (VS Code Extension)”.
-8. In the new VS Code window that opens, you can enjoy 🍭 Candy :)
+1. Install [<img height="16" src="https://rust-lang.org/static/images/favicon.svg"> Rust](https://rust-lang.org): [rust-lang.org/tools/install](https://rust-lang.org/tools/install) (use Rustup since we use nightly features).
+2. Clone this repo.
 
-If you are working on the Rust code itself, you might want to disable the release mode for quicker compilation:
-In the VS Code settings (JSON), add the following: `"candy.languageServerCommand": "cargo run --manifest-path <path-to-the-candy-folder>/compiler/cli/Cargo.toml -- lsp"`.
+Then, you can use Candy in two ways:
+
+### Use the VS Code Extension
+
+1. Install [<img height="16" src="https://code.visualstudio.com/favicon.ico"> Visual Studio Code (VS Code)](https://code.visualstudio.com): [code.visualstudio.com/download](https://code.visualstudio.com/download).
+2. Open the workspace (`compiler.code-workspace`) in VS Code.
+3. Install the recommended VS Code extensions.
+4. Run `npm install` inside `vscode_extension/`.
+5. Run the launch config “Run Extension (VS Code Extension)”.
+6. In the new VS Code window that opens, you can enjoy 🍭 Candy :)
+
+If you are working on the Rust code itself, you might want to disable release mode for quicker compilation:
+In `packages/candy.code-workspace`, in the `candy.languageServerCommand` setting, remove `--release`.
+(But don't commit that change.)
+
+### Use the CLI
+
+From the root of this repository, you can run the Candy CLI by starting the Candy commands with `cargo run --release --`:
+
+```sh
+# Run a Candy file:
+cargo run --release -- run ./packages/Examples/helloWorld.candy
+
+# View all available commands:
+cargo run --release -- help
+```
+
+(Everything after `--` is passed to Candy, everything before it to Cargo.)
 
 ## Environment Variables for Debugging the Compiler
 
@@ -100,3 +135,5 @@ CANDY_MIR_NORMALIZE_IDS=false
 # performed on the MIR.
 CANDY_MIR_OPTIMIZATION_LOG=target/optimization-log.md
 ```
+
+[Discord server]: https://discord.gg/5Vr4eAJ7gU

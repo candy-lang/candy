@@ -146,10 +146,7 @@ where
                 let body_end = body
                     .unwrap_whitespace_and_comment()
                     .last()
-                    .unwrap()
-                    .data
-                    .span
-                    .end;
+                    .map_or(arrow.data.span.end, |body| body.data.span.end);
                 self.push(arrow.data.span.end..body_end, FoldingRangeKind::Region);
 
                 self.visit_csts(body);
