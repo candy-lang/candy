@@ -9,9 +9,9 @@
     "url": "https://github.com/candy-lang/candy.git",
     "directory": "new-new-packages/vscode_extension"
   },
-  "//": "Keep in sync with `devDependencies`.`@types/vscode`",
+  "//": "Keep in sync with `devDependencies.@types/vscode`",
   "engines": {
-    "vscode": "^1.74.0"
+    "vscode": "^1.86.0"
   },
   "categories": [
     "Programming Languages",
@@ -248,7 +248,7 @@
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.6",
     "@types/node": "^20.11.20",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "^1.86.0",
     "@typescript-eslint/eslint-plugin": "^7.0.2",
     "@typescript-eslint/parser": "^7.0.2",
     "eslint": "^8.57.0",
