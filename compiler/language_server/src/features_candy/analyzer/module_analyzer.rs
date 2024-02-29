@@ -108,7 +108,7 @@ impl ModuleAnalyzer {
                     .unwrap();
                 let mut mir = (*mir).clone();
                 let mut static_panics = mir.static_panics();
-                static_panics.retain(|panic| panic.responsible.module == self.module);
+                static_panics.retain(|panic| -> bool { panic.responsible.module == self.module });
 
                 let tracing = TracingConfig {
                     register_fuzzables: TracingMode::Off,

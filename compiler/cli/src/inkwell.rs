@@ -58,7 +58,7 @@ pub fn compile(options: &Options) -> ProgramResult {
     let path = options
         .path
         .as_ref()
-        .unwrap_or_else(|| match &module.package {
+        .unwrap_or_else(|| match &module.package() {
             module::Package::User(user) => user,
             module::Package::Managed(managed) => managed,
             _ => unreachable!(),

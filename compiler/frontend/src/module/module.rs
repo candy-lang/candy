@@ -10,29 +10,46 @@ use std::{
     fs,
     hash::Hash,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 use tracing::{error, warn};
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Module {
-    pub package: Package,
-    pub path: Vec<String>,
-    pub kind: ModuleKind,
+pub struct Module(Arc<ModuleInner>);
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+struct ModuleInner {
+    package: Package,
+    path: Vec<String>,
+    kind: ModuleKind,
 }
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ModuleKind {
     Code,
     Asset,
 }
-
+impl From<ModuleInner> for Module {
+    fn from(val: ModuleInner) -> Self {
+        Self(Arc::new(val))
+    }
+}
 impl Module {
     #[must_use]
+    pub fn new(package: Package, path: Vec<String>, kind: ModuleKind) -> Self {
+        Self(Arc::new(ModuleInner {
+            package,
+            path,
+            kind,
+        }))
+    }
+
+    #[must_use]
     pub fn from_package_name(name: String) -> Self {
-        Self {
+        ModuleInner {
             package: Package::Managed(name.into()),
             path: vec![],
             kind: ModuleKind::Code,
         }
+        .into()
     }
 
     pub fn from_path(
@@ -83,20 +100,34 @@ impl Module {
             }
         }
 
-        Ok(Self {
+        Ok(ModuleInner {
             package,
             path,
             kind,
-        })
+        }
+        .into())
+    }
+
+    #[must_use]
+    pub fn package(&self) -> &Package {
+        &self.0.package
+    }
+    #[must_use]
+    pub fn path(&self) -> &Vec<String> {
+        &self.0.path
+    }
+    #[must_use]
+    pub fn kind(&self) -> ModuleKind {
+        self.0.kind
     }
 
     #[must_use]
     pub fn to_possible_paths(&self, packages_path: &PackagesPath) -> Option<Vec<PathBuf>> {
-        let mut path = self.package.to_path(packages_path)?;
-        for component in self.path.clone() {
+        let mut path = self.package().to_path(packages_path)?;
+        for component in self.path() {
             path.push(component);
         }
-        Some(match self.kind {
+        Some(match self.kind() {
             ModuleKind::Asset => vec![path],
             ModuleKind::Code => vec![
                 {
@@ -150,8 +181,8 @@ impl ToRichIr for Module {
         let range = builder.push(
             format!(
                 "{}:{}",
-                self.package,
-                self.path.iter().map(ToString::to_string).join("/"),
+                self.package(),
+                self.path().iter().map(ToString::to_string).join("/"),
             ),
             TokenType::Module,
             EnumSet::default(),

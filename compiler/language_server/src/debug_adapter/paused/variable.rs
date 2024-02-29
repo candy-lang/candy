@@ -65,13 +65,13 @@ impl PausedState {
                             variables.extend(
                                 parameters
                                     .iter()
-                                    .map(|it| ToString::to_string(&it.keys.last().unwrap()))
+                                    .map(|it| it.keys.last_as_str().unwrap())
                                     .zip_eq(call.arguments.clone())
                                     .skip(start)
                                     .take(count)
                                     .map(|(parameter, argument)| {
                                         self.create_variable(
-                                            parameter,
+                                            parameter.to_string(),
                                             argument,
                                             supports_variable_type,
                                         )

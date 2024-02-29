@@ -31,11 +31,11 @@ const TRACING: TracingConfig = TracingConfig {
 };
 lazy_static! {
     static ref PACKAGE: Package = Package::User("/".into());
-    static ref MODULE: Module = Module {
-        package: PACKAGE.clone(),
-        path: vec!["benchmark".to_string()],
-        kind: ModuleKind::Code,
-    };
+    static ref MODULE: Module = Module::new(
+        PACKAGE.clone(),
+        vec!["benchmark".to_string()],
+        ModuleKind::Code,
+    );
 }
 
 #[salsa::database(

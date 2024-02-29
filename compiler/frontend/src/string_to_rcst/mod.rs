@@ -35,11 +35,11 @@ pub trait StringToRcst: ModuleDb {
 pub type RcstResult = Result<Arc<Vec<Rcst>>, ModuleError>;
 
 fn rcst(db: &dyn StringToRcst, module: Module) -> RcstResult {
-    if module.kind != ModuleKind::Code {
+    if module.kind() != ModuleKind::Code {
         return Err(ModuleError::IsNotCandy);
     }
 
-    if let Package::Tooling(_) = &module.package {
+    if let Package::Tooling(_) = &module.package() {
         return Err(ModuleError::IsToolingModule);
     }
     let source = db
