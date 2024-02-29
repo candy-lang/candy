@@ -1,6 +1,5 @@
 [
   colors,
-  controlSequences,
   GraphicRenditions:
     [
       setForegroundColor3Or4Bit,
@@ -25,9 +24,9 @@ is color := color %
     | bool.lazyAnd { int.isUnsignedByte blue }
   _ -> False
 
-toForegroundText color :=
+toForegroundGraphicRenditionText color :=
   needs (is color)
-  graphicRendition = color %
+  color %
     Black -> setForegroundColor3Or4Bit colors.colors3Or4Bit.black
     Red -> setForegroundColor3Or4Bit colors.colors3Or4Bit.red
     Green -> setForegroundColor3Or4Bit colors.colors3Or4Bit.green
@@ -45,10 +44,9 @@ toForegroundText color :=
     BrightCyan -> setBrightForegroundColor3Or4Bit colors.colors3Or4Bit.cyan
     BrightWhite -> setBrightForegroundColor3Or4Bit colors.colors3Or4Bit.white
     TrueColor [red, green, blue] -> setForegroundColor8Or24Bit (colors.color24Bit red green blue)
-  controlSequences.selectGraphicRendition graphicRendition
-toBackgroundText color :=
+toBackgroundGraphicRenditionText color :=
   needs (is color)
-  graphicRendition = color %
+  color %
     Black -> setBackgroundColor3Or4Bit colors.colors3Or4Bit.black
     Red -> setBackgroundColor3Or4Bit colors.colors3Or4Bit.red
     Green -> setBackgroundColor3Or4Bit colors.colors3Or4Bit.green
@@ -66,4 +64,3 @@ toBackgroundText color :=
     BrightCyan -> setBrightBackgroundColor3Or4Bit colors.colors3Or4Bit.cyan
     BrightWhite -> setBrightBackgroundColor3Or4Bit colors.colors3Or4Bit.white
     TrueColor [red, green, blue] -> setBackgroundColor8Or24Bit (colors.color24Bit red green blue)
-  controlSequences.selectGraphicRendition graphicRendition

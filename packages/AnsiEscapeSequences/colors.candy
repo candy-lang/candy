@@ -2,8 +2,9 @@
 
 [int] = use "Core"
 
-colors3Or4Bit := # https://en.wikipedia.org/wiki/ANSI_escape_code#3-bit_and_4-bit
-  [Black: "0", Red: "1", Green: "2", Yellow: "3", Blue: "4", Magenta: "5", Cyan: "6", White: "7"]
+colors3Or4Bit :=
+  # https://en.wikipedia.org/wiki/ANSI_escape_code#3-bit_and_4-bit
+  [Black: 0, Red: 1, Green: 2, Yellow: 3, Blue: 4, Magenta: 5, Cyan: 6, White: 7]
 
 color8Bit number :=
   # https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit

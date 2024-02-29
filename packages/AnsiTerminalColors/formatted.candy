@@ -1,9 +1,10 @@
-[bool, ifElse, text] = use "Core"
-color = use "..color"
+[ControlSequences: [selectGraphicRendition], graphicRenditions] = use "AnsiEscapeSequences"
+[bool, ifElse, iterator, list, text] = use "Core"
+col = use "..color"
 style = use "..style"
 
 isOptionalColor optionalColor := optionalColor %
-  Color c -> color.is color
+  Color c -> col.is c
   Inherit -> True
   _ -> False
 
@@ -24,12 +25,12 @@ from textOrFormatted :=
 
 color textOrFormatted foregroundColor :=
   needs (isTextOrFormatted textOrFormatted)
-  needs (color.is foregroundColor)
+  needs (col.is foregroundColor)
   Formatted [content, backgroundColor, styles] = from textOrFormatted
   Formatted [content, ForegroundColor: Color foregroundColor, backgroundColor, styles]
 onColor textOrFormatted backgroundColor :=
   needs (isTextOrFormatted textOrFormatted)
-  needs (color.is backgroundColor)
+  needs (col.is backgroundColor)
   Formatted [content, foregroundColor, styles] = from textOrFormatted
   Formatted [content, foregroundColor, BackgroundColor: Color backgroundColor, styles]
 styles textOrFormatted styles :=
@@ -37,3 +38,24 @@ styles textOrFormatted styles :=
   needs (style.isList styles)
   Formatted [content, foregroundColor, backgroundColor] = from textOrFormatted
   Formatted [content, foregroundColor, backgroundColor, styles]
+
+format textOrFormatted :=
+  needs (isTextOrFormatted textOrFormatted)
+  Formatted [content, foregroundColor, backgroundColor, styles] = from textOrFormatted
+
+  renditions = (,)
+  renditions = foregroundColor %
+    Color c -> renditions | list.append (c | col.toForegroundGraphicRenditionText)
+    Inherit -> renditions
+  renditions = backgroundColor %
+    Color c -> renditions | list.append (c | col.toBackgroundGraphicRenditionText)
+    Inherit -> renditions
+  renditions = styles %
+    (,) -> renditions
+    _ -> renditions | list.append (style.listToForegroundGraphicRenditionText styles)
+
+  start =
+    selectGraphicRendition
+      renditions | iterator.fromList | iterator.joinToTextWithSeparator ";"
+  reset = selectGraphicRendition graphicRenditions.reset
+  "{start}{content}{reset}"
