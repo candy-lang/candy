@@ -1,0 +1,37 @@
+[color, formatted, style] = use "AnsiTerminalColors"
+[equals, function, int, iterator, text, toDebugText] = use "Core"
+
+main := { environment ->
+  environment.stdout ("Black" | formatted.color Black | formatted.format)
+  environment.stdout ("Red" | formatted.color Red | formatted.format)
+  environment.stdout ("Green" | formatted.color Green | formatted.format)
+  environment.stdout ("Yellow" | formatted.color Yellow | formatted.format)
+  environment.stdout ("Blue" | formatted.color Blue | formatted.format)
+  environment.stdout ("Magenta" | formatted.color Magenta | formatted.format)
+  environment.stdout ("Cyan" | formatted.color Cyan | formatted.format)
+  environment.stdout ("White" | formatted.color White | formatted.format)
+  environment.stdout ""
+  environment.stdout ("On Black" | formatted.onColor Black | formatted.format)
+  environment.stdout ("On Red" | formatted.onColor Red | formatted.format)
+  environment.stdout ("On Green" | formatted.onColor Green | formatted.format)
+  environment.stdout ("On Yellow" | formatted.onColor Yellow | formatted.format)
+  environment.stdout ("On Blue" | formatted.onColor Blue | formatted.format)
+  environment.stdout ("On Magenta" | formatted.onColor Magenta | formatted.format)
+  environment.stdout ("On Cyan" | formatted.onColor Cyan | formatted.format)
+  environment.stdout ("On White" | formatted.onColor White | formatted.format)
+  environment.stdout ""
+  environment.stdout ("Clear" | formatted.styles (Clear,) | formatted.format)
+  environment.stdout ("Bold" | formatted.styles (Bold,) | formatted.format)
+  environment.stdout ("Dimmed" | formatted.styles (Dimmed,) | formatted.format)
+  environment.stdout ("Italic" | formatted.styles (Italic,) | formatted.format)
+  environment.stdout ("Underline" | formatted.styles (Underline,) | formatted.format)
+  environment.stdout ("Blink" | formatted.styles (Blink,) | formatted.format)
+  environment.stdout ("Reversed" | formatted.styles (Reversed,) | formatted.format)
+  environment.stdout "{"Hidden" | formatted.styles (Hidden,) | formatted.format} (Hidden)"
+  environment.stdout ("Strikethrough" | formatted.styles (Strikethrough,) | formatted.format)
+  environment.stdout ""
+  environment.stdout
+    "Red Bold Underline Strikethrough" | formatted.color Red
+    | formatted.styles (Bold, Underline, Strikethrough)
+    | formatted.format
+}
