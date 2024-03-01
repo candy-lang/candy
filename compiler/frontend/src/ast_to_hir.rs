@@ -111,6 +111,7 @@ fn compile_top_level(
         is_top_level: true,
         use_id: None,
         builtins_id: None,
+        disambiguators: Disambiguators::default(),
     };
 
     context.generate_use();
@@ -130,6 +131,12 @@ fn compile_top_level(
     (context.body, id_mapping)
 }
 
+#[derive(Default)]
+struct Disambiguators {
+    named: FxHashMap<String, usize>,
+    positional: usize,
+}
+
 struct Context<'a> {
     module: Module,
     id_mapping: FxHashMap<hir::Id, Option<ast::Id>>,
@@ -141,6 +148,7 @@ struct Context<'a> {
     is_top_level: bool,
     use_id: Option<hir::Id>,
     builtins_id: Option<hir::Id>,
+    disambiguators: Disambiguators,
 }
 
 impl Context<'_> {
@@ -757,27 +765,33 @@ impl Context<'_> {
         key: impl Into<Option<&str>>,
     ) -> hir::Id {
         let key = key.into();
-        for disambiguator in 0.. {
-            let last_part = key.as_ref().map_or_else(
-                || disambiguator.into(),
-                |key| {
-                    if disambiguator == 0 {
-                        (*key).to_string().into()
-                    } else {
-                        IdKey::Named {
-                            name: (*key).to_string(),
-                            disambiguator,
-                        }
+        let last_part = key.map_or_else(
+            || {
+                let disambiguator = self.disambiguators.positional;
+                self.disambiguators.positional = disambiguator + 1;
+                disambiguator.into()
+            },
+            |key| match self.disambiguators.named.entry((*key).to_string()) {
+                Entry::Occupied(mut entry) => {
+                    let disambiguator = *entry.get();
+                    entry.insert(disambiguator + 1);
+                    IdKey::Named {
+                        name: (*key).to_string(),
+                        disambiguator,
                     }
-                },
-            );
-            let id = self.id_prefix.child(last_part);
-            if let Entry::Vacant(entry) = self.id_mapping.entry(id.clone()) {
-                entry.insert(ast_id.into());
-                return id;
-            }
-        }
-        unreachable!()
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(1);
+                    (*key).to_string().into()
+                }
+            },
+        );
+        let id = self.id_prefix.child(last_part);
+        let Entry::Vacant(entry) = self.id_mapping.entry(id.clone()) else {
+            unreachable!()
+        };
+        entry.insert(ast_id.into());
+        id
     }
 
     fn generate_sparkles(&mut self) {
