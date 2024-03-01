@@ -553,7 +553,7 @@ impl Context<'_> {
             for parameter in &function.parameters {
                 if let AstKind::Identifier(Identifier(parameter)) = &parameter.kind {
                     let name = parameter.value.to_string();
-                    parameters.push(scope.create_next_id(None, name.as_str()));
+                    parameters.push(scope.id_prefix.id.child(name.clone()));
 
                     let id = scope.create_next_id(parameter.id.clone(), &*name);
                     scope.body.identifiers.insert(id.clone(), name.clone());
@@ -834,7 +834,7 @@ impl Context<'_> {
 
         let use_id = self.create_next_id(None, "use");
         let (inner_body, relative_path) = self.with_scope(use_id.clone(), |scope| {
-            let relative_path = scope.create_next_id(None, "relativePath");
+            let relative_path = scope.id_prefix.id.child("relativePath");
             scope.push(
                 None,
                 Expression::UseModule {
