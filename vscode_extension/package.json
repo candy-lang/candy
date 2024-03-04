@@ -241,7 +241,7 @@
     "test": "node ./out/test/runTest.js"
   },
   "dependencies": {
-    "@vscode/debugadapter": "^1.64.0",
+    "@vscode/debugadapter": "^1.65.0",
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
