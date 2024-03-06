@@ -1,4 +1,7 @@
-use super::{utils::heap_object_impls, HeapObjectTrait};
+use super::{
+    utils::{heap_object_impls, RefCountToString},
+    HeapObjectTrait,
+};
 use crate::{
     heap::{object_heap::HeapObject, Heap, InlineObject},
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
@@ -212,7 +215,7 @@ impl DebugDisplay for HeapStruct {
                     })
                     .map(|(hash, key, value)| format!("{hash} → {key}: {value}"))
                     .join(", ")
-            )
+            )?;
         } else {
             write!(
                 f,
@@ -226,8 +229,13 @@ impl DebugDisplay for HeapStruct {
                     .sorted_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b))
                     .map(|(key, value)| format!("{key}: {value}"))
                     .join(", ")
-            )
+            )?;
         }
+
+        if is_debug {
+            write!(f, " [{}]", self.reference_count().ref_count_to_string())?;
+        }
+        Ok(())
     }
 }
 impl_debug_display_via_debugdisplay!(HeapStruct);

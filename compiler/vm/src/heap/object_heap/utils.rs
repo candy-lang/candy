@@ -1,3 +1,15 @@
+use extension_trait::extension_trait;
+
+#[extension_trait]
+pub impl RefCountToString for Option<usize> {
+    fn ref_count_to_string(&self) -> String {
+        self.as_ref().map_or_else(
+            || "not ref-counted".to_string(),
+            |count| format!("{count} {}", if *count == 1 { "ref" } else { "refs" }),
+        )
+    }
+}
+
 macro_rules! heap_object_impls {
     ($type:ty) => {
         impl TryFrom<$crate::heap::object_heap::HeapObject> for $type {

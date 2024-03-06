@@ -1,4 +1,7 @@
-use super::{utils::heap_object_impls, HeapObjectTrait};
+use super::{
+    utils::{heap_object_impls, RefCountToString},
+    HeapObjectTrait,
+};
 use crate::{
     heap::{object_heap::HeapObject, Heap, InlineObject, Text},
     utils::{impl_debug_display_via_debugdisplay, DebugDisplay},
@@ -71,7 +74,12 @@ impl DebugDisplay for HeapTag {
 
         write!(f, " (")?;
         DebugDisplay::fmt(&self.value(), f, is_debug)?;
-        write!(f, ")")
+        write!(f, ")")?;
+
+        if is_debug {
+            write!(f, " [{}]", self.reference_count().ref_count_to_string())?;
+        }
+        Ok(())
     }
 }
 impl_debug_display_via_debugdisplay!(HeapTag);

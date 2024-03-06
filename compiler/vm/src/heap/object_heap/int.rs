@@ -1,4 +1,7 @@
-use super::{utils::heap_object_impls, HeapObjectTrait};
+use super::{
+    utils::{heap_object_impls, RefCountToString},
+    HeapObjectTrait,
+};
 use crate::{
     heap::{object_heap::HeapObject, object_inline::int::InlineInt, Heap, Int, Tag},
     utils::{impl_debug_display_via_debugdisplay, impl_eq_hash_ord_via_get, DebugDisplay},
@@ -92,8 +95,12 @@ macro_rules! operator_fn {
 use operator_fn;
 
 impl DebugDisplay for HeapInt {
-    fn fmt(&self, f: &mut Formatter, _is_debug: bool) -> fmt::Result {
-        write!(f, "{}", self.get())
+    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
+        write!(f, "{}", self.get())?;
+        if is_debug {
+            write!(f, " [{}]", self.reference_count().ref_count_to_string())?;
+        }
+        Ok(())
     }
 }
 impl_debug_display_via_debugdisplay!(HeapInt);
