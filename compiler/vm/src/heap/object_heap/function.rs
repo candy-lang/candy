@@ -100,9 +100,9 @@ impl HeapFunction {
 
 impl DebugDisplay for HeapFunction {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
-        let argument_count = self.argument_count();
-        let captured = self.captured();
         if is_debug {
+            let argument_count = self.argument_count();
+            let captured = self.captured();
             write!(
                 f,
                 "{{ {} {} (capturing {}) → {:?} }}",
