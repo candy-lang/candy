@@ -23,7 +23,10 @@ impl Tracer for FuzzablesFinder {
         definition: candy_vm::heap::HirId,
         function: Function,
     ) {
-        function.dup();
+        match function {
+            Function::Inline(_) => {}
+            Function::Heap(function) => function.dup(),
+        }
         self.fuzzables.insert(definition.get().clone(), function);
     }
 }

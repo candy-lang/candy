@@ -1,6 +1,6 @@
 use self::{
-    builtin::InlineBuiltin, handle::InlineHandle, int::InlineInt, pointer::InlinePointer,
-    tag::InlineTag,
+    builtin::InlineBuiltin, function::InlineFunction, handle::InlineHandle, int::InlineInt,
+    pointer::InlinePointer, tag::InlineTag,
 };
 use super::{object_heap::HeapObject, Data, Heap};
 use crate::{
@@ -22,6 +22,7 @@ use std::{
 };
 
 pub(super) mod builtin;
+pub(super) mod function;
 pub(super) mod handle;
 pub(super) mod int;
 pub(super) mod pointer;
@@ -57,6 +58,7 @@ impl InlineObject {
     pub const KIND_BUILTIN: u64 = 0b010;
     pub const KIND_TAG: u64 = 0b011;
     pub const KIND_HANDLE: u64 = 0b100;
+    pub const KIND_FUNCTION: u64 = 0b101;
 
     #[must_use]
     pub const fn new(value: NonZeroU64) -> Self {
@@ -167,6 +169,7 @@ pub enum InlineData {
     Builtin(InlineBuiltin),
     Tag(InlineTag),
     Handle(InlineHandle),
+    Function(InlineFunction),
 }
 impl InlineData {
     fn handle_id(&self) -> Option<HandleId> {
@@ -187,6 +190,7 @@ impl From<InlineObject> for InlineData {
             InlineObject::KIND_BUILTIN => Self::Builtin(InlineBuiltin::new_unchecked(object)),
             InlineObject::KIND_TAG => Self::Tag(InlineTag::new_unchecked(object)),
             InlineObject::KIND_HANDLE => Self::Handle(InlineHandle::new_unchecked(object)),
+            InlineObject::KIND_FUNCTION => Self::Function(InlineFunction::new_unchecked(object)),
             _ => panic!("Unknown inline value type: {value:016x}"),
         }
     }
@@ -200,6 +204,7 @@ impl DebugDisplay for InlineData {
             Self::Builtin(value) => value.fmt(f, is_debug),
             Self::Tag(value) => value.fmt(f, is_debug),
             Self::Handle(value) => value.fmt(f, is_debug),
+            Self::Function(value) => value.fmt(f, is_debug),
         }
     }
 }
@@ -215,6 +220,7 @@ impl Deref for InlineData {
             Self::Builtin(value) => value,
             Self::Tag(value) => value,
             Self::Handle(value) => value,
+            Self::Function(value) => value,
         }
     }
 }

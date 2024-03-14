@@ -4,8 +4,8 @@ use super::{
         struct_::HeapStruct, tag::HeapTag, text::HeapText, HeapData, HeapObject,
     },
     object_inline::{
-        builtin::InlineBuiltin, handle::InlineHandle, int::InlineInt, tag::InlineTag, InlineData,
-        InlineObject,
+        builtin::InlineBuiltin, function::InlineFunction, handle::InlineHandle, int::InlineInt,
+        tag::InlineTag, InlineData, InlineObject,
     },
     Heap,
 };
@@ -60,6 +60,7 @@ impl From<InlineObject> for Data {
             InlineData::Builtin(builtin) => Self::Builtin(Builtin(builtin)),
             InlineData::Tag(symbol_id) => Self::Tag(Tag::Inline(symbol_id)),
             InlineData::Handle(handle) => Self::Handle(Handle(handle)),
+            InlineData::Function(function) => Self::Function(Function::Inline(function)),
         }
     }
 }
@@ -71,7 +72,7 @@ impl From<HeapObject> for Data {
             HeapData::Struct(struct_) => Self::Struct(Struct(struct_)),
             HeapData::Tag(tag) => Self::Tag(Tag::Heap(tag)),
             HeapData::Text(text) => Self::Text(Text(text)),
-            HeapData::Function(function) => Self::Function(Function(function)),
+            HeapData::Function(function) => Self::Function(Function::Heap(function)),
             HeapData::HirId(hir_id) => Self::HirId(HirId(hir_id)),
         }
     }
@@ -96,7 +97,6 @@ impl_debug_display_via_debugdisplay!(Data);
 
 // Int
 
-// FIXME: Custom Ord, PartialOrd impl
 #[derive(Clone, Copy, Eq, From, Hash, PartialEq)]
 pub enum Int {
     Inline(InlineInt),
@@ -512,8 +512,11 @@ impl_try_from_heap_object!(Struct, "Expected a struct.");
 
 // Function
 
-#[derive(Clone, Copy, Deref, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Function(HeapFunction);
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum Function {
+    Inline(InlineFunction),
+    Heap(HeapFunction),
+}
 
 impl Function {
     #[must_use]
@@ -524,11 +527,92 @@ impl Function {
         argument_count: usize,
         body: InstructionPointer,
     ) -> Self {
-        HeapFunction::create(heap, is_reference_counted, captured, argument_count, body).into()
+        if captured.is_empty() {
+            InlineFunction::try_create(argument_count, body).map(Self::Inline)
+        } else {
+            None
+        }
+        .unwrap_or_else(|| {
+            Self::Heap(HeapFunction::create(
+                heap,
+                is_reference_counted,
+                captured,
+                argument_count,
+                body,
+            ))
+        })
+    }
+
+    #[must_use]
+    pub fn captured_len(self) -> usize {
+        match self {
+            Self::Inline(_) => 0,
+            Self::Heap(function) => function.captured_len(),
+        }
+    }
+    #[must_use]
+    pub fn captured<'a>(self) -> &'a [InlineObject] {
+        match self {
+            Self::Inline(_) => &[],
+            Self::Heap(function) => function.captured(),
+        }
+    }
+
+    #[must_use]
+    pub fn argument_count(self) -> usize {
+        match self {
+            Self::Inline(function) => function.argument_count(),
+            Self::Heap(function) => function.argument_count(),
+        }
+    }
+
+    #[must_use]
+    pub fn body(self) -> InstructionPointer {
+        match self {
+            Self::Inline(function) => function.body(),
+            Self::Heap(function) => function.body(),
+        }
+    }
+
+    #[must_use]
+    pub fn clone_to_heap(self, heap: &mut Heap) -> Self {
+        self.clone_to_heap_with_mapping(heap, &mut FxHashMap::default())
+    }
+    #[must_use]
+    pub fn clone_to_heap_with_mapping(
+        self,
+        heap: &mut Heap,
+        address_map: &mut FxHashMap<HeapObject, HeapObject>,
+    ) -> Self {
+        match self {
+            Self::Inline(_) => self,
+            Self::Heap(function) => function
+                .clone_to_heap_with_mapping(heap, address_map)
+                .try_into()
+                .unwrap(),
+        }
     }
 }
 
-impls_via_0!(Function);
+impl DebugDisplay for Function {
+    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
+        match self {
+            Self::Inline(function) => DebugDisplay::fmt(function, f, is_debug),
+            Self::Heap(function) => DebugDisplay::fmt(function, f, is_debug),
+        }
+    }
+}
+impl_debug_display_via_debugdisplay!(Function);
+
+impl From<Function> for InlineObject {
+    fn from(value: Function) -> Self {
+        match value {
+            Function::Inline(function) => *function,
+            Function::Heap(function) => (*function).into(),
+        }
+    }
+}
+
 impl_try_froms!(Function, "Expected a function.");
 impl_try_from_heap_object!(Function, "Expected a function.");
 
