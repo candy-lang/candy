@@ -85,11 +85,11 @@ impl<'ctx> LlvmCandyModule<'ctx> {
     pub fn compile_obj_and_link(
         &self,
         path: &str,
-        build_rt: bool,
+        build_runtime: bool,
         debug: bool,
         linker: &str,
     ) -> Result<(), std::io::Error> {
-        if build_rt {
+        if build_runtime {
             std::process::Command::new("make")
                 .args(["-C", "compiler/backend_inkwell/candy_runtime/", "clean"])
                 .spawn()?

@@ -101,7 +101,7 @@ pub fn compile(options: &Options) -> ProgramResult {
     llvm_candy_module
         .compile_obj_and_link(&path, options.build_runtime, options.debug, &options.linker)
         .map_err(|err| {
-            error!("Failed to compile and link executable: {}", err);
+            error!("Failed to compile and link executable: {err}");
             Exit::ExternalError
         })?;
 
