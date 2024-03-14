@@ -61,8 +61,23 @@ impl InlineFunction {
 }
 
 impl DebugDisplay for InlineFunction {
-    fn fmt(&self, f: &mut Formatter, _is_debug: bool) -> fmt::Result {
-        write!(f, "{:?}", self.body())
+    fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
+        if is_debug {
+            let argument_count = self.argument_count();
+            write!(
+                f,
+                "{{ {} {} (capturing nothing) → {:?} }}",
+                argument_count,
+                if argument_count == 1 {
+                    "argument"
+                } else {
+                    "arguments"
+                },
+                self.body(),
+            )
+        } else {
+            write!(f, "{{…}}")
+        }
     }
 }
 impl_debug_display_via_debugdisplay!(InlineFunction);
