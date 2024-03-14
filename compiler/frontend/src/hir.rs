@@ -144,13 +144,14 @@ pub enum IdKey {
     Positional(usize),
 }
 impl IdPath {
-    fn is_empty(&self) -> bool {
+    #[must_use]
+    fn is_root(&self) -> bool {
         self.0.is_empty()
     }
 
     #[must_use]
     fn child(&self, key: IdKey) -> Self {
-        if self.is_empty() {
+        if self.is_root() {
             Self::from(key)
         } else {
             Self(format!("{}:{key}", self.0))
@@ -164,7 +165,16 @@ impl IdPath {
 
     #[must_use]
     fn parent(&self) -> Option<Self> {
-        self.0.rfind(':').map(|i| Self(self.0[..i].to_string()))
+        self.0
+            .rfind(':')
+            .map(|i| Self(self.0[..i].to_string()))
+            .or_else(|| {
+                if self.is_root() {
+                    None
+                } else {
+                    Some(Self::default())
+                }
+            })
     }
 }
 impl From<IdKey> for IdPath {
@@ -255,7 +265,7 @@ impl Id {
 
     #[must_use]
     pub fn is_root(&self) -> bool {
-        self.keys.is_empty()
+        self.keys.is_root()
     }
 
     #[must_use]

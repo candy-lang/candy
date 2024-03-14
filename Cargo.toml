@@ -15,3 +15,9 @@ members = [
 [workspace.package]
 edition = "2021"
 rust-version = "1.78.0"
+
+[profile.release]
+# This adds file and line number information to backtraces while only increasing
+# the executable's file size from 15 MB to 76 MB (compared to around 170 MB with
+# full debug information).
+debug = "limited"
