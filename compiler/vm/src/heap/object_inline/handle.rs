@@ -19,7 +19,7 @@ pub struct InlineHandle(InlineObject);
 
 impl InlineHandle {
     const HANDLE_ID_SHIFT: usize = 32;
-    const ARGUMENT_COUNT_SHIFT: usize = 4;
+    const ARGUMENT_COUNT_SHIFT: usize = 3;
 
     #[must_use]
     pub const fn new_unchecked(object: InlineObject) -> Self {
