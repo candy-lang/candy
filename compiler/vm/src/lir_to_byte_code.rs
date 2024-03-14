@@ -63,48 +63,62 @@ where
 
 struct LoweringContext<'c> {
     lir: &'c Lir,
-    byte_code: ByteCode,
+    constant_heap: Heap,
     constant_mapping: FxHashMap<ConstantId, InlineObject>,
+    origins: Vec<FxHashSet<hir::Id>>,
     body_mapping: FxHashMap<BodyId, InstructionPointer>,
     stack: Vec<Id>,
-    instructions: Vec<Instruction>,
+
+    /// Instructions for the body currently being lowered.
+    ///
+    /// For nested functions, [`LoweringContext::compile_body`] [`mem::take`]s
+    /// this and acts as the stack.
+    current_instructions: Vec<Instruction>,
+
+    /// Instructions for bodies that are fully lowered already.
+    final_instructions: Vec<Instruction>,
 }
 impl<'c> LoweringContext<'c> {
     fn compile(module: Module, lir: &Lir) -> ByteCode {
         let mut constant_heap = Heap::default();
 
-        // The body instruction pointer of the module function will be changed
-        // from zero to the correct one once the instructions are compiled.
-        let module_function = Function::create(&mut constant_heap, false, &[], 0, 0.into());
         let responsible_module = HirId::create(
             &mut constant_heap,
             false,
             hir::Id::new(module.clone(), vec![]),
         );
 
-        let byte_code = ByteCode {
-            module,
-            constant_heap,
-            instructions: vec![],
-            origins: vec![],
-            module_function,
-            responsible_module,
-        };
         let mut context = LoweringContext {
             lir,
-            byte_code,
+            constant_heap,
             constant_mapping: FxHashMap::default(),
+            origins: vec![],
             body_mapping: FxHashMap::default(),
             stack: vec![],
-            instructions: vec![],
+            current_instructions: vec![],
+            final_instructions: vec![],
         };
         let mut start = None;
         for (id, _) in lir.bodies().ids_and_bodies() {
             start = Some(context.compile_body(id));
+            assert!(context.current_instructions.is_empty());
         }
-        module_function.set_body(start.expect("LIR doesn't contain any bodies."));
 
-        context.byte_code
+        let module_function = Function::create(
+            &mut context.constant_heap,
+            false,
+            &[],
+            0,
+            start.expect("LIR doesn't contain any bodies."),
+        );
+        ByteCode {
+            module,
+            constant_heap: context.constant_heap,
+            instructions: context.final_instructions,
+            origins: context.origins,
+            module_function,
+            responsible_module,
+        }
     }
 
     fn get_body(&mut self, body_id: BodyId) -> InstructionPointer {
@@ -112,7 +126,7 @@ impl<'c> LoweringContext<'c> {
     }
     fn compile_body(&mut self, body_id: BodyId) -> InstructionPointer {
         let old_stack = mem::take(&mut self.stack);
-        let old_instructions = mem::take(&mut self.instructions);
+        let old_instructions = mem::take(&mut self.current_instructions);
 
         let body = self.lir.bodies().get(body_id);
         for captured in body.captured_ids() {
@@ -127,11 +141,14 @@ impl<'c> LoweringContext<'c> {
             self.compile_expression(id, expression);
         }
 
-        if matches!(self.instructions.last().unwrap(), Instruction::Call { .. },) {
-            let Instruction::Call { num_args } = self.instructions.pop().unwrap() else {
+        if matches!(
+            self.current_instructions.last().unwrap(),
+            Instruction::Call { .. },
+        ) {
+            let Instruction::Call { num_args } = self.current_instructions.pop().unwrap() else {
                 unreachable!()
             };
-            self.instructions.push(Instruction::TailCall {
+            self.current_instructions.push(Instruction::TailCall {
                 num_locals_to_pop: self.stack.len() - 1,
                 num_args,
             });
@@ -144,16 +161,16 @@ impl<'c> LoweringContext<'c> {
             self.emit(dummy_id, Instruction::Return);
         }
 
-        let num_instructions = self.instructions.len();
-        let start = self.byte_code.instructions.len().into();
-        self.byte_code.instructions.append(&mut self.instructions);
-        self.byte_code
-            .origins
-            .extend((0..num_instructions).map(|_| body.original_hirs().clone()));
+        let num_current_instructions = self.current_instructions.len();
+        let start = self.final_instructions.len().into();
+        self.final_instructions
+            .append(&mut self.current_instructions);
+        self.origins
+            .extend((0..num_current_instructions).map(|_| body.original_hirs().clone()));
         self.body_mapping.force_insert(body_id, start);
 
         self.stack = old_stack;
-        self.instructions = old_instructions;
+        self.current_instructions = old_instructions;
 
         start
     }
@@ -162,13 +179,10 @@ impl<'c> LoweringContext<'c> {
         match expression {
             Expression::CreateTag { symbol, value } => {
                 let symbol = self
-                    .byte_code
                     .constant_heap
                     .default_symbols()
                     .get(symbol)
-                    .unwrap_or_else(|| {
-                        Text::create(&mut self.byte_code.constant_heap, false, symbol)
-                    });
+                    .unwrap_or_else(|| Text::create(&mut self.constant_heap, false, symbol));
 
                 self.emit_reference_to(*value);
                 self.emit(id, Instruction::CreateTag { symbol });
@@ -327,49 +341,37 @@ impl<'c> LoweringContext<'c> {
     fn compile_constant(&mut self, id: ConstantId) -> InlineObject {
         let constant: InlineObject = match self.lir.constants().get(id) {
             Constant::Int(int) => {
-                Int::create_from_bigint(&mut self.byte_code.constant_heap, false, int.clone())
-                    .into()
+                Int::create_from_bigint(&mut self.constant_heap, false, int.clone()).into()
             }
-            Constant::Text(text) => {
-                Text::create(&mut self.byte_code.constant_heap, false, text).into()
-            }
+            Constant::Text(text) => Text::create(&mut self.constant_heap, false, text).into(),
             Constant::Tag { symbol, value } => {
                 let symbol = self
-                    .byte_code
                     .constant_heap
                     .default_symbols()
                     .get(symbol)
-                    .unwrap_or_else(|| {
-                        Text::create(&mut self.byte_code.constant_heap, false, symbol)
-                    });
+                    .unwrap_or_else(|| Text::create(&mut self.constant_heap, false, symbol));
                 let value = value.map(|id| self.get_constant(id));
-                Tag::create_with_value_option(
-                    &mut self.byte_code.constant_heap,
-                    false,
-                    symbol,
-                    value,
-                )
-                .into()
+                Tag::create_with_value_option(&mut self.constant_heap, false, symbol, value).into()
             }
             Constant::Builtin(builtin) => Builtin::create(*builtin).into(),
             Constant::List(items) => {
                 let items = items.iter().map(|id| self.get_constant(*id)).collect_vec();
-                List::create(&mut self.byte_code.constant_heap, false, &items).into()
+                List::create(&mut self.constant_heap, false, &items).into()
             }
             Constant::Struct(fields) => {
                 let fields = fields
                     .iter()
                     .map(|(key, value)| (self.get_constant(*key), self.get_constant(*value)))
                     .collect();
-                Struct::create(&mut self.byte_code.constant_heap, false, &fields).into()
+                Struct::create(&mut self.constant_heap, false, &fields).into()
             }
             Constant::HirId(hir_id) => {
-                HirId::create(&mut self.byte_code.constant_heap, false, hir_id.clone()).into()
+                HirId::create(&mut self.constant_heap, false, hir_id.clone()).into()
             }
             Constant::Function(body_id) => {
                 let body = self.get_body(*body_id);
                 Function::create(
-                    &mut self.byte_code.constant_heap,
+                    &mut self.constant_heap,
                     false,
                     &[],
                     self.lir.bodies().get(*body_id).parameter_count(),
@@ -388,7 +390,7 @@ impl<'c> LoweringContext<'c> {
     }
     fn emit(&mut self, id: Id, instruction: Instruction) {
         instruction.apply_to_stack(&mut self.stack, id);
-        self.instructions.push(instruction);
+        self.current_instructions.push(instruction);
     }
 }
 

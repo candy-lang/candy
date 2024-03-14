@@ -96,11 +96,6 @@ impl HeapFunction {
         #[allow(clippy::cast_possible_truncation)]
         unsafe { *self.body_pointer().as_ref() as usize }.into()
     }
-    pub fn set_body(self, body: InstructionPointer) {
-        unsafe {
-            *self.body_pointer().as_mut() = *body as u64;
-        }
-    }
 }
 
 impl DebugDisplay for HeapFunction {
