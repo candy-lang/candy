@@ -37,6 +37,8 @@
               llvmPackages_15.clangUseLLVM
               llvmPackages_15.llvm
               mold
+              nodejs_18
+              nodePackages.typescript
               rustToolchain
               rust-analyzer
               sccache
