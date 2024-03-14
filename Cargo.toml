@@ -15,3 +15,6 @@ members = [
 [workspace.package]
 edition = "2021"
 rust-version = "1.78.0"
+
+[profile.release]
+debug = "limited"
