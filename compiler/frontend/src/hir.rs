@@ -165,7 +165,16 @@ impl IdPath {
 
     #[must_use]
     fn parent(&self) -> Option<Self> {
-        self.0.rfind(':').map(|i| Self(self.0[..i].to_string()))
+        self.0
+            .rfind(':')
+            .map(|i| Self(self.0[..i].to_string()))
+            .or_else(|| {
+                if self.is_root() {
+                    None
+                } else {
+                    Some(Self::default())
+                }
+            })
     }
 }
 impl From<IdKey> for IdPath {
