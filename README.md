@@ -94,6 +94,7 @@ There are still compiler bugs and performance improvements that need work before
 ## How to use Candy
 
 1. Install [<img height="16" src="https://rust-lang.org/static/images/favicon.svg"> Rust](https://rust-lang.org): [rust-lang.org/tools/install](https://rust-lang.org/tools/install) (use Rustup since we use nightly features).
+   - Alternatively, use the provided [<img height="16" src="https://nixos.org/_astro/flake-blue.Bf2X2kC4_Z1yqDoT.svg"> Nix](https://nixos.org/) flake to install all required dependencies.
 2. Clone this repo.
 
 Then, you can use Candy in two ways:

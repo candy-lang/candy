@@ -10,7 +10,9 @@
     "directory": "new-new-packages/vscode_extension"
   },
   "//": "Keep in sync with `devDependencies.@types/vscode`",
+  "//": "https://github.com/ewanharris/vscode-versions",
   "engines": {
+    "node": "^18.17.1",
     "vscode": "^1.86.0"
   },
   "categories": [
