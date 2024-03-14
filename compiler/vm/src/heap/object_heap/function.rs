@@ -42,7 +42,7 @@ impl HeapFunction {
         );
 
         let argument_count_shift_for_max_size =
-            Self::CAPTURED_LEN_SHIFT + Self::ARGUMENT_COUNT_SHIFT;
+            InlineObject::BITS as usize - Self::CAPTURED_LEN_SHIFT + Self::ARGUMENT_COUNT_SHIFT;
         assert_eq!(
             (argument_count << argument_count_shift_for_max_size)
                 >> argument_count_shift_for_max_size,

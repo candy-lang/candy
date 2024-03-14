@@ -35,7 +35,8 @@ impl InlineHandle {
             handle_id,
             "Handle ID is too large.",
         );
-        let argument_count_shift_for_max_size = Self::HANDLE_ID_SHIFT + Self::ARGUMENT_COUNT_SHIFT;
+        let argument_count_shift_for_max_size =
+            InlineObject::BITS as usize - Self::HANDLE_ID_SHIFT + Self::ARGUMENT_COUNT_SHIFT;
         debug_assert_eq!(
             (argument_count << argument_count_shift_for_max_size)
                 >> argument_count_shift_for_max_size,
