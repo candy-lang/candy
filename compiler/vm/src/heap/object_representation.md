@@ -7,14 +7,13 @@ An object is stored as an _inline object_:
 
 An inline object is a single word containing a tagged union of different types of values:
 
-|                                                                     Value | Meaning                   |
-| ------------------------------------------------------------------------: | :------------------------ |
-| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx000` | Pointer                   |
-| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx001` | Int                       |
-| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx010` | Builtin                   |
-| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx011` | Tag without value         |
-| `bbbbbbbb bbbbbbbb bbbbbbbb bbbbbbbb aaaaaaaa aaaaaaaa aaaaaaaa aaaaa100` | Handle                    |
-| `bbbbbbbb bbbbbbbb bbbbbbbb bbbbbbbb bbbbbbbb bbbbbbbb bbbbbbbb aaaaa101` | Function without captures |
+|                                                                     Value | Meaning           |
+| ------------------------------------------------------------------------: | :---------------- |
+| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx000` | Pointer           |
+| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx001` | Int               |
+| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx010` | Builtin           |
+| `xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxx011` | Tag without value |
+| `bbbbbbbb bbbbbbbb bbbbbbbb bbbbbbbb aaaaaaaa aaaaaaaa aaaaaaaa aaaaa100` | Handle            |
 
 > The remaining patterns are invalid.
 
@@ -41,11 +40,6 @@ When setting the lowest three bits to zero, the word is a pointer to a heap text
 
 `a` stores the argument count.
 `b` stores the handle ID as an unsigned integer.
-
-### Function without captures
-
-`a` stores the argument count.
-`b` stores the function's body (instruction pointer).
 
 ## Heap Object
 

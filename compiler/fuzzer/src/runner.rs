@@ -72,7 +72,10 @@ impl<B: Borrow<ByteCode> + Clone> Runner<B> {
         let num_instructions = byte_code.borrow().instructions.len();
 
         let mut mapping = FxHashMap::default();
-        let function = function.clone_to_heap_with_mapping(&mut heap, &mut mapping);
+        let function = function
+            .clone_to_heap_with_mapping(&mut heap, &mut mapping)
+            .try_into()
+            .unwrap();
         let input = input.clone_to_heap_with_mapping(&mut heap, &mut mapping);
         let responsible = HirId::create(&mut heap, true, Id::fuzzer());
 

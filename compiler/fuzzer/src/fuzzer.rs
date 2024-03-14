@@ -65,7 +65,10 @@ impl Fuzzer {
     #[must_use]
     pub fn new(byte_code: Rc<ByteCode>, function: Function, function_id: Id) -> Self {
         let mut persistent_heap = Heap::default();
-        let function = function.clone_to_heap(&mut persistent_heap);
+        let function: Function = function
+            .clone_to_heap(&mut persistent_heap)
+            .try_into()
+            .unwrap();
 
         // TODO: Collect `InlineTag`s by walking `function`
         let pool = InputPool::new(
