@@ -30,11 +30,13 @@
           mkShell {
             LLVM_SYS_150_PREFIX = "${pkgs.llvmPackages_15.llvm.dev}";
             RUSTC_WRAPPER = "sccache";
+            RUSTFLAGS = "-C link-arg=-fuse-ld=mold";
             buildInputs = [
               libffi
               llvmPackages_15.bintools
               llvmPackages_15.clangUseLLVM
               llvmPackages_15.llvm
+              mold
               rustToolchain
               rust-analyzer
               sccache
