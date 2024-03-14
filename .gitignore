@@ -10,6 +10,9 @@ callgrind.out.*
 # ANTLR
 .antlr/
 
+# direnv
+.direnv/
+
 # Rust
 target
 
