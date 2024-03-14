@@ -133,7 +133,8 @@ impl IrFeatures {
             Ir::OptimizedLir(tracing_config) => Self::rich_ir_for_optimized_lir(
                 &config.module,
                 db.optimized_lir(
-                    ExecutionTarget::Module(config.module.clone()),
+                    //ExecutionTarget::Module(config.module.clone()),
+                    ExecutionTarget::MainFunction(config.module.clone()),
                     tracing_config.clone(),
                 ),
                 tracing_config,

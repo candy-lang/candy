@@ -13,6 +13,10 @@
       "path": "compiler/vm"
     },
     {
+      "name": "Compiler: Cranelift Backend",
+      "path": "compiler/backend_cranelift"
+    },
+    {
       "name": "Compiler: Inkwell Backend",
       "path": "compiler/backend_inkwell"
     },
@@ -60,8 +64,8 @@
       "editor.defaultFormatter": "redhat.vscode-yaml"
     },
     "editor.codeActionsOnSave": {
-      "source.fixAll": true,
-      "source.organizeImports": true
+      "source.fixAll": "explicit",
+      "source.organizeImports": "explicit"
     },
     "editor.formatOnPaste": true,
     "editor.formatOnSave": true,

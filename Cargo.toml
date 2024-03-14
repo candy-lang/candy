@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "compiler/backend_cranelift",
     "compiler/backend_inkwell",
     "compiler/cli",
     "compiler/frontend",
@@ -9,7 +10,7 @@ members = [
     "compiler/formatter/fuzz",
     "compiler/language_server",
     "compiler/vm",
-    "compiler/vm/fuzz",
+    "compiler/vm/fuzz", 
 ]
 
 [profile.release]

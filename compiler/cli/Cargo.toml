@@ -15,6 +15,7 @@ inkwell = ["candy_backend_inkwell"]
 
 [dependencies]
 candy_backend_inkwell = { path = "../backend_inkwell", optional = true }
+candy_backend_cranelift = { path = "../backend_cranelift" }
 candy_frontend = { path = "../frontend" }
 candy_fuzzer = { path = "../fuzzer" }
 candy_language_server = { path = "../language_server" }

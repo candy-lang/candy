@@ -21,6 +21,7 @@ use tracing_subscriber::{
 };
 
 mod check;
+mod cranelift;
 mod database;
 mod debug;
 mod fuzz;
@@ -47,6 +48,8 @@ enum CandyOptions {
 
     #[cfg(feature = "inkwell")]
     Inkwell(inkwell::Options),
+
+    Native(cranelift::Options),
 }
 
 #[tokio::main]
@@ -65,6 +68,7 @@ async fn main() -> ProgramResult {
         CandyOptions::Lsp => lsp::lsp().await,
         #[cfg(feature = "inkwell")]
         CandyOptions::Inkwell(options) => inkwell::compile(&options),
+        CandyOptions::Native(options) => cranelift::compile(options),
     }
 }
 
