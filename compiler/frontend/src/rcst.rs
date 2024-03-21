@@ -5,7 +5,7 @@ use crate::{
 
 pub type Rcst = Cst<()>;
 
-impl From<CstKind<()>> for Cst<()> {
+impl From<CstKind<()>> for Rcst {
     fn from(value: CstKind<()>) -> Self {
         Self {
             data: (),
@@ -14,7 +14,7 @@ impl From<CstKind<()>> for Cst<()> {
     }
 }
 
-impl ToRichIr for Cst<()> {
+impl ToRichIr for Rcst {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         self.kind.build_rich_ir(builder);
     }
