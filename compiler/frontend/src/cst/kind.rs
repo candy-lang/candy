@@ -662,7 +662,7 @@ where
                             builder.push_cst_kind_property("prefix", format!("\"{prefix}\""));
                         });
                     } else {
-                        builder.push_simple("None");
+                        builder.push_simple(" None");
                     }
 
                     builder.push_cst_kind_property_name("value");

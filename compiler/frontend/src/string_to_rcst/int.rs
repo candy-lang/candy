@@ -61,111 +61,95 @@ pub fn int(input: &str) -> Option<(&str, Rcst)> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::string_to_rcst::utils::build_simple_int;
+    use crate::string_to_rcst::utils::assert_rich_ir_snapshot;
 
     #[test]
     fn test_int() {
         // Binary
-        assert_eq!(
-            int("0b10"),
-            Some((
-                "",
-                CstKind::Int {
-                    radix_prefix: Some((IntRadix::Binary, "0b".to_string())),
-                    value: 0b10u8.into(),
-                    string: "10".to_string()
-                }
-                .into(),
-            )),
-        );
-        assert_eq!(
-            int("0B101"),
-            Some((
-                "",
-                CstKind::Int {
-                    radix_prefix: Some((IntRadix::Binary, "0B".to_string())),
-                    value: 0b101u8.into(),
-                    string: "101".to_string()
-                }
-                .into(),
-            )),
-        );
-        assert_eq!(
-            int("0b10100101"),
-            Some((
-                "",
-                CstKind::Int {
-                    radix_prefix: Some((IntRadix::Binary, "0b".to_string())),
-                    value: 0b1010_0101u32.into(),
-                    string: "10100101".to_string()
-                }
-                .into(),
-            )),
-        );
+        assert_rich_ir_snapshot!(int("0b10"), @r###"
+        Remaining input: ""
+        Parsed: Int:
+          radix_prefix:
+            radix: Binary
+            prefix: "0b"
+          value: 2
+          string: "10"
+        "###);
+        assert_rich_ir_snapshot!(int("0B101"), @r###"
+        Remaining input: ""
+        Parsed: Int:
+          radix_prefix:
+            radix: Binary
+            prefix: "0B"
+          value: 5
+          string: "101"
+        "###);
+        assert_rich_ir_snapshot!(int("0b10100101"), @r###"
+        Remaining input: ""
+        Parsed: Int:
+          radix_prefix:
+            radix: Binary
+            prefix: "0b"
+          value: 165
+          string: "10100101"
+        "###);
         // Decimal
-        assert_eq!(int("42 "), Some((" ", build_simple_int(42))));
-        assert_eq!(
-            int("012"),
-            Some((
-                "",
-                CstKind::Int {
-                    radix_prefix: None,
-                    value: 12u8.into(),
-                    string: "012".to_string()
-                }
-                .into(),
-            )),
-        );
+        assert_rich_ir_snapshot!(int("42 "), @r###"
+        Remaining input: " "
+        Parsed: Int:
+          radix_prefix: None
+          value: 42
+          string: "42"
+        "###);
+        assert_rich_ir_snapshot!(int("012"), @r###"
+        Remaining input: ""
+        Parsed: Int:
+          radix_prefix: None
+          value: 12
+          string: "012"
+        "###);
         // Hexadecimal
-        assert_eq!(
-            int("0x12"),
-            Some((
-                "",
-                CstKind::Int {
-                    radix_prefix: Some((IntRadix::Hexadecimal, "0x".to_string())),
-                    value: 0x12u8.into(),
-                    string: "12".to_string()
-                }
-                .into(),
-            )),
-        );
-        assert_eq!(
-            int("0X012"),
-            Some((
-                "",
-                CstKind::Int {
-                    radix_prefix: Some((IntRadix::Hexadecimal, "0X".to_string())),
-                    value: 0x12u8.into(),
-                    string: "012".to_string()
-                }
-                .into(),
-            )),
-        );
-        assert_eq!(
-            int("0xDEADc0de"),
-            Some((
-                "",
-                CstKind::Int {
-                    radix_prefix: Some((IntRadix::Hexadecimal, "0x".to_string())),
-                    value: 0xDEAD_C0DEu32.into(),
-                    string: "DEADc0de".to_string()
-                }
-                .into(),
-            )),
-        );
+        assert_rich_ir_snapshot!(int("0x12"), @r###"
+        Remaining input: ""
+        Parsed: Int:
+          radix_prefix:
+            radix: Hexadecimal
+            prefix: "0x"
+          value: 18
+          string: "12"
+        "###);
+        assert_rich_ir_snapshot!(int("0X012"), @r###"
+        Remaining input: ""
+        Parsed: Int:
+          radix_prefix:
+            radix: Hexadecimal
+            prefix: "0X"
+          value: 18
+          string: "012"
+        "###);
+        assert_rich_ir_snapshot!(int("0xDEADc0de"), @r###"
+        Remaining input: ""
+        Parsed: Int:
+          radix_prefix:
+            radix: Hexadecimal
+            prefix: "0x"
+          value: 3735929054
+          string: "DEADc0de"
+        "###);
 
-        assert_eq!(int("123 years"), Some((" years", build_simple_int(123))));
-        assert_eq!(int("foo"), None);
-        assert_eq!(
-            int("3D"),
-            Some((
-                "",
-                CstKind::Error {
-                    unparsable_input: "3D".to_string(),
-                    error: CstError::IntContainsNonDigits,
-                }
-                .into(),
-            )),
-        );
+        assert_rich_ir_snapshot!(int("123 years"), @r###"
+        Remaining input: " years"
+        Parsed: Int:
+          radix_prefix: None
+          value: 123
+          string: "123"
+        "###);
+        assert_rich_ir_snapshot!(int("foo"), @"Nothing was parsed");
+        assert_rich_ir_snapshot!(int("3D"), @r###"
+        Remaining input: ""
+        Parsed: Error:
+          unparsable_input: "3D"
+          error: IntContainsNonDigits
+        "###);
     }
 }

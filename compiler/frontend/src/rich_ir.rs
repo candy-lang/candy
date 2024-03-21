@@ -107,13 +107,6 @@ impl ToRichIr for String {
         builder.push_simple(self);
     }
 }
-impl<T: ToRichIr> ToRichIr for Option<T> {
-    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        if let Some(value) = self {
-            value.build_rich_ir(builder);
-        }
-    }
-}
 impl<T: ToRichIr> ToRichIr for Box<T> {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         self.as_ref().build_rich_ir(builder);

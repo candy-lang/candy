@@ -175,104 +175,137 @@ pub fn whitespaces_and_newlines(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::string_to_rcst::utils::{build_comment, build_newline, build_space};
+    use crate::string_to_rcst::utils::assert_rich_ir_snapshot;
 
     #[test]
     pub fn test_single_line_whitespace() {
-        assert_eq!(
-            single_line_whitespace("  \nfoo"),
-            Some(("\nfoo", CstKind::Whitespace("  ".to_string()).into())),
-        );
+        assert_rich_ir_snapshot!(single_line_whitespace("  \nfoo"), @r###"
+        Remaining input: "
+        foo"
+        Parsed: Whitespace "  "
+        "###);
     }
 
     #[test]
     fn test_leading_indentation() {
-        assert_eq!(
-            leading_indentation("foo", 0),
-            Some(("foo", CstKind::Whitespace(String::new()).into())),
-        );
-        assert_eq!(
-            leading_indentation("  foo", 1),
-            Some(("foo", CstKind::Whitespace("  ".to_string()).into())),
-        );
-        assert_eq!(leading_indentation("  foo", 2), None);
+        assert_rich_ir_snapshot!(leading_indentation("foo", 0), @r###"
+        Remaining input: "foo"
+        Parsed: Whitespace ""
+        "###);
+        assert_rich_ir_snapshot!(leading_indentation("  foo", 1), @r###"
+        Remaining input: "foo"
+        Parsed: Whitespace "  "
+        "###);
+        assert_rich_ir_snapshot!(leading_indentation("  foo", 2), @"Nothing was parsed");
     }
 
     #[test]
     fn test_whitespaces_and_newlines() {
-        assert_eq!(whitespaces_and_newlines("foo", 0, true), ("foo", vec![]));
-        assert_eq!(
+        assert_rich_ir_snapshot!(whitespaces_and_newlines("foo", 0, true), @r###"
+        Remaining input: "foo"
+        Parsed: 
+        "###);
+        assert_rich_ir_snapshot!(
             whitespaces_and_newlines("\nfoo", 0, true),
-            ("foo", vec![build_newline()]),
+            @r###"
+        Remaining input: "foo"
+        Parsed: Newline "\n"
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             whitespaces_and_newlines("\nfoo", 1, true),
-            ("\nfoo", vec![]),
+            @r###"
+        Remaining input: "
+        foo"
+        Parsed: 
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             whitespaces_and_newlines("\n  foo", 1, true),
-            (
-                "foo",
-                vec![
-                    build_newline(),
-                    CstKind::Whitespace("  ".to_string()).into(),
-                ],
-            ),
+            @r###"
+        Remaining input: "foo"
+        Parsed: Newline "\n"
+        Whitespace "  "
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             whitespaces_and_newlines("\n  foo", 0, true),
-            ("  foo", vec![build_newline()]),
+            @r###"
+        Remaining input: "  foo"
+        Parsed: Newline "\n"
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             whitespaces_and_newlines(" \n  foo", 0, true),
-            ("  foo", vec![build_space(), build_newline()]),
+            @r###"
+        Remaining input: "  foo"
+        Parsed: Whitespace " "
+        Newline "\n"
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             whitespaces_and_newlines("\n  foo", 2, true),
-            ("\n  foo", vec![]),
+            @r###"
+        Remaining input: "
+          foo"
+        Parsed: 
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             whitespaces_and_newlines("\tfoo", 1, true),
-            (
-                "foo",
-                vec![CstKind::Error {
-                    unparsable_input: "\t".to_string(),
-                    error: CstError::WeirdWhitespace,
-                }
-                .into()],
-            ),
+            @r###"
+        Remaining input: "foo"
+        Parsed: Error:
+          unparsable_input: "	"
+          error: WeirdWhitespace
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             whitespaces_and_newlines("# hey\n  foo", 1, true),
-            (
-                "foo",
-                vec![
-                    build_comment(" hey"),
-                    build_newline(),
-                    CstKind::Whitespace("  ".to_string()).into(),
-                ],
-            )
+            @r###"
+        Remaining input: "foo"
+        Parsed: Comment:
+          octothorpe: Octothorpe
+          comment: " hey"
+        Newline "\n"
+        Whitespace "  "
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             whitespaces_and_newlines("# foo\n\n  #bar\n", 1, true),
-            (
-                "\n",
-                vec![
-                    build_comment(" foo"),
-                    build_newline(),
-                    build_newline(),
-                    CstKind::Whitespace("  ".to_string()).into(),
-                    build_comment("bar"),
-                ],
-            ),
+            @r###"
+        Remaining input: "
+        "
+        Parsed: Comment:
+          octothorpe: Octothorpe
+          comment: " foo"
+        Newline "\n"
+        Newline "\n"
+        Whitespace "  "
+        Comment:
+          octothorpe: Octothorpe
+          comment: "bar"
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             whitespaces_and_newlines(" # abc\n", 1, true),
-            ("\n", vec![build_space(), build_comment(" abc")]),
+            @r###"
+        Remaining input: "
+        "
+        Parsed: Whitespace " "
+        Comment:
+          octothorpe: Octothorpe
+          comment: " abc"
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             whitespaces_and_newlines("\n# abc\n", 1, true),
-            ("\n# abc\n", vec![]),
+            @r###"
+        Remaining input: "
+        # abc
+        "
+        Parsed: 
+        "###
         );
     }
 }
