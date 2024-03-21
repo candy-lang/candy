@@ -86,14 +86,6 @@ rick := "
 "
 
 fromUtf8 := builtins.textFromUtf8
-charFromAsciiCode code :=
-  needs (int.is code)
-  needs (0 | int.isLessThanOrEqualTo code)
-  needs (code | int.isLessThanOrEqualTo 127)
-  # Ok text = fromUtf8 (code,)
-  # text
-  Ok text = fromUtf8 (code,)
-  text
 
 isEmpty := builtins.textIsEmpty
 length := builtins.textLength

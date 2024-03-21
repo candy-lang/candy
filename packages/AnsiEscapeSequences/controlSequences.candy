@@ -1,9 +1,9 @@
 # https://en.wikipedia.org/wiki/ANSI_escape_code#CSI_(Control_Sequence_Introducer)_sequences
 
+ascii = use "Ascii"
 [int, text] = use "Core"
-[escapeCode] = use "..escapeCode"
 
-controlSequenceIntroducer := "{escapeCode}["
+controlSequenceIntroducer := "{ascii.escape}["
 
 cursorUp lineCount :=
   # Moves the cursor `lineCount` lines up.

@@ -11,6 +11,10 @@
   - changed-files:
       - any-glob-to-any-file:
           - packages/AnsiTerminalColors/**/*
+'P: Ascii':
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/Ascii/**/*
 'P: Builtins':
   - changed-files:
       - any-glob-to-any-file:
