@@ -48,6 +48,14 @@ pub enum Expression {
         responsible: Id,
     },
 
+    Jump {
+        target: Id,
+    },
+    JumpConditionally {
+        target: Id,
+        condition: Id,
+    },
+
     Panic {
         reason: Id,
         responsible: Id,
@@ -127,6 +135,13 @@ impl Expression {
                     *argument = replacer(*argument);
                 }
                 *responsible = replacer(*responsible);
+            }
+            Self::Jump { target } => {
+                *target = replacer(*target);
+            }
+            Self::JumpConditionally { target, condition } => {
+                *target = replacer(*target);
+                *condition = replacer(*condition);
             }
             Self::Panic {
                 reason,
@@ -265,6 +280,16 @@ impl Expression {
                 builder.push(" (", None, EnumSet::empty());
                 responsible.build_rich_ir_with_constants(builder, constants, body);
                 builder.push(" is responsible)", None, EnumSet::empty());
+            }
+            Self::Jump { target } => {
+                builder.push("jump to ", None, EnumSet::empty());
+                target.build_rich_ir_with_constants(builder, constants, body);
+            }
+            Self::JumpConditionally { target, condition } => {
+                builder.push("jump to ", None, EnumSet::empty());
+                target.build_rich_ir_with_constants(builder, constants, body);
+                builder.push(" if ", None, EnumSet::empty());
+                condition.build_rich_ir_with_constants(builder, constants, body);
             }
             Self::Panic {
                 reason,
