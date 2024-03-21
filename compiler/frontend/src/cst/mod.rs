@@ -3,7 +3,12 @@ pub use self::{
     error::CstError, id::Id, is_multiline::IsMultiline, kind::CstKind, kind::IntRadix,
     unwrap_whitespace_and_comment::UnwrapWhitespaceAndComment,
 };
-use crate::{module::Module, position::Offset, rcst_to_cst::RcstToCst};
+use crate::{
+    module::Module,
+    position::Offset,
+    rcst_to_cst::RcstToCst,
+    rich_ir::{RichIrBuilder, ToRichIr},
+};
 use derive_more::Deref;
 use std::{
     fmt::{self, Display, Formatter},
@@ -48,6 +53,18 @@ impl Cst {
 impl Display for Cst {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         self.kind.fmt(f)
+    }
+}
+impl ToRichIr for Cst {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push_simple("Cst ");
+        self.data.id.build_rich_ir(builder);
+        builder.push_simple(format!(
+            " at {}..{}",
+            *self.data.span.start, *self.data.span.end
+        ));
+        builder.push_simple(" of kind ");
+        self.kind.build_rich_ir(builder);
     }
 }
 
