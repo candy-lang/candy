@@ -106,7 +106,7 @@ fn compile_top_level(
         db,
         public_identifiers: FxHashMap::default(),
         body: Body::default(),
-        id_prefix: hir::Id::new(module, vec![]),
+        id_prefix: hir::Id::new(module, vec![]).into(),
         identifiers: im::HashMap::new(),
         is_top_level: true,
         use_id: None,
@@ -130,13 +130,28 @@ fn compile_top_level(
     (context.body, id_mapping)
 }
 
+struct IdPrefix {
+    id: hir::Id,
+    named_disambiguators: FxHashMap<String, usize>,
+    positional_disambiguator: usize,
+}
+impl From<hir::Id> for IdPrefix {
+    fn from(value: hir::Id) -> Self {
+        Self {
+            id: value,
+            named_disambiguators: FxHashMap::default(),
+            positional_disambiguator: 0,
+        }
+    }
+}
+
 struct Context<'a> {
     module: Module,
     id_mapping: FxHashMap<hir::Id, Option<ast::Id>>,
     db: &'a dyn AstToHir,
     public_identifiers: FxHashMap<String, hir::Id>,
     body: Body,
-    id_prefix: hir::Id,
+    id_prefix: IdPrefix,
     identifiers: im::HashMap<String, hir::Id>,
     is_top_level: bool,
     use_id: Option<hir::Id>,
@@ -161,24 +176,25 @@ impl Context<'_> {
     {
         let reset_state = ScopeResetState {
             body: mem::take(&mut self.body),
-            id_prefix: self.id_prefix.clone(),
+            id_prefix: id_prefix
+                .into()
+                .map(|id_prefix| mem::replace(&mut self.id_prefix, id_prefix.into())),
             identifiers: self.identifiers.clone(),
         };
 
-        if let Some(id_prefix) = id_prefix.into() {
-            self.id_prefix = id_prefix;
-        }
         let res = self.with_non_top_level(|scope| func(scope));
 
         let inner_body = mem::replace(&mut self.body, reset_state.body);
-        self.id_prefix = reset_state.id_prefix;
+        if let Some(id_prefix) = reset_state.id_prefix {
+            self.id_prefix = id_prefix;
+        };
         self.identifiers = reset_state.identifiers;
         (inner_body, res)
     }
 }
 struct ScopeResetState {
     body: Body,
-    id_prefix: hir::Id,
+    id_prefix: Option<IdPrefix>,
     identifiers: im::HashMap<String, hir::Id>,
 }
 
@@ -537,7 +553,7 @@ impl Context<'_> {
             for parameter in &function.parameters {
                 if let AstKind::Identifier(Identifier(parameter)) = &parameter.kind {
                     let name = parameter.value.to_string();
-                    parameters.push(scope.id_prefix.child(name.clone()));
+                    parameters.push(scope.id_prefix.id.child(name.clone()));
 
                     let id = scope.create_next_id(parameter.id.clone(), &*name);
                     scope.body.identifiers.insert(id.clone(), name.clone());
@@ -757,27 +773,37 @@ impl Context<'_> {
         key: impl Into<Option<&str>>,
     ) -> hir::Id {
         let key = key.into();
-        for disambiguator in 0.. {
-            let last_part = key.as_ref().map_or_else(
-                || disambiguator.into(),
-                |key| {
-                    if disambiguator == 0 {
-                        (*key).to_string().into()
-                    } else {
-                        IdKey::Named {
-                            name: (*key).to_string(),
-                            disambiguator,
-                        }
+        let last_part = key.map_or_else(
+            || {
+                let disambiguator = self.id_prefix.positional_disambiguator;
+                self.id_prefix.positional_disambiguator = disambiguator + 1;
+                disambiguator.into()
+            },
+            |key| match self
+                .id_prefix
+                .named_disambiguators
+                .entry((*key).to_string())
+            {
+                Entry::Occupied(mut entry) => {
+                    let disambiguator = *entry.get();
+                    entry.insert(disambiguator + 1);
+                    IdKey::Named {
+                        name: (*key).to_string(),
+                        disambiguator,
                     }
-                },
-            );
-            let id = self.id_prefix.child(last_part);
-            if let Entry::Vacant(entry) = self.id_mapping.entry(id.clone()) {
-                entry.insert(ast_id.into());
-                return id;
-            }
-        }
-        unreachable!()
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(1);
+                    (*key).to_string().into()
+                }
+            },
+        );
+        let id = self.id_prefix.id.child(last_part);
+        let Entry::Vacant(entry) = self.id_mapping.entry(id.clone()) else {
+            unreachable!()
+        };
+        entry.insert(ast_id.into());
+        id
     }
 
     fn generate_sparkles(&mut self) {
@@ -808,7 +834,7 @@ impl Context<'_> {
 
         let use_id = self.create_next_id(None, "use");
         let (inner_body, relative_path) = self.with_scope(use_id.clone(), |scope| {
-            let relative_path = scope.id_prefix.child("relativePath");
+            let relative_path = scope.id_prefix.id.child("relativePath");
             scope.push(
                 None,
                 Expression::UseModule {
