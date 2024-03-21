@@ -662,10 +662,11 @@ where
                             builder.push_cst_kind_property("prefix", format!("\"{prefix}\""));
                         });
                     } else {
-                        builder.push_simple("None");
+                        builder.push_simple(" None");
                     }
 
                     builder.push_cst_kind_property_name("value");
+                    builder.push_simple(" ");
                     builder.push(value.to_string(), TokenType::Int, EnumSet::new());
 
                     builder.push_cst_kind_property("string", format!("\"{string}\""));
@@ -823,6 +824,7 @@ where
                     builder.push_cst_kind_property("value", value);
 
                     builder.push_cst_kind_property_name("comma");
+                    builder.push_simple(" ");
                     if let Some(comma) = comma {
                         comma.build_rich_ir(builder);
                     } else {
@@ -860,12 +862,13 @@ where
                         builder.push_cst_kind_property("key", key);
                         builder.push_cst_kind_property("colon", colon);
                     } else {
-                        builder.push_simple("None");
+                        builder.push_simple(" None");
                     }
 
                     builder.push_cst_kind_property("value", value);
 
                     builder.push_cst_kind_property_name("comma");
+                    builder.push_simple(" ");
                     if let Some(comma) = comma {
                         comma.build_rich_ir(builder);
                     } else {
@@ -939,7 +942,7 @@ where
                             builder.push_cst_kind_property("arrow", arrow);
                         });
                     } else {
-                        builder.push_simple("None");
+                        builder.push_simple(" None");
                     }
 
                     builder.push_cst_kind_property_name("body");
@@ -993,7 +996,7 @@ impl RichIrBuilder {
     }
     fn push_cst_kind_property_name(&mut self, property_name: &str) {
         self.push_newline();
-        self.push_simple(format!("{property_name}: "));
+        self.push_simple(format!("{property_name}:"));
     }
     fn push_cst_kind_property(&mut self, property_name: &str, value: impl ToRichIr) {
         self.push_newline();

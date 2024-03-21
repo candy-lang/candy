@@ -144,131 +144,118 @@ pub fn function(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::string_to_rcst::utils::{
-        build_comment, build_identifier, build_newline, build_simple_int, build_space,
-    };
+    use crate::string_to_rcst::utils::assert_rich_ir_snapshot;
 
     #[test]
     fn test_function() {
-        assert_eq!(function("2", 0), None);
-        assert_eq!(
-            function("{ 2 }", 0),
-            Some((
-                "",
-                CstKind::Function {
-                    opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.with_trailing_space()),
-                    parameters_and_arrow: None,
-                    body: vec![build_simple_int(2), build_space()],
-                    closing_curly_brace: Box::new(CstKind::ClosingCurlyBrace.into()),
-                }
-                .into(),
-            )),
-        );
+        assert_rich_ir_snapshot!(function("2", 0), @"Nothing was parsed");
+        assert_rich_ir_snapshot!(function("{ 2 }", 0), @r###"
+        Remaining input: ""
+        Parsed: Function:
+          opening_curly_brace: TrailingWhitespace:
+            child: OpeningCurlyBrace
+            whitespace:
+              Whitespace " "
+          parameters_and_arrow: None
+          body:
+            Int:
+              radix_prefix: None
+              value: 2
+              string: "2"
+            Whitespace " "
+          closing_curly_brace: ClosingCurlyBrace
+        "###);
         // { a ->
         //   foo
         // }
-        assert_eq!(
-            function("{ a ->\n  foo\n}", 0),
-            Some((
-                "",
-                CstKind::Function {
-                    opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.with_trailing_space()),
-                    parameters_and_arrow: Some((
-                        vec![build_identifier("a").with_trailing_space()],
-                        Box::new(CstKind::Arrow.with_trailing_whitespace(vec![
-                            CstKind::Newline("\n".to_string()),
-                            CstKind::Whitespace("  ".to_string())
-                        ])),
-                    )),
-                    body: vec![build_identifier("foo"), build_newline()],
-                    closing_curly_brace: Box::new(CstKind::ClosingCurlyBrace.into()),
-                }
-                .into(),
-            )),
-        );
+        assert_rich_ir_snapshot!(function("{ a ->\n  foo\n}", 0), @r###"
+        Remaining input: ""
+        Parsed: Function:
+          opening_curly_brace: TrailingWhitespace:
+            child: OpeningCurlyBrace
+            whitespace:
+              Whitespace " "
+          parameters_and_arrow:
+            parameters:
+              TrailingWhitespace:
+                child: Identifier "a"
+                whitespace:
+                  Whitespace " "
+            arrow: TrailingWhitespace:
+              child: Arrow
+              whitespace:
+                Newline "\n"
+                Whitespace "  "
+          body:
+            Identifier "foo"
+            Newline "\n"
+          closing_curly_brace: ClosingCurlyBrace
+        "###);
         // {
         // foo
-        assert_eq!(
-            function("{\nfoo", 0),
-            Some((
-                "\nfoo",
-                CstKind::Function {
-                    opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.into()),
-                    parameters_and_arrow: None,
-                    body: vec![],
-                    closing_curly_brace: Box::new(
-                        CstKind::Error {
-                            unparsable_input: String::new(),
-                            error: CstError::CurlyBraceNotClosed
-                        }
-                        .into()
-                    ),
-                }
-                .into(),
-            )),
-        );
+        assert_rich_ir_snapshot!(function("{\nfoo", 0), @r###"
+        Remaining input: "
+        foo"
+        Parsed: Function:
+          opening_curly_brace: OpeningCurlyBrace
+          parameters_and_arrow: None
+          body:
+          closing_curly_brace: Error:
+            unparsable_input: ""
+            error: CurlyBraceNotClosed
+        "###);
         // {->
         // }
-        assert_eq!(
-            function("{->\n}", 1),
-            Some((
-                "\n}",
-                CstKind::Function {
-                    opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.into()),
-                    parameters_and_arrow: Some((vec![], Box::new(CstKind::Arrow.into()))),
-                    body: vec![],
-                    closing_curly_brace: Box::new(
-                        CstKind::Error {
-                            unparsable_input: String::new(),
-                            error: CstError::CurlyBraceNotClosed
-                        }
-                        .into()
-                    ),
-                }
-                .into(),
-            )),
-        );
+        assert_rich_ir_snapshot!(function("{->\n}", 1), @r###"
+        Remaining input: "
+        }"
+        Parsed: Function:
+          opening_curly_brace: OpeningCurlyBrace
+          parameters_and_arrow:
+            parameters:
+            arrow: Arrow
+          body:
+          closing_curly_brace: Error:
+            unparsable_input: ""
+            error: CurlyBraceNotClosed
+        "###);
         // { foo
         //   bar
         // }
-        assert_eq!(
-            function("{ foo\n  bar\n}", 0),
-            Some((
-                "",
-                CstKind::Function {
-                    opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.with_trailing_space()),
-                    parameters_and_arrow: None,
-                    body: vec![
-                        build_identifier("foo"),
-                        build_newline(),
-                        CstKind::Whitespace("  ".to_string()).into(),
-                        build_identifier("bar"),
-                        build_newline(),
-                    ],
-                    closing_curly_brace: Box::new(CstKind::ClosingCurlyBrace.into())
-                }
-                .into(),
-            )),
-        );
+        assert_rich_ir_snapshot!(function("{ foo\n  bar\n}", 0), @r###"
+        Remaining input: ""
+        Parsed: Function:
+          opening_curly_brace: TrailingWhitespace:
+            child: OpeningCurlyBrace
+            whitespace:
+              Whitespace " "
+          parameters_and_arrow: None
+          body:
+            Identifier "foo"
+            Newline "\n"
+            Whitespace "  "
+            Identifier "bar"
+            Newline "\n"
+          closing_curly_brace: ClosingCurlyBrace
+        "###);
         // { foo # abc
         // }
-        assert_eq!(
-            function("{ foo # abc\n}", 0),
-            Some((
-                "",
-                CstKind::Function {
-                    opening_curly_brace: Box::new(CstKind::OpeningCurlyBrace.with_trailing_space()),
-                    parameters_and_arrow: None,
-                    body: vec![
-                        build_identifier("foo"),
-                        build_space(),
-                        build_comment(" abc"),
-                        build_newline(),
-                    ],
-                    closing_curly_brace: Box::new(CstKind::ClosingCurlyBrace.into())
-                }
-                .into()
-            )),
-        );
+        assert_rich_ir_snapshot!(function("{ foo # abc\n}", 0), @r###"
+        Remaining input: ""
+        Parsed: Function:
+          opening_curly_brace: TrailingWhitespace:
+            child: OpeningCurlyBrace
+            whitespace:
+              Whitespace " "
+          parameters_and_arrow: None
+          body:
+            Identifier "foo"
+            Whitespace " "
+            Comment:
+              octothorpe: Octothorpe
+              comment: " abc"
+            Newline "\n"
+          closing_curly_brace: ClosingCurlyBrace
+        "###);
     }
 }
