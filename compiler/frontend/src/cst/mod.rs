@@ -63,7 +63,7 @@ impl ToRichIr for Cst {
             " at {}..{}",
             *self.data.span.start, *self.data.span.end
         ));
-        builder.push_simple(": ");
+        builder.push_simple(" of kind ");
         self.kind.build_rich_ir(builder);
     }
 }

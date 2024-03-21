@@ -997,7 +997,7 @@ impl RichIrBuilder {
     }
     fn push_cst_kind_property(&mut self, property_name: &str, value: impl ToRichIr) {
         self.push_newline();
-        self.push_simple(format!("{property_name}:"));
+        self.push_simple(format!("{property_name}: "));
         value.build_rich_ir(self);
     }
 }
