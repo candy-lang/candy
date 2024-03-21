@@ -147,6 +147,21 @@ impl MachineState {
                 self.next_instruction = self.call_stack.pop();
                 InstructionResult::Done
             }
+            Instruction::Jump { target } => {
+                self.next_instruction = Some(*target);
+                InstructionResult::Done
+            }
+            Instruction::JumpConditionally { target } => {
+                let condition = self.pop_from_data_stack();
+                let condition = Tag::try_from(condition)
+                    .unwrap()
+                    .try_into_bool(heap)
+                    .unwrap();
+                if condition {
+                    self.next_instruction = Some(*target);
+                }
+                InstructionResult::Done
+            }
             Instruction::Panic => {
                 let responsible_for_panic = self.pop_from_data_stack();
                 let reason = self.pop_from_data_stack();

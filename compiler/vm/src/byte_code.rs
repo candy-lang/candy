@@ -103,6 +103,17 @@ pub enum Instruction {
     /// called.
     Return,
 
+    /// A more efficient alternative to `Call` that doesn't need a function
+    /// allocation.
+    ///
+    /// Does not modify the stack.
+    Jump { target: InstructionPointer },
+
+    /// Similar to `Jump`, but only jumps if the top of the stack is `True`.
+    ///
+    /// a, condition -> a
+    JumpConditionally { target: InstructionPointer },
+
     /// Panics. Because the panic instruction only occurs inside the generated
     /// needs function, the reason is already guaranteed to be a text.
     ///
@@ -184,6 +195,12 @@ impl Instruction {
             Self::Return => {
                 // Only modifies the call stack and the instruction pointer.
                 // Leaves the return value untouched on the stack.
+            }
+            Self::Jump { .. } => {
+                // Does not modify the stack.
+            }
+            Self::JumpConditionally { .. } => {
+                stack.pop(); // condition
             }
             Self::Panic => {
                 stack.pop(); // responsible
@@ -392,6 +409,10 @@ impl Instruction {
                 );
             }
             Self::Return => {}
+            Self::Jump { target } | Self::JumpConditionally { target } => {
+                builder.push(" to ", None, EnumSet::empty());
+                builder.push(format!("{target:?}"), None, EnumSet::empty());
+            }
             Self::Panic => {}
             Self::TraceCallStarts { num_args } | Self::TraceTailCall { num_args } => {
                 builder.push(
