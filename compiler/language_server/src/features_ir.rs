@@ -516,6 +516,13 @@ impl LanguageFeatures for IrFeatures {
                 let range = db.range_to_lsp_range(module.clone(), span.clone());
                 (module_to_url(module, &packages_path).unwrap(), range)
             }
+            ReferenceKey::CstId(_) => {
+                let config = IrConfig {
+                    module: config.module.clone(),
+                    ir: Ir::Rcst,
+                };
+                find_in_other_ir(config, &key).await?
+            }
             ReferenceKey::HirId(id) => {
                 let config = IrConfig {
                     module: id.module.clone(),
