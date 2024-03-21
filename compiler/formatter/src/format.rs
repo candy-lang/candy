@@ -19,7 +19,7 @@ use extension_trait::extension_trait;
 use itertools::Itertools;
 use traversal::dft_post_rev;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct FormattingInfo {
     pub indentation: Indentation,
 
@@ -1778,6 +1778,17 @@ mod test {
         test(
             "[foo: bar # abc\n  , baz]",
             "[\n  foo: bar, # abc\n  baz,\n]\n",
+        );
+
+        // https://github.com/candy-lang/candy/issues/828
+        // More [
+        //   State: [
+        //     YieldedAfterLastMatch: True,
+        //   ]
+        // ]
+        test(
+            "More [\n  State: [\n    YieldedAfterLastMatch: True,\n  ]\n]",
+            "More [State: [YieldedAfterLastMatch: True]]\n",
         );
     }
     #[test]
