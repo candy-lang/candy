@@ -2,6 +2,5 @@
 
 is bound := bound %
   Unbounded -> True
-  Inclusive a -> int.is a
-  Exclusive a -> int.is a
+  Inclusive a | Exclusive a -> int.is a
   _ -> False

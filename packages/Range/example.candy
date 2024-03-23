@@ -1,5 +1,5 @@
-range = use "Range"
 [iterator] = use "Core"
+range = use "Range"
 
 main := { environment ->
   a = 1 | range.until 10

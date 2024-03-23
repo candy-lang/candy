@@ -3,42 +3,37 @@ bound = use ".bound"
 [print] = use "Builtins"
 
 is range := range %
-  Empty -> True
-  All -> True
-  [start, end] -> bound.is start | bool.and (bound.is end)
+  Range range ->
+    range %
+      Empty -> True
+      [start, end] -> bound.is start | bool.and (bound.is end)
+      _ -> False
   _ -> False
 
+fromBounds start end :=
+  isEmpty = (start, end) %
+    (Inclusive a, Inclusive b) -> a | int.isGreaterThan b
+    (Inclusive a, Exclusive b) -> a | int.isGreaterThanOrEqualTo b
+    (Exclusive a, Inclusive b) -> a | int.isGreaterThanOrEqualTo b
+    (Exclusive a, Exclusive b) -> a | int.subtract b | int.absolute | int.isGreaterThanOrEqualTo 2
+  ifElse isEmpty { Range Empty } { Range [start, end] }
 from a :=
   needs (int.is a)
-  [Start: a, End: Unbounded]
+  fromBounds (Inclusive a) Unbounded
 to a b :=
   needs (int.is a)
   needs (int.is b)
-  [Start: Inclusive a, End: Exclusive b]
+  fromBounds (Inclusive a) (Exclusive b)
 until a b :=
   needs (int.is a)
   needs (int.is b)
-  [Start: Inclusive a, End: Inclusive b]
-
-normalize range :=
-  needs (is range)
-  range %
-    Empty -> Empty
-    All -> All
-    [start, end] ->
-      if (start | int.isGreaterThanOrEqualTo end) {
-        Empty
-      } {
-        (start, end) %
-          (Unbounded, Unbounded) -> All
-          _ -> [start, end]
-      }
+  fromBounds (Inclusive a) (Inclusive b)
 
 contains range value :=
   needs (is range)
+  Range range = range
   range %
     Empty -> False
-    All -> True
     [start, end] -> bool.and
       start %
         Unbounded -> True
@@ -52,12 +47,12 @@ contains range value :=
 union a b =
   needs (is a)
   needs (is b)
+  Range a = a
+  Range b = b
   (a, b) %
-    (Empty, _) -> Empty
-    (_, Empty) -> Empty
-    (All, b) -> b
-    (a, All) -> a
-    (a, b) -> [
+    (Empty, _) -> Range Empty
+    (_, Empty) -> Range Empty
+    (a, b) -> Range [
       Start: a.start %
         Unbounded -> b.start
         Inclusive a -> b.start %
@@ -82,6 +77,7 @@ union a b =
 
 iterate range :=
   needs (is range)
+  Range range = range
   range.start %
     Unbounded -> needs False "The range needs to have a bounded start."
     _ -> Nothing
