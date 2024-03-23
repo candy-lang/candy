@@ -1,0 +1,11 @@
+[iterator] = use "Core"
+range = use "Range"
+
+main := { environment ->
+  a = 1 | range.until 10
+  environment.stdout a
+
+  1 | range.until 10 | range.iterate | iterator.forEach { a ->
+    environment.stdout a
+  }
+}

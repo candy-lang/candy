@@ -1,0 +1,6 @@
+[int] = use "Core"
+
+is bound := bound %
+  Unbounded -> True
+  Inclusive a | Exclusive a -> int.is a
+  _ -> False
