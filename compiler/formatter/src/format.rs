@@ -473,6 +473,7 @@ pub fn format_cst<'a>(
             receiver,
             arguments,
         } => {
+            // Receiver
             let receiver =
                 format_receiver(edits, previous_width, receiver, info, ReceiverParent::Call);
             if arguments.is_empty() {
@@ -482,7 +483,7 @@ pub fn format_cst<'a>(
             // Arguments
             let previous_width_for_arguments = Width::multiline(None, info.indentation.width());
             let (last_argument, arguments) = arguments.split_last().unwrap();
-            let mut arguments = arguments
+            let arguments = arguments
                 .iter()
                 .map(|argument| {
                     let (argument, parentheses) = ExistingParentheses::split_from(edits, argument);
@@ -496,166 +497,48 @@ pub fn format_cst<'a>(
                 })
                 .collect_vec();
 
-            // Check whether the last argument is eligible for special sandwich-like formatting.
-            let (last_argument, last_argument_parentheses) =
-                ExistingParentheses::split_from(edits, last_argument);
-            let sandwich_like_last_argument = if !last_argument_parentheses
-                .are_required_due_to_comments()
-                && last_argument.is_sandwich_like()
-            {
-                Some((last_argument, last_argument_parentheses))
-            } else {
-                arguments.push(Argument::new(
-                    edits,
-                    previous_width_for_arguments,
-                    &info.with_indent(),
-                    last_argument,
-                    last_argument_parentheses,
-                ));
-                None
-            };
+            let last_argument = LastArgument::new(
+                edits,
+                previous_width_for_arguments,
+                &info.with_indent(),
+                last_argument,
+            );
 
-            let min_width_without_sandwich_like_last_argument = receiver
-                .min_width(info.indentation)
+            let min_width_without_last_argument = receiver.min_width(info.indentation)
                 + arguments
                     .iter()
                     .map(|it| SinglelineWidth::SPACE + it.min_singleline_width)
                     .sum::<Width>();
 
-            // `is_quasi_singleline` is true if the call fits into a single line or the last
-            // argument is a sandwich-like and only that argument continues onto following lines.
-            let (
-                ends_with_sandwich_like_multiline_formatting,
-                is_quasi_singleline,
-                sandwich_like_last_argument,
-                min_width,
-            ) = if let Some((argument, parentheses)) = sandwich_like_last_argument {
-                let min_width_before_last_argument =
-                    min_width_without_sandwich_like_last_argument + SinglelineWidth::SPACE;
+            let last_argument =
+                last_argument.format(edits, previous_width, info, min_width_without_last_argument);
 
-                let is_singleline_before_last_argument =
-                    previous_width.last_line_fits(info.indentation, min_width_before_last_argument);
-                let last_argument_info = if info.is_single_expression_in_assignment_body {
-                    if is_singleline_before_last_argument {
-                        info.with_dedent()
-                            .for_single_expression_in_assignment_body()
-                    } else {
-                        info.clone()
-                    }
-                } else if is_singleline_before_last_argument {
-                    // FIXME: rename method
-                    info.for_single_expression_in_assignment_body()
-                } else {
-                    info.with_indent()
-                };
-                let argument = format_cst(
-                    edits,
-                    previous_width + min_width_before_last_argument,
-                    argument,
-                    &last_argument_info,
-                );
-                let is_sandwich_like_multiline_formatting =
-                    argument.is_sandwich_like_multiline_formatting();
+            let argument_info = last_argument.derived_call_info.argument_info(info);
+            let trailing = last_argument.derived_call_info.trailing(info.indentation);
 
-                assert_eq!(last_argument.precedence(), Some(PrecedenceCategory::High));
-                let argument = parentheses.into_none(edits, argument);
-
-                let (argument_width, whitespace) = argument.split();
-                (
-                    is_sandwich_like_multiline_formatting,
-                    // Can only be true if the rest fits into a single line.
-                    is_sandwich_like_multiline_formatting,
-                    Some((
-                        argument_width,
-                        whitespace,
-                        is_sandwich_like_multiline_formatting,
-                    )),
-                    min_width_before_last_argument + argument_width,
-                )
-            } else {
-                (
-                    false,
-                    previous_width.last_line_fits(
-                        info.indentation,
-                        min_width_without_sandwich_like_last_argument,
-                    ),
-                    None,
-                    min_width_without_sandwich_like_last_argument,
-                )
-            };
-
-            // Handle last argument specially to support sandwich-likes.
-            // let (last_argument, last_argument_parentheses) =
-            //     ExistingParentheses::split_from(edits, cst);
-            // let last_argument_precedence = last_argument.precedence();
-
-            let (argument_info, trailing) = if is_quasi_singleline {
-                (info.clone(), TrailingWhitespace::Space)
-            } else {
-                (
-                    info.with_indent(),
-                    TrailingWhitespace::Indentation(info.indentation.with_indent()),
-                )
-            };
-
-            let last_argument_not_sandwich_like = if sandwich_like_last_argument.is_none() {
-                Some(arguments.pop().unwrap())
-            } else {
-                None
-            };
             let width = receiver.into_trailing(edits, trailing);
             let width = arguments.into_iter().fold(width, |old_width, argument| {
                 let argument = argument.format(
                     edits,
                     previous_width + old_width,
                     &argument_info,
-                    is_quasi_singleline,
+                    last_argument.derived_call_info.is_quasi_singleline,
                 );
-                let width = if is_quasi_singleline {
+                let width = if last_argument.derived_call_info.is_quasi_singleline {
                     argument.into_trailing_with_space(edits)
                 } else {
                     argument.into_trailing_with_indentation(edits, argument_info.indentation)
                 };
                 old_width + width
             });
-            // let last_argument_is_sandwich_like = matches!(
-            //     &last_argument.argument,
-            //     MaybeSandwichLikeArgument::SandwichLike(_)
-            // );
-            let info_for_last_argument =
-                if info.is_single_expression_in_assignment_body && is_quasi_singleline {
-                    argument_info.with_dedent()
-                } else {
-                    argument_info
-                };
-            let (last_argument_width, whitespace) =
-                if let Some((last_argument_width, last_argument_whitespace, _)) =
-                    sandwich_like_last_argument
-                {
-                    (last_argument_width, last_argument_whitespace)
-                } else {
-                    let last_argument = last_argument_not_sandwich_like.unwrap();
-                    last_argument
-                        .format(
-                            edits,
-                            previous_width + width,
-                            &info_for_last_argument,
-                            is_quasi_singleline,
-                        )
-                        .split()
-                };
-
-            let width = width + last_argument_width;
-            // FIXME: Is this necessary?
-            // if !is_singleline && !last_argument_is_sandwich_like {
-            //     width = width.without_first_line_width();
-            // }
 
             return FormattedCst::new_maybe_sandwich_like_multiline_formatting(
-                width,
+                width + last_argument.width,
                 false,
-                ends_with_sandwich_like_multiline_formatting,
-                whitespace,
+                last_argument
+                    .derived_call_info
+                    .ends_with_sandwich_like_multiline_formatting,
+                last_argument.whitespace,
             );
         }
         CstKind::List {
@@ -1247,8 +1130,6 @@ impl<'a> Argument<'a> {
         }
     }
 
-    /// Width of the opening parenthesis / bracket / curly brace
-    const SANDWICH_LIKE_MIN_SINGLELINE_WIDTH: SinglelineWidth = SinglelineWidth::PARENTHESIS;
     fn format(
         self,
         edits: &mut TextEdits,
@@ -1285,13 +1166,163 @@ impl<'a> Argument<'a> {
         }
     }
 }
+#[must_use]
 enum LastArgument<'a> {
-    SandwichLike(&'a Cst),
-    Other {
-        argument: FormattedCst<'a>,
-        min_singleline_width: Width,
+    SandwichLike {
+        argument: &'a Cst,
         parentheses: ExistingParentheses<'a>,
     },
+    Other(Argument<'a>),
+}
+/// Intermediate state of the last argument of a function call.
+///
+/// Represents a sandwich-like argument already formatted or a non-sandwich-like argument yet to be
+/// formatted.
+#[must_use]
+struct LastArgumentFormattedIfSandwichLike<'a> {
+    derived_call_info: LastArgumentDerivedCallInfo,
+    width: Width,
+    whitespace: ExistingWhitespace<'a>,
+}
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct LastArgumentDerivedCallInfo {
+    /// True if the call fits into a single line or the last argument is a sandwich-like and only
+    /// that argument continues onto following lines.
+    is_quasi_singleline: bool,
+
+    ends_with_sandwich_like_multiline_formatting: bool,
+}
+impl<'a> LastArgument<'a> {
+    fn new(
+        edits: &mut TextEdits,
+        previous_width: Width,
+        info: &FormattingInfo,
+        argument: &'a Cst,
+    ) -> Self {
+        let (argument, parentheses) = ExistingParentheses::split_from(edits, argument);
+        if !parentheses.are_required_due_to_comments() && argument.is_sandwich_like() {
+            assert_eq!(argument.precedence(), Some(PrecedenceCategory::High));
+            LastArgument::SandwichLike {
+                argument,
+                parentheses,
+            }
+        } else {
+            LastArgument::Other(Argument::new(
+                edits,
+                previous_width,
+                info,
+                argument,
+                parentheses,
+            ))
+        }
+    }
+
+    fn format(
+        self,
+        edits: &mut TextEdits,
+        previous_width: Width,
+        call_info: &FormattingInfo,
+        min_width_without_last_argument: Width,
+    ) -> LastArgumentFormattedIfSandwichLike<'a> {
+        match self {
+            LastArgument::SandwichLike {
+                argument,
+                parentheses,
+            } => {
+                let min_width_before_last_argument =
+                    min_width_without_last_argument + SinglelineWidth::SPACE;
+
+                let is_singleline_before_last_argument = previous_width
+                    .last_line_fits(call_info.indentation, min_width_before_last_argument);
+                let last_argument_info = if call_info.is_single_expression_in_assignment_body {
+                    if is_singleline_before_last_argument {
+                        call_info
+                            .with_dedent()
+                            .for_single_expression_in_assignment_body()
+                    } else {
+                        call_info.clone()
+                    }
+                } else if is_singleline_before_last_argument {
+                    // FIXME: rename method
+                    call_info.for_single_expression_in_assignment_body()
+                } else {
+                    call_info.with_indent()
+                };
+                let argument = format_cst(
+                    edits,
+                    previous_width + min_width_before_last_argument,
+                    argument,
+                    &last_argument_info,
+                );
+                let is_sandwich_like_multiline_formatting =
+                    argument.is_sandwich_like_multiline_formatting();
+
+                let argument = parentheses.into_none(edits, argument);
+
+                let (width, whitespace) = argument.split();
+                LastArgumentFormattedIfSandwichLike {
+                    derived_call_info: LastArgumentDerivedCallInfo {
+                        // Can only be true if the rest fits into a single line.
+                        is_quasi_singleline: is_sandwich_like_multiline_formatting,
+                        ends_with_sandwich_like_multiline_formatting:
+                            is_sandwich_like_multiline_formatting,
+                    },
+                    width,
+                    whitespace,
+                }
+            }
+            LastArgument::Other(argument) => {
+                let derived_call_info = LastArgumentDerivedCallInfo {
+                    is_quasi_singleline: previous_width.last_line_fits(
+                        call_info.indentation,
+                        min_width_without_last_argument
+                            + SinglelineWidth::SPACE
+                            + argument.min_singleline_width,
+                    ),
+                    ends_with_sandwich_like_multiline_formatting: false,
+                };
+                let info = if call_info.is_single_expression_in_assignment_body
+                    && derived_call_info.is_quasi_singleline
+                {
+                    derived_call_info.argument_info(call_info).with_dedent()
+                } else {
+                    derived_call_info.argument_info(call_info)
+                };
+                let (width, whitespace) = argument
+                    .format(
+                        edits,
+                        previous_width,
+                        &info,
+                        derived_call_info.is_quasi_singleline,
+                    )
+                    .split();
+
+                LastArgumentFormattedIfSandwichLike {
+                    derived_call_info,
+                    width,
+                    whitespace,
+                }
+            }
+        }
+    }
+}
+impl LastArgumentDerivedCallInfo {
+    #[must_use]
+    fn argument_info(self, call_info: &FormattingInfo) -> FormattingInfo {
+        if self.is_quasi_singleline {
+            call_info.clone()
+        } else {
+            call_info.with_indent()
+        }
+    }
+    #[must_use]
+    const fn trailing(self, indentation: Indentation) -> TrailingWhitespace {
+        if self.is_quasi_singleline {
+            TrailingWhitespace::Space
+        } else {
+            TrailingWhitespace::Indentation(indentation.with_indent())
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
