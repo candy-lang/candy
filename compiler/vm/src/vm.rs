@@ -189,10 +189,12 @@ where
                 // function. Now execute this main function using the
                 // environment we received earlier.
                 let responsible = HirId::create(heap, true, hir::Id::user());
+                let function = return_value.try_into()
+                    .unwrap_or_else(|_| panic!("Expected module's return value to be the main function, but got {return_value:?}"));
                 let new_vm = Self::for_function(
                     self.inner.byte_code,
                     heap,
-                    return_value.try_into().unwrap(),
+                    function,
                     &[environment.into()],
                     responsible,
                     self.inner.tracer,
