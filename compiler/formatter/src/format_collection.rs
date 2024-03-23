@@ -17,11 +17,8 @@ pub fn format_collection<'a>(
     is_comma_required_for_single_item: bool,
     info: &FormattingInfo,
 ) -> FormattedCst<'a> {
-    let (info, uses_sandwich_like_multiline_formatting) = info
-        .resolve_for_expression_with_indented_lines(
-            previous_width,
-            SinglelineWidth::PARENTHESIS.into(),
-        );
+    let (info, uses_sandwich_like_multiline_formatting) =
+        info.resolve_for_sandwich_like(previous_width, SinglelineWidth::PARENTHESIS.into());
 
     let opening_punctuation = format_cst(edits, previous_width, opening_punctuation, &info);
     let closing_punctuation = format_cst(

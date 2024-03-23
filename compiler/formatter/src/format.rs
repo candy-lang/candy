@@ -25,43 +25,43 @@ pub struct FormattingInfo {
 
     // The fields below apply only for direct descendants.
     pub trailing_comma_condition: Option<TrailingCommaCondition>,
-    pub is_single_expression_in_assignment_body: bool,
+    pub supports_sandwich_like_formatting: bool,
 }
 impl FormattingInfo {
     pub const fn with_indent(&self) -> Self {
         Self {
             indentation: self.indentation.with_indent(),
             trailing_comma_condition: None,
-            is_single_expression_in_assignment_body: false,
+            supports_sandwich_like_formatting: false,
         }
     }
     pub const fn with_dedent(&self) -> Self {
         Self {
             indentation: self.indentation.with_dedent(),
             trailing_comma_condition: None,
-            is_single_expression_in_assignment_body: false,
+            supports_sandwich_like_formatting: false,
         }
     }
     pub const fn with_trailing_comma_condition(&self, condition: TrailingCommaCondition) -> Self {
         Self {
             indentation: self.indentation,
             trailing_comma_condition: Some(condition),
-            is_single_expression_in_assignment_body: false,
+            supports_sandwich_like_formatting: false,
         }
     }
-    pub const fn for_single_expression_in_assignment_body(&self) -> Self {
+    pub const fn with_sandwich_like_support(&self) -> Self {
         Self {
             indentation: self.indentation.with_indent(),
             trailing_comma_condition: None,
-            is_single_expression_in_assignment_body: true,
+            supports_sandwich_like_formatting: true,
         }
     }
-    pub fn resolve_for_expression_with_indented_lines(
+    pub fn resolve_for_sandwich_like(
         &self,
         previous_width: Width,
         first_line_extra_width: Width,
     ) -> (Self, bool) {
-        let uses_sandwich_like_multiline_formatting = self.is_single_expression_in_assignment_body
+        let uses_sandwich_like_multiline_formatting = self.supports_sandwich_like_formatting
             && previous_width.last_line_fits(self.indentation, first_line_extra_width);
         let info = Self {
             indentation: if uses_sandwich_like_multiline_formatting {
@@ -70,7 +70,7 @@ impl FormattingInfo {
                 self.indentation
             },
             trailing_comma_condition: None,
-            is_single_expression_in_assignment_body: false,
+            supports_sandwich_like_formatting: false,
         };
         (info, uses_sandwich_like_multiline_formatting)
     }
@@ -280,10 +280,7 @@ pub fn format_cst<'a>(
             closing,
         } => {
             let (info, uses_sandwich_like_multiline_formatting) = info
-                .resolve_for_expression_with_indented_lines(
-                    previous_width,
-                    SinglelineWidth::DOUBLE_QUOTE.into(),
-                );
+                .resolve_for_sandwich_like(previous_width, SinglelineWidth::DOUBLE_QUOTE.into());
 
             let opening = format_cst(edits, previous_width, opening, &info);
             let closing = format_cst(
@@ -730,7 +727,7 @@ pub fn format_cst<'a>(
                 };
 
             let (case_info, is_sandwich_like_multiline_formatting) = info
-                .resolve_for_expression_with_indented_lines(
+                .resolve_for_sandwich_like(
                     previous_width,
                     expression_width + SinglelineWidth::PERCENT,
                 );
@@ -800,11 +797,8 @@ pub fn format_cst<'a>(
             body,
             closing_curly_brace,
         } => {
-            let (info, is_sandwich_like_multiline_formatting) = info
-                .resolve_for_expression_with_indented_lines(
-                    previous_width,
-                    SinglelineWidth::PARENTHESIS.into(),
-                );
+            let (info, is_sandwich_like_multiline_formatting) =
+                info.resolve_for_sandwich_like(previous_width, SinglelineWidth::PARENTHESIS.into());
 
             let opening_curly_brace = format_cst(edits, previous_width, opening_curly_brace, &info);
 
@@ -983,7 +977,7 @@ pub fn format_cst<'a>(
             let body_info = if body.len() == 1 {
                 // Avoid double indentation for bodies/items/entries in trailing functions/lists/
                 // structs.
-                info.for_single_expression_in_assignment_body()
+                info.with_sandwich_like_support()
             } else {
                 info.with_indent()
             };
@@ -1234,17 +1228,14 @@ impl<'a> LastArgument<'a> {
 
                 let is_singleline_before_last_argument = previous_width
                     .last_line_fits(call_info.indentation, min_width_before_last_argument);
-                let last_argument_info = if call_info.is_single_expression_in_assignment_body {
+                let last_argument_info = if call_info.supports_sandwich_like_formatting {
                     if is_singleline_before_last_argument {
-                        call_info
-                            .with_dedent()
-                            .for_single_expression_in_assignment_body()
+                        call_info.with_dedent().with_sandwich_like_support()
                     } else {
                         call_info.clone()
                     }
                 } else if is_singleline_before_last_argument {
-                    // FIXME: rename method
-                    call_info.for_single_expression_in_assignment_body()
+                    call_info.with_sandwich_like_support()
                 } else {
                     call_info.with_indent()
                 };
@@ -1281,7 +1272,7 @@ impl<'a> LastArgument<'a> {
                     ),
                     ends_with_sandwich_like_multiline_formatting: false,
                 };
-                let info = if call_info.is_single_expression_in_assignment_body
+                let info = if call_info.supports_sandwich_like_formatting
                     && derived_call_info.is_quasi_singleline
                 {
                     derived_call_info.argument_info(call_info).with_dedent()
