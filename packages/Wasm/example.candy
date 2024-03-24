@@ -1,0 +1,22 @@
+[print] = use "Builtins"
+[struct, result] = use "Core"
+
+main := { environment ->
+  wat = '"
+    (module
+      (type $t0 (func (param i32) (result i32)))
+      (func $add_one (export "add_one") (type $t0) (param $p0 i32) (result i32)
+        get_local $p0
+        i32.const 1
+        i32.add))
+  "'
+  
+  module = wat | environment.wasm.compile | result.unwrap
+  instance = [] | module.instantiate | result.unwrap
+  add_one = instance | struct.get "add_one" | result.unwrap
+
+  num = 42
+  res = add_one num
+  (res,) = res | result.unwrap
+  print "{num} + 1 = {res}"
+}
