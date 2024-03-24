@@ -19,6 +19,7 @@ use std::{
 };
 use tiny_http::{Request, Response, Server};
 use tracing::info;
+use wasmer::{Instance, Module, Store};
 
 pub trait Environment {
     fn handle<B: Borrow<ByteCode>, T: Tracer>(
@@ -79,6 +80,10 @@ pub struct DefaultEnvironment {
     stdin_handle: Handle,
     stdout_handle: Handle,
 
+    // WASM
+    wasm_compile_handle: Handle,
+    wasm_store: Store,
+
     dynamic_handles: FxHashMap<Handle, DynamicHandle>,
 }
 #[derive(Debug)]
@@ -88,6 +93,7 @@ enum DynamicHandle {
     HttpServerGetNextRequest(HttpServerIndex),
     HttpServerSendResponse(HttpServerIndex, HttpRequestId),
     HttpServerClose(HttpServerIndex),
+    WasmInstantiateModule(Module),
 }
 struct HttpServerState {
     server: Server,
@@ -135,6 +141,13 @@ impl DefaultEnvironment {
         let stdin_handle = Handle::new(heap, 0);
         let stdout_handle = Handle::new(heap, 1);
 
+        let wasm_compile_handle = Handle::new(heap, 1);
+        let wasm_object = Struct::create_with_symbol_keys(
+            heap,
+            true,
+            [(heap.default_symbols().compile, **wasm_compile_handle)],
+        );
+
         let environment_object = Struct::create_with_symbol_keys(
             heap,
             true,
@@ -152,6 +165,8 @@ impl DefaultEnvironment {
                 ),
                 (heap.default_symbols().stdin, **stdin_handle),
                 (heap.default_symbols().stdout, **stdout_handle),
+                (heap.default_symbols().wasm, wasm_object.into()),
+                (heap.default_symbols().stdout, **stdout_handle),
             ],
         );
         let environment = Self {
@@ -164,6 +179,8 @@ impl DefaultEnvironment {
             get_random_bytes_handle,
             stdin_handle,
             stdout_handle,
+            wasm_compile_handle,
+            wasm_store: Store::default(),
             dynamic_handles: FxHashMap::default(),
         };
         (environment_object, environment)
@@ -191,13 +208,17 @@ impl Environment for DefaultEnvironment {
             Self::stdin(heap, &call.arguments)
         } else if call.handle == self.stdout_handle {
             Self::stdout(heap, &call.arguments)
+        } else if call.handle == self.wasm_compile_handle {
+            Self::wasm_compile(self, heap, &call.arguments)
         } else {
-            let dynamic_handle = self.dynamic_handles.get(&call.handle).unwrap_or_else(|| {
-                panic!(
-                    "A handle was called that doesn't exist: {handle:?}",
-                    handle = call.handle,
-                )
-            });
+            let dynamic_handle = {
+                self.dynamic_handles.get(&call.handle).unwrap_or_else(|| {
+                    panic!(
+                        "A handle was called that doesn't exist: {handle:?}",
+                        handle = call.handle,
+                    )
+                })
+            };
             match dynamic_handle {
                 DynamicHandle::File(_) => {
                     // TODO: Panic
@@ -217,6 +238,9 @@ impl Environment for DefaultEnvironment {
                     ),
                 DynamicHandle::HttpServerClose(server_index) => {
                     self.http_server_close(heap, *server_index, &call.arguments)
+                }
+                DynamicHandle::WasmInstantiateModule(module) => {
+                    self.wasm_instantiate_module(heap, &module.clone(), &call.arguments)
                 }
             }
         };
@@ -584,6 +608,72 @@ impl DefaultEnvironment {
         }
 
         Tag::create_nothing(heap).into()
+    }
+
+    // WASM
+
+    fn wasm_compile(&mut self, heap: &mut Heap, arguments: &[InlineObject]) -> InlineObject {
+        let [wat] = arguments else { unreachable!() };
+        let Data::Text(wat) = (*wat).into() else {
+            // TODO: Panic
+            let message = Text::create(
+                heap,
+                true,
+                "Handle `wasm.compile` was called with a non-text.",
+            );
+            return Tag::create_result(heap, true, Err(message.into())).into();
+        };
+
+        let module = match Module::new(&self.wasm_store, wat.get()) {
+            Ok(module) => module,
+            Err(error) => {
+                let message = Text::create(heap, true, &error.to_string());
+                return Tag::create_result(heap, true, Err(message.into())).into();
+            }
+        };
+
+        let instantiate_handle =
+            self.create_dynamic_handle(heap, DynamicHandle::WasmInstantiateModule(module), 1);
+        let module = Struct::create_with_symbol_keys(
+            heap,
+            true,
+            [(heap.default_symbols().instantiate, **instantiate_handle)],
+        );
+        Tag::create_result(heap, true, Ok(module.into())).into()
+    }
+    fn wasm_instantiate_module(
+        &mut self,
+        heap: &mut Heap,
+        module: &Module,
+        arguments: &[InlineObject],
+    ) -> InlineObject {
+        let [imports] = arguments else { unreachable!() };
+        let Data::Struct(imports) = (*imports).into() else {
+            // TODO: Panic
+            let message = Text::create(
+                heap,
+                true,
+                "Handle `module.instantiate` was called with a non-struct.",
+            );
+            return Tag::create_result(heap, true, Err(message.into())).into();
+        };
+        if imports.len() > 0 {
+            let message = Text::create(heap, true, "Non-empty imports are not supported yet.");
+            return Tag::create_result(heap, true, Err(message.into())).into();
+        }
+
+        let import_object = wasmer::imports! {};
+        let instance = match Instance::new(&mut self.wasm_store, module, &import_object) {
+            Ok(instance) => instance,
+            Err(error) => {
+                let message = Text::create(heap, true, &error.to_string());
+                return Tag::create_result(heap, true, Err(message.into())).into();
+            }
+        };
+
+        // TODO: Access exports
+        let module = Struct::create_with_symbol_keys(heap, true, []);
+        Tag::create_result(heap, true, Ok(module.into())).into()
     }
 
     fn create_dynamic_handle(
