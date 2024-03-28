@@ -48,12 +48,13 @@ pub enum Expression {
         responsible: Id,
     },
 
-    Jump {
-        target: Id,
-    },
-    JumpConditionally {
-        target: Id,
+    IfElse {
         condition: Id,
+        then_body_id: BodyId,
+        then_captured: Vec<Id>,
+        else_body_id: BodyId,
+        else_captured: Vec<Id>,
+        responsible: Id,
     },
 
     Panic {
@@ -136,12 +137,22 @@ impl Expression {
                 }
                 *responsible = replacer(*responsible);
             }
-            Self::Jump { target } => {
-                *target = replacer(*target);
-            }
-            Self::JumpConditionally { target, condition } => {
-                *target = replacer(*target);
+            Self::IfElse {
+                condition,
+                then_body_id: _,
+                then_captured,
+                else_body_id: _,
+                else_captured,
+                responsible,
+            } => {
                 *condition = replacer(*condition);
+                for captured in then_captured {
+                    *captured = replacer(*captured);
+                }
+                for captured in else_captured {
+                    *captured = replacer(*captured);
+                }
+                *responsible = replacer(*responsible);
             }
             Self::Panic {
                 reason,
@@ -281,15 +292,39 @@ impl Expression {
                 responsible.build_rich_ir_with_constants(builder, constants, body);
                 builder.push(" is responsible)", None, EnumSet::empty());
             }
-            Self::Jump { target } => {
-                builder.push("jump to ", None, EnumSet::empty());
-                target.build_rich_ir_with_constants(builder, constants, body);
-            }
-            Self::JumpConditionally { target, condition } => {
-                builder.push("jump to ", None, EnumSet::empty());
-                target.build_rich_ir_with_constants(builder, constants, body);
-                builder.push(" if ", None, EnumSet::empty());
+            Self::IfElse {
+                condition,
+                then_body_id,
+                then_captured,
+                else_body_id,
+                else_captured,
+                responsible,
+            } => {
+                builder.push("if ", None, EnumSet::empty());
                 condition.build_rich_ir_with_constants(builder, constants, body);
+                builder.push(" then call ", None, EnumSet::empty());
+                then_body_id.build_rich_ir(builder);
+                if !then_captured.is_empty() {
+                    builder.push(" capturing ", None, EnumSet::empty());
+                    builder.push_children_custom(
+                        then_captured,
+                        |builder, it| it.build_rich_ir_with_constants(builder, constants, body),
+                        ", ",
+                    );
+                }
+                builder.push(" else call ", None, EnumSet::empty());
+                else_body_id.build_rich_ir(builder);
+                if !else_captured.is_empty() {
+                    builder.push(" capturing ", None, EnumSet::empty());
+                    builder.push_children_custom(
+                        else_captured,
+                        |builder, it| it.build_rich_ir_with_constants(builder, constants, body),
+                        ", ",
+                    );
+                }
+                builder.push(" (", None, EnumSet::empty());
+                responsible.build_rich_ir_with_constants(builder, constants, body);
+                builder.push(" is responsible)", None, EnumSet::empty());
             }
             Self::Panic {
                 reason,

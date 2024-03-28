@@ -147,19 +147,33 @@ impl MachineState {
                 self.next_instruction = self.call_stack.pop();
                 InstructionResult::Done
             }
-            Instruction::Jump { target } => {
-                self.next_instruction = Some(*target);
-                InstructionResult::Done
-            }
-            Instruction::JumpConditionally { target } => {
+            Instruction::IfElse {
+                then_target,
+                then_captured,
+                else_target,
+                else_captured,
+            } => {
+                let responsible = self.pop_from_data_stack();
                 let condition = self.pop_from_data_stack();
                 let condition = Tag::try_from(condition)
                     .unwrap()
                     .try_into_bool(heap)
                     .unwrap();
-                if condition {
-                    self.next_instruction = Some(*target);
+                let (target, captured) = if condition {
+                    (*then_target, then_captured)
+                } else {
+                    (*else_target, else_captured)
+                };
+
+                if let Some(next_instruction) = self.next_instruction {
+                    self.call_stack.push(next_instruction);
                 }
+                for offset in captured {
+                    let captured = self.get_from_data_stack(*offset);
+                    self.data_stack.push(captured);
+                }
+                self.push_to_data_stack(responsible);
+                self.next_instruction = Some(target);
                 InstructionResult::Done
             }
             Instruction::Panic => {

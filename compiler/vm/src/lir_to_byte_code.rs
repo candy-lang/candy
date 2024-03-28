@@ -68,19 +68,6 @@ struct LoweringContext<'c> {
     body_mapping: FxHashMap<BodyId, InstructionPointer>,
     stack: Vec<Id>,
     instructions: Vec<Instruction>,
-    pending_jump_targets: Vec<PendingJumpTarget>,
-}
-struct PendingJumpTarget {
-    /// Index of the jump instruction in the current body's instructions.
-    jump_index: usize,
-
-    /// ID of the target expression.
-    target_id: Id,
-
-    /// Index of the jump target in the current body's instructions.
-    ///
-    /// This is `None` until we're lowering the target.
-    target_index: Option<usize>,
 }
 impl<'c> LoweringContext<'c> {
     fn compile(module: Module, lir: &Lir) -> ByteCode {
@@ -110,7 +97,6 @@ impl<'c> LoweringContext<'c> {
             body_mapping: FxHashMap::default(),
             stack: vec![],
             instructions: vec![],
-            pending_jump_targets: vec![],
         };
         let mut start = None;
         for (id, _) in lir.bodies().ids_and_bodies() {
@@ -127,7 +113,6 @@ impl<'c> LoweringContext<'c> {
     fn compile_body(&mut self, body_id: BodyId) -> InstructionPointer {
         let old_stack = mem::take(&mut self.stack);
         let old_instructions = mem::take(&mut self.instructions);
-        let old_pending_jump_targets = mem::take(&mut self.pending_jump_targets);
 
         let body = self.lir.bodies().get(body_id);
         for captured in body.captured_ids() {
@@ -159,20 +144,6 @@ impl<'c> LoweringContext<'c> {
             self.emit(dummy_id, Instruction::Return);
         }
 
-        for pending_jump_target in &self.pending_jump_targets {
-            let target_index = pending_jump_target
-                .target_index
-                .expect("Jump target not lowered.");
-            let target = InstructionPointer::from(self.instructions.len() + target_index);
-            self.instructions[pending_jump_target.jump_index] = match &self.instructions
-                [pending_jump_target.jump_index]
-            {
-                Instruction::Jump { .. } => Instruction::Jump { target },
-                Instruction::JumpConditionally { .. } => Instruction::JumpConditionally { target },
-                _ => unreachable!(),
-            };
-        }
-
         let num_instructions = self.instructions.len();
         let start = self.byte_code.instructions.len().into();
         self.byte_code.instructions.append(&mut self.instructions);
@@ -183,19 +154,11 @@ impl<'c> LoweringContext<'c> {
 
         self.stack = old_stack;
         self.instructions = old_instructions;
-        self.pending_jump_targets = old_pending_jump_targets;
 
         start
     }
 
     fn compile_expression(&mut self, id: Id, expression: &Expression) {
-        for pending_jump_target in &mut self.pending_jump_targets {
-            if pending_jump_target.target_id == id {
-                assert_eq!(pending_jump_target.target_index, None);
-                pending_jump_target.target_index = Some(self.instructions.len());
-            }
-        }
-
         match expression {
             Expression::CreateTag { symbol, value } => {
                 let symbol = self
@@ -235,6 +198,7 @@ impl<'c> LoweringContext<'c> {
             }
             Expression::CreateFunction { captured, body_id } => {
                 let instruction_pointer = self.get_body(*body_id);
+                // PERF: Do we need to emit these references if we store stack offsets anyway?
                 for captured in captured {
                     self.emit_reference_to(*captured);
                 }
@@ -272,30 +236,31 @@ impl<'c> LoweringContext<'c> {
                     },
                 );
             }
-            Expression::Jump { target } => {
-                self.pending_jump_targets.push(PendingJumpTarget {
-                    jump_index: self.instructions.len(),
-                    target_id: *target,
-                    target_index: None,
-                });
-                self.emit(
-                    id,
-                    Instruction::Jump {
-                        target: InstructionPointer::null_pointer(),
-                    },
-                );
-            }
-            Expression::JumpConditionally { target, condition } => {
+            Expression::IfElse {
+                condition,
+                then_body_id,
+                then_captured,
+                else_body_id,
+                else_captured,
+                responsible,
+            } => {
                 self.emit_reference_to(*condition);
-                self.pending_jump_targets.push(PendingJumpTarget {
-                    jump_index: self.instructions.len(),
-                    target_id: *target,
-                    target_index: None,
-                });
+                self.emit_reference_to(*responsible);
+                let then_target = self.get_body(*then_body_id);
+                let else_target = self.get_body(*else_body_id);
                 self.emit(
                     id,
-                    Instruction::JumpConditionally {
-                        target: InstructionPointer::null_pointer(),
+                    Instruction::IfElse {
+                        then_target,
+                        then_captured: then_captured
+                            .iter()
+                            .map(|id| self.stack.find_id(*id))
+                            .collect(),
+                        else_target,
+                        else_captured: else_captured
+                            .iter()
+                            .map(|id| self.stack.find_id(*id))
+                            .collect(),
                     },
                 );
             }

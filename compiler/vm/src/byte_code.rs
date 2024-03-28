@@ -103,16 +103,16 @@ pub enum Instruction {
     /// called.
     Return,
 
-    /// A more efficient alternative to `Call` that doesn't need a function
-    /// allocation.
+    /// Conditionally calls either `then_target` or `else_target` depending on
+    /// the `condition`.
     ///
-    /// Does not modify the stack.
-    Jump { target: InstructionPointer },
-
-    /// Similar to `Jump`, but only jumps if the top of the stack is `True`.
-    ///
-    /// a, condition -> a
-    JumpConditionally { target: InstructionPointer },
+    /// a, condition, responsible -> a
+    IfElse {
+        then_target: InstructionPointer,
+        then_captured: Vec<StackOffset>,
+        else_target: InstructionPointer,
+        else_captured: Vec<StackOffset>,
+    },
 
     /// Panics. Because the panic instruction only occurs inside the generated
     /// needs function, the reason is already guaranteed to be a text.
@@ -196,10 +196,8 @@ impl Instruction {
                 // Only modifies the call stack and the instruction pointer.
                 // Leaves the return value untouched on the stack.
             }
-            Self::Jump { .. } => {
-                // Does not modify the stack.
-            }
-            Self::JumpConditionally { .. } => {
+            Self::IfElse { .. } => {
+                stack.pop(); // responsible
                 stack.pop(); // condition
             }
             Self::Panic => {
@@ -409,9 +407,29 @@ impl Instruction {
                 );
             }
             Self::Return => {}
-            Self::Jump { target } | Self::JumpConditionally { target } => {
-                builder.push(" to ", None, EnumSet::empty());
-                builder.push(format!("{target:?}"), None, EnumSet::empty());
+            Self::IfElse {
+                then_target,
+                then_captured,
+                else_target,
+                else_captured,
+            } => {
+                builder.push(
+                    format!(
+                        " then call {then_target:?} capturing {} else call {else_target:?} capturing {}",
+                        if then_captured.is_empty() {
+                            "nothing".to_string()
+                        } else {
+                            then_captured.iter().join(", ")
+                        },
+                        if else_captured.is_empty() {
+                            "nothing".to_string()
+                        } else {
+                            else_captured.iter().join(", ")
+                        },
+                    ), 
+                    None,
+                     EnumSet::empty(),
+                );
             }
             Self::Panic => {}
             Self::TraceCallStarts { num_args } | Self::TraceTailCall { num_args } => {
