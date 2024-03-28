@@ -23,6 +23,7 @@ impl MachineState {
         tracer: &mut impl Tracer,
     ) -> InstructionResult {
         if TRACE {
+            trace!("");
             trace!("Running instruction: {instruction:?}");
             trace!("Instruction pointer: {:?}", self.next_instruction.unwrap());
             trace!(
