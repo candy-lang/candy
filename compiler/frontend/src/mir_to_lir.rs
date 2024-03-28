@@ -1,10 +1,11 @@
 use crate::{
+    builtin_functions::BuiltinFunction,
     error::CompilerError,
-    hir::{self},
+    hir,
     hir_to_mir::ExecutionTarget,
     id::CountableId,
     lir::{self, Lir},
-    mir::{self},
+    mir,
     mir_optimize::OptimizeMir,
     string_to_rcst::ModuleError,
     utils::{HashMapExtension, HashSetExtension},
@@ -38,11 +39,17 @@ fn lir(db: &dyn MirToLir, target: ExecutionTarget, tracing: TracingConfig) -> Li
     Ok((Arc::new(lir), errors))
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 struct LoweringContext {
     constants: lir::Constants,
     constant_mapping: FxHashMap<mir::Id, lir::ConstantId>,
     bodies: lir::Bodies,
+    potential_if_else_bodies: FxHashMap<mir::Id, PotentialIfElseBody>,
+}
+#[derive(Debug)]
+struct PotentialIfElseBody {
+    body_id: lir::BodyId,
+    captured: Vec<lir::Id>,
 }
 impl LoweringContext {
     fn constant_for(&self, id: mir::Id) -> Option<lir::ConstantId> {
@@ -247,10 +254,22 @@ impl CurrentBody {
                     *responsible_parameter,
                     body,
                 );
+
+                let captured = self.ids_for(context, &captured);
+
+                if parameters.is_empty() {
+                    context.potential_if_else_bodies.force_insert(
+                        id,
+                        PotentialIfElseBody {
+                            body_id,
+                            captured: captured.clone(),
+                        },
+                    );
+                }
+
                 if captured.is_empty() {
                     self.push_constant(context, id, body_id);
                 } else {
-                    let captured = self.ids_for(context, &captured);
                     self.push(id, lir::Expression::CreateFunction { captured, body_id });
                 }
             }
@@ -260,6 +279,26 @@ impl CurrentBody {
                 arguments,
                 responsible,
             } => {
+                if Self::is_builtin_if_else(context, *function)
+                    && let Some(then_body) = context.potential_if_else_bodies.get(&arguments[0])
+                    && let Some(else_body) = context.potential_if_else_bodies.get(&arguments[1])
+                {
+                    let condition = self.id_for(context, arguments[2]);
+                    let responsible = self.id_for_without_dup(context, *responsible);
+                    self.push(
+                        id,
+                        lir::Expression::IfElse {
+                            condition,
+                            then_body_id: then_body.body_id,
+                            then_captured: then_body.captured.clone(),
+                            else_body_id: else_body.body_id,
+                            else_captured: else_body.captured.clone(),
+                            responsible,
+                        },
+                    );
+                    return;
+                }
+
                 let function = self.id_for(context, *function);
                 let arguments = self.ids_for(context, arguments);
                 let responsible = self.id_for_without_dup(context, *responsible);
@@ -380,6 +419,13 @@ impl CurrentBody {
         }
 
         self.push(id, context.constant_for(id).unwrap())
+    }
+    #[must_use]
+    fn is_builtin_if_else(context: &LoweringContext, id: mir::Id) -> bool {
+        matches!(
+            context.constant_for(id),
+            Some(constant_id) if context.constants.get(constant_id) == &lir::Constant::Builtin(BuiltinFunction::IfElse),
+        )
     }
 
     fn push_constant(

@@ -110,7 +110,7 @@ pub struct PathAndExecutionTargetAndTracing {
     #[arg(
         long,
         default_value("off"),
-        default_missing_value("only-potentially-panicking"),
+        default_missing_value("only-for-panic-traces"),
         num_args(0..=1),
         require_equals(true)
     )]

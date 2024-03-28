@@ -48,6 +48,15 @@ pub enum Expression {
         responsible: Id,
     },
 
+    IfElse {
+        condition: Id,
+        then_body_id: BodyId,
+        then_captured: Vec<Id>,
+        else_body_id: BodyId,
+        else_captured: Vec<Id>,
+        responsible: Id,
+    },
+
     Panic {
         reason: Id,
         responsible: Id,
@@ -125,6 +134,23 @@ impl Expression {
                 *function = replacer(*function);
                 for argument in arguments {
                     *argument = replacer(*argument);
+                }
+                *responsible = replacer(*responsible);
+            }
+            Self::IfElse {
+                condition,
+                then_body_id: _,
+                then_captured,
+                else_body_id: _,
+                else_captured,
+                responsible,
+            } => {
+                *condition = replacer(*condition);
+                for captured in then_captured {
+                    *captured = replacer(*captured);
+                }
+                for captured in else_captured {
+                    *captured = replacer(*captured);
                 }
                 *responsible = replacer(*responsible);
             }
@@ -260,6 +286,40 @@ impl Expression {
                         arguments,
                         |builder, it| it.build_rich_ir_with_constants(builder, constants, body),
                         " ",
+                    );
+                }
+                builder.push(" (", None, EnumSet::empty());
+                responsible.build_rich_ir_with_constants(builder, constants, body);
+                builder.push(" is responsible)", None, EnumSet::empty());
+            }
+            Self::IfElse {
+                condition,
+                then_body_id,
+                then_captured,
+                else_body_id,
+                else_captured,
+                responsible,
+            } => {
+                builder.push("if ", None, EnumSet::empty());
+                condition.build_rich_ir_with_constants(builder, constants, body);
+                builder.push(" then call ", None, EnumSet::empty());
+                then_body_id.build_rich_ir(builder);
+                if !then_captured.is_empty() {
+                    builder.push(" capturing ", None, EnumSet::empty());
+                    builder.push_children_custom(
+                        then_captured,
+                        |builder, it| it.build_rich_ir_with_constants(builder, constants, body),
+                        ", ",
+                    );
+                }
+                builder.push(" else call ", None, EnumSet::empty());
+                else_body_id.build_rich_ir(builder);
+                if !else_captured.is_empty() {
+                    builder.push(" capturing ", None, EnumSet::empty());
+                    builder.push_children_custom(
+                        else_captured,
+                        |builder, it| it.build_rich_ir_with_constants(builder, constants, body),
+                        ", ",
                     );
                 }
                 builder.push(" (", None, EnumSet::empty());

@@ -33,6 +33,7 @@
             RUSTFLAGS = "-C link-arg=-fuse-ld=mold";
             buildInputs = [
               cargo-insta
+              hyperfine
               libffi
               llvmPackages_15.bintools
               llvmPackages_15.clangUseLLVM
