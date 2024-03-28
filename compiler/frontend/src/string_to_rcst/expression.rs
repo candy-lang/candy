@@ -5,7 +5,7 @@ use super::{
     list::list,
     literal::{
         arrow, bar, closing_bracket, closing_curly_brace, closing_parenthesis, colon_equals_sign,
-        dot, equals_sign, percent,
+        comma, dot, equals_sign, percent,
     },
     struct_::struct_,
     text::text,
@@ -407,6 +407,31 @@ fn match_case(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
     let (input, whitespace) = whitespaces_and_newlines(input, indentation, true);
     let pattern = pattern.wrap_in_whitespace(whitespace);
 
+    let (input, condition) = if let Some((input, condition_comma)) = comma(input) {
+        let (input, whitespace) = whitespaces_and_newlines(input, indentation, true);
+        let condition_comma = condition_comma.wrap_in_whitespace(whitespace);
+        if let Some((input, condition_expresion)) = expression(
+            input,
+            indentation,
+            ExpressionParsingOptions {
+                allow_assignment: false,
+                allow_call: true,
+                allow_bar: true,
+                allow_function: true,
+            },
+        ) {
+            (input, Some((condition_comma, condition_expresion)))
+        } else {
+            let error = CstKind::Error {
+                unparsable_input: String::new(),
+                error: CstError::MatchCaseMissesCondition,
+            };
+            (input, Some((condition_comma, error.into())))
+        }
+    } else {
+        (input, None)
+    };
+
     let (input, arrow) = if let Some((input, arrow)) = arrow(input) {
         let (input, whitespace) = whitespaces_and_newlines(input, indentation, true);
         (input, arrow.wrap_in_whitespace(whitespace))
@@ -431,6 +456,7 @@ fn match_case(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
 
     let case = CstKind::MatchCase {
         pattern: Box::new(pattern),
+        condition: condition.map(Box::new),
         arrow: Box::new(arrow),
         body,
     };
