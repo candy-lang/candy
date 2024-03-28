@@ -199,6 +199,7 @@ impl Instruction {
             Self::IfElse { .. } => {
                 stack.pop(); // responsible
                 stack.pop(); // condition
+                stack.push(result); // return value
             }
             Self::Panic => {
                 stack.pop(); // responsible

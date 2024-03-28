@@ -168,8 +168,12 @@ impl MachineState {
                 if let Some(next_instruction) = self.next_instruction {
                     self.call_stack.push(next_instruction);
                 }
-                for offset in captured {
-                    let captured = self.get_from_data_stack(*offset);
+
+                // Initially, we need to adjust the offset because we already
+                // popped two values from the data stack. Afterwards, increment
+                // it for each value.
+                for (index, offset) in captured.iter().enumerate() {
+                    let captured = self.get_from_data_stack(*offset - 2 + index);
                     self.data_stack.push(captured);
                 }
                 self.push_to_data_stack(responsible);
