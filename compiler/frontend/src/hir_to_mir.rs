@@ -182,7 +182,7 @@ struct LoweringContext<'a> {
 struct OngoingDestructuring {
     result: Id,
 
-    /// Assignments such as `foo = …` are considered trivial.
+    /// Assignments such as `foo = …` or simple match patters (something % foo -> ...) are considered trivial.
     is_trivial: bool,
 }
 
@@ -363,8 +363,6 @@ impl<'a> LoweringContext<'a> {
                     self.ongoing_destructuring.clone().unwrap();
 
                 if is_trivial {
-                    // something %
-                    //   foo -> ...
                     body.push_reference(result)
                 } else {
                     let responsible = body.push_hir_id(hir_id.clone());

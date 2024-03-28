@@ -412,16 +412,13 @@ impl BodyBuilder {
             responsible,
         )
     }
-    pub fn push_if_not<E>(
+    pub fn push_if_not(
         &mut self,
         hir_id: &hir::Id,
         condition: Id,
-        else_builder: E,
+        else_builder: impl FnOnce(&mut Self),
         responsible: Id,
-    ) -> Id
-    where
-        E: FnOnce(&mut Self),
-    {
+    ) -> Id {
         self.push_if_else(
             hir_id,
             condition,
@@ -433,12 +430,12 @@ impl BodyBuilder {
         )
     }
     pub fn push_is_bool(&mut self, hir_id: &hir::Id, value: Id, responsible: Id) -> Id {
-        let is_condition_true = self.push_equals_value(value, true, responsible);
+        let is_value_true = self.push_equals_value(value, true, responsible);
         self.push_if_else(
             &hir_id.child("isValueTrue"),
-            is_condition_true,
+            is_value_true,
             |body| {
-                body.push_reference(is_condition_true);
+                body.push_reference(is_value_true);
             },
             |body| {
                 body.push_equals_value(value, false, responsible);
