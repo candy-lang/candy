@@ -44,10 +44,11 @@ struct LoweringContext {
     constants: lir::Constants,
     constant_mapping: FxHashMap<mir::Id, lir::ConstantId>,
     bodies: lir::Bodies,
-    potential_if_else_bodies: FxHashMap<mir::Id, PotentialIfElseBody>,
+    potential_if_else_bodies: FxHashMap<mir::Id, IfElseBody>,
+    delegating_if_else_body_id: Option<lir::BodyId>,
 }
-#[derive(Debug)]
-struct PotentialIfElseBody {
+#[derive(Clone, Debug)]
+struct IfElseBody {
     body_id: lir::BodyId,
     captured: Vec<lir::Id>,
 }
@@ -74,6 +75,41 @@ impl LoweringContext {
         );
         self.bodies.push(body)
     }
+
+    /// Creates a body capturing a function and then executing it.
+    ///
+    /// It's used for ifElse calls for which at least one of the branches'
+    /// functions is not exclusively used for ifElse bodies.
+    #[must_use]
+    fn delegating_if_else_body_id(&mut self) -> lir::BodyId {
+        self.delegating_if_else_body_id.unwrap_or_else(|| {
+            let target_function_id = mir::Id::from_usize(0);
+            let responsible_parameter_id = mir::Id::from_usize(1);
+            let call_id = mir::Id::from_usize(2);
+
+            let mut current_body = CurrentBody::new(
+                FxHashSet::default(),
+                &[target_function_id],
+                &[],
+                responsible_parameter_id,
+            );
+            let function = *current_body.id_mapping.get(&target_function_id).unwrap();
+            let responsible = *current_body
+                .id_mapping
+                .get(&responsible_parameter_id)
+                .unwrap();
+            current_body.push(
+                call_id,
+                lir::Expression::Call {
+                    function,
+                    arguments: vec![],
+                    responsible,
+                },
+            );
+            let body = current_body.finish(&self.constant_mapping);
+            self.bodies.push(body)
+        })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -93,9 +129,9 @@ impl CurrentBody {
         body: &mir::Body,
     ) -> lir::Body {
         let mut lir_body = Self::new(original_hirs, captured, parameters, responsible_parameter);
-        for (id, expression) in body.iter() {
+        for (index, (id, expression)) in body.iter().enumerate() {
             lir_body.current_constant = None;
-            lir_body.compile_expression(context, id, expression);
+            lir_body.compile_expression(context, id, expression, &body.expressions[index + 1..]);
         }
         lir_body.finish(&context.constant_mapping)
     }
@@ -147,6 +183,7 @@ impl CurrentBody {
         context: &mut LoweringContext,
         id: mir::Id,
         expression: &mir::Expression,
+        remaining_expressions: &[(mir::Id, mir::Expression)],
     ) {
         match expression {
             mir::Expression::Int(int) => self.push_constant(context, id, int.clone()),
@@ -260,14 +297,35 @@ impl CurrentBody {
                 if parameters.is_empty() {
                     context.potential_if_else_bodies.force_insert(
                         id,
-                        PotentialIfElseBody {
+                        IfElseBody {
                             body_id,
                             captured: captured.clone(),
                         },
                     );
                 }
 
-                if captured.is_empty() {
+                if parameters.is_empty()
+                    && remaining_expressions.iter().all(|(_, expression)| {
+                        if let mir::Expression::Call {
+                            function,
+                            arguments,
+                            ..
+                        } = expression
+                            && Self::is_builtin_if_else(context, *function)
+                            && arguments[0] != id
+                        {
+                            // Call to the ifElse builtin function
+                            true
+                        } else {
+                            // The expression doesn't reference the current body
+                            !expression.referenced_ids().contains(&id)
+                        }
+                    })
+                {
+                    // If the function takes no parameters and is only used in
+                    // calls to the ifElse builtin function, we refer to it in
+                    // the special ifElse LIR expression.
+                } else if captured.is_empty() {
                     self.push_constant(context, id, body_id);
                 } else {
                     self.push(id, lir::Expression::CreateFunction { captured, body_id });
@@ -279,20 +337,38 @@ impl CurrentBody {
                 arguments,
                 responsible,
             } => {
-                if Self::is_builtin_if_else(context, *function)
-                    && let Some(then_body) = context.potential_if_else_bodies.get(&arguments[0])
-                    && let Some(else_body) = context.potential_if_else_bodies.get(&arguments[1])
-                {
-                    let condition = self.id_for(context, arguments[2]);
+                if Self::is_builtin_if_else(context, *function) {
+                    let [condition, then_body, else_body] = arguments.as_slice() else {
+                        unreachable!()
+                    };
+
+                    let condition = self.id_for(context, *condition);
+                    let then_body = context
+                        .potential_if_else_bodies
+                        .get(then_body)
+                        .cloned()
+                        .unwrap_or_else(|| IfElseBody {
+                            body_id: context.delegating_if_else_body_id(),
+                            captured: vec![self.id_for(context, *then_body)],
+                        });
+                    let else_body = context
+                        .potential_if_else_bodies
+                        .get(else_body)
+                        .cloned()
+                        .unwrap_or_else(|| IfElseBody {
+                            body_id: context.delegating_if_else_body_id(),
+                            captured: vec![self.id_for(context, *else_body)],
+                        });
                     let responsible = self.id_for_without_dup(context, *responsible);
+
                     self.push(
                         id,
                         lir::Expression::IfElse {
                             condition,
                             then_body_id: then_body.body_id,
-                            then_captured: then_body.captured.clone(),
+                            then_captured: then_body.captured,
                             else_body_id: else_body.body_id,
-                            else_captured: else_body.captured.clone(),
+                            else_captured: else_body.captured,
                             responsible,
                         },
                     );
