@@ -1,5 +1,8 @@
-[iterator] = use "Core"
+[checkEquals, iterator] = use "Core"
 range = use "Range"
+
+checkEquals (is 2) True
+checkEquals (is Foo) False
 
 main := { environment ->
   a = 1 | range.until 10
