@@ -1,4 +1,8 @@
-use crate::{cst::CstKind, rcst::Rcst};
+use crate::{
+    cst::CstKind,
+    rcst::Rcst,
+    rich_ir::{RichIrBuilder, ToRichIr},
+};
 
 pub static MEANINGFUL_PUNCTUATION: &str = r#"=,.:|()[]{}->'"%#"#;
 pub static SUPPORTED_WHITESPACE: &str = " \r\n\t";
@@ -65,84 +69,36 @@ where
     }
 }
 
-#[cfg(test)]
-pub fn build_comment(value: impl AsRef<str>) -> Rcst {
-    CstKind::Comment {
-        octothorpe: Box::new(CstKind::Octothorpe.into()),
-        comment: value.as_ref().to_string(),
+impl<T: ToRichIr> ToRichIr for (&str, T) {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push_simple(format!("Remaining input: \"{}\"\nParsed: ", self.0));
+        self.1.build_rich_ir(builder);
     }
-    .into()
 }
-#[cfg(test)]
-pub fn build_identifier(value: impl AsRef<str>) -> Rcst {
-    CstKind::Identifier(value.as_ref().to_string()).into()
-}
-#[cfg(test)]
-pub fn build_symbol(value: impl AsRef<str>) -> Rcst {
-    CstKind::Symbol(value.as_ref().to_string()).into()
-}
-#[cfg(test)]
-pub fn build_simple_int(value: usize) -> Rcst {
-    CstKind::Int {
-        radix_prefix: None,
-        value: value.into(),
-        string: value.to_string(),
+impl ToRichIr for Vec<Rcst> {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        builder.push_multiline(self);
     }
-    .into()
 }
-#[cfg(test)]
-pub fn build_simple_text(value: impl AsRef<str>) -> Rcst {
-    CstKind::Text {
-        opening: Box::new(
-            CstKind::OpeningText {
-                opening_single_quotes: vec![],
-                opening_double_quote: Box::new(CstKind::DoubleQuote.into()),
-            }
-            .into(),
-        ),
-        parts: vec![CstKind::TextPart(value.as_ref().to_string()).into()],
-        closing: Box::new(
-            CstKind::ClosingText {
-                closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
-                closing_single_quotes: vec![],
-            }
-            .into(),
-        ),
+impl<T: ToRichIr> ToRichIr for Option<(&str, T)> {
+    fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
+        if let Some(value) = self {
+            value.build_rich_ir(builder);
+        } else {
+            builder.push_simple("Nothing was parsed");
+        }
     }
-    .into()
-}
-#[cfg(test)]
-pub fn build_space() -> Rcst {
-    CstKind::Whitespace(" ".to_string()).into()
-}
-#[cfg(test)]
-pub fn build_newline() -> Rcst {
-    CstKind::Newline("\n".to_string()).into()
 }
 
 #[cfg(test)]
-impl Rcst {
-    #[must_use]
-    pub fn with_trailing_space(self) -> Self {
-        self.with_trailing_whitespace(vec![CstKind::Whitespace(" ".to_string())])
-    }
-    #[must_use]
-    pub fn with_trailing_whitespace(self, trailing_whitespace: Vec<CstKind<()>>) -> Self {
-        CstKind::TrailingWhitespace {
-            child: Box::new(self),
-            whitespace: trailing_whitespace.into_iter().map(Into::into).collect(),
-        }
-        .into()
-    }
+macro_rules! assert_rich_ir_snapshot {
+    ($value:expr, @$string:literal) => {
+        insta::_assert_snapshot_base!(
+            transform=|it| $crate::rich_ir::ToRichIr::to_rich_ir(it, false).text,
+            $value,
+            @$string
+        );
+    };
 }
 #[cfg(test)]
-impl CstKind<()> {
-    #[must_use]
-    pub fn with_trailing_space(self) -> Rcst {
-        Rcst::from(self).with_trailing_space()
-    }
-    #[must_use]
-    pub fn with_trailing_whitespace(self, trailing_whitespace: Vec<Self>) -> Rcst {
-        Rcst::from(self).with_trailing_whitespace(trailing_whitespace)
-    }
-}
+pub(super) use assert_rich_ir_snapshot;

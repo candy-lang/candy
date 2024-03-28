@@ -1,0 +1,395 @@
+[int, text] = use "Core"
+
+codeToChar code :=
+  needs (int.is code)
+  needs (0 | int.isLessThanOrEqualTo code)
+  needs (code | int.isLessThanOrEqualTo 127)
+  # Ok text = fromUtf8 (code,)
+  # text
+  Ok text = text.fromUtf8 (code,)
+  text
+
+null :=
+  # <Null> (NUL)
+  codeToChar 0x00
+startOfHeading :=
+  # <Start of Heading> (SOH)
+  codeToChar 0x01
+startOfText :=
+  # <Start of Text> (STX)
+  codeToChar 0x02
+endOfText :=
+  # <End of Text> (ETX)
+  codeToChar 0x03
+endOfTransmission :=
+  # <End of Transmission> (EOT)
+  codeToChar 0x04
+enquiry :=
+  # <Enquiry> (ENQ)
+  codeToChar 0x05
+acknowledge :=
+  # <Acknowledge> (ACK)
+  codeToChar 0x06
+alert :=
+  # <Alert> (BEL)
+  codeToChar 0x07
+backspace :=
+  # <Backspace> (BS)
+  codeToChar 0x08
+characterTabulation :=
+  # <Character Tabulation> (HT, TAB)
+  codeToChar 0x09
+endOfLine :=
+  # <End of Line> (EOL, LF, NL)
+  codeToChar 0x0A
+lineTabulation :=
+  # <Line Tabulation> (VT)
+  codeToChar 0x0B
+formFeed :=
+  # <Form Feed> (FF)
+  codeToChar 0x0C
+carriageReturn :=
+  # <Carriage Return> (CR)
+  codeToChar 0x0D
+lockingShiftOne :=
+  # <Locking-Shift One> (SO)
+  codeToChar 0x0E
+lockingShiftZero :=
+  # <Locking-Shift Zero> (SI)
+  codeToChar 0x0F
+dataLinkEscape :=
+  # <Data Link Escape> (DLE)
+  codeToChar 0x10
+deviceControlOne :=
+  # <Device Control One> (DC1)
+  codeToChar 0x11
+deviceControlTwo :=
+  # <Device Control Two> (DC2)
+  codeToChar 0x12
+deviceControlThree :=
+  # <Device Control Three> (DC3)
+  codeToChar 0x13
+deviceControlFour :=
+  # <Device Control Four> (DC4)
+  codeToChar 0x14
+negativeAcknowledge :=
+  # <Negative Acknowledge> (NAK)
+  codeToChar 0x15
+synchronousIdle :=
+  # <Synchronous Idle> (SYN)
+  codeToChar 0x16
+endOfTransmissionBlock :=
+  # <End of Transmission Block> (ETB)
+  codeToChar 0x17
+cancel :=
+  # <Cancel> (CAN)
+  codeToChar 0x18
+endOfMedium :=
+  # <End of Medium> (EOM)
+  codeToChar 0x19
+substitute :=
+  # <Substitute> (SUB)
+  codeToChar 0x1A
+escape :=
+  # <Escape> (ESC)
+  codeToChar 0x1B
+fileSeparator :=
+  # <File Separator> (FS)
+  codeToChar 0x1C
+groupSeparator :=
+  # <Group Separator> (GS)
+  codeToChar 0x1D
+informationSeparatorTwo :=
+  # <Information Separator Two> (RS)
+  codeToChar 0x1E
+informationSeparatorOne :=
+  # <Information Separator One> (US)
+  codeToChar 0x1F
+space :=
+  # Space (SP)
+  codeToChar 0x20
+exclamationMark :=
+  # Exclamation Mark: “!”
+  codeToChar 0x21
+quotationMark :=
+  # Quotation Mark: “"”
+  codeToChar 0x22
+numberSign :=
+  # Number Sign: “#”
+  codeToChar 0x23
+dollarSign :=
+  # Dollar Sign: “$”
+  codeToChar 0x24
+percentSign :=
+  # Percent Sign: “%”
+  codeToChar 0x25
+ampersand :=
+  # Ampersand: “&”
+  codeToChar 0x26
+apostrophe :=
+  # Apostrophe: “'”
+  codeToChar 0x27
+leftParenthesis :=
+  # Left Parenthesis: “(”
+  codeToChar 0x28
+rightParenthesis :=
+  # Right Parenthesis: “)”
+  codeToChar 0x29
+asterisk :=
+  # Asterisk: “*”
+  codeToChar 0x2A
+plusSign :=
+  # Plus Sign: “+”
+  codeToChar 0x2B
+comma :=
+  # Comma: “,”
+  codeToChar 0x2C
+hyphenMinus :=
+  # Hyphen-Minus: “-”
+  codeToChar 0x2D
+fullStop :=
+  # Full Stop: “.”
+  codeToChar 0x2E
+solidus :=
+  # Solidus: “/”
+  codeToChar 0x2F
+digitZero :=
+  # Digit Zero: “0”
+  codeToChar 0x30
+digitOne :=
+  # Digit One: “1”
+  codeToChar 0x31
+digitTwo :=
+  # Digit Two: “2”
+  codeToChar 0x32
+digitThree :=
+  # Digit Three: “3”
+  codeToChar 0x33
+digitFour :=
+  # Digit Four: “4”
+  codeToChar 0x34
+digitFive :=
+  # Digit Five: “5”
+  codeToChar 0x35
+digitSix :=
+  # Digit Six: “6”
+  codeToChar 0x36
+digitSeven :=
+  # Digit Seven: “7”
+  codeToChar 0x37
+digitEight :=
+  # Digit Eight: “8”
+  codeToChar 0x38
+digitNine :=
+  # Digit Nine: “9”
+  codeToChar 0x39
+colon :=
+  # Colon: “:”
+  codeToChar 0x3A
+semicolon :=
+  # Semicolon: “;”
+  codeToChar 0x3B
+lessThanSign :=
+  # Less-Than Sign: “<”
+  codeToChar 0x3C
+equalsSign :=
+  # Equals Sign: “=”
+  codeToChar 0x3D
+greaterThanSign :=
+  # Greater-Than Sign: “>”
+  codeToChar 0x3E
+questionMark :=
+  # Question Mark: “?”
+  codeToChar 0x3F
+commercialAt :=
+  # Commercial At: “@”
+  codeToChar 0x40
+latinCapitalLetterA :=
+  # Latin Capital Letter A: “A”
+  codeToChar 0x41
+latinCapitalLetterB :=
+  # Latin Capital Letter B: “B”
+  codeToChar 0x42
+latinCapitalLetterC :=
+  # Latin Capital Letter C: “C”
+  codeToChar 0x43
+latinCapitalLetterD :=
+  # Latin Capital Letter D: “D”
+  codeToChar 0x44
+latinCapitalLetterE :=
+  # Latin Capital Letter E: “E”
+  codeToChar 0x45
+latinCapitalLetterF :=
+  # Latin Capital Letter F: “F”
+  codeToChar 0x46
+latinCapitalLetterG :=
+  # Latin Capital Letter G: “G”
+  codeToChar 0x47
+latinCapitalLetterH :=
+  # Latin Capital Letter H: “H”
+  codeToChar 0x48
+latinCapitalLetterI :=
+  # Latin Capital Letter I: “I”
+  codeToChar 0x49
+latinCapitalLetterJ :=
+  # Latin Capital Letter J: “J”
+  codeToChar 0x4A
+latinCapitalLetterK :=
+  # Latin Capital Letter K: “K”
+  codeToChar 0x4B
+latinCapitalLetterL :=
+  # Latin Capital Letter L: “L”
+  codeToChar 0x4C
+latinCapitalLetterM :=
+  # Latin Capital Letter M: “M”
+  codeToChar 0x4D
+latinCapitalLetterN :=
+  # Latin Capital Letter N: “N”
+  codeToChar 0x4E
+latinCapitalLetterO :=
+  # Latin Capital Letter O: “O”
+  codeToChar 0x4F
+latinCapitalLetterP :=
+  # Latin Capital Letter P: “P”
+  codeToChar 0x50
+latinCapitalLetterQ :=
+  # Latin Capital Letter Q: “Q”
+  codeToChar 0x51
+latinCapitalLetterR :=
+  # Latin Capital Letter R: “R”
+  codeToChar 0x52
+latinCapitalLetterS :=
+  # Latin Capital Letter S: “S”
+  codeToChar 0x53
+latinCapitalLetterT :=
+  # Latin Capital Letter T: “T”
+  codeToChar 0x54
+latinCapitalLetterU :=
+  # Latin Capital Letter U: “U”
+  codeToChar 0x55
+latinCapitalLetterV :=
+  # Latin Capital Letter V: “V”
+  codeToChar 0x56
+latinCapitalLetterW :=
+  # Latin Capital Letter W: “W”
+  codeToChar 0x57
+latinCapitalLetterX :=
+  # Latin Capital Letter X: “X”
+  codeToChar 0x58
+latinCapitalLetterY :=
+  # Latin Capital Letter Y: “Y”
+  codeToChar 0x59
+latinCapitalLetterZ :=
+  # Latin Capital Letter Z: “Z”
+  codeToChar 0x5A
+leftSquareBracket :=
+  # Left Square Bracket: “[”
+  codeToChar 0x5B
+reverseSolidus :=
+  # Reverse Solidus: “\”
+  codeToChar 0x5C
+rightSquareBracket :=
+  # Right Square Bracket: “]”
+  codeToChar 0x5D
+circumflexAccent :=
+  # Circumflex Accent: “^”
+  codeToChar 0x5E
+lowLine :=
+  # Low Line: “_”
+  codeToChar 0x5F
+graveAccent :=
+  # Grave Accent: “`”
+  codeToChar 0x60
+latinSmallLetterA :=
+  # Latin Small Letter A: “a”
+  codeToChar 0x61
+latinSmallLetterB :=
+  # Latin Small Letter B: “b”
+  codeToChar 0x62
+latinSmallLetterC :=
+  # Latin Small Letter C: “c”
+  codeToChar 0x63
+latinSmallLetterD :=
+  # Latin Small Letter D: “d”
+  codeToChar 0x64
+latinSmallLetterE :=
+  # Latin Small Letter E: “e”
+  codeToChar 0x65
+latinSmallLetterF :=
+  # Latin Small Letter F: “f”
+  codeToChar 0x66
+latinSmallLetterG :=
+  # Latin Small Letter G: “g”
+  codeToChar 0x67
+latinSmallLetterH :=
+  # Latin Small Letter H: “h”
+  codeToChar 0x68
+latinSmallLetterI :=
+  # Latin Small Letter I: “i”
+  codeToChar 0x69
+latinSmallLetterJ :=
+  # Latin Small Letter J: “j”
+  codeToChar 0x6A
+latinSmallLetterK :=
+  # Latin Small Letter K: “k”
+  codeToChar 0x6B
+latinSmallLetterL :=
+  # Latin Small Letter L: “l”
+  codeToChar 0x6C
+latinSmallLetterM :=
+  # Latin Small Letter M: “m”
+  codeToChar 0x6D
+latinSmallLetterN :=
+  # Latin Small Letter N: “n”
+  codeToChar 0x6E
+latinSmallLetterO :=
+  # Latin Small Letter O: “o”
+  codeToChar 0x6F
+latinSmallLetterP :=
+  # Latin Small Letter P: “p”
+  codeToChar 0x70
+latinSmallLetterQ :=
+  # Latin Small Letter Q: “q”
+  codeToChar 0x71
+latinSmallLetterR :=
+  # Latin Small Letter R: “r”
+  codeToChar 0x72
+latinSmallLetterS :=
+  # Latin Small Letter S: “s”
+  codeToChar 0x73
+latinSmallLetterT :=
+  # Latin Small Letter T: “t”
+  codeToChar 0x74
+latinSmallLetterU :=
+  # Latin Small Letter U: “u”
+  codeToChar 0x75
+latinSmallLetterV :=
+  # Latin Small Letter V: “v”
+  codeToChar 0x76
+latinSmallLetterW :=
+  # Latin Small Letter W: “w”
+  codeToChar 0x77
+latinSmallLetterX :=
+  # Latin Small Letter X: “x”
+  codeToChar 0x78
+latinSmallLetterY :=
+  # Latin Small Letter Y: “y”
+  codeToChar 0x79
+latinSmallLetterZ :=
+  # Latin Small Letter Z: “z”
+  codeToChar 0x7A
+leftCurlyBracket :=
+  # Left Curly Bracket: “{”
+  codeToChar 0x7B
+verticalLine :=
+  # Vertical Line: “|”
+  codeToChar 0x7C
+rightCurlyBracket :=
+  # Right Curly Bracket: “}”
+  codeToChar 0x7D
+tilde :=
+  # Tilde: “~”
+  codeToChar 0x7E
+delete :=
+  # <Delete> (DEL)
+  codeToChar 0x7F

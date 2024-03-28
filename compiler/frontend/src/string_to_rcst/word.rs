@@ -74,59 +74,73 @@ pub fn symbol(input: &str) -> Option<(&str, Rcst)> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::string_to_rcst::utils::{build_identifier, build_symbol};
+    use crate::string_to_rcst::utils::assert_rich_ir_snapshot;
 
     #[test]
     fn test_word() {
-        assert_eq!(word("hello, world"), Some((", world", "hello".to_string())));
-        assert_eq!(
-            word("I💖Candy blub"),
-            Some((" blub", "I💖Candy".to_string()))
-        );
-        assert_eq!(word("012🔥hi"), Some(("", "012🔥hi".to_string())));
-        assert_eq!(word("foo(blub)"), Some(("(blub)", "foo".to_string())));
-        assert_eq!(word("foo#abc"), Some(("#abc", "foo".to_string())));
+        assert_rich_ir_snapshot!(word("hello, world"), @r###"
+        Remaining input: ", world"
+        Parsed: hello
+        "###);
+        assert_rich_ir_snapshot!(word("I💖Candy blub"), @r###"
+        Remaining input: " blub"
+        Parsed: I💖Candy
+        "###);
+        assert_rich_ir_snapshot!(word("012🔥hi"), @r###"
+        Remaining input: ""
+        Parsed: 012🔥hi
+        "###);
+        assert_rich_ir_snapshot!(word("foo(blub)"), @r###"
+        Remaining input: "(blub)"
+        Parsed: foo
+        "###);
+        assert_rich_ir_snapshot!(word("foo#abc"), @r###"
+        Remaining input: "#abc"
+        Parsed: foo
+        "###);
     }
 
     #[test]
     fn test_identifier() {
-        assert_eq!(
-            identifier("foo bar"),
-            Some((" bar", build_identifier("foo")))
-        );
-        assert_eq!(identifier("_"), Some(("", build_identifier("_"))));
-        assert_eq!(identifier("_foo"), Some(("", build_identifier("_foo"))));
-        assert_eq!(identifier("Foo bar"), None);
-        assert_eq!(identifier("012 bar"), None);
-        assert_eq!(
-            identifier("f12🔥 bar"),
-            Some((
-                " bar",
-                CstKind::Error {
-                    unparsable_input: "f12🔥".to_string(),
-                    error: CstError::IdentifierContainsNonAlphanumericAscii,
-                }
-                .into(),
-            )),
-        );
+        assert_rich_ir_snapshot!(identifier("foo bar"), @r###"
+        Remaining input: " bar"
+        Parsed: Identifier "foo"
+        "###);
+        assert_rich_ir_snapshot!(identifier("_"), @r###"
+        Remaining input: ""
+        Parsed: Identifier "_"
+        "###);
+        assert_rich_ir_snapshot!(identifier("_foo"), @r###"
+        Remaining input: ""
+        Parsed: Identifier "_foo"
+        "###);
+        assert_rich_ir_snapshot!(identifier("Foo bar"), @"Nothing was parsed");
+        assert_rich_ir_snapshot!(identifier("012 bar"), @"Nothing was parsed");
+        assert_rich_ir_snapshot!(identifier("f12🔥 bar"), @r###"
+        Remaining input: " bar"
+        Parsed: Error:
+          unparsable_input: "f12🔥"
+          error: IdentifierContainsNonAlphanumericAscii
+        "###);
     }
 
     #[test]
     fn test_symbol() {
-        assert_eq!(symbol("Foo b"), Some((" b", build_symbol("Foo"))));
-        assert_eq!(symbol("Foo_Bar"), Some(("", build_symbol("Foo_Bar"))));
-        assert_eq!(symbol("foo bar"), None);
-        assert_eq!(symbol("012 bar"), None);
-        assert_eq!(
-            symbol("F12🔥 bar"),
-            Some((
-                " bar",
-                CstKind::Error {
-                    unparsable_input: "F12🔥".to_string(),
-                    error: CstError::SymbolContainsNonAlphanumericAscii,
-                }
-                .into()
-            )),
-        );
+        assert_rich_ir_snapshot!(symbol("Foo b"), @r###"
+        Remaining input: " b"
+        Parsed: Symbol "Foo"
+        "###);
+        assert_rich_ir_snapshot!(symbol("Foo_Bar"), @r###"
+        Remaining input: ""
+        Parsed: Symbol "Foo_Bar"
+        "###);
+        assert_rich_ir_snapshot!(symbol("foo bar"), @"Nothing was parsed");
+        assert_rich_ir_snapshot!(symbol("012 bar"), @"Nothing was parsed");
+        assert_rich_ir_snapshot!(symbol("F12🔥 bar"), @r###"
+        Remaining input: " bar"
+        Parsed: Error:
+          unparsable_input: "F12🔥"
+          error: SymbolContainsNonAlphanumericAscii
+        "###);
     }
 }

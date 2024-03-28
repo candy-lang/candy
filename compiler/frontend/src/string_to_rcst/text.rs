@@ -267,398 +267,386 @@ fn convert_whitespace_into_text_newlines(whitespace: Vec<Rcst>) -> Vec<Rcst> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::string_to_rcst::utils::{build_identifier, build_simple_int, build_simple_text};
-
-    fn build_text(single_quotes: usize, parts: Vec<Rcst>) -> Rcst {
-        CstKind::Text {
-            opening: Box::new(
-                CstKind::OpeningText {
-                    opening_single_quotes: vec![CstKind::SingleQuote.into(); single_quotes],
-                    opening_double_quote: Box::new(CstKind::DoubleQuote.into()),
-                }
-                .into(),
-            ),
-            parts,
-            closing: Box::new(
-                CstKind::ClosingText {
-                    closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
-                    closing_single_quotes: vec![CstKind::SingleQuote.into(); single_quotes],
-                }
-                .into(),
-            ),
-        }
-        .into()
-    }
+    use crate::string_to_rcst::utils::assert_rich_ir_snapshot;
 
     #[test]
     fn test_text() {
-        assert_eq!(text("foo", 0), None);
-        assert_eq!(
-            text(r#""foo" bar"#, 0),
-            Some((" bar", build_simple_text("foo"))),
-        );
+        assert_rich_ir_snapshot!(text("foo", 0), @"Nothing was parsed");
+        assert_rich_ir_snapshot!(text(r#""foo" bar"#, 0), @r###"
+        Remaining input: " bar"
+        Parsed: Text:
+          opening: OpeningText:
+            opening_single_quotes:
+            opening_double_quote: DoubleQuote
+          parts:
+            TextPart "foo"
+          closing: ClosingText:
+            closing_double_quote: DoubleQuote
+            closing_single_quotes:
+        "###);
         // "foo
         //   bar"2
-        assert_eq!(
-            text("\"foo\n  bar\"2", 0),
-            Some((
-                "2",
-                build_text(
-                    0,
-                    vec![
-                        CstKind::TextPart("foo".to_string()).into(),
-                        CstKind::TextNewline("\n".to_string())
-                            .with_trailing_whitespace(vec![CstKind::Whitespace("  ".to_string())]),
-                        CstKind::TextPart("bar".to_string()).into(),
-                    ]
-                )
-            )),
-        );
+        assert_rich_ir_snapshot!(text("\"foo\n  bar\"2", 0), @r###"
+        Remaining input: "2"
+        Parsed: Text:
+          opening: OpeningText:
+            opening_single_quotes:
+            opening_double_quote: DoubleQuote
+          parts:
+            TextPart "foo"
+            TrailingWhitespace:
+              child: TextNewline "\n"
+              whitespace:
+                Whitespace "  "
+            TextPart "bar"
+          closing: ClosingText:
+            closing_double_quote: DoubleQuote
+            closing_single_quotes:
+        "###);
         // "
         //   foo
         // "
-        assert_eq!(
-            text("\"\n  foo\n\"2", 0),
-            Some((
-                "2",
-                CstKind::Text {
-                    opening: Box::new(
-                        CstKind::OpeningText {
-                            opening_single_quotes: vec![],
-                            opening_double_quote: Box::new(CstKind::DoubleQuote.into()),
-                        }
-                        .with_trailing_whitespace(vec![
-                            CstKind::Newline("\n".to_string()),
-                            CstKind::Whitespace("  ".to_string())
-                        ]),
-                    ),
-                    parts: vec![CstKind::TextPart("foo".to_string())
-                        .with_trailing_whitespace(vec![CstKind::Newline("\n".to_string())])],
-                    closing: Box::new(
-                        CstKind::ClosingText {
-                            closing_double_quote: Box::new(CstKind::DoubleQuote.into()),
-                            closing_single_quotes: vec![],
-                        }
-                        .into(),
-                    ),
-                }
-                .into()
-            )),
-        );
+        assert_rich_ir_snapshot!(text("\"\n  foo\n\"2", 0), @r###"
+        Remaining input: "2"
+        Parsed: Text:
+          opening: TrailingWhitespace:
+            child: OpeningText:
+              opening_single_quotes:
+              opening_double_quote: DoubleQuote
+            whitespace:
+              Newline "\n"
+              Whitespace "  "
+          parts:
+            TrailingWhitespace:
+              child: TextPart "foo"
+              whitespace:
+                Newline "\n"
+          closing: ClosingText:
+            closing_double_quote: DoubleQuote
+            closing_single_quotes:
+        "###);
         //   "foo
         //   bar"
-        assert_eq!(
-            text("\"foo\n  bar\"2", 1),
-            Some((
-                "\n  bar\"2",
-                CstKind::Text {
-                    opening: Box::new(
-                        CstKind::OpeningText {
-                            opening_single_quotes: vec![],
-                            opening_double_quote: Box::new(CstKind::DoubleQuote.into()),
-                        }
-                        .into()
-                    ),
-                    parts: vec![CstKind::TextPart("foo".to_string()).into()],
-                    closing: Box::new(
-                        CstKind::Error {
-                            unparsable_input: String::new(),
-                            error: CstError::TextNotSufficientlyIndented,
-                        }
-                        .into(),
-                    ),
-                }
-                .into()
-            )),
-        );
-        assert_eq!(
-            text("\"foo", 0),
-            Some((
-                "",
-                CstKind::Text {
-                    opening: Box::new(
-                        CstKind::OpeningText {
-                            opening_single_quotes: vec![],
-                            opening_double_quote: Box::new(CstKind::DoubleQuote.into()),
-                        }
-                        .into()
-                    ),
-                    parts: vec![CstKind::TextPart("foo".to_string()).into()],
-                    closing: Box::new(
-                        CstKind::Error {
-                            unparsable_input: String::new(),
-                            error: CstError::TextNotClosed,
-                        }
-                        .into(),
-                    ),
-                }
-                .into()
-            )),
-        );
-        assert_eq!(
-            text("''\"foo\"'bar\"'' baz", 0),
-            Some((
-                " baz",
-                build_text(2, vec![CstKind::TextPart("foo\"'bar".to_string()).into()])
-            )),
-        );
-        assert_eq!(
-            text("\"foo {\"bar\"} baz\"", 0),
-            Some((
-                "",
-                build_text(
-                    0,
-                    vec![
-                        CstKind::TextPart("foo ".to_string()).into(),
-                        CstKind::TextInterpolation {
-                            opening_curly_braces: vec![CstKind::OpeningCurlyBrace.into()],
-                            expression: Box::new(build_simple_text("bar")),
-                            closing_curly_braces: vec![CstKind::ClosingCurlyBrace.into()],
-                        }
-                        .into(),
-                        CstKind::TextPart(" baz".to_string()).into(),
-                    ]
-                )
-            )),
-        );
-        assert_eq!(
-            text("'\"foo {\"bar\"} baz\"'", 0),
-            Some((
-                "",
-                build_text(
-                    1,
-                    vec![CstKind::TextPart("foo {\"bar\"} baz".to_string()).into()]
-                )
-            )),
-        );
-        assert_eq!(
-            text("\"foo {  \"bar\" } baz\"", 0),
-            Some((
-                "",
-                build_text(
-                    0,
-                    vec![
-                        CstKind::TextPart("foo ".to_string()).into(),
-                        CstKind::TextInterpolation {
-                            opening_curly_braces: vec![CstKind::OpeningCurlyBrace
-                                .with_trailing_whitespace(vec![CstKind::Whitespace(
-                                    "  ".to_string(),
-                                )])],
-                            expression: Box::new(build_simple_text("bar").with_trailing_space()),
-                            closing_curly_braces: vec![CstKind::ClosingCurlyBrace.into()],
-                        }
-                        .into(),
-                        CstKind::TextPart(" baz".to_string()).into(),
-                    ]
-                ),
-            )),
-        );
-        assert_eq!(
+        assert_rich_ir_snapshot!(text("\"foo\n  bar\"2", 1), @r###"
+        Remaining input: "
+          bar"2"
+        Parsed: Text:
+          opening: OpeningText:
+            opening_single_quotes:
+            opening_double_quote: DoubleQuote
+          parts:
+            TextPart "foo"
+          closing: Error:
+            unparsable_input: ""
+            error: TextNotSufficientlyIndented
+        "###);
+        assert_rich_ir_snapshot!(text("\"foo", 0), @r###"
+        Remaining input: ""
+        Parsed: Text:
+          opening: OpeningText:
+            opening_single_quotes:
+            opening_double_quote: DoubleQuote
+          parts:
+            TextPart "foo"
+          closing: Error:
+            unparsable_input: ""
+            error: TextNotClosed
+        "###);
+        assert_rich_ir_snapshot!(text("''\"foo\"'bar\"'' baz", 0), @r###"
+        Remaining input: " baz"
+        Parsed: Text:
+          opening: OpeningText:
+            opening_single_quotes:
+              SingleQuote
+              SingleQuote
+            opening_double_quote: DoubleQuote
+          parts:
+            TextPart "foo"'bar"
+          closing: ClosingText:
+            closing_double_quote: DoubleQuote
+            closing_single_quotes:
+              SingleQuote
+              SingleQuote
+        "###);
+        assert_rich_ir_snapshot!(text("\"foo {\"bar\"} baz\"", 0), @r###"
+        Remaining input: ""
+        Parsed: Text:
+          opening: OpeningText:
+            opening_single_quotes:
+            opening_double_quote: DoubleQuote
+          parts:
+            TextPart "foo "
+            TextInterpolation:
+              opening_curly_braces:
+                OpeningCurlyBrace
+              expression: Text:
+                opening: OpeningText:
+                  opening_single_quotes:
+                  opening_double_quote: DoubleQuote
+                parts:
+                  TextPart "bar"
+                closing: ClosingText:
+                  closing_double_quote: DoubleQuote
+                  closing_single_quotes:
+              closing_curly_braces:
+                ClosingCurlyBrace
+            TextPart " baz"
+          closing: ClosingText:
+            closing_double_quote: DoubleQuote
+            closing_single_quotes:
+        "###);
+        assert_rich_ir_snapshot!(text("'\"foo {\"bar\"} baz\"'", 0), @r###"
+        Remaining input: ""
+        Parsed: Text:
+          opening: OpeningText:
+            opening_single_quotes:
+              SingleQuote
+            opening_double_quote: DoubleQuote
+          parts:
+            TextPart "foo {"bar"} baz"
+          closing: ClosingText:
+            closing_double_quote: DoubleQuote
+            closing_single_quotes:
+              SingleQuote
+        "###);
+        assert_rich_ir_snapshot!(text("\"foo {  \"bar\" } baz\"", 0), @r###"
+        Remaining input: ""
+        Parsed: Text:
+          opening: OpeningText:
+            opening_single_quotes:
+            opening_double_quote: DoubleQuote
+          parts:
+            TextPart "foo "
+            TextInterpolation:
+              opening_curly_braces:
+                TrailingWhitespace:
+                  child: OpeningCurlyBrace
+                  whitespace:
+                    Whitespace "  "
+              expression: TrailingWhitespace:
+                child: Text:
+                  opening: OpeningText:
+                    opening_single_quotes:
+                    opening_double_quote: DoubleQuote
+                  parts:
+                    TextPart "bar"
+                  closing: ClosingText:
+                    closing_double_quote: DoubleQuote
+                    closing_single_quotes:
+                whitespace:
+                  Whitespace " "
+              closing_curly_braces:
+                ClosingCurlyBrace
+            TextPart " baz"
+          closing: ClosingText:
+            closing_double_quote: DoubleQuote
+            closing_single_quotes:
+        "###);
+        assert_rich_ir_snapshot!(
             text(
                 "\"Some text with {'\"an interpolation containing {{\"an interpolation\"}}\"'}\"",
                 0,
             ),
-            Some((
-                "",
-                build_text(
-                    0,
-                    vec![
-                        CstKind::TextPart("Some text with ".to_string()).into(),
-                        CstKind::TextInterpolation {
-                            opening_curly_braces: vec![CstKind::OpeningCurlyBrace.into()],
-                            expression: Box::new(build_text(
-                                1,
-                                vec![
-                                    CstKind::TextPart("an interpolation containing ".to_string(),)
-                                        .into(),
-                                    CstKind::TextInterpolation {
-                                        opening_curly_braces: vec![
-                                            CstKind::OpeningCurlyBrace.into(),
-                                            CstKind::OpeningCurlyBrace.into(),
-                                        ],
-                                        expression: Box::new(build_simple_text("an interpolation")),
-                                        closing_curly_braces: vec![
-                                            CstKind::ClosingCurlyBrace.into(),
-                                            CstKind::ClosingCurlyBrace.into(),
-                                        ],
-                                    }
-                                    .into(),
-                                ]
-                            )),
-                            closing_curly_braces: vec![CstKind::ClosingCurlyBrace.into()],
-                        }
-                        .into(),
-                    ]
-                )
-            )),
-        );
-        assert_eq!(
-            text("\"{ {2} }\"", 0),
-            Some((
-                "",
-                build_text(
-                    0,
-                    vec![
-                        CstKind::TextInterpolation {
-                            opening_curly_braces: vec![
-                                CstKind::OpeningCurlyBrace.with_trailing_space()
-                            ],
-                            expression: Box::new(
-                                CstKind::Function {
-                                    opening_curly_brace: Box::new(
-                                        CstKind::OpeningCurlyBrace.into()
-                                    ),
-                                    parameters_and_arrow: None,
-                                    body: vec![build_simple_int(2)],
-                                    closing_curly_brace: Box::new(
-                                        CstKind::ClosingCurlyBrace.into()
-                                    ),
-                                }
-                                .with_trailing_space(),
-                            ),
-                            closing_curly_braces: vec![CstKind::ClosingCurlyBrace.into()],
-                        }
-                        .into(),
-                    ]
-                )
-            )),
-        );
-        assert_eq!(
-            text("\"{{2}}\"", 0),
-            Some((
-                "",
-                build_text(
-                    0,
-                    vec![
-                        CstKind::TextPart("{".to_string()).into(),
-                        CstKind::TextInterpolation {
-                            opening_curly_braces: vec![CstKind::OpeningCurlyBrace.into()],
-                            expression: Box::new(build_simple_int(2)),
-                            closing_curly_braces: vec![CstKind::ClosingCurlyBrace.into()],
-                        }
-                        .into(),
-                        CstKind::TextPart("}".to_string()).into(),
-                    ]
-                )
-            )),
-        );
-        assert_eq!(
-            text("\"foo {} baz\"", 0),
-            Some((
-                "",
-                build_text(
-                    0,
-                    vec![
-                        CstKind::TextPart("foo ".to_string()).into(),
-                        CstKind::TextInterpolation {
-                            opening_curly_braces: vec![CstKind::OpeningCurlyBrace.into()],
-                            expression: Box::new(
-                                CstKind::Error {
-                                    unparsable_input: String::new(),
-                                    error: CstError::TextInterpolationMissesExpression,
-                                }
-                                .into(),
-                            ),
-                            closing_curly_braces: vec![CstKind::ClosingCurlyBrace.into()],
-                        }
-                        .into(),
-                        CstKind::TextPart(" baz".to_string()).into(),
-                    ]
-                )
-            )),
-        );
-        assert_eq!(
-            text("\"foo {\"bar\" baz\"", 0),
-            Some((
-                "",
-                CstKind::Text {
-                    opening: Box::new(
-                        CstKind::OpeningText {
-                            opening_single_quotes: vec![],
-                            opening_double_quote: Box::new(CstKind::DoubleQuote.into()),
-                        }
-                        .into()
-                    ),
-                    parts: vec![
-                        CstKind::TextPart("foo ".to_string()).into(),
-                        CstKind::TextInterpolation {
-                            opening_curly_braces: vec![CstKind::OpeningCurlyBrace.into()],
-                            expression: Box::new(
-                                CstKind::Call {
-                                    receiver: Box::new(
-                                        build_simple_text("bar").with_trailing_space(),
-                                    ),
-                                    arguments: vec![
-                                        build_identifier("baz"),
-                                        CstKind::Text {
-                                            opening: Box::new(
-                                                CstKind::OpeningText {
-                                                    opening_single_quotes: vec![],
-                                                    opening_double_quote: Box::new(
-                                                        CstKind::DoubleQuote.into()
-                                                    ),
-                                                }
-                                                .into(),
-                                            ),
-                                            parts: vec![],
-                                            closing: Box::new(
-                                                CstKind::Error {
-                                                    unparsable_input: String::new(),
-                                                    error: CstError::TextNotClosed,
-                                                }
-                                                .into()
-                                            )
-                                        }
-                                        .into()
-                                    ],
-                                }
-                                .into(),
-                            ),
-                            closing_curly_braces: vec![CstKind::Error {
-                                unparsable_input: String::new(),
-                                error: CstError::TextInterpolationNotClosed,
-                            }
-                            .into()],
-                        }
-                        .into(),
-                    ],
-                    closing: Box::new(
-                        CstKind::Error {
-                            unparsable_input: String::new(),
-                            error: CstError::TextNotClosed,
-                        }
-                        .into(),
-                    ),
-                }
-                .into()
-            )),
-        );
-        assert_eq!(
-            text("\"foo {\"bar\" \"a\"} baz\"", 0),
-            Some((
-                "",
-                build_text(
-                    0,
-                    vec![
-                        CstKind::TextPart("foo ".to_string()).into(),
-                        CstKind::TextInterpolation {
-                            opening_curly_braces: vec![CstKind::OpeningCurlyBrace.into()],
-                            expression: Box::new(
-                                CstKind::Call {
-                                    receiver: Box::new(
-                                        build_simple_text("bar").with_trailing_space(),
-                                    ),
-                                    arguments: vec![build_simple_text("a")],
-                                }
-                                .into(),
-                            ),
-                            closing_curly_braces: vec![CstKind::ClosingCurlyBrace.into()],
-                        }
-                        .into(),
-                        CstKind::TextPart(" baz".to_string()).into(),
-                    ]
-                )
-            )),
-        );
+            @r###"
+        Remaining input: ""
+        Parsed: Text:
+          opening: OpeningText:
+            opening_single_quotes:
+            opening_double_quote: DoubleQuote
+          parts:
+            TextPart "Some text with "
+            TextInterpolation:
+              opening_curly_braces:
+                OpeningCurlyBrace
+              expression: Text:
+                opening: OpeningText:
+                  opening_single_quotes:
+                    SingleQuote
+                  opening_double_quote: DoubleQuote
+                parts:
+                  TextPart "an interpolation containing "
+                  TextInterpolation:
+                    opening_curly_braces:
+                      OpeningCurlyBrace
+                      OpeningCurlyBrace
+                    expression: Text:
+                      opening: OpeningText:
+                        opening_single_quotes:
+                        opening_double_quote: DoubleQuote
+                      parts:
+                        TextPart "an interpolation"
+                      closing: ClosingText:
+                        closing_double_quote: DoubleQuote
+                        closing_single_quotes:
+                    closing_curly_braces:
+                      ClosingCurlyBrace
+                      ClosingCurlyBrace
+                closing: ClosingText:
+                  closing_double_quote: DoubleQuote
+                  closing_single_quotes:
+                    SingleQuote
+              closing_curly_braces:
+                ClosingCurlyBrace
+          closing: ClosingText:
+            closing_double_quote: DoubleQuote
+            closing_single_quotes:
+        "###);
+        assert_rich_ir_snapshot!(text("\"{ {2} }\"", 0), @r###"
+        Remaining input: ""
+        Parsed: Text:
+          opening: OpeningText:
+            opening_single_quotes:
+            opening_double_quote: DoubleQuote
+          parts:
+            TextInterpolation:
+              opening_curly_braces:
+                TrailingWhitespace:
+                  child: OpeningCurlyBrace
+                  whitespace:
+                    Whitespace " "
+              expression: TrailingWhitespace:
+                child: Function:
+                  opening_curly_brace: OpeningCurlyBrace
+                  parameters_and_arrow: None
+                  body:
+                    Int:
+                      radix_prefix: None
+                      value: 2
+                      string: "2"
+                  closing_curly_brace: ClosingCurlyBrace
+                whitespace:
+                  Whitespace " "
+              closing_curly_braces:
+                ClosingCurlyBrace
+          closing: ClosingText:
+            closing_double_quote: DoubleQuote
+            closing_single_quotes:
+        "###);
+        assert_rich_ir_snapshot!(text("\"{{2}}\"", 0), @r###"
+        Remaining input: ""
+        Parsed: Text:
+          opening: OpeningText:
+            opening_single_quotes:
+            opening_double_quote: DoubleQuote
+          parts:
+            TextPart "{"
+            TextInterpolation:
+              opening_curly_braces:
+                OpeningCurlyBrace
+              expression: Int:
+                radix_prefix: None
+                value: 2
+                string: "2"
+              closing_curly_braces:
+                ClosingCurlyBrace
+            TextPart "}"
+          closing: ClosingText:
+            closing_double_quote: DoubleQuote
+            closing_single_quotes:
+        "###);
+        assert_rich_ir_snapshot!(text("\"foo {} baz\"", 0), @r###"
+        Remaining input: ""
+        Parsed: Text:
+          opening: OpeningText:
+            opening_single_quotes:
+            opening_double_quote: DoubleQuote
+          parts:
+            TextPart "foo "
+            TextInterpolation:
+              opening_curly_braces:
+                OpeningCurlyBrace
+              expression: Error:
+                unparsable_input: ""
+                error: TextInterpolationMissesExpression
+              closing_curly_braces:
+                ClosingCurlyBrace
+            TextPart " baz"
+          closing: ClosingText:
+            closing_double_quote: DoubleQuote
+            closing_single_quotes:
+        "###);
+        assert_rich_ir_snapshot!(text("\"foo {\"bar\" baz\"", 0), @r###"
+        Remaining input: ""
+        Parsed: Text:
+          opening: OpeningText:
+            opening_single_quotes:
+            opening_double_quote: DoubleQuote
+          parts:
+            TextPart "foo "
+            TextInterpolation:
+              opening_curly_braces:
+                OpeningCurlyBrace
+              expression: Call:
+                receiver: TrailingWhitespace:
+                  child: Text:
+                    opening: OpeningText:
+                      opening_single_quotes:
+                      opening_double_quote: DoubleQuote
+                    parts:
+                      TextPart "bar"
+                    closing: ClosingText:
+                      closing_double_quote: DoubleQuote
+                      closing_single_quotes:
+                  whitespace:
+                    Whitespace " "
+                arguments:
+                  Identifier "baz"
+                  Text:
+                    opening: OpeningText:
+                      opening_single_quotes:
+                      opening_double_quote: DoubleQuote
+                    parts:
+                    closing: Error:
+                      unparsable_input: ""
+                      error: TextNotClosed
+              closing_curly_braces:
+                Error:
+                  unparsable_input: ""
+                  error: TextInterpolationNotClosed
+          closing: Error:
+            unparsable_input: ""
+            error: TextNotClosed
+        "###);
+        assert_rich_ir_snapshot!(text("\"foo {\"bar\" \"a\"} baz\"", 0), @r###"
+        Remaining input: ""
+        Parsed: Text:
+          opening: OpeningText:
+            opening_single_quotes:
+            opening_double_quote: DoubleQuote
+          parts:
+            TextPart "foo "
+            TextInterpolation:
+              opening_curly_braces:
+                OpeningCurlyBrace
+              expression: Call:
+                receiver: TrailingWhitespace:
+                  child: Text:
+                    opening: OpeningText:
+                      opening_single_quotes:
+                      opening_double_quote: DoubleQuote
+                    parts:
+                      TextPart "bar"
+                    closing: ClosingText:
+                      closing_double_quote: DoubleQuote
+                      closing_single_quotes:
+                  whitespace:
+                    Whitespace " "
+                arguments:
+                  Text:
+                    opening: OpeningText:
+                      opening_single_quotes:
+                      opening_double_quote: DoubleQuote
+                    parts:
+                      TextPart "a"
+                    closing: ClosingText:
+                      closing_double_quote: DoubleQuote
+                      closing_single_quotes:
+              closing_curly_braces:
+                ClosingCurlyBrace
+            TextPart " baz"
+          closing: ClosingText:
+            closing_double_quote: DoubleQuote
+            closing_single_quotes:
+        "###);
     }
 }
