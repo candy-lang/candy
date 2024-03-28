@@ -426,7 +426,7 @@ impl Instruction {
                         } else {
                             else_captured.iter().join(", ")
                         },
-                    ), 
+                    ),
                     None,
                      EnumSet::empty(),
                 );
