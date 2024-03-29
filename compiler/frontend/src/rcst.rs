@@ -2,7 +2,6 @@ use crate::{
     cst::{Cst, CstKind},
     rich_ir::{RichIrBuilder, ToRichIr},
 };
-use enumset::EnumSet;
 
 pub type Rcst = Cst<()>;
 

@@ -666,15 +666,14 @@ where
             } => {
                 let start = builder.push_simple("Int:").start;
                 builder.push_indented_foldable(|builder| {
-                    builder.push_cst_property_name("radix_prefix");
-                    if let Some((radix, prefix)) = radix_prefix {
-                        builder.push_indented_foldable(|builder| {
+                    builder.push_indented_optional_cst_property(
+                        "radix_prefix",
+                        radix_prefix.as_ref(),
+                        |builder, (radix, prefix)| {
                             builder.push_cst_property("radix", format!("{radix:?}"));
                             builder.push_cst_property("prefix", format!("\"{prefix}\""));
-                        });
-                    } else {
-                        builder.push_simple(" None");
-                    }
+                        },
+                    );
 
                     builder.push_cst_property_name("value");
                     builder.push_simple(" ");
@@ -834,13 +833,7 @@ where
                 builder.push_cst_kind("ListItem", |builder| {
                     builder.push_cst_property("value", value);
 
-                    builder.push_cst_property_name("comma");
-                    builder.push_simple(" ");
-                    if let Some(comma) = comma {
-                        comma.build_rich_ir(builder);
-                    } else {
-                        builder.push_simple("None");
-                    }
+                    builder.push_optional_cst_property("comma", comma.as_ref());
                 });
             }
             Self::Struct {
@@ -868,23 +861,18 @@ where
                 comma,
             } => {
                 builder.push_cst_kind("StructField", |builder| {
-                    builder.push_cst_property_name("key_and_colon");
-                    if let Some(box (key, colon)) = key_and_colon {
-                        builder.push_cst_property("key", key);
-                        builder.push_cst_property("colon", colon);
-                    } else {
-                        builder.push_simple(" None");
-                    }
+                    builder.push_indented_optional_cst_property(
+                        "key_and_colon",
+                        key_and_colon.as_ref(),
+                        |builder, box (key, colon)| {
+                            builder.push_cst_property("key", key);
+                            builder.push_cst_property("colon", colon);
+                        },
+                    );
 
                     builder.push_cst_property("value", value);
 
-                    builder.push_cst_property_name("comma");
-                    builder.push_simple(" ");
-                    if let Some(comma) = comma {
-                        comma.build_rich_ir(builder);
-                    } else {
-                        builder.push_simple("None");
-                    }
+                    builder.push_optional_cst_property("comma", comma.as_ref());
                 });
             }
             Self::StructAccess { struct_, dot, key } => {
@@ -950,22 +938,20 @@ where
                 builder.push_cst_kind("Function", |builder| {
                     builder.push_cst_property("opening_curly_brace", opening_curly_brace);
 
-                    builder.push_cst_property_name("parameters_and_arrow");
-                    if let Some((parameters, arrow)) = parameters_and_arrow {
-                        builder.push_indented_foldable(|builder| {
-                            builder.push_cst_property_name("parameters");
-                            builder.push_indented_foldable(|builder| {
-                                for parameter in parameters {
+                    builder.push_indented_optional_cst_property(
+                        "parameters_and_arrow",
+                        parameters_and_arrow.as_ref(),
+                        |builder, (parameters, arrow)| {
+                            builder.push_newline();
+                            builder.push_cst_kind("parameters", |builder| {
+                                if !parameters.is_empty() {
                                     builder.push_newline();
-                                    parameter.build_rich_ir(builder);
+                                    builder.push_multiline(parameters);
                                 }
                             });
-
                             builder.push_cst_property("arrow", arrow);
-                        });
-                    } else {
-                        builder.push_simple(" None");
-                    }
+                        },
+                    );
 
                     builder.push_cst_property_name("body");
                     builder.push_indented_foldable(|builder| {
@@ -1027,12 +1013,12 @@ impl RichIrBuilder {
         self.push_simple("None");
     }
 
-    fn push_optional_cst_property<T>(&mut self, property_name: &str, value: Option<impl ToRichIr>) {
+    fn push_optional_cst_property(&mut self, property_name: &str, value: Option<impl ToRichIr>) {
         self.push_cst_property_name(property_name);
+        self.push_simple(" ");
         if let Some(value) = value {
             value.build_rich_ir(self);
         } else {
-            self.push_simple(" ");
             self.push_none();
         }
     }

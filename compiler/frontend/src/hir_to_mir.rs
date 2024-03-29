@@ -645,7 +645,6 @@ impl<'a> LoweringContext<'a> {
                     expression,
                     case_pattern,
                 );
-                let builtin_if_else = body.push_builtin(BuiltinFunction::IfElse);
 
                 let is_pattern_match = body.push_is_match(pattern_result, responsible_for_match);
                 let case_id = hir_id.child(format!("case-{case_index}"));
@@ -661,14 +660,6 @@ impl<'a> LoweringContext<'a> {
                         responsible_for_match,
                         case_index + 1,
                     );
-                });
-
-                let then_function = body.push_function(case_id.child("matched"), |body, _| {
-                    self.ongoing_destructuring = Some(OngoingDestructuring {
-                        result: pattern_result,
-                        is_trivial: false,
-                    });
-                    self.compile_expressions(body, responsible_for_needs, &case_body.expressions);
                 });
 
                 let then_function = body.push_function(case_id.child("patternMatch"), |body, _| {

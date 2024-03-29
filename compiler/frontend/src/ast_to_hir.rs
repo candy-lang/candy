@@ -435,7 +435,7 @@ impl Context<'_> {
                                 };
 
                                 let (body, inner_body) = scope.with_scope(None, |scope| {
-                                    scope.with_scope(match_id.clone(), |scope| {}).0
+                                    scope.with_scope(match_id.clone(), |_scope| {}).0
                                 });
 
                                 hir::MatchCase {
