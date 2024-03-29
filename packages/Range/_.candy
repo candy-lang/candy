@@ -1,5 +1,5 @@
-bound = use ".bound"
-[bool, ifElse, int, iterator] = use "Core"
+bound := use ".bound"
+[bool, equals, ifElse, int, iterator] = use "Core"
 [print] = use "Builtins"
 
 fromBounds start end :=
@@ -10,7 +10,7 @@ fromBounds start end :=
     (Inclusive a, Exclusive b) -> a | int.isGreaterThanOrEqualTo b
     (Inclusive a, Unbounded) -> False
     (Exclusive a, Inclusive b) -> a | int.isGreaterThanOrEqualTo b
-    (Exclusive a, Exclusive b) -> a | int.subtract b | int.absolute | int.isGreaterThanOrEqualTo 2
+    (Exclusive a, Exclusive b) -> b | int.subtract a | int.absolute | int.isLessThanOrEqualTo 1
     (Exclusive a, Unbounded) -> False
     (Unbounded, _) -> False
   ifElse isEmpty { Range Empty } { Range [start, end] }
@@ -20,8 +20,8 @@ is range := range %
     range %
       Empty -> True
       [start, end] -> bound.is start | bool.and (bound.is end) | bool.lazyAnd {
-        fromBounds start end | equals range
-      }
+          fromBounds start end | equals range
+        }
       _ -> False
   _ -> False
 
