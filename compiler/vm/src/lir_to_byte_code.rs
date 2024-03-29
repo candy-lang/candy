@@ -212,6 +212,7 @@ impl<'c> LoweringContext<'c> {
             }
             Expression::CreateFunction { captured, body_id } => {
                 let instruction_pointer = self.get_body(*body_id);
+                // PERF: Do we need to emit these references if we store stack offsets anyway?
                 for captured in captured {
                     self.emit_reference_to(*captured);
                 }
@@ -246,6 +247,34 @@ impl<'c> LoweringContext<'c> {
                     id,
                     Instruction::Call {
                         num_args: arguments.len(),
+                    },
+                );
+            }
+            Expression::IfElse {
+                condition,
+                then_body_id,
+                then_captured,
+                else_body_id,
+                else_captured,
+                responsible,
+            } => {
+                self.emit_reference_to(*condition);
+                self.emit_reference_to(*responsible);
+                let then_target = self.get_body(*then_body_id);
+                let else_target = self.get_body(*else_body_id);
+                self.emit(
+                    id,
+                    Instruction::IfElse {
+                        then_target,
+                        then_captured: then_captured
+                            .iter()
+                            .map(|id| self.stack.find_id(*id))
+                            .collect(),
+                        else_target,
+                        else_captured: else_captured
+                            .iter()
+                            .map(|id| self.stack.find_id(*id))
+                            .collect(),
                     },
                 );
             }
