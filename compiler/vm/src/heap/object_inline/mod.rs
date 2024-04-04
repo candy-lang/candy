@@ -119,7 +119,7 @@ impl_debug_display_via_debugdisplay!(InlineObject);
 impl Eq for InlineObject {}
 impl PartialEq for InlineObject {
     fn eq(&self, other: &Self) -> bool {
-        self.raw_word() == other.raw_word() || InlineData::from(*self) == InlineData::from(*other)
+        InlineData::from(*self) == InlineData::from(*other)
     }
 }
 impl Hash for InlineObject {
