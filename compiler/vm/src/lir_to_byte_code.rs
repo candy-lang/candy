@@ -150,7 +150,7 @@ impl<'c> LoweringContext<'c> {
             };
             self.current_instructions.push(Instruction::TailCall {
                 num_locals_to_pop: self.stack.len() - 1,
-                num_args,
+                num_args: num_args.try_into().unwrap(),
             });
         } else {
             let dummy_id = Id::from_usize(0);

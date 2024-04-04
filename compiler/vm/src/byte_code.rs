@@ -90,7 +90,9 @@ pub enum Instruction {
     /// executing the call.
     TailCall {
         num_locals_to_pop: usize,
-        num_args: usize, // excluding the responsible argument
+        // This is `u32` instead of `usize` to reduce the size of the
+        // enum from 24 to 16 bytes.
+        num_args: u32, // excluding the responsible argument
     },
 
     /// Returns from the current function to the original caller. Leaves the
@@ -191,7 +193,7 @@ impl Instruction {
                 num_args,
             } => {
                 stack.pop(); // responsible
-                stack.pop_multiple(*num_args);
+                stack.pop_multiple((*num_args).try_into().unwrap());
                 stack.pop(); // function/builtin
                 stack.pop_multiple(*num_locals_to_pop);
                 stack.push(result); // return value
@@ -405,7 +407,7 @@ impl ToRichIr for Instruction {
                 builder.push(
                     format!(
                         " with {num_locals_to_pop} locals and {num_args} {}",
-                        arguments_plural(*num_args),
+                        arguments_plural((*num_args).try_into().unwrap()),
                     ),
                     None,
                     EnumSet::empty(),
