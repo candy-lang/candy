@@ -1,0 +1,53 @@
+[checkEquals, iterator] = use "Core"
+range = use "Range"
+bound = range.bound
+
+checkEquals (bound.is Unbounded) True
+checkEquals (bound.is (Inclusive 2)) True
+checkEquals (bound.is (Exclusive 3)) True
+checkEquals (bound.is Foo) False
+
+checkEquals (range.fromBounds Unbounded Unbounded) (Range [Start: Unbounded, End: Unbounded])
+checkEquals (range.fromBounds (Inclusive 2) Unbounded) (Range [Start: Inclusive 2, End: Unbounded])
+checkEquals (range.fromBounds (Exclusive 3) Unbounded) (Range [Start: Exclusive 3, End: Unbounded])
+checkEquals (range.fromBounds Unbounded (Inclusive 1)) (Range [Start: Unbounded, End: Inclusive 1])
+checkEquals (range.fromBounds Unbounded (Exclusive 1)) (Range [Start: Unbounded, End: Exclusive 1])
+checkEquals
+  range.fromBounds (Inclusive 1) (Inclusive 1)
+  Range [Start: Inclusive 1, End: Inclusive 1]
+checkEquals (range.fromBounds (Inclusive 1) (Inclusive 0)) (Range Empty)
+checkEquals (range.fromBounds (Inclusive 1) (Exclusive 1)) (Range Empty)
+checkEquals
+  range.fromBounds (Inclusive 1) (Exclusive 2)
+  Range [Start: Inclusive 1, End: Exclusive 2]
+checkEquals (range.fromBounds (Exclusive 1) (Inclusive 1)) (Range Empty)
+checkEquals (range.fromBounds (Exclusive 1) (Exclusive 1)) (Range Empty)
+checkEquals
+  range.fromBounds (Exclusive 1) (Exclusive 3)
+  Range [Start: Exclusive 1, End: Exclusive 3]
+checkEquals
+  range.fromBounds (Exclusive 1) (Inclusive 4)
+  Range [Start: Exclusive 1, End: Inclusive 4]
+
+checkEquals (range.is (Range Empty)) True
+checkEquals (range.is (Range [Start: Inclusive 1, End: Inclusive 2])) True
+
+checkEquals (range.contains (Range [Start: Inclusive 1, End: Inclusive 2]) 2) True
+checkEquals (range.contains (Range [Start: Inclusive 1, End: Exclusive 2]) 2) False
+checkEquals (range.contains (Range [Start: Inclusive 1, End: Inclusive 2]) 3) False
+checkEquals (range.contains (Range [Start: Inclusive 1, End: Inclusive 2]) 1) True
+checkEquals (range.contains (Range [Start: Inclusive 2, End: Inclusive 2]) 1) False
+checkEquals (range.contains (Range [Start: Exclusive 1, End: Inclusive 2]) 1) False
+
+checkEquals
+  range.intersection
+    Range [Start: Inclusive 1, End: Inclusive 5]
+    Range [Start: Inclusive 3, End: Inclusive 8]
+  Range [Start: Inclusive 3, End: Inclusive 5]
+
+main := { environment ->
+  a = 1 | range.until 10
+  environment.stdout a
+
+  1 | range.until 10 | range.iterate | iterator.forEach { a -> environment.stdout a }
+}
