@@ -156,8 +156,7 @@ impl MachineState {
             } => {
                 let responsible = self.pop_from_data_stack();
                 let condition = self.pop_from_data_stack();
-                let condition = Tag::try_from(condition)
-                    .unwrap()
+                let condition = Tag::new_inline_unchecked(condition)
                     .try_into_bool(heap)
                     .unwrap();
                 let (target, captured) = if condition {

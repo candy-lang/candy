@@ -308,6 +308,10 @@ pub enum Tag {
 
 impl Tag {
     #[must_use]
+    pub const fn new_inline_unchecked(value: InlineObject) -> Self {
+        Self::Inline(InlineTag::new_unchecked(value))
+    }
+    #[must_use]
     pub fn create(symbol: Text) -> Self {
         Self::Inline(InlineTag::new(symbol))
     }
