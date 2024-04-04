@@ -107,12 +107,7 @@ pub enum Instruction {
     /// the `condition`.
     ///
     /// a, condition, responsible -> a
-    IfElse {
-        then_target: InstructionPointer,
-        then_captured: Vec<StackOffset>,
-        else_target: InstructionPointer,
-        else_captured: Vec<StackOffset>,
-    },
+    IfElse(IfElse),
 
     /// Panics. Because the panic instruction only occurs inside the generated
     /// needs function, the reason is already guaranteed to be a text.
@@ -136,6 +131,13 @@ pub enum Instruction {
 
     /// a, HIR ID, function -> a
     TraceFoundFuzzableFunction,
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct IfElse {
+    pub then_target: InstructionPointer,
+    pub then_captured: Vec<StackOffset>,
+    pub else_target: InstructionPointer,
+    pub else_captured: Vec<StackOffset>,
 }
 
 impl Instruction {
@@ -196,7 +198,7 @@ impl Instruction {
                 // Only modifies the call stack and the instruction pointer.
                 // Leaves the return value untouched on the stack.
             }
-            Self::IfElse { .. } => {
+            Self::IfElse(_) => {
                 stack.pop(); // responsible
                 stack.pop(); // condition
                 stack.push(result); // return value
@@ -314,7 +316,7 @@ impl ToRichIr for ByteCode {
         }
     }
 }
-impl Instruction {
+impl ToRichIr for Instruction {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         let discriminant: InstructionDiscriminants = self.into();
         builder.push(
@@ -408,12 +410,12 @@ impl Instruction {
                 );
             }
             Self::Return => {}
-            Self::IfElse {
+            Self::IfElse(IfElse {
                 then_target,
                 then_captured,
                 else_target,
                 else_captured,
-            } => {
+            }) => {
                 builder.push(
                     format!(
                         " then call {then_target:?} capturing {} else call {else_target:?} capturing {}",

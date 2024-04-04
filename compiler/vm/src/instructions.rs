@@ -1,5 +1,5 @@
 use crate::{
-    byte_code::Instruction,
+    byte_code::{IfElse, Instruction},
     heap::{Data, Function, Heap, HirId, InlineObject, List, Struct, Tag, Text},
     tracer::Tracer,
     vm::{CallHandle, MachineState, Panic},
@@ -148,12 +148,12 @@ impl MachineState {
                 self.next_instruction = self.call_stack.pop();
                 InstructionResult::Done
             }
-            Instruction::IfElse {
+            Instruction::IfElse(IfElse {
                 then_target,
                 then_captured,
                 else_target,
                 else_captured,
-            } => {
+            }) => {
                 let responsible = self.pop_from_data_stack();
                 let condition = self.pop_from_data_stack();
                 let condition = Tag::try_from(condition)

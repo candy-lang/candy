@@ -1,5 +1,5 @@
 use crate::{
-    byte_code::{ByteCode, Instruction, StackOffset},
+    byte_code::{ByteCode, IfElse, Instruction, StackOffset},
     heap::{Builtin, Function, Heap, HirId, InlineObject, Int, List, Struct, Tag, Text},
     instruction_pointer::InstructionPointer,
 };
@@ -264,7 +264,7 @@ impl<'c> LoweringContext<'c> {
                 let else_target = self.get_body(*else_body_id);
                 self.emit(
                     id,
-                    Instruction::IfElse {
+                    Instruction::IfElse(IfElse {
                         then_target,
                         then_captured: then_captured
                             .iter()
@@ -275,7 +275,7 @@ impl<'c> LoweringContext<'c> {
                             .iter()
                             .map(|id| self.stack.find_id(*id))
                             .collect(),
-                    },
+                    }),
                 );
             }
             Expression::Panic {
