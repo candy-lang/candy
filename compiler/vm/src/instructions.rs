@@ -295,8 +295,7 @@ impl MachineState {
         self.data_stack.push(value.into());
     }
     fn pop_from_data_stack(&mut self) -> InlineObject {
-        let value = self.data_stack.pop();
-        unsafe { value.unwrap_unchecked() }
+        self.data_stack.pop().expect("Data stack is empty.")
     }
     fn pop_multiple_from_data_stack(&mut self, amount: usize) {
         debug_assert!(amount <= self.data_stack.len());
