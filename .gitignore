@@ -7,6 +7,7 @@ local/
 # Valgrind
 cachegrind.out.*
 callgrind.out.*
+vgcore.*
 
 # ANTLR
 .antlr/
