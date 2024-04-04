@@ -15,7 +15,6 @@ use std::{
     str::FromStr,
     sync::atomic::{AtomicBool, Ordering},
 };
-use tracing::{span, Level};
 
 /// Our language server talks to clients using the LSP on stdin/stdout. When it
 /// is running, we can't print log messages / etc. on stdout since it messes up
@@ -30,7 +29,7 @@ impl MachineState {
         args: &[InlineObject],
         responsible: HirId,
     ) -> InstructionResult {
-        let result = span!(Level::TRACE, "Running builtin").in_scope(|| match &builtin_function {
+        let result = match &builtin_function {
             BuiltinFunction::Equals => heap.equals(args),
             BuiltinFunction::FunctionRun => Heap::function_run(args, responsible),
             BuiltinFunction::GetArgumentCount => heap.get_argument_count(args),
@@ -76,7 +75,7 @@ impl MachineState {
             BuiltinFunction::TextTrimStart => heap.text_trim_start(args),
             BuiltinFunction::ToDebugText => heap.to_debug_text(args),
             BuiltinFunction::TypeOf => heap.type_of(args),
-        });
+        };
 
         match result {
             Ok(Return(value)) => {
