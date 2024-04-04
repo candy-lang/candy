@@ -145,7 +145,7 @@ impl HeapObject {
     }
     pub(super) fn free(self, heap: &mut Heap) {
         trace!("Freeing object at {self:p}.");
-        assert_eq!(self.reference_count().unwrap_or_default(), 0);
+        debug_assert_eq!(self.reference_count().unwrap_or_default(), 0);
         let data = HeapData::from(self);
         if DEBUG_ALLOCATIONS {
             // No need for pluralization because our heap objects are longer
@@ -306,7 +306,7 @@ impl From<HeapObject> for HeapData {
         let header_word = object.header_word();
         match header_word & HeapObject::KIND_MASK {
             HeapObject::KIND_INT => {
-                assert_eq!(
+                debug_assert_eq!(
                     header_word & !HeapObject::IS_REFERENCE_COUNTED_MASK,
                     HeapObject::KIND_INT,
                 );
@@ -318,7 +318,7 @@ impl From<HeapObject> for HeapData {
             HeapObject::KIND_TEXT => Self::Text(HeapText::new_unchecked(object)),
             HeapObject::KIND_FUNCTION => Self::Function(HeapFunction::new_unchecked(object)),
             HeapObject::KIND_HIR_ID => {
-                assert_eq!(
+                debug_assert_eq!(
                     header_word & !HeapObject::IS_REFERENCE_COUNTED_MASK,
                     HeapObject::KIND_HIR_ID,
                 );

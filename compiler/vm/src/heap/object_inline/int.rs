@@ -216,7 +216,7 @@ impl InlineObjectTrait for InlineInt {
 #[extension_trait]
 pub impl I64BitLength for i64 {
     fn bit_length(self) -> u32 {
-        assert!(!self.is_negative());
+        debug_assert!(!self.is_negative());
         Self::BITS - self.leading_zeros()
     }
 }

@@ -35,7 +35,7 @@ impl HeapFunction {
         body: InstructionPointer,
     ) -> Self {
         let captured_len = captured.len();
-        assert_eq!(
+        debug_assert_eq!(
             (captured_len << Self::CAPTURED_LEN_SHIFT) >> Self::CAPTURED_LEN_SHIFT,
             captured_len,
             "Function captures too many things.",
@@ -43,7 +43,7 @@ impl HeapFunction {
 
         let argument_count_shift_for_max_size =
             InlineObject::BITS as usize - Self::CAPTURED_LEN_SHIFT + Self::ARGUMENT_COUNT_SHIFT;
-        assert_eq!(
+        debug_assert_eq!(
             (argument_count << argument_count_shift_for_max_size)
                 >> argument_count_shift_for_max_size,
             argument_count,

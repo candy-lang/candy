@@ -261,7 +261,7 @@ impl MachineState {
                 self.run_builtin_function(heap, builtin.get(), arguments, responsible)
             }
             Data::Handle(handle) => {
-                assert_eq!(handle.argument_count(), arguments.len());
+                debug_assert_eq!(handle.argument_count(), arguments.len());
                 InstructionResult::CallHandle(CallHandle {
                     handle,
                     arguments: arguments.to_vec(),
@@ -277,7 +277,7 @@ impl MachineState {
         arguments: &[InlineObject],
         responsible: HirId,
     ) -> InstructionResult {
-        assert_eq!(function.argument_count(), arguments.len());
+        debug_assert_eq!(function.argument_count(), arguments.len());
         if let Some(next_instruction) = self.next_instruction {
             self.call_stack.push(next_instruction);
         }
@@ -299,7 +299,7 @@ impl MachineState {
         unsafe { value.unwrap_unchecked() }
     }
     fn pop_multiple_from_data_stack(&mut self, amount: usize) {
-        assert!(amount <= self.data_stack.len());
+        debug_assert!(amount <= self.data_stack.len());
         self.data_stack.truncate(self.data_stack.len() - amount);
     }
 }
