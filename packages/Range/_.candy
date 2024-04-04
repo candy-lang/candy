@@ -6,13 +6,12 @@ fromBounds start end :=
   needs (bound.is start)
   needs (bound.is end)
   isEmpty = (start, end) %
+    (Unbounded, _) -> False
+    (_, Unbounded) -> False
     (Inclusive a, Inclusive b) -> a | int.isGreaterThan b
     (Inclusive a, Exclusive b) -> a | int.isGreaterThanOrEqualTo b
-    (Inclusive a, Unbounded) -> False
     (Exclusive a, Inclusive b) -> a | int.isGreaterThanOrEqualTo b
     (Exclusive a, Exclusive b) -> b | int.subtract a | int.absolute | int.isLessThanOrEqualTo 1
-    (Exclusive a, Unbounded) -> False
-    (Unbounded, _) -> False
   ifElse isEmpty { Range Empty } { Range [start, end] }
 
 is range := range %
@@ -20,7 +19,7 @@ is range := range %
     range %
       Empty -> True
       [start, end] -> bound.is start | bool.and (bound.is end) | bool.lazyAnd {
-          fromBounds start end | equals range
+          fromBounds start end | equals (Range range)
         }
       _ -> False
   _ -> False
@@ -42,47 +41,47 @@ contains range value :=
   Range range = range
   range %
     Empty -> False
-    [start, end] -> bool.and
-      start %
-        Unbounded -> True
-        Inclusive a -> value | int.isGreaterThanOrEqualTo a
-        Exclusive a -> value | int.isGreaterThan a
-      end %
-        Unbounded -> True
-        Inclusive a -> value | int.isLessThanOrEqualTo a
-        Exclusive a -> value | int.isLessThan a
+    [start, end] ->
+      bool.and
+        start %
+          Unbounded -> True
+          Inclusive a -> value | int.isGreaterThanOrEqualTo a
+          Exclusive a -> value | int.isGreaterThan a
+        end %
+          Unbounded -> True
+          Inclusive a -> value | int.isLessThanOrEqualTo a
+          Exclusive a -> value | int.isLessThan a
 
-intersection a b =
+intersection a b :=
   needs (is a)
   needs (is b)
   Range a = a
   Range b = b
-  [start, end] = (a, b) %
+  (a, b) %
     (Empty, _) -> Range Empty
     (_, Empty) -> Range Empty
-    (a, b) -> [
-      Start: a.start %
-        Unbounded -> b.start
-        Inclusive a -> b.start %
-          Unbounded -> Inclusive a
-          Inclusive b -> Inclusive (int.max a b)
-          Exclusive b -> if (a | int.isGreaterThanOrEqualTo b) { Inclusive a } { Exclusive b }
-        Exclusive a -> b.start %
-          Unbounded -> Exclusive a
-          Inclusive b -> if (b | int.isGreaterThan a) { Inclusive a } { Exclusive b }
-          Exclusive b -> Exclusive (int.min a b),
-      End: a.end %
-        Unbounded -> b.end
-        Inclusive a -> b.end %
-          Unbounded -> Inclusive a
-          Inclusive b -> Inclusive (int.max a b)
-          Exclusive b -> if (a | int.isGreaterThanOrEqualTo b) { Inclusive a } { Exclusive b }
-        Exclusive a -> b.end %
-          Unbounded -> Exclusive a
-          Inclusive b -> if (b | int.isGreaterThan a) { Inclusive a } { Exclusive b }
-          Exclusive b -> Exclusive (int.min a b),
-      ]
-  fromBounds start end
+    (a, b) ->
+      fromBounds
+        a.start %
+          Unbounded -> b.start
+          Inclusive a -> b.start %
+              Unbounded -> Inclusive a
+              Inclusive b -> Inclusive (int.max a b)
+              Exclusive b -> if (a | int.isGreaterThanOrEqualTo b) { Inclusive a } { Exclusive b }
+          Exclusive a -> b.start %
+              Unbounded -> Exclusive a
+              Inclusive b -> if (b | int.isGreaterThan a) { Inclusive a } { Exclusive b }
+              Exclusive b -> Exclusive (int.max a b),
+        a.end %
+          Unbounded -> b.end
+          Inclusive a -> b.end %
+              Unbounded -> Inclusive a
+              Inclusive b -> Inclusive (int.min a b)
+              Exclusive b -> if (a | int.isGreaterThanOrEqualTo b) { Inclusive a } { Exclusive b }
+          Exclusive a -> b.end %
+              Unbounded -> Exclusive a
+              Inclusive b -> if (b | int.isGreaterThan a) { Inclusive a } { Exclusive b }
+              Exclusive b -> Exclusive (int.min a b),
 
 iterate range :=
   needs (is range)
@@ -100,8 +99,8 @@ iterate range :=
       end = bound %
         Inclusive a -> a | int.add 1
         Exclusive a -> a
-      iterator.generateWithState [Next: first, end] { state ->
-        ifElse (state.next | int.isGreaterThanOrEqualTo state.end) { Empty } {
-          More [Item: state.next, State: [Next: state.next | int.add 1, End: state.end]]
+      iterator.generateWithState first { next ->
+        ifElse (next | int.isGreaterThanOrEqualTo end) { Empty } {
+          More [Item: next, State: next | int.add 1]
         }
       }
