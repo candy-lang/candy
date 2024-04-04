@@ -264,25 +264,18 @@ impl<'c> LoweringContext<'c> {
                 let else_target = self.get_body(*else_body_id);
                 self.emit(
                     id,
-                    if then_captured.is_empty() && else_captured.is_empty() {
-                        Instruction::IfElseWithoutCaptures {
-                            then_target,
-                            else_target,
-                        }
-                    } else {
-                        Instruction::IfElse(Box::new(IfElse {
-                            then_target,
-                            then_captured: then_captured
-                                .iter()
-                                .map(|id| self.stack.find_id(*id))
-                                .collect(),
-                            else_target,
-                            else_captured: else_captured
-                                .iter()
-                                .map(|id| self.stack.find_id(*id))
-                                .collect(),
-                        }))
-                    },
+                    Instruction::IfElse(Box::new(IfElse {
+                        then_target,
+                        then_captured: then_captured
+                            .iter()
+                            .map(|id| self.stack.find_id(*id))
+                            .collect(),
+                        else_target,
+                        else_captured: else_captured
+                            .iter()
+                            .map(|id| self.stack.find_id(*id))
+                            .collect(),
+                    })),
                 );
             }
             Expression::Panic {

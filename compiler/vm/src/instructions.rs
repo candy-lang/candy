@@ -1,9 +1,8 @@
 use crate::{
-    byte_code::{CreateFunction, IfElse, Instruction, StackOffset},
+    byte_code::{CreateFunction, IfElse, Instruction},
     heap::{Data, Function, Heap, HirId, InlineObject, List, Struct, Tag, Text},
     tracer::Tracer,
     vm::{CallHandle, MachineState, Panic},
-    InstructionPointer,
 };
 use itertools::Itertools;
 use tracing::trace;
@@ -154,17 +153,34 @@ impl MachineState {
                 then_captured,
                 else_target,
                 else_captured,
-            }) => self.run_if_else(
-                heap,
-                *then_target,
-                then_captured,
-                *else_target,
-                else_captured,
-            ),
-            Instruction::IfElseWithoutCaptures {
-                then_target,
-                else_target,
-            } => self.run_if_else(heap, *then_target, &[], *else_target, &[]),
+            }) => {
+                let responsible = self.pop_from_data_stack();
+                let condition = self.pop_from_data_stack();
+                let condition = Tag::try_from(condition)
+                    .unwrap()
+                    .try_into_bool(heap)
+                    .unwrap();
+                let (target, captured) = if condition {
+                    (*then_target, then_captured)
+                } else {
+                    (*else_target, else_captured)
+                };
+
+                if let Some(next_instruction) = self.next_instruction {
+                    self.call_stack.push(next_instruction);
+                }
+
+                // Initially, we need to adjust the offset because we already
+                // popped two values from the data stack. Afterwards, increment
+                // it for each value.
+                for (index, offset) in captured.iter().enumerate() {
+                    let captured = self.get_from_data_stack(*offset - 2 + index);
+                    self.data_stack.push(captured);
+                }
+                self.push_to_data_stack(responsible);
+                self.next_instruction = Some(target);
+                InstructionResult::Done
+            }
             Instruction::Panic => {
                 let responsible_for_panic = self.pop_from_data_stack();
                 let reason = self.pop_from_data_stack();
@@ -275,42 +291,6 @@ impl MachineState {
         self.data_stack.extend_from_slice(arguments);
         self.push_to_data_stack(responsible);
         self.next_instruction = Some(function.body());
-        InstructionResult::Done
-    }
-
-    fn run_if_else(
-        &mut self,
-        heap: &Heap,
-        then_target: InstructionPointer,
-        then_captured: &[StackOffset],
-        else_target: InstructionPointer,
-        else_captured: &[StackOffset],
-    ) -> InstructionResult {
-        let responsible = self.pop_from_data_stack();
-        let condition = self.pop_from_data_stack();
-        let condition = Tag::try_from(condition)
-            .unwrap()
-            .try_into_bool(heap)
-            .unwrap();
-        let (target, captured) = if condition {
-            (then_target, then_captured)
-        } else {
-            (else_target, else_captured)
-        };
-
-        if let Some(next_instruction) = self.next_instruction {
-            self.call_stack.push(next_instruction);
-        }
-
-        // Initially, we need to adjust the offset because we already
-        // popped two values from the data stack. Afterwards, increment
-        // it for each value.
-        for (index, offset) in captured.iter().enumerate() {
-            let captured = self.get_from_data_stack(*offset - 2 + index);
-            self.data_stack.push(captured);
-        }
-        self.push_to_data_stack(responsible);
-        self.next_instruction = Some(target);
         InstructionResult::Done
     }
 
