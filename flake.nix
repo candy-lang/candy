@@ -36,6 +36,7 @@
               cargo-insta
               hyperfine
               libffi
+              libsForQt5.kcachegrind
               llvmPackages_15.bintools
               llvmPackages_15.clangUseLLVM
               llvmPackages_15.llvm
@@ -45,6 +46,7 @@
               rustToolchain
               rust-analyzer
               sccache
+              valgrind
             ];
           };
       });
