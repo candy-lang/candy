@@ -449,11 +449,9 @@ impl ToRichIr for Instruction {
                 else_target,
             } => {
                 builder.push(
-                    format!(
-                        " then call {then_target:?} capturing nothing else call {else_target:?} capturing nothing",
-                    ),
+                    format!(" then call {then_target:?} else call {else_target:?}"),
                     None,
-                     EnumSet::empty(),
+                    EnumSet::empty(),
                 );
             }
             Self::Panic => {}
