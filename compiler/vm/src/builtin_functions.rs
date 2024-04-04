@@ -163,9 +163,13 @@ use SuccessfulBehavior::*;
 
 impl Heap {
     fn equals(&mut self, args: &[InlineObject]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |a: Any, b: Any| {
-            Return(Tag::create_bool(self, **a == **b).into())
-        })
+        let [a, b] = args else {
+            panic!("A builtin function was called with the wrong number of arguments.");
+        };
+        let result = Return(Tag::create_bool(self, a == b).into());
+        a.drop(self);
+        b.drop(self);
+        result.into()
     }
 
     fn function_run(args: &[InlineObject], responsible: HirId) -> BuiltinResult {
