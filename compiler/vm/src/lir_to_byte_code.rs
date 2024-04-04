@@ -264,7 +264,7 @@ impl<'c> LoweringContext<'c> {
                 let else_target = self.get_body(*else_body_id);
                 self.emit(
                     id,
-                    Instruction::IfElse(IfElse {
+                    Instruction::IfElse(Box::new(IfElse {
                         then_target,
                         then_captured: then_captured
                             .iter()
@@ -275,7 +275,7 @@ impl<'c> LoweringContext<'c> {
                             .iter()
                             .map(|id| self.stack.find_id(*id))
                             .collect(),
-                    }),
+                    })),
                 );
             }
             Expression::Panic {

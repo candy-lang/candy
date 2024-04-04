@@ -107,7 +107,7 @@ pub enum Instruction {
     /// the `condition`.
     ///
     /// a, condition, responsible -> a
-    IfElse(IfElse),
+    IfElse(Box<IfElse>),
 
     /// Panics. Because the panic instruction only occurs inside the generated
     /// needs function, the reason is already guaranteed to be a text.
@@ -410,7 +410,7 @@ impl ToRichIr for Instruction {
                 );
             }
             Self::Return => {}
-            Self::IfElse(IfElse {
+            Self::IfElse(box IfElse {
                 then_target,
                 then_captured,
                 else_target,

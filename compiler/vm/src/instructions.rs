@@ -148,7 +148,7 @@ impl MachineState {
                 self.next_instruction = self.call_stack.pop();
                 InstructionResult::Done
             }
-            Instruction::IfElse(IfElse {
+            Instruction::IfElse(box IfElse {
                 then_target,
                 then_captured,
                 else_target,
