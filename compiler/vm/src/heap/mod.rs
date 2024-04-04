@@ -121,7 +121,7 @@ impl Heap {
 
     #[must_use]
     pub fn default_symbols(&self) -> &DefaultSymbols {
-        self.default_symbols.as_ref().unwrap()
+        unsafe { self.default_symbols.as_ref().unwrap_unchecked() }
     }
 
     #[must_use]
