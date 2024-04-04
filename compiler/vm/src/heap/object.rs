@@ -308,10 +308,6 @@ pub enum Tag {
 
 impl Tag {
     #[must_use]
-    pub const fn new_inline_unchecked(value: InlineObject) -> Self {
-        Self::Inline(InlineTag::new_unchecked(value))
-    }
-    #[must_use]
     pub fn create(symbol: Text) -> Self {
         Self::Inline(InlineTag::new(symbol))
     }
@@ -392,6 +388,10 @@ impl Tag {
             }
             Self::Heap(_) => Err("Expected a tag without a value, found {value:?}."),
         }
+    }
+    #[must_use]
+    pub fn value_into_bool_unchecked(value: InlineObject, heap: &Heap) -> bool {
+        InlineTag::new_unchecked(value).get() == heap.default_symbols().true_
     }
 
     #[must_use]

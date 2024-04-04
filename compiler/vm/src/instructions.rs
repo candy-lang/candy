@@ -155,10 +155,7 @@ impl MachineState {
                 else_captured,
             } => {
                 let responsible = self.pop_from_data_stack();
-                let condition = self.pop_from_data_stack();
-                let condition = Tag::new_inline_unchecked(condition)
-                    .try_into_bool(heap)
-                    .unwrap();
+                let condition = Tag::value_into_bool_unchecked(self.pop_from_data_stack(), heap);
                 let (target, captured) = if condition {
                     (*then_target, then_captured)
                 } else {
