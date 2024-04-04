@@ -213,8 +213,8 @@ where
             .byte_code
             .borrow()
             .instructions
-            .get(*current_instruction)
-            .expect("invalid instruction pointer");
+            .get(*current_instruction);
+        let instruction = unsafe { instruction.unwrap_unchecked() };
         self.inner.state.next_instruction = Some(current_instruction.next());
 
         let result = self
