@@ -6,12 +6,11 @@ fromBounds start end :=
   needs (bound.is start)
   needs (bound.is end)
   isEmpty = (start, end) %
-    (Unbounded, _) -> False
-    (_, Unbounded) -> False
+    (Unbounded, _) | (_, Unbounded) -> False
     (Inclusive a, Inclusive b) -> a | int.isGreaterThan b
     (Inclusive a, Exclusive b) -> a | int.isGreaterThanOrEqualTo b
     (Exclusive a, Inclusive b) -> a | int.isGreaterThanOrEqualTo b
-    (Exclusive a, Exclusive b) -> b | int.subtract a | int.absolute | int.isLessThanOrEqualTo 1
+    (Exclusive a, Exclusive b) -> b | int.subtract a | int.isLessThanOrEqualTo 1
   ifElse isEmpty { Range Empty } { Range [start, end] }
 
 is range := range %
@@ -58,8 +57,7 @@ intersection a b :=
   Range a = a
   Range b = b
   (a, b) %
-    (Empty, _) -> Range Empty
-    (_, Empty) -> Range Empty
+    (Empty, _) | (_, Empty) -> Range Empty
     (a, b) ->
       fromBounds
         a.start %
