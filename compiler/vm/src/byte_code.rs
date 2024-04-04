@@ -285,7 +285,7 @@ impl ToRichIr for ByteCode {
                 TokenType::Address,
                 EnumSet::empty(),
             );
-            builder.push(": ", None, EnumSet::empty());
+            builder.push_simple(": ");
             builder.push(
                 format!("{constant:?}"),
                 TokenType::Constant,
@@ -329,47 +329,39 @@ impl ToRichIr for ByteCode {
 impl ToRichIr for Instruction {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         let discriminant: InstructionDiscriminants = self.into();
-        builder.push(
-            Into::<&'static str>::into(discriminant),
-            None,
-            EnumSet::empty(),
-        );
+        builder.push_simple(Into::<&'static str>::into(discriminant));
 
         match self {
             Self::CreateTag { symbol } => {
-                builder.push(" ", None, EnumSet::empty());
-                let symbol_range = builder.push(symbol.get(), None, EnumSet::empty());
+                builder.push_simple(" ");
+                let symbol_range = builder.push_simple(symbol.get());
                 builder.push_reference(ReferenceKey::Symbol(symbol.to_string()), symbol_range);
             }
             Self::CreateList { num_items } => {
-                builder.push(" ", None, EnumSet::empty());
-                builder.push(num_items.to_string(), None, EnumSet::empty());
+                builder.push_simple(" ");
+                builder.push_simple(num_items.to_string());
             }
             Self::CreateStruct { num_fields } => {
-                builder.push(" ", None, EnumSet::empty());
-                builder.push(num_fields.to_string(), None, EnumSet::empty());
+                builder.push_simple(" ");
+                builder.push_simple(num_fields.to_string());
             }
             Self::CreateFunction(box CreateFunction {
                 captured,
                 num_args,
                 body,
             }) => {
-                builder.push(
-                    format!(
-                        " with {num_args} {} capturing {} starting at {body:?}",
-                        arguments_plural(*num_args),
-                        if captured.is_empty() {
-                            "nothing".to_string()
-                        } else {
-                            captured.iter().join(", ")
-                        },
-                    ),
-                    None,
-                    EnumSet::empty(),
-                );
+                builder.push_simple(format!(
+                    " with {num_args} {} capturing {} starting at {body:?}",
+                    arguments_plural(*num_args),
+                    if captured.is_empty() {
+                        "nothing".to_string()
+                    } else {
+                        captured.iter().join(", ")
+                    },
+                ));
             }
             Self::PushConstant(constant) => {
-                builder.push(" ", None, EnumSet::empty());
+                builder.push_simple(" ");
                 if let InlineData::Pointer(pointer) = InlineData::from(*constant) {
                     builder.push(
                         format!("{:?}", pointer.get().address()),
@@ -379,7 +371,7 @@ impl ToRichIr for Instruction {
                 } else {
                     builder.push("inline", TokenType::Address, EnumSet::empty());
                 }
-                builder.push(" ", None, EnumSet::empty());
+                builder.push_simple(" ");
                 builder.push(
                     format!("{constant:?}"),
                     TokenType::Constant,
@@ -387,37 +379,29 @@ impl ToRichIr for Instruction {
                 );
             }
             Self::PushFromStack(offset) => {
-                builder.push(" ", None, EnumSet::empty());
-                builder.push(offset.to_string(), None, EnumSet::empty());
+                builder.push_simple(" ");
+                builder.push_simple(offset.to_string());
             }
             Self::PopMultipleBelowTop(count) => {
-                builder.push(" ", None, EnumSet::empty());
-                builder.push(count.to_string(), None, EnumSet::empty());
+                builder.push_simple(" ");
+                builder.push_simple(count.to_string());
             }
             Self::Dup { amount } => {
-                builder.push(" by ", None, EnumSet::empty());
-                builder.push(amount.to_string(), None, EnumSet::empty());
+                builder.push_simple(" by ");
+                builder.push_simple(amount.to_string());
             }
             Self::Drop => {}
             Self::Call { num_args } => {
-                builder.push(
-                    format!(" with {num_args} {}", arguments_plural(*num_args)),
-                    None,
-                    EnumSet::empty(),
-                );
+                builder.push_simple(format!(" with {num_args} {}", arguments_plural(*num_args)));
             }
             Self::TailCall {
                 num_locals_to_pop,
                 num_args,
             } => {
-                builder.push(
-                    format!(
-                        " with {num_locals_to_pop} locals and {num_args} {}",
-                        arguments_plural((*num_args).try_into().unwrap()),
-                    ),
-                    None,
-                    EnumSet::empty(),
-                );
+                builder.push_simple(format!(
+                    " with {num_locals_to_pop} locals and {num_args} {}",
+                    arguments_plural((*num_args).try_into().unwrap()),
+                ));
             }
             Self::Return => {}
             Self::IfElse(box IfElse {
@@ -426,7 +410,7 @@ impl ToRichIr for Instruction {
                 else_target,
                 else_captured,
             }) => {
-                builder.push(
+                builder.push_simple(
                     format!(
                         " then call {then_target:?} capturing {} else call {else_target:?} capturing {}",
                         if then_captured.is_empty() {
@@ -440,38 +424,26 @@ impl ToRichIr for Instruction {
                             else_captured.iter().join(", ")
                         },
                     ),
-                    None,
-                     EnumSet::empty(),
                 );
             }
             Self::IfElseWithoutCaptures {
                 then_target,
                 else_target,
             } => {
-                builder.push(
-                    format!(" then call {then_target:?} else call {else_target:?}"),
-                    None,
-                    EnumSet::empty(),
-                );
+                builder.push_simple(format!(
+                    " then call {then_target:?} else call {else_target:?}"
+                ));
             }
             Self::Panic => {}
             Self::TraceCallStarts { num_args } | Self::TraceTailCall { num_args } => {
-                builder.push(
-                    format!(" ({num_args} {})", arguments_plural(*num_args)),
-                    None,
-                    EnumSet::empty(),
-                );
+                builder.push_simple(format!(" ({num_args} {})", arguments_plural(*num_args)));
             }
             Self::TraceCallEnds { has_return_value } => {
-                builder.push(
-                    if *has_return_value {
-                        " with return value"
-                    } else {
-                        " without return value"
-                    },
-                    None,
-                    EnumSet::empty(),
-                );
+                builder.push_simple(if *has_return_value {
+                    " with return value"
+                } else {
+                    " without return value"
+                });
             }
             Self::TraceExpressionEvaluated => {}
             Self::TraceFoundFuzzableFunction => {}
