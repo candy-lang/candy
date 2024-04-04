@@ -106,6 +106,12 @@ pub enum Instruction {
     ///
     /// a, condition, responsible -> a
     IfElse(Box<IfElse>),
+    // Optimization: Don't box the `IfElse` instruction if it doesn't capture
+    // anything.
+    IfElseWithoutCaptures {
+        then_target: InstructionPointer,
+        else_target: InstructionPointer,
+    },
 
     /// Panics. Because the panic instruction only occurs inside the generated
     /// needs function, the reason is already guaranteed to be a text.
@@ -202,7 +208,7 @@ impl Instruction {
                 // Only modifies the call stack and the instruction pointer.
                 // Leaves the return value untouched on the stack.
             }
-            Self::IfElse(_) => {
+            Self::IfElse(_) | Self::IfElseWithoutCaptures { .. } => {
                 stack.pop(); // responsible
                 stack.pop(); // condition
                 stack.push(result); // return value
@@ -433,6 +439,18 @@ impl ToRichIr for Instruction {
                         } else {
                             else_captured.iter().join(", ")
                         },
+                    ),
+                    None,
+                     EnumSet::empty(),
+                );
+            }
+            Self::IfElseWithoutCaptures {
+                then_target,
+                else_target,
+            } => {
+                builder.push(
+                    format!(
+                        " then call {then_target:?} capturing nothing else call {else_target:?} capturing nothing",
                     ),
                     None,
                      EnumSet::empty(),
