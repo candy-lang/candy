@@ -1,5 +1,5 @@
 use crate::{
-    byte_code::{IfElse, Instruction},
+    byte_code::{CreateFunction, IfElse, Instruction},
     heap::{Data, Function, Heap, HirId, InlineObject, List, Struct, Tag, Text},
     tracer::Tracer,
     vm::{CallHandle, MachineState, Panic},
@@ -79,11 +79,11 @@ impl MachineState {
                 self.push_to_data_stack(struct_);
                 InstructionResult::Done
             }
-            Instruction::CreateFunction {
+            Instruction::CreateFunction(box CreateFunction {
                 captured,
                 num_args,
                 body,
-            } => {
+            }) => {
                 let captured = captured
                     .iter()
                     .map(|offset| self.get_from_data_stack(*offset))

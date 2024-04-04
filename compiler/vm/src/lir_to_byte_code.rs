@@ -1,5 +1,5 @@
 use crate::{
-    byte_code::{ByteCode, IfElse, Instruction, StackOffset},
+    byte_code::{ByteCode, CreateFunction, IfElse, Instruction, StackOffset},
     heap::{Builtin, Function, Heap, HirId, InlineObject, Int, List, Struct, Tag, Text},
     instruction_pointer::InstructionPointer,
 };
@@ -218,11 +218,11 @@ impl<'c> LoweringContext<'c> {
                 }
                 self.emit(
                     id,
-                    Instruction::CreateFunction {
+                    Instruction::CreateFunction(Box::new(CreateFunction {
                         captured: captured.iter().map(|id| self.stack.find_id(*id)).collect(),
                         num_args: self.lir.bodies().get(*body_id).parameter_count(),
                         body: instruction_pointer,
-                    },
+                    })),
                 );
             }
             Expression::Constant(constant_id) => {

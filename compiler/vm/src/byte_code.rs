@@ -49,11 +49,7 @@ pub enum Instruction {
     /// Pushes a function.
     ///
     /// a -> a, pointer to function
-    CreateFunction {
-        captured: Vec<StackOffset>,
-        num_args: usize, // excluding responsible parameter
-        body: InstructionPointer,
-    },
+    CreateFunction(Box<CreateFunction>),
 
     /// Pushes a pointer onto the stack. MIR instructions that create
     /// compile-time known values are compiled to this instruction.
@@ -131,6 +127,12 @@ pub enum Instruction {
 
     /// a, HIR ID, function -> a
     TraceFoundFuzzableFunction,
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct CreateFunction {
+    pub captured: Vec<StackOffset>,
+    pub num_args: usize, // excluding responsible parameter
+    pub body: InstructionPointer,
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct IfElse {
@@ -339,11 +341,11 @@ impl ToRichIr for Instruction {
                 builder.push(" ", None, EnumSet::empty());
                 builder.push(num_fields.to_string(), None, EnumSet::empty());
             }
-            Self::CreateFunction {
+            Self::CreateFunction(box CreateFunction {
                 captured,
                 num_args,
                 body,
-            } => {
+            }) => {
                 builder.push(
                     format!(
                         " with {num_args} {} capturing {} starting at {body:?}",
