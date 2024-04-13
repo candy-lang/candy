@@ -16,12 +16,16 @@ use tracing::instrument;
 pub fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
     let (input, opening_single_quotes) = parse_multiple(input, single_quote, None)?;
     let (mut input, opening_double_quote) = double_quote(input)?;
+
     let (new_input, mut opening_whitespace) =
         whitespaces_and_newlines(input, indentation + 1, false);
 
     // If the string does not contain any newlines, parse the whitespace in
     // front of the string as part of the string and not as trailing whitespace.
     // This fixes https://github.com/candy-lang/candy/issues/896.
+    // if the string does not contain any newlines, parse the whitespace in
+    // front of the string as part of the string and not as trailing whitespace
+    // this fixes issue #896
     if opening_whitespace.iter().any(|it| it.is_newline()) {
         input = new_input;
     } else {
