@@ -293,7 +293,7 @@ mod test {
             closing_double_quote: DoubleQuote
             closing_single_quotes:
         "###);
-        //
+        // issue: https://github.com/candy-lang/candy/issues/1016
         assert_rich_ir_snapshot!(text("\"\n    text\n\"", 0), @r###"
         Remaining input: ""
         Parsed: Text:
@@ -314,6 +314,7 @@ mod test {
             closing_double_quote: DoubleQuote
             closing_single_quotes:
         "###);
+        // https://github.com/candy-lang/candy/issues/1016
         assert_rich_ir_snapshot!(text("\"\n  foo\n    bar\n\"", 0), @r###"
         Remaining input: ""
         Parsed: Text:
