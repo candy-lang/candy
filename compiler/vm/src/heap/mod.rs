@@ -199,7 +199,6 @@ impl Default for Heap {
 
 impl Drop for Heap {
     fn drop(&mut self) {
-        println!("{:?}", self.objects);
         self.clear();
     }
 }
