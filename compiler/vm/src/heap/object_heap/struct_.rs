@@ -31,7 +31,7 @@ impl HeapStruct {
         value: &FxHashMap<InlineObject, InlineObject>,
     ) -> Self {
         let len = value.len();
-        assert_eq!(
+        debug_assert_eq!(
             (len << Self::LEN_SHIFT) >> Self::LEN_SHIFT,
             len,
             "Struct is too long.",
@@ -56,7 +56,7 @@ impl HeapStruct {
     }
     #[must_use]
     fn create_uninitialized(heap: &mut Heap, is_reference_counted: bool, len: usize) -> Self {
-        assert_eq!(
+        debug_assert_eq!(
             (len << Self::LEN_SHIFT) >> Self::LEN_SHIFT,
             len,
             "Struct is too long.",
@@ -131,7 +131,7 @@ impl HeapStruct {
     }
     #[must_use]
     pub fn replace_at_index(self, heap: &mut Heap, index: usize, value: InlineObject) -> Self {
-        assert!(index < self.len());
+        debug_assert!(index < self.len());
 
         let struct_ = Self::create_uninitialized(heap, true, self.len());
         unsafe {

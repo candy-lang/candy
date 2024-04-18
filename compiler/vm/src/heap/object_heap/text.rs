@@ -27,7 +27,7 @@ impl HeapText {
     #[must_use]
     pub fn create(heap: &mut Heap, is_reference_counted: bool, value: &str) -> Self {
         let byte_len = value.len();
-        assert_eq!(
+        debug_assert_eq!(
             (byte_len << Self::BYTE_LEN_SHIFT) >> Self::BYTE_LEN_SHIFT,
             byte_len,
             "Text is too long.",

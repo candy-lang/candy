@@ -29,12 +29,14 @@
         devShell = with pkgs;
           mkShell {
             LLVM_SYS_150_PREFIX = "${pkgs.llvmPackages_15.llvm.dev}";
+            RUST_BACKTRACE = "1";
             RUSTC_WRAPPER = "sccache";
             RUSTFLAGS = "-C link-arg=-fuse-ld=mold";
             buildInputs = [
               cargo-insta
               hyperfine
               libffi
+              libsForQt5.kcachegrind
               llvmPackages_15.bintools
               llvmPackages_15.clangUseLLVM
               llvmPackages_15.llvm
@@ -44,6 +46,7 @@
               rustToolchain
               rust-analyzer
               sccache
+              valgrind
             ];
           };
       });

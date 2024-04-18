@@ -5,7 +5,9 @@ local/
 .goldens/
 
 # Valgrind
+cachegrind.out.*
 callgrind.out.*
+vgcore.*
 
 # ANTLR
 .antlr/

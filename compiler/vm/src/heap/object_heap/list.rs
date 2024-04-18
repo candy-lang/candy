@@ -33,7 +33,7 @@ impl HeapList {
     }
     #[must_use]
     fn create_uninitialized(heap: &mut Heap, is_reference_counted: bool, len: usize) -> Self {
-        assert_eq!(
+        debug_assert_eq!(
             (len << Self::LEN_SHIFT) >> Self::LEN_SHIFT,
             len,
             "List is too long.",
@@ -70,7 +70,7 @@ impl HeapList {
     }
     #[must_use]
     pub fn insert(self, heap: &mut Heap, index: usize, value: InlineObject) -> Self {
-        assert!(index <= self.len());
+        debug_assert!(index <= self.len());
 
         let len = self.len() + 1;
         let new_list = Self::create_uninitialized(heap, true, len);
@@ -91,7 +91,7 @@ impl HeapList {
     }
     #[must_use]
     pub fn remove(self, heap: &mut Heap, index: usize) -> Self {
-        assert!(index < self.len());
+        debug_assert!(index < self.len());
 
         let len = self.len() - 1;
         let new_list = Self::create_uninitialized(heap, true, len);
@@ -111,7 +111,7 @@ impl HeapList {
     }
     #[must_use]
     pub fn replace(self, heap: &mut Heap, index: usize, value: InlineObject) -> Self {
-        assert!(index < self.len());
+        debug_assert!(index < self.len());
 
         let new_list = Self::create(heap, true, self.items());
         unsafe { ptr::write(new_list.content_word_pointer(index).cast().as_ptr(), value) };

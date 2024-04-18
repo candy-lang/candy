@@ -68,7 +68,7 @@ impl HeapInt {
 
     #[must_use]
     pub fn bit_length(self, heap: &mut Heap) -> Int {
-        assert!(*self.get() >= 0.into());
+        debug_assert!(*self.get() >= 0.into());
         Int::create(heap, true, self.get().bits())
     }
 

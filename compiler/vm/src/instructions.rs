@@ -116,7 +116,7 @@ impl MachineState {
                 InstructionResult::Done
             }
             Instruction::Call { num_args } => {
-                let responsible = self.pop_from_data_stack().try_into().unwrap();
+                let responsible = HirId::new_unchecked(self.pop_from_data_stack());
                 let mut arguments = (0..*num_args)
                     .map(|_| self.pop_from_data_stack())
                     .collect_vec();
@@ -130,7 +130,7 @@ impl MachineState {
                 num_locals_to_pop,
                 num_args,
             } => {
-                let responsible = self.pop_from_data_stack().try_into().unwrap();
+                let responsible = HirId::new_unchecked(self.pop_from_data_stack());
                 let mut arguments = (0..*num_args)
                     .map(|_| self.pop_from_data_stack())
                     .collect_vec();
@@ -155,11 +155,7 @@ impl MachineState {
                 else_captured,
             } => {
                 let responsible = self.pop_from_data_stack();
-                let condition = self.pop_from_data_stack();
-                let condition = Tag::try_from(condition)
-                    .unwrap()
-                    .try_into_bool(heap)
-                    .unwrap();
+                let condition = Tag::value_into_bool_unchecked(self.pop_from_data_stack(), heap);
                 let (target, captured) = if condition {
                     (*then_target, then_captured)
                 } else {
@@ -182,7 +178,7 @@ impl MachineState {
                 InstructionResult::Done
             }
             Instruction::Panic => {
-                let responsible_for_panic = self.pop_from_data_stack();
+                let responsible = HirId::new_unchecked(self.pop_from_data_stack());
                 let reason = self.pop_from_data_stack();
 
                 let Ok(reason) = Text::try_from(reason) else {
@@ -192,8 +188,6 @@ impl MachineState {
                     // HIR to the MIR.
                     panic!("We should never generate byte code where the reason is not a text.");
                 };
-                let responsible: HirId = responsible_for_panic.try_into()
-                    .unwrap_or_else(|_| panic!("Expected a panic's responsible argument to be a HIR ID, but got {responsible_for_panic:?}."));
 
                 InstructionResult::Panic(Panic {
                     reason: reason.get().to_string(),
@@ -201,13 +195,13 @@ impl MachineState {
                 })
             }
             Instruction::TraceCallStarts { num_args } => {
-                let responsible = self.pop_from_data_stack().try_into().unwrap();
+                let responsible = HirId::new_unchecked(self.pop_from_data_stack());
                 let mut args = vec![];
                 for _ in 0..*num_args {
                     args.push(self.pop_from_data_stack());
                 }
                 let callee = self.pop_from_data_stack();
-                let call_site = self.pop_from_data_stack().try_into().unwrap();
+                let call_site = HirId::new_unchecked(self.pop_from_data_stack());
 
                 args.reverse();
                 tracer.call_started(heap, call_site, callee, args, responsible);
@@ -223,13 +217,13 @@ impl MachineState {
                 InstructionResult::Done
             }
             Instruction::TraceTailCall { num_args } => {
-                let responsible = self.pop_from_data_stack().try_into().unwrap();
+                let responsible = HirId::new_unchecked(self.pop_from_data_stack());
                 let mut args = vec![];
                 for _ in 0..*num_args {
                     args.push(self.pop_from_data_stack());
                 }
                 let callee = self.pop_from_data_stack();
-                let call_site = self.pop_from_data_stack().try_into().unwrap();
+                let call_site = HirId::new_unchecked(self.pop_from_data_stack());
 
                 args.reverse();
                 tracer.tail_call(heap, call_site, callee, args, responsible);
@@ -237,7 +231,7 @@ impl MachineState {
             }
             Instruction::TraceExpressionEvaluated => {
                 let value = self.pop_from_data_stack();
-                let expression = self.pop_from_data_stack().try_into().unwrap();
+                let expression = HirId::new_unchecked(self.pop_from_data_stack());
 
                 tracer.value_evaluated(heap, expression, value);
                 InstructionResult::Done
@@ -246,7 +240,7 @@ impl MachineState {
                 let function = self.pop_from_data_stack().try_into().expect(
                     "Instruction TraceFoundFuzzableFunction executed, but stack top is not a function.",
                 );
-                let definition = self.pop_from_data_stack().try_into().unwrap();
+                let definition = HirId::new_unchecked(self.pop_from_data_stack());
 
                 tracer.found_fuzzable_function(heap, definition, function);
                 InstructionResult::Done
@@ -267,7 +261,7 @@ impl MachineState {
                 self.run_builtin_function(heap, builtin.get(), arguments, responsible)
             }
             Data::Handle(handle) => {
-                assert_eq!(handle.argument_count(), arguments.len());
+                debug_assert_eq!(handle.argument_count(), arguments.len());
                 InstructionResult::CallHandle(CallHandle {
                     handle,
                     arguments: arguments.to_vec(),
@@ -283,7 +277,7 @@ impl MachineState {
         arguments: &[InlineObject],
         responsible: HirId,
     ) -> InstructionResult {
-        assert_eq!(function.argument_count(), arguments.len());
+        debug_assert_eq!(function.argument_count(), arguments.len());
         if let Some(next_instruction) = self.next_instruction {
             self.call_stack.push(next_instruction);
         }
@@ -304,7 +298,7 @@ impl MachineState {
         self.data_stack.pop().expect("Data stack is empty.")
     }
     fn pop_multiple_from_data_stack(&mut self, amount: usize) {
-        assert!(amount <= self.data_stack.len());
+        debug_assert!(amount <= self.data_stack.len());
         self.data_stack.truncate(self.data_stack.len() - amount);
     }
 }

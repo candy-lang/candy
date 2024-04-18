@@ -7,7 +7,7 @@ use super::{
         builtin::InlineBuiltin, handle::InlineHandle, int::InlineInt, tag::InlineTag, InlineData,
         InlineObject,
     },
-    Heap,
+    Heap, InlinePointer,
 };
 use crate::{
     handle_id::HandleId,
@@ -389,6 +389,10 @@ impl Tag {
             Self::Heap(_) => Err("Expected a tag without a value, found {value:?}."),
         }
     }
+    #[must_use]
+    pub fn value_into_bool_unchecked(value: InlineObject, heap: &Heap) -> bool {
+        InlineTag::new_unchecked(value).get() == heap.default_symbols().true_
+    }
 
     #[must_use]
     pub const fn has_value(&self) -> bool {
@@ -539,6 +543,12 @@ impl_try_from_heap_object!(Function, "Expected a function.");
 pub struct HirId(HeapHirId);
 
 impl HirId {
+    #[must_use]
+    pub fn new_unchecked(value: InlineObject) -> Self {
+        Self(HeapHirId::new_unchecked(
+            InlinePointer::new_unchecked(value).get(),
+        ))
+    }
     #[must_use]
     pub fn create(heap: &mut Heap, is_reference_counted: bool, id: Id) -> Self {
         HeapHirId::create(heap, is_reference_counted, id).into()

@@ -62,10 +62,9 @@ impl Heap {
         let layout = Layout::from_size_align(size, HeapObject::WORD_SIZE).unwrap();
 
         // TODO: Handle allocation failure by stopping the VM.
-        let pointer = alloc::Global
-            .allocate(layout)
-            .expect("Not enough memory.")
-            .cast();
+        let pointer = alloc::Global.allocate(layout);
+        let pointer = unsafe { pointer.unwrap_unchecked() };
+        let pointer = pointer.cast();
         unsafe { *pointer.as_ptr() = header_word };
         let object = HeapObject::new(pointer);
         if object.is_reference_counted() {
@@ -122,7 +121,7 @@ impl Heap {
 
     #[must_use]
     pub fn default_symbols(&self) -> &DefaultSymbols {
-        self.default_symbols.as_ref().unwrap()
+        unsafe { self.default_symbols.as_ref().unwrap_unchecked() }
     }
 
     #[must_use]
