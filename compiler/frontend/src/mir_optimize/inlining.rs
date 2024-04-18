@@ -153,7 +153,6 @@ impl Context<'_> {
                     entry.insert(NonZeroUsize::new(1).unwrap());
                 }
             }
-            return;
         }
 
         let Expression::Function {
