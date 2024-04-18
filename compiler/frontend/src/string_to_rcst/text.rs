@@ -9,6 +9,7 @@ use crate::{
     rcst::Rcst,
 };
 use itertools::Itertools;
+use std::mem;
 use tracing::instrument;
 
 // TODO: It might be a good idea to ignore text interpolations in patterns
@@ -252,25 +253,38 @@ fn text_part(mut input: &str, single_quotes_count: usize) -> Option<(&str, Rcst)
     }
 }
 
+/// Converts a vec of `CstKind::Newline(…)` and `CstKind::Whitespace(…)` into
+/// a vec of `CstKind::TrailingWhitespace { child: CstKind::TextNewline(…), … }`.
 #[instrument(level = "trace")]
 fn convert_whitespace_into_text_newlines(whitespace: Vec<Rcst>) -> Vec<Rcst> {
+    fn commit_last_newline(
+        parts: &mut Vec<Rcst>,
+        last_newline: Option<Rcst>,
+        whitespace_after_last_newline: Vec<Rcst>,
+    ) {
+        if let Some(last_newline) = last_newline {
+            parts.push(last_newline.wrap_in_whitespace(whitespace_after_last_newline));
+        }
+    }
+
+    let mut parts: Vec<Rcst> = vec![];
     let mut last_newline: Option<Rcst> = None;
     let mut whitespace_after_last_newline: Vec<Rcst> = vec![];
-    let mut parts: Vec<Rcst> = vec![];
-    for whitespace in whitespace
-        .iter()
-        .chain(std::iter::once(&CstKind::Newline("\n".to_string()).into()))
-    {
+
+    for whitespace in whitespace.iter() {
         if let CstKind::Newline(newline) = whitespace.kind.clone() {
-            if let Some(last_newline) = last_newline {
-                parts.push(last_newline.wrap_in_whitespace(whitespace_after_last_newline));
-                whitespace_after_last_newline = vec![];
-            }
+            commit_last_newline(
+                &mut parts,
+                last_newline,
+                mem::take(&mut whitespace_after_last_newline),
+            );
             last_newline = Some(CstKind::TextNewline(newline).into());
         } else {
             whitespace_after_last_newline.push(whitespace.clone());
         }
     }
+    commit_last_newline(&mut parts, last_newline, whitespace_after_last_newline);
+
     parts
 }
 
