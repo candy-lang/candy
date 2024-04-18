@@ -121,7 +121,7 @@ pub struct InliningState {
 impl InliningState {
     /// To avoid infinite recursion, we limit the number of times a function can
     /// be inlined into itself in a single module.
-    const MAX_RECURSION_INLINING_COUNT_IN_MODULE: usize = 32;
+    const MAX_RECURSION_INLINING_COUNT_IN_MODULE: usize = 5;
 }
 
 impl Context<'_> {
