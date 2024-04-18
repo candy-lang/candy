@@ -16,6 +16,7 @@ extension-trait = "1.0.1"
 im = "15.1.0"
 impl-trait-for-tuples = "0.2.2"
 itertools = "0.12.0"
+lazy_static = "1.4.0"
 linked-hash-map = "0.5.4"
 num-bigint = { version = "0.4.3", features = ["rand"] }
 num-integer = { version = "0.1.45", features = ["i128"] }
@@ -29,3 +30,10 @@ strum_macros = "0.26.1"
 tracing = { version = "0.1", features = ["release_max_level_debug"] }
 unicode-segmentation = "1.9.0"
 url = "2.2.2"
+
+[dev-dependencies]
+insta = "1.34.0"
+
+[profile.dev.package]
+insta.opt-level = 3
+similar.opt-level = 3

@@ -2,11 +2,10 @@ use crate::{
     cst::{Cst, CstKind},
     rich_ir::{RichIrBuilder, ToRichIr},
 };
-use enumset::EnumSet;
 
 pub type Rcst = Cst<()>;
 
-impl From<CstKind<()>> for Cst<()> {
+impl From<CstKind<()>> for Rcst {
     fn from(value: CstKind<()>) -> Self {
         Self {
             data: (),
@@ -17,7 +16,7 @@ impl From<CstKind<()>> for Cst<()> {
 
 impl ToRichIr for Rcst {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
-        builder.push(format!("{self:?}"), None, EnumSet::empty());
+        self.kind.build_rich_ir(builder);
     }
 }
 

@@ -1,0 +1,137 @@
+# https://en.wikipedia.org/wiki/ANSI_escape_code#CSI_(Control_Sequence_Introducer)_sequences
+
+ascii = use "Ascii"
+[int, text] = use "Core"
+
+controlSequenceIntroducer := "{ascii.escape}["
+
+cursorUp lineCount :=
+  # Moves the cursor `lineCount` lines up.
+  #
+  # If the cursor is already at the top edge of the screen, this has no effect.
+  needs (int.is lineCount)
+  needs (int.isNonNegative lineCount)
+  "{controlSequenceIntroducer}{lineCount}A"
+cursorDown lineCount :=
+  # Moves the cursor `lineCount` lines down.
+  #
+  # If the cursor is already at the bottom edge of the screen, this has no effect.
+  needs (int.is lineCount)
+  needs (int.isNonNegative lineCount)
+  "{controlSequenceIntroducer}{lineCount}B"
+cursorForward characterCount :=
+  # Moves the cursor `characterCount` characters for (right).
+  #
+  # If the cursor is already at the right edge of the screen, this has no effect.
+  needs (int.is characterCount)
+  needs (int.isNonNegative characterCount)
+  "{controlSequenceIntroducer}{characterCount}C"
+cursorBack characterCount :=
+  # Moves the cursor `characterCount` characters back (left).
+  #
+  # If the cursor is already at the left edge of the screen, this has no effect.
+  needs (int.is characterCount)
+  needs (int.isNonNegative characterCount)
+  "{controlSequenceIntroducer}{characterCount}D"
+cursorNextLine lineCount :=
+  # Moves cursor to beginning of the line `lineCount` lines down.
+  needs (int.is lineCount)
+  needs (int.isNonNegative lineCount)
+  "{controlSequenceIntroducer}{lineCount}E"
+cursorPreviousLine lineCount :=
+  # Moves cursor to beginning of the line `lineCount` lines up.
+  needs (int.is lineCount)
+  needs (int.isNonNegative lineCount)
+  "{controlSequenceIntroducer}{lineCount}F"
+cursorHorizontalAbsolute column :=
+  # Moves the cursor to column `column`.
+  #
+  # The value is 1-based, starting in the leftmost column.
+  needs (int.is column)
+  needs (int.isPositive column)
+  "{controlSequenceIntroducer}{column}G"
+cursorPosition column row :=
+  # Moves the cursor to `column`, `row`.
+  #
+  # The values are 1-based, starting in the top left corner.
+  needs (int.is column)
+  needs (int.isPositive column)
+  needs (int.is row)
+  needs (int.isPositive row)
+  "{controlSequenceIntroducer}{row};{column}H"
+
+eraseInDisplay range :=
+  # Clears part of the screen.
+  #
+  # - If `range` is `CursorToEnd`, clear from the cursor to the end of screen.
+  # - If `range` is `CursorToStart`, clear from the cursor to the start of the screen.
+  # - If `range` is `EntireScreen`, clear the entire screen (and moves cursor to upper left on
+  #   DOS ANSI.SYS).
+  # - If `range` is `EntireScreenAndScrollbackBuffer`, clear the entire screen and delete all lines
+  #   saved in the scrollback buffer (this feature was added for xterm and is supported by other
+  #   terminal applications).
+  range = range %
+    CursorToEnd -> 0
+    CursorToStart -> 1
+    EntireScreen -> 2
+    EntireScreenAndScrollbackBuffer -> 3
+    _ -> needs False "Invalid range"
+  "{controlSequenceIntroducer}{range}J"
+eraseInLine range :=
+  # Erases part of the line.
+  #
+  # If `range` is `CursorToEnd`, clear from the cursor to the end of the line.
+  # If `range` is `CursorToStart`, clear from the cursor to the beginning of the line.
+  # If `range` is `EntireLine`, clear the entire line.
+  #
+  # The cursor position does not change.
+  range = range %
+    CursorToEnd -> 0
+    CursorToStart -> 1
+    EntireLine -> 2
+    _ -> needs False "Invalid range"
+  "{controlSequenceIntroducer}{range}K"
+
+scrollUp lineCount :=
+  # Scroll the whole page up by {lineCount} lines.
+  #
+  # New lines are added at the bottom.
+  needs (int.is lineCount)
+  needs (int.isNonNegative lineCount)
+  "{controlSequenceIntroducer}{lineCount}S"
+scrollDown lineCount :=
+  # Scroll the whole page down by {lineCount} lines.
+  #
+  # New lines are added at the top.
+  needs (int.is lineCount)
+  needs (int.isNonNegative lineCount)
+  "{controlSequenceIntroducer}{lineCount}T"
+
+horizontalVerticalPosition column row :=
+  # Moves the cursor to `column`, `row`.
+  #
+  # Same as `cursorPosition`, but counts as a format effector function (like CR or LF) rather than
+  # an editor function (like `cursorDown` or `cursorNextLine`). This can lead to different handling
+  # in certain terminal modes.
+  #
+  # The values are 1-based, starting in the top left corner.
+  needs (int.is column)
+  needs (int.isPositive column)
+  needs (int.is row)
+  needs (int.isPositive row)
+  "{controlSequenceIntroducer}{column}{row}f"
+
+selectGraphicRendition graphicRenditionText :=
+  # n m	SGR	Sets colors and style of the characters following this code
+  needs (text.is graphicRenditionText)
+  "{controlSequenceIntroducer}{graphicRenditionText}m"
+
+portOn := # Enable aux serial port, usually for local serial printer
+  "{controlSequenceIntroducer}5i"
+portOff := # Disable aux serial port, usually for local serial printer
+  "{controlSequenceIntroducer}4i"
+
+deviceStatusReport :=
+  # Reports the cursor position (CPR) by transmitting `"ESC[n;mR"`, where n is the row and m is the
+  # column.
+  "{controlSequenceIntroducer}6n"

@@ -1,0 +1,5 @@
+# https://en.wikipedia.org/wiki/ANSI_escape_code
+
+colors := use ".colors"
+controlSequences := use ".controlSequences"
+graphicRenditions := use ".graphicRenditions"

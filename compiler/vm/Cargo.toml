@@ -31,14 +31,16 @@ unicode-segmentation = "1.9.0"
 walkdir = "2.3.3"
 
 [dev-dependencies]
-criterion = "0.5.1"
-criterion-cycles-per-byte = "0.5.0"
+iai-callgrind = "0.10.2"
 lazy_static = "1.4.0"
 tracing-subscriber = { version = "0.3.16", features = ["registry"] }
 
 [[bench]]
 name = "benchmark"
 harness = false
+
+[profile.bench]
+debug = true
 
 # https://github.com/flamegraph-rs/flamegraph
 [target.x86_64-unknown-linux-gnu]

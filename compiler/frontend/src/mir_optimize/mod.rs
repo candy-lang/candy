@@ -44,6 +44,7 @@
 
 use self::{
     current_expression::{Context, CurrentExpression},
+    log::OptimizationLogger,
     pure::PurenessInsights,
 };
 use super::{hir, hir_to_mir::HirToMir, mir::Mir, tracing::TracingConfig};
@@ -67,6 +68,7 @@ mod constant_folding;
 mod constant_lifting;
 mod current_expression;
 mod inlining;
+mod log;
 mod module_folding;
 mod pure;
 mod reference_following;
@@ -120,6 +122,7 @@ fn optimized_mir_without_tail_calls(
 ) -> OptimizedMirWithoutTailCallsResult {
     let module = target.module();
     debug!("{module}: Compiling.");
+    OptimizationLogger::log_optimized_mir_without_tail_calls_start(&target, tracing);
     let (mir, errors) = db.mir(target.clone(), tracing)?;
     let mut mir = (*mir).clone();
     let mut pureness = PurenessInsights::default();
@@ -130,6 +133,10 @@ fn optimized_mir_without_tail_calls(
     let complexity_after = mir.complexity();
 
     debug!("{module}: Done. Optimized from {complexity_before} to {complexity_after}");
+    OptimizationLogger::log_optimized_mir_without_tail_calls_end(
+        complexity_before,
+        complexity_after,
+    );
     Ok((Arc::new(mir), Arc::new(pureness), Arc::new(errors)))
 }
 
@@ -161,6 +168,7 @@ impl Context<'_> {
     fn optimize_body(&mut self, body: &mut Body) {
         // Even though `self.visible` is mutable, this function guarantees that
         // the value is the same after returning.
+        OptimizationLogger::log_optimize_body_start(body);
         let mut index = 0;
         while index < body.expressions.len() {
             // Thoroughly optimize the expression.
@@ -210,9 +218,11 @@ impl Context<'_> {
         call_tracing::remove_unnecessary_call_tracing(body, self.pureness, self.tracing.calls);
         tree_shaking::tree_shake(body, self.pureness);
         reference_following::remove_redundant_return_references(body, self.pureness);
+        OptimizationLogger::log_optimize_body_end();
     }
 
     fn optimize_expression(&mut self, expression: &mut CurrentExpression) {
+        OptimizationLogger::log_optimize_expression_start(expression);
         'outer: loop {
             if let Expression::Function {
                 parameters,
@@ -262,6 +272,7 @@ impl Context<'_> {
                 }
             }
         }
+        OptimizationLogger::log_optimize_expression_end();
     }
 }
 

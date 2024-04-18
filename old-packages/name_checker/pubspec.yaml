@@ -5,11 +5,7 @@ environment:
   sdk: '>=2.18.0 <3.0.0'
 
 dependencies:
-  basics: ^0.4.0
-  characters: ^1.0.0
-  collection: ^1.14.12
   http: ^0.13.5
-  meta: ^1.1.8
   retry: ^3.1.0
 
 dev_dependencies:

@@ -58,7 +58,7 @@ pub fn compile(options: &Options) -> ProgramResult {
     let path = options
         .path
         .as_ref()
-        .unwrap_or_else(|| match &module.package {
+        .unwrap_or_else(|| match &module.package() {
             module::Package::User(user) => user,
             module::Package::Managed(managed) => managed,
             _ => unreachable!(),
@@ -101,7 +101,7 @@ pub fn compile(options: &Options) -> ProgramResult {
     llvm_candy_module
         .compile_obj_and_link(&path, options.build_runtime, options.debug, &options.linker)
         .map_err(|err| {
-            error!("Failed to compile and link executable: {}", err);
+            error!("Failed to compile and link executable: {err}");
             Exit::ExternalError
         })?;
 

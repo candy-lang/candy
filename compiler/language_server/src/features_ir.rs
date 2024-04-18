@@ -239,7 +239,6 @@ impl IrFeatures {
         let mut builder = RichIrBuilder::default();
         builder.push_comment_line(format!("{ir_name} for module {module}"));
         if let Some(tracing_config) = tracing_config.into() {
-            builder.push_newline();
             builder.push_tracing_config(tracing_config);
         }
         builder.push_newline();
@@ -362,7 +361,7 @@ impl UrlFromIrConfig for Url {
         details.insert("scheme".to_string(), original_url.scheme().into());
         details.insert(
             "moduleKind".to_string(),
-            match config.module.kind {
+            match config.module.kind() {
                 ModuleKind::Code => "code".into(),
                 ModuleKind::Asset => "asset".into(),
             },
@@ -490,7 +489,11 @@ impl LanguageFeatures for IrFeatures {
 
             let rich_irs = self.open_irs.read().await;
             let other_ir = rich_irs.get(&uri)?;
-            let result = other_ir.ir.references.get(key).unwrap();
+            // Some HIR IDs are synthetic: They are created during HIR to MIR
+            // lowering.
+            // TODO(JonasWanke): We could always use "$" to mark synthetic parts
+            // in a HIR ID and then navigate to the prefix that's not synthetic.
+            let result = other_ir.ir.references.get(key)?;
             let target_range = other_ir.range_to_lsp_range(result.definition.as_ref().unwrap());
 
             Some((uri, target_range))
@@ -512,6 +515,13 @@ impl LanguageFeatures for IrFeatures {
                 let db = db.lock().await;
                 let range = db.range_to_lsp_range(module.clone(), span.clone());
                 (module_to_url(module, &packages_path).unwrap(), range)
+            }
+            ReferenceKey::CstId(_) => {
+                let config = IrConfig {
+                    module: config.module.clone(),
+                    ir: Ir::Rcst,
+                };
+                find_in_other_ir(config, &key).await?
             }
             ReferenceKey::HirId(id) => {
                 let config = IrConfig {

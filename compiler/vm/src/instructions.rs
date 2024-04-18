@@ -23,6 +23,7 @@ impl MachineState {
         tracer: &mut impl Tracer,
     ) -> InstructionResult {
         if TRACE {
+            trace!("");
             trace!("Running instruction: {instruction:?}");
             trace!("Instruction pointer: {:?}", self.next_instruction.unwrap());
             trace!(
@@ -145,6 +146,39 @@ impl MachineState {
             }
             Instruction::Return => {
                 self.next_instruction = self.call_stack.pop();
+                InstructionResult::Done
+            }
+            Instruction::IfElse {
+                then_target,
+                then_captured,
+                else_target,
+                else_captured,
+            } => {
+                let responsible = self.pop_from_data_stack();
+                let condition = self.pop_from_data_stack();
+                let condition = Tag::try_from(condition)
+                    .unwrap()
+                    .try_into_bool(heap)
+                    .unwrap();
+                let (target, captured) = if condition {
+                    (*then_target, then_captured)
+                } else {
+                    (*else_target, else_captured)
+                };
+
+                if let Some(next_instruction) = self.next_instruction {
+                    self.call_stack.push(next_instruction);
+                }
+
+                // Initially, we need to adjust the offset because we already
+                // popped two values from the data stack. Afterwards, increment
+                // it for each value.
+                for (index, offset) in captured.iter().enumerate() {
+                    let captured = self.get_from_data_stack(*offset - 2 + index);
+                    self.data_stack.push(captured);
+                }
+                self.push_to_data_stack(responsible);
+                self.next_instruction = Some(target);
                 InstructionResult::Done
             }
             Instruction::Panic => {

@@ -103,6 +103,17 @@ pub enum Instruction {
     /// called.
     Return,
 
+    /// Conditionally calls either `then_target` or `else_target` depending on
+    /// the `condition`.
+    ///
+    /// a, condition, responsible -> a
+    IfElse {
+        then_target: InstructionPointer,
+        then_captured: Vec<StackOffset>,
+        else_target: InstructionPointer,
+        else_captured: Vec<StackOffset>,
+    },
+
     /// Panics. Because the panic instruction only occurs inside the generated
     /// needs function, the reason is already guaranteed to be a text.
     ///
@@ -184,6 +195,11 @@ impl Instruction {
             Self::Return => {
                 // Only modifies the call stack and the instruction pointer.
                 // Leaves the return value untouched on the stack.
+            }
+            Self::IfElse { .. } => {
+                stack.pop(); // responsible
+                stack.pop(); // condition
+                stack.push(result); // return value
             }
             Self::Panic => {
                 stack.pop(); // responsible
@@ -392,6 +408,30 @@ impl Instruction {
                 );
             }
             Self::Return => {}
+            Self::IfElse {
+                then_target,
+                then_captured,
+                else_target,
+                else_captured,
+            } => {
+                builder.push(
+                    format!(
+                        " then call {then_target:?} capturing {} else call {else_target:?} capturing {}",
+                        if then_captured.is_empty() {
+                            "nothing".to_string()
+                        } else {
+                            then_captured.iter().join(", ")
+                        },
+                        if else_captured.is_empty() {
+                            "nothing".to_string()
+                        } else {
+                            else_captured.iter().join(", ")
+                        },
+                    ),
+                    None,
+                     EnumSet::empty(),
+                );
+            }
             Self::Panic => {}
             Self::TraceCallStarts { num_args } | Self::TraceTailCall { num_args } => {
                 builder.push(

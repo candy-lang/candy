@@ -83,20 +83,17 @@ pub fn body(mut input: &str, indentation: usize) -> (&str, Vec<Rcst>) {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::string_to_rcst::utils::{build_comment, build_identifier, build_space};
+    use crate::string_to_rcst::utils::assert_rich_ir_snapshot;
 
     #[test]
     fn test_body() {
-        assert_eq!(
-            body("foo # comment", 0),
-            (
-                "",
-                vec![
-                    build_identifier("foo"),
-                    build_space(),
-                    build_comment(" comment")
-                ]
-            ),
-        );
+        assert_rich_ir_snapshot!(Some(body("foo # comment", 0)), @r###"
+        Remaining input: ""
+        Parsed: Identifier "foo"
+        Whitespace " "
+        Comment:
+          octothorpe: Octothorpe
+          comment: " comment"
+        "###);
     }
 }

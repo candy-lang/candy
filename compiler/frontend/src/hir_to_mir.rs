@@ -16,7 +16,10 @@ use crate::{
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::sync::Arc;
+use std::{
+    fmt::{self, Display, Formatter},
+    sync::Arc,
+};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum ExecutionTarget {
@@ -33,6 +36,15 @@ impl ExecutionTarget {
     }
 }
 
+impl Display for ExecutionTarget {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            Self::Module(module) => write!(f, "module `{module}`"),
+            Self::MainFunction(module) => write!(f, "main function of module `{module}`"),
+        }
+    }
+}
+
 #[salsa::query_group(HirToMirStorage)]
 pub trait HirToMir: PositionConversionDb + CstDb + AstToHir {
     fn mir(&self, target: ExecutionTarget, tracing: TracingConfig) -> MirResult;
@@ -45,11 +57,11 @@ fn mir(db: &dyn HirToMir, target: ExecutionTarget, tracing: TracingConfig) -> Mi
     let (module, target_is_main_function) = match target {
         ExecutionTarget::Module(module) => (module, false),
         ExecutionTarget::MainFunction(module) => {
-            assert_eq!(module.kind, ModuleKind::Code);
+            assert_eq!(module.kind(), ModuleKind::Code);
             (module, true)
         }
     };
-    let (mir, errors) = match module.kind {
+    let (mir, errors) = match module.kind() {
         ModuleKind::Code => {
             let (hir, _) = db.hir(module.clone())?;
             let mut errors = FxHashSet::default();

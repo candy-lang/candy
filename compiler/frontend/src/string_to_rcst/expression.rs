@@ -440,13 +440,11 @@ fn match_case(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::string_to_rcst::utils::{
-        build_comment, build_identifier, build_newline, build_simple_int, build_space, build_symbol,
-    };
+    use crate::string_to_rcst::utils::assert_rich_ir_snapshot;
 
     #[test]
     fn test_expression() {
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo",
                 0,
@@ -457,9 +455,12 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some(("", build_identifier("foo")))
+            @r###"
+        Remaining input: ""
+        Parsed: Identifier "foo"
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "(foo Bar)",
                 0,
@@ -470,25 +471,23 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "",
-                CstKind::Parenthesized {
-                    opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
-                    inner: Box::new(
-                        CstKind::Call {
-                            receiver: Box::new(build_identifier("foo").with_trailing_space()),
-                            arguments: vec![build_symbol("Bar")],
-                        }
-                        .into()
-                    ),
-                    closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into())
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: ""
+        Parsed: Parenthesized:
+          opening_parenthesis: OpeningParenthesis
+          inner: Call:
+            receiver: TrailingWhitespace:
+              child: Identifier "foo"
+              whitespace:
+                Whitespace " "
+            arguments:
+              Symbol "Bar"
+          closing_parenthesis: ClosingParenthesis
+        "###
         );
         // foo
         //   .bar
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo\n  .bar",
                 0,
@@ -499,22 +498,21 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "",
-                CstKind::StructAccess {
-                    struct_: Box::new(build_identifier("foo").with_trailing_whitespace(vec![
-                        CstKind::Newline("\n".to_string()),
-                        CstKind::Whitespace("  ".to_string()),
-                    ])),
-                    dot: Box::new(CstKind::Dot.into()),
-                    key: Box::new(build_identifier("bar")),
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: ""
+        Parsed: StructAccess:
+          struct: TrailingWhitespace:
+            child: Identifier "foo"
+            whitespace:
+              Newline "\n"
+              Whitespace "  "
+          dot: Dot
+          key: Identifier "bar"
+        "###
         );
         // foo
         // .bar
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo\n.bar",
                 0,
@@ -525,11 +523,15 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some(("\n.bar", build_identifier("foo"))),
+            @r###"
+        Remaining input: "
+        .bar"
+        Parsed: Identifier "foo"
+        "###
         );
         // foo
         // | bar
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo\n| bar",
                 0,
@@ -540,22 +542,23 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "",
-                CstKind::BinaryBar {
-                    left: Box::new(
-                        build_identifier("foo")
-                            .with_trailing_whitespace(vec![CstKind::Newline("\n".to_string())]),
-                    ),
-                    bar: Box::new(CstKind::Bar.with_trailing_space()),
-                    right: Box::new(build_identifier("bar")),
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: ""
+        Parsed: BinaryBar:
+          left: TrailingWhitespace:
+            child: Identifier "foo"
+            whitespace:
+              Newline "\n"
+          bar: TrailingWhitespace:
+            child: Bar
+            whitespace:
+              Whitespace " "
+          right: Identifier "bar"
+        "###
         );
         // foo
         // | bar baz
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo\n| bar baz",
                 0,
@@ -566,28 +569,29 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "",
-                CstKind::BinaryBar {
-                    left: Box::new(
-                        build_identifier("foo")
-                            .with_trailing_whitespace(vec![CstKind::Newline("\n".to_string())]),
-                    ),
-                    bar: Box::new(CstKind::Bar.with_trailing_space()),
-                    right: Box::new(
-                        CstKind::Call {
-                            receiver: Box::new(build_identifier("bar").with_trailing_space()),
-                            arguments: vec![build_identifier("baz")],
-                        }
-                        .into(),
-                    ),
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: ""
+        Parsed: BinaryBar:
+          left: TrailingWhitespace:
+            child: Identifier "foo"
+            whitespace:
+              Newline "\n"
+          bar: TrailingWhitespace:
+            child: Bar
+            whitespace:
+              Whitespace " "
+          right: Call:
+            receiver: TrailingWhitespace:
+              child: Identifier "bar"
+              whitespace:
+                Whitespace " "
+            arguments:
+              Identifier "baz"
+        "###
         );
         // foo %
         //   123 -> 123
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo %\n  123 -> 123",
                 0,
@@ -598,25 +602,39 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "",
-                CstKind::Match {
-                    expression: Box::new(build_identifier("foo").with_trailing_space()),
-                    percent: Box::new(CstKind::Percent.with_trailing_whitespace(vec![
-                        CstKind::Newline("\n".to_string()),
-                        CstKind::Whitespace("  ".to_string()),
-                    ])),
-                    cases: vec![CstKind::MatchCase {
-                        pattern: Box::new(build_simple_int(123).with_trailing_space()),
-                        arrow: Box::new(CstKind::Arrow.with_trailing_space()),
-                        body: vec![build_simple_int(123)],
-                    }
-                    .into()],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: ""
+        Parsed: Match:
+          expression: TrailingWhitespace:
+            child: Identifier "foo"
+            whitespace:
+              Whitespace " "
+          percent: TrailingWhitespace:
+            child: Percent
+            whitespace:
+              Newline "\n"
+              Whitespace "  "
+          cases:
+            MatchCase:
+              pattern: TrailingWhitespace:
+                child: Int:
+                  radix_prefix: None
+                  value: 123
+                  string: "123"
+                whitespace:
+                  Whitespace " "
+              arrow: TrailingWhitespace:
+                child: Arrow
+                whitespace:
+                  Whitespace " "
+              body:
+                Int:
+                  radix_prefix: None
+                  value: 123
+                  string: "123"
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "(0, foo) | (foo, 0)",
                 0,
@@ -627,53 +645,51 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "",
-                CstKind::BinaryBar {
-                    left: Box::new(
-                        CstKind::List {
-                            opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
-                            items: vec![
-                                CstKind::ListItem {
-                                    value: Box::new(build_simple_int(0)),
-                                    comma: Some(Box::new(CstKind::Comma.into())),
-                                }
-                                .with_trailing_space(),
-                                CstKind::ListItem {
-                                    value: Box::new(build_identifier("foo")),
-                                    comma: None,
-                                }
-                                .into(),
-                            ],
-                            closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
-                        }
-                        .with_trailing_space(),
-                    ),
-                    bar: Box::new(CstKind::Bar.with_trailing_space()),
-                    right: Box::new(
-                        CstKind::List {
-                            opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
-                            items: vec![
-                                CstKind::ListItem {
-                                    value: Box::new(build_identifier("foo")),
-                                    comma: Some(Box::new(CstKind::Comma.into())),
-                                }
-                                .with_trailing_space(),
-                                CstKind::ListItem {
-                                    value: Box::new(build_simple_int(0)),
-                                    comma: None,
-                                }
-                                .into(),
-                            ],
-                            closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
-                        }
-                        .into(),
-                    ),
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: ""
+        Parsed: BinaryBar:
+          left: TrailingWhitespace:
+            child: List:
+              opening_parenthesis: OpeningParenthesis
+              items:
+                TrailingWhitespace:
+                  child: ListItem:
+                    value: Int:
+                      radix_prefix: None
+                      value: 0
+                      string: "0"
+                    comma: Comma
+                  whitespace:
+                    Whitespace " "
+                ListItem:
+                  value: Identifier "foo"
+                  comma: None
+              closing_parenthesis: ClosingParenthesis
+            whitespace:
+              Whitespace " "
+          bar: TrailingWhitespace:
+            child: Bar
+            whitespace:
+              Whitespace " "
+          right: List:
+            opening_parenthesis: OpeningParenthesis
+            items:
+              TrailingWhitespace:
+                child: ListItem:
+                  value: Identifier "foo"
+                  comma: Comma
+                whitespace:
+                  Whitespace " "
+              ListItem:
+                value: Int:
+                  radix_prefix: None
+                  value: 0
+                  string: "0"
+                comma: None
+            closing_parenthesis: ClosingParenthesis
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo bar",
                 0,
@@ -684,16 +700,18 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "",
-                CstKind::Call {
-                    receiver: Box::new(build_identifier("foo").with_trailing_space()),
-                    arguments: vec![build_identifier("bar")],
-                }
-                .into(),
-            ))
+            @r###"
+        Remaining input: ""
+        Parsed: Call:
+          receiver: TrailingWhitespace:
+            child: Identifier "foo"
+            whitespace:
+              Whitespace " "
+          arguments:
+            Identifier "bar"
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "Foo 4 bar",
                 0,
@@ -704,23 +722,29 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "",
-                CstKind::Call {
-                    receiver: Box::new(build_symbol("Foo").with_trailing_space()),
-                    arguments: vec![
-                        build_simple_int(4).with_trailing_space(),
-                        build_identifier("bar"),
-                    ],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: ""
+        Parsed: Call:
+          receiver: TrailingWhitespace:
+            child: Symbol "Foo"
+            whitespace:
+              Whitespace " "
+          arguments:
+            TrailingWhitespace:
+              child: Int:
+                radix_prefix: None
+                value: 4
+                string: "4"
+              whitespace:
+                Whitespace " "
+            Identifier "bar"
+        "###
         );
         // foo
         //   bar
         //   baz
         // 2
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo\n  bar\n  baz\n2",
                 0,
@@ -731,29 +755,29 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "\n2",
-                CstKind::Call {
-                    receiver: Box::new(build_identifier("foo").with_trailing_whitespace(vec![
-                        CstKind::Newline("\n".to_string()),
-                        CstKind::Whitespace("  ".to_string()),
-                    ])),
-                    arguments: vec![
-                        build_identifier("bar").with_trailing_whitespace(vec![
-                            CstKind::Newline("\n".to_string()),
-                            CstKind::Whitespace("  ".to_string()),
-                        ]),
-                        build_identifier("baz"),
-                    ],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: "
+        2"
+        Parsed: Call:
+          receiver: TrailingWhitespace:
+            child: Identifier "foo"
+            whitespace:
+              Newline "\n"
+              Whitespace "  "
+          arguments:
+            TrailingWhitespace:
+              child: Identifier "bar"
+              whitespace:
+                Newline "\n"
+                Whitespace "  "
+            Identifier "baz"
+        "###
         );
         // foo 1 2
         //   3
         //   4
         // bar
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo 1 2\n  3\n  4\nbar",
                 0,
@@ -764,29 +788,47 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "\nbar",
-                CstKind::Call {
-                    receiver: Box::new(build_identifier("foo").with_trailing_space()),
-                    arguments: vec![
-                        build_simple_int(1).with_trailing_space(),
-                        build_simple_int(2).with_trailing_whitespace(vec![
-                            CstKind::Newline("\n".to_string()),
-                            CstKind::Whitespace("  ".to_string()),
-                        ]),
-                        build_simple_int(3).with_trailing_whitespace(vec![
-                            CstKind::Newline("\n".to_string()),
-                            CstKind::Whitespace("  ".to_string()),
-                        ]),
-                        build_simple_int(4),
-                    ],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: "
+        bar"
+        Parsed: Call:
+          receiver: TrailingWhitespace:
+            child: Identifier "foo"
+            whitespace:
+              Whitespace " "
+          arguments:
+            TrailingWhitespace:
+              child: Int:
+                radix_prefix: None
+                value: 1
+                string: "1"
+              whitespace:
+                Whitespace " "
+            TrailingWhitespace:
+              child: Int:
+                radix_prefix: None
+                value: 2
+                string: "2"
+              whitespace:
+                Newline "\n"
+                Whitespace "  "
+            TrailingWhitespace:
+              child: Int:
+                radix_prefix: None
+                value: 3
+                string: "3"
+              whitespace:
+                Newline "\n"
+                Whitespace "  "
+            Int:
+              radix_prefix: None
+              value: 4
+              string: "4"
+        "###
         );
         // foo
         //   bar | baz
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo\n  bar | baz",
                 0,
@@ -797,24 +839,28 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "",
-                CstKind::Call {
-                    receiver: Box::new(build_identifier("foo").with_trailing_whitespace(vec![
-                        CstKind::Newline("\n".to_string()),
-                        CstKind::Whitespace("  ".to_string()),
-                    ])),
-                    arguments: vec![CstKind::BinaryBar {
-                        left: Box::new(build_identifier("bar").with_trailing_space()),
-                        bar: Box::new(CstKind::Bar.with_trailing_space()),
-                        right: Box::new(build_identifier("baz")),
-                    }
-                    .into()],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: ""
+        Parsed: Call:
+          receiver: TrailingWhitespace:
+            child: Identifier "foo"
+            whitespace:
+              Newline "\n"
+              Whitespace "  "
+          arguments:
+            BinaryBar:
+              left: TrailingWhitespace:
+                child: Identifier "bar"
+                whitespace:
+                  Whitespace " "
+              bar: TrailingWhitespace:
+                child: Bar
+                whitespace:
+                  Whitespace " "
+              right: Identifier "baz"
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "(foo Bar) Baz\n",
                 0,
@@ -825,35 +871,32 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "\n",
-                CstKind::Call {
-                    receiver: Box::new(
-                        CstKind::Parenthesized {
-                            opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
-                            inner: Box::new(
-                                CstKind::Call {
-                                    receiver: Box::new(
-                                        build_identifier("foo").with_trailing_space(),
-                                    ),
-                                    arguments: vec![build_symbol("Bar")],
-                                }
-                                .into()
-                            ),
-                            closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
-                        }
-                        .with_trailing_space(),
-                    ),
-                    arguments: vec![build_symbol("Baz")]
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: "
+        "
+        Parsed: Call:
+          receiver: TrailingWhitespace:
+            child: Parenthesized:
+              opening_parenthesis: OpeningParenthesis
+              inner: Call:
+                receiver: TrailingWhitespace:
+                  child: Identifier "foo"
+                  whitespace:
+                    Whitespace " "
+                arguments:
+                  Symbol "Bar"
+              closing_parenthesis: ClosingParenthesis
+            whitespace:
+              Whitespace " "
+          arguments:
+            Symbol "Baz"
+        "###
         );
         // foo T
         //
         //
         // bar = 5
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo T\n\n\nbar = 5",
                 0,
@@ -864,16 +907,21 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "\n\n\nbar = 5",
-                CstKind::Call {
-                    receiver: Box::new(build_identifier("foo").with_trailing_space()),
-                    arguments: vec![build_symbol("T")],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: "
+
+
+        bar = 5"
+        Parsed: Call:
+          receiver: TrailingWhitespace:
+            child: Identifier "foo"
+            whitespace:
+              Whitespace " "
+          arguments:
+            Symbol "T"
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo = 42",
                 0,
@@ -884,17 +932,25 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "",
-                CstKind::Assignment {
-                    left: Box::new(build_identifier("foo").with_trailing_space()),
-                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_space()),
-                    body: vec![build_simple_int(42)],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: ""
+        Parsed: Assignment:
+          left: TrailingWhitespace:
+            child: Identifier "foo"
+            whitespace:
+              Whitespace " "
+          assignment_sign: TrailingWhitespace:
+            child: EqualsSign
+            whitespace:
+              Whitespace " "
+          body:
+            Int:
+              radix_prefix: None
+              value: 42
+              string: "42"
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo =\n  bar\n\nbaz",
                 0,
@@ -905,20 +961,25 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "\n\nbaz",
-                CstKind::Assignment {
-                    left: Box::new(build_identifier("foo").with_trailing_space()),
-                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_whitespace(vec![
-                        CstKind::Newline("\n".to_string()),
-                        CstKind::Whitespace("  ".to_string())
-                    ])),
-                    body: vec![build_identifier("bar")],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: "
+
+        baz"
+        Parsed: Assignment:
+          left: TrailingWhitespace:
+            child: Identifier "foo"
+            whitespace:
+              Whitespace " "
+          assignment_sign: TrailingWhitespace:
+            child: EqualsSign
+            whitespace:
+              Newline "\n"
+              Whitespace "  "
+          body:
+            Identifier "bar"
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo 42",
                 0,
@@ -929,16 +990,21 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "",
-                CstKind::Call {
-                    receiver: Box::new(build_identifier("foo").with_trailing_space()),
-                    arguments: vec![build_simple_int(42)],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: ""
+        Parsed: Call:
+          receiver: TrailingWhitespace:
+            child: Identifier "foo"
+            whitespace:
+              Whitespace " "
+          arguments:
+            Int:
+              radix_prefix: None
+              value: 42
+              string: "42"
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo %",
                 0,
@@ -949,21 +1015,21 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "",
-                CstKind::Match {
-                    expression: Box::new(build_identifier("foo").with_trailing_space()),
-                    percent: Box::new(CstKind::Percent.into()),
-                    cases: vec![CstKind::Error {
-                        unparsable_input: String::new(),
-                        error: CstError::MatchMissesCases,
-                    }
-                    .into()],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: ""
+        Parsed: Match:
+          expression: TrailingWhitespace:
+            child: Identifier "foo"
+            whitespace:
+              Whitespace " "
+          percent: Percent
+          cases:
+            Error:
+              unparsable_input: ""
+              error: MatchMissesCases
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo %\n",
                 0,
@@ -974,24 +1040,25 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "\n",
-                CstKind::Match {
-                    expression: Box::new(build_identifier("foo").with_trailing_space()),
-                    percent: Box::new(CstKind::Percent.into()),
-                    cases: vec![CstKind::Error {
-                        unparsable_input: String::new(),
-                        error: CstError::MatchMissesCases,
-                    }
-                    .into()],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: "
+        "
+        Parsed: Match:
+          expression: TrailingWhitespace:
+            child: Identifier "foo"
+            whitespace:
+              Whitespace " "
+          percent: Percent
+          cases:
+            Error:
+              unparsable_input: ""
+              error: MatchMissesCases
+        "###
         );
         // foo %
         //   1 -> 2
         // Foo
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo %\n  1 -> 2\nFoo",
                 0,
@@ -1002,28 +1069,43 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "\nFoo",
-                CstKind::Match {
-                    expression: Box::new(build_identifier("foo").with_trailing_space()),
-                    percent: Box::new(CstKind::Percent.with_trailing_whitespace(vec![
-                        CstKind::Newline("\n".to_string()),
-                        CstKind::Whitespace("  ".to_string()),
-                    ])),
-                    cases: vec![CstKind::MatchCase {
-                        pattern: Box::new(build_simple_int(1).with_trailing_space()),
-                        arrow: Box::new(CstKind::Arrow.with_trailing_space()),
-                        body: vec![build_simple_int(2)],
-                    }
-                    .into()],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: "
+        Foo"
+        Parsed: Match:
+          expression: TrailingWhitespace:
+            child: Identifier "foo"
+            whitespace:
+              Whitespace " "
+          percent: TrailingWhitespace:
+            child: Percent
+            whitespace:
+              Newline "\n"
+              Whitespace "  "
+          cases:
+            MatchCase:
+              pattern: TrailingWhitespace:
+                child: Int:
+                  radix_prefix: None
+                  value: 1
+                  string: "1"
+                whitespace:
+                  Whitespace " "
+              arrow: TrailingWhitespace:
+                child: Arrow
+                whitespace:
+                  Whitespace " "
+              body:
+                Int:
+                  radix_prefix: None
+                  value: 2
+                  string: "2"
+        "###
         );
         // foo bar =
         //   3
         // 2
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo bar =\n  3\n2",
                 0,
@@ -1034,29 +1116,36 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "\n2",
-                CstKind::Assignment {
-                    left: Box::new(
-                        CstKind::Call {
-                            receiver: Box::new(build_identifier("foo").with_trailing_space()),
-                            arguments: vec![build_identifier("bar")],
-                        }
-                        .with_trailing_space(),
-                    ),
-                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_whitespace(vec![
-                        CstKind::Newline("\n".to_string()),
-                        CstKind::Whitespace("  ".to_string())
-                    ])),
-                    body: vec![build_simple_int(3)],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: "
+        2"
+        Parsed: Assignment:
+          left: TrailingWhitespace:
+            child: Call:
+              receiver: TrailingWhitespace:
+                child: Identifier "foo"
+                whitespace:
+                  Whitespace " "
+              arguments:
+                Identifier "bar"
+            whitespace:
+              Whitespace " "
+          assignment_sign: TrailingWhitespace:
+            child: EqualsSign
+            whitespace:
+              Newline "\n"
+              Whitespace "  "
+          body:
+            Int:
+              radix_prefix: None
+              value: 3
+              string: "3"
+        "###
         );
         // main := { environment ->
         //   input
         // }
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "main := { environment ->\n  input\n}",
                 0,
@@ -1067,34 +1156,44 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "",
-                CstKind::Assignment {
-                    left: Box::new(build_identifier("main").with_trailing_space()),
-                    assignment_sign: Box::new(CstKind::ColonEqualsSign.with_trailing_space()),
-                    body: vec![CstKind::Function {
-                        opening_curly_brace: Box::new(
-                            CstKind::OpeningCurlyBrace.with_trailing_space()
-                        ),
-                        parameters_and_arrow: Some((
-                            vec![build_identifier("environment").with_trailing_space()],
-                            Box::new(CstKind::Arrow.with_trailing_whitespace(vec![
-                                CstKind::Newline("\n".to_string()),
-                                CstKind::Whitespace("  ".to_string()),
-                            ])),
-                        )),
-                        body: vec![build_identifier("input"), build_newline()],
-                        closing_curly_brace: Box::new(CstKind::ClosingCurlyBrace.into()),
-                    }
-                    .into()],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: ""
+        Parsed: Assignment:
+          left: TrailingWhitespace:
+            child: Identifier "main"
+            whitespace:
+              Whitespace " "
+          assignment_sign: TrailingWhitespace:
+            child: ColonEqualsSign
+            whitespace:
+              Whitespace " "
+          body:
+            Function:
+              opening_curly_brace: TrailingWhitespace:
+                child: OpeningCurlyBrace
+                whitespace:
+                  Whitespace " "
+              parameters_and_arrow:
+                parameters:
+                  TrailingWhitespace:
+                    child: Identifier "environment"
+                    whitespace:
+                      Whitespace " "
+                arrow: TrailingWhitespace:
+                  child: Arrow
+                  whitespace:
+                    Newline "\n"
+                    Whitespace "  "
+              body:
+                Identifier "input"
+                Newline "\n"
+              closing_curly_brace: ClosingCurlyBrace
+        "###
         );
         // foo
         //   bar
         //   = 3
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo\n  bar\n  = 3",
                 0,
@@ -1105,31 +1204,33 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "",
-                CstKind::Assignment {
-                    left: Box::new(
-                        CstKind::Call {
-                            receiver: Box::new(build_identifier("foo").with_trailing_whitespace(
-                                vec![
-                                    CstKind::Newline("\n".to_string()),
-                                    CstKind::Whitespace("  ".to_string()),
-                                ]
-                            )),
-                            arguments: vec![build_identifier("bar")],
-                        }
-                        .with_trailing_whitespace(vec![
-                            CstKind::Newline("\n".to_string()),
-                            CstKind::Whitespace("  ".to_string()),
-                        ])
-                    ),
-                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_space()),
-                    body: vec![build_simple_int(3)],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: ""
+        Parsed: Assignment:
+          left: TrailingWhitespace:
+            child: Call:
+              receiver: TrailingWhitespace:
+                child: Identifier "foo"
+                whitespace:
+                  Newline "\n"
+                  Whitespace "  "
+              arguments:
+                Identifier "bar"
+            whitespace:
+              Newline "\n"
+              Whitespace "  "
+          assignment_sign: TrailingWhitespace:
+            child: EqualsSign
+            whitespace:
+              Whitespace " "
+          body:
+            Int:
+              radix_prefix: None
+              value: 3
+              string: "3"
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo =\n  ",
                 0,
@@ -1140,17 +1241,19 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "\n  ",
-                CstKind::Assignment {
-                    left: Box::new(build_identifier("foo").with_trailing_space()),
-                    assignment_sign: Box::new(CstKind::EqualsSign.into()),
-                    body: vec![],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: "
+          "
+        Parsed: Assignment:
+          left: TrailingWhitespace:
+            child: Identifier "foo"
+            whitespace:
+              Whitespace " "
+          assignment_sign: EqualsSign
+          body:
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo = # comment\n",
                 0,
@@ -1161,17 +1264,25 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "\n",
-                CstKind::Assignment {
-                    left: Box::new(build_identifier("foo").with_trailing_space()),
-                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_space()),
-                    body: vec![build_comment(" comment")],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: "
+        "
+        Parsed: Assignment:
+          left: TrailingWhitespace:
+            child: Identifier "foo"
+            whitespace:
+              Whitespace " "
+          assignment_sign: TrailingWhitespace:
+            child: EqualsSign
+            whitespace:
+              Whitespace " "
+          body:
+            Comment:
+              octothorpe: Octothorpe
+              comment: " comment"
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo = bar # comment\n",
                 0,
@@ -1182,24 +1293,30 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "\n",
-                CstKind::Assignment {
-                    left: Box::new(build_identifier("foo").with_trailing_space()),
-                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_space()),
-                    body: vec![
-                        build_identifier("bar"),
-                        build_space(),
-                        build_comment(" comment"),
-                    ],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: "
+        "
+        Parsed: Assignment:
+          left: TrailingWhitespace:
+            child: Identifier "foo"
+            whitespace:
+              Whitespace " "
+          assignment_sign: TrailingWhitespace:
+            child: EqualsSign
+            whitespace:
+              Whitespace " "
+          body:
+            Identifier "bar"
+            Whitespace " "
+            Comment:
+              octothorpe: Octothorpe
+              comment: " comment"
+        "###
         );
         // foo =
         //   # comment
         // 3
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo =\n  # comment\n3",
                 0,
@@ -1210,24 +1327,30 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "\n3",
-                CstKind::Assignment {
-                    left: Box::new(build_identifier("foo").with_trailing_space()),
-                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_whitespace(vec![
-                        CstKind::Newline("\n".to_string()),
-                        CstKind::Whitespace("  ".to_string()),
-                    ])),
-                    body: vec![build_comment(" comment")],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: "
+        3"
+        Parsed: Assignment:
+          left: TrailingWhitespace:
+            child: Identifier "foo"
+            whitespace:
+              Whitespace " "
+          assignment_sign: TrailingWhitespace:
+            child: EqualsSign
+            whitespace:
+              Newline "\n"
+              Whitespace "  "
+          body:
+            Comment:
+              octothorpe: Octothorpe
+              comment: " comment"
+        "###
         );
         // foo =
         //   # comment
         //   5
         // 3
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "foo =\n  # comment\n  5\n3",
                 0,
@@ -1238,25 +1361,32 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "\n3",
-                CstKind::Assignment {
-                    left: Box::new(build_identifier("foo").with_trailing_space()),
-                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_whitespace(vec![
-                        CstKind::Newline("\n".to_string()),
-                        CstKind::Whitespace("  ".to_string()),
-                    ])),
-                    body: vec![
-                        build_comment(" comment"),
-                        build_newline(),
-                        CstKind::Whitespace("  ".to_string()).into(),
-                        build_simple_int(5),
-                    ],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: "
+        3"
+        Parsed: Assignment:
+          left: TrailingWhitespace:
+            child: Identifier "foo"
+            whitespace:
+              Whitespace " "
+          assignment_sign: TrailingWhitespace:
+            child: EqualsSign
+            whitespace:
+              Newline "\n"
+              Whitespace "  "
+          body:
+            Comment:
+              octothorpe: Octothorpe
+              comment: " comment"
+            Newline "\n"
+            Whitespace "  "
+            Int:
+              radix_prefix: None
+              value: 5
+              string: "5"
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "(foo, bar) = (1, 2)",
                 0,
@@ -1267,51 +1397,52 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "",
-                CstKind::Assignment {
-                    left: Box::new(
-                        CstKind::List {
-                            opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
-                            items: vec![
-                                CstKind::ListItem {
-                                    value: Box::new(build_identifier("foo")),
-                                    comma: Some(Box::new(CstKind::Comma.into())),
-                                }
-                                .with_trailing_space(),
-                                CstKind::ListItem {
-                                    value: Box::new(build_identifier("bar")),
-                                    comma: None,
-                                }
-                                .into(),
-                            ],
-                            closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
-                        }
-                        .with_trailing_space()
-                    ),
-                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_space()),
-                    body: vec![CstKind::List {
-                        opening_parenthesis: Box::new(CstKind::OpeningParenthesis.into()),
-                        items: vec![
-                            CstKind::ListItem {
-                                value: Box::new(build_simple_int(1)),
-                                comma: Some(Box::new(CstKind::Comma.into())),
-                            }
-                            .with_trailing_space(),
-                            CstKind::ListItem {
-                                value: Box::new(build_simple_int(2)),
-                                comma: None,
-                            }
-                            .into(),
-                        ],
-                        closing_parenthesis: Box::new(CstKind::ClosingParenthesis.into()),
-                    }
-                    .into()],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: ""
+        Parsed: Assignment:
+          left: TrailingWhitespace:
+            child: List:
+              opening_parenthesis: OpeningParenthesis
+              items:
+                TrailingWhitespace:
+                  child: ListItem:
+                    value: Identifier "foo"
+                    comma: Comma
+                  whitespace:
+                    Whitespace " "
+                ListItem:
+                  value: Identifier "bar"
+                  comma: None
+              closing_parenthesis: ClosingParenthesis
+            whitespace:
+              Whitespace " "
+          assignment_sign: TrailingWhitespace:
+            child: EqualsSign
+            whitespace:
+              Whitespace " "
+          body:
+            List:
+              opening_parenthesis: OpeningParenthesis
+              items:
+                TrailingWhitespace:
+                  child: ListItem:
+                    value: Int:
+                      radix_prefix: None
+                      value: 1
+                      string: "1"
+                    comma: Comma
+                  whitespace:
+                    Whitespace " "
+                ListItem:
+                  value: Int:
+                    radix_prefix: None
+                    value: 2
+                    string: "2"
+                  comma: None
+              closing_parenthesis: ClosingParenthesis
+        "###
         );
-        assert_eq!(
+        assert_rich_ir_snapshot!(
             expression(
                 "[Foo: foo] = bar",
                 0,
@@ -1322,30 +1453,32 @@ mod test {
                     allow_function: true
                 }
             ),
-            Some((
-                "",
-                CstKind::Assignment {
-                    left: Box::new(
-                        CstKind::Struct {
-                            opening_bracket: Box::new(CstKind::OpeningBracket.into()),
-                            fields: vec![CstKind::StructField {
-                                key_and_colon: Some(Box::new((
-                                    build_symbol("Foo"),
-                                    CstKind::Colon.with_trailing_space(),
-                                ))),
-                                value: Box::new(build_identifier("foo")),
-                                comma: None,
-                            }
-                            .into()],
-                            closing_bracket: Box::new(CstKind::ClosingBracket.into()),
-                        }
-                        .with_trailing_space(),
-                    ),
-                    assignment_sign: Box::new(CstKind::EqualsSign.with_trailing_space()),
-                    body: vec![build_identifier("bar")],
-                }
-                .into(),
-            )),
+            @r###"
+        Remaining input: ""
+        Parsed: Assignment:
+          left: TrailingWhitespace:
+            child: Struct:
+              opening_bracket: OpeningBracket
+              fields:
+                StructField:
+                  key_and_colon:
+                  key: Symbol "Foo"
+                  colon: TrailingWhitespace:
+                    child: Colon
+                    whitespace:
+                      Whitespace " "
+                  value: Identifier "foo"
+                  comma: None
+              closing_bracket: ClosingBracket
+            whitespace:
+              Whitespace " "
+          assignment_sign: TrailingWhitespace:
+            child: EqualsSign
+            whitespace:
+              Whitespace " "
+          body:
+            Identifier "bar"
+        "###
         );
     }
 }

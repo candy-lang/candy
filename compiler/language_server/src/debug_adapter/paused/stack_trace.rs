@@ -107,7 +107,7 @@ impl PausedState {
                         &module_to_url(&function.module, &db.packages_path).unwrap(),
                     )),
                     source_reference: None,
-                    presentation_hint: if byte_code.module.package == function.module.package {
+                    presentation_hint: if byte_code.module.package() == function.module.package() {
                         PresentationHint::Emphasize
                     } else {
                         PresentationHint::Normal

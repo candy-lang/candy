@@ -9,6 +9,7 @@ use crate::{
 use derive_more::From;
 use enumset::EnumSet;
 use itertools::Itertools;
+use lazy_static::lazy_static;
 use linked_hash_map::LinkedHashMap;
 use num_bigint::BigUint;
 use rustc_hash::FxHashMap;
@@ -133,120 +134,187 @@ impl Body {
 #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Id {
     pub module: Module,
-    pub keys: Vec<IdKey>,
+    pub keys: IdPath,
 }
+#[derive(Clone, Eq, From, Hash, Ord, PartialEq, PartialOrd, Debug, Default)]
+pub struct IdPath(String);
 #[derive(Clone, Eq, From, Hash, Ord, PartialEq, PartialOrd)]
 pub enum IdKey {
     Named { name: String, disambiguator: usize },
     Positional(usize),
 }
+impl IdPath {
+    #[must_use]
+    fn is_root(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    #[must_use]
+    fn child(&self, key: IdKey) -> Self {
+        if self.is_root() {
+            Self::from(key)
+        } else {
+            Self(format!("{}:{key}", self.0))
+        }
+    }
+
+    #[must_use]
+    pub fn last_as_str(&self) -> Option<&str> {
+        self.0.rsplit(':').next()
+    }
+
+    #[must_use]
+    fn parent(&self) -> Option<Self> {
+        self.0
+            .rfind(':')
+            .map(|i| Self(self.0[..i].to_string()))
+            .or_else(|| {
+                if self.is_root() {
+                    None
+                } else {
+                    Some(Self::default())
+                }
+            })
+    }
+}
+impl From<IdKey> for IdPath {
+    fn from(value: IdKey) -> Self {
+        Self(format!("{value}"))
+    }
+}
+impl From<Vec<IdKey>> for IdPath {
+    fn from(value: Vec<IdKey>) -> Self {
+        Self(value.iter().join(":"))
+    }
+}
+impl Display for IdPath {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+fn tooling_module(name: String) -> Module {
+    Module::new(Package::Tooling(name), vec![], ModuleKind::Code)
+}
+lazy_static! {
+    static ref USER_MODULE: Module = tooling_module("user".to_string());
+    static ref PLATFORM_MODULE: Module = tooling_module("platform".to_string());
+    static ref FUZZER_MODULE: Module = tooling_module("fuzzer".to_string());
+    static ref DUMMY_MODULE: Module = tooling_module("dummy".to_string());
+    static ref NEEDS_MODULE: Module = Module::new(
+        Package::Anonymous {
+            url: "$generated".to_string(),
+        },
+        vec![],
+        ModuleKind::Code,
+    );
+}
+
 impl Id {
     #[must_use]
     pub fn new(module: Module, keys: Vec<IdKey>) -> Self {
-        Self { module, keys }
+        Self {
+            module,
+            keys: keys.into(),
+        }
     }
 
     /// An ID that can be used to blame the tooling. For example, when calling
     /// the `main` function, we want to be able to blame the platform for
     /// passing a wrong environment.
-    const fn tooling(name: String) -> Self {
+    fn tooling(module: Module) -> Self {
         Self {
-            module: Module {
-                package: Package::Tooling(name),
-                path: vec![],
-                kind: ModuleKind::Code,
-            },
-            keys: vec![],
+            module,
+            keys: IdPath::default(),
         }
     }
     /// The user of the Candy tooling is responsible. For example, when the user
     /// instructs the tooling to run a non-existent module, then the program
-    /// will panic with this responsiblity.
+    /// will panic with this responsibility.
     #[must_use]
     pub fn user() -> Self {
-        Self::tooling("user".to_string())
+        Self::tooling(USER_MODULE.clone())
     }
     /// Refers to the platform (non-Candy code).
     #[must_use]
     pub fn platform() -> Self {
-        Self::tooling("platform".to_string())
+        Self::tooling(PLATFORM_MODULE.clone())
     }
     #[must_use]
     pub fn fuzzer() -> Self {
-        Self::tooling("fuzzer".to_string())
+        Self::tooling(FUZZER_MODULE.clone())
     }
     /// A dummy ID that is guaranteed to never be responsible for a panic.
     #[must_use]
     pub fn dummy() -> Self {
-        Self::tooling("dummy".to_string())
+        Self::tooling(DUMMY_MODULE.clone())
     }
 
     #[must_use]
     pub fn needs() -> Self {
         Self {
-            module: Module {
-                package: Package::Anonymous {
-                    url: "$generated".to_string(),
-                },
-                path: vec![],
-                kind: ModuleKind::Code,
-            },
-            keys: vec![IdKey::from("needs")],
+            module: NEEDS_MODULE.clone(),
+            keys: IdKey::from("needs").into(),
         }
     }
 
     #[must_use]
     pub fn to_short_debug_string(&self) -> String {
-        format!("${}", self.keys.iter().join(":"))
+        format!("${}", self.keys)
     }
 
     #[must_use]
     pub fn is_root(&self) -> bool {
-        self.keys.is_empty()
+        self.keys.is_root()
     }
 
     #[must_use]
     pub fn parent(&self) -> Option<Self> {
-        match self.keys.len() {
-            0 => None,
-            _ => Some(Self {
-                module: self.module.clone(),
-                keys: self.keys[..self.keys.len() - 1].to_vec(),
-            }),
-        }
+        self.keys.parent().map(|keys| Self {
+            module: self.module.clone(),
+            keys,
+        })
     }
 
     #[must_use]
     pub fn child(&self, key: impl Into<IdKey>) -> Self {
-        let mut keys = self.keys.clone();
-        keys.push(key.into());
         Self {
             module: self.module.clone(),
-            keys,
+            keys: self.keys.child(key.into()),
         }
     }
 
     #[must_use]
     pub fn is_same_module_and_any_parent_of(&self, other: &Self) -> bool {
         self.module == other.module
-            && self.keys.len() < other.keys.len()
-            && self.keys.iter().zip(&other.keys).all(|(a, b)| a == b)
+            && other
+                .keys
+                .0
+                .starts_with(format!("{}:", self.keys.0).as_str())
     }
 
     #[must_use]
     pub fn function_name(&self) -> String {
         self.keys
-            .iter()
-            .map(|it| match it {
-                IdKey::Positional(index) => format!("<anonymous {index}>"),
-                IdKey::Named { name, .. } => name.to_string(),
+            .0
+            .split(':')
+            .map(|it| {
+                let first_char = it.chars().next().unwrap();
+                if first_char.is_numeric() {
+                    return format!("<anonymous {it}>");
+                }
+                let last_char = it.chars().last().unwrap();
+                if last_char.is_numeric() {
+                    return it.rfind('#').map_or_else(|| it, |i| &it[..i]).to_string();
+                }
+                it.to_string()
             })
             .join(" → ")
     }
 }
 impl Debug for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{}:{}", self.module, self.keys.iter().join(":"))
+        write!(f, "{}:{}", self.module, self.keys)
     }
 }
 impl Display for Id {

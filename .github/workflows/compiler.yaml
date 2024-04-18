@@ -25,7 +25,7 @@ jobs:
         with:
           path: ./llvm
           key: llvm-15.0
-      - uses: KyleMayes/install-llvm-action@v1.9.0
+      - uses: KyleMayes/install-llvm-action@v2.0.1
         with:
           version: "15.0"
           cached: ${{ steps.cache-llvm.outputs.cache-hit }}
@@ -55,7 +55,7 @@ jobs:
   #       with:
   #         path: ./llvm
   #         key: llvm-15.0
-  #     - uses: KyleMayes/install-llvm-action@v1.9.0
+  #     - uses: KyleMayes/install-llvm-action@v2.0.1
   #       with:
   #         version: "15.0"
   #         cached: ${{ steps.cache-llvm.outputs.cache-hit }}
@@ -89,7 +89,7 @@ jobs:
         with:
           path: ./llvm
           key: llvm-15.0
-      - uses: KyleMayes/install-llvm-action@v1.9.0
+      - uses: KyleMayes/install-llvm-action@v2.0.1
         with:
           version: "15.0"
           cached: ${{ steps.cache-llvm.outputs.cache-hit }}
@@ -157,54 +157,70 @@ jobs:
 
   benchmark:
     name: Benchmark
-    runs-on: ubuntu-latest
-    # Benchmarks on pushes to main should run sequentially.
-    concurrency: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('{0}-{1}-{2}', github.workflow, github.job, github.ref) || github.run_id }}
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: dsherret/rust-toolchain-file@v1
       - uses: Swatinem/rust-cache@v2.7.3
+      - name: Cache cargo plugins
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/
+          key: ${{ runner.os }}-benchmark-cargo-plugins
       - name: Cache LLVM and Clang
         id: cache-llvm
         uses: actions/cache@v4
         with:
           path: ./llvm
           key: llvm-15.0
-      - uses: KyleMayes/install-llvm-action@v1.9.0
+      - uses: KyleMayes/install-llvm-action@v2.0.1
         with:
           version: "15.0"
           cached: ${{ steps.cache-llvm.outputs.cache-hit }}
 
-      - name: Run benchmark
-        working-directory: compiler/vm/
-        # TODO(JonasWanke): Fix output format error
-        # Explicitly specify Bash since it also includes `-o pipefail`. Without
-        # it, this step succeeds even if the benchmark execution itself fails.
-        # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#exit-codes-and-error-action-preference
-        # shell: bash
-        run: cargo bench -- --output-format bencher | tee benchmark_output.txt
+      - name: Install Valgrind
+        run: sudo apt update && sudo apt install -y valgrind
+      - name: Install benchmark runner
+        run: |
+          version=$(cargo metadata --format-version=1 | \
+            jq '.packages[] | select(.name == "iai-callgrind").version' | \
+            tr -d '"'
+          )
+          # TODO(JonasWanke): Can we avoid the `--force`? Cargo should support
+          # installing it without the flag [0], but it currently fails [1].
+          # Maybe the cache is missing some files? [2]
+          # [0]: https://github.com/rust-lang/cargo/issues/6727
+          # [1]: https://github.com/candy-lang/candy/actions/runs/8103066154/job/22146912428?pr=929#step:9:59
+          # [2]: https://users.rust-lang.org/t/get-cargo-install-to-fail-silently-if-the-binary-already-exists/99507/2
+          cargo install iai-callgrind-runner --version $version --force
 
-      - name: Store benchmark result
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          name: Compiler
-          tool: cargo
-          output-file-path: compiler/vm/benchmark_output.txt
-          gh-pages-branch: gh-pages
-          gh-repository: github.com/candy-lang/benchmark-results
-          benchmark-data-dir-path: ./
-          # Only push results to the benchmark repository if we ran on a commit
-          # to the main branch.
-          auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          github-token: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.BENCHMARK_RESULTS_TOKEN || secrets.BENCHMARK_RESULTS_COMMENT_TOKEN }}
-          # Forks don't have access to secrets, so we can't create a commit
-          # comment. This step can still fail to notify us and the output shows
-          # results.
-          comment-always: ${{ github.secret_source == 'Actions' || github.secret_source == 'Dependabot' }}
-          comment-on-alert: ${{ github.secret_source == 'Actions' || github.secret_source == 'Dependabot' }}
-          alert-threshold: 200%
-          # Benchmarks running on GitHub Actions have a very high variance.
-          fail-on-alert: true
+      - name: Install Bencher CLI
+        uses: bencherdev/bencher@v0.4.2
+      - name: Run benchmarks and store results
+        working-directory: compiler/vm/
+        # TODO: Support PRs from forks: https://bencher.dev/docs/how-to/github-actions/#pull-requests-from-forks
+        env:
+          IAI_CALLGRIND_COLOR: never
+        run: |
+          # https://unix.stackexchange.com/a/724034
+          exec 3>&1
+          output=$(cargo bench 3>&- | tee /dev/fd/3)
+          exec 3>&-
+
+          renamed_output=$(echo "$output" | sed -E 's/^benchmark::main::(\S+) .*?:[cv]\("(.*?)"(, & \[("(.*?)"|)\]|)\)$/\1: \2.candy \5/g')
+
+          bencher run \
+            --project candy \
+            --token ${{ secrets.BENCHER_TOKEN }} \
+            --if-branch ${{ github.head_ref || github.ref_name }} \
+            --else-if-branch ${{ github.base_ref || 'main' }} \
+            --else-if-branch main \
+            --hash ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }} \
+            --testbed github-actions-ubuntu-22-04 \
+            --adapter rust_iai_callgrind \
+            --err \
+            --github-actions ${{ secrets.BENCHMARK_RESULTS_COMMENT_TOKEN }} \
+            echo "$renamed_output"
 
   vscode-extension-check:
     name: Check VS Code Extension

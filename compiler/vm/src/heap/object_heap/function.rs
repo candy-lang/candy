@@ -42,7 +42,7 @@ impl HeapFunction {
         );
 
         let argument_count_shift_for_max_size =
-            Self::CAPTURED_LEN_SHIFT + Self::ARGUMENT_COUNT_SHIFT;
+            InlineObject::BITS as usize - Self::CAPTURED_LEN_SHIFT + Self::ARGUMENT_COUNT_SHIFT;
         assert_eq!(
             (argument_count << argument_count_shift_for_max_size)
                 >> argument_count_shift_for_max_size,
@@ -96,18 +96,13 @@ impl HeapFunction {
         #[allow(clippy::cast_possible_truncation)]
         unsafe { *self.body_pointer().as_ref() as usize }.into()
     }
-    pub fn set_body(self, body: InstructionPointer) {
-        unsafe {
-            *self.body_pointer().as_mut() = *body as u64;
-        }
-    }
 }
 
 impl DebugDisplay for HeapFunction {
     fn fmt(&self, f: &mut Formatter, is_debug: bool) -> fmt::Result {
-        let argument_count = self.argument_count();
-        let captured = self.captured();
         if is_debug {
+            let argument_count = self.argument_count();
+            let captured = self.captured();
             write!(
                 f,
                 "{{ {} {} (capturing {}) → {:?} }}",

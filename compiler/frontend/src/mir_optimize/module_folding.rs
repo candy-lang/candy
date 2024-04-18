@@ -38,6 +38,8 @@ use crate::{
 use rustc_hash::FxHashMap;
 use std::mem;
 
+const NAME: &str = "Module Folding";
+
 pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
     let Expression::UseModule {
         current_module,
@@ -68,6 +70,7 @@ pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
                 },
             );
             expression.replace_with_multiple(
+                NAME,
                 panicking_expression(context.id_generator, error.payload.to_string(), responsible),
                 context.pureness,
             );
@@ -76,6 +79,7 @@ pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
         }
         _ => {
             expression.replace_with_multiple(
+                NAME,
                 panicking_expression(
                     context.id_generator,
                     "`use` expects a text as a path.".to_string(),
@@ -92,6 +96,7 @@ pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
         Err(error) => {
             let error = CompilerError::for_whole_module(current_module.clone(), error);
             expression.replace_with_multiple(
+                NAME,
                 panicking_expression(context.id_generator, error.payload.to_string(), responsible),
                 context.pureness,
             );
@@ -116,6 +121,7 @@ pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
 
             context.pureness.include(other_pureness.as_ref(), &mapping);
             expression.prepend_optimized(
+                NAME,
                 context.visible,
                 mir.body.iter().map(|(id, expression)| {
                     let mut expression = expression.clone();
@@ -128,6 +134,7 @@ pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
                 }),
             );
             expression.replace_with(
+                NAME,
                 Expression::Reference(mapping[&mir.body.return_value()]),
                 context.pureness,
             );
@@ -145,7 +152,7 @@ pub fn apply(context: &mut Context, expression: &mut CurrentExpression) {
 
             let (inner_id_generator, body) = builder.finish();
             *context.id_generator = inner_id_generator;
-            expression.replace_with_multiple(body, context.pureness);
+            expression.replace_with_multiple(NAME, body, context.pureness);
         }
     };
 }
@@ -157,7 +164,7 @@ fn resolve_module(current_module: &Module, path: &str) -> Result<Module, MirErro
             path: path.to_string(),
         });
     };
-    let Ok(module) = path.resolve_relative_to(current_module.clone()) else {
+    let Ok(module) = path.resolve_relative_to(current_module) else {
         return Err(MirError::UseHasTooManyParentNavigations {
             module: current_module.clone(),
             path: path.to_string(),
