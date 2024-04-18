@@ -1,5 +1,5 @@
 use crate::{
-    byte_code::{ByteCode, Instruction, StackOffset},
+    byte_code::{ByteCode, CreateFunction, IfElse, Instruction, StackOffset},
     heap::{Builtin, Function, Heap, HirId, InlineObject, Int, List, Struct, Tag, Text},
     instruction_pointer::InstructionPointer,
 };
@@ -150,7 +150,7 @@ impl<'c> LoweringContext<'c> {
             };
             self.current_instructions.push(Instruction::TailCall {
                 num_locals_to_pop: self.stack.len() - 1,
-                num_args,
+                num_args: num_args.try_into().unwrap(),
             });
         } else {
             let dummy_id = Id::from_usize(0);
@@ -218,11 +218,11 @@ impl<'c> LoweringContext<'c> {
                 }
                 self.emit(
                     id,
-                    Instruction::CreateFunction {
+                    Instruction::CreateFunction(Box::new(CreateFunction {
                         captured: captured.iter().map(|id| self.stack.find_id(*id)).collect(),
                         num_args: self.lir.bodies().get(*body_id).parameter_count(),
                         body: instruction_pointer,
-                    },
+                    })),
                 );
             }
             Expression::Constant(constant_id) => {
@@ -264,7 +264,7 @@ impl<'c> LoweringContext<'c> {
                 let else_target = self.get_body(*else_body_id);
                 self.emit(
                     id,
-                    Instruction::IfElse {
+                    Instruction::IfElse(Box::new(IfElse {
                         then_target,
                         then_captured: then_captured
                             .iter()
@@ -275,7 +275,7 @@ impl<'c> LoweringContext<'c> {
                             .iter()
                             .map(|id| self.stack.find_id(*id))
                             .collect(),
-                    },
+                    })),
                 );
             }
             Expression::Panic {
