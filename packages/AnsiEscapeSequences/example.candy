@@ -75,8 +75,8 @@ showColors3Or4Bit stdout =
     needs (function.is1 graphicRenditionFunction)
     needs (text.is content)
     coloredLine 0 8 graphicRenditionFunction { color -> content } " "
-  columnHeaders = iterator.range 8 | iterator.map { color -> " {color} " }
-    | iterator.joinToTextWithSeparator " "
+  columnHeaders =
+    iterator.range 8 | iterator.map { color -> " {color} " } | iterator.joinToTextWithSeparator " "
 
   stdout "# Colors: 3 and 4 Bit"
   stdout ""
