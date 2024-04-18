@@ -49,11 +49,7 @@ pub enum Instruction {
     /// Pushes a function.
     ///
     /// a -> a, pointer to function
-    CreateFunction {
-        captured: Vec<StackOffset>,
-        num_args: usize, // excluding responsible parameter
-        body: InstructionPointer,
-    },
+    CreateFunction(Box<CreateFunction>),
 
     /// Pushes a pointer onto the stack. MIR instructions that create
     /// compile-time known values are compiled to this instruction.
@@ -94,7 +90,9 @@ pub enum Instruction {
     /// executing the call.
     TailCall {
         num_locals_to_pop: usize,
-        num_args: usize, // excluding the responsible argument
+        // This is `u32` instead of `usize` to reduce the size of the
+        // enum from 24 to 16 bytes.
+        num_args: u32, // excluding the responsible argument
     },
 
     /// Returns from the current function to the original caller. Leaves the
@@ -107,12 +105,7 @@ pub enum Instruction {
     /// the `condition`.
     ///
     /// a, condition, responsible -> a
-    IfElse {
-        then_target: InstructionPointer,
-        then_captured: Vec<StackOffset>,
-        else_target: InstructionPointer,
-        else_captured: Vec<StackOffset>,
-    },
+    IfElse(Box<IfElse>),
 
     /// Panics. Because the panic instruction only occurs inside the generated
     /// needs function, the reason is already guaranteed to be a text.
@@ -136,6 +129,19 @@ pub enum Instruction {
 
     /// a, HIR ID, function -> a
     TraceFoundFuzzableFunction,
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct CreateFunction {
+    pub captured: Vec<StackOffset>,
+    pub num_args: usize, // excluding responsible parameter
+    pub body: InstructionPointer,
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct IfElse {
+    pub then_target: InstructionPointer,
+    pub then_captured: Vec<StackOffset>,
+    pub else_target: InstructionPointer,
+    pub else_captured: Vec<StackOffset>,
 }
 
 impl Instruction {
@@ -187,7 +193,7 @@ impl Instruction {
                 num_args,
             } => {
                 stack.pop(); // responsible
-                stack.pop_multiple(*num_args);
+                stack.pop_multiple((*num_args).try_into().unwrap());
                 stack.pop(); // function/builtin
                 stack.pop_multiple(*num_locals_to_pop);
                 stack.push(result); // return value
@@ -196,7 +202,7 @@ impl Instruction {
                 // Only modifies the call stack and the instruction pointer.
                 // Leaves the return value untouched on the stack.
             }
-            Self::IfElse { .. } => {
+            Self::IfElse(_) => {
                 stack.pop(); // responsible
                 stack.pop(); // condition
                 stack.push(result); // return value
@@ -273,7 +279,7 @@ impl ToRichIr for ByteCode {
                 TokenType::Address,
                 EnumSet::empty(),
             );
-            builder.push(": ", None, EnumSet::empty());
+            builder.push_simple(": ");
             builder.push(
                 format!("{constant:?}"),
                 TokenType::Constant,
@@ -314,50 +320,42 @@ impl ToRichIr for ByteCode {
         }
     }
 }
-impl Instruction {
+impl ToRichIr for Instruction {
     fn build_rich_ir(&self, builder: &mut RichIrBuilder) {
         let discriminant: InstructionDiscriminants = self.into();
-        builder.push(
-            Into::<&'static str>::into(discriminant),
-            None,
-            EnumSet::empty(),
-        );
+        builder.push_simple(Into::<&'static str>::into(discriminant));
 
         match self {
             Self::CreateTag { symbol } => {
-                builder.push(" ", None, EnumSet::empty());
-                let symbol_range = builder.push(symbol.get(), None, EnumSet::empty());
+                builder.push_simple(" ");
+                let symbol_range = builder.push_simple(symbol.get());
                 builder.push_reference(ReferenceKey::Symbol(symbol.to_string()), symbol_range);
             }
             Self::CreateList { num_items } => {
-                builder.push(" ", None, EnumSet::empty());
-                builder.push(num_items.to_string(), None, EnumSet::empty());
+                builder.push_simple(" ");
+                builder.push_simple(num_items.to_string());
             }
             Self::CreateStruct { num_fields } => {
-                builder.push(" ", None, EnumSet::empty());
-                builder.push(num_fields.to_string(), None, EnumSet::empty());
+                builder.push_simple(" ");
+                builder.push_simple(num_fields.to_string());
             }
-            Self::CreateFunction {
+            Self::CreateFunction(box CreateFunction {
                 captured,
                 num_args,
                 body,
-            } => {
-                builder.push(
-                    format!(
-                        " with {num_args} {} capturing {} starting at {body:?}",
-                        arguments_plural(*num_args),
-                        if captured.is_empty() {
-                            "nothing".to_string()
-                        } else {
-                            captured.iter().join(", ")
-                        },
-                    ),
-                    None,
-                    EnumSet::empty(),
-                );
+            }) => {
+                builder.push_simple(format!(
+                    " with {num_args} {} capturing {} starting at {body:?}",
+                    arguments_plural(*num_args),
+                    if captured.is_empty() {
+                        "nothing".to_string()
+                    } else {
+                        captured.iter().join(", ")
+                    },
+                ));
             }
             Self::PushConstant(constant) => {
-                builder.push(" ", None, EnumSet::empty());
+                builder.push_simple(" ");
                 if let InlineData::Pointer(pointer) = InlineData::from(*constant) {
                     builder.push(
                         format!("{:?}", pointer.get().address()),
@@ -367,7 +365,7 @@ impl Instruction {
                 } else {
                     builder.push("inline", TokenType::Address, EnumSet::empty());
                 }
-                builder.push(" ", None, EnumSet::empty());
+                builder.push_simple(" ");
                 builder.push(
                     format!("{constant:?}"),
                     TokenType::Constant,
@@ -375,46 +373,38 @@ impl Instruction {
                 );
             }
             Self::PushFromStack(offset) => {
-                builder.push(" ", None, EnumSet::empty());
-                builder.push(offset.to_string(), None, EnumSet::empty());
+                builder.push_simple(" ");
+                builder.push_simple(offset.to_string());
             }
             Self::PopMultipleBelowTop(count) => {
-                builder.push(" ", None, EnumSet::empty());
-                builder.push(count.to_string(), None, EnumSet::empty());
+                builder.push_simple(" ");
+                builder.push_simple(count.to_string());
             }
             Self::Dup { amount } => {
-                builder.push(" by ", None, EnumSet::empty());
-                builder.push(amount.to_string(), None, EnumSet::empty());
+                builder.push_simple(" by ");
+                builder.push_simple(amount.to_string());
             }
             Self::Drop => {}
             Self::Call { num_args } => {
-                builder.push(
-                    format!(" with {num_args} {}", arguments_plural(*num_args)),
-                    None,
-                    EnumSet::empty(),
-                );
+                builder.push_simple(format!(" with {num_args} {}", arguments_plural(*num_args)));
             }
             Self::TailCall {
                 num_locals_to_pop,
                 num_args,
             } => {
-                builder.push(
-                    format!(
-                        " with {num_locals_to_pop} locals and {num_args} {}",
-                        arguments_plural(*num_args),
-                    ),
-                    None,
-                    EnumSet::empty(),
-                );
+                builder.push_simple(format!(
+                    " with {num_locals_to_pop} locals and {num_args} {}",
+                    arguments_plural((*num_args).try_into().unwrap()),
+                ));
             }
             Self::Return => {}
-            Self::IfElse {
+            Self::IfElse(box IfElse {
                 then_target,
                 then_captured,
                 else_target,
                 else_captured,
-            } => {
-                builder.push(
+            }) => {
+                builder.push_simple(
                     format!(
                         " then call {then_target:?} capturing {} else call {else_target:?} capturing {}",
                         if then_captured.is_empty() {
@@ -428,28 +418,18 @@ impl Instruction {
                             else_captured.iter().join(", ")
                         },
                     ),
-                    None,
-                     EnumSet::empty(),
                 );
             }
             Self::Panic => {}
             Self::TraceCallStarts { num_args } | Self::TraceTailCall { num_args } => {
-                builder.push(
-                    format!(" ({num_args} {})", arguments_plural(*num_args)),
-                    None,
-                    EnumSet::empty(),
-                );
+                builder.push_simple(format!(" ({num_args} {})", arguments_plural(*num_args)));
             }
             Self::TraceCallEnds { has_return_value } => {
-                builder.push(
-                    if *has_return_value {
-                        " with return value"
-                    } else {
-                        " without return value"
-                    },
-                    None,
-                    EnumSet::empty(),
-                );
+                builder.push_simple(if *has_return_value {
+                    " with return value"
+                } else {
+                    " without return value"
+                });
             }
             Self::TraceExpressionEvaluated => {}
             Self::TraceFoundFuzzableFunction => {}

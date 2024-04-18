@@ -1,5 +1,5 @@
 use crate::{
-    byte_code::Instruction,
+    byte_code::{CreateFunction, IfElse, Instruction},
     heap::{Data, Function, Heap, HirId, InlineObject, List, Struct, Tag, Text},
     tracer::Tracer,
     vm::{CallHandle, MachineState, Panic},
@@ -79,11 +79,11 @@ impl MachineState {
                 self.push_to_data_stack(struct_);
                 InstructionResult::Done
             }
-            Instruction::CreateFunction {
+            Instruction::CreateFunction(box CreateFunction {
                 captured,
                 num_args,
                 body,
-            } => {
+            }) => {
                 let captured = captured
                     .iter()
                     .map(|offset| self.get_from_data_stack(*offset))
@@ -148,12 +148,12 @@ impl MachineState {
                 self.next_instruction = self.call_stack.pop();
                 InstructionResult::Done
             }
-            Instruction::IfElse {
+            Instruction::IfElse(box IfElse {
                 then_target,
                 then_captured,
                 else_target,
                 else_captured,
-            } => {
+            }) => {
                 let responsible = self.pop_from_data_stack();
                 let condition = Tag::value_into_bool_unchecked(self.pop_from_data_stack(), heap);
                 let (target, captured) = if condition {

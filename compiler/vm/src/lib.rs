@@ -2,6 +2,7 @@
     addr_parse_ascii,
     allocator_api,
     anonymous_lifetime_in_impl_trait,
+    box_patterns,
     iterator_try_collect,
     let_chains,
     nonzero_ops,
