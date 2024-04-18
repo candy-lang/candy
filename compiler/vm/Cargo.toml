@@ -29,6 +29,7 @@ tiny_http = "0.12.0"
 tracing = { version = "0.1", features = ["release_max_level_debug"] }
 unicode-segmentation = "1.9.0"
 walkdir = "2.3.3"
+wasmer = "4.2.6"
 
 [dev-dependencies]
 iai-callgrind = "0.10.2"

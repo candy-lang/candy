@@ -232,6 +232,7 @@ pub struct DefaultSymbols {
     pub arguments: Text,
     pub builtin: Text,
     pub close: Text,
+    pub compile: Text,
     pub equal: Text,
     pub error: Text,
     pub false_: Text,
@@ -242,6 +243,7 @@ pub struct DefaultSymbols {
     pub get_next_request: Text,
     pub greater: Text,
     pub http_server: Text,
+    pub instantiate: Text,
     pub int: Text,
     pub less: Text,
     pub list: Text,
@@ -260,6 +262,7 @@ pub struct DefaultSymbols {
     pub tag: Text,
     pub text: Text,
     pub true_: Text,
+    pub wasm: Text,
 }
 impl DefaultSymbols {
     pub fn new(heap: &mut Heap) -> Self {
@@ -267,6 +270,7 @@ impl DefaultSymbols {
             arguments: Text::create(heap, false, "Arguments"),
             builtin: Text::create(heap, false, "Builtin"),
             close: Text::create(heap, false, "Close"),
+            compile: Text::create(heap, false, "Compile"),
             equal: Text::create(heap, false, "Equal"),
             error: Text::create(heap, false, "Error"),
             false_: Text::create(heap, false, "False"),
@@ -278,6 +282,7 @@ impl DefaultSymbols {
             greater: Text::create(heap, false, "Greater"),
             http_server: Text::create(heap, false, "HttpServer"),
             int: Text::create(heap, false, "Int"),
+            instantiate: Text::create(heap, false, "Instantiate"),
             less: Text::create(heap, false, "Less"),
             list: Text::create(heap, false, "List"),
             not_an_integer: Text::create(heap, false, "NotAnInteger"),
@@ -295,6 +300,7 @@ impl DefaultSymbols {
             tag: Text::create(heap, false, "Tag"),
             text: Text::create(heap, false, "Text"),
             true_: Text::create(heap, false, "True"),
+            wasm: Text::create(heap, false, "Wasm"),
         }
     }
     fn clone_to_heap_with_mapping(
@@ -315,6 +321,7 @@ impl DefaultSymbols {
             arguments: clone_to_heap(heap, address_map, self.arguments),
             builtin: clone_to_heap(heap, address_map, self.builtin),
             close: clone_to_heap(heap, address_map, self.close),
+            compile: clone_to_heap(heap, address_map, self.compile),
             equal: clone_to_heap(heap, address_map, self.equal),
             error: clone_to_heap(heap, address_map, self.error),
             false_: clone_to_heap(heap, address_map, self.false_),
@@ -326,6 +333,7 @@ impl DefaultSymbols {
             greater: clone_to_heap(heap, address_map, self.greater),
             http_server: clone_to_heap(heap, address_map, self.http_server),
             int: clone_to_heap(heap, address_map, self.int),
+            instantiate: clone_to_heap(heap, address_map, self.instantiate),
             less: clone_to_heap(heap, address_map, self.less),
             list: clone_to_heap(heap, address_map, self.list),
             not_an_integer: clone_to_heap(heap, address_map, self.not_an_integer),
@@ -343,6 +351,7 @@ impl DefaultSymbols {
             tag: clone_to_heap(heap, address_map, self.tag),
             text: clone_to_heap(heap, address_map, self.text),
             true_: clone_to_heap(heap, address_map, self.true_),
+            wasm: clone_to_heap(heap, address_map, self.wasm),
         }
     }
 
