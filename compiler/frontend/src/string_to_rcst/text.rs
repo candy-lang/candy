@@ -37,10 +37,10 @@ pub fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
         .map(|(i, _)| i)
         .nth(1)
     {
-        let (first_whitespace, rest) = opening_whitespace.split_at(second_newline_index);
+        let rest = opening_whitespace.split_off(second_newline_index);
         (
-            first_whitespace.to_vec(),
-            convert_whitespace_into_text_newlines(rest.to_vec()),
+            opening_whitespace,
+            convert_whitespace_into_text_newlines(rest),
         )
     } else {
         (opening_whitespace, vec![])
@@ -58,7 +58,7 @@ pub fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
             input = input_after_part;
             parts.push(part);
         } else {
-            let (input_after_whitespace, whitespace) =
+            let (input_after_whitespace, mut whitespace) =
                 whitespaces_and_newlines(input, indentation + 1, false);
             input = input_after_whitespace;
 
@@ -69,16 +69,16 @@ pub fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
                 .map(|(i, _)| i)
                 .next_back()
             {
-                let (whitespace, rest) = whitespace.split_at(last_newline_index);
-                let mut newlines = convert_whitespace_into_text_newlines(whitespace.to_vec());
+                let rest = whitespace.split_off(last_newline_index);
+                let mut newlines = convert_whitespace_into_text_newlines(whitespace);
                 parts.append(&mut newlines);
-                rest.to_vec()
+                rest
             } else {
                 whitespace
             };
 
             // Allow closing quotes to have the same indentation level as the opening quotes
-            let (input_after_whitespace, whitespace) = if newline(input).is_some() {
+            let (input_after_whitespace, mut whitespace) = if newline(input).is_some() {
                 whitespaces_and_newlines(input, indentation, false)
             } else {
                 (input, Vec::new())
@@ -99,10 +99,10 @@ pub fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
                     .map(|(i, _)| i)
                     .next_back()
                 {
-                    let (whitespace, rest) = whitespace.split_at(last_newline_index);
-                    let mut newlines = convert_whitespace_into_text_newlines(whitespace.to_vec());
+                    let rest = whitespace.split_off(last_newline_index);
+                    let mut newlines = convert_whitespace_into_text_newlines(whitespace);
                     parts.append(&mut newlines);
-                    rest.to_vec()
+                    rest
                 } else {
                     let mut newlines =
                         convert_whitespace_into_text_newlines(whitespace_before_closing_quote);
@@ -271,8 +271,8 @@ fn convert_whitespace_into_text_newlines(whitespace: Vec<Rcst>) -> Vec<Rcst> {
     let mut last_newline: Option<Rcst> = None;
     let mut whitespace_after_last_newline: Vec<Rcst> = vec![];
 
-    for whitespace in whitespace.iter() {
-        if let CstKind::Newline(newline) = whitespace.kind.clone() {
+    for whitespace in whitespace {
+        if let CstKind::Newline(newline) = whitespace.kind {
             commit_last_newline(
                 &mut parts,
                 last_newline,
@@ -280,7 +280,7 @@ fn convert_whitespace_into_text_newlines(whitespace: Vec<Rcst>) -> Vec<Rcst> {
             );
             last_newline = Some(CstKind::TextNewline(newline).into());
         } else {
-            whitespace_after_last_newline.push(whitespace.clone());
+            whitespace_after_last_newline.push(whitespace);
         }
     }
     commit_last_newline(&mut parts, last_newline, whitespace_after_last_newline);
