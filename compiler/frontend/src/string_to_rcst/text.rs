@@ -20,8 +20,6 @@ pub fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
     let (new_input, mut opening_whitespace) =
         whitespaces_and_newlines(input, indentation + 1, false);
 
-    dbg!(&opening_whitespace);
-
     // If the string does not contain any newlines, parse the whitespace in
     // front of the string as part of the string and not as trailing whitespace.
     // This fixes https://github.com/candy-lang/candy/issues/896.
@@ -63,8 +61,6 @@ pub fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
                 whitespaces_and_newlines(input, indentation + 1, false);
             input = input_after_whitespace;
 
-            dbg!(input);
-
             let mut whitespace_before_closing_quote = if let Some(last_newline_index) = whitespace
                 .iter()
                 .enumerate()
@@ -80,15 +76,12 @@ pub fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
                 whitespace
             };
 
-            dbg!(&whitespace_before_closing_quote);
-
             // Allow closing quotes to have the same indentation level as the opening quotes
             let (input_after_whitespace, whitespace) = if newline(input).is_some() {
                 whitespaces_and_newlines(input, indentation, false)
             } else {
                 (input, Vec::new())
             };
-            dbg!(input_after_whitespace);
             let closing_quote = if let Some((input_after_double_quote, closing_double_quote)) =
                 double_quote(input_after_whitespace)
                 && let Some((input_after_single_quotes, closing_single_quotes)) = parse_multiple(
@@ -318,7 +311,10 @@ mod test {
               child: TextNewline "\n"
               whitespace:
                 Whitespace "  "
-            TextPart "  bar"
+            TrailingWhitespace:
+              child: TextPart "  bar"
+              whitespace:
+                Newline "\n"
           closing: ClosingText:
             closing_double_quote: DoubleQuote
             closing_single_quotes:
@@ -335,7 +331,10 @@ mod test {
               Newline "\n"
               Whitespace "  "
           parts:
-            TextPart "  text"
+            TrailingWhitespace:
+              child: TextPart "  text"
+              whitespace:
+                Newline "\n"
           closing: ClosingText:
             closing_double_quote: DoubleQuote
             closing_single_quotes:

@@ -122,10 +122,7 @@ pub fn whitespaces_and_newlines(
     let mut new_input = input;
     let mut new_parts = vec![];
     let mut is_sufficiently_indented = true;
-    let mut current_indendation_level = 0;
-    println!("\ncalled with {input:?}, {indentation}\n");
     loop {
-        println!("indent: {current_indendation_level}/{indentation}");
         let new_input_from_iteration_start = new_input;
 
         if also_comments
@@ -140,27 +137,22 @@ pub fn whitespaces_and_newlines(
         }
 
         if let Some((new_new_input, newline)) = newline(new_input) {
-            current_indendation_level = 0;
             new_input = new_new_input;
             new_parts.push(newline);
             is_sufficiently_indented = false;
         }
-        if current_indendation_level < indentation
-            && let Some((new_new_input, whitespace)) = leading_indentation(new_input, indentation)
-        {
-            current_indendation_level += 1;
+        if let Some((new_new_input, whitespace)) = leading_indentation(new_input, indentation) {
             new_input = new_new_input;
             new_parts.push(whitespace);
 
             input = new_input;
             parts.append(&mut new_parts);
             is_sufficiently_indented = true;
-        } else if let Some((new_new_input, whitespace)) = single_line_whitespace(new_input) {
+        }
+        if let Some((new_new_input, whitespace)) = single_line_whitespace(new_input) {
             new_input = new_new_input;
             new_parts.push(whitespace);
         }
-
-        println!("new input after iter: {new_input:?}\n");
 
         if new_input == new_input_from_iteration_start {
             break;
@@ -239,16 +231,18 @@ mod test {
         assert_rich_ir_snapshot!(
             whitespaces_and_newlines("\n  foo", 0, true),
             @r###"
-        Remaining input: "  foo"
+        Remaining input: "foo"
         Parsed: Newline "\n"
+        Whitespace "  "
         "###
         );
         assert_rich_ir_snapshot!(
             whitespaces_and_newlines(" \n  foo", 0, true),
             @r###"
-        Remaining input: "  foo"
+        Remaining input: "foo"
         Parsed: Whitespace " "
         Newline "\n"
+        Whitespace "  "
         "###
         );
         assert_rich_ir_snapshot!(
