@@ -195,7 +195,7 @@ jobs:
           cargo install iai-callgrind-runner --version $version --force
 
       - name: Install Bencher CLI
-        uses: bencherdev/bencher@v0.4.2
+        uses: bencherdev/bencher@v0.4.10
       - name: Run benchmarks and store results
         working-directory: compiler/vm/
         # TODO: Support PRs from forks: https://bencher.dev/docs/how-to/github-actions/#pull-requests-from-forks
