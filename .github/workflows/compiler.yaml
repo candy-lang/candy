@@ -25,7 +25,7 @@ jobs:
         with:
           path: ./llvm
           key: llvm-15.0
-      - uses: KyleMayes/install-llvm-action@v2.0.1
+      - uses: KyleMayes/install-llvm-action@v2.0.3
         with:
           version: "15.0"
           cached: ${{ steps.cache-llvm.outputs.cache-hit }}
@@ -55,7 +55,7 @@ jobs:
   #       with:
   #         path: ./llvm
   #         key: llvm-15.0
-  #     - uses: KyleMayes/install-llvm-action@v2.0.1
+  #     - uses: KyleMayes/install-llvm-action@v2.0.3
   #       with:
   #         version: "15.0"
   #         cached: ${{ steps.cache-llvm.outputs.cache-hit }}
@@ -89,7 +89,7 @@ jobs:
         with:
           path: ./llvm
           key: llvm-15.0
-      - uses: KyleMayes/install-llvm-action@v2.0.1
+      - uses: KyleMayes/install-llvm-action@v2.0.3
         with:
           version: "15.0"
           cached: ${{ steps.cache-llvm.outputs.cache-hit }}
@@ -173,7 +173,7 @@ jobs:
         with:
           path: ./llvm
           key: llvm-15.0
-      - uses: KyleMayes/install-llvm-action@v2.0.1
+      - uses: KyleMayes/install-llvm-action@v2.0.3
         with:
           version: "15.0"
           cached: ${{ steps.cache-llvm.outputs.cache-hit }}
