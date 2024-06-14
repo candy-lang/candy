@@ -166,6 +166,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "candy_compiler_v3"
+version = "0.1.0"
+dependencies = [
+]
+
+[[package]]
 name = "candy_formatter"
 version = "0.1.0"
 dependencies = [

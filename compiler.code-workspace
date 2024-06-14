@@ -5,6 +5,14 @@
       "path": "."
     },
     {
+      "name": "Compiler v3",
+      "path": "compiler_v3"
+    },
+    {
+      "name": "Packages v4",
+      "path": "packages_v4"
+    },
+    {
       "name": "Compiler: Frontend",
       "path": "compiler/frontend"
     },
