@@ -180,31 +180,22 @@ pub fn parameters(mut input: &str) -> (&str, Vec<Rcst>) {
 fn parameter(input: &str) -> Option<(&str, Rcst)> {
     let (input, name) = identifier(input)?.and_trailing_whitespace();
 
-    let (input, colon) = colon(input)
-        .unwrap_or_else(|| {
-            (
-                input,
-                CstKind::Error {
-                    unparsable_input: String::new(),
-                    error: "Parameter is missing a colon to separate name and type.".to_string(),
-                }
-                .into(),
-            )
-        })
-        .and_trailing_whitespace();
-
-    let (input, type_) = expression(input)
-        .unwrap_or_else(|| {
-            (
-                input,
-                CstKind::Error {
-                    unparsable_input: String::new(),
-                    error: "Parameter is missing a type.".to_string(),
-                }
-                .into(),
-            )
-        })
-        .and_trailing_whitespace();
+    let (input, colon_and_type) =
+        colon(input)
+            .and_trailing_whitespace()
+            .map_or((input, None), |(input, colon)| {
+                let (input, type_) = expression(input).unwrap_or_else(|| {
+                    (
+                        input,
+                        CstKind::Error {
+                            unparsable_input: String::new(),
+                            error: "Parameter is missing a type.".to_string(),
+                        }
+                        .into(),
+                    )
+                });
+                (input, Some(Box::new((colon, type_))))
+            });
 
     let (input, comma) = comma(input)
         .map(AndTrailingWhitespace::and_trailing_whitespace)
@@ -214,8 +205,7 @@ fn parameter(input: &str) -> Option<(&str, Rcst)> {
         input,
         CstKind::Parameter {
             name: Box::new(name),
-            colon: Box::new(colon),
-            type_: Box::new(type_),
+            colon_and_type,
             comma: comma.map(Box::new),
         }
         .into(),

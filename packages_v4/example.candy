@@ -1,4 +1,4 @@
-# Types
+# Structural Types
 let intType = int
 let textType = text
 let structType = [name: text, color: color]
@@ -18,3 +18,29 @@ let lambdaExpression = { x: int -> x }
 # Assignments
 let valueWithExplicitType: intType = 42
 let someFunction(x: int) -> int = { x }
+
+# Nominal Types
+let wrappedInt = type(int)
+let uint = type(
+  int,
+  { value ->
+    needs(value.isNonNegative())
+  },
+)
+let date = type(
+  [year: int, month: int, day: int],
+  { value ->
+    needs(month.isBetween(1, 12))
+    needs(day.isBetween(1, 31))
+  },
+)
+
+# Uniform Function Call Syntax
+let add(aDate: Date, duration: [days: int]) -> Date = {
+  date([
+    year: aDate.year,
+    month: aDate.month,
+    day: aDate.day.add(duration.days),
+  ])
+}
+aDate.add([days: 1]) # is equivalent to `add(aDate, [days: 1])`

@@ -273,13 +273,11 @@ impl Lower for Rcst {
             },
             CstKind::Parameter {
                 name,
-                colon,
-                type_,
+                colon_and_type,
                 comma,
             } => CstKind::Parameter {
                 name: name.lower(state),
-                colon: colon.lower(state),
-                type_: type_.lower(state),
+                colon_and_type: colon_and_type.lower(state),
                 comma: comma.lower(state),
             },
             CstKind::Error {

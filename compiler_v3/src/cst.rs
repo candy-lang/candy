@@ -147,8 +147,7 @@ pub enum CstKind<D = CstData> {
     },
     Parameter {
         name: Box<Cst<D>>,
-        colon: Box<Cst<D>>,
-        type_: Box<Cst<D>>,
+        colon_and_type: Option<Box<(Cst<D>, Cst<D>)>>,
         comma: Option<Box<Cst<D>>>,
     },
     Error {
@@ -336,13 +335,11 @@ impl CollectCstErrors for Cst {
             }
             CstKind::Parameter {
                 name,
-                colon,
-                type_,
+                colon_and_type,
                 comma,
             } => {
                 name.collect_errors_to(file, errors);
-                colon.collect_errors_to(file, errors);
-                type_.collect_errors_to(file, errors);
+                colon_and_type.collect_errors_to(file, errors);
                 comma.collect_errors_to(file, errors);
             }
             CstKind::Error {

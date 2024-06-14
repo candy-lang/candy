@@ -14,7 +14,7 @@ use clap::{Parser, ValueHint};
 use cst::CollectCstErrors;
 use rcst_to_cst::rcst_to_cst;
 use std::{fs, path::PathBuf};
-use tracing::{info, warn, Level, Metadata};
+use tracing::{error, info, warn, Level, Metadata};
 use tracing_subscriber::{
     filter, fmt::format::FmtSpan, layer::SubscriberExt, util::SubscriberInitExt, Layer,
 };
@@ -69,7 +69,7 @@ fn check(options: CheckOptions) -> ProgramResult {
 
     if has_errors {
         for error in errors {
-            warn!("{}", error.to_string_with_location(&source));
+            error!("{}", error.to_string_with_location(&source));
         }
         Err(Exit::CodeContainsErrors)
     } else {
