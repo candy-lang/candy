@@ -1,0 +1,20 @@
+# Types
+let intType = int
+let textType = text
+let structType = [name: text, color: color]
+# let enumType = Foo int | Bar
+let arrayType = array int
+
+# Expressions
+let intExpression = 42
+let textExpression = "Hello, World!"
+let textExpressionWithInterpolation = "The answer is {intExpression}!"
+let identifierExpression = intExpression
+let symbolExpression = SomeSymbol
+let parenthesizedExpression = (intExpression)
+let structExpression = [name: "Banana", color: Yellow]
+let lambdaExpression = { x: int -> x }
+
+# Assignments
+let valueWithExplicitType: intType = 42
+let someFunction(x: int) -> int = { x }
