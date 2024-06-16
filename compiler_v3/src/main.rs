@@ -12,8 +12,12 @@
 
 use ast::CollectAstErrors;
 use clap::{Parser, ValueHint};
-use std::{fs, path::PathBuf};
-use tracing::{error, info, warn, Level, Metadata};
+use std::{
+    fs,
+    path::PathBuf,
+    time::{Duration, Instant},
+};
+use tracing::{debug, error, info, warn, Level, Metadata};
 use tracing_subscriber::{
     filter, fmt::format::FmtSpan, layer::SubscriberExt, util::SubscriberInitExt, Layer,
 };
@@ -56,12 +60,17 @@ struct CheckOptions {
 
 #[allow(clippy::needless_pass_by_value)]
 fn check(options: CheckOptions) -> ProgramResult {
+    let started_at = Instant::now();
+
     let source = fs::read_to_string(&options.path).unwrap();
 
     let asts = string_to_ast::string_to_ast(&options.path, &source);
 
     let errors = asts.collect_errors();
     let has_errors = !errors.is_empty();
+
+    let ended_at = Instant::now();
+    debug!("Check took {}.", format_duration(ended_at - started_at));
 
     if has_errors {
         for error in errors {
@@ -71,6 +80,14 @@ fn check(options: CheckOptions) -> ProgramResult {
     } else {
         info!("No errors found 🎉");
         Ok(())
+    }
+}
+
+fn format_duration(duration: Duration) -> String {
+    if duration < Duration::from_millis(1) {
+        format!("{} µs", duration.as_micros())
+    } else {
+        format!("{} ms", duration.as_millis())
     }
 }
 
@@ -88,7 +105,7 @@ fn init_logger() {
                     .starts_with("candy")
         }))
         .with_filter(filter::filter_fn(level_for(
-            "candy_compiler_v3::string_to_rcst",
+            "candy_compiler_v3::string_to_ast",
             Level::DEBUG,
         )));
     tracing_subscriber::registry().with(console_log).init();
