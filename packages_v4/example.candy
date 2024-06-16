@@ -1,9 +1,14 @@
+# use("Core")
+# use(".utils")
+
 # Structural Types
 let intType = int
 let textType = text
 let structType = [name: text, color: color]
-# let enumType = Foo int | Bar
-let arrayType = array int
+# let enumType = Foo(int) | Bar
+let arrayType = array(int)
+# let functionType = (int, text) -> int
+
 
 # Expressions
 let intExpression = 42
@@ -37,6 +42,7 @@ let date = type(
 
 # Uniform Function Call Syntax
 let add(aDate: Date, duration: [days: int]) -> Date = {
+  needs(days.isNonNegative())
   date([
     year: aDate.year,
     month: aDate.month,
