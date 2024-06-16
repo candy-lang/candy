@@ -10,22 +10,19 @@
     clippy::too_many_lines
 )]
 
+use ast::CollectAstErrors;
 use clap::{Parser, ValueHint};
-use cst::CollectCstErrors;
-use rcst_to_cst::rcst_to_cst;
 use std::{fs, path::PathBuf};
 use tracing::{error, info, warn, Level, Metadata};
 use tracing_subscriber::{
     filter, fmt::format::FmtSpan, layer::SubscriberExt, util::SubscriberInitExt, Layer,
 };
 
-mod cst;
+mod ast;
 mod error;
 mod id;
 mod position;
-mod rcst;
-mod rcst_to_cst;
-mod string_to_rcst;
+mod string_to_ast;
 
 #[derive(Parser, Debug)]
 #[command(name = "candy", about = "The 🍭 Candy CLI.")]
@@ -61,10 +58,9 @@ struct CheckOptions {
 fn check(options: CheckOptions) -> ProgramResult {
     let source = fs::read_to_string(&options.path).unwrap();
 
-    let rcsts = string_to_rcst::string_to_rcst(&source);
-    let csts = rcst_to_cst(&rcsts);
+    let asts = string_to_ast::string_to_ast(&options.path, &source);
 
-    let errors = csts.collect_errors(&options.path);
+    let errors = asts.collect_errors();
     let has_errors = !errors.is_empty();
 
     if has_errors {
