@@ -5,7 +5,7 @@ use super::{
         opening_parenthesis,
     },
     whitespace::{AndTrailingWhitespace, OptionAndTrailingWhitespace},
-    word::identifier,
+    word::{identifier, word},
 };
 use crate::{cst::CstKind, rcst::Rcst};
 use tracing::instrument;
@@ -71,15 +71,9 @@ pub fn assignment(input: &str) -> Option<(&str, Rcst)> {
 
 #[instrument(level = "trace")]
 fn let_(input: &str) -> Option<(&str, Rcst)> {
-    input
-        .strip_prefix("let")
-        .take_if(|it| {
-            !matches!(
-                it.chars().next(),
-                Some('A'..='Z' | 'a'..='z' | '0'..='9' | '_')
-            )
-        })
-        .map(|it| (it, CstKind::Let.into()))
+    word(input)
+        .take_if(|(_, value)| value == "let")
+        .map(|(input, _)| (input, CstKind::Let.into()))
 }
 
 #[instrument(level = "trace")]
