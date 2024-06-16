@@ -1,19 +1,5 @@
-use crate::{error::CompilerError, impl_countable_id, position::Offset};
-use std::{
-    fmt::{self, Debug, Formatter},
-    ops::Range,
-    path::PathBuf,
-};
-
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Id(pub usize);
-impl_countable_id!(Id);
-
-impl Debug for Id {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "${}", self.0)
-    }
-}
+use crate::{error::CompilerError, position::Offset};
+use std::{ops::Range, path::PathBuf};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstString {

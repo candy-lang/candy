@@ -28,7 +28,7 @@ pub fn whitespace(mut parser: Parser) -> Option<Parser> {
 fn comment(parser: Parser) -> Option<Parser> {
     octothorpe(parser)?
         .consume_while(|c| !matches!(c, '\n' | '\r'))
-        .map_or(None, |(parser, _)| Some(parser))
+        .map(|(parser, _)| parser)
 }
 
 #[extension_trait]

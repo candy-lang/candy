@@ -32,8 +32,7 @@ pub fn lambda(parser: Parser) -> Option<(Parser, AstLambda)> {
             parameters,
             body,
             closing_curly_brace_error,
-        }
-        .into(),
+        },
     ))
 }
 

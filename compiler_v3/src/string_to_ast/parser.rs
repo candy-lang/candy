@@ -120,14 +120,15 @@ pub impl<'s> ParserUnwrapOrAstError<'s> for Option<Parser<'s>> {
         original_parser: Parser<'s>,
         error_message: impl Into<String>,
     ) -> (Parser<'s>, Option<AstError>) {
-        if let Some(parser) = self {
-            (parser, None)
-        } else {
-            (
-                original_parser,
-                Some(original_parser.error_at_current_offset(error_message)),
-            )
-        }
+        self.map_or_else(
+            || {
+                (
+                    original_parser,
+                    Some(original_parser.error_at_current_offset(error_message)),
+                )
+            },
+            |parser| (parser, None),
+        )
     }
 }
 #[extension_trait]

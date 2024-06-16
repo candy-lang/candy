@@ -121,11 +121,8 @@ fn struct_field<'a>(parser: Parser) -> Option<(Parser, AstStructField, Option<Pa
         .and_trailing_whitespace()
         .unwrap_or_ast_error(parser, "This struct field is missing a value.");
 
-    let (parser, parser_for_missing_comma_error) = if let Some(parser) = comma(parser) {
-        (parser, None)
-    } else {
-        (parser, Some(parser))
-    };
+    let (parser, parser_for_missing_comma_error) =
+        comma(parser).map_or((parser, Some(parser)), |parser| (parser, None));
 
     Some((
         parser,
@@ -205,11 +202,8 @@ fn expression_suffix_call<'s>(
 fn argument<'a>(parser: Parser) -> Option<(Parser, AstCallArgument, Option<Parser>)> {
     let (parser, value) = expression(parser)?.and_trailing_whitespace();
 
-    let (parser, parser_for_missing_comma_error) = if let Some(parser) = comma(parser) {
-        (parser, None)
-    } else {
-        (parser, Some(parser))
-    };
+    let (parser, parser_for_missing_comma_error) =
+        comma(parser).map_or((parser, Some(parser)), |parser| (parser, None));
 
     Some((
         parser,
