@@ -43,7 +43,7 @@ impl<'s> Parser<'s> {
     pub fn string(self, start_offset: Offset) -> AstString {
         assert!(start_offset <= self.offset);
         AstString {
-            string: self.source[*start_offset..*self.offset].to_string(),
+            string: self.source[*start_offset..*self.offset].into(),
             file: self.file.to_path_buf(),
             span: start_offset..self.offset,
         }
@@ -52,7 +52,7 @@ impl<'s> Parser<'s> {
     pub fn string_to(self, end_offset: Offset) -> AstString {
         assert!(self.offset <= end_offset);
         AstString {
-            string: self.source[*self.offset..*end_offset].to_string(),
+            string: self.source[*self.offset..*end_offset].into(),
             file: self.file.to_path_buf(),
             span: self.offset..end_offset,
         }
@@ -62,7 +62,7 @@ impl<'s> Parser<'s> {
     pub fn error_at_current_offset(self, message: impl Into<String>) -> AstError {
         AstError {
             unparsable_input: AstString {
-                string: String::new(),
+                string: "".into(),
                 file: self.file.to_path_buf(),
                 span: self.offset..self.offset,
             },

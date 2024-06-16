@@ -17,7 +17,7 @@ impl Debug for Id {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstString {
-    pub string: String,
+    pub string: Box<str>,
     pub file: PathBuf,
     pub span: Range<Offset>,
 }
@@ -103,7 +103,7 @@ pub struct AstText {
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum AstTextPart {
-    Text(String),
+    Text(Box<str>),
     Interpolation {
         expression: AstResult<Box<AstExpression>>,
         closing_curly_brace_error: Option<AstError>,

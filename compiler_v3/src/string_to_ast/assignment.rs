@@ -40,7 +40,7 @@ pub fn assignment(parser: Parser) -> Option<(Parser, AstAssignment)> {
 #[instrument(level = "trace")]
 fn let_(parser: Parser) -> Option<Parser> {
     word(parser)
-        .take_if(|(_, value)| value.string == "let")
+        .take_if(|(_, value)| &*value.string == "let")
         .map(|(parser, _)| parser)
 }
 

@@ -5,7 +5,7 @@ use tracing::instrument;
 #[instrument(level = "trace")]
 pub fn identifier(parser: Parser) -> Option<(Parser, AstIdentifier)> {
     let (parser, w) = word(parser)?;
-    if w.string == "let" {
+    if &*w.string == "let" {
         return None;
     }
 
