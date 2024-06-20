@@ -1,8 +1,10 @@
 use crate::{error::CompilerError, position::Offset};
+use derive_more::Deref;
 use std::{ops::Range, path::PathBuf};
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Deref, Eq, Hash, PartialEq)]
 pub struct AstString {
+    #[deref]
     pub string: Box<str>,
     pub file: PathBuf,
     pub span: Range<Offset>,
@@ -31,6 +33,11 @@ impl<T> AstResult<T> {
             value: value.into(),
             errors,
         }
+    }
+
+    #[must_use]
+    pub const fn value(&self) -> Option<&T> {
+        self.value.as_ref()
     }
 
     #[must_use]
