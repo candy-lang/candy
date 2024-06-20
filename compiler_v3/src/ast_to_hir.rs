@@ -1,8 +1,7 @@
 use crate::{
-    ast::{AstAssignment, AstAssignmentKind, AstExpression, AstStatement, AstString},
+    ast::{AstAssignment, AstAssignmentKind, AstExpression, AstStatement, AstString, AstTextPart},
     error::CompilerError,
-    hir::{Assignment, Body, Expression, Hir, Id, Parameter},
-    id::IdGenerator,
+    hir::{Assignment, Body, Expression, Hir, Type},
     position::Offset,
 };
 use rustc_hash::FxHashSet;
@@ -10,8 +9,10 @@ use std::{ops::Range, path::Path};
 
 pub fn ast_to_hir(path: &Path, ast: &[AstAssignment]) -> (Hir, Vec<CompilerError>) {
     let mut context = Context::new(path);
-    context.add_builtin_value("int", Expression::IntType);
-    context.add_builtin_value("text", Expression::TextType);
+    context.add_builtin_value("type", Expression::Type(Type::Type), Type::Type);
+    context.add_builtin_value("symbol", Expression::Type(Type::Symbol), Type::Type);
+    context.add_builtin_value("int", Expression::Type(Type::Int), Type::Type);
+    context.add_builtin_value("text", Expression::Type(Type::Text), Type::Type);
     context.lower_assignments(ast);
     (context.hir, context.errors)
 }
@@ -19,29 +20,36 @@ pub fn ast_to_hir(path: &Path, ast: &[AstAssignment]) -> (Hir, Vec<CompilerError
 #[derive(Debug)]
 struct Context<'c> {
     path: &'c Path,
-    id_generator: IdGenerator<Id>,
-    variables: Vec<(Box<str>, Id)>,
+    identifiers: Vec<(Box<str>, Identifier, Type)>,
     errors: Vec<CompilerError>,
     hir: Hir,
+}
+#[derive(Debug)]
+enum Identifier {
+    Variable { value: Expression },
+    Parameter,
 }
 impl<'c> Context<'c> {
     fn new(path: &'c Path) -> Self {
         Self {
             path,
-            id_generator: IdGenerator::default(),
-            variables: vec![],
+            identifiers: vec![],
             errors: vec![],
             hir: Hir::default(),
         }
     }
 
-    fn add_builtin_value(&mut self, name: impl Into<Box<str>>, expression: Expression) {
-        let value = self.expression_to_body(expression);
+    fn add_builtin_value(
+        &mut self,
+        name: impl Into<Box<str>>,
+        expression: Expression,
+        type_: Type,
+    ) {
         self.add_assignment_without_duplicate_name_check(
             name,
             Assignment::Value {
-                type_: value.clone(),
-                value,
+                value: expression,
+                type_,
             },
         );
     }
@@ -55,12 +63,11 @@ impl<'c> Context<'c> {
             if let Some(assignment) = assignment {
                 self.add_assignment(name, assignment);
             } else {
-                let value = self.expression_to_body(Expression::Error);
                 self.add_assignment(
                     name,
                     Assignment::Value {
-                        type_: value.clone(),
-                        value,
+                        value: Expression::Error,
+                        type_: Type::Error,
                     },
                 );
             }
@@ -74,10 +81,9 @@ impl<'c> Context<'c> {
         let assignment = match &assignment.kind {
             AstAssignmentKind::Value { type_, value } => {
                 try {
-                    Assignment::Value {
-                        type_: self.lower_expression(type_.as_ref()?.value()?)?,
-                        value: self.lower_expression(value.value()?)?,
-                    }
+                    // TODO: lower written type
+                    let (value, type_) = self.lower_expression(value.value()?)?;
+                    Assignment::Value { value, type_ }
                 }
             }
             AstAssignmentKind::Function {
@@ -85,39 +91,43 @@ impl<'c> Context<'c> {
                 return_type,
                 body,
                 ..
-            } => self.with_scope::<Option<Assignment>>(|context| try {
-                let mut parameter_names = FxHashSet::default();
-                let parameters = parameters
-                    .iter()
-                    .map(|parameter| try {
-                        let name = parameter.name.identifier.value()?.clone();
-                        if !parameter_names.insert(name.clone()) {
-                            context.push_error(
-                                name.span.clone(),
-                                format!("Duplicate parameter name: {}", *name),
-                            );
-                            return None;
-                        }
+            } => {
+                // self.with_scope(|context| try {
+                //     let mut parameter_names = FxHashSet::default();
+                //     let parameters = parameters
+                //         .iter()
+                //         .map(|parameter| try {
+                //             let name = parameter.name.identifier.value()?.clone();
+                //             if !parameter_names.insert(name.clone()) {
+                //                 context.add_error(
+                //                     name.span.clone(),
+                //                     format!("Duplicate parameter name: {}", *name),
+                //                 );
+                //                 return None;
+                //             }
 
-                        let type_ = context.lower_expression(parameter.type_.as_ref()?.value()?)?;
-                        let id = context.id_generator.generate();
-                        context.define_variable(name.string.clone(), id);
-                        Parameter {
-                            id,
-                            name: name.string,
-                            type_,
-                        }
-                    })
-                    .collect::<Option<Box<[_]>>>()?;
+                //             todo!();
 
-                let return_type = context.lower_expression(return_type.value()?.as_ref())?;
+                //             // let type_ = context.lower_expression(parameter.type_.as_ref()?.value()?)?;
+                //             // let id = context.id_generator.generate();
+                //             // context.define_variable(name.string.clone(), id);
+                //             // Parameter {
+                //             //     name: name.string,
+                //             //     type_,
+                //             // }
+                //         })
+                //         .collect::<Option<Box<[_]>>>()?;
 
-                Assignment::Function {
-                    parameters,
-                    return_type,
-                    body: context.lower_body(body)?,
-                }
-            }),
+                //     let return_type = context.lower_expression(return_type.value()?.as_ref())?;
+
+                //     // Assignment::Function {
+                //     //     parameters,
+                //     //     return_type,
+                //     //     body: context.lower_body(body)?,
+                //     // }
+                // });
+                todo!()
+            }
         };
         Some((name, assignment))
     }
@@ -128,61 +138,104 @@ impl<'c> Context<'c> {
             match statement {
                 AstStatement::Assignment(assignment) => {
                     let name = assignment.name.value()?.identifier.value()?.clone();
-                    let expression = match &assignment.kind {
-                        AstAssignmentKind::Value { type_, value } => {
-                            let type_ = self
-                                .lower_expression_into(type_.as_ref()?.value()?, &mut hir_body)?;
-                            let value =
-                                self.lower_expression_into(value.value()?, &mut hir_body)?;
-                            Expression::ValueWithTypeAnnotation { value, type_ }
+                    let (expression, type_) = match &assignment.kind {
+                        AstAssignmentKind::Value { value, type_: _ } => {
+                            // TODO: lower written type
+                            let (value, type_) = self.lower_expression(value.value()?)?;
+                            (
+                                Expression::ValueWithTypeAnnotation {
+                                    value: Box::new(value),
+                                    type_: type_.clone(),
+                                },
+                                type_,
+                            )
                         }
                         AstAssignmentKind::Function { .. } => todo!(),
                     };
-                    let id = self.add_expression_to_body(expression, &mut hir_body);
-                    hir_body.identifiers.push((id, name));
+                    self.add_expression_to_body(&mut hir_body, name.string, expression, type_);
                 }
                 AstStatement::Expression(expression) => {
-                    self.lower_expression_into(expression, &mut hir_body);
+                    let (expression, type_) = self.lower_expression(expression)?;
+                    self.add_expression_to_body(&mut hir_body, None, expression, type_);
                 }
             }
         }
         Some(hir_body)
     }
 
-    fn lower_expression(&mut self, expression: &AstExpression) -> Option<Body> {
-        let mut body = Body::default();
-        self.lower_expression_into(expression, &mut body)?;
-        Some(body)
-    }
-    fn lower_expression_into(&mut self, expression: &AstExpression, body: &mut Body) -> Option<Id> {
-        let expression = match expression {
+    fn lower_expression(&mut self, expression: &AstExpression) -> Option<(Expression, Type)> {
+        let (expression, type_) = match expression {
             AstExpression::Identifier(identifier) => {
                 let identifier = identifier.identifier.value()?;
-                let Some(id) = self.lookup_variable(identifier) else {
-                    self.push_error(
-                        identifier.span.clone(),
-                        format!("Unknown variable: {}", **identifier),
-                    );
+                let name = &identifier.string;
+                let Some((identifier, type_)) = self.lookup_identifier(identifier) else {
+                    self.add_error(identifier.span.clone(), format!("Unknown variable: {name}"));
                     return None;
                 };
-                Expression::Reference(id)
+
+                (
+                    match identifier {
+                        Identifier::Variable { value } => value.clone(),
+                        Identifier::Parameter => Expression::ParameterReference(name.clone()),
+                    },
+                    type_.clone(),
+                )
             }
-            AstExpression::Symbol(symbol) => {
-                Expression::Symbol(symbol.symbol.value()?.string.clone())
+            AstExpression::Symbol(symbol) => (
+                Expression::Symbol(symbol.symbol.value()?.string.clone()),
+                Type::Symbol,
+            ),
+            AstExpression::Int(int) => (Expression::Int(*int.value.value()?), Type::Int),
+            AstExpression::Text(text) => {
+                let text = text
+                    .parts
+                    .iter()
+                    .map::<Option<Expression>, _>(|it| try {
+                        match it {
+                            AstTextPart::Text(text) => Expression::Text(text.clone()),
+                            AstTextPart::Interpolation { expression, .. } => Expression::Call {
+                                receiver: Box::new(Expression::BuiltinToDebugText),
+                                arguments: [self.lower_expression(expression.value()?)?.0].into(),
+                            },
+                        }
+                    })
+                    .reduce(|lhs, rhs| match (lhs, rhs) {
+                        (Some(lhs), Some(rhs)) => Some(Expression::Call {
+                            receiver: Box::new(Expression::BuiltinTextConcat),
+                            arguments: [lhs, rhs].into(),
+                        }),
+                        _ => None,
+                    })??;
+                (text, Type::Text)
             }
-            AstExpression::Int(int) => Expression::Int(*int.value.value()?),
-            AstExpression::Text(_) => todo!(),
             AstExpression::Parenthesized(parenthesized) => {
-                return self.lower_expression_into(parenthesized.inner.value()?, body);
+                return self.lower_expression(parenthesized.inner.value()?);
             }
             AstExpression::Call(call) => {
-                let receiver = self.lower_expression_into(&call.receiver, body)?;
+                let (receiver, receiver_type) = self.lower_expression(&call.receiver)?;
                 let arguments = call
                     .arguments
                     .iter()
-                    .map(|argument| self.lower_expression_into(&argument.value, body))
+                    .map(|argument| self.lower_expression(&argument.value))
                     .collect::<Option<Box<[_]>>>()?;
-                Expression::Call(receiver, arguments)
+                let type_ = match receiver_type {
+                    Type::Type | Type::Symbol | Type::Int | Type::Text | Type::Struct(_) => {
+                        // TODO: report actual error location
+                        self.add_error(Offset(0)..Offset(0), "Cannot call this type");
+                        return None;
+                    }
+                    Type::Function {
+                        box return_type, ..
+                    } => return_type,
+                    Type::Error => Type::Error,
+                };
+                (
+                    Expression::Call {
+                        receiver: Box::new(receiver),
+                        arguments: arguments.iter().map(|(value, _)| value.clone()).collect(),
+                    },
+                    type_,
+                )
             }
             AstExpression::Struct(struct_) => {
                 let mut keys = FxHashSet::default();
@@ -192,22 +245,37 @@ impl<'c> Context<'c> {
                     .map(|field| try {
                         let name = field.key.identifier.value()?;
                         if !keys.insert(name.clone()) {
-                            self.push_error(
+                            self.add_error(
                                 name.span.clone(),
                                 format!("Duplicate struct field: {}", **name),
                             );
                             return None;
                         }
 
-                        let value =
-                            self.lower_expression_into(field.value.value()?.as_ref(), body)?;
-                        (name.string.clone(), value)
+                        let (value, type_) =
+                            self.lower_expression(field.value.value()?.as_ref())?;
+                        (name.string.clone(), value, type_)
                     })
-                    .collect::<Option<Box<[_]>>>()?;
-                Expression::Struct(fields)
+                    .collect::<Option<Vec<(Box<str>, Expression, Type)>>>()?;
+                let type_ = if fields.iter().any(|(_, _, type_)| type_ == &Type::Type) {
+                    Type::Type
+                } else {
+                    Type::Struct(
+                        fields
+                            .iter()
+                            .map(|(name, _, type_)| (name.clone(), type_.clone()))
+                            .collect(),
+                    )
+                };
+                let fields = fields
+                    .into_iter()
+                    .map(|(name, value, _)| (name, value))
+                    .collect();
+                (Expression::Struct(fields), type_)
             }
             AstExpression::StructAccess(struct_access) => {
-                let struct_ = self.lower_expression_into(struct_access.struct_.as_ref(), body)?;
+                let (struct_, struct_type) =
+                    self.lower_expression(struct_access.struct_.as_ref())?;
                 let field = struct_access
                     .key
                     .value()?
@@ -215,47 +283,69 @@ impl<'c> Context<'c> {
                     .value()?
                     .string
                     .clone();
-                Expression::StructAccess { struct_, field }
+                let type_ = match struct_type {
+                    Type::Type | Type::Symbol | Type::Int | Type::Text | Type::Function { .. } => {
+                        // TODO: report actual error location
+                        self.add_error(Offset(0)..Offset(0), "Receiver is not a struct");
+                        Type::Error
+                    }
+                    Type::Struct(struct_type) => {
+                        struct_type
+                            .iter()
+                            .find_map(|(name, type_)| {
+                                if name == &field {
+                                    Some(type_.clone())
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap_or_else(|| {
+                                // TODO: report actual error location
+                                self.add_error(
+                                    Offset(0)..Offset(0),
+                                    format!("Struct does not have field `{field}`"),
+                                );
+                                Type::Error
+                            })
+                    }
+                    Type::Error => todo!(),
+                };
+                (
+                    Expression::StructAccess {
+                        struct_: Box::new(struct_),
+                        field,
+                    },
+                    type_,
+                )
             }
             AstExpression::Lambda(_) => todo!(),
         };
-        Some(self.add_expression_to_body(expression, body))
+        Some((expression, type_))
     }
 
     // Utils
     fn with_scope<T>(&mut self, fun: impl FnOnce(&mut Self) -> T) -> T {
-        let scope = self.variables.len();
+        let scope = self.identifiers.len();
         let result = fun(self);
-        assert!(self.variables.len() >= scope);
-        self.variables.truncate(scope);
+        assert!(self.identifiers.len() >= scope);
+        self.identifiers.truncate(scope);
         result
     }
-    fn define_variable(&mut self, name: Box<str>, id: Id) {
-        self.variables.push((name, id));
+    fn define_identifier(&mut self, name: Box<str>, identifier: Identifier, type_: Type) {
+        self.identifiers.push((name, identifier, type_));
     }
     #[must_use]
-    fn lookup_variable(&self, name: &str) -> Option<Id> {
-        self.variables
+    fn lookup_identifier(&self, name: &str) -> Option<(&Identifier, &Type)> {
+        self.identifiers
             .iter()
             .rev()
-            .find_map(|(box variable_name, id)| {
-                if variable_name == name {
-                    Some(*id)
-                } else {
-                    None
-                }
-            })
+            .find(|(box variable_name, _, _)| variable_name == name)
+            .map(|(_, identifier, type_)| (identifier, type_))
     }
 
-    fn expression_to_body(&mut self, expression: Expression) -> Body {
-        Body {
-            identifiers: vec![],
-            expressions: vec![(self.id_generator.generate(), expression)],
-        }
-    }
     fn add_assignment(&mut self, name: &AstString, assignment: Assignment) {
-        if self.hir.assignments.iter().any(|(_, n, _)| n == &**name) {
-            self.push_error(
+        if self.hir.assignments.iter().any(|(n, _)| n == &**name) {
+            self.add_error(
                 name.span.clone(),
                 format!("Duplicate assignment: {}", **name),
             );
@@ -269,18 +359,34 @@ impl<'c> Context<'c> {
         name: impl Into<Box<str>>,
         assignment: Assignment,
     ) {
-        let id = self.id_generator.generate();
         let name = name.into();
-        self.define_variable(name.clone(), id);
-        self.hir.assignments.push((id, name, assignment));
+        let (identifier, type_) = match &assignment {
+            Assignment::Value { value, type_ } => (
+                Identifier::Variable {
+                    value: value.clone(),
+                },
+                type_.clone(),
+            ),
+            Assignment::Function {
+                parameters,
+                return_type,
+                body,
+            } => todo!(),
+        };
+        self.define_identifier(name.clone(), identifier, type_);
+        self.hir.assignments.push((name, assignment));
     }
-    fn add_expression_to_body(&mut self, expression: Expression, body: &mut Body) -> Id {
-        let id = self.id_generator.generate();
-        body.expressions.push((id, expression));
-        id
+    fn add_expression_to_body(
+        &mut self,
+        body: &mut Body,
+        name: impl Into<Option<Box<str>>>,
+        expression: Expression,
+        type_: Type,
+    ) {
+        body.expressions.push((name.into(), expression, type_));
     }
 
-    fn push_error(&mut self, span: Range<Offset>, message: impl Into<String>) {
+    fn add_error(&mut self, span: Range<Offset>, message: impl Into<String>) {
         self.errors.push(CompilerError {
             path: self.path.to_path_buf(),
             span,

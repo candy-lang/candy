@@ -13,9 +13,12 @@
 use ast::CollectAstErrors;
 use ast_to_hir::ast_to_hir;
 use clap::{Parser, ValueHint};
+use error::CompilerError;
+use hir::Hir;
+use hir_to_c::hir_to_c;
 use std::{
     fs,
-    path::PathBuf,
+    path::{self, Path, PathBuf},
     time::{Duration, Instant},
 };
 use tracing::{debug, error, info, warn, Level, Metadata};
@@ -27,6 +30,7 @@ mod ast;
 mod ast_to_hir;
 mod error;
 mod hir;
+mod hir_to_c;
 mod id;
 mod position;
 mod string_to_ast;
@@ -35,6 +39,7 @@ mod string_to_ast;
 #[command(name = "candy", about = "The 🍭 Candy CLI.")]
 enum CandyOptions {
     Check(CheckOptions),
+    Compile(CompileOptions),
 }
 
 fn main() -> ProgramResult {
@@ -44,6 +49,7 @@ fn main() -> ProgramResult {
 
     match options {
         CandyOptions::Check(options) => check(options),
+        CandyOptions::Compile(options) => compile(options),
     }
 }
 pub type ProgramResult = Result<(), Exit>;
@@ -55,27 +61,18 @@ pub enum Exit {
 
 #[derive(Parser, Debug)]
 struct CheckOptions {
-    /// The file or package to check. If none is provided, the package of your
-    /// current working directory will be checked.
+    /// The file or package to check.
     #[arg(value_hint = ValueHint::FilePath)]
     path: PathBuf,
 }
 
 #[allow(clippy::needless_pass_by_value)]
 fn check(options: CheckOptions) -> ProgramResult {
-    let started_at = Instant::now();
-
     let source = fs::read_to_string(&options.path).unwrap();
 
-    let asts = string_to_ast::string_to_ast(&options.path, &source);
-
-    let mut errors = asts.collect_errors();
-
-    let (hir, mut hir_errors) = ast_to_hir(&options.path, &asts);
-    errors.append(&mut hir_errors);
-
-    let ended_at = Instant::now();
-    debug!("Check took {}.", format_duration(ended_at - started_at));
+    let started_at = Instant::now();
+    let (_, errors) = compile_hir(&options.path, &source);
+    debug!("Check took {}.", format_duration(started_at.elapsed()));
 
     if errors.is_empty() {
         info!("No errors found 🎉");
@@ -86,6 +83,49 @@ fn check(options: CheckOptions) -> ProgramResult {
         }
         Err(Exit::CodeContainsErrors)
     }
+}
+
+#[derive(Parser, Debug)]
+struct CompileOptions {
+    /// The file or package to compile to C.
+    #[arg(value_hint = ValueHint::FilePath)]
+    path: PathBuf,
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn compile(options: CompileOptions) -> ProgramResult {
+    let source = fs::read_to_string(&options.path).unwrap();
+
+    let started_at = Instant::now();
+    let (hir, errors) = compile_hir(&options.path, &source);
+
+    if !errors.is_empty() {
+        for error in errors {
+            error!("{}", error.to_string_with_location(&source));
+        }
+        return Err(Exit::CodeContainsErrors);
+    }
+
+    let c_code = hir_to_c(&hir);
+    debug!(
+        "Compilation to C took {}.",
+        format_duration(started_at.elapsed())
+    );
+
+    fs::write(options.path.with_extension("c"), c_code).unwrap();
+
+    info!("Done 🎉");
+    Ok(())
+}
+
+fn compile_hir(path: &Path, source: &str) -> (Hir, Vec<CompilerError>) {
+    let asts = string_to_ast::string_to_ast(path, source);
+    let mut errors = asts.collect_errors();
+
+    let (hir, mut hir_errors) = ast_to_hir(path, &asts);
+    errors.append(&mut hir_errors);
+
+    (hir, errors)
 }
 
 fn format_duration(duration: Duration) -> String {
@@ -110,7 +150,7 @@ fn init_logger() {
                     .starts_with("candy")
         }))
         .with_filter(filter::filter_fn(level_for(
-            "candy_compiler_v3::string_to_ast",
+            "candy_v3::string_to_ast",
             Level::DEBUG,
         )));
     tracing_subscriber::registry().with(console_log).init();
