@@ -1,5 +1,5 @@
 use crate::{
-    ast::{AstAssignment, AstAssignmentKind, AstExpression, AstStatement},
+    ast::{AstAssignment, AstAssignmentKind, AstExpression, AstStatement, AstString},
     error::CompilerError,
     hir::{Assignment, Body, Expression, Hir, Id, Parameter},
     id::IdGenerator,
@@ -10,8 +10,8 @@ use std::{ops::Range, path::Path};
 
 pub fn ast_to_hir(path: &Path, ast: &[AstAssignment]) -> (Hir, Vec<CompilerError>) {
     let mut context = Context::new(path);
-    context.add_value("int", Expression::IntType);
-    context.add_value("text", Expression::TextType);
+    context.add_builtin_value("int", Expression::IntType);
+    context.add_builtin_value("text", Expression::TextType);
     context.lower_assignments(ast);
     (context.hir, context.errors)
 }
@@ -35,12 +35,9 @@ impl<'c> Context<'c> {
         }
     }
 
-    fn add_value(&mut self, name: impl Into<Box<str>>, expression: Expression) {
-        let value = Body {
-            identifiers: vec![],
-            expressions: vec![(self.id_generator.generate(), expression)],
-        };
-        self.add_assignment(
+    fn add_builtin_value(&mut self, name: impl Into<Box<str>>, expression: Expression) {
+        let value = self.expression_to_body(expression);
+        self.add_assignment_without_duplicate_name_check(
             name,
             Assignment::Value {
                 type_: value.clone(),
@@ -58,15 +55,22 @@ impl<'c> Context<'c> {
             if let Some(assignment) = assignment {
                 self.add_assignment(name, assignment);
             } else {
-                self.add_value(name, Expression::Error);
+                let value = self.expression_to_body(Expression::Error);
+                self.add_assignment(
+                    name,
+                    Assignment::Value {
+                        type_: value.clone(),
+                        value,
+                    },
+                );
             }
         }
     }
-    fn lower_assignment(
+    fn lower_assignment<'a>(
         &mut self,
-        assignment: &AstAssignment,
-    ) -> Option<(Box<str>, Option<Assignment>)> {
-        let name = assignment.name.value()?.identifier.value()?.string.clone();
+        assignment: &'a AstAssignment,
+    ) -> Option<(&'a AstString, Option<Assignment>)> {
+        let name = assignment.name.value()?.identifier.value()?;
         let assignment = match &assignment.kind {
             AstAssignmentKind::Value { type_, value } => {
                 try {
@@ -243,7 +247,28 @@ impl<'c> Context<'c> {
             })
     }
 
-    fn add_assignment(&mut self, name: impl Into<Box<str>>, assignment: Assignment) {
+    fn expression_to_body(&mut self, expression: Expression) -> Body {
+        Body {
+            identifiers: vec![],
+            expressions: vec![(self.id_generator.generate(), expression)],
+        }
+    }
+    fn add_assignment(&mut self, name: &AstString, assignment: Assignment) {
+        if self.hir.assignments.iter().any(|(_, n, _)| n == &**name) {
+            self.push_error(
+                name.span.clone(),
+                format!("Duplicate assignment: {}", **name),
+            );
+            return;
+        }
+
+        self.add_assignment_without_duplicate_name_check(name.string.clone(), assignment);
+    }
+    fn add_assignment_without_duplicate_name_check(
+        &mut self,
+        name: impl Into<Box<str>>,
+        assignment: Assignment,
+    ) {
         let id = self.id_generator.generate();
         let name = name.into();
         self.define_variable(name.clone(), id);
