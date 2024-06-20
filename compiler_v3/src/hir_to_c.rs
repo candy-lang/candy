@@ -97,7 +97,8 @@ impl<'h> Context<'h> {
             Expression::ValueWithTypeAnnotation { value, type_ } => {
                 self.lower_expression(value);
             }
-            Expression::ParameterReference(_) => todo!(),
+            Expression::ParameterReference(name) => self.push(name),
+            Expression::Lambda { .. } => todo!(),
             Expression::Call {
                 receiver,
                 arguments,

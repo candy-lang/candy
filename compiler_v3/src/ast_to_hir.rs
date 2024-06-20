@@ -87,80 +87,97 @@ impl<'c> Context<'c> {
                 }
             }
             AstAssignmentKind::Function {
-                parameters,
-                return_type,
-                body,
-                ..
+                parameters, body, ..
             } => {
-                // self.with_scope(|context| try {
-                //     let mut parameter_names = FxHashSet::default();
-                //     let parameters = parameters
-                //         .iter()
-                //         .map(|parameter| try {
-                //             let name = parameter.name.identifier.value()?.clone();
-                //             if !parameter_names.insert(name.clone()) {
-                //                 context.add_error(
-                //                     name.span.clone(),
-                //                     format!("Duplicate parameter name: {}", *name),
-                //                 );
-                //                 return None;
-                //             }
+                self.with_scope(|context| try {
+                    // TODO: lower parameter types
+                    assert!(parameters.is_empty());
+                    // let mut parameter_names = FxHashSet::default();
+                    // let parameters = parameters
+                    //     .iter()
+                    //     .map(|parameter| try {
+                    //         let name = parameter.name.identifier.value()?.clone();
+                    //         if !parameter_names.insert(name.clone()) {
+                    //             context.add_error(
+                    //                 name.span.clone(),
+                    //                 format!("Duplicate parameter name: {}", *name),
+                    //             );
+                    //             return None;
+                    //         }
 
-                //             todo!();
+                    //         todo!();
 
-                //             // let type_ = context.lower_expression(parameter.type_.as_ref()?.value()?)?;
-                //             // let id = context.id_generator.generate();
-                //             // context.define_variable(name.string.clone(), id);
-                //             // Parameter {
-                //             //     name: name.string,
-                //             //     type_,
-                //             // }
-                //         })
-                //         .collect::<Option<Box<[_]>>>()?;
+                    //         // let type_ = context.lower_expression(parameter.type_.as_ref()?.value()?)?;
+                    //         // let id = context.id_generator.generate();
+                    //         // context.define_variable(name.string.clone(), id);
+                    //         // Parameter {
+                    //         //     name: name.string,
+                    //         //     type_,
+                    //         // }
+                    //     })
+                    //     .collect::<Option<Box<[_]>>>()?;
 
-                //     let return_type = context.lower_expression(return_type.value()?.as_ref())?;
+                    // TODO: lower written return type
+                    // let return_type = context.lower_expression(return_type.value()?.as_ref())?;
 
-                //     // Assignment::Function {
-                //     //     parameters,
-                //     //     return_type,
-                //     //     body: context.lower_body(body)?,
-                //     // }
-                // });
-                todo!()
+                    let body = context.lower_body(body);
+
+                    Assignment::Function {
+                        parameters: [].into(),
+                        return_type: body.return_type().clone(),
+                        body,
+                    }
+                })
             }
         };
         Some((name, assignment))
     }
 
-    fn lower_body(&mut self, body: &[AstStatement]) -> Option<Body> {
+    fn lower_body(&mut self, body: &[AstStatement]) -> Body {
         let mut hir_body = Body::default();
         for statement in body {
             match statement {
                 AstStatement::Assignment(assignment) => {
-                    let name = assignment.name.value()?.identifier.value()?.clone();
+                    let Some(name) = assignment
+                        .name
+                        .value()
+                        .and_then(|it| it.identifier.value())
+                        .cloned()
+                    else {
+                        continue;
+                    };
+
                     let (expression, type_) = match &assignment.kind {
                         AstAssignmentKind::Value { value, type_: _ } => {
                             // TODO: lower written type
-                            let (value, type_) = self.lower_expression(value.value()?)?;
-                            (
-                                Expression::ValueWithTypeAnnotation {
-                                    value: Box::new(value),
-                                    type_: type_.clone(),
-                                },
-                                type_,
-                            )
+                            if let Some((value, type_)) =
+                                value.value().and_then(|it| self.lower_expression(it))
+                            {
+                                (
+                                    Expression::ValueWithTypeAnnotation {
+                                        value: Box::new(value),
+                                        type_: type_.clone(),
+                                    },
+                                    type_,
+                                )
+                            } else {
+                                (Expression::Error, Type::Error)
+                            }
                         }
                         AstAssignmentKind::Function { .. } => todo!(),
                     };
                     self.add_expression_to_body(&mut hir_body, name.string, expression, type_);
                 }
                 AstStatement::Expression(expression) => {
-                    let (expression, type_) = self.lower_expression(expression)?;
+                    let Some((expression, type_)) = self.lower_expression(expression) else {
+                        continue;
+                    };
+
                     self.add_expression_to_body(&mut hir_body, None, expression, type_);
                 }
             }
         }
-        Some(hir_body)
+        hir_body
     }
 
     fn lower_expression(&mut self, expression: &AstExpression) -> Option<(Expression, Type)> {
@@ -371,13 +388,25 @@ impl<'c> Context<'c> {
                 parameters,
                 return_type,
                 body,
-            } => todo!(),
+            } => (
+                // TODO: store as reference
+                Identifier::Variable {
+                    value: Expression::Lambda {
+                        parameters: parameters.clone(),
+                        body: body.clone(),
+                    },
+                },
+                Type::Function {
+                    parameter_types: parameters.iter().map(|it| it.type_.clone()).collect(),
+                    return_type: Box::new(return_type.clone()),
+                },
+            ),
         };
         self.define_identifier(name.clone(), identifier, type_);
         self.hir.assignments.push((name, assignment));
     }
     fn add_expression_to_body(
-        &mut self,
+        &self,
         body: &mut Body,
         name: impl Into<Option<Box<str>>>,
         expression: Expression,

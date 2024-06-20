@@ -16,21 +16,6 @@ pub enum Assignment {
         body: Body,
     },
 }
-impl Assignment {
-    pub fn type_(&self) -> Type {
-        match self {
-            Self::Value { type_, .. } => type_.clone(),
-            Self::Function {
-                parameters,
-                return_type,
-                ..
-            } => Type::Function {
-                parameter_types: parameters.iter().map(|it| it.type_.clone()).collect(),
-                return_type: Box::new(return_type.clone()),
-            },
-        }
-    }
-}
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Parameter {
     pub name: Box<str>,
@@ -40,6 +25,11 @@ pub struct Parameter {
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Body {
     pub expressions: Vec<(Option<Box<str>>, Expression, Type)>,
+}
+impl Body {
+    pub fn return_type(&self) -> &Type {
+        self.expressions.last().map_or(&Type::Error, |it| &it.2)
+    }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -57,6 +47,11 @@ pub enum Expression {
         type_: Type,
     },
     ParameterReference(Box<str>),
+    Lambda {
+        parameters: Box<[Parameter]>,
+        body: Body,
+    },
+    // Reference(Id),
     Call {
         receiver: Box<Expression>,
         arguments: Box<[Expression]>,
