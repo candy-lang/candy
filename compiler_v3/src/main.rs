@@ -1,4 +1,4 @@
-#![feature(box_patterns, option_take_if)]
+#![feature(box_patterns, option_take_if, try_blocks)]
 #![warn(clippy::nursery, clippy::pedantic, unused_crate_dependencies)]
 #![allow(
     clippy::cognitive_complexity,
@@ -11,6 +11,7 @@
 )]
 
 use ast::CollectAstErrors;
+use ast_to_hir::ast_to_hir;
 use clap::{Parser, ValueHint};
 use std::{
     fs,
@@ -23,7 +24,9 @@ use tracing_subscriber::{
 };
 
 mod ast;
+mod ast_to_hir;
 mod error;
+mod hir;
 mod id;
 mod position;
 mod string_to_ast;
@@ -66,20 +69,22 @@ fn check(options: CheckOptions) -> ProgramResult {
 
     let asts = string_to_ast::string_to_ast(&options.path, &source);
 
-    let errors = asts.collect_errors();
-    let has_errors = !errors.is_empty();
+    let mut errors = asts.collect_errors();
+
+    let (hir, mut hir_errors) = ast_to_hir(&options.path, &asts);
+    errors.append(&mut hir_errors);
 
     let ended_at = Instant::now();
     debug!("Check took {}.", format_duration(ended_at - started_at));
 
-    if has_errors {
+    if errors.is_empty() {
+        info!("No errors found 🎉");
+        Ok(())
+    } else {
         for error in errors {
             error!("{}", error.to_string_with_location(&source));
         }
         Err(Exit::CodeContainsErrors)
-    } else {
-        info!("No errors found 🎉");
-        Ok(())
     }
 }
 

@@ -84,7 +84,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "regex",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "shlex",
  "syn 2.0.48",
  "which",
@@ -137,7 +137,7 @@ dependencies = [
  "inkwell",
  "itertools 0.11.0",
  "llvm-sys",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "salsa",
 ]
 
@@ -156,7 +156,7 @@ dependencies = [
  "itertools 0.12.0",
  "lazy_static",
  "regex",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "salsa",
  "tokio",
  "tower-lsp",
@@ -174,6 +174,7 @@ dependencies = [
  "extension-trait",
  "itertools 0.12.0",
  "replace_with",
+ "rustc-hash 2.0.0",
  "tracing",
  "tracing-subscriber",
  "unicode-segmentation",
@@ -221,7 +222,7 @@ dependencies = [
  "num-bigint",
  "num-integer",
  "num-traits",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "salsa",
  "serde",
  "shellexpand",
@@ -243,7 +244,7 @@ dependencies = [
  "itertools 0.12.0",
  "num-bigint",
  "rand",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "strum",
  "tracing",
 ]
@@ -269,7 +270,7 @@ dependencies = [
  "num-bigint",
  "rand",
  "regex",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "salsa",
  "serde",
  "serde_json",
@@ -302,7 +303,7 @@ dependencies = [
  "pad",
  "paste",
  "rand",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "salsa",
  "strum",
  "tiny_http",
@@ -1457,6 +1458,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 
 [[package]]
+name = "rustc-hash"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "583034fd73374156e66797ed8e5b0d5690409c9226b22d87cb7f19821c05d152"
+
+[[package]]
 name = "rustc_version"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1516,7 +1523,7 @@ dependencies = [
  "log",
  "oorandom",
  "parking_lot 0.11.2",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "salsa-macros",
  "smallvec",
 ]
