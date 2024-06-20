@@ -63,7 +63,6 @@ pub enum AstExpression {
     Struct(AstStruct),
     StructAccess(AstStructAccess),
     Lambda(AstLambda),
-    Error(AstError),
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -316,9 +315,6 @@ impl CollectAstErrors for AstExpression {
                     statement.collect_errors_to(errors);
                 }
                 closing_curly_brace_error.collect_errors_to(errors);
-            }
-            Self::Error(error) => {
-                error.collect_errors_to(errors);
             }
         }
     }
