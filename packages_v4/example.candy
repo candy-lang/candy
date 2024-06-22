@@ -10,17 +10,17 @@ let structType = [name: text, color: int]
 # let functionType = (int, text) -> int
 
 # Expressions
-let intExpression = 42
+let intExpression: int = 42
 let textExpression = "Hello, World!"
 ## let textExpressionWithInterpolation = "The answer is {intExpression}!"
-## let identifierExpression = intExpression
+let identifierExpression = intExpression
 ## let symbolExpression = SomeSymbol
 ## let parenthesizedExpression = (intExpression)
 let structExpression = [name: "Banana", color: 12345]
 # let lambdaExpression = { x: int -> x }
 
 # Assignments
-## let valueWithExplicitType: int = 42
+let valueWithExplicitType: int = 42
 # let someFunction(x: int) -> int = { x }
 
 # Nominal Types

@@ -58,7 +58,7 @@ pub fn ast_to_hir(path: &Path, ast: &[AstAssignment]) -> (Hir, Vec<CompilerError
 struct Context<'c> {
     path: &'c Path,
     id_generator: IdGenerator<Id>,
-    identifiers: Vec<(Box<str>, Id, Type)>,
+    identifiers: Vec<(Box<str>, Id, Option<Assignment>, Type)>,
     errors: Vec<CompilerError>,
     hir: Hir,
 }
@@ -155,12 +155,13 @@ impl<'c> Context<'c> {
             parameter_types: parameters.iter().map(|it| it.type_.clone()).collect(),
             return_type: Box::new(return_type.clone()),
         };
-        self.identifiers.push((name.into(), id, type_));
         let assignment = Assignment::Function {
             parameters,
             return_type,
             body: Body::Builtin(builtin_function),
         };
+        self.identifiers
+            .push((name.into(), id, Some(assignment.clone()), type_));
         self.hir.assignments.push((id, name.into(), assignment));
     }
 
@@ -191,9 +192,24 @@ impl<'c> Context<'c> {
         let assignment = match &assignment.kind {
             AstAssignmentKind::Value { type_, value } => {
                 try {
-                    // TODO: lower written type
-                    let (value, type_) = self.lower_expression(value.value()?)?;
-                    Assignment::Value { value, type_ }
+                    let explicit_type = type_.as_ref().and_then(|type_| {
+                        let (type_value, type_type) = self
+                            .lower_expression(type_.value()?)
+                            .unwrap_or((Expression::Type(Type::Error), Type::Type));
+                        if !matches!(type_type, Type::Type | Type::Error) {
+                            self.add_error(name.span.clone(), "Assignment's type must be a type");
+                        }
+                        Some(self.evaluate_expression_to_type(&type_value))
+                    });
+                    let (value, value_type) = value
+                        .value()
+                        .and_then(|it| self.lower_expression(it))
+                        .unwrap_or((Expression::Error, Type::Error));
+                    // TODO: check `value_type` is assignable to `explicit_type`
+                    Assignment::Value {
+                        value,
+                        type_: explicit_type.unwrap_or(value_type),
+                    }
                 }
             }
             AstAssignmentKind::Function {
@@ -242,6 +258,49 @@ impl<'c> Context<'c> {
         Some((name, assignment))
     }
 
+    fn evaluate_expression_to_type(&mut self, expression: &Expression) -> Type {
+        match expression {
+            Expression::Symbol(_) => todo!(),
+            Expression::Int(_) => {
+                // TODO: report actual error location
+                self.add_error(Offset(0)..Offset(0), "Expected a type, not an int");
+                Type::Error
+            }
+            Expression::Text(_) => {
+                // TODO: report actual error location
+                self.add_error(Offset(0)..Offset(0), "Expected a type, not a text");
+                Type::Error
+            }
+            Expression::Struct(_) => todo!(),
+            Expression::StructAccess { struct_, field } => todo!(),
+            Expression::ValueWithTypeAnnotation { value, type_ } => todo!(),
+            Expression::Lambda { parameters, body } => todo!(),
+            Expression::Reference(id) => {
+                let assignment = self
+                    .identifiers
+                    .iter()
+                    .find(|(_, i, _, _)| i == id)
+                    .map(|(_, _, assignment, _)| assignment.clone())
+                    .expect("ID not found")
+                    .expect("TODO: ID belongs to a parameter");
+                match assignment {
+                    Assignment::Value { value, .. } => self.evaluate_expression_to_type(&value),
+                    Assignment::Function {
+                        parameters,
+                        return_type,
+                        body,
+                    } => todo!(),
+                }
+            }
+            Expression::Call {
+                receiver,
+                arguments,
+            } => todo!(),
+            Expression::Type(type_) => type_.clone(),
+            Expression::Error => Type::Error,
+        }
+    }
+
     fn lower_body(&mut self, body: &[AstStatement]) -> (Body, Type) {
         let mut expressions = vec![];
         for statement in body {
@@ -288,7 +347,15 @@ impl<'c> Context<'c> {
 
             let id = self.id_generator.generate();
             if let Some(name) = &name {
-                self.identifiers.push((name.clone(), id, type_.clone()));
+                self.identifiers.push((
+                    name.clone(),
+                    id,
+                    Some(Assignment::Value {
+                        value: expression.clone(),
+                        type_: type_.clone(),
+                    }),
+                    type_.clone(),
+                ));
             }
             expressions.push((id, name, expression, type_));
         }
@@ -480,8 +547,8 @@ impl<'c> Context<'c> {
         self.identifiers
             .iter()
             .rev()
-            .find(|(box variable_name, _, _)| variable_name == name)
-            .map(|(_, id, type_)| (*id, type_))
+            .find(|(box variable_name, _, _, _)| variable_name == name)
+            .map(|(_, id, _, type_)| (*id, type_))
     }
 
     fn add_assignment(&mut self, name: &AstString, assignment: Assignment) {
@@ -513,7 +580,8 @@ impl<'c> Context<'c> {
                 return_type: Box::new(return_type.clone()),
             },
         };
-        self.identifiers.push((name.clone(), id, type_));
+        self.identifiers
+            .push((name.clone(), id, Some(assignment.clone()), type_));
         self.hir.assignments.push((id, name, assignment));
     }
 

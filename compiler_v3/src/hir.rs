@@ -16,6 +16,19 @@ impl Display for Id {
 pub struct Hir {
     pub assignments: Vec<(Id, Box<str>, Assignment)>,
 }
+// impl Hir {
+//     /// `None` means the ID belongs to a parameter.
+//     #[must_use]
+//     pub fn get(&self, id: Id) -> Option<&Assignment> {
+//         self.assignments.iter().find_map(|(i, _, assignment)| {
+//             if i == &id {
+//                 Some(assignment)
+//             } else {
+//                 assignment.get(id)
+//             }
+//         })
+//     }
+// }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Assignment {
     Value {
@@ -28,6 +41,15 @@ pub enum Assignment {
         body: Body,
     },
 }
+// impl Assignment {
+//     #[must_use]
+//     pub fn get(&self, id: Id) -> Option<&Assignment> {
+//         match self {
+//             Self::Value { value,.. } => value.get(id),
+//             Self::Function { body, .. } => body.get(id),
+//         }
+//     }
+// }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Parameter {
     pub id: Id,
@@ -42,6 +64,23 @@ pub enum Body {
         expressions: Vec<(Id, Option<Box<str>>, Expression, Type)>,
     },
 }
+// impl Body {
+//     #[must_use]
+//     pub fn get(&self, id: Id) -> Option<&Assignment> {
+//         match self {
+//             Body::Builtin(_) => None,
+//             Body::Written { expressions } => {
+//                 expressions.iter().find_map(|(i, _, expression, _)| {
+//                     if i == &id {
+//                         Some(expression)
+//                     } else {
+//                         expression.get(id)
+//                     }
+//                 })
+//             }
+//         }
+//     }
+// }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Expression {
