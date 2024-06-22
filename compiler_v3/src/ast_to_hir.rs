@@ -37,7 +37,7 @@ pub fn ast_to_hir(path: &Path, ast: &[AstAssignment]) -> (Hir, Vec<CompilerError
                         "Main function must not have parameters",
                     );
                 }
-                if return_type != Type::Int {
+                if !matches!(return_type, Type::Int | Type::Error) {
                     // TODO: report actual error location
                     context.add_error(Offset(0)..Offset(0), "Main function must return an int");
                 }
@@ -88,6 +88,26 @@ impl<'c> Context<'c> {
         );
     }
     fn add_builtin_functions(&mut self) {
+        {
+            let a_id = self.id_generator.generate();
+            let b_id = self.id_generator.generate();
+            self.add_builtin_function(
+                BuiltinFunction::IntAdd,
+                [
+                    Parameter {
+                        id: a_id,
+                        name: "a".into(),
+                        type_: Type::Int,
+                    },
+                    Parameter {
+                        id: b_id,
+                        name: "b".into(),
+                        type_: Type::Int,
+                    },
+                ],
+                Type::Int,
+            );
+        }
         {
             // TODO: Return `Nothing`
             let message_id = self.id_generator.generate();

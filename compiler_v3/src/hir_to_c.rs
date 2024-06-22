@@ -77,6 +77,11 @@ impl<'h> Context<'h> {
             Body::Builtin(builtin_function) => {
                 self.push("// builtin function\n");
                 self.push(match builtin_function {
+                    BuiltinFunction::IntAdd => format!(
+                        "return {a} + {b};",
+                        a = parameters[0].id,
+                        b = parameters[1].id,
+                    ),
                     BuiltinFunction::Print => format!("puts({}); return 0;", parameters[0].id),
                     BuiltinFunction::TextConcat => format!(
                         "\

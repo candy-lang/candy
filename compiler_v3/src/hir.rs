@@ -72,6 +72,7 @@ pub enum Expression {
 #[derive(AsRefStr, Clone, Copy, Debug, Eq, Hash, PartialEq, VariantArray)]
 #[strum(serialize_all = "camelCase")]
 pub enum BuiltinFunction {
+    IntAdd,
     Print,
     TextConcat,
 }

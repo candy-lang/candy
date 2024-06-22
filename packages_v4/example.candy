@@ -55,7 +55,7 @@ let main() -> int = {
   let helloWorld = "Hello, World!"
   print(helloWorld)
 
-  let theAnswer = 42
+  let theAnswer = intAdd(40, 2)
   let theAnswerText = "42"
   print("The answer is {theAnswerText}!")
 
