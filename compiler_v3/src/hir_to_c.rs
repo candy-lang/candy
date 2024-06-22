@@ -24,6 +24,8 @@ impl<'h> Context<'h> {
     fn lower_hir(&mut self) {
         self.push("#include <stdint.h>\n");
         self.push("#include <stdio.h>\n\n");
+        self.push("#include <stdlib.h>\n\n");
+        self.push("#include <string.h>\n\n");
 
         for (id, name, assignment) in &self.hir.assignments {
             self.push(format!("// {name}\n"));

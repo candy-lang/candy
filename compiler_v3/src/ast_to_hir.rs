@@ -118,7 +118,7 @@ impl<'c> Context<'c> {
                         type_: Type::Text,
                     },
                 ],
-                Type::Int,
+                Type::Text,
             );
         }
     }
