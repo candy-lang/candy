@@ -82,6 +82,13 @@
     "rust-analyzer.check.command": "clippy",
     "rust-analyzer.imports.group.enable": false,
     "task.allowAutomaticTasks": "on",
-    "todo-tree.general.tags": ["FIXME", "PERF", "TODO"]
+    "todo-tree.general.tags": ["FIXME", "PERF", "TODO"],
+    "files.associations": {
+      "*.arb": "json",
+      "*.companionconfig": "json",
+      "*.tpp": "cpp",
+      "cstring": "c",
+      "locale": "c"
+    }
   }
 }

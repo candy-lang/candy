@@ -15,6 +15,7 @@ extension-trait = "1.0.1"
 itertools = "0.12.0"
 replace_with = "0.1.7"
 rustc-hash = "2.0.0"
+strum = { version = "0.26.1", features = ["derive"] }
 tracing = { version = "0.1", features = ["release_max_level_debug"] }
 tracing-subscriber = { version = "0.3.16", features = ["registry"] }
 unicode-segmentation = "1.9.0"

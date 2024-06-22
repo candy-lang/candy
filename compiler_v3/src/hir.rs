@@ -1,8 +1,20 @@
-use crate::ast::AstString;
+use crate::{id::CountableId, impl_countable_id};
+use derive_more::Deref;
+use std::fmt::{self, Display, Formatter};
+use strum::{AsRefStr, VariantArray};
+
+#[derive(Clone, Copy, Debug, Default, Deref, Eq, Hash, PartialEq)]
+pub struct Id(usize);
+impl_countable_id!(Id);
+impl Display for Id {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "_{}", self.0)
+    }
+}
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Hir {
-    pub assignments: Vec<(Box<str>, Assignment)>,
+    pub assignments: Vec<(Id, Box<str>, Assignment)>,
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Assignment {
@@ -18,18 +30,17 @@ pub enum Assignment {
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Parameter {
+    pub id: Id,
     pub name: Box<str>,
     pub type_: Type,
 }
 
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
-pub struct Body {
-    pub expressions: Vec<(Option<Box<str>>, Expression, Type)>,
-}
-impl Body {
-    pub fn return_type(&self) -> &Type {
-        self.expressions.last().map_or(&Type::Error, |it| &it.2)
-    }
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum Body {
+    Builtin(BuiltinFunction),
+    Written {
+        expressions: Vec<(Id, Option<Box<str>>, Expression, Type)>,
+    },
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -46,22 +57,29 @@ pub enum Expression {
         value: Box<Expression>,
         type_: Type,
     },
-    ParameterReference(Box<str>),
     Lambda {
         parameters: Box<[Parameter]>,
         body: Body,
     },
-    // Reference(Id),
+    Reference(Id),
     Call {
         receiver: Box<Expression>,
         arguments: Box<[Expression]>,
     },
-    BuiltinEquals,
-    BuiltinPrint,
-    BuiltinTextConcat,
-    BuiltinToDebugText,
     Type(Type),
     Error,
+}
+#[derive(AsRefStr, Clone, Copy, Debug, Eq, Hash, PartialEq, VariantArray)]
+#[strum(serialize_all = "camelCase")]
+pub enum BuiltinFunction {
+    Print,
+    TextConcat,
+}
+impl BuiltinFunction {
+    #[must_use]
+    pub fn id(self) -> Id {
+        Id::from_usize(self as usize)
+    }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

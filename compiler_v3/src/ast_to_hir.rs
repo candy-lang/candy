@@ -1,11 +1,13 @@
 use crate::{
     ast::{AstAssignment, AstAssignmentKind, AstExpression, AstStatement, AstString, AstTextPart},
     error::CompilerError,
-    hir::{Assignment, Body, Expression, Hir, Type},
+    hir::{Assignment, Body, BuiltinFunction, Expression, Hir, Id, Parameter, Type},
+    id::IdGenerator,
     position::Offset,
 };
 use rustc_hash::FxHashSet;
 use std::{ops::Range, path::Path};
+use strum::VariantArray;
 
 pub fn ast_to_hir(path: &Path, ast: &[AstAssignment]) -> (Hir, Vec<CompilerError>) {
     let mut context = Context::new(path);
@@ -13,26 +15,58 @@ pub fn ast_to_hir(path: &Path, ast: &[AstAssignment]) -> (Hir, Vec<CompilerError
     context.add_builtin_value("symbol", Expression::Type(Type::Symbol), Type::Type);
     context.add_builtin_value("int", Expression::Type(Type::Int), Type::Type);
     context.add_builtin_value("text", Expression::Type(Type::Text), Type::Type);
+    context.add_builtin_functions();
     context.lower_assignments(ast);
+
+    let main_function = context
+        .hir
+        .assignments
+        .iter()
+        .find(|(_, box n, _)| n == "main");
+    if let Some((_, _, assignment)) = main_function {
+        match assignment.clone() {
+            Assignment::Function {
+                parameters,
+                return_type,
+                ..
+            } => {
+                if !parameters.is_empty() {
+                    // TODO: report actual error location
+                    context.add_error(
+                        Offset(0)..Offset(0),
+                        "Main function must not have parameters",
+                    );
+                }
+                if return_type != Type::Int {
+                    // TODO: report actual error location
+                    context.add_error(Offset(0)..Offset(0), "Main function must return an int");
+                }
+            }
+            Assignment::Value { value, type_ } => {
+                // TODO: report actual error location
+                context.add_error(Offset(0)..Offset(0), "`main` function must be a function");
+            }
+        }
+    } else {
+        context.add_error(Offset(0)..Offset(0), "Program is missing a main function");
+    }
+
     (context.hir, context.errors)
 }
 
 #[derive(Debug)]
 struct Context<'c> {
     path: &'c Path,
-    identifiers: Vec<(Box<str>, Identifier, Type)>,
+    id_generator: IdGenerator<Id>,
+    identifiers: Vec<(Box<str>, Id, Type)>,
     errors: Vec<CompilerError>,
     hir: Hir,
-}
-#[derive(Debug)]
-enum Identifier {
-    Variable { value: Expression },
-    Parameter,
 }
 impl<'c> Context<'c> {
     fn new(path: &'c Path) -> Self {
         Self {
             path,
+            id_generator: IdGenerator::start_at(BuiltinFunction::VARIANTS.len()),
             identifiers: vec![],
             errors: vec![],
             hir: Hir::default(),
@@ -52,6 +86,62 @@ impl<'c> Context<'c> {
                 type_,
             },
         );
+    }
+    fn add_builtin_functions(&mut self) {
+        {
+            // TODO: Return `Nothing`
+            let message_id = self.id_generator.generate();
+            self.add_builtin_function(
+                BuiltinFunction::Print,
+                [Parameter {
+                    id: message_id,
+                    name: "message".into(),
+                    type_: Type::Text,
+                }],
+                Type::Int,
+            );
+        }
+        {
+            let a_id = self.id_generator.generate();
+            let b_id = self.id_generator.generate();
+            self.add_builtin_function(
+                BuiltinFunction::TextConcat,
+                [
+                    Parameter {
+                        id: a_id,
+                        name: "a".into(),
+                        type_: Type::Text,
+                    },
+                    Parameter {
+                        id: b_id,
+                        name: "b".into(),
+                        type_: Type::Text,
+                    },
+                ],
+                Type::Int,
+            );
+        }
+    }
+    fn add_builtin_function(
+        &mut self,
+        builtin_function: BuiltinFunction,
+        parameters: impl Into<Box<[Parameter]>>,
+        return_type: Type,
+    ) {
+        let name = builtin_function.as_ref();
+        let parameters = parameters.into();
+        let id = builtin_function.id();
+        let type_ = Type::Function {
+            parameter_types: parameters.iter().map(|it| it.type_.clone()).collect(),
+            return_type: Box::new(return_type.clone()),
+        };
+        self.identifiers.push((name.into(), id, type_));
+        let assignment = Assignment::Function {
+            parameters,
+            return_type,
+            body: Body::Builtin(builtin_function),
+        };
+        self.hir.assignments.push((id, name.into(), assignment));
     }
 
     fn lower_assignments(&mut self, assignments: &[AstAssignment]) {
@@ -120,11 +210,10 @@ impl<'c> Context<'c> {
                     // TODO: lower written return type
                     // let return_type = context.lower_expression(return_type.value()?.as_ref())?;
 
-                    let body = context.lower_body(body);
-
+                    let (body, return_type) = context.lower_body(body);
                     Assignment::Function {
                         parameters: [].into(),
-                        return_type: body.return_type().clone(),
+                        return_type,
                         body,
                     }
                 })
@@ -133,10 +222,10 @@ impl<'c> Context<'c> {
         Some((name, assignment))
     }
 
-    fn lower_body(&mut self, body: &[AstStatement]) -> Body {
-        let mut hir_body = Body::default();
+    fn lower_body(&mut self, body: &[AstStatement]) -> (Body, Type) {
+        let mut expressions = vec![];
         for statement in body {
-            match statement {
+            let (name, expression, type_) = match statement {
                 AstStatement::Assignment(assignment) => {
                     let Some(name) = assignment
                         .name
@@ -166,18 +255,32 @@ impl<'c> Context<'c> {
                         }
                         AstAssignmentKind::Function { .. } => todo!(),
                     };
-                    self.add_expression_to_body(&mut hir_body, name.string, expression, type_);
+                    (Some(name.string), expression, type_)
                 }
                 AstStatement::Expression(expression) => {
                     let Some((expression, type_)) = self.lower_expression(expression) else {
                         continue;
                     };
 
-                    self.add_expression_to_body(&mut hir_body, None, expression, type_);
+                    (None, expression, type_)
                 }
+            };
+
+            let id = self.id_generator.generate();
+            if let Some(name) = &name {
+                self.identifiers.push((name.clone(), id, type_.clone()));
             }
+            expressions.push((id, name, expression, type_));
         }
-        hir_body
+
+        if expressions.is_empty() {
+            // TODO: report actual error location
+            self.add_error(Offset(0)..Offset(0), "Body must not be empty");
+        }
+        let return_type = expressions
+            .last()
+            .map_or(Type::Error, |(_, _, _, type_)| type_.clone());
+        (Body::Written { expressions }, return_type)
     }
 
     fn lower_expression(&mut self, expression: &AstExpression) -> Option<(Expression, Type)> {
@@ -185,18 +288,12 @@ impl<'c> Context<'c> {
             AstExpression::Identifier(identifier) => {
                 let identifier = identifier.identifier.value()?;
                 let name = &identifier.string;
-                let Some((identifier, type_)) = self.lookup_identifier(identifier) else {
+                let Some((id, type_)) = self.lookup_identifier(identifier) else {
                     self.add_error(identifier.span.clone(), format!("Unknown variable: {name}"));
                     return None;
                 };
 
-                (
-                    match identifier {
-                        Identifier::Variable { value } => value.clone(),
-                        Identifier::Parameter => Expression::ParameterReference(name.clone()),
-                    },
-                    type_.clone(),
-                )
+                (Expression::Reference(id), type_.clone())
             }
             AstExpression::Symbol(symbol) => (
                 Expression::Symbol(symbol.symbol.value()?.string.clone()),
@@ -210,15 +307,25 @@ impl<'c> Context<'c> {
                     .map::<Option<Expression>, _>(|it| try {
                         match it {
                             AstTextPart::Text(text) => Expression::Text(text.clone()),
-                            AstTextPart::Interpolation { expression, .. } => Expression::Call {
-                                receiver: Box::new(Expression::BuiltinToDebugText),
-                                arguments: [self.lower_expression(expression.value()?)?.0].into(),
-                            },
+                            AstTextPart::Interpolation { expression, .. } => {
+                                let (value, type_) = self.lower_expression(expression.value()?)?;
+                                if type_ != Type::Text {
+                                    // TODO: report actual error location
+                                    self.add_error(
+                                        Offset(0)..Offset(0),
+                                        "Interpolated expression must be text",
+                                    );
+                                    return None;
+                                }
+                                value
+                            }
                         }
                     })
                     .reduce(|lhs, rhs| match (lhs, rhs) {
                         (Some(lhs), Some(rhs)) => Some(Expression::Call {
-                            receiver: Box::new(Expression::BuiltinTextConcat),
+                            receiver: Box::new(Expression::Reference(
+                                BuiltinFunction::TextConcat.id(),
+                            )),
                             arguments: [lhs, rhs].into(),
                         }),
                         _ => None,
@@ -348,20 +455,17 @@ impl<'c> Context<'c> {
         self.identifiers.truncate(scope);
         result
     }
-    fn define_identifier(&mut self, name: Box<str>, identifier: Identifier, type_: Type) {
-        self.identifiers.push((name, identifier, type_));
-    }
     #[must_use]
-    fn lookup_identifier(&self, name: &str) -> Option<(&Identifier, &Type)> {
+    fn lookup_identifier(&self, name: &str) -> Option<(Id, &Type)> {
         self.identifiers
             .iter()
             .rev()
             .find(|(box variable_name, _, _)| variable_name == name)
-            .map(|(_, identifier, type_)| (identifier, type_))
+            .map(|(_, id, type_)| (*id, type_))
     }
 
     fn add_assignment(&mut self, name: &AstString, assignment: Assignment) {
-        if self.hir.assignments.iter().any(|(n, _)| n == &**name) {
+        if self.hir.assignments.iter().any(|(_, n, _)| n == &**name) {
             self.add_error(
                 name.span.clone(),
                 format!("Duplicate assignment: {}", **name),
@@ -377,42 +481,20 @@ impl<'c> Context<'c> {
         assignment: Assignment,
     ) {
         let name = name.into();
-        let (identifier, type_) = match &assignment {
-            Assignment::Value { value, type_ } => (
-                Identifier::Variable {
-                    value: value.clone(),
-                },
-                type_.clone(),
-            ),
+        let id = self.id_generator.generate();
+        let type_ = match &assignment {
+            Assignment::Value { type_, .. } => type_.clone(),
             Assignment::Function {
                 parameters,
                 return_type,
-                body,
-            } => (
-                // TODO: store as reference
-                Identifier::Variable {
-                    value: Expression::Lambda {
-                        parameters: parameters.clone(),
-                        body: body.clone(),
-                    },
-                },
-                Type::Function {
-                    parameter_types: parameters.iter().map(|it| it.type_.clone()).collect(),
-                    return_type: Box::new(return_type.clone()),
-                },
-            ),
+                ..
+            } => Type::Function {
+                parameter_types: parameters.iter().map(|it| it.type_.clone()).collect(),
+                return_type: Box::new(return_type.clone()),
+            },
         };
-        self.define_identifier(name.clone(), identifier, type_);
-        self.hir.assignments.push((name, assignment));
-    }
-    fn add_expression_to_body(
-        &self,
-        body: &mut Body,
-        name: impl Into<Option<Box<str>>>,
-        expression: Expression,
-        type_: Type,
-    ) {
-        body.expressions.push((name.into(), expression, type_));
+        self.identifiers.push((name.clone(), id, type_));
+        self.hir.assignments.push((id, name, assignment));
     }
 
     fn add_error(&mut self, span: Range<Offset>, message: impl Into<String>) {

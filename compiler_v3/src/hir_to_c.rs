@@ -1,4 +1,4 @@
-use crate::hir::{Assignment, Body, Expression, Hir, Type};
+use crate::hir::{Assignment, Body, BuiltinFunction, Expression, Hir, Parameter, Type};
 use core::panic;
 
 pub fn hir_to_c(hir: &Hir) -> String {
@@ -22,60 +22,89 @@ impl<'h> Context<'h> {
     }
 
     fn lower_hir(&mut self) {
-        self.push("#include <stdint.h>\n\n");
+        self.push("#include <stdint.h>\n");
+        self.push("#include <stdio.h>\n\n");
 
-        for (name, assignment) in &self.hir.assignments {
+        for (id, name, assignment) in &self.hir.assignments {
             self.push(format!("// {name}\n"));
             match assignment {
-                Assignment::Value { type_, value } => {
+                Assignment::Value { type_, value } => 'case: {
                     if type_ == &Type::Type {
-                        continue;
+                        self.push("// Is a type.");
+                        break 'case;
                     }
 
                     self.push("const ");
                     self.lower_type(type_);
-                    self.push(format!(" {name} = "));
+                    self.push(format!(" {id} = "));
                     self.lower_expression(value);
-                    self.push(";\n");
+                    self.push(";");
                 }
                 Assignment::Function {
-                    parameters,
+                    box parameters,
                     return_type,
                     body,
                 } => {
                     self.lower_type(return_type);
-                    self.push(format!(" {name}("));
+                    self.push(format!(" {id}("));
                     for (i, parameter) in parameters.iter().enumerate() {
                         if i != 0 {
                             self.push(", ");
                         }
                         self.lower_type(&parameter.type_);
-                        self.push(format!(" {}", parameter.name));
+                        self.push(format!(" {}", parameter.id));
                     }
                     self.push(") {\n");
-                    self.lower_body(body);
-                    self.push("}\n");
+                    self.lower_body(parameters, body);
+                    self.push("}");
                 }
             }
-            self.push("\n");
+            self.push("\n\n");
         }
-    }
-    fn lower_body(&mut self, body: &Body) {
-        for (index, (name, expression, type_)) in body.expressions.iter().enumerate() {
-            if let Some(name) = name {
-                self.push(format!("// {name}\n"));
-            }
 
-            self.push("const ");
-            self.lower_type(type_);
-            self.push(format!(" _{index} = "));
-            self.lower_expression(expression);
-            self.push(";\n");
+        let (main_function_id, _, _) = self
+            .hir
+            .assignments
+            .iter()
+            .find(|(_, box name, _)| name == "main")
+            .unwrap();
+        self.push(format!("int main() {{ return {main_function_id}(); }}\n"));
+    }
+    fn lower_body(&mut self, parameters: &[Parameter], body: &Body) {
+        match body {
+            Body::Builtin(builtin_function) => {
+                self.push("// builtin function\n");
+                self.push(match builtin_function {
+                    BuiltinFunction::Print => format!("puts({}); return 0;", parameters[0].id),
+                    BuiltinFunction::TextConcat => format!(
+                        "\
+                        const size_t lengthA = strlen({a});\n\
+                        const size_t lengthB = strlen({b});\n\
+                        char *result = malloc(lengthA + lengthB + 1);\n\
+                        memcpy(result, {a}, lengthA);\n\
+                        memcpy(result + lengthA, {b}, lengthB + 1);\n\
+                        return result;",
+                        a = parameters[0].id,
+                        b = parameters[1].id,
+                    ),
+                });
+            }
+            Body::Written { expressions } => {
+                for (id, name, expression, type_) in expressions {
+                    if let Some(name) = name {
+                        self.push(format!("// {name}\n"));
+                    }
+
+                    self.lower_type(type_);
+                    self.push(format!(" {id} = "));
+                    self.lower_expression(expression);
+                    self.push(";\n");
+                }
+                self.push(format!("return {};", expressions.last().unwrap().0));
+            }
         }
-        self.push(format!("return _{};", body.expressions.len() - 1));
     }
     fn lower_expression(&mut self, expression: &Expression) {
-        dbg!(expression);
         match expression {
             Expression::Symbol(_) => todo!(),
             Expression::Int(int) => self.push(format!("{int}")),
@@ -97,8 +126,8 @@ impl<'h> Context<'h> {
             Expression::ValueWithTypeAnnotation { value, type_ } => {
                 self.lower_expression(value);
             }
-            Expression::ParameterReference(name) => self.push(name),
             Expression::Lambda { .. } => todo!(),
+            Expression::Reference(id) => self.push(id.to_string()),
             Expression::Call {
                 receiver,
                 arguments,
@@ -113,10 +142,7 @@ impl<'h> Context<'h> {
                 }
                 self.push(")");
             }
-            Expression::BuiltinEquals => todo!(),
-            Expression::BuiltinPrint => todo!(),
-            Expression::BuiltinTextConcat => todo!(),
-            Expression::BuiltinToDebugText => todo!(),
+
             Expression::Type(_) => panic!("Should have been resolved to a value."),
             Expression::Error => panic!("Error expression found."),
         }
@@ -126,7 +152,7 @@ impl<'h> Context<'h> {
     //     self.lower_expression_to_type_helper(body.return_value_id())
     // }
     fn lower_type(&mut self, type_: &Type) {
-        dbg!(type_);
+        self.push("const ");
         match type_ {
             Type::Type => todo!(),
             Type::Symbol => todo!(),
