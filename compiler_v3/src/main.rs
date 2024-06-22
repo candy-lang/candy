@@ -19,6 +19,7 @@ use hir_to_c::hir_to_c;
 use std::{
     fs,
     path::{self, Path, PathBuf},
+    process,
     time::{Duration, Instant},
 };
 use tracing::{debug, error, info, warn, Level, Metadata};
@@ -112,7 +113,26 @@ fn compile(options: CompileOptions) -> ProgramResult {
         format_duration(started_at.elapsed())
     );
 
-    fs::write(options.path.with_extension("c"), c_code).unwrap();
+    let c_path = options.path.with_extension("c");
+    fs::write(&c_path, c_code).unwrap();
+    process::Command::new("clang-format")
+        .args(["-i", c_path.to_str().unwrap()])
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
+
+    let executable_path = options.path.with_extension("");
+    process::Command::new("gcc")
+        .args([
+            c_path.to_str().unwrap(),
+            "-o",
+            executable_path.to_str().unwrap(),
+        ])
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
 
     info!("Done 🎉");
     Ok(())
