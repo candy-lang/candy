@@ -14,7 +14,7 @@ impl Display for Id {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Hir {
-    pub assignments: Vec<(Id, Box<str>, Assignment)>,
+    pub assignments: Vec<(Id, Box<str>, Definition)>,
 }
 // impl Hir {
 //     /// `None` means the ID belongs to a parameter.
@@ -30,10 +30,10 @@ pub struct Hir {
 //     }
 // }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum Assignment {
+pub enum Definition {
     Value {
-        value: Expression,
         type_: Type,
+        value: Expression,
     },
     Function {
         parameters: Box<[Parameter]>,

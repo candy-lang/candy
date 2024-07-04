@@ -1,12 +1,13 @@
 use crate::{
     ast::{AstAssignment, AstAssignmentKind, AstExpression, AstStatement, AstString, AstTextPart},
     error::CompilerError,
-    hir::{Assignment, Body, BuiltinFunction, Expression, Hir, Id, Parameter, Type},
+    hir::{Body, BuiltinFunction, Definition, Expression, Hir, Id, Parameter, Type},
     id::IdGenerator,
     position::Offset,
+    utils::HashMapExtension,
 };
-use rustc_hash::FxHashSet;
-use std::{ops::Range, path::Path};
+use rustc_hash::{FxHashMap, FxHashSet};
+use std::{collections::hash_map::Entry, mem, ops::Range, path::Path};
 use strum::VariantArray;
 
 pub fn ast_to_hir(path: &Path, ast: &[AstAssignment]) -> (Hir, Vec<CompilerError>) {
@@ -18,14 +19,42 @@ pub fn ast_to_hir(path: &Path, ast: &[AstAssignment]) -> (Hir, Vec<CompilerError
     context.add_builtin_functions();
     context.lower_assignments(ast);
 
-    let main_function = context
-        .hir
-        .assignments
-        .iter()
-        .find(|(_, box n, _)| n == "main");
+    let mut hir = Hir::default();
+    for (identifier, named) in mem::take(&mut context.definitions) {
+        match named {
+            Named::Value { id, definition } => {
+                let (type_, value) = definition.expect("Missing definition");
+                hir.assignments.push((
+                    id,
+                    identifier,
+                    Definition::Value {
+                        type_,
+                        value: value.unwrap(),
+                    },
+                ));
+            }
+            Named::Functions(functions) => {
+                for (id, signature_and_body) in functions {
+                    let (parameters, return_type, body) =
+                        signature_and_body.expect("Missing signature and body");
+                    hir.assignments.push((
+                        id,
+                        identifier.clone(),
+                        Definition::Function {
+                            parameters,
+                            return_type,
+                            body: body.expect("Missing body"),
+                        },
+                    ));
+                }
+            }
+        }
+    }
+
+    let main_function = hir.assignments.iter().find(|(_, box n, _)| n == "main");
     if let Some((_, _, assignment)) = main_function {
         match assignment.clone() {
-            Assignment::Function {
+            Definition::Function {
                 parameters,
                 return_type,
                 ..
@@ -42,7 +71,7 @@ pub fn ast_to_hir(path: &Path, ast: &[AstAssignment]) -> (Hir, Vec<CompilerError
                     context.add_error(Offset(0)..Offset(0), "Main function must return an int");
                 }
             }
-            Assignment::Value { value, type_ } => {
+            Definition::Value { value, type_ } => {
                 // TODO: report actual error location
                 context.add_error(Offset(0)..Offset(0), "`main` function must be a function");
             }
@@ -51,25 +80,33 @@ pub fn ast_to_hir(path: &Path, ast: &[AstAssignment]) -> (Hir, Vec<CompilerError
         context.add_error(Offset(0)..Offset(0), "Program is missing a main function");
     }
 
-    (context.hir, context.errors)
+    (hir, context.errors)
 }
 
 #[derive(Debug)]
 struct Context<'c> {
     path: &'c Path,
     id_generator: IdGenerator<Id>,
-    identifiers: Vec<(Box<str>, Id, Option<Assignment>, Type)>,
+    definitions: FxHashMap<Box<str>, Named>,
+    local_identifiers: Vec<(Box<str>, Id, Option<Definition>, Type)>,
     errors: Vec<CompilerError>,
-    hir: Hir,
+}
+#[derive(Debug)]
+enum Named {
+    Value {
+        id: Id,
+        definition: Option<(Type, Option<Expression>)>,
+    },
+    Functions(Vec<(Id, Option<(Box<[Parameter]>, Type, Option<Body>)>)>),
 }
 impl<'c> Context<'c> {
     fn new(path: &'c Path) -> Self {
         Self {
             path,
             id_generator: IdGenerator::start_at(BuiltinFunction::VARIANTS.len()),
-            identifiers: vec![],
+            definitions: FxHashMap::default(),
+            local_identifiers: vec![],
             errors: vec![],
-            hir: Hir::default(),
         }
     }
 
@@ -79,11 +116,11 @@ impl<'c> Context<'c> {
         expression: Expression,
         type_: Type,
     ) {
-        self.add_assignment_without_duplicate_name_check(
-            name,
-            Assignment::Value {
-                value: expression,
-                type_,
+        self.definitions.force_insert(
+            name.into(),
+            Named::Value {
+                id: self.id_generator.generate(),
+                definition: Some((type_, Some(expression))),
             },
         );
     }
@@ -151,71 +188,110 @@ impl<'c> Context<'c> {
         let name = builtin_function.as_ref();
         let parameters = parameters.into();
         let id = builtin_function.id();
-        let type_ = Type::Function {
-            parameter_types: parameters.iter().map(|it| it.type_.clone()).collect(),
-            return_type: Box::new(return_type.clone()),
-        };
-        let assignment = Assignment::Function {
-            parameters,
-            return_type,
-            body: Body::Builtin(builtin_function),
-        };
-        self.identifiers
-            .push((name.into(), id, Some(assignment.clone()), type_));
-        self.hir.assignments.push((id, name.into(), assignment));
+        self.definitions.force_insert(
+            name.into(),
+            Named::Functions(vec![(
+                id,
+                Some((
+                    parameters,
+                    return_type,
+                    Some(Body::Builtin(builtin_function)),
+                )),
+            )]),
+        );
     }
 
     fn lower_assignments(&mut self, assignments: &[AstAssignment]) {
         for assignment in assignments {
-            let Some((name, assignment)) = self.lower_assignment(assignment) else {
-                continue;
-            };
-
-            if let Some(assignment) = assignment {
-                self.add_assignment(name, assignment);
-            } else {
-                self.add_assignment(
-                    name,
-                    Assignment::Value {
-                        value: Expression::Error,
-                        type_: Type::Error,
-                    },
-                );
-            }
+            self.lower_assignment(assignment);
         }
     }
-    fn lower_assignment<'a>(
-        &mut self,
-        assignment: &'a AstAssignment,
-    ) -> Option<(&'a AstString, Option<Assignment>)> {
-        let name = assignment.name.value()?.identifier.value()?;
-        let assignment = match &assignment.kind {
-            AstAssignmentKind::Value { type_, value } => {
-                try {
-                    let explicit_type = type_.as_ref().and_then(|type_| {
-                        let (type_value, type_type) = self
-                            .lower_expression(type_.value()?)
-                            .unwrap_or((Expression::Type(Type::Error), Type::Type));
-                        if !matches!(type_type, Type::Type | Type::Error) {
-                            self.add_error(name.span.clone(), "Assignment's type must be a type");
+    fn lower_assignment(&mut self, assignment: &AstAssignment) {
+        let Some(name) = assignment.name.value().and_then(|it| it.identifier.value()) else {
+            return;
+        };
+
+        let old_local_assignments = mem::take(&mut self.local_identifiers);
+
+        match &assignment.kind {
+            AstAssignmentKind::Value { type_, value } => 'case: {
+                match self.definitions.entry(name.string.clone()) {
+                    Entry::Occupied(entry) => match entry.get() {
+                        Named::Functions(_) => {
+                            self.add_error(name.span.clone(), "A top-level value can't have the same name as a top-level function.");
+                            break 'case;
                         }
-                        Some(self.evaluate_expression_to_type(&type_value))
-                    });
-                    let (value, value_type) = value
-                        .value()
-                        .and_then(|it| self.lower_expression(it))
-                        .unwrap_or((Expression::Error, Type::Error));
-                    // TODO: check `value_type` is assignable to `explicit_type`
-                    Assignment::Value {
-                        value,
-                        type_: explicit_type.unwrap_or(value_type),
+                        Named::Value { .. } => {
+                            self.add_error(
+                                name.span.clone(),
+                                "Two top-level values can't have the same name.",
+                            );
+                            break 'case;
+                        }
+                    },
+                    Entry::Vacant(entry) => {
+                        entry.insert(Named::Value {
+                            id: self.id_generator.generate(),
+                            definition: None,
+                        });
                     }
+                }
+
+                let explicit_type = type_.as_ref().and_then(|type_| type_.value()).map(|type_| {
+                    let (type_value, type_type) = self
+                        .lower_expression(type_)
+                        .unwrap_or((Expression::Type(Type::Error), Type::Type));
+                    if !matches!(type_type, Type::Type | Type::Error) {
+                        self.add_error(name.span.clone(), "Assignment's type must be a type");
+                    }
+                    self.evaluate_expression_to_type(&type_value)
+                });
+                if let Some(explicit_type) = explicit_type.as_ref() {
+                    match self.definitions.get_mut(&name.string).unwrap() {
+                        Named::Value { definition, .. } => {
+                            *definition = Some((explicit_type.clone(), None));
+                        }
+                        Named::Functions(_) => unreachable!(),
+                    }
+                }
+
+                let (value, value_type) = value
+                    .value()
+                    .and_then(|it| self.lower_expression(it))
+                    .unwrap_or((Expression::Error, Type::Error));
+                // TODO: check `value_type` is assignable to `explicit_type`
+                match self.definitions.get_mut(&name.string).unwrap() {
+                    Named::Value { definition, .. } => {
+                        *definition = Some((explicit_type.unwrap_or(value_type), Some(value)));
+                    }
+                    Named::Functions(_) => unreachable!(),
                 }
             }
             AstAssignmentKind::Function {
-                parameters, body, ..
-            } => {
-                self.with_scope(|context| try {
+                parameters,
+                return_type,
+                body,
+                ..
+            } => 'case: {
+                let index = match self.definitions.entry(name.string.clone()) {
+                    Entry::Occupied(mut entry) => match entry.get_mut() {
+                        Named::Functions(functions) => {
+                            let index = functions.len();
+                            functions.push((self.id_generator.generate(), None));
+                            index
+                        }
+                        Named::Value { .. } => {
+                            self.add_error(name.span.clone(), "A top-level function can't have the same name as a top-level value.");
+                            break 'case;
+                        }
+                    },
+                    Entry::Vacant(entry) => {
+                        entry.insert(Named::Functions(vec![(self.id_generator.generate(), None)]));
+                        0
+                    }
+                };
+
+                self.with_scope(|context| {
                     // TODO: lower parameter types
                     assert!(parameters.is_empty());
                     // let mut parameter_names = FxHashSet::default();
@@ -243,19 +319,34 @@ impl<'c> Context<'c> {
                     //     })
                     //     .collect::<Option<Box<[_]>>>()?;
 
-                    // TODO: lower written return type
-                    // let return_type = context.lower_expression(return_type.value()?.as_ref())?;
-
-                    let (body, return_type) = context.lower_body(body);
-                    Assignment::Function {
-                        parameters: [].into(),
-                        return_type,
-                        body,
+                    let return_type = return_type
+                        .value()
+                        .and_then(|it| {
+                            context
+                                .lower_expression(it)
+                                .map(|(value, _)| context.evaluate_expression_to_type(&value))
+                        })
+                        .unwrap_or(Type::Error);
+                    match context.definitions.get_mut(&name.string).unwrap() {
+                        Named::Value { .. } => unreachable!(),
+                        Named::Functions(functions) => {
+                            functions[index].1 = Some(([].into(), return_type.clone(), None));
+                        }
                     }
-                })
+
+                    let (body, _) = context.lower_body(body);
+                    // TODO: check body's return type is assignable to `return_type`
+                    match context.definitions.get_mut(&name.string).unwrap() {
+                        Named::Value { .. } => unreachable!(),
+                        Named::Functions(functions) => {
+                            functions[index].1 = Some(([].into(), return_type, Some(body)));
+                        }
+                    };
+                });
             }
-        };
-        Some((name, assignment))
+        }
+
+        self.local_identifiers = old_local_assignments;
     }
 
     fn evaluate_expression_to_type(&mut self, expression: &Expression) -> Type {
@@ -276,20 +367,59 @@ impl<'c> Context<'c> {
             Expression::ValueWithTypeAnnotation { value, type_ } => todo!(),
             Expression::Lambda { parameters, body } => todo!(),
             Expression::Reference(id) => {
-                let assignment = self
-                    .identifiers
+                if let Some(assignment) = self
+                    .local_identifiers
                     .iter()
                     .find(|(_, i, _, _)| i == id)
-                    .map(|(_, _, assignment, _)| assignment.clone())
-                    .expect("ID not found")
-                    .expect("TODO: ID belongs to a parameter");
-                match assignment {
-                    Assignment::Value { value, .. } => self.evaluate_expression_to_type(&value),
-                    Assignment::Function {
-                        parameters,
-                        return_type,
-                        body,
-                    } => todo!(),
+                    .map(|(_, _, assignment, _)| {
+                        assignment.clone().expect("TODO: ID belongs to a parameter")
+                    })
+                {
+                    match assignment {
+                        Definition::Value { value, .. } => self.evaluate_expression_to_type(&value),
+                        Definition::Function {
+                            parameters,
+                            return_type,
+                            body,
+                        } => todo!(),
+                    }
+                } else {
+                    for definition in self.definitions.values() {
+                        match definition {
+                            Named::Value {
+                                id: inner_id,
+                                definition,
+                            } => {
+                                if id != inner_id {
+                                    continue;
+                                }
+
+                                if let Some(value) =
+                                    definition.as_ref().and_then(|(_, value)| value.as_ref())
+                                {
+                                    return self.evaluate_expression_to_type(&value.clone());
+                                }
+                                // TODO: report actual error location
+                                self.add_error(
+                                    Offset(0)..Offset(0),
+                                    "Recursion while resolving type",
+                                );
+                                return Type::Error;
+                            }
+                            Named::Functions(functions) => {
+                                if functions.iter().any(|(i, _)| i == id) {
+                                    // TODO: report actual error location
+                                    self.add_error(
+                                        Offset(0)..Offset(0),
+                                        "Function reference is not a valid type",
+                                    );
+                                    return Type::Error;
+                                }
+                                continue;
+                            }
+                        }
+                    }
+                    unreachable!("ID not found");
                 }
             }
             Expression::Call {
@@ -347,10 +477,10 @@ impl<'c> Context<'c> {
 
             let id = self.id_generator.generate();
             if let Some(name) = &name {
-                self.identifiers.push((
+                self.local_identifiers.push((
                     name.clone(),
                     id,
-                    Some(Assignment::Value {
+                    Some(Definition::Value {
                         value: expression.clone(),
                         type_: type_.clone(),
                     }),
@@ -375,12 +505,59 @@ impl<'c> Context<'c> {
             AstExpression::Identifier(identifier) => {
                 let identifier = identifier.identifier.value()?;
                 let name = &identifier.string;
-                let Some((id, type_)) = self.lookup_identifier(identifier) else {
+                if let Some((id, type_)) = self.lookup_local_identifier(identifier) {
+                    (Expression::Reference(id), type_.clone())
+                } else if let Some(named) = self.definitions.get(name) {
+                    match named {
+                        Named::Value { id, definition } => {
+                            let id = *id;
+                            let type_ = if let Some((type_, _)) = definition {
+                                type_.clone()
+                            } else {
+                                self.add_error(
+                                    identifier.span.clone(),
+                                    "Missing type in recursion",
+                                );
+                                Type::Error
+                            };
+                            (Expression::Reference(id), type_)
+                        }
+                        Named::Functions(functions) => {
+                            assert!(!functions.is_empty());
+                            if functions.len() > 1 {
+                                self.add_error(
+                                    identifier.span.clone(),
+                                    "Function overloads are not yet supported",
+                                );
+                                (Expression::Error, Type::Error)
+                            } else {
+                                let (id, signature_and_body) = &functions[0];
+                                if let Some((parameter_types, return_type, _)) = signature_and_body
+                                {
+                                    (
+                                        Expression::Reference(*id),
+                                        Type::Function {
+                                            parameter_types: parameter_types
+                                                .iter()
+                                                .map(|it| it.type_.clone())
+                                                .collect(),
+                                            return_type: Box::new(return_type.clone()),
+                                        },
+                                    )
+                                } else {
+                                    self.add_error(
+                                        identifier.span.clone(),
+                                        "Missing function signature in recursion",
+                                    );
+                                    (Expression::Error, Type::Error)
+                                }
+                            }
+                        }
+                    }
+                } else {
                     self.add_error(identifier.span.clone(), format!("Unknown variable: {name}"));
                     return None;
-                };
-
-                (Expression::Reference(id), type_.clone())
+                }
             }
             AstExpression::Symbol(symbol) => (
                 Expression::Symbol(symbol.symbol.value()?.string.clone()),
@@ -536,53 +713,19 @@ impl<'c> Context<'c> {
 
     // Utils
     fn with_scope<T>(&mut self, fun: impl FnOnce(&mut Self) -> T) -> T {
-        let scope = self.identifiers.len();
+        let scope = self.local_identifiers.len();
         let result = fun(self);
-        assert!(self.identifiers.len() >= scope);
-        self.identifiers.truncate(scope);
+        assert!(self.local_identifiers.len() >= scope);
+        self.local_identifiers.truncate(scope);
         result
     }
     #[must_use]
-    fn lookup_identifier(&self, name: &str) -> Option<(Id, &Type)> {
-        self.identifiers
+    fn lookup_local_identifier(&self, name: &str) -> Option<(Id, &Type)> {
+        self.local_identifiers
             .iter()
             .rev()
             .find(|(box variable_name, _, _, _)| variable_name == name)
             .map(|(_, id, _, type_)| (*id, type_))
-    }
-
-    fn add_assignment(&mut self, name: &AstString, assignment: Assignment) {
-        if self.hir.assignments.iter().any(|(_, n, _)| n == &**name) {
-            self.add_error(
-                name.span.clone(),
-                format!("Duplicate assignment: {}", **name),
-            );
-            return;
-        }
-
-        self.add_assignment_without_duplicate_name_check(name.string.clone(), assignment);
-    }
-    fn add_assignment_without_duplicate_name_check(
-        &mut self,
-        name: impl Into<Box<str>>,
-        assignment: Assignment,
-    ) {
-        let name = name.into();
-        let id = self.id_generator.generate();
-        let type_ = match &assignment {
-            Assignment::Value { type_, .. } => type_.clone(),
-            Assignment::Function {
-                parameters,
-                return_type,
-                ..
-            } => Type::Function {
-                parameter_types: parameters.iter().map(|it| it.type_.clone()).collect(),
-                return_type: Box::new(return_type.clone()),
-            },
-        };
-        self.identifiers
-            .push((name.clone(), id, Some(assignment.clone()), type_));
-        self.hir.assignments.push((id, name, assignment));
     }
 
     fn add_error(&mut self, span: Range<Offset>, message: impl Into<String>) {

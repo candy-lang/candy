@@ -35,6 +35,7 @@ mod hir_to_c;
 mod id;
 mod position;
 mod string_to_ast;
+mod utils;
 
 #[derive(Parser, Debug)]
 #[command(name = "candy", about = "The 🍭 Candy CLI.")]

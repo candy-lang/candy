@@ -1,4 +1,4 @@
-use crate::hir::{Assignment, Body, BuiltinFunction, Expression, Hir, Parameter, Type};
+use crate::hir::{Body, BuiltinFunction, Definition, Expression, Hir, Parameter, Type};
 use core::panic;
 
 pub fn hir_to_c(hir: &Hir) -> String {
@@ -23,14 +23,14 @@ impl<'h> Context<'h> {
 
     fn lower_hir(&mut self) {
         self.push("#include <stdint.h>\n");
-        self.push("#include <stdio.h>\n\n");
-        self.push("#include <stdlib.h>\n\n");
+        self.push("#include <stdio.h>\n");
+        self.push("#include <stdlib.h>\n");
         self.push("#include <string.h>\n\n");
 
         for (id, name, assignment) in &self.hir.assignments {
             self.push(format!("// {name}\n"));
             match assignment {
-                Assignment::Value { type_, value } => 'case: {
+                Definition::Value { type_, value } => 'case: {
                     if type_ == &Type::Type {
                         self.push("// Is a type.");
                         break 'case;
@@ -42,7 +42,7 @@ impl<'h> Context<'h> {
                     self.lower_expression(value);
                     self.push(";");
                 }
-                Assignment::Function {
+                Definition::Function {
                     box parameters,
                     return_type,
                     body,
