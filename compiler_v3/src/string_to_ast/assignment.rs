@@ -12,7 +12,10 @@ use super::{
     },
     word::{identifier, word},
 };
-use crate::ast::{AstAssignment, AstAssignmentKind, AstError, AstParameter};
+use crate::ast::{
+    AstAssignment, AstAssignmentFunction, AstAssignmentKind, AstAssignmentValue, AstError,
+    AstParameter,
+};
 use tracing::instrument;
 
 #[instrument(level = "trace")]
@@ -83,7 +86,7 @@ fn function_assignment(
         parser,
         assignment_sign_error,
         is_public,
-        AstAssignmentKind::Function {
+        AstAssignmentKind::Function(AstAssignmentFunction {
             parameters,
             closing_parenthesis_error,
             arrow_error,
@@ -91,7 +94,7 @@ fn function_assignment(
             opening_curly_brace_error,
             body,
             closing_curly_brace_error,
-        },
+        }),
     ))
 }
 
@@ -117,10 +120,10 @@ fn value_assignment(parser: Parser) -> (Parser, Option<AstError>, bool, AstAssig
         parser,
         assignment_sign_error,
         is_public,
-        AstAssignmentKind::Value {
+        AstAssignmentKind::Value(AstAssignmentValue {
             type_,
             value: value.map(Box::new),
-        },
+        }),
     )
 }
 
@@ -175,11 +178,8 @@ fn parameter(parser: Parser) -> Option<(Parser, AstParameter, Option<Parser>)> {
                 (parser, Some(type_))
             });
 
-    let (parser, parser_for_missing_comma_error) = if let Some(parser) = comma(parser) {
-        (parser, None)
-    } else {
-        (parser, Some(parser))
-    };
+    let (parser, parser_for_missing_comma_error) =
+        comma(parser).map_or((parser, Some(parser)), |parser| (parser, None));
 
     Some((
         parser,

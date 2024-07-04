@@ -162,19 +162,23 @@ pub struct AstAssignment {
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum AstAssignmentKind {
-    Value {
-        type_: Option<AstResult<Box<AstExpression>>>,
-        value: AstResult<Box<AstExpression>>,
-    },
-    Function {
-        parameters: Vec<AstParameter>,
-        closing_parenthesis_error: Option<AstError>,
-        arrow_error: Option<AstError>,
-        return_type: AstResult<Box<AstExpression>>,
-        opening_curly_brace_error: Option<AstError>,
-        body: Vec<AstStatement>,
-        closing_curly_brace_error: Option<AstError>,
-    },
+    Value(AstAssignmentValue),
+    Function(AstAssignmentFunction),
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct AstAssignmentValue {
+    pub type_: Option<AstResult<Box<AstExpression>>>,
+    pub value: AstResult<Box<AstExpression>>,
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct AstAssignmentFunction {
+    pub parameters: Vec<AstParameter>,
+    pub closing_parenthesis_error: Option<AstError>,
+    pub arrow_error: Option<AstError>,
+    pub return_type: AstResult<Box<AstExpression>>,
+    pub opening_curly_brace_error: Option<AstError>,
+    pub body: Vec<AstStatement>,
+    pub closing_curly_brace_error: Option<AstError>,
 }
 
 pub trait CollectAstErrors {
@@ -331,11 +335,11 @@ impl CollectAstErrors for AstAssignment {
         self.name.collect_errors_to(errors);
         self.assignment_sign_error.collect_errors_to(errors);
         match &self.kind {
-            AstAssignmentKind::Value { type_, value } => {
+            AstAssignmentKind::Value(AstAssignmentValue { type_, value }) => {
                 type_.collect_errors_to(errors);
                 value.collect_errors_to(errors);
             }
-            AstAssignmentKind::Function {
+            AstAssignmentKind::Function(AstAssignmentFunction {
                 parameters,
                 closing_parenthesis_error,
                 arrow_error,
@@ -343,7 +347,7 @@ impl CollectAstErrors for AstAssignment {
                 opening_curly_brace_error,
                 body,
                 closing_curly_brace_error,
-            } => {
+            }) => {
                 for parameter in parameters {
                     parameter.name.collect_errors_to(errors);
                     parameter.type_.collect_errors_to(errors);

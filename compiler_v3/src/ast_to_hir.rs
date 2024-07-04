@@ -1,13 +1,22 @@
 use crate::{
-    ast::{AstAssignment, AstAssignmentKind, AstExpression, AstStatement, AstString, AstTextPart},
+    ast::{
+        AstAssignment, AstAssignmentFunction, AstAssignmentKind, AstAssignmentValue, AstExpression,
+        AstStatement, AstTextPart,
+    },
     error::CompilerError,
     hir::{Body, BuiltinFunction, Definition, Expression, Hir, Id, Parameter, Type},
     id::IdGenerator,
     position::Offset,
     utils::HashMapExtension,
 };
+use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{collections::hash_map::Entry, mem, ops::Range, path::Path};
+use std::{
+    collections::{hash_map::Entry, BTreeSet},
+    mem,
+    ops::Range,
+    path::Path,
+};
 use strum::VariantArray;
 
 pub fn ast_to_hir(path: &Path, ast: &[AstAssignment]) -> (Hir, Vec<CompilerError>) {
@@ -17,12 +26,26 @@ pub fn ast_to_hir(path: &Path, ast: &[AstAssignment]) -> (Hir, Vec<CompilerError
     context.add_builtin_value("int", Expression::Type(Type::Int), Type::Type);
     context.add_builtin_value("text", Expression::Type(Type::Text), Type::Type);
     context.add_builtin_functions();
-    context.lower_assignments(ast);
+
+    context.catalog_assignments(ast);
+    context.lower_assignments();
+
+    let mut identifiers: FxHashMap<_, _> = context
+        .global_identifiers
+        .iter()
+        .flat_map(|(name, named)| match named {
+            Named::Value(id) => vec![(*id, name.clone())],
+            Named::Functions(functions) => {
+                functions.iter().map(|id| (*id, name.clone())).collect_vec()
+            }
+        })
+        .collect();
 
     let mut hir = Hir::default();
-    for (identifier, named) in mem::take(&mut context.definitions) {
-        match named {
-            Named::Value { id, definition } => {
+    for (id, definition) in mem::take(&mut context.definitions) {
+        let identifier = identifiers.remove(&id).unwrap();
+        match definition {
+            TempDefinition::Value(ValueDefinition { definition, .. }) => {
                 let (type_, value) = definition.expect("Missing definition");
                 hir.assignments.push((
                     id,
@@ -33,20 +56,20 @@ pub fn ast_to_hir(path: &Path, ast: &[AstAssignment]) -> (Hir, Vec<CompilerError
                     },
                 ));
             }
-            Named::Functions(functions) => {
-                for (id, signature_and_body) in functions {
-                    let (parameters, return_type, body) =
-                        signature_and_body.expect("Missing signature and body");
-                    hir.assignments.push((
-                        id,
-                        identifier.clone(),
-                        Definition::Function {
-                            parameters,
-                            return_type,
-                            body: body.expect("Missing body"),
-                        },
-                    ));
-                }
+            TempDefinition::Function(FunctionDefinition {
+                signature_and_body, ..
+            }) => {
+                let (parameters, return_type, body) =
+                    signature_and_body.expect("Missing signature and body");
+                hir.assignments.push((
+                    id,
+                    identifier.clone(),
+                    Definition::Function {
+                        parameters,
+                        return_type,
+                        body: body.expect("Missing body"),
+                    },
+                ));
             }
         }
     }
@@ -87,17 +110,33 @@ pub fn ast_to_hir(path: &Path, ast: &[AstAssignment]) -> (Hir, Vec<CompilerError
 struct Context<'c> {
     path: &'c Path,
     id_generator: IdGenerator<Id>,
-    definitions: FxHashMap<Box<str>, Named>,
+    definitions: FxHashMap<Id, TempDefinition<'c>>,
+    definitions_to_lower: BTreeSet<Id>,
+    global_identifiers: FxHashMap<Box<str>, Named>,
     local_identifiers: Vec<(Box<str>, Id, Option<Definition>, Type)>,
     errors: Vec<CompilerError>,
 }
 #[derive(Debug)]
 enum Named {
-    Value {
-        id: Id,
-        definition: Option<(Type, Option<Expression>)>,
-    },
-    Functions(Vec<(Id, Option<(Box<[Parameter]>, Type, Option<Body>)>)>),
+    Value(Id),
+    Functions(Vec<Id>),
+}
+#[derive(Debug)]
+enum TempDefinition<'a> {
+    Value(ValueDefinition<'a>),
+    Function(FunctionDefinition<'a>),
+}
+#[derive(Debug)]
+struct ValueDefinition<'a> {
+    identifier_span: Range<Offset>,
+    ast: Option<&'a AstAssignmentValue>,
+    definition: Option<(Type, Option<Expression>)>,
+}
+#[derive(Debug)]
+struct FunctionDefinition<'a> {
+    identifier_span: Range<Offset>,
+    ast: Option<&'a AstAssignmentFunction>,
+    signature_and_body: Option<(Box<[Parameter]>, Type, Option<Body>)>,
 }
 impl<'c> Context<'c> {
     fn new(path: &'c Path) -> Self {
@@ -105,6 +144,8 @@ impl<'c> Context<'c> {
             path,
             id_generator: IdGenerator::start_at(BuiltinFunction::VARIANTS.len()),
             definitions: FxHashMap::default(),
+            definitions_to_lower: BTreeSet::default(),
+            global_identifiers: FxHashMap::default(),
             local_identifiers: vec![],
             errors: vec![],
         }
@@ -116,13 +157,17 @@ impl<'c> Context<'c> {
         expression: Expression,
         type_: Type,
     ) {
+        let id = self.id_generator.generate();
         self.definitions.force_insert(
-            name.into(),
-            Named::Value {
-                id: self.id_generator.generate(),
+            id,
+            TempDefinition::Value(ValueDefinition {
+                identifier_span: Offset(0)..Offset(0),
+                ast: None,
                 definition: Some((type_, Some(expression))),
-            },
+            }),
         );
+        self.global_identifiers
+            .force_insert(name.into(), Named::Value(id));
     }
     fn add_builtin_functions(&mut self) {
         {
@@ -189,164 +234,210 @@ impl<'c> Context<'c> {
         let parameters = parameters.into();
         let id = builtin_function.id();
         self.definitions.force_insert(
-            name.into(),
-            Named::Functions(vec![(
-                id,
-                Some((
+            id,
+            TempDefinition::Function(FunctionDefinition {
+                identifier_span: Offset(0)..Offset(0),
+                ast: None,
+                signature_and_body: Some((
                     parameters,
                     return_type,
                     Some(Body::Builtin(builtin_function)),
                 )),
-            )]),
+            }),
         );
+        self.global_identifiers
+            .force_insert(name.into(), Named::Functions(vec![id]));
     }
 
-    fn lower_assignments(&mut self, assignments: &[AstAssignment]) {
+    fn catalog_assignments(&mut self, assignments: &'c [AstAssignment]) {
         for assignment in assignments {
-            self.lower_assignment(assignment);
+            self.catalog_assignment(assignment);
         }
     }
-    fn lower_assignment(&mut self, assignment: &AstAssignment) {
+    fn catalog_assignment(&mut self, assignment: &'c AstAssignment) {
         let Some(name) = assignment.name.value().and_then(|it| it.identifier.value()) else {
             return;
         };
 
-        let old_local_assignments = mem::take(&mut self.local_identifiers);
-
-        match &assignment.kind {
-            AstAssignmentKind::Value { type_, value } => 'case: {
-                match self.definitions.entry(name.string.clone()) {
+        let id = self.id_generator.generate();
+        let definition = match &assignment.kind {
+            AstAssignmentKind::Value(ast) => {
+                match self.global_identifiers.entry(name.string.clone()) {
                     Entry::Occupied(entry) => match entry.get() {
                         Named::Functions(_) => {
                             self.add_error(name.span.clone(), "A top-level value can't have the same name as a top-level function.");
-                            break 'case;
+                            return;
                         }
                         Named::Value { .. } => {
                             self.add_error(
                                 name.span.clone(),
                                 "Two top-level values can't have the same name.",
                             );
-                            break 'case;
+                            return;
                         }
                     },
                     Entry::Vacant(entry) => {
-                        entry.insert(Named::Value {
-                            id: self.id_generator.generate(),
-                            definition: None,
-                        });
+                        entry.insert(Named::Value(id));
                     }
                 }
-
-                let explicit_type = type_.as_ref().and_then(|type_| type_.value()).map(|type_| {
-                    let (type_value, type_type) = self
-                        .lower_expression(type_)
-                        .unwrap_or((Expression::Type(Type::Error), Type::Type));
-                    if !matches!(type_type, Type::Type | Type::Error) {
-                        self.add_error(name.span.clone(), "Assignment's type must be a type");
-                    }
-                    self.evaluate_expression_to_type(&type_value)
-                });
-                if let Some(explicit_type) = explicit_type.as_ref() {
-                    match self.definitions.get_mut(&name.string).unwrap() {
-                        Named::Value { definition, .. } => {
-                            *definition = Some((explicit_type.clone(), None));
-                        }
-                        Named::Functions(_) => unreachable!(),
-                    }
-                }
-
-                let (value, value_type) = value
-                    .value()
-                    .and_then(|it| self.lower_expression(it))
-                    .unwrap_or((Expression::Error, Type::Error));
-                // TODO: check `value_type` is assignable to `explicit_type`
-                match self.definitions.get_mut(&name.string).unwrap() {
-                    Named::Value { definition, .. } => {
-                        *definition = Some((explicit_type.unwrap_or(value_type), Some(value)));
-                    }
-                    Named::Functions(_) => unreachable!(),
-                }
+                TempDefinition::Value(ValueDefinition {
+                    identifier_span: name.span.clone(),
+                    ast: Some(ast),
+                    definition: None,
+                })
             }
-            AstAssignmentKind::Function {
-                parameters,
-                return_type,
-                body,
-                ..
-            } => 'case: {
-                let index = match self.definitions.entry(name.string.clone()) {
+            AstAssignmentKind::Function(ast) => {
+                let function = FunctionDefinition {
+                    identifier_span: name.span.clone(),
+                    ast: Some(ast),
+                    signature_and_body: None,
+                };
+                match self.global_identifiers.entry(name.string.clone()) {
                     Entry::Occupied(mut entry) => match entry.get_mut() {
                         Named::Functions(functions) => {
-                            let index = functions.len();
-                            functions.push((self.id_generator.generate(), None));
-                            index
+                            functions.push(id);
                         }
                         Named::Value { .. } => {
                             self.add_error(name.span.clone(), "A top-level function can't have the same name as a top-level value.");
-                            break 'case;
+                            return;
                         }
                     },
                     Entry::Vacant(entry) => {
-                        entry.insert(Named::Functions(vec![(self.id_generator.generate(), None)]));
-                        0
+                        entry.insert(Named::Functions(vec![id]));
                     }
-                };
-
-                self.with_scope(|context| {
-                    // TODO: lower parameter types
-                    assert!(parameters.is_empty());
-                    // let mut parameter_names = FxHashSet::default();
-                    // let parameters = parameters
-                    //     .iter()
-                    //     .map(|parameter| try {
-                    //         let name = parameter.name.identifier.value()?.clone();
-                    //         if !parameter_names.insert(name.clone()) {
-                    //             context.add_error(
-                    //                 name.span.clone(),
-                    //                 format!("Duplicate parameter name: {}", *name),
-                    //             );
-                    //             return None;
-                    //         }
-
-                    //         todo!();
-
-                    //         // let type_ = context.lower_expression(parameter.type_.as_ref()?.value()?)?;
-                    //         // let id = context.id_generator.generate();
-                    //         // context.define_variable(name.string.clone(), id);
-                    //         // Parameter {
-                    //         //     name: name.string,
-                    //         //     type_,
-                    //         // }
-                    //     })
-                    //     .collect::<Option<Box<[_]>>>()?;
-
-                    let return_type = return_type
-                        .value()
-                        .and_then(|it| {
-                            context
-                                .lower_expression(it)
-                                .map(|(value, _)| context.evaluate_expression_to_type(&value))
-                        })
-                        .unwrap_or(Type::Error);
-                    match context.definitions.get_mut(&name.string).unwrap() {
-                        Named::Value { .. } => unreachable!(),
-                        Named::Functions(functions) => {
-                            functions[index].1 = Some(([].into(), return_type.clone(), None));
-                        }
-                    }
-
-                    let (body, _) = context.lower_body(body);
-                    // TODO: check body's return type is assignable to `return_type`
-                    match context.definitions.get_mut(&name.string).unwrap() {
-                        Named::Value { .. } => unreachable!(),
-                        Named::Functions(functions) => {
-                            functions[index].1 = Some(([].into(), return_type, Some(body)));
-                        }
-                    };
-                });
+                }
+                TempDefinition::Function(function)
             }
-        }
+        };
+        self.definitions.force_insert(id, definition);
+        self.definitions_to_lower.insert(id);
+    }
+    fn lower_assignments(&mut self) {
+        while let Some(id) = self.definitions_to_lower.pop_last() {
+            let old_local_assignments = mem::take(&mut self.local_identifiers);
 
-        self.local_identifiers = old_local_assignments;
+            let definition = self.definitions.get(&id).unwrap();
+            match definition {
+                TempDefinition::Value(ValueDefinition {
+                    identifier_span,
+                    ast,
+                    definition,
+                }) => {
+                    if let Some((_, Some(_))) = definition {
+                        continue;
+                    }
+
+                    let identifier_span = identifier_span.clone();
+                    let ast = ast.unwrap();
+
+                    let explicit_type =
+                        ast.type_
+                            .as_ref()
+                            .and_then(|type_| type_.value())
+                            .map(|type_| {
+                                let (type_value, type_type) = self
+                                    .lower_expression(type_)
+                                    .unwrap_or((Expression::Type(Type::Error), Type::Type));
+                                if !matches!(type_type, Type::Type | Type::Error) {
+                                    self.add_error(
+                                        identifier_span,
+                                        "Assignment's type must be a type",
+                                    );
+                                }
+                                self.evaluate_expression_to_type(&type_value)
+                            });
+                    if let Some(explicit_type) = explicit_type.as_ref() {
+                        match self.definitions.get_mut(&id).unwrap() {
+                            TempDefinition::Value(ValueDefinition { definition, .. }) => {
+                                *definition = Some((explicit_type.clone(), None));
+                            }
+                            TempDefinition::Function(_) => unreachable!(),
+                        }
+                    }
+
+                    let (value, value_type) = ast
+                        .value
+                        .value()
+                        .and_then(|it| self.lower_expression(it))
+                        .unwrap_or((Expression::Error, Type::Error));
+                    // TODO: check `value_type` is assignable to `explicit_type`
+                    match self.definitions.get_mut(&id).unwrap() {
+                        TempDefinition::Value(ValueDefinition { definition, .. }) => {
+                            *definition = Some((explicit_type.unwrap_or(value_type), Some(value)));
+                        }
+                        TempDefinition::Function(_) => unreachable!(),
+                    }
+                }
+                TempDefinition::Function(FunctionDefinition {
+                    identifier_span,
+                    ast,
+                    signature_and_body,
+                }) => 'case: {
+                    let ast = ast.unwrap();
+                    self.with_scope(|context| {
+                        // TODO: lower parameter types
+                        assert!(ast.parameters.is_empty());
+                        // let mut parameter_names = FxHashSet::default();
+                        // let parameters = parameters
+                        //     .iter()
+                        //     .map(|parameter| try {
+                        //         let name = parameter.name.identifier.value()?.clone();
+                        //         if !parameter_names.insert(name.clone()) {
+                        //             context.add_error(
+                        //                 name.span.clone(),
+                        //                 format!("Duplicate parameter name: {}", *name),
+                        //             );
+                        //             return None;
+                        //         }
+
+                        //         todo!();
+
+                        //         // let type_ = context.lower_expression(parameter.type_.as_ref()?.value()?)?;
+                        //         // let id = context.id_generator.generate();
+                        //         // context.define_variable(name.string.clone(), id);
+                        //         // Parameter {
+                        //         //     name: name.string,
+                        //         //     type_,
+                        //         // }
+                        //     })
+                        //     .collect::<Option<Box<[_]>>>()?;
+
+                        let return_type = ast
+                            .return_type
+                            .value()
+                            .and_then(|it| {
+                                context
+                                    .lower_expression(it)
+                                    .map(|(value, _)| context.evaluate_expression_to_type(&value))
+                            })
+                            .unwrap_or(Type::Error);
+                        match context.definitions.get_mut(&id).unwrap() {
+                            TempDefinition::Value(_) => unreachable!(),
+                            TempDefinition::Function(FunctionDefinition {
+                                signature_and_body,
+                                ..
+                            }) => {
+                                *signature_and_body = Some(([].into(), return_type.clone(), None));
+                            }
+                        }
+
+                        let (body, _) = context.lower_body(&ast.body);
+                        // TODO: check body's return type is assignable to `return_type`
+                        match context.definitions.get_mut(&id).unwrap() {
+                            TempDefinition::Value(_) => unreachable!(),
+                            TempDefinition::Function(FunctionDefinition {
+                                signature_and_body,
+                                ..
+                            }) => {
+                                *signature_and_body = Some(([].into(), return_type, Some(body)));
+                            }
+                        };
+                    });
+                }
+            }
+
+            self.local_identifiers = old_local_assignments;
+        }
     }
 
     fn evaluate_expression_to_type(&mut self, expression: &Expression) -> Type {
@@ -383,42 +474,31 @@ impl<'c> Context<'c> {
                             body,
                         } => todo!(),
                     }
-                } else {
-                    for definition in self.definitions.values() {
-                        match definition {
-                            Named::Value {
-                                id: inner_id,
-                                definition,
-                            } => {
-                                if id != inner_id {
-                                    continue;
-                                }
-
-                                if let Some(value) =
-                                    definition.as_ref().and_then(|(_, value)| value.as_ref())
-                                {
-                                    return self.evaluate_expression_to_type(&value.clone());
-                                }
+                } else if let Some(definition) = self.definitions.get(id) {
+                    match definition {
+                        TempDefinition::Value(ValueDefinition { definition, .. }) => {
+                            let Some(value) =
+                                definition.as_ref().and_then(|(_, value)| value.as_ref())
+                            else {
                                 // TODO: report actual error location
                                 self.add_error(
                                     Offset(0)..Offset(0),
                                     "Recursion while resolving type",
                                 );
                                 return Type::Error;
-                            }
-                            Named::Functions(functions) => {
-                                if functions.iter().any(|(i, _)| i == id) {
-                                    // TODO: report actual error location
-                                    self.add_error(
-                                        Offset(0)..Offset(0),
-                                        "Function reference is not a valid type",
-                                    );
-                                    return Type::Error;
-                                }
-                                continue;
-                            }
+                            };
+                            self.evaluate_expression_to_type(&value.clone())
+                        }
+                        TempDefinition::Function(_) => {
+                            // TODO: report actual error location
+                            self.add_error(
+                                Offset(0)..Offset(0),
+                                "Function reference is not a valid type",
+                            );
+                            return Type::Error;
                         }
                     }
+                } else {
                     unreachable!("ID not found");
                 }
             }
@@ -446,7 +526,7 @@ impl<'c> Context<'c> {
                     };
 
                     let (expression, type_) = match &assignment.kind {
-                        AstAssignmentKind::Value { value, type_: _ } => {
+                        AstAssignmentKind::Value(AstAssignmentValue { value, type_: _ }) => {
                             // TODO: lower written type
                             if let Some((value, type_)) =
                                 value.value().and_then(|it| self.lower_expression(it))
@@ -507,9 +587,16 @@ impl<'c> Context<'c> {
                 let name = &identifier.string;
                 if let Some((id, type_)) = self.lookup_local_identifier(identifier) {
                     (Expression::Reference(id), type_.clone())
-                } else if let Some(named) = self.definitions.get(name) {
+                } else if let Some(named) = self.global_identifiers.get(name) {
                     match named {
-                        Named::Value { id, definition } => {
+                        Named::Value(id) => {
+                            let definition = match self.definitions.get(id).unwrap() {
+                                TempDefinition::Value(ValueDefinition { definition, .. }) => {
+                                    definition
+                                }
+                                TempDefinition::Function(_) => unreachable!(),
+                            };
+
                             let id = *id;
                             let type_ = if let Some((type_, _)) = definition {
                                 type_.clone()
@@ -531,11 +618,19 @@ impl<'c> Context<'c> {
                                 );
                                 (Expression::Error, Type::Error)
                             } else {
-                                let (id, signature_and_body) = &functions[0];
+                                let id = functions[0];
+                                let signature_and_body = match self.definitions.get(&id).unwrap() {
+                                    TempDefinition::Value(_) => unreachable!(),
+                                    TempDefinition::Function(FunctionDefinition {
+                                        signature_and_body,
+                                        ..
+                                    }) => signature_and_body,
+                                };
+
                                 if let Some((parameter_types, return_type, _)) = signature_and_body
                                 {
                                     (
-                                        Expression::Reference(*id),
+                                        Expression::Reference(id),
                                         Type::Function {
                                             parameter_types: parameter_types
                                                 .iter()

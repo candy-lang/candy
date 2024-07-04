@@ -3,7 +3,7 @@ use derive_more::Deref;
 use std::fmt::{self, Display, Formatter};
 use strum::{AsRefStr, VariantArray};
 
-#[derive(Clone, Copy, Debug, Default, Deref, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Deref, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Id(usize);
 impl_countable_id!(Id);
 impl Display for Id {
