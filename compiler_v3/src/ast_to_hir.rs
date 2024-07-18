@@ -355,9 +355,7 @@ impl<'c> Context<'c> {
                         .as_ref()
                         .and_then(|type_| type_.value())
                         .map(|type_| {
-                            let type_value = self
-                                .lower_expression(type_, Some(&Type::Type))
-                                .map_or(Expression::Type(Type::Error), |(value, _)| value);
+                            let (type_value, _) = self.lower_expression(type_, Some(&Type::Type));
                             self.evaluate_expression_to_type(&type_value)
                         });
                 if let Some(explicit_type) = explicit_type.as_ref() {
@@ -372,8 +370,9 @@ impl<'c> Context<'c> {
                 let (value, value_type) = ast
                     .value
                     .value()
-                    .and_then(|it| self.lower_expression(it, explicit_type.as_ref()))
-                    .unwrap_or((Expression::Error, Type::Error));
+                    .map_or((Expression::Error, Type::Error), |it| {
+                        self.lower_expression(it, explicit_type.as_ref())
+                    });
                 // TODO: check `value_type` is assignable to `explicit_type`
                 match self.definitions.get_mut(&id).unwrap() {
                     TempDefinition::Value(ValueDefinition { definition, .. }) => {
@@ -414,15 +413,10 @@ impl<'c> Context<'c> {
                     //     })
                     //     .collect::<Option<Box<[_]>>>()?;
 
-                    let return_type = ast
-                        .return_type
-                        .value()
-                        .and_then(|it| {
-                            context
-                                .lower_expression(it, Some(&Type::Type))
-                                .map(|(value, _)| context.evaluate_expression_to_type(&value))
-                        })
-                        .unwrap_or(Type::Error);
+                    let return_type = ast.return_type.value().map_or(Type::Error, |it| {
+                        let (value, _) = context.lower_expression(it, Some(&Type::Type));
+                        context.evaluate_expression_to_type(&value)
+                    });
                     match context.definitions.get_mut(&id).unwrap() {
                         TempDefinition::Value(_) => unreachable!(),
                         TempDefinition::Function(FunctionDefinition {
@@ -609,7 +603,7 @@ impl<'c> Context<'c> {
                         AstAssignmentKind::Value(AstAssignmentValue { value, type_: _ }) => {
                             // TODO: lower written type
                             if let Some((value, type_)) =
-                                value.value().and_then(|it| self.lower_expression(it, None))
+                                value.value().map(|it| self.lower_expression(it, None))
                             {
                                 (
                                     Expression::ValueWithTypeAnnotation {
@@ -628,12 +622,8 @@ impl<'c> Context<'c> {
                     (Some(name.string), expression, type_)
                 }
                 AstStatement::Expression(expression) => {
-                    let Some((expression, type_)) =
-                        self.lower_expression(expression, statement_context_type)
-                    else {
-                        continue;
-                    };
-
+                    let (expression, type_) =
+                        self.lower_expression(expression, statement_context_type);
                     (None, expression, type_)
                 }
             };
@@ -664,10 +654,12 @@ impl<'c> Context<'c> {
         &mut self,
         expression: &AstExpression,
         context_type: Option<&Type>,
-    ) -> Option<(Expression, Type)> {
+    ) -> (Expression, Type) {
         let (expression, type_) = match expression {
             AstExpression::Identifier(identifier) => {
-                let identifier = identifier.identifier.value()?;
+                let Some(identifier) = identifier.identifier.value() else {
+                    return (Expression::Error, Type::Error);
+                };
                 let name = &identifier.string;
                 if let Some((id, type_)) = self.lookup_local_identifier(identifier) {
                     (Expression::Reference(id), type_.clone())
@@ -737,11 +729,11 @@ impl<'c> Context<'c> {
                     }
                 } else {
                     self.add_error(identifier.span.clone(), format!("Unknown variable: {name}"));
-                    return None;
+                    (Expression::Error, Type::Error)
                 }
             }
             AstExpression::Symbol(symbol) => {
-                let symbol_string = &symbol.symbol.value()?.string;
+                let symbol_string = &symbol.symbol.value().unwrap().string;
                 if context_type == Some(&Type::Type) {
                     (
                         Expression::Type(Type::Tag(TagType {
@@ -763,45 +755,52 @@ impl<'c> Context<'c> {
                     )
                 }
             }
-            AstExpression::Int(int) => (Expression::Int(*int.value.value()?), Type::Int),
+            AstExpression::Int(int) => (
+                int.value
+                    .value()
+                    .map_or(Expression::Error, |it| Expression::Int(*it)),
+                Type::Int,
+            ),
             AstExpression::Text(text) => {
                 let text = text
                     .parts
                     .iter()
-                    .map::<Option<Expression>, _>(|it| try {
-                        match it {
-                            AstTextPart::Text(text) => Expression::Text(text.clone()),
-                            AstTextPart::Interpolation { expression, .. } => {
-                                let (value, type_) =
-                                    self.lower_expression(expression.value()?, Some(&Type::Text))?;
-                                if type_ != Type::Text {
-                                    // TODO: report actual error location
-                                    self.add_error(
-                                        Offset(0)..Offset(0),
-                                        "Interpolated expression must be text",
-                                    );
-                                    return None;
-                                }
-                                value
+                    .map::<Expression, _>(|it| match it {
+                        AstTextPart::Text(text) => Expression::Text(text.clone()),
+                        AstTextPart::Interpolation { expression, .. } => {
+                            let (value, type_) = expression
+                                .value()
+                                .map_or((Expression::Error, Type::Error), |it| {
+                                    self.lower_expression(it, Some(&Type::Text))
+                                });
+                            if type_ != Type::Text {
+                                // TODO: report actual error location
+                                self.add_error(
+                                    Offset(0)..Offset(0),
+                                    "Interpolated expression must be text",
+                                );
+                                return Expression::Error;
                             }
+                            value
                         }
                     })
-                    .reduce(|lhs, rhs| match (lhs, rhs) {
-                        (Some(lhs), Some(rhs)) => Some(Expression::Call {
-                            receiver: Box::new(Expression::Reference(
-                                BuiltinFunction::TextConcat.id(),
-                            )),
-                            arguments: [lhs, rhs].into(),
-                        }),
-                        _ => None,
-                    })??;
+                    .reduce(|lhs, rhs| Expression::Call {
+                        receiver: Box::new(Expression::Reference(BuiltinFunction::TextConcat.id())),
+                        arguments: [lhs, rhs].into(),
+                    })
+                    .unwrap_or_else(|| Expression::Text("".into()));
                 (text, Type::Text)
             }
             AstExpression::Parenthesized(parenthesized) => {
-                return self.lower_expression(parenthesized.inner.value()?, context_type);
+                return parenthesized
+                    .inner
+                    .value()
+                    .map_or((Expression::Error, Type::Error), |it| {
+                        self.lower_expression(it, context_type)
+                    });
             }
             AstExpression::Call(call) => {
-                let (receiver, receiver_type) = self.lower_expression(&call.receiver, None)?;
+                let (receiver, receiver_type) = self.lower_expression(&call.receiver, None);
                 let parameter_context_types: Option<Cow<Box<[Type]>>> = match &receiver_type {
                     Type::Tag(TagType {
                         value_type: Some(box type_),
@@ -825,12 +824,12 @@ impl<'c> Context<'c> {
                                 .and_then(|it| it.get(index)),
                         )
                     })
-                    .collect::<Option<Box<[_]>>>()?;
+                    .collect::<Box<[_]>>();
                 match receiver_type {
                     Type::Type | Type::Int | Type::Text | Type::Struct(_) | Type::Or { .. } => {
                         // TODO: report actual error location
                         self.add_error(Offset(0)..Offset(0), "Cannot call this type");
-                        return None;
+                        return (Expression::Error, Type::Error);
                     }
                     Type::Tag(TagType { symbol, value_type }) => {
                         if value_type.is_some() {
@@ -839,14 +838,14 @@ impl<'c> Context<'c> {
                                 Offset(0)..Offset(0),
                                 "You called a tag that already has a value.",
                             );
-                            return None;
+                            return (Expression::Error, Type::Error);
                         } else if arguments.len() > 1 {
                             // TODO: report actual error location
                             self.add_error(
                                 Offset(0)..Offset(0),
                                 "Tags can only be created with one value.",
                             );
-                            return None;
+                            return (Expression::Error, Type::Error);
                         }
 
                         assert!(!arguments.is_empty());
@@ -907,7 +906,7 @@ impl<'c> Context<'c> {
                     });
 
                 let mut keys = FxHashSet::default();
-                let fields = struct_
+                let Some(fields) = struct_
                     .fields
                     .iter()
                     .map(|field| try {
@@ -927,10 +926,13 @@ impl<'c> Context<'c> {
                                     .find(|(type_name, _)| type_name == &**name)
                                     .map(|(_, type_)| type_)
                             }),
-                        )?;
+                        );
                         (name.string.clone(), value, type_)
                     })
-                    .collect::<Option<Vec<(Box<str>, Expression, Type)>>>()?;
+                    .collect::<Option<Vec<(Box<str>, Expression, Type)>>>()
+                else {
+                    return (Expression::Error, Type::Error);
+                };
                 let type_ = if fields.iter().any(|(_, _, type_)| type_ == &Type::Type) {
                     Type::Type
                 } else {
@@ -950,14 +952,15 @@ impl<'c> Context<'c> {
             AstExpression::StructAccess(struct_access) => {
                 // TODO: If we support implicit struct type conversion, pass a context type here
                 let (struct_, struct_type) =
-                    self.lower_expression(struct_access.struct_.as_ref(), None)?;
-                let field = struct_access
+                    self.lower_expression(struct_access.struct_.as_ref(), None);
+                let Some(field) = struct_access
                     .key
-                    .value()?
-                    .identifier
-                    .value()?
-                    .string
-                    .clone();
+                    .value()
+                    .and_then(|it| it.identifier.value())
+                    .map(|it| it.string.clone())
+                else {
+                    return (Expression::Error, Type::Error);
+                };
                 let type_ = match struct_type {
                     Type::Type
                     | Type::Tag { .. }
@@ -1000,15 +1003,10 @@ impl<'c> Context<'c> {
             }
             AstExpression::Lambda(_) => todo!(),
             AstExpression::Or(or) => {
-                let (left, _) = self.lower_expression(&or.left, Some(&Type::Type))?;
-                let right = or
-                    .right
-                    .value()
-                    .and_then(|it| {
-                        self.lower_expression(it, Some(&Type::Type))
-                            .map(|(value, _)| value)
-                    })
-                    .unwrap_or(Expression::Error);
+                let (left, _) = self.lower_expression(&or.left, Some(&Type::Type));
+                let right = or.right.value().map_or(Expression::Error, |it| {
+                    self.lower_expression(it, Some(&Type::Type)).0
+                });
                 (
                     Expression::Or {
                         left: Box::new(left),
@@ -1025,26 +1023,26 @@ impl<'c> Context<'c> {
                     .iter()
                     .any(|to| Self::tag_type_is_assignable_to(from, to))
             {
-                Some((
+                (
                     Expression::CreateOrVariant {
                         or_type: OrType(to.clone()),
                         symbol: from.symbol.clone(),
                         value: Box::new(expression),
                     },
                     context_type.clone(),
-                ))
+                )
             } else if Self::is_assignable_to(&type_, context_type) {
-                Some((expression, context_type.clone()))
+                (expression, context_type.clone())
             } else {
                 // TODO: report actual error location
                 self.add_error(
                     Offset(0)..Offset(0),
                     format!("Expected type `{context_type:?}`, got `{type_:?}`."),
                 );
-                Some((Expression::Error, Type::Error))
+                (Expression::Error, Type::Error)
             }
         } else {
-            Some((expression, type_))
+            (expression, type_)
         }
     }
 
