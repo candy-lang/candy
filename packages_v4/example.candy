@@ -56,7 +56,7 @@ let nothing = Nothing
 let true = True
 let false = False
 
-let printHello(name: text) -> Nothing = {
+let printHello(name: text) = {
   print("Hello, {name}!")
 }
 

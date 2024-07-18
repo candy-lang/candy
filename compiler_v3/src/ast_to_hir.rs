@@ -421,9 +421,11 @@ impl<'c> Context<'c> {
                         })
                         .collect();
 
-                    let return_type = ast.return_type.value().map_or(Type::Error, |it| {
-                        let (value, _) = context.lower_expression(it, Some(&Type::Type));
-                        context.evaluate_expression_to_type(&value)
+                    let return_type = ast.return_type.as_ref().map_or_else(Type::nothing, |it| {
+                        it.value().map_or(Type::Error, |it| {
+                            let (value, _) = context.lower_expression(it, Some(&Type::Type));
+                            context.evaluate_expression_to_type(&value)
+                        })
                     });
                     match context.definitions.get_mut(&id).unwrap() {
                         TempDefinition::Value(_) => unreachable!(),

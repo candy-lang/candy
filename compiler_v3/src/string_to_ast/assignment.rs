@@ -62,13 +62,15 @@ fn function_assignment(
         )
         .and_trailing_whitespace();
 
-    let (parser, arrow_error) = arrow(parser)
-        .unwrap_or_ast_error(parser, "Function assignment is missing an arrow.")
-        .and_trailing_whitespace();
-
-    let (parser, return_type) = expression(parser)
-        .unwrap_or_ast_error(parser, "Function assignment is missing a return type.")
-        .and_trailing_whitespace();
+    let (parser, return_type) =
+        arrow(parser)
+            .and_trailing_whitespace()
+            .map_or((parser, None), |parser| {
+                let (parser, return_type) = expression(parser)
+                    .unwrap_or_ast_error(parser, "Function assignment is missing a return type.")
+                    .and_trailing_whitespace();
+                (parser, Some(return_type.map(Box::new)))
+            });
 
     let (parser, assignment_sign_error, is_public) = assignment_sign(parser);
     let parser = parser.and_trailing_whitespace();
@@ -89,8 +91,7 @@ fn function_assignment(
         AstAssignmentKind::Function(AstAssignmentFunction {
             parameters,
             closing_parenthesis_error,
-            arrow_error,
-            return_type: return_type.map(Box::new),
+            return_type,
             opening_curly_brace_error,
             body,
             closing_curly_brace_error,

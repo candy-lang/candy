@@ -181,8 +181,7 @@ pub struct AstAssignmentValue {
 pub struct AstAssignmentFunction {
     pub parameters: Vec<AstParameter>,
     pub closing_parenthesis_error: Option<AstError>,
-    pub arrow_error: Option<AstError>,
-    pub return_type: AstResult<Box<AstExpression>>,
+    pub return_type: Option<AstResult<Box<AstExpression>>>,
     pub opening_curly_brace_error: Option<AstError>,
     pub body: Vec<AstStatement>,
     pub closing_curly_brace_error: Option<AstError>,
@@ -353,7 +352,6 @@ impl CollectAstErrors for AstAssignment {
             AstAssignmentKind::Function(AstAssignmentFunction {
                 parameters,
                 closing_parenthesis_error,
-                arrow_error,
                 return_type,
                 opening_curly_brace_error,
                 body,
@@ -365,7 +363,6 @@ impl CollectAstErrors for AstAssignment {
                     parameter.comma_error.collect_errors_to(errors);
                 }
                 closing_parenthesis_error.collect_errors_to(errors);
-                arrow_error.collect_errors_to(errors);
                 return_type.collect_errors_to(errors);
                 opening_curly_brace_error.collect_errors_to(errors);
                 for statement in body {
