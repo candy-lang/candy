@@ -129,13 +129,11 @@ enum TempDefinition<'a> {
 }
 #[derive(Debug)]
 struct ValueDefinition<'a> {
-    identifier_span: Range<Offset>,
     ast: Option<&'a AstAssignmentValue>,
     definition: Option<(Type, Option<Expression>)>,
 }
 #[derive(Debug)]
 struct FunctionDefinition<'a> {
-    identifier_span: Range<Offset>,
     ast: Option<&'a AstAssignmentFunction>,
     signature_and_body: Option<(Box<[Parameter]>, Type, Option<Body>)>,
 }
@@ -163,7 +161,6 @@ impl<'c> Context<'c> {
         self.definitions.force_insert(
             id,
             TempDefinition::Value(ValueDefinition {
-                identifier_span: Offset(0)..Offset(0),
                 ast: None,
                 definition: Some((type_, Some(expression))),
             }),
@@ -238,7 +235,6 @@ impl<'c> Context<'c> {
         self.definitions.force_insert(
             id,
             TempDefinition::Function(FunctionDefinition {
-                identifier_span: Offset(0)..Offset(0),
                 ast: None,
                 signature_and_body: Some((
                     parameters,
@@ -283,14 +279,12 @@ impl<'c> Context<'c> {
                     }
                 }
                 TempDefinition::Value(ValueDefinition {
-                    identifier_span: name.span.clone(),
                     ast: Some(ast),
                     definition: None,
                 })
             }
             AstAssignmentKind::Function(ast) => {
                 let function = FunctionDefinition {
-                    identifier_span: name.span.clone(),
                     ast: Some(ast),
                     signature_and_body: None,
                 };
@@ -351,12 +345,7 @@ impl<'c> Context<'c> {
 
         let definition = self.definitions.get(&id).unwrap();
         match definition {
-            TempDefinition::Value(ValueDefinition {
-                identifier_span,
-                ast,
-                ..
-            }) => {
-                let identifier_span = identifier_span.clone();
+            TempDefinition::Value(ValueDefinition { ast, .. }) => {
                 let ast = ast.unwrap();
 
                 let explicit_type =
@@ -366,8 +355,7 @@ impl<'c> Context<'c> {
                         .map(|type_| {
                             let type_value = self
                                 .lower_expression(type_, Some(&Type::Type))
-                                .map(|(value, _)| value)
-                                .unwrap_or(Expression::Type(Type::Error));
+                                .map_or(Expression::Type(Type::Error), |(value, _)| value);
                             self.evaluate_expression_to_type(&type_value)
                         });
                 if let Some(explicit_type) = explicit_type.as_ref() {
@@ -758,7 +746,18 @@ impl<'c> Context<'c> {
                         box return_type,
                         ..
                     } => {
-                        if parameter_types.len() != arguments.len() {
+                        if parameter_types.len() == arguments.len() {
+                            (
+                                Expression::Call {
+                                    receiver: Box::new(receiver),
+                                    arguments: arguments
+                                        .iter()
+                                        .map(|(value, _)| value.clone())
+                                        .collect(),
+                                },
+                                return_type,
+                            )
+                        } else {
                             // TODO: report actual error location
                             self.add_error(
                                 Offset(0)..Offset(0),
@@ -774,17 +773,6 @@ impl<'c> Context<'c> {
                                 ),
                             );
                             (Expression::Error, Type::Error)
-                        } else {
-                            (
-                                Expression::Call {
-                                    receiver: Box::new(receiver),
-                                    arguments: arguments
-                                        .iter()
-                                        .map(|(value, _)| value.clone())
-                                        .collect(),
-                                },
-                                return_type,
-                            )
                         }
                     }
                     Type::Error => (Expression::Error, Type::Error),
