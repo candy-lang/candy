@@ -120,6 +120,16 @@ pub enum Expression {
     Type(Type),
     Error,
 }
+impl Expression {
+    #[must_use]
+    pub fn nothing() -> Self {
+        Self::Tag {
+            symbol: Box::from("Nothing"),
+            value: None,
+        }
+    }
+}
+
 #[derive(AsRefStr, Clone, Copy, Debug, Eq, Hash, PartialEq, VariantArray)]
 #[strum(serialize_all = "camelCase")]
 pub enum BuiltinFunction {
@@ -149,10 +159,27 @@ pub enum Type {
     },
     Error,
 }
+impl Type {
+    #[must_use]
+    pub fn nothing() -> Self {
+        Self::Tag(TagType::nothing())
+    }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct TagType {
     pub symbol: Box<str>,
     pub value_type: Option<Box<Type>>,
 }
+impl TagType {
+    #[must_use]
+    pub fn nothing() -> Self {
+        Self {
+            symbol: Box::from("Nothing"),
+            value_type: None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct OrType(pub Box<[TagType]>);

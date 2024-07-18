@@ -122,14 +122,20 @@ impl<'h> Context<'h> {
         match body {
             Body::Builtin(builtin_function) => {
                 self.push("// builtin function\n");
-                self.push(match builtin_function {
-                    BuiltinFunction::IntAdd => format!(
+                match builtin_function {
+                    BuiltinFunction::IntAdd => self.push(format!(
                         "return {a} + {b};",
                         a = parameters[0].id,
                         b = parameters[1].id,
-                    ),
-                    BuiltinFunction::Print => format!("puts({}); return 0;", parameters[0].id),
-                    BuiltinFunction::TextConcat => format!(
+                    )),
+                    BuiltinFunction::Print => {
+                        self.push(format!("puts({}); const ", parameters[0].id));
+                        self.lower_type(&Type::nothing());
+                        self.push(" _1 = ");
+                        self.lower_expression(&Expression::nothing());
+                        self.push("; return _1;");
+                    }
+                    BuiltinFunction::TextConcat => self.push(format!(
                         "\
                         const size_t lengthA = strlen({a});\n\
                         const size_t lengthB = strlen({b});\n\
@@ -139,8 +145,8 @@ impl<'h> Context<'h> {
                         return result;",
                         a = parameters[0].id,
                         b = parameters[1].id,
-                    ),
-                });
+                    )),
+                }
             }
             Body::Written { expressions } => {
                 for (id, name, expression, type_) in expressions {
@@ -148,6 +154,7 @@ impl<'h> Context<'h> {
                         self.push(format!("// {name}\n"));
                     }
 
+                    self.push("const ");
                     self.lower_type(type_);
                     self.push(format!(" {id} = "));
                     self.lower_expression(expression);
@@ -222,6 +229,7 @@ impl<'h> Context<'h> {
 
     fn lower_type_definitions(&mut self) {
         let mut definitions = FxHashSet::default();
+        self.lower_type_definition(&mut definitions, &Type::nothing());
         for (_, _, assignment) in &self.hir.assignments {
             match assignment {
                 Definition::Value { type_, value } => {

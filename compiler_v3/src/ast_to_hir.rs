@@ -192,7 +192,6 @@ impl<'c> Context<'c> {
             );
         }
         {
-            // TODO: Return `Nothing`
             let message_id = self.id_generator.generate();
             self.add_builtin_function(
                 BuiltinFunction::Print,
@@ -201,7 +200,7 @@ impl<'c> Context<'c> {
                     name: "message".into(),
                     type_: Type::Text,
                 }],
-                Type::Int,
+                Type::nothing(),
             );
         }
         {
@@ -384,34 +383,43 @@ impl<'c> Context<'c> {
             TempDefinition::Function(FunctionDefinition { ast, .. }) => {
                 let ast = ast.unwrap();
                 self.with_scope(|context| {
-                    // TODO: lower parameter types
-                    if !ast.parameters.is_empty() {
-                        todo!("Function definition with parameters");
-                    }
-                    // let mut parameter_names = FxHashSet::default();
-                    // let parameters = parameters
-                    //     .iter()
-                    //     .map(|parameter| try {
-                    //         let name = parameter.name.identifier.value()?.clone();
-                    //         if !parameter_names.insert(name.clone()) {
-                    //             context.add_error(
-                    //                 name.span.clone(),
-                    //                 format!("Duplicate parameter name: {}", *name),
-                    //             );
-                    //             return None;
-                    //         }
+                    let mut parameter_names = FxHashSet::default();
+                    let parameters = ast
+                        .parameters
+                        .iter()
+                        .filter_map(|parameter| try {
+                            let name = parameter.name.identifier.value()?.clone();
+                            if !parameter_names.insert(name.clone()) {
+                                context.add_error(
+                                    name.span.clone(),
+                                    format!("Duplicate parameter name: {}", *name),
+                                );
+                                return None;
+                            }
 
-                    //         todo!();
+                            let type_ = parameter
+                                .type_
+                                .as_ref()
+                                .and_then(|it| it.value())
+                                .map_or(Expression::Error, |it| {
+                                    context.lower_expression(it, Some(&Type::Type)).0
+                                });
+                            let type_ = context.evaluate_expression_to_type(&type_);
 
-                    //         // let type_ = context.lower_expression(parameter.type_.as_ref()?.value()?)?;
-                    //         // let id = context.id_generator.generate();
-                    //         // context.define_variable(name.string.clone(), id);
-                    //         // Parameter {
-                    //         //     name: name.string,
-                    //         //     type_,
-                    //         // }
-                    //     })
-                    //     .collect::<Option<Box<[_]>>>()?;
+                            let id = context.id_generator.generate();
+                            context.local_identifiers.push((
+                                name.string.clone(),
+                                id,
+                                None,
+                                type_.clone(),
+                            ));
+                            Parameter {
+                                id,
+                                name: name.string,
+                                type_,
+                            }
+                        })
+                        .collect();
 
                     let return_type = ast.return_type.value().map_or(Type::Error, |it| {
                         let (value, _) = context.lower_expression(it, Some(&Type::Type));
@@ -422,18 +430,18 @@ impl<'c> Context<'c> {
                         TempDefinition::Function(FunctionDefinition {
                             signature_and_body, ..
                         }) => {
-                            *signature_and_body = Some(([].into(), return_type.clone(), None));
+                            *signature_and_body = Some((parameters, return_type.clone(), None));
                         }
                     }
 
                     let body = context.lower_body(&ast.body, &return_type);
-                    // TODO: check body's return type is assignable to `return_type`
                     match context.definitions.get_mut(&id).unwrap() {
                         TempDefinition::Value(_) => unreachable!(),
                         TempDefinition::Function(FunctionDefinition {
                             signature_and_body, ..
                         }) => {
-                            *signature_and_body = Some(([].into(), return_type, Some(body)));
+                            let (_, _, definition_body) = signature_and_body.as_mut().unwrap();
+                            *definition_body = Some(body);
                         }
                     };
                 });

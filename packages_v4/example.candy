@@ -56,9 +56,13 @@ let nothing = Nothing
 let true = True
 let false = False
 
+let printHello(name: text) -> Nothing = {
+  print("Hello, {name}!")
+}
+
 let main() -> int = {
   let helloWorld = "Hello, World!"
-  print(helloWorld)
+  printHello("World")
 
   let theAnswer = intAdd(40, 2)
   let theAnswerText = "42"
