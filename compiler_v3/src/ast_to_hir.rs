@@ -114,6 +114,7 @@ struct Context<'c> {
     definitions_to_lower: BTreeSet<Id>,
     global_identifiers: FxHashMap<Box<str>, Named>,
     local_identifiers: Vec<(Box<str>, Id, Option<Definition>, Type)>,
+    current_lowering_chain: Vec<Id>,
     errors: Vec<CompilerError>,
 }
 #[derive(Debug)]
@@ -147,6 +148,7 @@ impl<'c> Context<'c> {
             definitions_to_lower: BTreeSet::default(),
             global_identifiers: FxHashMap::default(),
             local_identifiers: vec![],
+            current_lowering_chain: vec![],
             errors: vec![],
         }
     }
@@ -313,131 +315,149 @@ impl<'c> Context<'c> {
         self.definitions_to_lower.insert(id);
     }
     fn lower_assignments(&mut self) {
-        while let Some(id) = self.definitions_to_lower.pop_last() {
-            let old_local_assignments = mem::take(&mut self.local_identifiers);
+        while let Some(id) = self.definitions_to_lower.first() {
+            self.current_lowering_chain.clear();
 
-            let definition = self.definitions.get(&id).unwrap();
-            match definition {
-                TempDefinition::Value(ValueDefinition {
-                    identifier_span,
-                    ast,
-                    definition,
-                }) => {
-                    if let Some((_, Some(_))) = definition {
-                        continue;
-                    }
+            self.lower_assignment(*id);
 
-                    let identifier_span = identifier_span.clone();
-                    let ast = ast.unwrap();
+            assert!(self.current_lowering_chain.is_empty());
+        }
+    }
+    fn lower_assignments_with_name(&mut self, name: &str) {
+        let Some(named) = self.global_identifiers.get(name) else {
+            return;
+        };
 
-                    let explicit_type =
-                        ast.type_
-                            .as_ref()
-                            .and_then(|type_| type_.value())
-                            .map(|type_| {
-                                let (type_value, type_type) = self
-                                    .lower_expression(type_)
-                                    .unwrap_or((Expression::Type(Type::Error), Type::Type));
-                                if !matches!(type_type, Type::Type | Type::Error) {
-                                    self.add_error(
-                                        identifier_span,
-                                        "Assignment's type must be a type",
-                                    );
-                                }
-                                self.evaluate_expression_to_type(&type_value)
-                            });
-                    if let Some(explicit_type) = explicit_type.as_ref() {
-                        match self.definitions.get_mut(&id).unwrap() {
-                            TempDefinition::Value(ValueDefinition { definition, .. }) => {
-                                *definition = Some((explicit_type.clone(), None));
+        match named {
+            Named::Value(id) => self.lower_assignment(*id),
+            Named::Functions(ids) => {
+                for id in ids.clone() {
+                    self.lower_assignment(id);
+                }
+            }
+        }
+    }
+    fn lower_assignment(&mut self, id: Id) {
+        if self.current_lowering_chain.contains(&id) {
+            // TODO: Is this even necessary with `definitions_to_lower`?
+            return;
+        }
+        if !self.definitions_to_lower.remove(&id) {
+            return;
+        }
+
+        let old_local_assignments = mem::take(&mut self.local_identifiers);
+        self.current_lowering_chain.push(id);
+
+        let definition = self.definitions.get(&id).unwrap();
+        match definition {
+            TempDefinition::Value(ValueDefinition {
+                identifier_span,
+                ast,
+                ..
+            }) => {
+                let identifier_span = identifier_span.clone();
+                let ast = ast.unwrap();
+
+                let explicit_type =
+                    ast.type_
+                        .as_ref()
+                        .and_then(|type_| type_.value())
+                        .map(|type_| {
+                            let (type_value, type_type) = self
+                                .lower_expression(type_)
+                                .unwrap_or((Expression::Type(Type::Error), Type::Type));
+                            if !matches!(type_type, Type::Type | Type::Error) {
+                                self.add_error(identifier_span, "Assignment's type must be a type");
                             }
-                            TempDefinition::Function(_) => unreachable!(),
-                        }
-                    }
-
-                    let (value, value_type) = ast
-                        .value
-                        .value()
-                        .and_then(|it| self.lower_expression(it))
-                        .unwrap_or((Expression::Error, Type::Error));
-                    // TODO: check `value_type` is assignable to `explicit_type`
+                            self.evaluate_expression_to_type(&type_value)
+                        });
+                if let Some(explicit_type) = explicit_type.as_ref() {
                     match self.definitions.get_mut(&id).unwrap() {
                         TempDefinition::Value(ValueDefinition { definition, .. }) => {
-                            *definition = Some((explicit_type.unwrap_or(value_type), Some(value)));
+                            *definition = Some((explicit_type.clone(), None));
                         }
                         TempDefinition::Function(_) => unreachable!(),
                     }
                 }
-                TempDefinition::Function(FunctionDefinition {
-                    identifier_span,
-                    ast,
-                    signature_and_body,
-                }) => 'case: {
-                    let ast = ast.unwrap();
-                    self.with_scope(|context| {
-                        // TODO: lower parameter types
-                        assert!(ast.parameters.is_empty());
-                        // let mut parameter_names = FxHashSet::default();
-                        // let parameters = parameters
-                        //     .iter()
-                        //     .map(|parameter| try {
-                        //         let name = parameter.name.identifier.value()?.clone();
-                        //         if !parameter_names.insert(name.clone()) {
-                        //             context.add_error(
-                        //                 name.span.clone(),
-                        //                 format!("Duplicate parameter name: {}", *name),
-                        //             );
-                        //             return None;
-                        //         }
 
-                        //         todo!();
-
-                        //         // let type_ = context.lower_expression(parameter.type_.as_ref()?.value()?)?;
-                        //         // let id = context.id_generator.generate();
-                        //         // context.define_variable(name.string.clone(), id);
-                        //         // Parameter {
-                        //         //     name: name.string,
-                        //         //     type_,
-                        //         // }
-                        //     })
-                        //     .collect::<Option<Box<[_]>>>()?;
-
-                        let return_type = ast
-                            .return_type
-                            .value()
-                            .and_then(|it| {
-                                context
-                                    .lower_expression(it)
-                                    .map(|(value, _)| context.evaluate_expression_to_type(&value))
-                            })
-                            .unwrap_or(Type::Error);
-                        match context.definitions.get_mut(&id).unwrap() {
-                            TempDefinition::Value(_) => unreachable!(),
-                            TempDefinition::Function(FunctionDefinition {
-                                signature_and_body,
-                                ..
-                            }) => {
-                                *signature_and_body = Some(([].into(), return_type.clone(), None));
-                            }
-                        }
-
-                        let (body, _) = context.lower_body(&ast.body);
-                        // TODO: check body's return type is assignable to `return_type`
-                        match context.definitions.get_mut(&id).unwrap() {
-                            TempDefinition::Value(_) => unreachable!(),
-                            TempDefinition::Function(FunctionDefinition {
-                                signature_and_body,
-                                ..
-                            }) => {
-                                *signature_and_body = Some(([].into(), return_type, Some(body)));
-                            }
-                        };
-                    });
+                let (value, value_type) = ast
+                    .value
+                    .value()
+                    .and_then(|it| self.lower_expression(it))
+                    .unwrap_or((Expression::Error, Type::Error));
+                // TODO: check `value_type` is assignable to `explicit_type`
+                match self.definitions.get_mut(&id).unwrap() {
+                    TempDefinition::Value(ValueDefinition { definition, .. }) => {
+                        *definition = Some((explicit_type.unwrap_or(value_type), Some(value)));
+                    }
+                    TempDefinition::Function(_) => unreachable!(),
                 }
             }
+            TempDefinition::Function(FunctionDefinition { ast, .. }) => {
+                let ast = ast.unwrap();
+                self.with_scope(|context| {
+                    // TODO: lower parameter types
+                    assert!(ast.parameters.is_empty());
+                    // let mut parameter_names = FxHashSet::default();
+                    // let parameters = parameters
+                    //     .iter()
+                    //     .map(|parameter| try {
+                    //         let name = parameter.name.identifier.value()?.clone();
+                    //         if !parameter_names.insert(name.clone()) {
+                    //             context.add_error(
+                    //                 name.span.clone(),
+                    //                 format!("Duplicate parameter name: {}", *name),
+                    //             );
+                    //             return None;
+                    //         }
 
-            self.local_identifiers = old_local_assignments;
+                    //         todo!();
+
+                    //         // let type_ = context.lower_expression(parameter.type_.as_ref()?.value()?)?;
+                    //         // let id = context.id_generator.generate();
+                    //         // context.define_variable(name.string.clone(), id);
+                    //         // Parameter {
+                    //         //     name: name.string,
+                    //         //     type_,
+                    //         // }
+                    //     })
+                    //     .collect::<Option<Box<[_]>>>()?;
+
+                    let return_type = ast
+                        .return_type
+                        .value()
+                        .and_then(|it| {
+                            context
+                                .lower_expression(it)
+                                .map(|(value, _)| context.evaluate_expression_to_type(&value))
+                        })
+                        .unwrap_or(Type::Error);
+                    match context.definitions.get_mut(&id).unwrap() {
+                        TempDefinition::Value(_) => unreachable!(),
+                        TempDefinition::Function(FunctionDefinition {
+                            signature_and_body, ..
+                        }) => {
+                            *signature_and_body = Some(([].into(), return_type.clone(), None));
+                        }
+                    }
+
+                    let (body, _) = context.lower_body(&ast.body);
+                    // TODO: check body's return type is assignable to `return_type`
+                    match context.definitions.get_mut(&id).unwrap() {
+                        TempDefinition::Value(_) => unreachable!(),
+                        TempDefinition::Function(FunctionDefinition {
+                            signature_and_body, ..
+                        }) => {
+                            *signature_and_body = Some(([].into(), return_type, Some(body)));
+                        }
+                    };
+                });
+            }
         }
+
+        assert_eq!(self.current_lowering_chain.pop().unwrap(), id);
+        self.local_identifiers = old_local_assignments;
     }
 
     fn evaluate_expression_to_type(&mut self, expression: &Expression) -> Type {
@@ -590,14 +610,15 @@ impl<'c> Context<'c> {
                 } else if let Some(named) = self.global_identifiers.get(name) {
                     match named {
                         Named::Value(id) => {
-                            let definition = match self.definitions.get(id).unwrap() {
+                            let id = *id;
+                            self.lower_assignments_with_name(name);
+                            let definition = match self.definitions.get(&id).unwrap() {
                                 TempDefinition::Value(ValueDefinition { definition, .. }) => {
                                     definition
                                 }
                                 TempDefinition::Function(_) => unreachable!(),
                             };
 
-                            let id = *id;
                             let type_ = if let Some((type_, _)) = definition {
                                 type_.clone()
                             } else {
@@ -619,6 +640,7 @@ impl<'c> Context<'c> {
                                 (Expression::Error, Type::Error)
                             } else {
                                 let id = functions[0];
+                                self.lower_assignments_with_name(name);
                                 let signature_and_body = match self.definitions.get(&id).unwrap() {
                                     TempDefinition::Value(_) => unreachable!(),
                                     TempDefinition::Function(FunctionDefinition {
