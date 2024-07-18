@@ -1,7 +1,11 @@
-use crate::hir::{Body, BuiltinFunction, Definition, Expression, Hir, Parameter, Type};
+use crate::{
+    hir::{Body, BuiltinFunction, Definition, Expression, Hir, OrType, Parameter, TagType, Type},
+    utils::HashSetExtension,
+};
 use core::panic;
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
+use std::borrow::Cow;
 
 pub fn hir_to_c(hir: &Hir) -> String {
     let mut context = Context::new(hir);
@@ -198,7 +202,19 @@ impl<'h> Context<'h> {
                 }
                 self.push(")");
             }
-
+            Expression::Or { .. } => panic!("Or expression found."),
+            Expression::CreateOrVariant {
+                or_type,
+                symbol,
+                value,
+            } => {
+                self.push("{ ");
+                self.push(".symbol = ");
+                self.push(symbol);
+                self.push(", .tag = ");
+                self.lower_expression(value);
+                self.push("}");
+            }
             Expression::Type(_) => panic!("Should have been resolved to a value."),
             Expression::Error => panic!("Error expression found."),
         }
@@ -228,7 +244,7 @@ impl<'h> Context<'h> {
     }
     fn lower_type_definitions_in_body(
         &mut self,
-        definitions: &mut FxHashSet<&'h Type>,
+        definitions: &mut FxHashSet<Type>,
         body: &'h Body,
     ) {
         match body {
@@ -243,7 +259,7 @@ impl<'h> Context<'h> {
     }
     fn lower_type_definitions_in_expression(
         &mut self,
-        definitions: &mut FxHashSet<&'h Type>,
+        definitions: &mut FxHashSet<Type>,
         expression: &'h Expression,
     ) {
         match expression {
@@ -259,20 +275,27 @@ impl<'h> Context<'h> {
                 }
                 self.lower_type_definitions_in_body(definitions, body);
             }
-            Expression::Reference(_) | Expression::Call { .. } => {}
+            Expression::Reference(_)
+            | Expression::Call { .. }
+            | Expression::Or { .. }
+            | Expression::CreateOrVariant { .. } => {}
             Expression::Type(type_) => self.lower_type_definition(definitions, type_),
             Expression::Error => {}
         }
     }
-    fn lower_type_definition(&mut self, definitions: &mut FxHashSet<&'h Type>, type_: &'h Type) {
-        if matches!(type_, &Type::Type | &Type::Error) || !definitions.insert(type_) {
+    fn lower_type_definition(&mut self, definitions: &mut FxHashSet<Type>, type_: &Type) {
+        if matches!(type_, &Type::Type | &Type::Error) || definitions.contains(type_) {
             return;
         }
+        definitions.force_insert(type_.clone());
 
         match type_ {
             Type::Type => panic!("Type type found."),
-            Type::Tag { symbol, value_type } => {
-                if let Some(value_type) = value_type {
+            Type::Tag(TagType {
+                symbol: _,
+                value_type,
+            }) => {
+                if let Some(box value_type) = value_type {
                     self.lower_type_definition(definitions, value_type);
                 }
 
@@ -284,6 +307,38 @@ impl<'h> Context<'h> {
                     self.push(" value; ");
                 }
                 self.push("};\n");
+
+                self.push("typedef struct ");
+                self.lower_type(type_);
+                self.push(" ");
+                self.lower_type(type_);
+                self.push(";\n");
+            }
+            Type::Or(OrType(tags)) => {
+                for tag in tags.iter() {
+                    self.lower_type_definition(definitions, &Type::Tag(tag.clone()));
+                }
+
+                let tags = tags
+                    .iter()
+                    .sorted_by_key(|tag| &tag.symbol)
+                    .collect::<Vec<_>>();
+
+                self.push("struct ");
+                self.lower_type(type_);
+                self.push("{\nenum {");
+                for tag in &tags {
+                    self.push(&tag.symbol);
+                    self.push(", ");
+                }
+                self.push("} symbol;\nunion {");
+                for tag in tags {
+                    self.lower_type(&Type::Tag(tag.clone()));
+                    self.push(" ");
+                    self.push(&tag.symbol);
+                    self.push(";");
+                }
+                self.push("} tag;\n};\n");
 
                 self.push("typedef struct ");
                 self.lower_type(type_);
@@ -323,7 +378,7 @@ impl<'h> Context<'h> {
             }
             Type::Function {
                 parameter_types,
-                return_type,
+                box return_type,
             } => {
                 for type_ in parameter_types.iter() {
                     self.lower_type_definition(definitions, type_);
@@ -350,12 +405,13 @@ impl<'h> Context<'h> {
     fn lower_type(&mut self, type_: &Type) {
         match type_ {
             Type::Type => panic!("Type type found."),
-            Type::Tag { symbol, value_type } => {
-                self.push("tag_");
-                self.push(symbol);
-                if let Some(value_type) = value_type {
-                    self.push("_of_");
-                    self.lower_type(value_type);
+            Type::Tag(tag_type) => self.lower_tag_type(tag_type),
+            Type::Or(OrType(tags)) => {
+                for (index, tag) in tags.iter().enumerate() {
+                    if index != 0 {
+                        self.push("_or_");
+                    }
+                    self.lower_tag_type(tag);
                 }
             }
             Type::Int => self.push("candyInt"),
@@ -392,6 +448,14 @@ impl<'h> Context<'h> {
                 self.push("_end");
             }
             Type::Error => panic!("Error type found."),
+        }
+    }
+    fn lower_tag_type(&mut self, tag_type: &TagType) {
+        self.push("tag_");
+        self.push(&tag_type.symbol);
+        if let Some(value_type) = tag_type.value_type.as_ref() {
+            self.push("_of_");
+            self.lower_type(value_type);
         }
     }
 

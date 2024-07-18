@@ -1,7 +1,7 @@
 use super::{
     lambda::lambda,
     literal::{
-        closing_bracket, closing_parenthesis, colon, comma, dot, opening_bracket,
+        bar, closing_bracket, closing_parenthesis, colon, comma, dot, opening_bracket,
         opening_parenthesis,
     },
     parser::{Parser, ParserUnwrapOrAstError, ParserWithValueUnwrapOrAstError},
@@ -13,7 +13,7 @@ use super::{
     word::{identifier, int, symbol},
 };
 use crate::ast::{
-    AstCall, AstCallArgument, AstExpression, AstParenthesized, AstStruct, AstStructAccess,
+    AstCall, AstCallArgument, AstExpression, AstOr, AstParenthesized, AstStruct, AstStructAccess,
     AstStructField,
 };
 use replace_with::replace_with_or_abort;
@@ -50,6 +50,7 @@ pub fn expression(parser: Parser) -> Option<(Parser, AstExpression)> {
         did_make_progress |=
             parse_suffix(&mut parser, &mut result, expression_suffix_struct_access);
         did_make_progress |= parse_suffix(&mut parser, &mut result, expression_suffix_call);
+        did_make_progress |= parse_suffix(&mut parser, &mut result, expression_suffix_or);
         if !did_make_progress {
             break;
         }
@@ -193,6 +194,25 @@ fn expression_suffix_call<'s>(
             receiver: Box::new(current),
             arguments,
             closing_parenthesis_error,
+        })
+    });
+
+    Some(parser)
+}
+
+#[instrument(level = "trace")]
+fn expression_suffix_or<'s>(parser: Parser<'s>, current: &mut AstExpression) -> Option<Parser<'s>> {
+    let parser = whitespace(parser).unwrap_or(parser);
+
+    let parser = bar(parser)?.and_trailing_whitespace();
+
+    let (parser, right) =
+        expression(parser).unwrap_or_ast_error(parser, "This or is missing a right side.");
+
+    replace_with_or_abort(current, |current| {
+        AstExpression::Or(AstOr {
+            left: Box::new(current),
+            right: right.map(Box::new),
         })
     });
 

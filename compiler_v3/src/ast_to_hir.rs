@@ -4,7 +4,9 @@ use crate::{
         AstStatement, AstTextPart,
     },
     error::CompilerError,
-    hir::{Body, BuiltinFunction, Definition, Expression, Hir, Id, Parameter, Type},
+    hir::{
+        Body, BuiltinFunction, Definition, Expression, Hir, Id, OrType, Parameter, TagType, Type,
+    },
     id::IdGenerator,
     position::Offset,
     utils::HashMapExtension,
@@ -460,12 +462,12 @@ impl<'c> Context<'c> {
                 self.add_error(Offset(0)..Offset(0), "Expected a type, not a text");
                 Type::Error
             }
-            Expression::Tag { symbol, value } => Type::Tag {
+            Expression::Tag { symbol, value } => Type::Tag(TagType {
                 symbol: symbol.clone(),
                 value_type: value
                     .as_ref()
                     .map(|it| Box::new(self.evaluate_expression_to_type(it))),
-            },
+            }),
             Expression::Struct(_) => todo!(),
             Expression::StructAccess { struct_, field } => todo!(),
             Expression::ValueWithTypeAnnotation { value, type_ } => todo!(),
@@ -519,6 +521,65 @@ impl<'c> Context<'c> {
                 receiver,
                 arguments,
             } => todo!(),
+            Expression::Or { left, right } => {
+                fn add_tag_type(
+                    context: &mut Context,
+                    tags: &mut Vec<TagType>,
+                    has_error: &mut bool,
+                    tag: TagType,
+                ) {
+                    if tags.iter().any(|it| it.symbol == tag.symbol) {
+                        // TODO: report actual error location
+                        context.add_error(
+                            Offset(0)..Offset(0),
+                            format!("Or type contains tag `{}` multiple times.", tag.symbol),
+                        );
+                        *has_error = true;
+                    } else {
+                        tags.push(tag);
+                    }
+                }
+                fn add(
+                    context: &mut Context,
+                    tags: &mut Vec<TagType>,
+                    has_error: &mut bool,
+                    type_: Type,
+                ) {
+                    match type_ {
+                        Type::Type => todo!(),
+                        Type::Tag(tag) => add_tag_type(context, tags, has_error, tag),
+                        Type::Or(OrType(or_tags)) => {
+                            for tag in or_tags.iter() {
+                                add_tag_type(context, tags, has_error, tag.clone());
+                            }
+                        }
+                        Type::Int | Type::Text | Type::Struct(_) | Type::Function { .. } => {
+                            // TODO: report actual error location
+                            context.add_error(
+                                Offset(0)..Offset(0),
+                                format!("Or type can only contain tags types, found `{type_:?}`."),
+                            );
+                            *has_error = true;
+                        }
+                        Type::Error => *has_error = true,
+                    };
+                }
+
+                let mut tags = vec![];
+                let mut has_error = false;
+
+                let left = self.evaluate_expression_to_type(left);
+                let right = self.evaluate_expression_to_type(right);
+                add(self, &mut tags, &mut has_error, left);
+                add(self, &mut tags, &mut has_error, right);
+
+                if has_error {
+                    Type::Error
+                } else {
+                    Type::Or(OrType(tags.into()))
+                }
+            }
+            Expression::CreateOrVariant { or_type, .. } => Type::Or(or_type.clone()),
             Expression::Type(type_) => type_.clone(),
             Expression::Error => Type::Error,
         }
@@ -681,16 +742,26 @@ impl<'c> Context<'c> {
             }
             AstExpression::Symbol(symbol) => {
                 let symbol_string = &symbol.symbol.value()?.string;
-                (
-                    Expression::Tag {
-                        symbol: symbol_string.clone(),
-                        value: None,
-                    },
-                    Type::Tag {
-                        symbol: symbol_string.clone(),
-                        value_type: None,
-                    },
-                )
+                if context_type == Some(&Type::Type) {
+                    (
+                        Expression::Type(Type::Tag(TagType {
+                            symbol: symbol_string.clone(),
+                            value_type: None,
+                        })),
+                        Type::Type,
+                    )
+                } else {
+                    (
+                        Expression::Tag {
+                            symbol: symbol_string.clone(),
+                            value: None,
+                        },
+                        Type::Tag(TagType {
+                            symbol: symbol_string.clone(),
+                            value_type: None,
+                        }),
+                    )
+                }
             }
             AstExpression::Int(int) => (Expression::Int(*int.value.value()?), Type::Int),
             AstExpression::Text(text) => {
@@ -732,10 +803,10 @@ impl<'c> Context<'c> {
             AstExpression::Call(call) => {
                 let (receiver, receiver_type) = self.lower_expression(&call.receiver, None)?;
                 let parameter_context_types: Option<Cow<Box<[Type]>>> = match &receiver_type {
-                    Type::Tag {
+                    Type::Tag(TagType {
                         value_type: Some(box type_),
                         ..
-                    } => Some(Cow::Owned([type_.clone()].into())),
+                    }) => Some(Cow::Owned([type_.clone()].into())),
                     Type::Function {
                         parameter_types, ..
                     } => Some(Cow::Borrowed(parameter_types)),
@@ -756,12 +827,12 @@ impl<'c> Context<'c> {
                     })
                     .collect::<Option<Box<[_]>>>()?;
                 match receiver_type {
-                    Type::Type | Type::Int | Type::Text | Type::Struct(_) => {
+                    Type::Type | Type::Int | Type::Text | Type::Struct(_) | Type::Or { .. } => {
                         // TODO: report actual error location
                         self.add_error(Offset(0)..Offset(0), "Cannot call this type");
                         return None;
                     }
-                    Type::Tag { symbol, value_type } => {
+                    Type::Tag(TagType { symbol, value_type }) => {
                         if let Some(_) = value_type {
                             // TODO: report actual error location
                             self.add_error(
@@ -785,10 +856,10 @@ impl<'c> Context<'c> {
                                 symbol: symbol.clone(),
                                 value: Some(Box::new(value)),
                             },
-                            Type::Tag {
+                            Type::Tag(TagType {
                                 symbol,
                                 value_type: Some(Box::new(value_type)),
-                            },
+                            }),
                         )
                     }
                     Type::Function {
@@ -892,7 +963,8 @@ impl<'c> Context<'c> {
                     | Type::Tag { .. }
                     | Type::Int
                     | Type::Text
-                    | Type::Function { .. } => {
+                    | Type::Function { .. }
+                    | Type::Or { .. } => {
                         // TODO: report actual error location
                         self.add_error(Offset(0)..Offset(0), "Receiver is not a struct");
                         Type::Error
@@ -927,17 +999,50 @@ impl<'c> Context<'c> {
                 )
             }
             AstExpression::Lambda(_) => todo!(),
+            AstExpression::Or(or) => {
+                let (left, _) = self.lower_expression(&or.left, Some(&Type::Type))?;
+                let right = or
+                    .right
+                    .value()
+                    .and_then(|it| {
+                        self.lower_expression(it, Some(&Type::Type))
+                            .map(|(value, _)| value)
+                    })
+                    .unwrap_or(Expression::Error);
+                (
+                    Expression::Or {
+                        left: Box::new(left),
+                        right: Box::new(right),
+                    },
+                    Type::Type,
+                )
+            }
         };
 
-        if let Some(context_type) = context_type
-            && !Self::is_assignable_to(&type_, context_type)
-        {
-            // TODO: report actual error location
-            self.add_error(
-                Offset(0)..Offset(0),
-                format!("Expected type {context_type:?}, got {type_:?}."),
-            );
-            Some((Expression::Error, Type::Error))
+        if let Some(context_type) = context_type {
+            if let (Type::Tag(from), Type::Or(OrType(to))) = (&type_, context_type)
+                && to
+                    .iter()
+                    .any(|to| Self::tag_type_is_assignable_to(&from, to))
+            {
+                Some((
+                    Expression::CreateOrVariant {
+                        or_type: OrType(to.clone()),
+                        symbol: from.symbol.clone(),
+                        value: Box::new(expression),
+                    },
+                    context_type.clone(),
+                ))
+            } else if Self::is_assignable_to(&type_, context_type) {
+                Some((expression, context_type.clone()))
+            } else {
+                // TODO: report actual error location
+                self.add_error(
+                    Offset(0)..Offset(0),
+                    format!("Expected type `{context_type:?}`, got `{type_:?}`."),
+                );
+                Some((Expression::Error, Type::Error))
+            }
         } else {
             Some((expression, type_))
         }
@@ -945,36 +1050,26 @@ impl<'c> Context<'c> {
 
     fn is_assignable_to(from: &Type, to: &Type) -> bool {
         match (from, to) {
-            (Type::Error, _) | (_, Type::Error) => true,
-            (Type::Type, Type::Type) => true,
-            (
-                Type::Tag {
-                    symbol: symbol_a,
-                    value_type: value_type_a,
-                },
-                Type::Tag {
-                    symbol: symbol_b,
-                    value_type: value_type_b,
-                },
-            ) => {
-                if symbol_a != symbol_b || value_type_a.is_some() != value_type_b.is_some() {
+            (Type::Error, _)
+            | (_, Type::Error)
+            | (Type::Type, Type::Type)
+            | (Type::Int, Type::Int)
+            | (Type::Text, Type::Text) => true,
+            (Type::Tag(from), Type::Tag(to)) => Self::tag_type_is_assignable_to(from, to),
+            (Type::Or(OrType(from)), Type::Or(OrType(to))) => {
+                // TODO: support subsets
+                if from.len() == to.len() {
                     return false;
                 }
-                if let Some(value_type_a) = value_type_a
-                    && let Some(value_type_b) = value_type_b
-                {
-                    Self::is_assignable_to(value_type_a, value_type_b)
-                } else {
-                    true
-                }
+                from.iter().all(|from| {
+                    to.iter()
+                        .any(|to| Self::tag_type_is_assignable_to(from, to))
+                })
             }
-            (Type::Int, Type::Int) => true,
-            (Type::Text, Type::Text) => true,
             (Type::Struct(from), Type::Struct(to)) => {
                 if from.len() != to.len() {
                     return false;
                 }
-
                 from.iter().all(|(name, field_from)| {
                     let Some((_, field_to)) = to.iter().find(|(to_name, _)| name == to_name) else {
                         return false;
@@ -1001,6 +1096,15 @@ impl<'c> Context<'c> {
             }
             _ => false,
         }
+    }
+
+    fn tag_type_is_assignable_to(from: &TagType, to: &TagType) -> bool {
+        from.symbol == to.symbol
+            && match (from.value_type.as_ref(), to.value_type.as_ref()) {
+                (Some(from), Some(to)) => Self::is_assignable_to(from, to),
+                (None, None) => true,
+                _ => false,
+            }
     }
 
     // Utils

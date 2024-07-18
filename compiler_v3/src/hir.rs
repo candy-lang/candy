@@ -108,6 +108,15 @@ pub enum Expression {
         receiver: Box<Expression>,
         arguments: Box<[Expression]>,
     },
+    Or {
+        left: Box<Expression>,
+        right: Box<Expression>,
+    },
+    CreateOrVariant {
+        or_type: OrType,
+        symbol: Box<str>,
+        value: Box<Expression>,
+    },
     Type(Type),
     Error,
 }
@@ -129,10 +138,8 @@ impl BuiltinFunction {
 pub enum Type {
     #[allow(clippy::enum_variant_names)]
     Type,
-    Tag {
-        symbol: Box<str>,
-        value_type: Option<Box<Type>>,
-    },
+    Tag(TagType),
+    Or(OrType),
     Int,
     Text,
     Struct(Box<[(Box<str>, Type)]>),
@@ -142,3 +149,10 @@ pub enum Type {
     },
     Error,
 }
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct TagType {
+    pub symbol: Box<str>,
+    pub value_type: Option<Box<Type>>,
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct OrType(pub Box<[TagType]>);

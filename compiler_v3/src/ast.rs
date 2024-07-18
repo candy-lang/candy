@@ -70,6 +70,7 @@ pub enum AstExpression {
     Struct(AstStruct),
     StructAccess(AstStructAccess),
     Lambda(AstLambda),
+    Or(AstOr),
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -144,6 +145,12 @@ pub struct AstLambda {
     pub parameters: Vec<AstParameter>,
     pub body: Vec<AstStatement>,
     pub closing_curly_brace_error: Option<AstError>,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct AstOr {
+    pub left: Box<AstExpression>,
+    pub right: AstResult<Box<AstExpression>>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -326,6 +333,10 @@ impl CollectAstErrors for AstExpression {
                     statement.collect_errors_to(errors);
                 }
                 closing_curly_brace_error.collect_errors_to(errors);
+            }
+            Self::Or(AstOr { left, right }) => {
+                left.collect_errors_to(errors);
+                right.collect_errors_to(errors);
             }
         }
     }
