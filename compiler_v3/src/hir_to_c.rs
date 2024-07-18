@@ -1,5 +1,7 @@
 use crate::hir::{Body, BuiltinFunction, Definition, Expression, Hir, Parameter, Type};
 use core::panic;
+use itertools::Itertools;
+use rustc_hash::FxHashSet;
 
 pub fn hir_to_c(hir: &Hir) -> String {
     let mut context = Context::new(hir);
@@ -27,6 +29,10 @@ impl<'h> Context<'h> {
         self.push("#include <stdlib.h>\n");
         self.push("#include <string.h>\n\n");
 
+        self.push("/// Types Definitions\n\n");
+        self.lower_type_definitions();
+        self.push("\n");
+
         self.push("/// Declarations\n\n");
         for (id, name, assignment) in &self.hir.assignments {
             self.push(format!("/* {name} */ "));
@@ -37,6 +43,7 @@ impl<'h> Context<'h> {
                         break 'case;
                     }
 
+                    self.push("const ");
                     self.lower_type(type_);
                     self.push(format!(" {id};"));
                 }
@@ -71,6 +78,7 @@ impl<'h> Context<'h> {
                         break 'case;
                     }
 
+                    self.push("const ");
                     self.lower_type(type_);
                     self.push(format!(" {id} = "));
                     self.lower_expression(value);
@@ -189,28 +197,106 @@ impl<'h> Context<'h> {
         }
     }
 
-    // fn lower_expression_to_type_definition(&mut self, body: &Body) {
-    //     self.lower_expression_to_type_helper(body.return_value_id())
-    // }
-    fn lower_type(&mut self, type_: &Type) {
-        self.push("const ");
+    fn lower_type_definitions(&mut self) {
+        let mut definitions = FxHashSet::default();
+        for (_, _, assignment) in &self.hir.assignments {
+            match assignment {
+                Definition::Value { type_, value } => {
+                    self.lower_type_definition(&mut definitions, type_);
+                    self.lower_type_definitions_in_expression(&mut definitions, value);
+                }
+                Definition::Function {
+                    box parameters,
+                    return_type,
+                    body,
+                } => {
+                    for parameter in parameters {
+                        self.lower_type_definition(&mut definitions, &parameter.type_);
+                    }
+                    self.lower_type_definition(&mut definitions, return_type);
+                    match body {
+                        Body::Builtin(_) => {}
+                        Body::Written { expressions } => {
+                            for (_, _, expression, type_) in expressions {
+                                self.lower_type_definition(&mut definitions, type_);
+                                self.lower_type_definitions_in_expression(
+                                    &mut definitions,
+                                    expression,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    fn lower_type_definitions_in_expression(
+        &mut self,
+        definitions: &mut FxHashSet<&'h Type>,
+        expression: &'h Expression,
+    ) {
+        match expression {
+            Expression::Symbol(_)
+            | Expression::Int(_)
+            | Expression::Text(_)
+            | Expression::Struct(_)
+            | Expression::StructAccess { .. }
+            | Expression::ValueWithTypeAnnotation { .. }
+            | Expression::Lambda { .. }
+            | Expression::Reference(_)
+            | Expression::Call { .. } => {}
+            Expression::Type(type_) => self.lower_type_definition(definitions, type_),
+            Expression::Error => {}
+        }
+    }
+    fn lower_type_definition(&mut self, definitions: &mut FxHashSet<&'h Type>, type_: &'h Type) {
+        if matches!(type_, &Type::Type | &Type::Error) || !definitions.insert(type_) {
+            return;
+        }
+
         match type_ {
-            Type::Type => todo!(),
-            Type::Symbol => todo!(),
-            Type::Int => self.push("int64_t"),
-            Type::Text => self.push("char*"),
+            Type::Type => panic!("Type type found."),
+            Type::Symbol => eprintln!("Symbol type found: {type_:?}"),
+            Type::Int => {
+                self.push("typedef int64_t ");
+                self.lower_type(type_);
+                self.push(";\n");
+            }
+            Type::Text => {
+                self.push("typedef char* ");
+                self.lower_type(type_);
+                self.push(";\n");
+            }
             Type::Struct(struct_) => {
-                self.push("struct { ");
+                for (_, type_) in struct_.iter() {
+                    self.lower_type_definition(definitions, type_);
+                }
+
+                self.push("struct ");
+                self.lower_type(type_);
+                self.push("{");
                 for (name, type_) in struct_.iter() {
                     self.lower_type(type_);
                     self.push(format!(" {name}; "));
                 }
-                self.push("}");
+                self.push("};\n");
+
+                self.push("typedef struct ");
+                self.lower_type(type_);
+                self.push(" ");
+                self.lower_type(type_);
+                self.push(";\n");
             }
             Type::Function {
                 parameter_types,
                 return_type,
             } => {
+                for type_ in parameter_types.iter() {
+                    self.lower_type_definition(definitions, type_);
+                }
+                self.lower_type_definition(definitions, return_type);
+
+                self.push("typedef ");
                 self.lower_type(return_type);
                 self.push(" (*)(");
                 for (i, parameter_type) in parameter_types.iter().enumerate() {
@@ -219,39 +305,52 @@ impl<'h> Context<'h> {
                     }
                     self.lower_type(parameter_type);
                 }
-                self.push(")");
+                self.push(") ");
+                self.lower_type(type_);
+                self.push(";\n");
             }
-            Type::Error => todo!(),
-            // Expression::Symbol(symbol) => self.push(format!("type_symbol_{symbol}")),
-            // // self.push(format!("type_int_{int}")),
-            // Expression::Int(_) | Expression::IntType => self.push("int64_t"),
-            // // let text_type = self
-            // //     .text_types
-            // //     .iter()
-            // //     .position(|t| t == text)
-            // //     .unwrap_or_else(|| {
-            // //         self.text_types.push(text);
-            // //         self.text_types.len() - 1
-            // //     });
-            // // self.push(format!("text_type_{text_type}"));
-            // Expression::Text(_) | Expression::TextType => self.push("char*"),
-            // Expression::Struct(struct_) => {
-            //     self.push("struct { ");
-            //     for (name, id) in struct_.iter() {
-            //         self.lower_expression_to_type_helper(*id);
-            //         self.push(format!(" {name}; "));
-            //     }
-            //     self.push("}");
-            // }
-            // Expression::StructAccess { .. }
-            // | Expression::ValueWithTypeAnnotation { .. }
-            // | Expression::Reference(_)
-            // | Expression::Call(_, _)
-            // | Expression::BuiltinEquals
-            // | Expression::BuiltinPrint => {
-            //     panic!("Should have been resolved to a type.")
-            // }
-            // Expression::Error => panic!("Error expression found."),
+            Type::Error => panic!("Error type found."),
+        }
+    }
+
+    fn lower_type(&mut self, type_: &Type) {
+        match type_ {
+            Type::Type => panic!("Type type found."),
+            Type::Symbol => todo!(),
+            Type::Int => self.push("candyInt"),
+            Type::Text => self.push("candyText"),
+            Type::Struct(struct_) => {
+                self.push("structOf_");
+                for (index, (name, type_)) in
+                    struct_.iter().sorted_by_key(|(name, _)| name).enumerate()
+                {
+                    if index != 0 {
+                        self.push("_and_");
+                    }
+                    self.push(format!("{name}_"));
+                    self.lower_type(type_);
+                }
+                self.push("_end");
+            }
+            Type::Function {
+                parameter_types,
+                return_type,
+            } => {
+                self.push("function_");
+                if !parameter_types.is_empty() {
+                    self.push("taking");
+                    for (index, parameter_type) in parameter_types.iter().enumerate() {
+                        if index != 0 {
+                            self.push("_and_");
+                        }
+                        self.lower_type(parameter_type);
+                    }
+                }
+                self.push("_returning_");
+                self.lower_type(return_type);
+                self.push("_end");
+            }
+            Type::Error => panic!("Error type found."),
         }
     }
 
