@@ -124,6 +124,7 @@ impl BuiltinFunction {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Type {
+    #[allow(clippy::enum_variant_names)]
     Type,
     Symbol, // TODO: specific symbol as separate type
     Int,

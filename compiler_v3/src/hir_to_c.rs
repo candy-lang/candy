@@ -27,6 +27,41 @@ impl<'h> Context<'h> {
         self.push("#include <stdlib.h>\n");
         self.push("#include <string.h>\n\n");
 
+        self.push("/// Declarations\n\n");
+        for (id, name, assignment) in &self.hir.assignments {
+            self.push(format!("/* {name} */ "));
+            match assignment {
+                Definition::Value { type_, .. } => 'case: {
+                    if type_ == &Type::Type {
+                        self.push("// Is a type.");
+                        break 'case;
+                    }
+
+                    self.lower_type(type_);
+                    self.push(format!(" {id};"));
+                }
+                Definition::Function {
+                    box parameters,
+                    return_type,
+                    ..
+                } => {
+                    self.lower_type(return_type);
+                    self.push(format!(" {id}("));
+                    for (i, parameter) in parameters.iter().enumerate() {
+                        if i != 0 {
+                            self.push(", ");
+                        }
+                        self.lower_type(&parameter.type_);
+                        self.push(format!(" {}", parameter.id));
+                    }
+                    self.push(");");
+                }
+            }
+            self.push("\n");
+        }
+        self.push("\n");
+
+        self.push("/// Definitions\n\n");
         for (id, name, assignment) in &self.hir.assignments {
             self.push(format!("// {name}\n"));
             match assignment {
@@ -36,7 +71,6 @@ impl<'h> Context<'h> {
                         break 'case;
                     }
 
-                    self.push("const ");
                     self.lower_type(type_);
                     self.push(format!(" {id} = "));
                     self.lower_expression(value);
