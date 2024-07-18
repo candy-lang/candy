@@ -1,4 +1,4 @@
-#![feature(box_patterns, option_take_if, try_blocks)]
+#![feature(box_patterns, let_chains, option_take_if, try_blocks)]
 #![warn(clippy::nursery, clippy::pedantic, unused_crate_dependencies)]
 #![allow(
     clippy::cognitive_complexity,
@@ -18,7 +18,7 @@ use hir::Hir;
 use hir_to_c::hir_to_c;
 use std::{
     fs,
-    path::{self, Path, PathBuf},
+    path::{Path, PathBuf},
     process,
     time::{Duration, Instant},
 };

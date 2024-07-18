@@ -9,7 +9,7 @@ use crate::{
     position::Offset,
     utils::HashMapExtension,
 };
-use itertools::Itertools;
+use itertools::{Itertools, Position};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     collections::{hash_map::Entry, BTreeSet},
@@ -364,12 +364,10 @@ impl<'c> Context<'c> {
                         .as_ref()
                         .and_then(|type_| type_.value())
                         .map(|type_| {
-                            let (type_value, type_type) = self
-                                .lower_expression(type_)
-                                .unwrap_or((Expression::Type(Type::Error), Type::Type));
-                            if !matches!(type_type, Type::Type | Type::Error) {
-                                self.add_error(identifier_span, "Assignment's type must be a type");
-                            }
+                            let type_value = self
+                                .lower_expression(type_, Some(&Type::Type))
+                                .map(|(value, _)| value)
+                                .unwrap_or(Expression::Type(Type::Error));
                             self.evaluate_expression_to_type(&type_value)
                         });
                 if let Some(explicit_type) = explicit_type.as_ref() {
@@ -384,7 +382,7 @@ impl<'c> Context<'c> {
                 let (value, value_type) = ast
                     .value
                     .value()
-                    .and_then(|it| self.lower_expression(it))
+                    .and_then(|it| self.lower_expression(it, explicit_type.as_ref()))
                     .unwrap_or((Expression::Error, Type::Error));
                 // TODO: check `value_type` is assignable to `explicit_type`
                 match self.definitions.get_mut(&id).unwrap() {
@@ -398,7 +396,9 @@ impl<'c> Context<'c> {
                 let ast = ast.unwrap();
                 self.with_scope(|context| {
                     // TODO: lower parameter types
-                    assert!(ast.parameters.is_empty());
+                    if !ast.parameters.is_empty() {
+                        todo!("Function definition with parameters");
+                    }
                     // let mut parameter_names = FxHashSet::default();
                     // let parameters = parameters
                     //     .iter()
@@ -429,7 +429,7 @@ impl<'c> Context<'c> {
                         .value()
                         .and_then(|it| {
                             context
-                                .lower_expression(it)
+                                .lower_expression(it, Some(&Type::Type))
                                 .map(|(value, _)| context.evaluate_expression_to_type(&value))
                         })
                         .unwrap_or(Type::Error);
@@ -442,7 +442,7 @@ impl<'c> Context<'c> {
                         }
                     }
 
-                    let (body, _) = context.lower_body(&ast.body);
+                    let body = context.lower_body(&ast.body, &return_type);
                     // TODO: check body's return type is assignable to `return_type`
                     match context.definitions.get_mut(&id).unwrap() {
                         TempDefinition::Value(_) => unreachable!(),
@@ -531,9 +531,15 @@ impl<'c> Context<'c> {
         }
     }
 
-    fn lower_body(&mut self, body: &[AstStatement]) -> (Body, Type) {
+    fn lower_body(&mut self, body: &[AstStatement], context_type: &Type) -> Body {
         let mut expressions = vec![];
-        for statement in body {
+        for (position, statement) in body.iter().with_position() {
+            let statement_context_type = if matches!(position, Position::Last | Position::Only) {
+                Some(context_type)
+            } else {
+                None
+            };
+
             let (name, expression, type_) = match statement {
                 AstStatement::Assignment(assignment) => {
                     let Some(name) = assignment
@@ -549,7 +555,7 @@ impl<'c> Context<'c> {
                         AstAssignmentKind::Value(AstAssignmentValue { value, type_: _ }) => {
                             // TODO: lower written type
                             if let Some((value, type_)) =
-                                value.value().and_then(|it| self.lower_expression(it))
+                                value.value().and_then(|it| self.lower_expression(it, None))
                             {
                                 (
                                     Expression::ValueWithTypeAnnotation {
@@ -564,10 +570,13 @@ impl<'c> Context<'c> {
                         }
                         AstAssignmentKind::Function { .. } => todo!(),
                     };
+                    // TODO: return `Nothing` instead
                     (Some(name.string), expression, type_)
                 }
                 AstStatement::Expression(expression) => {
-                    let Some((expression, type_)) = self.lower_expression(expression) else {
+                    let Some((expression, type_)) =
+                        self.lower_expression(expression, statement_context_type)
+                    else {
                         continue;
                     };
 
@@ -594,13 +603,14 @@ impl<'c> Context<'c> {
             // TODO: report actual error location
             self.add_error(Offset(0)..Offset(0), "Body must not be empty");
         }
-        let return_type = expressions
-            .last()
-            .map_or(Type::Error, |(_, _, _, type_)| type_.clone());
-        (Body::Written { expressions }, return_type)
+        Body::Written { expressions }
     }
 
-    fn lower_expression(&mut self, expression: &AstExpression) -> Option<(Expression, Type)> {
+    fn lower_expression(
+        &mut self,
+        expression: &AstExpression,
+        context_type: Option<&Type>,
+    ) -> Option<(Expression, Type)> {
         let (expression, type_) = match expression {
             AstExpression::Identifier(identifier) => {
                 let identifier = identifier.identifier.value()?;
@@ -689,7 +699,8 @@ impl<'c> Context<'c> {
                         match it {
                             AstTextPart::Text(text) => Expression::Text(text.clone()),
                             AstTextPart::Interpolation { expression, .. } => {
-                                let (value, type_) = self.lower_expression(expression.value()?)?;
+                                let (value, type_) =
+                                    self.lower_expression(expression.value()?, Some(&Type::Text))?;
                                 if type_ != Type::Text {
                                     // TODO: report actual error location
                                     self.add_error(
@@ -714,35 +725,78 @@ impl<'c> Context<'c> {
                 (text, Type::Text)
             }
             AstExpression::Parenthesized(parenthesized) => {
-                return self.lower_expression(parenthesized.inner.value()?);
+                return self.lower_expression(parenthesized.inner.value()?, context_type);
             }
             AstExpression::Call(call) => {
-                let (receiver, receiver_type) = self.lower_expression(&call.receiver)?;
+                let (receiver, receiver_type) = self.lower_expression(&call.receiver, None)?;
+                let parameter_context_types = match &receiver_type {
+                    Type::Function {
+                        parameter_types, ..
+                    } => Some(parameter_types),
+                    _ => None,
+                };
+
                 let arguments = call
                     .arguments
                     .iter()
-                    .map(|argument| self.lower_expression(&argument.value))
+                    .enumerate()
+                    .map(|(index, argument)| {
+                        self.lower_expression(
+                            &argument.value,
+                            parameter_context_types.and_then(|it| it.get(index)),
+                        )
+                    })
                     .collect::<Option<Box<[_]>>>()?;
-                let type_ = match receiver_type {
+                match receiver_type {
                     Type::Type | Type::Symbol | Type::Int | Type::Text | Type::Struct(_) => {
                         // TODO: report actual error location
                         self.add_error(Offset(0)..Offset(0), "Cannot call this type");
                         return None;
                     }
                     Type::Function {
-                        box return_type, ..
-                    } => return_type,
-                    Type::Error => Type::Error,
-                };
-                (
-                    Expression::Call {
-                        receiver: Box::new(receiver),
-                        arguments: arguments.iter().map(|(value, _)| value.clone()).collect(),
-                    },
-                    type_,
-                )
+                        parameter_types,
+                        box return_type,
+                        ..
+                    } => {
+                        if parameter_types.len() != arguments.len() {
+                            // TODO: report actual error location
+                            self.add_error(
+                                Offset(0)..Offset(0),
+                                format!(
+                                    "Expected {} {}, got {}.",
+                                    parameter_types.len(),
+                                    if parameter_types.len() == 1 {
+                                        "argument"
+                                    } else {
+                                        "arguments"
+                                    },
+                                    arguments.len(),
+                                ),
+                            );
+                            (Expression::Error, Type::Error)
+                        } else {
+                            (
+                                Expression::Call {
+                                    receiver: Box::new(receiver),
+                                    arguments: arguments
+                                        .iter()
+                                        .map(|(value, _)| value.clone())
+                                        .collect(),
+                                },
+                                return_type,
+                            )
+                        }
+                    }
+                    Type::Error => (Expression::Error, Type::Error),
+                }
             }
             AstExpression::Struct(struct_) => {
+                let struct_context_type =
+                    context_type.and_then(|context_type| match context_type {
+                        Type::Struct(context_type) => Some(context_type),
+                        _ => None,
+                    });
+
                 let mut keys = FxHashSet::default();
                 let fields = struct_
                     .fields
@@ -757,8 +811,14 @@ impl<'c> Context<'c> {
                             return None;
                         }
 
-                        let (value, type_) =
-                            self.lower_expression(field.value.value()?.as_ref())?;
+                        let (value, type_) = self.lower_expression(
+                            field.value.value()?.as_ref(),
+                            struct_context_type.and_then(|it| {
+                                it.iter()
+                                    .find(|(type_name, _)| type_name == &**name)
+                                    .map(|(_, type_)| type_)
+                            }),
+                        )?;
                         (name.string.clone(), value, type_)
                     })
                     .collect::<Option<Vec<(Box<str>, Expression, Type)>>>()?;
@@ -779,8 +839,9 @@ impl<'c> Context<'c> {
                 (Expression::Struct(fields), type_)
             }
             AstExpression::StructAccess(struct_access) => {
+                // TODO: If we support implicit struct type conversion, pass a context type here
                 let (struct_, struct_type) =
-                    self.lower_expression(struct_access.struct_.as_ref())?;
+                    self.lower_expression(struct_access.struct_.as_ref(), None)?;
                 let field = struct_access
                     .key
                     .value()?
@@ -825,7 +886,59 @@ impl<'c> Context<'c> {
             }
             AstExpression::Lambda(_) => todo!(),
         };
-        Some((expression, type_))
+
+        if let Some(context_type) = context_type
+            && !Self::is_assignable_to(&type_, context_type)
+        {
+            // TODO: report actual error location
+            self.add_error(
+                Offset(0)..Offset(0),
+                format!("Expected type {context_type:?}, got {type_:?}."),
+            );
+            Some((Expression::Error, Type::Error))
+        } else {
+            Some((expression, type_))
+        }
+    }
+
+    fn is_assignable_to(from: &Type, to: &Type) -> bool {
+        match (from, to) {
+            (Type::Error, _) | (_, Type::Error) => true,
+            (Type::Type, Type::Type) => true,
+            (Type::Symbol, Type::Symbol) => true,
+            (Type::Int, Type::Int) => true,
+            (Type::Text, Type::Text) => true,
+            (Type::Struct(from), Type::Struct(to)) => {
+                if from.len() != to.len() {
+                    return false;
+                }
+
+                from.iter().all(|(name, field_from)| {
+                    let Some((_, field_to)) = to.iter().find(|(to_name, _)| name == to_name) else {
+                        return false;
+                    };
+                    Self::is_assignable_to(field_from, field_to)
+                })
+            }
+            (
+                Type::Function {
+                    parameter_types,
+                    return_type,
+                },
+                Type::Function {
+                    parameter_types: to_parameter_types,
+                    return_type: to_return_type,
+                },
+            ) => {
+                parameter_types.len() == to_parameter_types.len()
+                    && parameter_types
+                        .iter()
+                        .zip(to_parameter_types.iter())
+                        .all(|(from, to)| Self::is_assignable_to(from, to))
+                    && Self::is_assignable_to(return_type, to_return_type)
+            }
+            _ => false,
+        }
     }
 
     // Utils
